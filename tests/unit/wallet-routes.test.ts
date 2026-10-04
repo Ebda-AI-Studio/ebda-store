@@ -197,7 +197,7 @@ describe('admin adjust', () => {
     [{ amount: 500, note: '   ', idempotencyKey: KEY }, 'blank note'],
     [{ amount: 500, idempotencyKey: KEY }, 'missing note'],
     [{ amount: 0, note: 'x', idempotencyKey: KEY }, 'zero amount'],
-    [{ amount: 1.5, note: 'x', idempotencyKey: KEY }, 'fractional fils'],
+    [{ amount: 1.5, note: 'x', idempotencyKey: KEY }, 'fractional piastres'],
     [{ amount: 500, note: 'x' }, 'missing idempotency key'],
   ])('rejects %j (%s) before touching the wallet', async (body, _label) => {
     const res = await request(app).post(path).send(body);

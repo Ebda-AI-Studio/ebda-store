@@ -15,6 +15,7 @@ import {
 import { JsonLd } from '../../../components/JsonLd';
 import BundleDetailClient from './BundleDetailClient';
 
+import { fromMinor, REGION } from '@force/shared';
 /**
  * Bundle detail (PDP-equivalent for a fixed kit) page body — mirrors
  * `products/[slug]/ProductDetailBody.tsx`'s server/client split (server
@@ -88,8 +89,8 @@ export function buildBundleMetadata(
   const description =
     rawDescription?.slice(0, 160) ||
     (locale === 'ar'
-      ? `تسوق ${localizedName} من ${localizedStoreName}. توصيل سريع في الكويت.`
-      : `Buy ${localizedName} at ${localizedStoreName}. Fast delivery in Kuwait.`);
+      ? `تسوق ${localizedName} من ${localizedStoreName}. توصيل سريع في مصر.`
+      : `Buy ${localizedName} at ${localizedStoreName}. Fast delivery in Egypt.`);
   const canonicalUrl = storeAbsoluteUrl(
     { slug: storeSlug, domain: storeDomain },
     `/bundles/${bundle.slug}`
@@ -119,8 +120,8 @@ export function buildBundleMetadata(
       ...(ogImages.length ? { images: [ogImages[0].url] } : {}),
     },
     other: {
-      'product:price:amount': String(bundle.price / 1000),
-      'product:price:currency': 'KWD',
+      'product:price:amount': String(fromMinor(bundle.price)),
+      'product:price:currency': REGION.currency,
     },
   };
 }

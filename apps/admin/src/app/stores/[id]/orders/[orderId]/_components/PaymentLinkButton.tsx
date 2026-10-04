@@ -14,7 +14,7 @@ interface PaymentLinkButtonProps {
   /**
    * Existing payment URL from a prior `PaymentService.createPayment`
    * call on this order. When present (typical for WhatsApp-origin
-   * orders that minted a MyFatoorah link at creation), the button
+   * orders that minted a link at creation), the button
    * surfaces the existing link first with a Copy/Open action AND
    * exposes a smaller "Issue a new link" option. Without this prop
    * the original modal flow runs unchanged.
@@ -24,20 +24,18 @@ interface PaymentLinkButtonProps {
 
 interface PaymentLinkResult {
   paymentUrl: string;
+  /** Fawry: the reference code the customer pays at an outlet (no URL). */
+  instruction?: { kind: string; code?: string };
   invoiceId?: string;
-  notifyVia: 'link' | 'email' | 'all';
-  customerEmail?: string;
+  notifyVia: 'link';
 }
 
 /**
- * Self-contained "Issue MyFatoorah Payment Link" button + modal. Used
- * by the order detail page's action footer when a customer needs a
- * pay-by-link (e.g. KNET timeout, gateway blocked, abandoned cart).
- *
- * Two channels exposed: 'link' (copy + share manually) and 'email'
- * (MyFatoorah sends the email natively). SMS deliberately not surfaced
- * yet per Ahmad 2026-05-16. The backend endpoint accepts 'all' too
- * but we don't show it here until SMS is on the table.
+ * Self-contained "Issue Payment Link" button + modal. Used by the order detail
+ * page's action footer when a customer needs a pay-by-link (gateway blocked,
+ * abandoned cart). The link is made by the store's default payment gateway and
+ * is copied and shared by the merchant: none of the Egyptian gateways sends the
+ * customer a message for us, so 'link' is the only channel.
  */
 export function PaymentLinkButton({
   storeId,
@@ -66,21 +64,18 @@ export function PaymentLinkButton({
     }
   };
 
-  const issue = async (notifyVia: 'link' | 'email') => {
+  const issue = async () => {
     setIsIssuing(true);
     try {
       const { data, error: apiError } = await apiPost<PaymentLinkResult>(
         `/api/v1/stores/${storeId}/orders/${orderId}/payment-link`,
-        { notifyVia }
+        { notifyVia: 'link' }
       );
       if (apiError || !data) {
         toastError(t('issueFailed'), apiError?.message ?? '');
         return;
       }
       setResult(data);
-      if (notifyVia === 'email') {
-        toastSuccess(t('emailSent', { email: data.customerEmail ?? t('customerFallback') }));
-      }
     } catch (e) {
       toastError(
         t('issueFailed'),
@@ -92,9 +87,10 @@ export function PaymentLinkButton({
   };
 
   const copyLink = async () => {
-    if (!result?.paymentUrl) return;
+    const text = result?.paymentUrl || result?.instruction?.code;
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(result.paymentUrl);
+      await navigator.clipboard.writeText(text);
       toastSuccess(t('linkCopied'));
     } catch {
       toastError(t('clipboardError'));
@@ -263,7 +259,7 @@ export function PaymentLinkButton({
                 <div className="space-y-3">
                   <button
                     type="button"
-                    onClick={() => issue('link')}
+                    onClick={() => issue()}
                     disabled={isIssuing}
                     className="w-full rounded-xl border-2 border-primary bg-primary/5 p-4 text-start hover:bg-primary/10 disabled:opacity-60 transition-colors cursor-pointer"
                   >
@@ -292,36 +288,6 @@ export function PaymentLinkButton({
                       </div>
                     </div>
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={() => issue('email')}
-                    disabled={isIssuing}
-                    className="w-full rounded-xl border-2 border-border bg-background p-4 text-start hover:border-info hover:bg-info/5 disabled:opacity-60 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-start gap-3">
-                      <svg
-                        className="h-5 w-5 flex-shrink-0 text-info mt-0.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        aria-hidden
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                        />
-                      </svg>
-                      <div>
-                        <p className="font-semibold text-foreground">{t('option.email.title')}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {t('option.email.description')}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
                 </div>
 
                 {isIssuing && (
@@ -331,11 +297,7 @@ export function PaymentLinkButton({
             ) : (
               <div className="space-y-4">
                 <div className="rounded-xl bg-success/10 border border-success/20 p-4">
-                  <p className="text-sm font-semibold text-success-ink">
-                    {result.notifyVia === 'email'
-                      ? t('successEmailSent', { email: result.customerEmail ?? '' })
-                      : t('successGenerated')}
-                  </p>
+                  <p className="text-sm font-semibold text-success-ink">{t('successGenerated')}</p>
                 </div>
 
                 <div>
@@ -346,7 +308,7 @@ export function PaymentLinkButton({
                     <input
                       type="text"
                       readOnly
-                      value={result.paymentUrl}
+                      value={result.paymentUrl || result.instruction?.code || ''}
                       className="flex-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-foreground focus:outline-none"
                       onFocus={e => e.currentTarget.select()}
                       dir="ltr"

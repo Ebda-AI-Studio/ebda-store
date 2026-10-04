@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const t = useT('dashboard.super');
   const router = useRouter();
   const { user } = useAuth();
-  const { selectedStoreId, stores: globalStores } = useStore();
+  const { selectedStoreId, stores: globalStores, isLoading: storesLoading } = useStore();
   const storeName =
     selectedStoreId !== 'all' ? globalStores.find(s => s.id === selectedStoreId)?.name : null;
   const [stats, setStats] = useState<PlatformStats | null>(null);
@@ -34,10 +34,16 @@ export default function DashboardPage() {
   // store-scoped admin shell takes over.
   useEffect(() => {
     if (user?.role !== 'store_admin') return;
+    // A self-serve merchant who has not created a store yet lands in the
+    // onboarding stepper, not on an empty platform dashboard.
+    if (!storesLoading && globalStores.length === 0) {
+      router.replace('/onboarding');
+      return;
+    }
     if (globalStores.length === 0) return;
     const target = globalStores[0];
     if (target?.id) router.replace(`/stores/${target.id}`);
-  }, [user?.role, globalStores, router]);
+  }, [user?.role, globalStores, storesLoading, router]);
 
   useEffect(() => {
     // Don't fetch the platform dashboard while we're about to redirect

@@ -3,7 +3,7 @@
 // not just the query — see GATED_STORE_IDS below). palora is logged but NOT
 // gated (adopts minimal baseline).
 //   run:  node packages/database/scripts/verify-baseline-nodrift.mjs
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '@force/database';
 import { resolveLayoutSettings } from '@force/shared';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -66,7 +66,7 @@ export const GATED_STORE_COUNT = GATED_STORE_IDS.size + GATED_STORE_SLUGS.size;
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 async function main() {
-  const prisma = new PrismaClient();
+  const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
   const stores = await prisma.store.findMany({
     where: {
       OR: [

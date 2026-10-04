@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ebda-workers-api-spike",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      // Placeholder id: only used for a deployed Hyperdrive config. Local dev/tests use localConnectionString.
+      "id": "00000000000000000000000000000000",
+      // pgbouncer (transaction pool_mode, pool_size=2) as the non-bypass role ebda_app. Fake dev password.
+      "localConnectionString": "postgresql://ebda_app:ebda_app_dev_only@127.0.0.1:6432/ebda_spike"
+    }
+  ],
+  "vars": {
+    "BASE_DOMAIN": "ebda.app",
+    // Dev-only fake webhook secrets (real ones would be `wrangler secret`).
+    "WEBHOOK_SECRET_FAKEPAY": "dev-only-not-a-real-secret",
+    "DEBUG_HEADERS": "0"
+  }
+}

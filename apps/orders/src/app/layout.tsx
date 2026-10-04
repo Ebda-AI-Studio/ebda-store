@@ -1,15 +1,16 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Providers } from './providers';
+import { BRAND } from '@force/shared';
 
 export const metadata: Metadata = {
-  title: 'Force AI Store Orders',
-  description: 'Focused order management for your Force AI Store.',
+  title: `${BRAND.name} Orders`,
+  description: `Focused order management for your ${BRAND.name} store.`,
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Force AI Store Orders',
+    title: `${BRAND.name} Orders`,
   },
   robots: { index: false, follow: false },
   icons: {
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#ff6e00',
+  themeColor: BRAND.colors.night,
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,

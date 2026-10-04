@@ -1,6 +1,6 @@
 /**
  * Unit tests: the xlsx->csv converter must NOT drop variant rows (which have
- * no name) and must pass the variant columns through, with KWD->fils on price.
+ * no name) and must pass the variant columns through, with EGP->piastres on price.
  */
 import { describe, it, expect } from 'vitest';
 import ExcelJS from 'exceljs';
@@ -29,10 +29,18 @@ describe('xlsx variant passthrough', () => {
     expect(csv).toContain('1 Kg');
   });
 
-  it('converts variant price KWD -> fils', async () => {
+  it('converts variant price EGP -> piastres', async () => {
     const buf = await sheetToBuffer([header, ['', 'D1-1kg', '4.5', 'D1', 'Size', '1 Kg']]);
     const csv = await xlsxBufferToImportCsv(buf);
-    expect(csv).toContain('4500'); // 4.5 KWD -> 4500 fils
+    expect(csv).toContain('450'); // 4.5 EGP -> 450 piastres
+  });
+
+  it('REJECTS a price with more than 2 decimals instead of rounding it (sentinel NaN → bulk validator flags it)', async () => {
+    const buf = await sheetToBuffer([header, ['Item', 'S1', '1.999', '', '', '']]);
+    const csv = await xlsxBufferToImportCsv(buf);
+    expect(csv).toContain('NaN');
+    expect(csv).not.toContain('199');
+    expect(csv).not.toContain('200');
   });
 
   it('still drops a truly empty/nameless row with no parentSku', async () => {

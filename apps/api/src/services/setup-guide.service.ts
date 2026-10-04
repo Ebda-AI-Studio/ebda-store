@@ -1,0 +1,128 @@
+/**
+ * Setup-guide checklist state (SP5 self-serve onboarding).
+ *
+ * Persisted per store in `stores.settings.setupGuide`:
+ *   { manual: { [key]: boolean }, dismissed: boolean }
+ * `done` for each item is DERIVED from real store data wherever a reliable
+ * signal exists (see SETUP_GUIDE_ITEMS), so the list can never claim a product
+ * exists when it does not. Manual ticks cover only items with no data signal
+ * (share) or an explicit merchant decision (payment confirmed, domain skipped).
+ *
+ * Must run inside the store's tenant context (products, orders and shipping
+ * zones are RLS-protected): routes mount it behind `tenantContext`; other
+ * callers wrap it in `readInStoreContext`.
+ */
+import { prisma } from '@force/database';
+import {
+  SETUP_GUIDE_ITEMS,
+  isSetupGuideKey,
+  type SetupGuideKey,
+  type SetupGuideState,
+} from '@force/shared';
+import { AppError } from '../middleware/error-handler';
+
+interface StoredGuide {
+  manual?: Record<string, boolean>;
+  dismissed?: boolean;
+}
+
+function readStored(settings: unknown): StoredGuide {
+  const raw = (settings as { setupGuide?: unknown } | null)?.setupGuide;
+  return raw && typeof raw === 'object' ? (raw as StoredGuide) : {};
+}
+
+function hasBrandColor(theme: unknown): boolean {
+  const t = theme as { primaryColor?: unknown; primary?: unknown } | null;
+  return (
+    (typeof t?.primaryColor === 'string' && t.primaryColor.length > 0) ||
+    (typeof t?.primary === 'string' && t.primary.length > 0)
+  );
+}
+
+export class SetupGuideService {
+  static async get(storeId: string): Promise<SetupGuideState> {
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { logo: true, theme: true, domain: true, settings: true },
+    });
+    if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+
+    const [products, zones, orders, otherMethods] = await Promise.all([
+      prisma.product.count({ where: { storeId, deletedAt: null } }),
+      prisma.shippingZone.count({ where: { storeId, isActive: true } }),
+      prisma.order.count({ where: { storeId } }),
+      prisma.paymentConfig.count({ where: { storeId, isEnabled: true, provider: { not: 'cod' } } }),
+    ]);
+
+    const stored = readStored(store.settings);
+    const manual = stored.manual ?? {};
+
+    const fromData: Record<SetupGuideKey, boolean> = {
+      add_product: products > 0,
+      brand: !!store.logo || hasBrandColor(store.theme),
+      shipping: zones > 0,
+      // COD is on by default, so "enabled" alone proves nothing: payment is
+      // done when the merchant confirmed it (onboarding step / explicit tick)
+      // or has switched on a non-COD gateway.
+      payment: otherMethods > 0,
+      domain: !!store.domain,
+      test_order: orders > 0,
+      share: false,
+    };
+
+    const items = SETUP_GUIDE_ITEMS.map(def => {
+      const data = def.auto ? fromData[def.key] : false;
+      const ticked = def.manual && manual[def.key] === true;
+      return {
+        key: def.key,
+        done: data || ticked,
+        fromData: data,
+        optional: def.optional,
+        manual: def.manual,
+      };
+    });
+    const required = items.filter(i => !i.optional);
+    return {
+      items,
+      doneCount: items.filter(i => i.done).length,
+      totalCount: items.length,
+      requiredDone: required.filter(i => i.done).length,
+      requiredTotal: required.length,
+      dismissed: stored.dismissed === true,
+    };
+  }
+
+  /** Tick / untick a manual item. Data-derived-only items are refused. */
+  static async setManual(storeId: string, key: string, done: boolean): Promise<SetupGuideState> {
+    if (!isSetupGuideKey(key)) throw new AppError(400, 'INVALID_GUIDE_ITEM', 'Unknown guide item');
+    const def = SETUP_GUIDE_ITEMS.find(d => d.key === key)!;
+    if (!def.manual) {
+      throw new AppError(
+        400,
+        'AUTO_GUIDE_ITEM',
+        'This item completes automatically from your data'
+      );
+    }
+    // One atomic statement: concurrent ticks from two tabs cannot clobber each
+    // other (no read-modify-write of the whole settings blob).
+    await prisma.$executeRaw`
+      UPDATE stores SET settings = jsonb_set(
+        COALESCE(settings, '{}'::jsonb), '{setupGuide}',
+        COALESCE(settings->'setupGuide', '{}'::jsonb) || jsonb_build_object(
+          'manual', COALESCE(settings->'setupGuide'->'manual', '{}'::jsonb)
+                    || jsonb_build_object(${key}::text, ${done}::boolean)
+        ), true)
+      WHERE id = ${storeId}`;
+    return this.get(storeId);
+  }
+
+  static async setDismissed(storeId: string, dismissed: boolean): Promise<SetupGuideState> {
+    await prisma.$executeRaw`
+      UPDATE stores SET settings = jsonb_set(
+        COALESCE(settings, '{}'::jsonb), '{setupGuide}',
+        COALESCE(settings->'setupGuide', '{}'::jsonb)
+          || jsonb_build_object('dismissed', ${dismissed}::boolean), true)
+      WHERE id = ${storeId}`;
+    return this.get(storeId);
+  }
+}

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { OrderSummaryProps } from '../types';
 import { useOrderSummaryBase } from '../shared/useOrderSummaryBase';
 
+import { REGION } from '@force/shared';
 export default function MinimalOrderSummary({
   subtotal,
   discount = 0,
@@ -15,7 +16,7 @@ export default function MinimalOrderSummary({
   taxRatePercent = 0,
   taxIncludedInPrice = false,
   total,
-  currency = 'KWD',
+  currency = REGION.currency,
   isRtl: isRtlProp,
   children,
   ctaLabel,

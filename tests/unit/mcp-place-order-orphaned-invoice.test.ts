@@ -1,7 +1,7 @@
 /**
- * issue 2360 (agent path) — `place_order` (online) calls the gateway from
- * inside its payment wrap. If that wrap's COMMIT fails after the provider
- * ACCEPTED, the order is rolled back but the invoice stays live at the
+ * issue 2360 (agent path) — `place_order` (online) asks the gateway, then records the
+ * payment in a short wrap (SP6b: the gateway call itself holds no transaction). If that
+ * wrap's COMMIT fails after the provider ACCEPTED, the order is rolled back but the invoice stays live at the
  * gateway with no Payment row behind it. The catch must name it in a P1
  * (`alertOrphanedProviderInvoice`) so an operator can void it.
  *
@@ -28,7 +28,11 @@ vi.mock('@api/services/order.service', () => ({
   OrderService: { create: vi.fn(), rollbackForPaymentFailure: vi.fn() },
 }));
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
-  PaymentService: { getDefaultProvider: vi.fn(), createPayment: vi.fn() },
+  PaymentService: {
+    getDefaultProvider: vi.fn(),
+    requestProviderPayment: vi.fn(),
+    recordProviderPayment: vi.fn(),
+  },
 }));
 vi.mock('@api/services/payment-providers/orphaned-invoice-alert', () => ({
   alertOrphanedProviderInvoice: (...a: unknown[]) => h.orphanAlert(...a),
@@ -63,8 +67,8 @@ function harness() {
   return { server, tools };
 }
 
-const store = { id: 'store-1', name: 'Demo Store', slug: 'demo', currency: 'KWD', domain: null };
-const customer = { name: 'Sara Ali', address: 'Block 1, Street 2', country: 'KW' };
+const store = { id: 'store-1', name: 'Demo Store', slug: 'demo', currency: 'EGP', domain: null };
+const customer = { name: 'Sara Ali', address: 'Block 1, Street 2', country: 'EG' };
 
 async function placeOnline() {
   const { server, tools } = harness();
@@ -80,17 +84,21 @@ describe('MCP place_order (online) — orphaned gateway invoice (issue 2360)', (
     vi.clearAllMocks();
     h.wrapCalls = 0;
     h.failPaymentCommit = false;
-    vi.mocked(PaymentService.getDefaultProvider).mockResolvedValue('tap' as never);
-    vi.mocked(PaymentService.createPayment).mockResolvedValue({
-      transactionId: 'chg_1',
-      paymentUrl: 'https://pay.example/abc',
-      provider: 'tap',
+    vi.mocked(PaymentService.getDefaultProvider).mockResolvedValue('paymob' as never);
+    vi.mocked(PaymentService.requestProviderPayment).mockResolvedValue({
+      providerName: 'paymob',
+      response: {
+        transactionId: 'chg_1',
+        paymentUrl: 'https://pay.example/abc',
+        provider: 'paymob',
+      },
     } as never);
+    vi.mocked(PaymentService.recordProviderPayment).mockResolvedValue(undefined);
     vi.mocked(OrderService.create).mockResolvedValue({
       id: 'order-1',
       orderNumber: 'ORD-1',
       total: 12000,
-      currency: 'KWD',
+      currency: 'EGP',
       items: [],
     } as never);
   });
@@ -108,7 +116,7 @@ describe('MCP place_order (online) — orphaned gateway invoice (issue 2360)', (
       expect.objectContaining({
         storeId: 'store-1',
         orderId: 'order-1',
-        provider: 'tap',
+        provider: 'paymob',
         transactionId: 'chg_1',
         source: 'agent',
       })
@@ -116,7 +124,9 @@ describe('MCP place_order (online) — orphaned gateway invoice (issue 2360)', (
   });
 
   it('provider rejected → rolled back, no orphaned-invoice alert', async () => {
-    vi.mocked(PaymentService.createPayment).mockRejectedValueOnce(new Error('gateway 400'));
+    vi.mocked(PaymentService.requestProviderPayment).mockRejectedValueOnce(
+      new Error('gateway 400')
+    );
     await expect(placeOnline()).rejects.toThrow(/gateway 400/);
     expect(OrderService.rollbackForPaymentFailure).toHaveBeenCalled();
     expect(h.orphanAlert).not.toHaveBeenCalled();

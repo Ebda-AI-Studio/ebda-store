@@ -1,9 +1,8 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { publicLimiter } from '../middleware/security';
 import { featureService } from '../services/feature.service';
+import { runInStoreScope } from '@force/database';
 import { resolveStoreBySlug } from '../mcp/resolve-store';
-import { buildStoreMcpServer } from '../mcp/store-mcp-server';
 import { classifyToolCall, resolveAgentAuth } from '../mcp/agent-auth';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
@@ -97,6 +96,12 @@ async function handleMcpPost(req: Request, res: Response): Promise<void> {
   // credential is compared against exactly one, already-resolved tenant.
   req.auth = await resolveAgentAuth(req, store);
 
+  // Loaded on first MCP call, not at boot: the SDK, its zod schemas and the tool modules are
+  // ~10 MB of isolate heap that a Worker serving no MCP traffic should not pay for.
+  const [{ StreamableHTTPServerTransport }, { buildStoreMcpServer }] = await Promise.all([
+    import('@modelcontextprotocol/sdk/server/streamableHttp.js'),
+    import('../mcp/store-mcp-server.js'),
+  ]);
   const server = buildStoreMcpServer(store);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   res.on('close', () => {
@@ -104,7 +109,11 @@ async function handleMcpPost(req: Request, res: Response): Promise<void> {
     void server.close();
   });
   await server.connect(transport);
-  await transport.handleRequest(req, res, req.body);
+  // Strict RLS: every storefront read/write the tools make (`cart`, `catalog`, ...)
+  // needs the store GUC. `runInStoreScope` sets it per QUERY in a short transaction (no
+  // long-lived one is held open across `place_order`'s payment-gateway call), and the
+  // tools that open their own tenant transaction still nest correctly inside it.
+  await runInStoreScope(store.id, () => transport.handleRequest(req, res, req.body));
 }
 
 router.post('/:storeSlug', (req, res, next) => {

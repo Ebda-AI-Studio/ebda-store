@@ -11,6 +11,8 @@ import logger from '../lib/logger';
 import { maskEmailList } from '../lib/pii-mask';
 import { sendAlert } from './alerts.service';
 import { CORRUPT_CAP, replayDeadLetters, setAsideUnreadable } from '../lib/dead-letter';
+import { isWorkers } from '../lib/runtime';
+import { cfBindings } from '../cf/bindings';
 
 export interface QueuedEmail {
   id: string;
@@ -67,7 +69,17 @@ class EmailQueueService {
       createdAt: new Date().toISOString(),
     };
 
-    if (redis.isAvailable()) {
+    if (isWorkers) {
+      // Cloudflare Queues: durable, at-least-once, retried by the platform, dead-lettered
+      // into `ebda-email-dlq` (see `deliver` / `parkDeadLetter`, wired in cf/queues.ts).
+      const queue = cfBindings()?.EMAIL_QUEUE;
+      if (queue) {
+        await queue.send(queuedEmail, { contentType: 'json' });
+      } else {
+        logger.warn('[EMAIL QUEUE] EMAIL_QUEUE binding missing, sending immediately');
+        await this.sendEmail(queuedEmail, { inline: true });
+      }
+    } else if (redis.isAvailable()) {
       await redis.getClient()?.lpush(QUEUE_KEY, JSON.stringify(queuedEmail));
     } else {
       // Fallback: send immediately if Redis is not available. There is no
@@ -80,6 +92,32 @@ class EmailQueueService {
     }
 
     return id;
+  }
+
+  /**
+   * Cloudflare Queues consumer: ONE attempt, and it THROWS on failure so the platform
+   * retries the message (`max_retries`, `retry_delay` in wrangler.jsonc) and, once those
+   * are spent, moves it to the dead-letter queue (`parkDeadLetter`).
+   */
+  async deliver(email: QueuedEmail): Promise<void> {
+    await this.sendEmail(email, { inline: true });
+  }
+
+  /**
+   * Dead-letter queue consumer: park the exhausted email on the `email:failed` list the
+   * super-admin Email queue page reads (replayable), and page an operator. Cloudflare Queues
+   * has no API to browse a DLQ, which is why the list is the read side.
+   */
+  async parkDeadLetter(email: QueuedEmail, why = 'max attempts reached'): Promise<void> {
+    let parked = false;
+    if (redis.isAvailable()) {
+      parked = await (
+        redis.getClient()?.lpush(FAILED_KEY, JSON.stringify(email)) ?? Promise.resolve(null)
+      )
+        .then(r => r !== null)
+        .catch(() => false);
+    }
+    await this.reportPermanentFailure(email, why, parked ? 'listed' : 'lost');
   }
 
   /**
@@ -188,7 +226,7 @@ class EmailQueueService {
       if (opts.inline) {
         logger.error(
           { emailId: email.id, storeId: email.storeId, err: error },
-          '[EMAIL QUEUE] Inline send failed (Redis unavailable) — rethrowing to the caller'
+          '[EMAIL QUEUE] Send failed (inline, or a Queues consumer attempt) — rethrowing to the caller'
         );
         throw error;
       }
@@ -373,8 +411,22 @@ class EmailQueueService {
     const client = redis.getClient();
     if (!client) return { retried: 0, skipped: 0, kept: 0 };
 
+    // Workers: "re-queue" means producing to Cloudflare Queues, not LPUSH-ing a list nobody consumes.
+    const queue = isWorkers ? cfBindings()?.EMAIL_QUEUE : undefined;
+    const replayClient = queue
+      ? {
+          lpush: (key: string, value: string) =>
+            key === QUEUE_KEY
+              ? queue.send(JSON.parse(value), { contentType: 'json' })
+              : client.lpush(key, value),
+          rpop: (key: string) => client.rpop(key),
+          llen: (key: string) => client.llen(key),
+          ltrim: (key: string, a: number, b: number) => client.ltrim(key, a, b),
+          expire: (key: string, s: number) => client.expire(key, s),
+        }
+      : client;
     const { retried, skipped, kept, lost } = await replayDeadLetters<QueuedEmail>(
-      client,
+      replayClient,
       { failed: FAILED_KEY, corrupt: FAILED_CORRUPT_KEY, queue: QUEUE_KEY },
       isQueuedEmail,
       logger

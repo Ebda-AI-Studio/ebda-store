@@ -114,7 +114,7 @@ function abandonedOrderRow(overrides: Partial<Record<string, unknown>> = {}) {
     status: 'pending',
     paymentStatus: 'pending',
     total: 1500,
-    currency: 'KWD',
+    currency: 'EGP',
     paymentGatewayAbandonedAt: new Date('2026-09-20T10:00:00.000Z'),
     createdAt: new Date('2026-09-20T09:55:00.000Z'),
     shippingAddress: null,
@@ -125,7 +125,7 @@ function abandonedOrderRow(overrides: Partial<Record<string, unknown>> = {}) {
       email: 'sara@example.com',
       phone: '+965 9876 5432',
     },
-    payments: [{ provider: 'tap', paymentUrl: 'https://pay.tap.company/x', status: 'pending' }],
+    payments: [{ provider: 'kashier', paymentUrl: 'https://pay.tap.company/x', status: 'pending' }],
     items: [
       {
         id: 'item-1',
@@ -196,7 +196,7 @@ describe('GET /payment-abandonments — masked contact, never the raw value', ()
 
     expect(res.status).toBe(200);
     const row = res.body.data.abandoners[0];
-    expect(row.gateway).toBe('tap');
+    expect(row.gateway).toBe('kashier');
     expect(row.itemCount).toBe(1);
     expect(row.items).toEqual([
       {

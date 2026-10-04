@@ -215,10 +215,10 @@ describe('OrderService', () => {
       firstName: 'Test',
       lastName: 'Customer',
       address1: '123 Test St',
-      city: 'Kuwait City',
+      city: 'Cairo',
       state: 'Capital',
       postalCode: '12345',
-      country: 'Kuwait',
+      country: 'Egypt',
     },
     items: [
       {
@@ -364,10 +364,10 @@ describe('OrderService', () => {
         firstName: 'Test',
         lastName: 'Customer',
         address1: '123 Test St',
-        city: 'Kuwait City',
+        city: 'Cairo',
         state: 'Capital',
         postalCode: '12345',
-        country: 'Kuwait',
+        country: 'Egypt',
       },
       paymentMethod: 'cod',
     };
@@ -825,8 +825,8 @@ describe('OrderService', () => {
         vi.mocked(prisma.coupon.findFirst).mockResolvedValue(mockCoupon as any);
         vi.mocked(prisma.promotion.findMany).mockResolvedValue([mockPromotion] as any);
 
-        // Cart subtotal is 10000 fils (2 * 5000). Both levers discount
-        // exactly 1000 fils — a genuine tie, not just an equal-looking input.
+        // Cart subtotal is 10000 piastres (2 * 5000). Both levers discount
+        // exactly 1000 piastres — a genuine tie, not just an equal-looking input.
         let capturedOrderData: Record<string, unknown> | undefined;
         vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
           if (typeof fn === 'function') {
@@ -926,12 +926,12 @@ describe('OrderService', () => {
         scopeCategoryIds: [],
       };
 
-      it('promotion (3000 fils) strictly beats coupon (1000 fils) → promotion wins, coupon unused', async () => {
+      it('promotion (3000 piastres) strictly beats coupon (1000 piastres) → promotion wins, coupon unused', async () => {
         vi.mocked(prisma.coupon.findFirst).mockResolvedValue(mockCoupon as any);
         vi.mocked(prisma.promotion.findMany).mockResolvedValue([mockPromotion] as any);
 
-        // Cart subtotal is 10000 fils (2 * 5000). Coupon discounts 1000 fils,
-        // promotion discounts 3000 fils — a genuine, non-tied strict win.
+        // Cart subtotal is 10000 piastres (2 * 5000). Coupon discounts 1000 piastres,
+        // promotion discounts 3000 piastres — a genuine, non-tied strict win.
         let capturedOrderData: Record<string, unknown> | undefined;
         vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
           if (typeof fn === 'function') {
@@ -1000,10 +1000,10 @@ describe('OrderService', () => {
         firstName: 'Test',
         lastName: 'Customer',
         address1: '123 Test St',
-        city: 'Kuwait City',
+        city: 'Cairo',
         state: 'Capital',
         postalCode: '12345',
-        country: 'Kuwait',
+        country: 'Egypt',
       } as Record<string, unknown>,
       items: [{ productId: 'prod-123', quantity: 1 }],
       paymentMethod: 'cod' as const,

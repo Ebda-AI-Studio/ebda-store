@@ -40,7 +40,7 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('@api/config', () => ({
-  config: { webUrl: 'https://store.force-ai.co', encryptionKey: 'k'.repeat(32) },
+  config: { webUrl: 'https://ebda.app', encryptionKey: 'k'.repeat(32) },
 }));
 
 import { abandonedCartService } from '@api/services/abandoned-cart.service';
@@ -105,7 +105,9 @@ describe('abandoned-cart reminders carry no recovery link (issue 2035)', () => {
     });
     const sql = (h.queryRaw.mock.calls[0][0] as TemplateStringsArray).join('?');
     expect(sql).toMatch(/JOIN public\.orders o ON o\.id = ac\.recovered_order_id/);
-    expect(sql).toMatch(/o\.status NOT IN \('cancelled', 'refunded'\)/);
+    expect(sql).toMatch(
+      /o\.status NOT IN \('cancelled', 'refunded', 'awaiting_payment_confirmation'\)/
+    );
     expect(sql).toMatch(/o\.payment_status <> 'failed'/);
     expect(h.queryRaw.mock.calls[0].slice(1)).toEqual(['store-1', 'store-1']);
   });

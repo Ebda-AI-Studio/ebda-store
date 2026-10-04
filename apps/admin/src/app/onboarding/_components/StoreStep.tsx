@@ -1,0 +1,164 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { Button, Input } from '@force/ui';
+import { validateStoreSlug } from '@force/shared';
+import { apiGet, apiPost } from '../../../lib/api';
+import { suggestSlug } from '../../../lib/onboarding-validation';
+import { useT } from '@/i18n/useT';
+import type { OnboardingStore, SlugCheck } from './types';
+
+type SlugUi =
+  | { kind: 'idle' }
+  | { kind: 'checking' }
+  | { kind: 'available'; host: string }
+  | {
+      kind: 'problem';
+      key: 'taken' | 'reserved' | 'protected' | 'tooShort' | 'tooLong' | 'invalid';
+    };
+
+const REASON_KEY = {
+  SLUG_TAKEN: 'taken',
+  SLUG_RESERVED: 'reserved',
+  SLUG_PROTECTED: 'protected',
+  SLUG_TOO_SHORT: 'tooShort',
+  SLUG_TOO_LONG: 'tooLong',
+  SLUG_INVALID_CHARS: 'invalid',
+  SLUG_INVALID_HYPHEN: 'invalid',
+} as const;
+
+const DEBOUNCE_MS = 400;
+
+export function StoreStep({ onCreated }: { onCreated: (store: OnboardingStore) => void }) {
+  const t = useT('onboarding.flow.store');
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [slugUi, setSlugUi] = useState<SlugUi>({ kind: 'idle' });
+  const [nameError, setNameError] = useState('');
+  const [formError, setFormError] = useState('');
+  const [creating, setCreating] = useState(false);
+  // Only the newest availability answer may update the UI.
+  const latest = useRef(0);
+
+  useEffect(() => {
+    if (!slug) {
+      setSlugUi({ kind: 'idle' });
+      return;
+    }
+    // Format and reserved list are checked locally (same rules as the API) so
+    // an obviously bad address never costs a request.
+    const local = validateStoreSlug(slug);
+    if (!local.ok) {
+      setSlugUi({ kind: 'problem', key: REASON_KEY[local.code] });
+      return;
+    }
+    const ticket = ++latest.current;
+    setSlugUi({ kind: 'checking' });
+    const timer = setTimeout(async () => {
+      const { data, error } = await apiGet<SlugCheck>(
+        `/api/v1/onboarding/slug-check?slug=${encodeURIComponent(slug)}`
+      );
+      if (ticket !== latest.current) return;
+      if (error || !data) {
+        setSlugUi({ kind: 'idle' });
+      } else if (data.available) {
+        setSlugUi({ kind: 'available', host: data.host });
+      } else {
+        setSlugUi({ kind: 'problem', key: REASON_KEY[data.reason] });
+      }
+    }, DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [slug]);
+
+  function handleName(value: string) {
+    setName(value);
+    setNameError('');
+    if (!slugTouched) setSlug(suggestSlug(value));
+  }
+
+  function handleSlug(value: string) {
+    setSlugTouched(true);
+    setSlug(value.toLowerCase().replace(/\s+/g, '-'));
+  }
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError('');
+    if (!name.trim()) {
+      setNameError(t('nameRequired'));
+      return;
+    }
+    if (slugUi.kind !== 'available') return;
+    setCreating(true);
+    const { data, error } = await apiPost<{ store: OnboardingStore }>('/api/v1/onboarding/store', {
+      name: name.trim(),
+      slug,
+      language: document.documentElement.dir === 'rtl' ? 'ar' : 'en',
+    });
+    setCreating(false);
+    if (error || !data) {
+      if (error?.code === 'SLUG_TAKEN') setSlugUi({ kind: 'problem', key: 'taken' });
+      else if (error?.code === 'SLUG_RESERVED') setSlugUi({ kind: 'problem', key: 'reserved' });
+      else if (error?.code === 'SLUG_PROTECTED') setSlugUi({ kind: 'problem', key: 'protected' });
+      else if (error?.code === 'STORE_DAILY_LIMIT') setFormError(t('dailyLimit'));
+      else if (error?.code === 'STORE_LIMIT_REACHED') setFormError(t('limit'));
+      else setFormError(t('createFailed'));
+      return;
+    }
+    onCreated(data.store);
+  }
+
+  return (
+    <form onSubmit={handleCreate} className="space-y-4" noValidate>
+      <div>
+        <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
+        <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
+      </div>
+      {formError && (
+        <div role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink">
+          {formError}
+        </div>
+      )}
+      <Input
+        id="store-name"
+        label={t('name')}
+        value={name}
+        onChange={e => handleName(e.target.value)}
+        placeholder={t('namePlaceholder')}
+        error={nameError || undefined}
+        autoComplete="organization"
+      />
+      <div>
+        <Input
+          id="store-slug"
+          label={t('slug')}
+          dir="ltr"
+          value={slug}
+          onChange={e => handleSlug(e.target.value)}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          aria-describedby="store-slug-status"
+        />
+        <p id="store-slug-status" role="status" aria-live="polite" className="mt-1 min-h-5 text-sm">
+          {slugUi.kind === 'checking' && (
+            <span className="text-muted-foreground">{t('checking')}</span>
+          )}
+          {slugUi.kind === 'available' && (
+            <span dir="auto" className="text-success-ink">
+              {t('available', { host: slugUi.host })}
+            </span>
+          )}
+          {slugUi.kind === 'problem' && (
+            <span className="text-destructive-ink">{t(slugUi.key)}</span>
+          )}
+        </p>
+        <p className="text-xs text-muted-foreground">{t('slugHelp')}</p>
+      </div>
+      <Button type="submit" className="w-full" disabled={creating || slugUi.kind !== 'available'}>
+        {creating ? t('creating') : t('create')}
+      </Button>
+    </form>
+  );
+}

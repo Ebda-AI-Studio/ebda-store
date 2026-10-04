@@ -2,15 +2,17 @@ import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { Express } from 'express';
 import { config } from '../config';
+import { isWorkers } from '../lib/runtime';
+import { BRAND, BRAND_MARKETING_URL, BRAND_API_URL } from '@force/shared';
 
 const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Force Website Builder API',
+      title: `${BRAND.name} API`,
       version: '1.0.0',
       description: `
-# Force Website Builder API Documentation
+# ${BRAND.name} API Documentation
 
 Multi-tenant e-commerce platform API for managing stores, products, orders, and more.
 
@@ -51,13 +53,13 @@ All errors follow this format:
 | RATE_LIMITED | 429 | Too many requests |
       `,
       contact: {
-        name: 'Force AI',
-        email: 'info@force-ai.co',
-        url: 'https://force-ai.co',
+        name: BRAND.name,
+        email: BRAND.supportEmail,
+        url: BRAND_MARKETING_URL,
       },
       license: {
         name: 'Proprietary',
-        url: 'https://force-ai.co/terms',
+        url: BRAND.legalUrls.terms,
       },
     },
     servers: [
@@ -66,7 +68,7 @@ All errors follow this format:
         description: 'Development server',
       },
       {
-        url: 'https://api.force-ai.co/api/v1',
+        url: `${BRAND_API_URL}/api/v1`,
         description: 'Production server',
       },
     ],
@@ -145,7 +147,7 @@ All errors follow this format:
             slug: { type: 'string' },
             description: { type: 'string', nullable: true },
             descriptionAr: { type: 'string', nullable: true },
-            price: { type: 'integer', description: 'Price in fils (1 KWD = 1000 fils)' },
+            price: { type: 'integer', description: 'Price in piastres (1 EGP = 100 piastres)' },
             compareAtPrice: { type: 'integer', nullable: true },
             sku: { type: 'string', nullable: true },
             // Merchant-authored free-text card badge (EN + AR), same clearable
@@ -337,7 +339,7 @@ All errors follow this format:
             totalProfit: {
               type: 'integer',
               nullable: true,
-              description: 'Fils; null when sold lines have no cost price',
+              description: 'Piastres; null when sold lines have no cost price',
             },
             profitItemsMissingCost: { type: 'integer' },
             profitRevenueMissingCost: { type: 'integer' },
@@ -408,7 +410,7 @@ All errors follow this format:
       { name: 'Analytics', description: 'Store analytics endpoints' },
       { name: 'Payments', description: 'Payment processing endpoints' },
       { name: 'Uploads', description: 'File upload endpoints' },
-      { name: 'AI', description: 'Force AI assistant endpoints' },
+      { name: 'AI', description: 'Ebda assistant endpoints' },
       { name: 'Admin', description: 'Super admin management endpoints' },
     ],
   },
@@ -422,6 +424,11 @@ export function setupSwagger(app: Express) {
   if (process.env.NODE_ENV === 'production') {
     return;
   }
+  // Workers: swagger-jsdoc scans files through fs and swagger-ui serves static
+  // assets from disk. The API reference lives at docs.ebda.app (SP9).
+  if (isWorkers) {
+    return;
+  }
 
   // Serve Swagger UI
   app.use(
@@ -433,7 +440,7 @@ export function setupSwagger(app: Express) {
         .swagger-ui .info { margin-bottom: 30px }
         .swagger-ui .info .title { color: #f97316 }
       `,
-      customSiteTitle: 'Force API Documentation',
+      customSiteTitle: `${BRAND.name} API Documentation`,
       customfavIcon: '/favicon.ico',
       swaggerOptions: {
         persistAuthorization: true,

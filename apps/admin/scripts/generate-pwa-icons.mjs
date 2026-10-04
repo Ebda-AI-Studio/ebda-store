@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * FWB Admin (Force AI Store Admin / FSA) PWA icon generator.
+ * FWB Admin (Ebda Admin / FSA) PWA icon generator.
  *
  * Reads `apps/admin/public/favicon.svg` (orange tile + FSA wordmark, the
  * single source of truth) and writes the six PNG sizes Android / iOS /

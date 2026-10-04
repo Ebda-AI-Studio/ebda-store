@@ -240,11 +240,12 @@ describe('withCircuitBreaker Wrapper', () => {
 });
 
 describe('Pre-registered Circuits', () => {
-  it('should have payment circuits registered', () => {
-    expect(circuitBreaker.getState('payment-tap')).toBeDefined();
-    expect(circuitBreaker.getState('payment-myfatoorah')).toBeDefined();
-    expect(circuitBreaker.getState('payment-hesabe')).toBeDefined();
-    expect(circuitBreaker.getState('payment-upayments')).toBeDefined();
+  it('registers no global per-gateway payment circuit: payment circuits are per (store, provider)', () => {
+    // SP6a/6b: `provider-health.ts` creates `payment:<store>:<provider>` on first use, so one
+    // store's outage never opens another's.
+    for (const provider of ['paymob', 'kashier', 'fawry']) {
+      expect(circuitBreaker.getState(`payment-${provider}`)).toBeUndefined();
+    }
   });
 
   it('should have email circuit registered', () => {

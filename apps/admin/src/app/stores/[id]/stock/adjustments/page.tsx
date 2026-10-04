@@ -10,7 +10,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
-import { reportRangeQueryString } from '@force/shared';
+import { reportRangeQueryString, minorToDecimalString } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -115,8 +115,7 @@ export default function StockAdjustmentsPage() {
       header: t('impact'),
       alignEnd: true,
       cell: adj => {
-        const impact = adj.totalValueImpact / 1000;
-        const impactStr = `${impact >= 0 ? '+' : ''}${impact.toFixed(3)}`;
+        const impactStr = `${adj.totalValueImpact >= 0 ? '+' : ''}${minorToDecimalString(adj.totalValueImpact)}`;
         return (
           <span
             className={`font-mono text-xs font-semibold ${

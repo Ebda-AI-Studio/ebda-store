@@ -12,7 +12,7 @@ import { useCurrentStore } from '@/hooks/useCurrentStore';
  * (see `options`), so opening this card never silently rewrites a valid zone.
  */
 const TIME_ZONES = [
-  'Asia/Kuwait',
+  'Africa/Cairo',
   'Asia/Riyadh',
   'Asia/Dubai',
   'Asia/Qatar',

@@ -89,7 +89,7 @@ describe.skipIf(!hasDb)('soft-deleted products are excluded end to end (#1764)',
       try {
         await OrderService.create(store.storeId, undefined, sessionId, {
           shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
-          paymentMethod: 'myfatoorah',
+          paymentMethod: 'paymob',
         });
       } catch (err) {
         thrown = err as AppError;

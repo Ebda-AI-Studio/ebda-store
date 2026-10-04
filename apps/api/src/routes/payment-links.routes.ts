@@ -2,14 +2,14 @@
  * Merchant-Initiated Payment Links — Phase 7 (rewritten Phase 7.1).
  *
  * Lets a store admin send a customer a WhatsApp message containing a
- * one-tap MyFatoorah hosted-checkout URL. Used for invoices, custom quotes,
+ * one-tap hosted-checkout URL from the store's own gateway. Used for invoices, custom quotes,
  * or any out-of-band order.
  *
  * Flow:
  *   1. Validate input (phone, amount or items)
  *   2. Find-or-create a Customer row
  *   3. Create a draft Order (status=pending, paymentStatus=unpaid)
- *   4. Mint a MyFatoorah payment link via PaymentService.createPayment
+ *   4. Mint a payment link via PaymentService.createPayment (no request transaction)
  *   5. Send the hosted-checkout URL via the WBS paymentLink template
  *
  * Routes:
@@ -26,6 +26,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
+import { storefrontOrigin } from '@force/shared';
 import { z } from 'zod';
 import { prisma } from '@force/database';
 import { config } from '../config';
@@ -41,12 +42,15 @@ import { featureService } from '../services/feature.service';
 import logger from '../lib/logger';
 import type { Currency } from '../services/payment-providers/types';
 
+import { minorToDecimalString, REGION } from '@force/shared';
 const router = Router({ mergeParams: true });
 
 const bodySchema = z
   .object({
     // Customer's phone in E.164 format
-    customerPhone: z.string().regex(/^\+[1-9]\d{6,14}$/, 'Phone must be E.164 (e.g. +96512345678)'),
+    customerPhone: z
+      .string()
+      .regex(/^\+[1-9]\d{6,14}$/, 'Phone must be E.164 (e.g. +201012345678)'),
     customerName: z.string().min(1).max(100).optional(),
     // Items from the catalogue (productId references). Optional when an
     // extraAmount is provided — a payment link can be ALL custom charge
@@ -60,7 +64,7 @@ const bodySchema = z
       )
       .max(50)
       .optional(),
-    // Out-of-catalogue charge in fils. Baked into Order.total + persisted
+    // Out-of-catalogue charge in piastres. Baked into Order.total + persisted
     // as Order.extraAmount. Use for custom quotes, deposits, service fees
     // that don't map to a Product. Either items OR extraAmount (or both)
     // must be provided.
@@ -282,7 +286,7 @@ router.post(
           total: totalFils,
           extraAmount: extraFils,
           extraAmountNote: extraAmountNote || null,
-          currency: store.currency || 'KWD',
+          currency: store.currency || REGION.currency,
           shippingAddress: {
             phone: customerPhone,
             firstName: customer.firstName,
@@ -317,10 +321,8 @@ router.post(
       });
       draftOrderId = draftOrder.id;
 
-      // ── Mint MyFatoorah payment link ───────────────────────────────────────
-      const storefrontBaseUrl = store.domain
-        ? `https://${store.domain}`
-        : `${config.webUrl}/${store.slug}`;
+      // ── Mint the payment link ───────────────────────────────────────
+      const storefrontBaseUrl = storefrontOrigin(store);
 
       const customerDisplayName =
         `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim() || 'Customer';
@@ -328,9 +330,8 @@ router.post(
       // Resolve the store's configured payment provider FIRST so we can
       // build the provider-specific webhook URL. Each provider posts
       // back to /api/v1/webhooks/payment/<provider-name>; hardcoding
-      // /myfatoorah would break Tap / Hesabe / UPayments merchants
-      // because the matching handler verifies provider-specific
-      // signatures.
+      // a fixed name would break merchants on another gateway because
+      // the matching handler verifies provider-specific signatures.
       const providerName = await PaymentService.getDefaultProvider(storeId);
       if (!providerName) {
         // Don't leave the draft Order orphaned — clean it up.
@@ -393,8 +394,8 @@ router.post(
         return;
       }
 
-      const currencyDisplay = language === 'ar' ? 'د.ك' : store.currency || 'KWD';
-      const totalDisplay = (totalFils / 1000).toFixed(3);
+      const currencyDisplay = language === 'ar' ? 'ج.م' : store.currency || REGION.currency;
+      const totalDisplay = minorToDecimalString(totalFils);
       const storeName = language === 'ar' ? store.nameAr || store.name : store.name;
       const customerDisplay = customerName || (language === 'ar' ? 'العميل' : 'Customer');
 
@@ -403,7 +404,7 @@ router.post(
       //   {{2}} order total
       //   {{3}} currency
       //   {{4}} store name
-      //   {{5}} payment URL (MyFatoorah hosted checkout)
+      //   {{5}} payment URL (the gateway's hosted checkout)
       const variables = [customerDisplay, totalDisplay, currencyDisplay, storeName, paymentUrl];
 
       const idempotencyKey = `pl-${storeId}-${draftOrder.id}-${Date.now()}`;
@@ -492,7 +493,7 @@ router.post(
           orderNumber: draftOrder.orderNumber,
           invoiceId: result.invoiceId ?? null,
           totalFils,
-          currency: store.currency || 'KWD',
+          currency: store.currency || REGION.currency,
           messageId: wbsBody.messageId,
           expiresAt: new Date(Date.now() + PAYMENT_LINK_TTL_MS).toISOString(),
         },

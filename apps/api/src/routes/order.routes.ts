@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import ExcelJS from 'exceljs';
+import type ExcelJS from 'exceljs';
+import { loadExcelJS } from '../lib/lazy-modules';
 import {
   neutralizeRowObject,
   addFiltersSheet,
@@ -20,6 +21,10 @@ import {
   exportFilename,
   dayInOffset,
   parseTzOffset,
+  minorToDecimalString,
+  excelMoneyFormat,
+  BRAND,
+  storefrontOrigin,
 } from '@force/shared';
 import { COUPON_OVERRIDE_AUDIT_ACTION } from '../lib/coupon-override';
 import { InvoiceService } from '../services/invoice.service';
@@ -31,10 +36,11 @@ import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { recordPaymentEvent } from '../services/payment-event.service';
+import { InstapayService } from '../services/payment-providers/instapay.service';
 import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
 import { runInTenantContext } from '@force/database';
 import { config } from '../config';
-import type { Currency } from '../services/payment-providers/types';
+import type { Currency, PaymentProvider } from '../services/payment-providers/types';
 import { AppError } from '../middleware/error-handler';
 import { buildPaymentLineItems } from '../lib/payment-line-items';
 import {
@@ -68,7 +74,7 @@ const MAX_ORDERS_SCANNED = 20_000;
  * Date range: the shared report-range contract (`startDate`/`endDate`, ISO
  * instants resolved in the viewer's timezone). The legacy date-only
  * `from`/`to` pair stays accepted for older callers; it is read as a whole
- * UTC day, which is why the admin no longer sends it (a Kuwait
+ * UTC day, which is why the admin no longer sends it (an Egypt
  * merchant's "today" started 3 hours late). Returns null after a 422.
  */
 function parseOrderListFilters(
@@ -215,8 +221,8 @@ router.get(
       const orders = truncated ? fetched.slice(0, MAX_ORDERS_SCANNED) : fetched;
 
       // ---- Build workbook ----
-      const workbook = new ExcelJS.Workbook();
-      workbook.creator = 'Force Website Builder';
+      const workbook = new (await loadExcelJS()).Workbook();
+      workbook.creator = BRAND.name;
       workbook.created = new Date();
 
       const headerStyle: Partial<ExcelJS.Style> = {
@@ -238,19 +244,19 @@ router.get(
         { header: 'Pay Provider', key: 'payProvider', width: 16 },
         { header: 'Pay Method', key: 'payMethod', width: 16 },
         { header: 'Items', key: 'itemCount', width: 8 },
-        { header: 'Subtotal (KWD)', key: 'subtotal', width: 16 },
-        { header: 'Discount (KWD)', key: 'discount', width: 16 },
+        { header: 'Subtotal (EGP)', key: 'subtotal', width: 16 },
+        { header: 'Discount (EGP)', key: 'discount', width: 16 },
         { header: 'Coupon', key: 'coupon', width: 14 },
         { header: 'Promotion', key: 'promotion', width: 18 },
         // Loyalty points' share of Discount (issue 2239) — invisible before.
-        { header: 'Loyalty Discount (KWD)', key: 'loyaltyDiscount', width: 20 },
-        { header: 'Shipping (KWD)', key: 'shipping', width: 16 },
-        { header: 'Tax (KWD)', key: 'tax', width: 12 },
+        { header: 'Loyalty Discount (EGP)', key: 'loyaltyDiscount', width: 20 },
+        { header: 'Shipping (EGP)', key: 'shipping', width: 16 },
+        { header: 'Tax (EGP)', key: 'tax', width: 12 },
         // Issue 2168: for an inclusive order Tax is INSIDE Total, so
         // Subtotal − Discount + Shipping + Tax ≠ Total. This column says which
         // formula reconciles the row.
         { header: 'Tax Included In Price', key: 'taxIncluded', width: 20 },
-        { header: 'Total (KWD)', key: 'total', width: 14 },
+        { header: 'Total (EGP)', key: 'total', width: 14 },
         { header: 'Area', key: 'area', width: 18 },
         { header: 'City', key: 'city', width: 16 },
         { header: 'Country', key: 'country', width: 14 },
@@ -279,9 +285,9 @@ router.get(
         { header: 'SKU', key: 'sku', width: 16 },
         { header: 'Variant', key: 'variant', width: 20 },
         { header: 'Qty', key: 'qty', width: 8 },
-        { header: 'Unit Price (KWD)', key: 'unitPrice', width: 18 },
-        { header: 'Cost Price (KWD)', key: 'costPrice', width: 18 },
-        { header: 'Line Total (KWD)', key: 'lineTotal', width: 18 },
+        { header: 'Unit Price (EGP)', key: 'unitPrice', width: 18 },
+        { header: 'Cost Price (EGP)', key: 'costPrice', width: 18 },
+        { header: 'Line Total (EGP)', key: 'lineTotal', width: 18 },
       ];
 
       const itemsHeader = itemsSheet.getRow(1);
@@ -313,20 +319,20 @@ router.get(
             payProvider: payment?.provider ?? '',
             payMethod: payment?.method ?? '',
             itemCount: order.items?.length ?? 0,
-            subtotal: Number((order.subtotal / 1000).toFixed(3)),
+            subtotal: Number(minorToDecimalString(order.subtotal)),
             // `order.discount` is already the AUTHORITATIVE total (coupon/
             // promotion + loyalty combined) — adding couponDiscount on top
             // double-counted it. See order.service.ts's create() comment on
             // couponDiscount + promotionDiscount + loyaltyDiscount reconciling
             // to `discount`.
-            discount: Number((order.discount / 1000).toFixed(3)),
+            discount: Number(minorToDecimalString(order.discount)),
             coupon: order.couponCode ?? '',
             promotion: order.appliedPromotion?.name ?? '',
-            loyaltyDiscount: Number((order.loyaltyDiscount / 1000).toFixed(3)),
-            shipping: Number((order.shipping / 1000).toFixed(3)),
-            tax: Number((order.tax / 1000).toFixed(3)),
+            loyaltyDiscount: Number(minorToDecimalString(order.loyaltyDiscount)),
+            shipping: Number(minorToDecimalString(order.shipping)),
+            tax: Number(minorToDecimalString(order.tax)),
             taxIncluded: order.taxIncludedInPrice ? 'Yes' : 'No',
-            total: Number((order.total / 1000).toFixed(3)),
+            total: Number(minorToDecimalString(order.total)),
             area: addr?.area ?? addr?.state ?? '',
             city: addr?.city ?? '',
             country: addr?.country ?? '',
@@ -352,11 +358,11 @@ router.get(
               sku: item.sku ?? '',
               variant: item.variantName ?? '',
               qty: item.quantity,
-              unitPrice: Number((item.price / 1000).toFixed(3)),
-              // costPrice is snapshotted per line (fils) but nullable — leave the
+              unitPrice: Number(minorToDecimalString(item.price)),
+              // costPrice is snapshotted per line (piastres) but nullable — leave the
               // cell blank when unknown rather than showing a misleading 0.
-              costPrice: item.costPrice != null ? Number((item.costPrice / 1000).toFixed(3)) : '',
-              lineTotal: Number((item.total / 1000).toFixed(3)),
+              costPrice: item.costPrice != null ? Number(minorToDecimalString(item.costPrice)) : '',
+              lineTotal: Number(minorToDecimalString(item.total)),
             })
           );
         }
@@ -372,12 +378,12 @@ router.get(
 
       // Apply numeric and date formats
       for (const col of ['subtotal', 'discount', 'shipping', 'tax', 'total']) {
-        ordersSheet.getColumn(col).numFmt = '0.000';
+        ordersSheet.getColumn(col).numFmt = excelMoneyFormat();
       }
       ordersSheet.getColumn('orderDate').numFmt = 'yyyy-mm-dd';
 
       for (const col of ['unitPrice', 'costPrice', 'lineTotal']) {
-        itemsSheet.getColumn(col).numFmt = '0.000';
+        itemsSheet.getColumn(col).numFmt = excelMoneyFormat();
       }
       itemsSheet.getColumn('orderDate').numFmt = 'yyyy-mm-dd';
 
@@ -424,9 +430,9 @@ router.get(
 
 // Validation schemas
 //
-// Kuwait-friendly address validation: state and postalCode are not universally
-// applicable (Kuwait uses governorate names but no postal codes for delivery).
-// The structured Kuwait fields `area` (English governorate name) and `areaAr`
+// Egypt-friendly address validation: state and postalCode are not universally
+// applicable (Egypt uses governorate names but no postal codes for delivery).
+// The structured Egypt fields `area` (English governorate name) and `areaAr`
 // (Arabic name) are preferred over the generic `state` field. The storefront
 // checkout sends both since 2026-06-15; older orders only have `state`.
 // Admin manual order form sends `area` directly.
@@ -437,18 +443,24 @@ const addressSchema = z.object({
   address1: z.string().trim().min(1).max(500),
   address2: z.string().max(500).optional(),
   city: z.string().max(150).optional().default(''),
-  // Governorate (محافظة) — top-level KW administrative division.
+  // Governorate (محافظة) — top-level Egyptian administrative division.
   // Added 2026-06-18 alongside sub-area to support the cascade selector.
   governorate: z.string().max(60).optional().default(''),
   governorateAr: z.string().max(60).optional().default(''),
-  // Structured Kuwait sub-area / district, English name.
+  // Structured Egypt sub-area / district, English name.
   // Preferred over generic `state`; both are accepted for backwards compat.
   area: z.string().max(150).optional().default(''),
-  // Arabic name of the Kuwait delivery sub-area — stored so the admin UI can
+  // Arabic name of the Egypt delivery sub-area — stored so the admin UI can
   // render the address in Arabic without a client-side lookup table.
   areaAr: z.string().max(150).optional().default(''),
   state: z.string().max(150).optional().default(''),
   postalCode: z.string().max(30).optional().default(''),
+  // Structured Egyptian delivery details (also folded into address1 by the
+  // storefront for display back-compat). Optional so older clients still pass.
+  street: z.string().max(200).optional(),
+  building: z.string().max(100).optional(),
+  floor: z.string().max(50).optional(),
+  apartment: z.string().max(50).optional(),
   country: z.string().trim().min(2).max(60),
   phone: z.string().max(40).optional(),
   email: z.string().email().optional().or(z.literal('')),
@@ -677,7 +689,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
-  // accounting.invoicing is a Professional-tier addon (Kuwait-compliant tax
+  // accounting.invoicing is a Professional-tier addon (Egypt-compliant tax
   // invoice + PDF). Previously ungated at every layer — every plan incl. free
   // could generate it. Gate the merchant-facing generation; the customer-facing
   // public receipt route is intentionally left open (don't 403 a paying buyer).
@@ -884,6 +896,50 @@ router.post(
   }
 );
 
+// ==========================================
+// InstaPay: the merchant confirms the transfer arrived (SP6a)
+// ==========================================
+
+/**
+ * POST /stores/:storeId/orders/:orderId/confirm-instapay
+ *
+ * The one manual step of the InstaPay flow: the merchant saw the money in their
+ * InstaPay account. Confirms the order ONCE (awaiting_payment_confirmation ->
+ * confirmed, payment recorded, post-payment fan-out). A repeat is an idempotent
+ * 200 with `changed:false`; confirming an order whose window expired (and was
+ * cancelled) is a 409. Same permission as marking a COD order paid.
+ */
+router.post(
+  '/:orderId/confirm-instapay',
+  authenticate,
+  authorize('store_admin', 'super_admin', 'staff'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, orderId } = req.params;
+      const user = getAuthUser(req);
+      const outcome = await InstapayService.confirm({
+        storeId,
+        orderId,
+        actorUserId: user.userId,
+      });
+      await auditLog({
+        action: outcome.changed ? 'order.instapay_confirmed' : 'order.instapay_confirm_repeated',
+        userId: user.userId,
+        resourceType: 'order',
+        resourceId: orderId,
+        details: { status: outcome.status },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: outcome });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 /**
  * POST /stores/:storeId/orders/bulk-mark-paid
  * Mark multiple COD orders as paid (admin only)
@@ -1013,7 +1069,7 @@ router.post(
  * POST /stores/:storeId/orders/:orderId/refresh-payment-status
  *
  * Manual sync — admin clicks "refresh" on the order detail page to
- * re-check payment status with the provider (MyFatoorah / Tap /
+ * re-check payment status with the provider (Paymob / Kashier /
  * etc.) and update our DB accordingly. Use when a webhook didn't
  * fire (provider portal misconfigured, signature mismatch, etc.)
  * but the customer says they paid.
@@ -1062,7 +1118,7 @@ router.post(
       // from the stored payment row).
       const status = await PaymentService.getPaymentStatus(
         payment.transactionId,
-        payment.provider as 'tap' | 'myfatoorah' | 'hesabe' | 'upayments',
+        payment.provider as PaymentProvider,
         storeId
       );
 
@@ -1138,7 +1194,7 @@ router.post(
  * arrive (provider portal misconfigured, signature mismatch, the merchant
  * issued the refund out-of-band in the provider portal).
  *
- * MyFatoorah refunds start as Pending → finance team executes →
+ * Some gateways queue a refund as Pending → finance executes →
  * "Refunded" (or rejects → "Canceled"). The provider notifies us via
  * webhook, but this endpoint is the pull-side equivalent.
  */
@@ -1185,7 +1241,7 @@ router.post(
       const status = await runInTenantContext(storeId, () =>
         PaymentService.getRefundStatus(
           payment.refundId!,
-          payment.provider as 'tap' | 'myfatoorah' | 'hesabe' | 'upayments',
+          payment.provider as PaymentProvider,
           storeId
         )
       );
@@ -1223,7 +1279,7 @@ router.post(
         //
         // A missing, non-finite or non-positive provider amount is NOT
         // evidence of a partial refund — a status payload that carries no
-        // amount would otherwise be recorded as a 0-fil partial refund while
+        // amount would otherwise be recorded as a 0-piastre partial refund while
         // the gateway has already sent the WHOLE sum back: the order keeps its
         // pre-refund status, no reversal or GL entry runs, and the payment
         // still reads as refundable so a later return fires a second real
@@ -1304,7 +1360,7 @@ router.post(
       // Whole-order side effects belong to a whole-order refund. The write
       // above now distinguishes a partial out-of-band refund from a full one,
       // so gating this on the same arithmetic keeps the two coherent: without
-      // it a 2000-fil refund on a 5000-fil payment would record the payment as
+      // it a 2000-piastre refund on a 5000-piastre payment would record the payment as
       // partially refunded and then flip the ORDER to refunded and restore ALL
       // its inventory — the whole-order fanout the item-level path exists to
       // avoid. A partial refresh updates the payment and stops there; the
@@ -1416,7 +1472,7 @@ router.post(
  * POST /stores/:storeId/orders/:orderId/refund-via-provider
  *
  * Admin-initiated refund. Calls the payment provider's refund API
- * (MyFatoorah / Tap / etc.), then PaymentService.refund handles the
+ * (Paymob / Kashier / Fawry), then PaymentService.refund handles the
  * DB transaction (Payment.status -> refunded, Order.status -> refunded)
  * and OrderService.applyRefundEffects fans out side effects:
  *   - inventory restore (track_inventory products)
@@ -1425,7 +1481,7 @@ router.post(
  *   - loyalty points reversal (NEW — was missing before)
  *   - order/refunded Inngest event → customer refund email + admin push
  *
- * Defaults to full refund. Partial refunds: pass `amount` (in fils).
+ * Defaults to full refund. Partial refunds: pass `amount` (in piastres).
  */
 const refundViaProviderSchema = z.object({
   amount: z.number().int().positive().optional(),
@@ -1503,10 +1559,7 @@ router.post(
       // chain must surface as a non-2xx — this used to catch only the
       // provider-call error and swallow everything else into an HTTP 200
       // (money-integrity audit F2: operator gets no signal a refund
-      // broke). We still enrich the message with a MyFatoorah-specific
-      // hint (the #1 first-time failure mode is the "Refund" API
-      // permission not being enabled on the merchant account) and forward
-      // to `next(err)` instead of writing the response ourselves, so every
+      // broke). We forward to `next(err)` instead of writing the response ourselves, so every
       // failure mode in the chain — not just the provider call — reaches
       // the client as a real error.
       let result;
@@ -1532,11 +1585,7 @@ router.post(
           },
           '[Refund] admin-initiated provider refund failed'
         );
-        const hint =
-          payment.provider === 'myfatoorah'
-            ? ' (verify Refund permission is enabled on this account in the MyFatoorah portal: Settings → API Permissions → MakeRefund)'
-            : '';
-        next(new AppError(502, 'REFUND_FAILED', `${refundMessage}${hint}`));
+        next(new AppError(502, 'REFUND_FAILED', refundMessage));
         return;
       }
 
@@ -1603,15 +1652,15 @@ const adminOrderSchema = z
     billingAddress: z.record(z.unknown()).optional(),
     items: z.array(adminOrderItemSchema).min(1),
     paymentMethod: z.enum(['online', 'cod']).optional(),
-    paymentProvider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments', 'cod']).optional(),
+    paymentProvider: z.enum(['paymob', 'kashier', 'fawry', 'instapay', 'cod']).optional(),
     notes: z.string().optional(),
     couponCode: z.string().optional(),
     currency: z.string().optional(),
     /**
-     * Optional shipping fee override in integer fils (KWD × 1000).
+     * Optional shipping fee override in integer piastres (EGP × 100).
      * When set, it replaces the ShippingService-computed fee for this order.
      * Intended for phone orders where the merchant negotiates a custom rate.
-     * The admin UI collects KWD and converts to fils before sending.
+     * The admin UI collects EGP and converts to piastres before sending.
      */
     shippingOverride: z.number().int().min(0).optional(),
     /**
@@ -1670,25 +1719,28 @@ router.post(
 /**
  * POST /stores/:storeId/orders/:orderId/payment-link
  *
- * Issue a MyFatoorah payment link for an existing order. Used by the
- * merchant when a customer couldn't complete checkout on the original
- * payment flow (e.g. KNET timeout, gateway blocked, customer abandoned
- * and asked for the link via WhatsApp).
+ * Issue a payment link for an existing order, through one of the store's own gateways (Paymob,
+ * Kashier, Fawry). Used by the merchant when a customer couldn't complete checkout on the
+ * original payment flow (gateway blocked, customer abandoned and asked for the link).
  *
  * Body:
- *   - notifyVia: 'link' | 'email' | 'all'  (default 'link')
- *     'link'  → return URL only, merchant copies + sends manually
- *     'email' → MyFatoorah sends email to the customer
- *     'all'   → MyFatoorah sends SMS + email (NB: SMS not surfaced in
- *               UI yet, but the provider supports it natively)
+ *   - provider: 'paymob' | 'kashier' | 'fawry'   (default: the store's default online provider)
+ *   - method:   which of the provider's methods to offer (default: all it has enabled)
+ *   - notifyVia: 'link' (the only channel: the merchant copies and shares the link; none of the
+ *     Egyptian gateways sends the customer a message for us)
  *
- * The endpoint reuses the same `PaymentService.createPayment` path as
- * the public checkout — same per-store credentials, same callback +
- * webhook URLs — so a paid link still triggers the existing webhook +
- * order-status pipeline.
+ * The endpoint reuses the same `PaymentService.createPayment` path as the public checkout:
+ * same per-store credentials, same callback and webhook URLs, so a paid link still triggers the
+ * webhook and order-status pipeline.
+ *
+ * NO REQUEST TRANSACTION: this route runs under store scope (`orderRouteContext`), so the
+ * gateway call holds no transaction or connection. The order is read in a short scope, the
+ * gateway is called, then one short transaction records the payment.
  */
 const issuePaymentLinkSchema = z.object({
   notifyVia: z.enum(['link', 'email', 'all']).optional().default('link'),
+  provider: z.enum(['paymob', 'kashier', 'fawry']).optional(),
+  method: z.enum(['card', 'meeza', 'wallet', 'valu', 'payatfawry']).optional(),
 });
 
 router.post(
@@ -1701,7 +1753,19 @@ router.post(
     try {
       const { storeId, orderId } = req.params;
       const user = getAuthUser(req);
-      const { notifyVia } = issuePaymentLinkSchema.parse(req.body ?? {});
+      const { notifyVia, provider, method } = issuePaymentLinkSchema.parse(req.body ?? {});
+
+      if (notifyVia !== 'link') {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'NOTIFY_NOT_SUPPORTED',
+            message:
+              'The payment gateways do not send the link to the customer. Copy the link and share it.',
+          },
+        });
+        return;
+      }
 
       const order = await prisma.order.findFirst({
         where: { id: orderId, storeId, deletedAt: null },
@@ -1735,14 +1799,23 @@ router.post(
         return;
       }
 
+      // The gateway to use: the merchant's choice, else the store's default online provider.
+      const providerName = provider ?? (await PaymentService.getDefaultProvider(storeId));
+      if (!providerName) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'PAYMENT_NOT_CONFIGURED',
+            message: 'Set up a payment gateway in Settings → Payments before issuing a link.',
+          },
+        });
+        return;
+      }
+
       // Same storefront URL resolution the public checkout uses, so the
       // payment-success / payment-error callbacks land on the correct
       // tenant domain whether they have a custom domain or platform slug.
-      const storefrontBaseUrl = order.store?.domain
-        ? `https://${order.store.domain}`
-        : order.store?.slug
-          ? `${config.webUrl}/${order.store.slug}`
-          : config.webUrl;
+      const storefrontBaseUrl = order.store ? storefrontOrigin(order.store) : config.webUrl;
 
       const shipping = (order.shippingAddress ?? {}) as Record<string, string | undefined>;
       const customerName =
@@ -1751,21 +1824,6 @@ router.post(
         }`.trim() || 'Customer';
       const customerEmail = order.customer?.email || shipping.email || '';
       const customerPhone = order.customer?.phone || shipping.phone || undefined;
-
-      // MyFatoorah rejects empty email with 400 — bail early with a
-      // friendly error so the merchant knows they need an email on the
-      // order before they can issue a link.
-      if (notifyVia !== 'link' && !customerEmail) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'NO_CUSTOMER_EMAIL',
-            message:
-              'Cannot send the link via email — this order has no customer email on file. Pick "Copy link" and share it manually.',
-          },
-        });
-        return;
-      }
 
       const result = await PaymentService.createPayment(
         {
@@ -1785,10 +1843,11 @@ router.post(
           items: buildPaymentLineItems(order.items),
           callbackUrl: `${storefrontBaseUrl}/checkout/success`,
           errorUrl: `${storefrontBaseUrl}/checkout/error`,
-          webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/myfatoorah`,
+          webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${providerName}`,
           notifyVia,
+          ...(method ? { metadata: { method } } : {}),
         },
-        'myfatoorah',
+        providerName,
         storeId
       );
 
@@ -1799,7 +1858,7 @@ router.post(
         resourceId: orderId,
         details: {
           orderNumber: order.orderNumber,
-          notifyVia,
+          provider: providerName,
           invoiceId: result.invoiceId ?? null,
         },
         ip: req.ip,
@@ -1807,7 +1866,7 @@ router.post(
       });
 
       logger.info(
-        { orderId, orderNumber: order.orderNumber, notifyVia, invoiceId: result.invoiceId },
+        { orderId, orderNumber: order.orderNumber, provider: providerName },
         '[Payment-Link] issued by merchant'
       );
 
@@ -1815,9 +1874,11 @@ router.post(
         success: true,
         data: {
           paymentUrl: result.paymentUrl,
+          // Fawry: the reference code the customer pays with at an outlet.
+          instruction: result.instruction,
           invoiceId: result.invoiceId,
+          provider: providerName,
           notifyVia,
-          customerEmail: notifyVia !== 'link' ? customerEmail : undefined,
         },
       });
     } catch (error) {

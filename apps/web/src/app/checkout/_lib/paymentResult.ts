@@ -10,13 +10,23 @@
  */
 export interface PaymentCreateResult {
   success: boolean;
-  data?: { paymentUrl?: string; cod?: boolean };
+  data?: {
+    paymentUrl?: string;
+    cod?: boolean;
+    instapay?: unknown;
+    /** What the customer does next when it is not a redirect (a Fawry reference code). */
+    instruction?: { kind: string; code?: string; expiresAt?: string };
+  };
   error?: { code?: string; message?: string };
 }
 
 export interface PaymentResultActions {
   clearSavedCheckout: () => void;
   goToCodSuccess: () => void;
+  /** InstaPay: the order is on hold; the success page shows the transfer details. */
+  goToInstapay: () => void;
+  /** Fawry: the customer pays the reference code at an outlet; the success page shows it. */
+  goToReferenceCode: (code: string) => void;
   goToGateway: (paymentUrl: string) => void;
 }
 
@@ -33,6 +43,21 @@ export function handlePaymentCreateResult(
     // Cash on delivery — go straight to success.
     actions.clearSavedCheckout();
     actions.goToCodSuccess();
+    return;
+  }
+  if (result.success && result.data?.instapay) {
+    // InstaPay manual transfer — the success page shows who to pay, how much, and the reference.
+    actions.clearSavedCheckout();
+    actions.goToInstapay();
+    return;
+  }
+  if (
+    result.success &&
+    result.data?.instruction?.kind === 'reference-code' &&
+    result.data.instruction.code
+  ) {
+    actions.clearSavedCheckout();
+    actions.goToReferenceCode(result.data.instruction.code);
     return;
   }
   if (result.success && result.data?.paymentUrl) {

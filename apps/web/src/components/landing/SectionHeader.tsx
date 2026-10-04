@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * The one repeated section-header motif that glues the whole landing together
- * (the cohesion lesson from the Force AI reference landing): an optional
+ * (the cohesion lesson from the Ebda reference landing): an optional
  * orange kicker, a bold white title, a centered 80×3px orange hairline, and an
  * optional muted subtitle. Every section renders this so the page reads as one
  * system instead of a stack of disjoint blocks.

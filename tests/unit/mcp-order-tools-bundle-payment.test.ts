@@ -4,7 +4,7 @@
  * directly — the same defect `payment-line-items.test.ts` documents for
  * `payment.routes.ts` /create, `order.routes.ts` payment-link, and
  * `payment.factory.ts` retry. An agent placing an online-payment order for a
- * bundle box sent the customer to a hosted payment page (Tap/MyFatoorah)
+ * bundle box sent the customer to a hosted payment page (Paymob/Kashier/Fawry)
  * showing "Dates 3.724 / Honey 4.966 / Nuts x2 @ 1.655" instead of
  * "Ramadan Box 12.000" — this file is the fourth call site, missed by that
  * fix round because it lives under `mcp/`, not `routes/`.
@@ -31,7 +31,10 @@ vi.mock('@api/services/order.service', () => ({
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
   PaymentService: {
     getDefaultProvider: vi.fn(),
-    createPayment: vi.fn(),
+    // SP6b: the provider call (request) and the record are SEPARATE, so no transaction is
+    // held across the gateway; `createPayment` is not used by this tool any more.
+    requestProviderPayment: vi.fn(),
+    recordProviderPayment: vi.fn(),
   },
 }));
 
@@ -79,17 +82,29 @@ function harness() {
   return { server, tools };
 }
 
-const store = { id: 'store-1', name: 'Demo Store', slug: 'demo', currency: 'KWD', domain: null };
+/** What `requestProviderPayment` resolves with: which provider answered, and its response. */
+function accepted(extra: Record<string, unknown> = {}) {
+  return {
+    providerName: 'paymob',
+    response: {
+      provider: 'paymob',
+      transactionId: 'txn-1',
+      paymentUrl: 'https://pay.example/abc',
+      ...extra,
+    },
+  } as never;
+}
 
-const customer = { name: 'Sara Ali', address: 'Block 1, Street 2', country: 'KW' };
+const store = { id: 'store-1', name: 'Demo Store', slug: 'demo', currency: 'EGP', domain: null };
+
+const customer = { name: 'Sara Ali', address: 'Block 1, Street 2', country: 'EG' };
 
 describe('order.tools place_order (online) — payment-provider line items', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(PaymentService.getDefaultProvider).mockResolvedValue('tap' as never);
-    vi.mocked(PaymentService.createPayment).mockResolvedValue({
-      paymentUrl: 'https://pay.example/abc',
-    } as never);
+    vi.mocked(PaymentService.getDefaultProvider).mockResolvedValue('paymob' as never);
+    vi.mocked(PaymentService.requestProviderPayment).mockResolvedValue(accepted());
+    vi.mocked(PaymentService.recordProviderPayment).mockResolvedValue(undefined);
   });
 
   it('collapses a bundle order into ONE payment line at the bundle price — never the per-component allocated prices', async () => {
@@ -97,7 +112,7 @@ describe('order.tools place_order (online) — payment-provider line items', () 
       id: 'order-1',
       orderNumber: 'ORD-1',
       total: 12000,
-      currency: 'KWD',
+      currency: 'EGP',
       items: [
         {
           id: 'oi-1',
@@ -140,8 +155,8 @@ describe('order.tools place_order (online) — payment-provider line items', () 
       authorizedAgentExtra()
     );
 
-    expect(PaymentService.createPayment).toHaveBeenCalledTimes(1);
-    const request = vi.mocked(PaymentService.createPayment).mock.calls[0][0] as {
+    expect(PaymentService.requestProviderPayment).toHaveBeenCalledTimes(1);
+    const request = vi.mocked(PaymentService.requestProviderPayment).mock.calls[0][0] as {
       items: { name: string; quantity: number; unitPrice: number }[];
     };
 
@@ -169,7 +184,7 @@ describe('order.tools place_order (online) — payment-provider line items', () 
       id: 'order-2',
       orderNumber: 'ORD-2',
       total: 8000,
-      currency: 'KWD',
+      currency: 'EGP',
       items: [
         { id: 'oi-4', productName: 'Rug', quantity: 2, price: 3000, sku: 'RUG-1' },
         { id: 'oi-5', productName: 'Lamp', quantity: 1, price: 2000, sku: null },
@@ -184,7 +199,7 @@ describe('order.tools place_order (online) — payment-provider line items', () 
       authorizedAgentExtra()
     );
 
-    const request = vi.mocked(PaymentService.createPayment).mock.calls[0][0] as {
+    const request = vi.mocked(PaymentService.requestProviderPayment).mock.calls[0][0] as {
       items: { name: string; quantity: number; unitPrice: number; sku?: string }[];
     };
     expect(request.items).toEqual([
@@ -209,20 +224,19 @@ describe('order.tools place_order (online) — payment-provider line items', () 
 describe('order.tools place_order (online) — #900 tenant context', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(PaymentService.getDefaultProvider).mockResolvedValue('tap' as never);
+    vi.mocked(PaymentService.getDefaultProvider).mockResolvedValue('paymob' as never);
+    vi.mocked(PaymentService.recordProviderPayment).mockResolvedValue(undefined);
     vi.mocked(OrderService.create).mockResolvedValue({
       id: 'order-3',
       orderNumber: 'ORD-3',
       total: 5000,
-      currency: 'KWD',
+      currency: 'EGP',
       items: [{ id: 'oi-1', productName: 'Rug', quantity: 1, price: 5000, sku: null }],
     } as never);
   });
 
-  it('wraps order-create + createPayment in runInTenantContext(store.id, …)', async () => {
-    vi.mocked(PaymentService.createPayment).mockResolvedValue({
-      paymentUrl: 'https://pay.example/abc',
-    } as never);
+  it('wraps order-create + the payment record in runInTenantContext(store.id, …)', async () => {
+    vi.mocked(PaymentService.requestProviderPayment).mockResolvedValue(accepted());
     const { server, tools } = harness();
     registerOrderTools(server, store as never);
 
@@ -235,7 +249,7 @@ describe('order.tools place_order (online) — #900 tenant context', () => {
     expect(OrderService.create).toHaveBeenCalled();
   });
 
-  it('runs OrderService.create AND createPayment each INSIDE a tenant wrap (issue 2059)', async () => {
+  it('runs OrderService.create and the payment RECORD each inside a tenant wrap, and the PROVIDER CALL inside none (issue 2059, SP6b)', async () => {
     let depth = 0;
     vi.mocked(runInTenantContext).mockImplementation((async (
       _storeId: string,
@@ -255,13 +269,16 @@ describe('order.tools place_order (online) — #900 tenant context', () => {
         id: 'order-3',
         orderNumber: 'ORD-3',
         total: 5000,
-        currency: 'KWD',
+        currency: 'EGP',
         items: [{ id: 'oi-1', productName: 'Rug', quantity: 1, price: 5000, sku: null }],
       };
     }) as never);
-    vi.mocked(PaymentService.createPayment).mockImplementation((async () => {
-      insideAt.payment = depth;
-      return { paymentUrl: 'https://pay.example/abc' };
+    vi.mocked(PaymentService.requestProviderPayment).mockImplementation((async () => {
+      insideAt.providerCall = depth;
+      return accepted();
+    }) as never);
+    vi.mocked(PaymentService.recordProviderPayment).mockImplementation((async () => {
+      insideAt.record = depth;
     }) as never);
     const { server, tools } = harness();
     registerOrderTools(server, store as never);
@@ -271,14 +288,15 @@ describe('order.tools place_order (online) — #900 tenant context', () => {
       authorizedAgentExtra()
     );
 
-    // Each inside exactly one wrap — never outside, never nested in the other.
-    expect(insideAt).toEqual({ create: 1, payment: 1 });
+    // The order and the record are each inside exactly one wrap; the gateway call holds NONE
+    // (no transaction and no pooled connection while a slow gateway answers).
+    expect(insideAt).toEqual({ create: 1, providerCall: 0, record: 1 });
     vi.mocked(runInTenantContext).mockImplementation(((_s: string, fn: () => unknown) =>
       fn()) as never);
   });
 
-  it('runs the compensating rollback for a failed createPayment, in its own tenant context', async () => {
-    vi.mocked(PaymentService.createPayment).mockRejectedValue(new Error('gateway down'));
+  it('runs the compensating rollback for a failed provider call, in its own tenant context', async () => {
+    vi.mocked(PaymentService.requestProviderPayment).mockRejectedValue(new Error('gateway down'));
     vi.mocked(OrderService.rollbackForPaymentFailure).mockResolvedValue(undefined as never);
     const { server, tools } = harness();
     registerOrderTools(server, store as never);
@@ -302,10 +320,8 @@ describe('order.tools place_order (online) — #900 tenant context', () => {
   // failure of the wrap's own COMMIT (or its 30s timeout) — which rejects
   // AFTER the callback returned — skipped it and stranded a pending order
   // with stock taken, cart cleared and no Payment row.
-  it('still rolls the order back when the payment wrap fails AFTER createPayment resolved (commit failure)', async () => {
-    vi.mocked(PaymentService.createPayment).mockResolvedValue({
-      paymentUrl: 'https://pay.example/abc',
-    } as never);
+  it('still rolls the order back when the payment wrap fails AFTER the record resolved (commit failure)', async () => {
+    vi.mocked(PaymentService.requestProviderPayment).mockResolvedValue(accepted());
     vi.mocked(OrderService.rollbackForPaymentFailure).mockResolvedValue(undefined as never);
     let call = 0;
     vi.mocked(runInTenantContext).mockImplementation((async (
@@ -314,7 +330,7 @@ describe('order.tools place_order (online) — #900 tenant context', () => {
     ) => {
       call += 1;
       const out = await fn();
-      // 1st wrap = order-create (commits), 2nd = payment (its COMMIT fails).
+      // 1st wrap = order-create (commits), 2nd = the payment record (its COMMIT fails).
       if (call === 2) throw new Error('P2028 transaction commit failed');
       return out;
     }) as never);
@@ -338,9 +354,7 @@ describe('order.tools place_order (online) — #900 tenant context', () => {
   });
 
   it('never rolls back an order whose payment wrap committed', async () => {
-    vi.mocked(PaymentService.createPayment).mockResolvedValue({
-      paymentUrl: 'https://pay.example/abc',
-    } as never);
+    vi.mocked(PaymentService.requestProviderPayment).mockResolvedValue(accepted());
     const { server, tools } = harness();
     registerOrderTools(server, store as never);
 
@@ -350,7 +364,7 @@ describe('order.tools place_order (online) — #900 tenant context', () => {
     );
 
     expect(OrderService.rollbackForPaymentFailure).not.toHaveBeenCalled();
-    // Two separate wraps: order-create, then provider call + Payment write.
+    // Two separate wraps: order-create, then the Payment write (the provider call holds none).
     expect(vi.mocked(runInTenantContext)).toHaveBeenCalledTimes(2);
   });
 });

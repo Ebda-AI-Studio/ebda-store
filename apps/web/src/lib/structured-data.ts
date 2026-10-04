@@ -1,7 +1,9 @@
 import type { ResolvedStore } from './store-resolver';
 import { pickMetaDescription } from './seo/meta-description';
 import type { StorefrontLocale } from './seo/resolve-locale';
+import { BRAND_MARKETING_URL, storefrontOrigin } from '@force/shared';
 
+import { minorToDecimalString, REGION } from '@force/shared';
 /**
  * The name/description a JSON-LD node publishes for `locale` (#2196): the
  * Arabic field when the page resolved to `ar` and the merchant filled it in,
@@ -93,14 +95,14 @@ export function merchantReturnPolicyJsonLd(
   if (days === 0) {
     return {
       '@type': 'MerchantReturnPolicy',
-      applicableCountry: 'KW',
+      applicableCountry: 'EG',
       returnPolicyCategory: 'https://schema.org/MerchantReturnNotPermitted',
     };
   }
 
   return {
     '@type': 'MerchantReturnPolicy',
-    applicableCountry: 'KW',
+    applicableCountry: 'EG',
     returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
     merchantReturnDays: days,
     returnMethod: 'https://schema.org/ReturnByMail',
@@ -114,7 +116,7 @@ export function merchantReturnPolicyJsonLd(
 /** Public shape of a ShippingZone row, as served by GET /public/:storeId/shipping. */
 export interface PublicShippingZone {
   name: string;
-  /** In fils (1 KWD = 1000 fils), like every other money value in this codebase. */
+  /** In piastres (1 EGP = 100 piastres), like every other money value in this codebase. */
   deliveryFee: number;
   freeShippingThreshold: number | null;
   estimatedDaysMin: number | null;
@@ -150,8 +152,8 @@ export function shippingDetailsJsonLd(zones: PublicShippingZone[], opts: { curre
     '@type': 'OfferShippingDetails',
     shippingRate: {
       '@type': 'MonetaryAmount',
-      value: (cheapest.deliveryFee / 1000).toFixed(3),
-      currency: opts.currency || 'KWD',
+      value: minorToDecimalString(cheapest.deliveryFee),
+      currency: opts.currency || REGION.currency,
     },
     ...(min !== null && max !== null
       ? {
@@ -209,8 +211,8 @@ export function productJsonLd(
     })(),
     offers: {
       '@type': 'Offer',
-      price: (product.price / 1000).toFixed(3),
-      priceCurrency: store.currency || 'KWD',
+      price: minorToDecimalString(product.price),
+      priceCurrency: store.currency || REGION.currency,
       availability,
       url: productUrl,
       seller: {
@@ -244,7 +246,7 @@ interface BundleForJsonLd {
   descriptionAr?: string | null;
   slug: string;
   image?: string | null;
-  /** The bundle's single selling price (fils) — never a per-component price. */
+  /** The bundle's single selling price (piastres) — never a per-component price. */
   price: number;
   available: number;
 }
@@ -282,8 +284,8 @@ export function bundleJsonLd(
     })(),
     offers: {
       '@type': 'Offer',
-      price: (bundle.price / 1000).toFixed(3),
-      priceCurrency: store.currency || 'KWD',
+      price: minorToDecimalString(bundle.price),
+      priceCurrency: store.currency || REGION.currency,
       availability,
       url: bundleUrl,
       seller: {
@@ -322,9 +324,9 @@ export function organizationJsonLd(store: ResolvedStore, locale: StorefrontLocal
 
   // Real schema.org property. `areaServed` accepts Text — no need to guess
   // a Place/Country/AdministrativeArea @type for AI-generated free text
-  // ("Kuwait", "GCC") that isn't guaranteed to be a formal place name.
+  // ("Egypt", "GCC") that isn't guaranteed to be a formal place name.
   // Absent when the merchant/sweep never populated either field — never
-  // invented (a default "Kuwait/GCC" would be a false claim for a
+  // invented (a default "Egypt/GCC" would be a false claim for a
   // GCC-adjacent merchant that hasn't actually confirmed its service area).
   const areaServed =
     typeof aboutJson.location === 'string' && aboutJson.location.trim()
@@ -413,7 +415,7 @@ interface ItemListProduct {
   name: string;
   url: string;
   image?: string | null;
-  price?: number | null; // in fils (KWD * 1000)
+  price?: number | null; // in piastres (EGP * 1000)
   currency?: string;
   inStock?: boolean;
 }
@@ -436,8 +438,8 @@ export function itemList(products: ItemListProduct[], listName?: string): object
           ? {
               offers: {
                 '@type': 'Offer',
-                price: (p.price / 1000).toFixed(3),
-                priceCurrency: p.currency ?? 'KWD',
+                price: minorToDecimalString(p.price),
+                priceCurrency: p.currency ?? REGION.currency,
                 availability:
                   p.inStock !== false
                     ? 'https://schema.org/InStock'
@@ -482,7 +484,7 @@ export function storeJsonLd(s: StoreSchemaData): object {
           address: {
             '@type': 'PostalAddress',
             streetAddress: s.address,
-            addressCountry: 'KW', // Kuwait — platform-wide default for Force AI Store
+            addressCountry: 'EG', // Egypt — platform-wide default for Ebda
           },
         }
       : {}),
@@ -581,50 +583,36 @@ export function reviewJsonLd(r: {
 }
 
 /**
- * Resolve the canonical site URL for this store.
+ * Resolve the canonical site URL (origin) for this store.
+ *
+ * A store's origin is its custom domain when it has one, otherwise its free
+ * `<slug>.ebda.app` address (`storefrontOrigin`) — NEVER a path under the apex.
+ * Called with no store (platform-level callers) it returns the platform origin.
+ *
+ * History worth keeping: this once preferred the platform-wide
+ * NEXT_PUBLIC_SITE_URL over `store.domain`, so every custom-domain store
+ * advertised `rel=canonical` on the platform host — a URL that resolved to the
+ * DEMO store (verified live 2026-07-29), telling Google each merchant page
+ * duplicated a demo page. The store's own origin must always win.
  */
-export function getSiteUrl(store?: Pick<ResolvedStore, 'domain'>): string {
-  // A merchant's custom domain IS that store's canonical origin, so it MUST win
-  // over the platform-wide NEXT_PUBLIC_SITE_URL.
-  //
-  // This order used to be reversed, and because NEXT_PUBLIC_SITE_URL is always
-  // set in production (`https://store.force-ai.co`, inlined at build time), the
-  // `store.domain` branch below was DEAD — every custom-domain store advertised
-  // `rel=canonical`, `og:url` and every JSON-LD `url` on the platform host. Worse,
-  // `storeAbsoluteUrl` only adds the `/<slug>` prefix when `domain` is falsy, so
-  // pecannbee.com.kw/products/X claimed a canonical of
-  // store.force-ai.co/products/X — a URL that resolves to the DEMO store
-  // (verified live 2026-07-29). That tells Google every real merchant page is a
-  // duplicate of a demo page. Platform-path stores are unaffected: no domain →
-  // still the env var → still prefixed with `/<slug>`.
-  if (store?.domain) {
-    return `https://${store.domain.trim()}`;
+export function getSiteUrl(store?: { slug?: string | null; domain?: string | null }): string {
+  if (store?.domain || store?.slug) {
+    return storefrontOrigin({ slug: store.slug ?? '', domain: store.domain });
   }
   // Whitespace defense: a stray newline in the env var silently breaks
   // every URL in robots.txt + sitemap.xml (Google then can't fetch the map).
   if (process.env.NEXT_PUBLIC_SITE_URL) {
     return process.env.NEXT_PUBLIC_SITE_URL.trim().replace(/\/$/, '');
   }
-  // Canonical platform host after the 2026-06 Cloudflare rebrand. Fallback for
-  // platform-path stores (no custom domain); drives master sitemap URLs, the
-  // robots `Sitemap:` directive, OG `og:url`/`og:image`, and `rel=canonical`.
-  // It MUST be the live canonical domain — it was still `store.forcemediakw.com`
-  // after the CF cutover, so sitemap + OG advertised the old domain on
-  // store.force-ai.co (regression fixed 2026-06-27).
-  return 'https://store.force-ai.co';
+  // Platform-level fallback (no store): the marketing apex.
+  return BRAND_MARKETING_URL;
 }
 
 /**
- * Absolute in-store URL that preserves the platform `/<slug>` path prefix.
- * `getSiteUrl()` only returns the bare custom-domain (or platform-default)
- * origin — it does NOT include the `/<slug>` path prefix that platform-path
- * stores (no custom domain, `store.domain` is falsy) need, see
- * `apps/web/src/app/sitemap.ts`'s "master sitemap" branch for the same
- * pattern. Every per-page JSON-LD `url`, breadcrumb `item`, and
- * `rel=canonical` builder MUST route through this (or `getSiteUrl()` for the
- * bare origin) instead of hand-concatenating `${getSiteUrl(store)}${path}` —
- * skipping the prefix points crawlers/agents at a URL that resolves to the
- * wrong store (or the demo store) once it hits middleware.
+ * Absolute in-store URL: the store's origin (`getSiteUrl(store)`) plus `path`.
+ * There is no `/<slug>` path prefix — every store has its own host. Every
+ * per-page JSON-LD `url`, breadcrumb `item`, and `rel=canonical` builder MUST
+ * route through this instead of hand-concatenating.
  *
  * `path` may be given with or without a leading slash; '' or '/' both
  * resolve to the store root.
@@ -633,7 +621,6 @@ export function storeAbsoluteUrl(
   store: Pick<ResolvedStore, 'slug' | 'domain'>,
   path: string
 ): string {
-  const prefix = store.domain ? '' : `/${store.slug}`;
   const normalizedPath = path && !path.startsWith('/') ? `/${path}` : path;
-  return `${getSiteUrl(store)}${prefix}${normalizedPath}`;
+  return `${getSiteUrl(store)}${normalizedPath}`;
 }

@@ -45,7 +45,7 @@ function makeRes() {
   return res as unknown as Response & { statusCode: number; body: { error?: { code?: string } } };
 }
 
-const PLATFORM_ORIGIN = 'https://admin.force-ai.co';
+const PLATFORM_ORIGIN = 'https://app.ebda.app';
 const MERCHANT_ORIGIN = 'https://attacker-owned-shop.example';
 
 describe('restrictPlatformOnlyOrigins', () => {

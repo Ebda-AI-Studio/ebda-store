@@ -2,6 +2,7 @@ import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@for
 import { csvField, slugifyWithFallback } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
 import { recordSlugRedirect } from './slug-redirect.service';
+import { assertWithinLimit } from './plan-limit.service';
 import {
   bundleFkViolationKind,
   planBundlePinnedVariantSkips,
@@ -14,7 +15,7 @@ interface ProductImportRow {
   slug?: string;
   description?: string;
   descriptionAr?: string;
-  price: number; // In fils
+  price: number; // In piastres
   compareAtPrice?: number;
   costPrice?: number;
   sku?: string;
@@ -42,6 +43,11 @@ interface ProductImportRow {
   option2Value?: string;
   option3Name?: string;
   option3Value?: string;
+  // Meta columns written by the CSV converter (csv-import.ts): the row's
+  // 1-based number in the file the merchant actually uploaded, and a reason
+  // the converter already rejected it. Absent on hand-written template CSVs.
+  sourceRow?: string;
+  _error?: string;
 }
 
 interface ImportResult {
@@ -55,8 +61,8 @@ interface ImportResult {
 
 /**
  * A parsed variant row, grouped under its parent product by parentSku.
- * Numeric fields are already in fils / ints (the xlsx converter pre-multiplies
- * price; CSV callers pass fils directly).
+ * Numeric fields are already in piastres / ints (the xlsx converter pre-multiplies
+ * price; CSV callers pass piastres directly).
  */
 export interface VariantImportRow {
   parentSku: string;
@@ -460,7 +466,7 @@ export class BulkService {
       'product-slug',
       'Product description goes here',
       'وصف المنتج هنا',
-      '5000', // 5 KWD in fils
+      '5000', // 50.00 EGP in piastres
       '7500', // Compare at price
       '3000', // Cost price
       'SKU-001',
@@ -497,7 +503,7 @@ export class BulkService {
       '', // slug
       '', // description
       '', // descriptionAr
-      '5500', // variant price (5.5 KWD in fils)
+      '5500', // variant price (55.00 EGP in piastres)
       '', // compareAtPrice
       '', // costPrice
       'SKU-001-1KG', // variant sku
@@ -554,7 +560,11 @@ export class BulkService {
     // Split into records respecting quoted fields that may contain embedded
     // newlines (e.g. a product description with line breaks). A naive
     // split('\n') shatters such records into broken rows.
-    const lines = this.splitCsvRecords(csvData).filter(line => line.trim());
+    // A UTF-8 BOM (Excel "CSV UTF-8") would otherwise glue itself to the first
+    // header and the `name` column would silently stop matching.
+    const lines = this.splitCsvRecords(
+      csvData.charCodeAt(0) === 0xfeff ? csvData.slice(1) : csvData
+    ).filter(line => line.trim());
     if (lines.length < 2) {
       throw new AppError(
         400,
@@ -646,10 +656,21 @@ export class BulkService {
     };
 
     for (let i = 0; i < dataRows.length; i++) {
-      const rowIndex = i + 2; // 1-based, accounting for header
+      let rowIndex = i + 2; // 1-based, accounting for header
       try {
         const values = this.parseCSVLine(dataRows[i]);
         const row = this.mapRowToObject(headers, values);
+
+        // Converted CSVs (Shopify) carry the row's number in the uploaded file
+        // so errors point at what the merchant sees, and rows the converter
+        // already rejected are reported here — per row, never aborting the file.
+        const sourceRow = Number.parseInt(String(row.sourceRow ?? ''), 10);
+        if (Number.isFinite(sourceRow) && sourceRow > 0) rowIndex = sourceRow;
+        if (row._error) {
+          result.failed++;
+          result.errors.push({ row: rowIndex, error: String(row._error) });
+          continue;
+        }
 
         // Variant rows are handled separately — they inherit name/desc/etc.
         // from their parent and only contribute option + variant-level data.
@@ -660,6 +681,20 @@ export class BulkService {
             result.errors.push({
               row: rowIndex,
               error: 'Variant row requires option1Name and option1Value',
+            });
+            continue;
+          }
+          // A fractional/garbled variant price used to fall through toFils() as
+          // undefined and silently inherit the parent's price. Fail the row.
+          const badVariantAmount = (['price', 'compareAtPrice', 'costPrice'] as const).find(k => {
+            const v = row[k];
+            return v !== undefined && String(v).trim() !== '' && !/^\d+$/.test(String(v).trim());
+          });
+          if (badVariantAmount) {
+            result.failed++;
+            result.errors.push({
+              row: rowIndex,
+              error: `Variant ${badVariantAmount} "${row[badVariantAmount]}" must be a whole number of piastres`,
             });
             continue;
           }
@@ -696,9 +731,15 @@ export class BulkService {
           continue;
         }
 
-        if (row.price === undefined || isNaN(Number(row.price))) {
+        // Integer piastres only: parseInt("12.5") is 12, which would silently
+        // store a wrong price. A decimal here is a template mistake — reject it.
+        if (row.price === undefined || !/^\d+$/.test(String(row.price).trim())) {
           result.failed++;
-          result.errors.push({ row: rowIndex, error: 'Price is required and must be a number' });
+          result.errors.push({
+            row: rowIndex,
+            error:
+              'Price is required and must be a whole number of piastres (spreadsheets and Shopify files use EGP with at most 2 decimals)',
+          });
           continue;
         }
 
@@ -826,6 +867,16 @@ export class BulkService {
         result.failed += skipped.length;
         result.errors.push({ row: 0, error: skip.message });
       }
+    }
+
+    // ---- Phase 2.9: plan ceiling for the WHOLE batch (SP5) ----
+    // Counted once, here, BEFORE Phase 3 writes anything (categories, tags) and
+    // before any product row: an over-limit import is rejected whole with a 402
+    // rather than creating the first N rows and failing the rest. Only rows
+    // that CREATE a product count; updates of existing products do not.
+    const newProductCount = validRows.filter(r => !r.existing).length;
+    if (newProductCount > 0) {
+      await assertWithinLimit(storeId, 'maxProducts', { delta: newProductCount });
     }
 
     // ---- Phase 3: Batch-create new categories and tags ----

@@ -25,7 +25,7 @@ describe('computeBundlePrice', () => {
     expect(computeBundlePrice(SUM, 'percentage', 1500)).toBe(12325);
   });
 
-  it('treats fixed as fils off the sum', () => {
+  it('treats fixed as piastres off the sum', () => {
     expect(computeBundlePrice(SUM, 'fixed', 2500)).toBe(12000);
   });
 

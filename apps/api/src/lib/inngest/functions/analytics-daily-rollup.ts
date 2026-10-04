@@ -3,7 +3,7 @@
  *
  * Two Inngest functions:
  *
- *   analyticsDailyRollupCron  — nightly cron at 23:00 UTC (02:00 Kuwait, UTC+3).
+ *   analyticsDailyRollupCron  — nightly cron at 02:00 Cairo (`TZ=` cron, DST-aware).
  *                               Lists the accountingEnabled stores and FANS OUT
  *                               one `insights/rollup-requested` event per store
  *                               (issue 2348) — it does no rollup work itself.
@@ -27,7 +27,7 @@
  */
 
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import {
@@ -37,6 +37,7 @@ import {
   type RollupResult,
 } from '../../../services/accounting/analytics-rollup.service';
 
+import { REGION } from '@force/shared';
 interface RollupStep {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
 }
@@ -68,7 +69,7 @@ export async function runStoreRollupSteps(
 }
 
 // ---------------------------------------------------------------------------
-// Nightly cron — 02:00 Kuwait (= 23:00 UTC)
+// Nightly cron — 02:00 Egypt (= 23:00 UTC)
 // ---------------------------------------------------------------------------
 
 /** Events per `step.sendEvent` call — keeps each request well under Inngest's payload limit. */
@@ -80,19 +81,17 @@ export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunct
     name: 'Insights — nightly cohort/funnel/rfm rollup',
     retries: 2,
     concurrency: { limit: 1 },
-    triggers: [{ cron: '0 23 * * *' }], // 02:00 KW = 23:00 UTC (Kuwait is UTC+3)
+    triggers: [{ cron: `TZ=${REGION.timezone} 0 2 * * *` }], // 02:00 Cairo (DST-aware via TZ=)
   },
   async ({ step }) => {
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
     // stores table does not filter to 0 rows (no tenant GUC is set). Ids only.
     const stores = await step.run('list-stores', () =>
-      withRlsBypass(tx =>
-        tx.store.findMany({
-          where: { accountingEnabled: true, deletedAt: null },
-          select: { id: true },
-          orderBy: { id: 'asc' },
-        })
-      )
+      prisma.store.findMany({
+        where: { accountingEnabled: true, deletedAt: null },
+        select: { id: true },
+        orderBy: { id: 'asc' },
+      })
     );
 
     // One event per store, sent in bounded batches: the per-store work runs in

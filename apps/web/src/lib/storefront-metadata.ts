@@ -49,19 +49,19 @@ export function buildStorefrontMetadata(
 
   // Default OG/meta description when the merchant set no SEO description and no
   // store description. Kept generic + truthful — do NOT bake a shipping promise
-  // ("free delivery over 20 KWD") into the platform default: that claim isn't
+  // ("free delivery over 20 EGP") into the platform default: that claim isn't
   // true for every store and surfaced on stores that never offered it.
   const description =
     localizedDescription ||
     (preferAr
-      ? `تسوق أونلاين من ${localizedStoreName} في الكويت.`
-      : `Shop ${localizedStoreName} online in Kuwait.`);
+      ? `تسوق أونلاين من ${localizedStoreName} في مصر.`
+      : `Shop ${localizedStoreName} online in Egypt.`);
 
   const titleDefault =
     localizedTitle ||
     (preferAr
-      ? `${localizedStoreName} - تسوق أونلاين في الكويت`
-      : `${localizedStoreName} - Online Shopping in Kuwait`);
+      ? `${localizedStoreName} - تسوق أونلاين في مصر`
+      : `${localizedStoreName} - Online Shopping in Egypt`);
 
   // Resolve the og:image entry: use the merchant's explicit raster ogImage when
   // set, else the store-aware `/og?slug=<slug>` card (renders the store's logo
@@ -134,7 +134,7 @@ export function buildStorefrontMetadata(
     // favicons) when the merchant has uploaded a PWA icon set; otherwise
     // fall back to the merchant's custom favicon, else the store's own logo
     // so browser tabs + link-preview (WhatsApp) show the STORE's brand — not
-    // the platform's default Force AI icon when no favicon was uploaded.
+    // the platform's default Ebda icon when no favicon was uploaded.
     // This is the EXACT pre-B5 fallback for any store without favicon32/16.
     const faviconSrc = store.favicon || store.logo || undefined;
     if (pwaActive && (pwaFavicon32 || pwaFavicon16)) {
@@ -152,7 +152,7 @@ export function buildStorefrontMetadata(
   return {
     // og:image (the file-based opengraph-image route) resolves against
     // metadataBase. NEXT_PUBLIC_SITE_URL forces siteUrl to the platform domain
-    // for EVERY store, so og:image pointed at store.forcemediakw.com/opengraph-image
+    // for EVERY store, so og:image pointed at ebda.app/opengraph-image
     // — where the path-slug middleware serves HTML, not the image (broken WhatsApp
     // preview). Anchor metadataBase to the store's OWN domain when it has one so
     // the OG image resolves on the domain the page is actually served from.
@@ -180,8 +180,8 @@ export function buildStorefrontMetadata(
       'e-commerce',
       'online store',
       'shopping',
-      'Kuwait',
-      'KWD',
+      'Egypt',
+      'EGP',
       'delivery',
       localizedStoreName,
     ],
@@ -248,8 +248,8 @@ export function buildStorefrontMetadata(
       : {}),
     // Google Search Console verification. Two layers:
     //   - Platform token (`gzm3VDX...`) verifies the platform domain
-    //     `store.forcemediakw.com`. Applies on the platform path
-    //     (store.forcemediakw.com/<slug>) only.
+    //     `ebda.app`. Applies on the platform path
+    //     (<slug>.ebda.app) only.
     //   - Per-store token (`Store.googleSiteVerification`) verifies the
     //     merchant's own custom domain. Applies only when the request
     //     is being served for that custom domain.

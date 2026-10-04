@@ -276,7 +276,7 @@ describe('PUT /stores/:storeId/tax/rates/:id — an emptied tax-rate field clear
       name: 'VAT',
       nameAr: 'ضريبة',
       rate: 5,
-      country: 'KW',
+      country: 'EG',
       state: 'Hawally',
     });
     mockPrisma.taxRate.update.mockImplementation(({ data }: any) =>

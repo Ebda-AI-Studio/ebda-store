@@ -114,8 +114,8 @@ describe('Customers page KPI strip', () => {
     const strip = await screen.findByTestId('customers-kpi-strip');
     expect(strip.textContent).toContain('12');
     expect(strip.textContent).toContain('25%');
-    expect(strip.textContent).toContain('13.533');
-    expect(strip.textContent).toContain('216.530');
+    expect(strip.textContent).toContain('135.33');
+    expect(strip.textContent).toContain('2,165.30');
   });
 
   it('shows unknown — not zero — for a rate the server could not compute', async () => {

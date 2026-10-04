@@ -31,7 +31,7 @@ const storeState = {
     id: 'store-1',
     name: 'Test Store',
     slug: 'test',
-    currency: 'KWD',
+    currency: 'EGP',
     theme: {} as Record<string, unknown>,
   },
   layout: undefined as StoreLayoutSettings | undefined,
@@ -141,7 +141,7 @@ function render(
     React.createElement(Card as never, {
       product: product as never,
       isRtl,
-      currency: 'KWD',
+      currency: 'EGP',
     })
   );
 }
@@ -360,7 +360,7 @@ function renderCarousel(
     React.createElement(ProductCarousel as never, {
       products: [product] as never,
       isRtl: language === 'ar',
-      currency: 'KWD',
+      currency: 'EGP',
     })
   );
 }
@@ -514,8 +514,8 @@ describe('cardShape radius vs the modern pack (tailwind-merge order)', () => {
       const Comp = get();
       const props =
         name === 'ProductCarousel'
-          ? { products: [NO_SALE], pack: 'modern', cardShape: 'circle', currency: 'KWD' }
-          : { product: NO_SALE, pack: 'modern', cardShape: 'circle', currency: 'KWD' };
+          ? { products: [NO_SALE], pack: 'modern', cardShape: 'circle', currency: 'EGP' }
+          : { product: NO_SALE, pack: 'modern', cardShape: 'circle', currency: 'EGP' };
       const html = renderToStaticMarkup(React.createElement(Comp as never, props as never));
       // The card frame is the element that carries the modern pack's border.
       const frame = html.match(/class="[^"]*border-primary\/15[^"]*"/);
@@ -576,7 +576,7 @@ function renderWithWishlistHandler(
     React.createElement(Card as never, {
       product: product as never,
       isRtl: false,
-      currency: 'KWD',
+      currency: 'EGP',
       onAddToWishlist: () => {},
     })
   );
@@ -752,7 +752,7 @@ describe('quick-add collision — ProductCarousel only lifts the side quick-add 
       React.createElement(ProductCarousel as never, {
         products: [product] as never,
         isRtl: false,
-        currency: 'KWD',
+        currency: 'EGP',
         onAddToCart: () => {},
       })
     );

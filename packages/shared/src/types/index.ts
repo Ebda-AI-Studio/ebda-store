@@ -120,8 +120,8 @@ export interface StoreSettings {
    */
   checkoutDelivery?: CheckoutDeliverySettings;
   /**
-   * Optional, opt-in per-store minimum order value in FILS (1 KWD = 1000
-   * fils). When set to a positive number, a customer cannot place an order
+   * Optional, opt-in per-store minimum order value in PIASTRES (1 EGP = 1000
+   * piastres). When set to a positive number, a customer cannot place an order
    * whose items subtotal (before shipping/tax) falls below it. `0` or
    * unset = no minimum. Platform-level — any store can enable it via this
    * config, never a hardcoded slug. Enforced server-side in
@@ -253,7 +253,7 @@ export interface Product {
   costPrice?: number | null;
   /** Stored discount type — 'percentage' | 'fixed'. null = no admin-authored discount. */
   discountType?: 'percentage' | 'fixed' | null;
-  /** Stored discount value — basis points for percentage, fils for fixed. null when no discount. */
+  /** Stored discount value — basis points for percentage, piastres for fixed. null when no discount. */
   discountValue?: number | null;
   sku?: string | null;
   barcode?: string;
@@ -343,6 +343,7 @@ export interface Order {
 
 export type OrderStatus =
   | 'pending'
+  | 'awaiting_payment_confirmation'
   | 'confirmed'
   | 'processing'
   | 'shipped'

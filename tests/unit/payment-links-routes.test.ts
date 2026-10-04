@@ -72,7 +72,7 @@ const STORE = {
   nameAr: 'متجر',
   domain: 'shop.example',
   slug: 'shop',
-  currency: 'KWD',
+  currency: 'EGP',
   wbsEnabled: true,
   wbsApiKey: 'enc-key',
 };
@@ -125,7 +125,7 @@ beforeEach(() => {
   }));
   mockPrisma.order.delete.mockResolvedValue({});
   mockIsFeatureEnabled.mockResolvedValue(false);
-  mockPaymentService.getDefaultProvider.mockResolvedValue('myfatoorah');
+  mockPaymentService.getDefaultProvider.mockResolvedValue('paymob');
   mockPaymentService.createPayment.mockResolvedValue({
     paymentUrl: 'https://pay.example/inv-1',
     invoiceId: 'inv-1',

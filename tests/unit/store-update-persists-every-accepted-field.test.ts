@@ -34,8 +34,21 @@ vi.mock('@force/database', () => ({
   prisma: { store: { findUnique: findUniqueMock, update: updateMock } },
   Prisma: {},
   withMoneyTx: vi.fn(),
+  // store payloads carry row counts, read inside the store's own scope (`withStore`): zero here.
+  withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
+    fn({
+      // the transaction client is the same fake client, plus the zero counts
+      ...(await import('@force/database')).prisma,
+      product: { count: async () => 0 },
+      category: { count: async () => 0 },
+      order: { count: async () => 0 },
+    }),
+  acrossStores: async (_fn: unknown, o?: { storeIds?: string[] }) =>
+    (o?.storeIds ?? []).map(storeId => ({ storeId, value: { products: 0, orders: 0 } })),
 }));
-vi.mock('@force/shared', () => ({
+vi.mock('@force/shared', async importOriginal => ({
+  // Keep the real region config (REGION is read at import time by api config/services).
+  ...(await importOriginal<typeof import('@force/shared')>()),
   slugify: (s: string) => s,
   // #1518: pulled in transitively by importing `updateStoreSchema`
   // (store.routes.ts's heroCtaLink/settings.contact.addressUrl validators

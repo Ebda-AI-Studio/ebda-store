@@ -5,7 +5,7 @@
  * a key by pasting the English value back into ar.json. So this file also
  * asserts that no ar.json value is byte-identical to its en.json sibling,
  * except a reviewed allowlist of genuine exceptions: brand/product names,
- * acronyms (SKU, SEO, AEO, HEX, TTL, KNET, VIP), currency-independent
+ * acronyms (SKU, SEO, AEO, HEX, TTL, VIP), currency-independent
  * numeric/URL/code-shaped placeholder examples, and pure ICU interpolation
  * templates with no literal words. Every entry below was reviewed at the
  * time it was added — see the B2 admin-i18n-coverage PR.
@@ -39,7 +39,15 @@ const arFlat = flatten(ar as Messages);
 
 // Reviewed exceptions where en === ar is correct, not a missed translation.
 const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
-  // Numeric amount example (0.000 KWD), same digits in both locales.
+  // Self-serve onboarding: LTR example values (email address, Egyptian mobile
+  // in local format, a price in EGP) shown inside dir="ltr" inputs.
+  // InstaPay settings (SP6a): an example address and a local-format mobile, LTR in both locales.
+  'paymentSettings.instapay.handlePlaceholder',
+  'paymentSettings.instapay.phonePlaceholder',
+  'onboarding.signup.emailPlaceholder',
+  'onboarding.signup.phonePlaceholder',
+  'onboarding.flow.product.pricePlaceholder',
+  // Numeric amount example (0.000 EGP), same digits in both locales.
   'customers.detail.wallet.modal.amountPlaceholder',
   // Page-builder example placeholders for bilingual content fields, restored
   // from main (2026-09-25): identical on main by design.
@@ -126,6 +134,10 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
   'promotions.page.valuePercentage',
   'shipping.carriers.icarry.title',
   'shipping.carriers.aramex.title',
+  // SP7: Bosta is a brand name; the phone example is a local-format number, LTR in both locales.
+  'shipping.carriers.bosta.title',
+  'shipping.carriers.shipments.carrierNames.bosta',
+  'shipping.carriers.pickup.placeholders.phone',
   'shipping.carriers.shipments.carrierNames.icarry',
   'shipping.carriers.shipments.carrierNames.aramex',
   'shipping.table.dashPlaceholder',
@@ -141,7 +153,6 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
   'pwa.branding.shortNameArPlaceholder',
   'pwa.branding.descriptionArPlaceholder',
   'pwa.icons.urlPlaceholder',
-  'affiliates.payout.methods.knet',
   'bulk.import.skuPrefixPlaceholder',
   'marketingPixels.platforms.meta.name',
   'marketingPixels.platforms.tiktok.name',
@@ -170,15 +181,8 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
   'notifications.broadcast.placeholders.bodyEn',
   'notifications.broadcast.placeholders.bodyAr',
   'notifications.broadcast.placeholders.url',
-  'paymentSettings.providers.tapName',
-  'paymentSettings.providers.tapNameAr',
-  'paymentSettings.providers.myfatoorahName',
-  'paymentSettings.providers.myfatoorahNameAr',
-  'paymentSettings.providers.hesabeName',
-  'paymentSettings.providers.hesabeNameAr',
-  'paymentSettings.providers.upaymentsName',
-  'paymentSettings.providers.upaymentsNameAr',
-  'paymentSettings.providers.codNameAr',
+  // Kashier merchant id format example (MID-...), LTR in both locales.
+  'paymentSettings.kashier.merchantIdPlaceholder',
   'paymentSettings.cod.displayNamePlaceholder',
   'paymentSettings.cod.displayNameArPlaceholder',
   'paymentSettings.cod.fixedFeePlaceholder',

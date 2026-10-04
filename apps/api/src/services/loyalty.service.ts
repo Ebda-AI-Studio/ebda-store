@@ -3,10 +3,11 @@ import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { featureService } from './feature.service';
 
+import { fromMinor, minorToDecimalString } from '@force/shared';
 // Default loyalty settings structure
 export interface LoyaltySettings {
   // Points earning
-  pointsPerDinar: number; // Points earned per 1 KWD spent (e.g., 10 points per KWD)
+  pointsPerMajorUnit: number; // Points earned per 1 EGP spent (default 1 point per EGP)
   signupBonus: number; // Points given on account creation
   referralBonus: number; // Points for referring someone
   reviewBonus: number; // Points for leaving a review
@@ -21,7 +22,7 @@ export interface LoyaltySettings {
   };
 
   // Redemption
-  pointsValue: number; // Value in fils per point (e.g., 1 point = 1 fils)
+  pointsValue: number; // Value in piastres per point (e.g., 1 point = 1 piastres)
   minRedeemPoints: number; // Minimum points to redeem
   maxRedeemPercentage: number; // Max % of order that can be paid with points
 
@@ -30,7 +31,9 @@ export interface LoyaltySettings {
 }
 
 export const DEFAULT_LOYALTY_SETTINGS: LoyaltySettings = {
-  pointsPerDinar: 10, // 10 points per 1 KWD
+  // 1 point per 1 EGP spent; with pointsValue 1 piastre/point that is a 1% accrual
+  // (FWB: 10 points per 1 KWD at 1 fil/point = the same 1%). Name kept for API compat.
+  pointsPerMajorUnit: 1,
   signupBonus: 100,
   referralBonus: 200,
   reviewBonus: 50,
@@ -41,7 +44,7 @@ export const DEFAULT_LOYALTY_SETTINGS: LoyaltySettings = {
     gold: { minPoints: 5000, multiplier: 1.5 },
     platinum: { minPoints: 15000, multiplier: 2.0 },
   },
-  pointsValue: 1, // 1 point = 1 fils (0.001 KWD)
+  pointsValue: 1, // 1 point = 1 piastre (0.01 EGP)
   minRedeemPoints: 500, // Minimum 500 points to redeem
   maxRedeemPercentage: 50, // Max 50% of order value
   expirationMonths: 12, // Points expire after 1 year
@@ -54,12 +57,12 @@ interface LoyaltySettingsResponse {
 
 /** Result of resolving a requested loyalty redemption against the store's
  *  settings + the customer's balance + the order subtotal. All money is in
- *  FILS (integers). `pointsToRedeem`/`discountFils` are 0 when redemption is
+ *  PIASTRES (integers). `pointsToRedeem`/`discountFils` are 0 when redemption is
  *  not possible (below minimum, no balance, zero subtotal). */
 export interface RedemptionQuote {
   /** Points that will actually be burned (clamped to balance + caps). */
   pointsToRedeem: number;
-  /** Discount in fils = pointsToRedeem * pointsValue. */
+  /** Discount in piastres = pointsToRedeem * pointsValue. */
   discountFils: number;
   /** Whether the requested redemption produced any discount at all. */
   applied: boolean;
@@ -71,7 +74,7 @@ export interface RedemptionQuote {
  * *requested* point count and this function decides what (if anything) is
  * actually redeemable.
  *
- * Rules (all in fils, all integer):
+ * Rules (all in piastres, all integer):
  *  - below `minRedeemPoints` → nothing redeemed (applied=false).
  *  - clamp requested points to the customer's available balance.
  *  - the discount is capped at BOTH the order subtotal AND
@@ -79,7 +82,7 @@ export interface RedemptionQuote {
  *    cap binds, we reduce the burned point count to match so we never spend
  *    points we don't credit as discount (discount = points * pointsValue
  *    exactly — no orphaned points).
- *  - `pointsValue` is fils-per-point (>=1 by schema), so the integer division
+ *  - `pointsValue` is piastres-per-point (>=1 by schema), so the integer division
  *    when re-deriving capped points is exact at the floor.
  */
 export function computeRedemption(
@@ -134,7 +137,7 @@ interface CustomerPointsInfo {
   tierMultiplier: number;
   nextTier: string | null;
   pointsToNextTier: number;
-  pointsValue: number; // Value in fils
+  pointsValue: number; // Value in piastres
 }
 
 /**
@@ -437,9 +440,9 @@ export class LoyaltyService {
     // Get tier multiplier
     const tierInfo = this.getTierInfo(loyalty.totalEarned, settings);
 
-    // Calculate points: (orderTotal in KWD) * pointsPerDinar * tierMultiplier
-    const orderTotalKWD = orderTotalFils / 1000;
-    const basePoints = Math.floor(orderTotalKWD * settings.pointsPerDinar);
+    // Calculate points: (orderTotal in EGP) * pointsPerMajorUnit * tierMultiplier
+    const orderTotalMajor = fromMinor(orderTotalFils);
+    const basePoints = Math.floor(orderTotalMajor * settings.pointsPerMajorUnit);
     const pointsEarned = Math.floor(basePoints * tierInfo.multiplier);
 
     // Update balance and log transaction atomically. Compute the new
@@ -529,7 +532,7 @@ export class LoyaltyService {
    *
    * Called from `OrderService.applyRefundEffects` so every refund path —
    * status-button refund, gateway-initiated webhook refund, manual admin
-   * "Refund via MyFatoorah" — reverses the loyalty credit consistently.
+   * "Refund via provider" — reverses the loyalty credit consistently.
    */
   static async reverseEarnedPointsFromOrder(
     storeId: string,
@@ -746,7 +749,7 @@ export class LoyaltyService {
       );
     }
 
-    // Calculate discount value. pointsValue is fils-per-point.
+    // Calculate discount value. pointsValue is piastres-per-point.
     const discountFils = pointsToRedeem * Math.max(1, Math.floor(settings.pointsValue || 1));
 
     // Race-safe redeem: previously this was read-then-decrement, so two
@@ -793,7 +796,7 @@ export class LoyaltyService {
         orderId,
         type: 'redeem_discount',
         points: -pointsToRedeem,
-        description: `Redeemed ${pointsToRedeem} points for ${(discountFils / 1000).toFixed(3)} KWD discount`,
+        description: `Redeemed ${pointsToRedeem} points for ${minorToDecimalString(discountFils)} EGP discount`,
       },
     });
     const updated = await client.loyaltyPoints.findUnique({

@@ -12,11 +12,11 @@
  * seeded automatically on creation via StoreService.createStore.
  */
 
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '@force/database';
 import { seedCoaForStore } from '../apps/api/dist/services/accounting/account.service.js';
 
 const APPLY = process.argv.includes('--apply');
-const prisma = new PrismaClient();
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
 
 async function main() {
   const stores = await prisma.store.findMany({

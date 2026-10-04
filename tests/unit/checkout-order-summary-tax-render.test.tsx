@@ -89,7 +89,7 @@ describe('checkout OrderSummary — VAT row', () => {
     expect(html).toContain('VAT (5%)');
     // Intl.NumberFormat inserts a NBSP between the currency code and the
     // amount — match loosely rather than pin an invisible character.
-    expect(html).toMatch(/KWD\s*1\.000/);
+    expect(html).toMatch(/EGP\s*10\.00/);
     expect(html).not.toContain('Incl.');
   });
 
@@ -110,10 +110,10 @@ describe('checkout OrderSummary — VAT row', () => {
     expect(totalAt).toBeGreaterThan(-1);
     expect(inclAt).toBeGreaterThan(totalAt);
     const afterIncl = html.slice(inclAt, inclAt + 150);
-    // One combined text node ("Incl. VAT (5%) — KWD 1.000"), not a second
+    // One combined text node ("Incl. VAT (5%) — EGP 10.00"), not a second
     // <span class="... tabular-nums">amount</span> lined up under the
     // Subtotal/Shipping/Total column.
-    expect(afterIncl).toMatch(/Incl\. VAT \(5%\)[^<]*1\.000/);
+    expect(afterIncl).toMatch(/Incl\. VAT \(5%\)[^<]*10\.00/);
     expect(afterIncl).not.toMatch(/tabular-nums/);
   });
 

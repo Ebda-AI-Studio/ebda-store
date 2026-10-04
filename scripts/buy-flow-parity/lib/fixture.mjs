@@ -17,10 +17,14 @@ export const OWNER_PASSWORD = 'BfpOwner!Parity2026';
 // nosemgrep: generic.secrets.security.detected-bcrypt-hash.detected-bcrypt-hash -- hash of the throwaway local-harness password above, only ever seeded into a disposable local database
 const OWNER_HASH = '$2b$10$YZe6BZQ1L6DcDfyLDvHQLOXyy9PqCJ1Ml.fS6JBxcdoaNwOo0nEQi';
 
-export const MF_API_KEY = 'bfp-parity-myfatoorah-api-key';
-export const MF_WEBHOOK_SECRET = 'bfp-parity-myfatoorah-webhook-secret';
-export const COD_FEE = 500; // fils
-export const VAT_RATE = '5.00';
+// Paymob (the harness gateway): the Secret key (`Authorization: Token`), the HMAC secret that signs
+// the transaction callback, the public key, and one integration id per method.
+export const PM_SECRET_KEY = 'bfp-parity-paymob-secret-key';
+export const PM_HMAC_SECRET = 'bfp-parity-paymob-hmac-secret';
+export const PM_PUBLIC_KEY = 'bfp-parity-paymob-public-key';
+export const PM_INTEGRATIONS = { card: 11, meeza: 22, wallet: 33, valu: 44 };
+export const COD_FEE = 500; // piastres (5.00 EGP)
+export const VAT_RATE = '14.00';
 
 /** Name-derived UUID (v5-shaped). Stable across runs, refs and machines. */
 export function sid(name) {
@@ -92,7 +96,7 @@ export function buildFixture({ encryptionKey, scenarios }) {
         slug: `bfp-parity-${key}`,
         owner_id: ownerId,
         status: 'active',
-        currency: 'KWD',
+        currency: 'EGP',
         settings: {},
         // The 'vat' store's tax_rates row (below) only actually charges/
         // shows VAT once resolveActiveTaxRate's taxEnabled gate is on too
@@ -116,17 +120,18 @@ export function buildFixture({ encryptionKey, scenarios }) {
     }
     sql.push(
       insert('payment_configs', {
-        id: reg(`paycfg:${key}:myfatoorah`),
+        id: reg(`paycfg:${key}:paymob`),
         store_id: storeId,
-        provider: 'myfatoorah',
+        provider: 'paymob',
         is_enabled: true,
         is_default: true,
-        display_name: 'MyFatoorah',
-        api_key: encryptSecret(MF_API_KEY, encryptionKey),
-        webhook_secret: encryptSecret(MF_WEBHOOK_SECRET, encryptionKey),
+        display_name: 'Paymob',
+        api_key: encryptSecret(PM_SECRET_KEY, encryptionKey),
+        webhook_secret: encryptSecret(PM_HMAC_SECRET, encryptionKey),
         test_mode: true,
-        supported_methods: ['knet', 'visa'],
-        supported_currencies: ['KWD'],
+        supported_methods: ['card', 'meeza', 'wallet', 'valu'],
+        supported_currencies: ['EGP'],
+        settings: { publicKey: PM_PUBLIC_KEY, integrationIds: PM_INTEGRATIONS },
         updated_at: ts,
       })
     );
@@ -142,18 +147,18 @@ export function buildFixture({ encryptionKey, scenarios }) {
         updated_at: ts,
       })
     );
-    // Kuwait per-area delivery rates (what pecannbee-style stores configure).
+    // Egypt per-area delivery rates, in piastres (15.00 / 20.00 EGP; free over 400.00 EGP).
     const rates = [
-      ['Hawalli', 'حولي', 'Salmiya', 'السالمية', 1500, 40000],
-      ['Capital', 'العاصمة', 'Sharq', 'شرق', 2000, null],
+      ['Cairo', 'القاهرة', 'Nasr City', 'مدينة نصر', 1500, 40000],
+      ['Giza', 'الجيزة', 'Dokki', 'الدقي', 2000, null],
     ];
     for (const [gov, govAr, area, areaAr, fee, free] of rates) {
       sql.push(
         insert('shipping_area_rates', {
           id: reg(`rate:${key}:${area}`),
           store_id: storeId,
-          country: 'Kuwait',
-          country_ar: 'الكويت',
+          country: 'Egypt',
+          country_ar: 'مصر',
           governorate: gov,
           governorate_ar: govAr,
           area,

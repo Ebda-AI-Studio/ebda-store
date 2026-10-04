@@ -8,7 +8,7 @@
  *      - skips when accessToken is missing
  *      - skips when pixel is disabled
  *      - skips when accessToken is still the masked sentinel
- *      - builds the correct Meta CAPI request shape (currency, value÷1000, event_id=orderId,
+ *      - builds the correct Meta CAPI request shape (currency, value÷100, event_id=orderId,
  *        hashed email + phone, action_source, event_name)
  *      - builds the correct TikTok Events API request shape
  *      - passes test_event_code when configured
@@ -67,8 +67,8 @@ function sha256(value: string): string {
 
 const ORDER: PurchaseOrderData = {
   id: '550e8400-e29b-41d4-a716-446655440000',
-  total: 5000, // 5.000 KWD
-  currency: 'KWD',
+  total: 5000, // 50.00 EGP (piastres)
+  currency: 'EGP',
   customer: { email: '  Test@Example.com  ', phone: '+965 9999-8888' },
   shippingAddress: null,
 };
@@ -275,14 +275,14 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
     expect(body.data[0].event_id).toBe(ORDER.id);
   });
 
-  it('converts total milliKWD to decimal value', async () => {
-    // ORDER.total = 5000 milliKWD → should be 5.000 KWD
+  it('converts total piastres to decimal major value', async () => {
+    // ORDER.total = 5000 piastres → should be 50.00 EGP
     await sendPurchaseConversion(META_PIXELS, ORDER, STORE_URL);
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = metaBody(init);
-    expect(body.data[0].custom_data.value).toBeCloseTo(5.0, 3);
-    expect(body.data[0].custom_data.currency).toBe('KWD');
+    expect(body.data[0].custom_data.value).toBeCloseTo(50.0, 2);
+    expect(body.data[0].custom_data.currency).toBe('EGP');
   });
 
   it('sends SHA-256-hashed email in user_data.em array', async () => {
@@ -330,7 +330,7 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
     const order: PurchaseOrderData = {
       id: 'no-pii-order',
       total: 1000,
-      currency: 'KWD',
+      currency: 'EGP',
       customer: null,
       shippingAddress: null,
     };
@@ -345,7 +345,7 @@ describe('sendPurchaseConversion — Meta CAPI payload', () => {
     const order: PurchaseOrderData = {
       id: 'addr-pii-order',
       total: 2000,
-      currency: 'KWD',
+      currency: 'EGP',
       customer: null,
       shippingAddress: { email: 'guest@shop.com', phone: '+96599001122' },
     };
@@ -392,13 +392,13 @@ describe('sendPurchaseConversion — TikTok Events API payload', () => {
     expect(body.event_id).toBe(ORDER.id);
   });
 
-  it('sends correct value (milliKWD ÷ 1000) and currency', async () => {
+  it('sends correct value (piastres ÷ 100) and currency', async () => {
     await sendPurchaseConversion(TIKTOK_PIXELS, ORDER, STORE_URL);
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(init.body as string);
-    expect(body.properties.value).toBeCloseTo(5.0, 3);
-    expect(body.properties.currency).toBe('KWD');
+    expect(body.properties.value).toBeCloseTo(50.0, 2);
+    expect(body.properties.currency).toBe('EGP');
   });
 
   it('hashes email in context.user.email', async () => {
@@ -493,7 +493,7 @@ describe('isErasedCustomerOrder — right-to-erasure CAPI suppression', () => {
       isErasedCustomerOrder({
         firstName: 'Ahmad',
         email: 'shopper@example.com',
-        city: 'Kuwait City',
+        city: 'Cairo',
       })
     ).toBe(false);
   });

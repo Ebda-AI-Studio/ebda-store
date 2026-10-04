@@ -22,7 +22,7 @@ vi.mock('@force/database', () => ({
 }));
 
 vi.mock('@api/config', () => ({
-  config: { webUrl: 'https://store.force-ai.co', apiUrl: 'https://api.force-ai.co' },
+  config: { webUrl: 'https://ebda.app', apiUrl: 'https://api.ebda.app' },
 }));
 
 vi.mock('@api/lib/product-feed', () => ({
@@ -142,7 +142,7 @@ function reqWith(headers: Record<string, string>) {
 
 const res = () => ({ json: vi.fn(), set: vi.fn(), setHeader: vi.fn(), status: vi.fn() });
 
-const store = { id: 'store-1', name: 'S', slug: 'demo', currency: 'KWD', domain: null };
+const store = { id: 'store-1', name: 'S', slug: 'demo', currency: 'EGP', domain: null };
 const bundle = (id: string, startsAt: Date | null, expiresAt: Date | null) => ({
   id,
   name: id,

@@ -53,9 +53,9 @@ describe('resolveStorefrontLocale', () => {
     await expect(resolveStorefrontLocale('en')).resolves.toBe('en');
   });
 
-  it('falls back to en when neither cookie nor store default is set', async () => {
-    await expect(resolveStorefrontLocale(undefined)).resolves.toBe('en');
-    await expect(resolveStorefrontLocale(null)).resolves.toBe('en');
+  it('falls back to ar (Arabic-first, REGION.defaultLocale) when neither cookie nor store default is set', async () => {
+    await expect(resolveStorefrontLocale(undefined)).resolves.toBe('ar');
+    await expect(resolveStorefrontLocale(null)).resolves.toBe('ar');
   });
 
   it('ignores a garbage cookie value and falls through to the store default', async () => {

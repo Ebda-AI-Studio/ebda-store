@@ -1,7 +1,7 @@
 import { prisma } from '@force/database';
 
 /**
- * Funnel read model over `funnel_snapshots` (one row per store per KW day,
+ * Funnel read model over `funnel_snapshots` (one row per store per Cairo day,
  * written by the nightly `runFunnelRollup`). Shared by
  * `GET /insights/funnel` and the merchant MCP `admin_get_funnel` tool so the
  * two cannot disagree about the rows they read.

@@ -1,0 +1,65 @@
+---
+title: Webhooks
+description: Payment and billing webhooks, signature verification, idempotency and what status codes mean.
+section: Concepts
+order: 7
+---
+
+Ebda receives webhooks from payment and billing gateways. Verification always runs over the **exact raw bytes** the gateway sent, so the routes are mounted before the JSON body parser.
+
+## Subscription billing webhooks
+
+`POST /api/v1/webhooks/billing/:provider`
+
+Order of operations: **verify the signature, de-duplicate by the provider's event id, then settle**, all inside one database transaction.
+
+| Provider          | Header                | Scheme                                                                                                      |
+| ----------------- | --------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `kashier`         | `x-kashier-signature` | HMAC-SHA256 (hex) keyed by the payment API key, over the fields named in the payload's `data.signatureKeys` |
+| stub (tests only) | `x-stub-signature`    | `hex(HMAC-SHA256(secret, rawBody))`                                                                         |
+
+For Kashier the payload must list the signed fields in `data.signatureKeys`, and that list must cover the required identifying fields, otherwise the event is refused. The signature comparison is constant time.
+
+| Status                  | Meaning                                                                 |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `200`                   | Processed, or a replay (`duplicate: true`), or an ignored event         |
+| `401 INVALID_SIGNATURE` | Bad or missing signature. Nothing was parsed or stored                  |
+| `500`                   | Processing failed. The gateway should retry; nothing was marked as seen |
+
+## Payment webhooks
+
+`POST /api/v1/webhooks/payment/:provider`
+
+Each merchant connects their own Paymob, Kashier or Fawry account, and each gateway signs its webhook differently. Every delivery must be signed; without a signature the API answers `401`-class `MISSING_SIGNATURE` and records the attempt. The signature is then verified against the **per-store secret** the merchant saved:
+
+| Provider  | Where the signature is           | Scheme                                                                                                                     |
+| --------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `paymob`  | the `hmac` query parameter       | HMAC-SHA512 (hex) over 20 callback fields in a fixed order (amount, ids, success / pending / voided / refunded flags, ...) |
+| `kashier` | the `x-kashier-signature` header | HMAC-SHA256 (hex) over the fields named in `data.signatureKeys`, which must cover the order, amount, currency and status   |
+| `fawry`   | `messageSignature` in the body   | SHA-256 over the notification fields with the merchant's secure key appended (a plain hash, not an HMAC)                   |
+
+The payment is matched to its store by the provider's own reference (an exact match through a narrow database lookup), and a verified delivery is recorded before it is acted on, so a replay is a no-op. A signature that does not verify never moves money.
+
+| Status                       | Meaning                                                                                                                      |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `200`                        | Accepted. Work is queued durably; a duplicate delivery answers `200 Webhook already processed` so the gateway stops retrying |
+| `400 MISSING_TRANSACTION_ID` | The payload has no transaction id we recognise, so it cannot be de-duplicated safely                                         |
+| `400 INVALID_PROVIDER`       | Unknown provider segment                                                                                                     |
+
+## Receiving your own events
+
+Ebda does not yet send outbound webhooks to merchants. If you need order events, use the [merchant API](/merchant-api/) or ask support.
+
+## Implementing a verifier (your own endpoint)
+
+If you build a service that receives gateway callbacks in the same style, the safe pattern is:
+
+```js
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+export function verify(rawBody, signatureHex, secret) {
+  const expected = createHmac('sha256', secret).update(rawBody).digest();
+  const given = Buffer.from(signatureHex.trim().toLowerCase(), 'hex');
+  return given.length === expected.length && timingSafeEqual(given, expected);
+}
+```

@@ -39,7 +39,7 @@ import { AppError } from '../../middleware/error-handler';
  *
  * Tool output lands in a third-party LLM's context window and its transcript.
  * A customer's email and phone therefore leave as `a***@gmail.com` /
- * `+965 ****1234`, and no street-level address is returned. There is no
+ * `+201 ****1234`, and no street-level address is returned. There is no
  * unmask flag: the merchant has the full record on the dashboard, and an
  * agent does not need a shopper's door to reason about the business.
  *
@@ -122,7 +122,7 @@ export function registerAdminCustomerMarketingReadTools(server: McpServer, store
         "List this store's discount coupons: code, type (percentage or fixed), value, " +
         'usage against its limit, active dates, and a derived state ' +
         '(active / scheduled / expired / exhausted / inactive). A fixed value and every ' +
-        'amount are in fils (1 KWD = 1000 fils); a percentage value is 0-100.',
+        'amount are in piastres (1 EGP = 100 piastres); a percentage value is 0-100.',
       inputSchema: {
         search: z.string().trim().min(1).max(100).optional().describe('match code or name'),
         isActive: z.boolean().optional(),
@@ -175,7 +175,7 @@ export function registerAdminCustomerMarketingReadTools(server: McpServer, store
       description:
         "List this store's customers exactly as the admin Customers page groups them — " +
         'registered shoppers AND guest checkouts (grouped by email, else phone) — with ' +
-        'order count, total spent (fils), last order and RFM segment. Sorted by total ' +
+        'order count, total spent (piastres), last order and RFM segment. Sorted by total ' +
         'spent, highest first. Email and phone are MASKED; use `customerRef` with ' +
         'admin_get_customer for one customer. `segment` filters to an RFM segment or ' +
         "'guest'.",

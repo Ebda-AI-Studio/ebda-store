@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { prisma, Prisma, OrderStatus, withMoneyTx, setTenantGucs } from '@force/database';
-import { checkMinimumOrder, allocateBundlePrice } from '@force/shared';
+import {
+  checkMinimumOrder,
+  allocateBundlePrice,
+  fromMinor,
+  minorToDecimalString,
+  REGION,
+} from '@force/shared';
 import { generateOrderNumber } from '../utils/order-number';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { pairBackorderedLines } from '../lib/backorder-pairing';
@@ -38,6 +44,7 @@ import {
   invalidateCustomersCache,
 } from '../lib/public-cache';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
+import { noteOrderCreated } from './plan-limit.service';
 import { amountOnlyRefundKey } from '../lib/refund-methods';
 import { lineUnitCost } from '../lib/order-line-cost';
 import { customerKeyOf } from '../lib/customer-key';
@@ -258,7 +265,7 @@ export async function orderSearchWhere(
     }),
     guestOrderIdsMatching(storeId, search),
   ]);
-  // Each half degrades on its OWN: a broad guest term (every Kuwait guest phone starts `+965`)
+  // Each half degrades on its OWN: a broad guest term (every Egyptian guest phone starts `+20`)
   // must not cost the registered half its indexed `customer_id IN (...)` arm, nor the reverse
   // (issue 2444). Both over the cap is exactly `relationFallback`.
   const arms: Prisma.OrderWhereInput[] = [{ orderNumber: contains }];
@@ -486,7 +493,35 @@ export class OrderService {
       throw new AppError(404, 'NOT_FOUND', 'Order not found');
     }
 
-    return order;
+    // InstaPay (SP6a): what the merchant needs to match the transfer against their
+    // InstaPay app: the reference the customer entered and the hold deadline. A
+    // derived summary, never the raw payment metadata. Only present on an InstaPay
+    // order, so every other order keeps exactly the shape it always had.
+    const result: typeof order & {
+      instapay?: {
+        customerReference: string | null;
+        customerReferenceAt: string | null;
+        handle: string | null;
+        expiresAt: string | null;
+      };
+    } = order;
+    if (order.payments?.some(p => p.provider === 'instapay')) {
+      const ip = await prisma.payment.findFirst({
+        where: { orderId, provider: 'instapay' },
+        orderBy: { createdAt: 'desc' },
+        select: { metadata: true },
+      });
+      const m = (ip?.metadata ?? {}) as Record<string, unknown>;
+      const str = (v: unknown) => (typeof v === 'string' && v ? v : null);
+      result.instapay = {
+        customerReference: str(m.customerReference),
+        customerReferenceAt: str(m.customerReferenceAt),
+        handle: str(m.handle),
+        expiresAt: order.paymentConfirmationExpiresAt?.toISOString() ?? null,
+      };
+    }
+
+    return result;
   }
 
   static async getByOrderNumber(storeId: string, orderNumber: string) {
@@ -735,7 +770,7 @@ export class OrderService {
     // Build the targeting cart snapshot (product + category ids, per-line
     // totals) shared by coupon targeting and automatic promotion resolution.
     // Prices each line the same way as `subtotal` so scoped discounts compute
-    // against the exact fils the customer is charged.
+    // against the exact piastres the customer is charged.
     const cartItems = cart.items.map(item => ({
       productId: item.productId,
       categoryIds: (productInternalsById.get(item.productId)?.categories ?? []).map(
@@ -746,7 +781,7 @@ export class OrderService {
     }));
 
     // Per-store, opt-in minimum order value (Store.settings.minimumOrderFils,
-    // fils; 0/unset = no minimum). Platform-level — any store can configure
+    // piastres; 0/unset = no minimum). Platform-level — any store can configure
     // it, never a hardcoded slug. This is the REAL guard for the customer
     // checkout path; the storefront cart/checkout mirror it for UX only.
     // Deliberately NOT applied to OrderService.createAdminOrder — merchants
@@ -765,7 +800,7 @@ export class OrderService {
       throw new AppError(
         400,
         'MINIMUM_ORDER_NOT_MET',
-        `Minimum order value of ${((minimumOrderFils as number) / 1000).toFixed(3)} KWD required`
+        `Minimum order value of ${minorToDecimalString(minimumOrderFils as number)} EGP required`
       );
     }
 
@@ -868,9 +903,7 @@ export class OrderService {
         throw new AppError(
           400,
           'MIN_ORDER_NOT_MET',
-          `Minimum order amount of ${(appliedCoupon.minOrderAmount / 1000).toFixed(
-            3
-          )} KWD required for this coupon`
+          `Minimum order amount of ${minorToDecimalString(appliedCoupon.minOrderAmount)} ${REGION.currency} required for this coupon`
         );
       }
       // Targeting is evaluated for EVERY coupon type, including free_shipping —
@@ -1017,7 +1050,7 @@ export class OrderService {
     const order = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       // The public checkout (`POST /public/orders`) and the MCP `place_order`
       // tool reach this with NO tenant context, and `backorder_lines` (written
-      // below for backordered lines) has a STRICT RLS policy: under `force_app`
+      // below for backordered lines) has a STRICT RLS policy: under `ebda_app`
       // that insert is rejected and the whole order rolls back. Set the store
       // on this transaction's own connection. Inert on the owner role; a
       // no-op repeat when the caller's context already carried it.
@@ -1628,7 +1661,7 @@ export class OrderService {
     }
 
     // Notifications: only fire NOW for COD orders. For online-payment orders
-    // (Tap / MyFatoorah / Hesabe / UPayments) the customer hasn't actually
+    // (Paymob / Kashier / Fawry) the customer hasn't actually
     // paid yet at this point — firing emails / push / dispatcher here would
     // produce "new order" pings that turn into ghosts when the customer
     // abandons at the gateway and the order rolls back. Online-payment
@@ -1670,6 +1703,10 @@ export class OrderService {
     // Checkout decremented inventory inside the tx above (now committed) — bust
     // the storefront product caches so a sold-out item stops showing "in stock".
     await bustProductCaches(storeId);
+
+    // Monthly order cap (SP5): NEVER blocks checkout. Flags the store over its
+    // plan and notifies the merchant once a month — see `noteOrderCreated`.
+    void deferAfterTenantCommit('plan.noteOrderCreated', () => noteOrderCreated(storeId));
 
     return order;
   }
@@ -1907,6 +1944,17 @@ export class OrderService {
     // direct writers via `assertValidTransition` (see its doc comment for
     // the allowed-list rationale).
     assertValidTransition(order.status, status);
+    // An InstaPay order leaves `awaiting_payment_confirmation` for `confirmed`
+    // ONLY through the merchant's confirm (instapay-confirmation: it also records
+    // the payment, the audit trail and the post-payment fan-out). A bare status
+    // write would mark the order confirmed with no money recorded behind it.
+    if (order.status === 'awaiting_payment_confirmation' && status === 'confirmed') {
+      throw new AppError(
+        409,
+        'INSTAPAY_CONFIRM_REQUIRED',
+        'Confirm the InstaPay payment to confirm this order'
+      );
+    }
     // pending/cancelled → refunded exists for orders that captured a payment
     // (PR #770). A manual status change must not mark an order that never took
     // money as refunded.
@@ -2351,7 +2399,7 @@ export class OrderService {
    * NEVER trust client-asserted price/total.
    *
    * Creates the order in 'pending' / 'unpaid' state; the admin can
-   * then issue a MyFatoorah payment link via the existing
+   * then issue a payment link via the existing
    * /orders/:id/payment-link endpoint, OR mark it COD-paid, OR call
    * mark-paid once cash is collected. Ahmad 2026-05-16: 'admin can
    * land an order ... and copy the payment link'.
@@ -2371,12 +2419,12 @@ export class OrderService {
         quantity: number;
       }>;
       paymentMethod?: 'online' | 'cod';
-      paymentProvider?: 'tap' | 'myfatoorah' | 'hesabe' | 'upayments' | 'cod';
+      paymentProvider?: 'paymob' | 'kashier' | 'fawry' | 'instapay' | 'cod';
       notes?: string;
       couponCode?: string;
       currency?: string;
       /**
-       * Optional shipping fee override in integer fils (KWD × 1000).
+       * Optional shipping fee override in integer piastres (EGP × 100).
        * When present, replaces the ShippingService-computed fee.
        * Used for negotiated phone-order rates.
        */
@@ -2506,7 +2554,7 @@ export class OrderService {
     }
 
     // Manual override: if the admin specified a negotiated shipping fee
-    // (integer fils), it takes precedence over the calculated value.
+    // (integer piastres), it takes precedence over the calculated value.
     // This is intentionally applied AFTER calculateShipping so that any
     // future coupon type=free_shipping still runs against the base fee
     // first (the coupon block below may zero it out regardless).
@@ -2714,7 +2762,7 @@ export class OrderService {
           shipping,
           discount: couponDiscount,
           total,
-          currency: data.currency ?? 'KWD',
+          currency: data.currency ?? REGION.currency,
           couponCode: couponCode ?? null,
           shippingAddress: data.shippingAddress as Prisma.InputJsonValue,
           billingAddress: (data.billingAddress ?? data.shippingAddress) as Prisma.InputJsonValue,
@@ -2810,6 +2858,9 @@ export class OrderService {
       },
       '[Admin-Order] created on behalf of customer'
     );
+
+    // Same soft monthly-cap policy as storefront checkout (SP5).
+    void deferAfterTenantCommit('plan.noteOrderCreated', () => noteOrderCreated(storeId));
 
     return order;
   }

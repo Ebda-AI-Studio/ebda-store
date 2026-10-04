@@ -1,8 +1,8 @@
 /**
  * WhatsApp Templates Admin Routes — Phase 7
  *
- * Lets a store admin (or super-admin) manage their Force AI canonical
- * WhatsApp template set. Templates are picked from a fixed Force AI
+ * Lets a store admin (or super-admin) manage their Ebda canonical
+ * WhatsApp template set. Templates are picked from a fixed Ebda
  * library (apps/api/src/lib/wa-templates/definitions.ts) — no custom
  * body text in v1 to keep Meta approval predictable.
  *

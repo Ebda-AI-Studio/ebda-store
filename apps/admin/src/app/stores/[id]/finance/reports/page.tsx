@@ -6,7 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { toCsv } from '@/lib/csv';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiFetch } from '@/lib/api';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
 import { resolveStoreTimeZone, zonedIsoDay, zonedMonthStartDay } from '@force/shared';
@@ -87,11 +87,11 @@ interface TaxReportData {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const kwd = filsToKwd;
+const major = minorToMajor;
 
 // Default pickers name the STORE's today / month start — the days the API
 // resolves `YYYY-MM-DD` in (Ruling FRT-1). `toISOString()` gave the UTC day,
-// so before 03:00 Kuwait time "today" was still yesterday.
+// so before 03:00 Egypt time "today" was still yesterday.
 function todayIso(timeZone: string): string {
   return zonedIsoDay(new Date(), timeZone);
 }
@@ -191,9 +191,9 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
       r.code,
       r.nameEn,
       r.nameAr ?? '',
-      kwd(r.debit),
-      kwd(r.credit),
-      kwd(r.balance),
+      major(r.debit),
+      major(r.credit),
+      major(r.balance),
     ]);
     downloadCsv(`trial-balance-as-of-${asOf}.csv`, [
       [`Filters: As of = ${asOf}`],
@@ -260,13 +260,13 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
                     {tb('accountName')}
                   </th>
                   <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                    {tb('debit')} (KWD)
+                    {tb('debit')} (EGP)
                   </th>
                   <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                    {tb('credit')} (KWD)
+                    {tb('credit')} (EGP)
                   </th>
                   <th className="text-end px-3 py-2 w-28 font-medium text-muted-foreground">
-                    {tb('balance')} (KWD)
+                    {tb('balance')} (EGP)
                   </th>
                 </tr>
               </thead>
@@ -282,9 +282,9 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-end font-mono">{kwd(r.debit)}</td>
-                    <td className="px-3 py-2 text-end font-mono">{kwd(r.credit)}</td>
-                    <td className="px-3 py-2 text-end font-mono">{kwd(r.balance)}</td>
+                    <td className="px-3 py-2 text-end font-mono">{major(r.debit)}</td>
+                    <td className="px-3 py-2 text-end font-mono">{major(r.credit)}</td>
+                    <td className="px-3 py-2 text-end font-mono">{major(r.balance)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -294,10 +294,10 @@ function TrialBalanceTab({ storeId, timeZone }: { storeId: string; timeZone: str
                     {tb('totals')}
                   </td>
                   <td className="px-3 py-2 text-end font-mono font-semibold">
-                    {kwd(totals.debit)}
+                    {major(totals.debit)}
                   </td>
                   <td className="px-3 py-2 text-end font-mono font-semibold">
-                    {kwd(totals.credit)}
+                    {major(totals.credit)}
                   </td>
                   <td className="px-3 py-2 text-end text-xs">
                     {balanced && <span className="text-green-700">{tb('balanced')}</span>}
@@ -357,14 +357,14 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
     if (!data) return;
     const rows: string[][] = [];
     rows.push([tp('revenue'), '', '']);
-    data.revenue.accounts.forEach(a => rows.push([a.code, a.nameEn, kwd(a.balance)]));
-    rows.push([tp('totalRevenue'), '', kwd(data.revenue.total)]);
+    data.revenue.accounts.forEach(a => rows.push([a.code, a.nameEn, major(a.balance)]));
+    rows.push([tp('totalRevenue'), '', major(data.revenue.total)]);
     rows.push([]);
     rows.push([tp('expenses'), '', '']);
-    data.expenses.accounts.forEach(a => rows.push([a.code, a.nameEn, kwd(a.balance)]));
-    rows.push([tp('totalExpenses'), '', kwd(data.expenses.total)]);
+    data.expenses.accounts.forEach(a => rows.push([a.code, a.nameEn, major(a.balance)]));
+    rows.push([tp('totalExpenses'), '', major(data.expenses.total)]);
     rows.push([]);
-    rows.push([tp('netIncome'), '', kwd(data.netIncome)]);
+    rows.push([tp('netIncome'), '', major(data.netIncome)]);
     downloadCsv(`pnl-${from}_to_${to}.csv`, [[`Filters: Date range = ${from} to ${to}`], ...rows]);
   }
 
@@ -436,7 +436,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                         {a.code}
                       </td>
                       <td className="px-3 py-2">{a.nameEn}</td>
-                      <td className="px-3 py-2 text-end font-mono">{kwd(a.balance)} KWD</td>
+                      <td className="px-3 py-2 text-end font-mono">{major(a.balance)} EGP</td>
                     </tr>
                   ))}
                 </tbody>
@@ -446,7 +446,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                       {tp('totalRevenue')}
                     </td>
                     <td className="px-3 py-2 text-end font-mono font-semibold text-green-700">
-                      {kwd(data.revenue.total)} KWD
+                      {major(data.revenue.total)} EGP
                     </td>
                   </tr>
                 </tfoot>
@@ -466,7 +466,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                         {a.code}
                       </td>
                       <td className="px-3 py-2">{a.nameEn}</td>
-                      <td className="px-3 py-2 text-end font-mono">{kwd(a.balance)} KWD</td>
+                      <td className="px-3 py-2 text-end font-mono">{major(a.balance)} EGP</td>
                     </tr>
                   ))}
                 </tbody>
@@ -476,7 +476,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
                       {tp('totalExpenses')}
                     </td>
                     <td className="px-3 py-2 text-end font-mono font-semibold text-red-600">
-                      {kwd(data.expenses.total)} KWD
+                      {major(data.expenses.total)} EGP
                     </td>
                   </tr>
                 </tfoot>
@@ -493,7 +493,7 @@ function PnlTab({ storeId, timeZone }: { storeId: string; timeZone: string }) {
               }`}
             >
               {data.netIncome < 0 ? '−' : ''}
-              {kwd(Math.abs(data.netIncome))} KWD
+              {major(Math.abs(data.netIncome))} EGP
             </span>
           </div>
         </div>
@@ -549,16 +549,16 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
     if (!data) return;
     const rows: string[][] = [];
     rows.push([tbs('assets'), '', '']);
-    data.assets.accounts.forEach(a => rows.push([a.code, a.nameEn, kwd(a.balance)]));
-    rows.push([tbs('totalAssets'), '', kwd(data.assets.total)]);
+    data.assets.accounts.forEach(a => rows.push([a.code, a.nameEn, major(a.balance)]));
+    rows.push([tbs('totalAssets'), '', major(data.assets.total)]);
     rows.push([]);
     rows.push([tbs('liabilities'), '', '']);
-    data.liabilities.accounts.forEach(a => rows.push([a.code, a.nameEn, kwd(a.balance)]));
-    rows.push([tbs('totalLiabilities'), '', kwd(data.liabilities.total)]);
+    data.liabilities.accounts.forEach(a => rows.push([a.code, a.nameEn, major(a.balance)]));
+    rows.push([tbs('totalLiabilities'), '', major(data.liabilities.total)]);
     rows.push([]);
     rows.push([tbs('equity'), '', '']);
-    data.equity.accounts.forEach(a => rows.push([a.code, accountLabel(a), kwd(a.balance)]));
-    rows.push([tbs('totalEquity'), '', kwd(data.equity.total)]);
+    data.equity.accounts.forEach(a => rows.push([a.code, accountLabel(a), major(a.balance)]));
+    rows.push([tbs('totalEquity'), '', major(data.equity.total)]);
     downloadCsv(`balance-sheet-as-of-${asOf}.csv`, [[`Filters: As of = ${asOf}`], ...rows]);
   }
 
@@ -590,7 +590,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-end font-mono">{kwd(a.balance)} KWD</td>
+                  <td className="px-3 py-2 text-end font-mono">{major(a.balance)} EGP</td>
                 </tr>
               ))}
             </tbody>
@@ -600,7 +600,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
                   {totalLabel}
                 </td>
                 <td className="px-3 py-2 text-end font-mono font-semibold">
-                  {kwd(section.total)} KWD
+                  {major(section.total)} EGP
                 </td>
               </tr>
             </tfoot>
@@ -664,7 +664,7 @@ function BalanceSheetTab({ storeId, timeZone }: { storeId: string; timeZone: str
             <p className="text-sm text-green-700">{tbs('balanced')}</p>
           ) : (
             <p className="text-sm text-red-600">
-              {tbs('unbalanced', { amount: kwd(Math.abs(difference)) })}
+              {tbs('unbalanced', { amount: major(Math.abs(difference)) })}
             </p>
           )}
         </div>
@@ -733,10 +733,10 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
       r.date,
       r.orderNumber,
       r.customerName ?? '',
-      kwd(r.subtotal),
+      major(r.subtotal),
       `${r.taxRate}%`,
-      kwd(r.taxCollected),
-      r.total === null ? '' : kwd(r.total),
+      major(r.taxCollected),
+      r.total === null ? '' : major(r.total),
     ]);
     downloadCsv(`tax-report-${from}_to_${to}.csv`, [
       [`Filters: Date range = ${from} to ${to}`],
@@ -814,13 +814,13 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
             <div className="rounded-xl border border-border p-4">
               <p className="text-xs text-muted-foreground mb-1">{tt('totalTaxableSales')}</p>
               <p className="text-2xl font-semibold font-mono">
-                {kwd(data.summary.totalTaxableSales)} KWD
+                {major(data.summary.totalTaxableSales)} EGP
               </p>
             </div>
             <div className="rounded-xl border border-border p-4 bg-amber-50 border-amber-200">
               <p className="text-xs text-muted-foreground mb-1">{tt('totalTaxCollected')}</p>
               <p className="text-2xl font-semibold font-mono text-amber-800">
-                {kwd(data.summary.totalTaxCollected)} KWD
+                {major(data.summary.totalTaxCollected)} EGP
               </p>
             </div>
           </div>
@@ -840,10 +840,10 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                         {tt('entries')}
                       </th>
                       <th className="text-end px-3 py-2 font-medium text-muted-foreground">
-                        {tt('taxableBase')} (KWD)
+                        {tt('taxableBase')} (EGP)
                       </th>
                       <th className="text-end px-3 py-2 font-medium text-muted-foreground">
-                        {tt('taxCollected')} (KWD)
+                        {tt('taxCollected')} (EGP)
                       </th>
                     </tr>
                   </thead>
@@ -852,9 +852,9 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                       <tr key={i} className="border-t border-border/40">
                         <td className="px-3 py-2 font-mono">{r.taxRate}%</td>
                         <td className="px-3 py-2 text-end font-mono">{r.transactionCount}</td>
-                        <td className="px-3 py-2 text-end font-mono">{kwd(r.totalSubtotal)}</td>
+                        <td className="px-3 py-2 text-end font-mono">{major(r.totalSubtotal)}</td>
                         <td className="px-3 py-2 text-end font-mono font-semibold text-amber-800">
-                          {kwd(r.totalTaxCollected)}
+                          {major(r.totalTaxCollected)}
                         </td>
                       </tr>
                     ))}
@@ -890,16 +890,16 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                           {tt('customer')}
                         </th>
                         <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                          {tt('taxableBase')} (KWD)
+                          {tt('taxableBase')} (EGP)
                         </th>
                         <th className="text-end px-3 py-2 font-medium text-muted-foreground w-20">
                           {tt('taxRate')}
                         </th>
                         <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                          {tt('taxCollected')} (KWD)
+                          {tt('taxCollected')} (EGP)
                         </th>
                         <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
-                          {tt('orderTotal')} (KWD)
+                          {tt('orderTotal')} (EGP)
                         </th>
                       </tr>
                     </thead>
@@ -919,13 +919,13 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                           <td className="px-3 py-2 text-muted-foreground">
                             {row.customerName ?? <span className="italic">{tt('guest')}</span>}
                           </td>
-                          <td className="px-3 py-2 text-end font-mono">{kwd(row.subtotal)}</td>
+                          <td className="px-3 py-2 text-end font-mono">{major(row.subtotal)}</td>
                           <td className="px-3 py-2 text-end font-mono">{row.taxRate}%</td>
                           <td className="px-3 py-2 text-end font-mono font-semibold text-amber-800">
-                            {kwd(row.taxCollected)}
+                            {major(row.taxCollected)}
                           </td>
                           <td className="px-3 py-2 text-end font-mono">
-                            {row.total === null ? '—' : kwd(row.total)}
+                            {row.total === null ? '—' : major(row.total)}
                           </td>
                         </tr>
                       ))}
@@ -936,11 +936,11 @@ function TaxReportTab({ storeId, timeZone }: { storeId: string; timeZone: string
                           {tt('totals')}
                         </td>
                         <td className="px-3 py-2 text-end font-mono font-semibold">
-                          {kwd(data.summary.totalTaxableSales)}
+                          {major(data.summary.totalTaxableSales)}
                         </td>
                         <td />
                         <td className="px-3 py-2 text-end font-mono font-semibold text-amber-800">
-                          {kwd(data.summary.totalTaxCollected)}
+                          {major(data.summary.totalTaxCollected)}
                         </td>
                         <td />
                       </tr>

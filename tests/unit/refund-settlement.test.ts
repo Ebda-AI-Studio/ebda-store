@@ -99,7 +99,7 @@ describe('resolveRefundSettlement', () => {
   });
 
   describe('an already-accounted refund is not settled by a vague event', () => {
-    // MyFatoorah executes refunds asynchronously, so EVERY in-band partial
+    // a gateway may execute refunds asynchronously, so EVERY in-band partial
     // return gets a RefundStatusChanged webhook after PaymentService.refund
     // has already claimed its slice. That payload carries either no refund
     // amount at all or `RefundAmount ?? Amount` — the WHOLE invoice. Read as

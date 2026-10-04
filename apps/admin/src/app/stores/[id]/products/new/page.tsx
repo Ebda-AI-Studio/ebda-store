@@ -10,6 +10,7 @@ import {
   computeDiscountAmount,
   formatPrice,
   PRODUCT_BADGE_LABEL_MAX_LENGTH,
+  roundToMinor,
 } from '@force/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../components/ImageUpload';
@@ -62,7 +63,7 @@ export default function NewProductPage() {
     /** Merchant-authored product card badge (EN / AR). Empty = no badge. */
     badgeLabel: '',
     badgeLabelAr: '',
-    /** Regular (RRP) price as KWD string entered by the merchant. */
+    /** Regular (RRP) price as EGP string entered by the merchant. */
     price: '',
     costPrice: '',
     sku: '',
@@ -77,7 +78,7 @@ export default function NewProductPage() {
 
   // Discount state — separate from formData since they use non-string values.
   const [discountType, setDiscountType] = useState<DiscountType>('none');
-  /** Discount value string: percentage as "12.5" (displays as %) or KWD for fixed. */
+  /** Discount value string: percentage as "12.5" (displays as %) or EGP for fixed. */
   const [discountValue, setDiscountValue] = useState('');
 
   // Fetch categories for this store
@@ -124,9 +125,9 @@ export default function NewProductPage() {
     setIsLoading(true);
 
     try {
-      const regularPriceFils = Math.round(parseFloat(formData.price) * 1000);
+      const regularPriceFils = roundToMinor(parseFloat(formData.price));
       const costPriceInFils = formData.costPrice
-        ? Math.round(parseFloat(formData.costPrice) * 1000)
+        ? roundToMinor(parseFloat(formData.costPrice))
         : null;
 
       // Derive price + compareAtPrice from the discount input.
@@ -148,8 +149,8 @@ export default function NewProductPage() {
             apiDiscountValue = basisPoints;
           }
         } else {
-          // Fixed KWD → fils.
-          const fixedFils = Math.round(parseFloat(discountValue) * 1000);
+          // Fixed EGP → piastres.
+          const fixedFils = roundToMinor(parseFloat(discountValue));
           if (Number.isFinite(fixedFils) && fixedFils > 0) {
             const result = applyDiscount(regularPriceFils, 'fixed', fixedFils);
             finalPrice = result.price;
@@ -308,7 +309,7 @@ export default function NewProductPage() {
                 <Input
                   label={t('fields.price')}
                   type="number"
-                  step="0.001"
+                  step="0.01"
                   min={0}
                   value={formData.price}
                   onChange={e => updateField('price', e.target.value)}
@@ -318,7 +319,7 @@ export default function NewProductPage() {
                 <Input
                   label={t('fields.costPrice')}
                   type="number"
-                  step="0.001"
+                  step="0.01"
                   min={0}
                   value={formData.costPrice}
                   onChange={e => updateField('costPrice', e.target.value)}
@@ -348,7 +349,7 @@ export default function NewProductPage() {
                         : t('fields.discountFixed')
                     }
                     type="number"
-                    step={discountType === 'percentage' ? '0.01' : '0.001'}
+                    step={discountType === 'percentage' ? '0.01' : '0.01'}
                     min={0}
                     max={discountType === 'percentage' ? 100 : undefined}
                     value={discountValue}
@@ -364,7 +365,7 @@ export default function NewProductPage() {
               {/* Row 3: Preview cell */}
               {(() => {
                 if (discountType === 'none' || !discountValue || !formData.price) return null;
-                const regularFils = Math.round(parseFloat(formData.price) * 1000);
+                const regularFils = roundToMinor(parseFloat(formData.price));
                 if (!Number.isFinite(regularFils) || regularFils <= 0) return null;
 
                 let discountedFils = regularFils;
@@ -378,7 +379,7 @@ export default function NewProductPage() {
                   discountedFils = regularFils - amount;
                   pctOff = pct;
                 } else {
-                  const fixedFils = Math.round(parseFloat(discountValue) * 1000);
+                  const fixedFils = roundToMinor(parseFloat(discountValue));
                   if (!Number.isFinite(fixedFils) || fixedFils <= 0) return null;
                   const amount = computeDiscountAmount(regularFils, 'fixed', fixedFils);
                   discountedFils = regularFils - amount;

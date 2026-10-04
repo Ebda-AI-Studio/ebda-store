@@ -90,7 +90,7 @@ describe('loyalty redemption — integration', () => {
         storeId,
         name: 'Redeemable Widget',
         slug: `${TAG}-widget`,
-        price: 10_000, // 10 KWD in fils
+        price: 10_000, // 10 EGP in piastres
         inventory: 1000,
         trackInventory: false, // skip inventory bookkeeping noise
         status: 'active',
@@ -145,26 +145,26 @@ describe('loyalty redemption — integration', () => {
       firstName: 'Cust',
       lastName: 'Test',
       address1: 'Block 1',
-      city: 'Kuwait City',
+      city: 'Cairo',
       state: 'Capital',
       postalCode: '00000',
-      country: 'KW',
+      country: 'EG',
       phone: '96551234567',
     },
-    paymentMethod: 'myfatoorah', // non-COD → no inngest/socket fanout at create
+    paymentMethod: 'paymob', // non-COD → no inngest/socket fanout at create
   };
 
   it('golden path: decrements balance, applies discount to total, logs redeem_discount', async () => {
     await giveCustomerPoints(2000);
     const sessionId = `${TAG}-golden`;
-    await seedCart(sessionId, 1, true); // 1 x 10 KWD = 10000 fils subtotal
+    await seedCart(sessionId, 1, true); // 1 x 10 EGP = 10000 piastres subtotal
 
     const order = await OrderService.create(storeId, customerId, sessionId, {
       ...baseOrderData,
       pointsToRedeem: 1500,
     });
 
-    // 1500 points @ 1 fil = 1500 fils discount; subtotal 10000 → total 8500
+    // 1500 points @ 1 fil = 1500 piastres discount; subtotal 10000 → total 8500
     // (tax 0, shipping 0 for this store).
     expect(order.subtotal).toBe(10_000);
     expect(order.loyaltyPointsRedeemed).toBe(1500);
@@ -190,11 +190,11 @@ describe('loyalty redemption — integration', () => {
   it('caps the loyalty discount at the subtotal and reduces burned points', async () => {
     await giveCustomerPoints(50_000);
     const sessionId = `${TAG}-cap`;
-    await seedCart(sessionId, 1, true); // 10000 fils subtotal
+    await seedCart(sessionId, 1, true); // 10000 piastres subtotal
 
     const order = await OrderService.create(storeId, customerId, sessionId, {
       ...baseOrderData,
-      pointsToRedeem: 50_000, // would be 50000 fils, capped at 10000
+      pointsToRedeem: 50_000, // would be 50000 piastres, capped at 10000
     });
 
     expect(order.loyaltyDiscount).toBe(10_000);

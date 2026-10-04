@@ -42,7 +42,10 @@ vi.mock('@force/database', () => ({
     }
     return out;
   },
+  // Reads before the payment wrap (the order, the existing payment) never fail.
+  withStore: async (_s: string, fn: () => unknown) => fn(),
 }));
+vi.mock('@api/lib/definer', () => ({ getOrderStoreId: async () => 'store-1' }));
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (_req: any, _res: any, next: any) => next(),
   optionalAuthenticate: (_req: any, _res: any, next: any) => next(),
@@ -54,9 +57,21 @@ vi.mock('@api/middleware/security', () => ({
   paymentLimiter: (_req: any, _res: any, next: any) => next(),
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('@api/utils/store-helpers', () => ({ getAuthUser: (req: any) => req.user }));
+vi.mock('@api/utils/store-helpers', () => ({
+  getAuthUser: (req: any) => req.user,
+  resolvePublicStoreId: async () => undefined,
+}));
 vi.mock('@api/services/payment-providers/payment.factory', () => ({
-  PaymentService: { createPayment: (...a: unknown[]) => h.createPayment(...a) },
+  // The route calls the provider in two halves; a COMMIT failure hits the second.
+  PaymentService: {
+    requestProviderPayment: async (...a: unknown[]) => ({
+      providerName: 'paymob',
+      response: await h.createPayment(...a),
+    }),
+    recordProviderPayment: vi.fn().mockResolvedValue(undefined),
+    getDefaultProvider: async () => 'paymob',
+    getAvailableProviders: async () => [],
+  },
 }));
 vi.mock('@api/services/payment-providers/orphaned-invoice-alert', () => ({
   alertOrphanedProviderInvoice: (...a: unknown[]) => h.orphanAlert(...a),
@@ -96,7 +111,7 @@ beforeEach(() => {
     status: 'pending',
     total: 5000,
     walletAmount: 0,
-    currency: 'KWD',
+    currency: 'EGP',
     items: [],
     customer: null,
     shippingAddress: { email: 'g@example.com' },
@@ -108,7 +123,7 @@ beforeEach(() => {
   h.createPayment.mockResolvedValue({
     transactionId: 'txn-1',
     paymentUrl: 'https://gw.test/pay',
-    provider: 'myfatoorah',
+    provider: 'paymob',
   });
 });
 
@@ -121,7 +136,7 @@ const create = (provider: string) =>
 describe('POST /payments/create — rollback survives a failed COMMIT (issue 2306)', () => {
   it('online: provider accepted, COMMIT fails → the order is rolled back', async () => {
     h.commitFails = true;
-    const res = await create('myfatoorah');
+    const res = await create('paymob');
     expect(res.status).toBe(500);
     expect(h.rollbackCalls).toEqual([['store-1', ORDER_ID, 'sess-1']]);
   });
@@ -130,13 +145,13 @@ describe('POST /payments/create — rollback survives a failed COMMIT (issue 230
   // still live with no Payment row behind it, so it must be named in a P1.
   it('online: provider accepted, COMMIT fails → the live invoice is alerted', async () => {
     h.commitFails = true;
-    await create('myfatoorah');
+    await create('paymob');
     expect(h.orphanAlert).toHaveBeenCalledTimes(1);
     expect(h.orphanAlert).toHaveBeenCalledWith(
       expect.objectContaining({
         storeId: 'store-1',
         orderId: ORDER_ID,
-        provider: 'myfatoorah',
+        provider: 'paymob',
         transactionId: 'txn-1',
         amount: 5000,
         source: 'checkout',
@@ -149,7 +164,7 @@ describe('POST /payments/create — rollback survives a failed COMMIT (issue 230
   // this file mocks out: tests/unit/payment-create-orphaned-record.test.ts.
   it('online: provider REJECTED → no orphaned-invoice alert (nothing was minted)', async () => {
     h.createPayment.mockRejectedValueOnce(new Error('gateway 400'));
-    const res = await create('myfatoorah');
+    const res = await create('paymob');
     expect(res.status).toBe(500);
     expect(h.rollbackCalls).toEqual([['store-1', ORDER_ID, 'sess-1']]);
     expect(h.orphanAlert).not.toHaveBeenCalled();
@@ -169,7 +184,7 @@ describe('POST /payments/create — rollback survives a failed COMMIT (issue 230
   });
 
   it('a committed payment is never rolled back (control)', async () => {
-    const res = await create('myfatoorah');
+    const res = await create('paymob');
     expect(res.status).toBe(200);
     expect(h.rollbackCalls).toEqual([]);
     expect(h.orphanAlert).not.toHaveBeenCalled();

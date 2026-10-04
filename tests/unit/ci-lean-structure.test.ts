@@ -1,0 +1,258 @@
+/**
+ * Lean CI (SP4 task 9): the shape of .github/workflows/ci.yml and the
+ * workspace-affected logic in scripts/ci-affected.mjs.
+ *
+ * Ahmad's decision: pull requests run only lint, typecheck and unit tests for
+ * the paths that changed; integration, e2e and mutation run on main or nightly.
+ * That is what keeps Ebda inside 2,000 GitHub-hosted minutes/month
+ * (docs/ebda/ci.md). A job that drifts into the wrong lane is a budget bug, so
+ * the lanes are pinned here.
+ */
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import yaml from 'js-yaml';
+// @ts-expect-error - plain .mjs script, no type declarations
+import { classify, loadWorkspaces, UNIT_PATHS } from '../../scripts/ci-affected.mjs';
+
+const ROOT = path.resolve(__dirname, '../..');
+const raw = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+
+type Job = { if?: string; needs?: string | string[]; 'runs-on'?: string; steps?: unknown[] };
+const ci = yaml.load(raw) as {
+  on: Record<string, any>;
+  concurrency: { group: string; 'cancel-in-progress': string };
+  env: Record<string, string>;
+  jobs: Record<string, Job>;
+};
+
+/** The jobs that must never run on a pull request. */
+const MAIN_LANE = [
+  'build',
+  'test-unit',
+  'orphan-tests',
+  'test-integration',
+  'test-rls-ebda-app',
+  'test-rls-payload-parity',
+  'test-e2e',
+  'security',
+  'mutation',
+];
+const PR_LANE = ['changes', 'guards', 'lint', 'typecheck', 'unit', 'worker-dry-run'];
+
+/** Does the job (or, through `needs`, a job it waits on) skip on pull_request? */
+function skipsOnPr(name: string, seen = new Set<string>()): boolean {
+  if (seen.has(name)) return false;
+  seen.add(name);
+  const job = ci.jobs[name];
+  if (
+    job.if &&
+    /github\.event_name\s*!=\s*'pull_request'|github\.event_name\s*==\s*'(schedule|workflow_dispatch)'/.test(
+      job.if
+    )
+  )
+    return true;
+  const needs = ([] as string[]).concat(job.needs ?? []);
+  return needs.some(n => skipsOnPr(n, seen));
+}
+
+describe('ci.yml triggers', () => {
+  it('runs on PRs to main, pushes to main, a Mon-Sat nightly, a Sunday full run and manual dispatch', () => {
+    expect(ci.on.pull_request.branches).toEqual(['main']);
+    expect(ci.on.push.branches).toEqual(['main']);
+    expect(ci.on.schedule.map((e: { cron: string }) => e.cron)).toEqual([
+      '17 1 * * 1-6',
+      '17 1 * * 0',
+    ]);
+    expect(ci.on).toHaveProperty('workflow_dispatch');
+  });
+
+  it('every `github.event.schedule ==` condition names a cron that is actually declared', () => {
+    const declared = ci.on.schedule.map((e: { cron: string }) => e.cron);
+    const used = [...raw.matchAll(/github\.event\.schedule == '([^']+)'/g)].map(m => m[1]);
+    expect(used.length).toBeGreaterThan(0);
+    for (const u of used) expect(declared, u).toContain(u);
+  });
+
+  it('cancels superseded PR runs, and only PR runs', () => {
+    expect(ci.concurrency.group).toMatch(/^ci-/);
+    expect(ci.concurrency.group).toContain('github.ref');
+    expect(ci.concurrency['cancel-in-progress']).toBe("${{ github.event_name == 'pull_request' }}");
+  });
+
+  it('uses Node 22 (wrangler >= 4.110) and caches npm in every setup-node that installs', () => {
+    expect(ci.env.NODE_VERSION).toBe('22');
+    const steps = raw.split('uses: actions/setup-node@').slice(1);
+    expect(steps.length).toBeGreaterThan(8);
+    // Exactly one setup-node skips the cache: the `changes` job, which only
+    // runs the dependency-free scripts/ci-affected.mjs and installs nothing.
+    const uncached = steps.filter(
+      b => !/^[^\n]*\n\s+with:[\s\S]*?cache: npm/.test(b.split('\n\n')[0] + '\n')
+    );
+    expect(uncached).toHaveLength(1);
+  });
+});
+
+describe('ci.yml lanes', () => {
+  it('every job is declared in exactly one lane (a new job must pick one)', () => {
+    const declared = new Set([...PR_LANE, ...MAIN_LANE, 'notify-failure']);
+    expect(Object.keys(ci.jobs).sort()).toEqual([...declared].sort());
+  });
+
+  it.each(MAIN_LANE)('%s never runs on a pull request', name => {
+    expect(skipsOnPr(name), `${name} is reachable from a pull_request`).toBe(true);
+  });
+
+  it('mutation tests are weekly or manual only, never on a push or the Mon-Sat nightly', () => {
+    const cond = ci.jobs.mutation.if ?? '';
+    expect(cond).toMatch(
+      /github\.event_name == 'schedule' && github\.event\.schedule == '17 1 \* \* 0'/
+    );
+    expect(cond).toMatch(/workflow_dispatch/);
+    expect(cond).not.toMatch(/'push'/);
+    expect(raw).toMatch(/npx stryker run/);
+    expect(raw).toMatch(/defence-mutation-record\.mjs --tier=unit/);
+  });
+
+  it('a push to main runs only the lite guards (the merge commit already passed its PR)', () => {
+    const runsOnPush = (name: string): boolean => {
+      const j = ci.jobs[name];
+      const cond = j.if ?? '';
+      if (/always\(\)/.test(cond)) return true;
+      if (/github\.event_name\s*==\s*'(pull_request|schedule|workflow_dispatch)'/.test(cond))
+        return false;
+      if (/needs\.changes\./.test(cond)) return false;
+      return ([] as string[]).concat(j.needs ?? []).every(runsOnPush);
+    };
+    const onPush = Object.keys(ci.jobs).filter(runsOnPush);
+    expect(onPush.sort()).toEqual(['guards', 'notify-failure']);
+  });
+
+  it('the strict-RLS proof runs on every cron (nightly), not only the Sunday full run', () => {
+    const cond = ci.jobs['test-rls-ebda-app'].if ?? '';
+    expect(cond).toMatch(/github\.event_name == 'schedule'/);
+    expect(cond).not.toMatch(/github\.event\.schedule/);
+    expect(ci.jobs['test-rls-ebda-app'].needs).toBeUndefined();
+  });
+
+  it('the PR lane runs lint, typecheck and unit tests for changed paths only', () => {
+    for (const name of ['lint', 'typecheck', 'unit', 'worker-dry-run']) {
+      expect(ci.jobs[name].needs, name).toEqual(['changes']);
+      expect(ci.jobs[name].if, name).toMatch(/needs\.changes\.outputs\./);
+    }
+    expect(ci.jobs.changes.if).toBe("github.event_name == 'pull_request'");
+  });
+
+  it('the always-on guards run the no-FWB-branding test, the pin check and the migration gate', () => {
+    const g = ci.jobs.guards;
+    expect(g.needs).toBeUndefined();
+    expect(g.if).toBeUndefined();
+    expect(JSON.stringify(g.steps)).toMatch(/no-fwb-branding\.test\.ts/);
+    expect(JSON.stringify(g.steps)).toMatch(/check-action-pins\.sh/);
+    expect(JSON.stringify(g.steps)).toMatch(/check-migration-order\.mjs/);
+  });
+
+  it('keeps the strict-RLS jobs on ebda_app (never the superuser) in the main lane', () => {
+    expect(raw).toMatch(/DB role check: current_user=ebda_app rolbypassrls=false/);
+    expect(raw).toMatch(/ALTER ROLE ebda_app WITH PASSWORD/);
+    expect(raw).toMatch(/postgresql:\/\/ebda_app:ci-only-app-pw@/);
+    expect(raw).toMatch(/image: postgres:16-alpine/);
+    expect(raw).toMatch(/image: redis:7-alpine/);
+    for (const n of ['test-integration', 'test-rls-ebda-app']) expect(skipsOnPr(n)).toBe(true);
+  });
+
+  it('the PR unit paths are a subset of the main-lane unit globs', () => {
+    const mainRun = raw
+      .split('\n')
+      .find(l => l.includes('vitest run tests/unit packages/shared/src'))!;
+    for (const p of Object.values(UNIT_PATHS).flat() as string[]) expect(mainRun, p).toContain(p);
+  });
+});
+
+describe('scripts/ci-affected.mjs', () => {
+  const ws = loadWorkspaces(ROOT);
+  const run = (...files: string[]) => classify(files, ws);
+
+  it('finds the real workspaces', () => {
+    const dirs = ws.map((w: { dir: string }) => w.dir);
+    expect(dirs).toEqual(
+      expect.arrayContaining(['apps/api', 'apps/web', 'apps/admin', 'packages/shared'])
+    );
+  });
+
+  it('docs-only changes select nothing', () => {
+    const r = run('docs/ebda/ci.md', 'README.md', 'apps/web/README.md');
+    expect(r.code).toBe(false);
+    expect(r.lint).toEqual([]);
+    expect(r.unit).toEqual([]);
+    expect(r.workers).toEqual([]);
+  });
+
+  it('an app change selects that app and its unit path', () => {
+    const r = run('apps/admin/src/app/page.tsx');
+    expect(r.all).toBe(false);
+    expect(r.workspaces).toEqual(['apps/admin']);
+    expect(r.lint).toEqual(['-w apps/admin']);
+    expect(r.typecheck).toEqual(['apps/admin/tsconfig.json']);
+    expect(r.unit).toEqual(['tests/unit', 'apps/admin/src']);
+    // Ordinary source changes do not dry-run the Worker (~9 billed minutes)...
+    expect(r.workers).toEqual([]);
+  });
+
+  it('...but a change to the Worker own config does', () => {
+    expect(run('apps/admin/wrangler.jsonc').workers).toEqual(['admin']);
+    expect(run('apps/orders/package.json').workers).toEqual(['orders']);
+    expect(run('apps/web/sentry-worker-entry.ts').workers).toEqual(['web']);
+    expect(run('apps/status/src/index.ts').workers).toEqual(['status']);
+    // the API is a Worker app since SP4 Stage 1 (apps/api/wrangler.jsonc)
+    expect(run('apps/api/wrangler.jsonc').workers).toEqual(['api']);
+    // root manifest / cf-* scripts hit every Worker app
+    expect(run('package-lock.json').workers.sort()).toEqual([
+      'admin',
+      'api',
+      'marketing',
+      'orders',
+      'status',
+      'web',
+    ]);
+  });
+
+  it('a package change also selects its dependents', () => {
+    const r = run('packages/ui/src/button.tsx');
+    expect(r.workspaces).toEqual(expect.arrayContaining(['packages/ui', 'apps/admin', 'apps/web']));
+  });
+
+  it.each([
+    'packages/shared/src/x.ts',
+    'packages/database/prisma/schema.prisma',
+    'package.json',
+    'package-lock.json',
+    'tsconfig.base.json',
+    'vitest.config.ts',
+  ])('%s selects every workspace', f => {
+    const r = run(f);
+    expect(r.all).toBe(true);
+    expect(r.workspaces).toEqual(ws.map((w: { dir: string }) => w.dir));
+  });
+
+  it('tests/, scripts/ and .github/ run the unit tiers without touching per-app lint', () => {
+    for (const f of ['tests/unit/x.test.ts', 'scripts/foo.mjs', '.github/workflows/ci.yml']) {
+      const r = run(f);
+      expect(r.all, f).toBe(false);
+      expect(r.lint, f).toEqual([]);
+      expect(r.unit, f).toContain('tests/unit');
+      expect(r.unit, f).toContain('packages/shared/src');
+    }
+  });
+
+  it('only lists Worker apps that have a wrangler config', () => {
+    const r = run('package.json');
+    expect(r.workers.length).toBeGreaterThan(0);
+    expect(r.workers).not.toContain('docs');
+    expect(r.workers).not.toContain('help');
+    for (const w of r.workers as string[]) {
+      const entry = ws.find((x: { dir: string }) => x.dir === `apps/${w}`);
+      expect(entry.hasWrangler, w).toBe(true);
+    }
+  });
+});

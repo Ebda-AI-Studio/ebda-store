@@ -5,6 +5,7 @@ import logger from '../../logger';
 import type { InngestFunction } from 'inngest';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
+import { storeOrigin } from '@force/shared';
 
 /**
  * Post-purchase review request — fires when an order transitions to
@@ -144,9 +145,7 @@ export const reviewRequest: InngestFunction.Any = inngest.createFunction(
       return { skipped: 'store-missing' };
     }
 
-    const base = store.domain
-      ? `https://${store.domain}`
-      : `https://store.force-ai.co/${store.slug}`;
+    const base = store.domain ? `https://${store.domain}` : storeOrigin(store.slug);
 
     // ── Build per-item review links ────────────────────────────────────────
     type OrderItemForReview = {

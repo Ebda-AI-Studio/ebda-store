@@ -22,7 +22,7 @@ vi.mock('../hooks/useNumerals', () => ({
   useNumerals: () => ({ localize: (s: unknown) => String(s) }),
 }));
 vi.mock('../hooks/useLocalePrice', () => ({
-  useLocalePrice: () => (n: number) => `${n / 1000} KWD`,
+  useLocalePrice: () => (n: number) => `${n / 1000} EGP`,
 }));
 vi.mock('next/image', () => ({
   __esModule: true,

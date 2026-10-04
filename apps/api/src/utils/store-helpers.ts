@@ -2,6 +2,8 @@ import { Request } from 'express';
 import { prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { AuthPayload } from '../middleware/auth';
+import { storeLookupForHost } from '../lib/store-host';
+import { resolveStoreId } from '../lib/definer';
 
 /**
  * Extracts the authenticated user from the request.
@@ -30,7 +32,22 @@ export function getAuthUser(req: Request): AuthPayload {
  * from the gate even when the domain-resolved store had the feature on,
  * because the gate could not see the domain header at all.
  */
+const RESOLVED_PUBLIC_STORE = Symbol('ebda.resolvedPublicStore');
+
 export async function resolvePublicStoreId(req: Request): Promise<string | undefined> {
+  // Resolved at most once per request: the public-route store scope
+  // (`publicStoreContext`) resolves it first and every handler's own
+  // `getStoreIdFromRequest` then reuses the answer.
+  const memo = (req as unknown as Record<symbol, Promise<string | undefined>>)[
+    RESOLVED_PUBLIC_STORE
+  ];
+  if (memo) return memo;
+  const pending = lookupPublicStoreId(req);
+  (req as unknown as Record<symbol, Promise<string | undefined>>)[RESOLVED_PUBLIC_STORE] = pending;
+  return pending;
+}
+
+async function lookupPublicStoreId(req: Request): Promise<string | undefined> {
   const headerStoreId = req.headers['x-store-id'] as string | undefined;
   if (headerStoreId) {
     const store = await prisma.store.findFirst({
@@ -40,30 +57,20 @@ export async function resolvePublicStoreId(req: Request): Promise<string | undef
     if (store) return store.id;
   }
 
-  const rawDomain = req.headers['x-store-domain'] as string | undefined;
-  if (rawDomain) {
-    const domain = rawDomain.toLowerCase().replace(/^www\./, '');
-    const store = await prisma.store.findFirst({
-      where: { domain, status: 'active' },
-      select: { id: true },
-    });
-    if (store) return store.id;
+  const lookup = storeLookupForHost(req.headers['x-store-domain'] as string | undefined);
+  if (lookup) {
+    // The host -> store lookup is a SECURITY DEFINER function
+    // (`ebda_resolve_store_id`): exact slug / custom-domain match on an active
+    // store, id only — the same call the Worker shell makes first.
+    const storeId = await resolveStoreId(
+      lookup.by === 'slug' ? { slug: lookup.slug } : { domain: lookup.domain }
+    );
+    if (storeId) return storeId;
   }
 
   return undefined;
 }
 
-/**
- * Get store ID from request context.
- *
- * Resolution order (any step that fails is a hard 400 — we do NOT silently
- * fall back to the first-created store, which used to leak Palora's
- * catalogue into every other storefront's SSR requests):
- *   1. X-Store-ID header — validated against the DB.
- *   2. x-store-domain header — looked up by domain (normalized: stripped
- *      `www.`, lowercased).
- *   3. Otherwise throw AppError 400.
- */
 export async function getStoreIdFromRequest(req: Request): Promise<string> {
   const storeId = await resolvePublicStoreId(req);
   if (storeId) return storeId;

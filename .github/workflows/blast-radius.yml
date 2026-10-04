@@ -5,16 +5,19 @@ name: blast-radius
 # (human or AI) reviews the BLAST RADIUS — not just the diff. Catches the
 # "changed a shared symbol, silently broke a consumer" class (incl. stale test
 # doubles). Never fails the build; it annotates + comments.
+#
+# Stays on pull requests in the lean CI (SP4 task 9) because it is cheap: no
+# `npm ci`, no build, just a checkout, a git diff and a python3 walk of the
+# committed graph, ~1 billed minute. It is skipped for docs-only PRs. Every
+# heavier gate moved to main/nightly; see docs/ebda/ci.md.
 
 on:
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
   workflow_dispatch:
-    inputs:
-      force_cloud:
-        description: 'Run on cloud (ubuntu-latest) instead of self-hosted'
-        type: boolean
-        default: false
 
 concurrency:
   group: blast-radius-${{ github.ref }}
@@ -26,40 +29,9 @@ permissions:
 
 jobs:
   blast-radius:
-    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 8
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      # Pre-checkout guard (#1883): survives an OOM-kill/guest-restart on a
-      # prior job that stranded a root-owned trufflehog-*/ dir `if: always()`
-      # cannot cover, because nothing after the kill runs, checkout included.
-      - name: Remove root-owned trufflehog scratch (pre-checkout guard, issue 1883)
-        # Inline, not a local composite action: a `uses: ./.github/actions/...`
-        # step cannot resolve before actions/checkout has put the repo on disk.
-        shell: bash
-        run: |
-          shopt -s nullglob
-          # Sparse-checkout leak (2026-09-30): a sparse job on this persistent
-          # self-hosted workspace left core.sparseCheckout in .git/config, and
-          # the next plain actions/checkout reused it, so orders' deploy got a
-          # scripts-only tree ("npm ci: no package-lock.json"). Undo any
-          # inherited sparse config BEFORE checkout, in every job.
-          if [ -d .git ] && [ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]; then
-            echo "::warning::workspace .git carries a sparse-checkout config from a prior job — disabling it before checkout"
-            git sparse-checkout disable 2>/dev/null || true
-            git config --unset-all core.sparseCheckout 2>/dev/null || true
-            git config --unset-all core.sparseCheckoutCone 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
-          leftovers=(trufflehog-*)
-          if [ ${#leftovers[@]} -eq 0 ]; then
-            exit 0
-          fi
-          echo "::warning::found stranded root-owned trufflehog scratch from a prior job (${leftovers[*]}) — removing before checkout"
-          docker run --rm -v "$PWD":/workspace -w /workspace \
-            alpine:3.20 sh -c 'rm -rf trufflehog-*' || {
-            echo "::warning::trufflehog scratch cleanup failed — checkout may still hit EACCES; needs a root delete on this runner" >&2
-            exit 0
-          }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # need base + head to diff
@@ -88,9 +60,8 @@ jobs:
 
       - name: Comment on PR
         if: github.event_name == 'pull_request'
-        # No `gh` dependency (issue 2452): the self-hosted WSL runners ship without the gh CLI, so
-        # the old `gh pr comment` step died with exit 127 under continue-on-error and the report
-        # never reached a PR while the job read green. This calls the REST API with python3 (which
+        # No `gh` dependency (issue 2452): a `gh pr comment` step died with exit 127 under
+        # continue-on-error and the report never reached a PR while the job read green. This calls the REST API with python3 (which
         # scripts/blast-radius.sh already requires). A delivery failure is logged as an explicit
         # ::warning:: (never a silent green) and does not fail the informational job.
         env:

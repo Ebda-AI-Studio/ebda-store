@@ -1,7 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 import { isUntrackedForGuests } from '@/lib/guest-checkout';
 import type { AbandonedCartStats } from './types';
 
@@ -37,7 +37,7 @@ interface StatsGridProps {
   guestCheckout?: boolean;
 }
 
-const formatKwd = filsToKwd;
+const formatMajor = minorToMajor;
 
 /**
  * Four-column summary cards at the top of the abandoned carts page.
@@ -62,7 +62,7 @@ export function StatsGrid({ stats, guestCheckout }: StatsGridProps) {
 
   const sub = guestCheckout ? tGuest('registeredOnly') : undefined;
   // Recovery is not tracked (issue 2035): the API answers null, which is
-  // unknown — shown as a note, never as 0 / 0% / 0 KWD.
+  // unknown — shown as a note, never as 0 / 0% / 0 EGP.
   const notTracked = t('recoveryNotTracked');
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -83,7 +83,7 @@ export function StatsGrid({ stats, guestCheckout }: StatsGridProps) {
         label={t('recoveredRevenue')}
         value={
           stats?.recoveredRevenue != null
-            ? t('kwdValue', { amount: formatKwd(stats.recoveredRevenue) })
+            ? t('baseValue', { amount: formatMajor(stats.recoveredRevenue) })
             : notTracked
         }
         muted={stats?.recoveredRevenue == null}

@@ -93,7 +93,7 @@ describe('RefundMethodModal', () => {
     previewWith(GATEWAY_OK, 1978);
     renderModal();
 
-    await waitFor(() => expect(screen.getAllByText(/1\.978/).length).toBeGreaterThanOrEqual(3));
+    await waitFor(() => expect(screen.getAllByText(/19\.78/).length).toBeGreaterThanOrEqual(3));
     expect(apiGet).toHaveBeenCalledWith(
       '/api/v1/stores/store-1/returns/admin/ret-1/refund-preview'
     );
@@ -135,7 +135,7 @@ describe('RefundMethodModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'continue' }));
 
     expect(onConfirm, 'choosing is not confirming').not.toHaveBeenCalled();
-    expect(screen.getByText(/confirmOriginal .*1\.978/)).toBeTruthy();
+    expect(screen.getByText(/confirmOriginal .*19\.78/)).toBeTruthy();
     expect(screen.getByText('confirmIrreversible')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'confirmSendRefund' }));
@@ -201,12 +201,12 @@ describe('RefundMethodModal', () => {
       error: null,
     });
     const onConfirm = renderModal();
-    await waitFor(() => expect(screen.getAllByText(/7\.500/).length).toBeGreaterThanOrEqual(1));
+    await waitFor(() => expect(screen.getAllByText(/75\.00/).length).toBeGreaterThanOrEqual(1));
 
     fireEvent.click(radio('store_credit')!);
     fireEvent.click(screen.getByRole('button', { name: 'continue' }));
-    expect(screen.getByText(/confirmWallet .*7\.500/)).toBeTruthy();
-    expect(screen.queryByText(/9\.000/), 'never the off-platform figure').toBeNull();
+    expect(screen.getByText(/confirmWallet .*75\.00/)).toBeTruthy();
+    expect(screen.queryByText(/90\.00/), 'never the off-platform figure').toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'refundMethodConfirm' }));
     expect(onConfirm).toHaveBeenCalledWith('store_credit');

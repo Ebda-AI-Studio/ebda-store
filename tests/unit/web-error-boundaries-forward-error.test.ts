@@ -117,7 +117,7 @@ describe('the retry page never links a merchant shopper to the platform', () => 
    * During a transient `getStore()` returns the demo-sentinel fallback, so
    * `useStoreUrl` drops the `/<slug>` prefix and "Go Home" resolves to `/`.
    * On the platform host that is not the merchant's storefront — measured
-   * 2026-09-16, `https://store.force-ai.co/` answers `307 → force-ai.co`. So
+   * 2026-09-16, `https://ebda.app/` answers `307 → ebda.app`. So
    * the link must not render on that branch at all (Ruling SR-7); the HARD
    * multi-tenant rule is stated in `app/not-found.tsx`.
    */
@@ -168,7 +168,7 @@ describe('the retry page is not TITLED "Page not found"', () => {
    * the DEFAULT_STORE shape. The transient one must be checked FIRST: the demo
    * sentinel (`id === 'demo'`) also matches the transient fallback, so if the
    * order is ever swapped, a rate-limited storefront goes back to being titled
-   * "Page not found — Force AI" around a body that says "we're a little busy".
+   * "Page not found — Ebda" around a body that says "we're a little busy".
    *
    * Asserted on source order because this repo has no way to render a Next
    * `generateMetadata` in a test. It proves the BRANCH ORDER, not the output.

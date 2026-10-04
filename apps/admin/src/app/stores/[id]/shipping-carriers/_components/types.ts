@@ -6,7 +6,7 @@
 
 import { DEFAULT_PICKUP, type PickupAddress } from './PickupAddressForm';
 
-export type CarrierKey = 'icarry' | 'aramex';
+export type CarrierKey = 'icarry' | 'aramex' | 'bosta';
 
 export interface ICarryConfig {
   enabled: boolean;
@@ -16,9 +16,22 @@ export interface ICarryConfig {
   pickup: PickupAddress;
 }
 
+export interface BostaConfig {
+  enabled: boolean;
+  isDefault: boolean;
+  apiKey: string;
+  businessLocationId: string;
+  sandbox: boolean;
+  pickup: PickupAddress;
+}
+
 export interface AramexConfig {
   enabled: boolean;
   isDefault: boolean;
+  /** Use Aramex's test environment. */
+  sandbox: boolean;
+  /** The merchant has Aramex's written confirmation that COD is collected in EGP. */
+  codEgpConfirmed: boolean;
   accountNumber: string;
   accountPin: string;
   accountEntity: string;
@@ -31,6 +44,7 @@ export interface AramexConfig {
 export interface CarrierConfigs {
   icarry: ICarryConfig;
   aramex: AramexConfig;
+  bosta: BostaConfig;
 }
 
 export interface Shipment {
@@ -42,11 +56,19 @@ export interface Shipment {
   createdAt: string;
 }
 
+/** A row of `GET /stores/:id/shipments` as the API sends it. */
+export interface ShipmentApiRow {
+  id: string;
+  carrier: string;
+  trackingNumber: string | null;
+  status: string;
+  createdAt: string;
+  order?: { orderNumber?: string };
+}
+
 export interface ShipmentsData {
-  shipments: Shipment[];
-  total: number;
-  page: number;
-  limit: number;
+  shipments: ShipmentApiRow[];
+  meta?: { total: number; page: number; limit: number; totalPages: number };
 }
 
 export type TestStatus = 'idle' | 'testing' | 'success' | 'error';
@@ -57,11 +79,11 @@ export type TestStatus = 'idle' | 'testing' | 'success' | 'error';
  * narrow them at the page level when merging into DEFAULT_CONFIGS.
  */
 export interface CarrierConfigApiRow {
-  carrierCode: string;
+  carrier: string;
   enabled?: boolean;
   isDefault?: boolean;
   credentials?: Record<string, string | undefined>;
-  settings?: Record<string, string | undefined>;
+  settings?: Record<string, string | boolean | undefined>;
 }
 
 /**
@@ -86,6 +108,11 @@ export const SHIPMENT_COLORS = {
   },
   returned: { className: 'bg-info/10 text-info-ink dark:bg-info/30 dark:text-info-ink' },
   cancelled: { className: 'bg-muted text-muted-foreground' },
+  creating: { className: 'bg-muted text-foreground' },
+  creation_failed: {
+    className:
+      'bg-destructive/10 text-destructive-ink dark:bg-destructive/30 dark:text-destructive-ink',
+  },
 } as const;
 
 export const DEFAULT_CONFIGS: CarrierConfigs = {
@@ -96,13 +123,23 @@ export const DEFAULT_CONFIGS: CarrierConfigs = {
     merchantId: '',
     pickup: { ...DEFAULT_PICKUP },
   },
+  bosta: {
+    enabled: false,
+    isDefault: false,
+    apiKey: '',
+    businessLocationId: '',
+    sandbox: false,
+    pickup: { ...DEFAULT_PICKUP },
+  },
   aramex: {
     enabled: false,
     isDefault: false,
+    sandbox: false,
+    codEgpConfirmed: false,
     accountNumber: '',
     accountPin: '',
     accountEntity: '',
-    accountCountryCode: 'KW',
+    accountCountryCode: 'EG',
     username: '',
     password: '',
     pickup: { ...DEFAULT_PICKUP },

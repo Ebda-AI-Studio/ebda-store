@@ -56,13 +56,13 @@ vi.mock('@api/services/alerts.service', () => ({
 import { confirmPaymentFromProviderStatus } from '@api/services/payment-confirm.service';
 import type { PaymentStatusResponse } from '@api/services/payment-providers/types';
 
-// `amount` mirrors `order.total` in fils (see PaymentService.createPayment) —
+// `amount` mirrors `order.total` in piastres (see PaymentService.createPayment) —
 // required so the paid-amount reconciliation gate has an expected value to
 // compare against.
 const basePayment = {
   id: 'pay_1',
   status: 'pending',
-  provider: 'myfatoorah',
+  provider: 'paymob',
   metadata: {},
   amount: 5000,
 };
@@ -73,12 +73,12 @@ function statusResponse(
 ): PaymentStatusResponse {
   return {
     success: true,
-    provider: 'myfatoorah',
+    provider: 'paymob',
     transactionId: '215031900',
     invoiceId: '215031900',
     status,
     amount: 5000,
-    currency: 'KWD',
+    currency: 'EGP',
     ...overrides,
   };
 }
@@ -110,7 +110,7 @@ describe('confirmPaymentFromProviderStatus', () => {
       data: {
         orderId: 'ord_1',
         storeId: 'store_1',
-        paymentMethod: 'myfatoorah',
+        paymentMethod: 'paymob',
         locale: 'ar',
       },
     });
@@ -232,14 +232,14 @@ describe('confirmPaymentFromProviderStatus', () => {
 
   // Money-integrity audit F3 (2026-07-02): a 'completed' provider status
   // alone must never be enough to confirm an order — the PAID AMOUNT must
-  // also match what we expect (payment.amount, fils).
+  // also match what we expect (payment.amount, piastres).
   describe('paid-amount reconciliation (F3)', () => {
     it('paidAmount far below payment.amount → does NOT mark paid, alerts P0, no fanout', async () => {
       const result = await confirmPaymentFromProviderStatus({
-        payment: basePayment, // amount: 5000 fils
+        payment: basePayment, // amount: 5000 piastres
         order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'unpaid', locale: null },
-        // Provider reports only 1000 fils paid against a 5000 fils invoice.
-        providerStatus: statusResponse('completed', { paidAmount: 1000, paidCurrency: 'KWD' }),
+        // Provider reports only 1000 piastres paid against a 5000 piastres invoice.
+        providerStatus: statusResponse('completed', { paidAmount: 1000, paidCurrency: 'EGP' }),
         source: 'guest_verify',
       });
 
@@ -268,11 +268,11 @@ describe('confirmPaymentFromProviderStatus', () => {
       );
     });
 
-    it('paidAmount within rounding tolerance (≤5 fils short) → still marks paid', async () => {
+    it('paidAmount within rounding tolerance (≤5 piastres short) → still marks paid', async () => {
       const result = await confirmPaymentFromProviderStatus({
-        payment: basePayment, // amount: 5000 fils
+        payment: basePayment, // amount: 5000 piastres
         order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'unpaid', locale: null },
-        providerStatus: statusResponse('completed', { paidAmount: 4997, paidCurrency: 'KWD' }),
+        providerStatus: statusResponse('completed', { paidAmount: 4997, paidCurrency: 'EGP' }),
         source: 'guest_verify',
       });
 
@@ -282,7 +282,7 @@ describe('confirmPaymentFromProviderStatus', () => {
       expect(sendAlertMock).not.toHaveBeenCalled();
     });
 
-    it('no paidAmount reported (Tap/Hesabe/UPayments never set it) → falls back to status-only, marks paid', async () => {
+    it('no paidAmount reported (a gateway that does not report it leaves it unset) → falls back to status-only, marks paid', async () => {
       const result = await confirmPaymentFromProviderStatus({
         payment: basePayment,
         order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'unpaid', locale: null },
@@ -299,7 +299,7 @@ describe('confirmPaymentFromProviderStatus', () => {
       const result = await confirmPaymentFromProviderStatus({
         payment: basePayment,
         order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'unpaid', locale: null },
-        providerStatus: statusResponse('completed', { paidAmount: 6000, paidCurrency: 'KWD' }),
+        providerStatus: statusResponse('completed', { paidAmount: 6000, paidCurrency: 'EGP' }),
         source: 'guest_verify',
       });
 

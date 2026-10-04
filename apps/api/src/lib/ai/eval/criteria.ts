@@ -561,7 +561,7 @@ const seoMeta: CriteriaSpec<SeoEvalInput, SeoSuggestion> = {
     {
       name: 'search-relevance',
       instruction:
-        'The title/keywords plausibly match how a Kuwaiti/GCC shopper would actually search for this entity.',
+        'The title/keywords plausibly match how an Egyptian/GCC shopper would actually search for this entity.',
     },
   ],
 };
@@ -778,7 +778,7 @@ const storeFaq: CriteriaSpec<StoreFaqEvalInput, DraftedFaqLike[]> = {
           reason:
             bad.length === 0
               ? 'no gateway company names leaked'
-              : `${bad.length} answer(s) name a payment-gateway company (Tap/MyFatoorah/Hesabe/UPayments) instead of the method`,
+              : `${bad.length} answer(s) name a payment-gateway company (Paymob/Kashier) instead of the method`,
         };
       },
     },
@@ -1461,7 +1461,7 @@ const expenseOcr: CriteriaSpec<{ receiptUrl?: string }, OcrEvalOutput> = {
       name: 'currency-iso-code',
       run: (_input, output) => ({
         pass: typeof output?.currency === 'string' && /^[A-Z]{3}$/.test(output.currency),
-        reason: 'currency must be a 3-letter uppercase ISO code (e.g. KWD)',
+        reason: 'currency must be a 3-letter uppercase ISO code (e.g. EGP)',
       }),
     },
     {

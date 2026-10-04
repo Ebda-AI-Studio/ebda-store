@@ -3,6 +3,8 @@ export interface Store {
   name: string;
   slug: string;
   domain: string | null;
+  /** Store settings JSON — `defaultLanguage` drives the language of customer-facing share text. */
+  settings?: Record<string, unknown> | null;
   /** Storefront logo URL — used by the onboarding checklist to detect upload step. */
   logo?: string | null;
   /** Legacy single hero image URL — fallback signal when layoutSettings.hero.slides is empty. */

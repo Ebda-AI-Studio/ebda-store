@@ -75,7 +75,7 @@ vi.mock('@api/lib/logger', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('@api/config', () => ({
-  config: { webUrl: 'https://store.force-ai.co', apiUrl: 'https://api.force-ai.co' },
+  config: { webUrl: 'https://ebda.app', apiUrl: 'https://api.ebda.app' },
 }));
 
 import { registerOrderTools } from '@api/mcp/tools/order.tools';
@@ -98,8 +98,8 @@ function harness(register: (s: McpServer, store: never) => void) {
   return tools;
 }
 
-const store = { id: 'store-1', name: 'Demo', slug: 'demo', currency: 'KWD', domain: null };
-const customer = { name: 'Sara Ali', address: 'Block 1', country: 'KW' };
+const store = { id: 'store-1', name: 'Demo', slug: 'demo', currency: 'EGP', domain: null };
+const customer = { name: 'Sara Ali', address: 'Block 1', country: 'EG' };
 
 /** The single auditLog call whose `action` matches. */
 function rowFor(action: string) {
@@ -120,7 +120,7 @@ describe('place_order — attribution', () => {
       orderNumber: 'ORD-1',
       status: 'pending',
       total: 3000,
-      currency: 'KWD',
+      currency: 'EGP',
       items: [],
     } as never);
   });
@@ -245,7 +245,7 @@ describe('place_order (cod) — writes after the order commits', () => {
       orderNumber: 'ORD-1',
       status: 'pending',
       total: 3000,
-      currency: 'KWD',
+      currency: 'EGP',
       items: [],
     } as never);
     vi.mocked(OrderService.rollbackForPaymentFailure).mockResolvedValue(undefined as never);
@@ -271,7 +271,7 @@ describe('place_order (cod) — writes after the order commits', () => {
   });
 
   // PR 2301 audit: the COD Payment-row failure rollback was the one call site
-  // left outside a tenant wrap — under force_app it would read no rows and do
+  // left outside a tenant wrap — under ebda_app it would read no rows and do
   // nothing, stranding a pending, stock-taken order.
   it('runs the COD payment-failure rollback INSIDE its own tenant wrap', async () => {
     const db = await import('@force/database');

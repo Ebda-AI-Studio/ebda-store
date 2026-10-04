@@ -109,7 +109,7 @@ function mockOrderWithCompletedPayment() {
     storeId: STORE_ID,
     orderNumber: 'ORD-1001',
     paymentStatus: 'paid',
-    payments: [{ transactionId: 'txn_1', provider: 'myfatoorah' }],
+    payments: [{ transactionId: 'txn_1', provider: 'paymob' }],
   });
 }
 
@@ -140,7 +140,7 @@ describe('POST /:orderId/refund-via-provider', () => {
     paymentServiceRefund.mockResolvedValue({
       refundId: 'rf_123',
       amount: 5000,
-      provider: 'myfatoorah',
+      provider: 'paymob',
       status: 'completed',
     });
 
@@ -161,7 +161,7 @@ describe('POST /:orderId/refund-via-provider', () => {
     paymentServiceRefund.mockResolvedValue({
       refundId: 'rf_2',
       amount: 3000,
-      provider: 'myfatoorah',
+      provider: 'paymob',
       status: 'completed',
     });
 

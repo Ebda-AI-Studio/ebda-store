@@ -79,7 +79,7 @@ describe('Product Management', () => {
       const productData = {
         name: 'Test Product',
         slug: `test-product-${Date.now()}`,
-        price: 10000, // 10 KWD in fils
+        price: 10000, // 10 EGP in piastres
         inventory: 50,
         status: 'active',
       };

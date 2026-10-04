@@ -23,12 +23,15 @@ import {
 import { trackInitiateCheckout } from '../../components/MarketingPixels';
 import {
   isValidEmail,
-  KUWAIT_GOVERNORATES,
+  EGYPT_GOVERNORATES,
   findGovernorateByArea,
   resolveColor,
   checkMinimumOrder,
   computeOrderTax,
   type CheckoutDeliverySettings,
+  fromMinor,
+  REGION,
+  isValidEgyptianMobile,
 } from '@force/shared';
 import { GovernorateAreaSelect } from './_components/GovernorateAreaSelect';
 import { DeliverySection } from './_components/DeliverySection';
@@ -190,7 +193,7 @@ export default function CheckoutClient() {
   // Today/tomorrow + availability derive from this via the pure
   // resolveDeliverySelection helper, which also rolls over to tomorrow once
   // every window's order-by time has passed for today.
-  const storeTimezone = store?.timezone || 'Asia/Kuwait';
+  const storeTimezone = store?.timezone || 'Africa/Cairo';
   const [nowMinutes, setNowMinutes] = useState(() => getNowMinutesInTimezone(storeTimezone));
   const deliveryWindowsEnabled = !!checkoutDelivery?.windows?.enabled;
   useEffect(() => {
@@ -248,8 +251,8 @@ export default function CheckoutClient() {
       numItems:
         cartContextItems.reduce((sum, item) => sum + item.quantity, 0) +
         cartContextBundles.reduce((sum, b) => sum + b.quantity, 0),
-      value: cartContextTotal / 1000,
-      currency: 'KWD',
+      value: fromMinor(cartContextTotal),
+      currency: REGION.currency,
     });
   }, [cartIsReady, cartContextItems, cartContextBundles, cartContextTotal]);
 
@@ -379,7 +382,7 @@ export default function CheckoutClient() {
   const { isAuthenticated } = useAuth();
   const [loyalty, setLoyalty] = useState<{
     points: number;
-    pointsValue: number; // fils per point
+    pointsValue: number; // piastres per point
     minRedeemPoints: number;
     maxRedeemPercentage: number;
   } | null>(null);
@@ -413,15 +416,14 @@ export default function CheckoutClient() {
     firstName: '',
     lastName: '',
     phone: '',
-    // Kuwaiti structured address fields
-    governorate: '', // EN canonical (e.g. 'Hawalli')
-    area: '', // EN canonical (e.g. 'Salmiya')
-    block: '', // قطعة *
+    // Egyptian structured address fields
+    governorate: '', // EN canonical (e.g. 'Cairo')
+    area: '', // EN canonical (e.g. 'Maadi')
     street: '', // الشارع *
-    avenue: '', // الجادة (optional)
-    house: '', // منزل *
-    floor: '', // الطابق (optional)
-    apartment: '', // شقة (optional)
+    building: '', // رقم المبنى *
+    floor: '', // الدور (optional)
+    apartment: '', // الشقة (optional)
+    landmark: '', // علامة مميزة (optional)
     notes: '',
     // kept for back-compat with sessionStorage / PaymentStep display
     address: '',
@@ -525,12 +527,11 @@ export default function CheckoutClient() {
       email: saved.email || prev.email,
       governorate: saved.governorate || prev.governorate,
       area: saved.area || prev.area,
-      block: saved.block || prev.block,
       street: saved.street || prev.street,
-      avenue: saved.avenue || prev.avenue,
-      house: saved.house || prev.house,
+      building: saved.building || prev.building,
       floor: saved.floor || prev.floor,
       apartment: saved.apartment || prev.apartment,
+      landmark: saved.landmark || prev.landmark,
       notes: saved.notes || prev.notes,
     }));
     if (saved.area) setSelectedArea(saved.area);
@@ -545,9 +546,8 @@ export default function CheckoutClient() {
     phone?: string;
     governorate?: string;
     area?: string;
-    block?: string;
     street?: string;
-    house?: string;
+    building?: string;
     address?: string;
   }>({});
 
@@ -567,8 +567,11 @@ export default function CheckoutClient() {
             : Promise.resolve(null),
           api.get<{
             providers: (PaymentProvider | string)[];
+            /** Per online provider, the methods the merchant turned on. */
+            methods?: Record<string, Array<{ code: string; name: string; nameAr: string }>>;
             defaultProvider?: string;
             cod?: { fixedFee: number; displayName: string; displayNameAr: string | null };
+            instapay?: { displayName: string; displayNameAr: string | null; expiryHours: number };
           }>('/payments/config'),
         ]);
 
@@ -599,13 +602,28 @@ export default function CheckoutClient() {
         }
 
         if (paymentResult.success && paymentResult.data) {
-          // API returns providers as a string[] (e.g. ["myfatoorah"]) — normalize
+          // API returns providers as a string[] (e.g. ["paymob"]) — normalize
           // each entry to the {id, name} object the PaymentStep map expects.
           // PaymentStep falls back to DEFAULT_PAYMENT_PROVIDERS for display info.
+          //
+          // Paymob and Fawry offer several methods the customer chooses between here (card,
+          // Meeza, wallet, valU / Pay at Fawry, card): each becomes its own option with the id
+          // `<provider>:<method>`. Kashier's hosted page offers its methods itself, so it stays one
+          // option.
           const rawProviders = paymentResult.data.providers || [];
-          const allProviders: PaymentProvider[] = rawProviders.map(p =>
-            typeof p === 'string' ? { id: p, name: p } : p
-          );
+          const allProviders: PaymentProvider[] = rawProviders.flatMap(p => {
+            if (typeof p !== 'string') return [p];
+            const methods = paymentResult.data?.methods?.[p] ?? [];
+            if ((p === 'paymob' || p === 'fawry') && methods.length > 0) {
+              return methods.map(m => ({
+                id: `${p}:${m.code}`,
+                name: m.name,
+                nameAr: m.nameAr,
+                methods: [m.code],
+              }));
+            }
+            return [{ id: p, name: p === 'kashier' ? 'Card / wallet' : p }];
+          });
 
           // Add COD as a provider option if enabled
           if (paymentResult.data.cod) {
@@ -622,9 +640,23 @@ export default function CheckoutClient() {
             });
           }
 
+          // InstaPay (manual transfer; the merchant confirms) when the store offers it.
+          if (paymentResult.data.instapay) {
+            allProviders.push({
+              id: 'instapay',
+              name: paymentResult.data.instapay.displayName || 'InstaPay',
+              nameAr: paymentResult.data.instapay.displayNameAr || 'إنستاباي',
+              description: 'Transfer with InstaPay, the store confirms when it arrives',
+              descriptionAr: 'حوّل عبر إنستاباي ويؤكد المتجر طلبك عند وصول المبلغ',
+            });
+          }
+
           setPaymentProviders(allProviders);
           if (paymentResult.data.defaultProvider) {
-            setSelectedProvider(paymentResult.data.defaultProvider);
+            // The default is a provider id; a provider shown as several methods starts on its first.
+            const def = paymentResult.data.defaultProvider;
+            const first = allProviders.find(o => o.id === def || o.id.startsWith(`${def}:`));
+            setSelectedProvider(first?.id ?? def);
           }
         } else {
           // Payment config genuinely failed to load (network/5xx) — surface it
@@ -751,18 +783,16 @@ export default function CheckoutClient() {
       );
     }
 
-    // Phone validation (Kuwait format)
+    // Phone validation (Egypt format)
     if (!formData.phone.trim()) {
       errors.phone = t('Phone number is required', 'رقم الهاتف مطلوب');
     } else {
-      // Remove spaces, dashes and plus sign for validation
-      const cleanPhone = formData.phone.replace(/[\s\-+]/g, '');
-      // Kuwait numbers: 965 + 8 digits OR 8 digits.
-      // Mobile prefixes: 5/6/9. Landline prefixes: 2/4. All 8 digits total.
-      if (!/^(965)?[24569]\d{7}$/.test(cleanPhone)) {
+      // Egyptian mobile: 010/011/012/015 + 8 digits, with or without the
+      // trunk 0 / +20 (Eastern Arabic digits accepted). One shared rule.
+      if (!isValidEgyptianMobile(formData.phone)) {
         errors.phone = t(
-          'Please enter a valid Kuwait phone number',
-          'يرجى إدخال رقم هاتف كويتي صحيح'
+          'Please enter a valid Egyptian mobile number (e.g. 01012345678)',
+          'يرجى إدخال رقم موبايل مصري صحيح (مثال: 01012345678)'
         );
       }
     }
@@ -775,19 +805,14 @@ export default function CheckoutClient() {
       errors.area = t('Please select a delivery area', 'يرجى اختيار منطقة التوصيل');
     }
 
-    // Block validation (required)
-    if (!formData.block.trim()) {
-      errors.block = t('Block is required', 'القطعة مطلوبة');
-    }
-
     // Street validation (required)
     if (!formData.street.trim()) {
       errors.street = t('Street is required', 'الشارع مطلوب');
     }
 
-    // House validation (required)
-    if (!formData.house.trim()) {
-      errors.house = t('House / building number is required', 'رقم المنزل أو المبنى مطلوب');
+    // Building validation (required)
+    if (!formData.building.trim()) {
+      errors.building = t('Building number is required', 'رقم المبنى مطلوب');
     }
 
     setFormErrors(errors);
@@ -885,12 +910,11 @@ export default function CheckoutClient() {
       email: '',
       governorate: '',
       area: '',
-      block: '',
       street: '',
-      avenue: '',
-      house: '',
+      building: '',
       floor: '',
       apartment: '',
+      landmark: '',
       notes: '',
     }));
     setSelectedArea('');
@@ -1058,7 +1082,7 @@ export default function CheckoutClient() {
     walletSpendable && useWalletBalance && wallet ? Math.min(wallet.balance, total) : 0;
 
   // Per-store, opt-in minimum order value (Store.settings.minimumOrderFils,
-  // fils; 0/unset = no minimum). Defense-in-depth for direct navigation to
+  // piastres; 0/unset = no minimum). Defense-in-depth for direct navigation to
   // /checkout that bypasses the cart page's guard — the API's
   // OrderService.create is the real, hard-blocking check. store.settings is
   // a loose Record — cast the one key we read, same pattern as
@@ -1183,7 +1207,7 @@ export default function CheckoutClient() {
 
     // Persist or clear saved info based on the saveInfo checkbox.
     if (store?.id) {
-      const selectedGovForSave = KUWAIT_GOVERNORATES.find(g => g.en === formData.governorate);
+      const selectedGovForSave = EGYPT_GOVERNORATES.find(g => g.en === formData.governorate);
       const selectedAreaForSave =
         selectedGovForSave?.areas.find(a => a.en === formData.area) ??
         findGovernorateByArea(formData.area)?.areas.find(a => a.en === formData.area);
@@ -1199,12 +1223,11 @@ export default function CheckoutClient() {
           governorateAr: selectedGovForSave?.ar ?? rateRowForSave?.governorateAr ?? '',
           area: selectedAreaForSave?.en ?? formData.area,
           areaAr: selectedAreaForSave?.ar ?? rateRowForSave?.areaAr ?? '',
-          block: formData.block,
           street: formData.street,
-          avenue: formData.avenue,
-          house: formData.house,
+          building: formData.building,
           floor: formData.floor,
           apartment: formData.apartment,
+          landmark: formData.landmark,
           notes: formData.notes,
         });
       } else {
@@ -1222,10 +1245,10 @@ export default function CheckoutClient() {
       // — not the authenticated user's profile email (which can differ when
       // a logged-in admin checks out for someone else).
       // Resolve both English and Arabic names.
-      // For Kuwait areas, prefer the static canonical data; for custom areas
+      // For Egypt areas, prefer the static canonical data; for custom areas
       // (not in the static list), fall back to the rate-row AR names.
-      const selectedGov = KUWAIT_GOVERNORATES.find(g => g.en === formData.governorate);
-      const selectedKuwaitArea =
+      const selectedGov = EGYPT_GOVERNORATES.find(g => g.en === formData.governorate);
+      const selectedEgyptArea =
         selectedGov?.areas.find(a => a.en === formData.area) ??
         findGovernorateByArea(formData.area)?.areas.find(a => a.en === formData.area);
       const rateRow = rateByArea.get(formData.area);
@@ -1233,10 +1256,10 @@ export default function CheckoutClient() {
       // Compose address1 from structured fields for back-compat with
       // existing order display / admin views.
       const address1Parts = [
-        formData.block ? `Block ${formData.block}` : '',
-        formData.street ? `Street ${formData.street}` : '',
-        formData.avenue ? `Avenue ${formData.avenue}` : '',
-        formData.house ? `House ${formData.house}` : '',
+        formData.street,
+        formData.building ? `Building ${formData.building}` : '',
+        formData.floor ? `Floor ${formData.floor}` : '',
+        formData.apartment ? `Apt ${formData.apartment}` : '',
       ].filter(Boolean);
       const composedAddress1 = address1Parts.join(', ') || formData.address;
 
@@ -1267,27 +1290,27 @@ export default function CheckoutClient() {
           firstName: formData.firstName,
           lastName: formData.lastName,
           address1: composedAddress1,
-          address2: formData.apartment,
+          address2: formData.landmark,
           // Structured address fields — custom area AR names fall back to the rate row.
-          area: selectedKuwaitArea?.en ?? formData.area,
-          areaAr: selectedKuwaitArea?.ar ?? rateRow?.areaAr ?? '',
+          area: selectedEgyptArea?.en ?? formData.area,
+          areaAr: selectedEgyptArea?.ar ?? rateRow?.areaAr ?? '',
           governorate: selectedGov?.en ?? formData.governorate,
           governorateAr: selectedGov?.ar ?? rateRow?.governorateAr ?? '',
           // Additional structured fields for delivery logistics
-          block: formData.block,
           street: formData.street,
-          avenue: formData.avenue,
-          house: formData.house,
+          building: formData.building,
           floor: formData.floor,
+          apartment: formData.apartment,
           city: '',
           // Use the country from the rate row when available (multi-country stores),
-          // falling back to "Kuwait" — matches the Address.country default + the
-          // "Kuwait" value every Kuwait rate row carries (don't mix "KW" / "Kuwait").
-          country: rateRow?.country ?? 'Kuwait',
+          // falling back to "Egypt" — matches the Address.country default + the
+          // "Egypt" value every Egypt rate row carries (don't mix "KW" / "Egypt").
+          country: rateRow?.country ?? REGION.countryName.en,
           phone: formData.phone,
           email: formData.email,
         },
-        paymentMethod: selectedProvider,
+        // The provider only: the method (card / Meeza / ...) belongs to /payments/create.
+        paymentMethod: selectedProvider.split(':')[0],
         notes: notesWithDelivery,
         couponCode: appliedCoupon?.code,
         // Only send a redemption request when the customer opted in AND the
@@ -1342,15 +1365,18 @@ export default function CheckoutClient() {
       // resolved storefront base url (custom domain or slug). Sending absolute
       // urls with the store's custom domain trips the schema's platform-origin
       // refinement, which is intended to block open-redirect attacks.
-      const paymentResult = await api.post<{ paymentUrl?: string; cod?: boolean }>(
-        '/payments/create',
-        {
-          orderId: order.id,
-          provider: selectedProvider,
-          successUrl: `/checkout/success?orderId=${order.id}`,
-          errorUrl: `/checkout/error?orderId=${order.id}`,
-        }
-      );
+      const [selectedProviderId, selectedMethod] = selectedProvider.split(':');
+      const paymentResult = await api.post<{
+        paymentUrl?: string;
+        cod?: boolean;
+        instruction?: { kind: string; code?: string; expiresAt?: string };
+      }>('/payments/create', {
+        orderId: order.id,
+        provider: selectedProviderId,
+        ...(selectedMethod ? { method: selectedMethod } : {}),
+        successUrl: `/checkout/success?orderId=${order.id}`,
+        errorUrl: `/checkout/error?orderId=${order.id}`,
+      });
 
       // Success clears the saved checkout form and promo code before leaving
       // the page, so they don't leak into the next order. A failure keeps
@@ -1368,6 +1394,12 @@ export default function CheckoutClient() {
           }
         },
         goToCodSuccess: () => router.push(storeUrl(`/checkout/success?orderId=${order.id}&cod=1`)),
+        goToInstapay: () =>
+          router.push(storeUrl(`/checkout/success?orderId=${order.id}&instapay=1`)),
+        goToReferenceCode: code =>
+          router.push(
+            storeUrl(`/checkout/success?orderId=${order.id}&ref=${encodeURIComponent(code)}`)
+          ),
         goToGateway: paymentUrl => {
           window.location.href = paymentUrl;
         },
@@ -1405,9 +1437,8 @@ export default function CheckoutClient() {
           'shippingAddress.state': 'area',
           'shippingAddress.area': 'area',
           'shippingAddress.governorate': 'governorate',
-          'shippingAddress.block': 'block',
           'shippingAddress.street': 'street',
-          'shippingAddress.house': 'house',
+          'shippingAddress.building': 'building',
         };
         const inlineErrors: typeof formErrors = {};
         for (const [path, msgs] of Object.entries(details)) {
@@ -1467,6 +1498,25 @@ export default function CheckoutClient() {
           friendly = t(
             'Cash on delivery is currently unavailable. Please choose another payment method.',
             'الدفع عند الاستلام غير متاح حالياً. يرجى اختيار طريقة دفع أخرى.'
+          );
+          break;
+        case 'PAYMENT_PROVIDER_ERROR':
+          friendly = t(
+            'We could not start your payment. Please try again or choose another payment method.',
+            'تعذّر بدء عملية الدفع. يرجى المحاولة مرة أخرى أو اختيار طريقة دفع أخرى.'
+          );
+          break;
+        case 'PAYMENT_METHOD_UNAVAILABLE':
+          // One method is down (circuit open): the cart was restored, the others still work.
+          friendly = t(
+            'This payment method is temporarily unavailable. Please choose another one, such as cash on delivery or InstaPay.',
+            'طريقة الدفع هذه غير متاحة مؤقتاً. يرجى اختيار طريقة أخرى مثل الدفع عند الاستلام أو إنستاباي.'
+          );
+          break;
+        case 'INSTAPAY_NOT_AVAILABLE':
+          friendly = t(
+            'InstaPay is not available for this store right now. Please choose another payment method.',
+            'إنستاباي غير متاح لهذا المتجر حالياً. يرجى اختيار طريقة دفع أخرى.'
           );
           break;
         case 'PAYMENT_PROVIDER_NOT_CONFIGURED':
@@ -1711,11 +1761,13 @@ export default function CheckoutClient() {
   // When the store has rates for >1 distinct country, the country selector
   // renders inside GovernorateAreaSelect instead and this row is hidden.
   const distinctRatedCountries =
-    allAreaRates.length > 0 ? [...new Set(allAreaRates.map(r => r.country))] : ['Kuwait'];
+    allAreaRates.length > 0
+      ? [...new Set(allAreaRates.map(r => r.country))]
+      : [REGION.countryName.en];
   const isSingleCountryStore = distinctRatedCountries.length <= 1;
-  const singleCountryEn = distinctRatedCountries[0] ?? 'Kuwait';
+  const singleCountryEn = distinctRatedCountries[0] ?? REGION.countryName.en;
   const singleCountryAr =
-    allAreaRates.find(r => r.country === singleCountryEn)?.countryAr ?? 'الكويت';
+    allAreaRates.find(r => r.country === singleCountryEn)?.countryAr ?? REGION.countryName.ar;
 
   return (
     <MinimalChrome label={checkoutLabelEn} labelAr={checkoutLabelAr}>
@@ -1868,7 +1920,7 @@ export default function CheckoutClient() {
                           type="tel"
                           autoComplete="tel"
                           inputMode="tel"
-                          placeholder="+965 XXXX XXXX"
+                          placeholder={REGION.phone.placeholderIntl}
                           value={formData.phone}
                           onChange={e => updateField('phone', e.target.value)}
                           aria-invalid={formErrors.phone ? true : undefined}
@@ -2031,97 +2083,64 @@ export default function CheckoutClient() {
                         )}
                       </div>
 
-                      {/* Structured Kuwaiti address fields */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div data-error={!!formErrors.block}>
-                          <Input
-                            label={t('Block *', '\u0642\u0637\u0639\u0629 *')}
-                            value={formData.block}
-                            onChange={e => updateField('block', e.target.value)}
-                            aria-invalid={formErrors.block ? true : undefined}
-                            className={
-                              formErrors.block
-                                ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                                : ''
-                            }
-                          />
-                          {formErrors.block && (
-                            <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                              {formErrors.block}
-                            </p>
-                          )}
-                        </div>
-                        <div data-error={!!formErrors.street}>
-                          <Input
-                            label={t('Street *', '\u0627\u0644\u0634\u0627\u0631\u0639 *')}
-                            value={formData.street}
-                            onChange={e => updateField('street', e.target.value)}
-                            aria-invalid={formErrors.street ? true : undefined}
-                            className={
-                              formErrors.street
-                                ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                                : ''
-                            }
-                          />
-                          {formErrors.street && (
-                            <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                              {formErrors.street}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
+                      {/* Structured Egyptian address fields */}
+                      <div data-error={!!formErrors.street}>
                         <Input
-                          label={t(
-                            'Avenue (optional)',
-                            '\u0627\u0644\u062c\u0627\u062f\u0629 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
-                          )}
-                          value={formData.avenue}
-                          onChange={e => updateField('avenue', e.target.value)}
+                          label={t('Street *', 'اسم الشارع *')}
+                          autoComplete="address-line1"
+                          value={formData.street}
+                          onChange={e => updateField('street', e.target.value)}
+                          aria-invalid={formErrors.street ? true : undefined}
+                          className={
+                            formErrors.street
+                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
+                              : ''
+                          }
                         />
-                        <div data-error={!!formErrors.house}>
+                        {formErrors.street && (
+                          <p role="alert" className="mt-1 text-sm text-destructive-ink">
+                            {formErrors.street}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div data-error={!!formErrors.building}>
                           <Input
-                            label={t(
-                              'House / Building *',
-                              '\u0645\u0646\u0632\u0644 / \u0645\u0628\u0646\u0649 *'
-                            )}
-                            value={formData.house}
-                            onChange={e => updateField('house', e.target.value)}
-                            aria-invalid={formErrors.house ? true : undefined}
+                            label={t('Building no. *', 'رقم المبنى *')}
+                            value={formData.building}
+                            onChange={e => updateField('building', e.target.value)}
+                            aria-invalid={formErrors.building ? true : undefined}
                             className={
-                              formErrors.house
+                              formErrors.building
                                 ? 'border-destructive focus:border-destructive focus:ring-destructive'
                                 : ''
                             }
                           />
-                          {formErrors.house && (
+                          {formErrors.building && (
                             <p role="alert" className="mt-1 text-sm text-destructive-ink">
-                              {formErrors.house}
+                              {formErrors.building}
                             </p>
                           )}
                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
                         <Input
-                          label={t(
-                            'Floor (optional)',
-                            '\u0627\u0644\u0637\u0627\u0628\u0642 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
-                          )}
+                          label={t('Floor (optional)', 'الدور (اختياري)')}
                           value={formData.floor}
                           onChange={e => updateField('floor', e.target.value)}
                         />
                         <Input
-                          label={t(
-                            'Apartment (optional)',
-                            '\u0634\u0642\u0629 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
-                          )}
+                          label={t('Apartment (optional)', 'الشقة (اختياري)')}
                           autoComplete="address-line2"
                           value={formData.apartment}
                           onChange={e => updateField('apartment', e.target.value)}
                         />
                       </div>
+
+                      <Input
+                        label={t('Landmark (optional)', 'علامة مميزة (اختياري)')}
+                        value={formData.landmark}
+                        onChange={e => updateField('landmark', e.target.value)}
+                      />
 
                       <div>
                         <label

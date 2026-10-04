@@ -1,4 +1,3 @@
-import { headers } from 'next/headers';
 import { API_URL } from '../../../lib/api';
 import {
   resolveAgentStore,
@@ -6,6 +5,7 @@ import {
   storefrontBaseUrl,
 } from '../../../lib/agent-store-resolver';
 
+import { REGION } from '@force/shared';
 /**
  * `/.well-known/acp.json` — Agentic Commerce Protocol discovery.
  *
@@ -24,8 +24,8 @@ import {
  * ## Served per store, on three hosts
  *
  *   wadyaljuz.com/.well-known/acp.json          → that merchant
- *   store.force-ai.co/<slug>/.well-known/…      → that merchant
- *   store.force-ai.co/.well-known/…             → 404 (the platform is not a shop)
+ *   <slug>.ebda.app/.well-known/…      → that merchant
+ *   ebda.app/.well-known/…             → 404 (the platform is not a shop)
  *
  * `resolveAgentStore()` owns that logic, shared with `/llms.txt` so the two
  * cannot disagree about which store a request belongs to.
@@ -53,8 +53,7 @@ export async function GET() {
   // Fail closed. Same 404 as an unknown store — do not diverge these.
   if (!store.enabledFeatures?.includes('agent_checkout')) return notFound();
 
-  const h = await headers();
-  const base = storefrontBaseUrl(store, h.get('host'));
+  const base = storefrontBaseUrl(store);
   const viaCookie = await resolvedViaCookie();
 
   const body = {
@@ -72,9 +71,9 @@ export async function GET() {
       },
     },
     // The currency a price in any of these surfaces is quoted in. Integer minor
-    // units throughout — KWD prices are in fils (1 KWD = 1000 fils), so an
+    // units throughout — EGP prices are in piastres (1 EGP = 100 piastres), so an
     // agent that assumes 2 decimal places will be wrong by 10x on this platform.
-    currency: store.currency ?? 'KWD',
+    currency: store.currency ?? REGION.currency,
     capabilities: {
       catalog: true,
       cart: true,
@@ -124,13 +123,12 @@ export async function GET() {
       // tells an agent it may transact when it may not (or the reverse). Five
       // minutes bounds the window without a per-request DB read.
       //
-      // Shared-cacheable because this path is resolved ONLY from the URL slug
-      // segment or the custom-domain Host — middleware.ts's
-      // URL_KEYED_PUBLIC_PATHS guard (#1959) never lets the sticky
-      // `x-store-slug` cookie reach it. THAT guard is the load-bearing control
-      // against a cross-tenant edge-cache entry; the `viaCookie → private`
-      // branch below is an unreachable second line of defence (#2174, see
-      // resolvedViaCookie). `Vary: Cookie` covers a Vary-respecting cache.
+      // Shared-cacheable because this path is resolved ONLY from the request
+      // Host (`<slug>.ebda.app` or the custom domain) — middleware sets
+      // `x-store-domain` from it and no cookie or path ever names a store, so
+      // the URL (host included) fully keys the answer at a shared cache. The
+      // `viaCookie → private` branch below is a retired second line of defence
+      // (see resolvedViaCookie). `Vary: Cookie` covers a Vary-respecting cache.
       'Cache-Control': viaCookie ? 'private, max-age=300' : 'public, max-age=300, s-maxage=300',
       ...(viaCookie ? {} : { Vary: 'Cookie' }),
     },

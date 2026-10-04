@@ -5,8 +5,8 @@
 // reseed). Idempotent. After this, future baseline changes reach the demos
 // with no reseed.
 //   run: railway run node packages/database/scripts/demos-content-only-layout.mjs
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import { createPrismaClient } from '@force/database';
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
 
 const demos = await prisma.store.findMany({
   where: { slug: { startsWith: 'demo-' } },

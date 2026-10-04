@@ -9,7 +9,7 @@ import { apiGet, apiGetPage } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
-import { reportRangeQueryString } from '@force/shared';
+import { reportRangeQueryString, minorToDecimalString } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,9 +61,9 @@ interface SalesStats {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function kwd(fils: number | null | undefined): string {
-  if (typeof fils !== 'number' || !Number.isFinite(fils)) return '0.000';
-  return (fils / 1000).toFixed(3);
+function major(piastres: number | null | undefined): string {
+  if (typeof piastres !== 'number' || !Number.isFinite(piastres)) return '0.00';
+  return minorToDecimalString(piastres);
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -108,7 +108,7 @@ export default function FinanceDashboardPage() {
     // refers to the same window regardless of the viewer's local timezone.
     // BUG-F-DASH-02 fix (2026-06-09): `toDateStr` produced local YYYY-MM-DD
     // which the finance API appended T00:00:00 as local midnight, while
-    // analytics used toISOString() (UTC), causing Kuwait (UTC+3) users to
+    // analytics used toISOString() (UTC), causing Egypt (UTC+3) users to
     // see a 3-hour boundary mismatch between the two panels on the same page.
     const from = resolved.startDate.toISOString();
     const to = resolved.endDate.toISOString();
@@ -224,7 +224,7 @@ export default function FinanceDashboardPage() {
                 !
               </span>
             )}
-            {kwd(row.balance)} KWD
+            {major(row.balance)} EGP
           </span>
         );
       },
@@ -267,14 +267,14 @@ export default function FinanceDashboardPage() {
                   }`}
                   title={dashboardErr ?? undefined}
                 >
-                  {dashboardErr ? '—' : kwd(thisMonth.revenue)}
+                  {dashboardErr ? '—' : major(thisMonth.revenue)}
                 </p>
                 {dashboardErr ? (
                   <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                     {t('couldntLoad')}
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">KWD</p>
+                  <p className="text-xs text-muted-foreground">EGP</p>
                 )}
               </div>
 
@@ -289,14 +289,14 @@ export default function FinanceDashboardPage() {
                   }`}
                   title={dashboardErr ?? undefined}
                 >
-                  {dashboardErr ? '—' : kwd(thisMonth.expenses)}
+                  {dashboardErr ? '—' : major(thisMonth.expenses)}
                 </p>
                 {dashboardErr ? (
                   <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                     {t('couldntLoad')}
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">KWD</p>
+                  <p className="text-xs text-muted-foreground">EGP</p>
                 )}
               </div>
 
@@ -318,7 +318,7 @@ export default function FinanceDashboardPage() {
                   ) : (
                     <>
                       {netPositive ? '' : '−'}
-                      {kwd(Math.abs(thisMonth.net))}
+                      {major(Math.abs(thisMonth.net))}
                     </>
                   )}
                 </p>
@@ -327,7 +327,7 @@ export default function FinanceDashboardPage() {
                     {t('couldntLoad')}
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">KWD</p>
+                  <p className="text-xs text-muted-foreground">EGP</p>
                 )}
               </div>
             </div>
@@ -356,9 +356,9 @@ export default function FinanceDashboardPage() {
                     {t('salesOrdersRevenue')}
                   </p>
                   <p className="text-2xl font-semibold font-mono text-green-700">
-                    {kwd(salesStats.totalRevenue)}
+                    {major(salesStats.totalRevenue)}
                   </p>
-                  <p className="text-xs text-muted-foreground">KWD</p>
+                  <p className="text-xs text-muted-foreground">EGP</p>
                 </div>
                 <div className="rounded-xl border border-border p-4 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">
@@ -385,21 +385,21 @@ export default function FinanceDashboardPage() {
                     }`}
                     title={dashboardErr ?? undefined}
                   >
-                    {dashboardErr ? '—' : kwd(stockValue)}
+                    {dashboardErr ? '—' : major(stockValue)}
                   </p>
                   {dashboardErr ? (
                     <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                       {t('couldntLoad')}
                     </p>
                   ) : (
-                    <p className="text-sm text-muted-foreground">KWD</p>
+                    <p className="text-sm text-muted-foreground">EGP</p>
                   )}
                   {!dashboardErr &&
                     disabledVariantStockValue !== null &&
                     disabledVariantStockValue > 0 && (
                       <p className="text-xs text-muted-foreground pt-1">
                         {t('disabledVariantStockValue', {
-                          amount: kwd(disabledVariantStockValue),
+                          amount: major(disabledVariantStockValue),
                         })}
                       </p>
                     )}
@@ -452,14 +452,14 @@ export default function FinanceDashboardPage() {
                       }`}
                       title={dashboardErr ?? undefined}
                     >
-                      {dashboardErr ? '—' : kwd(val)}
+                      {dashboardErr ? '—' : major(val)}
                     </p>
                     {dashboardErr ? (
                       <p className="text-xs text-destructive-ink truncate" title={dashboardErr}>
                         {t('couldntLoad')}
                       </p>
                     ) : (
-                      <p className="text-xs text-muted-foreground">KWD</p>
+                      <p className="text-xs text-muted-foreground">EGP</p>
                     )}
                   </div>
                 ))}

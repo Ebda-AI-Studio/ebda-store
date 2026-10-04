@@ -1,10 +1,8 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { hashMerchantKey, hasPlausibleMerchantKeyShape } from '../mcp/merchant-auth';
 import { featureService } from '../services/feature.service';
 import { resolveStoreBySlug } from '../mcp/resolve-store';
-import { buildMerchantMcpServer } from '../mcp/merchant-mcp-server';
 import { verifyMerchantKey, MERCHANT_MCP_FEATURE, MERCHANT_KEY_HEADER } from '../mcp/merchant-auth';
 import { AppError } from '../middleware/error-handler';
 import { makeRateLimitStore, rateLimitRedisClient } from '../middleware/security';
@@ -181,6 +179,11 @@ async function handleMerchantMcpPost(req: Request, res: Response): Promise<void>
   // window in which a key for store B is evaluated against store A.
   req.auth = await verifyMerchantKey(req, store);
 
+  // Loaded on first call, see mcp.routes.ts.
+  const [{ StreamableHTTPServerTransport }, { buildMerchantMcpServer }] = await Promise.all([
+    import('@modelcontextprotocol/sdk/server/streamableHttp.js'),
+    import('../mcp/merchant-mcp-server.js'),
+  ]);
   const server = buildMerchantMcpServer(store);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   res.on('close', () => {

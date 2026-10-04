@@ -130,7 +130,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
       customerName,
       customerEmail: order.customer?.email || guestEmail,
       // Bundle boxes collapse to ONE row each (see groupOrderLinesForDisplay)
-      // — the emailed confirmation must show "Ramadan Box · 12.000 KWD",
+      // — the emailed confirmation must show "Ramadan Box · 12.000 EGP",
       // never the per-component allocated shares that fund that one price.
       items: groupOrderLinesForDisplay(
         order.items as Array<{
@@ -168,6 +168,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
       promotionNameAr: order.appliedPromotion?.nameAr ?? undefined,
       total: order.total,
       shippingAddress: shippingAddress as OrderEmailData['shippingAddress'],
+      isCod: (paymentMethod || '').toLowerCase() === 'cod',
     };
 
     const store = await step.run('load-store', () =>
@@ -279,9 +280,9 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
           paymentMethod,
         });
       }),
-      // Orders-PWA (orders.forcemediakw.com) staff push via OneSignal.
+      // Orders-PWA (orders.ebda.app) staff push via OneSignal.
       // Targets ONLY the Orders OneSignal app — a different device set + a
-      // different origin from the OneSignal admin app (app.forcemediakw.com),
+      // different origin from the OneSignal admin app (app.ebda.app),
       // so the two never double-send. Tag-based: only devices tagged with
       // this store's `store_id` (set when staff enable notifications) receive
       // it. Replaces the old VAPID web-push path (server 403 + iOS-unreliable).

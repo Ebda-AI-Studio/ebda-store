@@ -12,7 +12,7 @@ export interface OrderActionPayment {
   transactionId?: string | null;
   paymentUrl?: string | null;
   paymentLink?: string | null;
-  /** Fils. Needed (with refundedAmount) for refundViaProviderRemaining. */
+  /** Piastres. Needed (with refundedAmount) for refundViaProviderRemaining. */
   amount?: number | null;
   refundedAmount?: number | null;
   createdAt?: string | Date | null;
@@ -31,6 +31,8 @@ export interface OrderActionVisibility {
   hasProviderPayment: boolean;
   /** The MANUAL mark-paid toggle: unpaid AND no provider row (COD/no row). */
   showManualMarkPaid: boolean;
+  /** InstaPay: the order waits for the merchant's "payment received" confirmation. */
+  showConfirmInstapay: boolean;
   /** Refund via the provider: paid, a refundable online payment, not refunded. */
   showRefundViaProvider: boolean;
   /** Refresh refund status: a provider-issued refund exists to ask about. */
@@ -38,7 +40,7 @@ export interface OrderActionVisibility {
 }
 
 /**
- * What `POST /orders/:id/refund-via-provider` would send, in fils: the NEWEST
+ * What `POST /orders/:id/refund-via-provider` would send, in piastres: the NEWEST
  * `completed` / `partially_refunded` payment's `amount - refundedAmount` — the
  * row and figure that route and PaymentService.refund use when no amount is
  * given (#2069). The order total overstates it after a partial refund.
@@ -59,11 +61,19 @@ export function refundViaProviderRemaining(order: OrderActionInput): number | nu
 
 export function orderActionVisibility(order: OrderActionInput): OrderActionVisibility {
   const payments = order.payments ?? [];
-  const showMarkPaid = order.paymentStatus !== 'paid';
+  // An InstaPay order awaiting confirmation is paid ONLY through the dedicated
+  // confirm: no payment link, no provider refresh, no manual mark-paid.
+  const awaitingInstapay =
+    order.status === 'awaiting_payment_confirmation' &&
+    payments.some(p => p.provider === 'instapay' && p.status === 'pending');
+  const showMarkPaid = order.paymentStatus !== 'paid' && !awaitingInstapay;
   // Paid status on an order with a provider-payment row MUST come from the
   // provider (webhook / verify), never a manual flip — financial integrity.
+  // COD and InstaPay have no provider behind them: their paid status and any
+  // refund are the merchant's own actions, never a provider call.
+  const isManual = (p: OrderActionPayment) => p.provider === 'cod' || p.provider === 'instapay';
   const hasProviderPayment = payments.some(
-    p => p.provider !== 'cod' && !!(p.paymentUrl || p.paymentLink || p.transactionId)
+    p => !isManual(p) && !!(p.paymentUrl || p.paymentLink || p.transactionId)
   );
   // A partially refunded payment still has a refundable balance — the API's
   // refund-via-provider accepts it (#1360), so the button must not vanish
@@ -72,7 +82,7 @@ export function orderActionVisibility(order: OrderActionInput): OrderActionVisib
     p =>
       (p.status === 'completed' || p.status === 'partially_refunded') &&
       !!p.transactionId &&
-      p.provider !== 'cod'
+      !isManual(p)
   );
   const refundedPayment = payments.some(
     p =>
@@ -84,6 +94,7 @@ export function orderActionVisibility(order: OrderActionInput): OrderActionVisib
     showMarkPaid,
     hasProviderPayment,
     showManualMarkPaid: showMarkPaid && !hasProviderPayment,
+    showConfirmInstapay: awaitingInstapay,
     showRefundViaProvider:
       order.paymentStatus === 'paid' && refundableOnlinePayment && order.status !== 'refunded',
     showRefreshRefundStatus: refundedPayment,

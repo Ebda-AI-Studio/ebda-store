@@ -5,11 +5,12 @@ import { Button, Modal, useToast } from '@force/ui';
 import { apiPost } from '../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
+import { minorToDecimalString } from '@force/shared';
 interface RefundButtonProps {
   storeId: string;
   orderId: string;
   orderNumber: string;
-  /** Fils the provider will be asked for (the payment's refundable remainder) — quoted in the confirm. */
+  /** Piastres the provider will be asked for (the payment's refundable remainder) — quoted in the confirm. */
   total: number;
   currency: string;
   /** Re-fetch the parent order after a successful refund. */
@@ -18,7 +19,7 @@ interface RefundButtonProps {
 }
 
 /**
- * Admin-initiated refund via the payment provider (MyFatoorah / Tap / etc.).
+ * Admin-initiated refund via the payment provider (Paymob / Kashier / Fawry).
  * Calls the store-scoped refund endpoint which:
  *   1. hits the provider's refund API
  *   2. flips Payment.status -> refunded and Order.status -> refunded
@@ -69,13 +70,11 @@ export function RefundButton({
         toastError(t('toastFailedTitle'), error?.message ?? '');
         return;
       }
-      // MyFatoorah refunds are queued for their finance team's review,
-      // so "issued" is misleading — the customer's card hasn't moved yet.
-      // Same wording works for Tap/Hesabe/UPayments which are typically
-      // faster but still asynchronous on the provider side.
+      // A gateway may queue or review a refund, so "issued" is misleading —
+      // the customer's card hasn't necessarily moved yet.
       toastSuccess(
         t('toastSuccessBody', {
-          amount: (data.refundAmount / 1000).toFixed(3),
+          amount: minorToDecimalString(data.refundAmount),
           currency,
           provider: data.provider,
         })
@@ -117,7 +116,7 @@ export function RefundButton({
         <p className="text-sm text-muted-foreground">
           {t.rich('modalBodyIntro', {
             b: chunks => <strong className="text-foreground">{chunks}</strong>,
-            amount: (total / 1000).toFixed(3),
+            amount: minorToDecimalString(total),
             currency,
           })}
         </p>

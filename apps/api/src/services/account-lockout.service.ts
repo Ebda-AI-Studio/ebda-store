@@ -4,7 +4,7 @@
  */
 
 import { redis } from './redis.service';
-import { prisma } from '@force/database';
+import { insertAuditLog } from '../lib/definer';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
 
@@ -197,13 +197,11 @@ class AccountLockoutService {
    */
   private async logAttempt(email: string, ip?: string, success?: boolean): Promise<void> {
     try {
-      await prisma.auditLog.create({
-        data: {
-          action: success ? 'LOGIN_SUCCESS' : 'LOGIN_FAILED',
-          resourceType: 'auth',
-          details: { email },
-          ipAddress: ip,
-        },
+      await insertAuditLog({
+        action: success ? 'LOGIN_SUCCESS' : 'LOGIN_FAILED',
+        resourceType: 'auth',
+        details: { email },
+        ip,
       });
     } catch (error) {
       // Don't fail login for audit logging errors

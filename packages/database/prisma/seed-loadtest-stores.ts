@@ -15,18 +15,19 @@
  * (comma-separated, single line) for consumption by multi-store-storm.js.
  */
 
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '../src/client';
 import * as bcrypt from 'bcryptjs';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const prisma = new PrismaClient();
+import { roundToMinor, REGION } from '@force/shared';
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
 
 // ============================================
 // Config
 // ============================================
 
-const LOADTEST_USER_EMAIL = 'loadtest+stores@forcemediakw.com';
+const LOADTEST_USER_EMAIL = 'loadtest+stores@ebda.app';
 const LOADTEST_STORE_SLUG_PREFIX = 'loadtest-store-';
 const STORE_COUNT = parseInt(process.env.LOADTEST_STORE_COUNT ?? '20', 10);
 const IS_CLEANUP = process.argv.includes('--cleanup');
@@ -47,8 +48,8 @@ function generateSlug(name: string): string {
     .replace(/(^-|-$)/g, '');
 }
 
-function priceInFils(kwd: number): number {
-  return Math.round(kwd * 1000);
+function priceInFils(major: number): number {
+  return roundToMinor(major);
 }
 
 async function hashPassword(password: string): Promise<string> {
@@ -292,7 +293,7 @@ async function seedLoadtestStore(ownerId: string, storeIndex: number) {
       plan: 'starter',
       description: `Disposable load-test store #${storeIndex}. Safe to delete.`,
       descriptionAr: `متجر اختبار حمل مؤقت رقم ${storeIndex}`,
-      currency: 'KWD',
+      currency: REGION.currency,
       template: 'modern',
       theme: {
         primaryColor: '26 100% 50%',

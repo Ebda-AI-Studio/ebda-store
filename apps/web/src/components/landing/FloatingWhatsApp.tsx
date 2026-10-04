@@ -2,15 +2,16 @@
 
 /**
  * Persistent bottom-right WhatsApp CTA — the always-visible "escape hatch"
- * conversion button (cohesion lesson from the Force AI reference landing).
+ * conversion button (cohesion lesson from the Ebda reference landing).
  */
+import { BRAND } from '@force/shared';
 export function FloatingWhatsApp() {
   return (
     <a
       href="https://wa.me/96541169141"
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Chat with Force AI on WhatsApp"
+      aria-label={`Chat with ${BRAND.name} on WhatsApp`}
       className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#25d366] text-white shadow-[0_8px_30px_rgba(37,211,102,0.45)] transition-transform hover:scale-110"
     >
       {/* WhatsApp glyph */}

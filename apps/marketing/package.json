@@ -1,0 +1,38 @@
+{
+  "name": "@force/marketing",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "next dev -p 3005",
+    "build": "next build",
+    "start": "node ../../packages/site-kit/src/gates/serve-static.mjs out 3005",
+    "lint": "eslint src scripts --ext .ts,.tsx,.mjs",
+    "lint:fix": "eslint src scripts --ext .ts,.tsx,.mjs --fix",
+    "og": "node scripts/make-og.mjs",
+    "check:a11y": "node scripts/a11y-check.mjs",
+    "check:lighthouse": "node scripts/lighthouse-check.mjs",
+    "check": "npm run build && npm run check:a11y",
+    "clean": "rm -rf .next out node_modules"
+  },
+  "dependencies": {
+    "next": "^16.3.8",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@force/site-kit": "*",
+    "@lhci/cli": "^0.15.1",
+    "@next/eslint-plugin-next": "^16.1.1",
+    "@playwright/test": "1.60.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-react": "^7.37.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "sharp": "^0.35.3",
+    "typescript": "^5.3.0",
+    "typescript-eslint": "^8.59.1",
+    "wrangler": "4.116.0"
+  }
+}

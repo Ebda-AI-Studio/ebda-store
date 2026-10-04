@@ -1,9 +1,18 @@
 /**
- * The Postgres session settings (GUCs) that RLS policies read, and the
- * statements that set them for one transaction.
+ * The Postgres settings (GUCs) that RLS policies read, and the statement that
+ * sets them for one transaction.
  *
  * Shared by `runInTenantContext`, the proxy's `$transaction` inheritance and
  * `withMoneyTx` so all three set the SAME settings the SAME way.
+ *
+ * TRANSACTION-LOCAL ONLY (R-EBDA-001, docs/ebda/design/cloudflare-backend.md §3).
+ * Every setting goes through `set_config(name, value, true)`: `true` is
+ * `is_local`, so the value reverts at COMMIT/ROLLBACK and a transaction-mode
+ * pooler (Hyperdrive, pgbouncer, Neon) that hands this server connection to the
+ * next tenant can never leak it. The spike's negative control — a session-level
+ * `set_config(..., false)` — leaked into a later, different client 13-20 times
+ * out of 20. A session-level SET is banned repo-wide by
+ * `tests/unit/no-session-level-gucs.test.ts`.
  */
 
 export interface TenantGucs {
@@ -11,26 +20,38 @@ export interface TenantGucs {
   userId?: string;
 }
 
+export const GUC_STORE = 'app.current_store_id';
+export const GUC_USER = 'app.current_user_id';
+
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** `SET LOCAL` statements for the given settings, in a fixed order. */
-export function gucStatements(gucs: TenantGucs): string[] {
-  const out: string[] = [];
+/**
+ * The statements that set the given settings, in a fixed order — at most ONE:
+ * both GUCs go in a single `SELECT set_config(...), set_config(...)`, because on
+ * a Worker every round trip to the database is a network hop. Values are bound
+ * parameters, never interpolated, so there is no quoting to get wrong.
+ */
+export function gucStatements(gucs: TenantGucs): Array<{ sql: string; params: string[] }> {
+  const calls: string[] = [];
+  const params: string[] = [];
   if (gucs.storeId) {
-    out.push(`SET LOCAL app.current_store_id = '${gucs.storeId.replace(/'/g, "''")}'`);
+    params.push(gucs.storeId);
+    calls.push(`set_config('${GUC_STORE}', $${params.length}, true)`);
   }
   if (gucs.userId) {
-    out.push(`SET LOCAL app.current_user_id = '${gucs.userId.replace(/'/g, "''")}'`);
+    params.push(gucs.userId);
+    calls.push(`set_config('${GUC_USER}', $${params.length}, true)`);
   }
-  return out;
+  return calls.length ? [{ sql: `SELECT ${calls.join(', ')}`, params }] : [];
 }
 
-/** Run the `SET LOCAL`s on an open interactive transaction. */
-export async function applyGucs(
-  tx: { $executeRawUnsafe: (sql: string) => Promise<unknown> },
-  gucs: TenantGucs
-): Promise<void> {
-  for (const sql of gucStatements(gucs)) await tx.$executeRawUnsafe(sql);
+type RawQuerier = {
+  $queryRawUnsafe: (sql: string, ...params: unknown[]) => unknown;
+};
+
+/** Run the `set_config`s on an open interactive transaction. */
+export async function applyGucs(tx: RawQuerier, gucs: TenantGucs): Promise<void> {
+  for (const { sql, params } of gucStatements(gucs)) await tx.$queryRawUnsafe(sql, ...params);
 }
 
 /**
@@ -39,10 +60,7 @@ export async function applyGucs(
  * it to inherit — e.g. the public checkout. Validates like
  * `runInTenantContext`.
  */
-export async function setTenantGucs(
-  tx: { $executeRawUnsafe: (sql: string) => Promise<unknown> },
-  gucs: TenantGucs
-): Promise<void> {
+export async function setTenantGucs(tx: RawQuerier, gucs: TenantGucs): Promise<void> {
   if (gucs.storeId !== undefined && !UUID_RE.test(gucs.storeId)) {
     throw new Error('Invalid store ID format');
   }

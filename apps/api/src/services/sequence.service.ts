@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { withRlsBypass } from '@force/database';
+import { withStore } from '@force/database';
 
 const PREFIX = {
   journal: 'JE',
@@ -41,12 +41,10 @@ export async function nextSequence(
   // don't inherit search_path=public still resolve the relation correctly.
   //
   // sequences table has RLS enabled (accounting_foundations migration).
-  // Wrap in withRlsBypass for Inngest/cron callers that have no tenant
-  // context. Request-handler callers already run inside a tenant tx
-  // with app.current_store_id set; nesting withRlsBypass inside a
-  // tenant context simply overrides bypass=true for our transaction
-  // which is fine — sequence values are storeId-scoped via the
-  // composite primary key, so cross-tenant leak isn't possible.
+  // Wrapped in withStore for Inngest/cron callers that have no tenant
+  // context; a request-handler caller already runs inside a tenant tx for this
+  // store, and withStore joins it. Sequence values are storeId-scoped via the
+  // composite primary key.
   //
   // When a transaction client is supplied, run the upsert on that connection
   // directly — no new pool connection acquired, no deadlock risk under load.
@@ -61,7 +59,9 @@ export async function nextSequence(
 
   const row = tx
     ? await execQuery(tx)
-    : await withRlsBypass(innerTx => execQuery(innerTx as unknown as Prisma.TransactionClient));
+    : await withStore(storeId, innerTx =>
+        execQuery(innerTx as unknown as Prisma.TransactionClient)
+      );
 
   const n = Number(row[0].next);
   return `${prefix}-${year}-${String(n).padStart(6, '0')}`;

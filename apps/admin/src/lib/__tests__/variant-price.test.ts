@@ -1,6 +1,6 @@
 /**
  * #1919 — a variant whose price is null inherits the product price. The admin
- * manual-order picker priced it at 0, and the mass-edit grid showed 0.000 and
+ * manual-order picker priced it at 0, and the mass-edit grid showed 0.00 and
  * then SAVED 0 as an override for every inheriting variant it loaded.
  */
 import { describe, it, expect } from 'vitest';
@@ -21,9 +21,9 @@ describe('variant price helpers', () => {
     expect(variantFieldToPrice(variantPriceToField(null))).toBeNull();
   });
 
-  it('an override round-trips through the KWD field', () => {
-    expect(variantPriceToField(4500)).toBe('4.500');
-    expect(variantFieldToPrice('4.500')).toBe(4500);
+  it('an override round-trips through the EGP field', () => {
+    expect(variantPriceToField(4500)).toBe('45.00');
+    expect(variantFieldToPrice('45.00')).toBe(4500);
     expect(variantFieldToPrice('  ')).toBeNull();
   });
 });

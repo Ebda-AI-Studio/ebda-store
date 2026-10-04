@@ -32,9 +32,9 @@ interface CustomerRow {
   email: string;
   phone: string;
   totalOrders: number;
-  /** Sum of every order's total (all statuses), in fils. */
+  /** Sum of every order's total (all statuses), in piastres. */
   totalSpent: number;
-  /** totalSpent / totalOrders, in fils (0 for a zero-order customer). */
+  /** totalSpent / totalOrders, in piastres (0 for a zero-order customer). */
   avgOrderValue: number;
   // Null for a registered shopper with zero orders (#1882).
   lastOrderDate: string | null;

@@ -21,15 +21,16 @@
  * re-matched to a second row (enforced by the exclusion query).
  */
 
-import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
+import { prisma, runInTenantContext, withStore } from '@force/database';
 import type { BankMatchStatus, BankTransaction, Prisma } from '@prisma/client';
 import { parseStatementCsv, parseStatementOfx, type ParsedRow } from './bank-statement-parser';
 import { assertStoreOwns } from './assert-store-owns';
 import { COUNTED_STATUSES_SQL } from './reports.service';
 
+import { minorToDecimalString } from '@force/shared';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** Fil tolerance for amount matching (5 fils = 0.005 KWD — rounding/truncation). */
+/** Fil tolerance for amount matching (5 piastres = 0.005 EGP — rounding/truncation). */
 const AMOUNT_TOLERANCE_FILS = 5;
 
 /** Maximum days difference between bank transaction date and journal posting date. */
@@ -90,15 +91,15 @@ export interface ReconciliationSummary {
  *   explaining what the merchant should do to close the gap.
  */
 export interface ReconciliationDifference {
-  /** Sum of all bank statement lines net in fils (credits positive, debits negative from bank POV). */
+  /** Sum of all bank statement lines net in piastres (credits positive, debits negative from bank POV). */
   bankBalanceFils: number;
-  /** Ledger balance for the linked GL account up to statement period end (debit−credit, fils). */
+  /** Ledger balance for the linked GL account up to statement period end (debit−credit, piastres). */
   ledgerBalanceFils: number;
   /** bankBalanceFils − ledgerBalanceFils. Zero = reconciled. */
   differenceFils: number;
-  /** Total fils of unmatched bank lines (explains bank side of the gap). */
+  /** Total piastres of unmatched bank lines (explains bank side of the gap). */
   unmatchedBankFils: number;
-  /** Total fils of unmatched ledger entries for this GL account in the period (explains ledger side). */
+  /** Total piastres of unmatched ledger entries for this GL account in the period (explains ledger side). */
   unmatchedLedgerFils: number;
   /** How many ledger entries against this GL account in the period have no matching bank tx. */
   unmatchedLedgerCount: number;
@@ -139,7 +140,7 @@ export async function importBankStatement(
   let statementId: string;
   let imported = 0;
 
-  await withRlsBypass(async tx => {
+  await withStore(storeId, async tx => {
     // glAccountId comes from the request body and is written onto the
     // BankStatement unchecked, then read back with the account's code and
     // name. #1241: this used to run BEFORE this block, on the bare `prisma`
@@ -214,7 +215,7 @@ function buildBankTxCreateData(
 /**
  * Bounded chunk size for the auto-match loop below. Mirrors the
  * `SCAN_CHUNK_SIZE` pattern in `reorder-scan.service.ts` — each chunk runs
- * inside its OWN short `withRlsBypass` transaction so a large statement
+ * inside its OWN short `withStore` transaction so a large statement
  * (500+ rows) can never blow the 30s interactive-tx timeout regardless of
  * total row count.
  */
@@ -231,7 +232,7 @@ const MATCH_CHUNK_SIZE = 50;
  *
  * Execution shape (fixed 2026-07-02 — same defect class as the low-stock-scan
  * / reorder-scan 30s interactive-tx timeout, P1 2026-06-27/30): the original
- * version held the ENTIRE per-bank-tx-row loop inside one `withRlsBypass`
+ * version held the ENTIRE per-bank-tx-row loop inside one `withStore`
  * transaction, and re-fetched the full store-wide "already matched" entry
  * list from scratch on EVERY iteration (redundant — that baseline never
  * changes during a pass; only the in-memory `claimedEntries` set does). On a
@@ -240,7 +241,7 @@ const MATCH_CHUNK_SIZE = 50;
  *
  * Fix: fetch the already-matched baseline ONCE (not per row), then chunk the
  * per-row candidate-lookup + write loop into bounded `MATCH_CHUNK_SIZE`
- * batches, each its own short `withRlsBypass` transaction, so no single
+ * batches, each its own short `withStore` transaction, so no single
  * transaction's duration scales with the statement's row count. The
  * candidate-matching logic and per-row confidence math are unchanged.
  */
@@ -254,7 +255,7 @@ export async function runAutoMatch(
   // iteration before; that baseline is invariant for the duration of this
   // pass — only `claimedEntries`, tracked in memory below, changes).
   // -------------------------------------------------------------------------
-  const { bankTxs, alreadyMatchedIds } = await withRlsBypass(async tx => {
+  const { bankTxs, alreadyMatchedIds } = await withStore(storeId, async tx => {
     // Reset prior auto_matches so re-runs are idempotent
     await tx.bankTransaction.updateMany({
       where: { statementId, storeId, matchStatus: 'auto_matched' },
@@ -303,7 +304,7 @@ export async function runAutoMatch(
   for (let chunkStart = 0; chunkStart < bankTxs.length; chunkStart += MATCH_CHUNK_SIZE) {
     const chunk = bankTxs.slice(chunkStart, chunkStart + MATCH_CHUNK_SIZE);
 
-    await withRlsBypass(async tx => {
+    await withStore(storeId, async tx => {
       for (const btx of chunk) {
         const from = new Date(btx.date.getTime() - DATE_TOLERANCE_MS);
         const to = new Date(btx.date.getTime() + DATE_TOLERANCE_MS);
@@ -370,7 +371,7 @@ export async function runAutoMatch(
   // -------------------------------------------------------------------------
   // Step 3: recompute + persist statement status in its own short tx.
   // -------------------------------------------------------------------------
-  await withRlsBypass(async tx => {
+  await withStore(storeId, async tx => {
     const totalTx = await tx.bankTransaction.count({ where: { statementId, storeId } });
     const matchedTotal = await tx.bankTransaction.count({
       where: {
@@ -392,7 +393,7 @@ export async function runAutoMatch(
   return { matched, unmatched, ambiguous };
 }
 
-/** Confidence 0–100: 100 = exact fils match, lower as difference grows. */
+/** Confidence 0–100: 100 = exact piastres match, lower as difference grows. */
 function computeConfidence(txFils: number, ledgerFils: number): number {
   const diff = Math.abs(txFils - ledgerFils);
   if (diff === 0) return 100;
@@ -423,7 +424,7 @@ export interface ManualMatchInput {
 export async function applyManualMatch(input: ManualMatchInput): Promise<BankTransaction> {
   const { storeId, transactionId, action, journalEntryId } = input;
 
-  return withRlsBypass(async tx => {
+  return withStore(storeId, async tx => {
     // Verify the bank transaction belongs to this store
     const btx = await tx.bankTransaction.findUnique({
       where: { id: transactionId },
@@ -591,11 +592,11 @@ export async function getReconciliationSummary(
  *   < 0 → ledger shows more than bank (over-posted or duplicate ledger entries)
  *   = 0 → bank and ledger agree for this period
  *
- * UNMATCHED BANK FILS:
+ * UNMATCHED BANK PIASTRES:
  *   Sum of unmatched BankTransaction amounts. These are the bank lines that have
  *   no corresponding ledger entry — they represent the "missing" ledger side.
  *
- * UNMATCHED LEDGER FILS:
+ * UNMATCHED LEDGER PIASTRES:
  *   Net of counted (posted + reversed) JournalLine entries against the GL account in the period that
  *   are NOT matched to any BankTransaction. These are ledger entries that have
  *   no bank confirmation.
@@ -610,7 +611,7 @@ export async function getReconciliationDifference(
   statementId: string,
   storeId: string
 ): Promise<ReconciliationDifference> {
-  return withRlsBypass(async tx => {
+  return withStore(storeId, async tx => {
     // Fetch statement meta (linked GL account + period)
     const stmt = await tx.bankStatement.findFirst({
       where: { id: statementId, storeId },
@@ -644,7 +645,7 @@ export async function getReconciliationDifference(
 
       const status = btx.matchStatus as BankMatchStatus;
       if (status === 'unmatched') {
-        unmatchedBankFils += btx.amountFils; // absolute fils (sign context is per bank tx)
+        unmatchedBankFils += btx.amountFils; // absolute piastres (sign context is per bank tx)
       }
     }
 
@@ -721,9 +722,9 @@ export async function getReconciliationDifference(
     const isReconciled = differenceFils === 0;
 
     // ── Suggested action ──
-    const kwdBank = (Math.abs(bankBalanceFils) / 1000).toFixed(3);
-    const kwdLedger = (Math.abs(ledgerBalanceFils) / 1000).toFixed(3);
-    const kwdDiff = (Math.abs(differenceFils) / 1000).toFixed(3);
+    const baseBank = minorToDecimalString(Math.abs(bankBalanceFils));
+    const baseLedger = minorToDecimalString(Math.abs(ledgerBalanceFils));
+    const baseDiff = minorToDecimalString(Math.abs(differenceFils));
     const unmatchedCount = bankTxs.filter(b => b.matchStatus === 'unmatched').length;
     const unmatchedLedgerCount = unmatched.length;
 
@@ -736,26 +737,26 @@ export async function getReconciliationDifference(
       suggestedActionAr = 'البنك والدفتر متطابقان — تم إغلاق كشف الحساب بالكامل. لا يلزم أي إجراء.';
     } else if (differenceFils > 0) {
       suggestedActionEn =
-        `Bank balance (KWD ${kwdBank}) exceeds ledger balance (KWD ${kwdLedger}) by KWD ${kwdDiff}. ` +
-        `${unmatchedCount} unmatched bank line(s) totalling KWD ${(unmatchedBankFils / 1000).toFixed(3)} have no ledger entry. ` +
+        `Bank balance (EGP ${baseBank}) exceeds ledger balance (EGP ${baseLedger}) by EGP ${baseDiff}. ` +
+        `${unmatchedCount} unmatched bank line(s) totalling EGP ${minorToDecimalString(unmatchedBankFils)} have no ledger entry. ` +
         `Suggested action: record journal entries for the missing bank transactions, ` +
-        `or post an adjusting entry of KWD ${kwdDiff} (debit bank account, credit appropriate account).`;
+        `or post an adjusting entry of EGP ${baseDiff} (debit bank account, credit appropriate account).`;
       suggestedActionAr =
-        `رصيد البنك (${kwdBank} د.ك) يتجاوز رصيد الدفتر (${kwdLedger} د.ك) بفارق ${kwdDiff} د.ك. ` +
-        `${unmatchedCount} حركة/حركات بنكية غير مطابقة بمجموع ${(unmatchedBankFils / 1000).toFixed(3)} د.ك لا يقابلها قيود في الدفتر. ` +
+        `رصيد البنك (${baseBank} ج.م) يتجاوز رصيد الدفتر (${baseLedger} ج.م) بفارق ${baseDiff} ج.م ` +
+        `${unmatchedCount} حركة/حركات بنكية غير مطابقة بمجموع ${minorToDecimalString(unmatchedBankFils)} ج.م لا يقابلها قيود في الدفتر. ` +
         `الإجراء المقترح: سجّل قيوداً محاسبية للحركات البنكية الغائبة، ` +
-        `أو أضف قيد تسوية بقيمة ${kwdDiff} د.ك (مدين: حساب البنك، دائن: الحساب المناسب).`;
+        `أو أضف قيد تسوية بقيمة ${baseDiff} ج.م (مدين: حساب البنك، دائن: الحساب المناسب).`;
     } else {
       suggestedActionEn =
-        `Ledger balance (KWD ${kwdLedger}) exceeds bank balance (KWD ${kwdBank}) by KWD ${kwdDiff}. ` +
-        `${unmatchedLedgerCount} unmatched ledger entry/entries totalling KWD ${(Math.abs(unmatchedLedgerFils) / 1000).toFixed(3)} have no bank confirmation. ` +
+        `Ledger balance (EGP ${baseLedger}) exceeds bank balance (EGP ${baseBank}) by EGP ${baseDiff}. ` +
+        `${unmatchedLedgerCount} unmatched ledger entry/entries totalling EGP ${minorToDecimalString(Math.abs(unmatchedLedgerFils))} have no bank confirmation. ` +
         `Suggested action: verify the ${unmatchedLedgerCount} unmatched ledger entries — reverse any duplicates, ` +
-        `or post an adjusting entry of KWD ${kwdDiff} (credit bank account, debit appropriate account).`;
+        `or post an adjusting entry of EGP ${baseDiff} (credit bank account, debit appropriate account).`;
       suggestedActionAr =
-        `رصيد الدفتر (${kwdLedger} د.ك) يتجاوز رصيد البنك (${kwdBank} د.ك) بفارق ${kwdDiff} د.ك. ` +
-        `${unmatchedLedgerCount} قيد/قيود في الدفتر بمجموع ${(Math.abs(unmatchedLedgerFils) / 1000).toFixed(3)} د.ك لا يقابلها حركات بنكية. ` +
+        `رصيد الدفتر (${baseLedger} ج.م) يتجاوز رصيد البنك (${baseBank} ج.م) بفارق ${baseDiff} ج.م ` +
+        `${unmatchedLedgerCount} قيد/قيود في الدفتر بمجموع ${minorToDecimalString(Math.abs(unmatchedLedgerFils))} ج.م لا يقابلها حركات بنكية. ` +
         `الإجراء المقترح: راجع القيود ${unmatchedLedgerCount} غير المطابقة — اعكس أي قيود مكررة، ` +
-        `أو أضف قيد تسوية بقيمة ${kwdDiff} د.ك (دائن: حساب البنك، مدين: الحساب المناسب).`;
+        `أو أضف قيد تسوية بقيمة ${baseDiff} ج.م (دائن: حساب البنك، مدين: الحساب المناسب).`;
     }
 
     return {

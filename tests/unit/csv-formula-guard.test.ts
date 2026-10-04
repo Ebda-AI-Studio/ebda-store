@@ -2,7 +2,7 @@
  * csvField / neutralizeFormula — the one CSV-injection guard every exporter
  * shares (packages/shared/src/csv-utils.ts).
  *
- * #811: finance exports format amounts with filsToKwd ("-1.500"), and the
+ * #811: finance exports format amounts with minorToMajor ("-1.500"), and the
  * guard prefixed every negative amount with a quote, so spreadsheets imported
  * it as text and SUM() skipped it. A cell that is entirely a number is now
  * left alone — and every injection payload, including ones that START like a
@@ -44,7 +44,7 @@ describe('neutralizeFormula', () => {
 });
 
 describe('csvField', () => {
-  it('exports a negative KWD amount as a bare number', () => {
+  it('exports a negative EGP amount as a bare number', () => {
     expect(csvField('-1.500')).toBe('-1.500');
   });
 

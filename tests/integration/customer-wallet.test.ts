@@ -41,20 +41,20 @@ const baseOrderData = {
     firstName: 'Wallet',
     lastName: 'Buyer',
     address1: 'Block 1',
-    city: 'Kuwait City',
+    city: 'Cairo',
     state: 'Capital',
     postalCode: '00000',
-    country: 'KW',
+    country: 'EG',
     phone: '96550000000',
   },
-  paymentMethod: 'myfatoorah',
+  paymentMethod: 'paymob',
 };
 
 describe.skipIf(!hasDb)('customer wallet — integration', () => {
   let ownerId: string;
   let storeId: string;
-  let productA: string; // 6000 fils
-  let productB: string; // 4000 fils
+  let productA: string; // 6000 piastres
+  let productB: string; // 4000 piastres
 
   async function setFeature(featureKey: string, enabled: boolean) {
     await prisma.storeFeature.upsert({
@@ -569,7 +569,17 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
       note: 'x',
     });
 
-    await StoreService.delete(s2.id);
+    // Store deletion is a super_admin action: the audit-trail definers check the acting user.
+    const operator = await prisma.user.create({
+      data: {
+        email: `${uid('operator')}@test.local`,
+        passwordHash: 'x',
+        firstName: 'Op',
+        lastName: 'Erator',
+        role: 'super_admin',
+      },
+    });
+    await StoreService.delete(s2.id, operator.id);
 
     expect(await prisma.store.count({ where: { id: s2.id } })).toBe(0);
     expect(await prisma.customerWallet.count({ where: { storeId: s2.id } })).toBe(0);

@@ -14,29 +14,20 @@
  *
  * Scaling: uses a raw `$executeRaw` upsert (INSERT … ON CONFLICT DO UPDATE)
  * so one SQL round-trip handles the counter increment without a separate read.
- * The `withRlsBypass` wrapper is required because this runs outside a tenant
- * context (public endpoint, no JWT) and the table has RLS enabled.
+ * The `withStore` wrapper is required because this runs outside a tenant
+ * request context (public endpoint, no JWT) and the table has RLS enabled.
  */
 
-import { prisma, withRlsBypass } from '@force/database';
+import { withStore } from '@force/database';
+import { regionDayStart } from '@force/shared';
 import { BoundedMap } from '../lib/bounded-map';
+import { isWorkers } from '../lib/runtime';
 import logger from '../lib/logger';
 
 // ---------------------------------------------------------------------------
-// Kuwait timezone helper (mirrors analytics-rollup.service.ts)
+// Cairo calendar day (DST-aware; same helper the rollup uses, so the JOIN is exact)
 // ---------------------------------------------------------------------------
-const KW_OFFSET_MS = 3 * 60 * 60 * 1000;
-
-/**
- * Returns the current day's date at UTC midnight aligned to Kuwait calendar day
- * (KW midnight = UTC 21:00 previous day). This is the same logic the rollup
- * uses for FunnelSnapshot periodDate, so the JOIN is exact.
- */
-function kwDayStart(d: Date = new Date()): Date {
-  const kwMs = d.getTime() + KW_OFFSET_MS;
-  const dayMs = Math.floor(kwMs / (24 * 60 * 60 * 1000)) * (24 * 60 * 60 * 1000);
-  return new Date(dayMs - KW_OFFSET_MS);
-}
+const dayStart = (d: Date = new Date()): Date => regionDayStart(d);
 
 // ---------------------------------------------------------------------------
 // In-memory session debounce
@@ -51,15 +42,18 @@ const sessionViewDebounce = new BoundedMap<string, number>(MAX_DEBOUNCE_ENTRIES)
 
 // Periodic cleanup: remove expired debounce entries every 5 minutes to prevent
 // false positives once the BoundedMap starts evicting the oldest entry.
-const _cleanupInterval = setInterval(
-  () => {
-    const now = Date.now();
-    for (const [key, expiresAt] of sessionViewDebounce) {
-      if (expiresAt <= now) sessionViewDebounce.delete(key);
-    }
-  },
-  5 * 60 * 1000
-);
+// Not on Workers (no timers in global scope; the isolate is short-lived).
+const _cleanupInterval = isWorkers
+  ? undefined
+  : setInterval(
+      () => {
+        const now = Date.now();
+        for (const [key, expiresAt] of sessionViewDebounce) {
+          if (expiresAt <= now) sessionViewDebounce.delete(key);
+        }
+      },
+      5 * 60 * 1000
+    );
 
 // ---------------------------------------------------------------------------
 // Core ingest function
@@ -91,12 +85,14 @@ export async function recordProductView(
     sessionViewDebounce.set(key, now + SESSION_DEBOUNCE_MS);
   }
 
-  const date = kwDayStart();
+  const date = dayStart();
 
   try {
     // Single-round-trip upsert: increment count or create a new row for today.
-    // We bypass RLS because this runs outside a tenant JWT context.
-    await withRlsBypass(
+    // Runs outside a tenant request context (public storefront beacon), so it
+    // enters the store's scope itself.
+    await withStore(
+      storeId,
       tx =>
         tx.$executeRaw`
         INSERT INTO product_daily_views (id, store_id, product_id, date, count)

@@ -1,4 +1,4 @@
-import { withRlsBypass } from '@force/database';
+import { withScopedToOrderStore } from './order-scope';
 import type { Prisma } from '@prisma/client';
 import { getSystemAccountIdByCode } from '../account.service';
 import { postEntry, type JournalLineInput } from '../journal.service';
@@ -54,7 +54,7 @@ export interface PartialReturnJournalArgs {
  *      DR Inventory       line costPrice × qty returned, per line
  *      CR COGS            same amounts
  *
- * All amounts are integer minor units (fils) — no float arithmetic. The
+ * All amounts are integer minor units (piastres) — no float arithmetic. The
  * per-line revenue/COGS amounts are exact (price × qty). The order-level
  * discount and tax are allocated pro-rata by returned gross over subtotal
  * using CUMULATIVE floor allocation across this order's partial returns:
@@ -94,7 +94,10 @@ export async function postPartialReturnJournal(
   args: PartialReturnJournalArgs
 ): Promise<{ posted: number; skipped?: string }> {
   if (!args.tx) {
-    return withRlsBypass(tx => postPartialReturnJournal({ ...args, tx }));
+    return withScopedToOrderStore(args, tx => postPartialReturnJournal({ ...args, tx }), {
+      posted: 0,
+      skipped: 'order-not-found',
+    });
   }
   const { orderId, refundKey, items, tx } = args;
 
@@ -109,7 +112,7 @@ export async function postPartialReturnJournal(
       // nothing, `provider` falls back to 'cod' and the entry credits 1020
       // (COD Clearing) instead of the real gateway account. The entry still
       // balances, so the trial balance and every direct-call test pass while
-      // KNET stays permanently overstated.
+      // the card/online account stays permanently overstated.
       payments: {
         where: { status: { in: ['completed', 'partially_refunded', 'refunded'] } },
         orderBy: { createdAt: 'desc' },
@@ -303,7 +306,7 @@ export async function postPartialReturnJournal(
     }
     if (salesReturnDebit < 0) {
       throw new Error(
-        `postPartialReturnJournal: refund ${refundKey} on order ${orderId} recorded ${creditTotal} fils, less than its tax share ${taxThis}`
+        `postPartialReturnJournal: refund ${refundKey} on order ${orderId} recorded ${creditTotal} piastres, less than its tax share ${taxThis}`
       );
     }
 
@@ -481,12 +484,15 @@ export async function postAmountOnlyRefundJournal(args: {
   storeId?: string;
   /** `refund:<providerRefundId>` — see amountOnlyRefundKey (lib/refund-methods). */
   refundKey: string;
-  /** Fils actually refunded. */
+  /** Piastres actually refunded. */
   amount: number;
   tx?: Prisma.TransactionClient;
 }): Promise<{ posted: number; skipped?: string }> {
   if (!args.tx) {
-    return withRlsBypass(tx => postAmountOnlyRefundJournal({ ...args, tx }));
+    return withScopedToOrderStore(args, tx => postAmountOnlyRefundJournal({ ...args, tx }), {
+      posted: 0,
+      skipped: 'order-not-found',
+    });
   }
   const { orderId, refundKey, amount, tx } = args;
   if (!Number.isSafeInteger(amount) || amount <= 0) {

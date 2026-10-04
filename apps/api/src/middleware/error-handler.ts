@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { Prisma } from '@force/database';
+import { uniqueViolationTarget } from '../lib/prisma-errors';
 import logger from '../lib/logger';
 
 export class AppError extends Error {
@@ -11,7 +12,7 @@ export class AppError extends Error {
     // Was `Record<string, string[]>` (the Zod-validation-issues shape,
     // built inline below, never through this constructor). Widened for
     // RULING T9-a: `bundle.routes.ts`'s `price_not_allocatable` 422 needed
-    // a structured non-string payload (`{ suggested: <fils integer> }`)
+    // a structured non-string payload (`{ suggested: <piastres integer> }`)
     // carried through this SAME field rather than inventing a second,
     // bespoke response shape — see that file's `PRICE_NOT_ALLOCATABLE`
     // throws for the first real caller of a non-string-array `details`.
@@ -80,8 +81,7 @@ export function isExpectedClientError(err: unknown): boolean {
     // row, an idempotency key — is our own double write and is captured
     // (issue 2005).
     if (err.code === 'P2002') {
-      const target = (err.meta as { target?: unknown } | undefined)?.target;
-      const fields = Array.isArray(target) ? target.map(String) : [String(target ?? '')];
+      const fields = uniqueViolationTarget(err);
       return fields.some(f => MERCHANT_TYPED_UNIQUE_FIELDS.has(f) || /_(sku|slug)_key$/.test(f));
     }
     return false;
@@ -184,7 +184,7 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
   // requestId. NEVER return `err.code` (reveals Prisma/Postgres), `err.message`
   // (raw SQL/constraint text), or `err.meta` (schema column/constraint names)
   // to the client — that leaks the internal stack. Support maps requestId →
-  // the logged detail. (Force AI internal-data boundary; CLAUDE.md: never
+  // the logged detail. (Ebda internal-data boundary; CLAUDE.md: never
   // expose database error messages, codes, hints, or stack traces to clients.)
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     logger.error({ err, requestId }, 'Prisma known request error');
@@ -225,8 +225,7 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
     };
 
     if (err.code === 'P2002') {
-      const target = err.meta?.target;
-      const columns = Array.isArray(target) ? target.map(String) : [];
+      const columns = uniqueViolationTarget(err);
       // Ignore tenant-scoping columns — "store_id + sku is taken" is noise to a
       // merchant who only ever operates inside their own store.
       const named = columns

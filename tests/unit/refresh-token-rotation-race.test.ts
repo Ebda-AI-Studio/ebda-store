@@ -31,7 +31,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * writes filter it, so a CAS that matches nothing returns 0 here for the same
  * reason it would in Postgres.
  */
-const { mockPrisma, mockLogger, store, byToken, reset } = vi.hoisted(() => {
+const { mockPrisma, TOKEN_OWNER, mockLogger, store, byToken, reset } = vi.hoisted(() => {
   const store = new Map<string, any>();
   const byToken = new Map<string, any>();
   let seq = 0;
@@ -46,6 +46,18 @@ const { mockPrisma, mockLogger, store, byToken, reset } = vi.hoisted(() => {
       }
       return r[k] === v;
     });
+
+  // The token's owner is read AS themselves (`withUser`), not joined from the token row.
+  const TOKEN_OWNER = (over: Record<string, unknown> = {}) => ({
+    id: 'user-1',
+    email: 'merchant@example.com',
+    role: 'store_owner',
+    storeId: 'store-1',
+    status: 'active',
+    deletedAt: null,
+    tokenVersion: 0,
+    ...over,
+  });
 
   const mockPrisma = {
     refreshToken: {
@@ -89,7 +101,7 @@ const { mockPrisma, mockLogger, store, byToken, reset } = vi.hoisted(() => {
       }),
     },
     user: {
-      findUnique: vi.fn(async () => ({ tokenVersion: 0 })),
+      findUnique: vi.fn(async () => TOKEN_OWNER()),
     },
   };
 
@@ -97,11 +109,12 @@ const { mockPrisma, mockLogger, store, byToken, reset } = vi.hoisted(() => {
     store.clear();
     byToken.clear();
     seq = 0;
-    mockPrisma.user.findUnique.mockImplementation(async () => ({ tokenVersion: 0 }));
+    mockPrisma.user.findUnique.mockImplementation(async () => TOKEN_OWNER());
   };
 
   return {
     mockPrisma,
+    TOKEN_OWNER,
     mockLogger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
     store,
     byToken,
@@ -109,7 +122,15 @@ const { mockPrisma, mockLogger, store, byToken, reset } = vi.hoisted(() => {
   };
 });
 
-vi.mock('@force/database', () => ({ prisma: mockPrisma, Prisma: {} }));
+// `withUser` (the token owner is read as themselves under strict RLS) runs on the same fake client.
+vi.mock('@force/database', async () => ({
+  ...(await import('./helpers/database-mock')).databaseMock({ prisma: mockPrisma }),
+  Prisma: {},
+}));
+// `getUserState` is the `ebda_user_state` definer; `user.findUnique` stays the source of truth.
+vi.mock('@api/lib/definer', () => ({
+  getUserState: async () => (await mockPrisma.user.findUnique()) ?? null,
+}));
 vi.mock('@api/lib/logger', () => ({ default: mockLogger }));
 vi.mock('@api/services/redis.service', () => ({
   redis: { isAvailable: vi.fn().mockReturnValue(false), getClient: vi.fn() },
@@ -519,7 +540,10 @@ describe('a revocation landing mid-refresh wins', () => {
     // Sign-out-everywhere, a password change and a password reset all bump
     // tokenVersion before revoking rows. Landing between our read and our
     // write, it would otherwise miss the row we are about to create.
-    mockPrisma.user.findUnique.mockResolvedValue({ tokenVersion: USER.tokenVersion + 1 });
+    // 1st read: the token's owner (still at the version we read); 2nd: the post-write re-read.
+    mockPrisma.user.findUnique
+      .mockResolvedValueOnce(TOKEN_OWNER())
+      .mockResolvedValue(TOKEN_OWNER({ tokenVersion: USER.tokenVersion + 1 }));
 
     await expect(AuthService.refreshTokens('any-token')).rejects.toThrow(/revoked/i);
 

@@ -22,7 +22,7 @@
  *      the same WKUserScript mechanism. Facebook/Instagram in-app browsers
  *      (`FBAN`/`FBIOS`/`Instagram`) are deliberately NOT here (issue 2008):
  *      no event evidenced them, and link-in-bio traffic through those apps
- *      is the widest-reach mobile surface of a Kuwait storefront — silencing
+ *      is the widest-reach mobile surface of an Egypt storefront — silencing
  *      it would hide our own inline-script errors from exactly those users;
  *   2. EVERY frame must be attributed to a page path — none may come from a
  *      script file (`*.js`/`*.mjs`/`*.cjs` — every chunk we ship); AND

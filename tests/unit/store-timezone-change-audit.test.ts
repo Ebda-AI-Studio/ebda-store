@@ -50,7 +50,7 @@ function app() {
 describe('PUT /stores/:id audits a time-zone change (issue 2432)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    findUniqueMock.mockResolvedValue({ timezone: 'Asia/Kuwait' });
+    findUniqueMock.mockResolvedValue({ timezone: 'Africa/Cairo' });
     updateMock.mockResolvedValue({ id: 'store-1' });
     auditLogMock.mockResolvedValue(undefined);
   });
@@ -65,12 +65,12 @@ describe('PUT /stores/:id audits a time-zone change (issue 2432)', () => {
       storeId: 'store-1',
       resourceType: 'store',
       resourceId: 'store-1',
-      details: { from: 'Asia/Kuwait', to: 'Europe/London' },
+      details: { from: 'Africa/Cairo', to: 'Europe/London' },
     });
   });
 
   it('does not audit when the zone is re-saved unchanged', async () => {
-    await request(app()).put('/stores/store-1').send({ timezone: 'Asia/Kuwait' });
+    await request(app()).put('/stores/store-1').send({ timezone: 'Africa/Cairo' });
     expect(auditLogMock).not.toHaveBeenCalled();
   });
 

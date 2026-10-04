@@ -3,7 +3,7 @@
  *
  * Replaces the old file-convention `app/opengraph-image.tsx`. That special file
  * was served at a fixed `/opengraph-image` URL with NO way to carry the store
- * identity, so for path-based storefronts (`store.forcemediakw.com/<slug>`)
+ * identity, so for path-based storefronts (`<slug>.ebda.app`)
  * WhatsApp fetched `…/opengraph-image` with no `/<slug>` context and the route
  * resolved to the PLATFORM-DEFAULT store — every path-based store's link
  * preview showed the generic "Force" card instead of the merchant's branding.

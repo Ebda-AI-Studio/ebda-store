@@ -74,12 +74,12 @@ describe('renderBrandedShell', () => {
     expect(html).not.toMatch(/hsla?\(/);
   });
 
-  it('falls back to platform orange when theme color is invalid', () => {
+  it('falls back to platform gold when theme color is invalid', () => {
     const html = renderBrandedShell(
       '<p>hi</p>',
       baseStore({ theme: { primaryColor: 'rm -rf /' } })
     );
-    expect(html).toContain('background-color:#ff6e00');
+    expect(html).toContain('background-color:#B08D57');
     expect(html).not.toContain('rm -rf');
   });
 
@@ -102,7 +102,7 @@ describe('renderBrandedShell', () => {
 
   it('includes powered-by line in footer', () => {
     const html = renderBrandedShell('<p>hi</p>', baseStore());
-    expect(html).toContain('Powered by Force AI');
+    expect(html).toContain('Powered by Ebda');
   });
 
   it('escapes the store name to prevent XSS in header', () => {
@@ -173,10 +173,10 @@ describe('EmailService language override', () => {
           firstName: 'Ahmad',
           lastName: 'S',
           address1: '1 Main St',
-          city: 'Kuwait City',
-          state: 'KW',
+          city: 'Cairo',
+          state: 'EG',
           postalCode: '12345',
-          country: 'KW',
+          country: 'EG',
         },
       },
       'ar'
@@ -207,10 +207,10 @@ describe('EmailService language override', () => {
         firstName: 'Fatima',
         lastName: 'K',
         address1: '2 Main St',
-        city: 'Kuwait City',
-        state: 'KW',
+        city: 'Cairo',
+        state: 'EG',
         postalCode: '12345',
-        country: 'KW',
+        country: 'EG',
       },
     });
     // No language arg — should read store.settings.defaultLanguage = 'ar'
@@ -242,10 +242,10 @@ describe('EmailService language override', () => {
           firstName: 'John',
           lastName: 'D',
           address1: '3 Main St',
-          city: 'Kuwait City',
-          state: 'KW',
+          city: 'Cairo',
+          state: 'EG',
           postalCode: '12345',
-          country: 'KW',
+          country: 'EG',
         },
       },
       'en'

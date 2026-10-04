@@ -69,7 +69,7 @@ describe('Order Flow', () => {
         storeId: store.id,
         name: 'Order Test Product',
         slug: `order-test-product-${Date.now()}`,
-        price: 5000, // 5 KWD in fils
+        price: 5000, // 5 EGP in piastres
         inventory: 100,
         status: 'active',
       },
@@ -161,8 +161,8 @@ describe('Order Flow', () => {
             firstName: 'Test',
             lastName: 'Customer',
             address1: '123 Test Street',
-            city: 'Kuwait City',
-            country: 'Kuwait',
+            city: 'Cairo',
+            country: 'Egypt',
             phone: '+96512345678',
           },
           paymentMethod: 'cod',
@@ -171,7 +171,7 @@ describe('Order Flow', () => {
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
       expect(res.body.data.order.orderNumber).toBeDefined();
-      // 2 items × 5000 fils each
+      // 2 items × 5000 piastres each
       expect(res.body.data.order.total).toBeGreaterThanOrEqual(10000);
 
       createdOrderId = res.body.data.order.id;
@@ -226,8 +226,8 @@ describe('Order Flow', () => {
             firstName: 'Test',
             lastName: 'Customer',
             address1: '123 Test Street',
-            city: 'Kuwait City',
-            country: 'Kuwait',
+            city: 'Cairo',
+            country: 'Egypt',
             phone: '+96512345678',
           },
           paymentMethod: 'cod',
@@ -253,8 +253,8 @@ describe('Order Flow', () => {
             firstName: 'Test',
             lastName: 'Customer',
             address1: '123 Test Street',
-            city: 'Kuwait City',
-            country: 'Kuwait',
+            city: 'Cairo',
+            country: 'Egypt',
             phone: '+96512345678',
           },
           paymentMethod: 'cod',
@@ -410,8 +410,8 @@ describe('Order Flow', () => {
             firstName: 'Test',
             lastName: 'Cancel',
             address1: '123 Test Street',
-            city: 'Kuwait City',
-            country: 'Kuwait',
+            city: 'Cairo',
+            country: 'Egypt',
             phone: '+96512345678',
           },
           paymentMethod: 'cod',

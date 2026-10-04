@@ -4,13 +4,13 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { CartIcon } from '@force/ui';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { ABANDONED_CART_COLORS, CART_STATUS_KEYS } from './types';
 import type { AbandonedCartRecord, ListMeta } from './types';
 
-const formatKwd = filsToKwd;
+const formatMajor = minorToMajor;
 
 /** Best-effort display string for the customer column. */
 function customerDisplay(record: AbandonedCartRecord): string {
@@ -46,7 +46,7 @@ export function AbandonedCartsTable({
   const storeId = useParams().id as string;
   const t = useT('abandonedCarts.list');
   const tStatus = useT('abandonedCarts.status');
-  const tKwd = useT('abandonedCarts.stats');
+  const tMajor = useT('abandonedCarts.stats');
 
   const columns: DataTableColumn<AbandonedCartRecord>[] = [
     {
@@ -58,7 +58,7 @@ export function AbandonedCartsTable({
       header: t('columns.total'),
       cell: record => (
         <span className="text-sm text-foreground whitespace-nowrap">
-          {tKwd('kwdValue', { amount: formatKwd(record.cartTotal) })}
+          {tMajor('baseValue', { amount: formatMajor(record.cartTotal) })}
         </span>
       ),
     },

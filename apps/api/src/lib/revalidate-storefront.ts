@@ -1,3 +1,4 @@
+import { storeHost } from '@force/shared';
 import logger from './logger';
 
 /**
@@ -7,11 +8,12 @@ import logger from './logger';
  * instead of waiting out the data-cache TTL.
  *
  * The storefront resolver tags its store fetches `store-domain:<domain>` and
- * `store-slug:<slug>`; we purge both so a store is refreshed whether visitors
- * reach it via its custom domain or the platform slug path.
+ * `store-slug:<slug>`; a slug purge also hits `store-domain:<slug>.ebda.app`, so a
+ * store is refreshed whether visitors reach it at its free subdomain or its
+ * custom domain.
  *
  * Config — this is a TWO-SIDED contract and both sides must agree:
- *  - STOREFRONT_REVALIDATE_URL (API): storefront base, e.g. https://store.force-ai.co
+ *  - STOREFRONT_REVALIDATE_URL (API): storefront base, e.g. https://ebda.app
  *  - REVALIDATE_SECRET (API **and** the storefront Worker): shared secret.
  *
  * If the secret is missing on the STOREFRONT, this endpoint answers 503 and
@@ -63,7 +65,12 @@ export async function revalidateStorefrontNow(opts: RevalidateOptions): Promise<
 
   const tags: string[] = [...(opts.tags ?? [])];
   if (opts.domain) tags.push(`store-domain:${opts.domain.toLowerCase().replace(/^www\./, '')}`);
-  if (opts.slug) tags.push(`store-slug:${opts.slug}`);
+  if (opts.slug) {
+    tags.push(`store-slug:${opts.slug}`);
+    // The storefront resolves `<slug>.ebda.app` BY HOST (`store-domain:<host>`),
+    // so a slug purge must hit that tag too.
+    tags.push(`store-domain:${storeHost(opts.slug)}`);
+  }
   if (tags.length === 0) return 'nothing-to-purge';
 
   const url = `${base.replace(/\/$/, '')}/api/revalidate`;

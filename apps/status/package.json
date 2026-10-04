@@ -1,0 +1,33 @@
+{
+  "name": "@force/status",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "description": "status.ebda.app: its own Cloudflare Worker + Durable Object. Independent of apps/api.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src test scripts --ext .ts,.mjs",
+    "lint:fix": "eslint src test scripts --ext .ts,.mjs --fix",
+    "snapshot": "tsx scripts/snapshot.ts",
+    "check:a11y": "node scripts/a11y-check.mjs",
+    "check:lighthouse": "node scripts/lighthouse-check.mjs",
+    "check": "npm run typecheck && npm run build && npm test && npm run snapshot && npm run check:a11y",
+    "clean": "rm -rf dist .gate node_modules"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/workers-types": "^5.20261003.1",
+    "@force/site-kit": "*",
+    "eslint": "^9.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.3.0",
+    "typescript-eslint": "^8.59.1",
+    "vitest": "^4.1.0",
+    "wrangler": "4.116.0"
+  }
+}

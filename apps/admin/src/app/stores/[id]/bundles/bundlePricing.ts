@@ -10,6 +10,7 @@
  */
 import type { BundleLine } from '@force/shared';
 
+import { roundToMinor } from '@force/shared';
 /**
  * Availability sentinel for "every component is untracked" — mirrors
  * `UNTRACKED_AVAILABILITY_CAP` in `apps/api/src/services/bundle.service.ts`
@@ -52,7 +53,7 @@ export function computeAvailability(items: ClientAvailabilityItem[]): number {
   return min === Number.POSITIVE_INFINITY ? UNTRACKED_AVAILABILITY_CAP : Math.max(0, min);
 }
 
-/** sum(unitPrice * quantity) across the bundle's component lines, in fils. */
+/** sum(unitPrice * quantity) across the bundle's component lines, in piastres. */
 export function computeComponentSum(lines: Array<{ unitPrice: number; quantity: number }>): number {
   return lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
 }
@@ -80,13 +81,13 @@ export function basisPointsToPercent(bps: number): number {
   return bps / 100;
 }
 
-/** Parses the merchant's KWD input (e.g. "11.999") into integer fils, the
+/** Parses the merchant's EGP input (e.g. "11.999") into integer piastres, the
  *  wire unit every money field in this API uses. Non-numeric/empty input is
- *  treated as 0 fils rather than NaN, matching promotions/page.tsx's
+ *  treated as 0 piastres rather than NaN, matching promotions/page.tsx's
  *  `parseFloat(...) || 0` convention for the same kind of field. */
-export function kwdToFils(kwd: string): number {
-  const n = parseFloat(kwd);
-  return Number.isFinite(n) ? Math.round(n * 1000) : 0;
+export function majorToMinor(major: string): number {
+  const n = parseFloat(major);
+  return Number.isFinite(n) ? roundToMinor(n) : 0;
 }
 
 /**
@@ -121,7 +122,7 @@ export function extractVariantOptions<T extends { id: string }>(
  * "tested" by grepping the source, which is blind to an arithmetic
  * regression. `page.tsx` renders whichever key this returns.
  *
- *  - `'discountAboveComponentSum'` — a `fixed` (fils-off) discount worth the
+ *  - `'discountAboveComponentSum'` — a `fixed` (piastres-off) discount worth the
  *    whole component total. `computeBundlePrice` clamps at 0, so the preview
  *    shows a free box rather than a negative one and the merchant has no
  *    reason to expect the save to be refused; the server answers

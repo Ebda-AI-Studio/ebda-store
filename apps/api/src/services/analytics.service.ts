@@ -3,7 +3,12 @@ import { ON_HAND_SQL, storeStockValueFils } from '../lib/effective-inventory-sql
 import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
 import { redis } from './redis.service';
 import { profitAndLoss } from './accounting/reports.service';
-import { pickSalesGranularity, type AnalyticsPeriod, type SalesGranularity } from '@force/shared';
+import {
+  NON_REVENUE_ORDER_STATUSES,
+  pickSalesGranularity,
+  type AnalyticsPeriod,
+  type SalesGranularity,
+} from '@force/shared';
 
 // ==========================================
 // Simple cache-aside helper for analytics queries (60s TTL).
@@ -96,7 +101,7 @@ interface DashboardStats {
   totalProfit: number | null;
   /** Order lines in the period whose cost is missing (excluded from `totalProfit`). */
   profitItemsMissingCost: number;
-  /** Revenue (fils) of those lines — the sales `totalProfit` does not cover. */
+  /** Revenue (piastres) of those lines — the sales `totalProfit` does not cover. */
   profitRevenueMissingCost: number;
   /** `null` when either period's profit is unknown or incomplete. */
   profitChange: number | null;
@@ -347,7 +352,7 @@ export class AnalyticsService {
       storeId,
       deletedAt: null,
       createdAt: { gte: startDate, lte: endDate },
-      status: { notIn: ['cancelled', 'refunded'] },
+      status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
       paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
     };
 
@@ -387,7 +392,7 @@ export class AnalyticsService {
           AND o.deleted_at IS NULL
           AND o.created_at >= ${startDate}
           AND o.created_at <= ${endDate}
-          AND o.status NOT IN ('cancelled', 'refunded')
+          AND o.status NOT IN ('cancelled', 'refunded', 'awaiting_payment_confirmation')
           AND o.payment_status <> 'failed'
       `,
     ]);
@@ -418,7 +423,7 @@ export class AnalyticsService {
    * through to daily grouping — `this_year` sent ~270 daily bars.
    *
    * `tzOffsetMinutes` is the viewer's UTC offset (east-positive, e.g. +180 for
-   * Kuwait). The admin resolves presets to local midnight, so bucketing by UTC
+   * Egypt). The admin resolves presets to local midnight, so bucketing by UTC
    * day put a phantom leading bucket for the previous UTC day in front of every
    * range. Buckets are computed on `created_at + offset`, so a key such as
    * `2026-09-01` is the viewer's calendar day. Weeks start on Monday (Postgres
@@ -473,7 +478,7 @@ export class AnalyticsService {
       WHERE store_id = ${storeId}
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}
-        AND status NOT IN ('cancelled', 'refunded')
+        AND status NOT IN ('cancelled', 'refunded', 'awaiting_payment_confirmation')
         AND payment_status <> 'failed'
       GROUP BY period
       ORDER BY period ASC
@@ -526,7 +531,7 @@ export class AnalyticsService {
         order: {
           storeId,
           createdAt: { gte: startDate, lte: endDate },
-          status: { notIn: ['cancelled', 'refunded'] },
+          status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
           paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
         },
       },
@@ -593,7 +598,7 @@ export class AnalyticsService {
         order: {
           storeId,
           createdAt: { gte: startDate, lte: endDate },
-          status: { notIn: ['cancelled', 'refunded'] },
+          status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
           paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
         },
       },
@@ -717,7 +722,7 @@ export class AnalyticsService {
         where: {
           storeId,
           deletedAt: null,
-          status: { notIn: ['cancelled', 'refunded'] },
+          status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
           paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
         },
         _sum: { total: true },
@@ -848,7 +853,7 @@ export class AnalyticsService {
         storeId,
         deletedAt: null,
         createdAt: { gte: startDate, lte: endDate },
-        status: { notIn: ['cancelled', 'refunded'] },
+        status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
       },
       _sum: { total: true },
       _count: true,

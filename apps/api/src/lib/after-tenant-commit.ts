@@ -71,6 +71,7 @@
 import { AsyncLocalStorage } from 'async_hooks';
 import { onClosedTenantTxAccess, runInTenantContext } from '@force/database';
 import logger from './logger';
+import { cfBindings, cfWaitUntil } from '../cf/bindings';
 import { sendAlert } from '../services/alerts.service';
 
 interface DeferredTask {
@@ -148,7 +149,11 @@ export function deferAfterTenantCommit<T>(
   const connections = Math.max(1, Math.floor(options.connections ?? 1));
   const scope = deferralStorage.getStore();
   if (!scope) {
-    return run();
+    const inline = run();
+    // On a Worker the caller usually `void`s this: keep the work (and the request's database lease)
+    // alive until it settles instead of letting it be cancelled with the response. Node: untouched.
+    if (cfBindings()) cfWaitUntil(inline);
+    return inline;
   }
   if (scope.closed) {
     // This call arrived from a promise that outlived the request it was

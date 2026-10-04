@@ -116,8 +116,8 @@ const ACTIVE_STORE = {
 
 const ORDER_WITH_PHONE = {
   orderNumber: 'ORD-001',
-  total: 10500, // 10.500 KWD
-  currency: 'KWD',
+  total: 10500, // 10.500 EGP
+  currency: 'EGP',
   shippingAddress: { firstName: 'Ahmed', lastName: 'Sharaf', phone: '+96512345678' },
   shipment: null,
   customer: null,

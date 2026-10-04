@@ -3,7 +3,8 @@
  *
  * Normalisation replaces only values that are random BY CONSTRUCTION and would
  * differ between two runs of the SAME code: generated UUIDs, order numbers,
- * timestamps, JWTs / CSRF tokens. Seeded ids become `<seed:...>` (the fixture is
+ * timestamps, JWTs / CSRF tokens, the hash tail of the Paymob merchant reference and the
+ * loopback port of each API instance. Seeded ids become `<seed:...>` (the fixture is
  * deterministic), generated ids become `<id:N>` numbered by first appearance —
  * so "the same order id is referenced in the same places" is still compared.
  * No money field, status, amount or key is ever normalised.
@@ -14,6 +15,11 @@ const ORDER_NO_RE = /\bORD-[0-9A-Z]{4,}-[0-9A-Z]{3,}\b/g;
 const TS_RE = /\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\b/g;
 const JWT_RE = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 // Build-location of each ref's temporary worktree (differs per sha by design).
+// The Paymob merchant reference is `<orderNo>-<10 hex>`: the tail is a hash of the idempotency
+// key, which holds the (random) order id. Random by construction, like the id itself.
+const REF_HASH_RE = /(<orderNo:\d+>)-[0-9a-f]{10}\b/g;
+// Each API instance listens on its own loopback port, and the callback URLs it sends name it.
+const LOOPBACK_PORT_RE = /(https?:\/\/127\.0\.0\.1):\d+/g;
 const WORKTREE_RE = /[^\s"'`]*fwb-buy-flow-parity\/wt-[0-9a-f]+/g;
 const SECRET_KEYS = new Set([
   'csrfToken',
@@ -42,6 +48,8 @@ export function makeNormalizer(seedIds) {
       .replace(WORKTREE_RE, '<worktree>')
       .replace(JWT_RE, '<jwt>')
       .replace(ORDER_NO_RE, mapOrderNo)
+      .replace(REF_HASH_RE, '$1-<hash>')
+      .replace(LOOPBACK_PORT_RE, '$1:<port>')
       .replace(UUID_RE, mapId)
       .replace(TS_RE, '<ts>');
 

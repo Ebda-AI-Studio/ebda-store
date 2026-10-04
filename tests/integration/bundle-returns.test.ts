@@ -55,7 +55,7 @@ import {
 
 const stepStub = { run: <T>(_id: string, fn: () => Promise<T>) => fn() };
 
-/** Same "Ramadan Box" worked example as order-bundles.test.ts: Dates ×1 (4.500 KWD), Honey ×1 (6.000), Nuts ×2 (2.000 each) — componentSum 14.500, fixed_price 12.000 (a real 2.500 discount, so shelf-price and allocated-price sums differ). Returns the three product ids + the bundle id. Module-level (not nested in one describe) so both the business-logic and route-layer suites below share it without duplicating the fixture. */
+/** Same "Ramadan Box" worked example as order-bundles.test.ts: Dates ×1 (4.500 EGP), Honey ×1 (6.000), Nuts ×2 (2.000 each) — componentSum 14.500, fixed_price 12.000 (a real 2.500 discount, so shelf-price and allocated-price sums differ). Returns the three product ids + the bundle id. Module-level (not nested in one describe) so both the business-logic and route-layer suites below share it without duplicating the fixture. */
 async function seedRamadanBox(storeId: string, tag: string) {
   const dates = await seedProduct(storeId, `${tag}-dates`, {
     price: 4500,

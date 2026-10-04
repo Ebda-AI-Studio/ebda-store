@@ -55,7 +55,7 @@ describe.skipIf(!hasDb)('assertAiQuota — per-store slice + interactive headroo
             name: `aiq-${n}`,
             slug: `aiq-${n}-${suffix}`,
             template: 'modern',
-            currency: 'KWD',
+            currency: 'EGP',
             ownerId: owner.id,
           },
         });

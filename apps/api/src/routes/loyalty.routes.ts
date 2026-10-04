@@ -49,7 +49,7 @@ const updateSettingsSchema = z.object({
   loyaltyEnabled: z.boolean().optional(),
   settings: z
     .object({
-      pointsPerDinar: z.number().min(1).max(100).optional(),
+      pointsPerMajorUnit: z.number().min(1).max(100).optional(),
       signupBonus: z.number().min(0).optional(),
       referralBonus: z.number().min(0).optional(),
       reviewBonus: z.number().min(0).optional(),
@@ -455,7 +455,7 @@ publicRouter.get(
         success: true,
         data: {
           enabled: true,
-          pointsPerDinar: result.settings.pointsPerDinar,
+          pointsPerMajorUnit: result.settings.pointsPerMajorUnit,
           signupBonus: result.settings.signupBonus,
           pointsValue: result.settings.pointsValue,
           minRedeemPoints: result.settings.minRedeemPoints,

@@ -2,16 +2,19 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button, Input } from '@force/ui';
 import { useAuth, postLoginDestination, type MfaChallenge } from '../../lib/auth';
 import { useT } from '@/i18n/useT';
+import { NileNight } from './_components/NileNight';
 
 const REMEMBER_EMAIL_KEY = 'force-admin-remember-email';
 
 export default function LoginPage() {
   const t = useT('auth.login');
   const tb = useT('components.brand');
+  const tSignup = useT('onboarding.signup');
   const router = useRouter();
   const { login, completeMfaLogin, isLoading: authLoading, isAuthenticated } = useAuth();
   const [email, setEmail] = useState('');
@@ -101,7 +104,11 @@ export default function LoginPage() {
   // ── MFA step ───────────────────────────────────────────────────────────────
   if (mfaChallenge) {
     return (
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen flex-col lg:flex-row">
+        {/* Mobile: short Nile band above the form (decorative) */}
+        <div className="relative h-24 shrink-0 overflow-hidden bg-[#0A0B0C] lg:hidden">
+          <NileNight />
+        </div>
         <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
           <div className="mx-auto w-full max-w-sm lg:w-96">
             <div className="text-center">
@@ -196,10 +203,12 @@ export default function LoginPage() {
 
         {/* Right side - Branding */}
         <div className="relative hidden w-0 flex-1 lg:block">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary to-primary/80">
-            <div className="flex h-full flex-col items-center justify-center px-12 text-white">
+          <div className="absolute inset-0 bg-[#0A0B0C]">
+            <NileNight />
+            <div className="absolute inset-0 bg-[#0A0B0C]/55" aria-hidden="true" />
+            <div className="relative flex h-full flex-col items-center justify-center px-12 text-white">
               <h1 className="text-4xl font-bold">{t('brandTitle')}</h1>
-              <p className="mt-4 text-lg text-white/80 text-center max-w-md">
+              <p className="mt-4 text-lg text-white/85 text-center max-w-md">
                 {t('brandSubtitle')}
               </p>
             </div>
@@ -211,8 +220,12 @@ export default function LoginPage() {
 
   // ── Normal login step ──────────────────────────────────────────────────────
   return (
-    <div className="flex min-h-screen">
-      {/* Left side - Login form */}
+    <div className="flex min-h-screen flex-col lg:flex-row">
+      {/* Mobile band, then login form */}
+      {/* Mobile: short Nile band above the form (decorative) */}
+      <div className="relative h-24 shrink-0 overflow-hidden bg-[#0A0B0C] lg:hidden">
+        <NileNight />
+      </div>
       <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
         <div className="mx-auto w-full max-w-sm lg:w-96">
           <div className="text-center">
@@ -304,16 +317,25 @@ export default function LoginPage() {
             </Button>
           </form>
 
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            {tSignup('noAccount')}{' '}
+            <Link href="/signup" className="text-primary-ink hover:underline">
+              {tSignup('createStore')}
+            </Link>
+          </p>
+
           <p className="mt-8 text-center text-xs text-muted-foreground">{t('footer')}</p>
         </div>
       </div>
 
       {/* Right side - Branding */}
       <div className="relative hidden w-0 flex-1 lg:block">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary to-primary/80">
-          <div className="flex h-full flex-col items-center justify-center px-12 text-white">
+        <div className="absolute inset-0 bg-[#0A0B0C]">
+          <NileNight />
+          <div className="absolute inset-0 bg-[#0A0B0C]/55" aria-hidden="true" />
+          <div className="relative flex h-full flex-col items-center justify-center px-12 text-white">
             <h1 className="text-4xl font-bold">{t('brandTitle')}</h1>
-            <p className="mt-4 text-lg text-white/80 text-center max-w-md">{t('brandSubtitle')}</p>
+            <p className="mt-4 text-lg text-white/85 text-center max-w-md">{t('brandSubtitle')}</p>
             <div className="mt-12 grid grid-cols-3 gap-8 text-center">
               <div>
                 <p className="text-3xl font-bold">100+</p>

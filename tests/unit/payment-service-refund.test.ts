@@ -72,6 +72,8 @@ vi.mock('@force/database', () => ({
   // Each refund record commits on its own transaction; with no database the
   // callback simply runs.
   runInTenantContext: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
+  // The factory reads a store's provider configs inside that store's scope.
+  withStore: (_storeId: unknown, fn: () => Promise<unknown>) => fn(),
 }));
 
 vi.mock('@api/config', () => ({
@@ -141,26 +143,15 @@ vi.mock('@api/lib/logger', () => ({
 // The provider's own `.refund()` call — always succeeds in these tests; we
 // are testing what happens AFTER the provider (and the DB tx) succeed.
 const providerRefund = vi.fn();
-vi.mock('@api/services/payment-providers/tap.provider', () => ({
-  TapPaymentProvider: class {
-    initialize = vi.fn();
-    refund = providerRefund;
-  },
-}));
-vi.mock('@api/services/payment-providers/myfatoorah.provider', () => ({
-  MyFatoorahPaymentProvider: class {
-    initialize = vi.fn();
-    refund = providerRefund;
-  },
-}));
-vi.mock('@api/services/payment-providers/hesabe.provider', () => ({
-  HesabePaymentProvider: class {
-    initialize = vi.fn();
-    refund = providerRefund;
-  },
-}));
-vi.mock('@api/services/payment-providers/upayments.provider', () => ({
-  UPaymentsProvider: class {
+
+// The Egyptian gateways are v2 adapters behind `V2ProviderBridge`; these tests drive the v1 face
+// the factory and PaymentService use, so the bridge itself is replaced by a stub provider.
+vi.mock('@api/services/payment-providers/v2-bridge', () => ({
+  V2ProviderBridge: class {
+    name: string;
+    constructor(adapter: { name: string }) {
+      this.name = adapter.name;
+    }
     initialize = vi.fn();
     refund = providerRefund;
   },
@@ -179,14 +170,14 @@ function mockHappyPathUpToEffects() {
     orderId: ORDER_ID,
     amount: 5000,
     status: 'completed',
-    provider: 'myfatoorah',
+    provider: 'paymob',
     metadata: {},
     order: { storeId: STORE_ID, store: {}, status: 'confirmed' },
   });
   paymentUpdateMany.mockResolvedValue({ count: 1 });
   paymentConfigFindMany.mockResolvedValue([
     {
-      provider: 'myfatoorah',
+      provider: 'paymob',
       apiKey: 'test-key',
       secretKey: null,
       merchantId: null,
@@ -196,15 +187,15 @@ function mockHappyPathUpToEffects() {
       isDefault: true,
       displayName: null,
       displayNameAr: null,
-      supportedMethods: ['knet'],
-      supportedCurrencies: ['KWD'],
+      supportedMethods: ['card'],
+      supportedCurrencies: ['EGP'],
       fixedFee: 0,
       percentageFee: 0,
     },
   ]);
   providerRefund.mockResolvedValue({
     success: true,
-    provider: 'myfatoorah',
+    provider: 'paymob',
     refundId: 'rf_123',
     transactionId: TRANSACTION_ID,
     amount: 5000,
@@ -567,7 +558,7 @@ describe('PaymentService.refund — never invents a GL key (issue 2310)', () => 
     mockHappyPathUpToEffects();
     providerRefund.mockResolvedValue({
       success: true,
-      provider: 'myfatoorah',
+      provider: 'paymob',
       refundId: '',
       transactionId: TRANSACTION_ID,
       amount: 1000,

@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '@force/database';
-import { csvField } from '@force/shared';
+import { csvField, resolveDefaultLanguage } from '@force/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
@@ -250,7 +250,7 @@ router.post(
       const emails = subscribers.map(s => s.email);
 
       const settingsJson = store.settings as Record<string, unknown> | null;
-      const defaultLanguage: 'en' | 'ar' = settingsJson?.defaultLanguage === 'ar' ? 'ar' : 'en';
+      const defaultLanguage: 'en' | 'ar' = resolveDefaultLanguage(settingsJson?.defaultLanguage);
 
       // Wrap the provided HTML in the branded shell
       const storeContext = {

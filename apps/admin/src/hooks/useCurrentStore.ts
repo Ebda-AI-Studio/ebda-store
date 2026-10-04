@@ -14,7 +14,12 @@ export interface Store {
   name: string;
   nameAr?: string;
   slug: string;
+  // The VERIFIED custom domain (the only one served). An unverified claim is in
+  // `pendingDomain` until the provider verifies it; released after 72h.
   domain?: string;
+  pendingDomain?: string | null;
+  domainStatus?: 'pending' | 'active' | 'failed' | null;
+  domainClaimedAt?: string | null;
   // Legacy frontend-hosting-provider column. Cloudflare-for-SaaS is the only
   // provider now (Vercel cancelled 2026-07); no UI reads/writes this anymore.
   domainProvider?: string | null;

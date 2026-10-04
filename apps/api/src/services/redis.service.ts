@@ -1,4 +1,6 @@
 import Redis from 'ioredis';
+import { CfRedis } from '../cf/ioredis-cf';
+import { isWorkers } from '../lib/runtime';
 import { config } from '../config';
 import logger from '../lib/logger';
 
@@ -15,20 +17,24 @@ class RedisService {
     if (this.client && this.isConnected) return;
 
     try {
-      this.client = new Redis(config.redisUrl, {
-        maxRetriesPerRequest: 3,
-        retryStrategy(times: number) {
-          return Math.min(times * 500, 30000);
-        },
-        lazyConnect: true,
-        // When REDIS_KEY_PREFIX is set (e.g. `fwb-staging:` on staging),
-        // ioredis transparently prefixes every command's keys. All
-        // consumers (cache.set/get, csrf, session, ratelimit, lock,
-        // email-queue) get the prefix for free — no per-call changes
-        // needed. Prod leaves the env var unset so the prefix is ''
-        // and existing keys stay shaped as `cache:*`, `csrf:*`, etc.
-        keyPrefix: config.redisKeyPrefix || undefined,
-      });
+      // Workers: no sockets and no Redis. The same command surface runs on the AuthState
+      // Durable Object (strong state) and KV (`cache:*`), see cf/ioredis-cf.ts.
+      this.client = isWorkers
+        ? (new CfRedis({ keyPrefix: config.redisKeyPrefix || undefined }) as unknown as Redis)
+        : new Redis(config.redisUrl, {
+            maxRetriesPerRequest: 3,
+            retryStrategy(times: number) {
+              return Math.min(times * 500, 30000);
+            },
+            lazyConnect: true,
+            // When REDIS_KEY_PREFIX is set (e.g. `fwb-staging:` on staging),
+            // ioredis transparently prefixes every command's keys. All
+            // consumers (cache.set/get, csrf, session, ratelimit, lock,
+            // email-queue) get the prefix for free — no per-call changes
+            // needed. Prod leaves the env var unset so the prefix is ''
+            // and existing keys stay shaped as `cache:*`, `csrf:*`, etc.
+            keyPrefix: config.redisKeyPrefix || undefined,
+          });
 
       this.client.on('connect', () => {
         this.isConnected = true;

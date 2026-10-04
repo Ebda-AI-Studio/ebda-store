@@ -1,0 +1,35 @@
+---
+title: Rate limits
+description: The limits the API enforces, how a limited request looks and how to back off.
+section: Concepts
+order: 6
+---
+
+Limits are enforced per client IP address (and per store for public reads). Every limited response is `429` with the standard envelope:
+
+```json
+{
+  "success": false,
+  "error": { "code": "RATE_LIMITED", "message": "Too many requests, please try again later." }
+}
+```
+
+The standard `RateLimit-*` headers (limit, remaining, reset) are sent on limited routes. Read them rather than hard-coding the numbers below, which can change.
+
+| Scope                                                | Limit                                                 |
+| ---------------------------------------------------- | ----------------------------------------------------- |
+| Any write (`POST`, `PUT`, `PATCH`, `DELETE`), global | 200 per 15 minutes per IP. Reads are not counted here |
+| Public storefront reads (`/public/*`)                | 300 per minute per IP, plus a per-store backstop      |
+| Cart operations                                      | 30 per minute                                         |
+| Other writes on limited routes                       | 30 per minute                                         |
+| Payment attempts                                     | 10 per minute                                         |
+| Sign-in and other auth routes                        | 15 per 15 minutes                                     |
+| Password-reset emails                                | 3 per hour                                            |
+
+## Account lockout
+
+Separate from rate limiting, an account is **locked for 15 minutes after 5 failed sign-in attempts** within a 15-minute window. A successful sign-in clears the counter.
+
+## Backing off
+
+On `429`, wait until the reset time in the `RateLimit-Reset` header (or `Retry-After` when present), then retry with exponential backoff and jitter. Do not retry writes that may already have succeeded without an idempotency check of your own.

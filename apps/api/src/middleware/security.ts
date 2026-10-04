@@ -8,11 +8,13 @@ import rateLimit, {
 import { RedisStore } from 'rate-limit-redis';
 import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { prisma } from '@force/database';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
+import { isWorkers } from '../lib/runtime';
+import { CfRateLimitStore } from '../cf/rate-limit-store';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { config } from '../config';
+import { abuseConfig } from '../lib/abuse-config';
 import logger from '../lib/logger';
 import {
   recordMemoryFallback,
@@ -20,6 +22,7 @@ import {
   recordSharedCounting,
 } from '../lib/rate-limit-telemetry';
 import { withSavepoint } from '../lib/savepoint';
+import { insertAuditLog } from '../lib/definer';
 
 // ==========================================
 // CSRF Protection with Redis + In-Memory Fallback
@@ -33,16 +36,20 @@ const csrfTokensMemory = new BoundedMap<string, { value: string; expiresAt: Date
   MAX_CSRF_TOKENS
 );
 
-// Periodic cleanup of expired CSRF tokens
-setInterval(
-  () => {
-    const now = new Date();
-    for (const [key, value] of csrfTokensMemory) {
-      if (value.expiresAt < now) csrfTokensMemory.delete(key);
-    }
-  },
-  5 * 60 * 1000
-); // Every 5 minutes
+// Periodic cleanup of expired CSRF tokens. Not on Workers: a timer in global
+// scope is a disallowed operation there, an isolate is short-lived, and the
+// shared CSRF store is the Durable Object (see cf/ioredis-cf.ts).
+if (!isWorkers) {
+  setInterval(
+    () => {
+      const now = new Date();
+      for (const [key, value] of csrfTokensMemory) {
+        if (value.expiresAt < now) csrfTokensMemory.delete(key);
+      }
+    },
+    5 * 60 * 1000
+  ); // Every 5 minutes
+}
 
 /**
  * Principal a CSRF token is bound to when the minting request had no
@@ -246,7 +253,7 @@ const STOREFRONT_ALLOWED_STORE_PATHS: RegExp[] = [
   // patterns all expected a store id as the segment after /stores and these
   // have the literal `public` there. That would have returned 403 on shipping,
   // coupons and promotions for every merchant on a custom domain — checkout
-  // unusable — while working perfectly on store.force-ai.co, which is a
+  // unusable — while working perfectly on ebda.app, which is a
   // platform origin and returns early long before this list is consulted.
   // Anchored against a `.` segment so `/stores/public/../<id>/customers`
   // cannot satisfy a bare prefix. A store id never begins with a dot. Belt and
@@ -470,6 +477,10 @@ const CSRF_EXEMPT_AUTH_PATHS: ReadonlySet<string> = new Set([
   '/api/v1/auth/verify-email',
   '/api/v1/auth/resend-verification',
   '/api/v1/auth/mfa/verify',
+  // Self-serve merchant signup (SP5): credential-less entry points reached
+  // before any session exists, like register / resend-verification above.
+  '/api/v1/auth/merchant/signup',
+  '/api/v1/auth/merchant/resend-verification',
 ]);
 
 export function isCsrfExemptAuthPath(path: string): boolean {
@@ -539,7 +550,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // `application/x-www-form-urlencoded` / `multipart/form-data` /
   // `text/plain`. JSON / XHR requests trigger a CORS preflight first,
   // and our CORS config rejects unknown origins — so JSON POSTs from
-  // forcemediakw.com (admin / storefront) are inherently safe.
+  // ebda.app (admin / storefront) are inherently safe.
   //
   // CRITICAL: this skip MUST gate on the request's Origin being a
   // PLATFORM origin, not "any allowed origin". Custom merchant domains
@@ -740,7 +751,11 @@ class RedisOrMemoryStore implements Store {
   readonly prefix: string;
   // Keys are shared across replicas whenever Redis is up.
   readonly localKeys = false;
-  private readonly memory = new MemoryStore();
+  // Workers: counters live in the AuthState Durable Object (exact, shared by every
+  // isolate). No MemoryStore there: it starts a timer at init, which workerd forbids
+  // in global scope, and a per-isolate count is worthless on an ephemeral isolate.
+  private readonly memory = isWorkers ? undefined : new MemoryStore();
+  private readonly cfStore: CfRateLimitStore | undefined;
   private redisStore: RedisStore | undefined;
   private redisStoreClient: RedisCaller | undefined;
   private options: Options | undefined;
@@ -750,14 +765,21 @@ class RedisOrMemoryStore implements Store {
     name: string
   ) {
     this.prefix = `rl:${name}:`;
+    if (isWorkers) this.cfStore = new CfRateLimitStore(this.prefix);
   }
 
   init(options: Options): void {
     this.options = options;
-    this.memory.init(options);
+    this.memory?.init(options);
+    this.cfStore?.init(options);
   }
 
   private current(): Store {
+    if (this.cfStore) {
+      recordSharedCounting();
+      return this.cfStore;
+    }
+    const memory = this.memory as MemoryStore;
     const client = this.resolveClient();
     if (!client) {
       // issue 1963: never silent — counted, summarised, alerted once.
@@ -765,7 +787,7 @@ class RedisOrMemoryStore implements Store {
         this.prefix,
         rateLimitSharedEnabled() ? 'redis-unavailable' : 'disabled'
       );
-      return this.memory;
+      return memory;
     }
     recordSharedCounting();
     if (!this.redisStore || this.redisStoreClient !== client) {
@@ -1047,7 +1069,7 @@ export const authEmailAddressLimiter = rateLimit({
  * `/verify-email` isn't one — the token is a 256-bit hash (brute force is
  * infeasible; see the S5-4 comment above) — and this platform is
  * multi-tenant, so shoppers on DIFFERENT stores sharing one egress IP (a
- * Kuwait mobile carrier, an office/retail wifi) pooled into one budget. The
+ * Egypt mobile carrier, an office/retail wifi) pooled into one budget. The
  * 16th person to click a perfectly valid verification link in 15 minutes got
  * 429'd with `authLimiter`'s "Too many login attempts" message (#1863).
  *
@@ -1086,6 +1108,122 @@ export const verifyEmailLimiter = rateLimit({
   skip: skipForLoadTestOrTests,
   keyGenerator: verifyEmailLimiterKey,
 });
+
+/**
+ * Per-IP bucket for the public merchant signup + resend routes (SP5).
+ *
+ * Signup creates a user row and sends mail, so it needs a volume cap that
+ * `authLimiter` (sized for login guessing, keyed IP+email) does not give:
+ * rotating the email field would mint a fresh bucket every request. This key
+ * is IP-only. 20/hour is generous for a shared Egyptian mobile-carrier egress
+ * IP yet stops a signup-spam loop; the per-ADDRESS mail cap is
+ * `authEmailAddressLimiter`, stacked on the same routes.
+ *
+ * `createMerchantSignupIpLimiter` is a factory so a test can build one that is
+ * NOT skipped under vitest (every shared limiter is) and observe a real 429.
+ */
+export function merchantSignupIpLimiterKey(req: Request): string {
+  return `merchant-signup-${ipKeyGenerator(req.ip ?? '')}`;
+}
+
+export function createMerchantSignupIpLimiter(opts?: {
+  skip?: (req: Request) => boolean;
+  max?: number;
+  prefix?: string;
+}) {
+  return rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, opts?.prefix ?? 'merchant-signup-ip'),
+    windowMs: 60 * 60 * 1000,
+    max: opts?.max ?? 20,
+    message: {
+      success: false,
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'Too many signups from this network, try again later.',
+      },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skip: opts?.skip ?? skipForLoadTestOrTests,
+    keyGenerator: merchantSignupIpLimiterKey,
+  });
+}
+
+export const merchantSignupIpLimiter = createMerchantSignupIpLimiter();
+
+/**
+ * Signup VELOCITY (SP5 task 4), on `POST /auth/merchant/signup` only (the resend
+ * route keeps the shared budget above):
+ *
+ *   - per IP:  `SIGNUP_IP_PER_HOUR` (default 5)
+ *   - per /24: `SIGNUP_SUBNET_PER_HOUR` (default 20) - an IPv4 /24 (IPv6 /64)
+ *     is one household / office / small VPS block, so rotating the last octet
+ *     does not mint a fresh budget.
+ *
+ * Keys ignore the body (rotating the email must not help). Both are factories
+ * so a test can build ones that are NOT skipped under vitest.
+ */
+export function signupSubnetKey(ipRaw: string | undefined): string {
+  const ip = (ipRaw ?? '').replace(/^::ffff:/i, '');
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/.exec(ip);
+  if (v4) return `${v4[1]}.${v4[2]}.${v4[3]}.0/24`;
+  return `${ipKeyGenerator(ip, 64)}`;
+}
+
+function signupVelocityLimiter(opts: {
+  prefix: string;
+  max: () => number;
+  key: (req: Request) => string;
+  message: string;
+  skip?: (req: Request) => boolean;
+}) {
+  return rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, opts.prefix),
+    windowMs: 60 * 60 * 1000,
+    max: opts.max,
+    message: { success: false, error: { code: 'RATE_LIMITED', message: opts.message } },
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    skip: opts.skip ?? skipForLoadTestOrTests,
+    keyGenerator: opts.key,
+    // The subnet key folds IPv6 itself (signupSubnetKey -> ipKeyGenerator /64);
+    // the library's source-text check cannot see through that helper.
+    validate: { keyGeneratorIpFallback: false },
+  });
+}
+
+export function createSignupIpVelocityLimiter(opts?: {
+  skip?: (req: Request) => boolean;
+  prefix?: string;
+  max?: () => number;
+}) {
+  return signupVelocityLimiter({
+    prefix: opts?.prefix ?? 'merchant-signup-ip-h',
+    max: opts?.max ?? (() => abuseConfig.signupIpPerHour()),
+    key: req => `signup-ip-${ipKeyGenerator(req.ip ?? '')}`,
+    message: 'Too many signups from this network, try again later.',
+    skip: opts?.skip,
+  });
+}
+
+export function createSignupSubnetVelocityLimiter(opts?: {
+  skip?: (req: Request) => boolean;
+  prefix?: string;
+  max?: () => number;
+}) {
+  return signupVelocityLimiter({
+    prefix: opts?.prefix ?? 'merchant-signup-net-h',
+    max: opts?.max ?? (() => abuseConfig.signupSubnetPerHour()),
+    key: req => `signup-net-${signupSubnetKey(req.ip)}`,
+    message: 'Too many signups from this network, try again later.',
+    skip: opts?.skip,
+  });
+}
+
+export const merchantSignupIpVelocityLimiter = createSignupIpVelocityLimiter();
+export const merchantSignupSubnetVelocityLimiter = createSignupSubnetVelocityLimiter();
 
 /**
  * Upper bound on a string we are willing to run an HMAC over in the refresh
@@ -1587,18 +1725,20 @@ export async function auditLog(entry: AuditLogEntry) {
     // tenant transaction, and the catch below swallows — an unguarded failure
     // aborted that transaction, so the write the client was told succeeded
     // rolled back at COMMIT.
+    //
+    // Through the append-only definer `ebda_audit_log_insert` (lib/definer.ts):
+    // `audit_logs` is store-scoped under strict RLS, but platform events carry
+    // no store, and a request may log against a store other than its own.
     await withSavepoint(() =>
-      prisma.auditLog.create({
-        data: {
-          action: entry.action,
-          userId: entry.userId,
-          storeId: entry.storeId,
-          resourceType: entry.resourceType,
-          resourceId: entry.resourceId,
-          details: entry.details ? JSON.parse(JSON.stringify(entry.details)) : {},
-          ipAddress: entry.ip,
-          userAgent: entry.userAgent,
-        },
+      insertAuditLog({
+        action: entry.action,
+        userId: entry.userId,
+        storeId: entry.storeId,
+        resourceType: entry.resourceType,
+        resourceId: entry.resourceId,
+        details: entry.details ? JSON.parse(JSON.stringify(entry.details)) : {},
+        ip: entry.ip,
+        userAgent: entry.userAgent,
       })
     );
   } catch (error) {

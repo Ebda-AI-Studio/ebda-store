@@ -1,5 +1,6 @@
 import { orderTaxPlacement } from '@force/shared';
 import { escapeHtml, emailMoney } from './_util';
+import { waMeEmailBlock } from './_wa-me';
 import type { OrderEmailData } from '../email.service';
 
 const LABELS = {
@@ -140,6 +141,7 @@ export const orderConfirmationTemplate = {
       ${escapeHtml(d.shippingAddress.city)}, ${escapeHtml(d.shippingAddress.state)} ${escapeHtml(d.shippingAddress.postalCode)}<br>
       ${escapeHtml(d.shippingAddress.country)}
     </div>
+    ${waMeEmailBlock(d.waMe, 'en')}
   `;
   },
 
@@ -184,6 +186,7 @@ export const orderConfirmationTemplate = {
       ${escapeHtml(d.shippingAddress.city)}, ${escapeHtml(d.shippingAddress.state)} ${escapeHtml(d.shippingAddress.postalCode)}<br>
       ${escapeHtml(d.shippingAddress.country)}
     </div>
+    ${waMeEmailBlock(d.waMe, 'ar')}
   `;
   },
 };

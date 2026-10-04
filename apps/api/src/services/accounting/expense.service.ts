@@ -3,9 +3,10 @@ import { prisma, hasTenantContext, runInTenantContext } from '@force/database';
 import type { Expense } from '@prisma/client';
 import {
   isCashOrBankAccount,
-  convertToKwd,
+  convertToBase,
   requiresFxRate,
   ALLOWED_CURRENCIES,
+  REGION,
 } from '@force/shared';
 import { nextSequence } from '../sequence.service';
 import { inngest } from '../../lib/inngest/client';
@@ -18,19 +19,19 @@ export interface CreateExpenseInput {
   expenseAccountId: string;
   paidFromAccountId: string;
   /**
-   * When currency=KWD (or absent): amount in KWD fils.
-   * When currency≠KWD: amount in the FOREIGN currency's minor units (e.g. USD cents).
-   *   The service converts to KWD fils using fxRate and stores both.
+   * When currency=EGP (or absent): amount in EGP piastres.
+   * When currency≠EGP: amount in the FOREIGN currency's minor units (e.g. USD cents).
+   *   The service converts to EGP piastres using fxRate and stores both.
    */
   amount: number;
   taxAmount?: number;
   expenseDate: Date | string;
-  /** ISO-4217 code. Defaults to 'KWD'. */
+  /** ISO-4217 code. Defaults to 'EGP'. */
   currency?: string;
   /**
-   * FX rate: 1 unit of `currency` = fxRate KWD.
-   * Required when currency !== 'KWD'. Stored as Decimal (exact; no float drift).
-   * For non-KWD OCR drafts where the rate is unknown, omit and the service
+   * FX rate: 1 unit of `currency` = fxRate EGP.
+   * Required when currency !== 'EGP'. Stored as Decimal (exact; no float drift).
+   * For non-EGP OCR drafts where the rate is unknown, omit and the service
    * stores fxRate=1 as a placeholder; the merchant must update before posting.
    */
   fxRate?: number;
@@ -59,7 +60,7 @@ export async function createExpense(input: CreateExpenseInput): Promise<ExpenseW
   // Issue 2291: with no ambient tenant transaction (the expense-OCR Inngest
   // job) the guard below opened its own transient transaction, but every
   // statement after it — the paid-from lookup and the INSERT, both on STRICT
-  // RLS tables — ran GUC-less: under force_app the lookup reads nothing (a
+  // RLS tables — ran GUC-less: under ebda_app the lookup reads nothing (a
   // misleading 400 INVALID_PAID_FROM) and the insert is rejected. The whole
   // body now runs in ONE store-scoped transaction, which also closes the
   // guard-vs-write window. The HTTP route already wraps it, so there it joins.
@@ -105,7 +106,7 @@ async function createExpenseInScope(input: CreateExpenseInput): Promise<ExpenseW
   }
 
   const expenseNumber = await nextSequence(input.storeId, 'expense');
-  const currency = (input.currency ?? 'KWD').toUpperCase();
+  const currency = (input.currency ?? REGION.currency).toUpperCase();
 
   // Validate currency against the allowed set
   if (!ALLOWED_CURRENCIES.includes(currency as (typeof ALLOWED_CURRENCIES)[number])) {
@@ -113,42 +114,42 @@ async function createExpenseInScope(input: CreateExpenseInput): Promise<ExpenseW
   }
 
   // ── Multi-currency FX conversion ──────────────────────────────────────────
-  // When currency is KWD: input.amount is already in KWD fils — no conversion.
-  // When currency is non-KWD:
+  // When currency is EGP: input.amount is already in EGP piastres — no conversion.
+  // When currency is non-EGP:
   //   - input.amount is in the FOREIGN currency's minor units (e.g. USD cents).
-  //   - fxRate converts: 1 foreign unit → fxRate KWD.
+  //   - fxRate converts: 1 foreign unit → fxRate EGP.
   //   - If fxRate is not provided, we store fxRate=1 as a placeholder and flag
   //     the expense so the merchant reviews before posting.
-  let amountKwd: number;
-  let taxAmountKwd: number;
+  let amountBase: number;
+  let taxAmountBase: number;
   let fxRateToStore: number;
   let originalAmountToStore: number;
   let originalTaxAmountToStore: number;
 
   if (!requiresFxRate(currency)) {
-    // KWD path — identical to before
-    amountKwd = input.amount;
-    taxAmountKwd = input.taxAmount ?? 0;
+    // EGP path — identical to before
+    amountBase = input.amount;
+    taxAmountBase = input.taxAmount ?? 0;
     fxRateToStore = 1;
     originalAmountToStore = input.amount;
     originalTaxAmountToStore = input.taxAmount ?? 0;
   } else {
-    // Non-KWD path
+    // Non-EGP path
     const rate = input.fxRate ?? 1; // placeholder if not supplied
     if (rate <= 0 || !isFinite(rate)) {
       throw new AppError(422, 'INVALID_FX_RATE', 'fxRate must be a finite positive number.');
     }
     const rawAmount = input.originalAmount ?? input.amount;
     const rawTax = input.taxAmount ?? 0;
-    amountKwd = convertToKwd(rawAmount, rate);
-    taxAmountKwd = convertToKwd(rawTax, rate);
+    amountBase = convertToBase(rawAmount, rate, currency);
+    taxAmountBase = convertToBase(rawTax, rate, currency);
     fxRateToStore = rate;
     originalAmountToStore = rawAmount;
     originalTaxAmountToStore = rawTax;
   }
 
-  const total = amountKwd + taxAmountKwd;
-  const taxAmount = taxAmountKwd;
+  const total = amountBase + taxAmountBase;
+  const taxAmount = taxAmountBase;
 
   return prisma.expense.create({
     data: {
@@ -157,13 +158,13 @@ async function createExpenseInScope(input: CreateExpenseInput): Promise<ExpenseW
       supplierId: input.supplierId ?? null,
       expenseAccountId: input.expenseAccountId,
       paidFromAccountId: input.paidFromAccountId,
-      amount: amountKwd,
+      amount: amountBase,
       taxAmount,
       total,
       currency,
       fxRate: fxRateToStore,
       // originalAmount stores the TOTAL original foreign amount (amount + tax in foreign units)
-      // so it mirrors how `total` mirrors (amount + tax) in KWD fils.
+      // so it mirrors how `total` mirrors (amount + tax) in EGP piastres.
       originalAmount: originalAmountToStore + originalTaxAmountToStore,
       expenseDate: new Date(input.expenseDate),
       status: 'draft',

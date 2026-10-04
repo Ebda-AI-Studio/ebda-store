@@ -5,8 +5,6 @@ import { EmailService } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
 import { LoyaltyService } from '../../../services/loyalty.service';
 import { affiliateService } from '../../../services/affiliate.service';
-import { shippingCarrierService } from '../../../services/shipping-carrier.service';
-import { featureService } from '../../../services/feature.service';
 import logger from '../../logger';
 import { inngest } from '../client';
 
@@ -148,16 +146,10 @@ export async function handleOrderStatusChanged(
       })
     );
   } else if (status === 'confirmed') {
+    // Booking with the carrier is its own retried Inngest job (shipment-create): a carrier
+    // outage must never fail or hold up this fan-out. The job checks the feature flag.
     add('auto-ship', () =>
-      // store_features + shipments + shipping_carrier_configs are all FORCE RLS,
-      // so BOTH the feature check and the shipment create must run with the
-      // tenant GUC set (Inngest has no request ALS scope to inherit).
-      runInTenantContext(storeId, async () => {
-        const shippingEnabled = await featureService.isFeatureEnabled(storeId, 'shipping_carriers');
-        if (shippingEnabled) {
-          await shippingCarrierService.createShipmentForOrder(storeId, orderId);
-        }
-      })
+      inngest.send({ name: 'shipment/create.requested', data: { storeId, orderId } })
     );
     if (shippingAddrFull) {
       add('email-payment-success', () =>
@@ -169,7 +161,7 @@ export async function handleOrderStatusChanged(
             customerEmail,
             // Bundle boxes collapse to ONE row each (see
             // groupOrderLinesForDisplay) — the payment-success email must
-            // show "Ramadan Box · 12.000 KWD", never the per-component
+            // show "Ramadan Box · 12.000 EGP", never the per-component
             // allocated shares that fund that one price.
             items: groupOrderLinesForDisplay(order.items).map(row =>
               row.kind === 'bundle'

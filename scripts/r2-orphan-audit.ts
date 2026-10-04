@@ -32,7 +32,8 @@
  */
 
 import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '@force/database';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -149,7 +150,7 @@ async function collectReferencedKeys(
  * R2_ORPHAN_SWEEP_APPLY=true) are the two bulk-delete collectors; this one used to read
  * the registry with a bare client — no tenant context, no bypass (issue 2251).
  * Harmless while production connects as the table owner; the moment the
- * Phase 3 force_app cutover flips DATABASE_URL, a contextless read of a STRICT
+ * Phase 3 ebda_app cutover flips DATABASE_URL, a contextless read of a STRICT
  * table returns zero rows, every blog cover / expense receipt / stock-adjustment
  * photo / how-to image reads as an orphan, and `--apply` deletes them from R2
  * irreversibly. One transaction per page, like the sweep.
@@ -157,14 +158,10 @@ async function collectReferencedKeys(
 export function rlsBypassRunner(prisma: Pick<PrismaClient, '$transaction'>): R2ReferenceRunner {
   return fn =>
     prisma.$transaction(
-      async tx => {
-        await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
-        // Reset a stale session-level store id so old-style policies
-        // (`current_store_id() IS NULL`) allow all rows too — same as
-        // withRlsBypass in @force/database.
-        await tx.$executeRaw`SET LOCAL app.current_store_id = ''`;
-        return fn(tx as unknown as R2ReferenceDb);
-      },
+      // An OWNER-ROLE connection (DIRECT_URL) reads every row by itself; there is
+      // no bypass GUC to set. The guard (`assertStrictTablesVisible`) proves the
+      // role bypasses RLS before any delete is trusted.
+      async tx => fn(tx as unknown as R2ReferenceDb),
       { maxWait: 10_000, timeout: 30_000 }
     );
 }
@@ -297,7 +294,7 @@ async function audit(): Promise<AuditResult> {
   const objects = await listAllR2Objects(client, bucket);
   console.log(`Found ${objects.length} objects in bucket "${bucket}".`);
 
-  const prisma = new PrismaClient();
+  const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
   try {
     console.log('Collecting referenced keys from database...');
     const run = rlsBypassRunner(prisma);

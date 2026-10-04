@@ -7,8 +7,8 @@ import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 import { formatPrice } from '@/lib/format';
 
-/** Converts fils (integer) to a KWD display string with 3 decimal places. */
-const formatKwd = formatPrice;
+/** Converts piastres (integer) to an EGP display string (2 decimals). */
+const formatMajor = formatPrice;
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -21,11 +21,9 @@ function formatDate(iso: string): string {
 function gatewayLabel(provider: string | null): string {
   if (!provider) return '—';
   const map: Record<string, string> = {
-    tap: 'Tap',
-    myfatoorah: 'MyFatoorah',
-    hesabe: 'Hesabe',
-    upayments: 'UPayments',
-    stripe: 'Stripe',
+    paymob: 'Paymob',
+    kashier: 'Kashier',
+    fawry: 'Fawry',
   };
   return map[provider.toLowerCase()] ?? provider;
 }
@@ -103,7 +101,9 @@ export function AbandonmentsTable({
     {
       header: t('colValue'),
       cell: record => (
-        <span className="text-sm text-foreground whitespace-nowrap">{formatKwd(record.total)}</span>
+        <span className="text-sm text-foreground whitespace-nowrap">
+          {formatMajor(record.total)}
+        </span>
       ),
     },
     {

@@ -18,6 +18,7 @@ import { ItemsCard } from './_components/ItemsCard';
 import { PlatformCard } from './_components/PlatformCard';
 import { CustomerCard } from './_components/CustomerCard';
 import { NotesCard } from './_components/NotesCard';
+import { ShipmentCard } from './_components/ShipmentCard';
 import { ActionFooter } from './_components/ActionFooter';
 import { OrderLifecycleTimeline } from '../../../../../components/order-timeline/OrderLifecycleTimeline';
 import type { OrderDetail } from './_components/types';
@@ -40,6 +41,7 @@ export default function OrderDetailPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [confirmMarkPaidOpen, setConfirmMarkPaidOpen] = useState(false);
   const [confirmRefundOpen, setConfirmRefundOpen] = useState(false);
+  const [confirmInstapayOpen, setConfirmInstapayOpen] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     if (!storeId || !orderId) return;
@@ -119,6 +121,34 @@ export default function OrderDetailPage() {
     } finally {
       setIsUpdating(false);
       setConfirmMarkPaidOpen(false);
+    }
+  };
+
+  // InstaPay: the merchant saw the transfer. The endpoint is idempotent (a second
+  // tap answers changed:false) and refuses an order whose window expired.
+  const handleConfirmInstapay = async () => {
+    if (!order) return;
+    setIsUpdating(true);
+    try {
+      const { data, error: apiError } = await apiPost<{ changed: boolean }>(
+        `/api/v1/stores/${storeId}/orders/${order.id}/confirm-instapay`,
+        {}
+      );
+      if (apiError) {
+        toastError(tList('errors.confirmInstapay'), apiError.message ?? '');
+      } else {
+        toastSuccess(
+          data?.changed === false
+            ? tList('toast.instapayAlready')
+            : tList('toast.instapayConfirmed')
+        );
+      }
+      await fetchOrder();
+    } catch {
+      toastError(tList('errors.confirmInstapay'));
+    } finally {
+      setIsUpdating(false);
+      setConfirmInstapayOpen(false);
     }
   };
 
@@ -229,6 +259,7 @@ export default function OrderDetailPage() {
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-4">
                 <DeliveryCard order={order} locale={locale} />
+                <ShipmentCard storeId={storeId} orderId={orderId} onChanged={fetchOrder} />
                 <PaymentCard order={order} userRole={user?.role} />
                 <CustomerCard order={order} />
                 <NotesCard order={order} />
@@ -248,6 +279,7 @@ export default function OrderDetailPage() {
               isUpdating={isUpdating}
               onStatusChange={requestStatusChange}
               onMarkPaid={() => setConfirmMarkPaidOpen(true)}
+              onConfirmInstapay={() => setConfirmInstapayOpen(true)}
               onPrintInvoice={openInvoice}
               onPaymentRefreshed={fetchOrder}
             />
@@ -262,6 +294,17 @@ export default function OrderDetailPage() {
           cancelLabel={tList('confirm.cancel')}
           onConfirm={handleMarkPaid}
           onClose={() => setConfirmMarkPaidOpen(false)}
+        />
+
+        <ConfirmActionModal
+          open={confirmInstapayOpen}
+          title={tList('confirm.instapayTitle')}
+          description={tList('confirm.instapayDescription')}
+          confirmLabel={tList('confirm.confirm')}
+          cancelLabel={tList('confirm.cancel')}
+          isLoading={isUpdating}
+          onConfirm={handleConfirmInstapay}
+          onClose={() => setConfirmInstapayOpen(false)}
         />
 
         <ConfirmActionModal

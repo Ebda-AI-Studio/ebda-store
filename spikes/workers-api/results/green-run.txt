@@ -1,0 +1,53 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+
+ RUN  v4.1.11 /home/user/ebda/spikes/workers-api
+
+stdout | test/timing.test.ts > sequential per-request timings
+[timing] first request in isolate (wasm init + cold connect): 1814ms
+
+ ✓ test/routes.test.ts > host routing > slug host and custom domain map to the right store 2514ms
+ ✓ test/routes.test.ts > host routing > unknown host -> 404 (never the first store) 762ms
+ ✓ test/routes.test.ts > host routing > reserved slugs never resolve to a store 14ms
+ ✓ test/routes.test.ts > cart add > add twice -> quantity 2, both 200 (no 25P02 abort) 1493ms
+stdout | test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > 300 interleaved concurrent requests (amelia/rival + no-GUC probes): 0 leaks, pooled connections shared across tenants
+[load] 300 ops in 5657ms; latency p50=432.0ms p95=1593.0ms max=1771.0ms; leaks=0 bad=0; distinct backend pids=2 (6084,6085); pids serving BOTH tenants=2
+
+ ✓ test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > 300 interleaved concurrent requests (amelia/rival + no-GUC probes): 0 leaks, pooled connections shared across tenants 5660ms
+stdout | test/routes.test.ts > cart add > 12 concurrent adds on one cart -> quantity 12, no errors
+[cart-concurrent] statuses 200,200,200,200,200,200,200,200,200,200,200,200
+
+ ✓ test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > role is non-bypass and every table is ENABLE+FORCE RLS 88ms
+ ✓ test/routes.test.ts > cart add > 12 concurrent adds on one cart -> quantity 12, no errors 982ms
+ ✓ test/routes.test.ts > cart add > another tenant's product id on this host is a 404, and writes nothing 38ms
+ ✓ test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > a request whose GUC is not set returns zero rows, and cannot write 79ms
+ ✓ test/routes.test.ts > cart add > same session id on two hosts yields two independent carts 76ms
+ ✓ test/routes.test.ts > payment webhook > bad signature -> 401; missing -> 401; bad hex -> 401; unknown provider -> 404; nothing stored 44ms
+ ✓ test/routes.test.ts > payment webhook > good -> 200 and cart paid; replay -> 200 no duplicate row, no second state change 147ms
+ ✓ test/routes.test.ts > payment webhook > 5 simultaneous replays of one event -> exactly one row, all 200 87ms
+ ✓ test/routes.test.ts > payment webhook > a webhook delivered on rival's host cannot mark amelia's cart paid 79ms
+stdout | test/timing.test.ts > sequential per-request timings
+[timing] GET /products: end-to-end p50=23.0ms p95=532.0ms min=15.0ms | in-handler tx(incl. connect+BEGIN..COMMIT) p50=19.0ms p95=529.0ms min=13.0ms
+
+stdout | test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > transaction-local set_config does not leak to the next tenant on a reused pooled connection
+[reuse] 40 amelia->unscoped pairs: same backend pid in 15/40; leaks=0
+
+ ✓ test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > transaction-local set_config does not leak to the next tenant on a reused pooled connection 1112ms
+stdout | test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > NEGATIVE CONTROL: a session-level set_config(..., false) DOES leak through pgbouncer (proves the harness can fail)
+[negative-control] session-level set_config leaked into a later, different client 13/20 times
+
+ ✓ test/isolation.test.ts > tenant isolation through pgbouncer (transaction mode, pool_size=2) on workerd > NEGATIVE CONTROL: a session-level set_config(..., false) DOES leak through pgbouncer (proves the harness can fail) 439ms
+stdout | test/timing.test.ts > sequential per-request timings
+[timing] POST /cart/items: end-to-end p50=24.0ms p95=45.0ms min=18.0ms | in-handler tx(incl. connect+BEGIN..COMMIT) p50=20.0ms p95=40.0ms min=14.0ms
+
+stdout | test/timing.test.ts > sequential per-request timings
+[timing] POST /webhooks/payments/fakepay: end-to-end p50=20.0ms p95=26.0ms min=16.0ms | in-handler tx(incl. connect+BEGIN..COMMIT) p50=12.0ms p95=18.0ms min=11.0ms
+
+ ✓ test/timing.test.ts > sequential per-request timings 8668ms
+
+ Test Files  3 passed (3)
+      Tests  17 passed (17)
+   Start at  18:30:57
+   Duration  10.25s (transform 1.17s, setup 0ms, import 1.08s, tests 22.29s, environment 1ms)
+

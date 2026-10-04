@@ -1,0 +1,337 @@
+/**
+ * Kashier adapter (SP5 task 3). Built from the shapes documented in
+ * docs/ebda/research/egypt-payment-providers.md — NO sandbox keys existed when
+ * this was written, so everything marked UNVERIFIED must be confirmed against
+ * `test-api.kashier.io` before go-live:
+ *
+ *  - UNVERIFIED: exact paths/bodies for payment sessions (`POST /v3/payment/sessions`),
+ *    the saved-card charge (`POST /v3/orders`, `interactionSource: RECURRING`) and the
+ *    redirect/response field names. Paths are constants below.
+ *  - UNVERIFIED: that recurring/token charging is enabled on Ebda's account
+ *    (the research found one account answered 404 "isn't enabled for recurring
+ *    agreements"). Ask Kashier for enablement in writing.
+ *  - DOCUMENTED (research): webhook = HMAC-SHA256, header `x-kashier-signature`,
+ *    keyed with the Payment API key; the payload's `signatureKeys` array, sorted
+ *    alphabetically, selects which `data` fields are signed; refund =
+ *    `PUT /v3/orders/:orderId`; amounts are decimal strings with exactly 2dp.
+ *
+ * Base URL is configurable (`KASHIER_BASE_URL`, default the sandbox).
+ */
+import { minorToDecimalString, tryToMinor } from '@force/shared';
+import {
+  BillingProviderError,
+  BillingSignatureError,
+  headerValue,
+  type BillingProvider,
+  type BillingWebhookEvent,
+  type BillingWebhookKind,
+  type ChargeRequest,
+  type ChargeResult,
+  type CheckoutRequest,
+  type CheckoutResult,
+  type HeaderBag,
+  type ParsedReturn,
+  type RefundRequest,
+  type RefundResult,
+} from './types';
+import { hmacSha256Hex, safeEqual } from './signature';
+
+export interface KashierConfig {
+  baseUrl: string;
+  merchantId: string;
+  /** Secret key — sent as the `Authorization` header on API calls. */
+  secretKey: string;
+  /** Payment API key — keys the webhook HMAC. */
+  apiKey: string;
+  timeoutMs?: number;
+  fetchImpl?: typeof fetch;
+}
+
+export const KASHIER_SANDBOX_URL = 'https://test-api.kashier.io';
+const SESSIONS_PATH = '/v3/payment/sessions';
+const CHARGE_PATH = '/v3/orders';
+const refundPath = (orderId: string) => `/v3/orders/${encodeURIComponent(orderId)}`;
+
+/**
+ * The signed fields a webhook MUST cover. A (validly signed) payload whose
+ * `signatureKeys` omits any of these could have its unsigned amount/status
+ * rewritten in transit, so it is rejected.
+ */
+const REQUIRED_SIGNED_KEYS = ['amount', 'currency', 'merchantOrderId', 'status'] as const;
+
+/** Integer piastres -> Kashier's decimal string ("199.99"). Integer math only. */
+export function gatewayAmount(amountMinor: number): string {
+  if (!Number.isSafeInteger(amountMinor) || amountMinor < 0) {
+    throw new RangeError(
+      `Invalid amount ${amountMinor}: must be a non-negative integer of minor units`
+    );
+  }
+  return minorToDecimalString(amountMinor, 'EGP');
+}
+
+/** Kashier decimal string -> integer piastres, or null when malformed / not 2dp-safe. */
+export function parseGatewayAmount(raw: unknown): number | null {
+  if (typeof raw !== 'string' && typeof raw !== 'number') return null;
+  return tryToMinor(String(raw), 'EGP');
+}
+
+const TOKEN_KEY = /token/i;
+
+/** Deep copy with every `*token*` key removed — card tokens must never be persisted/logged. */
+export function stripTokens(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripTokens);
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (TOKEN_KEY.test(k)) continue;
+      out[k] = stripTokens(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+/** Percent-encode like `qs.stringify` (RFC 3986), which Kashier's reference code uses. */
+function enc(v: string): string {
+  return encodeURIComponent(v).replace(
+    /[!'()*]/g,
+    c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+}
+
+function scalar(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  return typeof v === 'object' ? JSON.stringify(v) : String(v);
+}
+
+/** Signature string for a webhook `data` object: sorted `signatureKeys`, `k=v` joined by `&`. */
+export function kashierSignaturePayload(
+  data: Record<string, unknown>,
+  signatureKeys: string[]
+): string {
+  return [...signatureKeys]
+    .sort()
+    .map(k => `${enc(k)}=${enc(scalar(data[k]))}`)
+    .join('&');
+}
+
+export class KashierBillingProvider implements BillingProvider {
+  readonly name = 'kashier' as const;
+  private readonly cfg: Required<Omit<KashierConfig, 'fetchImpl'>> & { fetchImpl: typeof fetch };
+
+  constructor(cfg: KashierConfig) {
+    this.cfg = {
+      timeoutMs: 15_000,
+      fetchImpl: (...a) => fetch(...a),
+      ...cfg,
+      baseUrl: (cfg.baseUrl || KASHIER_SANDBOX_URL).replace(/\/+$/, ''),
+    } as KashierBillingProvider['cfg'];
+  }
+
+  private async call(
+    method: 'POST' | 'PUT',
+    path: string,
+    body: unknown
+  ): Promise<{ status: number; json: Record<string, unknown> }> {
+    if (!this.cfg.secretKey || !this.cfg.merchantId) {
+      throw new BillingProviderError('Kashier is not configured (merchant id / secret key)', true);
+    }
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), this.cfg.timeoutMs);
+    let res: Response;
+    try {
+      res = await this.cfg.fetchImpl(`${this.cfg.baseUrl}${path}`, {
+        method,
+        headers: {
+          'content-type': 'application/json',
+          authorization: this.cfg.secretKey,
+          'api-key': this.cfg.apiKey,
+        },
+        body: JSON.stringify(body),
+        signal: ctl.signal,
+      });
+    } catch (err) {
+      // Timeout / DNS / reset: we cannot know whether the gateway processed it.
+      throw new BillingProviderError(`Kashier request failed: ${(err as Error).message}`, false);
+    } finally {
+      clearTimeout(timer);
+    }
+    let json: Record<string, unknown> = {};
+    try {
+      json = (await res.json()) as Record<string, unknown>;
+    } catch {
+      /* non-JSON body */
+    }
+    if (res.status >= 500) {
+      throw new BillingProviderError(`Kashier answered ${res.status}`, false);
+    }
+    if (res.status === 401 || res.status === 403 || res.status === 404) {
+      // Bad keys / account not enabled for this feature: nothing was charged.
+      throw new BillingProviderError(
+        `Kashier refused the request (${res.status}): ${scalar(json.message ?? json.error)}`,
+        true
+      );
+    }
+    return { status: res.status, json };
+  }
+
+  async createCheckoutForSubscription(req: CheckoutRequest): Promise<CheckoutResult> {
+    const { status, json } = await this.call('POST', SESSIONS_PATH, {
+      merchantId: this.cfg.merchantId,
+      merchantOrderId: req.merchantOrderId,
+      amount: gatewayAmount(req.amountMinor),
+      currency: req.currency,
+      paymentType: 'credit',
+      type: 'one-time',
+      allowedMethods: 'card',
+      // Save the card so Ebda can charge it on renewal (needs account enablement).
+      saveCard: 'required',
+      display: req.locale ?? 'ar',
+      description: req.description,
+      merchantRedirect: req.returnUrl,
+      serverWebhook: req.webhookUrl,
+      customer: { reference: req.customer.reference, email: req.customer.email },
+    });
+    const url = typeof json.sessionUrl === 'string' ? json.sessionUrl : null;
+    if (status >= 400 || !url) {
+      throw new BillingProviderError(
+        `Kashier did not return a checkout URL (${status}): ${scalar(json.message)}`,
+        true
+      );
+    }
+    return {
+      redirectUrl: url,
+      providerSessionId: typeof json._id === 'string' ? json._id : null,
+    };
+  }
+
+  async chargeSavedCard(req: ChargeRequest): Promise<ChargeResult> {
+    const { status, json } = await this.call('POST', CHARGE_PATH, {
+      merchantId: this.cfg.merchantId,
+      // Kashier has no idempotency header: a unique merchantOrderId per attempt
+      // is the dedupe handle (research: `REN-{tenant}-{period}-{retry}`).
+      merchantOrderId: req.merchantOrderId ?? req.idempotencyKey,
+      amount: gatewayAmount(req.amountMinor),
+      currency: req.currency,
+      description: req.description,
+      interactionSource: 'RECURRING',
+      paymentMethod: { type: 'card', card: { cardToken: req.token } },
+    });
+    const raw = stripTokens(json);
+    const state = scalar(json.status).toUpperCase();
+    const chargeId = scalar(json.transactionId ?? json.orderId ?? json.kashierOrderId) || null;
+    if (state === 'SUCCESS' || state === 'APPROVED' || state === 'PAID') {
+      return { status: 'succeeded', chargeId, raw };
+    }
+    if (state === 'PENDING' || state === 'PROCESSING') return { status: 'pending', chargeId, raw };
+    return {
+      status: 'failed',
+      chargeId,
+      failureReason:
+        scalar(json.message ?? json.errorMessage ?? json.reason) || `declined (${status})`,
+      raw,
+    };
+  }
+
+  async refund(req: RefundRequest): Promise<RefundResult> {
+    const { status, json } = await this.call('PUT', refundPath(req.chargeId), {
+      apiOperation: 'REFUND',
+      reason: `refund ${req.idempotencyKey}`,
+      transaction: { amount: gatewayAmount(req.amountMinor) },
+    });
+    const raw = stripTokens(json);
+    const state = scalar(json.status).toUpperCase();
+    const refundId = scalar(json.transactionId ?? json.refundId) || null;
+    if (state === 'SUCCESS' || state === 'REFUNDED') return { status: 'succeeded', refundId, raw };
+    if (state === 'PENDING') return { status: 'pending', refundId, raw };
+    return {
+      status: 'failed',
+      refundId,
+      failureReason: scalar(json.message ?? json.reason) || `refund rejected (${status})`,
+      raw,
+    };
+  }
+
+  verifyWebhook(rawBody: Buffer | string, headers: HeaderBag): BillingWebhookEvent {
+    const provided = headerValue(headers, 'x-kashier-signature');
+    if (!provided) throw new BillingSignatureError('Missing x-kashier-signature');
+    if (!this.cfg.apiKey) throw new BillingSignatureError('Kashier API key not configured');
+
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : rawBody);
+    } catch {
+      throw new BillingSignatureError('Unparseable webhook body');
+    }
+    const data = (payload?.data ?? null) as Record<string, unknown> | null;
+    const keys = data?.signatureKeys;
+    if (
+      !data ||
+      typeof data !== 'object' ||
+      !Array.isArray(keys) ||
+      !keys.every(k => typeof k === 'string')
+    ) {
+      throw new BillingSignatureError('Webhook has no signatureKeys');
+    }
+    for (const required of REQUIRED_SIGNED_KEYS) {
+      if (!keys.includes(required)) {
+        throw new BillingSignatureError(`signatureKeys does not cover "${required}"`);
+      }
+    }
+    const expected = hmacSha256Hex(
+      this.cfg.apiKey,
+      kashierSignaturePayload(data, keys as string[])
+    );
+    if (!safeEqual(expected, provided.trim().toLowerCase())) {
+      throw new BillingSignatureError();
+    }
+
+    // ── Signature good: only now interpret the payload. ──
+    const rawStatus = scalar(data.status).toUpperCase();
+    const isRefund = scalar(payload.event).toLowerCase() === 'refund';
+    let kind: BillingWebhookKind = 'ignored';
+    if (['SUCCESS', 'APPROVED', 'PAID'].includes(rawStatus)) {
+      kind = isRefund ? 'refund.succeeded' : 'charge.succeeded';
+    } else if (['FAILURE', 'FAILED', 'DECLINED', 'ERROR', 'EXPIRED'].includes(rawStatus)) {
+      kind = isRefund ? 'refund.failed' : 'charge.failed';
+    }
+    const txn = scalar(data.transactionId ?? data.kashierOrderId ?? data.orderId);
+    const merchantOrderId = scalar(data.merchantOrderId) || null;
+    const cardToken = scalar(
+      data.cardDataToken ??
+        data.cardToken ??
+        (data.paymentMethod as { card?: { cardToken?: unknown } } | undefined)?.card?.cardToken
+    );
+    const created = Date.parse(scalar(data.createdAt ?? data.date));
+    return {
+      eventId: `${txn || merchantOrderId || 'unknown'}:${rawStatus || 'UNKNOWN'}`,
+      kind,
+      merchantOrderId,
+      providerRef: txn || null,
+      amountMinor: parseGatewayAmount(data.amount),
+      currency: scalar(data.currency) || null,
+      failureReason: kind.endsWith('failed')
+        ? scalar(data.message ?? data.errorMessage ?? data.reason) || rawStatus
+        : undefined,
+      card: cardToken ? { token: cardToken } : undefined,
+      customerRef:
+        scalar((data.customer as { reference?: unknown } | undefined)?.reference) || undefined,
+      occurredAt: Number.isNaN(created) ? new Date() : new Date(created),
+      raw: stripTokens(payload),
+    };
+  }
+
+  parseReturn(query: Record<string, unknown>): ParsedReturn {
+    const status = scalar(query.paymentStatus ?? query.status).toUpperCase();
+    return {
+      merchantOrderId: scalar(query.merchantOrderId) || null,
+      providerRef: scalar(query.orderReference ?? query.transactionId) || null,
+      outcome: ['SUCCESS', 'APPROVED', 'PAID'].includes(status)
+        ? 'success'
+        : status
+          ? 'failure'
+          : 'unknown',
+      trusted: false,
+    };
+  }
+}

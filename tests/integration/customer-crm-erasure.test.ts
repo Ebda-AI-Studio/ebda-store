@@ -63,7 +63,7 @@ async function seed(): Promise<Seeded> {
           name: `crmerase-store-${tag}`,
           slug: `${PREFIX}store-${tag}-${uniq}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: owner.id,
         },
       });

@@ -37,10 +37,10 @@ const faq = (answer: string, answerAr = '') => ({
 
 describe('extractMeasurements', () => {
   it('extracts number+unit tokens, ignores unit-less numbers', () => {
-    const m = extractMeasurements('Ships in 2-3 days. Net weight 400 g. Price 5 KWD.');
+    const m = extractMeasurements('Ships in 2-3 days. Net weight 400 g. Price 5 EGP.');
     expect(m.has('400:g')).toBe(true);
     expect(m.has('2:g')).toBe(false); // "days" is not a unit
-    expect(m.has('5:g')).toBe(false); // KWD is not a measurement unit
+    expect(m.has('5:g')).toBe(false); // EGP is not a measurement unit
   });
 
   it('normalizes Arabic-Indic digits and Arabic units', () => {
@@ -86,7 +86,7 @@ describe('validateFaqGrounding', () => {
   it('keeps answers whose numbers carry no measurement unit', () => {
     const { kept } = validateFaqGrounding(
       [
-        faq('Delivery takes 2-3 business days within Kuwait.'),
+        faq('Delivery takes 2-3 business days within Egypt.'),
         faq('You can order 3 packs or more for a discount.'),
       ],
       sizedProduct

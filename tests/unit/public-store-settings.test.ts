@@ -33,7 +33,7 @@ describe('publicStoreSettings — allowlists storefront-consumed keys only', () 
       checkoutLabelAr: 'دفع آمن',
       checkoutDelivery: { windows: { enabled: true, items: [] } },
       minimumOrderFils: 5000,
-      acceptedPaymentMethods: ['KNET'],
+      acceptedPaymentMethods: ['Visa'],
       orderInvoiceEmail: 'owner@example.com',
     };
     const out = publicStoreSettings(input);
@@ -48,7 +48,7 @@ describe('publicStoreSettings — allowlists storefront-consumed keys only', () 
       checkoutLabelAr: 'دفع آمن',
       checkoutDelivery: input.checkoutDelivery,
       minimumOrderFils: 5000,
-      acceptedPaymentMethods: ['KNET'],
+      acceptedPaymentMethods: ['Visa'],
     });
   });
 

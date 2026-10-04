@@ -27,9 +27,10 @@
  * recreates them, so it's safe to run repeatedly.
  */
 
-import { PrismaClient, type StoreTemplate, type Prisma } from '@prisma/client';
+import { type StoreTemplate, type Prisma } from '@prisma/client';
+import { createPrismaClient } from '../src/client';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
 
 /**
  * Build a demo store's layout: ONLY the source store's CONTENT (hero slides +

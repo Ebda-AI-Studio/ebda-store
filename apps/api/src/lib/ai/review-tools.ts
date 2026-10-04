@@ -109,7 +109,7 @@ export async function detectSpamReview(reviewId: string): Promise<SpamCheckResul
     return { spamScore: 0, reasons: [], recommendedStatus: 'pending' };
   }
 
-  const prompt = `You are a fraud detector for product reviews on a Kuwait e-commerce platform. Analyze this review for spam, fakeness, profanity, or off-topic content.
+  const prompt = `You are a fraud detector for product reviews on an Egypt e-commerce platform. Analyze this review for spam, fakeness, profanity, or off-topic content.
 
 Score 0.0-1.0:
 - 0.0-0.2: clearly genuine
@@ -244,7 +244,7 @@ export async function draftOwnerResponse(
   });
   if (!review) throw new Error(`Review ${reviewId} not found`);
 
-  const prompt = `You are helping a Kuwait merchant draft a professional, warm response to a customer's product review. Match the tone (positive review → thank them genuinely; negative → empathize + offer to make it right). Keep responses concise (1-3 sentences).
+  const prompt = `You are helping an Egypt merchant draft a professional, warm response to a customer's product review. Match the tone (positive review → thank them genuinely; negative → empathize + offer to make it right). Keep responses concise (1-3 sentences).
 
 Write BOTH versions in JSON: { "en": "...", "ar": "..." }
 - en: English

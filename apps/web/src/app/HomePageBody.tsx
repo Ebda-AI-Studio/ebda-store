@@ -3,7 +3,11 @@ import { PLATFORM_MARKETING_URL } from '../lib/platform';
 import type { ResolvedStore } from '../lib/store-resolver';
 import { API_URL } from '../lib/api';
 import type { Product, Category } from '../lib/api';
-import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
+import {
+  resolveLayoutSettings,
+  type StoreLayoutSettings,
+  resolveDefaultLanguage,
+} from '@force/shared';
 import { storeJsonLd, breadcrumbJsonLd, itemList, storeAbsoluteUrl } from '../lib/structured-data';
 import { JsonLd } from '../components/JsonLd';
 import { HomePageContent } from './HomePageContent';
@@ -280,10 +284,10 @@ export async function HomePageBody({
   // visitor to the marketing site rather than rendering a second one here.
   //
   // This URL used to serve its own `EditorialLanding`, because at the time
-  // force-ai.co did not pitch the store-builder service. It does now, and
+  // ebda.app did not pitch the store-builder service. It does now, and
   // covers the whole product range, so a separate pitch on the platform host
   // only competed with it for the same search terms under a worse title
-  // ("Force - Online Shopping in Kuwait").
+  // ("Force - Online Shopping in Egypt").
   //
   // 307, not 308: a permanent redirect is cached by browsers indefinitely and
   // would be painful to undo if this host ever needs its own root again.
@@ -338,7 +342,9 @@ export async function HomePageBody({
     address: store.address,
     description: store.description,
     social: socialUrls,
-    inLanguage: (store.settings as Record<string, unknown>)?.defaultLanguage === 'ar' ? 'ar' : 'en',
+    inLanguage: resolveDefaultLanguage(
+      (store.settings as Record<string, unknown>)?.defaultLanguage
+    ),
   });
 
   const homeBreadcrumbJsonLd = breadcrumbJsonLd([{ name: 'Home', url: siteUrl }]);

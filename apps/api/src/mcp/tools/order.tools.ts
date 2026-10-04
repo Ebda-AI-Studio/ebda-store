@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { storefrontOrigin } from '@force/shared';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { prisma, runInTenantContext, withTenantContext } from '@force/database';
 import type { McpStore } from '../resolve-store';
@@ -23,6 +24,7 @@ import {
 } from '../agent-auth';
 import { ok } from './tool-result';
 
+import { codFeeMinor } from '@force/shared';
 /**
  * Agent orders reuse the SAME required-field contract as a human guest
  * order (`shippingAddressSchema` in `public.routes.ts`): firstName+lastName
@@ -40,7 +42,7 @@ const customerSchema = z.object({
   email: z.string().trim().email().optional(),
   address: z.string().trim().min(1),
   city: z.string().trim().optional(),
-  country: z.string().trim().min(2).default('KW'),
+  country: z.string().trim().min(2).default('EG'),
 });
 
 function splitName(name: string): { firstName: string; lastName: string } {
@@ -50,9 +52,9 @@ function splitName(name: string): { firstName: string; lastName: string } {
 
 // Mirrors payment.routes.ts's storefront-base-url derivation (POST
 // /payments/create, online branch): custom domain wins, else the
-// platform web app at /<slug>.
+// store's free `<slug>.ebda.app` origin.
 function storefrontBaseUrl(store: McpStore): string {
-  return store.domain ? `https://${store.domain}` : `${config.webUrl}/${store.slug}`;
+  return storefrontOrigin(store);
 }
 
 export function registerOrderTools(server: McpServer, store: McpStore): void {
@@ -170,7 +172,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           // cod branch, so an agent COD order is indistinguishable from a
           // human COD order to the rest of the platform (admin order detail,
           // "mark cash collected" flow, payment events).
-          const codFee = codConfig.fixedFee ? Number(codConfig.fixedFee) : 0;
+          const codFee = codFeeMinor(order.total, { fixedMinor: Number(codConfig.fixedFee) || 0 });
           const total = codFee > 0 ? order.total + codFee : order.total;
 
           // Tenant-scoped AND atomic: `withTenantContext` runs both writes
@@ -208,7 +210,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           } catch (err) {
             // Its own fresh tenant wrap, like the two sibling rollbacks: the
             // payment transaction above has rolled back, so there is no
-            // ambient scope and, under force_app, the rollback's reads would
+            // ambient scope and, under ebda_app, the rollback's reads would
             // see no rows and silently do nothing (PR 2301 audit).
             await runInTenantContext(store.id, () =>
               OrderService.rollbackForPaymentFailure(store.id, order.id, cartId)
@@ -343,46 +345,49 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           // same callback/error URL convention, same
           // `.../webhooks/payment/<provider>` webhook shape — provider is
           // resolved explicitly above rather than left undefined.
-          const payment = await runInTenantContext(store.id, async () => {
-            const created = await PaymentService.createPayment(
-              {
-                orderId: order.id,
-                orderNumber: order.orderNumber,
-                amount: order.total,
-                currency: order.currency as Currency,
-                customer: {
-                  id: `guest-${order.id}`,
-                  name: customer.name,
-                  email: customer.email ?? '',
-                  phone: customer.phone,
-                },
-                // Same collapse every other payment-provider call site uses
-                // (`payment.routes.ts` /create, `order.routes.ts` payment-link,
-                // `payment.factory.ts` retry — see `payment-line-items.ts`'s I3
-                // note): a bundle box must reach the gateway's hosted page as
-                // ONE line at the bundle price, never its per-component
-                // allocated shares. This call site mapped `order.items` raw and
-                // was the one instance final review missed.
-                items: buildPaymentLineItems(order.items),
-                callbackUrl: `${base}/checkout/success`,
-                errorUrl: `${base}/checkout/error`,
-                webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${provider}`,
-              },
-              provider,
-              store.id
-            );
-            acceptedInvoice = {
-              storeId: store.id,
-              orderId: order.id,
-              orderNumber: order.orderNumber,
-              provider: created.provider,
-              transactionId: created.transactionId,
-              amount: order.total,
-              currency: order.currency,
-              source: 'agent',
-            };
-            return created;
-          });
+          //
+          // THE PROVIDER CALL HAS NO TRANSACTION OPEN (SP6b): the order above is already
+          // committed, the gateway is asked with nothing held (behind its deadline and the
+          // per-store breaker), and only the Payment row + its audit event are written in a
+          // short transaction of their own.
+          const paymentRequest = {
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            amount: order.total,
+            currency: order.currency as Currency,
+            customer: {
+              id: `guest-${order.id}`,
+              name: customer.name,
+              email: customer.email ?? '',
+              phone: customer.phone,
+            },
+            // Same collapse every other payment-provider call site uses
+            // (`payment.routes.ts` /create, `order.routes.ts` payment-link,
+            // `payment.factory.ts` retry — see `payment-line-items.ts`'s I3
+            // note): a bundle box must reach the gateway's hosted page as
+            // ONE line at the bundle price, never its per-component
+            // allocated shares. This call site mapped `order.items` raw and
+            // was the one instance final review missed.
+            items: buildPaymentLineItems(order.items),
+            callbackUrl: `${base}/checkout/success`,
+            errorUrl: `${base}/checkout/error`,
+            webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${provider}`,
+          };
+          const { providerName: acceptedBy, response: payment } =
+            await PaymentService.requestProviderPayment(paymentRequest, provider, store.id);
+          acceptedInvoice = {
+            storeId: store.id,
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            provider: payment.provider,
+            transactionId: payment.transactionId,
+            amount: order.total,
+            currency: order.currency,
+            source: 'agent',
+          };
+          await runInTenantContext(store.id, () =>
+            PaymentService.recordProviderPayment(acceptedBy, paymentRequest, payment, store.id)
+          );
           // The Payment row is committed: the order is paid-for-pending now,
           // and must never be rolled back from here on.
           rollbackOrderId = null;

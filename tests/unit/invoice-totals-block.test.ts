@@ -3,7 +3,7 @@
  * files for VAT.
  *
  *  - issue 1705: money is formatted in the ORDER's currency by the shared
- *    helper, not a local `/1000 + toFixed(3)` that printed "10.000 USD".
+ *    helper, not a local `/1000 + toFixed(3)` that printed "100.000 USD".
  *  - issue 2239: the discount is split into coupon / promotion / loyalty
  *    points / remainder, like every order screen, instead of one aggregate
  *    line annotated with the coupon code only.
@@ -29,7 +29,7 @@ function order(overrides: Record<string, unknown> = {}) {
     id: 'o1',
     orderNumber: 'N-1',
     locale: 'en',
-    currency: 'KWD',
+    currency: 'EGP',
     status: 'delivered',
     paymentStatus: 'paid',
     createdAt: new Date('2026-09-30T10:00:00Z'),
@@ -54,8 +54,8 @@ function order(overrides: Record<string, unknown> = {}) {
       address: null,
       logo: null,
       theme: null,
-      currency: 'KWD',
-      timezone: 'Asia/Kuwait',
+      currency: 'EGP',
+      timezone: 'Africa/Cairo',
     },
     customer: null,
     items: [],
@@ -84,15 +84,15 @@ beforeEach(() => findFirst.mockReset());
 describe('invoice totals block', () => {
   it('formats money in the order currency (USD minor units are cents)', async () => {
     const t = await totals(order({ currency: 'USD', subtotal: 10000, shipping: 0, total: 10000 }));
-    expect(t).toContain('$100.00');
-    expect(t).not.toContain('10.000');
+    expect(t).toContain('USD 100.00');
+    expect(t).not.toContain('EGP');
   });
 
   it('names a loyalty-only discount instead of printing it unexplained', async () => {
     const t = await totals(
       order({ discount: 1000, loyaltyDiscount: 1000, loyaltyPointsRedeemed: 200, total: 4500 })
     );
-    expect(t).toContain('Loyalty points (200) −1.000 KWD');
+    expect(t).toContain('Loyalty points (200) −10.00 EGP');
     expect(t).not.toMatch(/Discount −/);
   });
 
@@ -106,19 +106,19 @@ describe('invoice totals block', () => {
         total: 4000,
       })
     );
-    expect(t).toContain('Coupon (SAVE) −0.500 KWD');
-    expect(t).toContain('Loyalty points −1.000 KWD');
+    expect(t).toContain('Coupon (SAVE) −5.00 EGP');
+    expect(t).toContain('Loyalty points −10.00 EGP');
   });
 
   it('shows exclusive tax as a summed row before Total', async () => {
     const t = await totals(order({ tax: 250, total: 5750 }));
-    expect(t.indexOf('Tax 0.250 KWD')).toBeGreaterThan(-1);
-    expect(t.indexOf('Tax 0.250 KWD')).toBeLessThan(t.indexOf('Total'));
+    expect(t.indexOf('Tax 2.50 EGP')).toBeGreaterThan(-1);
+    expect(t.indexOf('Tax 2.50 EGP')).toBeLessThan(t.indexOf('Total'));
   });
 
   it('shows inclusive tax as a caption AFTER Total, never a summed row', async () => {
     const t = await totals(order({ tax: 238, taxIncludedInPrice: true, total: 5500 }));
     expect(t).not.toMatch(/(^| )Tax 0\.238/);
-    expect(t.indexOf('Incl. VAT 0.238 KWD')).toBeGreaterThan(t.indexOf('Total 5.500 KWD'));
+    expect(t.indexOf('Incl. VAT 2.38 EGP')).toBeGreaterThan(t.indexOf('Total 55.00 EGP'));
   });
 });

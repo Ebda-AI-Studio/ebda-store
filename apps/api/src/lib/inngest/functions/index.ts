@@ -21,6 +21,7 @@ import {
 } from './data-retention';
 import { alertsFailureWatch } from './alerts-failure-watch';
 import { gmailAlertPoller } from './gmail-alert-poller';
+import { isWorkers } from '../../runtime';
 import { queueDepthWatch } from './queue-depth-watch';
 import { agentWriteDeniedWatch } from './agent-write-denied-watch';
 import { orderWhatsAppNotify } from './order-whatsapp-notify';
@@ -43,7 +44,11 @@ import { aiAutofillCleanup } from './ai-autofill-cleanup';
 import { aiAutofillSweep } from './ai-autofill-sweep';
 import { orderCapiConversion } from './order-capi-conversion';
 import { orderAutoCancelUnpaid } from './order-auto-cancel-unpaid';
+import { instapayExpiry } from './instapay-expiry';
+import { shipmentCreate } from './shipment-create';
 import { storeUsageSnapshot } from './store-usage-snapshot';
+import { billingRenewalDaily } from './billing-renewal';
+import { domainClaimSweep } from './domain-claim-sweep';
 import { r2OrphanSweep } from './r2-orphan-sweep';
 import { paymentAbandonmentSweep } from './payment-abandonment-sweep';
 import { paymentWebhookProcess } from './payment-webhook-process';
@@ -78,7 +83,7 @@ import { campaignSend } from './campaign-send';
  * `/api/v1/inngest`. Functions added here are picked up by the
  * Inngest platform on the next deploy / dev sync.
  */
-export const inngestFunctions: InngestFunction.Any[] = [
+const allInngestFunctions: InngestFunction.Any[] = [
   orderCreated,
   orderRefunded,
   bulkImportProducts,
@@ -136,7 +141,12 @@ export const inngestFunctions: InngestFunction.Any[] = [
   orderCapiConversion,
   // Auto-cancel stale unpaid orders past AUTO_CANCEL_UNPAID_DAYS (daily cron).
   orderAutoCancelUnpaid,
+  instapayExpiry,
+  // SP7: carrier booking off the order path, retried, merchant notified when it gives up.
+  shipmentCreate,
   storeUsageSnapshot,
+  billingRenewalDaily,
+  domainClaimSweep,
   // Weekly R2 orphan sweep: lists bucket vs DB references and reports
   // orphans via logger + Telegram. Deletion gated on R2_ORPHAN_SWEEP_APPLY=true.
   r2OrphanSweep,
@@ -204,3 +214,12 @@ export const inngestFunctions: InngestFunction.Any[] = [
   // no cron, so registering it sends nothing on its own.
   campaignSend,
 ];
+
+/**
+ * Served functions. On Workers the Gmail alert poller is left out: it is FWB ops plumbing over IMAP
+ * (TCP + TLS to Gmail), dropped from the Ebda API (R-EBDA-001 section 5); Ebda alerts come from
+ * Sentry and the status page.
+ */
+export const inngestFunctions: InngestFunction.Any[] = isWorkers
+  ? allInngestFunctions.filter(f => f !== gmailAlertPoller)
+  : allInngestFunctions;

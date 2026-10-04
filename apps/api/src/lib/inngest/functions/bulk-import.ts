@@ -1,9 +1,10 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
+import { prisma, runInStoreScope, withStore } from '@force/database';
 import { BulkService } from '../../../services/bulk.service';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { getEntityStoreId } from '../../definer';
 
 /**
  * True when a bulk import actually wrote/changed products and the public
@@ -54,18 +55,31 @@ export const bulkImportProducts: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
-    // BulkImportJob is a cross-tenant job queue table — use withRlsBypass to
-    // load it (no storeId GUC set yet at this point).
-    const job = await withRlsBypass(tx => tx.bulkImportJob.findUnique({ where: { id: jobId } }));
+    // BulkImportJob is a store-scoped job table: the event names the store (a
+    // replayed event without one is resolved by primary key through a definer)
+    // and the job is read inside that store's scope.
+    const jobStoreId = event.data.storeId ?? (await getEntityStoreId('bulk_import_job', jobId));
+    const job = jobStoreId
+      ? await withStore(jobStoreId, tx => tx.bulkImportJob.findUnique({ where: { id: jobId } }))
+      : null;
     if (!job) {
       logger.warn({ jobId }, 'bulk-import/started fired for missing job');
       return;
     }
 
-    // From here we know the storeId. Use runInTenantContext so all subsequent
+    // From here we know the storeId. Use runInStoreScope so all subsequent
     // reads/writes (Products, Categories, BulkImportJob status) go through the
     // tenant's RLS policies rather than silently returning 0 rows.
-    await runInTenantContext(job.storeId, async () => {
+    //
+    // NOT runInTenantContext: importProducts creates categories/tags first and
+    // then links them from its own `withMoneyTx` batches. Those batches are
+    // separate transactions, so under ONE outer tenant transaction they could
+    // not see the not-yet-committed categories — every import that introduced
+    // a NEW category or tag failed with a product_categories FK violation (and
+    // a 5k-row import also outlived the 30s interactive-transaction limit).
+    // A store scope holds no long transaction: each query commits on its own,
+    // and withMoneyTx batches start with the same store GUC.
+    await runInStoreScope(job.storeId, async () => {
       await prisma.bulkImportJob.update({
         where: { id: jobId },
         data: { status: 'running', startedAt: new Date() },

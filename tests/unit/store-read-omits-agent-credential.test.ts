@@ -42,8 +42,23 @@ vi.mock('@force/database', () => ({
   },
   Prisma: {},
   withMoneyTx: vi.fn(),
+  // store payloads carry row counts, read inside the store's own scope (`withStore`): zero here.
+  withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
+    fn({
+      // the transaction client is the same fake client, plus the zero counts
+      ...(await import('@force/database')).prisma,
+      product: { count: async () => 0 },
+      category: { count: async () => 0 },
+      order: { count: async () => 0 },
+    }),
+  acrossStores: async (_fn: unknown, o?: { storeIds?: string[] }) =>
+    (o?.storeIds ?? []).map(storeId => ({ storeId, value: { products: 0, orders: 0 } })),
 }));
-vi.mock('@force/shared', () => ({ slugify: (s: string) => s }));
+vi.mock('@force/shared', async importOriginal => ({
+  // Keep the real region config (REGION is read at import time by api config/services).
+  ...(await importOriginal<typeof import('@force/shared')>()),
+  slugify: (s: string) => s,
+}));
 vi.mock('../../apps/api/src/services/redis.service', () => ({
   redis: { delete: vi.fn(), get: redisGetMock, set: redisSetMock },
 }));

@@ -16,6 +16,8 @@ interface ActionFooterProps {
   isUpdating: boolean;
   onStatusChange: (newStatus: string) => void;
   onMarkPaid: () => void;
+  /** InstaPay: the merchant saw the transfer arrive. */
+  onConfirmInstapay?: () => void;
   onPrintInvoice: () => void;
   onPaymentRefreshed?: () => void;
 }
@@ -26,6 +28,7 @@ export function ActionFooter({
   isUpdating,
   onStatusChange,
   onMarkPaid,
+  onConfirmInstapay,
   onPrintInvoice,
   onPaymentRefreshed,
 }: ActionFooterProps) {
@@ -70,8 +73,13 @@ export function ActionFooter({
   //     payment with a transactionId (never COD), not already refunded.
   //   - showRefreshRefundStatus: a provider-issued refund exists — the safety
   //     net for a missed refund webhook.
-  const { showMarkPaid, showManualMarkPaid, showRefundViaProvider, showRefreshRefundStatus } =
-    orderActionVisibility(order);
+  const {
+    showMarkPaid,
+    showManualMarkPaid,
+    showConfirmInstapay,
+    showRefundViaProvider,
+    showRefreshRefundStatus,
+  } = orderActionVisibility(order);
 
   return (
     // Lifted above the fixed MobileBottomNav (h-14 = 56px) on mobile so the
@@ -83,6 +91,18 @@ export function ActionFooter({
       aria-label={t('toolbarLabel')}
     >
       <div className="flex flex-wrap items-center gap-2">
+        {/* InstaPay: the one primary action. Idempotent on the server, so a second tap is safe. */}
+        {showConfirmInstapay && onConfirmInstapay && (
+          <button
+            type="button"
+            onClick={onConfirmInstapay}
+            disabled={isUpdating}
+            data-testid="confirm-instapay"
+            className="flex-1 min-w-0 basis-[8rem] inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-success px-3 py-2.5 text-center text-sm font-semibold leading-tight text-success-foreground hover:bg-success/90 disabled:opacity-60 transition-colors cursor-pointer"
+          >
+            {isUpdating ? '…' : t('confirmInstapay')}
+          </button>
+        )}
         {nextStatus && !isFinal && (
           <button
             type="button"
@@ -113,7 +133,7 @@ export function ActionFooter({
             )}
           </button>
         )}
-        {/* Payment Link — surface existing MyFatoorah/Tap URL when the
+        {/* Payment Link — surface the existing payment URL when the
             order already has one (WhatsApp-origin orders mint a link
             at creation), otherwise open the issue-new modal. Picks the
             most recent non-paid Payment row with a usable URL. */}
@@ -166,7 +186,7 @@ export function ActionFooter({
           />
         )}
         {/* Refresh refund status — diagnostic. Re-check provider status
-            for an already-submitted refund. MyFatoorah refunds queue
+            for an already-submitted refund. A gateway may queue refunds
             for 1-3 days; this button confirms when the finance team
             has actually executed the refund (so the customer's card
             reflects the credit). Same safety-net pattern as Refresh

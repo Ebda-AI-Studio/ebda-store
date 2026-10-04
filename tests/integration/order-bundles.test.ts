@@ -55,7 +55,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
     store = await seedBundleStore(suffix);
   });
 
-  /** Seeds the "Ramadan Box" from the design doc's worked example: Dates ×1 (4.500 KWD), Honey ×1 (6.000), Nuts ×2 (2.000 each) — componentSum 14.500, fixed_price 12.000. Returns the three product ids + the bundle id. */
+  /** Seeds the "Ramadan Box" from the design doc's worked example: Dates ×1 (4.500 EGP), Honey ×1 (6.000), Nuts ×2 (2.000 each) — componentSum 14.500, fixed_price 12.000. Returns the three product ids + the bundle id. */
   async function seedRamadanBox(tag: string) {
     const dates = await seedProduct(store.storeId, `${suffix}-${tag}-dates`, {
       price: 4500,
@@ -98,7 +98,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
     const order = await checkoutBundleFor(store.storeId, ramadanBox, 1);
 
     const group = order.items.filter(i => i.bundleGroupId);
-    // Invariant 1: the group sums to exactly the bundle price in fils.
+    // Invariant 1: the group sums to exactly the bundle price in piastres.
     expect(group.reduce((s, i) => s + i.total, 0)).toBe(12000);
     // Invariant 2: unit price × quantity reconciles to the stored total, on
     // EVERY line — this is what makes the allocation representable at all
@@ -185,7 +185,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
     await expect(
       OrderService.create(store.storeId, undefined, sessionId, {
         shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
-        paymentMethod: 'myfatoorah',
+        paymentMethod: 'paymob',
       })
     ).rejects.toMatchObject({ statusCode: 400 });
 
@@ -221,7 +221,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
     await expect(
       OrderService.create(store.storeId, undefined, sessionId, {
         shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
-        paymentMethod: 'myfatoorah',
+        paymentMethod: 'paymob',
       })
     ).rejects.toMatchObject({ statusCode: 400 });
 
@@ -248,7 +248,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
     await expect(
       OrderService.create(store.storeId, undefined, sessionId, {
         shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
-        paymentMethod: 'myfatoorah',
+        paymentMethod: 'paymob',
       })
     ).rejects.toMatchObject({ statusCode: 409 });
 
@@ -294,7 +294,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
       price: 3000,
       inventory: 100,
     });
-    // componentSum 5000, fixed_price 4000 -> 1000 fils saved per box.
+    // componentSum 5000, fixed_price 4000 -> 1000 piastres saved per box.
     const bundleId = await seedBundle(store.storeId, `${suffix}-t10-bundle`, {
       pricingType: 'fixed_price',
       pricingValue: 4000,

@@ -1,4 +1,3 @@
-import { headers } from 'next/headers';
 import { API_URL } from '../../../lib/api';
 import {
   resolveAgentStore,
@@ -6,6 +5,7 @@ import {
   storefrontBaseUrl,
 } from '../../../lib/agent-store-resolver';
 
+import { REGION, minorUnitsPerMajor } from '@force/shared';
 /**
  * `/.well-known/ucp` — Universal Commerce Protocol discovery.
  *
@@ -40,8 +40,7 @@ export async function GET() {
   // "no such store" from "store exists, agent checkout off" on either path.
   if (!store.enabledFeatures?.includes('agent_checkout')) return notFound();
 
-  const h = await headers();
-  const base = storefrontBaseUrl(store, h.get('host'));
+  const base = storefrontBaseUrl(store);
   const viaCookie = await resolvedViaCookie();
 
   const body = {
@@ -54,14 +53,13 @@ export async function GET() {
         phone: store.phone ?? undefined,
       },
     },
-    // Integer MINOR units everywhere on this platform. KWD has three decimal
-    // places (1 KWD = 1000 fils), so an agent that assumes the near-universal
-    // two is wrong by a factor of ten — stated explicitly because a wrong
+    // Integer MINOR units everywhere on this platform (EGP: 1 EGP = 100 piastres,
+    // 2 decimals). The scale is stated explicitly per currency because a wrong
     // assumption here is a mispriced order, not a display bug.
     pricing: {
-      currency: store.currency ?? 'KWD',
+      currency: store.currency ?? REGION.currency,
       amounts: 'integer-minor-units',
-      minor_units_per_major: (store.currency ?? 'KWD') === 'KWD' ? 1000 : 100,
+      minor_units_per_major: minorUnitsPerMajor(store.currency ?? REGION.currency),
     },
     transports: [
       {
@@ -92,10 +90,9 @@ export async function GET() {
     status: 200,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      // See acp.json: resolved only from URL slug / custom-domain Host
-      // (middleware.ts URL_KEYED_PUBLIC_PATHS, #1959 — the load-bearing
-      // control). The `viaCookie → private` branch is an unreachable second
-      // line of defence (#2174).
+      // See acp.json: resolved only from the request Host (`<slug>.ebda.app`
+      // or custom domain), so the URL keys the answer. The `viaCookie →
+      // private` branch is a retired second line of defence.
       'Cache-Control': viaCookie ? 'private, max-age=300' : 'public, max-age=300, s-maxage=300',
       ...(viaCookie ? {} : { Vary: 'Cookie' }),
     },

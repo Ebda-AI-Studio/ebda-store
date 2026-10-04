@@ -7,6 +7,9 @@ import Link from 'next/link';
 import { Button } from '@force/ui';
 import { api, type Order } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
+import { WaMeCodConfirmButton } from '../../../templates/shared/WaMeButtons';
+import { InstapayCard } from './InstapayCard';
+import { FawryReferenceCard } from './FawryReferenceCard';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useCart } from '../../../contexts/CartContext';
 import { trackPurchase } from '../../../components/MarketingPixels';
@@ -14,22 +17,28 @@ import { firePurchasePixelOnce } from '../../../lib/purchase-pixel-guard';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatDate } from '@/lib/format-date';
 import { useLastListing } from '../../../hooks/useLastListing';
-import { groupOrderLinesForDisplay } from '@force/shared';
+import { groupOrderLinesForDisplay, fromMinor, REGION } from '@force/shared';
 
 // Payment verification outcome that drives the truthful headline/icon.
 //   verifying → we're asking the API to confirm with the gateway
 //   paid      → provider confirmed PAID
-//   pending   → provider hasn't reported a final status yet (KNET delay)
+//   pending   → provider hasn't reported a final status yet
 //   failed    → provider reported failed/expired/cancelled
 //   cod       → cash on delivery (no gateway to verify)
+//   awaiting  → InstaPay: the customer transfers, the merchant confirms (no gateway)
 //   unknown   → verify couldn't run (no orderId / network) — neutral copy
-type PaymentState = 'verifying' | 'paid' | 'pending' | 'failed' | 'cod' | 'unknown';
+type PaymentState = 'verifying' | 'paid' | 'pending' | 'failed' | 'cod' | 'awaiting' | 'unknown';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams?.get('orderId');
   const isCod = searchParams?.get('cod') === '1';
-  // MyFatoorah appends its PaymentId to the success URL on return; the
+  const isInstapay = searchParams?.get('instapay') === '1';
+  // A Fawry reference code (the customer pays it in cash at an outlet, hours later). A plain
+  // code only: anything else in the URL is ignored.
+  const rawRef = searchParams?.get('ref') ?? '';
+  const fawryRef = /^[A-Za-z0-9-]{4,32}$/.test(rawRef) ? rawRef : null;
+  // A gateway may append its payment id to the success URL on return; the
   // casing varies (`paymentId` vs `Id`). Forward it to the API for the
   // audit trail — authorization rides on the order UUID, not this value.
   const returnPaymentId = searchParams?.get('paymentId') || searchParams?.get('Id') || undefined;
@@ -42,7 +51,9 @@ function SuccessContent() {
 
   const [order, setOrder] = useState<Order | null>(null);
   const [, setIsLoading] = useState(true);
-  const [paymentState, setPaymentState] = useState<PaymentState>(isCod ? 'cod' : 'verifying');
+  const [paymentState, setPaymentState] = useState<PaymentState>(
+    isCod ? 'cod' : isInstapay || fawryRef ? 'awaiting' : 'verifying'
+  );
 
   useEffect(() => {
     // Clear cart on successful checkout
@@ -64,20 +75,24 @@ function SuccessContent() {
       // "confirmed". This is the reliable confirmation path — it also
       // triggers the same server-side fanout (email/push/accounting) the
       // missed webhook would have. Idempotent + safe to call on reload.
-      if (!isCod) {
+      if (!isCod && !isInstapay) {
         try {
           const verify = await api.verifyOrderPayment(orderId!, returnPaymentId);
           if (!cancelled && verify.success && verify.data) {
             const s = verify.data.paymentStatus;
-            setPaymentState(s === 'paid' ? 'paid' : s === 'failed' ? 'failed' : 'pending');
+            // An unpaid Fawry reference code is not "being confirmed": it is waiting for the
+            // customer to pay it at an outlet.
+            setPaymentState(
+              s === 'paid' ? 'paid' : s === 'failed' ? 'failed' : fawryRef ? 'awaiting' : 'pending'
+            );
           } else if (!cancelled) {
-            setPaymentState('pending');
+            setPaymentState(fawryRef ? 'awaiting' : 'pending');
           }
         } catch {
           // Verification network error — show pending (truthful: we don't
           // know yet). The webhook backup + the customer's order page will
           // still reflect the real status once it settles.
-          if (!cancelled) setPaymentState('pending');
+          if (!cancelled) setPaymentState(fawryRef ? 'awaiting' : 'pending');
         }
       }
 
@@ -91,6 +106,7 @@ function SuccessContent() {
           // (committed) or online orders the provider reported paid. Don't
           // attribute revenue for a pending/failed gateway return.
           const confirmed = isCod || fetchedOrder.paymentStatus === 'paid';
+          // (An InstaPay order is not a sale until the merchant confirms the transfer: paymentStatus stays unpaid.)
           // Once per ORDER, not per mount: a refresh or a re-opened success
           // link must not report the sale again (#1346). The order is marked
           // only when a pixel library actually received it — before marketing
@@ -102,8 +118,8 @@ function SuccessContent() {
                 orderId: fetchedOrder.id,
                 contentIds: fetchedOrder.items.map(item => item.productId),
                 numItems: fetchedOrder.items.reduce((sum, item) => sum + item.quantity, 0),
-                value: fetchedOrder.total / 1000,
-                currency: 'KWD',
+                value: fromMinor(fetchedOrder.total),
+                currency: REGION.currency,
               })
             );
           }
@@ -124,32 +140,46 @@ function SuccessContent() {
 
   // Truthful headline + sub-copy per verified state.
   const heading =
-    paymentState === 'failed'
-      ? t('Payment not completed', 'لم يكتمل الدفع')
-      : paymentState === 'pending'
-        ? t('Confirming your payment…', 'جاري تأكيد الدفع…')
-        : t('Thank you for your order!', 'شكراً لطلبك!');
+    paymentState === 'awaiting' && fawryRef
+      ? t('Waiting for your payment', 'بانتظار الدفع')
+      : paymentState === 'awaiting'
+        ? t('Waiting for your transfer', 'بانتظار التحويل')
+        : paymentState === 'failed'
+          ? t('Payment not completed', 'لم يكتمل الدفع')
+          : paymentState === 'pending'
+            ? t('Confirming your payment…', 'جاري تأكيد الدفع…')
+            : t('Thank you for your order!', 'شكراً لطلبك!');
 
   const subCopy =
-    paymentState === 'failed'
+    paymentState === 'awaiting' && fawryRef
       ? t(
-          'We could not confirm your payment. If you were charged, it will be reconciled shortly — otherwise please try again.',
-          'لم نتمكن من تأكيد الدفع. إذا تم خصم المبلغ فسيتم تسويته قريباً، وإلا يرجى المحاولة مرة أخرى.'
+          'Your order is held for you. Pay the reference code below at any Fawry outlet.',
+          'طلبك محجوز لك. ادفع كود الدفع الموضّح أدناه في أي منفذ فوري.'
         )
-      : paymentState === 'pending'
+      : paymentState === 'awaiting'
         ? t(
-            'Your payment is being confirmed. This page will update, or check your order status shortly.',
-            'جاري تأكيد دفعتك. ستتحدث هذه الصفحة، أو تحقق من حالة طلبك بعد قليل.'
+            'Your order is held for you. Transfer the amount below and the store will confirm it.',
+            'طلبك محجوز لك. حوّل المبلغ الموضّح أدناه وسيؤكده المتجر.'
           )
-        : isCod
+        : paymentState === 'failed'
           ? t(
-              'Your order has been placed. Please have the payment ready when your order is delivered.',
-              'تم تقديم طلبك. يرجى تجهيز المبلغ عند استلام الطلب.'
+              'We could not confirm your payment. If you were charged, it will be reconciled shortly — otherwise please try again.',
+              'لم نتمكن من تأكيد الدفع. إذا تم خصم المبلغ فسيتم تسويته قريباً، وإلا يرجى المحاولة مرة أخرى.'
             )
-          : t(
-              'Your payment is confirmed and your order will be shipped soon.',
-              'تم تأكيد دفعتك وسيتم شحن طلبك قريباً.'
-            );
+          : paymentState === 'pending'
+            ? t(
+                'Your payment is being confirmed. This page will update, or check your order status shortly.',
+                'جاري تأكيد دفعتك. ستتحدث هذه الصفحة، أو تحقق من حالة طلبك بعد قليل.'
+              )
+            : isCod
+              ? t(
+                  'Your order has been placed. Please have the payment ready when your order is delivered.',
+                  'تم تقديم طلبك. يرجى تجهيز المبلغ عند استلام الطلب.'
+                )
+              : t(
+                  'Your payment is confirmed and your order will be shipped soon.',
+                  'تم تأكيد دفعتك وسيتم شحن طلبك قريباً.'
+                );
 
   return (
     <MinimalChrome>
@@ -157,7 +187,9 @@ function SuccessContent() {
         <div className="text-center">
           {/* Status icon \u2014 reflects the VERIFIED payment state, not an
               unconditional checkmark. */}
-          {paymentState === 'verifying' || paymentState === 'pending' ? (
+          {paymentState === 'verifying' ||
+          paymentState === 'pending' ||
+          paymentState === 'awaiting' ? (
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-warning/15">
               <div className="h-9 w-9 animate-spin rounded-full border-4 border-warning border-t-transparent" />
             </div>
@@ -207,6 +239,21 @@ function SuccessContent() {
                 )}
               </p>
             </div>
+          )}
+
+          {isInstapay && orderId && (
+            <InstapayCard
+              orderId={orderId}
+              onStatus={s =>
+                setPaymentState(s === 'awaiting' ? 'awaiting' : s === 'paid' ? 'paid' : 'failed')
+              }
+            />
+          )}
+
+          {fawryRef && <FawryReferenceCard code={fawryRef} />}
+
+          {isCod && order && (
+            <WaMeCodConfirmButton order={order} className="mx-auto mt-6 max-w-md" />
           )}
 
           <div className="mt-8 rounded-xl border bg-card p-6 shadow-sm text-left">

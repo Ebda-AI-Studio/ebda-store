@@ -21,10 +21,11 @@ const { mockOrderFindMany, mockReturnFindMany, mockSend, mockSendAlert } = vi.ho
   mockSendAlert: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
-  withRlsBypass: (fn: (tx: unknown) => unknown) =>
-    fn({ order: { findMany: mockOrderFindMany }, return: { findMany: mockReturnFindMany } }),
-}));
+vi.mock('@force/database', async () =>
+  (await import('./helpers/database-mock')).databaseMock({
+    prisma: { order: { findMany: mockOrderFindMany }, return: { findMany: mockReturnFindMany } },
+  })
+);
 vi.mock('@api/lib/inngest/client', () => ({
   inngest: { send: mockSend, createFunction: vi.fn(() => ({})) },
 }));

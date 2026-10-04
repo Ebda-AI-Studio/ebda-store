@@ -10,7 +10,8 @@
  *     └─ processReminders()       — send scheduled reminder steps
  */
 
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, acrossStores, acrossStoresFlat } from '@force/database';
+import { storefrontOrigin } from '@force/shared';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { redis } from './redis.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
@@ -172,10 +173,10 @@ class AbandonedCartService {
     // Find all stores with the abandoned_cart feature enabled.
     // store_features is FORCE-RLS; this is a platform-level cron with no tenant
     // context, and the scan is INTENTIONALLY cross-tenant (all eligible stores).
-    // Without bypass the policy returns 0 rows → the whole abandoned-cart system
-    // silently never runs. Bypass is correct here (cross-tenant by design).
-    const storeFeatures = await withRlsBypass(tx =>
-      tx.storeFeature.findMany({
+    // Contextless, the policy returns 0 rows → the whole abandoned-cart system
+    // silently never runs. So the scan visits each store in its own scope.
+    const storeFeatures = await acrossStoresFlat(() =>
+      prisma.storeFeature.findMany({
         where: { featureKey: 'abandoned_cart', enabled: true },
         select: { storeId: true },
       })
@@ -289,7 +290,7 @@ class AbandonedCartService {
             )
           ).filter((b): b is CartItemSnapshot => b !== null);
 
-          // Calculate total from snapshot (price is in fils / integer cents) —
+          // Calculate total from snapshot (price is in piastres / integer cents) —
           // per chosen variant price, matching cart/checkout. Bundles add
           // their resolved bundle price x quantity, exactly like the
           // storefront cart's own `bundlesSubtotal` (cart.service.ts).
@@ -359,20 +360,22 @@ class AbandonedCartService {
    */
   async detectAndNotifyAbandonedWaCarts(correlationId?: string): Promise<void> {
     // Find all stores with both abandoned_cart + whatsapp features enabled.
-    // Cross-tenant platform cron over FORCE-RLS store_features → bypass required
+    // Cross-tenant platform cron over FORCE-RLS store_features → per-store scan
     // (same reason as detectNewAbandonments above).
-    const [storeFeatures, waFeatures] = await withRlsBypass(tx =>
+    const perStore = await acrossStores(() =>
       Promise.all([
-        tx.storeFeature.findMany({
+        prisma.storeFeature.findMany({
           where: { featureKey: 'abandoned_cart', enabled: true },
           select: { storeId: true },
         }),
-        tx.storeFeature.findMany({
+        prisma.storeFeature.findMany({
           where: { featureKey: 'whatsapp', enabled: true },
           select: { storeId: true },
         }),
       ])
     );
+    const storeFeatures = perStore.flatMap(r => r.value[0]);
+    const waFeatures = perStore.flatMap(r => r.value[1]);
 
     const abandonedCartStoreIds = new Set(storeFeatures.map(sf => sf.storeId));
     const waStoreIds = new Set(waFeatures.map(sf => sf.storeId));
@@ -597,8 +600,8 @@ class AbandonedCartService {
 
     // Build variables for force_cart_abandoned_v1:
     //   {{1}} customer name, {{2}} cart total, {{3}} store name
-    const cartTotalKwd = (cart.totalFils / 1000).toFixed(3);
-    const totalDisplay = `${cartTotalKwd} ${cart.currency}`;
+    const cartTotalMajor = (cart.totalFils / 1000).toFixed(3);
+    const totalDisplay = `${cartTotalMajor} ${cart.currency}`;
     const customerName = cart.customerName || 'Customer';
 
     const variables = [customerName, totalDisplay, store.name];
@@ -722,9 +725,7 @@ class AbandonedCartService {
     // storefront ever read them, the snapshot could not restore a cart (no
     // product/variant ids), and the signed link never expired, so the
     // recovery flow they implied did not exist.
-    const storeDomain = abandonedCart.store?.domain
-      ? `https://${abandonedCart.store.domain}`
-      : `${config.webUrl}/${abandonedCart.store?.slug ?? ''}`;
+    const storeDomain = abandonedCart.store ? storefrontOrigin(abandonedCart.store) : config.webUrl;
 
     const cartUrl = `${storeDomain}/cart`;
 
@@ -738,7 +739,7 @@ class AbandonedCartService {
     const customerName = abandonedCart.customer
       ? `${abandonedCart.customer.firstName} ${abandonedCart.customer.lastName}`.trim()
       : 'Customer';
-    const cartTotalFormatted = (abandonedCart.cartTotal / 1000).toFixed(3); // fils → KWD
+    const cartTotalFormatted = (abandonedCart.cartTotal / 1000).toFixed(3); // piastres → EGP
 
     const notificationData: NotificationData = {
       customerName,
@@ -806,8 +807,8 @@ class AbandonedCartService {
 
       const expiresAt = new Date(Date.now() + storeConfig.couponExpiryHours * 60 * 60 * 1000);
 
-      // Coupon.value is Int (percentage 0–100 or fixed amount in fils)
-      // couponMaxDiscount is now Int (fils) — use directly as Coupon.maxDiscount
+      // Coupon.value is Int (percentage 0–100 or fixed amount in piastres)
+      // couponMaxDiscount is now Int (piastres) — use directly as Coupon.maxDiscount
       const maxDiscountInt =
         storeConfig.couponMaxDiscount !== null ? storeConfig.couponMaxDiscount : undefined;
 
@@ -978,7 +979,7 @@ class AbandonedCartService {
         AND ac.status = 'recovered'
         AND o.store_id = ${storeId}
         AND o.deleted_at IS NULL
-        AND o.status NOT IN ('cancelled', 'refunded')
+        AND o.status NOT IN ('cancelled', 'refunded', 'awaiting_payment_confirmation')
         AND o.payment_status <> 'failed'
     `;
     const recoveredRevenue = Number(revenueRows[0]?.revenue ?? 0);

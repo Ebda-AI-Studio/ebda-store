@@ -3,6 +3,7 @@
 import AnimatedTextCycle from '@/components/ui/animated-text-cycle';
 import { Aurora } from '@/components/landing/Reveal';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { BRAND } from '@force/shared';
 
 const CYCLE_WORDS = ['storefront', 'catalog', 'checkout', 'brand', 'growth'];
 
@@ -51,7 +52,7 @@ export default function CtaSection() {
             {t('Talk on WhatsApp', 'تواصل عبر واتساب')}
           </a>
           <a
-            href="mailto:info@force-ai.co"
+            href={`mailto:${BRAND.supportEmail}`}
             className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.02] px-7 py-4 text-base font-semibold text-white transition-colors hover:border-primary"
           >
             {t('Email us', 'راسلنا')}

@@ -21,12 +21,11 @@ const h = vi.hoisted(() => ({
 vi.mock('@force/database', () => ({
   runInTenantContext: async (_s: string, fn: () => Promise<unknown>) => fn(),
   runInStoreScope: async (_s: string, fn: () => Promise<unknown>) => fn(),
-  withRlsBypass: async (fn: (tx: unknown) => Promise<unknown>) =>
-    fn({
-      store: { findMany: async () => [{ id: 's1' }, { id: 's2' }] },
-      // run-started-at reads the DATABASE clock (issue 2076).
-      $queryRaw: async () => [{ now: new Date() }],
-    }),
+  prisma: {
+    store: { findMany: async () => [{ id: 's1' }, { id: 's2' }] },
+    // run-started-at reads the DATABASE clock (issue 2076).
+    $queryRaw: async () => [{ now: new Date() }],
+  },
 }));
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { createFunction: h.createFunction } }));
 vi.mock('@api/services/feature.service', () => ({

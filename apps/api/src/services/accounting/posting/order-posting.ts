@@ -6,15 +6,20 @@ import logger from '../../../lib/logger';
 
 /**
  * Maps a Payment.provider value to the COA system account code that should
- * be debited when that provider's payment is received. KNET = 1000,
- * Card (Tap/Hesabe/UPayments) = 1010, COD = 1020.
+ * be debited when that provider's payment is received. Multi-method / instant
+ * gateways (Paymob: cards, Meeza, wallets, valU; Fawry: reference codes) = 1000
+ * 'Cash Online', the card-first hosted gateway (Kashier) = 1010 'Cash Card', COD = 1020.
+ * The split is inherited from the Kuwait gateways it replaced (aggregator -> 1000,
+ * card gateway -> 1010) and is an accounting choice the owner has not re-confirmed
+ * for Egypt: it only decides WHICH asset account the receipt is booked to, never an amount.
  */
 export const PROVIDER_TO_CASH_CODE: Record<string, string> = {
-  myfatoorah: '1000',
-  tap: '1010',
-  hesabe: '1010',
-  upayments: '1010',
+  paymob: '1000',
+  kashier: '1010',
+  fawry: '1000',
   cod: '1020',
+  // InstaPay: a bank transfer the merchant confirmed (SP6a), booked with the instant methods.
+  instapay: '1000',
 };
 
 /**

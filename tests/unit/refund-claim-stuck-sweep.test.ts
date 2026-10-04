@@ -63,9 +63,11 @@ h.findMany.mockImplementation(
   }
 );
 
-vi.mock('@force/database', () => ({
-  withRlsBypass: (fn: (tx: unknown) => unknown) => fn({ paymentEvent: { findMany: h.findMany } }),
-}));
+vi.mock('@force/database', async () =>
+  (await import('./helpers/database-mock')).databaseMock({
+    prisma: { paymentEvent: { findMany: h.findMany } },
+  })
+);
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: h.sendAlert }));
 vi.mock('@api/services/redis.service', () => ({
   redis: {

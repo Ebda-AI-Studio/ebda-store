@@ -70,9 +70,9 @@ describe('admin ICU numbers render Latin digits (issue 1971)', () => {
   it('admin prices keep the Arabic currency symbol but use Latin digits', () => {
     const ar = formatPrice(1500, { locale: 'ar' });
     expect(ARABIC_INDIC.test(ar), ar).toBe(false);
-    expect(ar).toMatch(/1[.,٫]500/);
-    expect(ar).toContain('د.ك');
-    expect(formatPrice(1500)).toMatch(/1\.500/);
+    expect(ar).toMatch(/15[.,٫]00/);
+    expect(ar).toContain('ج.م');
+    expect(formatPrice(1500)).toMatch(/15\.00/);
   });
 
   it('the formats are wired into both the server request config and the client provider', () => {

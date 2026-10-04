@@ -3,14 +3,14 @@
  *
  * Scans active trackInventory products for a store and generates AI-powered
  * bilingual clearance copy for dead-stock products. Designed to be called by
- * the Inngest weekly cron (Sunday 06:00 KW) or on-demand by a super_admin.
+ * the Inngest weekly cron (Sunday 06:00 Cairo) or on-demand by a super_admin.
  *
  * Algorithm (per spec Part 3.2):
  *   1. Expire old open flags (>30 days, status='expired').
  *   2. List active products with trackInventory=true and stock on hand.
  *   3. For each product: compute daysSinceSale + stockValueFils (null when the
  *      product has no cost price — value UNKNOWN, not zero).
- *   4. Flag if daysSinceSale >= 90 AND (stockValueFils >= 50000 OR value unknown).
+ *   4. Flag if daysSinceSale >= 90 AND (stockValueFils >= 500000 OR value unknown).
  *      A product that has never sold is aged from its createdAt instead, so a
  *      newly listed product is not "90 days dead" on day one.
  *      A product without a cost price used to be skipped entirely, which made
@@ -21,13 +21,13 @@
  *      open flag, not on scannedAt: keying on the per-run timestamp inserted a
  *      new open flag every weekly run (5 open cards for 1 product in prod).
  *
- * RLS note (2026-06-01): the entire scan body runs inside withRlsBypass so
+ * RLS note (2026-06-01): the entire scan body runs inside withStore so
  * Inngest jobs (no tenant GUC in context) can read deadstock_flags, products,
  * and order_items without being filtered to an empty result set by the
  * direct-compare RLS policies.
  */
 
-import { prisma, withRlsBypass, Prisma } from '@force/database';
+import { prisma, withStore, Prisma } from '@force/database';
 import { activeVariants, effectiveInventory } from '../../lib/effective-inventory';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
@@ -78,7 +78,8 @@ const GEMINI_CHUNK_SIZE = 20;
 const GEMINI_THROTTLE_MS = 2500;
 const EXPIRE_AFTER_DAYS = 30;
 const DEADSTOCK_DAYS_THRESHOLD = 90;
-const DEADSTOCK_VALUE_FILS_THRESHOLD = 50_000; // 50 KWD in fils (1 KWD = 1000 fils)
+// 5,000 EGP in piastres (1 EGP = 100 piastres). Re-based from FWB's 50 KWD; product to confirm.
+const DEADSTOCK_VALUE_FILS_THRESHOLD = 500_000;
 
 // ---------------------------------------------------------------------------
 // Helper: days since last paid sale for a product
@@ -130,7 +131,7 @@ function daysSince(lastSaleAt: Date | undefined): number {
 }
 
 // ---------------------------------------------------------------------------
-// Helper: variant-aware stock value (fils), or null when unknown
+// Helper: variant-aware stock value (piastres), or null when unknown
 // ---------------------------------------------------------------------------
 
 const knownCost = (c: number | null | undefined): number | null =>
@@ -187,7 +188,7 @@ function buildGeminiPrompt(candidates: DeadstockCandidate[]): string {
     costPrice: c.costPrice,
   }));
 
-  return `You are a retail clearance copywriter for a Kuwait e-commerce store. For each
+  return `You are a retail clearance copywriter for an Egypt e-commerce store. For each
 dead-stock product below, suggest a clearance discount percentage (10-50) and
 write a short bilingual campaign copy (<=80 chars each, English + Arabic).
 
@@ -211,7 +212,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
   // as reorder-scan.service.ts (the prior single-tx-around-everything design
   // timed out at ~112s on stores with many candidates + the 2.5s throttle).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { expiredCount, candidates, scanned } = await withRlsBypass(async (tx: any) => {
+  const { expiredCount, candidates, scanned } = await withStore(storeId, async (tx: any) => {
     // -------------------------------------------------------------------------
     // Step 1: Expire old open flags (>30 days)
     // -------------------------------------------------------------------------
@@ -369,7 +370,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
   // SAVEPOINT so one failed write rolls back only itself instead of aborting
   // the whole transaction (every later statement would otherwise fail 25P02).
   //
-  // Chunked (issue 2259): one withRlsBypass per PHASE3_CHUNK_SIZE candidates,
+  // Chunked (issue 2259): one withStore per PHASE3_CHUNK_SIZE candidates,
   // the way phase 1 chunks its scan. The candidate set is uncapped (every
   // uncosted store's whole stale catalogue can qualify) and each candidate
   // costs ~5 round-trips with its savepoint, so a single transaction could
@@ -381,7 +382,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
   for (let chunkStart = 0; chunkStart < candidates.length; chunkStart += PHASE3_CHUNK_SIZE) {
     const slice = candidates.slice(chunkStart, chunkStart + PHASE3_CHUNK_SIZE);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rowsUpserted += await withRlsBypass(async (tx: any) => {
+    rowsUpserted += await withStore(storeId, async (tx: any) => {
       let upserted = 0;
 
       for (const candidate of slice) {

@@ -7,7 +7,7 @@
  *   - Arabic body renders expected Arabic copy + data interpolation
  *   - Subject lines are correct for both languages
  *   - XSS-dangerous characters in data are escaped in both variants
- *   - Currency rendered as KWD (en) / د.ك (ar) on money templates
+ *   - Currency rendered as EGP (en) / ج.م (ar) on money templates
  */
 
 import { describe, it, expect } from 'vitest';
@@ -279,10 +279,10 @@ const orderData = {
     firstName: 'Ahmad',
     lastName: 'S',
     address1: '1 Main St',
-    city: 'Kuwait City',
-    state: 'KW',
+    city: 'Cairo',
+    state: 'EG',
     postalCode: '12345',
-    country: 'Kuwait',
+    country: 'Egypt',
   },
 };
 
@@ -297,16 +297,16 @@ describe('orderConfirmationTemplate', () => {
     expect(orderConfirmationTemplate.subject.ar(orderData, STORE)).toContain('تم تأكيد');
   });
 
-  it('en body uses KWD currency', () => {
+  it('en body uses EGP currency', () => {
     const html = orderConfirmationTemplate.en(orderData, STORE);
-    expect(html).toContain('KWD');
-    expect(html).not.toContain('د.ك');
+    expect(html).toContain('EGP');
+    expect(html).not.toContain('ج.م');
   });
 
   it('ar body uses Arabic currency symbol', () => {
     const html = orderConfirmationTemplate.ar(orderData, STORE);
-    expect(html).toContain('د.ك');
-    expect(html).not.toContain(' KWD');
+    expect(html).toContain('ج.م');
+    expect(html).not.toContain(' EGP');
   });
 
   it('en body has Shipping Address label', () => {
@@ -327,15 +327,15 @@ describe('orderConfirmationTemplate', () => {
 
   it('total formatted correctly (en)', () => {
     const html = orderConfirmationTemplate.en(orderData, STORE);
-    // 3650 fils = 3.650 KWD
-    expect(html).toContain('3.650');
+    // 3650 piastres = 36.50 EGP
+    expect(html).toContain('36.50');
   });
 
   it('discount row shows the coupon code when a coupon applied (en)', () => {
     const d = { ...orderData, discount: 300, couponCode: 'SAVE10' };
     const html = orderConfirmationTemplate.en(d, STORE);
     expect(html).toContain('Discount (SAVE10)');
-    expect(html).toContain('0.300');
+    expect(html).toContain('3.00');
   });
 
   it('discount row names the promotion when no coupon code is set (en)', () => {
@@ -377,15 +377,15 @@ describe('paymentSuccessTemplate', () => {
     expect(paymentSuccessTemplate.subject.ar(orderData, STORE)).toContain('تم استلام الدفعة');
   });
 
-  it('en body contains KWD total', () => {
+  it('en body contains EGP total', () => {
     const html = paymentSuccessTemplate.en(orderData, STORE);
-    expect(html).toContain('KWD');
-    expect(html).toContain('3.650');
+    expect(html).toContain('EGP');
+    expect(html).toContain('36.50');
   });
 
   it('ar body contains Arabic currency', () => {
     const html = paymentSuccessTemplate.ar(orderData, STORE);
-    expect(html).toContain('د.ك');
+    expect(html).toContain('ج.م');
   });
 
   it('XSS in customerName escaped (en)', () => {

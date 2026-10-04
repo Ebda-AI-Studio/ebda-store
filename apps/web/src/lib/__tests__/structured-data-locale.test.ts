@@ -18,7 +18,7 @@ const store = {
   name: 'Wady Aljuz',
   nameAr: 'وادي الجوز',
   slug: 'wady',
-  currency: 'KWD',
+  currency: 'EGP',
   status: 'active',
   theme: {},
   socialLinks: {},

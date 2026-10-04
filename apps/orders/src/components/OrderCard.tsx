@@ -5,8 +5,22 @@ import type { Order } from '@/lib/orders';
 import { StatusBadge } from './StatusBadge';
 import { formatMoney, formatDateTime, customerName } from '@/lib/format';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { ConfirmInstapayButton } from './ConfirmInstapayButton';
 
-export function OrderCard({ order, storeId }: { order: Order; storeId: string }) {
+import { REGION } from '@force/shared';
+export function OrderCard({
+  order,
+  storeId,
+  canManage = false,
+  onChanged,
+}: {
+  order: Order;
+  storeId: string;
+  /** The viewer may confirm payments (orders:manage). */
+  canManage?: boolean;
+  /** Called after an in-card action (the InstaPay confirm) so the list reloads. */
+  onChanged?: () => void;
+}) {
   const { t, locale } = useLanguage();
   const itemCount = order.items?.reduce((sum, i) => sum + (i.quantity ?? 0), 0) ?? 0;
 
@@ -24,41 +38,56 @@ export function OrderCard({ order, storeId }: { order: Order; storeId: string })
   const primaryLine = name || orderRef;
   const secondaryRef = name ? orderRef : null;
 
-  return (
-    <Link
-      href={`/orders/${order.id}?store=${storeId}`}
-      className="block min-h-[56px] rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors active:bg-muted/50 active:scale-[0.99]"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold leading-snug text-foreground">{primaryLine}</p>
-          {secondaryRef && (
-            <p className="mt-0.5 truncate text-xs leading-snug text-muted-foreground">
-              {secondaryRef}
-            </p>
-          )}
-        </div>
-        <StatusBadge status={order.status} />
-      </div>
+  const awaitingInstapay = order.status === 'awaiting_payment_confirmation';
 
-      <div className="mt-3 flex items-end justify-between gap-3">
-        <div className="text-xs leading-relaxed text-muted-foreground">
-          <p>{formatDateTime(order.createdAt, locale)}</p>
-          {itemCount > 0 && (
-            <p>
-              {itemCount} {t.orders.items}
+  return (
+    <div>
+      <Link
+        href={`/orders/${order.id}?store=${storeId}`}
+        className="block min-h-[56px] rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors active:bg-muted/50 active:scale-[0.99]"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold leading-snug text-foreground">{primaryLine}</p>
+            {secondaryRef && (
+              <p className="mt-0.5 truncate text-xs leading-snug text-muted-foreground">
+                {secondaryRef}
+              </p>
+            )}
+          </div>
+          <StatusBadge status={order.status} />
+        </div>
+
+        <div className="mt-3 flex items-end justify-between gap-3">
+          <div className="text-xs leading-relaxed text-muted-foreground">
+            <p>{formatDateTime(order.createdAt, locale)}</p>
+            {itemCount > 0 && (
+              <p>
+                {itemCount} {t.orders.items}
+              </p>
+            )}
+          </div>
+          <div className="text-end">
+            <p className="text-base font-bold leading-tight text-foreground">
+              {formatMoney(order.total, order.currency ?? REGION.currency)}
             </p>
-          )}
+            {order.paymentStatus === 'paid' ? (
+              <p className="text-xs font-semibold text-success-ink">{t.filters.paid}</p>
+            ) : null}
+          </div>
         </div>
-        <div className="text-end">
-          <p className="text-base font-bold leading-tight text-foreground">
-            {formatMoney(order.total, order.currency ?? 'KWD')}
-          </p>
-          {order.paymentStatus === 'paid' ? (
-            <p className="text-xs font-semibold text-success-ink">{t.filters.paid}</p>
-          ) : null}
-        </div>
-      </div>
-    </Link>
+      </Link>
+      {/* InstaPay: confirm the transfer right from the list, one thumb. */}
+      {awaitingInstapay && canManage && (
+        <ConfirmInstapayButton
+          storeId={storeId}
+          orderId={order.id}
+          amountMinor={order.total}
+          currency={order.currency ?? REGION.currency}
+          onConfirmed={() => onChanged?.()}
+          className="mt-2"
+        />
+      )}
+    </div>
   );
 }

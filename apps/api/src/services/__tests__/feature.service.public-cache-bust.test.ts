@@ -61,16 +61,19 @@ vi.mock('@force/database', () => ({
       deleteMany: mockStoreFeatureDeleteMany,
       findMany: mockStoreFeatureFindMany,
     },
-    store: { update: mockStoreUpdate },
+    store: { update: mockStoreUpdate, findUnique: mockStoreFindUnique },
   },
   Prisma: {},
   withMoneyTx: mockWithMoneyTx,
-  // `bustPublicStoreCache` reads the store's slug/domain via withRlsBypass,
+  // `bustPublicStoreCache` reads the store's slug/domain via withStore,
   // same shape as the existing single-flight test's mock.
-  withRlsBypass: vi.fn(async (fn: (tx: unknown) => unknown) =>
+  withStore: vi.fn(async (_storeId: string, fn: (tx: unknown) => unknown) =>
     fn({
       store: { findUnique: mockStoreFindUnique },
       storeFeature: { findMany: mockStoreFeatureFindMany, upsert: mockStoreFeatureUpsert },
+      // plans engine (SP5): no subscription row -> the plan resolves from the legacy enum
+      storeSubscription: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
+      plan: { findUnique: vi.fn().mockResolvedValue(null) },
     })
   ),
 }));
@@ -91,6 +94,9 @@ describe('FeatureService — public cache bust (audit-followup #1668)', () => {
       fn({
         storeFeature: { upsert: mockStoreFeatureUpsert, findMany: mockStoreFeatureFindMany },
         store: { findUnique: mockStoreFindUnique },
+        // plans engine (SP5): no subscription row -> the plan resolves from the legacy enum
+        storeSubscription: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
+        plan: { findUnique: vi.fn().mockResolvedValue(null) },
       })
     );
   });

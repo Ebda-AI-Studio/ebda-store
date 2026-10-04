@@ -5,8 +5,8 @@
  * two bare-mounted, user-scoped routers `router.param`/`tenantContext` can't
  * reach: `address.routes.ts` and `wishlist.routes.ts`.
  *
- * The real force_app cross-tenant enforcement is proven end-to-end against
- * a live Postgres connection in `tests/integration/rls-force-app.test.ts`
+ * The real ebda_app cross-tenant enforcement is proven end-to-end against
+ * a live Postgres connection in `tests/integration/rls-ebda-app.test.ts`
  * (describe blocks "RLS-3: userContext middleware call surface — ..."). This
  * file is narrower and DB-free: it mocks `runInTenantContext` and asserts
  * `userContext` calls it with the exact arguments the wiring in

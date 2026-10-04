@@ -44,11 +44,14 @@ export type NavLabels = {
   /** Platform-wide AI usage rollup (super_admin only) */
   platformAiUsage: string;
   platformUsageHistory: string;
+  /** Plans catalogue editor (super_admin only) */
+  platformPlans: string;
+  platformBillingEvents: string;
   // Super-admin store-scoped item
   manageFeatures: string;
 };
 
-// Super Admin navigation (Force Media platform admin)
+// Super Admin navigation (Ebda platform admin)
 export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
   return [
     {
@@ -82,6 +85,18 @@ export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
       name: labels.platformUsageHistory,
       href: '/usage-history',
       icon: 'M3 3v18h18M7 16v-4m4 4V8m4 8v-6m4 6V5',
+    },
+    {
+      // Layers icon — the plans catalogue (limits, visibility, prices).
+      name: labels.platformPlans,
+      href: '/plans',
+      icon: 'M12 3l9 4.5-9 4.5-9-4.5L12 3zm0 9l9 4.5-9 4.5-9-4.5L12 12z',
+    },
+    {
+      // Receipt icon — the append-only subscription billing ledger.
+      name: labels.platformBillingEvents,
+      href: '/billing-events',
+      icon: 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z',
     },
   ];
 }

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { runInStoreScope, runInTenantContext } from '@force/database';
 import { withDeferredWork } from '../lib/after-tenant-commit';
+import { resolvePublicStoreId } from '../utils/store-helpers';
 import { runRequestInTransaction } from './request-transaction';
 
 /**
@@ -9,13 +10,13 @@ import { runRequestInTransaction } from './request-transaction';
  * Wraps the downstream route handler in a Prisma interactive transaction
  * with `SET LOCAL app.current_store_id = '<storeId>'`. This sets the GUC
  * that RLS policies read — but the policies themselves only ENFORCE
- * against the non-bypass `force_app` role. Production currently connects
+ * against the non-bypass `ebda_app` role. Production currently connects
  * as the `neondb_owner` BYPASSRLS role (see `apps/api/src/index.ts` boot
  * guard), so today this is inert: it is correct-but-inert plumbing ahead
  * of the RLS cutover (see `docs/plans/2026-07-02-rls-cutover.md`), not a
  * live backstop. Tenant isolation today rests entirely on the application
  * layer (`requireStoreAccess` + explicit `where: { storeId }`). Once the
- * cutover flips `DATABASE_URL` to `force_app` and drops
+ * cutover flips `DATABASE_URL` to `ebda_app` and drops
  * `ALLOW_BYPASSRLS_ROLE`, this same wiring becomes a real database-level
  * backstop with zero code changes — that is the point of shipping it now.
  *
@@ -50,7 +51,7 @@ import { runRequestInTransaction } from './request-transaction';
  * - Routes WITHOUT a storeId skip this middleware (no RLS filtering)
  * - If the transaction fails, the error handler returns a clean 500
  * - Existing `where: { storeId }` filters remain as defense-in-depth
- *   (and are the ONLY isolation mechanism until the force_app cutover)
+ *   (and are the ONLY isolation mechanism until the ebda_app cutover)
  * - Super_admin cross-tenant routes don't pass through this middleware
  * - 30-second transaction timeout prevents long-lived transactions
  */
@@ -225,6 +226,57 @@ export function aiRouteContext(req: Request, res: Response, next: NextFunction):
 }
 
 /**
+ * The orders router's context, chosen PER REQUEST (SP6b): everything stays on ONE request
+ * transaction except `POST /:orderId/payment-link`, which calls a payment gateway. That one
+ * runs under store scope, so the gateway call holds no transaction and no pooled connection:
+ * short read, call, then a short transaction to record the payment.
+ */
+const PAYMENT_LINK_PATH = /^\/[^/]+\/payment-link\/?$/;
+
+export function orderRouteContext(req: Request, res: Response, next: NextFunction): void {
+  if (req.method === 'POST' && PAYMENT_LINK_PATH.test(req.path)) {
+    storeScopeContext(req, res, next);
+    return;
+  }
+  tenantContext(req, res, next);
+}
+
+/**
+ * The shipping-carrier router's context, chosen PER REQUEST (SP7). Reads stay on ONE request
+ * transaction; everything that calls a carrier (booking, cancelling, refreshing tracking, testing
+ * credentials, fetching a label) or writes runs under store scope, so a slow courier API holds no
+ * transaction and no pooled connection. Registered with `router.param('storeId', ...)` inside the
+ * router, because it is mounted at the bare `/stores` prefix (which never sees the param).
+ *
+ * Before this the router was CONTEXT-LESS: under strict RLS every read returned nothing and every
+ * write was rejected, so the carrier settings page and the order shipping actions could not work.
+ */
+const SHIPPING_EXTERNAL_GET = /^\/[^/]+\/shipments\/[^/]+\/label\/?$/;
+
+export function shippingCarrierRouteContext(req: Request, res: Response, next: NextFunction): void {
+  if (SAFE_METHODS.has(req.method) && !SHIPPING_EXTERNAL_GET.test(req.path)) {
+    tenantContext(req, res, next);
+    return;
+  }
+  storeScopeContext(req, res, next);
+}
+
+/**
+ * Merchant billing router context (SP5 task 3): reads (GET/HEAD) share ONE
+ * request transaction; writes (checkout, change-plan, cancel, resume) call the
+ * payment gateway, so they run under a store scope instead — the billing
+ * service opens its own short transactions around the claim/settle steps and
+ * never holds one across the provider call (CLAUDE.md RLS note).
+ */
+export function billingRouteContext(req: Request, res: Response, next: NextFunction): void {
+  if (SAFE_METHODS.has(req.method)) {
+    tenantContext(req, res, next);
+    return;
+  }
+  storeScopeContext(req, res, next);
+}
+
+/**
  * RLS cutover Phase 1c (docs/plans/2026-07-02-rls-cutover.md) — user-scoped
  * context wrapper for routers that never pass through `tenantContext`.
  *
@@ -239,7 +291,7 @@ export function aiRouteContext(req: Request, res: Response, next: NextFunction):
  * `app.current_store_id`) permanently unset for their traffic, which is
  * FAIL-OPEN (no DB backstop) against the allow-contextless
  * `rls_addresses_user` / `rls_wishlists_tenant` / `rls_wishlist_items_tenant`
- * policies once force_app is live.
+ * policies once ebda_app is live.
  *
  * `userContext(getUserId, getStoreId?)` returns a middleware that:
  *   1. Resolves the authenticated user id via `getUserId(req)` — callers
@@ -265,9 +317,9 @@ export function aiRouteContext(req: Request, res: Response, next: NextFunction):
  * INERT on the current bypass role (`neondb_owner`, BYPASSRLS skips every
  * policy) — this wraps handlers in the same interactive-tx pattern the
  * already-wired store-scoped routers use, but changes zero query results
- * until the Phase 3 force_app cutover.
+ * until the Phase 3 ebda_app cutover.
  *
- * Behavior note for the cutover (NOT today): once force_app is live, a
+ * Behavior note for the cutover (NOT today): once ebda_app is live, a
  * cross-user probe (e.g. GET/PUT/DELETE another user's address) that
  * currently 403s at the app-layer ownership check will instead 404 — the
  * RLS policy makes the row invisible to the `findUnique`/`findFirst`
@@ -308,4 +360,53 @@ export function userContext(
       { userId, storeId, middleware: 'userContext' }
     );
   };
+}
+
+/**
+ * Store scope for the PUBLIC (storefront) routes, where the store is not in a
+ * `/stores/:storeId` path param but in the `X-Store-ID` / `x-store-domain`
+ * headers (or, for a few routes, a UUID first path segment).
+ *
+ * Under strict RLS a public handler that reads before it is inside a store scope
+ * sees no tenant rows at all, so this runs once, at the top of the `/public`
+ * mounts, and puts the request in its store's scope:
+ *
+ *   - GET/HEAD: ONE request transaction (`tenantContext`) — a read-only storefront
+ *     request costs one pooled connection, as the design (one transaction per
+ *     request) intends;
+ *   - everything else: `storeScopeContext` — every query is its own short
+ *     transaction, because a write handler may call out (payment gateway, email)
+ *     and must not hold a 30s interactive transaction open across it. The same
+ *     split as the AI router (`aiRouteContext`).
+ *
+ * A request that names no resolvable store passes straight through: the handlers
+ * that identify the store themselves (`/stores/:slugOrId`, `/store/resolve`, the
+ * SMS opt-out) read only the un-scoped `stores` table or enter a scope after
+ * they resolve it (`readInStoreContext`), which joins this one when it matches.
+ */
+const PATH_STORE_RE = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i;
+
+export function publicStoreContext(req: Request, res: Response, next: NextFunction): void {
+  void (async () => {
+    let storeId: string | undefined;
+    try {
+      storeId = await resolvePublicStoreId(req);
+      if (!storeId) {
+        const m = PATH_STORE_RE.exec(req.path);
+        if (m) storeId = m[1].toLowerCase();
+      }
+    } catch (err) {
+      next(err);
+      return;
+    }
+    if (!storeId) {
+      next();
+      return;
+    }
+    // The context middlewares read `req.params.storeId`; Express rewrites
+    // `req.params` for every later layer, so setting it here cannot leak.
+    req.params = { ...req.params, storeId };
+    if (SAFE_METHODS.has(req.method)) tenantContext(req, res, next);
+    else storeScopeContext(req, res, next);
+  })();
 }

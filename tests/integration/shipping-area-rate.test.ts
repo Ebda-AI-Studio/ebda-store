@@ -230,21 +230,21 @@ describe('POST /stores/public/:storeId/shipping/calculate', () => {
   });
 
   it('returns freeShipping=true when orderTotal meets freeShippingThreshold', async () => {
-    // Seed a rate with freeShippingThreshold=10000 fils (≈1 KWD)
+    // Seed a rate with freeShippingThreshold=10000 piastres (≈1 EGP)
     await withRlsBypass(async tx => {
       await tx.shippingAreaRate.upsert({
         where: {
           storeId_country_governorate_area: {
             storeId: storeAId,
-            country: 'Kuwait',
-            governorate: 'Kuwait City',
+            country: 'Egypt',
+            governorate: 'Cairo',
             area: 'Sharq',
           },
         },
         create: {
           storeId: storeAId,
-          governorate: 'Kuwait City',
-          governorateAr: 'مدينة الكويت',
+          governorate: 'Cairo',
+          governorateAr: 'القاهرة',
           area: 'Sharq',
           areaAr: 'شرق',
           deliveryFee: 2000,
@@ -263,7 +263,7 @@ describe('POST /stores/public/:storeId/shipping/calculate', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        governorate: 'Kuwait City',
+        governorate: 'Cairo',
         area: 'Sharq',
         orderTotal: 15000, // exceeds 10000 threshold → free
       }),

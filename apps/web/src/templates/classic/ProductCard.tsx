@@ -17,7 +17,7 @@ import {
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor, getProductCardTextSizes } from '@force/shared';
+import { resolveColor, getProductCardTextSizes, fromMinor, REGION } from '@force/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
@@ -42,7 +42,7 @@ import {
 function ClassicProductCard({
   product,
   isRtl: isRtlProp,
-  currency = 'KWD',
+  currency = REGION.currency,
   quantityInCart = 0,
   onAddToCart,
   urlPrefix = '',
@@ -101,7 +101,7 @@ function ClassicProductCard({
   // Variant-aware pricing — see lib/product-pricing.ts.
   const pricing = getProductPricing(product, undefined, 'card');
   const hasSale = !!pricing.displayCompare || pricing.hasVariantDiscount;
-  // BUG 1 fix: use helper for correct KWD/pct badge text.
+  // BUG 1 fix: use helper for correct EGP/pct badge text.
   const discountBadgeText = getDiscountBadgeText(product, isRtl);
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
   const orderable = product.inStock !== false || product.acceptsBackorder === true;
@@ -284,7 +284,7 @@ function ClassicProductCard({
           </div>
 
           {/* Badges — top corner for "new"; sale badge wins over "new" when
-              both apply. BUG 1 fix: label comes from helper (KWD or pct).
+              both apply. BUG 1 fix: label comes from helper (EGP or pct).
               BUG 2 fix: no inStock gate. Sale badge corner + color are
               merchant-configurable via productCardDefaults.discountBadge
               (physical; unset = top corner, or bottom-left when theme.saleBadgeLegacyCorner, #1998). */}
@@ -372,7 +372,7 @@ function ClassicProductCard({
             {/* schema meta always rendered for SEO */}
             <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
               <meta itemProp="priceCurrency" content={currency} />
-              <meta itemProp="price" content={String(pricing.displayPrice / 1000)} />
+              <meta itemProp="price" content={String(fromMinor(pricing.displayPrice))} />
             </span>
             {priceVisible && (
               <Price

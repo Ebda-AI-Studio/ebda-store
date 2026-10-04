@@ -482,12 +482,12 @@ describe('ReturnService.complete — piecewise returns on a zero-shipping order'
       id: 'pay-1',
       transactionId: 'txn-1',
       amount: 8900,
-      refundedAmount: 8800, // only 100 fils left, the piece is worth far more
+      refundedAmount: 8800, // only 100 piastres left, the piece is worth far more
       status: 'partially_refunded',
     });
 
     await expect(ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'gateway')).rejects.toThrow(
-      /only 0\.100 KWD is left on the payment/i
+      /only 1\.00 EGP is left on the payment/i
     );
 
     expect(providerRefund).not.toHaveBeenCalled();
@@ -516,7 +516,7 @@ describe('ReturnService.complete — piecewise returns on a zero-shipping order'
 
     expect(err.code).toBe('PARTIAL_REFUND_EXCEEDS_PAYMENT');
     expect(err.message).toMatch(/store credit or bank transfer/i);
-    expect(err.message).toMatch(/4\.945 KWD/);
+    expect(err.message).toMatch(/49\.45 EGP/);
     expect(err.details).toEqual({ refundAmount: 4945, refundableRemaining: 100 });
     // A manual method is the stated way out, and it does complete.
     vi.resetAllMocks();
@@ -539,7 +539,7 @@ describe('ReturnService.complete — the claim is retained once money may have m
    * so until it lands the retry recomputes the identical allocation (this
    * return is still excluded from prevQty by `id: { not: returnId }`) and the
    * payment still has room. A "retryable" return after a successful refund is
-   * a second real refund, and there is no undo API at Tap/MyFatoorah/KNET.
+   * a second real refund, and there is no undo API at the gateway.
    *
    * So the claim is held and the merchant gets a 409 until a human reconciles
    * — a stranded return is recoverable by hand; a duplicate refund is not.
@@ -1135,7 +1135,7 @@ describe('ReturnService.refundPreview — what the admin confirms is what comple
       refundedAmount: PAYMENT_TOTAL,
       status: 'refunded',
       transactionId: 'tx-1',
-      provider: 'tap',
+      provider: 'kashier',
     });
 
     const preview = await ReturnService.refundPreview(STORE_ID, RETURN_ID);

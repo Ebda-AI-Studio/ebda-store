@@ -6,8 +6,9 @@ import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 
+import { roundToMinor } from '@force/shared';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AccountRow {
@@ -81,11 +82,11 @@ export default function NewJournalEntryPage() {
     setLines(cur => (cur.length <= 2 ? cur : cur.filter((_, idx) => idx !== i)));
   }
 
-  // Totals computed in fils for balance check; user types KWD (3 dp)
+  // Totals computed in piastres for balance check; user types EGP (3 dp)
   const totals = lines.reduce(
     (acc, l) => ({
-      debit: acc.debit + Math.round((parseFloat(l.debit) || 0) * 1000),
-      credit: acc.credit + Math.round((parseFloat(l.credit) || 0) * 1000),
+      debit: acc.debit + roundToMinor(parseFloat(l.debit) || 0),
+      credit: acc.credit + roundToMinor(parseFloat(l.credit) || 0),
     }),
     { debit: 0, credit: 0 }
   );
@@ -104,8 +105,8 @@ export default function NewJournalEntryPage() {
         memoAr: memoAr || undefined,
         lines: lines.map(l => ({
           accountId: l.accountId,
-          debit: Math.round((parseFloat(l.debit) || 0) * 1000),
-          credit: Math.round((parseFloat(l.credit) || 0) * 1000),
+          debit: roundToMinor(parseFloat(l.debit) || 0),
+          credit: roundToMinor(parseFloat(l.credit) || 0),
           lineMemo: l.lineMemo || undefined,
         })),
       };
@@ -180,10 +181,10 @@ export default function NewJournalEntryPage() {
                   {tNew('account')}
                 </th>
                 <th className="text-end px-3 py-2 w-32 font-medium text-muted-foreground">
-                  {t('debit')} (KWD)
+                  {t('debit')} (EGP)
                 </th>
                 <th className="text-end px-3 py-2 w-32 font-medium text-muted-foreground">
-                  {t('credit')} (KWD)
+                  {t('credit')} (EGP)
                 </th>
                 <th className="text-start px-3 py-2 font-medium text-muted-foreground">
                   {t('memo')}
@@ -212,7 +213,7 @@ export default function NewJournalEntryPage() {
                     <input
                       type="number"
                       min="0"
-                      step="0.001"
+                      step="0.01"
                       value={l.debit}
                       onChange={e =>
                         updateLine(i, {
@@ -227,7 +228,7 @@ export default function NewJournalEntryPage() {
                     <input
                       type="number"
                       min="0"
-                      step="0.001"
+                      step="0.01"
                       value={l.credit}
                       onChange={e =>
                         updateLine(i, {
@@ -263,10 +264,10 @@ export default function NewJournalEntryPage() {
               <tr className="border-t border-border">
                 <td className="px-3 py-2 font-medium">{tNew('totals')}</td>
                 <td className="px-3 py-2 text-end font-mono font-semibold">
-                  {filsToKwd(totals.debit)}
+                  {minorToMajor(totals.debit)}
                 </td>
                 <td className="px-3 py-2 text-end font-mono font-semibold">
-                  {filsToKwd(totals.credit)}
+                  {minorToMajor(totals.credit)}
                 </td>
                 <td className="px-3 py-2" colSpan={2}>
                   {!balanced && totals.debit + totals.credit > 0 && (

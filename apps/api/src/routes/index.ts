@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes';
+import merchantSignupRoutes from './merchant-signup.routes';
+import onboardingRoutes from './onboarding.routes';
+import setupGuideRoutes from './setup-guide.routes';
 import mfaRoutes from './mfa.routes';
 import storeRoutes from './store.routes';
 import blogRoutes from './blog.routes';
@@ -69,16 +72,33 @@ import backordersRoutes from './backorders.routes';
 import slugRedirectsRoutes from './slug-redirects.routes';
 import botAnalyticsRoutes from './bot-analytics.routes';
 import staffRoutes from './staff.routes';
+import billingRoutes from './billing.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
 import mcpRoutes from './mcp.routes';
 import mcpAdminRoutes from './mcp-admin.routes';
-import { tenantContext, aiRouteContext } from '../middleware/tenant-context';
+import realtimeRoutes from './realtime.routes';
+import {
+  tenantContext,
+  aiRouteContext,
+  orderRouteContext,
+  storeScopeContext,
+  publicStoreContext,
+  billingRouteContext,
+} from '../middleware/tenant-context';
 
 const router = Router();
 
 // Public routes (no auth required)
+// Every /public request that names a store (X-Store-ID / x-store-domain / a UUID
+// path segment) runs in that store's RLS scope: one request transaction for
+// reads, per-query short transactions for writes. See publicStoreContext.
+router.use('/public', publicStoreContext);
 router.use('/public', publicRoutes);
 router.use('/public', publicStoreLayoutRoutes);
+
+// Token + store-room authority for the Workers realtime Durable Object (no tenant scope:
+// it reads only the `stores` routing table).
+router.use('/realtime', realtimeRoutes);
 
 // Store-scoped MCP endpoint (agent checkout) — POST /api/v1/mcp/:storeSlug.
 // Resolves the store by slug + checks the `agent_checkout` feature gate
@@ -97,6 +117,7 @@ router.use('/mcp', mcpRoutes);
 // `/auth/` prefix does NOT exempt its PUT from CSRF: only the credential-less
 // auth entry points are exempt (`isCsrfExemptAuthPath`, issue 2425).
 router.use('/auth/me/sms-consent', smsConsentAccountRoutes);
+router.use('/auth/merchant', merchantSignupRoutes);
 router.use('/auth', authRoutes);
 // MFA sub-routes: enroll/begin, enroll/verify, verify (challenge), disable.
 // Mounted under /auth/mfa so the full path is /api/v1/auth/mfa/*.
@@ -142,7 +163,7 @@ router.use('/admin', tenantContext, adminAnswerEngineRoutes);
 // like the other fixed routers would be WRONG: it would try to open a
 // single-store RLS transaction using a user id or product id as the
 // "storeId" for the non-store routes, which would either no-op (falls the
-// UUID check) or — worse, post-force_app-cutover — silently scope every
+// UUID check) or — worse, post-ebda_app-cutover — silently scope every
 // query in that request to zero rows (current_store_id() would never match
 // any real store_id). Left unchanged; see the PR description for this ticket.
 router.use('/admin', tenantContext, adminRoutes);
@@ -217,7 +238,10 @@ router.use('/stores/:storeId/categories', tenantContext, categoryRoutes);
 router.use('/stores/:storeId/ai', aiRouteContext, aiRoutes);
 router.use('/stores/:storeId/typography', tenantContext, typographyRoutes);
 router.use('/stores/:storeId/cart', tenantContext, cartRoutes);
-router.use('/stores/:storeId/orders', tenantContext, orderRoutes);
+// Context per request (SP6b): the admin payment link calls a payment gateway, so it runs
+// under store scope (no long transaction held across the call); every other order route
+// keeps its one request transaction. See `orderRouteContext`.
+router.use('/stores/:storeId/orders', orderRouteContext, orderRoutes);
 // Customers export (.xlsx). Mounted at /stores/:storeId so the route
 // has access to storeId via mergeParams.
 router.use('/stores/:storeId', tenantContext, customersRoutes);
@@ -252,6 +276,8 @@ router.use('/stores/:storeId/returns', tenantContext, returnRoutes);
 // ownership guard reuses an ambient context via
 // assertStoreOwnsInTenantScope — issue 2057. reconcileCountSession's own
 // runInTenantContext is what still blocks this router.)
+router.use('/onboarding', onboardingRoutes);
+router.use('/stores', tenantContext, setupGuideRoutes);
 router.use('/stores', tenantContext, couponRoutes);
 router.use('/stores', tenantContext, shippingRoutes);
 router.use('/stores', tenantContext, taxRoutes);
@@ -341,11 +367,10 @@ router.use('/stores', tenantContext, recommendationRoutes);
 router.use('/public', publicRecommendationRoutes);
 
 // Shipping carrier routes (admin + public tracking at /stores/public/...).
-// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499):
-// createShipmentForOrder / cancelShipment / updateShipmentStatus /
-// testConnection all call external courier APIs (Aramex, iCarry) in-request —
-// slow third-party calls have no place inside a 30s RLS transaction.
-router.use('/stores', tenantContext, shippingCarrierRoutes);
+// Scoped PER REQUEST inside the router (`router.param('storeId', shippingCarrierRouteContext)`):
+// reads share one request transaction, while booking / cancelling / tracking / label calls to the
+// courier APIs run under store scope so no transaction is held across a slow third party.
+router.use('/stores', shippingCarrierRoutes);
 
 // Affiliate routes (admin + public apply/track)
 router.use('/stores', tenantContext, affiliateRoutes);
@@ -372,7 +397,7 @@ router.use('/public/campaigns', campaignPublicRoutes);
 // Login-free opt-out link carried by every promotional SMS (issue 206).
 router.use('/public/sms-consent', smsConsentPublicRoutes);
 
-// WBS integration routes (Force AI Store ↔ WBS bridge config).
+// WBS integration routes (Ebda ↔ WBS bridge config).
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): handlers
 // call the external WBS backend via `fetch` in-request.
 router.use('/stores', tenantContext, wbsIntegrationRoutes);
@@ -390,7 +415,9 @@ router.use('/stores', tenantContext, merchantKeyRoutes);
 router.use('/stores/:id/wa-templates', tenantContext, waTemplatesRoutes);
 
 // Phase 7: merchant-initiated payment links via WhatsApp
-router.use('/stores/:id/payment-links', tenantContext, paymentLinksRoutes);
+// Calls a payment gateway (and WhatsApp), so it runs under store scope (SP6b): no transaction
+// is held across those calls.
+router.use('/stores/:id/payment-links', storeScopeContext, paymentLinksRoutes);
 
 // Finance routes (COA tree + general ledger journal).
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): the
@@ -455,6 +482,9 @@ router.use('/stores', tenantContext, botAnalyticsRoutes);
 
 // Staff management — store owners add / remove staff members
 router.use('/stores/:storeId/staff', tenantContext, staffRoutes);
+
+// Merchant billing — plan, subscription, usage vs limits (SP5)
+router.use('/stores/:storeId/billing', billingRouteContext, billingRoutes);
 
 // Payment-gateway abandonment retargeting (Enterprise — payment_abandonment)
 router.use('/stores/:storeId/payment-abandonments', tenantContext, paymentAbandonmentsRoutes);

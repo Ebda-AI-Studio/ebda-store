@@ -7,6 +7,8 @@ node_modules
 # Build outputs
 dist/
 build/
+# site-kit's build helpers are SOURCE (MDX/OpenAPI renderers), not output.
+!packages/site-kit/src/build/
 .next/
 .nuxt/
 .output/
@@ -162,3 +164,15 @@ dump.rdb
 # Session-local handoff artifacts written by the agent OS (never committed).
 # Sibling of handoff.md, which .prettierignore already exempts.
 .handoff/
+
+# Ebda static sites / status worker
+apps/docs/.generated/
+apps/status/.gate/
+apps/status/dist/
+.wrangler/
+
+# Local Worker secrets (apps/api/.dev.vars.example is the committed template)
+.dev.vars
+
+# wrangler dry-run output (apps/api cf:dry-run)
+dist-cf/

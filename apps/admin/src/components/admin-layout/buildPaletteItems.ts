@@ -21,7 +21,7 @@ export interface PaletteItem {
 
 // Concept synonyms per page, EN + AR, keyed by the LAST path segment of the
 // href. Lets the palette match by what a page CONTAINS, not just its title —
-// e.g. "logo"/"شعار" → Branding, "knet"/"كي نت" → Payment settings. Matching is
+// e.g. "logo"/"شعار" → Branding, "paymob"/"فوري" → Payment settings. Matching is
 // Arabic-folded in the palette, so unvowelled/variant Arabic still hits.
 const PAGE_KEYWORDS: Record<string, string> = {
   branding:
@@ -29,7 +29,7 @@ const PAGE_KEYWORDS: Record<string, string> = {
   seo: 'seo search engine meta title description google keywords sitemap سيو محركات البحث جوجل وصف كلمات مفتاحية عنوان',
   domain: 'domain url web address custom domain dns website link نطاق دومين رابط عنوان موقع ويب',
   'payment-settings':
-    'payment gateway checkout tap myfatoorah knet hesabe upayments card cod دفع بوابة كي نت ماي فاتورة بطاقة الدفع عند الاستلام',
+    'payment gateway checkout paymob kashier fawry instapay meeza wallet valu card cod دفع بوابة باي موب كاشير فوري إنستاباي ميزة محفظة فاليو بطاقة الدفع عند الاستلام',
   shipping: 'delivery rates zones courier areas governorate شحن توصيل مناطق محافظة أسعار شركة شحن',
   tax: 'vat taxes ضريبة ضرائب القيمة المضافة',
   pwa: 'app install mobile icon manifest progressive تطبيق جوال أيقونة تثبيت',
@@ -37,6 +37,8 @@ const PAGE_KEYWORDS: Record<string, string> = {
   language: 'translation arabic english locale rtl لغة ترجمة عربي انجليزي اتجاه',
   staff: 'team members roles permissions users access موظفين فريق صلاحيات أدوار مستخدمين وصول',
   announcement: 'banner bar top message strip إعلان شريط رسالة علوي',
+  billing:
+    'plan subscription upgrade usage limits invoice باقة اشتراك ترقية استخدام حدود فاتورة فوترة',
   'page-builder':
     'design layout sections hero homepage builder تصميم تخطيط أقسام الصفحة الرئيسية بانر منشئ',
   products: 'catalog items inventory skus goods منتجات سلع بضائع كتالوج',
@@ -98,6 +100,7 @@ export interface SettingsPaletteLabels {
   announcement: string;
   agentKey: string;
   merchantKeys: string;
+  billing: string;
 }
 
 /**
@@ -160,6 +163,7 @@ export function buildStorePaletteItems(
       [settings.staff, `/stores/${storeId}/staff`],
       [settings.agentKey, `/stores/${storeId}/agent-key`],
       [settings.merchantKeys, `/stores/${storeId}/merchant-keys`],
+      [settings.billing, `/stores/${storeId}/billing`],
     ];
     for (const [name, href] of pages)
       items.push({ name, href, group: settingsGroup, keywords: keywordsForHref(href) });

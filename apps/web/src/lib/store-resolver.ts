@@ -8,7 +8,13 @@ import {
   type StoreLocationPublic,
   DEFAULT_THEME,
   getTemplateTheme,
+  REGION,
+  BRAND,
+  parseStoreHost,
+  isReservedSlug,
+  validateStoreSlugFormat,
 } from '@force/shared';
+import { devSuffixesAllowed } from './platform-host';
 import { API_URL } from './api';
 import { decodeRouteParam } from './route-params';
 import { StoreTemporarilyUnavailableError } from './store-unavailable';
@@ -190,7 +196,7 @@ export interface ResolvedStore {
    *
    * It exists because those two cases are opposite facts that `id === 'demo'`
    * cannot tell apart, and `app/layout.tsx::generateMetadata` keys on that
-   * sentinel to emit `title: 'Page not found — Force AI'`. Without this flag a
+   * sentinel to emit `title: 'Page not found — Ebda'`. Without this flag a
    * rate-limited merchant's storefront renders the "we're a little busy" body
    * inside a document whose `<title>` says the page does not exist — the exact
    * claim this work removes, relocated from the body to the head.
@@ -201,19 +207,19 @@ export interface ResolvedStore {
 /**
  * Default store used as a last-resort fallback when no real store can be
  * resolved (dev environment, edge-case paths). Production traffic on
- * `store.forcemediakw.com/` is redirected to the marketing site by the
+ * `ebda.app/` is redirected to the marketing site by the
  * middleware before this fallback is ever rendered, so customers never
  * see it. The neutral copy below is intentional — if it does slip through
- * somewhere, "Force" is harmless; "Force Demo Store" looked broken.
+ * somewhere, "Ebda" is harmless; "Ebda Demo Store" looked broken.
  */
 const DEFAULT_STORE: ResolvedStore = {
   id: 'demo',
-  name: 'Force',
-  nameAr: 'فورس',
+  name: BRAND.name,
+  nameAr: BRAND.nameAr,
   slug: 'demo',
   status: 'active',
-  currency: 'KWD',
-  timezone: 'Asia/Kuwait',
+  currency: REGION.currency,
+  timezone: 'Africa/Cairo',
   template: 'modern',
   theme: DEFAULT_THEME,
   socialLinks: {},
@@ -244,14 +250,6 @@ const CACHE_TTL = 8 * 1000;
 export async function getStoreDomain(): Promise<string | null> {
   const headersList = await headers();
   return headersList.get('x-store-domain');
-}
-
-/**
- * Get the store slug from request headers (set by middleware on platform domains)
- */
-export async function getStoreSlug(): Promise<string | null> {
-  const headersList = await headers();
-  return headersList.get('x-store-slug');
 }
 
 /**
@@ -374,8 +372,8 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
       favicon: storeData.favicon,
       description: storeData.description,
       descriptionAr: storeData.descriptionAr,
-      currency: storeData.currency || 'KWD',
-      timezone: storeData.timezone || 'Asia/Kuwait',
+      currency: storeData.currency || REGION.currency,
+      timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
       theme: { ...templateTheme, ...customTheme },
       socialLinks: typeof storeData.socialLinks === 'object' ? storeData.socialLinks : {},
@@ -536,8 +534,8 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       favicon: storeData.favicon,
       description: storeData.description,
       descriptionAr: storeData.descriptionAr,
-      currency: storeData.currency || 'KWD',
-      timezone: storeData.timezone || 'Asia/Kuwait',
+      currency: storeData.currency || REGION.currency,
+      timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
       theme: { ...templateTheme, ...customTheme },
       socialLinks: typeof storeData.socialLinks === 'object' ? storeData.socialLinks : {},
@@ -626,11 +624,13 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
  * Exported so the OG-card route (`/og?slug=…`) can resolve a SPECIFIC store
  * independent of request headers. The old file-convention `/opengraph-image`
  * route could only ever see the platform-default store for path-based
- * storefronts (`store.forcemediakw.com/<slug>`) — WhatsApp fetches the image URL
+ * storefronts (`<slug>.ebda.app`) — WhatsApp fetches the image URL
  * with no `/<slug>` path context, so every path-based store's social preview
  * fell back to the Force default card. A slug-parameterised route fixes that.
  */
 export async function resolveStoreBySlug(slug: string): Promise<ResolvedStore | null> {
+  // A reserved or malformed slug is never a store: answer null without an API call.
+  if (isReservedSlug(slug) || !validateStoreSlugFormat(slug).ok) return null;
   const cacheKey = `slug:${slug}`;
   const cached = storeCache.get(cacheKey);
   if (cached && cached.expires > Date.now()) {
@@ -650,16 +650,22 @@ export async function resolveStoreBySlug(slug: string): Promise<ResolvedStore | 
 }
 
 /**
- * Get the current store based on request context
- * This is the main function to use in server components
+ * Get the current store based on request context — LENIENT: for the layout
+ * chrome only (the 404 and retry pages render inside the layout and need
+ * SOMETHING to paint). Page bodies must use {@link getStoreOrNotFound}.
  *
- * Resolution order:
- * 1. Custom domain (x-store-domain header)
- * 2. Store slug in URL path (x-store-slug header)
- * 3. Default demo store
+ * The store is identified by the request HOST alone (`x-store-domain`, set by
+ * middleware for `<slug>.ebda.app` and custom domains):
+ *
+ *  - resolves → that store;
+ *  - host named but unknown → the neutral `DEFAULT_STORE` CHROME sentinel
+ *    (id `demo`), flagged transient if the API could not be asked. It is never
+ *    another merchant's data, and the page body still 404s;
+ *  - no host identifier (a platform host) → the same sentinel.
+ *
+ * There is no path-slug or cookie identifier any more.
  */
 export async function getStore(): Promise<ResolvedStore> {
-  // 1. Custom domain resolution
   const domain = await getStoreDomain();
   if (domain) {
     const { store, transient } = await lenientResolve(() => resolveStoreByDomain(domain));
@@ -667,15 +673,8 @@ export async function getStore(): Promise<ResolvedStore> {
     return transient ? TRANSIENTLY_UNRESOLVED_STORE : DEFAULT_STORE;
   }
 
-  // 2. Slug-based resolution (platform domains)
-  const slug = await getStoreSlug();
-  if (slug) {
-    const { store, transient } = await lenientResolve(() => resolveStoreBySlug(slug));
-    if (store) return store;
-    return transient ? TRANSIENTLY_UNRESOLVED_STORE : DEFAULT_STORE;
-  }
-
-  // 3. No identifier in the request at all — the genuine platform sentinel.
+  // No identifier in the request at all — a platform host, the genuine
+  // platform sentinel.
   return DEFAULT_STORE;
 }
 
@@ -685,7 +684,7 @@ export async function getStore(): Promise<ResolvedStore> {
  * Identical chrome to `DEFAULT_STORE` — we do not know the merchant's brand
  * during a transient, and inventing one would be worse — but flagged so
  * `layout.tsx::generateMetadata` does not title the retry page
- * "Page not found — Force AI".
+ * "Page not found — Ebda".
  */
 const TRANSIENTLY_UNRESOLVED_STORE: ResolvedStore = {
   ...DEFAULT_STORE,
@@ -725,8 +724,8 @@ async function lenientResolve(
 /**
  * Server-component variant of {@link getStore} that triggers Next's
  * `notFound()` when a store identifier was provided in the request but
- * doesn't match any active store (custom domain not registered, or
- * platform-path slug like `/haha` that no merchant owns).
+ * doesn't match any active store (a `<slug>.ebda.app` nobody owns, or a custom
+ * domain that is not registered).
  *
  * Pages that depend on a real store (homepage, /products, /categories,
  * etc.) should use this so unknown slugs land on the branded
@@ -753,18 +752,11 @@ export async function getStoreOrNotFound(): Promise<ResolvedStore> {
     return store;
   }
 
-  const slug = await getStoreSlug();
-  if (slug) {
-    const store = await resolveStoreBySlug(slug);
-    if (!store) notFound();
-    return store;
-  }
-
-  // No identifier in the request at all — bare-root on a platform
-  // domain. Middleware redirects this to forcemediakw.com in
-  // production, so reaching here means localhost or a preview
-  // deploy; render the default chrome rather than 404.
-  return DEFAULT_STORE;
+  // No store identifier: a platform host (the apex, a preview host). A platform
+  // host NEVER renders a store — not the demo, not the first one — so any
+  // store-dependent page is a 404. (`/` redirects to the marketing site before
+  // it gets here; see app/page.tsx.)
+  notFound();
 }
 
 /**
@@ -787,9 +779,9 @@ export async function getStoreOrNotFound(): Promise<ResolvedStore> {
  * existing flat/header-based route (Track B, and the legacy tree while the
  * rewrite is flag-off).
  *
- * `tenant` is the middleware-encoded tenant key:
- *  - a normalized custom domain (e.g. `"wadyaljuz.com"`), OR
- *  - `slug:<slug>` for platform-path stores (e.g. `"slug:palora"`).
+ * `tenant` is the middleware-encoded tenant key — the request HOST:
+ *  - `<slug>.ebda.app` (e.g. `"amelia.ebda.app"`), OR
+ *  - a normalized custom domain (e.g. `"wadyaljuz.com"`).
  *
  * Triggers Next's `notFound()` when the tenant doesn't resolve to an active
  * store — mirrors `getStoreOrNotFound()`'s behavior for unknown
@@ -802,7 +794,7 @@ export async function getStoreOrNotFound(): Promise<ResolvedStore> {
  * True only for a store that actually resolved: not the demo sentinel and not
  * the transient-failure fallback (which spreads DEFAULT_STORE, id 'demo').
  * Metadata that names a URL (a canonical) must be gated on this (#1855):
- * `storeAbsoluteUrl` of the sentinel is `https://store.force-ai.co/demo`, so
+ * `storeAbsoluteUrl` of the sentinel is `https://ebda.app/demo`, so
  * an API blip told Google a merchant's page duplicated the demo store.
  */
 export function isResolvedStore(store: ResolvedStore): boolean {
@@ -811,17 +803,15 @@ export function isResolvedStore(store: ResolvedStore): boolean {
 
 export async function getStoreByTenantParam(rawTenant: string): Promise<ResolvedStore> {
   // Decoded HERE, once, for every tenant-store route: middleware percent-
-  // encodes the `slug:` colon into the rewrite path, and Next hands the page
-  // component the RAW segment (`slug%3Apecannbee`) even though
-  // `generateMetadata` gets it decoded — see lib/route-params.ts.
+  // encodes the rewrite path, and Next hands the page component the RAW segment
+  // even though `generateMetadata` gets it decoded — see lib/route-params.ts.
   const tenant = decodeRouteParam(rawTenant);
-  const SLUG_PREFIX = 'slug:';
-  if (tenant.startsWith(SLUG_PREFIX)) {
-    const slug = tenant.slice(SLUG_PREFIX.length);
-    const store = await resolveStoreBySlug(slug);
-    if (!store) notFound();
-    return store;
-  }
+
+  // The tenant key is the request HOST. Re-classify it so a hand-built
+  // `/tenant-store/<anything>` can only ever resolve a real store host — a
+  // reserved label, platform host, IP or malformed value is a 404 here too.
+  const parsed = parseStoreHost(tenant, { allowDevSuffixes: devSuffixesAllowed() });
+  if (parsed.kind !== 'subdomain' && parsed.kind !== 'custom') notFound();
 
   const store = await resolveStoreByDomain(tenant);
   if (!store) notFound();
@@ -875,8 +865,8 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       favicon: storeData.favicon,
       description: storeData.description,
       descriptionAr: storeData.descriptionAr,
-      currency: storeData.currency || 'KWD',
-      timezone: storeData.timezone || 'Asia/Kuwait',
+      currency: storeData.currency || REGION.currency,
+      timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
       theme: { ...templateTheme, ...customTheme },
       socialLinks: typeof storeData.socialLinks === 'object' ? storeData.socialLinks : {},

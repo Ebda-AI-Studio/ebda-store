@@ -71,7 +71,7 @@ describe.skipIf(!hasDb)('store status PATCH — cache invalidation', () => {
           slug,
           domain,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: owner.id,
           status: 'active',
         },

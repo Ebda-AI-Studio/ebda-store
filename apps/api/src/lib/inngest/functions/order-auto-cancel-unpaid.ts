@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { OrderService } from '../../../services/order.service';
@@ -9,12 +9,13 @@ import type { PaymentProvider } from '../../../services/payment-providers/types'
 import { sendAlert } from '../../../services/alerts.service';
 import { AppError } from '../../../middleware/error-handler';
 import { recordPaymentEvent } from '../../../services/payment-event.service';
+import { sweepAcrossStores } from '../../cross-store';
 
 /**
  * Auto-cancel stale unpaid orders — daily cron (03:00 UTC).
  *
  * Finds orders left status=pending / paymentStatus=unpaid past
- * AUTO_CANCEL_UNPAID_DAYS (default 2 — matches the MyFatoorah payment-link
+ * AUTO_CANCEL_UNPAID_DAYS (default 2 — matches the payment-link
  * 2-day validity, after which the link is dead and the order will never be
  * paid) and cancels them.
  *
@@ -26,7 +27,7 @@ import { recordPaymentEvent } from '../../../services/payment-event.service';
  * and the merchant's manual "Refresh payment" button. All three can miss the
  * same order at once:
  *
- *   customer pays → webhook is lost (dropped, or — for MyFatoorah — never fires
+ *   customer pays → webhook is lost (dropped, or — for a gateway that never fires
  *   per-invoice because it is configured account-level) AND the customer never
  *   lands back on the success page (closed the tab, dead battery, lost signal)
  *
@@ -145,42 +146,46 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
     // Cross-tenant — withRlsBypass so FORCE RLS doesn't hide other tenants'
     // rows (no HTTP tenant GUC on a cron).
     const stale = await step.run('find-stale-unpaid', () =>
-      withRlsBypass(tx =>
-        tx.order.findMany({
-          where: {
-            status: 'pending',
-            paymentStatus: 'unpaid',
-            deletedAt: null,
-            createdAt: { lt: threshold },
-          },
-          select: {
-            id: true,
-            storeId: true,
-            orderNumber: true,
-            paymentStatus: true,
-            locale: true,
-            // Newest gateway payment for this order. COD rows carry no
-            // transactionId and no online provider, so they fall out here and
-            // the order skips the provider call entirely.
-            payments: {
-              where: { transactionId: { not: null }, provider: { not: 'cod' } },
-              select: {
-                id: true,
-                status: true,
-                provider: true,
-                metadata: true,
-                amount: true,
-                currency: true,
-                transactionId: true,
-              },
-              orderBy: { createdAt: 'desc' },
-              take: 1,
+      sweepAcrossStores({
+        fetch: () =>
+          prisma.order.findMany({
+            where: {
+              status: 'pending',
+              paymentStatus: 'unpaid',
+              deletedAt: null,
+              createdAt: { lt: threshold },
             },
-          },
-          orderBy: { createdAt: 'asc' },
-          take: RUN_CAP,
-        })
-      )
+            select: {
+              createdAt: true,
+              id: true,
+              storeId: true,
+              orderNumber: true,
+              paymentStatus: true,
+              locale: true,
+              // Newest gateway payment for this order. COD rows carry no
+              // transactionId and no online provider, so they fall out here and
+              // the order skips the provider call entirely.
+              payments: {
+                where: { transactionId: { not: null }, provider: { not: 'cod' } },
+                select: {
+                  id: true,
+                  status: true,
+                  provider: true,
+                  metadata: true,
+                  amount: true,
+                  currency: true,
+                  transactionId: true,
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+              },
+            },
+            orderBy: { createdAt: 'asc' },
+            take: RUN_CAP,
+          }),
+        orderKey: r => r.createdAt,
+        take: RUN_CAP,
+      })
     );
 
     if (stale.length === 0) {

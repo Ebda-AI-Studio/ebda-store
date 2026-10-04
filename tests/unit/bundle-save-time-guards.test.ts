@@ -306,7 +306,7 @@ describe('POST /:storeId/bundles — duplicate components (P2-2)', () => {
 describe('POST /:storeId/bundles — fixed_price above the component sum (P2-5)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // One component at 14500 fils.
+    // One component at 14500 piastres.
     mockPrisma.product.findMany.mockResolvedValue([{ id: P_A, price: 14500, variants: [] }]);
     mockPrisma.bundle.findFirst.mockResolvedValue(null);
   });
@@ -360,14 +360,14 @@ describe('POST /:storeId/bundles — fixed_price above the component sum (P2-5)'
 describe('POST/PUT /:storeId/bundles — a `fixed` discount that swallows the components (P1)', () => {
   // The third `BundlePricingType` member. `assertPricingValueInRange` covered
   // 'percentage' and `assertPriceWithinComponentSum` covered 'fixed_price';
-  // 'fixed' (fils OFF the component sum) was covered by neither, so
+  // 'fixed' (piastres OFF the component sum) was covered by neither, so
   // `computeBundlePrice`'s `Math.max(0, componentSum - pricingValue)` clamp
   // silently accepted a discount worth more than the whole kit and sold the
   // box for 0 — while the semantically identical `fixed_price: 15000` on the
   // same components was correctly rejected.
   beforeEach(() => {
     vi.clearAllMocks();
-    // One component at 14500 fils — the same kit the `fixed_price` block above
+    // One component at 14500 piastres — the same kit the `fixed_price` block above
     // uses, so the two rejections are directly comparable.
     mockPrisma.product.findMany.mockResolvedValue([{ id: P_A, price: 14500, variants: [] }]);
     mockPrisma.bundle.findFirst.mockResolvedValue(null);
@@ -466,7 +466,7 @@ describe('POST/PUT /:storeId/bundles — a `fixed` discount that swallows the co
 //
 // `allocateBundlePrice` breaks a fractional-remainder tie by the ORIGINAL
 // INDEX of the line in the array it is given (see bundle-pricing.ts). Two
-// components at unitPrice 100 fils, quantities 2 and 3, and a bundle price
+// components at unitPrice 100 piastres, quantities 2 and 3, and a bundle price
 // of 499 (componentSum 500) produce an EXACT tie: reordering the two lines
 // flips `isAllocatable` from true to false. `resolveBundleLines`' canonical
 // (productId, variantId) sort is what stops the admin route from seeing a

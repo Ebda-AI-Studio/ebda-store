@@ -1,9 +1,10 @@
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 import { redis } from '../../../services/redis.service';
+import { sweepAcrossStores } from '../../cross-store';
 
 /**
  * Stuck status-change fanout sweep — scheduled safety net (#619).
@@ -79,26 +80,29 @@ export async function handleOrderStatusFanoutStuckSweep(
 
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
   const stuck: StuckTransition[] = await step.run('find-stuck-status-fanouts', async () =>
-    withRlsBypass(tx =>
-      tx.order.findMany({
-        where: {
-          statusFanoutClaimedAt: null,
-          statusFanoutRequestedAt: { lt: cutoff, gt: floorCutoff },
-          status: { in: [...FANOUT_STATUSES] },
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-          storeId: true,
-          status: true,
-          paymentStatus: true,
-          statusFanoutRequestedAt: true,
-          statusFanoutRequestedStatus: true,
-        },
-        orderBy: { statusFanoutRequestedAt: 'asc' },
-        take: SWEEP_TAKE,
-      })
-    )
+    sweepAcrossStores({
+      fetch: () =>
+        prisma.order.findMany({
+          where: {
+            statusFanoutClaimedAt: null,
+            statusFanoutRequestedAt: { lt: cutoff, gt: floorCutoff },
+            status: { in: [...FANOUT_STATUSES] },
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            storeId: true,
+            status: true,
+            paymentStatus: true,
+            statusFanoutRequestedAt: true,
+            statusFanoutRequestedStatus: true,
+          },
+          orderBy: { statusFanoutRequestedAt: 'asc' },
+          take: SWEEP_TAKE,
+        }),
+      orderKey: r => r.statusFanoutRequestedAt ?? 0,
+      take: SWEEP_TAKE,
+    })
   );
 
   const failedAfterClaim = await reportFailedAfterClaim(step, cutoff, floorCutoff);
@@ -141,9 +145,9 @@ export async function handleOrderStatusFanoutStuckSweep(
         },
       }).catch(() => undefined);
       // Disarm, so the same lost transition is reported once, not every tick.
-      await withRlsBypass(tx =>
-        Promise.all(
-          superseded.map(o =>
+      await Promise.all(
+        superseded.map(o =>
+          withStore(o.storeId, tx =>
             tx.order.updateMany({
               where: {
                 id: o.id,
@@ -243,25 +247,28 @@ async function reportFailedAfterClaim(
   floorCutoff: Date
 ): Promise<number> {
   const failed = await step.run('find-failed-after-claim', () =>
-    withRlsBypass(tx =>
-      tx.order.findMany({
-        where: {
-          statusFanoutClaimedAt: { lt: cutoff, gt: floorCutoff },
-          statusFanoutCompletedAt: null,
-          statusFanoutRequestedStatus: { not: null },
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-          storeId: true,
-          status: true,
-          statusFanoutRequestedStatus: true,
-          statusFanoutRequestedAt: true,
-        },
-        orderBy: { statusFanoutClaimedAt: 'asc' },
-        take: SWEEP_TAKE,
-      })
-    )
+    sweepAcrossStores({
+      fetch: () =>
+        prisma.order.findMany({
+          where: {
+            statusFanoutClaimedAt: { lt: cutoff, gt: floorCutoff },
+            statusFanoutCompletedAt: null,
+            statusFanoutRequestedStatus: { not: null },
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            storeId: true,
+            status: true,
+            statusFanoutRequestedStatus: true,
+            statusFanoutRequestedAt: true,
+          },
+          orderBy: { statusFanoutClaimedAt: 'asc' },
+          take: SWEEP_TAKE,
+        }),
+      orderKey: r => r.statusFanoutRequestedAt ?? 0,
+      take: SWEEP_TAKE,
+    })
   );
   if (failed.length === 0) return 0;
   return step.run('alert-failed-after-claim', async () => {

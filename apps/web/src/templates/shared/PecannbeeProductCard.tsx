@@ -34,6 +34,8 @@ import { BrandPill } from './BrandPill';
 import { getDiscountBadgeColor } from './discount-badge';
 import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
 
+import { fromMinor, minorToDecimalString } from '@force/shared';
+import { REGION } from '@force/shared';
 interface PecannbeeProductCardProps extends ProductCardProps {
   pack?: TemplateId;
   /**
@@ -55,7 +57,7 @@ interface PecannbeeProductCardProps extends ProductCardProps {
  * │                              │
  * ├──────────────────────────┤
  * │ Product name (1–2 lines)    │
- * │ KD 5.000  KD 6.000        │
+ * │ EGP 50.00  EGP 60.00        │
  * │ ┌────────────────────┐ │
  * │ │  Add to cart  🛒  │ │  ← full-width pill CTA
  * │ └────────────────────┘ │
@@ -67,7 +69,7 @@ interface PecannbeeProductCardProps extends ProductCardProps {
 function PecannbeeProductCardImpl({
   product,
   isRtl: isRtlProp,
-  currency = 'KWD',
+  currency = REGION.currency,
   onAddToCart,
   onAddToWishlist,
   onRemoveFromWishlist,
@@ -134,7 +136,7 @@ function PecannbeeProductCardImpl({
   // allowed are still orderable — CTA stays pressable, no OOS label shown.
   const orderable = inStock || product.acceptsBackorder === true;
   const onSale = isOnSale(product);
-  // BUG 1 fix: use getDiscountBadgeText so fixed-KWD discounts render correctly.
+  // BUG 1 fix: use getDiscountBadgeText so fixed-EGP discounts render correctly.
   const discountBadgeText = getDiscountBadgeText(product, isRtl);
 
   const name = isRtl && product.nameAr ? product.nameAr : product.name;
@@ -482,7 +484,7 @@ function PecannbeeProductCardImpl({
                   className="contents"
                 >
                   <meta itemProp="priceCurrency" content={currency} />
-                  <meta itemProp="price" content={String(pricing.displayPrice / 1000)} />
+                  <meta itemProp="price" content={String(fromMinor(pricing.displayPrice))} />
                   <span
                     data-zone="productPrice"
                     className={`font-bold tabular-nums ${textSizes.price} ${styles.productCardPrice}`}
@@ -498,12 +500,12 @@ function PecannbeeProductCardImpl({
                     }}
                   >
                     {pricing.mode === 'fromMin' ? `${isRtl ? 'من ' : 'From '}` : ''}
-                    {localize((pricing.displayPrice / 1000).toFixed(3))} {currency}
+                    {localize(minorToDecimalString(pricing.displayPrice))} {currency}
                   </span>
                 </span>
                 {pricing.displayCompare && (
                   <span className="text-sm text-muted-foreground line-through">
-                    {localize((pricing.displayCompare / 1000).toFixed(3))}
+                    {localize(minorToDecimalString(pricing.displayCompare))}
                   </span>
                 )}
               </div>

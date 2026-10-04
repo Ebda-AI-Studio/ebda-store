@@ -1,14 +1,31 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { prisma, Prisma, StoreStatus, withMoneyTx, withRlsBypass } from '@force/database';
+import {
+  prisma,
+  Prisma,
+  StoreStatus,
+  acrossStores,
+  setTenantGucs,
+  withMoneyTx,
+  withStore,
+} from '@force/database';
+import { ensureAdminUser } from '../lib/definer';
 import { bustStoreCaches } from './store.service';
+import { syncSubscriptionFromLegacyPlan } from './plan-sync';
+import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { resolveDomainService } from './domain-provider';
 import { ResendService } from './resend.service';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
-import { isValidTimeZone, slugifyWithFallback } from '@force/shared';
+import {
+  isValidTimeZone,
+  slugifyWithFallback,
+  REGION,
+  storefrontOrigin,
+  isReservedSlug,
+} from '@force/shared';
 
 // ==========================================
 // Store Provisioning Service
@@ -24,6 +41,15 @@ export interface ProvisionStoreInput {
   // only provider (Vercel cancelled 2026-07); kept optional for signature compat.
   domainProvider?: 'cloudflare';
   plan?: 'free' | 'starter' | 'professional' | 'enterprise';
+  /**
+   * Initial store status. Defaults to `active` (super-admin provisioning).
+   * Self-serve onboarding creates the store `inactive` (unreachable at
+   * `<slug>.ebda.app`) and flips it live at the final step.
+   */
+  status?: 'active' | 'inactive';
+  /** Initial storefront template; defaults to the schema default. */
+  template?: 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
+  storeNameAr?: string;
 
   // Owner details
   ownerEmail: string;
@@ -35,6 +61,7 @@ export interface ProvisionStoreInput {
     theme?: string;
     currency?: string;
     timezone?: string;
+    defaultLanguage?: 'ar' | 'en';
   };
 }
 
@@ -66,14 +93,26 @@ export class ProvisioningService {
       storeSlug,
       domain,
       plan = 'starter',
+      status = 'active',
+      template,
+      storeNameAr,
       ownerEmail,
       ownerName,
       ownerPassword,
       settings,
     } = input;
 
-    // Generate slug if not provided
-    const slug = storeSlug || this.generateSlug(storeName);
+    // An explicit slug is the store's `<slug>.ebda.app`: validate it (format +
+    // reserved list) and refuse with a stable SLUG_* code. A generated one is
+    // coerced into a valid, unreserved slug.
+    // Protected brand names (SLUG_PROTECTED) are NOT re-checked here: this runs
+    // for super_admin provisioning (the support-claim path, which may grant a
+    // protected name) and for self-serve onboarding, which already refused a
+    // protected slug for non-super_admin before calling in. Reserved labels and
+    // format are still enforced.
+    const slug = storeSlug
+      ? assertStoreSlug(storeSlug, { allowProtected: true })
+      : this.generateSlug(storeName);
 
     // Check if slug is available
     const existingStore = await prisma.store.findUnique({
@@ -124,44 +163,29 @@ export class ProvisioningService {
     try {
       // Create store, owner, and default category in a single transaction.
       // The provisioning transaction creates rows in RLS-protected tables
-      // (categories, payment_configs) before we know the new storeId, so we
-      // cannot use runInTenantContext. SET LOCAL app.bypass_rls = 'true' gives
-      // the same transaction-scoped escape hatch as withRlsBypass — the GUC
-      // resets automatically when the transaction commits or rolls back.
+      // (categories, payment_configs) for a storeId that does not exist yet, so
+      // it cannot start inside runInTenantContext: it creates the owner and the
+      // store first, then switches its own transaction to the new store with a
+      // transaction-local set_config before touching the tenant tables.
       result = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-        await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
-
-        // Check if owner email exists. Admin/store-owner accounts live in
-        // the global namespace (storeId NULL); customers are scoped per
-        // store via the composite unique. Provisioning a store always
-        // looks up against the global admin scope.
-        const existingUser = await tx.user.findFirst({
-          where: { email: ownerEmail, storeId: null },
-        });
-
-        let owner;
-        const isNewUser = !existingUser;
-
-        if (existingUser) {
-          owner = existingUser;
-        } else {
-          // Parse name into first/last
-          const nameParts = ownerName.trim().split(' ');
-          const firstName = nameParts[0];
-          const lastName = nameParts.slice(1).join(' ') || '';
-
-          // Create owner directly inside the transaction
-          owner = await tx.user.create({
-            data: {
-              email: ownerEmail,
-              passwordHash,
-              firstName,
-              lastName,
-              role: 'store_admin',
-              emailVerified: false,
-            },
-          });
-        }
+        // Find-or-create the owner in the ADMIN namespace (users.store_id NULL).
+        // Admin accounts are not visible from a store scope and the store does
+        // not exist yet, so this is the `ebda_admin_user_ensure` definer, run on
+        // THIS transaction (it is just a function call). An existing account is
+        // used as is, whatever its role, exactly as before.
+        const nameParts = ownerName.trim().split(' ');
+        const owner = await ensureAdminUser(
+          {
+            email: ownerEmail,
+            passwordHash,
+            firstName: nameParts[0],
+            lastName: nameParts.slice(1).join(' ') || '',
+            role: 'store_admin',
+            emailVerified: false,
+          },
+          tx
+        );
+        const isNewUser = owner.created;
 
         // `timezone` governs the store's tax periods (Ruling FRT-2), so it goes
         // to the `stores.timezone` COLUMN — validated, else the column default.
@@ -173,16 +197,46 @@ export class ProvisioningService {
             name: storeName,
             slug,
             domain,
+            // Operator-assigned (super_admin) domains are trusted: active at once.
+            ...(domain ? { domainStatus: 'active', domainVerifiedAt: new Date() } : {}),
             domainProvider: input.domainProvider ?? null,
+            ...(storeNameAr ? { nameAr: storeNameAr } : {}),
             ownerId: owner.id,
-            status: 'active',
+            status,
+            ...(template ? { template } : {}),
             plan,
             ...(isValidTimeZone(requestedZone) ? { timezone: requestedZone } : {}),
             settings: {
               theme: settingsRest.theme || 'default',
-              currency: settingsRest.currency || 'USD',
+              currency: settingsRest.currency || REGION.currency,
               ...settingsRest,
+              // Arabic-first unless the caller said otherwise (spread above wins if present).
+              defaultLanguage:
+                (settingsRest as { defaultLanguage?: string }).defaultLanguage ||
+                REGION.defaultLocale,
             },
+          },
+        });
+
+        // The store exists now: from here the transaction acts as it, so the rows
+        // below satisfy the strict store policies (set_config, transaction-local).
+        await setTenantGucs(tx, { storeId: store.id });
+
+        // Subscription row for the plan the operator chose (SP5 plans engine).
+        // Super-admin provisioning is platform-controlled, so a custom domain
+        // here is NOT plan-gated (the operator is assigning the plan).
+        await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
+
+        // Default VAT (Ebda: `REGION.defaultVatBps` = 14%), seeded as an ACTIVE
+        // editable rate. The charge itself stays gated on `Store.taxEnabled`
+        // (ruling TAX-1), which the merchant flips once VAT-registered.
+        await tx.taxRate.create({
+          data: {
+            storeId: store.id,
+            name: 'VAT',
+            nameAr: 'ضريبة القيمة المضافة',
+            rate: REGION.defaultVatBps / 100,
+            isActive: true,
           },
         });
 
@@ -211,7 +265,7 @@ export class ProvisioningService {
             displayNameAr: 'الدفع عند الاستلام',
             testMode: false,
             supportedMethods: ['cod'],
-            supportedCurrencies: ['KWD'],
+            supportedCurrencies: [REGION.currency],
             fixedFee: 0,
             percentageFee: 0,
           },
@@ -284,7 +338,7 @@ export class ProvisioningService {
         temporaryPassword: result.isNewUser ? tempPassword : undefined,
       },
       urls: {
-        storefront: domain ? `https://${domain}` : `${process.env.WEB_URL}/${result.store.slug}`,
+        storefront: storefrontOrigin({ slug: result.store.slug, domain }),
         admin: `${process.env.ADMIN_URL}`,
       },
     };
@@ -317,29 +371,43 @@ export class ProvisioningService {
       ];
     }
 
-    // _count.products and _count.orders require reading from RLS-protected
-    // tables (products, orders). Without bypass_rls, the correlated subqueries
-    // run as force_app with no tenant GUC → every count returns 0. Wrap in
-    // withRlsBypass so the aggregate can read across all tenants correctly.
-    const [stores, total] = await withRlsBypass((tx: Prisma.TransactionClient) =>
-      Promise.all([
-        tx.store.findMany({
-          where,
-          skip,
-          take: limit,
-          include: {
-            owner: {
-              select: { id: true, email: true, firstName: true, lastName: true },
-            },
-            _count: {
-              select: { products: true, orders: true },
-            },
+    // `_count.products` / `_count.orders` read RLS-protected tables, so a
+    // correlated count from the stores table would see no rows. The page of
+    // stores is read first (`stores` carries no RLS; the owner join resolves under
+    // the caller's user scope), then each store on the page is counted inside its
+    // OWN store scope.
+    const [pageStores, total] = await Promise.all([
+      prisma.store.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          owner: {
+            select: { id: true, email: true, firstName: true, lastName: true },
           },
-          orderBy: { createdAt: 'desc' },
-        }),
-        tx.store.count({ where }),
-      ])
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.store.count({ where }),
+    ]);
+    const counts = new Map(
+      (
+        await acrossStores(
+          async () => {
+            const [products, orders] = await Promise.all([
+              prisma.product.count(),
+              prisma.order.count(),
+            ]);
+            return { products, orders };
+          },
+          { storeIds: pageStores.map(s => s.id) }
+        )
+      ).map(r => [r.storeId, r.value])
     );
+    const stores = pageStores.map(s => ({
+      ...s,
+      _count: counts.get(s.id) ?? { products: 0, orders: 0 },
+    }));
 
     return {
       stores,
@@ -356,6 +424,10 @@ export class ProvisioningService {
    * Get store statistics
    */
   static async getStoreStats(storeId: string) {
+    return withStore(storeId, () => this.readStoreStats(storeId));
+  }
+
+  private static async readStoreStats(storeId: string) {
     const [productCount, orderCount, customerCount, revenueResult] = await Promise.all([
       prisma.product.count({ where: { storeId } }),
       prisma.order.count({ where: { storeId } }),
@@ -414,7 +486,10 @@ export class ProvisioningService {
    * defect that put '' and '-1'..'-4' product slugs on a live store.
    */
   private static generateSlug(name: string): string {
-    return slugifyWithFallback(name, 'store', { ascii: true }).substring(0, 50);
+    const derived = deriveStoreSlug(slugifyWithFallback(name, 'store', { ascii: true }));
+    // A name that derives a reserved label ("Support") gets a suffix so the
+    // store is created at a legal address instead of failing.
+    return isReservedSlug(derived) ? `${derived}-1` : derived;
   }
 
   /**

@@ -16,7 +16,7 @@ import type { CheckoutCartItem, CheckoutCartBundle, Coupon } from './types';
 export interface LoyaltyRedeemControl {
   /** Current available points balance. */
   points: number;
-  /** Fils per point (for the value estimate). */
+  /** Piastres per point (for the value estimate). */
   pointsValue: number;
   /** Store minimum points required to redeem. */
   minRedeemPoints: number;
@@ -26,7 +26,7 @@ export interface LoyaltyRedeemControl {
   /** Points the customer chose to redeem. */
   pointsToRedeem: number;
   onPointsChange: (points: number) => void;
-  /** Discount (fils) the redemption currently yields (already capped). */
+  /** Discount (piastres) the redemption currently yields (already capped). */
   loyaltyDiscount: number;
 }
 
@@ -35,12 +35,12 @@ export interface LoyaltyRedeemControl {
  *  balance on a store whose wallet checkout the API reports as available;
  *  undefined otherwise (nothing renders). */
 export interface WalletSpendControl {
-  /** Current wallet balance in fils. */
+  /** Current wallet balance in piastres. */
   balance: number;
   /** Whether the customer chose to pay from the wallet for this order. */
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
-  /** Fils the wallet covers on this order (display estimate; the server
+  /** Piastres the wallet covers on this order (display estimate; the server
    *  re-resolves it at order creation). */
   applied: number;
 }
@@ -68,7 +68,7 @@ interface OrderSummaryProps {
    *  at order creation. */
   promotionDiscount?: number;
   shipping: number;
-  /** VAT amount in fils, computed via `computeOrderTax` (same formula the
+  /** VAT amount in piastres, computed via `computeOrderTax` (same formula the
    *  API charges at order creation — ruling M3-3 in docs/RULINGS.md). 0
    *  for a store with no active tax rate — renders nothing. */
   tax: number;
@@ -131,7 +131,7 @@ export function OrderSummary({
   const totalColorStyle = summaryColors?.totalColor
     ? { color: summaryColors.totalColor }
     : undefined;
-  // KWD formatting for the points-value hint (pointsValue is fils/point).
+  // EGP formatting for the points-value hint (pointsValue is piastres/point).
   const pointsValueLabel = (points: number) =>
     loyalty ? formatPrice(points * loyalty.pointsValue) : '';
   // Localised product name on the order summary line — checkout +

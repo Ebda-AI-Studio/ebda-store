@@ -1,4 +1,4 @@
-# Force Website Builder - Docker Compose
+# Ebda - Docker Compose
 # Development and Production environment setup
 
 services:
@@ -87,20 +87,13 @@ services:
       WEB_URL: ${WEB_URL:-http://localhost:3000}
       ADMIN_URL: ${ADMIN_URL:-http://localhost:3001}
       API_URL: ${API_URL:-http://localhost:4000}
-      # Payment providers
-      TAP_API_KEY: ${TAP_API_KEY:-}
-      TAP_SECRET_KEY: ${TAP_SECRET_KEY:-}
-      TAP_WEBHOOK_SECRET: ${TAP_WEBHOOK_SECRET:-}
-      MYFATOORAH_API_KEY: ${MYFATOORAH_API_KEY:-}
-      HESABE_API_KEY: ${HESABE_API_KEY:-}
-      UPAYMENTS_API_KEY: ${UPAYMENTS_API_KEY:-}
       # Email
       SMTP_HOST: ${SMTP_HOST:-mailhog}
       SMTP_PORT: ${SMTP_PORT:-1025}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@force-ai.co}
-      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Force Media}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-no-reply@ebda.app}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Ebda}
       # Storage
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-minioadmin}

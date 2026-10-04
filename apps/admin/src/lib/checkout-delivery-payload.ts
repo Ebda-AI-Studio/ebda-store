@@ -1,6 +1,7 @@
 import type { CheckoutDeliverySettings } from '@force/shared';
 import { textFieldValue } from './form-text';
 
+import { roundToMinor } from '@force/shared';
 /**
  * Payload builder for the per-store checkout-delivery settings page.
  *
@@ -23,21 +24,21 @@ import { textFieldValue } from './form-text';
  * literal `null` reads exactly like "not configured".
  */
 
-/** Round a KWD string input to integer fils. Empty/invalid/non-positive
+/** Round a EGP string input to integer piastres. Empty/invalid/non-positive
  *  input resolves to 0 (= no minimum), matching the platform's opt-in
  *  convention for this field. */
-export function kwdInputToFils(kwd: string): number {
-  const parsed = parseFloat(kwd);
+export function majorInputToMinor(major: string): number {
+  const parsed = parseFloat(major);
   if (!Number.isFinite(parsed) || parsed <= 0) return 0;
-  return Math.round(parsed * 1000);
+  return roundToMinor(parsed);
 }
 
 export interface CheckoutDeliveryForm {
   /** The store's current `settings` JSON, spread through untouched. */
   existingSettings: Record<string, unknown>;
   config: CheckoutDeliverySettings;
-  /** Raw KWD string the merchant typed; empty = no minimum. */
-  minimumOrderKwd: string;
+  /** Raw EGP string the merchant typed; empty = no minimum. */
+  minimumOrderMajor: string;
   /** Raw (untrimmed) order-invoice address; empty = feature off. */
   orderInvoiceEmail: string;
 }
@@ -46,7 +47,7 @@ export function buildCheckoutDeliverySettings(form: CheckoutDeliveryForm): Recor
   return {
     ...form.existingSettings,
     checkoutDelivery: form.config,
-    minimumOrderFils: kwdInputToFils(form.minimumOrderKwd),
+    minimumOrderFils: majorInputToMinor(form.minimumOrderMajor),
     // 'update' — this page only ever edits an existing store, so an emptied
     // address must send an explicit null that survives JSON.stringify and
     // overwrites the stored value on the server's shallow merge.

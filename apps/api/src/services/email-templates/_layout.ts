@@ -16,6 +16,7 @@
  */
 
 /** The canonical email body width. Fluid below it (`width:100%;max-width`). */
+import { BRAND } from '@force/shared';
 export const EMAIL_MAX_WIDTH = 600;
 /**
  * Store logo box: at most this wide AND at most EMAIL_LOGO_MAX_HEIGHT tall,
@@ -147,7 +148,10 @@ function hslToHex(h: number, s: number, l: number): string {
  * and the Tailwind-token HSL component form. Anything else (including
  * injection attempts) is the fallback — the value lands in inline CSS.
  */
-export function emailColor(value: string | null | undefined, fallback = '#ff6e00'): string {
+export function emailColor(
+  value: string | null | undefined,
+  fallback: string = BRAND.colors.gold
+): string {
   if (!value || typeof value !== 'string' || value.length > 50) return fallback;
   const v = value.trim();
   if (/^#[0-9a-fA-F]{6}$/.test(v) || /^#[0-9a-fA-F]{3}$/.test(v)) return v;

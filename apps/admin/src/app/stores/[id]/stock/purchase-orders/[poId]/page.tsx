@@ -7,8 +7,9 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
-import { formatPrice, filsToKwd } from '@/lib/format';
+import { formatPrice, minorToMajor } from '@/lib/format';
 
+import { minorToDecimalString } from '@force/shared';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface POItem {
@@ -20,7 +21,7 @@ interface POItem {
   variant?: { id: string; title: string; titleAr: string | null } | null;
   qty: number;
   qtyReceived: number;
-  unitCost: number; // fils
+  unitCost: number; // piastres
 }
 
 interface PurchaseOrder {
@@ -29,7 +30,7 @@ interface PurchaseOrder {
   status: 'draft' | 'sent' | 'partial' | 'received' | 'cancelled';
   expectedDate: string | null;
   receivedDate: string | null;
-  totalCost: number; // fils
+  totalCost: number; // piastres
   createdAt: string;
   notes: string | null;
   supplier: { id: string; name: string };
@@ -226,7 +227,7 @@ export default function PurchaseOrderDetailPage() {
       header: t('new.unitCost'),
       alignEnd: true,
       className: 'w-28',
-      cell: item => <span className="font-mono text-xs">{filsToKwd(item.unitCost)}</span>,
+      cell: item => <span className="font-mono text-xs">{minorToMajor(item.unitCost)}</span>,
     },
     {
       header: t('new.lineTotal'),
@@ -234,7 +235,7 @@ export default function PurchaseOrderDetailPage() {
       hideOnMobile: true,
       className: 'w-28',
       cell: item => (
-        <span className="font-mono text-xs">{((item.qty * item.unitCost) / 1000).toFixed(3)}</span>
+        <span className="font-mono text-xs">{minorToDecimalString(item.qty * item.unitCost)}</span>
       ),
     },
     ...(canReceive

@@ -45,10 +45,10 @@ Defaults:
 - Storefront: `https://wadyaljuz.com` — in CI the `smoke-test` job reads the
   `SMOKE_STOREFRONT_URL` repo Actions **variable** first (falling back to
   wadyaljuz.com), so the reference merchant can change without a code change.
-  The platform host (`store.force-ai.co`) serves the landing page with no
+  The platform host (`ebda.app`) serves the landing page with no
   product links, so it cannot satisfy the PDP test — the target must be a
   live merchant storefront with at least one published product.
-- Admin: `https://admin.force-ai.co` (corrected 2026-09-02 — `app.forcemediakw.com`
+- Admin: `https://app.ebda.app` (corrected 2026-09-02 — `app.ebda.app`
   now 301-redirects here since the Cloudflare migration; it still "works" via the
   redirect but every baseURL-relative check was really exercising the redirect
   target under the wrong URL)

@@ -64,7 +64,7 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
           name: 'pci-test-store',
           slug: `pci-test-${suffix}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: owner.id,
         },
       });
@@ -101,10 +101,10 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
       await tx.payment.create({
         data: {
           orderId: onlineOrderId,
-          provider: 'myfatoorah',
+          provider: 'paymob',
           status: 'pending',
           amount: ORDER_TOTAL,
-          currency: 'KWD',
+          currency: 'EGP',
           transactionId: `pci-txn-${suffix}`,
           paymentUrl: 'https://pay.example.test/invoice-1',
         },
@@ -113,10 +113,10 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
       await tx.payment.create({
         data: {
           orderId: paidOrderId,
-          provider: 'myfatoorah',
+          provider: 'paymob',
           status: 'completed',
           amount: ORDER_TOTAL,
-          currency: 'KWD',
+          currency: 'EGP',
           transactionId: `pci-txn-paid-${suffix}`,
         },
       });
@@ -171,7 +171,7 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
   it('online create with a live pending payment returns the EXISTING paymentUrl', async () => {
     const res = await request(app)
       .post('/api/v1/payments/create')
-      .send({ orderId: onlineOrderId, provider: 'myfatoorah' });
+      .send({ orderId: onlineOrderId, provider: 'paymob' });
     expect(res.status).toBe(200);
     expect(res.body.data.paymentUrl).toBe('https://pay.example.test/invoice-1');
     expect(res.body.data.transactionId).toBe(`pci-txn-${suffix}`);
@@ -185,7 +185,7 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
   it('create on an order with a settled payment is refused with 409', async () => {
     const res = await request(app)
       .post('/api/v1/payments/create')
-      .send({ orderId: paidOrderId, provider: 'myfatoorah' });
+      .send({ orderId: paidOrderId, provider: 'paymob' });
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('ORDER_ALREADY_PAID');
   });
@@ -196,17 +196,17 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
       tx.payment.create({
         data: {
           orderId: paidOrderId,
-          provider: 'tap',
+          provider: 'kashier',
           status: 'completed',
           amount: ORDER_TOTAL,
-          currency: 'KWD',
+          currency: 'EGP',
           transactionId: `pci-txn-dup-${suffix}`,
         },
       })
     );
 
     h.sendAlert.mockClear();
-    await alertIfDuplicateCapture(dup.id, paidOrderId, 'tap');
+    await alertIfDuplicateCapture(dup.id, paidOrderId, 'kashier');
     expect(h.sendAlert).toHaveBeenCalledTimes(1);
     expect(h.sendAlert.mock.calls[0][0]).toMatchObject({
       level: 'p0',
@@ -218,7 +218,7 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
     const solo = await withRlsBypass(tx =>
       tx.payment.findFirstOrThrow({ where: { orderId: onlineOrderId } })
     );
-    await alertIfDuplicateCapture(solo.id, onlineOrderId, 'myfatoorah');
+    await alertIfDuplicateCapture(solo.id, onlineOrderId, 'paymob');
     expect(h.sendAlert).not.toHaveBeenCalled();
   });
 });

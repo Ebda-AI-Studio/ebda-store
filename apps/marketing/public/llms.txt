@@ -1,0 +1,19 @@
+# Ebda (ابدأ)
+
+> Ebda is a self-serve online store builder for sellers in Egypt, built by Whisky 11. Arabic-first (RTL) with English. Merchants sign up, build and run their own store; every store gets a free <slug>.ebda.app address and can attach a custom domain.
+
+Status: pre-launch. Pricing is not published yet. Payment methods beyond cash on delivery, and shipping-carrier integrations, are marked "coming" on the site.
+
+## Pages
+- [Home (Arabic)](https://ebda.app/): product overview, how it works, payments, WhatsApp, pricing placeholders, FAQ
+- [Home (English)](https://ebda.app/en/): the same in English
+- [Legal](https://ebda.app/legal/): company and legal notice (draft)
+- [Privacy](https://ebda.app/privacy/): privacy policy (draft)
+- [Terms](https://ebda.app/terms/): terms of service (draft)
+
+## Facts
+- Payments: cash on delivery; InstaPay with one merchant confirmation step; cards and wallets through Egyptian gateways are coming.
+- WhatsApp: free click-to-chat (wa.me) links. Automated WhatsApp messaging is not available yet.
+- Shipping: carrier integrations (Bosta, Aramex and others) are coming.
+- Sign up: https://app.ebda.app/signup
+- Contact: support@ebda.app; security reports: security@ebda.app

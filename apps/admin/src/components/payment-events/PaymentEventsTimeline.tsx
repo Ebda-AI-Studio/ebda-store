@@ -193,10 +193,10 @@ function StatusChip({ from, to }: { from: string; to: string }) {
 // ---------------------------------------------------------------------------
 
 const PROVIDER_LABELS: Record<string, string> = {
-  tap: 'Tap',
-  myfatoorah: 'MyFatoorah',
-  hesabe: 'Hesabe',
-  upayments: 'UPayments',
+  paymob: 'Paymob',
+  kashier: 'Kashier',
+  fawry: 'Fawry',
+  instapay: 'InstaPay',
   cod: 'COD',
 };
 

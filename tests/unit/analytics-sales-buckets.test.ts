@@ -5,7 +5,7 @@
  * day|week|month|year, so every 9-preset value fell to the `default` branch and
  * was grouped BY DAY — `this_year` sent ~270 daily bars. And the zero-fill
  * walked UTC days from a start that is the browser's local midnight (21:00Z for
- * Kuwait), adding a phantom leading bucket for the previous UTC day.
+ * Egypt), adding a phantom leading bucket for the previous UTC day.
  *
  * Now the bucket is picked from the range length and buckets are the viewer's
  * calendar days (tzOffset). Every preset is checked (enum-as-checklist).
@@ -88,7 +88,7 @@ describe('bucket helpers', () => {
 
 describe('AnalyticsService.getSalesChart', () => {
   it('this_year → monthly buckets (not ~270 daily bars)', async () => {
-    // Kuwait midnight Jan 1 → end of Sep 30, Kuwait.
+    // Egypt midnight Jan 1 → end of Sep 30, Egypt.
     const startDate = new Date('2025-12-31T21:00:00Z');
     const endDate = new Date('2026-09-30T20:59:59Z');
     queryRaw.mockResolvedValue([
@@ -119,9 +119,9 @@ describe('AnalyticsService.getSalesChart', () => {
     expect(queryRaw.mock.calls[0]).toContain('month');
   });
 
-  it('local-midnight start in Kuwait → no phantom leading bucket for the previous UTC day', async () => {
-    const startDate = new Date('2026-08-31T21:00:00Z'); // Sep 1 00:00 Kuwait
-    const endDate = new Date('2026-09-30T20:59:59Z'); // Sep 30 23:59 Kuwait
+  it('local-midnight start in Egypt → no phantom leading bucket for the previous UTC day', async () => {
+    const startDate = new Date('2026-08-31T21:00:00Z'); // Sep 1 00:00 Egypt
+    const endDate = new Date('2026-09-30T20:59:59Z'); // Sep 30 23:59 Egypt
     const { sales, granularity } = await AnalyticsService.getSalesChart(
       STORE,
       'this_month',

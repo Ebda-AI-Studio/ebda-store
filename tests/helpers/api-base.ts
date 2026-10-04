@@ -20,7 +20,7 @@
  *      looks like broken auth rather than broken configuration.
  *
  *   2. Tests firing at production. Deployed environments set
- *      `API_URL=https://api.force-ai.co`. On any machine holding those values,
+ *      `API_URL=https://api.ebda.app`. On any machine holding those values,
  *      a local `npm run test:integration` would build a perfectly VALID
  *      production base and then POST `/auth/register` against it, creating
  *      real users in a live tenant. The suite must never be steerable by a
@@ -40,7 +40,7 @@
  * VALIDATION
  *
  * A bare host is rejected loudly instead of failing cryptically later.
- * `new URL('api.force-ai.co')` throws, and `new URL('localhost:4000')` does
+ * `new URL('api.ebda.app')` throws, and `new URL('localhost:4000')` does
  * NOT throw — it parses `localhost:` as an opaque scheme whose `.origin` is
  * the *string* `"null"`, which is truthy and would flow into every fetch. The
  * protocol check below is what catches that second case; the try/catch alone
@@ -109,7 +109,7 @@ export function normalizeApiOrigin(raw: string, source = 'TEST_API_URL'): string
  *
  * Choosing a test-scoped variable name stops dotenv injecting a production
  * value BEHIND the suite's back, which is real but partial: it does nothing
- * about someone exporting TEST_API_URL=https://api.force-ai.co by hand and
+ * about someone exporting TEST_API_URL=https://api.ebda.app by hand and
  * then running a suite that POSTs /auth/register. Until this check existed the
  * promise "the suite must never be steerable at a real, reachable API" was
  * enforced by a naming convention, not by code.

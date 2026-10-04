@@ -5,7 +5,7 @@
  * guard a money-integrity path that has no other test coverage:
  *
  *   - `showManualMarkPaid` must be false whenever the order has a real
- *     payment-provider row (MyFatoorah/Tap/Hesabe/UPayments) — letting a
+ *     payment-provider row (Paymob/Kashier/Fawry) — letting a
  *     merchant manually flip a provider-tracked order to "paid" would create
  *     a false paid record for money that was never actually captured.
  *   - `showRefundViaProvider` must require BOTH `paymentStatus === 'paid'`
@@ -82,7 +82,7 @@ function baseOrder(
     shipping: 0,
     discount: 0,
     total: 12000,
-    currency: 'KWD',
+    currency: 'EGP',
     notes: null,
     customerNotes: null,
     shippingAddress: null,
@@ -133,7 +133,7 @@ describe('ActionFooter — money-safety button visibility (renders the real DOM 
       paymentStatus: 'paid',
       payments: [
         payment({
-          provider: 'myfatoorah',
+          provider: 'paymob',
           status: 'completed',
           transactionId: 'txn_123',
         }),
@@ -151,7 +151,7 @@ describe('ActionFooter — money-safety button visibility (renders the real DOM 
       paymentStatus: 'paid',
       payments: [
         payment({
-          provider: 'myfatoorah',
+          provider: 'paymob',
           status: 'completed',
           transactionId: 'txn_123',
         }),
@@ -171,7 +171,7 @@ describe('ActionFooter — money-safety button visibility (renders the real DOM 
       status: 'pending',
       paymentStatus: 'unpaid',
       payments: [
-        payment({ provider: 'myfatoorah', status: 'pending', paymentUrl: 'https://pay.example/x' }),
+        payment({ provider: 'paymob', status: 'pending', paymentUrl: 'https://pay.example/x' }),
       ],
     });
     renderFooter(order);
@@ -244,5 +244,55 @@ describe('ActionFooter — refund-via-provider amount (#2069)', () => {
       })
     );
     expect(screen.getByTestId('refund-button').getAttribute('data-total')).toBe('3000');
+  });
+});
+
+// SP6a — InstaPay: the merchant's one primary action while the transfer is unconfirmed.
+describe('ActionFooter — InstaPay awaiting confirmation', () => {
+  const awaiting = () =>
+    baseOrder({
+      status: 'awaiting_payment_confirmation',
+      paymentStatus: 'unpaid',
+      payments: [
+        payment({ provider: 'instapay', status: 'pending', transactionId: 'instapay_k1' }),
+      ],
+    });
+
+  it('offers "payment received", and neither a payment link, a provider refresh nor manual mark-paid', () => {
+    const onConfirm = vi.fn();
+    render(
+      <ActionFooter
+        order={awaiting()}
+        storeId="store-1"
+        isUpdating={false}
+        onStatusChange={() => {}}
+        onMarkPaid={() => {}}
+        onConfirmInstapay={onConfirm}
+        onPrintInvoice={() => {}}
+      />
+    );
+    fireEvent.click(screen.getByTestId('confirm-instapay'));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('markPaid')).toBeNull();
+    expect(screen.queryByTestId('payment-link-button')).toBeNull();
+    expect(screen.queryByTestId('refresh-payment-button')).toBeNull();
+    // it can only be cancelled otherwise: never advanced to processing/shipped from here
+    expect(screen.getByText('cancel')).toBeTruthy();
+    expect(screen.queryByText('processing')).toBeNull();
+    expect(screen.queryByText('shipped')).toBeNull();
+  });
+
+  it('no confirm button once the order is confirmed, and no provider refund for InstaPay', () => {
+    renderFooter(
+      baseOrder({
+        status: 'confirmed',
+        paymentStatus: 'paid',
+        payments: [
+          payment({ provider: 'instapay', status: 'completed', transactionId: 'instapay_k1' }),
+        ],
+      })
+    );
+    expect(screen.queryByTestId('confirm-instapay')).toBeNull();
+    expect(screen.queryByTestId('refund-button')).toBeNull();
   });
 });

@@ -97,7 +97,7 @@ beforeAll(async () => {
       shipping: 0,
       discount: 0,
       total: 50000,
-      currency: 'KWD',
+      currency: 'EGP',
       shippingAddress: {},
       billingAddress: {},
       createdAt: orderDate,

@@ -3,6 +3,7 @@ import { inngest } from '../client';
 import { prisma as defaultPrisma, runInTenantContext } from '@force/database';
 import logger from '../../logger';
 import { featureService } from '../../../services/feature.service';
+import { storeOrigin } from '@force/shared';
 
 interface SyncArgs {
   // The upsert emitter (product.service) sends `op: 'create'|'update'`, NOT `action`.
@@ -115,9 +116,7 @@ export const productMetaSync = async ({
           },
         });
         if (product) {
-          const storeBase = store.domain
-            ? `https://${store.domain}`
-            : `https://store.force-ai.co/${store.slug}`;
+          const storeBase = store.domain ? `https://${store.domain}` : storeOrigin(store.slug);
           productPayload = {
             ...product,
             link: `${storeBase}/products/${product.slug}`,

@@ -56,7 +56,7 @@ afterAll(async () => {
 
 describe('stock adjustment posting per type', () => {
   // Each test: create adjustment of type T, post it, verify journal counterpart.
-  // We use deltaQty = -10 (loss of 10 units @ 2000 cost = 20000 fils impact, signed negative)
+  // We use deltaQty = -10 (loss of 10 units @ 2000 cost = 20000 piastres impact, signed negative)
   // except for 'found' which is positive.
 
   async function runAdjustmentAndVerify(

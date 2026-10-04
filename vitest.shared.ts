@@ -21,7 +21,7 @@ import path from 'path';
  * one place cannot do that again.
  */
 export function perAppAtAlias(): Plugin {
-  const apps = ['api', 'admin', 'web', 'orders'];
+  const apps = ['api', 'admin', 'web', 'orders', 'marketing'];
   return {
     name: 'per-app-at-alias',
     async resolveId(source, importer) {
@@ -60,5 +60,7 @@ export function workspaceAliases(root: string): Record<string, string> {
     '@orders': path.resolve(root, './apps/orders/src'),
     '@database': path.resolve(root, './packages/database'),
     '@shared': path.resolve(root, './packages/shared'),
+    // Pure brand module only — keeps marketing bundles free of the shared barrel.
+    '@force/shared/brand': path.resolve(root, './packages/shared/src/brand'),
   };
 }

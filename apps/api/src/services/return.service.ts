@@ -24,6 +24,7 @@ import {
 import { featureService } from './feature.service';
 import { WalletService } from './wallet.service';
 
+import { minorToDecimalString } from '@force/shared';
 interface CreateReturnItemInput {
   orderItemId: string;
   productId: string;
@@ -95,9 +96,9 @@ interface PartialAllocation {
   gatewayShare: number;
 }
 
-/** Fils as a 3-decimal KWD string, for merchant-facing error text. */
-function formatKwd(fils: number): string {
-  return (fils / 1000).toFixed(3);
+/** Piastres as a 2-decimal EGP string, for merchant-facing error text. */
+function formatMajor(piastres: number): string {
+  return minorToDecimalString(piastres);
 }
 
 /**
@@ -122,7 +123,7 @@ async function lockOrderReturns(orderId: string): Promise<void> {
 /**
  * The same lock, for the CUSTOMER-facing `create()` — bounded (issues 2004 /
  * 2030). `complete()` holds this key across the provider refund round-trip
- * (up to ~16s for MyFatoorah's two calls), and a storefront return submission
+ * (a gateway refund can take several seconds), and a storefront return submission
  * must not sit on a pooled connection behind a merchant's refund until its own
  * 30s transaction times out as a P2028 500. It polls the non-blocking
  * `pg_try_advisory_xact_lock` for a short window — long enough for a racing
@@ -656,7 +657,7 @@ export class ReturnService {
     // `refundedAt` is the claim marker: nullable, only ever set at completion,
     // and updateMany's WHERE is evaluated atomically, so exactly one caller can
     // transition null -> now. Losing the race is a 409, not a second refund —
-    // gateway refunds are terminal at Tap/MyFatoorah/KNET with no undo API.
+    // gateway refunds are terminal at the gateway with no undo API.
     //
     // The claim lives in the request transaction, so a crash or any 5xx rolls
     // it back with everything else: it cannot strand a return (#1349, #1361).
@@ -783,7 +784,7 @@ export class ReturnService {
       // A partial return on an order paid partly from the customer wallet
       // refunds the wallet's pro-rata share to the wallet and only the rest at
       // the gateway (#1956). When the whole allocation is the wallet's (an
-      // order paid entirely from it, or a rounding fils), nothing is sent.
+      // order paid entirely from it, or a rounding piastres), nothing is sent.
       const walletShare = isGatewayRefund && partial ? partial.walletShare : 0;
       const skipProvider = isGatewayRefund && partial !== null && partial.gatewayShare === 0;
 
@@ -1367,7 +1368,7 @@ export class ReturnService {
     // order-level discount or tax applied (see create(), above). Refunding it
     // hands the customer the pre-discount price while the journal credits the
     // discounted one: on the integration fixture (subtotal 9000, discount
-    // 1000, tax 900, returning one 2000-fil line) that is 2000 out the door
+    // 1000, tax 900, returning one 2000-piastre line) that is 2000 out the door
     // against 1978 booked, and the gap widens with the discount.
     //
     // So the amount is DERIVED for a partial return, from the same allocator
@@ -1406,7 +1407,7 @@ export class ReturnService {
         // refundableRemaining is therefore shipping + cashCredit_final, and
         // `>=` reduces to rejecting whenever shipping <= 0. Order.shipping
         // defaults to 0 and free delivery / store pickup is the norm for
-        // Kuwait merchants, so `>=` hard-blocked the second half of every
+        // Egypt merchants, so `>=` hard-blocked the second half of every
         // two-line piecewise return. Only refunding MORE than is left is the
         // real error.
         //
@@ -1418,7 +1419,7 @@ export class ReturnService {
         throw new AppError(
           409,
           'PARTIAL_REFUND_EXCEEDS_PAYMENT',
-          `This return is worth ${formatKwd(toGateway)} KWD at the gateway but only ${formatKwd(refundableRemaining)} KWD is left on the payment, because part of it was already refunded outside this return. Complete it with store credit or bank transfer instead, and settle the difference with the customer directly.`,
+          `This return is worth ${formatMajor(toGateway)} EGP at the gateway but only ${formatMajor(refundableRemaining)} EGP is left on the payment, because part of it was already refunded outside this return. Complete it with store credit or bank transfer instead, and settle the difference with the customer directly.`,
           { refundAmount: toGateway, refundableRemaining }
         );
       }

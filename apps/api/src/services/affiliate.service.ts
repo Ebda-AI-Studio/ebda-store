@@ -19,7 +19,7 @@ interface AffiliateConfigDefaults {
 const CONFIG_DEFAULTS: AffiliateConfigDefaults = {
   defaultCommissionRate: 10,
   cookieDurationDays: 30,
-  minPayoutAmount: 5000,
+  minPayoutAmount: 50000, // 500 EGP in piastres
   autoApprove: false,
   publicSignupEnabled: true,
 };

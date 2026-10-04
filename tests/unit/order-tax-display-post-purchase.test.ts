@@ -6,8 +6,8 @@ import { orderTaxPlacement } from '@force/shared';
 /**
  * Issue 2210 — the post-purchase order surfaces printed an INCLUSIVE `tax`
  * as a summed row between Subtotal and Total, so an inclusive order read
- * Subtotal 5.000 + Tax 0.238 + Shipping 0.500 against a printed Total of
- * 5.500. Every surface now takes the placement from `orderTaxPlacement`.
+ * Subtotal 50.00 + Tax 2.38 + Shipping 5.00 against a printed Total of
+ * 55.00. Every surface now takes the placement from `orderTaxPlacement`.
  */
 
 const mockFindFirst = vi.fn();
@@ -40,7 +40,7 @@ function invoiceOrder(overrides: Record<string, unknown>) {
     items: [],
     payments: [],
     appliedPromotion: null,
-    store: { name: 'S', currency: 'KWD', theme: null, timezone: 'Asia/Kuwait' },
+    store: { name: 'S', currency: 'EGP', theme: null, timezone: 'Africa/Cairo' },
     ...overrides,
   };
 }
@@ -80,7 +80,7 @@ describe('invoice — inclusive VAT placement', () => {
     const caption = html.indexOf('row tax-included');
     expect(caption).toBeGreaterThan(grand);
     expect(html).toContain('Incl. VAT');
-    expect(html).toContain('0.238 KWD');
+    expect(html).toContain('2.38 EGP');
   });
 
   it('inclusive order in Arabic uses the Arabic caption', async () => {
@@ -95,7 +95,7 @@ describe('invoice — inclusive VAT placement', () => {
       invoiceOrder({ taxIncludedInPrice: false, tax: 250, total: 5750 })
     );
     const html = await InvoiceService.generateInvoice('s1', 'o1', 'en');
-    expect(html).toMatch(/<span class="label">Tax<\/span><span class="val">0\.250 KWD/);
+    expect(html).toMatch(/<span class="label">Tax<\/span><span class="val">2\.50 EGP/);
     expect(html).not.toContain('row tax-included');
   });
 });

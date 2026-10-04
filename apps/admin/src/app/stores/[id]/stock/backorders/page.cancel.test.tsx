@@ -66,7 +66,7 @@ describe('backorder cancel modal (issue 2275)', () => {
     api.apiPost.mockResolvedValue({ data: { id: 'bo-1', owedToCustomer: 2000 }, error: null });
     await cancelLine();
     await waitFor(() => expect(screen.getByText(/cancelModal\.owedNotice/)).toBeTruthy());
-    expect(screen.getByText(/2\.000/)).toBeTruthy();
+    expect(screen.getByText(/20\.00/)).toBeTruthy();
   });
 
   it('an unpaid line owes nothing: the modal just closes', async () => {

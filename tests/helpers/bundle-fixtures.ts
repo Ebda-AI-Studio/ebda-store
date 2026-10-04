@@ -113,7 +113,7 @@ export async function seedBundleStore(suffix: string): Promise<FixtureStore> {
         name: `bundle-fixture-store-${suffix}`,
         slug: `bundle-fixture-${suffix}`,
         template: 'modern',
-        currency: 'KWD',
+        currency: 'EGP',
         ownerId: owner.id,
         status: 'active',
       },
@@ -152,7 +152,7 @@ export async function seedStoreWithoutBundlesFeature(suffix: string): Promise<Fi
         name: `bundle-fixture-nofeature-store-${suffix}`,
         slug: `bundle-fixture-nofeature-${suffix}`,
         template: 'modern',
-        currency: 'KWD',
+        currency: 'EGP',
         ownerId: owner.id,
         status: 'active',
       },
@@ -345,11 +345,11 @@ export const DEFAULT_TEST_SHIPPING_ADDRESS = {
   firstName: 'Bundle',
   lastName: 'Buyer',
   address1: 'Block 1, Street 1',
-  city: 'Kuwait City',
+  city: 'Cairo',
   state: 'Capital',
-  area: 'Kuwait City',
+  area: 'Cairo',
   postalCode: '00000',
-  country: 'KW',
+  country: 'EG',
   phone: '96551234567',
   email: 'bundle-buyer@example.com',
 };
@@ -391,7 +391,7 @@ export interface CheckoutOptions {
  * mirrors how `tests/integration/loyalty-redemption.test.ts` drives
  * checkout for other money-path integration coverage (bypassing HTTP, which
  * adds nothing this suite needs to assert). `paymentMethod` defaults to
- * `myfatoorah` (non-COD) so checkout doesn't attempt the COD
+ * `paymob` (non-COD) so checkout doesn't attempt the COD
  * inngest/socket notification fanout that a lightweight test app doesn't
  * wire up. Returns the created order WITH `items` (already included by
  * `OrderService.create`).
@@ -411,7 +411,7 @@ export async function checkoutBundleFor(
   }
   return OrderService.create(storeId, opts.customerId, sessionId, {
     shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
-    paymentMethod: opts.paymentMethod ?? 'myfatoorah',
+    paymentMethod: opts.paymentMethod ?? 'paymob',
   });
 }
 

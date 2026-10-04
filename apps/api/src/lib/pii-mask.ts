@@ -13,7 +13,7 @@
  */
 
 /**
- * `+96512345678` → `+965 ****5678`; `9876 5432` → `****5432`.
+ * `+201012345678` → `+201 ****5678`; `0101 2345 678` → `****5678`.
  * A leading `+` keeps its (up to 3-digit) country code. Fewer than 5 digits
  * masks everything. Empty/nullish input returns null (unknown, not "").
  */
@@ -93,14 +93,14 @@ export function maskAddress(address: unknown): Record<string, unknown> | null {
 }
 
 /**
- * Shopper-authored free text (order `notes` / `customerNotes`) is where Kuwait
+ * Shopper-authored free text (order `notes` / `customerNotes`) is where Egyptian
  * shoppers type street directions and a callback number — a field no schema
  * constrains. Redact anything shaped like a phone number (a run of 8+ digits,
  * spaces/dashes allowed between them, optional leading `+`) or an email
  * address; the rest of the note (delivery-time wishes, gift messages) stays
  * readable. Empty/nullish input returns null.
  */
-// 8+ digits (a Kuwait mobile is 8; with +965 it is 11), spaces/hyphens
+// 8+ digits (an Egyptian mobile is 11 digits locally; with +20 it is 12), spaces/hyphens
 // allowed between them — but NOT an ISO date (`2026-09-30`, 8 digits) or a
 // short order/building number, which a triage agent needs to read (PR 2301
 // audit P3). Dates are masked out before the phone pass, and a digit run

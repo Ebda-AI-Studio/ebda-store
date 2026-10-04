@@ -11,7 +11,7 @@ import logger from '../../lib/logger';
  *     so a partial out-of-band refund still restored all inventory and reversed
  *     the entire sale journal.
  *  2. The unknown-amount rule was then added to the webhook and not the route,
- *     so an amount-less provider response was recorded as a 0-fil PARTIAL
+ *     so an amount-less provider response was recorded as a 0-piastre PARTIAL
  *     refund — suppressing every reversal while the money had already left the
  *     gateway, and leaving the payment looking refundable so a later return
  *     could fire a second real refund.
@@ -29,7 +29,7 @@ import logger from '../../lib/logger';
  *    `alreadyRefunded` is positive, an IN-BAND partial refund has already been
  *    claimed on this payment and the event is almost certainly the provider's
  *    asynchronous settle notice for exactly that slice. Neither an absent
- *    amount nor one that equals the whole payment (MyFatoorah's refund webhook
+ *    amount nor one that equals the whole payment (a gateway's refund webhook
  *    falls back to the INVOICE `Amount` when `RefundAmount` is missing) is then
  *    evidence that the balance was refunded too, so neither settles the
  *    payment. Reading them as full marks a partly-refunded payment as settled

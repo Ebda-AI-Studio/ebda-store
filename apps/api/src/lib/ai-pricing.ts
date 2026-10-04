@@ -91,8 +91,8 @@ export function __resetRateCacheForTests(): void {
  * Cost of one call in MICROS of the billing currency, or `null` when the model
  * has no configured rate.
  *
- * Micros, not fils: a single flash-lite call is routinely a small fraction of
- * one fils, and integer fils would round essentially every row to 0, making the
+ * Micros, not piastres: a single flash-lite call is routinely a small fraction of
+ * one piastres, and integer piastres would round essentially every row to 0, making the
  * whole column useless for exactly the small-per-call/large-in-aggregate spend
  * it exists to measure.
  */

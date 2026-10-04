@@ -3,10 +3,10 @@
  *
  * Materialises three snapshot tables nightly for every store:
  *   • CustomerCohortSnapshot  — cohort retention matrix
- *   • FunnelSnapshot          — checkout funnel per calendar day (KW timezone)
+ *   • FunnelSnapshot          — checkout funnel per calendar day (Cairo timezone)
  *   • CustomerRfmSnapshot     — per-customer RFM quintile + segment
  *
- * Designed to be called by the `analytics-daily-rollup` Inngest cron (02:00 KW)
+ * Designed to be called by the `analytics-daily-rollup` Inngest cron (02:00 Cairo)
  * or on-demand via `POST /:storeId/insights/rollup/run-now`.
  *
  * Guest handling: orders where customerId IS NULL are keyed by
@@ -26,6 +26,12 @@ import { customerKeyOf, isGuestOrder, rfmKeyFor } from '../../lib/customer-key';
 // aborted the transaction and silently doomed every later block's writes.
 import { withSavepoint } from '../../lib/savepoint';
 
+import {
+  regionDayStart,
+  regionDayStartOffset,
+  regionMonthStart,
+  regionYearMonth,
+} from '@force/shared';
 /**
  * Rows per savepoint on the per-row UPDATE loops (issue 2293). A savepoint
  * per row issued SAVEPOINT + UPDATE + RELEASE — three round trips per row —
@@ -77,42 +83,32 @@ export interface RollupResult {
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Kuwait is UTC+3. We use this to align "day" boundaries. */
-const KW_OFFSET_MS = 3 * 60 * 60 * 1000;
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Returns the floor of a Date to the start of its UTC day,
- * shifted so that "day" boundaries are in Kuwait time (UTC+3).
- * i.e. Kuwait midnight corresponds to UTC 21:00 the prior day.
- */
-function kwDayStart(d: Date): Date {
-  const kwMs = d.getTime() + KW_OFFSET_MS;
-  const dayMs = Math.floor(kwMs / (24 * 60 * 60 * 1000)) * (24 * 60 * 60 * 1000);
-  return new Date(dayMs - KW_OFFSET_MS);
+// Day/month boundaries are calendar days in REGION.timezone (Africa/Cairo),
+// DST-aware (a fixed offset is wrong for half the year). view-ingest.service.ts
+// uses the same `regionDayStart`, so its ProductDailyView `date` joins exactly.
+
+/** Start of the Cairo calendar day containing `d`. */
+function dayStartOf(d: Date): Date {
+  return regionDayStart(d);
 }
 
-/** Returns a Date set to N full calendar days before the given date (KW-aligned). */
-function kwDaysAgo(n: number, from: Date = new Date()): Date {
-  return new Date(kwDayStart(from).getTime() - n * 24 * 60 * 60 * 1000);
+/** Start of the Cairo day `n` full calendar days before the one containing `from`. */
+function daysAgo(n: number, from: Date = new Date()): Date {
+  return regionDayStartOffset(from, -n);
 }
 
-/** Formats a Date as 'YYYY-MM' based on UTC month (shifted for KW). */
+/** Formats a Date as 'YYYY-MM' (Cairo calendar month). */
 function toYearMonth(d: Date): string {
-  const kwDate = new Date(d.getTime() + KW_OFFSET_MS);
-  const y = kwDate.getUTCFullYear();
-  const m = String(kwDate.getUTCMonth() + 1).padStart(2, '0');
-  return `${y}-${m}`;
+  return regionYearMonth(d);
 }
 
-/** Returns the start of a given YYYY-MM month in UTC (accounting for KW offset). */
+/** Returns the start of a given YYYY-MM month (Cairo midnight of the 1st). */
 function monthStart(ym: string): Date {
-  const [y, m] = ym.split('-').map(Number);
-  // midnight KW of the 1st of the month = UTC midnight - 3h
-  return new Date(Date.UTC(y, m - 1, 1, 0, 0, 0) - KW_OFFSET_MS);
+  return regionMonthStart(ym);
 }
 
 /** Generates a sequence of 'YYYY-MM' strings from start to end (inclusive). */
@@ -420,13 +416,13 @@ export async function runCohortRollup(storeId: string): Promise<number> {
 // ---------------------------------------------------------------------------
 
 /**
- * For each calendar day from `daysBack` days ago to yesterday (KW timezone),
+ * For each calendar day from `daysBack` days ago to yesterday (Cairo timezone),
  * counts funnel stages and writes FunnelSnapshot rows.
  *
  * Returns the number of day-rows written.
  */
 export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<number> {
-  const today = kwDayStart(new Date());
+  const today = dayStartOf(new Date());
 
   type FunnelRow = {
     periodDate: Date;
@@ -441,8 +437,8 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
   const computedRows: FunnelRow[] = [];
 
   for (let d = daysBack; d >= 1; d--) {
-    const dayStart = kwDaysAgo(d, new Date(today.getTime() + KW_OFFSET_MS)); // shift back to KW reference
-    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+    const dayStart = daysAgo(d, today);
+    const dayEnd = regionDayStartOffset(dayStart, 1); // next Cairo midnight (DST-safe, not +24h)
 
     // cartsCreated
     const cartsCreated = await prisma.cart.count({
@@ -488,19 +484,19 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
     });
 
     // productViews: sum of ProductDailyView.count for this store on this calendar day.
-    // `date` in product_daily_views is a DATE stored at UTC midnight (kwDayStart output),
+    // `date` in product_daily_views is a DATE stored at UTC midnight (regionDayStart output),
     // so an exact equality match on dayStart gives the right rows.
     const productViewsAgg = await prisma.productDailyView.aggregate({
       where: {
         storeId,
-        date: dayStart, // exact match — DATE column stored as UTC midnight KW-day-start
+        date: dayStart, // exact match — DATE column stored as Cairo-day-start instant
       },
       _sum: { count: true },
     });
     const productViews = productViewsAgg._sum.count ?? 0;
 
     computedRows.push({
-      periodDate: dayStart, // store as UTC midnight-aligned KW day start
+      periodDate: dayStart, // store as the Cairo day-start instant
       productViews,
       cartsCreated,
       cartItemsAdded,

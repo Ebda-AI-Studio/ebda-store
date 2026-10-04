@@ -18,17 +18,17 @@ export interface OrderCustomer {
 export interface OrderPayment {
   id?: string;
   provider: string;
-  /** Specific method within the provider (e.g. knet, visa, mastercard). */
+  /** Specific method within the provider (e.g. card, meeza, wallet). */
   method?: string | null;
   status: string;
   amount?: number;
   /** Provider-side transaction id, useful for reconciliation. */
   transactionId?: string | null;
-  /** Provider's hosted-checkout URL (MyFatoorah / Tap / Hesabe / UPayments). */
+  /** Provider's hosted-checkout URL (Paymob / Kashier / Fawry). */
   paymentUrl?: string | null;
   /** Legacy alias for paymentUrl kept for backwards compatibility. */
   paymentLink?: string | null;
-  /** Fils already refunded from this payment (partial refunds accumulate). */
+  /** Piastres already refunded from this payment (partial refunds accumulate). */
   refundedAmount?: number | null;
   createdAt?: string;
 }
@@ -81,6 +81,8 @@ export interface Order {
   status: string;
   paymentStatus: string;
   createdAt: string;
+  /** InstaPay hold deadline (ISO) while the order awaits the merchant's confirmation. */
+  paymentConfirmationExpiresAt?: string | null;
   payments?: OrderPayment[];
   items?: OrderLineItem[];
 }
@@ -101,7 +103,7 @@ export interface AddressJson {
   floor?: string;
   apartment?: string;
   notes?: string;
-  // Governorate (top-level KW administrative division).
+  // Governorate (top-level Egyptian governorate (محافظة)).
   governorate?: string;
   governorateAr?: string;
   // Bilingual fallback fields stored as the customer entered them.
@@ -125,12 +127,12 @@ export interface OrderDetail extends Order {
   promotionDiscount?: number;
   /** The promotion that discounted this order, when `promotionDiscount` > 0. */
   appliedPromotion?: { id: string; name: string; nameAr?: string | null } | null;
-  /** The loyalty-points redemption portion of `discount`, in fils (0 when no
+  /** The loyalty-points redemption portion of `discount`, in piastres (0 when no
    *  points were redeemed). */
   loyaltyDiscount?: number;
   /** Points redeemed for `loyaltyDiscount`; null on a pre-feature order. */
   loyaltyPointsRedeemed?: number | null;
-  /** Customer-wallet (store credit) portion of `total`, in fils (D1). The
+  /** Customer-wallet (store credit) portion of `total`, in piastres (D1). The
    *  gateway / courier collects `total - walletAmount`. 0 or absent for every
    *  order that did not use the wallet. */
   walletAmount?: number;
@@ -143,6 +145,13 @@ export interface OrderDetail extends Order {
   updatedAt: string;
   items: OrderLineItem[];
   payments?: OrderPayment[];
+  /** InstaPay summary for the merchant (the customer's entered reference, the handle paid to). */
+  instapay?: {
+    customerReference: string | null;
+    customerReferenceAt: string | null;
+    handle: string | null;
+    expiresAt: string | null;
+  } | null;
 }
 
 export interface Pagination {
@@ -172,7 +181,16 @@ export const statusOptionsFor = orderStatusOptions;
  * client-side concept derived from paymentStatus rather than a status enum
  * value — see filterMatches below.
  */
-export const STATUS_FILTERS = ['all', 'new', 'paid', 'processing', 'shipped', 'delivered'] as const;
+export const STATUS_FILTERS = [
+  'all',
+  'new',
+  // InstaPay orders waiting for the merchant's "payment received" (SP6a).
+  'awaiting',
+  'paid',
+  'processing',
+  'shipped',
+  'delivered',
+] as const;
 
 export type StatusFilter = (typeof STATUS_FILTERS)[number];
 
@@ -183,6 +201,7 @@ export type StatusFilter = (typeof STATUS_FILTERS)[number];
 export function filterToApiStatus(filter: StatusFilter): string | undefined {
   if (filter === 'all' || filter === 'paid') return undefined;
   if (filter === 'new') return 'pending';
+  if (filter === 'awaiting') return 'awaiting_payment_confirmation';
   return filter;
 }
 
@@ -194,6 +213,7 @@ export function clientFilterMatches(order: Order, filter: StatusFilter): boolean
 
 export const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-warning/15 text-warning-foreground border-warning/30',
+  awaiting_payment_confirmation: 'bg-primary/15 text-primary-ink border-primary/30',
   confirmed: 'bg-info/15 text-info-ink border-info/30',
   processing: 'bg-info/15 text-info-ink border-info/30',
   shipped: 'bg-primary/15 text-primary-ink border-primary/30',

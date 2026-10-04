@@ -98,7 +98,7 @@ async function paidOrder(status: 'delivered' | 'refunded' | 'cancelled') {
       shipping: 0,
       discount: 0,
       total: 2000,
-      currency: 'KWD',
+      currency: 'EGP',
       shippingAddress: {},
       billingAddress: {},
       items: {
@@ -114,7 +114,7 @@ async function paidOrder(status: 'delivered' | 'refunded' | 'cancelled') {
         ],
       },
       payments: {
-        create: [{ provider: 'myfatoorah', status: 'completed', amount: 2000, paidAt: new Date() }],
+        create: [{ provider: 'paymob', status: 'completed', amount: 2000, paidAt: new Date() }],
       },
     },
   });

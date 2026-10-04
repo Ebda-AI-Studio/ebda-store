@@ -45,7 +45,7 @@ function buildCategorizePrompt(input: SuggestProductCategoryInput): string {
     .map(c => `${c.id} :: ${c.name}${c.nameAr ? ` / ${c.nameAr}` : ''}`)
     .join('\n');
 
-  return `You categorise products for a Kuwait-based e-commerce store called ${storeName}.
+  return `You categorise products for an Egypt-based e-commerce store called ${storeName}.
 
 Available categories (id :: name [/ name_ar]):
 ${catList}

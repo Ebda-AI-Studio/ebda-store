@@ -99,8 +99,8 @@ import { formatDate, formatPrice } from '../../../../../lib/format';
 import { ERASURE_REVIEW_PARAM } from '../_components/customerSegments';
 import { useT } from '../../../../../i18n/useT';
 
-function formatKwd(fils: number): string {
-  return formatPrice(fils);
+function formatMajor(piastres: number): string {
+  return formatPrice(piastres);
 }
 
 function StatusChip({ status }: { status: string }) {
@@ -388,7 +388,7 @@ export default function CustomerDetailPage() {
             {refundedPayment && (
               <p className="mt-1 text-xs text-destructive-ink">
                 <span className="font-semibold">{t('refunded')}</span>
-                {' · '}-{formatKwd(refundedPayment.refundedAmount ?? order.total)} {t('via')}{' '}
+                {' · '}-{formatMajor(refundedPayment.refundedAmount ?? order.total)} {t('via')}{' '}
                 {refundedPayment.provider}
                 {refundedPayment.metadata?.refundedAt && (
                   <>
@@ -425,7 +425,7 @@ export default function CustomerDetailPage() {
       header: t('colTotal'),
       alignEnd: true,
       cell: order => (
-        <span className="text-sm font-bold text-foreground">{formatKwd(order.total)}</span>
+        <span className="text-sm font-bold text-foreground">{formatMajor(order.total)}</span>
       ),
     },
     {
@@ -630,7 +630,7 @@ export default function CustomerDetailPage() {
                     {t('statsSpent')}
                   </p>
                   <p className="mt-1 text-2xl font-bold text-foreground">
-                    {formatKwd(customer.totalSpent)}
+                    {formatMajor(customer.totalSpent)}
                   </p>
                 </div>
                 <div className="rounded-xl border bg-card p-4">
@@ -638,7 +638,7 @@ export default function CustomerDetailPage() {
                     {t('statsAvgOrder')}
                   </p>
                   <p className="mt-1 text-2xl font-bold text-foreground">
-                    {formatKwd(customer.avgOrderValue)}
+                    {formatMajor(customer.avgOrderValue)}
                   </p>
                 </div>
                 <div className="rounded-xl border bg-card p-4">
@@ -675,12 +675,12 @@ export default function CustomerDetailPage() {
                 )}
                 {customer.refundedCount > 0 && (
                   <span
-                    title={`${t('refunded')}: ${formatKwd(customer.totalRefunded)}`}
+                    title={`${t('refunded')}: ${formatMajor(customer.totalRefunded)}`}
                     className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive-ink"
                   >
                     {t('statusRefunded')} · {customer.refundedCount}
                     <span className="text-[10px] text-destructive-ink">
-                      ({formatKwd(customer.totalRefunded)})
+                      ({formatMajor(customer.totalRefunded)})
                     </span>
                   </span>
                 )}
@@ -753,7 +753,7 @@ export default function CustomerDetailPage() {
                         </p>
                         {walletEnabled && walletBalance > 0 && (
                           <p className="mt-1 text-sm font-medium text-destructive-ink">
-                            {tWallet('forfeitWarning', { amount: formatKwd(walletBalance) })}
+                            {tWallet('forfeitWarning', { amount: formatMajor(walletBalance) })}
                           </p>
                         )}
                       </div>

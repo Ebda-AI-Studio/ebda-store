@@ -808,9 +808,7 @@ export default function StoreSeoPage() {
                   placeholder={t('senderPrefixPlaceholder')}
                   className="flex-1 px-3 py-2 text-sm focus:outline-none"
                 />
-                <span className="bg-muted px-3 py-2 text-sm text-muted-foreground">
-                  @force-ai.co
-                </span>
+                <span className="bg-muted px-3 py-2 text-sm text-muted-foreground">@ebda.app</span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{t('senderPrefixHint')}</p>
             </div>

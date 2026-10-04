@@ -109,7 +109,7 @@ export default function BlogIndexPage() {
                       </div>
                       <div className="p-4">
                         <p className="text-xs text-foreground/55">
-                          {new Date(date).toLocaleDateString(isRtl ? 'ar-KW' : 'en-KW', {
+                          {new Date(date).toLocaleDateString(isRtl ? 'ar-EG' : 'en-EG', {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',

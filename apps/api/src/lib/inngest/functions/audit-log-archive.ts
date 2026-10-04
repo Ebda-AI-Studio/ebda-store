@@ -1,6 +1,6 @@
 import type { InngestFunction } from 'inngest';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { withRlsBypass } from '@force/database';
+import { loadS3 } from '../../lazy-modules';
+import { auditRetention } from '../../definer';
 import logger from '../../logger';
 import { inngest } from '../client';
 
@@ -9,7 +9,7 @@ import { inngest } from '../client';
  * Mirrors the manual `scripts/archive-audit-logs.mjs --apply --export`
  * invocation but on a cron so we don't have to remember to run it.
  *
- * Trigger: every Sunday at 03:00 UTC (06:00 Asia/Kuwait — middle of
+ * Trigger: every Sunday at 03:00 UTC (06:00 Africa/Cairo — middle of
  * the night, well after the night-shift admins finish for the day).
  *
  * Why archive AND delete: dropping the rows shrinks the working set
@@ -34,9 +34,7 @@ export const auditLogArchive: InngestFunction.Any = inngest.createFunction(
     // audit_logs is a cross-tenant system table. Inngest crons run without any
     // HTTP tenant context so no store GUC is set. FORCE RLS on audit_logs would
     // filter every read to 0 rows. Use withRlsBypass for all DB access here.
-    const total = await step.run('count-old-rows', () =>
-      withRlsBypass(tx => tx.auditLog.count({ where: { createdAt: { lt: cutoff } } }))
-    );
+    const total = await step.run('count-old-rows', () => auditRetention.count(cutoff));
 
     if (total === 0) {
       logger.info({ cutoff }, 'audit-log-archive: nothing to archive');
@@ -54,6 +52,7 @@ export const auditLogArchive: InngestFunction.Any = inngest.createFunction(
         return { skipped: true, written: 0, key: null };
       }
 
+      const { S3Client, PutObjectCommand } = await loadS3();
       const s3 = new S3Client({
         endpoint,
         region: 'auto',
@@ -67,14 +66,8 @@ export const auditLogArchive: InngestFunction.Any = inngest.createFunction(
       while (true) {
         // withRlsBypass in a loop: each page is a fresh transaction. The cursor
         // value is captured in closure so the next page picks up where we left off.
-        const rows: Array<{ id: string }> = await withRlsBypass(tx =>
-          tx.auditLog.findMany({
-            where: { createdAt: { lt: cutoff } },
-            orderBy: { id: 'asc' },
-            take: EXPORT_PAGE,
-            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-          })
-        );
+        // Through definers: audit_logs spans every store AND store-less platform rows.
+        const rows: Array<{ id: string }> = await auditRetention.page(cutoff, cursor, EXPORT_PAGE);
         if (rows.length === 0) break;
         for (const r of rows) chunks.push(JSON.stringify(r) + '\n');
         written += rows.length;
@@ -106,17 +99,7 @@ export const auditLogArchive: InngestFunction.Any = inngest.createFunction(
       while (true) {
         // Raw DELETE bypasses Prisma's model layer — wrap in withRlsBypass so
         // the session's GUC allows the DELETE to execute cross-tenant.
-        const result = await withRlsBypass(tx =>
-          tx.$executeRawUnsafe<number>(
-            `DELETE FROM public.audit_logs WHERE id IN (
-               SELECT id FROM public.audit_logs WHERE created_at < $1::timestamp LIMIT ${DELETE_BATCH}
-             )`,
-            // Prisma 6.19 $executeRawUnsafe rejects JS Date objects — pass ISO
-            // string. `created_at` is `timestamp without time zone`, so cast
-            // the string param with `$1::timestamp` (no `timestamp < text`).
-            cutoff.toISOString()
-          )
-        );
+        const result = await auditRetention.purge(cutoff, DELETE_BATCH);
         if (!result || result === 0) break;
         total += Number(result);
       }

@@ -3,7 +3,7 @@
  *
  * The storefront hardcoded `maxRedeemPercentage: 100` because the public
  * loyalty info omitted it. Under the default 50% cap, a customer redeeming a
- * balance worth more than half the order saw e.g. 2.000 KWD in the summary and
+ * balance worth more than half the order saw e.g. 2.000 EGP in the summary and
  * was charged 5.000. Now the info route reports the cap and the client runs a
  * step-for-step mirror of `computeRedemption`; this suite runs both over the
  * same grid so any future drift in either one fails here, not at a customer.
@@ -22,7 +22,7 @@ const { estimateLoyaltyRedemption } = await import('@web/app/checkout/_lib/loyal
 
 describe('checkout loyalty estimate == server computeRedemption', () => {
   it('the reported case: default 50% cap binds, summary matches the charge', () => {
-    // 10.000 KWD goods, 8000 points at 1 fils each (8.000 KWD) requested.
+    // 10.000 EGP goods, 8000 points at 1 piastres each (8.000 EGP) requested.
     const server = computeRedemption(DEFAULT_LOYALTY_SETTINGS, 8000, 10000, 8000);
     const client = estimateLoyaltyRedemption(DEFAULT_LOYALTY_SETTINGS, 8000, 10000, 8000);
     expect(server.discountFils).toBe(5000);

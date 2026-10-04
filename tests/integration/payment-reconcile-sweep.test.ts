@@ -45,7 +45,7 @@ describe.skipIf(!hasDb)('payment-reconcile-sweep', () => {
           name: 'prs-test-store',
           slug: `prs-test-${suffix}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: owner.id,
         },
       });
@@ -69,10 +69,10 @@ describe.skipIf(!hasDb)('payment-reconcile-sweep', () => {
         await tx.payment.create({
           data: {
             orderId: cancelledOrderId,
-            provider: 'myfatoorah',
+            provider: 'paymob',
             status: 'completed',
             amount: 5000,
-            currency: 'KWD',
+            currency: 'EGP',
             transactionId: `prs-txn-${suffix}`,
           },
         })
@@ -95,10 +95,10 @@ describe.skipIf(!hasDb)('payment-reconcile-sweep', () => {
       await tx.payment.create({
         data: {
           orderId: healthy.id,
-          provider: 'myfatoorah',
+          provider: 'paymob',
           status: 'completed',
           amount: 5000,
-          currency: 'KWD',
+          currency: 'EGP',
           transactionId: `prs-txn-ok-${suffix}`,
         },
       });

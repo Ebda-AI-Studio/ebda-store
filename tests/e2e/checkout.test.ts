@@ -68,7 +68,7 @@ describe('Checkout Flow', () => {
         slug: `checkout-test-store-${Date.now()}`,
         ownerId: user.id,
         status: 'active',
-        currency: 'KWD',
+        currency: 'EGP',
       },
     });
     testStoreId = store.id;
@@ -79,7 +79,7 @@ describe('Checkout Flow', () => {
         storeId: store.id,
         name: 'Checkout Product 1',
         slug: `checkout-product-1-${Date.now()}`,
-        price: 5000, // 5 KWD
+        price: 5000, // 5 EGP
         inventory: 50,
         status: 'active',
       },
@@ -91,7 +91,7 @@ describe('Checkout Flow', () => {
         storeId: store.id,
         name: 'Checkout Product 2',
         slug: `checkout-product-2-${Date.now()}`,
-        price: 7500, // 7.5 KWD
+        price: 7500, // 7.5 EGP
         inventory: 30,
         status: 'active',
       },
@@ -283,8 +283,8 @@ describe('Checkout Flow', () => {
             firstName: 'Test',
             lastName: 'Customer',
             address1: '123 Test Street',
-            city: 'Kuwait City',
-            country: 'Kuwait',
+            city: 'Cairo',
+            country: 'Egypt',
             phone: '+96512345678',
           },
           paymentMethod: 'cod',

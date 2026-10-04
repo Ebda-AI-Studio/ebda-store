@@ -1,6 +1,7 @@
-import ExcelJS from 'exceljs';
+import { loadExcelJS } from '../lib/lazy-modules';
 import { AppError } from '../middleware/error-handler';
 
+import { tryToMinor } from '@force/shared';
 /**
  * Convert an XLSX buffer into the platform's CSV import format.
  *
@@ -11,8 +12,8 @@ import { AppError } from '../middleware/error-handler';
  * metadata get folded into the description field instead of lost.
  *
  * Rules:
- *  - Prices in the sheet are human currency (e.g. 1.25 = 1.250 KWD);
- *    we convert to fils (× 1000).
+ *  - Prices in the sheet are human currency (e.g. 1.25 = 1.250 EGP);
+ *    we convert to piastres (× 100, strict: max 2 decimals).
  *  - Sequential `#N` style identifiers become `${skuPrefix}-${N}`.
  *  - Arabic columns keep their text (we don't transliterate).
  */
@@ -32,7 +33,7 @@ export async function xlsxBufferToImportCsv(
     trackInventory = false,
   } = options;
 
-  const workbook = new ExcelJS.Workbook();
+  const workbook = new (await loadExcelJS()).Workbook();
   try {
     // exceljs' load signature expects ArrayBuffer-backed data; copy the
     // buffer's view to be explicit so TS is happy across node/undici Buffer types.
@@ -279,23 +280,18 @@ function rowToProduct(
 
   const out: Partial<ProductRowOut> = { ...raw };
 
-  // Price — convert from human currency (1.25) to fils (1250).
-  if (raw.price) {
-    const parsed = parseFloat(raw.price);
-    if (Number.isFinite(parsed)) {
-      out.price = Math.round(parsed * 1000).toString();
-    }
-  }
-  if (raw.compareAtPrice) {
-    const parsed = parseFloat(raw.compareAtPrice);
-    if (Number.isFinite(parsed)) {
-      out.compareAtPrice = Math.round(parsed * 1000).toString();
-    }
-  }
-  if (raw.costPrice) {
-    const parsed = parseFloat(raw.costPrice);
-    if (Number.isFinite(parsed)) {
-      out.costPrice = Math.round(parsed * 1000).toString();
+  // Price — convert from human currency (12.50) to piastres (1250). STRICT:
+  // more than the currency's decimals ("12.505") is rejected, never rounded —
+  // the row gets the sentinel 'NaN', which the bulk validator reports as an
+  // invalid price instead of silently importing a mangled amount.
+  for (const key of ['price', 'compareAtPrice', 'costPrice'] as const) {
+    const cell = raw[key];
+    if (!cell) continue;
+    const minor = tryToMinor(cell);
+    if (minor !== null) {
+      out[key] = String(minor);
+    } else if (Number.isFinite(parseFloat(cell))) {
+      out[key] = 'NaN';
     }
   }
 

@@ -72,7 +72,7 @@ function mockProvider(
   return { engine, query: queryMock, queryMock };
 }
 
-const FIXED_PROMPTS = [{ text: 'best gadgets in Kuwait', locale: 'en' as const }];
+const FIXED_PROMPTS = [{ text: 'best gadgets in Egypt', locale: 'en' as const }];
 
 beforeAll(async () => {
   await prisma.user.upsert({

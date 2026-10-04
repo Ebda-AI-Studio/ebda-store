@@ -6,9 +6,9 @@
  * Dry-run by default (prints current state). Pass --apply to write.
  * Run on PROD:  railway run npx tsx packages/database/prisma/flip-card-frame-primary.ts --apply
  */
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '../src/client';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
 const APPLY = process.argv.includes('--apply');
 
 async function main() {

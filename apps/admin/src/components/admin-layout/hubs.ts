@@ -232,11 +232,13 @@ export const HUBS: HubDefinition[] = [
       '/payment-settings',
       '/shipping',
       '/shipping-carriers',
+      '/cod-reconciliation',
       '/tax',
       '/pwa',
       '/language',
       '/template',
       '/announcement',
+      '/billing',
     ],
     // Settings pages share one hub for nav highlighting; they have no sub-tabs.
     buildTabs: () => [],

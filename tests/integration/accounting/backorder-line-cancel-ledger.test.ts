@@ -51,7 +51,7 @@ function uid(): string {
  *   C 1000 × 3 (cost  400) → 3000
  * subtotal 8500, discount 1000, tax 777 (exclusive), total 8277 + shipping.
  * Neither 1000 nor 777 splits evenly by line gross, so a per-line (non-
- * cumulative) allocation would leave fils behind — the all-lines test catches it.
+ * cumulative) allocation would leave piastres behind — the all-lines test catches it.
  */
 async function seedOrder(opts: { shipping?: number; qtyFulfilledC?: number } = {}) {
   const shipping = opts.shipping ?? 0;
@@ -72,7 +72,7 @@ async function seedOrder(opts: { shipping?: number; qtyFulfilledC?: number } = {
       tax: 777,
       shipping,
       total,
-      currency: 'KWD',
+      currency: 'EGP',
       shippingAddress: {},
       billingAddress: {},
       items: {
@@ -87,9 +87,7 @@ async function seedOrder(opts: { shipping?: number; qtyFulfilledC?: number } = {
         })),
       },
       payments: {
-        create: [
-          { provider: 'myfatoorah', status: 'completed', amount: total, paidAt: new Date() },
-        ],
+        create: [{ provider: 'paymob', status: 'completed', amount: total, paidAt: new Date() }],
       },
     },
     include: { items: true },

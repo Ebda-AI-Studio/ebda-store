@@ -5,6 +5,7 @@ import { parse, toRGBA } from 'color-bits';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { BRAND, BRAND_MARKETING_URL } from '@force/shared';
 
 // ---------------------------------------------------------------------------
 // color-bits helpers
@@ -30,7 +31,7 @@ function colorWithOpacity(
 // ---------------------------------------------------------------------------
 
 export const siteConfig = {
-  name: 'Force AI',
+  name: BRAND.name,
   hero: {
     description: 'The AI-powered commerce platform built for Gulf businesses.',
   },
@@ -281,8 +282,8 @@ export function FlickeringFooter() {
   const isTablet = useMediaQuery('(min-width: 640px)');
   const { t } = useLanguage();
 
-  // Big text: "Force AI" on desktop, "Force" on tablet, nothing on mobile
-  const bigText = isDesktop ? 'Force AI' : isTablet ? 'Force' : null;
+  // Big text: "Ebda" on desktop, "Force" on tablet, nothing on mobile
+  const bigText = isDesktop ? BRAND.name : isTablet ? BRAND.name : null;
 
   // Translated footer link columns — column titles + link labels
   // Real destinations only — landing section anchors + live contact channels.
@@ -304,8 +305,8 @@ export function FlickeringFooter() {
       title: t('Get in touch', 'تواصل معنا'),
       links: [
         { label: t('WhatsApp', 'واتساب'), href: 'https://wa.me/96541169141' },
-        { label: t('Email', 'البريد'), href: 'mailto:info@force-ai.co' },
-        { label: t('Force AI', 'فورس إيه آي'), href: 'https://force-ai.co' },
+        { label: t('Email', 'البريد'), href: `mailto:${BRAND.supportEmail}` },
+        { label: t('Ebda', 'ابدأ'), href: BRAND_MARKETING_URL },
       ],
     },
   ];
@@ -317,11 +318,11 @@ export function FlickeringFooter() {
       {/* ------------------------------------------------------------------ */}
       <div className="relative z-10 border-t border-border/30 px-6 py-16">
         <div className="max-w-6xl mx-auto flex flex-col gap-12 md:gap-0 md:flex-row md:justify-between">
-          {/* Brand lockup — real Force AI logo (public/logo.svg, orange mark). */}
+          {/* Brand lockup — real Ebda logo (public/logo.svg, orange mark). */}
           <div className="flex flex-col gap-4 max-w-xs">
             <div className="flex items-center gap-2.5">
-              <img src="/logo.svg" alt="Force AI" className="h-9 w-auto" />
-              <span className="text-white font-bold text-lg tracking-tight">Force AI</span>
+              <img src="/logo.svg" alt={BRAND.name} className="h-9 w-auto" />
+              <span className="text-white font-bold text-lg tracking-tight">{BRAND.name}</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
               {t(
@@ -338,8 +339,11 @@ export function FlickeringFooter() {
               >
                 WhatsApp · +965 6674 0311
               </a>
-              <a href="mailto:info@force-ai.co" className="hover:text-primary transition-colors">
-                info@force-ai.co
+              <a
+                href={`mailto:${BRAND.supportEmail}`}
+                className="hover:text-primary transition-colors"
+              >
+                {BRAND.supportEmail}
               </a>
             </div>
           </div>
@@ -400,7 +404,7 @@ export function FlickeringFooter() {
       <div className="relative z-10 border-t border-border/20 px-6 py-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <p className="text-xs text-muted-foreground/60">
-            &copy; {new Date().getFullYear()} Force AI.{' '}
+            &copy; {new Date().getFullYear()} Ebda.{' '}
             {t('All rights reserved.', 'جميع الحقوق محفوظة.')}
           </p>
           <div className="flex items-center gap-4">

@@ -45,11 +45,11 @@ describe('checkMinimumOrder', () => {
     expect(result.shortfallFils).toBe(0);
   });
 
-  it('computes the exact Pecannbee scenario (5 KWD minimum, 2 KWD short)', () => {
-    // 5 KWD = 5000 fils minimum, cart at 3 KWD = 3000 fils.
+  it('computes the exact Pecannbee scenario (5 EGP minimum, 2 EGP short)', () => {
+    // 5 EGP = 5000 piastres minimum, cart at 3 EGP = 3000 piastres.
     const result = checkMinimumOrder(3000, 5000);
     expect(result.met).toBe(false);
-    expect(result.shortfallFils).toBe(2000); // 2.000 KWD more needed
+    expect(result.shortfallFils).toBe(2000); // 2.000 EGP more needed
   });
 
   it('is not met for a subtotal of 0 against a positive minimum', () => {

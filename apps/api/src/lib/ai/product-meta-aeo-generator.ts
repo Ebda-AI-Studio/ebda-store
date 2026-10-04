@@ -57,7 +57,7 @@ export function buildMetaAeoPrompt(
         ? `the category name and the kinds of products it contains at ${storeName ?? 'the store'}`
         : 'the product name and what it does or is for';
 
-  return `You are an AEO (Answer Engine Optimisation) expert writing meta descriptions for a Kuwait-based e-commerce ${kind}.
+  return `You are an AEO (Answer Engine Optimisation) expert writing meta descriptions for an Egypt-based e-commerce ${kind}.
 
 ${context}
 
@@ -71,7 +71,7 @@ Write a meta description that directly answers the question a user might ask an 
 - Both English and Arabic (formal MSA)
 
 Return ONLY a JSON object with keys "en" and "ar". No markdown, no code fences — pure JSON only.
-Example: {"en": "Force AI Store is a Kuwait-based online retailer ...", "ar": "فورس ستور متجر كويتي متخصص في ..."}`;
+Example: {"en": "Ebda is an Egypt-based online retailer ...", "ar": "ابدأ متجر مصري متخصص في ..."}`;
 }
 
 export interface GenerateProductMetaAeoInput {

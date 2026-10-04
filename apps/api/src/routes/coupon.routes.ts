@@ -9,6 +9,7 @@ import { CouponService } from '../services/coupon.service';
 import { resolveCustomerContext } from '../services/promotion-resolver';
 import { tenantContext } from '../middleware/tenant-context';
 
+import { minorToDecimalString } from '@force/shared';
 const router = Router();
 
 // Mounted at the bare '/stores' prefix in routes/index.ts, so Express does
@@ -332,7 +333,7 @@ router.post(
           success: false,
           error: {
             code: 'MIN_ORDER_NOT_MET',
-            message: `Minimum order amount of ${(coupon.minOrderAmount / 1000).toFixed(3)} KWD required`,
+            message: `Minimum order amount of ${minorToDecimalString(coupon.minOrderAmount)} EGP required`,
           },
         });
         return;

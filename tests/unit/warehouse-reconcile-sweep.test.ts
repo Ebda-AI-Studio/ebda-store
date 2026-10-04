@@ -1,7 +1,7 @@
 /**
  * warehouse-reconcile-sweep — daily completeness sweep (Task 4, item 5
- * data-integrity). Verifies: (1) stores are enumerated via withRlsBypass
- * (FORCE RLS, no tenant GUC in a cron), (2) each store's reconcile is NOT
+ * data-integrity). Verifies: (1) stores are enumerated with acrossStores
+ * (strict RLS, one tenant transaction per store), (2) each store's reconcile is NOT
  * wrapped in a whole-store `runInTenantContext` but IS wrapped in
  * `runInStoreScope` (issue 2081 — per-query scoping; fix wave 2, #936 — that
  * wrapper opened ONE 30s Prisma transaction across an unbounded SKU count,
@@ -22,15 +22,19 @@ const h = vi.hoisted(() => ({
   scopes: [] as string[],
   runInStoreScope: vi.fn(),
   sendAlert: vi.fn().mockResolvedValue('sent'),
-  withRlsBypass: vi.fn((fn: (tx: unknown) => unknown) =>
-    fn({ warehouse: { findMany: h.warehouseFindMany } })
-  ),
 }));
 
 vi.mock('@force/database', () => ({
   runInTenantContext: h.runInTenant,
   runInStoreScope: h.runInStoreScope,
-  withRlsBypass: h.withRlsBypass,
+  prisma: {},
+  // The sweep visits every store and keeps those that have a warehouse row;
+  // `warehouseFindMany` stands for "the stores that have one".
+  acrossStores: async () =>
+    ((await h.warehouseFindMany()) as Array<{ storeId: string }>).map(r => ({
+      storeId: r.storeId,
+      value: { storeId: r.storeId },
+    })),
 }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: h.sendAlert }));
 vi.mock('@api/services/warehouse.service', () => ({
@@ -53,21 +57,16 @@ beforeEach(() => {
     h.scopes.push(storeId);
     return fn();
   });
-  h.withRlsBypass.mockImplementation((fn: (tx: unknown) => unknown) =>
-    fn({ warehouse: { findMany: h.warehouseFindMany } })
-  );
 });
 
 describe('sweepAllWarehouseStores', () => {
-  it('enumerates stores with warehouses via withRlsBypass and reconciles each WITHOUT a whole-store runInTenantContext wrapper', async () => {
+  it('enumerates stores with warehouses across stores and reconciles each WITHOUT a whole-store runInTenantContext wrapper', async () => {
     h.warehouseFindMany.mockResolvedValue([{ storeId: 's1' }, { storeId: 's2' }]);
     h.backfillReconcileAll.mockResolvedValue({ skusReconciled: 2, skusFailed: 0 });
 
     const result = await sweepAllWarehouseStores(stepStub);
 
-    expect(h.warehouseFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ distinct: ['storeId'] })
-    );
+    expect(h.warehouseFindMany).toHaveBeenCalled();
     expect(h.backfillReconcileAll).toHaveBeenCalledWith('s1');
     expect(h.backfillReconcileAll).toHaveBeenCalledWith('s2');
     // #936: no whole-store 30s transaction ceiling — backfillReconcileAll

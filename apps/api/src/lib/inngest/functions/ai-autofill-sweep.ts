@@ -1,7 +1,7 @@
 /**
  * AI-first autofill sweep — daily leader-locked catalogue sweep
  *
- * Daily at 03:00 Kuwait (= 00:00 UTC), for every store with autopilot
+ * Daily at 03:00 Egypt (= 00:00 UTC), for every store with autopilot
  * enabled:
  *   1. Recomputes order-driven FBT recommendations (recalculateFBT).
  *   2. Sweeps all active products: fills empty AI fields + refreshes stale ones
@@ -24,7 +24,7 @@
  */
 
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass } from '@force/database';
+import { prisma } from '@force/database';
 import { withLeaderLock } from '../../leader-election';
 import { sweepStore } from '../../../services/ai-autofill.service';
 import { recommendationService } from '../../../services/recommendation.service';
@@ -45,7 +45,7 @@ const aiAutofillSweepFn = inngest.createFunction(
     name: 'AI-first: daily catalogue autofill sweep',
     retries: 1,
     concurrency: { limit: 1 },
-    // Daily at 03:00 KW (= 00:00 UTC). Was every-3-days, but on a large initial
+    // Daily at 00:00 UTC (02:00/03:00 Cairo — pinned to UTC on purpose: the Gemini quota resets then). Was every-3-days, but on a large initial
     // backfill the sweep hits the Gemini free-tier daily cap and aborts partway
     // (throw on isAiQuotaCapError) — a 3-day cadence then left the remainder
     // unbalanced for days. Daily lets each run resume the backlog right after the
@@ -66,12 +66,10 @@ const aiAutofillSweepFn = inngest.createFunction(
       // suspended / inactive / churned stores. Loaded ONCE so batch
       // boundaries are stable across retries.
       const storeIds = await step.run('load-stores', async () => {
-        const stores = await withRlsBypass(tx =>
-          tx.store.findMany({
-            where: { deletedAt: null, status: 'active' },
-            select: { id: true },
-          })
-        );
+        const stores = await prisma.store.findMany({
+          where: { deletedAt: null, status: 'active' },
+          select: { id: true },
+        });
         return stores.map(s => s.id);
       });
 

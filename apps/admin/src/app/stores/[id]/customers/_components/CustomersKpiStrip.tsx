@@ -12,9 +12,9 @@ export interface CustomersSummary {
   /** 0..1, or null when the store has no buyers (unknown, not 0%). */
   repeatRate: number | null;
   orders: number;
-  /** Fils. */
+  /** Piastres. */
   totalSpent: number;
-  /** Fils, or null when there are no counted orders. */
+  /** Piastres, or null when there are no counted orders. */
   avgOrderValue: number | null;
 }
 

@@ -1,5 +1,5 @@
 /**
- * Shared XLSX export helper — Force Website Builder API
+ * Shared XLSX export helper — Ebda API
  *
  * Wraps ExcelJS to stream a formatted workbook directly to an Express
  * response. All CSV export routes that want a parallel XLSX endpoint
@@ -7,12 +7,13 @@
  * build for CSV — guarantees the two outputs stay in sync.
  *
  * Column `numFmt` examples:
- *   '#,##0.000'  → KWD three-decimal amounts
+ *   '#,##0.00'   → EGP two-decimal amounts (use `excelMoneyFormat` from @force/shared)
  *   '@'          → force text cell (prevents Excel from mangling phone numbers)
  */
-import ExcelJS from 'exceljs';
+import type ExcelJS from 'exceljs';
+import { loadExcelJS } from '../lazy-modules';
 import type { Response } from 'express';
-import { neutralizeFormula, describeListFilters, type ReportRange } from '@force/shared';
+import { neutralizeFormula, describeListFilters, type ReportRange, BRAND } from '@force/shared';
 
 /**
  * Formula-injection guard, cell/row level — for routes that build an ExcelJS
@@ -43,7 +44,7 @@ export interface XlsxColumn {
   header: string;
   key: string;
   width?: number;
-  numFmt?: string; // e.g. '#,##0.000' for KWD amounts
+  numFmt?: string; // e.g. excelMoneyFormat({ grouped: true }) for EGP amounts
 }
 
 export interface StreamXlsxOpts {
@@ -108,8 +109,8 @@ export function addFiltersSheet(wb: ExcelJS.Workbook, filters: ExportFilterSumma
  * Caller MUST NOT write headers or call res.end() before this.
  */
 export async function streamXlsxResponse(res: Response, opts: StreamXlsxOpts): Promise<void> {
-  const wb = new ExcelJS.Workbook();
-  wb.creator = 'Force AI Store';
+  const wb = new (await loadExcelJS()).Workbook();
+  wb.creator = BRAND.name;
   wb.created = new Date();
 
   const ws = wb.addWorksheet(opts.sheetName || 'Sheet1');

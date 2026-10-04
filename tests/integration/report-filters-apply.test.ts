@@ -9,9 +9,9 @@
  * request AND the rows that come back. Auth is stubbed; the routers,
  * services and SQL are the real ones.
  *
- * Kuwait is UTC+3, so the fixtures use Kuwait-local day boundaries:
+ * Egypt is UTC+3, so the fixtures use Egypt-local day boundaries:
  * "September" = 2026-08-31T21:00Z … 2026-09-30T20:59:59.999Z. An order at
- * 2026-09-30T22:30Z is 1 Oct 01:30 in Kuwait — OUTSIDE September for the
+ * 2026-09-30T22:30Z is 1 Oct 01:30 in Egypt — OUTSIDE September for the
  * merchant, although it is Sep 30 in UTC.
  */
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
@@ -66,7 +66,7 @@ let storeId: string;
 let app: Express;
 const customerIds: string[] = [];
 
-/** Kuwait-local calendar months as the admin resolves them. */
+/** Egypt-local calendar months as the admin resolves them. */
 const AUG = {
   startDate: new Date('2026-07-31T21:00:00.000Z'),
   endDate: new Date('2026-08-31T20:59:59.999Z'),
@@ -97,7 +97,7 @@ async function order(opts: {
       shipping: 0,
       discount: 0,
       total: opts.total,
-      currency: 'KWD',
+      currency: 'EGP',
       customerId: opts.customerId,
       shippingAddress: {},
       billingAddress: {},
@@ -182,7 +182,7 @@ beforeAll(async () => {
   sepCancelled = (
     await order({ at: '2026-09-16T10:00:00Z', total: 500, status: 'cancelled', customerId: salem })
   ).id;
-  // Sep 30 in UTC, 1 Oct in Kuwait.
+  // Sep 30 in UTC, 1 Oct in Egypt.
   kuwaitOct1 = (await order({ at: '2026-09-30T22:30:00Z', total: 700, customerId: salem })).id;
   // Payment abandonments, one per month.
   await order({
@@ -257,7 +257,7 @@ describe('analytics: the selected range reaches every period-based widget', () =
     const sep = await get(`/analytics/dashboard?${reportRangeQueryString(SEP)}`);
     expect(aug.status).toBe(200);
     expect(aug.body.data.stats.totalRevenue).toBe(1000);
-    // Sep: 2000 delivered; the cancelled order and the Kuwait-Oct-1 order excluded.
+    // Sep: 2000 delivered; the cancelled order and the Egypt-Oct-1 order excluded.
     expect(sep.body.data.stats.totalRevenue).toBe(2000);
   });
 
@@ -295,7 +295,7 @@ describe('orders list: every filter is applied server-side', () => {
     return (res.body.data.orders as Array<{ id: string }>).map(o => o.id).sort();
   };
 
-  it('date range: Kuwait-local days (the UTC-Sep-30 order is Oct 1 for the merchant)', async () => {
+  it('date range: Egypt-local days (the UTC-Sep-30 order is Oct 1 for the merchant)', async () => {
     expect(await list({ range: AUG })).toContain(augOrder);
     const sep = await list({ range: SEP });
     expect(sep).toEqual(expect.arrayContaining([sepOrder, sepCancelled]));
@@ -388,7 +388,7 @@ describe('payment abandonments: the list follows the picked days', () => {
   });
 });
 
-/** `localDayRange` pinned to Kuwait so the test does not depend on the runner's TZ. */
+/** `localDayRange` pinned to Egypt so the test does not depend on the runner's TZ. */
 function localRange(from: string, to: string) {
   const r = localDayRange(from, to)!;
   const shift = (d: Date) => new Date(d.getTime() + d.getTimezoneOffset() * 60_000 - 180 * 60_000);

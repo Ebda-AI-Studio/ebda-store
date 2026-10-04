@@ -10,13 +10,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 let viaCookie = false;
 
 vi.mock('next/headers', () => ({
-  headers: async () => ({ get: () => 'store.force-ai.co' }),
+  headers: async () => ({ get: () => 'ebda.app' }),
 }));
 
 vi.mock('../../../lib/agent-store-resolver', () => ({
   resolveAgentStore: vi.fn(),
   resolvedViaCookie: async () => viaCookie,
-  storefrontBaseUrl: () => 'https://store.force-ai.co/test-store',
+  storefrontBaseUrl: () => 'https://ebda.app/test-store',
 }));
 
 import { resolveAgentStore } from '../../../lib/agent-store-resolver';
@@ -28,7 +28,7 @@ const STORE = {
   id: 'store_1',
   name: 'Test Store',
   slug: 'test-store',
-  currency: 'KWD',
+  currency: 'EGP',
   enabledFeatures: ['agent_checkout'],
 };
 

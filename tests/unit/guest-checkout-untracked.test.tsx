@@ -91,7 +91,7 @@ describe('abandoned-cart StatsGrid', () => {
   });
 
   // issue 2035: the API reports recovery as null (not tracked). The three
-  // recovery cards must say so — never "0", "0%" or "0.000 KWD".
+  // recovery cards must say so — never "0", "0%" or "0.000 EGP".
   it('null recovery figures render "not tracked", never a false 0', () => {
     const html = renderToStaticMarkup(
       <StatsGrid
@@ -106,7 +106,7 @@ describe('abandoned-cart StatsGrid', () => {
     );
     expect(html).toContain('>7<');
     expect(html.match(/abandonedCarts\.stats\.recoveryNotTracked/g)).toHaveLength(3);
-    expect(html).not.toMatch(/>0<|>0%<|kwdValue/);
+    expect(html).not.toMatch(/>0<|>0%<|baseValue/);
   });
 });
 

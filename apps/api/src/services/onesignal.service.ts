@@ -17,6 +17,7 @@ import { prisma, Prisma } from '@force/database';
 import { config } from '../config';
 import logger from '../lib/logger';
 
+import { minorToDecimalString } from '@force/shared';
 const ENDPOINT = 'https://onesignal.com/api/v1/notifications';
 
 interface NotifyOrderInput {
@@ -25,9 +26,9 @@ interface NotifyOrderInput {
   storeId: string;
   storeName: string;
   customerName: string;
-  total: number; // fils
+  total: number; // piastres
   currency: string;
-  /** Payment method the customer chose at checkout (e.g. 'cod', 'knet',
+  /** Payment method the customer chose at checkout (e.g. 'cod', 'paymob',
    *  'visa'). Surfaced in the super_admin push body so platform staff can
    *  triage at a glance — COD orders need active warehouse handling
    *  whereas card-paid orders can wait. */
@@ -44,14 +45,16 @@ function formatPaymentMethod(method: string | undefined): string {
     cod: 'Cash on Delivery',
     cash: 'Cash on Delivery',
     cash_on_delivery: 'Cash on Delivery',
-    knet: 'KNET',
+    instapay: 'InstaPay',
+    paymob: 'Paymob',
+    kashier: 'Kashier',
+    fawry: 'Fawry',
     visa: 'Visa',
     mastercard: 'Mastercard',
+    meeza: 'Meeza',
+    wallet: 'Mobile wallet',
+    valu: 'valU',
     apple_pay: 'Apple Pay',
-    google_pay: 'Google Pay',
-    benefit: 'Benefit',
-    mada: 'Mada',
-    stc_pay: 'STC Pay',
   };
   if (labels[normalized]) return labels[normalized];
   // Title-case fallback for unknown methods.
@@ -65,7 +68,7 @@ interface NotifyOrdersAppInput {
   orderId: string;
   orderNumber: string;
   storeId: string;
-  total: number; // fils
+  total: number; // piastres
   currency: string;
   customerName: string;
   /** Buyer locale — only used to pick which contents string leads (both
@@ -121,20 +124,20 @@ export class OneSignalRequestError extends Error {
 }
 
 /** Storefront app — used by `broadcastToStore` (customer-facing pushes
- *  from merchants). Origin: https://store.forcemediakw.com. */
+ *  from merchants). Origin: https://ebda.app. */
 function isStorefrontConfigured(): boolean {
   return !!(config.onesignalAppId && config.onesignalRestApiKey);
 }
 
 /** Admin app — used by `notifyAdminsOfOrder` (new-order pings to store
- *  owners). Origin: https://app.forcemediakw.com. Distinct from the
+ *  owners). Origin: https://app.ebda.app. Distinct from the
  *  storefront app because OneSignal locks each app to a single origin. */
 function isAdminConfigured(): boolean {
   return !!(config.onesignalAdminAppId && config.onesignalAdminRestApiKey);
 }
 
 /** Orders PWA — used by `notifyOrdersAppOfOrder` (new-order pings to store
- *  staff running the Orders app). Origin: https://orders.forcemediakw.com.
+ *  staff running the Orders app). Origin: https://orders.ebda.app.
  *  A SEPARATE OneSignal app from both the admin and storefront ones because
  *  OneSignal locks each app to a single origin. No fallback — when unset we
  *  skip the send silently (see `notifyOrdersAppOfOrder`). */
@@ -158,8 +161,8 @@ function ordersAppOrderUrl(orderId: string, storeId: string): string {
   return `${config.ordersUrl}/orders/${orderId}?store=${encodeURIComponent(storeId)}`;
 }
 
-function formatMoney(fils: number, currency: string): string {
-  return `${(fils / 1000).toFixed(3)} ${currency}`;
+function formatMoney(piastres: number, currency: string): string {
+  return `${minorToDecimalString(piastres, currency)} ${currency}`;
 }
 
 export class OneSignalService {
@@ -170,7 +173,7 @@ export class OneSignalService {
    */
   static async notifyAdminsOfOrder(input: NotifyOrderInput): Promise<void> {
     // Admin pushes go through the admin OneSignal app (origin
-    // app.forcemediakw.com), NOT the storefront app. OneSignal locks each
+    // app.ebda.app), NOT the storefront app. OneSignal locks each
     // app to a single chrome_web_origin so we can't reuse the storefront
     // app for admin devices — they'd fail subscription with an origin
     // mismatch error.
@@ -310,8 +313,8 @@ export class OneSignalService {
 
   /**
    * Push a "New order" notification to the staff running the Orders PWA
-   * (orders.forcemediakw.com) for THIS store. Distinct from
-   * `notifyAdminsOfOrder` (admin PWA, app.forcemediakw.com) — a different
+   * (orders.ebda.app) for THIS store. Distinct from
+   * `notifyAdminsOfOrder` (admin PWA, app.ebda.app) — a different
    * device set + a different OneSignal app, so the two never double-send.
    *
    * Targeting is TAG-BASED: the Orders app tags each subscribed device with
@@ -696,7 +699,7 @@ export class OneSignalService {
   /**
    * Push a refund-issued notification to admins of the store + super_admins.
    * Fired from the order/refunded Inngest fan-out so every refund path
-   * (gateway-driven, admin "Refund via MyFatoorah", status-button) lands
+   * (gateway-driven, admin "Refund via provider", status-button) lands
    * the same merchant push. Customer notification rides the same fan-out
    * via EmailService.sendOrderRefunded.
    */
@@ -783,6 +786,129 @@ export class OneSignalService {
     };
 
     await Promise.all([send(storeAdminBody, 'store_admin'), send(superAdminBody, 'super_admin')]);
+  }
+
+  /**
+   * InstaPay manual orders (SP6a): tell the store's admins an order is waiting for
+   * them to confirm the transfer (`awaiting`), or that the hold ran out and the
+   * order was cancelled (`expired`). Store admins only: the money question is the
+   * merchant's, not the platform's.
+   */
+  static async notifyAdminsOfInstapay(
+    input: Omit<NotifyOrderInput, 'customerName' | 'paymentMethod'> & {
+      kind: 'awaiting' | 'expired';
+    }
+  ): Promise<void> {
+    if (!isAdminConfigured()) {
+      logger.warn('Admin OneSignal not configured — skipping InstaPay notification');
+      return;
+    }
+    const url = adminOrderUrl(input.storeId, input.orderId);
+    const moneyText = formatMoney(input.total, input.currency);
+    const awaiting = input.kind === 'awaiting';
+    const storeAdminPlayerIds = await this.getAdminPlayerIds({
+      role: 'store_admin',
+      ownsStoreId: input.storeId,
+    });
+    const body = {
+      app_id: config.onesignalAdminAppId,
+      url,
+      web_buttons: [{ id: 'view-order', text: 'View order', url }],
+      data: {
+        type: awaiting ? 'order.instapay_awaiting' : 'order.instapay_expired',
+        orderId: input.orderId,
+        storeId: input.storeId,
+        storeName: input.storeName,
+      },
+      headings: awaiting
+        ? { en: 'InstaPay transfer to confirm', ar: 'تحويل إنستاباي بانتظار التأكيد' }
+        : { en: 'InstaPay order expired', ar: 'انتهت مهلة طلب إنستاباي' },
+      contents: awaiting
+        ? {
+            en: `${input.orderNumber} — ${moneyText}. Confirm once the transfer arrives.`,
+            ar: `${input.orderNumber} — ${moneyText}. أكّد الطلب بمجرد وصول التحويل.`,
+          }
+        : {
+            en: `${input.orderNumber} — ${moneyText}. No confirmation in time: cancelled, stock released.`,
+            ar: `${input.orderNumber} — ${moneyText}. لم يتم التأكيد في الوقت المحدد: أُلغي الطلب وأُعيد المخزون.`,
+          },
+      ...(storeAdminPlayerIds.length > 0
+        ? { include_player_ids: storeAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
+    };
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Key ${config.onesignalAdminRestApiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        logger.error({ status: res.status, kind: input.kind }, 'OneSignal InstaPay push failed');
+      }
+    } catch (err) {
+      logger.error({ err, kind: input.kind }, 'OneSignal InstaPay push threw');
+    }
+  }
+
+  /**
+   * Shipping (SP7): tell the store's admins a carrier booking failed for good (after the
+   * automatic retries), so they can fix the cause (credentials, address, COD support) or ship
+   * the order by hand. The order itself is already placed and unaffected.
+   */
+  static async notifyAdminsOfShipmentFailure(input: {
+    storeId: string;
+    storeName: string;
+    orderId: string;
+    orderNumber: string;
+    carrier: string;
+    reason: string;
+  }): Promise<void> {
+    if (!isAdminConfigured()) {
+      logger.warn('Admin OneSignal not configured — skipping shipment failure notification');
+      return;
+    }
+    const url = adminOrderUrl(input.storeId, input.orderId);
+    const storeAdminPlayerIds = await this.getAdminPlayerIds({
+      role: 'store_admin',
+      ownsStoreId: input.storeId,
+    });
+    const body = {
+      app_id: config.onesignalAdminAppId,
+      url,
+      web_buttons: [{ id: 'view-order', text: 'View order', url }],
+      data: {
+        type: 'order.shipment_failed',
+        orderId: input.orderId,
+        storeId: input.storeId,
+        storeName: input.storeName,
+      },
+      headings: { en: 'Shipment not booked', ar: 'لم يتم حجز الشحنة' },
+      contents: {
+        en: `${input.orderNumber}: ${input.carrier} could not book this order (${input.reason}). Open the order to retry or ship it manually.`,
+        ar: `${input.orderNumber}: تعذّر حجز الشحنة لدى ${input.carrier} (${input.reason}). افتح الطلب لإعادة المحاولة أو الشحن يدويًا.`,
+      },
+      ...(storeAdminPlayerIds.length > 0
+        ? { include_player_ids: storeAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
+    };
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Key ${config.onesignalAdminRestApiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        logger.error({ status: res.status }, 'OneSignal shipment failure push failed');
+      }
+    } catch (err) {
+      logger.error({ err }, 'OneSignal shipment failure push threw');
+    }
   }
 
   /**

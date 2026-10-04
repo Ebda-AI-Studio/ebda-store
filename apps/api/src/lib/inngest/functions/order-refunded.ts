@@ -1,11 +1,5 @@
 import { NonRetriableError, type InngestFunction } from 'inngest';
-import {
-  prisma,
-  runInTenantContext,
-  withMoneyTx,
-  withRlsBypass,
-  type Prisma,
-} from '@force/database';
+import { prisma, runInTenantContext, withMoneyTx, type Prisma } from '@force/database';
 import { EmailService, type OrderRefundEmailData } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
 import { OneSignalService } from '../../../services/onesignal.service';
@@ -19,7 +13,9 @@ import { BACKORDER_CANCEL_MARKER } from '../../../services/accounting/posting/pr
 import { healBackorderStockDebt } from '../../../services/accounting/backorder-stock-heal';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { auditLogExists } from '../../definer';
 
+import { fromMinor } from '@force/shared';
 interface FanoutStep {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
 }
@@ -111,7 +107,7 @@ function releasedChannels(meta: Record<string, unknown>): RefundNotifyChannel[] 
 /**
  * Fans out side effects when an order is refunded — fires from
  * `OrderService.applyRefundEffects` so EVERY refund path (gateway-driven
- * webhook, admin "Refund via MyFatoorah", manual status-button) lands
+ * webhook, admin "Refund via provider", manual status-button) lands
  * the same reversals + customer-facing notifications without bespoke wiring
  * at each callsite.
  *
@@ -409,21 +405,18 @@ export async function handleOrderRefunded(
   // incremented `usageCount`; decrementing on its cancel handed a live
   // redemption back to the merchant's limit (issue 2303, ruling M-OVR-1a).
   // The `order.admin_created` audit row is the durable record of an
-  // admin-created order (cross-store actor row, so read bypassed). Looked up
-  // in its OWN step, BEFORE the coupon transaction opens (issue 2359):
-  // `withRlsBypass` is a fresh `$transaction` on a second pool connection, and
-  // taking one while `withMoneyTx` holds another is the double-nest pool
-  // hazard (assert-store-owns.ts). The row is immutable history, so reading it
+  // admin-created order (an actor row with no store, so it is read through a
+  // definer). Looked up in its OWN step, BEFORE the coupon transaction opens
+  // (issue 2359): it is a second pool connection, and taking one while
+  // `withMoneyTx` holds another is the double-nest pool hazard
+  // (assert-store-owns.ts). The row is immutable history, so reading it
   // outside the transaction loses nothing.
   const adminOrderNeverReserved =
     !isPartial && !!order.couponCode && new Date(order.createdAt) < ADMIN_COUPON_RESERVE_CUTOVER
       ? await step.run('admin-created-lookup', async () => {
-          const row = await withRlsBypass(b =>
-            b.auditLog.findFirst({
-              where: { action: 'order.admin_created', resourceType: 'order', resourceId: orderId },
-              select: { id: true },
-            })
-          );
+          // The row carries NO store (an actor row), so a store-scoped read cannot
+          // see it: a definer answers the existence question.
+          const row = await auditLogExists('order.admin_created', 'order', orderId);
           return !!row;
         })
       : false;
@@ -730,7 +723,7 @@ export async function handleOrderRefunded(
   // money — a paid order CANCELLED before any refund was executed — is not a
   // refund and must not spend the once-per-order "Refund issued" claim. It
   // used to: the cancel emailed "Refund issued" for the order total before a
-  // fils moved, took the claim, and the real settlement later found the claim
+  // piastres moved, took the claim, and the real settlement later found the claim
   // and told the customer nothing. The cancel now sends its own notice
   // ("Your order was cancelled. You were not charged.", en/ar, claimed once
   // via `cancel_notified`), and "Refund issued" waits for the event that moved
@@ -888,7 +881,7 @@ export async function handleOrderRefunded(
               customerName,
               customerPhone: guestPhone || undefined,
               orderNumber: order.orderNumber,
-              amount: refundAmount / 1000,
+              amount: fromMinor(refundAmount),
               storeId,
               storeName: store?.name ?? storeId,
             })

@@ -2,107 +2,35 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { applyGucs, gucStatements, type TenantGucs } from './tenant-gucs';
+import type { AppPrismaClient } from './client';
+import { baseClient } from './request-db';
 
-// Options are extracted so the client's TYPE can be derived from them. A global
-// `omit` narrows PrismaClient's generic, so a plain `PrismaClient` annotation on
-// the dev-mode cache below no longer matches what `new PrismaClient(...)`
-// returns. Deriving keeps them in lockstep instead of casting the mismatch away.
-const prismaOptions = {
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  datasourceUrl: appendPoolParams(process.env.DATABASE_URL),
-  // Never let User secrets leave the DB layer unless a caller asks by name.
-  //
-  // Before this, ~46 reads on secret-bearing models ran without an explicit
-  // `select`, and the ONLY thing stopping a leak was each response path
-  // remembering to project its output. That is fail-OPEN: every new endpoint
-  // touching `user` has to independently remember. A global omit fails CLOSED
-  // — a forgotten projection returns nothing instead of a password hash.
-  //
-  // Callers that legitimately need one opt back in per query with
-  // `omit: { passwordHash: false }`, which makes every legitimate use explicit
-  // and greppable. A query-level `select` also still returns the field (naming
-  // it IS asking for it); `select` and `omit` cannot be combined in one query.
-  //
-  // Store credentials (wbsApiKey, metaAccessToken, agentApiKey) joined the
-  // omit on 2026-09-25. The earlier worry was that guards like
-  // `if (!store.wbsApiKey) return;` would turn into SILENT no-ops. They can't:
-  // the generated types follow the global omit, so reading an omitted field
-  // off a query that didn't select it is a TYPE ERROR, and every reader now
-  // names the field in its `select`. PaymentConfig.{apiKey,secretKey,
-  // webhookSecret} still needs the same pass.
-  omit: {
-    user: {
-      passwordHash: true,
-      mfaSecret: true,
-      mfaBackupCodes: true,
-    },
-    store: {
-      wbsApiKey: true,
-      metaAccessToken: true,
-      agentApiKey: true,
-    },
-  },
-} satisfies Prisma.PrismaClientOptions;
+// The client factory, the per-request client binding and the process singleton
+// live in ./client and ./request-db. Everything below resolves its client
+// through `basePrisma()`: the request-bound client when a Worker bound one with
+// `runWithRequestDb`, else the lazily created Node singleton.
+export { createPrismaClient, createPrismaClientWithAdapter, resolvePoolConfig } from './client';
+export type { AppPrismaClient, DbClient, CreatePrismaClientOptions } from './client';
+export {
+  runWithRequestDb,
+  createIsolateDb,
+  hasRequestDb,
+  type RunWithRequestDbOptions,
+  type IsolateDb,
+  type IsolateDbOptions,
+} from './request-db';
+export { ClientPool, ClientPoolTimeout, ConnectionScope } from './client-pool';
+export type { ClientLease, ClientPoolOptions } from './client-pool';
 
-export type AppPrismaClient = PrismaClient<typeof prismaOptions>;
+const basePrisma = (): AppPrismaClient => baseClient();
 
 /**
- * Accepts either the app client or an interactive-transaction client.
- *
- * `Prisma.TransactionClient` is generated from the UN-narrowed PrismaClient, so
- * once a global `omit` narrows our client the two are no longer assignable.
- * Helpers that take "a client, tx or not" should type that parameter as
- * `DbClient` rather than casting the mismatch away at each call site.
+ * The client the exported `prisma` resolves to right now — an explicit handle
+ * for the few callers that need the client itself (a Worker shell, a script
+ * that disconnects), not a transaction. Prefer the `prisma` export.
  */
-export type DbClient = AppPrismaClient | Prisma.TransactionClient;
-
-// Prevent multiple instances in development
-const globalForPrisma = globalThis as unknown as {
-  prisma: AppPrismaClient | undefined;
-};
-
-const basePrisma: AppPrismaClient = globalForPrisma.prisma ?? new PrismaClient(prismaOptions);
-
-/**
- * Append connection parameters for Neon serverless Postgres.
- * Neon suspends idle connections which causes Prisma to hang on stale
- * pooled connections. These params ensure:
- * - connect_timeout: new connections fail fast instead of hanging
- * - pool_timeout: pooled connection acquisition times out
- * - connection_limit: keep pool small to reduce stale connections
- * - pgbouncer: required when using Neon's connection pooler
- */
-function appendPoolParams(url: string | undefined): string | undefined {
-  if (!url) return url;
-  try {
-    const u = new URL(url);
-    if (!u.searchParams.has('connect_timeout')) {
-      u.searchParams.set('connect_timeout', '10');
-    }
-    if (!u.searchParams.has('pool_timeout')) {
-      u.searchParams.set('pool_timeout', process.env.DB_POOL_TIMEOUT || '20');
-    }
-    if (!u.searchParams.has('connection_limit')) {
-      // A limit of 5 starved the pool under real concurrency (storefront + admin
-      // + Inngest async writers share one process) -> ~220x/day "Timed out
-      // fetching a new connection from the pool" in Sentry. Neon's pooled
-      // endpoint runs pgbouncer in transaction mode, so a higher per-instance
-      // client limit multiplexes safely onto fewer server connections.
-      // Default 15; override via DB_CONNECTION_LIMIT in Railway without a deploy.
-      u.searchParams.set('connection_limit', process.env.DB_CONNECTION_LIMIT || '15');
-    }
-    // Enable pgbouncer mode for Neon pooler URLs
-    if (u.hostname.includes('neon.tech') && !u.searchParams.has('pgbouncer')) {
-      u.searchParams.set('pgbouncer', 'true');
-    }
-    return u.toString();
-  } catch {
-    return url;
-  }
-}
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = basePrisma;
+export function getDb(): AppPrismaClient {
+  return baseClient();
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +105,7 @@ function scopedOp(storeId: string, exec: () => Promise<unknown>): ScopedOp & Pro
  * STRICT policy (store_id = app.current_store_id, no contextless allowance)
  * then read as empty and rejected writes, while allow-contextless tables
  * silently lost their tenant scoping. Measured on 2026-09-25 under a real
- * `force_app` login: inside `runInTenantContext`, a direct count of
+ * `ebda_app` login: inside `runInTenantContext`, a direct count of
  * `ai_recommendation` returned 2 rows, the same count through `withMoneyTx`
  * or a batch `$transaction([...])` returned 0.
  *
@@ -186,7 +114,8 @@ function scopedOp(storeId: string, exec: () => Promise<unknown>): ScopedOp & Pro
  * starts with the same `SET LOCAL`s. Inert on a BYPASSRLS role.
  */
 function transactionWithGucs(gucs: TenantGucs) {
-  const base = basePrisma.$transaction.bind(basePrisma) as (...a: unknown[]) => Promise<unknown>;
+  const client = basePrisma();
+  const base = client.$transaction.bind(client) as (...a: unknown[]) => Promise<unknown>;
   return (arg: unknown, opts?: unknown): Promise<unknown> => {
     if (typeof arg === 'function') {
       const fn = arg as (tx: TenantTx) => Promise<unknown>;
@@ -203,7 +132,9 @@ function transactionWithGucs(gucs: TenantGucs) {
           return out;
         });
       }
-      const sets = gucStatements(gucs).map(sql => basePrisma.$executeRawUnsafe(sql));
+      const sets = gucStatements(gucs).map(({ sql, params }) =>
+        client.$queryRawUnsafe(sql, ...params)
+      );
       return base([...sets, ...arg], opts).then(r => (r as unknown[]).slice(sets.length));
     }
     return base(arg, opts);
@@ -408,15 +339,23 @@ export function currentTenantGucs(): TenantGucs | undefined {
 /**
  * Proxy-wrapped Prisma client.
  *
+ * Which client it talks to is decided PER ACCESS (`basePrisma()`): the
+ * request-bound client when a Worker bound one with `runWithRequestDb`, else
+ * the Node process singleton. Callers keep importing the one `prisma`.
+ *
  * When called inside `runInTenantContext`, model accessors and raw query
  * helpers transparently delegate to the tenant-scoped transaction that
- * already has `SET LOCAL app.current_store_id` applied.
+ * already has `app.current_store_id` set (transaction-locally).
  *
- * Outside a tenant context the proxy passes through to the base client,
- * so cross-tenant operations (super_admin, migrations, crons) work unchanged.
+ * Outside a tenant context the proxy passes through to the base client. Under
+ * the strict-RLS role that client reads NO tenant rows: cross-store work goes
+ * through `acrossStores`, the SECURITY DEFINER functions or `withStore`, never
+ * through a bypass (see the RLS section of CLAUDE.md).
  */
-export const prisma = new Proxy(basePrisma, {
-  get(target, prop, receiver) {
+export const prisma = new Proxy({} as AppPrismaClient, {
+  get(_target, prop) {
+    const target = basePrisma();
+    const receiver = target;
     const tx = tenantStorage.getStore();
     if (tx && isProxiedProp(prop)) {
       // Detection only — see `closedTenantTxs`. Routing is unchanged.
@@ -456,7 +395,26 @@ export const prisma = new Proxy(basePrisma, {
       }
       return value;
     }
-    return Reflect.get(target, prop, receiver);
+    const value = Reflect.get(target, prop, receiver);
+    // `$connect` / `$disconnect` / `$on` / `$extends` / `$use` are called as
+    // `prisma.$x()`, i.e. with the proxy as `this`; they must act on the
+    // client resolved NOW, not on whatever the proxy resolves to later.
+    return typeof value === 'function' && typeof prop === 'string' && prop[0] === '$'
+      ? value.bind(target)
+      : value;
+  },
+  // The target is an empty shell, so the remaining traps forward to the live
+  // client. `vi.spyOn(prisma, '$transaction')`, `'user' in prisma` and friends
+  // then behave as they did when the target was the client itself.
+  has: (_t, prop) => prop in basePrisma(),
+  set: (_t, prop, value) => Reflect.set(basePrisma(), prop, value),
+  defineProperty: (_t, prop, desc) => Reflect.defineProperty(basePrisma(), prop, desc),
+  deleteProperty: (_t, prop) => Reflect.deleteProperty(basePrisma(), prop),
+  ownKeys: () => Reflect.ownKeys(basePrisma()),
+  getOwnPropertyDescriptor: (_t, prop) => {
+    const d = Reflect.getOwnPropertyDescriptor(basePrisma(), prop);
+    if (d) d.configurable = true;
+    return d;
   },
   // Cast to the OMIT-NARROWED type, not bare PrismaClient. With bare
   // PrismaClient the types would still advertise `passwordHash` while the
@@ -570,7 +528,7 @@ export async function runInTenantContext<T>(
   if (storeId !== undefined && !UUID_RE.test(storeId)) {
     throw new Error('Invalid store ID format');
   }
-  return basePrisma.$transaction(
+  return basePrisma().$transaction(
     async tx => {
       await applyGucs(tx, { storeId, userId });
       txGucs.set(tx as object, { storeId, userId });
@@ -617,11 +575,9 @@ export async function withTenantContext<T>(
   if (!UUID_RE.test(storeId)) {
     throw new Error('Invalid store ID format');
   }
-  return basePrisma.$transaction(
+  return basePrisma().$transaction(
     async tx => {
-      await tx.$executeRawUnsafe(
-        `SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`
-      );
+      await applyGucs(tx, { storeId });
       return fn(tx);
     },
     { maxWait: 10000, timeout: 30000 }
@@ -638,7 +594,7 @@ export async function withTenantContext<T>(
  * expired mid-sweep (#461), so the wrapper was removed on the belief that the
  * jobs touch no RLS-protected table. They do: `bulk_ai_jobs`, `ai_usage`,
  * `ai_recommendation`, `store_faqs` and `store_howtos` all carry STRICT
- * policies, so under `force_app` every one of those jobs would read nothing
+ * policies, so under `ebda_app` every one of those jobs would read nothing
  * and fail its first `bulkAiJob.update` (P2025).
  *
  * Inside the scope, each model call / raw query runs in its own short
@@ -655,50 +611,240 @@ export function runInStoreScope<T>(storeId: string, fn: () => Promise<T>): Promi
   return storeScope.run({ storeId }, fn);
 }
 
+// ---------------------------------------------------------------------------
+// Cross-store and contextless access under STRICT RLS (R-EBDA-001)
+// ---------------------------------------------------------------------------
+//
+// The app role (`ebda_app`) has no BYPASSRLS and the policies carry no bypass
+// GUC and no contextless allowance: a query with no store set reads NO tenant
+// rows and its writes are rejected. Code that is not inside a request's tenant
+// transaction therefore reaches tenant data in exactly three ways:
+//
+//   1. `withStore(storeId, fn)`      — the store is known (a webhook that
+//                                      resolved its order, an Inngest event with
+//                                      a storeId, a public route after it
+//                                      resolved the host);
+//   2. `withUser(userId, fn)`        — the user is known (auth flows) — the
+//                                      `users` / `addresses` policies key on
+//                                      `app.current_user_id`;
+//   3. `acrossStores(fn)`            — a cron/super-admin sweep: one short
+//                                      tenant transaction PER STORE;
+//   4. a SECURITY DEFINER function   — the narrow, named lookups that must run
+//                                      BEFORE a store or user is known (host ->
+//                                      store, login email -> user id, webhook
+//                                      provider reference -> store). They live
+//                                      in the strict-RLS migration and are called
+//                                      through `$queryRaw`.
+
 /**
- * Execute a callback within a transaction that BYPASSES Row-Level Security.
+ * Run `fn` scoped to `storeId` under RLS, whether or not the caller already
+ * has a tenant context.
  *
- * Use this for super-admin, cron, Inngest, and other cross-tenant operations
- * that need to touch RLS-protected tables (journal_entries, accounts,
- * orders, products, etc.) without being filtered to the current tenant.
+ *  - Inside a tenant TRANSACTION already scoped to this store: reuse it, so the
+ *    work is atomic with the request (a second connection could not see the
+ *    request's uncommitted rows).
+ *  - Inside `runInStoreScope` for this store: each query is its own short
+ *    transaction, as everywhere in that scope.
+ *  - Anything else — no context, or a context for a DIFFERENT store or none:
+ *    open a short `runInTenantContext(storeId, ...)`.
  *
- * RLS policies on FWB are written with an explicit bypass clause:
- *   USING (
- *     store_id::text = current_setting('app.current_store_id', true)
- *     OR current_setting('app.bypass_rls', true) = 'true'
- *   )
- *
- * Setting the bypass GUC via SET LOCAL means the override dies on
- * commit/rollback (transaction-scoped, no leak to other connections).
- *
- * Trap this helper protects against: opening a fresh prisma.$transaction
- * for cross-tenant work, then watching DELETEs / UPDATEs silently match
- * zero rows because RLS filtered them out. See
- * feedback-postgres-rls-silent-filter-trap.md for the FWB incident
- * 2026-05-21.
- *
- * @example
- *   // Inngest job archiving cross-tenant audit logs
- *   await withRlsBypass(async tx => {
- *     await tx.$executeRaw`DELETE FROM public.audit_logs WHERE created_at < ${cutoff}`;
- *   });
+ * `fn` receives the `prisma` proxy typed as a transaction client, so existing
+ * `tx.model.findMany(...)` code moves over without change.
  */
-export async function withRlsBypass<T>(fn: (tx: TenantTx) => Promise<T>): Promise<T> {
-  return basePrisma.$transaction(
+export function withStore<T>(storeId: string, fn: (tx: TenantTx) => Promise<T>): Promise<T> {
+  const run = () => fn(prisma as unknown as TenantTx);
+  if (currentTenantGucs()?.storeId === storeId) return run();
+  if (!tenantStorage.getStore() && storeScope.getStore()?.storeId === storeId) return run();
+  return runInTenantContext(storeId, run);
+}
+
+/**
+ * Run `fn` as `userId` (and optionally within `storeId`) under RLS: the
+ * identity-keyed tables (`users`, `addresses`, `store_staff`) match on
+ * `app.current_user_id`. Reuses the ambient transaction when it already carries
+ * this user (and store, if one is given).
+ */
+export function withUser<T>(
+  userId: string,
+  fn: (tx: TenantTx) => Promise<T>,
+  storeId?: string
+): Promise<T> {
+  const run = () => fn(prisma as unknown as TenantTx);
+  const ambient = currentTenantGucs();
+  if (ambient?.userId === userId && (storeId === undefined || ambient.storeId === storeId)) {
+    return run();
+  }
+  return runInTenantContext(storeId, run, userId);
+}
+
+export interface AcrossStoresOptions {
+  /** Restrict to these stores (default: every store that is not soft-deleted). */
+  storeIds?: string[];
+  /** Extra `Store` filter, e.g. `{ accountingEnabled: true }`. */
+  where?: Prisma.StoreWhereInput;
+  /** Stores processed at once, each in its own transaction. Default 4. */
+  concurrency?: number;
+  /**
+   * Called when `fn` throws for one store. When given, that store is skipped and
+   * the sweep carries on (a cron must not die on one bad tenant); when omitted
+   * the first error rejects the whole call.
+   */
+  onStoreError?: (storeId: string, err: unknown) => void;
+}
+
+/**
+ * Run `fn` once per store, each inside its OWN tenant transaction for that
+ * store, and return the per-store results. This is how a cron, an Inngest sweep
+ * or a super-admin dashboard reads or writes "across tenants" without any
+ * bypass: the database only ever shows `fn` the rows of the store it is
+ * currently scoped to.
+ *
+ * Result-shape contract: `fn` sees only ONE store's rows, so a global
+ * `take`/`orderBy`/`count` becomes per-store. The caller merges (sum the
+ * counts, concatenate the rows, then sort and cut to the global limit).
+ * `stores` carries no RLS (it is the tenant root and holds routing data), so
+ * listing store ids needs no definer function.
+ */
+export async function acrossStores<T>(
+  fn: (storeId: string) => Promise<T>,
+  opts: AcrossStoresOptions = {}
+): Promise<Array<{ storeId: string; value: T }>> {
+  const storeIds =
+    opts.storeIds ??
+    (
+      await prisma.store.findMany({
+        where: { deletedAt: null, ...opts.where },
+        select: { id: true },
+        orderBy: { id: 'asc' },
+      })
+    ).map(s => s.id);
+
+  const out: Array<{ storeId: string; value: T } | undefined> = new Array(storeIds.length);
+  let next = 0;
+  let failure: { err: unknown } | undefined;
+  const worker = async () => {
+    while (!failure) {
+      const i = next++;
+      if (i >= storeIds.length) return;
+      const storeId = storeIds[i];
+      try {
+        out[i] = { storeId, value: await runInTenantContext(storeId, () => fn(storeId)) };
+      } catch (err) {
+        if (opts.onStoreError) opts.onStoreError(storeId, err);
+        else failure = { err };
+      }
+    }
+  };
+  const n = Math.max(1, Math.min(opts.concurrency ?? 4, storeIds.length || 1));
+  await Promise.all(Array.from({ length: n }, worker));
+  if (failure) throw failure.err;
+  return out.filter((r): r is { storeId: string; value: T } => r !== undefined);
+}
+
+/** `acrossStores` for a per-store LIST: the lists concatenated in store order. */
+export async function acrossStoresFlat<T>(
+  fn: (storeId: string) => Promise<T[]>,
+  opts: AcrossStoresOptions = {}
+): Promise<T[]> {
+  return (await acrossStores(fn, opts)).flatMap(r => r.value);
+}
+
+// ---------------------------------------------------------------------------
+// Named platform jobs (the cron-side context of a few cross-store definers)
+// ---------------------------------------------------------------------------
+
+/**
+ * The platform jobs a cross-store SECURITY DEFINER function recognises. A job is
+ * a NAME, not a bypass: it opens no table to `ebda_app`, and only the definers
+ * that list it (`ebda_is_system_job`) consult it.
+ */
+export type SystemJob = 'audit-log-retention' | 'webhook-inbox';
+
+/**
+ * Run `fn` with `app.system_job = job` set TRANSACTION-LOCALLY, so the definer
+ * functions that serve a cron (audit retention, the webhook inbox consumer) can
+ * tell it from an arbitrary caller. Inside a tenant transaction the setting is
+ * put on that transaction for the duration of `fn` and cleared afterwards (the
+ * work stays atomic with the request); otherwise `fn` runs in its own short
+ * transaction that carries only the job name. Never a session-level setting.
+ */
+export async function withSystemJob<T>(job: SystemJob, fn: () => Promise<T>): Promise<T> {
+  const setJob = (tx: TenantTx, value: string) =>
+    tx.$queryRawUnsafe(`SELECT set_config('app.system_job', $1, true)`, value);
+  const ambient = tenantStorage.getStore();
+  if (ambient) {
+    await setJob(ambient, job);
+    try {
+      return await fn();
+    } finally {
+      // Best effort: on an aborted transaction the reset cannot run, and the
+      // setting dies with the rollback anyway.
+      await setJob(ambient, '').catch(() => undefined);
+    }
+  }
+  return basePrisma().$transaction(
     async tx => {
-      // 1. app.bypass_rls = 'true': honoured by new-style RLS policies
-      //    (accounting tables + tables updated in 20260602000000_fix_ai_usage_rls_bypass).
-      await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
-      // 2. app.current_store_id = '': resets any stale session-level GUC.
-      //    current_store_id() returns NULLIF('', '') = NULL so old-style
-      //    policies (`current_store_id() IS NULL`) also allow all rows.
-      //    Defense-in-depth: a reused pgbouncer connection may carry a
-      //    previous request's store ID at session scope even after SET LOCAL
-      //    reverts on commit — this explicit reset guarantees the bypass
-      //    path works for both policy generations.
-      await tx.$executeRaw`SET LOCAL app.current_store_id = ''`;
-      return fn(tx);
+      await setJob(tx, job);
+      return tenantStorage.run(tx, fn);
     },
     { maxWait: 10000, timeout: 30000 }
   );
 }
+
+// ---------------------------------------------------------------------------
+// Owner-role transactions (migrations, ops scripts, test fixtures ONLY)
+// ---------------------------------------------------------------------------
+
+const ownerRoleChecked = new WeakMap<object, Promise<boolean>>();
+
+async function connectionBypassesRls(client: AppPrismaClient): Promise<boolean> {
+  let check = ownerRoleChecked.get(client);
+  if (!check) {
+    check = client.$queryRaw<
+      Array<{ ok: boolean }>
+    >`SELECT (rolsuper OR rolbypassrls) AS ok FROM pg_roles WHERE rolname = current_user`.then(
+      rows => rows[0]?.ok === true
+    );
+    ownerRoleChecked.set(client, check);
+  }
+  const ok = await check;
+  if (!ok) ownerRoleChecked.delete(client);
+  return ok;
+}
+
+/**
+ * Whether the current connection bypasses RLS BY ITSELF (a superuser or
+ * BYPASSRLS owner role). False on the strict-RLS app role. A job that is only
+ * correct with an owner-role connection (the destructive R2 orphan sweep) checks
+ * this first and skips cleanly instead of reading zero rows.
+ */
+export async function isOwnerRole(): Promise<boolean> {
+  return connectionBypassesRls(basePrisma());
+}
+
+/**
+ * Run `fn` in a plain transaction on a connection whose role bypasses RLS BY
+ * ITSELF (a superuser or BYPASSRLS owner: the `DIRECT_URL` role that runs
+ * migrations, an ops script, the integration tests' fixture connection).
+ *
+ * It sets NO GUC. FWB's `withRlsBypass` flipped `app.bypass_rls`; Ebda's
+ * policies no longer read it. And it REFUSES to run on the strict-RLS app role:
+ * every API/Worker query goes through `withStore` / `withUser` / `acrossStores`
+ * / a SECURITY DEFINER function instead, and a call that reaches this on
+ * `ebda_app` would otherwise read zero rows and report success. The refusal is
+ * loud on purpose. `tests/unit/no-rls-bypass-in-runtime.test.ts` keeps
+ * `apps/api/src` from importing it at all.
+ */
+export async function withOwnerTx<T>(fn: (tx: TenantTx) => Promise<T>): Promise<T> {
+  const client = basePrisma();
+  if (!(await connectionBypassesRls(client))) {
+    throw new Error(
+      'withOwnerTx/withRlsBypass: this connection is the strict-RLS app role, which has no ' +
+        'bypass. Use withStore(), withUser(), acrossStores() or a SECURITY DEFINER function.'
+    );
+  }
+  return client.$transaction(tx => fn(tx), { maxWait: 10000, timeout: 30000 });
+}
+
+/** @deprecated FWB's name. Same as `withOwnerTx`: no GUC, owner role only. */
+export const withRlsBypass = withOwnerTx;

@@ -172,7 +172,7 @@ describe('commission audit rows are awaited (#1589)', () => {
 
 describe('createPayout — concurrent payouts cannot overdraw the balance', () => {
   it('debits the balance conditionally and refuses when a concurrent payout already took it', async () => {
-    // The read says 5.000 KWD is pending — but a concurrent payout committed
+    // The read says 5.000 EGP is pending — but a concurrent payout committed
     // first, so the conditional debit matches 0 rows.
     h.affiliateFindFirst.mockResolvedValue({ id: 'aff-1', pendingBalance: 5000 });
     h.affiliateUpdateMany.mockResolvedValue({ count: 0 });

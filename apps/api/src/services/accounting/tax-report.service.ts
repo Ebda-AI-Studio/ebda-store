@@ -6,7 +6,7 @@ import { DEFAULT_STORE_TIME_ZONE, zonedIsoDay } from '@force/shared';
  * that moved Tax Payable (2100) in the period: the sale, and any
  * refund/return reversal or partial-return adjustment. Reversal rows carry
  * NEGATIVE amounts, so the summary nets to what the merchant actually owes.
- * All money fields are in FILS (integer — smallest KWD unit = 1/1000 KWD).
+ * All money fields are in PIASTRES (integer — smallest EGP unit = 1/1000 EGP).
  */
 export interface TaxReportRow {
   /**
@@ -26,7 +26,7 @@ export interface TaxReportRow {
   /** Customer display name, or null for guest orders */
   customerName: string | null;
   /**
-   * Taxable-base movement of this entry in fils — the entry's net Sales
+   * Taxable-base movement of this entry in piastres — the entry's net Sales
    * Revenue (4000) credit. Positive on the sale (= subtotal − discount),
    * negative on a refund reversal or partial-return adjustment.
    */
@@ -34,12 +34,12 @@ export interface TaxReportRow {
   /** Applied tax rate as a percentage string, e.g. "5.00" */
   taxRate: string;
   /**
-   * Tax movement of this entry in fils — the entry's net Tax Payable (2100)
+   * Tax movement of this entry in piastres — the entry's net Tax Payable (2100)
    * credit. Positive on the sale, negative on a reversal/adjustment.
    */
   taxCollected: number;
   /**
-   * Order total in fils on the SALE row only; null on a reversal row, so the
+   * Order total in piastres on the SALE row only; null on a reversal row, so the
    * column sums to each order's value once instead of once per entry (#1253).
    */
   total: number | null;
@@ -50,9 +50,9 @@ export interface TaxRateSummary {
   taxRate: string;
   /** Number of tax-moving journal ENTRIES at this rate (reversals included), not orders */
   transactionCount: number;
-  /** Net taxable-base movement in fils (reversals subtract) */
+  /** Net taxable-base movement in piastres (reversals subtract) */
   totalSubtotal: number;
-  /** Net tax collected in fils (reversals subtract) */
+  /** Net tax collected in piastres (reversals subtract) */
   totalTaxCollected: number;
 }
 
@@ -67,9 +67,9 @@ export interface TaxReportResult {
     transactionCount: number;
     /** Distinct orders those entries belong to (#1208) */
     orderCount: number;
-    /** NET taxable sales in fils — sales minus refund/return reversals */
+    /** NET taxable sales in piastres — sales minus refund/return reversals */
     totalTaxableSales: number;
-    /** NET tax collected in fils — sales minus refund/return reversals */
+    /** NET tax collected in piastres — sales minus refund/return reversals */
     totalTaxCollected: number;
     byRate: TaxRateSummary[];
   };
@@ -107,12 +107,12 @@ export interface TaxReportResult {
  * pattern as reports.service.ts trialBalance().
  *
  * Note: "taxRate" is derived per entry rather than from a TaxRate record
- * because (a) the journal only stores the computed fils amount, not the rate,
+ * because (a) the journal only stores the computed piastres amount, not the rate,
  * and (b) rate records can be edited/deleted after the fact. We derive the
  * effective rate as Math.round(taxDelta / baseDelta * 10000) / 100 and
  * represent as a fixed-2 string ("5.00", "0.00"). This is what appears on the
  * transaction rows and the by-rate breakdown. (A partial-return adjustment's
- * rate matches the sale's up to fils-level rounding of the pro-rata split, so
+ * rate matches the sale's up to piastres-level rounding of the pro-rata split, so
  * rows group under the same rate bucket in practice.)
  */
 export async function generateTaxReport(

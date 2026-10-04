@@ -101,9 +101,9 @@ describe('a transient failure must NOT be rendered as "store not found"', () => 
     expect(err).toBeInstanceOf(StoreTemporarilyUnavailableError);
   });
 
-  it('does not 404 when the API is unhealthy (503) on the slug path', async () => {
+  it('does not 404 when the API is unhealthy (503) on a <slug>.ebda.app host', async () => {
     const slug = uniq('down');
-    headerBag.value.set('x-store-slug', slug);
+    headerBag.value.set('x-store-domain', `${slug}.ebda.app`);
     fetchMock.mockResolvedValue(json({}, 503));
 
     const err = await thrownBy(getStoreOrNotFound);
@@ -157,8 +157,8 @@ describe('a definitive miss must still 404 — the tenant-isolation invariant', 
     expect(err).toBeInstanceOf(hoisted.NotFoundError);
   });
 
-  it('404s when the API says the slug belongs to no store', async () => {
-    headerBag.value.set('x-store-slug', uniq('ghost'));
+  it('404s when the API says the <slug>.ebda.app host belongs to no store', async () => {
+    headerBag.value.set('x-store-domain', `${uniq('ghost')}.ebda.app`);
     fetchMock.mockResolvedValue(json({ success: false, error: { code: 'NOT_FOUND' } }, 404));
 
     const err = await thrownBy(getStoreOrNotFound);
@@ -186,7 +186,7 @@ describe('getStoreByTenantParam makes the same distinction', () => {
   it('does not 404 a tenant route on a 429', async () => {
     fetchMock.mockResolvedValue(json({ success: false }, 429));
 
-    const err = await thrownBy(() => getStoreByTenantParam(`slug:${uniq('t-busy')}`));
+    const err = await thrownBy(() => getStoreByTenantParam(`${uniq('t-busy')}.ebda.app`));
 
     expect(hoisted.notFound).not.toHaveBeenCalled();
     expect(err).toBeInstanceOf(StoreTemporarilyUnavailableError);
@@ -195,7 +195,7 @@ describe('getStoreByTenantParam makes the same distinction', () => {
   it('still 404s a tenant route whose store genuinely does not exist', async () => {
     fetchMock.mockResolvedValue(json({ success: false }, 404));
 
-    const err = await thrownBy(() => getStoreByTenantParam(`slug:${uniq('t-ghost')}`));
+    const err = await thrownBy(() => getStoreByTenantParam(`${uniq('t-ghost')}.ebda.app`));
 
     expect(hoisted.notFound).toHaveBeenCalled();
     expect(err).toBeInstanceOf(hoisted.NotFoundError);
@@ -214,7 +214,7 @@ describe('the lenient resolver still never throws into the layout', () => {
     await expect(getStore()).resolves.toMatchObject({ id: 'demo' });
 
     // ...and it must MARK the fallback as transient. `layout.tsx` keys on the
-    // `id === 'demo'` sentinel to emit `title: 'Page not found — Force AI'`, so
+    // `id === 'demo'` sentinel to emit `title: 'Page not found — Ebda'`, so
     // without this flag the retry BODY renders inside a document whose TITLE
     // says the store does not exist — the same claim, relocated to the head.
     await expect(getStore()).resolves.toMatchObject({ transientResolveFailure: true });

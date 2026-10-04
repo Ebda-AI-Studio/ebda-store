@@ -92,7 +92,7 @@ async function checkout(
   }
   const order = await OrderService.create(storeId, undefined, sessionId, {
     shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
-    paymentMethod: 'myfatoorah',
+    paymentMethod: 'paymob',
   });
   const backorders = await withRlsBypass(tx =>
     tx.backorderLine.findMany({

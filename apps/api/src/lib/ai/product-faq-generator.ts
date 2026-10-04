@@ -80,7 +80,7 @@ function buildProductFactsBlock(product: GenerateProductFaqsInput['product']): s
 export function buildProductFaqPrompt(input: GenerateProductFaqsInput): string {
   const { storeName, product, count } = input;
   const factsBlock = buildProductFactsBlock(product);
-  return `You are an SEO + AEO expert helping a Kuwait-based e-commerce store write product FAQs.
+  return `You are an SEO + AEO expert helping an Egypt-based e-commerce store write product FAQs.
 
 Store: ${storeName}
 Product: ${product.name}${product.nameAr ? ` / ${product.nameAr}` : ''}

@@ -12,7 +12,7 @@
  * Requires DATABASE_URL env var (reads from apps/api/.env if not set).
  */
 
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '@force/database';
 import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -28,7 +28,7 @@ if (!process.env.DATABASE_URL) {
   }
 }
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
 const STORE_SLUG = 'wadyaljuz';
 const FEATURE_KEY = 'inventory.backorder';
 
@@ -93,7 +93,9 @@ async function main() {
     process.exit(1);
   } else {
     console.log(`\nOK: Wady Aljuz backorder flag = ENABLED`);
-    console.log(`  Source: ${overrideRow ? `override row (enabled=${overrideRow.enabled})` : `${store.plan} plan baseline`}`);
+    console.log(
+      `  Source: ${overrideRow ? `override row (enabled=${overrideRow.enabled})` : `${store.plan} plan baseline`}`
+    );
   }
 }
 

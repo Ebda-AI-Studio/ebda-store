@@ -12,6 +12,7 @@ import { emailVerificationTemplate } from './email-templates/email-verification'
 import { resendVerificationTemplate } from './email-templates/resend-verification';
 import { duplicateRegistrationTemplate } from './email-templates/duplicate-registration';
 import { orderConfirmationTemplate } from './email-templates/order-confirmation';
+import { buildOrderEmailWaMe } from './email-templates/_wa-me';
 import { emailMoney } from './email-templates/_util';
 import {
   EMAIL_COLORS,
@@ -39,7 +40,17 @@ import { returnConfirmationTemplate } from './email-templates/return-confirmatio
 import { returnStatusUpdateTemplate } from './email-templates/return-status-update';
 import { reviewRequestTemplate, type ReviewRequestData } from './email-templates/review-request';
 import { lowStockAlertTemplate, type LowStockAlertItem } from './email-templates/low-stock-alert';
+import {
+  planLimitReachedTemplate,
+  type PlanLimitReachedData,
+} from './email-templates/plan-limit-reached';
+import {
+  subscriptionBillingTemplate,
+  type SubscriptionBillingNoticeData,
+} from './email-templates/subscription-billing';
+import { BRAND, brandFrom, poweredByBrand } from '@force/shared';
 
+import { resolveDefaultLanguage } from '@force/shared';
 // ==========================================
 // Email Service
 // Transactional email handling
@@ -183,7 +194,7 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
               ${contactBlock}
               <p class="copyright" style="${footerP}color:${c.inkSoft};font-weight:500;">© ${year} ${storeName}</p>
               ${footerLines.map(l => `<p style="${footerP}">${l}</p>`).join('\n              ')}
-              <p class="powered" style="margin:14px 0 0;font-size:11px;color:${c.inkMute};">Powered by Force AI</p>
+              <p class="powered" style="margin:14px 0 0;font-size:11px;color:${c.inkMute};">${poweredByBrand()}</p>
             </td>
           </tr>
         </table>
@@ -218,7 +229,7 @@ export interface OrderEmailData {
   promotionDiscount?: number;
   loyaltyDiscount?: number;
   loyaltyPointsRedeemed?: number | null;
-  /** The order's currency; money renders in it (issue 1705). Default KWD. */
+  /** The order's currency; money renders in it (issue 1705). Default EGP. */
   currency?: string;
   couponCode?: string;
   /** Name of the automatic promotion that discounted this order, when a
@@ -238,19 +249,23 @@ export interface OrderEmailData {
     postalCode: string;
     country: string;
   };
+  /** Cash-on-delivery order — drives the "Confirm on WhatsApp" prompt. */
+  isCod?: boolean;
+  /** Free-tier `wa.me` link (set by `sendOrderConfirmation`; absent without a store number). */
+  waMe?: { url: string; kind: 'cod_confirm' | 'order_question' };
 }
 
 export interface OrderRefundEmailData {
   orderNumber: string;
   customerName: string;
   customerEmail: string;
-  /** Total of the original order in fils. */
+  /** Total of the original order in piastres. */
   orderTotal: number;
-  /** Refunded amount in fils — equals orderTotal for full refunds. */
+  /** Refunded amount in piastres — equals orderTotal for full refunds. */
   refundAmount: number;
   /** Optional admin-supplied reason shown to the customer. */
   reason?: string;
-  /** The order's currency; money renders in it (issue 1705). Default KWD. */
+  /** The order's currency; money renders in it (issue 1705). Default EGP. */
   currency?: string;
 }
 
@@ -308,8 +323,9 @@ export class EmailService {
       },
     });
     if (!store) throw new Error(`Store ${storeId} not found`);
-    const storeDefaultLang =
-      (store.settings as Record<string, unknown> | null)?.defaultLanguage === 'ar' ? 'ar' : 'en';
+    const storeDefaultLang = resolveDefaultLanguage(
+      (store.settings as Record<string, unknown> | null)?.defaultLanguage
+    );
     const language = args.language ?? storeDefaultLang;
     const html = renderBrandedShell(args.content, {
       name: store.name,
@@ -352,14 +368,14 @@ export class EmailService {
     opts?: { queue?: boolean }
   ): Promise<void> {
     const html = renderBrandedShell(args.content, {
-      name: 'Force AI Store',
+      name: BRAND.name,
       nameAr: null,
       logo: null,
       theme: null,
       email: null,
       phone: null,
       address: null,
-      defaultLanguage: 'en',
+      defaultLanguage: resolveDefaultLanguage(undefined),
     });
     if (opts?.queue) {
       // Durable retry queue (storeId=null → platform sender on drain).
@@ -368,7 +384,7 @@ export class EmailService {
     }
     const r = await getPlatformResend();
     const payload: Record<string, unknown> = {
-      from: 'Force AI Store <noreply@force-ai.co>',
+      from: brandFrom(),
       to: Array.isArray(args.to) ? args.to : [args.to],
       subject: args.subject,
       html,
@@ -404,7 +420,7 @@ export class EmailService {
   static async sendPlatformRaw(options: EmailOptions): Promise<void> {
     const r = await getPlatformResend();
     const payload: Record<string, unknown> = {
-      from: 'Force AI Store <noreply@force-ai.co>',
+      from: brandFrom(),
       to: Array.isArray(options.to) ? options.to : [options.to],
       subject: options.subject,
       html: options.html,
@@ -431,16 +447,18 @@ export class EmailService {
   ): Promise<void> {
     const store = await prisma.store.findUnique({
       where: { id: storeId },
-      select: { name: true, settings: true },
+      select: { name: true, nameAr: true, settings: true, whatsapp: true, theme: true },
     });
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
-      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
-        ? 'ar'
-        : 'en');
-    const subject = orderConfirmationTemplate.subject[lang](data, store.name);
-    const content = orderConfirmationTemplate[lang](data, store.name);
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
+    // Free-tier wa.me link (no API): only when the store has a valid number.
+    const withWaMe: OrderEmailData = { ...data, waMe: buildOrderEmailWaMe(data, store, lang) };
+    const subject = orderConfirmationTemplate.subject[lang](withWaMe, store.name);
+    const content = orderConfirmationTemplate[lang](withWaMe, store.name);
     await this.sendForStore(
       storeId,
       { to: data.customerEmail, subject, content, language: lang },
@@ -450,7 +468,7 @@ export class EmailService {
 
   /**
    * Order Refund Email — sent when a refund is issued (gateway-initiated,
-   * admin "Refund via MyFatoorah", or status-button refund). Always fires
+   * admin "Refund via provider", or status-button refund). Always fires
    * from the order/refunded Inngest fanout AFTER the DB transaction
    * settled, so a Resend outage can't roll the refund back.
    */
@@ -467,9 +485,9 @@ export class EmailService {
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
-      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
-        ? 'ar'
-        : 'en');
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
     const subject = orderRefundedTemplate.subject[lang](data);
     const content = orderRefundedTemplate[lang](data);
     // Durable retry queue, like every other order-lifecycle email: this is
@@ -501,9 +519,9 @@ export class EmailService {
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
-      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
-        ? 'ar'
-        : 'en');
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
     await this.sendForStore(
       storeId,
       {
@@ -531,9 +549,9 @@ export class EmailService {
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
-      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
-        ? 'ar'
-        : 'en');
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
     const subject = paymentSuccessTemplate.subject[lang](data, store.name);
     const content = paymentSuccessTemplate[lang](data, store.name);
     await this.sendForStore(
@@ -563,9 +581,9 @@ export class EmailService {
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
-      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
-        ? 'ar'
-        : 'en');
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
     const subject = paymentFailedTemplate.subject[lang](data, store.name);
     const content = paymentFailedTemplate[lang](data, store.name, config.webUrl);
     await this.sendForStore(storeId, { to: data.customerEmail, subject, content, language: lang });
@@ -593,9 +611,9 @@ export class EmailService {
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
-      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
-        ? 'ar'
-        : 'en');
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
     const subject = orderShippedTemplate.subject[lang](data, store.name);
     const content = orderShippedTemplate[lang](data, store.name);
     await this.sendForStore(
@@ -625,9 +643,9 @@ export class EmailService {
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
-      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
-        ? 'ar'
-        : 'en');
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
     const subject = passwordResetTemplate.subject[lang](data, store.name);
     const content = passwordResetTemplate[lang](data, store.name);
     await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
@@ -648,9 +666,9 @@ export class EmailService {
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
-      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
-        ? 'ar'
-        : 'en');
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
     const subject = welcomeTemplate.subject[lang](data, store.name);
     const content = welcomeTemplate[lang](data, store.name, config.webUrl);
     await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
@@ -676,9 +694,9 @@ export class EmailService {
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
-      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
-        ? 'ar'
-        : 'en');
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
     const subject = emailVerificationTemplate.subject[lang](data, store.name);
     const content = emailVerificationTemplate[lang](data, store.name);
     await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
@@ -705,9 +723,9 @@ export class EmailService {
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
-      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
-        ? 'ar'
-        : 'en');
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
     const subject = duplicateRegistrationTemplate.subject[lang](data, store.name);
     const content = duplicateRegistrationTemplate[lang](data, store.name, config.webUrl);
     await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
@@ -733,9 +751,9 @@ export class EmailService {
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
-      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
-        ? 'ar'
-        : 'en');
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
     const subject = resendVerificationTemplate.subject[lang](data, store.name);
     const content = resendVerificationTemplate[lang](data, store.name);
     await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
@@ -763,9 +781,9 @@ export class EmailService {
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
-      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
-        ? 'ar'
-        : 'en');
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
     const subject = returnConfirmationTemplate.subject[lang](data, store.name);
     const content = returnConfirmationTemplate[lang](data, store.name);
     // `queue: true` — same durable Redis retry path the order-lifecycle
@@ -804,9 +822,9 @@ export class EmailService {
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
-      ((store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
-        ? 'ar'
-        : 'en');
+      resolveDefaultLanguage(
+        (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
     const subject = returnStatusUpdateTemplate.subject[lang](data, store.name);
     const content = returnStatusUpdateTemplate[lang](data, store.name);
     // Durable queue, same reasoning as sendReturnConfirmation above.
@@ -886,9 +904,9 @@ export class EmailService {
     });
     const lang: 'en' | 'ar' =
       language ??
-      ((store?.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
-        ? 'ar'
-        : 'en');
+      resolveDefaultLanguage(
+        (store?.settings as { defaultLanguage?: string } | null)?.defaultLanguage
+      );
     const alertData = {
       items: data.items,
       storeName: data.storeName,
@@ -897,6 +915,46 @@ export class EmailService {
     const subject = lowStockAlertTemplate.subject[lang](alertData);
     const content = lowStockAlertTemplate[lang](alertData);
     await this.sendForStore(storeId, { to: data.to, subject, content, language: lang });
+  }
+
+  /**
+   * Merchant notice: the store passed its plan's monthly order cap (SP5).
+   * Recipient is resolved by the caller (the store owner's email).
+   */
+  static async sendPlanLimitReached(
+    storeId: string,
+    data: PlanLimitReachedData & { to: string },
+    language?: 'en' | 'ar'
+  ): Promise<void> {
+    const lang: 'en' | 'ar' = language ?? 'en';
+    await this.sendForStore(storeId, {
+      to: data.to,
+      subject: planLimitReachedTemplate.subject[lang](data),
+      content: planLimitReachedTemplate[lang](data),
+      language: lang,
+    });
+  }
+
+  /**
+   * Merchant notice from the subscription dunning cycle (SP5 task 3): a failed
+   * renewal with a retry scheduled, or the final downgrade to Free.
+   */
+  static async sendSubscriptionBillingNotice(
+    storeId: string,
+    data: SubscriptionBillingNoticeData & { to: string },
+    language?: 'en' | 'ar'
+  ): Promise<void> {
+    const lang: 'en' | 'ar' = language ?? 'en';
+    await this.sendForStore(
+      storeId,
+      {
+        to: data.to,
+        subject: subscriptionBillingTemplate.subject[lang](data),
+        content: subscriptionBillingTemplate[lang](data),
+        language: lang,
+      },
+      { queue: true }
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -954,7 +1012,7 @@ export class EmailService {
       content,
       text: this.htmlToText(
         renderBrandedShell(content, {
-          name: 'Force AI Store',
+          name: BRAND.name,
           nameAr: null,
           logo: null,
           theme: null,

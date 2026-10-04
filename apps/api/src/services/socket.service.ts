@@ -5,10 +5,14 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { prisma } from '@force/database';
+import { getUserState } from '../lib/definer';
 import { redis } from './redis.service';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
 import { AppError } from '../middleware/error-handler';
+import { fromMinor, formatMoney } from '@force/shared';
+import { isWorkers } from '../lib/runtime';
+import { cfBindings, cfWaitUntil } from '../cf/bindings';
 // UiRefreshEvent is defined in lib/socket-broadcast and re-exported; we inline
 // the interface here to avoid a circular dependency
 // (socket-broadcast → socket.service → socket-broadcast).
@@ -42,6 +46,35 @@ interface NotificationPayload {
   createdAt: Date;
 }
 
+/**
+ * Workers: there is no socket.io server in the isolate. Rooms are Durable Objects
+ * (cf/store-realtime.ts): `user:<id>` holds a user's WebSockets, `store:<id>` fans out to
+ * the user DOs subscribed to the store. Delivery is best-effort and rides `waitUntil`,
+ * so an emit never delays the response (same contract as the socket.io path).
+ */
+function realtimeEmit(
+  room: { user: string } | { store: string },
+  event: string,
+  payload: unknown
+): void {
+  const ns = cfBindings()?.STORE_REALTIME;
+  if (!ns) return;
+  const call = (async () => {
+    if ('user' in room) {
+      const stub = ns.get(ns.idFromName(`user:${room.user}`)) as unknown as {
+        deliver(a: { event: string; payload: unknown }): Promise<number>;
+      };
+      await stub.deliver({ event, payload });
+    } else {
+      const stub = ns.get(ns.idFromName(`store:${room.store}`)) as unknown as {
+        emitStore(storeId: string, event: string, payload: unknown): Promise<number>;
+      };
+      await stub.emitStore(room.store, event, payload);
+    }
+  })().catch(err => logger.warn({ err, event }, '[realtime] emit failed (non-fatal)'));
+  cfWaitUntil(call);
+}
+
 class SocketService {
   private io: Server | null = null;
   private userSockets: Map<string, Set<string>> = new Map(); // userId -> socketIds
@@ -60,7 +93,7 @@ class SocketService {
           // Reuse the SINGLE platform-origin allowlist shared with the Express
           // CORS handler + CSRF middleware (lib/cors-cache). This inline list
           // used to only cover webUrl/adminUrl + Vercel, so it dropped the
-          // Orders PWA (orders.force-ai.co) and the force-ai.co / forcemediakw
+          // Orders PWA (orders.ebda.app) and the ebda.app
           // prod fallbacks + CF Worker previews → the admin/orders WebSocket
           // handshake failed CORS. Delegating here keeps the two configs from
           // ever drifting again.
@@ -172,10 +205,7 @@ class SocketService {
           const cachedTv = await redis.getUserTokenVersion(payload.userId);
           let currentTv: number;
           if (cachedTv === null) {
-            const u = await prisma.user.findUnique({
-              where: { id: payload.userId },
-              select: { tokenVersion: true },
-            });
+            const u = await getUserState(payload.userId);
             currentTv = u?.tokenVersion ?? 0;
             // Warm the cache so subsequent connections skip the DB lookup.
             await redis.setUserTokenVersion(payload.userId, currentTv);
@@ -317,6 +347,7 @@ class SocketService {
    * Send notification to a specific user
    */
   notifyUser(userId: string, notification: NotificationPayload) {
+    if (isWorkers) return realtimeEmit({ user: userId }, 'notification', notification);
     if (!this.io) return;
     this.io.to(`user:${userId}`).emit('notification', notification);
   }
@@ -325,6 +356,7 @@ class SocketService {
    * Send notification to all admins of a store
    */
   notifyStore(storeId: string, notification: NotificationPayload) {
+    if (isWorkers) return realtimeEmit({ store: storeId }, 'notification', notification);
     if (!this.io) return;
     this.io.to(`store:${storeId}`).emit('notification', notification);
   }
@@ -333,6 +365,8 @@ class SocketService {
    * Broadcast to all connected clients
    */
   broadcast(event: string, data: unknown) {
+    // Workers: platform-wide broadcast has no caller and no room; not implemented there.
+    if (isWorkers) return;
     if (!this.io) return;
     this.io.emit(event, data);
   }
@@ -358,9 +392,7 @@ class SocketService {
     this.notifyStore(storeId, {
       type: 'new_order',
       title: 'New Order Received',
-      message: `Order #${order.orderNumber} from ${order.customerName} - ${(
-        order.total / 1000
-      ).toFixed(3)} KWD`,
+      message: `Order #${order.orderNumber} from ${order.customerName} - ${formatMoney(order.total, 'en')}`,
       data: { ...order, storeId, url },
       createdAt: new Date(),
     });
@@ -439,6 +471,7 @@ class SocketService {
    * Used by broadcastToStore() in lib/socket-broadcast.ts. Never throws.
    */
   broadcastUiRefresh(storeId: string, event: UiRefreshEvent): void {
+    if (isWorkers) return realtimeEmit({ store: storeId }, 'ui-refresh', event);
     if (!this.io) return;
     this.io.to(`store:${storeId}`).emit('ui-refresh', event);
   }

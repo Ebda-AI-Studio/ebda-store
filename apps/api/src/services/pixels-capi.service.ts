@@ -28,6 +28,7 @@ import crypto from 'crypto';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
 
+import { fromMinor, REGION } from '@force/shared';
 // ─── Hashing helpers ─────────────────────────────────────────────────────────
 
 /**
@@ -74,7 +75,7 @@ interface MarketingPixelsJson {
 
 export interface PurchaseOrderData {
   id: string; // orderId — used as event_id for deduplication
-  total: number; // stored as integer milliKWD (e.g. 5000 = 5.000 KWD)
+  total: number; // stored as integer piastres (e.g. 5000 = 50.00 EGP)
   currency: string;
   customer?: {
     email?: string | null;
@@ -153,9 +154,9 @@ async function sendMetaCAPI(
   if (email && email.trim()) userData.em = [hashEmail(email)];
   if (phone && phone.trim()) userData.ph = [hashPhone(phone)];
 
-  // total is stored as milliunits (e.g. 5000 = KWD 5.000). Divide by 1000
-  // to get the decimal value Meta expects.
-  const value = order.total / 1000;
+  // total is stored in minor units (piastres: 5000 = EGP 50.00); Meta wants the
+  // decimal major value.
+  const value = fromMinor(order.total, order.currency || REGION.currency);
 
   const payload: MetaCAPIPayload = {
     data: [
@@ -167,7 +168,7 @@ async function sendMetaCAPI(
         event_source_url: storeUrl,
         user_data: userData,
         custom_data: {
-          currency: order.currency || 'KWD',
+          currency: order.currency || REGION.currency,
           value,
         },
       },
@@ -274,7 +275,7 @@ async function sendTikTokCAPI(
   if (email && email.trim()) user.email = hashEmail(email);
   if (phone && phone.trim()) user.phone_number = hashPhone(phone);
 
-  const value = order.total / 1000;
+  const value = fromMinor(order.total, order.currency || REGION.currency);
 
   const payload: TikTokEventPayload = {
     pixel_code: pixelId,
@@ -282,7 +283,7 @@ async function sendTikTokCAPI(
     event_time: Math.floor(Date.now() / 1000),
     event_id: order.id,
     properties: {
-      currency: order.currency || 'KWD',
+      currency: order.currency || REGION.currency,
       value,
     },
     context: {

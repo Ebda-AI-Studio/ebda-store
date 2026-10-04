@@ -129,7 +129,7 @@ describe('page-builder preview CSP', () => {
   it('lets the preview route embed an arbitrary merchant domain', async () => {
     const preview = (await rules()).find(r => r.source === PAGE_BUILDER_PREVIEW_SOURCE)!;
     // Compare TOKENS, never a substring: `toContain('https:')` is satisfied by
-    // `https://store.force-ai.co`, so the strict list — the original bug —
+    // `https://ebda.app`, so the strict list — the original bug —
     // passed this assertion. Mutation testing caught it.
     expect(frameSrc(preview.csp).split(/\s+/)).toContain('https:');
   });
@@ -137,7 +137,7 @@ describe('page-builder preview CSP', () => {
   it('keeps every other admin route on the strict list', async () => {
     const other = (await rules()).find(r => r.source === ADMIN_CATCHALL_SOURCE)!;
     const fs_ = frameSrc(other.csp);
-    expect(fs_).toContain('https://*.force-ai.co');
+    expect(fs_).toContain('https://*.ebda.app');
     // The bare scheme must NOT leak into the catch-all.
     expect(fs_.split(/\s+/)).not.toContain('https:');
   });

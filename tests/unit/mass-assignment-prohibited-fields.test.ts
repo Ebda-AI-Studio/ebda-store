@@ -141,6 +141,11 @@ vi.mock('@api/services/store.service', () => ({
   },
 }));
 
+// The per-account daily store cap (SP5 task 4) is covered in self-serve-abuse.test.ts.
+vi.mock('@api/services/store-creation-limit', () => ({
+  assertStoreCreationBudget: vi.fn().mockResolvedValue(undefined),
+  withStoreCreationLock: (_owner: string, fn: () => unknown) => fn(),
+}));
 vi.mock('@api/services/domain-provider', () => ({
   resolveDomainService: vi.fn(() => ({ isConfigured: () => false })),
 }));
@@ -348,7 +353,7 @@ describe('mass assignment — prohibited fields never reach the write-service ca
       .post(`/api/v1/stores/${STORE_ID}/orders`)
       .set('x-session-id', 'session-1')
       .send({
-        shippingAddress: { firstName: 'A', lastName: 'B', address1: 'Street 1', country: 'KW' },
+        shippingAddress: { firstName: 'A', lastName: 'B', address1: 'Street 1', country: 'EG' },
         paymentMethod: 'cod',
         ...BASE_PROHIBITED,
       });
@@ -515,6 +520,9 @@ const ROUTE_INVENTORY: Record<string, Coverage> = {
     exempt: 'no request-body fields are read at all — queues an email for the existing order',
   },
   "order.routes.ts POST '/:orderId/mark-paid'": {
+    exempt: 'reads no request body — orderId/storeId come from the URL params',
+  },
+  "order.routes.ts POST '/:orderId/confirm-instapay'": {
     exempt: 'reads no request body — orderId/storeId come from the URL params',
   },
   "order.routes.ts POST '/bulk-mark-paid'": {

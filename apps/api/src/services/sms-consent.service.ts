@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
 
 /**
@@ -145,7 +145,7 @@ export class SmsConsentService {
   ): Promise<{ id: string } | null> {
     const phoneKey = smsConsentPhoneKey(phone);
     if (!phoneKey) return null;
-    return withRlsBypass(tx =>
+    return withStore(storeId, tx =>
       tx.smsMarketingConsent.findFirst({
         where: { storeId, phoneKey, granted: true },
         select: { id: true },

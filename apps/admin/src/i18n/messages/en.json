@@ -146,7 +146,7 @@
           },
           "paymentMethod": {
             "title": "Set up at least one payment method",
-            "subtitle": "Enable Tap, MyFatoorah, Hesabe, UPayments, or Cash on Delivery.",
+            "subtitle": "Enable Paymob, Kashier, Fawry, InstaPay, or Cash on Delivery.",
             "cta": "Configure payments"
           },
           "shipping": {
@@ -184,7 +184,7 @@
         "storeName": "Store Name",
         "urlSlug": "URL Slug",
         "slugPlaceholder": "my-store-name",
-        "slugHint": "Your store will be at: store.force-ai.co/{slug}",
+        "slugHint": "Your store will be at: {slug}.ebda.app",
         "slugHintPlaceholder": "your-slug",
         "plan": "Plan",
         "status": "Status",
@@ -396,7 +396,9 @@
       "errors": {
         "storeNameRequired": "Store name is required",
         "storeUrlRequired": "Store URL is required",
-        "storeUrlInvalid": "URL can only contain lowercase letters, numbers, and hyphens",
+        "storeUrlInvalid": "URL can only contain lowercase letters, numbers, and single hyphens (not at the start or end)",
+        "storeUrlReserved": "This address is reserved. Please choose another one",
+        "storeUrlLength": "Address must be 3 to 40 characters",
         "emailRequired": "Email is required",
         "emailInvalid": "Please enter a valid email address",
         "ownerNameRequired": "Owner name is required",
@@ -501,7 +503,7 @@
         },
         "price": "Price",
         "priceMode": {
-          "set": "Set price (KWD)",
+          "set": "Set price (EGP)",
           "adjustPct": "Adjust by %"
         },
         "priceValue": "Price value",
@@ -522,7 +524,7 @@
         "variantGridProduct": "Product",
         "variantGridVariant": "Variant",
         "variantGridInventory": "Inventory",
-        "variantGridPrice": "Price (KWD)",
+        "variantGridPrice": "Price (EGP)",
         "variantSaving": "Saving...",
         "variantSaveAll": "Save variant changes",
         "toast": {
@@ -654,14 +656,14 @@
         "excerptArPlaceholder": "ملخص من جملة أو جملتين لنتائج البحث وبطاقات المشاركة...",
         "mediaHint": "Drag and drop images here, or click to select",
         "mediaSizeHint": "Recommended 1000×1000 (square). Up to 10MB per file — we auto-compress for the storefront.",
-        "price": "Price (KWD)",
-        "costPrice": "Cost (KWD)",
+        "price": "Price (EGP)",
+        "costPrice": "Cost (EGP)",
         "profitLabel": "Profit margin per unit:",
         "pricePlaceholder": "0.000",
         "discountLabel": "Discount",
         "discountNone": "None",
         "discountPercentage": "Percentage (%)",
-        "discountFixed": "Fixed (KWD)",
+        "discountFixed": "Fixed (EGP)",
         "discountValuePlaceholder": "0",
         "discountPercentagePlaceholder": "0.0",
         "discountPreviewLabel": "Preview price after discount",
@@ -821,9 +823,9 @@
         "descriptionMultiAxis": "This product has multi-axis variants (e.g. Size × Color). You can edit price, stock, and the image of each combination, but the names are locked because creating new combinations needs both axes.",
         "colName": "Name",
         "colNameAr": "Name (Arabic)",
-        "colPrice": "Price (KWD)",
-        "colCompareAt": "Compare-at (KWD)",
-        "colCost": "Cost (KWD)",
+        "colPrice": "Price (EGP)",
+        "colCompareAt": "Compare-at (EGP)",
+        "colCost": "Cost (EGP)",
         "colStock": "Stock",
         "colImage": "Image",
         "namePlaceholder": "e.g. Medium",
@@ -875,14 +877,14 @@
         "badgeLabelHint": "Free text shown as a chip on this product's card and page. Leave empty for no badge. Max 32 characters.",
         "mediaHint": "Drag and drop images here, or click to select",
         "mediaSizeHint": "Recommended 1000×1000 (square). Up to 10MB per file — we auto-compress for the storefront.",
-        "price": "Price (KWD)",
+        "price": "Price (EGP)",
         "pricePlaceholder": "0.000",
-        "costPrice": "Cost (KWD)",
-        "pricingHint": "Enter prices in KWD. The discount dropdown auto-sets the compare-at price on the storefront.",
+        "costPrice": "Cost (EGP)",
+        "pricingHint": "Enter prices in EGP. The discount dropdown auto-sets the compare-at price on the storefront.",
         "discountLabel": "Discount",
         "discountNone": "None",
         "discountPercentage": "Percentage (%)",
-        "discountFixed": "Fixed (KWD)",
+        "discountFixed": "Fixed (EGP)",
         "discountValuePlaceholder": "0",
         "discountPercentagePlaceholder": "0.0",
         "discountPreviewLabel": "Preview price after discount",
@@ -972,6 +974,7 @@
       "filters": {
         "all": "All Orders",
         "pending": "Pending",
+        "awaiting_payment_confirmation": "Awaiting InstaPay",
         "confirmed": "Confirmed",
         "processing": "Processing",
         "shipped": "Shipped",
@@ -1004,7 +1007,7 @@
         "status": "Status",
         "date": "Date",
         "actions": "Actions",
-        "totalValue": "{amount} KWD",
+        "totalValue": "{amount} EGP",
         "moreItems": "+{count} more",
         "agentBadge": "Agent"
       },
@@ -1041,7 +1044,9 @@
         "cancel": "Cancel",
         "manualRefundTitle": "Mark Order as Refunded?",
         "manualRefundDescription": "This only records a refund. It restores stock, reverses the coupon and loyalty points, and tells the customer a refund was issued — but it does NOT send any money back. To actually return a card payment, open the order and use \"Refund via provider\".",
-        "manualRefundDescriptionCancelled": "This order was cancelled, so its stock, coupon and loyalty points were already reversed at cancellation. This only records the refund on the order — it does NOT send any money back, and the customer is not sent a new notice. To actually return a card payment, use \"Refund via provider\"."
+        "manualRefundDescriptionCancelled": "This order was cancelled, so its stock, coupon and loyalty points were already reversed at cancellation. This only records the refund on the order — it does NOT send any money back, and the customer is not sent a new notice. To actually return a card payment, use \"Refund via provider\".",
+        "instapayTitle": "Confirm the InstaPay transfer?",
+        "instapayDescription": "Confirm that the money for this order is in your InstaPay account. The order is then confirmed and can be shipped. Tapping twice is safe."
       },
       "toast": {
         "errorTitle": "Error",
@@ -1050,7 +1055,9 @@
         "markedPaidTitle": "Marked as Paid",
         "markedPaidDescription": "Order has been marked as paid.",
         "bulkUpdateTitle": "Bulk Update",
-        "bulkUpdateDescription": "{count} order(s) marked as paid."
+        "bulkUpdateDescription": "{count} order(s) marked as paid.",
+        "instapayConfirmed": "Payment confirmed",
+        "instapayAlready": "Already confirmed"
       },
       "export": {
         "button": "Export orders",
@@ -1063,12 +1070,14 @@
         "statusUpdate": "Failed to update status",
         "markPaid": "Failed to mark as paid",
         "bulkMarkPaid": "Failed to bulk mark as paid",
-        "retry": "Retry"
+        "retry": "Retry",
+        "confirmInstapay": "Could not confirm the InstaPay payment"
       },
       "agentBadge": "Agent"
     },
     "status": {
       "pending": "Pending",
+      "awaiting_payment_confirmation": "Awaiting InstaPay confirmation",
       "confirmed": "Confirmed",
       "processing": "Processing",
       "shipped": "Shipped",
@@ -1108,10 +1117,10 @@
         "viaAreaRate": "area rate",
         "viaZone": "zone",
         "viaSource": "(via {source})",
-        "noRateConfigured": "No rate configured for this area — set a fee below or the order will save with 0 KWD shipping.",
-        "overrideLabel": "Shipping fee override (KWD) — leave blank to use the calculated fee",
+        "noRateConfigured": "No rate configured for this area — set a fee below or the order will save with 0 EGP shipping.",
+        "overrideLabel": "Shipping fee override (EGP) — leave blank to use the calculated fee",
         "overridePlaceholder": "e.g. 1.500",
-        "overrideActive": "Override active: {price} ({fils} fils) will be used instead of the calculated fee."
+        "overrideActive": "Override active: {price} ({piastres} piastres) will be used instead of the calculated fee."
       },
       "productsSection": {
         "heading": "Products",
@@ -1139,7 +1148,7 @@
         "itemCount": "{count, plural, one {{count, number, latn} item} other {{count, number, latn} items}}",
         "creating": "Creating…",
         "placeOrder": "Place order",
-        "unpaidHint": "Order created in unpaid state. Issue a MyFatoorah payment link from the order detail page after save."
+        "unpaidHint": "Order created in unpaid state. Issue a payment link from the order detail page after save."
       },
       "errors": {
         "noItems": "Add at least one product before placing the order",
@@ -1204,7 +1213,8 @@
         "markPaid": "Mark Paid",
         "addNote": "Add Note",
         "refund": "Refund",
-        "toolbarLabel": "Order actions"
+        "toolbarLabel": "Order actions",
+        "confirmInstapay": "Payment received"
       },
       "loading": "Loading order…",
       "errors": {
@@ -1229,7 +1239,7 @@
         "button": "Refund via provider",
         "buttonTooltip": "Refund the customer via the original payment provider",
         "modalTitle": "Refund order {orderNumber}?",
-        "modalBodyIntro": "A refund request of <b>{amount} {currency}</b> will be sent to the payment provider. The customer's card typically reflects the refund in 1-3 business days (MyFatoorah refunds are reviewed by their finance team before execution).",
+        "modalBodyIntro": "A refund request of <b>{amount} {currency}</b> will be sent to the payment provider. The customer's card typically reflects the refund in 1-3 business days (some gateways review refunds before executing them).",
         "modalBodySideEffects": "Inventory will be restored, coupon usage decremented, loyalty points reversed, and the customer will be notified by email. This cannot be undone.",
         "reasonLabel": "Reason (optional, shown to the customer)",
         "reasonPlaceholder": "Out of stock, customer request, duplicate charge…",
@@ -1258,7 +1268,53 @@
         "toastNoChange": "Refund still {status} (no change)"
       },
       "paidFromWallet": "Paid from wallet",
-      "amountDue": "Amount due"
+      "amountDue": "Amount due",
+      "instapay": {
+        "title": "InstaPay transfer",
+        "waiting": "Waiting for the transfer. Confirm only after you see {amount} in your InstaPay account.",
+        "expires": "Held until {when}. After that the order is cancelled and the stock is released.",
+        "expired": "The hold has run out. The order will be cancelled and cannot be confirmed.",
+        "customerReference": "Reference entered by the customer",
+        "noReference": "The customer has not entered a reference yet.",
+        "payTo": "Paid to",
+        "orderRef": "Quote in the transfer note"
+      },
+      "shipment": {
+        "title": "Shipment",
+        "errorTitle": "Error",
+        "failed": "Something went wrong. Please try again.",
+        "created": "Shipment created",
+        "cancelled": "Shipment cancelled",
+        "cod": "Cash on delivery: {amount}",
+        "codWillCollect": "The courier will collect {amount} on delivery.",
+        "printLabel": "Print label",
+        "refresh": "Refresh tracking",
+        "cancel": "Cancel shipment",
+        "keep": "Keep",
+        "moveTo": "Update status",
+        "chooseStatus": "Choose a status",
+        "timeline": "Tracking",
+        "timelineEmpty": "No tracking updates yet.",
+        "failedTitle": "The carrier could not book this shipment",
+        "failedHint": "The order is placed and unaffected. It was tried {attempts} time(s) and will be retried automatically; you can retry now or ship it another way.",
+        "creating": "Booking with the carrier…",
+        "wasCancelled": "The previous shipment was cancelled. You can create a new one.",
+        "blocked": {
+          "instapay": "This InstaPay order cannot be shipped until you confirm the transfer arrived.",
+          "status": "This order cannot be shipped in its current status."
+        },
+        "carrier": "Carrier",
+        "manualOption": "Manual (other courier)",
+        "manualName": "Courier name",
+        "manualTracking": "Tracking number",
+        "create": "Create shipment",
+        "retry": "Retry booking",
+        "confirmCancelTitle": "Cancel this shipment?",
+        "confirmCancelDescription": "The carrier is asked to cancel the parcel and the order goes back to processing.",
+        "forceCancelTitle": "The carrier did not cancel it",
+        "forceCancelDescription": "The courier may already have the parcel. You can stop tracking it here anyway, but the parcel may still be delivered.",
+        "forceCancel": "Cancel here anyway"
+      }
     },
     "layout": {
       "title": "Storefront layout",
@@ -1814,26 +1870,19 @@
       "linkCopied": "Link copied to clipboard",
       "clipboardError": "Could not access clipboard — copy the link manually",
       "issueFailed": "Failed to issue payment link",
-      "emailSent": "Email sent to {email}",
-      "customerFallback": "customer",
       "copyAria": "Copy payment link",
       "openAria": "Open payment link",
       "issueNewLink": "Issue a new link",
       "buttonLabel": "Payment Link",
       "modalTitle": "Issue Payment Link",
-      "modalSubtitle": "Order {orderNumber} — generate a MyFatoorah link to collect payment.",
+      "modalSubtitle": "Order {orderNumber} — generate a payment link to collect payment.",
       "option": {
         "copyLink": {
           "title": "Copy link",
           "description": "Generate the URL — copy it and share via WhatsApp, email, or any channel you prefer."
-        },
-        "email": {
-          "title": "Send via email",
-          "description": "MyFatoorah delivers the payment link directly to the customer's email on file."
         }
       },
       "issuing": "Issuing payment link…",
-      "successEmailSent": "✓ Email sent to {email}",
       "successGenerated": "✓ Payment link generated",
       "paymentUrlLabel": "Payment URL",
       "copyButton": "Copy",
@@ -2015,7 +2064,7 @@
           "directionLabel": "Change",
           "credit": "Add credit",
           "debit": "Deduct",
-          "amountLabel": "Amount (KWD)",
+          "amountLabel": "Amount (EGP)",
           "amountPlaceholder": "0.000",
           "noteLabel": "Reason",
           "notePlaceholder": "Why is this balance changing? Only your team sees this.",
@@ -2023,7 +2072,7 @@
           "newBalance": "New balance: {amount}",
           "submit": "Save adjustment",
           "cancel": "Cancel",
-          "invalidAmount": "Enter an amount greater than 0 with at most 3 decimals.",
+          "invalidAmount": "Enter an amount greater than 0 with at most 2 decimals.",
           "noteRequired": "A reason is required.",
           "exceedsBalance": "You cannot deduct more than the current balance.",
           "successTitle": "Wallet updated",
@@ -2173,7 +2222,7 @@
       },
       "paymentSettings": {
         "title": "Payment Settings",
-        "description": "Configure payment providers: Tap, MyFatoorah, Hesabe, UPayments"
+        "description": "Configure payment providers: Paymob, Kashier, Fawry, InstaPay, Cash on Delivery"
       },
       "shipping": {
         "title": "Shipping",
@@ -2225,7 +2274,7 @@
       },
       "whatsapp": {
         "title": "WhatsApp Integration",
-        "description": "Force Business Platform · templates · order updates · payment links"
+        "description": "Ebda WhatsApp Platform · templates · order updates · payment links"
       },
       "staff": {
         "title": "Staff Members",
@@ -2233,7 +2282,7 @@
       },
       "whatsappBridge": {
         "title": "WhatsApp Business",
-        "description": "Connect Force AI Store to Force AI WhatsApp Business Platform — paste your API key + configure templates"
+        "description": "Connect Ebda to Ebda WhatsApp Business Platform — paste your API key + configure templates"
       },
       "whatsappTemplates": {
         "title": "WhatsApp Templates",
@@ -2241,7 +2290,7 @@
       },
       "whatsappPaymentLink": {
         "title": "WhatsApp Payment Link",
-        "description": "Send a customer a one-tap payment link via WhatsApp — Kuwait alternative to WhatsApp Pay"
+        "description": "Send a customer a one-tap payment link via WhatsApp — Egypt alternative to WhatsApp Pay"
       },
       "whatsappOrderUpdates": {
         "title": "Order Updates",
@@ -2262,11 +2311,15 @@
       "merchantKeys": {
         "title": "Merchant MCP keys",
         "description": "Issue keys so you can run this store from Claude Code or any MCP client"
+      },
+      "billing": {
+        "title": "Billing",
+        "description": "Plan, usage and limits"
       }
     },
     "metaCatalogCard": {
-      "provisionLabel": "Provision automatically · Force AI assisted",
-      "provisionDescription": "Creates a new Commerce Catalog under the Force AI parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
+      "provisionLabel": "Provision automatically · Ebda assisted",
+      "provisionDescription": "Creates a new Commerce Catalog under the Ebda parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
       "provisionButton": "Provision automatically",
       "provisioningButton": "Provisioning…"
     },
@@ -2530,16 +2583,26 @@
       "whatsapp": "WhatsApp Number",
       "phone": "Phone",
       "phoneAr": "Phone (Arabic Display)",
-      "phonePlaceholder": "+965 XXXX XXXX",
+      "phonePlaceholder": "+20 1XX XXX XXXX",
       "phoneArPlaceholder": "٩٦٥ XXXX XXXX+",
       "address": "Address",
       "addressAr": "Address (Arabic)",
-      "addressPlaceholder": "123 Street, City, Kuwait",
-      "addressArPlaceholder": "١٢٣ شارع، المدينة، الكويت",
+      "addressPlaceholder": "123 Street, City, Egypt",
+      "addressArPlaceholder": "١٢٣ شارع، المدينة، مصر",
       "addressUrl": "Map link",
       "addressUrlPlaceholder": "https://maps.app.goo.gl/...",
       "addressUrlHint": "Paste a Google or Apple Maps link to your storefront's pin. The footer address will become clickable and open this URL in a new tab.",
-      "addressClickable": "Make address clickable on storefront"
+      "addressClickable": "Make address clickable on storefront",
+      "whatsappHint": "Customers chat with you on WhatsApp through a free click-to-chat link. Egyptian mobile (010, 011, 012, 015).",
+      "whatsappInvalid": "Enter a valid Egyptian mobile number, e.g. 01012345678.",
+      "waMeTitle": "WhatsApp buttons",
+      "waMeNeedsNumber": "Add your WhatsApp number above to turn these buttons on.",
+      "waMeProductShare": "Product share / ask button",
+      "waMeProductShareHint": "A WhatsApp button on every product page, prefilled with the product name, price and link.",
+      "waMeOrderQuestion": "\"Ask about this order\" button",
+      "waMeOrderQuestionHint": "Lets customers message you about an order from the order page.",
+      "waMeCodConfirm": "Cash-on-delivery confirmation prompt",
+      "waMeCodConfirmHint": "After a cash-on-delivery order, shows a \"Confirm on WhatsApp\" button and adds it to the order email."
     },
     "social": {
       "instagram": "Instagram",
@@ -2588,12 +2651,12 @@
       "fieldPublished": "Published (visible on storefront)",
       "phName": "e.g. Main Branch",
       "phNameAr": "e.g. Main Branch",
-      "phCountry": "e.g. Kuwait",
-      "phCountryAr": "e.g. Kuwait",
+      "phCountry": "e.g. Egypt",
+      "phCountryAr": "e.g. Egypt",
       "phAddress": "e.g. Block 5, Salem Al Mubarak St, Salmiya",
       "phAddressAr": "e.g. Block 5, Salem Al Mubarak St, Salmiya",
-      "phPhone": "e.g. +965 2222 2222",
-      "phWhatsapp": "e.g. +96599999999",
+      "phPhone": "e.g. +20 2 2222 2222",
+      "phWhatsapp": "e.g. +201012345678",
       "phHours": "e.g. Sat–Thu 9am–10pm",
       "phHoursAr": "e.g. Sat–Thu 9am–10pm",
       "phMapsUrl": "https://maps.google.com/...",
@@ -2688,10 +2751,10 @@
       "descriptionArPlaceholder": "احصل على خصم 20٪ على جميع منتجات الصيف",
       "typeLabel": "Discount Type *",
       "valuePercentageLabel": "Percentage (%) *",
-      "valueAmountLabel": "Amount (KWD) *",
-      "minOrderLabel": "Minimum Order (KWD)",
+      "valueAmountLabel": "Amount (EGP) *",
+      "minOrderLabel": "Minimum Order (EGP)",
       "minOrderPlaceholder": "10.000",
-      "maxDiscountLabel": "Max Discount (KWD)",
+      "maxDiscountLabel": "Max Discount (EGP)",
       "maxDiscountPlaceholder": "50.000",
       "usageLimitLabel": "Total Usage Limit",
       "usageLimitPlaceholder": "100",
@@ -2729,10 +2792,10 @@
       "typePercentage": "Percentage",
       "typeFixed": "Fixed amount",
       "valueLabelPercentage": "Value (%)",
-      "valueLabelFixed": "Value (KWD)",
+      "valueLabelFixed": "Value (EGP)",
       "valuePercentage": "{value}%",
-      "valueFixed": "{value} fils",
-      "maxDiscount": "Max discount (KWD)",
+      "valueFixed": "{value} piastres",
+      "maxDiscount": "Max discount (EGP)",
       "priority": "Priority",
       "startsAt": "Start date",
       "expiresAt": "Expiry date",
@@ -2740,7 +2803,7 @@
       "targetingHeading": "Targeting",
       "customerGroup": "Customer group",
       "allCustomers": "All customers",
-      "minOrderAmount": "Minimum order amount (KWD)",
+      "minOrderAmount": "Minimum order amount (EGP)",
       "minQuantity": "Minimum quantity",
       "firstOrderOnlyLabel": "First order only",
       "scopeProducts": "Specific products",
@@ -2790,9 +2853,9 @@
       "pricingTypeFixedPrice": "Fixed price",
       "pricingTypePercentage": "Percentage off",
       "pricingTypeFixed": "Fixed amount off",
-      "pricingValueLabelFixedPrice": "Bundle price (KWD)",
+      "pricingValueLabelFixedPrice": "Bundle price (EGP)",
       "pricingValueLabelPercentage": "Discount (%)",
-      "pricingValueLabelFixed": "Discount amount (KWD)",
+      "pricingValueLabelFixed": "Discount amount (EGP)",
       "activeLabel": "Bundle is active",
       "startsAt": "Start date",
       "expiresAt": "Expiry date",
@@ -2851,11 +2914,11 @@
     "carriers": {
       "page": {
         "title": "Shipping Carriers",
-        "subtitle": "Configure iCarry and Aramex delivery integrations"
+        "subtitle": "Connect Bosta or Aramex, or ship with any courier by hand"
       },
       "empty": {
         "title": "Shipping Carriers not enabled",
-        "description": "Enable the Shipping Carriers feature in your store features to configure iCarry and Aramex delivery integrations."
+        "description": "Enable the Shipping Carriers feature in your store features to configure Bosta, Aramex and manual delivery."
       },
       "shared": {
         "enabled": "Enabled",
@@ -2867,7 +2930,7 @@
       },
       "icarry": {
         "title": "iCarry",
-        "subtitle": "Kuwait delivery via iCarry",
+        "subtitle": "Egypt delivery via iCarry",
         "fields": {
           "apiKey": "API Key",
           "merchantId": "Merchant ID"
@@ -2879,37 +2942,42 @@
       },
       "aramex": {
         "title": "Aramex",
-        "subtitle": "International delivery via Aramex",
+        "subtitle": "Delivery via Aramex (tracking is checked automatically)",
         "fields": {
           "accountNumber": "Account Number",
           "accountPin": "PIN",
           "accountEntity": "Entity",
           "accountCountryCode": "Country Code",
           "username": "Username",
-          "password": "Password"
+          "password": "Password",
+          "sandbox": "Use the Aramex test environment",
+          "codEgpConfirmed": "COD in EGP confirmed by Aramex"
         },
         "placeholders": {
           "accountNumber": "Aramex account number",
           "accountPin": "Account PIN",
-          "accountEntity": "e.g. KWI",
-          "accountCountryCode": "e.g. KW",
+          "accountEntity": "e.g. CAI",
+          "accountCountryCode": "e.g. EG",
           "username": "Aramex account username",
           "password": "Aramex account password"
-        }
+        },
+        "codNotice": "Aramex may only accept cash-on-delivery amounts in US dollars. Until Aramex confirms in writing that your account collects COD in EGP and you switch this on, cash-on-delivery orders cannot be shipped with Aramex (prepaid orders are not affected)."
       },
       "pickup": {
         "title": "Pickup Address",
         "fields": {
-          "area": "Area",
-          "block": "Block",
-          "street": "Street",
-          "building": "Building"
+          "area": "District",
+          "name": "Contact name",
+          "phone": "Phone",
+          "line1": "Address",
+          "city": "Governorate"
         },
         "placeholders": {
-          "area": "e.g. Salmiya",
-          "block": "e.g. 12",
-          "street": "e.g. Gulf Road",
-          "building": "e.g. Al Hamra"
+          "area": "e.g. Dokki",
+          "name": "Store or contact name",
+          "phone": "01012345678",
+          "line1": "e.g. 12 Tahrir St",
+          "city": "e.g. Cairo"
         }
       },
       "shipments": {
@@ -2924,7 +2992,9 @@
         },
         "carrierNames": {
           "icarry": "iCarry",
-          "aramex": "Aramex"
+          "aramex": "Aramex",
+          "bosta": "Bosta",
+          "manual": "Manual"
         },
         "statuses": {
           "created": "Created",
@@ -2934,7 +3004,9 @@
           "delivered": "Delivered",
           "failed": "Failed",
           "returned": "Returned",
-          "cancelled": "Cancelled"
+          "cancelled": "Cancelled",
+          "creating": "Booking",
+          "creation_failed": "Booking failed"
         },
         "columns": {
           "orderNumber": "Order #",
@@ -2969,12 +3041,35 @@
         "testFailedRetry": "Test connection failed.",
         "defaultSetTitle": "Default Set",
         "defaultSetDescription": "{carrier} is now the default carrier.",
-        "defaultSetFailed": "Failed to set default carrier."
+        "defaultSetFailed": "Failed to set default carrier.",
+        "rotatedTitle": "Secret rotated",
+        "rotatedDescription": "The old callback address no longer works; new deliveries use the new one.",
+        "rotateFailed": "Could not rotate the secret. Save the Bosta settings first."
+      },
+      "bosta": {
+        "title": "Bosta",
+        "subtitle": "Delivery and cash on delivery via Bosta",
+        "fields": {
+          "apiKey": "API key",
+          "businessLocationId": "Pickup location ID",
+          "sandbox": "Use the Bosta test environment"
+        },
+        "placeholders": {
+          "apiKey": "Bosta API key",
+          "businessLocationId": "Your Bosta pickup location ID"
+        },
+        "webhookNotice": "Tracking updates reach us automatically: every delivery is booked with a private callback address for your store. Rotate the secret below if you think it has leaked.",
+        "rotateSecret": "Rotate webhook secret"
+      },
+      "manual": {
+        "title": "Manual carrier",
+        "description": "Always available on the order page for a courier without an integration: type the courier name and the tracking number it gave you, then move the shipment along yourself. Cash on delivery is tracked the same way.",
+        "codLink": "Open COD reconciliation"
       }
     },
     "page": {
       "title": "Delivery areas & fees",
-      "subtitle": "Set per-area delivery fees for every Kuwait district",
+      "subtitle": "Set per-area delivery fees for every Egypt district",
       "intro": "A shipping zone is a group of areas you charge a single rate to deliver to. Define a zone for each region you ship to so checkout can quote the right delivery fee.",
       "carriersBannerTitle": "Shipping Carriers enabled",
       "carriersBannerHint": "Configure iCarry & Aramex credentials, test connections, and view shipments.",
@@ -3003,7 +3098,7 @@
       "status": "Status",
       "actions": "Actions",
       "moreAreas": "+{count} more",
-      "freeShippingOver": "Over {amount} KWD",
+      "freeShippingOver": "Over {amount} EGP",
       "dashPlaceholder": "-",
       "daysRange": "{min}-{max} days",
       "daysSingle": "{days} days",
@@ -3011,7 +3106,7 @@
       "inactive": "Inactive",
       "edit": "Edit",
       "delete": "Delete",
-      "priceWithCurrency": "{amount} KWD"
+      "priceWithCurrency": "{amount} EGP"
     },
     "modal": {
       "editTitle": "Edit Shipping Zone",
@@ -3023,12 +3118,12 @@
       "zoneNameArPlaceholder": "e.g., منطقة العاصمة",
       "areasLabel": "Areas",
       "areasPlaceholder": "Separate areas with commas: Capital, Hawalli, Farwaniya",
-      "addAllKuwaitGovernorates": "+ Add All Kuwait Governorates",
+      "addAllEgyptGovernorates": "+ Add All Egypt Governorates",
       "areasArLabel": "Areas (Arabic)",
       "areasArPlaceholder": "العاصمة، حولي، الفروانية",
-      "deliveryFeeLabel": "Delivery Fee (KWD)",
+      "deliveryFeeLabel": "Delivery Fee (EGP)",
       "deliveryFeePlaceholder": "1.000",
-      "freeShippingLabel": "Free Shipping Over (KWD)",
+      "freeShippingLabel": "Free Shipping Over (EGP)",
       "freeShippingPlaceholder": "25.000",
       "estimatedDaysLabel": "Estimated Delivery Time (Days)",
       "estimatedDaysMinPlaceholder": "Min days",
@@ -3041,7 +3136,7 @@
     },
     "areaRates": {
       "sectionTitle": "Delivery areas & fees",
-      "sectionSubtitle": "Set a fee per Kuwait area. This is the recommended way to price per-area delivery.",
+      "sectionSubtitle": "Set a fee per Egypt area. This is the recommended way to price per-area delivery.",
       "applyAll": "Apply fee to all areas:",
       "applyBtn": "Apply",
       "applyAllGlobal": "Apply to all areas (all governorates)",
@@ -3053,7 +3148,7 @@
       "freeOver": "Free over",
       "freeOverLabel": "Free-shipping threshold",
       "optional": "optional",
-      "currency": "KWD",
+      "currency": "EGP",
       "save": "Save area rates",
       "saving": "Saving…",
       "savedTitle": "Saved",
@@ -3204,7 +3299,7 @@
       "lowStock": "Low Stock",
       "outOfStock": "Out of Stock",
       "stockValue": "Stock Value",
-      "kwdValue": "{value} KWD"
+      "baseValue": "{value} EGP"
     },
     "alertBanner": {
       "needAttention": "{count, plural, =1 {{count, number, latn} product needs attention} other {{count, number, latn} products need attention}}",
@@ -3227,7 +3322,7 @@
       "empty": "No products tracked",
       "emptyDescription": "Inventory rows appear here for each product with stock tracking enabled. Add a product to start managing stock levels.",
       "adjustAction": "Adjust",
-      "kwdValue": "{value} KWD",
+      "baseValue": "{value} EGP",
       "filters": {
         "all": "All"
       },
@@ -3300,11 +3395,11 @@
   },
   "pwa": {
     "installHint": {
-      "title": "Install Force Admin to receive push notifications",
+      "title": "Install Ebda Admin to receive push notifications",
       "description": "iPhone needs the app added to your home screen before push notifications can work.",
       "step1": "Tap the Share icon in Safari",
       "step2": "Choose Add to Home Screen",
-      "step3": "Open Force Admin from the home screen and allow notifications",
+      "step3": "Open Ebda Admin from the home screen and allow notifications",
       "dismiss": "Dismiss"
     },
     "page": {
@@ -3436,7 +3531,7 @@
       "inviteInstagramLabel": "Instagram (optional)",
       "inviteTiktokLabel": "TikTok (optional)",
       "inviteNotesLabel": "Internal Notes (optional)",
-      "inviteNotesPlaceholder": "e.g. Kuwait fashion micro-influencer, 50K followers",
+      "inviteNotesPlaceholder": "e.g. Egypt fashion micro-influencer, 50K followers",
       "inviteSubmit": "Add Affiliate",
       "inviting": "Adding…",
       "inviteCancel": "Cancel",
@@ -3500,8 +3595,8 @@
       "fields": {
         "defaultCommissionRate": "Default Commission Rate (%)",
         "cookieDurationDays": "Cookie Duration (days)",
-        "minPayoutAmount": "Min Payout Amount (KWD)",
-        "minPayoutEquivalent": "{amount} KWD equivalent"
+        "minPayoutAmount": "Min Payout Amount (EGP)",
+        "minPayoutEquivalent": "{amount} EGP equivalent"
       },
       "toggles": {
         "autoApprove": {
@@ -3524,14 +3619,15 @@
         "available": "Available balance:"
       },
       "fields": {
-        "amount": "Amount (KWD)",
+        "amount": "Amount (EGP)",
         "method": "Method",
         "notes": "Notes",
         "notesPlaceholder": "Optional notes for this payout"
       },
       "methods": {
         "bank_transfer": "Bank Transfer",
-        "knet": "KNET",
+        "instapay": "InstaPay",
+        "wallet": "Mobile wallet",
         "cash": "Cash",
         "manual": "Manual"
       }
@@ -3619,7 +3715,7 @@
       "instructionsTitle": "How to Import Products",
       "step1": "Download the CSV template using the button below",
       "step2": "Fill in your product data following the template format",
-      "step3": "Prices are in KWD (e.g. 12.500)",
+      "step3": "Prices are in EGP (e.g. 12.500)",
       "step4": "For multiple categories/tags/images, separate with commas within quotes",
       "step5": "Upload the completed CSV file and click Import",
       "downloadTemplate": "Download Template",
@@ -3670,7 +3766,7 @@
         "allFields": "All product fields are included in the export",
         "commaSeparated": "Categories, tags, and images are comma-separated within their columns",
         "reImport": "The exported file can be edited and re-imported to update products",
-        "pricesInFils": "Prices are in KWD (e.g. 12.500)"
+        "pricesInFils": "Prices are in EGP (e.g. 12.500)"
       }
     },
     "errors": {
@@ -3859,7 +3955,7 @@
       "recovered": "Ordered later",
       "recoveryRate": "Ordered-later rate",
       "recoveredRevenue": "Revenue from later orders",
-      "kwdValue": "{amount} KWD",
+      "baseValue": "{amount} EGP",
       "recoveryNotTracked": "Not tracked"
     },
     "status": {
@@ -3890,7 +3986,7 @@
         "maxDiscount": "Max Discount",
         "expiry": "Expiry",
         "noLimit": "No limit",
-        "kwd": "KWD",
+        "major": "EGP",
         "hours": "hours"
       }
     },
@@ -4024,7 +4120,8 @@
         "ALREADY_REFUNDED": "This payment has already been refunded in full.",
         "REFUND_EXCEEDS_REMAINING": "The refund is more than what is left un-refunded on this payment. Refresh the page — part of it was refunded elsewhere.",
         "INVALID_REFUND_AMOUNT": "This return has no refund amount. Set the refund amount before completing it.",
-        "AMBIGUOUS_PAYMENT": "This payment reference matches more than one payment, so nothing was refunded and the return was not completed. Refund it from the payment provider dashboard and contact support."
+        "AMBIGUOUS_PAYMENT": "This payment reference matches more than one payment, so nothing was refunded and the return was not completed. Refund it from the payment provider dashboard and contact support.",
+        "MANUAL_PROVIDER_REFUND": "This order was paid by InstaPay, which cannot refund through the system. Send the money back from your InstaPay app, then complete the return with \"Already refunded — record only\"."
       }
     },
     "modal": {
@@ -4516,7 +4613,7 @@
     },
     "earning": {
       "title": "Point Earning",
-      "pointsPerDinar": "Points per 1 KWD Spent",
+      "pointsPerMajorUnit": "Points per 1 EGP Spent",
       "signupBonus": "Signup Bonus",
       "referralBonus": "Referral Bonus",
       "reviewBonus": "Review Bonus",
@@ -4533,8 +4630,8 @@
     },
     "redemption": {
       "title": "Redemption",
-      "pointValue": "Point Value (KWD)",
-      "pointValueHint": "1 point = {value} KWD",
+      "pointValue": "Point Value (EGP)",
+      "pointValueHint": "1 point = {value} EGP",
       "minRedeem": "Min Points to Redeem",
       "maxPercent": "Max % of Order",
       "expirationMonths": "Expiration (months)",
@@ -4638,18 +4735,6 @@
       "connectionError": "Unable to connect to the server. Please check your connection and try again.",
       "retry": "Retry"
     },
-    "providers": {
-      "tapName": "Tap Payments",
-      "tapNameAr": "تاب للمدفوعات",
-      "myfatoorahName": "MyFatoorah",
-      "myfatoorahNameAr": "ماي فاتورة",
-      "hesabeName": "Hesabe",
-      "hesabeNameAr": "حسابي",
-      "upaymentsName": "UPayments",
-      "upaymentsNameAr": "يو بيمنتس",
-      "codName": "Cash on Delivery",
-      "codNameAr": "الدفع عند الاستلام"
-    },
     "toggle": {
       "enabled": "Enabled",
       "disabled": "Disabled"
@@ -4660,13 +4745,15 @@
       "displayNamePlaceholder": "Cash on Delivery",
       "displayNameArLabel": "Display Name (Arabic)",
       "displayNameArPlaceholder": "الدفع عند الاستلام",
-      "fixedFeeLabel": "Surcharge Fee (KWD)",
+      "fixedFeeLabel": "Surcharge Fee (EGP)",
       "fixedFeePlaceholder": "0.000",
-      "fixedFeeEquals": "= {amount} KWD",
+      "fixedFeeEquals": "= {amount} EGP",
       "fixedFeeHelpPrefix": "Extra charge added to the order when the customer pays cash on delivery. Enter",
       "fixedFeeHelpZero": "0",
       "fixedFeeHelpSuffix": "for free COD.",
-      "infoBanner": "COD orders bypass the payment gateway. The customer confirms the order, and you mark it as paid from the Orders page once cash is collected."
+      "infoBanner": "COD orders bypass the payment gateway. The customer confirms the order, and you mark it as paid from the Orders page once cash is collected.",
+      "percentLabel": "Percentage surcharge (%)",
+      "percentHelp": "Optional: a percentage of the order total added to the fixed fee, rounded to the piastre."
     },
     "gateway": {
       "apiKeyLabel": "API Key",
@@ -4676,7 +4763,11 @@
       "webhookSecretLabel": "Webhook Secret",
       "webhookSecretPlaceholder": "Enter webhook secret",
       "webhookUrlLabel": "Webhook URL (paste in provider dashboard)",
-      "webhookUrlDescription": "Configure this URL in your provider's merchant dashboard so payment events reach your store. One URL serves every store — our handler matches each incoming payment to your store via the provider's transaction ID, then verifies the signature using your store's own webhook secret (set above).",
+      "webhookUrlDescription": {
+        "paymob": "In the Paymob dashboard, paste this URL as the \"Transaction processed callback\" of your integrations. Paymob appends its signature to it; we verify it with your HMAC secret (above).",
+        "kashier": "Kashier is told this URL with every payment, so there is nothing to paste. It is shown for reference: payment events are verified with your Payment API key (above).",
+        "fawry": "In the Fawry merchant portal, set this URL as the server notification URL. We verify every notification with your secure key (above)."
+      },
       "webhookUrlCopy": "Copy",
       "webhookUrlCopied": "Copied!",
       "merchantIdLabel": "Merchant ID",
@@ -4694,7 +4785,83 @@
       "unableToConnect": "Unable to connect to the server"
     },
     "save": "Save",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "instapay": {
+      "handleLabel": "InstaPay address (IPA)",
+      "handlePlaceholder": "yourname@instapay",
+      "phoneLabel": "Linked mobile number",
+      "phonePlaceholder": "01012345678",
+      "accountNameLabel": "Account name shown on the transfer",
+      "expiryLabel": "Hold the order for (hours)",
+      "expiryHelp": "If you have not confirmed the transfer by then, the order is cancelled, the stock goes back on sale and the customer is told. Default 48.",
+      "noteEnLabel": "Note to the customer (English)",
+      "noteArLabel": "Note to the customer (Arabic)",
+      "infoBanner": "InstaPay has no merchant API. The customer transfers to your address or number and quotes the order number; you confirm \"Payment received\" on the order (admin or the Orders app). Until then the order is held, does not ship and does not count as revenue.",
+      "needHandleOrPhone": "Add an InstaPay address or a phone number before turning InstaPay on."
+    },
+    "health": {
+      "healthy": "Working",
+      "degraded": "Having trouble",
+      "down": "Down: hidden at checkout",
+      "unknown": "Not checked yet",
+      "note": "When a provider times out or is unreachable, only that method is hidden from checkout for a minute or two. Cash on delivery and your other methods keep working."
+    },
+    "paymob": {
+      "secretKeyLabel": "Secret key",
+      "secretKeyHelp": "Paymob dashboard > Settings > Account Info. Used for every server call.",
+      "secretKeyPlaceholder": "Paste the secret key",
+      "hmacLabel": "HMAC secret",
+      "hmacHelp": "Paymob dashboard > Settings > Account Info > HMAC. Verifies Paymob's callbacks.",
+      "hmacPlaceholder": "Paste the HMAC secret",
+      "publicKeyLabel": "Public key",
+      "publicKeyHelp": "Shown in the checkout link; not a secret.",
+      "publicKeyPlaceholder": "Paste the public key",
+      "integrationsTitle": "Payment methods",
+      "integrationsHelp": "Paste the integration ID of each method you want to offer (Paymob dashboard > Developers > Payment Integrations). Leave a method empty to hide it.",
+      "integrationPlaceholder": "Integration ID",
+      "methods": {
+        "card": "Card",
+        "meeza": "Meeza",
+        "wallet": "Mobile wallet (Vodafone Cash, Orange, e&)",
+        "valu": "valU installments"
+      }
+    },
+    "kashier": {
+      "merchantIdLabel": "Merchant ID (MID)",
+      "merchantIdHelp": "Kashier dashboard > Integrations. Looks like MID-1234-56.",
+      "merchantIdPlaceholder": "MID-...",
+      "apiKeyLabel": "Payment API key",
+      "apiKeyHelp": "Kashier dashboard > Integrations. Also verifies Kashier's webhooks.",
+      "apiKeyPlaceholder": "Paste the Payment API key",
+      "secretKeyLabel": "Secret key",
+      "secretKeyHelp": "Kashier dashboard > Integrations. Used for every server call.",
+      "secretKeyPlaceholder": "Paste the secret key",
+      "displayLabel": "Payment page language",
+      "display": {
+        "ar": "Arabic",
+        "en": "English"
+      },
+      "methodsTitle": "Methods on the payment page",
+      "methods": {
+        "card": "Card",
+        "wallet": "Mobile wallet"
+      }
+    },
+    "fawry": {
+      "merchantCodeLabel": "Merchant code",
+      "merchantCodeHelp": "Given by Fawry when your account is opened.",
+      "merchantCodePlaceholder": "Paste the merchant code",
+      "secureKeyLabel": "Secure key",
+      "secureKeyHelp": "Signs every request and verifies every Fawry notification.",
+      "secureKeyPlaceholder": "Paste the secure key",
+      "expiryLabel": "Reference code valid for (hours)",
+      "expiryHelp": "How long the customer has to pay the code at an outlet. Default 72.",
+      "methodsTitle": "Methods",
+      "methods": {
+        "payatfawry": "Pay at Fawry (reference code)",
+        "card": "Card"
+      }
+    }
   },
   "hero": {
     "page": {
@@ -4748,9 +4915,9 @@
       "preview": "Preview",
       "content": "Content",
       "textEnglish": "Announcement Text (English)",
-      "textEnglishPlaceholder": "Free shipping on orders over 10 KWD!",
+      "textEnglishPlaceholder": "Free shipping on orders over 10 EGP!",
       "textArabic": "Announcement Text (Arabic)",
-      "textArabicPlaceholder": "شحن مجاني للطلبات فوق ١٠ د.ك!",
+      "textArabicPlaceholder": "شحن مجاني للطلبات فوق ١٠ ج.م!",
       "linkUrl": "Link URL (optional)",
       "linkUrlPlaceholder": "https://example.com/sale",
       "linkUrlHint": "The entire bar will link to this URL when clicked",
@@ -4909,15 +5076,15 @@
       "arBadge": "AR",
       "advanced": "Advanced",
       "metaTitle": "Meta Title",
-      "metaTitlePlaceholder": "My Store — Best Products in Kuwait",
+      "metaTitlePlaceholder": "My Store — Best Products in Egypt",
       "metaTitleHint": "Appears in browser tabs and search results. Keep under {max} characters for best results.",
       "metaDescription": "Meta Description",
-      "metaDescriptionPlaceholder": "Discover our wide range of products with fast delivery across Kuwait...",
+      "metaDescriptionPlaceholder": "Discover our wide range of products with fast delivery across Egypt...",
       "metaDescriptionHint": "Shown in search result snippets. Keep under {max} characters for best results.",
       "metaTitleAr": "Meta Title (Arabic)",
-      "metaTitleArPlaceholder": "متجري — أفضل المنتجات في الكويت",
+      "metaTitleArPlaceholder": "متجري — أفضل المنتجات في مصر",
       "metaDescriptionAr": "Meta Description (Arabic)",
-      "metaDescriptionArPlaceholder": "اكتشف مجموعتنا الواسعة من المنتجات مع توصيل سريع في الكويت...",
+      "metaDescriptionArPlaceholder": "اكتشف مجموعتنا الواسعة من المنتجات مع توصيل سريع في مصر...",
       "ogImage": "OG Image URL",
       "ogImagePlaceholder": "https://example.com/og-image.jpg",
       "ogImageHint": "Image shown when your store is shared on social media. Recommended: 1200×630px. Leave empty and we auto-generate one from your store logo + name.",
@@ -4925,7 +5092,7 @@
       "twitterPlaceholder": "yourstorehandle",
       "googleSiteVerification": "Google Search Console verification (custom domain only)",
       "googleSiteVerificationPlaceholder": "Paste the meta tag or just the token",
-      "googleSiteVerificationHint": "Your store is already verified on store.force-ai.co — you only need this once you connect a custom domain (e.g. yourstore.com).\n1. Open Google Search Console and add your custom domain as a URL-prefix property.\n2. Pick the \"HTML tag\" verification method.\n3. Paste the whole meta tag (or just the content token) here and save.\n4. Click Verify in Search Console — your storefront will already be serving the tag.",
+      "googleSiteVerificationHint": "Your store is already verified on ebda.app — you only need this once you connect a custom domain (e.g. yourstore.com).\n1. Open Google Search Console and add your custom domain as a URL-prefix property.\n2. Pick the \"HTML tag\" verification method.\n3. Paste the whole meta tag (or just the content token) here and save.\n4. Click Verify in Search Console — your storefront will already be serving the tag.",
       "successMessage": "SEO settings saved successfully",
       "failedMessage": "Failed to save SEO settings",
       "connectionError": "Unable to connect to the server",
@@ -4933,10 +5100,10 @@
       "aeoTitle": "Answer Engine Optimization",
       "aeoHint": "Conversational copy for AI answer engines (Perplexity, Google AI Overview, Bing Copilot). Auto-filled by the AEO sweep; you can edit per-entity.",
       "aeoLabelEn": "AEO meta description (EN)",
-      "aeoPlaceholderEn": "Conversational answer-engine copy. e.g. «Wady Aljuz is a Kuwait-based online grocery store specializing in…»",
+      "aeoPlaceholderEn": "Conversational answer-engine copy. e.g. «Wady Aljuz is an Egypt-based online grocery store specializing in…»",
       "aeoHintText": "Direct-answer style, 130–160 chars. Leave blank to let the AEO sweep fill it.",
       "aeoLabelAr": "AEO meta description (AR)",
-      "aeoPlaceholderAr": "نسخة عربية لمحركات الإجابة — مثال: «وادي الجوز متجر إلكتروني كويتي متخصص في…»",
+      "aeoPlaceholderAr": "نسخة عربية لمحركات الإجابة — مثال: «وادي الجوز متجر إلكتروني مصري متخصص في…»",
       "senderPrefixPlaceholder": "noreply",
       "senderPrefix": "Email sender prefix",
       "senderPrefixHint": "The part before the @ on outgoing emails. Default: noreply. Examples: hello, orders, support. Letters/digits/dot/hyphen/underscore only.",
@@ -5046,6 +5213,8 @@
       "dnsPropagation": "DNS changes can take up to 48 hours to propagate.",
       "checkDns": "Check DNS",
       "checkingDns": "Checking...",
+      "claimPending": "We are waiting for DNS verification of {domain}. Add the DNS records below; it is not live yet. A claim that is not verified within 72 hours is released automatically.",
+      "claimFailed": "We could not verify {domain}. Check the DNS records below and save the domain again. An unverified claim is released automatically after 72 hours.",
       "verifiedMessage": "Domain is verified and SSL is active. Your store is accessible at https://{domain}",
       "noDomain": "No custom domain configured. This store is accessible via its default subdomain.",
       "dnsTableLabel": "DNS records",
@@ -5299,7 +5468,7 @@
   "auth": {
     "login": {
       "title": "Admin Login",
-      "subtitle": "Sign in to access the Force AI Platform",
+      "subtitle": "Sign in to access the Ebda Platform",
       "email": "Email address",
       "emailPlaceholder": "you@example.com",
       "password": "Password",
@@ -5307,8 +5476,8 @@
       "signIn": "Sign in",
       "signingIn": "Signing in…",
       "loginFailed": "Login failed",
-      "footer": "Force AI Platform Admin Panel",
-      "brandTitle": "Force AI Store",
+      "footer": "Ebda Platform Admin Panel",
+      "brandTitle": "Ebda",
       "brandSubtitle": "Manage your e-commerce stores, users, and platform settings from one powerful dashboard.",
       "statActiveStores": "Active Stores",
       "statProducts": "Products",
@@ -5457,7 +5626,8 @@
         "staff": "Staff & roles",
         "announcement": "Announcement bar",
         "agentKey": "AI agent key",
-        "merchantKeys": "Merchant MCP keys"
+        "merchantKeys": "Merchant MCP keys",
+        "billing": "Billing"
       }
     },
     "notificationBell": {
@@ -5577,9 +5747,9 @@
       "closeSidebar": "Close sidebar",
       "goBack": "Go back",
       "viewStore": "View Store",
-      "forcePlatformBrand": "AI Platform",
+      "forcePlatformBrand": "Platform",
       "forceAdminBrand": "Admin",
-      "forceBrandPrefix": "Force",
+      "forceBrandPrefix": "Ebda",
       "languageLabel": "Language",
       "focusMode": {
         "enterFocusMode": "Focus mode",
@@ -5592,7 +5762,9 @@
       "staffBadge": "Staff",
       "staffBadgeHint": "Limited access",
       "hubSectionsAriaLabel": "Hub sections",
-      "navPlatformUsageHistory": "Usage history (platform)"
+      "navPlatformUsageHistory": "Usage history (platform)",
+      "navPlatformPlans": "Plans (platform)",
+      "navPlatformBillingEvents": "Billing ledger (platform)"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -5603,7 +5775,7 @@
       "ariaLabel": "Language"
     },
     "brand": {
-      "forceMediaAlt": "Force AI"
+      "forceMediaAlt": "Ebda"
     },
     "aiUsageSummaryCard": {
       "loading": "Loading AI quota…",
@@ -5855,7 +6027,7 @@
       "expenses": "Expenses",
       "net": "Net Income",
       "stockValue": "Stock Value",
-      "disabledVariantStockValue": "Held on disabled variants: {amount} KWD — not counted as stock",
+      "disabledVariantStockValue": "Held on disabled variants: {amount} EGP — not counted as stock",
       "cash": "Cash by Account",
       "balanceSheet": "Balance Sheet",
       "assets": "Assets",
@@ -5905,9 +6077,9 @@
       "date": "Date",
       "vendor": "Vendor",
       "category": "Category",
-      "amount": "Amount (KWD)",
-      "tax": "Tax (KWD)",
-      "total": "Total (KWD)",
+      "amount": "Amount (EGP)",
+      "tax": "Tax (EGP)",
+      "total": "Total (EGP)",
       "status": "Status",
       "allStatuses": "All statuses",
       "receiptOnly": "Receipt drafts only (any date)",
@@ -5938,9 +6110,9 @@
         "selectSupplier": "(no vendor)",
         "selectExpenseAccount": "Select expense category",
         "selectPaidFromAccount": "Select paid-from account",
-        "amount": "Amount (KWD)",
-        "taxAmount": "Tax (KWD)",
-        "totalInKwd": "Total (KWD)",
+        "amount": "Amount (EGP)",
+        "taxAmount": "Tax (EGP)",
+        "totalInBase": "Total (EGP)",
         "notes": "Notes (English)",
         "notesAr": "Notes (Arabic)",
         "receiptUrl": "Receipt URL",
@@ -5960,7 +6132,7 @@
         "expenseCategoryLabel": "Expense Category",
         "paidFromAccountLabel": "Paid From Account",
         "currencyLabel": "Currency",
-        "fxRateLabel": "FX Rate (1 {currency} = ? KWD)",
+        "fxRateLabel": "FX Rate (1 {currency} = ? EGP)",
         "fxRateHint": "Enter the exchange rate from your bank or receipt date.",
         "fxRatePlaceholder": "e.g. 0.30700",
         "errorExpenseDateRequired": "Expense date is required",
@@ -5970,7 +6142,7 @@
         "errorFxRateRequired": "FX rate is required for {currency} expenses and must be a positive number",
         "uploadFailedGeneric": "Upload failed ({status})",
         "uploadFailedRetry": "Upload failed. Please try again.",
-        "totalInKwdConverted": "Total in KWD (converted @ {rate} rate):",
+        "totalInBaseConverted": "Total in EGP (converted @ {rate} rate):",
         "minorUnitsSuffix": "({currency} minor units)"
       }
     },
@@ -6014,7 +6186,7 @@
         "equity": "Equity",
         "totalEquity": "Total Equity",
         "balanced": "Balance sheet verified — Assets = Liabilities + Equity",
-        "unbalanced": "Out of balance by {amount} KWD — Assets ≠ Liabilities + Equity",
+        "unbalanced": "Out of balance by {amount} EGP — Assets ≠ Liabilities + Equity",
         "currentEarnings": "Retained & current earnings",
         "currentEarningsHint": "Revenue minus expenses up to this date (not yet closed to an equity account)"
       },
@@ -6068,8 +6240,8 @@
         "manualMatched": "Manual-matched",
         "unmatched": "Unmatched",
         "ignored": "Ignored",
-        "matchedAmount": "Matched amount (KWD)",
-        "unmatchedAmount": "Unmatched amount (KWD)"
+        "matchedAmount": "Matched amount (EGP)",
+        "unmatchedAmount": "Unmatched amount (EGP)"
       },
       "import": {
         "title": "Import Bank Statement",
@@ -6089,7 +6261,7 @@
       "tx": {
         "date": "Date",
         "description": "Description",
-        "amount": "Amount (KWD)",
+        "amount": "Amount (EGP)",
         "direction": "Direction",
         "ref": "Ref",
         "matchStatus": "Match Status",
@@ -6146,17 +6318,17 @@
     },
     "fxRates": {
       "title": "FX Rate Registry",
-      "subtitle": "Record exchange rates for non-KWD transactions",
+      "subtitle": "Record exchange rates for non-EGP transactions",
       "multiCurrencyAccounting": "Multi-Currency Accounting",
       "featureInactive": "Feature not active",
       "featureInactiveDesc": "The Accounting — Multi-Currency feature is not enabled for this store. Contact your account manager to enable it on an Enterprise plan.",
       "recordNewRate": "Record a New Rate",
-      "rateMeaning": "Rate meaning: 1 unit of the selected currency = rate KWD.",
-      "rateExample": "Example: USD at 0.307 means 1 USD = 0.307 KWD (307 fils).",
+      "rateMeaning": "Rate meaning: 1 unit of the selected currency = rate EGP.",
+      "rateExample": "Example: USD at 0.307 means 1 USD = 0.307 EGP (307 piastres).",
       "currencyLabel": "Currency",
-      "rateLabel": "Rate (KWD per 1 {currency})",
+      "rateLabel": "Rate (EGP per 1 {currency})",
       "rateDateLabel": "Rate Date",
-      "ratePreview": "Preview: 1 {currency} = {rate} KWD | 100 {currency} = {rate100} KWD",
+      "ratePreview": "Preview: 1 {currency} = {rate} EGP | 100 {currency} = {rate100} EGP",
       "saving": "Saving…",
       "saveRate": "Save Rate",
       "rateSaved": "Rate saved successfully.",
@@ -6167,7 +6339,7 @@
       "allCurrencies": "All currencies",
       "noRates": "No rates recorded yet. Add the first rate above.",
       "colCurrency": "Currency",
-      "colRate": "Rate (KWD)",
+      "colRate": "Rate (EGP)",
       "colDate": "Date",
       "colRecorded": "Recorded",
       "loading": "Loading…"
@@ -6295,7 +6467,7 @@
       "type": "Type",
       "status": "Status",
       "date": "Date",
-      "impact": "Value Impact (KWD)",
+      "impact": "Value Impact (EGP)",
       "types": {
         "cycle_count": "Cycle Count",
         "damage": "Damage",
@@ -6410,7 +6582,7 @@
       "status": "Status",
       "expectedDate": "Expected",
       "receivedDate": "Received",
-      "total": "Total (KWD)",
+      "total": "Total (EGP)",
       "createdDate": "Created",
       "statuses": {
         "draft": "Draft",
@@ -6425,8 +6597,8 @@
         "expectedDateLabel": "Expected receipt date",
         "addItem": "+ Add line item",
         "qty": "Qty",
-        "unitCost": "Unit cost (KWD)",
-        "lineTotal": "Line total (KWD)",
+        "unitCost": "Unit cost (EGP)",
+        "lineTotal": "Line total (EGP)",
         "subtotal": "Subtotal",
         "submit": "Create draft PO",
         "notesLabel": "Notes (English)",
@@ -6493,7 +6665,7 @@
       "description": "AI-powered reorder suggestions based on velocity + lead time + open backorders.",
       "lastScanned": "Last scanned {time}",
       "rescanNow": "Re-scan now",
-      "empty": "No reorder suggestions right now. The next AI scan runs tomorrow at 06:00 KW.",
+      "empty": "No reorder suggestions right now. The next AI scan runs tomorrow at 06:00 Cairo time.",
       "comingSoon": "AI-powered reorder suggestions are coming in Batch 3.",
       "explainer": "We'll compute weekly velocity × supplier lead time + safety stock + open backorders to surface 'reorder N units of X' cards. One click to draft a PO pre-filled with quantities and the best supplier.",
       "notify": "Notify me when ready",
@@ -6516,9 +6688,9 @@
       "description": "Slow-moving SKUs with AI-suggested clearance.",
       "lastScanned": "Last scanned {time}",
       "rescanNow": "Re-scan now",
-      "empty": "No dead stock found. A product is flagged when it is in stock, has not sold for 90+ days (a product that has never sold counts from the day it was added) and is worth at least KWD 50 at cost — or has no cost price set, in which case its value is shown as unknown.",
+      "empty": "No dead stock found. A product is flagged when it is in stock, has not sold for 90+ days (a product that has never sold counts from the day it was added) and is worth at least EGP 5,000 at cost — or has no cost price set, in which case its value is shown as unknown.",
       "comingSoon": "AI-powered dead-stock detection is coming in Batch 3.",
-      "explainer": "We'll flag products with 0 sales in 90 days and stock value above KWD 50, with AI-generated bilingual clearance copy and suggested discount %.",
+      "explainer": "We'll flag products with 0 sales in 90 days and stock value above EGP 5,000, with AI-generated bilingual clearance copy and suggested discount %.",
       "notify": "Notify me when ready",
       "card": {
         "daysSinceSale": "Last sold {days} days ago",
@@ -6610,7 +6782,7 @@
       "topSkus": "Top 5 SKUs (last 7 days)",
       "yesterdayFunnel": "Yesterday's funnel",
       "aiCallout": "AI:",
-      "noDataYet": "Insights will populate after the first nightly rollup at 02:00 KW.",
+      "noDataYet": "Insights will populate after the first nightly rollup at 02:00 Cairo time.",
       "asOf": "As of",
       "repeatPurchaseBasis": "of {count, plural, one {{count, number, latn} buyer} other {{count, number, latn} buyers}} re-ordered (last 30 days)",
       "repeatPurchaseUnknown": "No identifiable buyers in the last 30 days",
@@ -6630,9 +6802,9 @@
       "aiLabel": "AI:",
       "retentionMatrixTitle": "Retention Matrix",
       "ltvByCohortTitle": "Cumulative LTV by Cohort",
-      "colTotalRevenue": "Total Revenue (KWD)",
+      "colTotalRevenue": "Total Revenue (EGP)",
       "colLtvPerCustomer": "LTV / Customer",
-      "noDataYet": "No cohort data yet. Insights will populate after the first nightly rollup at 02:00 KW."
+      "noDataYet": "No cohort data yet. Insights will populate after the first nightly rollup at 02:00 Cairo time."
     },
     "funnel": {
       "title": "Checkout Funnel",
@@ -6646,14 +6818,14 @@
       "checkouts": "Checkouts Started",
       "completed": "Orders Completed",
       "abandoned": "Abandoned",
-      "revenue": "Revenue (KWD)",
+      "revenue": "Revenue (EGP)",
       "dropoff": "Drop-off",
       "aiLabel": "AI:",
       "overviewTitle": "Funnel Overview",
       "abandonedUnit": "carts",
       "dailyBreakdownTitle": "Daily Breakdown",
       "colDate": "Date",
-      "noDataYet": "No funnel data yet for this window. Insights populate after the first nightly rollup at 02:00 KW."
+      "noDataYet": "No funnel data yet for this window. Insights populate after the first nightly rollup at 02:00 Cairo time."
     },
     "segments": {
       "title": "Customer Segments (RFM)",
@@ -6672,7 +6844,7 @@
       "recommendedAction": "Recommended Action",
       "totalSegmentedCustomers": "Total Segmented Customers",
       "totalMonetaryValue": "Total Monetary Value",
-      "noSegmentData": "No segment data yet. Insights populate after the first nightly rollup at 02:00 KW.",
+      "noSegmentData": "No segment data yet. Insights populate after the first nightly rollup at 02:00 Cairo time.",
       "aiLabel": "AI:",
       "shareOfCustomers": "{pct}% of customers",
       "shareOfTotal": "{pct}% of total",
@@ -7243,7 +7415,7 @@
       "topQueriesTitle": "Top queries (latest day)",
       "noTopQueries": "No query data yet.",
       "notConnectedTitle": "Google Search Console not connected",
-      "notConnectedBody": "Once Force AI's Search Console access is set up for your store's domain, search impressions, clicks, and top queries will appear here automatically — no action needed on your end."
+      "notConnectedBody": "Once Ebda's Search Console access is set up for your store's domain, search impressions, clicks, and top queries will appear here automatically — no action needed on your end."
     }
   },
   "paymentAbandonments": {
@@ -7277,7 +7449,7 @@
   "whatsappIntegration": {
     "page": {
       "title": "WhatsApp Integration",
-      "subtitle": "Force AI WhatsApp Business Platform · templates · order updates · payment links",
+      "subtitle": "Ebda WhatsApp Business Platform · templates · order updates · payment links",
       "navAriaLabel": "WhatsApp settings"
     },
     "tabs": {
@@ -7290,13 +7462,13 @@
       "botAnalytics": "Bot Analytics"
     },
     "connection": {
-      "connectTitle": "Connect Force AI WhatsApp",
-      "connectDescription": "Paste the API key generated in your Force AI WhatsApp Business Platform admin to link this store.",
-      "apiKeyLabel": "Force AI WhatsApp API Key",
-      "apiKeyHint": "Generate the key in WBS admin → Clients → Force AI Store Bridge icon. Paste it here — the key is verified immediately.",
+      "connectTitle": "Connect Ebda WhatsApp",
+      "connectDescription": "Paste the API key generated in your Ebda WhatsApp Business Platform admin to link this store.",
+      "apiKeyLabel": "Ebda WhatsApp API Key",
+      "apiKeyHint": "Generate the key in WBS admin → Clients → Ebda Bridge icon. Paste it here — the key is verified immediately.",
       "connecting": "Connecting...",
       "connect": "Connect",
-      "finishTitle": "Finish connecting Force AI WhatsApp",
+      "finishTitle": "Finish connecting Ebda WhatsApp",
       "finishDescription": "An API key is saved but WhatsApp notifications aren't enabled yet. Select your templates below and enable to activate.",
       "disconnecting": "Disconnecting...",
       "removeKey": "Remove key",
@@ -7307,7 +7479,7 @@
       "available": "available",
       "savedNotVerified": "Saved — not verified",
       "keyInvalid": "The API key may be invalid. Template sending will fail — disconnect and re-key.",
-      "cantVerify": "Couldn't reach Force AI WhatsApp to verify this key. It's saved but unconfirmed — use Retry.",
+      "cantVerify": "Couldn't reach Ebda WhatsApp to verify this key. It's saved but unconfirmed — use Retry.",
       "retry": "Retry",
       "notificationsTitle": "Enable WhatsApp Notifications",
       "notificationsDescription": "Master switch for outbound WhatsApp messages. Per-event templates and channel choices live in the Order Updates tab.",
@@ -7319,17 +7491,17 @@
       "toastInvalidKeyTitle": "Invalid key",
       "toastInvalidKeyBody": "The API key was rejected. Generate a new key in WBS admin.",
       "toastConnectFailedTitle": "Connection failed",
-      "toastConnectFailedBody": "Could not connect to Force AI WhatsApp",
+      "toastConnectFailedBody": "Could not connect to Ebda WhatsApp",
       "toastConnectedTitle": "Connected",
-      "toastConnectedAutoErr": "Force AI WhatsApp connected — but template auto-submit failed: {error}. Visit Templates tab to retry.",
+      "toastConnectedAutoErr": "Ebda WhatsApp connected — but template auto-submit failed: {error}. Visit Templates tab to retry.",
       "toastConnectedSeededTitle": "Connected + templates submitted",
       "toastConnectedSeededBody": "{seeded} template(s) seeded, {submitted} pending Meta approval (~10min–24h).",
-      "toastConnectedBody": "Force AI WhatsApp Business Platform connected",
+      "toastConnectedBody": "Ebda WhatsApp Business Platform connected",
       "toastUnexpected": "An unexpected error occurred",
       "toastDisconnectFailedTitle": "Disconnect failed",
       "toastDisconnectFailedBody": "Could not disconnect",
       "toastDisconnectedTitle": "Disconnected",
-      "toastDisconnectedBody": "Force WhatsApp integration removed",
+      "toastDisconnectedBody": "Ebda WhatsApp integration removed",
       "toastConnectFirstTitle": "Connect first",
       "toastConnectFirstBody": "Please connect a WBS API key before enabling notifications",
       "toastSaveFailedTitle": "Save failed",
@@ -7341,7 +7513,7 @@
       "toastWaOnBody": "Customers can now order directly via WhatsApp DM.",
       "toastWaOffBody": "WhatsApp DM ordering has been turned off.",
       "toastWaSaveFailedBody": "Could not update WA ordering setting",
-      "apiKeyPlaceholder": "Paste key from WBS admin → Client → Force AI Store Bridge"
+      "apiKeyPlaceholder": "Paste key from WBS admin → Client → Ebda Bridge"
     },
     "templates": {
       "generating": "Generating…",
@@ -7355,7 +7527,7 @@
       "refresh": "Refresh",
       "loading": "Loading templates…",
       "noTemplates": "No templates set up yet.",
-      "noTemplatesHint": "Click Generate defaults to add the 12 canonical Force AI templates as drafts.",
+      "noTemplatesHint": "Click Generate defaults to add the 12 canonical Ebda templates as drafts.",
       "howItWorks": "How it works: Click Generate defaults to create the canonical templates as drafts. Click Sync to Meta to submit them. Meta reviews each template; approval typically takes 10 minutes to 24 hours.",
       "logoLabel": "Use my store logo as the WhatsApp message header",
       "logoHint": "Customers see your store logo at the top of every order-update message. Applied when you next generate or sync templates.",
@@ -7405,7 +7577,7 @@
     },
     "orderUpdates": {
       "notConnected": "Not connected yet.",
-      "notConnectedHint": "Connect to Force AI WhatsApp Business Platform first from the Connection tab, then come back here.",
+      "notConnectedHint": "Connect to Ebda WhatsApp Business Platform first from the Connection tab, then come back here.",
       "loading": "Loading…",
       "messageLanguage": "Message language",
       "templateNotFound": "Template not found",
@@ -7416,7 +7588,7 @@
       "bothOff": "Both off — event will be silent",
       "saving": "Saving…",
       "saveChanges": "Save changes",
-      "howItWorks": "How it works: when a customer's order transitions to one of these states, the FWB API fires the corresponding WhatsApp template via your Force WhatsApp Business Platform integration. Use the channel checkboxes to control which notification methods are active per event.",
+      "howItWorks": "How it works: when a customer's order transitions to one of these states, the Ebda API fires the corresponding WhatsApp template via your Ebda WhatsApp Business Platform integration. Use the channel checkboxes to control which notification methods are active per event.",
       "events": {
         "orderPaid": {
           "label": "Order paid",
@@ -7446,7 +7618,7 @@
       "savedBody": "Order update settings updated."
     },
     "paymentLink": {
-      "description": "Send a customer a one-tap WhatsApp payment link backed by a MyFatoorah invoice. Pick catalogue items, add a custom amount, or both — the customer taps once, lands on the MyFatoorah checkout, and pays. The link stays valid until the order is paid or canceled.",
+      "description": "Send a customer a one-tap WhatsApp payment link from your own payment gateway. Pick catalogue items, add a custom amount, or both — the customer taps once, lands on the gateway checkout, and pays. The link stays valid until the order is paid or canceled.",
       "phoneLabel": "Customer WhatsApp number (E.164)",
       "phoneError": "Must start with + and be 8–16 digits.",
       "nameLabel": "Customer name (optional)",
@@ -7456,7 +7628,7 @@
       "searchProducts": "Search {count} products by name or SKU…",
       "change": "Change",
       "customAmountLabel": "Custom amount (optional)",
-      "customAmountHint": "Add a charge that isn't a catalogue product — a custom quote, service fee, or deposit. Baked into the order total + reconciled when MyFatoorah callback returns.",
+      "customAmountHint": "Add a charge that isn't a catalogue product — a custom quote, service fee, or deposit. Baked into the order total + reconciled when the gateway callback returns.",
       "customAmountNote": "What is this for? (optional)",
       "itemsSubtotal": "Items subtotal",
       "customAmount": "Custom amount",
@@ -7465,7 +7637,7 @@
       "sending": "Sending…",
       "sendLink": "Send payment link via WhatsApp",
       "sentTitle": "Sent successfully",
-      "sentDescription": "Customer receives the WhatsApp message immediately. The MyFatoorah checkout link stays valid until the order is paid or canceled.",
+      "sentDescription": "Customer receives the WhatsApp message immediately. The checkout link stays valid until the order is paid or canceled.",
       "viewOrder": "View order →",
       "requirements": "Requirements: the paymentLink template must be approved by Meta. Visit the Templates tab to generate and sync templates.",
       "langEn": "English",
@@ -7474,7 +7646,7 @@
       "toastCouldNotSendTitle": "Could not send",
       "toastUnknownError": "Unknown error",
       "toastSentTitle": "Payment link sent",
-      "toastSentBody": "{phone} will receive the MyFatoorah checkout link via WhatsApp.",
+      "toastSentBody": "{phone} will receive the checkout link via WhatsApp.",
       "toastSendFailedTitle": "Send failed",
       "removeItemAriaLabel": "Remove item",
       "orderNumberLabel": "Order #{orderNumber}",
@@ -7566,8 +7738,8 @@
       "accessTokenPlaceholderRotate": "Type a new token to rotate it",
       "accessTokenPlaceholderNew": "Paste your System User token",
       "accessTokenHint": "Create a System User in Meta Business Manager → grant <code>catalog_management</code> permission. Token is encrypted at rest and never shown again after saving.",
-      "provisionTitle": "Provision automatically · Force AI assisted",
-      "provisionDescription": "Creates a new Commerce Catalog under the Force AI parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
+      "provisionTitle": "Provision automatically · Ebda assisted",
+      "provisionDescription": "Creates a new Commerce Catalog under the Ebda parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
       "provisioning": "Provisioning…",
       "provisionButton": "Provision automatically",
       "saving": "Saving…",
@@ -7577,7 +7749,7 @@
       "provisionError": "Meta auto-provisioning failed",
       "provisionSuccess": "Meta catalog provisioned — submit it for Meta review next.",
       "confirmAlready": "A catalog id is already filled in. Clear it first if you really want to provision a new one. Continue anyway?",
-      "confirmNew": "This will call Meta Graph API to create a brand-new Commerce Catalog under the Force AI parent Business Manager and assign it to this store. Continue?",
+      "confirmNew": "This will call Meta Graph API to create a brand-new Commerce Catalog under the Ebda parent Business Manager and assign it to this store. Continue?",
       "catalogIdPlaceholder": "e.g. 123456789012345",
       "businessIdPlaceholder": "e.g. 987654321098765"
     },
@@ -7779,7 +7951,7 @@
       "noWindowsYet": "No delivery windows yet — add one above.",
       "minOrderSectionTitle": "Minimum order value",
       "minOrderSectionHint": "Customers can't check out with an items subtotal below this amount. Leave empty or 0 to disable.",
-      "minOrderLabel": "Minimum order (KWD)",
+      "minOrderLabel": "Minimum order (EGP)",
       "minOrderPlaceholder": "e.g. 5.000",
       "invoiceEmailSectionTitle": "Order invoice email",
       "invoiceEmailSectionHint": "Every order in this store also emails the invoice to this address (e.g. the store owner). Leave empty to disable.",
@@ -7985,7 +8157,7 @@
     },
     "premiumSubtitle": "Premium add-on",
     "featureNotEnabledTitle": "Feature not enabled",
-    "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Force AI to request access.",
+    "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Ebda to request access.",
     "mainSubtitle": "Sticky button group your customers see on every page",
     "showWidgetLabel": "Show widget on storefront",
     "showWidgetHint": "When off, no widget renders even though the feature is enabled.",
@@ -8138,7 +8310,7 @@
     "walletsWithBalance": "Customers with a balance",
     "checkoutTitle": "Pay with wallet at checkout",
     "checkoutOn": "On — signed-in customers can pay part or all of an order from their balance.",
-    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Contact Force AI support to turn it on.",
+    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Contact Ebda support to turn it on.",
     "checkoutAccounting": "Unavailable while accounting is on — the ledger does not yet record store credit as a liability, so wallet payments would be booked as cash.",
     "colCustomer": "Customer",
     "colContact": "Contact",
@@ -8171,5 +8343,482 @@
       "aiCalls": "AI calls / spend",
       "aiUnpriced": "+{count} unpriced — spend is a floor"
     }
+  },
+  "plans": {
+    "title": "Plans",
+    "subtitle": "Edit the plans merchants subscribe to: limits, visibility and prices. Prices stay empty until set.",
+    "loading": "Loading plans…",
+    "loadError": "Failed to load plans.",
+    "edit": "Edit",
+    "editTitle": "Edit plan {code}",
+    "public": "Public",
+    "hidden": "Hidden",
+    "unlimited": "Unlimited",
+    "priceNotSet": "Not set",
+    "priceHint": "Prices are in EGP (stored as piastres). A blank price means not set yet, not free.",
+    "save": "Save plan",
+    "saving": "Saving…",
+    "table": {
+      "plan": "Plan",
+      "visibility": "Visibility",
+      "monthly": "Monthly price",
+      "yearly": "Yearly price",
+      "stores": "Stores",
+      "actions": "Actions"
+    },
+    "form": {
+      "nameEn": "Name (English)",
+      "nameAr": "Name (Arabic)",
+      "sort": "Sort order",
+      "isPublic": "Shown on the public pricing page",
+      "priceMonthly": "Monthly price (EGP)",
+      "priceYearly": "Yearly price (EGP)",
+      "limitsTitle": "Limits",
+      "bpsHint": "Fees are in basis points (100 = 1%). Online and cash-on-delivery fees are set separately."
+    },
+    "limits": {
+      "maxProducts": "Products",
+      "maxStaff": "Staff members",
+      "maxOrdersPerMonth": "Orders per month",
+      "maxStorageMb": "Storage (MB)",
+      "customDomain": "Custom domain",
+      "platformFeeBps": "Platform fee, online orders (bps)",
+      "codPlatformFeeBps": "Platform fee, cash on delivery (bps)",
+      "abandonedCartAutomation": "Abandoned-cart recovery",
+      "whatsappAutomation": "WhatsApp automation"
+    },
+    "errors": {
+      "invalidNumber": "Enter valid numbers for the price and sort order.",
+      "saveFailed": "Could not save the plan."
+    },
+    "toasts": {
+      "savedTitle": "Plan saved",
+      "savedDesc": "Plan {code} was updated.",
+      "errorTitle": "Error"
+    }
+  },
+  "billing": {
+    "title": "Billing",
+    "subtitle": "Your plan, what it includes, and how much of it you have used.",
+    "loading": "Loading billing…",
+    "loadError": "Failed to load billing.",
+    "currentPlan": "Current plan",
+    "unlimited": "Unlimited",
+    "usageTitle": "Usage",
+    "ordersThisMonth": "Orders this month",
+    "usedOf": "{used} of {limit}",
+    "storageNotTracked": "Up to {limit} MB (usage is not tracked yet)",
+    "includedTitle": "Included in your plan",
+    "included": "Included",
+    "notIncluded": "Not included",
+    "platformFee": "Platform fee (online orders)",
+    "codFee": "Platform fee (cash on delivery)",
+    "trialEnds": "Trial ends",
+    "renewsOn": "Renews on",
+    "endsOn": "Ends on",
+    "status": {
+      "none": "Active",
+      "trialing": "Trial",
+      "active": "Active",
+      "past_due": "Payment overdue",
+      "canceled": "Canceled",
+      "comped": "Complimentary"
+    },
+    "overLimit": {
+      "title": "You passed this month's order limit",
+      "body": "Your plan includes {limit} orders a month. Your customers can still order and nothing is blocked. Upgrade to stay within your plan."
+    },
+    "upgradeTitle": "Upgrade",
+    "upgradeBody": "Move to a bigger plan for more products, staff and orders, a custom domain and automation.",
+    "upgradeCta": "Upgrade plan",
+    "upgradeSoon": "Online upgrade is coming soon. Contact support to change your plan now.",
+    "priceTbd": "Price to be announced",
+    "perMonth": "/ month",
+    "adminTitle": "Platform admin",
+    "adminPlanLabel": "Assign plan",
+    "adminApply": "Apply plan",
+    "assigning": "Applying…",
+    "toasts": {
+      "errorTitle": "Could not change the plan",
+      "assignedTitle": "Plan updated",
+      "assignedDesc": "This store is now on {code}."
+    },
+    "subscribeTitle": "Choose a plan",
+    "subscribeBody": "Pay by card in EGP. Your card is saved securely with our payment provider and charged automatically each period.",
+    "intervalMonthly": "Monthly",
+    "intervalYearly": "Yearly",
+    "perYear": "/ year",
+    "subscribe": "Subscribe",
+    "switchTo": "Switch to this plan",
+    "currentBadge": "Current plan",
+    "redirecting": "Redirecting to secure payment…",
+    "priceUnset": "Not available yet",
+    "checkoutError": "Could not start the payment",
+    "changeError": "Could not change the plan",
+    "upgradedToast": "Plan upgraded",
+    "upgradeDeclined": "The charge was declined. Your plan was not changed.",
+    "upgradePending": "The payment is being confirmed.",
+    "scheduledToast": "Change scheduled for the end of the current period.",
+    "canceledToast": "Your plan will end at the end of the current period.",
+    "canceledNowToast": "Your plan was canceled.",
+    "resumedToast": "Cancellation removed.",
+    "cancelPlan": "Cancel plan",
+    "resumePlan": "Keep my plan",
+    "confirmCancel": "Cancel your plan? It stays active until the end of the current period, then the store moves to Free (your data is kept).",
+    "cancelsOn": "Ends on",
+    "pendingPlan": "Switching to {plan} on {date}",
+    "pastDueTitle": "We could not charge your card",
+    "pastDueBody": "We will retry on {date}. Update your payment method by subscribing again. If it keeps failing, your store moves to the Free plan (your data is kept).",
+    "canceledTitle": "You are on the Free plan",
+    "canceledBody": "Your previous paid plan ended. Your data is kept and Free limits apply.",
+    "checkoutReturnPending": "Confirming your payment…",
+    "checkoutReturnOk": "Payment confirmed. Your plan is active.",
+    "checkoutReturnFailed": "The payment did not go through.",
+    "checkoutReturnLater": "We have not received the confirmation yet. This page will update shortly.",
+    "invoicesTitle": "Charges and invoices",
+    "invoicesEmpty": "No charges yet.",
+    "invoiceCols": {
+      "date": "Date",
+      "description": "Description",
+      "amount": "Amount",
+      "status": "Status",
+      "reason": "Reason"
+    },
+    "invoiceTypes": {
+      "checkout": "Subscription payment",
+      "renewal": "Renewal",
+      "upgrade": "Upgrade",
+      "refund": "Refund"
+    },
+    "invoiceStatuses": {
+      "pending": "Pending",
+      "succeeded": "Paid",
+      "failed": "Failed",
+      "refunded": "Refunded"
+    },
+    "retryN": "retry {n}",
+    "stubTitle": "Local test gateway",
+    "stubBody": "The stub provider is active. Simulate the gateway's answer for the pending checkout:",
+    "stubPay": "Simulate success",
+    "stubDecline": "Simulate decline"
+  },
+  "planLimit": {
+    "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
+    "maxStaff": "Your plan allows up to {limit} staff members. Upgrade to add more.",
+    "maxOrdersPerMonth": "Your plan allows up to {limit} orders per month. Upgrade to keep growing.",
+    "maxStorageMb": "Your plan allows up to {limit} MB of storage. Upgrade to add more.",
+    "customDomain": "Custom domains are not included in your plan. Upgrade to connect your own domain.",
+    "abandonedCartAutomation": "Abandoned-cart recovery is not included in your plan. Upgrade to turn it on.",
+    "whatsappAutomation": "WhatsApp automation is not included in your plan. Upgrade to turn it on."
+  },
+  "onboarding": {
+    "signup": {
+      "title": "Create your store",
+      "subtitle": "Start selling online in minutes. No card needed.",
+      "name": "Your name",
+      "namePlaceholder": "Mona Hassan",
+      "email": "Email address",
+      "emailPlaceholder": "you@example.com",
+      "phone": "Mobile number (optional)",
+      "phonePlaceholder": "010 1234 5678",
+      "phoneHelp": "An Egyptian mobile, for order and account alerts.",
+      "password": "Password",
+      "passwordPlaceholder": "Create a password",
+      "passwordHelp": "At least 8 characters with upper and lower case letters, a number and a symbol.",
+      "submit": "Create my account",
+      "submitting": "Creating your account…",
+      "haveAccount": "Already have an account?",
+      "signIn": "Sign in",
+      "errors": {
+        "nameRequired": "Enter your name",
+        "emailInvalid": "Enter a valid email address",
+        "passwordWeak": "Password needs 8+ characters, upper and lower case, a number and a symbol",
+        "phoneInvalid": "Enter a valid Egyptian mobile number, or leave it empty",
+        "emailDisposable": "Please use a permanent email address, not a temporary one",
+        "tooFast": "Please wait a moment and submit again",
+        "formExpired": "This form expired. Please submit again",
+        "rateLimited": "Too many attempts. Please try again in a little while.",
+        "generic": "We could not create your account. Please try again."
+      },
+      "sent": {
+        "title": "Check your email",
+        "body": "If this address can be used, we sent a verification link to {email}. It is valid for 24 hours.",
+        "resend": "Send the link again",
+        "resending": "Sending…",
+        "resent": "If the address is eligible, a new link is on its way.",
+        "backToLogin": "Back to sign in"
+      },
+      "noAccount": "New to Ebda?",
+      "createStore": "Create your store"
+    },
+    "verify": {
+      "verifying": "Verifying your email…",
+      "successTitle": "Email verified",
+      "successBody": "Your account is ready. Let's set up your store.",
+      "continue": "Continue",
+      "failedTitle": "We could not verify your email",
+      "invalid": "This link is invalid or has already been used.",
+      "expired": "This link has expired. Request a new one below.",
+      "missing": "The verification link is incomplete.",
+      "generic": "Something went wrong. Please try again.",
+      "resendTitle": "Get a new link",
+      "email": "Email address",
+      "resend": "Send a new link",
+      "resending": "Sending…",
+      "resent": "If the address is eligible, a new link is on its way.",
+      "backToLogin": "Back to sign in"
+    },
+    "flow": {
+      "title": "Set up your store",
+      "stepOf": "Step {current} of {total}",
+      "steps": {
+        "store": "Name",
+        "template": "Look",
+        "product": "Product",
+        "payment": "Payment",
+        "live": "Launch"
+      },
+      "back": "Back",
+      "next": "Continue",
+      "skip": "Skip for now",
+      "loading": "Loading…",
+      "loadFailed": "We could not load your setup. Please refresh.",
+      "verifyGate": {
+        "title": "Verify your email to continue",
+        "body": "We sent a verification link to {email}. Open it, then come back and refresh this page.",
+        "refresh": "I verified my email",
+        "resend": "Send the link again",
+        "resent": "If the address is eligible, a new link is on its way."
+      },
+      "store": {
+        "title": "Name your store",
+        "subtitle": "Pick a name and your free store address.",
+        "name": "Store name",
+        "namePlaceholder": "My shop",
+        "slug": "Store address",
+        "slugHelp": "Latin letters, digits and hyphens only. You can add your own domain later.",
+        "checking": "Checking…",
+        "available": "{host} is available",
+        "taken": "This address is already taken",
+        "reserved": "This address is reserved. Choose another one.",
+        "protected": "This address matches a protected brand name. Contact support to claim it, or choose another one.",
+        "tooShort": "Use at least 3 characters",
+        "tooLong": "Use at most 40 characters",
+        "invalid": "Use lowercase letters, digits and single hyphens only",
+        "nameRequired": "Enter your store name",
+        "create": "Create my store",
+        "creating": "Creating…",
+        "createFailed": "We could not create the store. Please try again.",
+        "dailyLimit": "You have created several stores today. Please try again tomorrow or contact support.",
+        "limit": "You have reached the store limit for this account."
+      },
+      "template": {
+        "title": "Pick a look",
+        "subtitle": "Choose a template. You can change it any time.",
+        "modern": "Modern",
+        "modernDesc": "Clean lines and bold accents.",
+        "classic": "Classic",
+        "classicDesc": "Timeless serif elegance.",
+        "minimal": "Minimal",
+        "minimalDesc": "Lots of space, product first.",
+        "bold": "Bold",
+        "boldDesc": "Vibrant and energetic.",
+        "elegant": "Elegant",
+        "elegantDesc": "Refined fashion and beauty look.",
+        "selected": "Selected",
+        "saveFailed": "We could not save the template. Please try again."
+      },
+      "product": {
+        "title": "Add your first product",
+        "subtitle": "Name, price and a photo. You can add the rest later.",
+        "name": "Product name",
+        "namePlaceholder": "Cotton scarf",
+        "price": "Price (EGP)",
+        "pricePlaceholder": "250",
+        "photo": "Photo (optional)",
+        "nameRequired": "Enter the product name",
+        "priceInvalid": "Enter a price greater than zero",
+        "add": "Add product",
+        "adding": "Adding…",
+        "added": "{name} was added.",
+        "addFailed": "We could not add the product. Please try again.",
+        "limit": "You have reached your plan's product limit.",
+        "stock": "Quantity in stock",
+        "stockInvalid": "Enter a whole number, 0 or more"
+      },
+      "payment": {
+        "title": "How will customers pay?",
+        "subtitle": "Cash on delivery is on by default.",
+        "cod": "Cash on delivery",
+        "codDesc": "Customers pay the courier when the order arrives.",
+        "moreLater": "Cards, Meeza, mobile wallets, valU, Pay at Fawry and InstaPay are set up later in Settings > Payments, with your own Paymob, Kashier or Fawry account.",
+        "saveFailed": "We could not save your payment settings. Please try again.",
+        "needOne": "Keep at least one payment method on."
+      },
+      "live": {
+        "title": "Ready to launch",
+        "subtitle": "Your store goes live at {host}.",
+        "checklistName": "Store name",
+        "checklistTemplate": "Template",
+        "checklistProduct": "Products added",
+        "checklistPayment": "Payment",
+        "noProducts": "None yet. You can add products from the dashboard.",
+        "publish": "Publish my store",
+        "publishing": "Publishing…",
+        "publishFailed": "We could not publish the store. Please try again.",
+        "doneTitle": "Your store is live",
+        "doneBody": "Share the link and start selling.",
+        "visit": "Open my store",
+        "copy": "Copy link",
+        "copied": "Copied",
+        "whatsapp": "Share on WhatsApp",
+        "dashboard": "Go to dashboard"
+      }
+    },
+    "setupGuide": {
+      "title": "Setup guide",
+      "subtitle": "Finish these steps to get your first order.",
+      "progress": "{done} of {total} done",
+      "loadFailed": "We could not load the setup guide.",
+      "dismiss": "Hide guide",
+      "show": "Show the setup guide",
+      "optional": "Optional",
+      "done": "Done",
+      "markDone": "Mark as done",
+      "markUndone": "Undo",
+      "open": "Open",
+      "items": {
+        "add_product": {
+          "title": "Add a product",
+          "desc": "Add your first product with a photo and a price."
+        },
+        "brand": {
+          "title": "Set your logo and colors",
+          "desc": "Make the store look like your brand."
+        },
+        "shipping": {
+          "title": "Set shipping zones",
+          "desc": "Tell customers where you deliver and the fee."
+        },
+        "payment": {
+          "title": "Choose payment methods",
+          "desc": "Cash on delivery is on. Review or add more."
+        },
+        "domain": {
+          "title": "Connect your own domain",
+          "desc": "Use yourname.com instead of the free address."
+        },
+        "test_order": {
+          "title": "Place a test order",
+          "desc": "Open your store and order something as a customer."
+        },
+        "share": {
+          "title": "Share your store link",
+          "desc": "Send your link to customers on WhatsApp."
+        }
+      }
+    }
+  },
+  "billingEvents": {
+    "title": "Billing ledger",
+    "subtitle": "Every subscription charge, renewal retry, upgrade and refund. Rows are append-only.",
+    "loading": "Loading ledger…",
+    "failedToLoad": "Failed to load the billing ledger.",
+    "empty": "No billing events yet.",
+    "refresh": "Refresh",
+    "all": "All",
+    "statusFilter": "Status",
+    "typeFilter": "Type",
+    "stuck": "Outcome unknown — reconcile",
+    "retry": "retry {n}",
+    "refund": "Refund",
+    "confirmRefund": "Refund {amount} to the merchant's card?",
+    "refundFailed": "Refund failed: {message}",
+    "refundDone": "Refund recorded.",
+    "columns": {
+      "date": "Date",
+      "store": "Store",
+      "type": "Type",
+      "plan": "Plan",
+      "amount": "Amount",
+      "status": "Status",
+      "reference": "Gateway reference",
+      "failure": "Failure",
+      "action": "Action"
+    },
+    "types": {
+      "checkout": "Checkout",
+      "renewal": "Renewal",
+      "upgrade": "Upgrade",
+      "refund": "Refund"
+    },
+    "statuses": {
+      "pending": "Pending",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "refunded": "Refunded"
+    },
+    "interval": {
+      "monthly": "monthly",
+      "yearly": "yearly"
+    }
+  },
+  "codReconciliation": {
+    "title": "COD reconciliation",
+    "subtitle": "What your carriers should have collected against what they report and remit",
+    "errorTitle": "Error",
+    "importFailed": "The statement could not be imported.",
+    "imported": "Imported {count} line(s)",
+    "totals": "Totals",
+    "owed": "Owed (COD)",
+    "collected": "Collected",
+    "fees": "Carrier fees",
+    "net": "Remitted (net)",
+    "outstanding": "Still to receive",
+    "over": "Over-remitted",
+    "unmatched": "Unmatched lines",
+    "flagged": "Shipments needing attention",
+    "identity": "Owed minus collected always equals still to receive minus over-remitted, to the piastre. Collected equals fees plus remitted.",
+    "importTitle": "Import a carrier statement",
+    "importHelp": "Upload the COD settlement CSV from your carrier. It needs a tracking number column and the collected amount (or net amount and fee), in EGP. Uploading the same statement again changes nothing.",
+    "carrier": "Carrier",
+    "file": "CSV file",
+    "paste": "Statement text",
+    "pastePlaceholder": "…or paste the statement here",
+    "import": "Import",
+    "importResult": "{inserted} new, {duplicates} already imported, {unmatched} not matching any shipment.",
+    "rejectedLine": "Line {line}: {reason}",
+    "filterStatus": "Filter by status",
+    "allStatuses": "All statuses",
+    "filterCarrier": "Filter by carrier",
+    "allCarriers": "All carriers",
+    "statuses": {
+      "flagged": "Needs attention",
+      "awaiting": "Awaiting remittance",
+      "partial": "Partly remitted",
+      "settled": "Settled",
+      "over_remitted": "Over-remitted",
+      "mismatch": "Mismatch"
+    },
+    "tableLabel": "COD shipments",
+    "empty": "No COD shipments yet.",
+    "lines": "{count} remittances",
+    "columns": {
+      "order": "Order #",
+      "carrier": "Carrier",
+      "tracking": "Tracking #",
+      "owed": "Owed",
+      "collected": "Collected",
+      "fees": "Fees",
+      "net": "Remitted",
+      "open": "Open",
+      "status": "Status",
+      "date": "Date"
+    },
+    "page": "Page {page} of {pages}",
+    "previous": "Previous",
+    "next": "Next",
+    "unmatchedTitle": "Lines matching no shipment",
+    "unmatchedHelp": "These statement lines name a tracking number that is not one of your shipments. They match automatically if that shipment appears."
   }
 }

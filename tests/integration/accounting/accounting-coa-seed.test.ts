@@ -46,8 +46,8 @@ describe('account.service', () => {
       expect(second).toBe(29);
 
       const tree = await listAccountsTree(store.id);
-      expect(tree.assets.find(a => a.code === '1000')?.nameEn).toBe('Cash KNET');
-      expect(tree.assets.find(a => a.code === '1000')?.nameAr).toBe('كاش كي نت');
+      expect(tree.assets.find(a => a.code === '1000')?.nameEn).toBe('Cash Online');
+      expect(tree.assets.find(a => a.code === '1000')?.nameAr).toBe('كاش مدفوعات إلكترونية');
       expect(tree.expenses.length).toBeGreaterThan(10);
       // Confirm every returned node carries isSystem=true (whole template is system)
       const allSystem = [

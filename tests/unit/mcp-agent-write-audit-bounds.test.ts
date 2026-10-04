@@ -70,7 +70,7 @@ vi.mock('@api/lib/logger', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('@api/config', () => ({
-  config: { webUrl: 'https://store.force-ai.co', apiUrl: 'https://api.force-ai.co' },
+  config: { webUrl: 'https://ebda.app', apiUrl: 'https://api.ebda.app' },
 }));
 
 import { registerCartTools } from '@api/mcp/tools/cart.tools';
@@ -78,7 +78,7 @@ import { registerOrderTools } from '@api/mcp/tools/order.tools';
 import { CartService } from '@api/services/cart.service';
 import { AUDIT_DETAIL_MAX_CHARS, MCP_ID_MAX_CHARS } from '@api/mcp/agent-auth';
 
-const store = { id: 'store-1', name: 'Demo', slug: 'demo', currency: 'KWD', domain: null };
+const store = { id: 'store-1', name: 'Demo', slug: 'demo', currency: 'EGP', domain: null };
 
 type Handler = (input: unknown, extra?: unknown) => Promise<unknown>;
 type Registered = { schema: Record<string, z.ZodTypeAny>; handler: Handler };
@@ -132,7 +132,7 @@ describe('MCP write tools — id length is bounded at the schema', () => {
   it('rejects an over-long cartId on place_order and view_cart', () => {
     const { place_order } = harness(registerOrderTools);
     const { view_cart } = harness(registerCartTools);
-    const customer = { name: 'Sara Ali', address: 'Block 1', country: 'KW' };
+    const customer = { name: 'Sara Ali', address: 'Block 1', country: 'EG' };
 
     expect(
       z.object(place_order.schema).safeParse({ cartId: HUGE, paymentMethod: 'cod', customer })
@@ -168,7 +168,7 @@ describe('auditAgentWrite — persisted details are truncated', () => {
 
   it('truncates a huge cartId on the pre-auth denied row for place_order', async () => {
     const { place_order } = harness(registerOrderTools);
-    const customer = { name: 'Sara Ali', address: 'Block 1', country: 'KW' };
+    const customer = { name: 'Sara Ali', address: 'Block 1', country: 'EG' };
 
     await expect(
       place_order.handler({ cartId: HUGE, paymentMethod: 'cod', customer }, anonymousAgentExtra())

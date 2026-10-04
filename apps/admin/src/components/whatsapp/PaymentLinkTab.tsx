@@ -2,7 +2,7 @@
 
 /**
  * PaymentLinkTab — extracted from /stores/[id]/payment-link/page.tsx.
- * Merchant-initiated MyFatoorah payment links via WhatsApp.
+ * Merchant-initiated payment links (from the store's own gateway) via WhatsApp.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -12,6 +12,7 @@ import { formatPrice } from '../../lib/format';
 import { useT } from '../../i18n/useT';
 import { paymentLinkErrorMessage } from './payment-link-errors';
 
+import { minorToDecimalString, roundToMinor, REGION } from '@force/shared';
 interface PaymentLinkResponse {
   paymentUrl: string;
   orderId: string;
@@ -115,7 +116,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
   const { success: toastSuccess, error: toastError } = useToast();
   const t = useT('whatsappIntegration.paymentLink');
 
-  const [customerPhone, setCustomerPhone] = useState('+965');
+  const [customerPhone, setCustomerPhone] = useState(REGION.phone.callingCode);
   const [customerName, setCustomerName] = useState('');
   const [language, setLanguage] = useState<'en' | 'ar'>('en');
   const [sending, setSending] = useState(false);
@@ -126,8 +127,8 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [cartLines, setCartLines] = useState<CartLine[]>([{ productId: '', quantity: 1 }]);
   // Extra out-of-catalogue charge (custom quote, deposit, service fee).
-  // Stored as KWD string in the input, converted to fils at send time.
-  const [extraAmountKwd, setExtraAmountKwd] = useState('');
+  // Stored as EGP string in the input, converted to piastres at send time.
+  const [extraAmountMajor, setExtraAmountMajor] = useState('');
   const [extraAmountNote, setExtraAmountNote] = useState('');
   // Per-line typeahead query — keyed by line index. Each row has its own
   // search box so the merchant can type to find a product from a 1000+
@@ -137,7 +138,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
   const loadProducts = useCallback(async () => {
     setLoadingProducts(true);
     try {
-      // 1000 covers every active Force AI Store catalogue today (Wady Aljuz
+      // 1000 covers every active Ebda catalogue today (Wady Aljuz
       // tops at ~235). For catalogues that grow past 1000 the next
       // iteration should switch to server-side `?search=` paging.
       const { data } = await apiGet<{ products: ProductOption[] }>(
@@ -158,13 +159,13 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
   const phoneValid = /^\+[1-9]\d{6,14}$/.test(customerPhone.trim());
   const validLines = cartLines.filter(l => l.productId && l.quantity > 0);
 
-  // Parse extra amount (KWD with up to 3 decimals → fils).
+  // Parse extra amount (EGP with up to 2 decimals → piastres).
   const extraFils = (() => {
-    const v = extraAmountKwd.trim();
+    const v = extraAmountMajor.trim();
     if (!v) return 0;
     const n = Number(v);
     if (!Number.isFinite(n) || n < 0) return 0;
-    return Math.round(n * 1000);
+    return roundToMinor(n);
   })();
 
   const canSend = phoneValid && (validLines.length > 0 || extraFils > 0) && !sending;
@@ -256,7 +257,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
             type="tel"
             value={customerPhone}
             onChange={e => setCustomerPhone(e.target.value)}
-            placeholder="+96512345678"
+            placeholder={REGION.phone.placeholderIntl}
             className="w-full rounded-md border bg-background text-foreground px-3 py-2 text-sm font-mono"
           />
           {!phoneValid && customerPhone.length > 4 && (
@@ -394,14 +395,14 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
           <div className="flex items-center gap-2">
             <input
               type="number"
-              step="0.001"
+              step="0.01"
               min="0"
-              value={extraAmountKwd}
-              onChange={e => setExtraAmountKwd(e.target.value)}
-              placeholder="0.000"
+              value={extraAmountMajor}
+              onChange={e => setExtraAmountMajor(e.target.value)}
+              placeholder="0.00"
               className="w-32 rounded-md border bg-background text-foreground px-3 py-2 text-sm font-mono tabular-nums"
             />
-            <span className="text-sm text-muted-foreground">KWD</span>
+            <span className="text-sm text-muted-foreground">EGP</span>
             <input
               type="text"
               value={extraAmountNote}
@@ -420,7 +421,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
               <div className="flex justify-between text-foreground">
                 <span>{t('itemsSubtotal')}</span>
                 <span className="font-mono tabular-nums">
-                  {(itemsSubtotalFils / 1000).toFixed(3)} {language === 'ar' ? 'د.ك' : 'KWD'}
+                  {minorToDecimalString(itemsSubtotalFils)} {language === 'ar' ? 'ج.م' : 'EGP'}
                 </span>
               </div>
             )}
@@ -431,14 +432,14 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                   {extraAmountNote ? ` (${extraAmountNote})` : ''}
                 </span>
                 <span className="font-mono tabular-nums">
-                  {(extraFils / 1000).toFixed(3)} {language === 'ar' ? 'د.ك' : 'KWD'}
+                  {minorToDecimalString(extraFils)} {language === 'ar' ? 'ج.م' : 'EGP'}
                 </span>
               </div>
             )}
             <div className="flex justify-between font-semibold text-foreground pt-1 border-t border-primary/30">
               <span>{t('total')}</span>
               <span className="font-mono tabular-nums">
-                {(totalFils / 1000).toFixed(3)} {language === 'ar' ? 'د.ك' : 'KWD'}
+                {minorToDecimalString(totalFils)} {language === 'ar' ? 'ج.م' : 'EGP'}
               </span>
             </div>
           </div>

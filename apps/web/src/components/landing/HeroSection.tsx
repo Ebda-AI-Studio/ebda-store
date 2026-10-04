@@ -1,7 +1,8 @@
 'use client';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { BRAND } from '@force/shared';
 
-// Editorial grain — kills the flat "cheap" feel (matches the force-ai.co umbrella).
+// Editorial grain — kills the flat "cheap" feel (matches the ebda.app umbrella).
 const GRAIN =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
@@ -36,7 +37,7 @@ export function HeroSection() {
 
           <h1 className="mb-6 text-4xl font-extrabold leading-[1.03] tracking-tight text-white md:text-6xl">
             {t('Build your store with', 'ابنِ متجرك مع')}{' '}
-            <span className="text-primary">Force AI</span>
+            <span className="text-primary">{BRAND.name}</span>
           </h1>
 
           <p className="mx-auto mb-9 max-w-xl text-base leading-relaxed text-white/60 md:mx-0 md:text-lg">
@@ -56,14 +57,14 @@ export function HeroSection() {
               {t('Talk on WhatsApp', 'تواصل عبر واتساب')}
             </a>
             <a
-              href="mailto:info@force-ai.co"
+              href={`mailto:${BRAND.supportEmail}`}
               className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.02] px-6 py-3.5 text-base font-semibold text-white transition-colors hover:border-primary"
             >
               {t('Email us', 'راسلنا')}
             </a>
           </div>
 
-          {/* Proof — real Force AI stores */}
+          {/* Proof — real Ebda stores */}
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3 text-xs text-white/50 md:justify-start">
             <span>{t('Powering real Kuwait stores', 'نشغّل متاجر كويتية حقيقية')}</span>
             <span className="flex items-center gap-2.5">
@@ -78,7 +79,7 @@ export function HeroSection() {
           </div>
         </div>
 
-        {/* Product frame — a real store built on Force AI */}
+        {/* Product frame — a real store built on Ebda */}
         <div className="relative">
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#100f0e] shadow-[0_40px_120px_rgba(0,0,0,0.7),0_30px_90px_rgba(255,106,26,0.13)]">
             <div className="flex items-center gap-2 border-b border-white/[0.06] bg-[#0e0d0c] px-4 py-3">
@@ -92,8 +93,8 @@ export function HeroSection() {
             <img
               src="/landing/pecannbee-store.jpeg"
               alt={t(
-                'Pecannbee — a real store built on Force AI',
-                'بيكان بي — متجر حقيقي مبني على فورس'
+                `Pecannbee — a real store built on ${BRAND.name}`,
+                `بيكان بي — متجر حقيقي مبني على ${BRAND.nameAr}`
               )}
               width={1440}
               height={900}
@@ -108,7 +109,7 @@ export function HeroSection() {
               <b className="block text-white">
                 {t('Real store · live now', 'متجر حقيقي · مباشر الآن')}
               </b>
-              {t('Built on Force AI', 'مبني على فورس')}
+              {t(`Built on ${BRAND.name}`, `مبني على ${BRAND.nameAr}`)}
             </span>
           </div>
         </div>

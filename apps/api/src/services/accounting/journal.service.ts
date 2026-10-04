@@ -1,10 +1,12 @@
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withStore } from '@force/database';
+import { getEntityStoreId } from '../../lib/definer';
 import type { JournalEntry, JournalEntrySource, Prisma } from '@prisma/client';
 import { Prisma as PrismaNs } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { broadcastToStore } from '../../lib/socket-broadcast';
 import { withSavepointOn } from '../../lib/savepoint';
 
+import { REGION } from '@force/shared';
 export interface JournalLineInput {
   accountId: string;
   debit: number;
@@ -15,20 +17,20 @@ export interface JournalLineInput {
   refId?: string;
   /**
    * ISO-4217 currency code of the original transaction.
-   * Defaults to 'KWD' (no conversion needed).
+   * Defaults to 'EGP' (no conversion needed).
    */
   currency?: string;
   /**
-   * FX rate: 1 unit of `currency` = fxRate KWD.
-   * Required when currency !== 'KWD'.
+   * FX rate: 1 unit of `currency` = fxRate EGP.
+   * Required when currency !== 'EGP'.
    * Stored as Prisma Decimal (numeric(16,8)) for exact arithmetic.
    * Pass as a number or string — it is coerced to Decimal on write.
    */
   fxRate?: number;
   /**
-   * Original amount in the foreign currency's minor units (before KWD conversion).
-   * For KWD lines this equals debit or credit.
-   * For non-KWD lines, debit/credit hold the KWD-converted fils.
+   * Original amount in the foreign currency's minor units (before EGP conversion).
+   * For EGP lines this equals debit or credit.
+   * For non-EGP lines, debit/credit hold the EGP-converted piastres.
    */
   originalAmount?: number;
 }
@@ -69,13 +71,12 @@ export async function postEntry(input: PostEntryInput): Promise<JournalEntry> {
   // jobs and other background workers call postEntry directly via the
   // proxy, which falls through to basePrisma with no app.current_store_id
   // GUC set. The journal_entries RLS policy then filters every INSERT /
-  // SELECT to invisible — silent no-op, no error. Wrap in withRlsBypass
+  // SELECT to invisible — silent no-op, no error. Wrap in withStore
   // when standalone so the GUC is set inside our own transaction.
-  // Caller-provided tx is assumed to have either app.current_store_id
-  // set (from request middleware) OR bypass_rls (from store-delete style
-  // ops).
+  // Caller-provided tx is assumed to have app.current_store_id set (from
+  // request middleware or a store-scoped delete).
   if (!input.tx) {
-    return withRlsBypass(tx => postEntry({ ...input, tx }));
+    return withStore(input.storeId, tx => postEntry({ ...input, tx }));
   }
 
   // Fast-path idempotency check (skipped if no sourceId — manual entries are
@@ -120,8 +121,8 @@ export async function postEntry(input: PostEntryInput): Promise<JournalEntry> {
         debit: l.debit,
         credit: l.credit,
         // Multi-currency: thread FX fields through when present.
-        // KWD lines omit these (Prisma uses schema defaults: currency='KWD', fxRate=1, originalAmount=0).
-        ...(l.currency && l.currency !== 'KWD'
+        // EGP lines omit these (Prisma uses schema defaults: currency='EGP', fxRate=1, originalAmount=0).
+        ...(l.currency && l.currency !== REGION.currency
           ? {
               currency: l.currency,
               fxRate: l.fxRate ?? 1,
@@ -248,7 +249,7 @@ export async function reverseEntry(
             credit: l.debit,
             // Preserve FX metadata on reversals so the reversal entry still
             // shows the original foreign-currency context.
-            ...(l.currency && l.currency !== 'KWD'
+            ...(l.currency && l.currency !== REGION.currency
               ? {
                   currency: l.currency,
                   fxRate: l.fxRate ?? 1,
@@ -272,12 +273,21 @@ export async function reverseEntry(
 
     return reversal;
   };
-  // When no caller-provided tx, wrap in withRlsBypass — Inngest reversal
+  // When no caller-provided tx, wrap in withStore — Inngest reversal
   // paths (refund posting, profit-anomaly remediation) run without tenant
   // context, so RLS on journal_entries would silently filter every read
   // and the create would fail WITH CHECK. See journal.service.postEntry
   // for the same pattern + feedback-postgres-rls-silent-filter-trap.md.
-  const reversal = await (tx ? run(tx) : withRlsBypass(run));
+  let reversal: JournalEntry;
+  if (tx) {
+    reversal = await run(tx);
+  } else {
+    // The entry's store is found by primary key through a definer, and the
+    // reversal runs inside it.
+    const originalStoreId = await getEntityStoreId('journal_entry', originalId);
+    if (!originalStoreId) throw new Error(`JournalEntry ${originalId} not found`);
+    reversal = await withStore(originalStoreId, t => run(t as unknown as Prisma.TransactionClient));
+  }
 
   // Non-blocking UI refresh signal — best-effort, never throws
   broadcastToStore(reversal.storeId, {

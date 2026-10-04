@@ -240,7 +240,7 @@ export default function SettingsClient() {
       // GDPR Art. 17 and applicable GCC data-protection law (see
       // docs/legal/gcc-data-protection.md) compliant erasure: POST /auth/me/erase
       // irreversibly anonymizes PII while preserving anonymized order records
-      // for Kuwait MOF tax retention. The old DELETE /auth/me was a soft-delete
+      // for Egypt MOF tax retention. The old DELETE /auth/me was a soft-delete
       // (deletedAt timestamp) that left PII intact — NOT compliant.
       const result = await api.post<{ message: string }>('/auth/me/erase', {});
       if (result.success) {

@@ -3,12 +3,12 @@
  *
  * The routes' `viaCookie → private` branches are tested elsewhere by injecting
  * `x-store-slug-source: cookie` straight into a mocked `headers()`, which
- * proves nothing about production: middleware.ts's URL_KEYED_PUBLIC_PATHS
- * guard (#1959) is what keeps the sticky `x-store-slug` cookie from ever
- * resolving a store on these paths, and it is the load-bearing control. This
- * suite drives `middleware()` itself, then hands the route exactly the request
- * headers the middleware forwarded — so deleting that guard (and trusting the
- * routes to "handle cookie resolution themselves") turns it red.
+ * proves nothing about production: what keeps a cookie (or path) from ever
+ * resolving a store on these paths is that middleware.ts identifies a store by
+ * the Host ALONE (`x-store-domain`) — the sticky `x-store-slug` cookie and the
+ * `/<slug>` path entry are gone. This suite drives `middleware()` itself, then
+ * hands the route exactly the request headers the middleware forwarded — so
+ * reintroducing a cookie/path store identity turns it red.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -29,9 +29,9 @@ function captureForwarded(res: Response) {
 }
 
 function platformRequest(path: string) {
-  return new NextRequest(`https://store.force-ai.co${path}`, {
+  return new NextRequest(`https://ebda.app${path}`, {
     headers: {
-      host: 'store.force-ai.co',
+      host: 'ebda.app',
       cookie: 'x-store-slug=palora',
       // A client cannot forge the signal either.
       'x-store-slug-source': 'cookie',
@@ -44,6 +44,16 @@ function stubApi() {
     'fetch',
     vi.fn(async (url: string) => {
       const u = String(url);
+      if (u.includes('/public/store/resolve')) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              store: { id: 'store_p', slug: 'palora', name: 'Palora', status: 'active' },
+              enabledFeatures: ['agent_checkout', 'agent_feed'],
+            },
+          })
+        );
+      }
       if (u.includes('/public/stores/palora')) {
         return new Response(
           JSON.stringify({
@@ -52,6 +62,14 @@ function stubApi() {
               enabledFeatures: ['agent_checkout', 'agent_feed'],
             },
           })
+        );
+      }
+      if (u.includes('/public/categories')) {
+        return new Response(JSON.stringify({ data: { categories: [] } }));
+      }
+      if (u.includes('/public/products')) {
+        return new Response(
+          JSON.stringify({ data: { products: [], pagination: { totalPages: 1 } } })
         );
       }
       if (u.includes('/public/stores?')) {
@@ -75,6 +93,7 @@ describe('agent-discovery documents on the real middleware path (#2174)', () => 
       captureForwarded(middleware(platformRequest(path)));
       expect(forwarded.get('x-store-slug')).toBeUndefined();
       expect(forwarded.get('x-store-slug-source')).toBeUndefined();
+      expect(forwarded.get('x-store-domain')).toBeUndefined();
     }
   );
 
@@ -84,7 +103,7 @@ describe('agent-discovery documents on the real middleware path (#2174)', () => 
     const res = await GET();
     const body = await res.text();
     expect(body).not.toContain('Palora');
-    expect(body).toContain('# Force AI Store');
+    expect(body).toContain('# Ebda');
     expect(res.headers.get('cache-control')).toMatch(/^public, s-maxage=/);
   });
 
@@ -95,8 +114,24 @@ describe('agent-discovery documents on the real middleware path (#2174)', () => 
     expect(res.status).toBe(404);
   });
 
-  it('control: a normal subroute DOES carry the cookie store', () => {
+  it('a normal platform subroute does not carry the cookie store either', () => {
     captureForwarded(middleware(platformRequest('/products')));
-    expect(forwarded.get('x-store-slug')).toBe('palora');
+    expect(forwarded.get('x-store-slug')).toBeUndefined();
+    expect(forwarded.get('x-store-domain')).toBeUndefined();
+  });
+
+  it('control: <slug>.ebda.app/llms.txt DOES answer as that store, from the Host', async () => {
+    captureForwarded(
+      middleware(
+        new NextRequest('https://palora.ebda.app/llms.txt', {
+          headers: { host: 'palora.ebda.app' },
+        })
+      )
+    );
+    expect(forwarded.get('x-store-domain')).toBe('palora.ebda.app');
+    const { GET } = await import('../../apps/web/src/app/llms.txt/route');
+    const res = await GET();
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('Palora');
   });
 });

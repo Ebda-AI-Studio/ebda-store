@@ -135,10 +135,10 @@ export default function CartClient() {
   const [promoType, setPromoType] = useState('');
   const [promoValue, setPromoValue] = useState(0);
   const [isValidating, setIsValidating] = useState(false);
-  // Default to 0 fils. A merchant who hasn't set up shipping zones yet
-  // shouldn't have a phantom 2.5 KWD fee shown to customers — the
+  // Default to 0 piastres. A merchant who hasn't set up shipping zones yet
+  // shouldn't have a phantom 2.5 EGP fee shown to customers — the
   // backend's calculateShipping returns 0 when no zones exist, but the
-  // cart used to show 2.5 KWD on its own UI breakdown until the
+  // cart used to show 2.5 EGP on its own UI breakdown until the
   // checkout step corrected it. Same for the free-shipping threshold:
   // 0 means "no threshold configured" so the gate just resolves to
   // free.
@@ -347,7 +347,7 @@ export default function CartClient() {
     }
   }, [store.id]);
 
-  // All amounts are in fils (1 KWD = 1000 fils) so they can be passed directly to formatPrice
+  // All amounts are in piastres (1 EGP = 100 piastres) so they can be passed directly to formatPrice
   const subtotal = cartTotal;
   const discount = promoApplied ? promoDiscount : 0;
   // shippingLoaded guards against showing a phantom fee while the zones
@@ -382,7 +382,7 @@ export default function CartClient() {
   const { components: T } = useTemplateComponents();
 
   // Per-store, opt-in minimum order value (Store.settings.minimumOrderFils,
-  // fils; 0/unset = no minimum). This is a UX guard only — the API's
+  // piastres; 0/unset = no minimum). This is a UX guard only — the API's
   // OrderService.create is the real, hard-blocking check. store.settings is
   // a loose Record — cast the one key we read, same pattern as
   // checkoutDelivery in CheckoutClient.tsx.
@@ -1167,7 +1167,7 @@ export default function CartClient() {
                       <div className="flex flex-wrap items-center justify-center gap-3">
                         {(() => {
                           // Customer-facing payment METHODS (not gateways). The
-                          // Kuwait default is correct for most stores; a merchant
+                          // Egypt default is correct for most stores; a merchant
                           // can override via settings.acceptedPaymentMethods.
                           const configured = Array.isArray(
                             (store?.settings as Record<string, unknown>)?.acceptedPaymentMethods
@@ -1178,7 +1178,7 @@ export default function CartClient() {
                           const methods =
                             configured && configured.length
                               ? configured
-                              : ['KNET', 'Visa', 'Mastercard', 'Apple Pay'];
+                              : ['Visa', 'Mastercard', 'Meeza', 'Fawry'];
                           return methods.map(method => (
                             <div
                               key={method}

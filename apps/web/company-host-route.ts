@@ -1,21 +1,23 @@
 /**
- * Pure routing decision for the Force AI COMPANY-page carve-out.
+ * Pure routing decision for the Ebda COMPANY-page carve-out.
  *
- * This Worker owns the WHOLE `force-ai.co` zone (SaaS wildcard route), so it
- * sees EVERY host: the company apex, `store/admin/orders.force-ai.co`, and every
+ * This Worker owns the WHOLE `ebda.app` zone (SaaS wildcard route), so it
+ * sees EVERY host: the company apex, `store/admin/orders.ebda.app`, and every
  * merchant custom domain (pecannbee.com, wadyaljuz.com, …). This helper decides
  * what to do based ONLY on the hostname, with no side effects, so the routing
  * contract is unit-testable in isolation from the (heavy) Next handler.
  *
  * Contract — ONLY the two exact company hosts are ever intercepted:
- *   - `www.force-ai.co` → 301 redirect to the bare apex (single canonical host)
- *   - `force-ai.co`     → reverse-proxy to the Pages company site
+ *   - `ebda.app` → 301 redirect to the bare apex (single canonical host)
+ *   - `ebda.app`     → reverse-proxy to the Pages company site
  *   - anything else (store/admin/orders subdomains, `/<slug>`, EVERY merchant
  *     domain) → `next`, i.e. fall through to the Next storefront UNCHANGED.
  */
+import { BRAND } from '@force/shared';
 
-export const COMPANY_APEX = 'force-ai.co';
-export const COMPANY_ORIGIN = 'https://force-ai-landing-preview.pages.dev';
+export const COMPANY_APEX: string = BRAND.domains.marketing;
+/** Pages project that serves the marketing site (SP9 creates it). */
+export const COMPANY_ORIGIN = 'https://ebda-marketing.pages.dev';
 
 export type CompanyRoute =
   | { kind: 'redirect'; location: string; status: 301 }

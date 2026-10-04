@@ -2,8 +2,8 @@
  * issue 2041 — readInStoreContext must reuse the ambient tenant transaction
  * ONLY when it is scoped to the requested store. A transaction with no store
  * GUC (`userContext` on /addresses, a header-less /wishlist) or another
- * store's GUC reads a STRICT table as [] under force_app. The real-RLS proof
- * is in tests/integration/rls-force-app.test.ts (run under a force_app login);
+ * store's GUC reads a STRICT table as [] under ebda_app. The real-RLS proof
+ * is in tests/integration/rls-ebda-app.test.ts (run on an ebda_app login);
  * this unit pin is what the defence-mutation record runs.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';

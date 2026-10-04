@@ -6,18 +6,18 @@ import { PLATFORM_MARKETING_URL } from '../../apps/web/src/lib/platform';
 const web = (p: string) => readFileSync(resolve(__dirname, '../../apps/web/src', p), 'utf8');
 
 /**
- * The platform host (`store.force-ai.co`) sends its bare root to the marketing
+ * The platform host (`ebda.app`) sends its bare root to the marketing
  * site instead of serving a second marketing page of its own.
  *
  * The rule these guard is a TENANT-ISOLATION rule, not a styling one: a
  * merchant's customer must never be moved from that merchant's storefront onto
- * the Force AI pitch (which links to competitors' stores). So the marketing URL
+ * the Ebda pitch (which links to competitors' stores). So the marketing URL
  * is allowed on exactly two surfaces — the bare-root branch and the platform
  * 404 — and nowhere a merchant's customer can reach.
  */
 describe('platform root redirect', () => {
   it('points at the marketing site, not a merchant or platform host', () => {
-    expect(PLATFORM_MARKETING_URL).toBe('https://force-ai.co');
+    expect(PLATFORM_MARKETING_URL).toBe('https://ebda.app');
     expect(PLATFORM_MARKETING_URL).not.toMatch(/store\.force-ai\.co/);
   });
 
@@ -50,7 +50,7 @@ describe('platform root redirect', () => {
       expect(code, `${file} imports the platform pitch URL`).not.toContain(
         'PLATFORM_MARKETING_URL'
       );
-      expect(code, `${file} links out to force-ai.co`).not.toMatch(/force-ai\.co/);
+      expect(code, `${file} links out to ebda.app`).not.toMatch(/force-ai\.co/);
     }
   });
 
@@ -64,12 +64,12 @@ describe('platform root redirect', () => {
 
   it('titles the platform sentinel as a 404, not as a merchant store', () => {
     // DEFAULT_STORE is named "Force", so the shared storefront metadata builder
-    // produced "Force - Online Shopping in Kuwait" — a merchant title for a
+    // produced "Force - Online Shopping in Egypt" — a merchant title for a
     // store that does not exist, on a page whose body is a 404. The tab kept
     // making a promise the page had stopped making.
     const src = web('app/layout.tsx');
     expect(src).toMatch(/if \(store\.id === 'demo'\) \{/);
-    expect(src).toMatch(/title: 'Page not found — Force AI'/);
+    expect(src).toMatch(/title: `Page not found — \$\{BRAND\.name\}`/);
     expect(src).toMatch(/robots: \{ index: false, follow: false \}/);
     // It must short-circuit BEFORE the storefront builder, not after.
     const sentinel = src.indexOf("store.id === 'demo'");

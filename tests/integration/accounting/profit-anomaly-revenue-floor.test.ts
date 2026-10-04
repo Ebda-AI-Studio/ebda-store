@@ -8,7 +8,7 @@
  *  - a thin store's quiet week does NOT page;
  *  - a real drop off a real baseline still fires p0;
  *  - the baseline is the 3 weeks BEFORE the current one (a 58% week vs a
- *    100 KWD/week prior reads −42% → p0; the old contaminated baseline read
+ *    1,000 EGP/week prior reads −42% → p0; the old contaminated baseline read
  *    it as −35% → warning).
  *
  * Every store is created per test, so a --retry re-run gets fresh rows.
@@ -39,7 +39,7 @@ const OWNER = '00000000-0000-0000-0000-0000000000f9';
 const stores: string[] = [];
 const DAY = 24 * 60 * 60 * 1000;
 
-async function storeWithSales(sales: Array<{ daysAgo: number; fils: number }>) {
+async function storeWithSales(sales: Array<{ daysAgo: number; piastres: number }>) {
   await prisma.user.upsert({
     where: { id: OWNER },
     update: {},
@@ -72,8 +72,8 @@ async function storeWithSales(sales: Array<{ daysAgo: number; fils: number }>) {
       sourceId: `sale-${suffix}-${i++}`,
       postedAt: new Date(Date.now() - sale.daysAgo * DAY),
       lines: [
-        { accountId: cash, debit: sale.fils, credit: 0 },
-        { accountId: revenue, debit: 0, credit: sale.fils },
+        { accountId: cash, debit: sale.piastres, credit: 0 },
+        { accountId: revenue, debit: 0, credit: sale.piastres },
       ],
     });
   }
@@ -95,11 +95,11 @@ afterAll(async () => {
 });
 
 describe('revenue_drop', () => {
-  it('a thin store (3 KWD/week) with a quiet week does not page', async () => {
+  it('a thin store (30 EGP/week) with a quiet week does not page', async () => {
     const storeId = await storeWithSales([
-      { daysAgo: 10, fils: 3000 },
-      { daysAgo: 17, fils: 3000 },
-      { daysAgo: 24, fils: 3000 },
+      { daysAgo: 10, piastres: 3000 },
+      { daysAgo: 17, piastres: 3000 },
+      { daysAgo: 24, piastres: 3000 },
     ]);
     await runProfitAnomalyScan(storeId);
     expect(await revenueDrop(storeId)).toBeNull();
@@ -107,10 +107,10 @@ describe('revenue_drop', () => {
 
   it('a real drop off a real baseline still pages p0', async () => {
     const storeId = await storeWithSales([
-      { daysAgo: 10, fils: 300_000 },
-      { daysAgo: 17, fils: 300_000 },
-      { daysAgo: 24, fils: 300_000 },
-      { daysAgo: 2, fils: 100_000 },
+      { daysAgo: 10, piastres: 3_000_000 },
+      { daysAgo: 17, piastres: 3_000_000 },
+      { daysAgo: 24, piastres: 3_000_000 },
+      { daysAgo: 2, piastres: 1_000_000 },
     ]);
     await runProfitAnomalyScan(storeId);
     expect(await revenueDrop(storeId)).toMatchObject({ severity: 'p0' });
@@ -118,14 +118,14 @@ describe('revenue_drop', () => {
 
   it('the baseline is the three weeks BEFORE the current week, not a window containing it', async () => {
     const storeId = await storeWithSales([
-      { daysAgo: 10, fils: 100_000 },
-      { daysAgo: 17, fils: 100_000 },
-      { daysAgo: 24, fils: 100_000 },
-      { daysAgo: 2, fils: 58_000 },
+      { daysAgo: 10, piastres: 1_000_000 },
+      { daysAgo: 17, piastres: 1_000_000 },
+      { daysAgo: 24, piastres: 1_000_000 },
+      { daysAgo: 2, piastres: 580_000 },
     ]);
     await runProfitAnomalyScan(storeId);
     const row = await revenueDrop(storeId);
     expect(row).toMatchObject({ severity: 'p0' });
-    expect(Number(row!.baseline28d)).toBeCloseTo(100_000, 0);
+    expect(Number(row!.baseline28d)).toBeCloseTo(1_000_000, 0);
   });
 });

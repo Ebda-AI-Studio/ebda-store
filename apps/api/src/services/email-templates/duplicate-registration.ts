@@ -1,4 +1,5 @@
 import { escapeHtml } from './_util';
+import { BRAND } from '@force/shared';
 
 export interface DuplicateRegistrationData {
   email: string;
@@ -35,7 +36,7 @@ export const duplicateRegistrationTemplate = {
     </p>
     <p>
       If you've forgotten your password, you can
-      <a href="${resetUrlEsc}" style="color: #ff6e00;">request a reset link</a>.
+      <a href="${resetUrlEsc}" style="color: ${BRAND.colors.gold};">request a reset link</a>.
     </p>
     <p style="font-size: 14px; color: #666; margin-top: 24px;">
       If this wasn't you, you can ignore this email — no changes were
@@ -62,7 +63,7 @@ export const duplicateRegistrationTemplate = {
     </p>
     <p>
       إذا نسيت كلمة المرور، يمكنك
-      <a href="${resetUrlEsc}" style="color: #ff6e00;">طلب رابط إعادة التعيين</a>.
+      <a href="${resetUrlEsc}" style="color: ${BRAND.colors.gold};">طلب رابط إعادة التعيين</a>.
     </p>
     <p style="font-size: 14px; color: #666; margin-top: 24px;">
       إذا لم تكن أنت من فعل ذلك، يمكنك تجاهل هذه الرسالة — لم يتم إجراء أي تغييرات

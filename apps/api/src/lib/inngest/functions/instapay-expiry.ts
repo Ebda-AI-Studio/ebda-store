@@ -1,0 +1,73 @@
+import type { InngestFunction } from 'inngest';
+import { prisma } from '@force/database';
+import { AWAITING_PAYMENT_CONFIRMATION } from '@force/shared';
+import logger from '../../logger';
+import { inngest } from '../client';
+import { sweepAcrossStores } from '../../cross-store';
+import { InstapayService } from '../../../services/payment-providers/instapay.service';
+
+/**
+ * InstaPay hold expiry (SP6a, Review Focus 3) — every 15 minutes.
+ *
+ * An InstaPay order waits in `awaiting_payment_confirmation` for the merchant to
+ * confirm the transfer. Past `payment_confirmation_expires_at` (default 48h, per
+ * store) the money is not coming: the order is cancelled, its stock released
+ * through the normal cancel path, and the merchant (push) and customer
+ * (cancellation notice) are told. A confirm that wins the row lock first keeps
+ * the order; one that arrives after expiry is refused.
+ *
+ * Cross-store without a bypass: the due orders are found with one tenant
+ * transaction per store (`sweepAcrossStores`, strict RLS), and each order is then
+ * expired in its OWN short store transaction (`InstapayService.expireOne`), so one
+ * bad order or tenant never blocks the rest and no transaction spans the sweep.
+ */
+const RUN_CAP = 500;
+
+export const instapayExpiry: InngestFunction.Any = inngest.createFunction(
+  {
+    id: 'instapay-expiry',
+    name: 'Expire unconfirmed InstaPay orders (every 15 minutes)',
+    retries: 2,
+    concurrency: { limit: 1 },
+    triggers: [{ cron: '*/15 * * * *' }],
+  },
+  async ({ step }) => {
+    const now = new Date();
+    const due = await step.run('find-due', () =>
+      sweepAcrossStores({
+        fetch: () =>
+          prisma.order.findMany({
+            where: {
+              status: AWAITING_PAYMENT_CONFIRMATION,
+              deletedAt: null,
+              paymentConfirmationExpiresAt: { lte: now },
+            },
+            select: { id: true, storeId: true, paymentConfirmationExpiresAt: true },
+            orderBy: { paymentConfirmationExpiresAt: 'asc' },
+            take: RUN_CAP,
+          }),
+        orderKey: r => r.paymentConfirmationExpiresAt ?? 0,
+        take: RUN_CAP,
+      })
+    );
+
+    let expired = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const o of due) {
+      const outcome = await step.run(`expire-${o.id}`, async () => {
+        try {
+          return await InstapayService.expireOne(o.storeId, o.id, now);
+        } catch (err) {
+          logger.error({ err, orderId: o.id, storeId: o.storeId }, 'instapay-expiry: failed');
+          return 'failed' as const;
+        }
+      });
+      if (outcome === 'expired') expired += 1;
+      else if (outcome === 'failed') failed += 1;
+      else skipped += 1;
+    }
+    logger.info({ scanned: due.length, expired, skipped, failed }, 'instapay-expiry completed');
+    return { scanned: due.length, expired, skipped, failed };
+  }
+);

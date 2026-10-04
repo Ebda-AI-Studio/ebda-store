@@ -14,6 +14,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockUserFindFirst = vi.fn();
+const mockFindUserIdByEmail = vi.fn();
 
 vi.mock('@force/database', () => ({
   prisma: {
@@ -22,6 +23,14 @@ vi.mock('@force/database', () => ({
     store: { findUnique: vi.fn() },
   },
   Prisma: {},
+  // the user row is read inside the user's own scope once the definer has named it
+  withUser: async (_id: string, fn: (tx: unknown) => unknown) =>
+    fn({ user: { findUnique: (...a: unknown[]) => mockUserFindFirst(...a) } }),
+}));
+
+// The email -> user id step is the SECURITY DEFINER lookup (the only place the scope is applied).
+vi.mock('@api/lib/definer', () => ({
+  findUserIdByEmail: (...a: unknown[]) => mockFindUserIdByEmail(...a),
 }));
 
 vi.mock('@api/services/email.service', () => ({
@@ -38,6 +47,7 @@ describe('authScope — email must be a scalar, never a Prisma filter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUserFindFirst.mockResolvedValue(null);
+    mockFindUserIdByEmail.mockResolvedValue(null);
   });
 
   it('rejects a filter object in requestPasswordReset before any DB read', async () => {
@@ -56,17 +66,19 @@ describe('authScope — email must be a scalar, never a Prisma filter', () => {
 
   it('still passes a plain string straight through to the where clause', async () => {
     await AuthService.requestPasswordReset('real@example.test', 'store-1');
-    expect(mockUserFindFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { email: 'real@example.test', storeId: 'store-1' },
-      })
+    expect(mockFindUserIdByEmail).toHaveBeenCalledWith(
+      'real@example.test',
+      'store-1',
+      expect.anything()
     );
   });
 
   it('keeps the admin (storeId null) scope shape unchanged', async () => {
     await AuthService.requestPasswordReset('admin@example.test', null);
-    expect(mockUserFindFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { email: 'admin@example.test', storeId: null } })
+    expect(mockFindUserIdByEmail).toHaveBeenCalledWith(
+      'admin@example.test',
+      null,
+      expect.anything()
     );
   });
 });

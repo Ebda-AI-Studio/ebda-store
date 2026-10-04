@@ -98,7 +98,7 @@ function deliveryOf(o: any, shipment: ShipmentSummary | undefined) {
     trackingNumber: shipment?.trackingNumber ?? null,
     estimatedDeliveryAt: shipment?.estimatedDeliveryAt ?? null,
     governorate: str('governorate'),
-    // The storefront writes the selected delivery area to `state` on the KW
+    // The storefront writes the selected delivery area to `state` on the legacy
     // address model; newer orders also carry an explicit `area`.
     area: str('area') ?? str('state'),
     areaAr: str('areaAr'),
@@ -350,7 +350,7 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
         ]);
         // An explicit ALLOWLIST, never `...o` (issue 2244): a spread is a
         // denylist, so every Order column rode out verbatim — including the
-        // shopper-authored `notes`/`customerNotes`, where Kuwait shoppers
+        // shopper-authored `notes`/`customerNotes`, where Egypt shoppers
         // type street directions and a callback number — and any future
         // column would too. This payload lands in a third-party LLM context.
         return ok({

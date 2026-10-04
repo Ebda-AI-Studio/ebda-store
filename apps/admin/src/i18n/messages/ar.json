@@ -146,7 +146,7 @@
           },
           "paymentMethod": {
             "title": "فعّل وسيلة دفع واحدة على الأقل",
-            "subtitle": "فعّل Tap أو MyFatoorah أو Hesabe أو UPayments أو الدفع عند الاستلام.",
+            "subtitle": "فعّل Paymob أو Kashier أو فوري أو إنستاباي أو الدفع عند الاستلام.",
             "cta": "إعداد الدفع"
           },
           "shipping": {
@@ -184,7 +184,7 @@
         "storeName": "اسم المتجر",
         "urlSlug": "معرّف الرابط",
         "slugPlaceholder": "my-store-name",
-        "slugHint": "سيكون متجرك على: store.force-ai.co/{slug}",
+        "slugHint": "سيكون متجرك على: {slug}.ebda.app",
         "slugHintPlaceholder": "your-slug",
         "plan": "الخطة",
         "status": "الحالة",
@@ -396,7 +396,9 @@
       "errors": {
         "storeNameRequired": "اسم المتجر مطلوب",
         "storeUrlRequired": "رابط المتجر مطلوب",
-        "storeUrlInvalid": "يمكن أن يحتوي الرابط على أحرف إنجليزية صغيرة وأرقام وشرطات فقط",
+        "storeUrlInvalid": "يمكن أن يحتوي الرابط على أحرف إنجليزية صغيرة وأرقام وشرطات مفردة فقط (وليس في البداية أو النهاية)",
+        "storeUrlReserved": "هذا العنوان محجوز. اختر عنوانًا آخر",
+        "storeUrlLength": "يجب أن يتكون العنوان من 3 إلى 40 حرفًا",
         "emailRequired": "البريد الإلكتروني مطلوب",
         "emailInvalid": "يرجى إدخال عنوان بريد إلكتروني صالح",
         "ownerNameRequired": "اسم المالك مطلوب",
@@ -501,7 +503,7 @@
         },
         "price": "السعر",
         "priceMode": {
-          "set": "تحديد السعر (د.ك)",
+          "set": "تحديد السعر (ج.م)",
           "adjustPct": "تعديل بنسبة %"
         },
         "priceValue": "قيمة السعر",
@@ -522,7 +524,7 @@
         "variantGridProduct": "المنتج",
         "variantGridVariant": "المتغير",
         "variantGridInventory": "المخزون",
-        "variantGridPrice": "السعر (د.ك)",
+        "variantGridPrice": "السعر (ج.م)",
         "variantSaving": "جارٍ الحفظ...",
         "variantSaveAll": "حفظ تغييرات المتغيرات",
         "toast": {
@@ -654,14 +656,14 @@
         "excerptArPlaceholder": "ملخص من جملة أو جملتين لنتائج البحث وبطاقات المشاركة...",
         "mediaHint": "اسحب وأفلت الصور هنا، أو انقر للاختيار",
         "mediaSizeHint": "الموصى به 1000×1000 (مربع). حتى 10 ميجابايت لكل ملف — نقوم بضغطها تلقائياً للمتجر.",
-        "price": "السعر (د.ك)",
-        "costPrice": "التكلفة (د.ك)",
+        "price": "السعر (ج.م)",
+        "costPrice": "التكلفة (ج.م)",
         "profitLabel": "هامش الربح لكل وحدة:",
         "pricePlaceholder": "0.000",
         "discountLabel": "الخصم",
         "discountNone": "بدون خصم",
         "discountPercentage": "نسبة مئوية (%)",
-        "discountFixed": "مبلغ ثابت (د.ك)",
+        "discountFixed": "مبلغ ثابت (ج.م)",
         "discountValuePlaceholder": "0",
         "discountPercentagePlaceholder": "0.0",
         "discountPreviewLabel": "معاينة السعر بعد الخصم",
@@ -821,9 +823,9 @@
         "descriptionMultiAxis": "هذا المنتج له متغيرات متعددة المحاور (مثل المقاس × اللون). يمكنك تعديل السعر والمخزون والصورة لكل تركيبة، لكن الأسماء مقفلة لأن إنشاء تركيبات جديدة يحتاج محورين.",
         "colName": "الاسم",
         "colNameAr": "الاسم بالعربية",
-        "colPrice": "السعر (د.ك)",
-        "colCompareAt": "السعر قبل الخصم (د.ك)",
-        "colCost": "التكلفة (د.ك)",
+        "colPrice": "السعر (ج.م)",
+        "colCompareAt": "السعر قبل الخصم (ج.م)",
+        "colCost": "التكلفة (ج.م)",
         "colStock": "المخزون",
         "colImage": "الصورة",
         "namePlaceholder": "مثلاً Medium",
@@ -875,14 +877,14 @@
         "badgeLabelHint": "نص حر يظهر كشارة على بطاقة هذا المنتج وصفحته. اتركه فارغًا لإخفاء الشارة. 32 حرفًا كحد أقصى.",
         "mediaHint": "اسحب وأفلت الصور هنا، أو انقر للاختيار",
         "mediaSizeHint": "الموصى به 1000×1000 (مربع). حتى 10 ميجابايت لكل ملف — نقوم بضغطها تلقائياً للمتجر.",
-        "price": "السعر (د.ك)",
+        "price": "السعر (ج.م)",
         "pricePlaceholder": "0.000",
-        "costPrice": "التكلفة (د.ك)",
-        "pricingHint": "أدخل الأسعار بالدينار الكويتي. تعيين الخصم سيضبط السعر قبل الخصم تلقائيًا في المتجر.",
+        "costPrice": "التكلفة (ج.م)",
+        "pricingHint": "أدخل الأسعار بالجنيه المصري. تعيين الخصم سيضبط السعر قبل الخصم تلقائيًا في المتجر.",
         "discountLabel": "الخصم",
         "discountNone": "بدون خصم",
         "discountPercentage": "نسبة مئوية (%)",
-        "discountFixed": "مبلغ ثابت (د.ك)",
+        "discountFixed": "مبلغ ثابت (ج.م)",
         "discountValuePlaceholder": "0",
         "discountPercentagePlaceholder": "0.0",
         "discountPreviewLabel": "معاينة السعر بعد الخصم",
@@ -972,6 +974,7 @@
       "filters": {
         "all": "جميع الطلبات",
         "pending": "قيد الانتظار",
+        "awaiting_payment_confirmation": "بانتظار تأكيد إنستاباي",
         "confirmed": "مؤكد",
         "processing": "قيد المعالجة",
         "shipped": "تم الشحن",
@@ -1004,7 +1007,7 @@
         "status": "الحالة",
         "date": "التاريخ",
         "actions": "الإجراءات",
-        "totalValue": "{amount} د.ك",
+        "totalValue": "{amount} ج.م",
         "moreItems": "+{count} أخرى",
         "agentBadge": "وكيل ذكاء اصطناعي"
       },
@@ -1041,7 +1044,9 @@
         "cancel": "إلغاء",
         "manualRefundTitle": "تعليم الطلب كمسترد؟",
         "manualRefundDescription": "هذا يسجّل الاسترداد فقط: يعيد المخزون ويلغي الكوبون ونقاط الولاء ويُبلغ العميل بأنه تم الاسترداد — لكنه لا يعيد أي مبلغ. لإعادة دفعة البطاقة فعلياً، افتح الطلب واستخدم \"استرداد عبر مزوّد الدفع\".",
-        "manualRefundDescriptionCancelled": "تم إلغاء هذا الطلب، لذا أُعيد مخزونه وأُلغي الكوبون ونقاط الولاء عند الإلغاء. هذا يسجّل الاسترداد على الطلب فقط — ولا يعيد أي مبلغ، ولا يُرسل إشعار جديد إلى العميل. لإعادة دفعة البطاقة فعلياً، استخدم \"استرداد عبر مزوّد الدفع\"."
+        "manualRefundDescriptionCancelled": "تم إلغاء هذا الطلب، لذا أُعيد مخزونه وأُلغي الكوبون ونقاط الولاء عند الإلغاء. هذا يسجّل الاسترداد على الطلب فقط — ولا يعيد أي مبلغ، ولا يُرسل إشعار جديد إلى العميل. لإعادة دفعة البطاقة فعلياً، استخدم \"استرداد عبر مزوّد الدفع\".",
+        "instapayTitle": "تأكيد تحويل إنستاباي؟",
+        "instapayDescription": "أكّد أن مبلغ هذا الطلب وصل إلى حسابك في إنستاباي. سيصبح الطلب مؤكداً وجاهزاً للشحن. الضغط مرتين آمن."
       },
       "toast": {
         "errorTitle": "خطأ",
@@ -1050,7 +1055,9 @@
         "markedPaidTitle": "تم التعليم كمدفوع",
         "markedPaidDescription": "تم تعليم الطلب كمدفوع.",
         "bulkUpdateTitle": "تحديث جماعي",
-        "bulkUpdateDescription": "تم تعليم {count} طلب كمدفوع."
+        "bulkUpdateDescription": "تم تعليم {count} طلب كمدفوع.",
+        "instapayConfirmed": "تم تأكيد الدفع",
+        "instapayAlready": "تم تأكيده من قبل"
       },
       "export": {
         "button": "تصدير الطلبات",
@@ -1063,12 +1070,14 @@
         "statusUpdate": "تعذّر تحديث الحالة",
         "markPaid": "تعذّر التعليم كمدفوع",
         "bulkMarkPaid": "تعذّر التعليم الجماعي كمدفوع",
-        "retry": "إعادة المحاولة"
+        "retry": "إعادة المحاولة",
+        "confirmInstapay": "تعذّر تأكيد دفعة إنستاباي"
       },
       "agentBadge": "وكيل ذكي"
     },
     "status": {
       "pending": "قيد الانتظار",
+      "awaiting_payment_confirmation": "بانتظار تأكيد إنستاباي",
       "confirmed": "مؤكد",
       "processing": "قيد المعالجة",
       "shipped": "تم الشحن",
@@ -1108,10 +1117,10 @@
         "viaAreaRate": "سعر المنطقة",
         "viaZone": "المنطقة الشحنية",
         "viaSource": "(عبر {source})",
-        "noRateConfigured": "لا يوجد سعر شحن مُعدّ لهذه المنطقة — حدّد رسومًا أدناه، وإلا سيُحفظ الطلب برسوم شحن 0 د.ك.",
-        "overrideLabel": "تجاوز رسوم الشحن (د.ك) — اتركه فارغًا لاستخدام الرسوم المحسوبة",
+        "noRateConfigured": "لا يوجد سعر شحن مُعدّ لهذه المنطقة — حدّد رسومًا أدناه، وإلا سيُحفظ الطلب برسوم شحن 0 ج.م",
+        "overrideLabel": "تجاوز رسوم الشحن (ج.م) — اتركه فارغًا لاستخدام الرسوم المحسوبة",
         "overridePlaceholder": "مثال: 1.500",
-        "overrideActive": "التجاوز اليدوي مفعّل: سيُستخدم {price} ({fils} فلس) بدلاً من الرسوم المحسوبة."
+        "overrideActive": "التجاوز اليدوي مفعّل: سيُستخدم {price} ({piastres} فلس) بدلاً من الرسوم المحسوبة."
       },
       "productsSection": {
         "heading": "المنتجات",
@@ -1139,7 +1148,7 @@
         "itemCount": "{count, plural, zero {{count, number, latn} عنصر} one {عنصر واحد} two {عنصران} few {{count, number, latn} عناصر} many {{count, number, latn} عنصرًا} other {{count, number, latn} عنصر}}",
         "creating": "جارٍ الإنشاء…",
         "placeOrder": "إتمام الطلب",
-        "unpaidHint": "أُنشئ الطلب بحالة غير مدفوع. أصدر رابط دفع عبر MyFatoorah من صفحة تفاصيل الطلب بعد الحفظ."
+        "unpaidHint": "أُنشئ الطلب بحالة غير مدفوع. أصدر رابط دفع من صفحة تفاصيل الطلب بعد الحفظ."
       },
       "errors": {
         "noItems": "أضف منتجًا واحدًا على الأقل قبل إتمام الطلب",
@@ -1204,7 +1213,8 @@
         "markPaid": "وضع كمدفوع",
         "addNote": "إضافة ملاحظة",
         "refund": "استرداد",
-        "toolbarLabel": "إجراءات الطلب"
+        "toolbarLabel": "إجراءات الطلب",
+        "confirmInstapay": "تم استلام المبلغ"
       },
       "loading": "جاري تحميل الطلب…",
       "errors": {
@@ -1229,7 +1239,7 @@
         "button": "استرداد عبر مزوّد الدفع",
         "buttonTooltip": "استرداد المبلغ للعميل عبر مزوّد الدفع الأصلي",
         "modalTitle": "استرداد الطلب {orderNumber}؟",
-        "modalBodyIntro": "سيتم إرسال طلب استرداد بقيمة <b>{amount} {currency}</b> إلى مزوّد الدفع. عادةً ما تنعكس عملية الاسترداد على بطاقة العميل خلال 1-3 أيام عمل (يراجع فريق MyFatoorah المالي طلبات الاسترداد قبل تنفيذها).",
+        "modalBodyIntro": "سيتم إرسال طلب استرداد بقيمة <b>{amount} {currency}</b> إلى مزوّد الدفع. عادةً ما تنعكس عملية الاسترداد على بطاقة العميل خلال 1-3 أيام عمل (تراجع بعض البوابات طلبات الاسترداد قبل تنفيذها).",
         "modalBodySideEffects": "سيتم إعادة المخزون، وخصم استخدام الكوبون، وعكس نقاط الولاء، وإشعار العميل عبر البريد الإلكتروني. لا يمكن التراجع عن هذا الإجراء.",
         "reasonLabel": "السبب (اختياري، يظهر للعميل)",
         "reasonPlaceholder": "نفاد المخزون، طلب العميل، خصم مكرر…",
@@ -1258,7 +1268,53 @@
         "toastNoChange": "الاسترداد لا يزال {status} (لا تغيير)"
       },
       "paidFromWallet": "مدفوع من المحفظة",
-      "amountDue": "المبلغ المستحق"
+      "amountDue": "المبلغ المستحق",
+      "instapay": {
+        "title": "تحويل إنستاباي",
+        "waiting": "بانتظار التحويل. لا تؤكد إلا بعد أن ترى {amount} في حساب إنستاباي الخاص بك.",
+        "expires": "محجوز حتى {when}. بعدها يُلغى الطلب وتعود المنتجات للمخزون.",
+        "expired": "انتهت مهلة الحجز. سيُلغى الطلب ولا يمكن تأكيده.",
+        "customerReference": "المرجع الذي أدخله العميل",
+        "noReference": "لم يُدخل العميل مرجعاً بعد.",
+        "payTo": "حُوِّل إلى",
+        "orderRef": "يُذكر في ملاحظة التحويل"
+      },
+      "shipment": {
+        "title": "الشحنة",
+        "errorTitle": "خطأ",
+        "failed": "حدث خطأ ما. حاول مرة أخرى.",
+        "created": "تم إنشاء الشحنة",
+        "cancelled": "تم إلغاء الشحنة",
+        "cod": "الدفع عند الاستلام: {amount}",
+        "codWillCollect": "سيحصّل المندوب {amount} عند التسليم.",
+        "printLabel": "طباعة بوليصة الشحن",
+        "refresh": "تحديث التتبع",
+        "cancel": "إلغاء الشحنة",
+        "keep": "إبقاء",
+        "moveTo": "تحديث الحالة",
+        "chooseStatus": "اختر حالة",
+        "timeline": "التتبع",
+        "timelineEmpty": "لا توجد تحديثات تتبع بعد.",
+        "failedTitle": "تعذّر على شركة الشحن حجز هذه الشحنة",
+        "failedHint": "الطلب مسجّل ولم يتأثر. تمت المحاولة {attempts} مرة وستُعاد تلقائيًا؛ يمكنك إعادة المحاولة الآن أو الشحن بطريقة أخرى.",
+        "creating": "جارٍ الحجز لدى شركة الشحن…",
+        "wasCancelled": "تم إلغاء الشحنة السابقة. يمكنك إنشاء شحنة جديدة.",
+        "blocked": {
+          "instapay": "لا يمكن شحن طلب إنستاباي هذا قبل تأكيد وصول التحويل.",
+          "status": "لا يمكن شحن هذا الطلب في حالته الحالية."
+        },
+        "carrier": "شركة الشحن",
+        "manualOption": "يدوي (شركة توصيل أخرى)",
+        "manualName": "اسم شركة التوصيل",
+        "manualTracking": "رقم التتبع",
+        "create": "إنشاء شحنة",
+        "retry": "إعادة محاولة الحجز",
+        "confirmCancelTitle": "إلغاء هذه الشحنة؟",
+        "confirmCancelDescription": "سيُطلب من شركة الشحن إلغاء الطرد ويعود الطلب إلى حالة المعالجة.",
+        "forceCancelTitle": "لم تلغِ شركة الشحن الطرد",
+        "forceCancelDescription": "ربما استلم المندوب الطرد بالفعل. يمكنك إيقاف تتبعه هنا على أي حال، لكن قد يظل الطرد يُسلَّم.",
+        "forceCancel": "إلغاء هنا على أي حال"
+      }
     },
     "layout": {
       "title": "تخطيط المتجر",
@@ -1814,26 +1870,19 @@
       "linkCopied": "تم نسخ الرابط إلى الحافظة",
       "clipboardError": "تعذّر الوصول إلى الحافظة — انسخ الرابط يدويًا",
       "issueFailed": "تعذّر إصدار رابط الدفع",
-      "emailSent": "تم إرسال البريد الإلكتروني إلى {email}",
-      "customerFallback": "العميل",
       "copyAria": "نسخ رابط الدفع",
       "openAria": "فتح رابط الدفع",
       "issueNewLink": "إصدار رابط جديد",
       "buttonLabel": "رابط الدفع",
       "modalTitle": "إصدار رابط دفع",
-      "modalSubtitle": "الطلب {orderNumber} — إنشاء رابط MyFatoorah لتحصيل الدفع.",
+      "modalSubtitle": "الطلب {orderNumber} — إنشاء رابط دفع لتحصيل المبلغ.",
       "option": {
         "copyLink": {
           "title": "نسخ الرابط",
           "description": "أنشئ الرابط — انسخه وشاركه عبر واتساب أو البريد الإلكتروني أو أي وسيلة تفضّلها."
-        },
-        "email": {
-          "title": "إرسال عبر البريد الإلكتروني",
-          "description": "يرسل MyFatoorah رابط الدفع مباشرة إلى البريد الإلكتروني المسجّل للعميل."
         }
       },
       "issuing": "جارٍ إصدار رابط الدفع…",
-      "successEmailSent": "✓ تم إرسال البريد الإلكتروني إلى {email}",
       "successGenerated": "✓ تم إنشاء رابط الدفع",
       "paymentUrlLabel": "رابط الدفع",
       "copyButton": "نسخ",
@@ -2015,7 +2064,7 @@
           "directionLabel": "نوع التعديل",
           "credit": "إضافة رصيد",
           "debit": "خصم",
-          "amountLabel": "المبلغ (د.ك)",
+          "amountLabel": "المبلغ (ج.م)",
           "amountPlaceholder": "0.000",
           "noteLabel": "السبب",
           "notePlaceholder": "لماذا يتغير الرصيد؟ يظهر هذا لفريقك فقط.",
@@ -2173,7 +2222,7 @@
       },
       "paymentSettings": {
         "title": "إعدادات الدفع",
-        "description": "تكوين مزوّدي الدفع: Tap، MyFatoorah، Hesabe، UPayments"
+        "description": "تكوين مزوّدي الدفع: Paymob وKashier وفوري وإنستاباي والدفع عند الاستلام"
       },
       "shipping": {
         "title": "الشحن",
@@ -2225,7 +2274,7 @@
       },
       "whatsapp": {
         "title": "تكامل واتساب",
-        "description": "منصة فورس للأعمال · القوالب · تحديثات الطلبات · روابط الدفع"
+        "description": "منصة ابدأ للأعمال · القوالب · تحديثات الطلبات · روابط الدفع"
       },
       "staff": {
         "title": "أعضاء الفريق",
@@ -2233,7 +2282,7 @@
       },
       "whatsappBridge": {
         "title": "واتساب الأعمال",
-        "description": "اربط متجرك بمنصة فورس لواتساب الأعمال — الصق مفتاح الواجهة البرمجية واضبط القوالب"
+        "description": "اربط متجرك بمنصة ابدأ لواتساب الأعمال — الصق مفتاح الواجهة البرمجية واضبط القوالب"
       },
       "whatsappTemplates": {
         "title": "قوالب واتساب",
@@ -2241,7 +2290,7 @@
       },
       "whatsappPaymentLink": {
         "title": "رابط دفع واتساب",
-        "description": "أرسل للعميل رابط دفع بنقرة واحدة عبر واتساب — البديل الكويتي عن واتساب باي"
+        "description": "أرسل للعميل رابط دفع بنقرة واحدة عبر واتساب — البديل المصري عن واتساب باي"
       },
       "whatsappOrderUpdates": {
         "title": "تحديثات الطلبات",
@@ -2262,11 +2311,15 @@
       "merchantKeys": {
         "title": "مفاتيح MCP للتاجر",
         "description": "أصدر مفاتيح لإدارة هذا المتجر من Claude Code أو أي عميل MCP"
+      },
+      "billing": {
+        "title": "الفوترة",
+        "description": "الباقة والاستخدام والحدود"
       }
     },
     "metaCatalogCard": {
-      "provisionLabel": "إعداد تلقائي · مُدار بواسطة Force AI",
-      "provisionDescription": "ينشئ كتالوج تجاري جديد ضمن حساب Business Manager الرئيسي لـ Force AI ويملأ الحقول الثلاثة أعلاه. يغني المتجر عن التنقل داخل Meta Business Manager. ستحتاج لاحقًا إلى تقديم الكتالوج لمراجعة ميتا.",
+      "provisionLabel": "إعداد تلقائي · مُدار بواسطة ابدأ",
+      "provisionDescription": "ينشئ كتالوج تجاري جديد ضمن حساب Business Manager الرئيسي لـ ابدأ ويملأ الحقول الثلاثة أعلاه. يغني المتجر عن التنقل داخل Meta Business Manager. ستحتاج لاحقًا إلى تقديم الكتالوج لمراجعة ميتا.",
       "provisionButton": "إعداد تلقائي",
       "provisioningButton": "جارٍ الإعداد…"
     },
@@ -2530,16 +2583,26 @@
       "whatsapp": "رقم WhatsApp",
       "phone": "الهاتف",
       "phoneAr": "الهاتف (عرض عربي)",
-      "phonePlaceholder": "+965 XXXX XXXX",
+      "phonePlaceholder": "+20 1XX XXX XXXX",
       "phoneArPlaceholder": "٩٦٥ XXXX XXXX+",
       "address": "العنوان",
       "addressAr": "العنوان (بالعربية)",
-      "addressPlaceholder": "123 Street, City, Kuwait",
-      "addressArPlaceholder": "١٢٣ شارع، المدينة، الكويت",
+      "addressPlaceholder": "123 Street, City, Egypt",
+      "addressArPlaceholder": "١٢٣ شارع، المدينة، مصر",
       "addressUrl": "رابط الخريطة",
       "addressUrlPlaceholder": "https://maps.app.goo.gl/...",
       "addressUrlHint": "ألصق رابط Google Maps أو Apple Maps لموقع المتجر. سيصبح العنوان في تذييل المتجر قابلاً للنقر ويفتح هذا الرابط في تبويب جديد.",
-      "addressClickable": "اجعل العنوان قابلاً للنقر في تذييل المتجر"
+      "addressClickable": "اجعل العنوان قابلاً للنقر في تذييل المتجر",
+      "whatsappHint": "يتواصل معك العملاء على واتساب عبر رابط محادثة مجاني. رقم موبايل مصري (010 أو 011 أو 012 أو 015).",
+      "whatsappInvalid": "أدخل رقم موبايل مصري صحيح، مثل 01012345678.",
+      "waMeTitle": "أزرار واتساب",
+      "waMeNeedsNumber": "أضف رقم واتساب أعلاه لتفعيل هذه الأزرار.",
+      "waMeProductShare": "زر مشاركة المنتج / السؤال عنه",
+      "waMeProductShareHint": "زر واتساب في صفحة كل منتج برسالة جاهزة فيها اسم المنتج وسعره ورابطه.",
+      "waMeOrderQuestion": "زر «اسأل عن هذا الطلب»",
+      "waMeOrderQuestionHint": "يتيح للعميل مراسلتك بخصوص طلبه من صفحة الطلب.",
+      "waMeCodConfirm": "طلب تأكيد الدفع عند الاستلام",
+      "waMeCodConfirmHint": "بعد طلب الدفع عند الاستلام يظهر زر «أكّد على واتساب» ويُضاف إلى بريد الطلب."
     },
     "social": {
       "instagram": "Instagram",
@@ -2588,12 +2651,12 @@
       "fieldPublished": "منشور (مرئي للعملاء في المتجر)",
       "phName": "مثال: الفرع الرئيسي",
       "phNameAr": "مثال: الفرع الرئيسي",
-      "phCountry": "مثال: الكويت",
-      "phCountryAr": "مثال: الكويت",
+      "phCountry": "مثال: مصر",
+      "phCountryAr": "مثال: مصر",
       "phAddress": "مثال: قطعة 5، شارع سالم المبارك، السالمية",
       "phAddressAr": "مثال: قطعة 5، شارع سالم المبارك، السالمية",
-      "phPhone": "مثال: 2222 2222 965+",
-      "phWhatsapp": "مثال: 99999999 965+",
+      "phPhone": "مثال: +20 2 2222 2222",
+      "phWhatsapp": "مثال: +201012345678",
       "phHours": "مثال: السبت–الخميس 9ص–10م",
       "phHoursAr": "مثال: السبت–الخميس 9ص–10م",
       "phMapsUrl": "https://maps.google.com/...",
@@ -2688,10 +2751,10 @@
       "descriptionArPlaceholder": "احصل على خصم 20٪ على جميع منتجات الصيف",
       "typeLabel": "نوع الخصم *",
       "valuePercentageLabel": "النسبة (%) *",
-      "valueAmountLabel": "المبلغ (د.ك) *",
-      "minOrderLabel": "الحد الأدنى للطلب (د.ك)",
+      "valueAmountLabel": "المبلغ (ج.م) *",
+      "minOrderLabel": "الحد الأدنى للطلب (ج.م)",
       "minOrderPlaceholder": "10.000",
-      "maxDiscountLabel": "الحد الأقصى للخصم (د.ك)",
+      "maxDiscountLabel": "الحد الأقصى للخصم (ج.م)",
       "maxDiscountPlaceholder": "50.000",
       "usageLimitLabel": "إجمالي حد الاستخدام",
       "usageLimitPlaceholder": "100",
@@ -2729,10 +2792,10 @@
       "typePercentage": "نسبة مئوية",
       "typeFixed": "مبلغ ثابت",
       "valueLabelPercentage": "القيمة (%)",
-      "valueLabelFixed": "القيمة (د.ك)",
+      "valueLabelFixed": "القيمة (ج.م)",
       "valuePercentage": "{value}%",
       "valueFixed": "{value} فلس",
-      "maxDiscount": "الحد الأقصى للخصم (د.ك)",
+      "maxDiscount": "الحد الأقصى للخصم (ج.م)",
       "priority": "الأولوية",
       "startsAt": "تاريخ البدء",
       "expiresAt": "تاريخ الانتهاء",
@@ -2740,7 +2803,7 @@
       "targetingHeading": "الاستهداف",
       "customerGroup": "مجموعة العملاء",
       "allCustomers": "جميع العملاء",
-      "minOrderAmount": "الحد الأدنى لمبلغ الطلب (د.ك)",
+      "minOrderAmount": "الحد الأدنى لمبلغ الطلب (ج.م)",
       "minQuantity": "الحد الأدنى للكمية",
       "firstOrderOnlyLabel": "الطلب الأول فقط",
       "scopeProducts": "منتجات محددة",
@@ -2790,9 +2853,9 @@
       "pricingTypeFixedPrice": "سعر ثابت",
       "pricingTypePercentage": "نسبة خصم مئوية",
       "pricingTypeFixed": "مبلغ خصم ثابت",
-      "pricingValueLabelFixedPrice": "سعر الباقة (د.ك)",
+      "pricingValueLabelFixedPrice": "سعر الباقة (ج.م)",
       "pricingValueLabelPercentage": "الخصم (%)",
-      "pricingValueLabelFixed": "قيمة الخصم (د.ك)",
+      "pricingValueLabelFixed": "قيمة الخصم (ج.م)",
       "activeLabel": "الباقة مفعّلة",
       "startsAt": "تاريخ البدء",
       "expiresAt": "تاريخ الانتهاء",
@@ -2851,11 +2914,11 @@
     "carriers": {
       "page": {
         "title": "شركات الشحن",
-        "subtitle": "إعداد تكاملات التوصيل مع iCarry و Aramex"
+        "subtitle": "اربط بوسطة أو أرامكس، أو اشحن مع أي شركة توصيل يدويًا"
       },
       "empty": {
         "title": "شركات الشحن غير مفعّلة",
-        "description": "فعّل ميزة شركات الشحن في ميزات المتجر لإعداد تكاملات التوصيل مع iCarry و Aramex."
+        "description": "فعّل ميزة شركات الشحن في ميزات المتجر لإعداد التوصيل مع بوسطة وأرامكس والشحن اليدوي."
       },
       "shared": {
         "enabled": "مفعّل",
@@ -2867,7 +2930,7 @@
       },
       "icarry": {
         "title": "iCarry",
-        "subtitle": "توصيل داخل الكويت عبر iCarry",
+        "subtitle": "توصيل داخل مصر عبر iCarry",
         "fields": {
           "apiKey": "مفتاح API",
           "merchantId": "معرّف التاجر"
@@ -2879,37 +2942,42 @@
       },
       "aramex": {
         "title": "Aramex",
-        "subtitle": "توصيل دولي عبر Aramex",
+        "subtitle": "التوصيل عبر Aramex (يتم فحص التتبع تلقائيًا)",
         "fields": {
           "accountNumber": "رقم الحساب",
           "accountPin": "الرقم السري",
           "accountEntity": "الكيان",
           "accountCountryCode": "رمز الدولة",
           "username": "اسم المستخدم",
-          "password": "كلمة المرور"
+          "password": "كلمة المرور",
+          "sandbox": "استخدام بيئة الاختبار الخاصة بـ Aramex",
+          "codEgpConfirmed": "أكدت Aramex التحصيل عند الاستلام بالجنيه المصري"
         },
         "placeholders": {
           "accountNumber": "رقم حساب Aramex",
           "accountPin": "الرقم السري للحساب",
-          "accountEntity": "مثال: KWI",
-          "accountCountryCode": "مثال: KW",
+          "accountEntity": "مثال: CAI",
+          "accountCountryCode": "مثال: EG",
           "username": "اسم مستخدم حساب Aramex",
           "password": "كلمة مرور حساب Aramex"
-        }
+        },
+        "codNotice": "قد تقبل Aramex مبالغ الدفع عند الاستلام بالدولار الأمريكي فقط. إلى أن تؤكد Aramex كتابيًا أن حسابك يحصّل بالجنيه المصري وتفعّل هذا الخيار، لا يمكن شحن طلبات الدفع عند الاستلام عبر Aramex (الطلبات المدفوعة مسبقًا لا تتأثر)."
       },
       "pickup": {
         "title": "عنوان الاستلام",
         "fields": {
-          "area": "المنطقة",
-          "block": "القطعة",
-          "street": "الشارع",
-          "building": "المبنى"
+          "area": "الحي",
+          "name": "اسم جهة الاتصال",
+          "phone": "الهاتف",
+          "line1": "العنوان",
+          "city": "المحافظة"
         },
         "placeholders": {
-          "area": "مثال: السالمية",
-          "block": "مثال: 12",
-          "street": "مثال: شارع الخليج",
-          "building": "مثال: الحمراء"
+          "area": "مثال: الدقي",
+          "name": "اسم المتجر أو جهة الاتصال",
+          "phone": "01012345678",
+          "line1": "مثال: 12 شارع التحرير",
+          "city": "مثال: القاهرة"
         }
       },
       "shipments": {
@@ -2924,7 +2992,9 @@
         },
         "carrierNames": {
           "icarry": "iCarry",
-          "aramex": "Aramex"
+          "aramex": "Aramex",
+          "bosta": "Bosta",
+          "manual": "يدوي"
         },
         "statuses": {
           "created": "تم الإنشاء",
@@ -2934,7 +3004,9 @@
           "delivered": "تم التسليم",
           "failed": "فشل",
           "returned": "مُرجع",
-          "cancelled": "ملغى"
+          "cancelled": "ملغى",
+          "creating": "جارٍ الحجز",
+          "creation_failed": "فشل الحجز"
         },
         "columns": {
           "orderNumber": "رقم الطلب",
@@ -2969,12 +3041,35 @@
         "testFailedRetry": "فشل اختبار الاتصال.",
         "defaultSetTitle": "تم تعيين الافتراضي",
         "defaultSetDescription": "{carrier} أصبحت شركة الشحن الافتراضية.",
-        "defaultSetFailed": "تعذّر تعيين شركة الشحن الافتراضية."
+        "defaultSetFailed": "تعذّر تعيين شركة الشحن الافتراضية.",
+        "rotatedTitle": "تم تغيير المفتاح",
+        "rotatedDescription": "عنوان الرد القديم لم يعد يعمل، وستستخدم الطلبات الجديدة العنوان الجديد.",
+        "rotateFailed": "تعذّر تغيير المفتاح السري. احفظ إعدادات بوسطة أولًا."
+      },
+      "bosta": {
+        "title": "Bosta",
+        "subtitle": "التوصيل والدفع عند الاستلام عبر بوسطة",
+        "fields": {
+          "apiKey": "مفتاح API",
+          "businessLocationId": "معرّف موقع الاستلام",
+          "sandbox": "استخدام بيئة الاختبار الخاصة ببوسطة"
+        },
+        "placeholders": {
+          "apiKey": "مفتاح API الخاص ببوسطة",
+          "businessLocationId": "معرّف موقع الاستلام في بوسطة"
+        },
+        "webhookNotice": "تصلنا تحديثات التتبع تلقائيًا: يُحجز كل طلب توصيل بعنوان رد خاص بمتجرك. غيّر المفتاح السري أدناه إذا اشتبهت في تسريبه.",
+        "rotateSecret": "تغيير المفتاح السري للرد"
+      },
+      "manual": {
+        "title": "الشحن اليدوي",
+        "description": "متاح دائمًا في صفحة الطلب لأي شركة توصيل بدون تكامل: اكتب اسم الشركة ورقم التتبع الذي أعطتك إياه، ثم حدّث حالة الشحنة بنفسك. يُتابَع الدفع عند الاستلام بالطريقة نفسها.",
+        "codLink": "فتح مطابقة المبالغ المحصّلة"
       }
     },
     "page": {
       "title": "مناطق التوصيل والرسوم",
-      "subtitle": "حدّد رسوم التوصيل لكل منطقة في الكويت",
+      "subtitle": "حدّد رسوم التوصيل لكل منطقة في مصر",
       "intro": "منطقة الشحن هي مجموعة من المناطق التي تتقاضى عنها رسوم توصيل موحّدة. أنشئ منطقة لكل إقليم تشحن إليه ليتمكن صفحة الدفع من تسعير الشحن بدقّة.",
       "carriersBannerTitle": "شركات الشحن مفعّلة",
       "carriersBannerHint": "اضبط بيانات iCarry وAramex، واختبر الاتصال، وتابع الشحنات.",
@@ -3003,7 +3098,7 @@
       "status": "الحالة",
       "actions": "الإجراءات",
       "moreAreas": "+{count} أخرى",
-      "freeShippingOver": "فوق {amount} د.ك",
+      "freeShippingOver": "فوق {amount} ج.م",
       "dashPlaceholder": "-",
       "daysRange": "{min}-{max} يوم",
       "daysSingle": "{days} يوم",
@@ -3011,7 +3106,7 @@
       "inactive": "غير نشط",
       "edit": "تعديل",
       "delete": "حذف",
-      "priceWithCurrency": "{amount} د.ك"
+      "priceWithCurrency": "{amount} ج.م"
     },
     "modal": {
       "editTitle": "تعديل منطقة الشحن",
@@ -3023,12 +3118,12 @@
       "zoneNameArPlaceholder": "مثال: منطقة العاصمة",
       "areasLabel": "المناطق",
       "areasPlaceholder": "افصل بين المناطق بفواصل: العاصمة، حولي، الفروانية",
-      "addAllKuwaitGovernorates": "+ إضافة جميع محافظات الكويت",
+      "addAllEgyptGovernorates": "+ إضافة جميع محافظات مصر",
       "areasArLabel": "المناطق (بالعربية)",
       "areasArPlaceholder": "العاصمة، حولي، الفروانية",
-      "deliveryFeeLabel": "رسوم التوصيل (د.ك)",
+      "deliveryFeeLabel": "رسوم التوصيل (ج.م)",
       "deliveryFeePlaceholder": "1.000",
-      "freeShippingLabel": "شحن مجاني فوق (د.ك)",
+      "freeShippingLabel": "شحن مجاني فوق (ج.م)",
       "freeShippingPlaceholder": "25.000",
       "estimatedDaysLabel": "مدة التسليم المتوقعة (أيام)",
       "estimatedDaysMinPlaceholder": "الحد الأدنى",
@@ -3041,7 +3136,7 @@
     },
     "areaRates": {
       "sectionTitle": "مناطق التوصيل والرسوم",
-      "sectionSubtitle": "حدّد رسوم التوصيل لكل منطقة في الكويت. هذه هي الطريقة الموصى بها لتسعير التوصيل.",
+      "sectionSubtitle": "حدّد رسوم التوصيل لكل منطقة في مصر. هذه هي الطريقة الموصى بها لتسعير التوصيل.",
       "applyAll": "تطبيق الرسوم على جميع مناطق المحافظة:",
       "applyBtn": "تطبيق",
       "applyAllGlobal": "تطبيق على جميع المناطق (كل المحافظات)",
@@ -3053,7 +3148,7 @@
       "freeOver": "شحن مجاني فوق",
       "freeOverLabel": "حد الشحن المجاني",
       "optional": "اختياري",
-      "currency": "د.ك",
+      "currency": "ج.م",
       "save": "حفظ رسوم المناطق",
       "saving": "جارٍ الحفظ…",
       "savedTitle": "تم الحفظ",
@@ -3204,7 +3299,7 @@
       "lowStock": "مخزون منخفض",
       "outOfStock": "نفد من المخزون",
       "stockValue": "قيمة المخزون",
-      "kwdValue": "{value} د.ك"
+      "baseValue": "{value} ج.م"
     },
     "alertBanner": {
       "needAttention": "{count, plural, =1 {{count, number, latn} منتج يحتاج إلى انتباه} other {{count, number, latn} منتج يحتاجون إلى انتباه}}",
@@ -3227,7 +3322,7 @@
       "empty": "لا يوجد منتجات مُتتبَّعة",
       "emptyDescription": "تظهر هنا كل المنتجات التي تم تفعيل تتبّع المخزون لها. أضف منتجًا لبدء إدارة المخزون.",
       "adjustAction": "تعديل",
-      "kwdValue": "{value} د.ك",
+      "baseValue": "{value} ج.م",
       "filters": {
         "all": "الكل"
       },
@@ -3300,11 +3395,11 @@
   },
   "pwa": {
     "installHint": {
-      "title": "ثبّت تطبيق فورس أدمن لتلقي الإشعارات",
+      "title": "ثبّت تطبيق ابدأ أدمن لتلقي الإشعارات",
       "description": "يحتاج الآيفون لإضافة التطبيق للشاشة الرئيسية قبل أن يصلك الإشعار.",
       "step1": "اضغط أيقونة المشاركة في Safari",
       "step2": "اختر إضافة إلى الشاشة الرئيسية",
-      "step3": "افتح فورس أدمن من الشاشة الرئيسية واسمح بالإشعارات",
+      "step3": "افتح ابدأ أدمن من الشاشة الرئيسية واسمح بالإشعارات",
       "dismiss": "إغلاق"
     },
     "page": {
@@ -3436,7 +3531,7 @@
       "inviteInstagramLabel": "إنستغرام (اختياري)",
       "inviteTiktokLabel": "تيك توك (اختياري)",
       "inviteNotesLabel": "ملاحظات داخلية (اختياري)",
-      "inviteNotesPlaceholder": "مثال: مؤثر موضة كويتي، 50 ألف متابع",
+      "inviteNotesPlaceholder": "مثال: مؤثر موضة مصري، 50 ألف متابع",
       "inviteSubmit": "إضافة المسوّق",
       "inviting": "جارٍ الإضافة…",
       "inviteCancel": "إلغاء",
@@ -3500,8 +3595,8 @@
       "fields": {
         "defaultCommissionRate": "معدل العمولة الافتراضي (%)",
         "cookieDurationDays": "مدة ملف تعريف الارتباط (أيام)",
-        "minPayoutAmount": "الحد الأدنى لمبلغ الدفع (د.ك)",
-        "minPayoutEquivalent": "ما يعادل {amount} د.ك"
+        "minPayoutAmount": "الحد الأدنى لمبلغ الدفع (ج.م)",
+        "minPayoutEquivalent": "ما يعادل {amount} ج.م"
       },
       "toggles": {
         "autoApprove": {
@@ -3524,14 +3619,15 @@
         "available": "الرصيد المتاح:"
       },
       "fields": {
-        "amount": "المبلغ (د.ك)",
+        "amount": "المبلغ (ج.م)",
         "method": "الطريقة",
         "notes": "ملاحظات",
         "notesPlaceholder": "ملاحظات اختيارية لهذه الدفعة"
       },
       "methods": {
         "bank_transfer": "تحويل بنكي",
-        "knet": "KNET",
+        "instapay": "إنستاباي",
+        "wallet": "محفظة إلكترونية",
         "cash": "نقدًا",
         "manual": "يدوي"
       }
@@ -3619,7 +3715,7 @@
       "instructionsTitle": "كيفية استيراد المنتجات",
       "step1": "نزّل قالب CSV باستخدام الزر أدناه",
       "step2": "املأ بيانات منتجاتك متبعًا تنسيق القالب",
-      "step3": "الأسعار بالدينار الكويتي (مثال: 12.500)",
+      "step3": "الأسعار بالجنيه المصري (مثال: 12.500)",
       "step4": "لتعدد الفئات/الوسوم/الصور، افصل بفواصل داخل علامات الاقتباس",
       "step5": "ارفع ملف CSV المكتمل وانقر على استيراد",
       "downloadTemplate": "تنزيل القالب",
@@ -3670,7 +3766,7 @@
         "allFields": "جميع حقول المنتج مضمنة في التصدير",
         "commaSeparated": "الفئات والوسوم والصور مفصولة بفواصل داخل أعمدتها",
         "reImport": "يمكن تعديل الملف المصدّر وإعادة استيراده لتحديث المنتجات",
-        "pricesInFils": "الأسعار بالدينار الكويتي (مثال: 12.500)"
+        "pricesInFils": "الأسعار بالجنيه المصري (مثال: 12.500)"
       }
     },
     "errors": {
@@ -3859,7 +3955,7 @@
       "recovered": "طلبوا لاحقًا",
       "recoveryRate": "نسبة من طلبوا لاحقًا",
       "recoveredRevenue": "إيرادات الطلبات اللاحقة",
-      "kwdValue": "{amount} د.ك",
+      "baseValue": "{amount} ج.م",
       "recoveryNotTracked": "غير متتبَّع"
     },
     "status": {
@@ -3890,7 +3986,7 @@
         "maxDiscount": "الحد الأقصى للخصم",
         "expiry": "الانتهاء",
         "noLimit": "بلا حد",
-        "kwd": "د.ك",
+        "major": "ج.م",
         "hours": "ساعة"
       }
     },
@@ -4024,7 +4120,8 @@
         "ALREADY_REFUNDED": "تم استرداد هذه الدفعة بالكامل مسبقاً.",
         "REFUND_EXCEEDS_REMAINING": "مبلغ الاسترداد أكبر من المتبقي غير المسترد من هذه الدفعة. حدّث الصفحة — فقد تم استرداد جزء منها بطريقة أخرى.",
         "INVALID_REFUND_AMOUNT": "لا يوجد مبلغ استرداد لهذا المرتجع. حدّد مبلغ الاسترداد قبل إكماله.",
-        "AMBIGUOUS_PAYMENT": "مرجع هذه الدفعة يطابق أكثر من دفعة واحدة، لذا لم يُسترد أي مبلغ ولم يكتمل الإرجاع. استرده من لوحة تحكم مزوّد الدفع وتواصل مع الدعم."
+        "AMBIGUOUS_PAYMENT": "مرجع هذه الدفعة يطابق أكثر من دفعة واحدة، لذا لم يُسترد أي مبلغ ولم يكتمل الإرجاع. استرده من لوحة تحكم مزوّد الدفع وتواصل مع الدعم.",
+        "MANUAL_PROVIDER_REFUND": "دُفع هذا الطلب عبر إنستاباي ولا يمكن استرداده من خلال النظام. أعد المبلغ من تطبيق إنستاباي الخاص بك، ثم أكمل الإرجاع بخيار «تم الاسترداد — تسجيل فقط»."
       }
     },
     "modal": {
@@ -4516,7 +4613,7 @@
     },
     "earning": {
       "title": "كسب النقاط",
-      "pointsPerDinar": "النقاط لكل 1 د.ك يُنفق",
+      "pointsPerMajorUnit": "النقاط لكل 1 ج.م يُنفق",
       "signupBonus": "مكافأة التسجيل",
       "referralBonus": "مكافأة الإحالة",
       "reviewBonus": "مكافأة التقييم",
@@ -4533,8 +4630,8 @@
     },
     "redemption": {
       "title": "الاستبدال",
-      "pointValue": "قيمة النقطة (د.ك)",
-      "pointValueHint": "1 نقطة = {value} د.ك",
+      "pointValue": "قيمة النقطة (ج.م)",
+      "pointValueHint": "1 نقطة = {value} ج.م",
       "minRedeem": "الحد الأدنى من النقاط للاستبدال",
       "maxPercent": "الحد الأقصى % من الطلب",
       "expirationMonths": "الانتهاء (أشهر)",
@@ -4638,18 +4735,6 @@
       "connectionError": "تعذّر الاتصال بالخادم. يرجى التحقق من الاتصال والمحاولة مرة أخرى.",
       "retry": "إعادة المحاولة"
     },
-    "providers": {
-      "tapName": "Tap Payments",
-      "tapNameAr": "تاب للمدفوعات",
-      "myfatoorahName": "MyFatoorah",
-      "myfatoorahNameAr": "ماي فاتورة",
-      "hesabeName": "Hesabe",
-      "hesabeNameAr": "حسابي",
-      "upaymentsName": "UPayments",
-      "upaymentsNameAr": "يو بيمنتس",
-      "codName": "الدفع عند الاستلام",
-      "codNameAr": "الدفع عند الاستلام"
-    },
     "toggle": {
       "enabled": "مفعّل",
       "disabled": "معطّل"
@@ -4660,13 +4745,15 @@
       "displayNamePlaceholder": "Cash on Delivery",
       "displayNameArLabel": "الاسم المعروض (العربية)",
       "displayNameArPlaceholder": "الدفع عند الاستلام",
-      "fixedFeeLabel": "رسوم إضافية (د.ك)",
+      "fixedFeeLabel": "رسوم إضافية (ج.م)",
       "fixedFeePlaceholder": "0.000",
-      "fixedFeeEquals": "= {amount} د.ك",
+      "fixedFeeEquals": "= {amount} ج.م",
       "fixedFeeHelpPrefix": "رسوم إضافية تُضاف إلى الطلب عند دفع العميل نقدًا عند الاستلام. أدخل",
       "fixedFeeHelpZero": "0",
       "fixedFeeHelpSuffix": "لإلغاء الرسوم.",
-      "infoBanner": "تتجاوز طلبات الدفع عند الاستلام بوابة الدفع. يؤكد العميل الطلب، وتقوم أنت بتعليمه كمدفوع من صفحة الطلبات عند استلام المبلغ."
+      "infoBanner": "تتجاوز طلبات الدفع عند الاستلام بوابة الدفع. يؤكد العميل الطلب، وتقوم أنت بتعليمه كمدفوع من صفحة الطلبات عند استلام المبلغ.",
+      "percentLabel": "نسبة رسوم إضافية (٪)",
+      "percentHelp": "اختياري: نسبة من إجمالي الطلب تُضاف إلى الرسم الثابت وتُقرَّب إلى أقرب قرش."
     },
     "gateway": {
       "apiKeyLabel": "مفتاح API",
@@ -4676,7 +4763,11 @@
       "webhookSecretLabel": "سر webhook",
       "webhookSecretPlaceholder": "أدخل سر webhook",
       "webhookUrlLabel": "رابط الـ Webhook (الصقه في لوحة مزود الدفع)",
-      "webhookUrlDescription": "أضف هذا الرابط في لوحة مزود الدفع الخاص بك حتى تصل أحداث الدفع إلى متجرك. رابط واحد يخدم جميع المتاجر — يربط النظام كل عملية دفع بمتجرك عبر رقم العملية الصادر من المزود، ثم يتحقّق من التوقيع باستخدام «سر webhook» الخاص بمتجرك (المُحدَّد أعلاه).",
+      "webhookUrlDescription": {
+        "paymob": "في لوحة Paymob، الصق هذا الرابط في «Transaction processed callback» لتكاملاتك. تضيف Paymob توقيعها إليه، ونتحقق منه بسر HMAC الخاص بك (أعلاه).",
+        "kashier": "يُرسَل هذا الرابط إلى Kashier مع كل عملية دفع، فلا حاجة للصقه. يظهر هنا للعلم فقط: تُتحقَّق أحداث الدفع بمفتاح Payment API الخاص بك (أعلاه).",
+        "fawry": "في بوابة تجّار فوري، اضبط هذا الرابط كرابط إشعارات الخادم. نتحقق من كل إشعار بمفتاحك الآمن (أعلاه)."
+      },
       "webhookUrlCopy": "نسخ",
       "webhookUrlCopied": "تم النسخ!",
       "merchantIdLabel": "معرّف التاجر",
@@ -4694,7 +4785,83 @@
       "unableToConnect": "تعذّر الاتصال بالخادم"
     },
     "save": "حفظ",
-    "saving": "جارٍ الحفظ..."
+    "saving": "جارٍ الحفظ...",
+    "instapay": {
+      "handleLabel": "عنوان إنستاباي (IPA)",
+      "handlePlaceholder": "yourname@instapay",
+      "phoneLabel": "رقم الموبايل المرتبط",
+      "phonePlaceholder": "01012345678",
+      "accountNameLabel": "اسم الحساب الظاهر في التحويل",
+      "expiryLabel": "احتفظ بالطلب لمدة (ساعات)",
+      "expiryHelp": "إن لم تؤكد التحويل خلال هذه المدة يُلغى الطلب وتعود المنتجات للبيع ويُبلَّغ العميل. الافتراضي ٤٨.",
+      "noteEnLabel": "ملاحظة للعميل (الإنجليزية)",
+      "noteArLabel": "ملاحظة للعميل (العربية)",
+      "infoBanner": "لا توجد واجهة برمجية لإنستاباي للتجار. يحوّل العميل إلى عنوانك أو رقمك ويذكر رقم الطلب، وتؤكد أنت «تم استلام المبلغ» من الطلب (لوحة الإدارة أو تطبيق الطلبات). حتى ذلك الحين يبقى الطلب محجوزاً ولا يُشحن ولا يُحتسب ضمن الإيرادات.",
+      "needHandleOrPhone": "أضف عنوان إنستاباي أو رقم هاتف قبل تفعيل إنستاباي."
+    },
+    "health": {
+      "healthy": "يعمل",
+      "degraded": "يواجه مشكلة",
+      "down": "متوقف: مخفي من الدفع",
+      "unknown": "لم يُفحص بعد",
+      "note": "عند تعطّل مزوّد الدفع أو انتهاء مهلته تُخفى هذه الطريقة وحدها من صفحة الدفع لدقيقة أو دقيقتين، وتبقى بقية الطرق (مثل الدفع عند الاستلام) تعمل."
+    },
+    "paymob": {
+      "secretKeyLabel": "المفتاح السري",
+      "secretKeyHelp": "لوحة Paymob > الإعدادات > معلومات الحساب. يُستخدم في كل طلب من الخادم.",
+      "secretKeyPlaceholder": "الصق المفتاح السري",
+      "hmacLabel": "سر HMAC",
+      "hmacHelp": "لوحة Paymob > الإعدادات > معلومات الحساب > HMAC. يتحقّق من إشعارات Paymob.",
+      "hmacPlaceholder": "الصق سر HMAC",
+      "publicKeyLabel": "المفتاح العام",
+      "publicKeyHelp": "يظهر في رابط الدفع وليس سرّاً.",
+      "publicKeyPlaceholder": "الصق المفتاح العام",
+      "integrationsTitle": "طرق الدفع",
+      "integrationsHelp": "الصق معرّف التكامل (Integration ID) لكل طريقة تريد عرضها (لوحة Paymob > Developers > Payment Integrations). اترك الطريقة فارغة لإخفائها.",
+      "integrationPlaceholder": "معرّف التكامل",
+      "methods": {
+        "card": "بطاقة",
+        "meeza": "ميزة",
+        "wallet": "محفظة إلكترونية (فودافون كاش، أورنج، اتصالات)",
+        "valu": "تقسيط فاليو"
+      }
+    },
+    "kashier": {
+      "merchantIdLabel": "معرّف التاجر (MID)",
+      "merchantIdHelp": "لوحة Kashier > Integrations. يبدو هكذا: MID-1234-56.",
+      "merchantIdPlaceholder": "MID-...",
+      "apiKeyLabel": "مفتاح Payment API",
+      "apiKeyHelp": "لوحة Kashier > Integrations. يتحقّق أيضاً من إشعارات Kashier.",
+      "apiKeyPlaceholder": "الصق مفتاح Payment API",
+      "secretKeyLabel": "المفتاح السري",
+      "secretKeyHelp": "لوحة Kashier > Integrations. يُستخدم في كل طلب من الخادم.",
+      "secretKeyPlaceholder": "الصق المفتاح السري",
+      "displayLabel": "لغة صفحة الدفع",
+      "display": {
+        "ar": "العربية",
+        "en": "الإنجليزية"
+      },
+      "methodsTitle": "الطرق في صفحة الدفع",
+      "methods": {
+        "card": "بطاقة",
+        "wallet": "محفظة إلكترونية"
+      }
+    },
+    "fawry": {
+      "merchantCodeLabel": "كود التاجر",
+      "merchantCodeHelp": "تمنحه فوري عند فتح حسابك.",
+      "merchantCodePlaceholder": "الصق كود التاجر",
+      "secureKeyLabel": "المفتاح الآمن",
+      "secureKeyHelp": "يوقّع كل طلب ويتحقّق من كل إشعار من فوري.",
+      "secureKeyPlaceholder": "الصق المفتاح الآمن",
+      "expiryLabel": "مدة صلاحية كود الدفع (ساعات)",
+      "expiryHelp": "المدة التي يملكها العميل لدفع الكود في أي منفذ. الافتراضي ٧٢.",
+      "methodsTitle": "الطرق",
+      "methods": {
+        "payatfawry": "ادفع في فوري (كود دفع)",
+        "card": "بطاقة"
+      }
+    }
   },
   "hero": {
     "page": {
@@ -4748,9 +4915,9 @@
       "preview": "معاينة",
       "content": "المحتوى",
       "textEnglish": "نص الإعلان (الإنجليزية)",
-      "textEnglishPlaceholder": "Free shipping on orders over 10 KWD!",
+      "textEnglishPlaceholder": "Free shipping on orders over 10 EGP!",
       "textArabic": "نص الإعلان (العربية)",
-      "textArabicPlaceholder": "شحن مجاني للطلبات فوق ١٠ د.ك!",
+      "textArabicPlaceholder": "شحن مجاني للطلبات فوق ١٠ ج.م!",
       "linkUrl": "رابط URL (اختياري)",
       "linkUrlPlaceholder": "https://example.com/sale",
       "linkUrlHint": "سيرتبط الشريط بالكامل بهذا الرابط عند النقر",
@@ -4909,15 +5076,15 @@
       "arBadge": "AR",
       "advanced": "متقدّم",
       "metaTitle": "عنوان الميتا",
-      "metaTitlePlaceholder": "My Store — Best Products in Kuwait",
+      "metaTitlePlaceholder": "My Store — Best Products in Egypt",
       "metaTitleHint": "يظهر في تبويبات المتصفح ونتائج البحث. ابقَ تحت {max} حرف لأفضل النتائج.",
       "metaDescription": "وصف الميتا",
-      "metaDescriptionPlaceholder": "Discover our wide range of products with fast delivery across Kuwait...",
+      "metaDescriptionPlaceholder": "Discover our wide range of products with fast delivery across Egypt...",
       "metaDescriptionHint": "يظهر في مقتطفات نتائج البحث. ابقَ تحت {max} حرف لأفضل النتائج.",
       "metaTitleAr": "عنوان الميتا (العربية)",
-      "metaTitleArPlaceholder": "متجري — أفضل المنتجات في الكويت",
+      "metaTitleArPlaceholder": "متجري — أفضل المنتجات في مصر",
       "metaDescriptionAr": "وصف الميتا (العربية)",
-      "metaDescriptionArPlaceholder": "اكتشف مجموعتنا الواسعة من المنتجات مع توصيل سريع في الكويت...",
+      "metaDescriptionArPlaceholder": "اكتشف مجموعتنا الواسعة من المنتجات مع توصيل سريع في مصر...",
       "ogImage": "رابط صورة OG",
       "ogImagePlaceholder": "https://example.com/og-image.jpg",
       "ogImageHint": "الصورة التي تظهر عند مشاركة متجرك على وسائل التواصل. مستحسن: 1200×630 بكسل. اتركها فارغة وسننشئ واحدة تلقائياً من شعار متجرك واسمه.",
@@ -4925,7 +5092,7 @@
       "twitterPlaceholder": "yourstorehandle",
       "googleSiteVerification": "التحقق من Google Search Console (للنطاق المخصص فقط)",
       "googleSiteVerificationPlaceholder": "الصق وسم meta كاملاً أو رمز التحقق فقط",
-      "googleSiteVerificationHint": "متجرك موثّق بالفعل على store.force-ai.co — لا تحتاج إلى هذا الحقل إلا بعد ربط نطاق مخصص (مثل yourstore.com).\n1. افتح Google Search Console وأضف نطاقك المخصص كخاصية URL-prefix.\n2. اختر طريقة التحقق \"HTML tag\".\n3. الصق وسم meta كاملاً (أو رمز content فقط) هنا واحفظ.\n4. اضغط Verify في Search Console — المتجر سيكون قد بدأ بإصدار الوسم تلقائياً.",
+      "googleSiteVerificationHint": "متجرك موثّق بالفعل على ebda.app — لا تحتاج إلى هذا الحقل إلا بعد ربط نطاق مخصص (مثل yourstore.com).\n1. افتح Google Search Console وأضف نطاقك المخصص كخاصية URL-prefix.\n2. اختر طريقة التحقق \"HTML tag\".\n3. الصق وسم meta كاملاً (أو رمز content فقط) هنا واحفظ.\n4. اضغط Verify في Search Console — المتجر سيكون قد بدأ بإصدار الوسم تلقائياً.",
       "successMessage": "تم حفظ إعدادات SEO بنجاح",
       "failedMessage": "تعذّر حفظ إعدادات SEO",
       "connectionError": "تعذّر الاتصال بالخادم",
@@ -4933,10 +5100,10 @@
       "aeoTitle": "تحسين نتائج محركات البحث الذكية",
       "aeoHint": "تم تعبئة البيانات تلقائياً بواسطة نظام البحث الذكي، تقدر تعدل عليها حسب كل جهة.",
       "aeoLabelEn": "وصف الميتا الخاص بـ AEO (إنجليزي)",
-      "aeoPlaceholderEn": "Conversational answer-engine copy. e.g. «Wady Aljuz is a Kuwait-based online grocery store specializing in…»",
+      "aeoPlaceholderEn": "Conversational answer-engine copy. e.g. «Wady Aljuz is an Egypt-based online grocery store specializing in…»",
       "aeoHintText": "اترك الحقل فارغاً ليقوم نظام AEO بتعبئته تلقائياً. أسلوب إجابة مباشر، 130–160 حرف.",
       "aeoLabelAr": "وصف ميتا لـ AEO (عربي)",
-      "aeoPlaceholderAr": "نسخة عربية لمحركات الإجابة — مثال: «وادي الجوز متجر إلكتروني كويتي متخصص في…»",
+      "aeoPlaceholderAr": "نسخة عربية لمحركات الإجابة — مثال: «وادي الجوز متجر إلكتروني مصري متخصص في…»",
       "senderPrefixPlaceholder": "noreply",
       "senderPrefix": "بادئة البريد الإلكتروني",
       "senderPrefixHint": "الجزء قبل @ في البريد الصادر. الافتراضي: noreply. أمثلة: hello, orders, support. حروف وأرقام ونقطة وشرطة وشرطة سفلية فقط.",
@@ -5046,6 +5213,8 @@
       "dnsPropagation": "قد تستغرق تغييرات DNS حتى 48 ساعة للانتشار.",
       "checkDns": "فحص DNS",
       "checkingDns": "جارٍ الفحص...",
+      "claimPending": "ننتظر التحقق من DNS للنطاق {domain}. أضف سجلات DNS أدناه؛ النطاق غير مفعّل بعد. يتم تحرير الطلب تلقائيًا إذا لم يتم التحقق خلال 72 ساعة.",
+      "claimFailed": "تعذّر التحقق من النطاق {domain}. راجع سجلات DNS أدناه ثم احفظ النطاق مرة أخرى. يتم تحرير الطلب غير المتحقق منه تلقائيًا بعد 72 ساعة.",
       "verifiedMessage": "تم التحقق من النطاق وتفعيل SSL. يمكن الوصول إلى متجرك عبر https://{domain}",
       "noDomain": "لم يتم إعداد نطاق مخصّص. يمكن الوصول إلى هذا المتجر عبر النطاق الفرعي الافتراضي.",
       "dnsTableLabel": "سجلات DNS",
@@ -5299,7 +5468,7 @@
   "auth": {
     "login": {
       "title": "تسجيل دخول المسؤول",
-      "subtitle": "سجّل الدخول للوصول إلى منصة Force AI",
+      "subtitle": "سجّل الدخول للوصول إلى منصة ابدأ",
       "email": "عنوان البريد الإلكتروني",
       "emailPlaceholder": "you@example.com",
       "password": "كلمة المرور",
@@ -5307,8 +5476,8 @@
       "signIn": "تسجيل الدخول",
       "signingIn": "جارٍ تسجيل الدخول…",
       "loginFailed": "فشل تسجيل الدخول",
-      "footer": "لوحة إدارة منصة Force AI",
-      "brandTitle": "متجر Force AI",
+      "footer": "لوحة إدارة منصة ابدأ",
+      "brandTitle": "متجر ابدأ",
       "brandSubtitle": "أدر متاجرك الإلكترونية ومستخدميك وإعدادات المنصة من لوحة تحكم واحدة قوية.",
       "statActiveStores": "المتاجر النشطة",
       "statProducts": "المنتجات",
@@ -5457,7 +5626,8 @@
         "staff": "الموظفون والصلاحيات",
         "announcement": "شريط الإعلان",
         "agentKey": "مفتاح وكيل الذكاء الاصطناعي",
-        "merchantKeys": "مفاتيح MCP للتاجر"
+        "merchantKeys": "مفاتيح MCP للتاجر",
+        "billing": "الفوترة"
       }
     },
     "notificationBell": {
@@ -5577,9 +5747,9 @@
       "closeSidebar": "إغلاق الشريط الجانبي",
       "goBack": "رجوع",
       "viewStore": "عرض المتجر",
-      "forcePlatformBrand": "AI Platform",
+      "forcePlatformBrand": "Platform",
       "forceAdminBrand": "Admin",
-      "forceBrandPrefix": "Force",
+      "forceBrandPrefix": "ابدأ",
       "languageLabel": "اللغة",
       "focusMode": {
         "enterFocusMode": "وضع التركيز",
@@ -5592,7 +5762,9 @@
       "staffBadge": "موظف",
       "staffBadgeHint": "صلاحية محدودة",
       "hubSectionsAriaLabel": "أقسام المركز",
-      "navPlatformUsageHistory": "سجل الاستخدام (المنصة)"
+      "navPlatformUsageHistory": "سجل الاستخدام (المنصة)",
+      "navPlatformPlans": "الباقات (المنصة)",
+      "navPlatformBillingEvents": "سجل الفوترة (المنصة)"
     },
     "errorState": {
       "defaultTitle": "حدث خطأ ما",
@@ -5603,7 +5775,7 @@
       "ariaLabel": "اللغة"
     },
     "brand": {
-      "forceMediaAlt": "Force AI"
+      "forceMediaAlt": "Ebda"
     },
     "aiUsageSummaryCard": {
       "loading": "جاري تحميل رصيد الذكاء الاصطناعي...",
@@ -5855,7 +6027,7 @@
       "expenses": "المصروفات",
       "net": "صافي الدخل",
       "stockValue": "قيمة المخزون",
-      "disabledVariantStockValue": "محتجزة في متغيّرات معطّلة: {amount} د.ك — غير محسوبة ضمن المخزون",
+      "disabledVariantStockValue": "محتجزة في متغيّرات معطّلة: {amount} ج.م — غير محسوبة ضمن المخزون",
       "cash": "النقدية بحسب الحساب",
       "balanceSheet": "الميزانية العمومية",
       "assets": "الأصول",
@@ -5905,9 +6077,9 @@
       "date": "التاريخ",
       "vendor": "المورد",
       "category": "الفئة",
-      "amount": "المبلغ (د.ك)",
-      "tax": "الضريبة (د.ك)",
-      "total": "الإجمالي (د.ك)",
+      "amount": "المبلغ (ج.م)",
+      "tax": "الضريبة (ج.م)",
+      "total": "الإجمالي (ج.م)",
       "status": "الحالة",
       "allStatuses": "كل الحالات",
       "receiptOnly": "مسودات الإيصالات فقط (أي تاريخ)",
@@ -5938,9 +6110,9 @@
         "selectSupplier": "(بدون مورد)",
         "selectExpenseAccount": "اختر فئة المصروف",
         "selectPaidFromAccount": "اختر حساب الدفع",
-        "amount": "المبلغ (د.ك)",
-        "taxAmount": "الضريبة (د.ك)",
-        "totalInKwd": "الإجمالي (د.ك)",
+        "amount": "المبلغ (ج.م)",
+        "taxAmount": "الضريبة (ج.م)",
+        "totalInBase": "الإجمالي (ج.م)",
         "notes": "ملاحظات (إنجليزي)",
         "notesAr": "ملاحظات (عربي)",
         "receiptUrl": "رابط الإيصال",
@@ -5960,7 +6132,7 @@
         "expenseCategoryLabel": "فئة المصروف",
         "paidFromAccountLabel": "الدفع من حساب",
         "currencyLabel": "العملة",
-        "fxRateLabel": "سعر الصرف (1 {currency} = ؟ د.ك)",
+        "fxRateLabel": "سعر الصرف (1 {currency} = ؟ ج.م)",
         "fxRateHint": "أدخل سعر الصرف من البنك أو تاريخ الإيصال.",
         "fxRatePlaceholder": "مثال: 0.30700",
         "errorExpenseDateRequired": "تاريخ المصروف مطلوب",
@@ -5970,7 +6142,7 @@
         "errorFxRateRequired": "سعر الصرف مطلوب لمصروفات {currency} ويجب أن يكون رقمًا موجبًا",
         "uploadFailedGeneric": "فشل الرفع ({status})",
         "uploadFailedRetry": "فشل الرفع. يرجى المحاولة مرة أخرى.",
-        "totalInKwdConverted": "الإجمالي بالدينار الكويتي (محوّل بسعر {rate}):",
+        "totalInBaseConverted": "الإجمالي بالجنيه المصري (محوّل بسعر {rate}):",
         "minorUnitsSuffix": "(وحدات {currency} الصغرى)"
       }
     },
@@ -6014,7 +6186,7 @@
         "equity": "حقوق الملكية",
         "totalEquity": "إجمالي حقوق الملكية",
         "balanced": "الميزانية مثبّتة — الأصول = الالتزامات + حقوق الملكية",
-        "unbalanced": "الميزانية غير متوازنة بفارق {amount} د.ك — الأصول ≠ الالتزامات + حقوق الملكية",
+        "unbalanced": "الميزانية غير متوازنة بفارق {amount} ج.م — الأصول ≠ الالتزامات + حقوق الملكية",
         "currentEarnings": "الأرباح المحتجزة والحالية",
         "currentEarningsHint": "الإيرادات ناقص المصروفات حتى هذا التاريخ (لم تُقفل بعد في حساب حقوق الملكية)"
       },
@@ -6068,8 +6240,8 @@
         "manualMatched": "مطابق يدوياً",
         "unmatched": "غير مطابق",
         "ignored": "متجاهل",
-        "matchedAmount": "المبلغ المطابق (د.ك)",
-        "unmatchedAmount": "المبلغ غير المطابق (د.ك)"
+        "matchedAmount": "المبلغ المطابق (ج.م)",
+        "unmatchedAmount": "المبلغ غير المطابق (ج.م)"
       },
       "import": {
         "title": "استيراد كشف البنك",
@@ -6089,7 +6261,7 @@
       "tx": {
         "date": "التاريخ",
         "description": "البيان",
-        "amount": "المبلغ (د.ك)",
+        "amount": "المبلغ (ج.م)",
         "direction": "الاتجاه",
         "ref": "المرجع",
         "matchStatus": "حالة المطابقة",
@@ -6146,17 +6318,17 @@
     },
     "fxRates": {
       "title": "سجل أسعار الصرف",
-      "subtitle": "تسجيل أسعار صرف المعاملات غير الكويتية",
+      "subtitle": "تسجيل أسعار صرف المعاملات غير المصرية",
       "multiCurrencyAccounting": "المحاسبة متعددة العملات",
       "featureInactive": "الميزة غير مفعّلة",
       "featureInactiveDesc": "ميزة المحاسبة — متعددة العملات غير مفعّلة لهذا المتجر. تواصل مع مدير حسابك لتفعيلها ضمن خطة Enterprise.",
       "recordNewRate": "تسجيل سعر جديد",
-      "rateMeaning": "معنى السعر: 1 وحدة من العملة المختارة = السعر بالدينار الكويتي.",
-      "rateExample": "مثال: الدولار الأمريكي بسعر 0.307 يعني 1 دولار = 0.307 دينار كويتي (307 فلوس).",
+      "rateMeaning": "معنى السعر: 1 وحدة من العملة المختارة = السعر بالجنيه المصري.",
+      "rateExample": "مثال: الدولار الأمريكي بسعر 0.307 يعني 1 دولار = 0.307 جنيه مصري (307 فلوس).",
       "currencyLabel": "العملة",
-      "rateLabel": "السعر (د.ك مقابل 1 {currency})",
+      "rateLabel": "السعر (ج.م مقابل 1 {currency})",
       "rateDateLabel": "تاريخ السعر",
-      "ratePreview": "معاينة: 1 {currency} = {rate} د.ك | 100 {currency} = {rate100} د.ك",
+      "ratePreview": "معاينة: 1 {currency} = {rate} ج.م | 100 {currency} = {rate100} ج.م",
       "saving": "جارٍ الحفظ…",
       "saveRate": "حفظ السعر",
       "rateSaved": "تم حفظ السعر بنجاح.",
@@ -6167,7 +6339,7 @@
       "allCurrencies": "جميع العملات",
       "noRates": "لا توجد أسعار مسجّلة بعد. أضف السعر الأول أعلاه.",
       "colCurrency": "العملة",
-      "colRate": "السعر (د.ك)",
+      "colRate": "السعر (ج.م)",
       "colDate": "التاريخ",
       "colRecorded": "وقت التسجيل",
       "loading": "جارٍ التحميل…"
@@ -6295,7 +6467,7 @@
       "type": "النوع",
       "status": "الحالة",
       "date": "التاريخ",
-      "impact": "الأثر (د.ك)",
+      "impact": "الأثر (ج.م)",
       "types": {
         "cycle_count": "جرد دوري",
         "damage": "تلف",
@@ -6410,7 +6582,7 @@
       "status": "الحالة",
       "expectedDate": "المتوقع",
       "receivedDate": "تاريخ الاستلام",
-      "total": "الإجمالي (د.ك)",
+      "total": "الإجمالي (ج.م)",
       "createdDate": "تاريخ الإنشاء",
       "statuses": {
         "draft": "مسودة",
@@ -6425,8 +6597,8 @@
         "expectedDateLabel": "تاريخ الاستلام المتوقع",
         "addItem": "+ إضافة بند",
         "qty": "الكمية",
-        "unitCost": "تكلفة الوحدة (د.ك)",
-        "lineTotal": "إجمالي البند (د.ك)",
+        "unitCost": "تكلفة الوحدة (ج.م)",
+        "lineTotal": "إجمالي البند (ج.م)",
         "subtotal": "المجموع الفرعي",
         "submit": "إنشاء مسودة أمر الشراء",
         "notesLabel": "ملاحظات (إنجليزي)",
@@ -6516,9 +6688,9 @@
       "description": "المنتجات بطيئة الحركة مع اقتراحات تصفية مدعومة بالذكاء الاصطناعي.",
       "lastScanned": "آخر فحص {time}",
       "rescanNow": "فحص الآن",
-      "empty": "لا توجد بضاعة راكدة. يُحدَّد المنتج عندما يكون متوفراً في المخزون ولم يُبَع منذ 90 يوماً أو أكثر (المنتج الذي لم يُبَع أبداً يُحتسب من يوم إضافته) وتبلغ قيمته بسعر التكلفة 50 د.ك على الأقل — أو عندما لا يكون له سعر تكلفة، فتظهر قيمته غير معروفة.",
+      "empty": "لا توجد بضاعة راكدة. يُحدَّد المنتج عندما يكون متوفراً في المخزون ولم يُبَع منذ 90 يوماً أو أكثر (المنتج الذي لم يُبَع أبداً يُحتسب من يوم إضافته) وتبلغ قيمته بسعر التكلفة 5,000 ج.م على الأقل — أو عندما لا يكون له سعر تكلفة، فتظهر قيمته غير معروفة.",
       "comingSoon": "اكتشاف البضاعة الراكدة المدعوم بالذكاء الاصطناعي قادم في Batch 3.",
-      "explainer": "سنحدد المنتجات التي لم تُباع خلال 90 يوماً وقيمة مخزونها تتجاوز 50 د.ك، مع اقتراح نصوص تصفية ثنائية اللغة ونسبة خصم مقترحة.",
+      "explainer": "سنحدد المنتجات التي لم تُباع خلال 90 يوماً وقيمة مخزونها تتجاوز 5,000 ج.م، مع اقتراح نصوص تصفية ثنائية اللغة ونسبة خصم مقترحة.",
       "notify": "أخطرني عند الإطلاق",
       "card": {
         "daysSinceSale": "آخر بيع منذ {days} يوماً",
@@ -6610,7 +6782,7 @@
       "topSkus": "أفضل 5 منتجات (آخر 7 أيام)",
       "yesterdayFunnel": "مسار الشراء أمس",
       "aiCallout": "AI:",
-      "noDataYet": "ستظهر التحليلات بعد أول تحديث ليلي الساعة 02:00 بتوقيت الكويت.",
+      "noDataYet": "ستظهر التحليلات بعد أول تحديث ليلي الساعة 02:00 بتوقيت القاهرة.",
       "asOf": "حتى",
       "repeatPurchaseBasis": "{count, plural, one {من مشترٍ واحد أعاد الطلب} other {من {count, number, latn} مشترين أعادوا الطلب}} (آخر 30 يوماً)",
       "repeatPurchaseUnknown": "لا يوجد مشترون يمكن تمييزهم خلال آخر 30 يوماً",
@@ -6630,9 +6802,9 @@
       "aiLabel": "الذكاء الاصطناعي:",
       "retentionMatrixTitle": "مصفوفة الاستبقاء",
       "ltvByCohortTitle": "القيمة الدائمة التراكمية حسب الشريحة",
-      "colTotalRevenue": "إجمالي الإيرادات (د.ك)",
+      "colTotalRevenue": "إجمالي الإيرادات (ج.م)",
       "colLtvPerCustomer": "القيمة الدائمة / عميل",
-      "noDataYet": "لا توجد بيانات مجموعات بعد. ستظهر الرؤى بعد أول تجميع ليلي عند الساعة 02:00 بتوقيت الكويت."
+      "noDataYet": "لا توجد بيانات مجموعات بعد. ستظهر الرؤى بعد أول تجميع ليلي عند الساعة 02:00 بتوقيت القاهرة."
     },
     "funnel": {
       "title": "قمع إتمام الشراء",
@@ -6646,14 +6818,14 @@
       "checkouts": "عمليات دفع بدأت",
       "completed": "طلبات مكتملة",
       "abandoned": "مهجورة",
-      "revenue": "الإيرادات (د.ك)",
+      "revenue": "الإيرادات (ج.م)",
       "dropoff": "نسبة التراجع",
       "aiLabel": "الذكاء الاصطناعي:",
       "overviewTitle": "نظرة عامة على القمع",
       "abandonedUnit": "سلة",
       "dailyBreakdownTitle": "التفصيل اليومي",
       "colDate": "التاريخ",
-      "noDataYet": "لا توجد بيانات لمسار الشراء في هذه الفترة بعد. تظهر الرؤى بعد أول تجميع ليلي عند الساعة 02:00 بتوقيت الكويت."
+      "noDataYet": "لا توجد بيانات لمسار الشراء في هذه الفترة بعد. تظهر الرؤى بعد أول تجميع ليلي عند الساعة 02:00 بتوقيت القاهرة."
     },
     "segments": {
       "title": "شرائح العملاء (RFM)",
@@ -6672,7 +6844,7 @@
       "recommendedAction": "الإجراء الموصى به",
       "totalSegmentedCustomers": "إجمالي العملاء المصنّفين",
       "totalMonetaryValue": "إجمالي القيمة المالية",
-      "noSegmentData": "لا توجد بيانات شرائح بعد. تُحدَّث التحليلات بعد أول تشغيل ليلي الساعة 02:00 بتوقيت الكويت.",
+      "noSegmentData": "لا توجد بيانات شرائح بعد. تُحدَّث التحليلات بعد أول تشغيل ليلي الساعة 02:00 بتوقيت القاهرة.",
       "aiLabel": "الذكاء الاصطناعي:",
       "shareOfCustomers": "{pct}% من العملاء",
       "shareOfTotal": "{pct}% من الإجمالي",
@@ -7243,7 +7415,7 @@
       "topQueriesTitle": "أهم الكلمات المفتاحية (آخر يوم)",
       "noTopQueries": "لا توجد بيانات كلمات مفتاحية بعد.",
       "notConnectedTitle": "لم يتم ربط Google Search Console بعد",
-      "notConnectedBody": "بمجرد إعداد وصول Force AI إلى Search Console لنطاق متجرك، ستظهر هنا مرات الظهور والنقرات وأهم الكلمات المفتاحية تلقائياً — لا حاجة لأي إجراء من جانبك."
+      "notConnectedBody": "بمجرد إعداد وصول ابدأ إلى Search Console لنطاق متجرك، ستظهر هنا مرات الظهور والنقرات وأهم الكلمات المفتاحية تلقائياً — لا حاجة لأي إجراء من جانبك."
     }
   },
   "paymentAbandonments": {
@@ -7277,7 +7449,7 @@
   "whatsappIntegration": {
     "page": {
       "title": "ربط واتساب",
-      "subtitle": "منصة Force AI للأعمال عبر واتساب · القوالب · تحديثات الطلبات · روابط الدفع",
+      "subtitle": "منصة ابدأ للأعمال عبر واتساب · القوالب · تحديثات الطلبات · روابط الدفع",
       "navAriaLabel": "إعدادات واتساب"
     },
     "tabs": {
@@ -7290,13 +7462,13 @@
       "botAnalytics": "تحليلات البوت"
     },
     "connection": {
-      "connectTitle": "ربط Force AI WhatsApp",
-      "connectDescription": "قم بلصق مفتاح الـ API الذي تم إنشاؤه في منصة Force AI WhatsApp Business الخاصة بك لربط هذا المتجر.",
-      "apiKeyLabel": "مفتاح Force AI WhatsApp API",
-      "apiKeyHint": "قم بإنشاء المفتاح من لوحة تحكم WBS ← العملاء ← أيقونة Force AI Store Bridge. الصقه هنا — سيتم التحقق من المفتاح فوراً.",
+      "connectTitle": "ربط ابدأ WhatsApp",
+      "connectDescription": "قم بلصق مفتاح الـ API الذي تم إنشاؤه في منصة ابدأ WhatsApp Business الخاصة بك لربط هذا المتجر.",
+      "apiKeyLabel": "مفتاح ابدأ WhatsApp API",
+      "apiKeyHint": "قم بإنشاء المفتاح من لوحة تحكم WBS ← العملاء ← أيقونة Ebda Bridge. الصقه هنا — سيتم التحقق من المفتاح فوراً.",
       "connecting": "جاري الربط...",
       "connect": "ربط",
-      "finishTitle": "إكمال ربط Force AI WhatsApp",
+      "finishTitle": "إكمال ربط ابدأ WhatsApp",
       "finishDescription": "تم حفظ مفتاح الـ API ولكن لم يتم تفعيل إشعارات واتساب بعد. اختر القوالب الخاصة بك أدناه وقم بالتفعيل للبدء.",
       "disconnecting": "جاري إلغاء الربط...",
       "removeKey": "إزالة المفتاح",
@@ -7307,7 +7479,7 @@
       "available": "متاح",
       "savedNotVerified": "تم الحفظ — بانتظار التحقق",
       "keyInvalid": "قد يكون مفتاح الـ API غير صالح. فشل إرسال القوالب — يرجى إلغاء الربط وإدخال المفتاح مجدداً.",
-      "cantVerify": "تعذر الاتصال بـ Force AI WhatsApp للتحقق من المفتاح. تم حفظ المفتاح ولكن لم يتم تأكيده — استخدم إعادة المحاولة.",
+      "cantVerify": "تعذر الاتصال بـ ابدأ WhatsApp للتحقق من المفتاح. تم حفظ المفتاح ولكن لم يتم تأكيده — استخدم إعادة المحاولة.",
       "retry": "إعادة المحاولة",
       "notificationsTitle": "تفعيل إشعارات واتساب",
       "notificationsDescription": "المفتاح الرئيسي لرسائل واتساب الصادرة. توجد قوالب لكل حدث وخيارات القنوات في تبويب تحديثات الطلبات.",
@@ -7319,17 +7491,17 @@
       "toastInvalidKeyTitle": "مفتاح غير صالح",
       "toastInvalidKeyBody": "تم رفض مفتاح API. أنشئ مفتاحاً جديداً في لوحة WBS.",
       "toastConnectFailedTitle": "فشل الاتصال",
-      "toastConnectFailedBody": "تعذّر الاتصال بواتساب Force AI",
+      "toastConnectFailedBody": "تعذّر الاتصال بواتساب ابدأ",
       "toastConnectedTitle": "تم الاتصال",
-      "toastConnectedAutoErr": "تم ربط واتساب Force AI — لكن فشل الإرسال التلقائي للقوالب: {error}. افتح تبويب القوالب لإعادة المحاولة.",
+      "toastConnectedAutoErr": "تم ربط واتساب ابدأ — لكن فشل الإرسال التلقائي للقوالب: {error}. افتح تبويب القوالب لإعادة المحاولة.",
       "toastConnectedSeededTitle": "تم الاتصال + إرسال القوالب",
       "toastConnectedSeededBody": "تم تجهيز {seeded} قالب، و{submitted} بانتظار موافقة Meta (~10 دقائق–24 ساعة).",
-      "toastConnectedBody": "تم ربط منصة واتساب الأعمال Force AI",
+      "toastConnectedBody": "تم ربط منصة واتساب الأعمال ابدأ",
       "toastUnexpected": "حدث خطأ غير متوقع",
       "toastDisconnectFailedTitle": "فشل قطع الاتصال",
       "toastDisconnectFailedBody": "تعذّر قطع الاتصال",
       "toastDisconnectedTitle": "تم قطع الاتصال",
-      "toastDisconnectedBody": "تمت إزالة تكامل واتساب Force",
+      "toastDisconnectedBody": "تمت إزالة تكامل واتساب ابدأ",
       "toastConnectFirstTitle": "اتصل أولاً",
       "toastConnectFirstBody": "يرجى ربط مفتاح WBS API قبل تفعيل الإشعارات",
       "toastSaveFailedTitle": "فشل الحفظ",
@@ -7341,7 +7513,7 @@
       "toastWaOnBody": "يمكن للعملاء الآن الطلب مباشرة عبر رسائل واتساب.",
       "toastWaOffBody": "تم إيقاف الطلب عبر رسائل واتساب.",
       "toastWaSaveFailedBody": "تعذّر تحديث إعداد الطلب عبر واتساب",
-      "apiKeyPlaceholder": "الصق المفتاح من لوحة تحكم WBS ← العملاء ← Force AI Store Bridge"
+      "apiKeyPlaceholder": "الصق المفتاح من لوحة تحكم WBS ← العملاء ← Ebda Bridge"
     },
     "templates": {
       "generating": "جاري الإنشاء…",
@@ -7355,7 +7527,7 @@
       "refresh": "تحديث",
       "loading": "جاري تحميل القوالب…",
       "noTemplates": "لم يتم إعداد أي قوالب بعد.",
-      "noTemplatesHint": "اضغط على إنشاء القيم الافتراضية لإضافة قوالب Force AI الأساسية الـ 12 كمسودات.",
+      "noTemplatesHint": "اضغط على إنشاء القيم الافتراضية لإضافة قوالب ابدأ الأساسية الـ 12 كمسودات.",
       "howItWorks": "طريقة العمل: اضغط على إنشاء القيم الافتراضية لإنشاء القوالب الأساسية كمسودات. ثم اضغط على مزامنة إلى Meta لإرسالها. تقوم Meta بمراجعة كل قالب؛ وعادة ما تستغرق الموافقة من 10 دقائق إلى 24 ساعة.",
       "logoLabel": "استخدم شعار متجري كترويسة لرسائل واتساب",
       "logoHint": "سيظهر شعار متجرك للعملاء في أعلى كل رسالة تحديث للطلب. يتم تطبيق هذا عند المزامنة القادمة للقوالب.",
@@ -7405,7 +7577,7 @@
     },
     "orderUpdates": {
       "notConnected": "مو متصل للحين.",
-      "notConnectedHint": "لازم تتصل بمنصة Force AI WhatsApp Business أول شي من تبويب الاتصال، وبعدين ارجع هني.",
+      "notConnectedHint": "لازم تتصل بمنصة ابدأ WhatsApp Business أول شي من تبويب الاتصال، وبعدين ارجع هني.",
       "loading": "جاري التحميل…",
       "messageLanguage": "لغة الرسالة",
       "templateNotFound": "القالب مو موجود",
@@ -7416,7 +7588,7 @@
       "bothOff": "الاثنين مغلقين — الإشعار ماراح يوصل",
       "saving": "جاري الحفظ…",
       "saveChanges": "حفظ التغييرات",
-      "howItWorks": "طريقة العمل: لما تتغير حالة طلب العميل لواحدة من هالحالات، FWB API راح يرسل قالب WhatsApp المناسب من خلال تكامل منصة Force WhatsApp Business. استخدم خانات الاختيار عشان تحدد طرق الإشعار اللي تبيها لكل حالة.",
+      "howItWorks": "طريقة العمل: لما تتغير حالة طلب العميل لواحدة من هالحالات، واجهة ابدأ راح يرسل قالب WhatsApp المناسب من خلال تكامل منصة واتساب ابدأ Business. استخدم خانات الاختيار عشان تحدد طرق الإشعار اللي تبيها لكل حالة.",
       "events": {
         "orderPaid": {
           "label": "تم دفع الطلب",
@@ -7446,7 +7618,7 @@
       "savedBody": "تم تحديث إعدادات تحديثات الطلب."
     },
     "paymentLink": {
-      "description": "أرسل للعميل رابط دفع عبر WhatsApp بضغطة واحدة مدعوم بفاتورة MyFatoorah. اختر منتجات من الكتالوج، أو أضف مبلغاً مخصصاً، أو كلاهما — العميل يضغط مرة واحدة، وينتقل إلى صفحة الدفع الخاصة بـ MyFatoorah لإتمام العملية. يظل الرابط فعالاً حتى يتم دفع الطلب أو إلغاؤه.",
+      "description": "أرسل للعميل رابط دفع عبر WhatsApp بضغطة واحدة من بوابة الدفع الخاصة بك. اختر منتجات من الكتالوج، أو أضف مبلغاً مخصصاً، أو كلاهما — العميل يضغط مرة واحدة، وينتقل إلى صفحة الدفع لإتمام العملية. يظل الرابط فعالاً حتى يتم دفع الطلب أو إلغاؤه.",
       "phoneLabel": "رقم WhatsApp الخاص بالعميل (بالصيغة الدولية E.164)",
       "phoneError": "يجب أن يبدأ بـ + وأن يتراوح طوله بين 8 و 16 رقماً.",
       "nameLabel": "اسم العميل (اختياري)",
@@ -7456,7 +7628,7 @@
       "searchProducts": "البحث في {count} من المنتجات بالاسم أو رمز SKU…",
       "change": "تغيير",
       "customAmountLabel": "مبلغ مخصص (اختياري)",
-      "customAmountHint": "أضف رسوماً ليست ضمن منتجات الكتالوج — مثل عرض سعر مخصص، أو رسوم خدمة، أو عربون. سيتم إدراجها ضمن إجمالي الطلب وتسويتها عند استلام رد MyFatoorah.",
+      "customAmountHint": "أضف رسوماً ليست ضمن منتجات الكتالوج — مثل عرض سعر مخصص، أو رسوم خدمة، أو عربون. سيتم إدراجها ضمن إجمالي الطلب وتسويتها عند استلام رد البوابة.",
       "customAmountNote": "ما الغرض من هذا المبلغ؟ (اختياري)",
       "itemsSubtotal": "إجمالي المنتجات",
       "customAmount": "مبلغ مخصص",
@@ -7465,7 +7637,7 @@
       "sending": "جاري الإرسال…",
       "sendLink": "إرسال رابط الدفع عبر WhatsApp",
       "sentTitle": "تم الإرسال بنجاح",
-      "sentDescription": "سوف يستلم العميل رسالة WhatsApp فوراً. رابط الدفع من MyFatoorah سيظل فعالاً حتى يتم دفع الطلب أو إلغاؤه.",
+      "sentDescription": "سوف يستلم العميل رسالة WhatsApp فوراً. رابط الدفع سيظل فعالاً حتى يتم دفع الطلب أو إلغاؤه.",
       "viewOrder": "عرض الطلب →",
       "requirements": "المتطلبات: يجب أن يتم اعتماد قالب paymentLink بواسطة Meta. قم بزيارة تبويب القوالب لإنشاء ومزامنة القوالب.",
       "langEn": "الإنجليزية",
@@ -7474,7 +7646,7 @@
       "toastCouldNotSendTitle": "تعذّر الإرسال",
       "toastUnknownError": "خطأ غير معروف",
       "toastSentTitle": "تم إرسال رابط الدفع",
-      "toastSentBody": "سيستلم {phone} رابط دفع MyFatoorah عبر واتساب.",
+      "toastSentBody": "سيستلم {phone} رابط الدفع عبر واتساب.",
       "toastSendFailedTitle": "فشل الإرسال",
       "removeItemAriaLabel": "إزالة المنتج",
       "orderNumberLabel": "الطلب رقم {orderNumber}",
@@ -7566,8 +7738,8 @@
       "accessTokenPlaceholderRotate": "أدخل رمزاً جديداً لتحديث الرمز الحالي",
       "accessTokenPlaceholderNew": "الصق رمز مستخدم النظام الخاص بك",
       "accessTokenHint": "أنشئ مستخدم نظام في مدير أعمال Meta ← امنح صلاحية <code>catalog_management</code>. الرمز مُشفّر عند التخزين ولن يُعرض مرة أخرى بعد الحفظ.",
-      "provisionTitle": "الإعداد التلقائي · بمساعدة Force AI",
-      "provisionDescription": "يقوم بإنشاء كتالوج تجارة جديد تحت مدير أعمال Force AI ويملأ الحقول الثلاثة أعلاه تلقائياً. يوفر عليك عناء التنقل داخل مدير أعمال Meta. لا يزال يتعين عليك إرسال الكتالوج للمراجعة من قبل Meta لاحقاً.",
+      "provisionTitle": "الإعداد التلقائي · بمساعدة ابدأ",
+      "provisionDescription": "يقوم بإنشاء كتالوج تجارة جديد تحت مدير أعمال ابدأ ويملأ الحقول الثلاثة أعلاه تلقائياً. يوفر عليك عناء التنقل داخل مدير أعمال Meta. لا يزال يتعين عليك إرسال الكتالوج للمراجعة من قبل Meta لاحقاً.",
       "provisioning": "جاري الإعداد...",
       "provisionButton": "إعداد تلقائي",
       "saving": "جاري الحفظ...",
@@ -7577,7 +7749,7 @@
       "provisionError": "فشل الإعداد التلقائي لـ Meta",
       "provisionSuccess": "تم إعداد كتالوج Meta — قدّمه لمراجعة Meta بعد ذلك.",
       "confirmAlready": "يوجد معرّف كتالوج مُدخل بالفعل. امسحه أولاً إذا كنت تريد فعلاً إعداد كتالوج جديد. هل تريد المتابعة على أي حال؟",
-      "confirmNew": "سيؤدي هذا إلى استدعاء واجهة Meta Graph API لإنشاء كتالوج تجاري جديد تماماً ضمن مدير أعمال Force AI الرئيسي وتعيينه لهذا المتجر. هل تريد المتابعة؟",
+      "confirmNew": "سيؤدي هذا إلى استدعاء واجهة Meta Graph API لإنشاء كتالوج تجاري جديد تماماً ضمن مدير أعمال ابدأ الرئيسي وتعيينه لهذا المتجر. هل تريد المتابعة؟",
       "catalogIdPlaceholder": "مثال: 123456789012345",
       "businessIdPlaceholder": "مثال: 987654321098765"
     },
@@ -7779,7 +7951,7 @@
       "noWindowsYet": "لا توجد مواعيد توصيل بعد — أضف واحدًا أعلاه.",
       "minOrderSectionTitle": "الحد الأدنى لقيمة الطلب",
       "minOrderSectionHint": "لا يمكن للعملاء إتمام الطلب إذا كان مجموع المنتجات أقل من هذا المبلغ. اتركه فارغًا أو 0 للتعطيل.",
-      "minOrderLabel": "الحد الأدنى للطلب (د.ك)",
+      "minOrderLabel": "الحد الأدنى للطلب (ج.م)",
       "minOrderPlaceholder": "مثال: 5.000",
       "invoiceEmailSectionTitle": "بريد فاتورة الطلب",
       "invoiceEmailSectionHint": "يتم إرسال فاتورة كل طلب في هذا المتجر إلى هذا البريد أيضًا (مثل صاحب المتجر). اتركه فارغًا للتعطيل.",
@@ -7985,7 +8157,7 @@
     },
     "premiumSubtitle": "إضافة مميزة",
     "featureNotEnabledTitle": "الميزة غير مفعّلة",
-    "featureNotEnabledBody": "الودجة العائمة إضافة مميزة. يجب أن يفعّلها مسؤول عام لهذا المتجر قبل أن تتمكن من إعدادها. تواصل مع Force AI لطلب الوصول.",
+    "featureNotEnabledBody": "الودجة العائمة إضافة مميزة. يجب أن يفعّلها مسؤول عام لهذا المتجر قبل أن تتمكن من إعدادها. تواصل مع ابدأ لطلب الوصول.",
     "mainSubtitle": "مجموعة أزرار ثابتة يراها عملاؤك في كل صفحة",
     "showWidgetLabel": "إظهار الودجة في واجهة المتجر",
     "showWidgetHint": "عند التعطيل، لن تظهر الودجة حتى لو كانت الميزة مفعّلة.",
@@ -8138,7 +8310,7 @@
     "walletsWithBalance": "عملاء لديهم رصيد",
     "checkoutTitle": "الدفع من المحفظة عند الشراء",
     "checkoutOn": "مفعّل — يمكن للعملاء المسجلين دفع جزء من الطلب أو كامله من رصيدهم.",
-    "checkoutOff": "غير مفعّل — يرى العملاء رصيدهم في حساباتهم لكن لا يمكنهم إنفاقه عند الشراء بعد. تواصل مع دعم Force AI لتفعيله.",
+    "checkoutOff": "غير مفعّل — يرى العملاء رصيدهم في حساباتهم لكن لا يمكنهم إنفاقه عند الشراء بعد. تواصل مع دعم ابدأ لتفعيله.",
     "checkoutAccounting": "غير متاح أثناء تفعيل المحاسبة — دفتر الحسابات لا يسجل رصيد المتجر كالتزام بعد، فستُسجَّل مدفوعات المحفظة كنقد.",
     "colCustomer": "العميل",
     "colContact": "التواصل",
@@ -8171,5 +8343,482 @@
       "aiCalls": "استدعاءات / إنفاق الذكاء الاصطناعي",
       "aiUnpriced": "+{count} غير مسعّر — الإنفاق حدّ أدنى"
     }
+  },
+  "plans": {
+    "title": "الباقات",
+    "subtitle": "عدّل الباقات التي يشترك بها التجار: الحدود والظهور والأسعار. تبقى الأسعار فارغة حتى يتم تحديدها.",
+    "loading": "جارٍ تحميل الباقات…",
+    "loadError": "تعذّر تحميل الباقات.",
+    "edit": "تعديل",
+    "editTitle": "تعديل الباقة {code}",
+    "public": "عامة",
+    "hidden": "مخفية",
+    "unlimited": "غير محدود",
+    "priceNotSet": "غير محدد",
+    "priceHint": "الأسعار بالجنيه المصري (تُخزَّن بالقروش). السعر الفارغ يعني أنه لم يُحدَّد بعد، وليس مجانًا.",
+    "save": "حفظ الباقة",
+    "saving": "جارٍ الحفظ…",
+    "table": {
+      "plan": "الباقة",
+      "visibility": "الظهور",
+      "monthly": "السعر الشهري",
+      "yearly": "السعر السنوي",
+      "stores": "المتاجر",
+      "actions": "الإجراءات"
+    },
+    "form": {
+      "nameEn": "الاسم (بالإنجليزية)",
+      "nameAr": "الاسم (بالعربية)",
+      "sort": "ترتيب العرض",
+      "isPublic": "تظهر في صفحة الأسعار العامة",
+      "priceMonthly": "السعر الشهري (ج.م)",
+      "priceYearly": "السعر السنوي (ج.م)",
+      "limitsTitle": "الحدود",
+      "bpsHint": "الرسوم بالنقاط الأساسية (100 = 1%). رسوم الدفع الإلكتروني والدفع عند الاستلام منفصلة."
+    },
+    "limits": {
+      "maxProducts": "المنتجات",
+      "maxStaff": "أعضاء الفريق",
+      "maxOrdersPerMonth": "الطلبات شهريًا",
+      "maxStorageMb": "التخزين (ميجابايت)",
+      "customDomain": "النطاق المخصص",
+      "platformFeeBps": "رسوم المنصة، الطلبات الإلكترونية (نقطة أساس)",
+      "codPlatformFeeBps": "رسوم المنصة، الدفع عند الاستلام (نقطة أساس)",
+      "abandonedCartAutomation": "استرداد السلات المتروكة",
+      "whatsappAutomation": "أتمتة واتساب"
+    },
+    "errors": {
+      "invalidNumber": "أدخل أرقامًا صحيحة للسعر وترتيب العرض.",
+      "saveFailed": "تعذّر حفظ الباقة."
+    },
+    "toasts": {
+      "savedTitle": "تم حفظ الباقة",
+      "savedDesc": "تم تحديث الباقة {code}.",
+      "errorTitle": "خطأ"
+    }
+  },
+  "billing": {
+    "title": "الفوترة",
+    "subtitle": "باقتك وما تتضمنه وكم استخدمت منها.",
+    "loading": "جارٍ تحميل الفوترة…",
+    "loadError": "تعذّر تحميل الفوترة.",
+    "currentPlan": "الباقة الحالية",
+    "unlimited": "غير محدود",
+    "usageTitle": "الاستخدام",
+    "ordersThisMonth": "طلبات هذا الشهر",
+    "usedOf": "{used} من {limit}",
+    "storageNotTracked": "حتى {limit} ميجابايت (لا يتم تتبّع الاستخدام بعد)",
+    "includedTitle": "ما تتضمنه باقتك",
+    "included": "متاح",
+    "notIncluded": "غير متاح",
+    "platformFee": "رسوم المنصة (الطلبات الإلكترونية)",
+    "codFee": "رسوم المنصة (الدفع عند الاستلام)",
+    "trialEnds": "تنتهي التجربة في",
+    "renewsOn": "يتجدد في",
+    "endsOn": "ينتهي في",
+    "status": {
+      "none": "نشطة",
+      "trialing": "فترة تجريبية",
+      "active": "نشطة",
+      "past_due": "دفعة متأخرة",
+      "canceled": "ملغاة",
+      "comped": "مجانية بمنحة"
+    },
+    "overLimit": {
+      "title": "تجاوزت حد الطلبات لهذا الشهر",
+      "body": "تتيح باقتك {limit} طلبًا شهريًا. عملاؤك ما زالوا قادرين على الطلب ولم يتم حظر أي شيء. قم بالترقية للبقاء ضمن باقتك."
+    },
+    "upgradeTitle": "الترقية",
+    "upgradeBody": "انتقل إلى باقة أكبر للحصول على منتجات وفريق وطلبات أكثر، ونطاق مخصص، وأتمتة.",
+    "upgradeCta": "ترقية الباقة",
+    "upgradeSoon": "الترقية عبر الإنترنت قريبًا. تواصل مع الدعم لتغيير باقتك الآن.",
+    "priceTbd": "السعر يُعلن لاحقًا",
+    "perMonth": "/ شهريًا",
+    "adminTitle": "إدارة المنصة",
+    "adminPlanLabel": "تعيين الباقة",
+    "adminApply": "تطبيق الباقة",
+    "assigning": "جارٍ التطبيق…",
+    "toasts": {
+      "errorTitle": "تعذّر تغيير الباقة",
+      "assignedTitle": "تم تحديث الباقة",
+      "assignedDesc": "أصبح هذا المتجر على الباقة {code}."
+    },
+    "subscribeTitle": "اختر باقة",
+    "subscribeBody": "ادفع ببطاقتك بالجنيه المصري. تُحفظ بطاقتك بأمان لدى مزوّد الدفع ويتم الخصم تلقائيًا كل فترة.",
+    "intervalMonthly": "شهري",
+    "intervalYearly": "سنوي",
+    "perYear": "/ سنويًا",
+    "subscribe": "اشترك",
+    "switchTo": "انتقل إلى هذه الباقة",
+    "currentBadge": "باقتك الحالية",
+    "redirecting": "جارٍ التحويل إلى صفحة الدفع الآمن…",
+    "priceUnset": "غير متاحة بعد",
+    "checkoutError": "تعذّر بدء الدفع",
+    "changeError": "تعذّر تغيير الباقة",
+    "upgradedToast": "تمت ترقية الباقة",
+    "upgradeDeclined": "تم رفض الدفعة. لم تتغير باقتك.",
+    "upgradePending": "جارٍ تأكيد الدفعة.",
+    "scheduledToast": "تمت جدولة التغيير لنهاية الفترة الحالية.",
+    "canceledToast": "ستنتهي باقتك في نهاية الفترة الحالية.",
+    "canceledNowToast": "تم إلغاء باقتك.",
+    "resumedToast": "تم إلغاء طلب الإنهاء.",
+    "cancelPlan": "إلغاء الباقة",
+    "resumePlan": "الاحتفاظ بباقتي",
+    "confirmCancel": "هل تريد إلغاء باقتك؟ تبقى فعّالة حتى نهاية الفترة الحالية ثم ينتقل المتجر إلى المجانية (بياناتك محفوظة).",
+    "cancelsOn": "تنتهي في",
+    "pendingPlan": "الانتقال إلى {plan} في {date}",
+    "pastDueTitle": "تعذّر الخصم من بطاقتك",
+    "pastDueBody": "سنعيد المحاولة في {date}. حدّث وسيلة الدفع بالاشتراك من جديد. إذا استمر الفشل ينتقل متجرك إلى الباقة المجانية (بياناتك محفوظة).",
+    "canceledTitle": "أنت على الباقة المجانية",
+    "canceledBody": "انتهت باقتك المدفوعة السابقة. بياناتك محفوظة وتسري حدود الباقة المجانية.",
+    "checkoutReturnPending": "جارٍ تأكيد الدفع…",
+    "checkoutReturnOk": "تم تأكيد الدفع. باقتك فعّالة الآن.",
+    "checkoutReturnFailed": "لم تتم عملية الدفع.",
+    "checkoutReturnLater": "لم نستلم التأكيد بعد. ستتحدّث هذه الصفحة قريبًا.",
+    "invoicesTitle": "الدفعات والفواتير",
+    "invoicesEmpty": "لا توجد دفعات بعد.",
+    "invoiceCols": {
+      "date": "التاريخ",
+      "description": "الوصف",
+      "amount": "المبلغ",
+      "status": "الحالة",
+      "reason": "السبب"
+    },
+    "invoiceTypes": {
+      "checkout": "دفعة اشتراك",
+      "renewal": "تجديد",
+      "upgrade": "ترقية",
+      "refund": "استرداد"
+    },
+    "invoiceStatuses": {
+      "pending": "قيد الانتظار",
+      "succeeded": "مدفوعة",
+      "failed": "فاشلة",
+      "refunded": "مستردة"
+    },
+    "retryN": "إعادة محاولة {n}",
+    "stubTitle": "بوابة اختبار محلية",
+    "stubBody": "مزوّد الاختبار فعّال. حاكِ ردّ بوابة الدفع للدفع المعلّق:",
+    "stubPay": "محاكاة نجاح",
+    "stubDecline": "محاكاة رفض"
+  },
+  "planLimit": {
+    "maxProducts": "باقتك تسمح بحد أقصى {limit} منتج. قم بالترقية لإضافة المزيد.",
+    "maxStaff": "باقتك تسمح بحد أقصى {limit} من أعضاء الفريق. قم بالترقية لإضافة المزيد.",
+    "maxOrdersPerMonth": "باقتك تسمح بحد أقصى {limit} طلب شهريًا. قم بالترقية لمواصلة النمو.",
+    "maxStorageMb": "باقتك تسمح بمساحة تخزين حتى {limit} ميجابايت. قم بالترقية لإضافة المزيد.",
+    "customDomain": "النطاق المخصص غير متاح في باقتك. قم بالترقية لربط نطاقك الخاص.",
+    "abandonedCartAutomation": "استرداد السلات المتروكة غير متاح في باقتك. قم بالترقية لتفعيله.",
+    "whatsappAutomation": "أتمتة واتساب غير متاحة في باقتك. قم بالترقية لتفعيلها."
+  },
+  "onboarding": {
+    "signup": {
+      "title": "أنشئ متجرك",
+      "subtitle": "ابدأ البيع أونلاين في دقائق. بدون بطاقة.",
+      "name": "اسمك",
+      "namePlaceholder": "منى حسن",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "you@example.com",
+      "phone": "رقم الموبايل (اختياري)",
+      "phonePlaceholder": "010 1234 5678",
+      "phoneHelp": "رقم موبايل مصري لتنبيهات الطلبات والحساب.",
+      "password": "كلمة المرور",
+      "passwordPlaceholder": "أنشئ كلمة مرور",
+      "passwordHelp": "8 أحرف على الأقل مع حروف كبيرة وصغيرة ورقم ورمز.",
+      "submit": "إنشاء حسابي",
+      "submitting": "جارٍ إنشاء حسابك…",
+      "haveAccount": "لديك حساب بالفعل؟",
+      "signIn": "تسجيل الدخول",
+      "errors": {
+        "nameRequired": "أدخل اسمك",
+        "emailInvalid": "أدخل بريدًا إلكترونيًا صحيحًا",
+        "passwordWeak": "كلمة المرور تحتاج 8 أحرف على الأقل مع حروف كبيرة وصغيرة ورقم ورمز",
+        "phoneInvalid": "أدخل رقم موبايل مصري صحيح أو اتركه فارغًا",
+        "emailDisposable": "من فضلك استخدم بريدًا إلكترونيًا دائمًا وليس مؤقتًا",
+        "tooFast": "انتظر لحظة ثم أرسل مرة أخرى",
+        "formExpired": "انتهت صلاحية النموذج. أرسله مرة أخرى",
+        "rateLimited": "محاولات كثيرة. حاول مرة أخرى بعد قليل.",
+        "generic": "تعذّر إنشاء حسابك. حاول مرة أخرى."
+      },
+      "sent": {
+        "title": "تحقق من بريدك",
+        "body": "إذا كان هذا البريد صالحًا للاستخدام فقد أرسلنا رابط التأكيد إلى {email}. الرابط صالح لمدة 24 ساعة.",
+        "resend": "أرسل الرابط مرة أخرى",
+        "resending": "جارٍ الإرسال…",
+        "resent": "إذا كان البريد صالحًا فسيصلك رابط جديد قريبًا.",
+        "backToLogin": "العودة لتسجيل الدخول"
+      },
+      "noAccount": "جديد على إبدأ؟",
+      "createStore": "أنشئ متجرك"
+    },
+    "verify": {
+      "verifying": "جارٍ تأكيد بريدك…",
+      "successTitle": "تم تأكيد البريد",
+      "successBody": "حسابك جاهز. هيا نجهّز متجرك.",
+      "continue": "متابعة",
+      "failedTitle": "تعذّر تأكيد بريدك",
+      "invalid": "هذا الرابط غير صالح أو سبق استخدامه.",
+      "expired": "انتهت صلاحية هذا الرابط. اطلب رابطًا جديدًا أدناه.",
+      "missing": "رابط التأكيد غير مكتمل.",
+      "generic": "حدث خطأ ما. حاول مرة أخرى.",
+      "resendTitle": "احصل على رابط جديد",
+      "email": "البريد الإلكتروني",
+      "resend": "أرسل رابطًا جديدًا",
+      "resending": "جارٍ الإرسال…",
+      "resent": "إذا كان البريد صالحًا فسيصلك رابط جديد قريبًا.",
+      "backToLogin": "العودة لتسجيل الدخول"
+    },
+    "flow": {
+      "title": "جهّز متجرك",
+      "stepOf": "الخطوة {current} من {total}",
+      "steps": {
+        "store": "الاسم",
+        "template": "الشكل",
+        "product": "المنتج",
+        "payment": "الدفع",
+        "live": "الإطلاق"
+      },
+      "back": "رجوع",
+      "next": "متابعة",
+      "skip": "تخطَّ الآن",
+      "loading": "جارٍ التحميل…",
+      "loadFailed": "تعذّر تحميل إعدادك. حدّث الصفحة.",
+      "verifyGate": {
+        "title": "أكّد بريدك للمتابعة",
+        "body": "أرسلنا رابط تأكيد إلى {email}. افتحه ثم عد وحدّث هذه الصفحة.",
+        "refresh": "لقد أكدت بريدي",
+        "resend": "أرسل الرابط مرة أخرى",
+        "resent": "إذا كان البريد صالحًا فسيصلك رابط جديد قريبًا."
+      },
+      "store": {
+        "title": "اختر اسم متجرك",
+        "subtitle": "اختر اسمًا وعنوان متجرك المجاني.",
+        "name": "اسم المتجر",
+        "namePlaceholder": "متجري",
+        "slug": "عنوان المتجر",
+        "slugHelp": "حروف لاتينية وأرقام وشرطات فقط. يمكنك إضافة نطاقك الخاص لاحقًا.",
+        "checking": "جارٍ التحقق…",
+        "available": "{host} متاح",
+        "taken": "هذا العنوان مستخدم بالفعل",
+        "reserved": "هذا العنوان محجوز. اختر عنوانًا آخر.",
+        "protected": "هذا العنوان يطابق اسم علامة تجارية محمية. تواصل مع الدعم للمطالبة به، أو اختر عنوانًا آخر.",
+        "tooShort": "استخدم 3 أحرف على الأقل",
+        "tooLong": "استخدم 40 حرفًا على الأكثر",
+        "invalid": "استخدم حروفًا صغيرة وأرقامًا وشرطات مفردة فقط",
+        "nameRequired": "أدخل اسم متجرك",
+        "create": "إنشاء متجري",
+        "creating": "جارٍ الإنشاء…",
+        "createFailed": "تعذّر إنشاء المتجر. حاول مرة أخرى.",
+        "dailyLimit": "أنشأت عدة متاجر اليوم. حاول غدًا أو تواصل مع الدعم.",
+        "limit": "وصلت إلى الحد الأقصى للمتاجر في هذا الحساب."
+      },
+      "template": {
+        "title": "اختر الشكل",
+        "subtitle": "اختر قالبًا. يمكنك تغييره في أي وقت.",
+        "modern": "عصري",
+        "modernDesc": "خطوط نظيفة ولمسات جريئة.",
+        "classic": "كلاسيكي",
+        "classicDesc": "أناقة خالدة بخطوط سيريف.",
+        "minimal": "بسيط",
+        "minimalDesc": "مساحات واسعة والمنتج أولًا.",
+        "bold": "جريء",
+        "boldDesc": "نابض بالحياة والطاقة.",
+        "elegant": "أنيق",
+        "elegantDesc": "شكل راقٍ للأزياء والجمال.",
+        "selected": "محدد",
+        "saveFailed": "تعذّر حفظ القالب. حاول مرة أخرى."
+      },
+      "product": {
+        "title": "أضف أول منتج",
+        "subtitle": "الاسم والسعر وصورة. يمكنك إضافة الباقي لاحقًا.",
+        "name": "اسم المنتج",
+        "namePlaceholder": "إيشارب قطن",
+        "price": "السعر (ج.م)",
+        "pricePlaceholder": "250",
+        "photo": "صورة (اختياري)",
+        "nameRequired": "أدخل اسم المنتج",
+        "priceInvalid": "أدخل سعرًا أكبر من الصفر",
+        "add": "إضافة المنتج",
+        "adding": "جارٍ الإضافة…",
+        "added": "تمت إضافة {name}.",
+        "addFailed": "تعذّرت إضافة المنتج. حاول مرة أخرى.",
+        "limit": "وصلت إلى حد المنتجات في باقتك.",
+        "stock": "الكمية في المخزون",
+        "stockInvalid": "أدخل رقمًا صحيحًا، 0 أو أكثر"
+      },
+      "payment": {
+        "title": "كيف سيدفع عملاؤك؟",
+        "subtitle": "الدفع عند الاستلام مفعّل افتراضيًا.",
+        "cod": "الدفع عند الاستلام",
+        "codDesc": "يدفع العميل للمندوب عند وصول الطلب.",
+        "moreLater": "البطاقات وميزة والمحافظ الإلكترونية وفاليو والدفع في فوري وإنستاباي تُعدّ لاحقًا من الإعدادات > المدفوعات، بحسابك الخاص في Paymob أو Kashier أو فوري.",
+        "saveFailed": "تعذّر حفظ إعدادات الدفع. حاول مرة أخرى.",
+        "needOne": "أبقِ طريقة دفع واحدة على الأقل مفعّلة."
+      },
+      "live": {
+        "title": "جاهز للإطلاق",
+        "subtitle": "سيعمل متجرك على {host}.",
+        "checklistName": "اسم المتجر",
+        "checklistTemplate": "القالب",
+        "checklistProduct": "المنتجات المضافة",
+        "checklistPayment": "الدفع",
+        "noProducts": "لا يوجد بعد. يمكنك إضافة المنتجات من لوحة التحكم.",
+        "publish": "انشر متجري",
+        "publishing": "جارٍ النشر…",
+        "publishFailed": "تعذّر نشر المتجر. حاول مرة أخرى.",
+        "doneTitle": "متجرك أصبح مباشرًا",
+        "doneBody": "شارك الرابط وابدأ البيع.",
+        "visit": "افتح متجري",
+        "copy": "انسخ الرابط",
+        "copied": "تم النسخ",
+        "whatsapp": "شارك على واتساب",
+        "dashboard": "اذهب إلى لوحة التحكم"
+      }
+    },
+    "setupGuide": {
+      "title": "دليل الإعداد",
+      "subtitle": "أكمل هذه الخطوات لتحصل على أول طلب.",
+      "progress": "تم {done} من {total}",
+      "loadFailed": "تعذّر تحميل دليل الإعداد.",
+      "dismiss": "إخفاء الدليل",
+      "show": "إظهار دليل الإعداد",
+      "optional": "اختياري",
+      "done": "تم",
+      "markDone": "تحديد كمكتمل",
+      "markUndone": "تراجع",
+      "open": "فتح",
+      "items": {
+        "add_product": {
+          "title": "أضف منتجًا",
+          "desc": "أضف أول منتج مع صورة وسعر."
+        },
+        "brand": {
+          "title": "حدد الشعار والألوان",
+          "desc": "اجعل المتجر يعبّر عن علامتك."
+        },
+        "shipping": {
+          "title": "حدد مناطق الشحن",
+          "desc": "أخبر العملاء أين توصّل وكم الرسوم."
+        },
+        "payment": {
+          "title": "اختر طرق الدفع",
+          "desc": "الدفع عند الاستلام مفعّل. راجعه أو أضف المزيد."
+        },
+        "domain": {
+          "title": "اربط نطاقك الخاص",
+          "desc": "استخدم yourname.com بدل العنوان المجاني."
+        },
+        "test_order": {
+          "title": "جرّب طلبًا تجريبيًا",
+          "desc": "افتح متجرك واطلب منتجًا كأنك عميل."
+        },
+        "share": {
+          "title": "شارك رابط متجرك",
+          "desc": "أرسل الرابط لعملائك على واتساب."
+        }
+      }
+    }
+  },
+  "billingEvents": {
+    "title": "سجل الفوترة",
+    "subtitle": "كل دفعة اشتراك وإعادة محاولة تجديد وترقية واسترداد. السجلات للإضافة فقط ولا تُعدَّل.",
+    "loading": "جارٍ تحميل السجل…",
+    "failedToLoad": "تعذّر تحميل سجل الفوترة.",
+    "empty": "لا توجد عمليات فوترة بعد.",
+    "refresh": "تحديث",
+    "all": "الكل",
+    "statusFilter": "الحالة",
+    "typeFilter": "النوع",
+    "stuck": "النتيجة غير معروفة — يلزم التسوية",
+    "retry": "إعادة محاولة {n}",
+    "refund": "استرداد",
+    "confirmRefund": "استرداد {amount} إلى بطاقة التاجر؟",
+    "refundFailed": "فشل الاسترداد: {message}",
+    "refundDone": "تم تسجيل الاسترداد.",
+    "columns": {
+      "date": "التاريخ",
+      "store": "المتجر",
+      "type": "النوع",
+      "plan": "الباقة",
+      "amount": "المبلغ",
+      "status": "الحالة",
+      "reference": "مرجع بوابة الدفع",
+      "failure": "سبب الفشل",
+      "action": "إجراء"
+    },
+    "types": {
+      "checkout": "دفع اشتراك",
+      "renewal": "تجديد",
+      "upgrade": "ترقية",
+      "refund": "استرداد"
+    },
+    "statuses": {
+      "pending": "قيد الانتظار",
+      "succeeded": "ناجحة",
+      "failed": "فاشلة",
+      "refunded": "مستردة"
+    },
+    "interval": {
+      "monthly": "شهري",
+      "yearly": "سنوي"
+    }
+  },
+  "codReconciliation": {
+    "title": "مطابقة المبالغ المحصّلة عند الاستلام",
+    "subtitle": "ما كان يجب أن تحصّله شركات الشحن مقابل ما تبلّغ عنه وتحوّله",
+    "errorTitle": "خطأ",
+    "importFailed": "تعذّر استيراد الكشف.",
+    "imported": "تم استيراد {count} سطر",
+    "totals": "الإجماليات",
+    "owed": "المستحق (الدفع عند الاستلام)",
+    "collected": "المحصّل",
+    "fees": "رسوم شركة الشحن",
+    "net": "المحوَّل (الصافي)",
+    "outstanding": "لم يصل بعد",
+    "over": "محوَّل بالزيادة",
+    "unmatched": "أسطر غير مطابقة",
+    "flagged": "شحنات تحتاج انتباهك",
+    "identity": "المستحق ناقص المحصّل يساوي دائمًا ما لم يصل ناقص المحوَّل بالزيادة، بالقرش. والمحصّل يساوي الرسوم زائد المحوَّل.",
+    "importTitle": "استيراد كشف شركة الشحن",
+    "importHelp": "ارفع ملف CSV لتسوية الدفع عند الاستلام من شركة الشحن. يلزم عمود رقم التتبع والمبلغ المحصّل (أو الصافي والرسوم) بالجنيه المصري. رفع الكشف نفسه مرة أخرى لا يغيّر شيئًا.",
+    "carrier": "شركة الشحن",
+    "file": "ملف CSV",
+    "paste": "نص الكشف",
+    "pastePlaceholder": "…أو الصق الكشف هنا",
+    "import": "استيراد",
+    "importResult": "{inserted} جديد، و{duplicates} مستورد سابقًا، و{unmatched} لا يطابق أي شحنة.",
+    "rejectedLine": "السطر {line}: {reason}",
+    "filterStatus": "تصفية حسب الحالة",
+    "allStatuses": "كل الحالات",
+    "filterCarrier": "تصفية حسب شركة الشحن",
+    "allCarriers": "كل الشركات",
+    "statuses": {
+      "flagged": "تحتاج انتباهًا",
+      "awaiting": "بانتظار التحويل",
+      "partial": "محوَّل جزئيًا",
+      "settled": "تمت التسوية",
+      "over_remitted": "محوَّل بالزيادة",
+      "mismatch": "غير متطابق"
+    },
+    "tableLabel": "شحنات الدفع عند الاستلام",
+    "empty": "لا توجد شحنات دفع عند الاستلام بعد.",
+    "lines": "{count} تحويلات",
+    "columns": {
+      "order": "رقم الطلب",
+      "carrier": "شركة الشحن",
+      "tracking": "رقم التتبع",
+      "owed": "المستحق",
+      "collected": "المحصّل",
+      "fees": "الرسوم",
+      "net": "المحوَّل",
+      "open": "المتبقي",
+      "status": "الحالة",
+      "date": "التاريخ"
+    },
+    "page": "صفحة {page} من {pages}",
+    "previous": "السابق",
+    "next": "التالي",
+    "unmatchedTitle": "أسطر لا تطابق أي شحنة",
+    "unmatchedHelp": "هذه الأسطر في الكشف تذكر رقم تتبع ليس ضمن شحناتك. ستتطابق تلقائيًا إذا ظهرت تلك الشحنة."
   }
 }

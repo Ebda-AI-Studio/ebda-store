@@ -13,7 +13,7 @@
  *      (`POST /stores/:storeId/orders/:orderId/refresh-payment-status`).
  *   3. The GUEST verify-on-return endpoint
  *      (`POST /public/orders/:orderId/verify-payment`) — the reliable
- *      primary confirmation path, because MyFatoorah's webhook is
+ *      primary confirmation path, because a gateway's webhook can be
  *      configured account-level in their portal and never fires per-invoice.
  *   4. The auto-cancel sweep (`order-auto-cancel-unpaid`) — the last-resort
  *      net. Before cancelling a stale unpaid order it asks the provider, and
@@ -38,10 +38,12 @@ import type { PaymentStatus } from '@force/database';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
+import { CardTestingGuard } from './card-testing-guard.service';
 import { OneSignalService } from './onesignal.service';
 import { recordPaymentEvent } from './payment-event.service';
 import type { PaymentStatusResponse } from './payment-providers/types';
 import { invalidateCustomersCache } from '../lib/public-cache';
+import { cfWaitUntil } from '../cf/bindings';
 import { assertValidTransition } from './order-status-machine';
 
 /**
@@ -56,11 +58,13 @@ export type ConfirmSource = 'admin_refresh' | 'guest_verify' | 'auto_cancel_swee
 
 /** Money-integrity F3 (2026-07-02 audit): reconciliation tolerance for a
  *  provider-reported paid amount vs the expected `Payment.amount`. Both
- *  sides are in fils (see `PaymentService.createPayment`, which stores
+ *  sides are in piastres (see `PaymentService.createPayment`, which stores
  *  `amount: request.amount === order.total`, and every provider's
- *  `parseWebhook`/`getPaymentStatus`, which convert to fils via
- *  `Math.round(x * 1000)`). 5 fils absorbs float/rounding noise without
- *  masking a real underpayment. */
+ *  `parseWebhook`/`getPaymentStatus`, which convert to piastres via
+ *  `Math.round(x * 100)` for a 2-decimal currency). 5 piastres (0.05 EGP)
+ *  absorbs float/rounding noise without masking a real underpayment — the same
+ *  5-minor-unit noise bound FWB used, deliberately NOT re-tuned in the EGP
+ *  conversion (it is a rounding allowance, not a money value). */
 const AMOUNT_TOLERANCE_FILS = 5;
 
 export interface ConfirmPaymentInput {
@@ -70,10 +74,10 @@ export interface ConfirmPaymentInput {
     status: string;
     provider: string;
     metadata: unknown;
-    /** Expected amount in fils (mirrors order.total at payment creation) —
+    /** Expected amount in piastres (mirrors order.total at payment creation) —
      *  required for the paid-amount reconciliation gate below. */
     amount: number;
-    /** Payment.currency (default 'KWD'). Used only to gate the amount
+    /** Payment.currency (default 'EGP'). Used only to gate the amount
      *  reconciliation to same-currency comparisons — see below. */
     currency?: string;
   };
@@ -116,6 +120,17 @@ export async function confirmPaymentFromProviderStatus(
   const { payment, order, providerStatus, source, triggeredByUserId = null } = input;
   const status = providerStatus.status;
 
+  // InstaPay has no provider to ask: the ONLY thing that confirms it is the
+  // merchant's confirm (InstapayService.confirm). A pull-side reconciliation must
+  // never mark such an order paid, whatever a caller passes in.
+  if (payment.provider === 'instapay') {
+    return {
+      paymentStatus: order.paymentStatus === 'paid' ? 'paid' : 'unpaid',
+      providerStatus: status,
+      statusChanged: false,
+    };
+  }
+
   // Determine whether this is a genuine transition vs a redundant call.
   // We compare against the ORDER's current paymentStatus (the durable
   // signal a customer/merchant sees) so a duplicate verify or a webhook
@@ -137,9 +152,8 @@ export async function confirmPaymentFromProviderStatus(
     // Paid-amount reconciliation (money-integrity audit F3, 2026-07-02).
     // The provider says the invoice is "Paid", but that alone doesn't prove
     // the AMOUNT paid matches what we expect. `providerStatus.paidAmount`
-    // (fils) is only populated by providers that distinguish invoiced vs
-    // settled amount (currently MyFatoorah's GetPaymentStatus —
-    // `PaidCurrencyValue`); Tap/Hesabe/UPayments never set it. Only gate
+    // (piastres) is only populated by providers that distinguish invoiced vs
+    // settled amount (`paidAmount` on the status answer); a gateway that does not send it leaves it unset. Only gate
     // when it's actually present + parseable and the currencies line up —
     // never block on missing/ambiguous data, since a false block here
     // would hold a legitimately-paid customer's order hostage.
@@ -194,7 +208,7 @@ export async function confirmPaymentFromProviderStatus(
         store: { id: order.storeId, name: alertStore?.name ?? order.storeId },
         source: 'payment.confirm.amount_mismatch',
         title: 'payment.confirm.amount_mismatch',
-        body: `Order ${order.id}: ${payment.provider} reports paid ${paidAmount} fils but the order total is ${payment.amount} fils. Order was NOT marked as paid — investigate before fulfilling.`,
+        body: `Order ${order.id}: ${payment.provider} reports paid ${paidAmount} piastres but the order total is ${payment.amount} piastres. Order was NOT marked as paid — investigate before fulfilling.`,
         context: {
           orderId: order.id,
           paymentId: payment.id,
@@ -300,44 +314,47 @@ export async function confirmPaymentFromProviderStatus(
     // so the order lookup survives FORCE RLS (no HTTP middleware on the admin
     // refresh / guest verify paths' provider callbacks) and a push glitch
     // never affects the reconciliation result we return to the caller.
-    void runInTenantContext(order.storeId, async () => {
-      const detail = await prisma.order.findUnique({
-        where: { id: order.id },
-        select: {
-          orderNumber: true,
-          total: true,
-          currency: true,
-          customer: { select: { firstName: true, lastName: true, email: true } },
-          shippingAddress: true,
-        },
-      });
-      if (!detail) return;
-      const shippingAddress = detail.shippingAddress as Record<string, unknown> | null;
-      const guestFirstName =
-        typeof shippingAddress?.firstName === 'string' ? shippingAddress.firstName : '';
-      const guestLastName =
-        typeof shippingAddress?.lastName === 'string' ? shippingAddress.lastName : '';
-      const customerName =
-        `${detail.customer?.firstName || guestFirstName} ${detail.customer?.lastName || guestLastName}`.trim() ||
-        detail.customer?.email ||
-        'Customer';
-      const store = await prisma.store
-        .findUnique({ where: { id: order.storeId }, select: { name: true } })
-        .catch(() => null);
-      await OneSignalService.notifyAdminsOfPaymentSuccess({
-        orderId: order.id,
-        orderNumber: detail.orderNumber,
-        storeId: order.storeId,
-        storeName: store?.name ?? order.storeId,
-        customerName,
-        total: detail.total,
-        currency: detail.currency,
-        paymentMethod: payment.provider,
-      });
-    }).catch((err: unknown) =>
-      logger.error(
-        { err, orderId: order.id, source },
-        '[PAYMENT CONFIRM] payment-received push failed'
+    // `cfWaitUntil`: a bare floating promise is cancelled with the response on a Worker.
+    cfWaitUntil(
+      runInTenantContext(order.storeId, async () => {
+        const detail = await prisma.order.findUnique({
+          where: { id: order.id },
+          select: {
+            orderNumber: true,
+            total: true,
+            currency: true,
+            customer: { select: { firstName: true, lastName: true, email: true } },
+            shippingAddress: true,
+          },
+        });
+        if (!detail) return;
+        const shippingAddress = detail.shippingAddress as Record<string, unknown> | null;
+        const guestFirstName =
+          typeof shippingAddress?.firstName === 'string' ? shippingAddress.firstName : '';
+        const guestLastName =
+          typeof shippingAddress?.lastName === 'string' ? shippingAddress.lastName : '';
+        const customerName =
+          `${detail.customer?.firstName || guestFirstName} ${detail.customer?.lastName || guestLastName}`.trim() ||
+          detail.customer?.email ||
+          'Customer';
+        const store = await prisma.store
+          .findUnique({ where: { id: order.storeId }, select: { name: true } })
+          .catch(() => null);
+        await OneSignalService.notifyAdminsOfPaymentSuccess({
+          orderId: order.id,
+          orderNumber: detail.orderNumber,
+          storeId: order.storeId,
+          storeName: store?.name ?? order.storeId,
+          customerName,
+          total: detail.total,
+          currency: detail.currency,
+          paymentMethod: payment.provider,
+        });
+      }).catch((err: unknown) =>
+        logger.error(
+          { err, orderId: order.id, source },
+          '[PAYMENT CONFIRM] payment-received push failed'
+        )
       )
     );
 
@@ -375,6 +392,17 @@ export async function confirmPaymentFromProviderStatus(
       triggeredByUserId,
       details: { source, reason: 'provider_status_confirmed_failed', providerStatus: status },
     });
+
+    // Card-testing bookkeeping (SP5 task 4): a confirmed DECLINE (not cancelled /
+    // expired). Idempotent per payment, so a webhook that already counted it is
+    // not counted twice.
+    if (status === 'failed') {
+      void CardTestingGuard.recordDecline({
+        storeId: order.storeId,
+        orderId: order.id,
+        paymentId: payment.id,
+      });
+    }
 
     return { paymentStatus: 'failed', providerStatus: status, statusChanged: true };
   }

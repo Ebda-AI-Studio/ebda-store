@@ -112,7 +112,7 @@ export function snapshotDb(dbUrl, { orderIds, productIds, variantIds, couponIds 
     dbUrl,
     `SELECT w.provider, w.idempotency_key, w.status, w.result_status, w.attempts, w.last_error, w.result_order_id, w.created_at
        FROM public.webhook_events w WHERE w.result_order_id = ANY(${oids})
-          OR w.idempotency_key IN (SELECT 'mf_' || p.invoice_id FROM public.payments p WHERE p.order_id = ANY(${oids}) AND p.invoice_id IS NOT NULL)`,
+          OR (w.payload #>> '{obj,order,id}') IN (SELECT p.transaction_id FROM public.payments p WHERE p.order_id = ANY(${oids}) AND p.transaction_id IS NOT NULL)`,
     'r.created_at, r.idempotency_key'
   );
 

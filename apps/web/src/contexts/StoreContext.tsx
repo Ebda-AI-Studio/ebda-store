@@ -24,6 +24,8 @@ import {
   deriveBrandRoles,
   colorToHslTriplet,
   statusInkVars,
+  REGION,
+  BRAND,
 } from '@force/shared';
 
 /**
@@ -219,7 +221,7 @@ interface StoreContextValue {
    */
   draftSettings: Record<string, unknown> | null;
   /**
-   * Whether the current request is on a platform host (`store.force-ai.co`,
+   * Whether the current request is on a platform host (`ebda.app`,
    * `localhost`, etc.) rather than a merchant's custom domain — see
    * `lib/platform-host.ts`. Seeded server-side from the `x-is-platform`
    * header middleware already sets (`layout.tsx`), so the FIRST render
@@ -238,12 +240,12 @@ const StoreContext = createContext<StoreContextValue | null>(null);
  */
 const DEFAULT_STORE: StoreData = {
   id: 'demo',
-  name: 'Force',
-  nameAr: 'فورس',
+  name: BRAND.name,
+  nameAr: BRAND.nameAr,
   slug: 'demo',
   status: 'active',
-  currency: 'KWD',
-  timezone: 'Asia/Kuwait',
+  currency: REGION.currency,
+  timezone: 'Africa/Cairo',
   template: 'modern',
   theme: DEFAULT_THEME,
   socialLinks: {},
@@ -485,41 +487,20 @@ export function useStoreContact() {
 }
 
 /**
- * Hook to build store-prefixed URLs.
- * On platform domains (see `PLATFORM_HOSTS`/`PLATFORM_SUFFIXES` in
- * lib/platform-host.ts), URLs are prefixed with /{slug}.
- * On custom domains, URLs are returned as-is.
+ * Hook to build in-store URLs.
+ *
+ * Every store has its own host (`<slug>.ebda.app` or a custom domain), so an
+ * in-store path is already complete: this returns it unchanged. The old
+ * `/<slug>` prefix for path-based platform storefronts is gone — a platform
+ * host never renders a store. The hook is kept (rather than deleted) because
+ * dozens of call sites build links through it.
  */
 export function useStoreUrl() {
-  // `isPlatform` is computed once, centrally, in `StoreProvider` (seeded
-  // server-side from `x-is-platform` where the caller passes it, with a
-  // client-only `isPlatformHost()` fallback otherwise — see there for the
-  // hydration-mismatch reasoning). Reading it from context instead of
-  // re-deriving it here keeps every `useStoreUrl()` caller and
-  // `useIsPlatform()` in agreement about which host this is.
-  const { store, isPlatform } = useStore();
-
-  const prefix = isPlatform && store.slug && store.id !== 'demo' ? `/${store.slug}` : '';
-
-  return useCallback(
-    (path: string) => {
-      if (!prefix) return path;
-      // Bare base (`''` or `'/'`) → the prefix itself, WITHOUT a trailing slash.
-      // Callers use storeUrl('') as a `urlPrefix` and then build `${urlPrefix}/cart`,
-      // so a trailing slash here produced `/<slug>//cart` on the platform host
-      // (custom domains were unaffected because prefix is ''). `/<slug>` is also
-      // the canonical store-root route, so storeUrl('/') maps there cleanly.
-      if (path === '' || path === '/') return prefix;
-      // Don't double-prefix
-      if (path.startsWith(prefix)) return path;
-      return `${prefix}${path.startsWith('/') ? path : `/${path}`}`;
-    },
-    [prefix]
-  );
+  return useCallback((path: string) => path, []);
 }
 
 /**
- * Whether this request is on a platform host (`store.force-ai.co`,
+ * Whether this request is on a platform host (`ebda.app`,
  * `localhost`, a preview subdomain) rather than a merchant's custom domain.
  *
  * Exposed separately from `useStoreUrl()` (rather than changing that hook's

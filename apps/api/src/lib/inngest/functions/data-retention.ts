@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withStore, acrossStores, acrossStoresFlat } from '@force/database';
 import { AuthService, eraseNeedsCrmReview } from '../../../services/auth.service';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -30,7 +30,7 @@ import { auditLog } from '../../../middleware/security';
 
 const ABANDONED_CART_RETENTION_DAYS = 30;
 const SOFT_DELETED_USER_RETENTION_DAYS = 365;
-// Kuwait MOF tax record retention is 5 years from invoice issue.
+// Egypt MOF tax record retention is 5 years from invoice issue.
 // After that the order row is no longer required for tax compliance
 // and its PII snapshots (already nullified at customer-erase time,
 // but not for orders whose customer never asked to be erased) need
@@ -56,12 +56,15 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
 
     // FORCE RLS: data-retention is cross-tenant — no storeId available.
     // Use withRlsBypass for all DB operations in this cron.
-    const candidateCount = await step.run('count-candidates', () =>
-      withRlsBypass(tx =>
-        tx.abandonedCart.count({
-          where: { createdAt: { lt: cutoff }, customerId: null },
-        })
-      )
+    // Store-scoped table: counted and purged store by store, each in its own scope.
+    const candidateCount = await step.run('count-candidates', async () =>
+      (
+        await acrossStores(() =>
+          prisma.abandonedCart.count({
+            where: { createdAt: { lt: cutoff }, customerId: null },
+          })
+        )
+      ).reduce((n, r) => n + r.value, 0)
     );
 
     if (candidateCount === 0) {
@@ -69,24 +72,25 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
       return { purged: 0 };
     }
 
-    // deleteMany is server-side bulk; the BATCH_CAP throttles via `id`
-    // window so a runaway backlog (e.g. first run after months of
-    // missed schedules) doesn't lock the table for minutes.
-    const deleted = await step.run('delete-batch', () =>
-      withRlsBypass(async tx => {
-        const candidates = await tx.abandonedCart.findMany({
+    const deleted = await step.run('delete-batch', async () => {
+      let removed = 0;
+      for (const { value } of await acrossStores(async () => {
+        const candidates = await prisma.abandonedCart.findMany({
           where: { createdAt: { lt: cutoff }, customerId: null },
           select: { id: true },
           orderBy: { createdAt: 'asc' },
           take: ABANDONED_CART_BATCH_CAP,
         });
         if (candidates.length === 0) return 0;
-        const result = await tx.abandonedCart.deleteMany({
+        const result = await prisma.abandonedCart.deleteMany({
           where: { id: { in: candidates.map(c => c.id) } },
         });
         return result.count;
-      })
-    );
+      })) {
+        removed += value;
+      }
+      return removed;
+    });
 
     logger.info({ cutoff, candidateCount, deleted }, 'abandoned-cart-purge: completed');
     return { purged: deleted, remaining: candidateCount - deleted };
@@ -107,18 +111,21 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
     // (see AuthService.eraseAccount). Skip those — re-running the
     // erase transaction is idempotent but wastes a write per row.
     // FORCE RLS: cross-tenant cron — use withRlsBypass throughout.
-    const candidates = await step.run('find-candidates', () =>
-      withRlsBypass(tx =>
-        tx.user.findMany({
-          where: {
-            role: 'customer',
-            deletedAt: { not: null, lt: cutoff },
-            NOT: { email: { startsWith: 'erased-' } },
-          },
-          select: { id: true },
-          take: USER_ANONYMIZE_BATCH_CAP,
-        })
-      )
+    // Customers live in their store's scope: found store by store.
+    const candidates = await step.run('find-candidates', async () =>
+      (
+        await acrossStoresFlat(() =>
+          prisma.user.findMany({
+            where: {
+              role: 'customer',
+              deletedAt: { not: null, lt: cutoff },
+              NOT: { email: { startsWith: 'erased-' } },
+            },
+            select: { id: true },
+            take: USER_ANONYMIZE_BATCH_CAP,
+          })
+        )
+      ).slice(0, USER_ANONYMIZE_BATCH_CAP)
     );
 
     if (candidates.length === 0) {
@@ -167,7 +174,7 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
 /**
  * Order anonymization at 5 years.
  *
- * Kuwait MOF requires invoice retention ≥5 years for tax compliance.
+ * Egypt MOF requires invoice retention ≥5 years for tax compliance.
  * After that window the order ROW can still survive (financial record)
  * but its PII snapshots must go (applicable GCC data-protection law +
  * GDPR Art. 5(1)(e) storage limitation — see
@@ -189,7 +196,7 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
 export const orderAnonymizeAtFiveYears: InngestFunction.Any = inngest.createFunction(
   {
     id: 'order-anonymize-5y-monthly',
-    name: 'Anonymize orders older than 5 years (Kuwait MOF retention window)',
+    name: 'Anonymize orders older than 5 years (Egypt MOF retention window)',
     retries: 2,
     triggers: [{ cron: '30 3 1 * *' }],
   },
@@ -197,27 +204,28 @@ export const orderAnonymizeAtFiveYears: InngestFunction.Any = inngest.createFunc
     const cutoff = new Date(Date.now() - ORDER_ANONYMIZE_RETENTION_DAYS * 24 * 60 * 60 * 1000);
 
     // FORCE RLS: cross-tenant cron — use withRlsBypass throughout.
-    const candidates = await step.run('find-candidates', () =>
-      withRlsBypass(tx =>
-        tx.order.findMany({
-          where: {
-            createdAt: { lt: cutoff },
-            // Skip rows already anonymized (idempotent re-runs).
-            // The eraseAccount path writes {anonymized: true}; checking
-            // for `path: ['anonymized'], equals: true` is the prisma
-            // way to query inside JSONB.
-            NOT: {
-              shippingAddress: {
-                path: ['anonymized'],
-                equals: true,
+    const candidates = await step.run('find-candidates', async () =>
+      (
+        await acrossStoresFlat(() =>
+          prisma.order.findMany({
+            where: {
+              createdAt: { lt: cutoff },
+              NOT: {
+                shippingAddress: {
+                  path: ['anonymized'],
+                  equals: true,
+                },
               },
             },
-          },
-          select: { id: true },
-          take: ORDER_ANONYMIZE_BATCH_CAP,
-          orderBy: { createdAt: 'asc' },
-        })
+            select: { id: true, storeId: true, createdAt: true },
+            take: ORDER_ANONYMIZE_BATCH_CAP,
+            orderBy: { createdAt: 'asc' },
+          })
+        )
       )
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+        .slice(0, ORDER_ANONYMIZE_BATCH_CAP)
+        .map(o => ({ id: o.id, storeId: o.storeId }))
     );
 
     if (candidates.length === 0) {
@@ -229,10 +237,10 @@ export const orderAnonymizeAtFiveYears: InngestFunction.Any = inngest.createFunc
     let failed = 0;
     const anonymizedJson = { anonymized: true } as const;
 
-    for (const { id } of candidates) {
+    for (const { id, storeId } of candidates) {
       try {
         await step.run(`anonymize-${id}`, () =>
-          withRlsBypass(tx =>
+          withStore(storeId, tx =>
             tx.order.update({
               where: { id },
               data: {

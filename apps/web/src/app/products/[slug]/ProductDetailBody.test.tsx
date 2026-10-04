@@ -63,7 +63,7 @@ afterEach(() => {
 });
 
 describe('ProductDetailBody — redirect-on-miss', () => {
-  it('rename → 308: permanentRedirect fires with the store-prefixed platform URL, notFound does not fire', async () => {
+  it('rename → 308: permanentRedirect fires with the <slug>.ebda.app store URL, notFound does not fire', async () => {
     delete process.env.NEXT_PUBLIC_SITE_URL;
     global.fetch = makeFetchMock({ ok: false, status: 404 }) as unknown as typeof fetch;
     mockedFetchSlugRedirect.mockResolvedValue('raw-pecan');
@@ -74,7 +74,8 @@ describe('ProductDetailBody — redirect-on-miss', () => {
       ProductDetailBody({ store, slug: 'raw-pecan-2636297', draftToken: undefined })
     ).rejects.toThrow('__PERMANENT_REDIRECT__');
 
-    const expectedUrl = `${getSiteUrl(store)}/pecan/products/raw-pecan`;
+    const expectedUrl = `${getSiteUrl(store)}/products/raw-pecan`;
+    expect(expectedUrl).toBe('https://pecan.ebda.app/products/raw-pecan');
     expect(mockedPermanentRedirect).toHaveBeenCalledTimes(1);
     expect(mockedPermanentRedirect).toHaveBeenCalledWith(expectedUrl);
     expect(mockedNotFound).not.toHaveBeenCalled();

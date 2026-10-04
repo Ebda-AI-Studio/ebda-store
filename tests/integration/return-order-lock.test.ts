@@ -54,7 +54,7 @@ describe.skipIf(!hasDb)('returns on one order are serialised by the order lock',
           name: 'rol-test-store',
           slug: `rol-test-${suffix}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: owner.id,
         },
       });

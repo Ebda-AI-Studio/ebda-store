@@ -134,7 +134,7 @@ describe.skipIf(!hasDb)('cart unique-race recovery under the ambient tenant tran
     const got = await cart.getCart().expect(200);
     expect(got.body.data.cart.bundles).toHaveLength(1);
     expect(got.body.data.cart.bundles[0].quantity).toBe(3);
-    // Priced live off the bundle, never the component sum — 900 fils x 3.
+    // Priced live off the bundle, never the component sum — 900 piastres x 3.
     expect(got.body.data.cart.bundles[0].total).toBe(2700);
   });
 });

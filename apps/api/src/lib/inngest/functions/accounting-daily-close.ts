@@ -1,15 +1,16 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 
+import { REGION } from '@force/shared';
 /**
  * Nightly trial-balance integrity scan. For every store with accounting
  * enabled, sum SUM(DR) and SUM(CR) across ALL posted journal lines. If they
  * diverge by any amount, fire a P0 Telegram alert — the GL has drifted.
  *
- * Runs at 22:00 UTC = 01:00 KW (Kuwait is UTC+3).
+ * Runs at 01:00 Cairo (`TZ=` cron; Egypt observes DST).
  */
 export const accountingDailyClose: InngestFunction.Any = inngest.createFunction(
   {
@@ -17,17 +18,15 @@ export const accountingDailyClose: InngestFunction.Any = inngest.createFunction(
     name: 'Accounting daily close',
     retries: 2,
     concurrency: { limit: 1 }, // serialize across all stores
-    triggers: [{ cron: '0 22 * * *' }],
+    triggers: [{ cron: `TZ=${REGION.timezone} 0 1 * * *` }], // 01:00 Cairo (DST-aware via TZ=)
   },
   async ({ step }) => {
     // FORCE RLS: cross-tenant cron — use withRlsBypass to enumerate stores.
     const stores = await step.run('list-stores-with-accounting', () =>
-      withRlsBypass(tx =>
-        tx.store.findMany({
-          where: { accountingEnabled: true, deletedAt: null },
-          select: { id: true, name: true, slug: true },
-        })
-      )
+      prisma.store.findMany({
+        where: { accountingEnabled: true, deletedAt: null },
+        select: { id: true, name: true, slug: true },
+      })
     );
 
     let drifts = 0;
@@ -35,8 +34,9 @@ export const accountingDailyClose: InngestFunction.Any = inngest.createFunction(
       const result = await step.run(`drift-${store.id}`, async () => {
         // Cross-tenant cron — no tenant context on this connection.
         // RLS on journal_entries/journal_lines would filter every read
-        // to 0 rows. Wrap in withRlsBypass for accurate sums.
-        const sums = await withRlsBypass(
+        // to 0 rows. Read each store in its own scope for accurate sums.
+        const sums = await withStore(
+          store.id,
           tx => tx.$queryRaw<{ total_debit: bigint; total_credit: bigint }[]>`
             SELECT
               COALESCE(SUM(l.debit), 0)  AS total_debit,
@@ -60,7 +60,7 @@ export const accountingDailyClose: InngestFunction.Any = inngest.createFunction(
             store: { id: store.id, name: store.name, slug: store.slug ?? undefined },
             source: 'cron.accounting-daily-close',
             title: `Trial balance drift — ${store.name}`,
-            body: `Store ${store.slug}: DR=${result.dr} CR=${result.cr} (drift ${result.drift} fils)`,
+            body: `Store ${store.slug}: DR=${result.dr} CR=${result.cr} (drift ${result.drift} piastres)`,
           })
         );
       }

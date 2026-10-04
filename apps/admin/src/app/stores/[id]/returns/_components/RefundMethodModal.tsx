@@ -5,6 +5,7 @@ import { Button, Modal } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../lib/api';
 
+import { formatMoney } from '@force/shared';
 type RefundMethod = 'original' | 'store_credit' | 'bank_transfer' | 'manual';
 
 // 'manual' ("Already refunded — record only") is offered ONLY when a refund for
@@ -14,17 +15,17 @@ const REFUND_METHODS: RefundMethod[] = ['original', 'store_credit', 'bank_transf
 /** `GET /returns/admin/:id/refund-preview` — ReturnService.refundPreview. */
 interface RefundPreview {
   isFullReturn: boolean;
-  /** What a non-gateway completion records, in fils. */
+  /** What a non-gateway completion records, in piastres. */
   recordedAmount: number;
   /** With the customer wallet on: what store credit puts in the customer's
-   *  wallet, in fils (complete() credits exactly this). Null = wallet off. */
+   *  wallet, in piastres (complete() credits exactly this). Null = wallet off. */
   storeCreditToWallet?: number | null;
   gateway: {
     available: boolean;
-    /** What would be sent to the customer's original payment method, in fils. */
+    /** What would be sent to the customer's original payment method, in piastres. */
     amount: number | null;
     /** On an order paid partly from the customer wallet, the part of this
-     *  refund that goes back to the wallet instead, in fils (#1956). */
+     *  refund that goes back to the wallet instead, in piastres (#1956). */
     walletShare?: number;
     refundableRemaining: number | null;
     unavailableReason: string | null;
@@ -45,12 +46,8 @@ const KNOWN_GATEWAY_REASONS = new Set([
   'REFUND_PERMISSION_REQUIRED',
 ]);
 
-function formatCurrency(fils: number) {
-  return new Intl.NumberFormat('en-KW', {
-    style: 'currency',
-    currency: 'KWD',
-    minimumFractionDigits: 3,
-  }).format(fils / 1000);
+function formatCurrency(piastres: number) {
+  return formatMoney(piastres, 'en');
 }
 
 interface RefundMethodModalProps {

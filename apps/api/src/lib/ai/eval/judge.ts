@@ -70,7 +70,7 @@ function buildJudgePrompt(
     return acc;
   }, {});
 
-  return `You are a strict, skeptical QA judge evaluating AI-generated e-commerce content for a Kuwait-based store-builder platform. Your job is to catch REAL defects — hallucinated facts, duplicated content, irrelevant output, tone mismatches. Do not be lenient; a plausible-sounding but ungrounded claim is still a failure.
+  return `You are a strict, skeptical QA judge evaluating AI-generated e-commerce content for an Egypt-based store-builder platform. Your job is to catch REAL defects — hallucinated facts, duplicated content, irrelevant output, tone mismatches. Do not be lenient; a plausible-sounding but ungrounded claim is still a failure.
 
 CONTENT TYPE: ${type} — ${description}
 

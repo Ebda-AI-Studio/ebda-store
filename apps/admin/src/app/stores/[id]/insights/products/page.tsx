@@ -12,12 +12,13 @@ import { ErrorState } from '@/components/ErrorState';
 // rendered blank or 0 (2026-09-30 audit, finding 2).
 import type { ProductVelocityResponse, ProductVelocityRow } from '@force/shared';
 
+import { minorToDecimalString } from '@force/shared';
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 // Unknown (null) renders as "—", never as a fabricated 0.
-function kwd(fils: number | null | undefined): string {
-  if (typeof fils !== 'number' || !Number.isFinite(fils)) return '—';
-  return (fils / 1000).toFixed(3);
+function major(piastres: number | null | undefined): string {
+  if (typeof piastres !== 'number' || !Number.isFinite(piastres)) return '—';
+  return minorToDecimalString(piastres);
 }
 
 function num(v: number | null | undefined, digits = 2): string {
@@ -121,7 +122,7 @@ export default function InsightsProductsPage() {
         <span
           className={`font-mono ${row.avgSellingPriceFils === null ? 'text-muted-foreground' : ''}`}
         >
-          {kwd(row.avgSellingPriceFils)}
+          {major(row.avgSellingPriceFils)}
         </span>
       ),
     },
@@ -144,7 +145,7 @@ export default function InsightsProductsPage() {
       alignEnd: true,
       hideOnMobile: true,
       cell: row => (
-        <span className="font-mono text-muted-foreground">{kwd(row.costPriceFils)}</span>
+        <span className="font-mono text-muted-foreground">{major(row.costPriceFils)}</span>
       ),
     },
   ];

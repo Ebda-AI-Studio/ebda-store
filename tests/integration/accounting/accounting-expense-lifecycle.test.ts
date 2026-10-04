@@ -35,7 +35,7 @@ beforeAll(async () => {
   storeId = s.id;
   await seedCoaForStore(storeId);
   marketingAccountId = await getSystemAccountIdByCode(storeId, '5200'); // Marketing
-  cashAccountId = await getSystemAccountIdByCode(storeId, '1000'); // Cash KNET
+  cashAccountId = await getSystemAccountIdByCode(storeId, '1000'); // Cash Online
 });
 
 afterAll(async () => {
@@ -53,7 +53,7 @@ describe('expense lifecycle: draft → approve → post → journal', () => {
       storeId,
       expenseAccountId: marketingAccountId,
       paidFromAccountId: cashAccountId,
-      amount: 50000, // 50 KWD
+      amount: 50000, // 50 EGP
       taxAmount: 0,
       expenseDate: new Date(),
       notes: 'Test FB ad spend',
@@ -86,7 +86,7 @@ describe('expense lifecycle: draft → approve → post → journal', () => {
     const drLine = entry!.lines.find(l => l.debit === 50000);
     const crLine = entry!.lines.find(l => l.credit === 50000);
     expect(drLine?.account.code).toBe('5200'); // Marketing
-    expect(crLine?.account.code).toBe('1000'); // Cash KNET
+    expect(crLine?.account.code).toBe('1000'); // Cash Online
   });
 
   it('reject path: rejected expense cannot be posted', async () => {

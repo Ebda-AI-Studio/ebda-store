@@ -37,7 +37,7 @@ describe('normalizeApiOrigin', () => {
   });
 
   it('rejects a bare host that URL() refuses to parse', () => {
-    expect(() => normalizeApiOrigin('api.force-ai.co', 'TEST_API_URL')).toThrow(
+    expect(() => normalizeApiOrigin('api.ebda.app', 'TEST_API_URL')).toThrow(
       /not a valid absolute URL/
     );
   });
@@ -74,15 +74,15 @@ describe('api-base safety claims are enforced, not just documented', () => {
   // whose production value is a real, reachable API". Before this, only the
   // variable NAME enforced that — exporting TEST_API_URL by hand walked past it.
   it('refuses a non-local host', async () => {
-    process.env.TEST_API_URL = 'https://api.force-ai.co';
+    process.env.TEST_API_URL = 'https://api.ebda.app';
     await expect(import('../helpers/api-base')).rejects.toThrow(/non-local host/i);
   });
 
   it('allows a non-local host only with an explicit opt-in', async () => {
-    process.env.TEST_API_URL = 'https://api.force-ai.co';
+    process.env.TEST_API_URL = 'https://api.ebda.app';
     process.env.TEST_API_ALLOW_REMOTE = '1';
     const m = await import('../helpers/api-base');
-    expect(m.API_BASE).toBe('https://api.force-ai.co/api/v1');
+    expect(m.API_BASE).toBe('https://api.ebda.app/api/v1');
   });
 
   it.each(['http://localhost:4000', 'http://127.0.0.1:4000', 'http://192.168.1.9:4000'])(
@@ -139,11 +139,11 @@ describe('resolveRaw precedence (#1637)', () => {
   });
 
   // The regression this file exists to prevent: the SERVER's own env vars
-  // (deployed values include `API_URL=https://api.force-ai.co`) must never be
+  // (deployed values include `API_URL=https://api.ebda.app`) must never be
   // read as the suite's base, or a local `npm run test:integration` on a
   // machine holding production values would POST /auth/register at prod.
   it('never consults API_URL/API_HOST — a deployed value stays inert', async () => {
-    process.env.API_URL = 'https://api.force-ai.co';
+    process.env.API_URL = 'https://api.ebda.app';
     process.env.API_HOST = 'localhost';
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const m = await import('../helpers/api-base');

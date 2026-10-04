@@ -97,9 +97,14 @@ vi.mock('@force/database', () => ({
       h.moneyTxDepth.n--;
     }
   },
-  withRlsBypass: async (fn: (b: unknown) => unknown) => {
+}));
+
+// The pre-cutover `order.admin_created` actor row carries no store, so it is answered by the
+// `ebda_audit_log_exists` definer (`auditLogExists`); `auditLogFindFirst` stands for that row.
+vi.mock('@api/lib/definer', () => ({
+  auditLogExists: async () => {
     if (h.moneyTxDepth.n > 0) h.bypassCalledInsideMoneyTx();
-    return fn({ auditLog: { findFirst: h.auditLogFindFirst } });
+    return !!(await h.auditLogFindFirst());
   },
 }));
 
@@ -157,7 +162,7 @@ const ORDER = {
   // explicitly below with status 'cancelled'.
   status: 'refunded',
   total: 5000,
-  currency: 'KWD',
+  currency: 'EGP',
   locale: 'en',
   customer: { email: 'buyer@test.com', firstName: 'Sam', lastName: 'B' },
   payments: [],
@@ -337,7 +342,7 @@ describe('order-refunded fanout — reverse-coupon step', () => {
     expect(couponMarkers).toHaveLength(1); // marker written once
   });
 
-  // Issue 2359: the pre-cutover admin-order lookup is a withRlsBypass read —
+  // Issue 2359: the pre-cutover admin-order lookup is a definer read —
   // a fresh $transaction on a second pool connection. It must run in its own
   // step BEFORE the coupon withMoneyTx opens, never inside it.
   it('pre-cutover admin order: looks up admin_created OUTSIDE the money tx and skips the decrement', async () => {
@@ -1091,7 +1096,7 @@ describe('order-refunded fanout — cancel before any refund moved (issue 1948)'
     h.orderFindUnique.mockResolvedValue({
       ...ORDER,
       status: 'cancelled',
-      payments: [{ refundedAmount: 0, provider: 'myfatoorah', metadata: {} }],
+      payments: [{ refundedAmount: 0, provider: 'paymob', metadata: {} }],
       couponCode: null,
       customerId: null,
     });
@@ -1115,19 +1120,19 @@ describe('order-refunded fanout — cancel before any refund moved (issue 1948)'
     [
       'a captured card payment → refund pending',
       'paid',
-      [{ provider: 'myfatoorah', status: 'completed', refundedAmount: 0, metadata: {} }],
+      [{ provider: 'paymob', status: 'completed', refundedAmount: 0, metadata: {} }],
       true,
     ],
     [
       'an unpaid order → not charged',
       'unpaid',
-      [{ provider: 'myfatoorah', status: 'pending', refundedAmount: 0, metadata: {} }],
+      [{ provider: 'paymob', status: 'pending', refundedAmount: 0, metadata: {} }],
       false,
     ],
     [
       'an auth-only / voided payment → not charged',
       'unpaid',
-      [{ provider: 'tap', status: 'cancelled', refundedAmount: 0, metadata: {} }],
+      [{ provider: 'kashier', status: 'cancelled', refundedAmount: 0, metadata: {} }],
       false,
     ],
     // PR 2335 audit P1: COD whose cash was COLLECTED (mark-paid → order paid,
@@ -1165,7 +1170,7 @@ describe('order-refunded fanout — cancel before any refund moved (issue 1948)'
     h.orderFindUnique.mockResolvedValue({
       ...ORDER,
       status: 'cancelled',
-      payments: [{ refundedAmount: 5000, provider: 'myfatoorah', metadata: {} }],
+      payments: [{ refundedAmount: 5000, provider: 'paymob', metadata: {} }],
       couponCode: null,
       customerId: null,
     });

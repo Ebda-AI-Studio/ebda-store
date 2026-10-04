@@ -2,7 +2,7 @@
  * Regression: public checkout order validation contract (the P0 that failed in
  * front of a client on 2026-06-09).
  *
- * Kuwait addresses have no "city" (the locality is the area/district, sent as
+ * Egypt addresses have no "city" (the locality is the area/district, sent as
  * `state`), and the email field is optional. The storefront checkout form sends
  * `city: ''` and frequently `email: ''`. An earlier `shippingAddressSchema`
  * required `city` (`.min(1)`) and treated email as required-or-undefined, so a
@@ -13,14 +13,14 @@
 import { describe, it, expect } from 'vitest';
 import { shippingAddressSchema, createOrderSchema } from '@api/routes/public.routes';
 
-// A realistic Kuwait checkout payload as the storefront actually sends it.
+// A realistic Egypt checkout payload as the storefront actually sends it.
 const kwAddress = {
   firstName: 'Ahmad',
   lastName: 'Sharaf',
   address1: 'Block 4, Street 1, House 10',
   city: '', // KW model: city is always blank
   state: 'Hawally', // legacy: area/district used to live here
-  country: 'KW',
+  country: 'EG',
   phone: '+96512345678',
 };
 
@@ -92,7 +92,7 @@ describe('public checkout order schema (KW contract regression)', () => {
     it('accepts a full KW order (blank city + no email) with a payment method', () => {
       const r = createOrderSchema.safeParse({
         shippingAddress: kwAddress,
-        paymentMethod: 'myfatoorah',
+        paymentMethod: 'paymob',
       });
       expect(r.success).toBe(true);
     });
@@ -101,14 +101,14 @@ describe('public checkout order schema (KW contract regression)', () => {
       expect(
         createOrderSchema.safeParse({
           shippingAddress: kwAddress,
-          paymentMethod: 'knet',
+          paymentMethod: 'card',
           locale: 'ar',
         }).success
       ).toBe(true);
       expect(
         createOrderSchema.safeParse({
           shippingAddress: kwAddress,
-          paymentMethod: 'knet',
+          paymentMethod: 'card',
           locale: 'fr',
         }).success
       ).toBe(false);

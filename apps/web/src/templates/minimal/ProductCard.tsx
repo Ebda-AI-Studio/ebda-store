@@ -17,7 +17,7 @@ import {
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor, getProductCardTextSizes } from '@force/shared';
+import { resolveColor, getProductCardTextSizes, fromMinor, REGION } from '@force/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price } from '@force/ui';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
@@ -47,7 +47,7 @@ import { cn } from '@force/ui';
 function MinimalProductCard({
   product,
   isRtl: isRtlProp,
-  currency = 'KWD',
+  currency = REGION.currency,
   quantityInCart = 0,
   onAddToCart,
   urlPrefix = '',
@@ -103,7 +103,7 @@ function MinimalProductCard({
   // Variant-aware pricing — see lib/product-pricing.ts.
   const pricing = getProductPricing(product, undefined, 'card');
   const hasSale = !!pricing.displayCompare || pricing.hasVariantDiscount;
-  // BUG 1 fix: use helper for correct KWD/pct text.
+  // BUG 1 fix: use helper for correct EGP/pct text.
   const discountBadgeText = getDiscountBadgeText(product, isRtl);
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
   const orderable = product.inStock !== false || product.acceptsBackorder === true;
@@ -390,7 +390,7 @@ function MinimalProductCard({
             {/* schema meta always rendered for SEO */}
             <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
               <meta itemProp="priceCurrency" content={currency} />
-              <meta itemProp="price" content={String(pricing.displayPrice / 1000)} />
+              <meta itemProp="price" content={String(fromMinor(pricing.displayPrice))} />
             </span>
             {priceVisible && (
               <Price
@@ -407,7 +407,7 @@ function MinimalProductCard({
             {/* Discount indicator — minimal pack stays chrome-free, so use a
               short label inline (no corner overlay; the position field of
               productCardDefaults.discountBadge is a no-op here by design).
-              BUG 1 fix: show helper text (KWD or pct).
+              BUG 1 fix: show helper text (EGP or pct).
               BUG 2 fix: shown even when OOS (no inStock gate). Color is
               merchant-configurable via productCardDefaults.discountBadge.color. */}
             {priceVisible && hasSale && discountBadgeText && (

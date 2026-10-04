@@ -1,6 +1,6 @@
 /**
  * Issue 2444 — when ONLY the guest side of an order search is over `ORDER_SEARCH_CUSTOMER_ID_CAP`
- * (every Kuwait guest phone starts `+965`, so the digits of a phone typed left to right match every
+ * (every Egypt guest phone starts `+965`, so the digits of a phone typed left to right match every
  * guest order), `orderSearchWhere` returned the whole four-LEFT-JOIN `relationFallback`, discarding
  * the registered-customer lookup that had already succeeded. Each half now degrades on its own.
  *

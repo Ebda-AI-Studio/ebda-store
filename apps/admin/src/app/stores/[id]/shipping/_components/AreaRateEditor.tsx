@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@force/ui';
-import { KUWAIT_GOVERNORATES } from '@force/shared';
+import { EGYPT_GOVERNORATES, minorToDecimalString, REGION } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPut, apiDelete, apiFetch } from '../../../../../lib/api';
-import { kwdToFils, getIncompleteNewRows } from './areaRateValidation';
+import { majorToMinor, getIncompleteNewRows } from './areaRateValidation';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -17,22 +17,22 @@ interface AreaRate {
   governorateAr: string;
   area: string;
   areaAr: string;
-  deliveryFee: number; // fils
-  freeShippingThreshold: number | null; // fils
+  deliveryFee: number; // piastres
+  freeShippingThreshold: number | null; // piastres
   isActive: boolean;
   position: number;
 }
 
-// Per-row local state (KWD strings for inputs)
+// Per-row local state (EGP strings for inputs)
 interface AreaRowState {
   isActive: boolean;
-  feeKwd: string; // "1.500"
-  thresholdKwd: string; // "10.000" or ""
+  feeMajor: string; // "1.500"
+  thresholdMajor: string; // "10.000" or ""
 }
 
 type AreaStateMap = Record<string, AreaRowState>; // key = `${governorate}||${area}`
 
-// A custom row: a rate that is not part of the static Kuwait list
+// A custom row: a rate that is not part of the static Egypt list
 interface CustomRow {
   /** DB id — present if the row was fetched from the server; absent if unsaved */
   id?: string;
@@ -43,8 +43,8 @@ interface CustomRow {
   area: string;
   areaAr: string;
   isActive: boolean;
-  feeKwd: string;
-  thresholdKwd: string;
+  feeMajor: string;
+  thresholdMajor: string;
 }
 
 interface Props {
@@ -53,18 +53,18 @@ interface Props {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function filsToKwd(fils: number): string {
-  return (fils / 1000).toFixed(3);
+function minorToMajor(piastres: number): string {
+  return minorToDecimalString(piastres);
 }
 
 function rowKey(governorate: string, area: string) {
   return `${governorate}||${area}`;
 }
 
-/** Returns true if the (country, governorate, area) triple belongs to the static Kuwait list */
-function isKuwaitStatic(country: string, governorate: string, area: string): boolean {
-  if (country !== 'Kuwait') return false;
-  const gov = KUWAIT_GOVERNORATES.find(g => g.en === governorate);
+/** Returns true if the (country, governorate, area) triple belongs to the static Egypt list */
+function isEgyptStatic(country: string, governorate: string, area: string): boolean {
+  if (country !== REGION.countryName.en) return false;
+  const gov = EGYPT_GOVERNORATES.find(g => g.en === governorate);
   if (!gov) return false;
   return gov.areas.some(a => a.en === area);
 }
@@ -110,8 +110,8 @@ function Toggle({ checked, onChange, label }: ToggleProps) {
 }
 
 interface FeeInputsProps {
-  feeKwd: string;
-  thresholdKwd: string;
+  feeMajor: string;
+  thresholdMajor: string;
   onFeeChange: (v: string) => void;
   onThresholdChange: (v: string) => void;
   feeLabel: string;
@@ -121,8 +121,8 @@ interface FeeInputsProps {
   freeOverHint: string;
 }
 function FeeInputs({
-  feeKwd,
-  thresholdKwd,
+  feeMajor,
+  thresholdMajor,
   onFeeChange,
   onThresholdChange,
   feeLabel,
@@ -137,9 +137,9 @@ function FeeInputs({
         <input
           type="number"
           min="0"
-          step="0.001"
-          placeholder="0.000"
-          value={feeKwd}
+          step="0.01"
+          placeholder="0.00"
+          value={feeMajor}
           onChange={e => onFeeChange(e.target.value)}
           aria-label={feeLabel}
           className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
@@ -153,9 +153,9 @@ function FeeInputs({
         <input
           type="number"
           min="0"
-          step="0.001"
+          step="0.01"
           placeholder={optionalLabel}
-          value={thresholdKwd}
+          value={thresholdMajor}
           onChange={e => onThresholdChange(e.target.value)}
           aria-label={freeOverLabel}
           className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
@@ -175,30 +175,30 @@ export function AreaRateEditor({ storeId }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Static Kuwait area state (same structure as before)
+  // Static Egypt area state (same structure as before)
   const [areaState, setAreaState] = useState<AreaStateMap>({});
 
   // Custom (non-static) rows — country/province/area added by the merchant
   const [customRows, setCustomRows] = useState<CustomRow[]>([]);
 
-  // Accordion: which Kuwait governorate is open
+  // Accordion: which Egypt governorate is open
   const [openGov, setOpenGov] = useState<string | null>(null);
   // Accordion: which custom-country is open (keyed by country EN)
   const [openCustomCountry, setOpenCustomCountry] = useState<string | null>(null);
 
-  // Bulk-apply per-governorate input value (Kuwait static)
-  const [bulkFeeKwd, setBulkFeeKwd] = useState<Record<string, string>>({});
+  // Bulk-apply per-governorate input value (Egypt static)
+  const [bulkFeeMajor, setBulkFeeMajor] = useState<Record<string, string>>({});
   // Per-governorate free-shipping-over threshold (decoupled from the fee apply).
-  const [bulkThresholdKwd, setBulkThresholdKwd] = useState<Record<string, string>>({});
+  const [bulkThresholdMajor, setBulkThresholdMajor] = useState<Record<string, string>>({});
 
   // Global bulk-apply: applies one flat fee + free-over threshold to ALL
-  // areas across ALL Kuwait governorates at once.
-  const [globalBulkFeeKwd, setGlobalBulkFeeKwd] = useState('');
-  const [globalBulkThresholdKwd, setGlobalBulkThresholdKwd] = useState('');
+  // areas across ALL Egypt governorates at once.
+  const [globalBulkFeeMajor, setGlobalBulkFeeMajor] = useState('');
+  const [globalBulkThresholdMajor, setGlobalBulkThresholdMajor] = useState('');
 
   // "Add area" inline forms per (country||governorate) key
   const [addAreaForm, setAddAreaForm] = useState<
-    Record<string, { area: string; areaAr: string; feeKwd: string }>
+    Record<string, { area: string; areaAr: string; feeMajor: string }>
   >({});
   // Which add-area inline forms are open
   const [addAreaOpen, setAddAreaOpen] = useState<Record<string, boolean>>({});
@@ -212,7 +212,7 @@ export function AreaRateEditor({ storeId }: Props) {
     governorateAr: '',
     area: '',
     areaAr: '',
-    feeKwd: '',
+    feeMajor: '',
   });
 
   // Import/export
@@ -233,10 +233,10 @@ export function AreaRateEditor({ storeId }: Props) {
 
       const map: AreaStateMap = {};
       // Pre-populate all canonical areas as inactive/empty
-      for (const gov of KUWAIT_GOVERNORATES) {
+      for (const gov of EGYPT_GOVERNORATES) {
         for (const area of gov.areas) {
           const k = rowKey(gov.en, area.en);
-          map[k] = { isActive: false, feeKwd: '', thresholdKwd: '' };
+          map[k] = { isActive: false, feeMajor: '', thresholdMajor: '' };
         }
       }
 
@@ -244,14 +244,14 @@ export function AreaRateEditor({ storeId }: Props) {
 
       if (data?.rates) {
         for (const rate of data.rates) {
-          if (isKuwaitStatic(rate.country, rate.governorate, rate.area)) {
-            // Overlay onto the static Kuwait map
+          if (isEgyptStatic(rate.country, rate.governorate, rate.area)) {
+            // Overlay onto the static Egypt map
             const k = rowKey(rate.governorate, rate.area);
             map[k] = {
               isActive: rate.isActive,
-              feeKwd: rate.deliveryFee > 0 ? filsToKwd(rate.deliveryFee) : '',
-              thresholdKwd:
-                rate.freeShippingThreshold != null ? filsToKwd(rate.freeShippingThreshold) : '',
+              feeMajor: rate.deliveryFee > 0 ? minorToMajor(rate.deliveryFee) : '',
+              thresholdMajor:
+                rate.freeShippingThreshold != null ? minorToMajor(rate.freeShippingThreshold) : '',
             };
           } else {
             // Non-static: add to custom rows
@@ -264,9 +264,9 @@ export function AreaRateEditor({ storeId }: Props) {
               area: rate.area,
               areaAr: rate.areaAr,
               isActive: rate.isActive,
-              feeKwd: rate.deliveryFee > 0 ? filsToKwd(rate.deliveryFee) : '',
-              thresholdKwd:
-                rate.freeShippingThreshold != null ? filsToKwd(rate.freeShippingThreshold) : '',
+              feeMajor: rate.deliveryFee > 0 ? minorToMajor(rate.deliveryFee) : '',
+              thresholdMajor:
+                rate.freeShippingThreshold != null ? minorToMajor(rate.freeShippingThreshold) : '',
             });
           }
         }
@@ -285,7 +285,7 @@ export function AreaRateEditor({ storeId }: Props) {
     fetchRates();
   }, [fetchRates]);
 
-  // ── Static Kuwait row updates ─────────────────────────────────────────────
+  // ── Static Egypt row updates ─────────────────────────────────────────────
 
   function updateRow(key: string, patch: Partial<AreaRowState>) {
     setAreaState(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }));
@@ -310,35 +310,35 @@ export function AreaRateEditor({ storeId }: Props) {
     setCustomRows(prev => prev.filter((_, i) => i !== idx));
   }
 
-  // ── Bulk apply (Kuwait static) ────────────────────────────────────────────
+  // ── Bulk apply (Egypt static) ────────────────────────────────────────────
 
   function applyBulkFee(govEn: string) {
-    const gov = KUWAIT_GOVERNORATES.find(g => g.en === govEn);
+    const gov = EGYPT_GOVERNORATES.find(g => g.en === govEn);
     if (!gov) return;
-    const feeKwd = bulkFeeKwd[govEn] ?? '';
+    const feeMajor = bulkFeeMajor[govEn] ?? '';
     setAreaState(prev => {
       const next = { ...prev };
       for (const area of gov.areas) {
         const k = rowKey(gov.en, area.en);
-        next[k] = { ...next[k], feeKwd, isActive: feeKwd !== '' };
+        next[k] = { ...next[k], feeMajor, isActive: feeMajor !== '' };
       }
       return next;
     });
   }
 
-  // ── Global bulk-apply (ALL Kuwait areas across ALL governorates) ──────────
+  // ── Global bulk-apply (ALL Egypt areas across ALL governorates) ──────────
 
   // Apply ONE flat fee to every area in every governorate. Leaves each area's
   // free-over threshold untouched (decoupled from the free-over apply below).
   function applyGlobalFee() {
-    const feeKwd = globalBulkFeeKwd.trim();
-    if (feeKwd === '') return;
+    const feeMajor = globalBulkFeeMajor.trim();
+    if (feeMajor === '') return;
     setAreaState(prev => {
       const next = { ...prev };
-      for (const gov of KUWAIT_GOVERNORATES) {
+      for (const gov of EGYPT_GOVERNORATES) {
         for (const area of gov.areas) {
           const k = rowKey(gov.en, area.en);
-          next[k] = { ...next[k], feeKwd, isActive: true };
+          next[k] = { ...next[k], feeMajor, isActive: true };
         }
       }
       return next;
@@ -349,14 +349,14 @@ export function AreaRateEditor({ storeId }: Props) {
   // Decoupled — leaves each area's fee untouched (so the merchant can set a
   // uniform "free over X" across the country without overwriting the fees).
   function applyGlobalThreshold() {
-    const thresholdKwd = globalBulkThresholdKwd.trim();
-    if (thresholdKwd === '') return;
+    const thresholdMajor = globalBulkThresholdMajor.trim();
+    if (thresholdMajor === '') return;
     setAreaState(prev => {
       const next = { ...prev };
-      for (const gov of KUWAIT_GOVERNORATES) {
+      for (const gov of EGYPT_GOVERNORATES) {
         for (const area of gov.areas) {
           const k = rowKey(gov.en, area.en);
-          next[k] = { ...next[k], thresholdKwd };
+          next[k] = { ...next[k], thresholdMajor };
         }
       }
       return next;
@@ -366,15 +366,15 @@ export function AreaRateEditor({ storeId }: Props) {
   // Apply ONE free-shipping-over threshold to every area in ONE governorate.
   // Decoupled from the per-governorate fee apply (leaves fees untouched).
   function applyBulkThreshold(govEn: string) {
-    const gov = KUWAIT_GOVERNORATES.find(g => g.en === govEn);
+    const gov = EGYPT_GOVERNORATES.find(g => g.en === govEn);
     if (!gov) return;
-    const thresholdKwd = bulkThresholdKwd[govEn] ?? '';
-    if (thresholdKwd === '') return;
+    const thresholdMajor = bulkThresholdMajor[govEn] ?? '';
+    if (thresholdMajor === '') return;
     setAreaState(prev => {
       const next = { ...prev };
       for (const area of gov.areas) {
         const k = rowKey(gov.en, area.en);
-        next[k] = { ...next[k], thresholdKwd };
+        next[k] = { ...next[k], thresholdMajor };
       }
       return next;
     });
@@ -388,7 +388,7 @@ export function AreaRateEditor({ storeId }: Props) {
     const k = addAreaFormKey(country, governorate);
     setAddAreaOpen(prev => ({ ...prev, [k]: !prev[k] }));
     if (!addAreaForm[k]) {
-      setAddAreaForm(prev => ({ ...prev, [k]: { area: '', areaAr: '', feeKwd: '' } }));
+      setAddAreaForm(prev => ({ ...prev, [k]: { area: '', areaAr: '', feeMajor: '' } }));
     }
   }
 
@@ -411,16 +411,16 @@ export function AreaRateEditor({ storeId }: Props) {
       areaAr: form.areaAr.trim(),
       // A zone the merchant explicitly adds is meant to be USED — default it
       // active so it saves + applies at checkout, even with a 0 / blank fee
-      // (a legitimate FREE-delivery zone). Defaulting to `feeKwd !== ''` made
+      // (a legitimate FREE-delivery zone). Defaulting to `feeMajor !== ''` made
       // free zones inactive → silently dropped / blocked on save.
       isActive: true,
-      feeKwd: form.feeKwd,
-      thresholdKwd: '',
+      feeMajor: form.feeMajor,
+      thresholdMajor: '',
     };
 
     setCustomRows(prev => [...prev, newRow]);
     // Reset and close the form
-    setAddAreaForm(prev => ({ ...prev, [k]: { area: '', areaAr: '', feeKwd: '' } }));
+    setAddAreaForm(prev => ({ ...prev, [k]: { area: '', areaAr: '', feeMajor: '' } }));
     setAddAreaOpen(prev => ({ ...prev, [k]: false }));
   }
 
@@ -441,8 +441,8 @@ export function AreaRateEditor({ storeId }: Props) {
       // zone actually saves + applies, instead of being created inactive and
       // dropped. See submitAddArea for the full rationale.
       isActive: true,
-      feeKwd: addLocForm.feeKwd,
-      thresholdKwd: '',
+      feeMajor: addLocForm.feeMajor,
+      thresholdMajor: '',
     };
 
     setCustomRows(prev => [...prev, newRow]);
@@ -453,7 +453,7 @@ export function AreaRateEditor({ storeId }: Props) {
       governorateAr: '',
       area: '',
       areaAr: '',
-      feeKwd: '',
+      feeMajor: '',
     });
     setAddLocOpen(false);
   }
@@ -489,17 +489,17 @@ export function AreaRateEditor({ storeId }: Props) {
 
       let position = 0;
 
-      // 1. Static Kuwait rows
-      for (const gov of KUWAIT_GOVERNORATES) {
+      // 1. Static Egypt rows
+      for (const gov of EGYPT_GOVERNORATES) {
         for (const area of gov.areas) {
           const k = rowKey(gov.en, area.en);
           const row = areaState[k];
           if (!row) continue;
-          const fee = kwdToFils(row.feeKwd);
+          const fee = majorToMinor(row.feeMajor);
           if (!row.isActive && fee === 0) continue;
           const entry: (typeof rates)[number] = {
-            country: 'Kuwait',
-            countryAr: 'الكويت',
+            country: REGION.countryName.en,
+            countryAr: REGION.countryName.ar,
             governorate: gov.en,
             governorateAr: gov.ar,
             area: area.en,
@@ -508,16 +508,16 @@ export function AreaRateEditor({ storeId }: Props) {
             isActive: row.isActive,
             position: position++,
           };
-          if (row.thresholdKwd.trim() !== '') {
-            entry.freeShippingThreshold = kwdToFils(row.thresholdKwd);
+          if (row.thresholdMajor.trim() !== '') {
+            entry.freeShippingThreshold = majorToMinor(row.thresholdMajor);
           }
           rates.push(entry);
         }
       }
 
-      // 2. Custom rows (includes custom Kuwait areas AND other countries)
+      // 2. Custom rows (includes custom Egypt areas AND other countries)
       for (const row of customRows) {
-        const fee = kwdToFils(row.feeKwd);
+        const fee = majorToMinor(row.feeMajor);
         if (!row.isActive && fee === 0) continue;
         const entry: (typeof rates)[number] = {
           country: row.country,
@@ -530,8 +530,8 @@ export function AreaRateEditor({ storeId }: Props) {
           isActive: row.isActive,
           position: position++,
         };
-        if (row.thresholdKwd.trim() !== '') {
-          entry.freeShippingThreshold = kwdToFils(row.thresholdKwd);
+        if (row.thresholdMajor.trim() !== '') {
+          entry.freeShippingThreshold = majorToMinor(row.thresholdMajor);
         }
         rates.push(entry);
       }
@@ -647,25 +647,25 @@ export function AreaRateEditor({ storeId }: Props) {
   // ── Counts for accordion header ───────────────────────────────────────────
 
   function feeCount(govEn: string): number {
-    const gov = KUWAIT_GOVERNORATES.find(g => g.en === govEn);
+    const gov = EGYPT_GOVERNORATES.find(g => g.en === govEn);
     if (!gov) return 0;
     return gov.areas.filter(area => {
       const row = areaState[rowKey(govEn, area.en)];
-      return row && (row.isActive || kwdToFils(row.feeKwd) > 0);
+      return row && (row.isActive || majorToMinor(row.feeMajor) > 0);
     }).length;
   }
 
   // ── Custom geography grouping helpers ─────────────────────────────────────
 
   /**
-   * Returns unique custom countries. Kuwait is NOT included here even if
-   * there are custom areas added under Kuwait governorates — those render
-   * inside the static Kuwait accordion.
+   * Returns unique custom countries. Egypt is NOT included here even if
+   * there are custom areas added under Egypt governorates — those render
+   * inside the static Egypt accordion.
    */
   function customCountries(): string[] {
     const seen = new Set<string>();
     for (const row of customRows) {
-      if (row.country !== 'Kuwait') seen.add(row.country);
+      if (row.country !== REGION.countryName.en) seen.add(row.country);
     }
     return Array.from(seen);
   }
@@ -675,17 +675,17 @@ export function AreaRateEditor({ storeId }: Props) {
   }
 
   /**
-   * Custom areas that were added to a static Kuwait governorate
-   * (country === 'Kuwait' but area is NOT in the static list for that gov).
+   * Custom areas that were added to a static Egypt governorate
+   * (country === 'Egypt' but area is NOT in the static list for that gov).
    */
-  function customAreasForKuwaitGov(govEn: string): Array<{ row: CustomRow; idx: number }> {
+  function customAreasForEgyptGov(govEn: string): Array<{ row: CustomRow; idx: number }> {
     return customRows
       .map((row, idx) => ({ row, idx }))
       .filter(
         ({ row }) =>
-          row.country === 'Kuwait' &&
+          row.country === REGION.countryName.en &&
           row.governorate === govEn &&
-          !KUWAIT_GOVERNORATES.find(g => g.en === govEn)?.areas.some(a => a.en === row.area)
+          !EGYPT_GOVERNORATES.find(g => g.en === govEn)?.areas.some(a => a.en === row.area)
       );
   }
 
@@ -838,10 +838,10 @@ export function AreaRateEditor({ storeId }: Props) {
               <input
                 type="number"
                 min="0"
-                step="0.001"
-                placeholder="0.000"
-                value={globalBulkFeeKwd}
-                onChange={e => setGlobalBulkFeeKwd(e.target.value)}
+                step="0.01"
+                placeholder="0.00"
+                value={globalBulkFeeMajor}
+                onChange={e => setGlobalBulkFeeMajor(e.target.value)}
                 aria-label={t('applyAllGlobalFee')}
                 className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
               />
@@ -857,10 +857,10 @@ export function AreaRateEditor({ storeId }: Props) {
               <input
                 type="number"
                 min="0"
-                step="0.001"
+                step="0.01"
                 placeholder={t('optional')}
-                value={globalBulkThresholdKwd}
-                onChange={e => setGlobalBulkThresholdKwd(e.target.value)}
+                value={globalBulkThresholdMajor}
+                onChange={e => setGlobalBulkThresholdMajor(e.target.value)}
                 aria-label={t('applyAllGlobalThreshold')}
                 className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
               />
@@ -870,7 +870,7 @@ export function AreaRateEditor({ storeId }: Props) {
           <button
             type="button"
             onClick={applyGlobalFee}
-            disabled={globalBulkFeeKwd.trim() === ''}
+            disabled={globalBulkFeeMajor.trim() === ''}
             className="px-3 py-1 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('applyAllGlobalFeeBtn')}
@@ -878,7 +878,7 @@ export function AreaRateEditor({ storeId }: Props) {
           <button
             type="button"
             onClick={applyGlobalThreshold}
-            disabled={globalBulkThresholdKwd.trim() === ''}
+            disabled={globalBulkThresholdMajor.trim() === ''}
             className="px-3 py-1 text-xs font-medium border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('applyAllGlobalThresholdBtn')}
@@ -886,15 +886,15 @@ export function AreaRateEditor({ storeId }: Props) {
         </div>
       </div>
 
-      {/* ── Static Kuwait governorate accordion ─────────────────────────── */}
+      {/* ── Static Egypt governorate accordion ─────────────────────────── */}
       <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
-        {KUWAIT_GOVERNORATES.map(gov => {
+        {EGYPT_GOVERNORATES.map(gov => {
           const isOpen = openGov === gov.en;
           const count = feeCount(gov.en);
-          const customAreas = customAreasForKuwaitGov(gov.en);
-          const addKey = addAreaFormKey('Kuwait', gov.en);
+          const customAreas = customAreasForEgyptGov(gov.en);
+          const addKey = addAreaFormKey(REGION.countryName.en, gov.en);
           const addAreaIsOpen = addAreaOpen[addKey] ?? false;
-          const addForm = addAreaForm[addKey] ?? { area: '', areaAr: '', feeKwd: '' };
+          const addForm = addAreaForm[addKey] ?? { area: '', areaAr: '', feeMajor: '' };
 
           return (
             <div key={gov.en}>
@@ -932,10 +932,12 @@ export function AreaRateEditor({ storeId }: Props) {
                     <input
                       type="number"
                       min="0"
-                      step="0.001"
-                      placeholder="0.000"
-                      value={bulkFeeKwd[gov.en] ?? ''}
-                      onChange={e => setBulkFeeKwd(prev => ({ ...prev, [gov.en]: e.target.value }))}
+                      step="0.01"
+                      placeholder="0.00"
+                      value={bulkFeeMajor[gov.en] ?? ''}
+                      onChange={e =>
+                        setBulkFeeMajor(prev => ({ ...prev, [gov.en]: e.target.value }))
+                      }
                       aria-label={t('applyAll')}
                       className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                     />
@@ -954,11 +956,11 @@ export function AreaRateEditor({ storeId }: Props) {
                     <input
                       type="number"
                       min="0"
-                      step="0.001"
+                      step="0.01"
                       placeholder={t('optional')}
-                      value={bulkThresholdKwd[gov.en] ?? ''}
+                      value={bulkThresholdMajor[gov.en] ?? ''}
                       onChange={e =>
-                        setBulkThresholdKwd(prev => ({ ...prev, [gov.en]: e.target.value }))
+                        setBulkThresholdMajor(prev => ({ ...prev, [gov.en]: e.target.value }))
                       }
                       aria-label={t('freeOver')}
                       className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
@@ -967,7 +969,7 @@ export function AreaRateEditor({ storeId }: Props) {
                     <button
                       type="button"
                       onClick={() => applyBulkThreshold(gov.en)}
-                      disabled={(bulkThresholdKwd[gov.en] ?? '').trim() === ''}
+                      disabled={(bulkThresholdMajor[gov.en] ?? '').trim() === ''}
                       className="px-3 py-1 text-xs font-medium border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {t('applyBtn')}
@@ -978,7 +980,11 @@ export function AreaRateEditor({ storeId }: Props) {
                   <div className="divide-y divide-border/60">
                     {gov.areas.map(area => {
                       const k = rowKey(gov.en, area.en);
-                      const row = areaState[k] ?? { isActive: false, feeKwd: '', thresholdKwd: '' };
+                      const row = areaState[k] ?? {
+                        isActive: false,
+                        feeMajor: '',
+                        thresholdMajor: '',
+                      };
 
                       return (
                         <div
@@ -996,15 +1002,15 @@ export function AreaRateEditor({ storeId }: Props) {
                             </span>
                           </div>
                           <FeeInputs
-                            feeKwd={row.feeKwd}
-                            thresholdKwd={row.thresholdKwd}
+                            feeMajor={row.feeMajor}
+                            thresholdMajor={row.thresholdMajor}
                             onFeeChange={val =>
                               updateRow(k, {
-                                feeKwd: val,
+                                feeMajor: val,
                                 isActive: val !== '' ? true : row.isActive,
                               })
                             }
-                            onThresholdChange={val => updateRow(k, { thresholdKwd: val })}
+                            onThresholdChange={val => updateRow(k, { thresholdMajor: val })}
                             feeLabel={`${t('feeLabel')} – ${area.en}`}
                             freeOverLabel={`${t('freeOverLabel')} – ${area.en}`}
                             currencyLabel={t('currency')}
@@ -1016,7 +1022,7 @@ export function AreaRateEditor({ storeId }: Props) {
                     })}
                   </div>
 
-                  {/* Custom areas added to this Kuwait governorate */}
+                  {/* Custom areas added to this Egypt governorate */}
                   {customAreas.length > 0 && (
                     <div className="border-t border-border/60">
                       <p className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/10">
@@ -1041,15 +1047,17 @@ export function AreaRateEditor({ storeId }: Props) {
                               )}
                             </div>
                             <FeeInputs
-                              feeKwd={row.feeKwd}
-                              thresholdKwd={row.thresholdKwd}
+                              feeMajor={row.feeMajor}
+                              thresholdMajor={row.thresholdMajor}
                               onFeeChange={val =>
                                 updateCustomRow(idx, {
-                                  feeKwd: val,
+                                  feeMajor: val,
                                   isActive: val !== '' ? true : row.isActive,
                                 })
                               }
-                              onThresholdChange={val => updateCustomRow(idx, { thresholdKwd: val })}
+                              onThresholdChange={val =>
+                                updateCustomRow(idx, { thresholdMajor: val })
+                              }
                               feeLabel={`${t('feeLabel')} – ${row.area}`}
                               freeOverLabel={`${t('freeOverLabel')} – ${row.area}`}
                               currencyLabel={t('currency')}
@@ -1070,12 +1078,12 @@ export function AreaRateEditor({ storeId }: Props) {
                     </div>
                   )}
 
-                  {/* Add area inline form for this Kuwait governorate */}
+                  {/* Add area inline form for this Egypt governorate */}
                   <div className="border-t border-border/60 px-4 py-2">
                     {!addAreaIsOpen ? (
                       <button
                         type="button"
-                        onClick={() => toggleAddAreaForm('Kuwait', gov.en)}
+                        onClick={() => toggleAddAreaForm(REGION.countryName.en, gov.en)}
                         className="text-xs text-primary hover:underline flex items-center gap-1"
                       >
                         <svg
@@ -1133,13 +1141,13 @@ export function AreaRateEditor({ storeId }: Props) {
                             <input
                               type="number"
                               min="0"
-                              step="0.001"
-                              placeholder="0.000"
-                              value={addForm.feeKwd}
+                              step="0.01"
+                              placeholder="0.00"
+                              value={addForm.feeMajor}
                               onChange={e =>
                                 setAddAreaForm(prev => ({
                                   ...prev,
-                                  [addKey]: { ...addForm, feeKwd: e.target.value },
+                                  [addKey]: { ...addForm, feeMajor: e.target.value },
                                 }))
                               }
                               className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
@@ -1149,7 +1157,14 @@ export function AreaRateEditor({ storeId }: Props) {
                         </div>
                         <button
                           type="button"
-                          onClick={() => submitAddArea('Kuwait', 'الكويت', gov.en, gov.ar)}
+                          onClick={() =>
+                            submitAddArea(
+                              REGION.countryName.en,
+                              REGION.countryName.ar,
+                              gov.en,
+                              gov.ar
+                            )
+                          }
                           disabled={!addForm.area.trim()}
                           className="px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -1157,7 +1172,7 @@ export function AreaRateEditor({ storeId }: Props) {
                         </button>
                         <button
                           type="button"
-                          onClick={() => toggleAddAreaForm('Kuwait', gov.en)}
+                          onClick={() => toggleAddAreaForm(REGION.countryName.en, gov.en)}
                           className="px-3 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted/60 transition-colors"
                         >
                           {t('cancel')}
@@ -1213,7 +1228,7 @@ export function AreaRateEditor({ storeId }: Props) {
                   const govAddForm = addAreaForm[govAddKey] ?? {
                     area: '',
                     areaAr: '',
-                    feeKwd: '',
+                    feeMajor: '',
                   };
 
                   return (
@@ -1248,16 +1263,16 @@ export function AreaRateEditor({ storeId }: Props) {
                                 )}
                               </div>
                               <FeeInputs
-                                feeKwd={row.feeKwd}
-                                thresholdKwd={row.thresholdKwd}
+                                feeMajor={row.feeMajor}
+                                thresholdMajor={row.thresholdMajor}
                                 onFeeChange={val =>
                                   updateCustomRow(idx, {
-                                    feeKwd: val,
+                                    feeMajor: val,
                                     isActive: val !== '' ? true : row.isActive,
                                   })
                                 }
                                 onThresholdChange={val =>
-                                  updateCustomRow(idx, { thresholdKwd: val })
+                                  updateCustomRow(idx, { thresholdMajor: val })
                                 }
                                 feeLabel={`${t('feeLabel')} – ${row.area}`}
                                 freeOverLabel={`${t('freeOverLabel')} – ${row.area}`}
@@ -1343,13 +1358,13 @@ export function AreaRateEditor({ storeId }: Props) {
                                 <input
                                   type="number"
                                   min="0"
-                                  step="0.001"
-                                  placeholder="0.000"
-                                  value={govAddForm.feeKwd}
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  value={govAddForm.feeMajor}
                                   onChange={e =>
                                     setAddAreaForm(prev => ({
                                       ...prev,
-                                      [govAddKey]: { ...govAddForm, feeKwd: e.target.value },
+                                      [govAddKey]: { ...govAddForm, feeMajor: e.target.value },
                                     }))
                                   }
                                   className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
@@ -1499,10 +1514,10 @@ export function AreaRateEditor({ storeId }: Props) {
                   <input
                     type="number"
                     min="0"
-                    step="0.001"
-                    placeholder="0.000"
-                    value={addLocForm.feeKwd}
-                    onChange={e => setAddLocForm(prev => ({ ...prev, feeKwd: e.target.value }))}
+                    step="0.01"
+                    placeholder="0.00"
+                    value={addLocForm.feeMajor}
+                    onChange={e => setAddLocForm(prev => ({ ...prev, feeMajor: e.target.value }))}
                     className="w-28 px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
                   />
                   <span className="text-xs text-muted-foreground">{t('currency')}</span>
@@ -1522,7 +1537,7 @@ export function AreaRateEditor({ storeId }: Props) {
                     governorateAr: '',
                     area: '',
                     areaAr: '',
-                    feeKwd: '',
+                    feeMajor: '',
                   });
                 }}
                 className="px-3 py-1.5 text-sm font-medium border border-border rounded-lg hover:bg-muted/60 transition-colors"

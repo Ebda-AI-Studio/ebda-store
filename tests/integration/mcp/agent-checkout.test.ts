@@ -23,7 +23,7 @@
  *     `error` object) — locks in the capability-leak fix so a regression
  *     that reintroduces a distinct code/message per path fails this test.
  *  5. `search_products` finds a just-created product, `get_product` returns
- *     its detail (price in fils, unchanged), and `get_store_info` returns
+ *     its detail (price in piastres, unchanged), and `get_store_info` returns
  *     the store's currency.
  *  6. `add_to_cart` mints a cartId, `view_cart` reflects it, oversell is
  *     rejected.
@@ -111,7 +111,7 @@ beforeAll(async () => {
       ownerId,
       plan: 'starter',
       status: 'active',
-      currency: 'KWD',
+      currency: 'EGP',
       agentApiKey: encryption.encrypt(agentKeyA),
       agentApiKeyRotatedAt: new Date(),
     },
@@ -287,17 +287,17 @@ describe('MCP endpoint — handshake + gating', () => {
     expect(searchJson.products.some((x: any) => x.id === p.id)).toBe(true);
     const found = searchJson.products.find((x: any) => x.id === p.id);
     expect(found.title).toBe('Blue Widget');
-    expect(found.currency).toBe('KWD');
+    expect(found.currency).toBe('EGP');
     expect(found.availability).toBe('in_stock');
 
     const detail = await client.callTool({ name: 'get_product', arguments: { productId: p.id } });
     const detailJson = JSON.parse((detail.content as any)[0].text);
     expect(detailJson.id).toBe(p.id);
     expect(detailJson.price).toBe(2500);
-    expect(detailJson.currency).toBe('KWD');
+    expect(detailJson.currency).toBe('EGP');
 
     const info = await client.callTool({ name: 'get_store_info', arguments: {} });
-    expect(JSON.parse((info.content as any)[0].text).currency).toBe('KWD');
+    expect(JSON.parse((info.content as any)[0].text).currency).toBe('EGP');
 
     const missing = await client.callTool({
       name: 'get_product',
@@ -336,7 +336,7 @@ describe('MCP endpoint — handshake + gating', () => {
     expect(addJson.items[0].productId).toBe(prod.id);
     expect(addJson.items[0].quantity).toBe(1);
     expect(addJson.items[0].unitPrice).toBe(1000);
-    expect(addJson.currency).toBe('KWD');
+    expect(addJson.currency).toBe('EGP');
 
     const view = await client.callTool({
       name: 'view_cart',
@@ -483,7 +483,7 @@ describe('MCP endpoint — handshake + gating', () => {
       },
     });
     // This store has no PaymentConfig row for any online provider (tap/
-    // myfatoorah/hesabe/upayments) and the test harness sets no provider env
+    // paymob/kashier/fawry) and the test harness sets no provider env
     // vars, so PaymentFactory has nothing to fall back to either —
     // PaymentService.getDefaultProvider(store.id) resolves null.
     const { client, transport } = mcpClient(slug, agentKeyA);
@@ -559,7 +559,7 @@ describe('MCP endpoint — cross-tenant isolation (storeId scoping)', () => {
         ownerId: storeBOwnerId,
         plan: 'starter',
         status: 'active',
-        currency: 'KWD',
+        currency: 'EGP',
         agentApiKey: encryption.encrypt(agentKeyB),
         agentApiKeyRotatedAt: new Date(),
       },
@@ -740,7 +740,7 @@ describe('MCP endpoint — agent-write authorisation', () => {
         ownerId: storeCOwnerId,
         plan: 'starter',
         status: 'active',
-        currency: 'KWD',
+        currency: 'EGP',
       },
     });
     storeCId = storeC.id;

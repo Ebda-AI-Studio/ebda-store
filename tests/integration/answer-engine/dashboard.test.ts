@@ -126,7 +126,7 @@ beforeAll(async () => {
       {
         storeId: storeA.storeId,
         engine: 'gemini',
-        promptText: 'best gadgets in Kuwait',
+        promptText: 'best gadgets in Egypt',
         locale: 'en',
         cited: true,
         rank: 1,
@@ -138,7 +138,7 @@ beforeAll(async () => {
       {
         storeId: storeA.storeId,
         engine: 'gemini',
-        promptText: 'where to buy smart widget in Kuwait',
+        promptText: 'where to buy smart widget in Egypt',
         locale: 'en',
         cited: false,
         citedUrls: [],
@@ -149,7 +149,7 @@ beforeAll(async () => {
       {
         storeId: storeA.storeId,
         engine: 'perplexity',
-        promptText: 'best gadgets in Kuwait',
+        promptText: 'best gadgets in Egypt',
         locale: 'en',
         cited: true,
         rank: 2,
@@ -161,7 +161,7 @@ beforeAll(async () => {
       {
         storeId: storeA.storeId,
         engine: 'perplexity',
-        promptText: 'where to buy smart widget in Kuwait',
+        promptText: 'where to buy smart widget in Egypt',
         locale: 'en',
         cited: false,
         citedUrls: [],
@@ -172,7 +172,7 @@ beforeAll(async () => {
       {
         storeId: storeA.storeId,
         engine: 'openai',
-        promptText: 'best gadgets in Kuwait',
+        promptText: 'best gadgets in Egypt',
         locale: 'en',
         cited: false,
         citedUrls: [],
@@ -229,13 +229,13 @@ describe('GET /stores/:storeId/answer-engine/summary', () => {
     // ── per-prompt win/lose (latest run) ────────────────────────────────
     expect(prompts.length).toBe(5);
     const geminiWin = prompts.find(
-      (p: any) => p.engine === 'gemini' && p.promptText === 'best gadgets in Kuwait'
+      (p: any) => p.engine === 'gemini' && p.promptText === 'best gadgets in Egypt'
     );
     expect(geminiWin.cited).toBe(true);
     expect(geminiWin.competitorUrls).toEqual([]);
 
     const geminiLoss = prompts.find(
-      (p: any) => p.engine === 'gemini' && p.promptText === 'where to buy smart widget in Kuwait'
+      (p: any) => p.engine === 'gemini' && p.promptText === 'where to buy smart widget in Egypt'
     );
     expect(geminiLoss.cited).toBe(false);
     expect(geminiLoss.competitorUrls).toEqual(['https://competitor-a1.example']);
@@ -268,7 +268,7 @@ describe('GET /stores/:storeId/answer-engine/summary', () => {
     expect(body.data.prompts.length).toBe(1);
     expect(body.data.prompts[0].promptText).toBe(STORE_B_UNIQUE_PROMPT);
     const rawBody = JSON.stringify(body);
-    expect(rawBody).not.toContain('best gadgets in Kuwait');
+    expect(rawBody).not.toContain('best gadgets in Egypt');
     expect(rawBody).not.toContain(storeA.domain);
   });
 
@@ -306,7 +306,7 @@ describe('GET /stores/:storeId/answer-engine/summary', () => {
       data: {
         storeId: groundingStore.storeId,
         engine: 'gemini',
-        promptText: 'best gadgets in Kuwait',
+        promptText: 'best gadgets in Egypt',
         locale: 'en',
         cited: false,
         citedUrls: [],

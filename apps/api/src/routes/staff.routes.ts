@@ -13,12 +13,14 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'crypto';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import { prisma, withRlsBypass, UserRole } from '@force/database';
+import { withStore, UserRole } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
+import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';
+import { assertWithinLimit } from '../services/plan-limit.service';
 
 const router = Router({ mergeParams: true });
 
@@ -42,7 +44,7 @@ router.get(
     try {
       const { storeId } = req.params;
 
-      const members = await withRlsBypass(tx =>
+      const members = await withStore(storeId, tx =>
         tx.storeStaff.findMany({
           where: { storeId },
           include: {
@@ -92,47 +94,39 @@ router.post(
       const { storeId } = req.params;
       const input = inviteStaffSchema.parse(req.body);
 
-      // Look for an existing staff/admin user with this email (global namespace)
-      let staffUser = await withRlsBypass(tx =>
-        tx.user.findFirst({
-          where: {
-            email: input.email,
-            storeId: null, // admin-namespace users have NULL storeId
-          },
-        })
-      );
+      // Plan ceiling (SP5): one more seat must fit the store's maxStaff.
+      await assertWithinLimit(storeId, 'maxStaff');
 
-      if (staffUser) {
-        // User exists — must already be a staff or store_admin role
-        if (staffUser.role === UserRole.customer || staffUser.role === UserRole.super_admin) {
-          throw new AppError(
-            409,
-            'ROLE_CONFLICT',
-            'This email belongs to a customer or platform admin account and cannot be used for store staff.'
-          );
-        }
-      } else {
-        // Create a new staff user in the global (storeId=null) namespace
+      // The admin namespace (users.store_id NULL) is not visible from a store's
+      // scope, so find-or-create goes through the `ebda_admin_user_ensure`
+      // definer: it returns the existing account untouched, or creates a staff
+      // account. The password is only hashed when no account exists yet.
+      const exists = await findUserIdByEmail(input.email, null, { includeDeleted: true });
+      let passwordHash = '';
+      if (!exists) {
         // Cryptographically-strong fallback password (never Math.random for secrets).
         const password = input.password ?? randomBytes(18).toString('base64url') + 'A1!';
-        const passwordHash = await bcrypt.hash(password, 12);
+        passwordHash = await bcrypt.hash(password, 12);
+      }
+      const staffUser = await ensureAdminUser({
+        email: input.email,
+        passwordHash,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        role: UserRole.staff,
+      });
 
-        staffUser = await withRlsBypass(tx =>
-          tx.user.create({
-            data: {
-              email: input.email,
-              firstName: input.firstName,
-              lastName: input.lastName,
-              passwordHash,
-              role: UserRole.staff,
-              storeId: null, // staff live in the global namespace
-            },
-          })
+      // User exists — must already be a staff or store_admin role
+      if (staffUser.role === UserRole.customer || staffUser.role === UserRole.super_admin) {
+        throw new AppError(
+          409,
+          'ROLE_CONFLICT',
+          'This email belongs to a customer or platform admin account and cannot be used for store staff.'
         );
       }
 
       // Prevent double-add
-      const existing = await withRlsBypass(tx =>
+      const existing = await withStore(storeId, tx =>
         tx.storeStaff.findUnique({
           where: { userId_storeId: { userId: staffUser.id, storeId } },
         })
@@ -145,7 +139,7 @@ router.post(
         );
       }
 
-      const membership = await withRlsBypass(tx =>
+      const membership = await withStore(storeId, tx =>
         tx.storeStaff.create({
           data: { storeId, userId: staffUser.id },
         })
@@ -196,7 +190,7 @@ router.delete(
     try {
       const { storeId, userId } = req.params;
 
-      const membership = await withRlsBypass(tx =>
+      const membership = await withStore(storeId, tx =>
         tx.storeStaff.findUnique({
           where: { userId_storeId: { userId, storeId } },
         })
@@ -206,7 +200,7 @@ router.delete(
         throw new AppError(404, 'NOT_FOUND', 'Staff member not found in this store.');
       }
 
-      await withRlsBypass(tx =>
+      await withStore(storeId, tx =>
         tx.storeStaff.delete({
           where: { userId_storeId: { userId, storeId } },
         })

@@ -3,11 +3,13 @@
 import Image from 'next/image';
 import { useStore } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { BRAND_MARKETING_URL, BRAND } from '@force/shared';
 
+import { normalizeEgyptianMobile } from '@force/shared';
 /**
  * Branded "we'll be back soon" page rendered when the resolved store has
  * `status === 'suspended'`. Replaces the normal storefront chrome on every
- * route so the customer feels like the merchant — not Force AI — is in
+ * route so the customer feels like the merchant — not Ebda — is in
  * maintenance.
  *
  * Wired in via `StoreMaintenanceGate` (used in `app/layout.tsx`) so every
@@ -26,7 +28,7 @@ import { useLanguage } from '../contexts/LanguageContext';
  *   - The contact strip only renders when at least one contact channel is
  *     set — empty stores get the headline + body alone, which still reads
  *     intentional rather than half-finished.
- *   - "Powered by Force AI" footer link points to the marketing site so any
+ *   - "Powered by Ebda" footer link points to the marketing site so any
  *     customer who lands here can verify the platform is healthy even when
  *     this particular store is offline.
  *
@@ -48,12 +50,16 @@ export function StoreMaintenance() {
     'يخضع حالياً لأعمال الصيانة. يرجى المحاولة مرة أخرى لاحقاً.'
   );
   const contactHeading = t('Need to reach us?', 'تحتاج للتواصل معنا؟');
-  const poweredByLabel = t('Powered by Force AI', 'مدعوم من Force AI');
+  const poweredByLabel = t(`Powered by ${BRAND.name}`, `مدعوم من ${BRAND.nameAr}`);
 
   // Normalize the WhatsApp number to digits so wa.me works regardless of the
-  // format the merchant typed (the admin form accepts "+965 9999 1234",
-  // "0096599991234", etc.).
-  const whatsappDigits = store.whatsapp ? store.whatsapp.replace(/\D/g, '') : '';
+  // format the merchant typed (the admin form accepts "+20 101 234 5678",
+  // "01012345678", "0020 1012345678", etc.). An Egyptian mobile is promoted to
+  // its international form (wa.me needs the country code); anything else keeps
+  // just its digits.
+  const whatsappDigits = store.whatsapp
+    ? (normalizeEgyptianMobile(store.whatsapp)?.slice(1) ?? store.whatsapp.replace(/\D/g, ''))
+    : '';
   const hasContact = !!(store.email || store.phone || whatsappDigits);
 
   return (
@@ -171,7 +177,7 @@ export function StoreMaintenance() {
 
         <footer className="mt-16 text-xs text-muted-foreground">
           <a
-            href="https://store.force-ai.co"
+            href={BRAND_MARKETING_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="transition-colors hover:text-foreground"

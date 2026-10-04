@@ -3,7 +3,7 @@
  *
  * Scans active trackInventory products for a store and generates AI-powered
  * bilingual reorder suggestions when projected stock falls below the minimum
- * threshold. Designed to be called by the Inngest daily cron (06:00 KW) or
+ * threshold. Designed to be called by the Inngest daily cron (06:00 Cairo) or
  * on-demand by a super_admin "Re-scan now" action.
  *
  * Algorithm (per spec Part 3.1):
@@ -27,13 +27,13 @@
  * 0 for a variant product. Step 1 expires any such legacy open row (and any
  * open row for a variant that has since been disabled) on the next run.
  *
- * RLS note (2026-06-01): the entire scan body runs inside withRlsBypass so
+ * RLS note (2026-06-01): the entire scan body runs inside withStore so
  * Inngest jobs (no tenant GUC in context) can read reorder_suggestions,
  * purchase_order_items, backorder_lines and products without being filtered
  * to an empty result set by the direct-compare RLS policies.
  */
 
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 import { effectiveInventory } from '../../lib/effective-inventory';
@@ -94,7 +94,7 @@ interface GeminiReasoningResponse {
  * product, or null if none exists. Used as a fallback when no ReorderRule
  * carries a preferredSupplierId.
  *
- * When `tx` is provided (inside a withRlsBypass callback) the query runs
+ * When `tx` is provided (inside a withStore callback) the query runs
  * within the bypass transaction so RLS doesn't filter results. Falls back
  * to the module-level `prisma` proxy for HTTP-context callers.
  */
@@ -188,7 +188,7 @@ function buildGeminiPrompt(candidates: ReorderCandidate[]): string {
     minQty: c.minQty,
   }));
 
-  return `You are an inventory ops assistant for a Kuwait retailer. For each product below,
+  return `You are an inventory ops assistant for an Egypt retailer. For each product below,
 in <=2 sentences each, explain WHY this reorder suggestion makes sense given the velocity
 + on-hand + lead time + open backlog. Output bilingual (English + Arabic).
 Return STRICT JSON:
@@ -211,7 +211,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
   // --- Phase 1: expire stale suggestions + load the product list -------------
   // The bypass GUC is SET LOCAL (transaction-scoped) so all RLS-protected reads
   // (reorder_suggestions, purchase_order_items, backorder_lines, products) must
-  // happen inside a withRlsBypass tx. This first tx stays tiny (one UPDATE + one
+  // happen inside a withStore tx. This first tx stays tiny (one UPDATE + one
   // findMany); the per-product metric fan-out is computed below in BOUNDED
   // chunks (each its own short tx), and the slow Gemini reasoning (phase 2) runs
   // OUTSIDE any open transaction. Keeping every tx short is what prevents the
@@ -219,7 +219,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
   // connection-pool starvation the prior single-tx-around-everything design hit
   // (~112s on stores with many candidates + the 2.5s per-chunk throttle).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { expiredCount, products } = await withRlsBypass(async (tx: any) => {
+  const { expiredCount, products } = await withStore(storeId, async (tx: any) => {
     // -------------------------------------------------------------------------
     // Step 1: Mark stale open suggestions as expired
     // -------------------------------------------------------------------------
@@ -412,7 +412,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
   for (let chunkStart = 0; chunkStart < units.length; chunkStart += SCAN_CHUNK_SIZE) {
     const unitSlice = units.slice(chunkStart, chunkStart + SCAN_CHUNK_SIZE);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const chunkCandidates = await withRlsBypass(async (tx: any) => {
+    const chunkCandidates = await withStore(storeId, async (tx: any) => {
       const collected: ReorderCandidate[] = [];
 
       for (const unit of unitSlice) {
@@ -576,7 +576,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
   // --- Phase 3: Upsert ReorderSuggestion rows in a SHORT RLS-bypass tx --------
   // DB writes only — no network, so this stays well under the 30s timeout.
   //
-  // Chunked (issue 2259): one withRlsBypass per PHASE3_CHUNK_SIZE candidates,
+  // Chunked (issue 2259): one withStore per PHASE3_CHUNK_SIZE candidates,
   // the way phase 1 chunks its scan. The candidate set is uncapped (every
   // uncosted store's whole stale catalogue can qualify) and each candidate
   // costs ~5 round-trips with its savepoint, so a single transaction could
@@ -588,7 +588,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
   for (let chunkStart = 0; chunkStart < candidates.length; chunkStart += PHASE3_CHUNK_SIZE) {
     const slice = candidates.slice(chunkStart, chunkStart + PHASE3_CHUNK_SIZE);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rowsUpserted += await withRlsBypass(async (tx: any) => {
+    rowsUpserted += await withStore(storeId, async (tx: any) => {
       let upserted = 0;
 
       for (const candidate of slice) {

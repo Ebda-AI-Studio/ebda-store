@@ -1,6 +1,26 @@
-import { prisma, Prisma, withMoneyTx, StoreStatus } from '@force/database';
+import {
+  prisma,
+  Prisma,
+  setTenantGucs,
+  acrossStores,
+  withStore,
+  withUser,
+  withMoneyTx,
+  StoreStatus,
+} from '@force/database';
+import { detachStoreAuditLogs, unlinkUserAuditLogs } from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
-import { slugify, slugifyWithFallback } from '@force/shared';
+import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
+import {
+  slugify,
+  slugifyWithFallback,
+  isReservedSlug,
+  isProtectedSlug,
+  STORE_SLUG_ERROR_MESSAGES,
+  storeHost,
+  REGION,
+  LEGACY_STORE_PLAN_TO_PLAN_CODE,
+} from '@force/shared';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
@@ -10,6 +30,9 @@ import { StorageService } from './storage.service';
 import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
+import { assertPlanAllows, assertWithinLimit } from './plan-limit.service';
+import { storeDomainWhere } from '../lib/store-host';
+import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
 
 /**
  * Bust every public-cache entry that depends on a store record. The
@@ -37,11 +60,16 @@ export async function bustStoreCaches(
   domain?: string | null
 ): Promise<void> {
   await invalidateCached(`public:store:${storeId}`);
-  if (slug) await invalidateCached(`public:store:${slug}`);
+  if (slug) {
+    await invalidateCached(`public:store:${slug}`);
+    // `<slug>.ebda.app` resolves by slug and is cached under its HOST.
+    await invalidateCached(`public:store:resolve:${storeHost(slug)}`);
+  }
   if (domain) await invalidateCached(`public:store:resolve:${domain}`);
   // The credentialed-CORS trust for the domain depends on the store's status
   // too (#1214), so it is busted on the same writes.
   if (domain) bustCorsCache(domain);
+  if (slug) bustCorsCache(storeHost(slug));
   await invalidateCached(`public:categories:${storeId}`);
   await invalidateCachedPrefix(`public:products:${storeId}:`);
   // Purge the storefront's Next data cache too (fire-and-forget, no-op if the
@@ -107,6 +135,27 @@ type UpdateStoreData = Partial<CreateStoreData> & {
   locationsEnabled?: boolean;
 };
 
+/**
+ * Row counts the store payloads carry (`_count`). `products`, `orders` and `categories` are
+ * store-scoped under strict RLS, so a relation count taken from the `stores` query would silently
+ * read 0 outside a tenant context: each count is taken inside the store's own scope instead.
+ */
+async function countStoreRows(
+  storeId: string,
+  opts: { orders?: boolean } = {}
+): Promise<{ products: number; categories: number; orders?: number }> {
+  return withStore(storeId, async tx => {
+    const [products, categories, orders] = await Promise.all([
+      tx.product.count(),
+      tx.category.count(),
+      opts.orders ? tx.order.count() : Promise.resolve(undefined),
+    ]);
+    return opts.orders
+      ? { products, categories, orders: orders as number }
+      : { products, categories };
+  });
+}
+
 export class StoreService {
   /**
    * Invalidate all Redis cache keys for a store.
@@ -150,15 +199,32 @@ export class StoreService {
           owner: {
             select: { id: true, email: true, firstName: true, lastName: true },
           },
-          _count: { select: { products: true, orders: true } },
         },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.store.count({ where }),
     ]);
 
+    // `products` / `orders` are store-scoped under strict RLS, so a relation count taken
+    // from the `stores` query would see nothing. Count each listed store inside its own scope.
+    const counts = new Map(
+      (
+        await acrossStores(
+          async () => ({
+            products: await prisma.product.count(),
+            orders: await prisma.order.count(),
+          }),
+          { storeIds: stores.map(st => st.id) }
+        )
+      ).map(r => [r.storeId, r.value])
+    );
+    const withCounts = stores.map(st => ({
+      ...st,
+      _count: counts.get(st.id) ?? { products: 0, orders: 0 },
+    }));
+
     return {
-      stores,
+      stores: withCounts,
       meta: {
         page,
         limit,
@@ -192,27 +258,30 @@ export class StoreService {
   }
 
   static async getById(storeId: string) {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      // The per-store agent (MCP) WRITE credential is a secret, even encrypted:
-      // it has no consumer outside `mcp/agent-auth.ts` (which reads it with its
-      // own explicit select), so it is omitted at the service boundary rather
-      // than left to every caller to remember to strip. Same reasoning as
-      // `maskMarketingPixelSecrets` on `GET /stores/:id`.
-      omit: { agentApiKey: true },
-      include: {
-        owner: {
-          select: { id: true, email: true, firstName: true, lastName: true },
+    // Inside the store's own scope: the payload names the owner, whose `users` row is visible from
+    // there (owner of the current store) and from nowhere else under strict RLS.
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        // The per-store agent (MCP) WRITE credential is a secret, even encrypted:
+        // it has no consumer outside `mcp/agent-auth.ts` (which reads it with its
+        // own explicit select), so it is omitted at the service boundary rather
+        // than left to every caller to remember to strip. Same reasoning as
+        // `maskMarketingPixelSecrets` on `GET /stores/:id`.
+        omit: { agentApiKey: true },
+        include: {
+          owner: {
+            select: { id: true, email: true, firstName: true, lastName: true },
+          },
         },
-        _count: { select: { products: true, orders: true, categories: true } },
-      },
-    });
+      })
+    );
 
     if (!store) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
     }
 
-    return store;
+    return { ...store, _count: await countStoreRows(store.id, { orders: true }) };
   }
 
   static async getBySlug(slug: string) {
@@ -238,20 +307,18 @@ export class StoreService {
       // than left to every caller to remember to strip. Same reasoning as
       // `maskMarketingPixelSecrets` on `GET /stores/:id`.
       omit: { agentApiKey: true },
-      include: {
-        _count: { select: { products: true, categories: true } },
-      },
     });
 
     if (!store) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
     }
+    const storeWithCounts = { ...store, _count: await countStoreRows(store.id) };
 
     // Write to cache (best-effort, 120s TTL — invalidated explicitly
     // on every store update so admin edits land within seconds, not
     // minutes).
     try {
-      await redis.set(`store:slug:${slug}`, JSON.stringify(store), 120);
+      await redis.set(`store:slug:${slug}`, JSON.stringify(storeWithCounts), 120);
     } catch (err) {
       logger.warn(
         { err: err instanceof Error ? err.message : 'unknown' },
@@ -259,22 +326,42 @@ export class StoreService {
       );
     }
 
-    return store;
+    return storeWithCounts;
   }
 
-  static async create(ownerId: string, data: CreateStoreData) {
+  static async create(
+    ownerId: string,
+    data: CreateStoreData,
+    opts: { allowProtectedSlug?: boolean } = {}
+  ) {
     // Same class as the product-slug defect: an empty slugify result made the
     // de-duplication loop mint '-1'/'-2' store slugs. A store is even less
     // recoverable than a product, so it gets the same guarantee.
-    const baseSlug = slugifyWithFallback(data.slug || data.name, 'store', { ascii: true });
+    //
+    // An EXPLICIT slug is a merchant's choice of `<slug>.ebda.app`, so it is
+    // validated strictly (format + reserved list) and refused with a clear
+    // code — never silently rewritten into something they did not ask for.
+    // A slug DERIVED from the name is best-effort: it is padded/suffixed until
+    // it is valid and unreserved ("Support" → `support-1`, not a refusal).
+    let baseSlug: string;
+    if (data.slug) {
+      baseSlug = assertStoreSlug(data.slug, { allowProtected: opts.allowProtectedSlug });
+    } else {
+      baseSlug = deriveStoreSlug(slugifyWithFallback(data.name, 'store', { ascii: true }));
+      // A name-derived slug that is a protected brand is refused (suffixing it
+      // would only normalise back to the same brand).
+      if (!opts.allowProtectedSlug && isProtectedSlug(baseSlug)) {
+        throw new AppError(400, 'SLUG_PROTECTED', STORE_SLUG_ERROR_MESSAGES.SLUG_PROTECTED);
+      }
+    }
 
     // Auto-deduplicate slug
     let slug = baseSlug;
     let suffix = 0;
-    while (await prisma.store.findUnique({ where: { slug } })) {
+    while (isReservedSlug(slug) || (await prisma.store.findUnique({ where: { slug } }))) {
       suffix++;
       if (suffix > 100) throw new AppError(409, 'SLUG_COLLISION', 'Too many slug collisions');
-      slug = `${baseSlug}-${suffix}`;
+      slug = `${baseSlug.slice(0, 40 - String(suffix).length - 1)}-${suffix}`;
     }
 
     // Check domain uniqueness
@@ -288,15 +375,26 @@ export class StoreService {
       }
     }
 
+    // Plan gate (SP5): a brand-new store starts on the default plan, which
+    // decides whether it may carry a custom domain at creation.
+    if (data.domain) {
+      await assertPlanAllows(LEGACY_STORE_PLAN_TO_PLAN_CODE[NEW_STORE_LEGACY_PLAN], 'customDomain');
+    }
+
     const store = await prisma.store.create({
       data: {
         name: data.name,
         slug,
+        // Reachable only for a super_admin (the routes drop `domain` for anyone
+        // else): an operator-assigned domain is trusted, so it starts `active`.
+        // Merchants claim a domain through PUT /stores/:id/domain (pending).
         domain: data.domain,
+        ...(data.domain ? { domainStatus: 'active', domainVerifiedAt: new Date() } : {}),
         ownerId,
         settings: data.settings || {
-          currency: 'KWD',
-          locale: 'en-KW',
+          currency: REGION.currency,
+          locale: 'ar-EG',
+          defaultLanguage: REGION.defaultLocale,
         },
         // 2026-07-12 design structural batch: new stores get the persona-chrome
         // completion + card-frame dedup ON by default (Ahmad-approved for NEW
@@ -314,21 +412,50 @@ export class StoreService {
           rtlPolish: true,
         },
       },
-      include: {
-        owner: {
-          select: { id: true, email: true, firstName: true, lastName: true },
-        },
-      },
     });
 
-    // Seed Chart of Accounts (Kuwait retail template, 27 system accounts).
+    // Every store gets a subscription row from day one (SP5): the plan the
+    // enum default put it on, mapped onto a plan code. Written in the new
+    // store's own scope (store_subscriptions is under strict RLS).
+    //
+    // Default VAT (Ebda: 14%, `REGION.defaultVatBps`) is seeded in the same
+    // scope as an ACTIVE rate row so the merchant's tax page shows it and only
+    // has to flip `taxEnabled` once VAT-registered (the charge is gated on
+    // `Store.taxEnabled`, ruling TAX-1); it is editable per store like any other.
+    await withStore(store.id, async tx => {
+      await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
+      await tx.taxRate.create({
+        data: {
+          storeId: store.id,
+          name: 'VAT',
+          nameAr: 'ضريبة القيمة المضافة',
+          rate: REGION.defaultVatBps / 100,
+          isActive: true,
+        },
+      });
+    });
+
+    // Seed Chart of Accounts (Egypt retail template, 27 system accounts).
     // Idempotent — safe if accountingEnabled is later toggled.
     await seedCoaForStore(store.id);
 
-    return store;
+    // The owner row is identity-scoped under strict RLS (`users`), and no store scope exists
+    // yet when the store is created: read it as the owner (the acting user), after the fact.
+    const owner = await withUser(ownerId, tx =>
+      tx.user.findUnique({
+        where: { id: ownerId },
+        select: { id: true, email: true, firstName: true, lastName: true },
+      })
+    );
+
+    return { ...store, owner };
   }
 
-  static async update(storeId: string, data: UpdateStoreData) {
+  static async update(
+    storeId: string,
+    data: UpdateStoreData,
+    opts: { allowProtectedSlug?: boolean } = {}
+  ) {
     const store = await this.getById(storeId);
     // Snapshot the heroImage URL so a replaced banner gets the old R2
     // object cleaned up post-commit. Same posture as branding / seo /
@@ -337,17 +464,20 @@ export class StoreService {
 
     // Auto-deduplicate slug if changing
     if (data.slug && data.slug !== store.slug) {
-      const baseSlug = data.slug;
+      const baseSlug = assertStoreSlug(data.slug, { allowProtected: opts.allowProtectedSlug });
+      data.slug = baseSlug;
       let suffix = 0;
       while (await prisma.store.findUnique({ where: { slug: data.slug } })) {
         suffix++;
         if (suffix > 100) throw new AppError(409, 'SLUG_COLLISION', 'Too many slug collisions');
-        data.slug = `${baseSlug}-${suffix}`;
+        data.slug = `${baseSlug.slice(0, 40 - String(suffix).length - 1)}-${suffix}`;
       }
     }
 
     // Check domain uniqueness if changing
     if (data.domain && data.domain !== store.domain) {
+      // Plan gate (SP5): attaching a custom domain needs the plan capability.
+      await assertWithinLimit(storeId, 'customDomain');
       const existingDomain = await prisma.store.findUnique({
         where: { domain: data.domain },
       });
@@ -367,47 +497,52 @@ export class StoreService {
       } as Prisma.InputJsonValue;
     }
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        name: data.name,
-        slug: data.slug,
-        domain: data.domain,
-        settings: mergedSettings,
-        ...(data.heroTitle !== undefined && { heroTitle: data.heroTitle }),
-        ...(data.heroTitleAr !== undefined && { heroTitleAr: data.heroTitleAr }),
-        ...(data.heroSubtitle !== undefined && { heroSubtitle: data.heroSubtitle }),
-        ...(data.heroSubtitleAr !== undefined && { heroSubtitleAr: data.heroSubtitleAr }),
-        ...(data.heroCtaText !== undefined && { heroCtaText: data.heroCtaText }),
-        ...(data.heroCtaTextAr !== undefined && { heroCtaTextAr: data.heroCtaTextAr }),
-        ...(data.heroCtaLink !== undefined && { heroCtaLink: data.heroCtaLink }),
-        ...(data.heroImage !== undefined && { heroImage: data.heroImage }),
-        ...(data.blogEnabled !== undefined && { blogEnabled: data.blogEnabled }),
-        ...(data.timezone !== undefined && { timezone: data.timezone }),
-        // These three were accepted by updateStoreSchema and dropped here. The
-        // route validated them, the service typed them, and this object — the
-        // only thing that actually writes — never mentioned them. So the admin
-        // got "Saved", the column stayed NULL, and the value reappeared blank on
-        // reload. Store locations could not be enabled by any merchant that was
-        // not seeded, and the whole return-policy feature was dead: with the
-        // column NULL, merchantReturnPolicyJsonLd() returns null forever and
-        // hasMerchantReturnPolicy is never emitted.
-        //
-        // `!== undefined` rather than a truthiness check is load-bearing on all
-        // three. null is a MEANINGFUL value the admin sends to clear a declared
-        // policy, and 0 is a meaningful returnWindowDays ("returns not
-        // accepted") — both would be dropped by a falsy guard, reintroducing the
-        // same silent no-op for the two values that most need to persist.
-        ...(data.locationsEnabled !== undefined && { locationsEnabled: data.locationsEnabled }),
-        ...(data.returnWindowDays !== undefined && { returnWindowDays: data.returnWindowDays }),
-        ...(data.returnFeesPaidBy !== undefined && { returnFeesPaidBy: data.returnFeesPaidBy }),
-      },
-      include: {
-        owner: {
-          select: { id: true, email: true, firstName: true, lastName: true },
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: {
+          name: data.name,
+          slug: data.slug,
+          domain: data.domain,
+          ...(data.domain && data.domain !== store.domain
+            ? { domainStatus: 'active', domainVerifiedAt: new Date(), pendingDomain: null }
+            : {}),
+          settings: mergedSettings,
+          ...(data.heroTitle !== undefined && { heroTitle: data.heroTitle }),
+          ...(data.heroTitleAr !== undefined && { heroTitleAr: data.heroTitleAr }),
+          ...(data.heroSubtitle !== undefined && { heroSubtitle: data.heroSubtitle }),
+          ...(data.heroSubtitleAr !== undefined && { heroSubtitleAr: data.heroSubtitleAr }),
+          ...(data.heroCtaText !== undefined && { heroCtaText: data.heroCtaText }),
+          ...(data.heroCtaTextAr !== undefined && { heroCtaTextAr: data.heroCtaTextAr }),
+          ...(data.heroCtaLink !== undefined && { heroCtaLink: data.heroCtaLink }),
+          ...(data.heroImage !== undefined && { heroImage: data.heroImage }),
+          ...(data.blogEnabled !== undefined && { blogEnabled: data.blogEnabled }),
+          ...(data.timezone !== undefined && { timezone: data.timezone }),
+          // These three were accepted by updateStoreSchema and dropped here. The
+          // route validated them, the service typed them, and this object — the
+          // only thing that actually writes — never mentioned them. So the admin
+          // got "Saved", the column stayed NULL, and the value reappeared blank on
+          // reload. Store locations could not be enabled by any merchant that was
+          // not seeded, and the whole return-policy feature was dead: with the
+          // column NULL, merchantReturnPolicyJsonLd() returns null forever and
+          // hasMerchantReturnPolicy is never emitted.
+          //
+          // `!== undefined` rather than a truthiness check is load-bearing on all
+          // three. null is a MEANINGFUL value the admin sends to clear a declared
+          // policy, and 0 is a meaningful returnWindowDays ("returns not
+          // accepted") — both would be dropped by a falsy guard, reintroducing the
+          // same silent no-op for the two values that most need to persist.
+          ...(data.locationsEnabled !== undefined && { locationsEnabled: data.locationsEnabled }),
+          ...(data.returnWindowDays !== undefined && { returnWindowDays: data.returnWindowDays }),
+          ...(data.returnFeesPaidBy !== undefined && { returnFeesPaidBy: data.returnFeesPaidBy }),
         },
-      },
-    });
+        include: {
+          owner: {
+            select: { id: true, email: true, firstName: true, lastName: true },
+          },
+        },
+      })
+    );
 
     // Invalidate store cache (best-effort)
     try {
@@ -415,6 +550,14 @@ export class StoreService {
       if (store.domain) await redis.delete(`store:domain:${store.domain}`);
       // Also invalidate updated keys if slug/domain changed
       if (data.slug && data.slug !== store.slug) await redis.delete(`store:slug:${data.slug}`);
+      // A renamed slug frees its OLD address: bust the old host's resolve entry
+      // (and the old by-slug key) so `<old>.ebda.app` stops resolving to this
+      // store immediately instead of after the 120s TTL.
+      if (data.slug && data.slug !== store.slug) {
+        await invalidateCached(`public:store:resolve:${storeHost(store.slug)}`);
+        await invalidateCached(`public:store:${store.slug}`);
+        revalidateStorefront({ slug: store.slug });
+      }
       if (data.domain && data.domain !== store.domain)
         await redis.delete(`store:domain:${data.domain}`);
     } catch (err) {
@@ -452,7 +595,7 @@ export class StoreService {
    * Caller is responsible for super_admin authorization (route enforces it)
    * and for writing the STORE_DELETED audit log AFTER this returns successfully.
    */
-  static async delete(storeId: string) {
+  static async delete(storeId: string, actorUserId?: string) {
     const store = await this.getById(storeId);
 
     await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
@@ -478,19 +621,21 @@ export class StoreService {
       // ROOT CAUSE 2026-05-21 — RLS was silently filtering every delete
       // to zero rows. The accounting tables (journal_entries, expenses,
       // stock_adjustments, accounts, sequences) have row-level-security
-      // policies that require either app.current_store_id GUC to match
-      // OR app.bypass_rls = 'true'. Inside this transaction neither
-      // was set, so DELETE matched 0 rows even though rows existed.
-      // The FK violation at store.delete then fired because the
+      // policies that match only the transaction's store, and this
+      // transaction had none set, so DELETE matched 0 rows even though rows
+      // existed. The FK violation at store.delete then fired because the
       // journal_entries rows were never actually touched.
       //
-      // Set the bypass GUC for the duration of THIS transaction only —
-      // SET LOCAL scoping means it dies on commit/rollback. This is a
-      // super-admin-only code path (route gates with super_admin role
-      // check) so bypass is appropriate here.
-      await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
+      // The transaction is scoped to THIS store with a transaction-local
+      // set_config (no bypass flag exists any more). It dies on commit/rollback,
+      // and this is a super-admin-only code path (the route gates on role).
+      // The acting super_admin is set too: unlinking the owner's audit rows below
+      // happens AFTER the store row is gone, so the definer's "user of the caller's
+      // store" test cannot match; the caller's own role (ebda_is_super_admin) is
+      // what authorises it.
+      await setTenantGucs(tx, { storeId, ...(actorUserId ? { userId: actorUserId } : {}) });
 
-      logger.info({ storeId }, '[STORE_DELETE] start (raw sql, rls bypassed)');
+      logger.info({ storeId }, '[STORE_DELETE] start (raw sql, store-scoped)');
 
       const reviewCount =
         await tx.$executeRaw`DELETE FROM public.reviews WHERE store_id = ${storeId}`;
@@ -525,8 +670,9 @@ export class StoreService {
       logger.info({ storeId, count: backorderCount }, '[STORE_DELETE] backorderLines');
 
       // Detach historical audit logs by nulling their storeId (preserves trail).
-      const auditCount =
-        await tx.$executeRaw`UPDATE public.audit_logs SET store_id = NULL WHERE store_id = ${storeId}`;
+      // A definer: nulling store_id leaves the store scope, which the policy's
+      // WITH CHECK would reject.
+      const auditCount = await detachStoreAuditLogs(storeId, tx);
       logger.info({ storeId, count: auditCount }, '[STORE_DELETE] auditLogs (detached)');
 
       // Verification: count any rows that would still block the store delete.
@@ -559,7 +705,7 @@ export class StoreService {
         select: { id: true, role: true, _count: { select: { stores: true } } },
       });
       if (owner && owner.role === 'store_admin' && owner._count.stores === 0) {
-        await tx.auditLog.updateMany({ where: { userId: owner.id }, data: { userId: null } });
+        await unlinkUserAuditLogs(owner.id, tx);
         await tx.refreshToken.deleteMany({ where: { userId: owner.id } });
         await tx.verificationToken.deleteMany({ where: { userId: owner.id } });
         await tx.oneSignalSubscription.deleteMany({ where: { userId: owner.id } });
@@ -620,10 +766,10 @@ export class StoreService {
     // Revenue = orders that are EITHER confirmed-and-beyond by fulfillment
     // status OR paid by payment status. Captures the case where an order
     // sits in 'pending' fulfillment but the customer's card was already
-    // charged (Tap/MyFatoorah webhook landed the payment but a fulfillment
+    // charged (a gateway webhook landed the payment but a fulfillment
     // worker hasn't moved the order forward yet). Without the paymentStatus
-    // arm, dashboards showed Revenue=0 even when KWDs had been collected.
-    // Ahmad 2026-05-21 — Wadyaljuz had 23 orders, KWD 0.000 revenue.
+    // arm, dashboards showed Revenue=0 even when money had been collected.
+    // Ahmad 2026-05-21 — Wadyaljuz had 23 orders, EGP 0.000 revenue.
     const [productCount, orderCount, customerCount, totalRevenue, recentOrders] = await Promise.all(
       [
         prisma.product.count({ where: { storeId, status: 'active' } }),
@@ -674,16 +820,14 @@ export class StoreService {
       );
     }
 
-    const store = await prisma.store.findUnique({
-      where: { domain },
-      include: {
-        _count: { select: { products: true, categories: true } },
-      },
-    });
+    // VERIFIED domains only (domainStatus 'active'): an unverified claim is
+    // never a storefront (SP5 task 4).
+    const found = await prisma.store.findFirst({ where: storeDomainWhere(domain) });
 
-    if (!store) {
+    if (!found) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
     }
+    const store = { ...found, _count: await countStoreRows(found.id) };
 
     // Write to cache (best-effort, 120s TTL — invalidated on store updates).
     try {
@@ -824,7 +968,8 @@ export class StoreService {
       email?: string;
       phone?: string;
       phoneAr?: string;
-      whatsapp?: string;
+      /** E.164 Egyptian mobile; `null` clears it. */
+      whatsapp?: string | null;
       address?: string;
       addressAr?: string;
       /** Phase D.6 — WhatsApp bot "Locations & Hours" branch */

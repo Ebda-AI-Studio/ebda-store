@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildCheckoutDeliverySettings,
-  kwdInputToFils,
+  majorInputToMinor,
   type CheckoutDeliveryForm,
 } from '../checkout-delivery-payload';
 
@@ -25,7 +25,7 @@ const CONFIG = {
 
 /** The store's `settings` JSON as loaded from the API. */
 const STORED = {
-  currency: 'KWD',
+  currency: 'EGP',
   orderInvoiceEmail: 'former.employee@store.com',
   minimumOrderFils: 5000,
 };
@@ -44,7 +44,7 @@ describe('buildCheckoutDeliverySettings — the emptied order-invoice address cl
     const body = serialize({
       existingSettings: STORED,
       config: CONFIG,
-      minimumOrderKwd: '5.000',
+      minimumOrderMajor: '5.000',
       orderInvoiceEmail: '',
     });
 
@@ -57,7 +57,7 @@ describe('buildCheckoutDeliverySettings — the emptied order-invoice address cl
     const body = serialize({
       existingSettings: STORED,
       config: CONFIG,
-      minimumOrderKwd: '',
+      minimumOrderMajor: '',
       orderInvoiceEmail: '   ',
     });
     expect(body.orderInvoiceEmail).toBeNull();
@@ -67,7 +67,7 @@ describe('buildCheckoutDeliverySettings — the emptied order-invoice address cl
     const body = serialize({
       existingSettings: STORED,
       config: CONFIG,
-      minimumOrderKwd: '5.000',
+      minimumOrderMajor: '5.000',
       orderInvoiceEmail: '',
     });
 
@@ -80,7 +80,7 @@ describe('buildCheckoutDeliverySettings — the emptied order-invoice address cl
     const body = serialize({
       existingSettings: STORED,
       config: CONFIG,
-      minimumOrderKwd: '5.000',
+      minimumOrderMajor: '5.000',
       orderInvoiceEmail: '  owner@store.com  ',
     });
     expect(body.orderInvoiceEmail).toBe('owner@store.com');
@@ -91,29 +91,29 @@ describe('buildCheckoutDeliverySettings — the emptied order-invoice address cl
     const body = serialize({
       existingSettings: { ...STORED, floatingWidget: { enabled: true }, navMenu: [] },
       config: CONFIG,
-      minimumOrderKwd: '2.500',
+      minimumOrderMajor: '25.00',
       orderInvoiceEmail: 'owner@store.com',
     });
-    expect(body.currency).toBe('KWD');
+    expect(body.currency).toBe('EGP');
     expect(body.floatingWidget).toEqual({ enabled: true });
     expect(body.navMenu).toEqual([]);
     expect(body.checkoutDelivery).toEqual(CONFIG);
-    expect(body.minimumOrderFils).toBe(2500);
+    expect(body.minimumOrderFils).toBe(2500); // 25.00 EGP in piastres
   });
 });
 
-describe('kwdInputToFils', () => {
-  it('rounds a KWD string to integer fils', () => {
-    expect(kwdInputToFils('5.000')).toBe(5000);
-    expect(kwdInputToFils('2.5')).toBe(2500);
-    expect(kwdInputToFils('0.0015')).toBe(2);
+describe('majorInputToMinor', () => {
+  it('rounds a EGP string to integer piastres', () => {
+    expect(majorInputToMinor('50.00')).toBe(5000);
+    expect(majorInputToMinor('25')).toBe(2500);
+    expect(majorInputToMinor('0.015')).toBe(2); // 1.5 piastres → half up
   });
 
   it('resolves empty / invalid / non-positive input to 0 (= no minimum)', () => {
-    expect(kwdInputToFils('')).toBe(0);
-    expect(kwdInputToFils('  ')).toBe(0);
-    expect(kwdInputToFils('abc')).toBe(0);
-    expect(kwdInputToFils('-3')).toBe(0);
-    expect(kwdInputToFils('0')).toBe(0);
+    expect(majorInputToMinor('')).toBe(0);
+    expect(majorInputToMinor('  ')).toBe(0);
+    expect(majorInputToMinor('abc')).toBe(0);
+    expect(majorInputToMinor('-3')).toBe(0);
+    expect(majorInputToMinor('0')).toBe(0);
   });
 });

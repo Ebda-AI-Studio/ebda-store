@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction, CookieOptions } from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
-import { prisma } from '@force/database';
+import { withUser } from '@force/database';
 import { config } from '../config';
 import { authenticate, rejectImpersonated } from '../middleware/auth';
 import {
@@ -85,7 +85,7 @@ export function setSessionCookies(res: Response, accessToken: string, refreshTok
  *  was stored with — per RFC6265bis §5.5 a Set-Cookie that is not
  *  `SameSite=None; Secure` is ignored outright on a cross-site request, and
  *  the storefront hits /auth/refresh cross-site (pecannbee.com.kw →
- *  api.force-ai.co). Clearing with a bare `{ path: '/' }` therefore dropped
+ *  api.ebda.app). Clearing with a bare `{ path: '/' }` therefore dropped
  *  silently for exactly the shoppers that needed it. maxAge must be stripped:
  *  clearCookie supplies the epoch `expires` itself and a surviving maxAge
  *  would override it back into the future. */
@@ -777,10 +777,12 @@ router.delete(
       const userId = req.user!.userId;
 
       // Soft-delete: set deletedAt timestamp so data is preserved but account is deactivated
-      await prisma.user.update({
-        where: { id: userId },
-        data: { deletedAt: new Date() },
-      });
+      await withUser(userId, tx =>
+        tx.user.update({
+          where: { id: userId },
+          data: { deletedAt: new Date() },
+        })
+      );
 
       // Audit log
       await auditLog({
@@ -807,7 +809,7 @@ router.delete(
 // Unlike DELETE /auth/me (soft-delete that
 // leaves PII intact), this nulls/scrubs every identifying field across
 // the schema in a single transaction and preserves anonymized order
-// records for Kuwait MOF ≥5y tax retention. No request body — possession
+// records for Egypt MOF ≥5y tax retention. No request body — possession
 // of a valid auth token is the confirmation.
 router.post(
   '/me/erase',

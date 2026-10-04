@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Alert } from '../../../../../components/Alert';
 import { useT } from '@/i18n/useT';
 
+import { minorToDecimalString, roundToMinor } from '@force/shared';
 function getWebhookUrl(providerId: string): string {
   const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/$/, '');
   const base = apiBase.endsWith('/api/v1') ? apiBase : `${apiBase}/api/v1`;
@@ -28,9 +29,18 @@ export interface StorePaymentConfig {
   displayName?: string | null;
   displayNameAr?: string | null;
   fixedFee?: number;
+  /** Non-secret per-provider settings (InstaPay handle/phone/expiry, COD percentage). */
+  settings?: Record<string, unknown> | null;
+  /** Last persisted provider health, and the live circuit state of this API node. */
+  healthStatus?: 'healthy' | 'degraded' | 'down' | 'unknown' | null;
+  circuit?: 'healthy' | 'degraded' | 'down' | null;
 }
 
-export type ProviderKind = 'gateway' | 'cod';
+/** `paymob` / `kashier` / `fawry` are the Egyptian gateways, each with its own credential form. */
+export type ProviderKind = 'paymob' | 'kashier' | 'fawry' | 'cod' | 'instapay';
+
+const isGateway = (kind: ProviderKind) =>
+  kind === 'paymob' || kind === 'kashier' || kind === 'fawry';
 
 export interface ProviderDef {
   id: string;
@@ -53,7 +63,10 @@ interface ProviderCardProps {
   message?: ProviderSaveMessage;
   onToggle: (enabled: boolean) => void;
   onToggleExpanded: () => void;
-  onUpdateField: (field: keyof StorePaymentConfig, value: string | number | boolean | null) => void;
+  onUpdateField: (
+    field: keyof StorePaymentConfig,
+    value: string | number | boolean | null | Record<string, unknown>
+  ) => void;
   onSave: () => void;
 }
 
@@ -89,54 +102,63 @@ export function ProviderCard({
             <h3 className="font-semibold text-foreground">{provider.name}</h3>
             <p className="text-xs text-muted-foreground">{provider.nameAr}</p>
           </div>
+          {isGateway(provider.kind) && form.isEnabled && <HealthChip form={form} />}
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {form.isEnabled ? t('toggle.enabled') : t('toggle.disabled')}
-            </span>
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={form.isEnabled}
-                onChange={e => onToggle(e.target.checked)}
-                disabled={saving}
-                className="sr-only peer"
-              />
-              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-400/30 peer-disabled:opacity-50" />
-            </label>
-          </div>
+        {
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                {form.isEnabled ? t('toggle.enabled') : t('toggle.disabled')}
+              </span>
+              <label className="relative inline-flex cursor-pointer items-center">
+                <input
+                  type="checkbox"
+                  checked={form.isEnabled}
+                  onChange={e => onToggle(e.target.checked)}
+                  disabled={saving}
+                  className="sr-only peer"
+                />
+                <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-400/30 peer-disabled:opacity-50" />
+              </label>
+            </div>
 
-          <button
-            type="button"
-            onClick={onToggleExpanded}
-            className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors"
-          >
-            {t('configure')}
-            <svg
-              className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+            <button
+              type="button"
+              onClick={onToggleExpanded}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </button>
-        </div>
+              {t('configure')}
+              <svg
+                className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+          </div>
+        }
       </div>
 
       {expanded && (
         <div className="border-t bg-muted p-6 space-y-5">
           {provider.kind === 'cod' ? (
             <CodFields form={form} onUpdateField={onUpdateField} />
+          ) : provider.kind === 'instapay' ? (
+            <InstapayFields form={form} onUpdateField={onUpdateField} />
+          ) : provider.kind === 'paymob' ? (
+            <PaymobFields providerId={provider.id} form={form} onUpdateField={onUpdateField} />
+          ) : provider.kind === 'kashier' ? (
+            <KashierFields providerId={provider.id} form={form} onUpdateField={onUpdateField} />
           ) : (
-            <GatewayFields providerId={provider.id} form={form} onUpdateField={onUpdateField} />
+            <FawryFields providerId={provider.id} form={form} onUpdateField={onUpdateField} />
           )}
 
           {message && (
@@ -168,7 +190,10 @@ function CodFields({
   onUpdateField,
 }: {
   form: StorePaymentConfig;
-  onUpdateField: (field: keyof StorePaymentConfig, value: string | number | boolean | null) => void;
+  onUpdateField: (
+    field: keyof StorePaymentConfig,
+    value: string | number | boolean | null | Record<string, unknown>
+  ) => void;
 }) {
   const t = useT('paymentSettings.cod');
 
@@ -209,12 +234,12 @@ function CodFields({
             <input
               type="number"
               min={0}
-              step={0.001}
-              value={((Number(form.fixedFee) || 0) / 1000).toFixed(3)}
+              step={0.01}
+              value={minorToDecimalString(Number(form.fixedFee) || 0)}
               onChange={e =>
                 onUpdateField(
                   'fixedFee',
-                  Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 1000))
+                  Math.max(0, roundToMinor(parseFloat(e.target.value) || 0))
                 )
               }
               placeholder={t('fixedFeePlaceholder')}
@@ -228,6 +253,32 @@ function CodFields({
         </div>
       </div>
 
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-1">
+          {t('percentLabel')}
+        </label>
+        <input
+          type="number"
+          min={0}
+          max={50}
+          step={0.01}
+          value={settingNumber(form, 'percentBps') / 100}
+          onChange={e =>
+            onUpdateField(
+              'settings',
+              mergeSettings(form, {
+                percentBps: Math.min(
+                  5000,
+                  Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 100))
+                ),
+              })
+            )
+          }
+          className="w-40 rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+        <p className="mt-1 text-xs text-muted-foreground">{t('percentHelp')}</p>
+      </div>
+
       <div className="rounded-lg border border-border bg-background p-3 text-xs text-muted-foreground">
         {t('infoBanner')}
       </div>
@@ -235,14 +286,474 @@ function CodFields({
   );
 }
 
-function GatewayFields({
+const settingString = (form: StorePaymentConfig, key: string): string => {
+  const v = form.settings?.[key];
+  return typeof v === 'string' ? v : '';
+};
+const settingNumber = (form: StorePaymentConfig, key: string): number => {
+  const v = form.settings?.[key];
+  return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+};
+const mergeSettings = (form: StorePaymentConfig, patch: Record<string, unknown>) => ({
+  ...(form.settings ?? {}),
+  ...patch,
+});
+
+/** Provider health the merchant can see: the live circuit wins over the last persisted value. */
+function HealthChip({ form }: { form: StorePaymentConfig }) {
+  const t = useT('paymentSettings.health');
+  const state =
+    form.circuit && form.circuit !== 'healthy' ? form.circuit : (form.healthStatus ?? 'unknown');
+  const tone =
+    state === 'down'
+      ? 'bg-destructive/10 text-destructive-ink'
+      : state === 'degraded'
+        ? 'bg-amber-100 text-amber-800'
+        : state === 'healthy'
+          ? 'bg-emerald-100 text-emerald-800'
+          : 'bg-muted text-muted-foreground';
+  return (
+    <span
+      className={`ms-2 rounded-full px-2 py-0.5 text-xs font-medium ${tone}`}
+      data-testid="provider-health"
+      title={t('note')}
+    >
+      {t(state)}
+    </span>
+  );
+}
+
+function InstapayFields({
+  form,
+  onUpdateField,
+}: {
+  form: StorePaymentConfig;
+  onUpdateField: (
+    field: keyof StorePaymentConfig,
+    value: string | number | boolean | null | Record<string, unknown>
+  ) => void;
+}) {
+  const t = useT('paymentSettings.instapay');
+  const setSetting = (key: string, value: string | number) =>
+    onUpdateField('settings', mergeSettings(form, { [key]: value }) as never);
+  const input =
+    'w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary';
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            {t('handleLabel')}
+          </label>
+          <input
+            type="text"
+            dir="ltr"
+            value={settingString(form, 'handle')}
+            onChange={e => setSetting('handle', e.target.value)}
+            placeholder={t('handlePlaceholder')}
+            className={input}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            {t('phoneLabel')}
+          </label>
+          <input
+            type="tel"
+            dir="ltr"
+            value={settingString(form, 'phone')}
+            onChange={e => setSetting('phone', e.target.value)}
+            placeholder={t('phonePlaceholder')}
+            className={input}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            {t('accountNameLabel')}
+          </label>
+          <input
+            type="text"
+            value={settingString(form, 'accountName')}
+            onChange={e => setSetting('accountName', e.target.value)}
+            className={input}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            {t('expiryLabel')}
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={336}
+            value={settingNumber(form, 'expiryHours') || 48}
+            onChange={e =>
+              setSetting(
+                'expiryHours',
+                Math.min(336, Math.max(1, Math.floor(Number(e.target.value) || 48)))
+              )
+            }
+            className="w-32 rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">{t('expiryHelp')}</p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            {t('noteEnLabel')}
+          </label>
+          <input
+            type="text"
+            value={settingString(form, 'noteEn')}
+            onChange={e => setSetting('noteEn', e.target.value)}
+            maxLength={300}
+            className={input}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            {t('noteArLabel')}
+          </label>
+          <input
+            type="text"
+            lang="ar"
+            dir="rtl"
+            value={settingString(form, 'noteAr')}
+            onChange={e => setSetting('noteAr', e.target.value)}
+            maxLength={300}
+            className={input}
+          />
+        </div>
+      </div>
+      <div className="rounded-lg border border-border bg-background p-3 text-xs text-muted-foreground">
+        {t('infoBanner')}
+      </div>
+    </>
+  );
+}
+
+type UpdateField = (
+  field: keyof StorePaymentConfig,
+  value: string | number | boolean | null | Record<string, unknown>
+) => void;
+
+const inputClass =
+  'w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary';
+
+function Labelled({
+  label,
+  help,
+  children,
+}: {
+  label: string;
+  help?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-foreground mb-1">{label}</label>
+      {children}
+      {help && <p className="mt-1 text-xs text-muted-foreground">{help}</p>}
+    </div>
+  );
+}
+
+/** One of the checkboxes that turn a gateway method on (Kashier / Fawry). */
+function MethodChecks({
+  options,
+  selected,
+  onChange,
+}: {
+  options: Array<{ code: string; label: string }>;
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-4">
+      {options.map(o => (
+        <label key={o.code} className="flex items-center gap-2 text-sm text-foreground">
+          <input
+            type="checkbox"
+            checked={selected.includes(o.code)}
+            onChange={e =>
+              onChange(
+                e.target.checked ? [...selected, o.code] : selected.filter(c => c !== o.code)
+              )
+            }
+          />
+          {o.label}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+const settingStringList = (form: StorePaymentConfig, key: string, fallback: string[]): string[] => {
+  const v = form.settings?.[key];
+  return Array.isArray(v) && v.every(x => typeof x === 'string') && v.length > 0
+    ? (v as string[])
+    : fallback;
+};
+
+/** Paymob: Secret key + HMAC secret (credentials) and the public key + one integration id per method. */
+function PaymobFields({
   providerId,
   form,
   onUpdateField,
 }: {
   providerId: string;
   form: StorePaymentConfig;
-  onUpdateField: (field: keyof StorePaymentConfig, value: string | number | boolean | null) => void;
+  onUpdateField: UpdateField;
+}) {
+  const t = useT('paymentSettings.paymob');
+  const ids = (form.settings?.integrationIds ?? {}) as Record<string, number | undefined>;
+  const setId = (method: string, raw: string) => {
+    const n = Math.floor(Number(raw));
+    const next = { ...ids };
+    if (raw === '' || !Number.isFinite(n) || n <= 0) delete next[method];
+    else next[method] = n;
+    onUpdateField('settings', mergeSettings(form, { integrationIds: next }));
+  };
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Labelled label={t('secretKeyLabel')} help={t('secretKeyHelp')}>
+          <input
+            type="password"
+            autoComplete="off"
+            value={form.apiKey || ''}
+            onChange={e => onUpdateField('apiKey', e.target.value)}
+            placeholder={t('secretKeyPlaceholder')}
+            className={inputClass}
+          />
+          <SavedCredentialHint value={form.apiKey} missing={form.apiKeyFingerprintMissing} />
+        </Labelled>
+        <Labelled label={t('hmacLabel')} help={t('hmacHelp')}>
+          <input
+            type="password"
+            autoComplete="off"
+            value={form.webhookSecret || ''}
+            onChange={e => onUpdateField('webhookSecret', e.target.value)}
+            placeholder={t('hmacPlaceholder')}
+            className={inputClass}
+          />
+        </Labelled>
+        <Labelled label={t('publicKeyLabel')} help={t('publicKeyHelp')}>
+          <input
+            type="text"
+            dir="ltr"
+            value={settingString(form, 'publicKey')}
+            onChange={e =>
+              onUpdateField('settings', mergeSettings(form, { publicKey: e.target.value }))
+            }
+            placeholder={t('publicKeyPlaceholder')}
+            className={inputClass}
+          />
+        </Labelled>
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-foreground">{t('integrationsTitle')}</p>
+        <p className="mb-2 text-xs text-muted-foreground">{t('integrationsHelp')}</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {(['card', 'meeza', 'wallet', 'valu'] as const).map(method => (
+            <Labelled key={method} label={t(`methods.${method}`)}>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                dir="ltr"
+                value={ids[method] ?? ''}
+                onChange={e => setId(method, e.target.value)}
+                placeholder={t('integrationPlaceholder')}
+                className={inputClass}
+                data-testid={`paymob-integration-${method}`}
+              />
+            </Labelled>
+          ))}
+        </div>
+      </div>
+
+      <GatewayFooter providerId={providerId} form={form} onUpdateField={onUpdateField} />
+    </>
+  );
+}
+
+/** Kashier: merchant id, Payment API key and Secret key, plus which methods the hosted page offers. */
+function KashierFields({
+  providerId,
+  form,
+  onUpdateField,
+}: {
+  providerId: string;
+  form: StorePaymentConfig;
+  onUpdateField: UpdateField;
+}) {
+  const t = useT('paymentSettings.kashier');
+  const methods = settingStringList(form, 'methods', ['card', 'wallet']);
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Labelled label={t('merchantIdLabel')} help={t('merchantIdHelp')}>
+          <input
+            type="text"
+            dir="ltr"
+            value={form.merchantId || ''}
+            onChange={e => onUpdateField('merchantId', e.target.value)}
+            placeholder={t('merchantIdPlaceholder')}
+            className={inputClass}
+          />
+          <SavedCredentialHint
+            value={form.merchantId}
+            missing={form.merchantIdFingerprintMissing}
+          />
+        </Labelled>
+        <Labelled label={t('apiKeyLabel')} help={t('apiKeyHelp')}>
+          <input
+            type="password"
+            autoComplete="off"
+            value={form.apiKey || ''}
+            onChange={e => onUpdateField('apiKey', e.target.value)}
+            placeholder={t('apiKeyPlaceholder')}
+            className={inputClass}
+          />
+          <SavedCredentialHint value={form.apiKey} missing={form.apiKeyFingerprintMissing} />
+        </Labelled>
+        <Labelled label={t('secretKeyLabel')} help={t('secretKeyHelp')}>
+          <input
+            type="password"
+            autoComplete="off"
+            value={form.secretKey || ''}
+            onChange={e => onUpdateField('secretKey', e.target.value)}
+            placeholder={t('secretKeyPlaceholder')}
+            className={inputClass}
+          />
+        </Labelled>
+        <Labelled label={t('displayLabel')}>
+          <select
+            value={settingString(form, 'display') || 'ar'}
+            onChange={e =>
+              onUpdateField('settings', mergeSettings(form, { display: e.target.value }))
+            }
+            className={inputClass}
+          >
+            <option value="ar">{t('display.ar')}</option>
+            <option value="en">{t('display.en')}</option>
+          </select>
+        </Labelled>
+      </div>
+
+      <div>
+        <p className="mb-2 text-sm font-medium text-foreground">{t('methodsTitle')}</p>
+        <MethodChecks
+          options={[
+            { code: 'card', label: t('methods.card') },
+            { code: 'wallet', label: t('methods.wallet') },
+          ]}
+          selected={methods}
+          onChange={next =>
+            onUpdateField(
+              'settings',
+              mergeSettings(form, { methods: next.length ? next : methods })
+            )
+          }
+        />
+      </div>
+
+      <GatewayFooter providerId={providerId} form={form} onUpdateField={onUpdateField} />
+    </>
+  );
+}
+
+/** Fawry: merchant code + secure key, the enabled methods and how long a reference code stays payable. */
+function FawryFields({
+  providerId,
+  form,
+  onUpdateField,
+}: {
+  providerId: string;
+  form: StorePaymentConfig;
+  onUpdateField: UpdateField;
+}) {
+  const t = useT('paymentSettings.fawry');
+  const methods = settingStringList(form, 'methods', ['payatfawry', 'card']);
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Labelled label={t('merchantCodeLabel')} help={t('merchantCodeHelp')}>
+          <input
+            type="text"
+            dir="ltr"
+            value={form.merchantId || ''}
+            onChange={e => onUpdateField('merchantId', e.target.value)}
+            placeholder={t('merchantCodePlaceholder')}
+            className={inputClass}
+          />
+          <SavedCredentialHint
+            value={form.merchantId}
+            missing={form.merchantIdFingerprintMissing}
+          />
+        </Labelled>
+        <Labelled label={t('secureKeyLabel')} help={t('secureKeyHelp')}>
+          <input
+            type="password"
+            autoComplete="off"
+            value={form.apiKey || ''}
+            onChange={e => onUpdateField('apiKey', e.target.value)}
+            placeholder={t('secureKeyPlaceholder')}
+            className={inputClass}
+          />
+          <SavedCredentialHint value={form.apiKey} missing={form.apiKeyFingerprintMissing} />
+        </Labelled>
+        <Labelled label={t('expiryLabel')} help={t('expiryHelp')}>
+          <input
+            type="number"
+            min={1}
+            max={720}
+            value={settingNumber(form, 'expiryHours') || 72}
+            onChange={e =>
+              onUpdateField(
+                'settings',
+                mergeSettings(form, {
+                  expiryHours: Math.min(720, Math.max(1, Math.floor(Number(e.target.value) || 72))),
+                })
+              )
+            }
+            className="w-32 rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </Labelled>
+      </div>
+
+      <div>
+        <p className="mb-2 text-sm font-medium text-foreground">{t('methodsTitle')}</p>
+        <MethodChecks
+          options={[
+            { code: 'payatfawry', label: t('methods.payatfawry') },
+            { code: 'card', label: t('methods.card') },
+          ]}
+          selected={methods}
+          onChange={next =>
+            onUpdateField(
+              'settings',
+              mergeSettings(form, { methods: next.length ? next : methods })
+            )
+          }
+        />
+      </div>
+
+      <GatewayFooter providerId={providerId} form={form} onUpdateField={onUpdateField} />
+    </>
+  );
+}
+
+/** The part every gateway shares: the webhook URL to paste in the dashboard, and the test / live switch. */
+function GatewayFooter({
+  providerId,
+  form,
+  onUpdateField,
+}: {
+  providerId: string;
+  form: StorePaymentConfig;
+  onUpdateField: UpdateField;
 }) {
   const t = useT('paymentSettings.gateway');
   const [copied, setCopied] = useState(false);
@@ -261,65 +772,9 @@ function GatewayFields({
 
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">
-            {t('apiKeyLabel')}
-          </label>
-          <input
-            type="password"
-            value={form.apiKey || ''}
-            onChange={e => onUpdateField('apiKey', e.target.value)}
-            placeholder={t('apiKeyPlaceholder')}
-            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-          <SavedCredentialHint value={form.apiKey} missing={form.apiKeyFingerprintMissing} />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">
-            {t('secretKeyLabel')}
-          </label>
-          <input
-            type="password"
-            value={form.secretKey || ''}
-            onChange={e => onUpdateField('secretKey', e.target.value)}
-            placeholder={t('secretKeyPlaceholder')}
-            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">
-            {t('webhookSecretLabel')}
-          </label>
-          <input
-            type="password"
-            value={form.webhookSecret || ''}
-            onChange={e => onUpdateField('webhookSecret', e.target.value)}
-            placeholder={t('webhookSecretPlaceholder')}
-            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">
-            {t('merchantIdLabel')}
-          </label>
-          <input
-            type="text"
-            value={form.merchantId || ''}
-            onChange={e => onUpdateField('merchantId', e.target.value)}
-            placeholder={t('merchantIdPlaceholder')}
-            className="w-full rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-          <SavedCredentialHint
-            value={form.merchantId}
-            missing={form.merchantIdFingerprintMissing}
-          />
-        </div>
-      </div>
-
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
         <p className="mb-1 font-medium text-blue-900">{t('webhookUrlLabel')}</p>
-        <p className="mb-2 text-xs text-blue-700">{t('webhookUrlDescription')}</p>
+        <p className="mb-2 text-xs text-blue-700">{t(`webhookUrlDescription.${providerId}`)}</p>
         <div className="flex items-center gap-2">
           <input
             type="text"

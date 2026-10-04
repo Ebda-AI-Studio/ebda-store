@@ -39,10 +39,15 @@ import { ProductsFilterSidebar } from './ProductsFilterSidebar';
 import { ProductsPagination } from './ProductsPagination';
 import { recordLastListing, consumeFocusProduct } from '@/lib/last-listing';
 
+import { roundToMinor } from '@force/shared';
 /**
  * How many products the user can choose to load per PLP page. Capped at 96
  * because larger pages start to hurt mobile data + LCP without much UX win.
  */
+/** Price-filter slider range, in MAJOR units (EGP). Not a data scale — a UX bound. */
+const PRICE_SLIDER_MAX = 5000;
+const PRICE_SLIDER_STEP = 10;
+
 const PER_PAGE_OPTIONS: readonly number[] = [12, 24, 48, 96];
 
 /** Sort option labels are translated at render time via the t() helper */
@@ -153,11 +158,10 @@ export default function ProductsClient({
     return PER_PAGE_OPTIONS.includes(stored) ? stored : 96;
   });
 
-  // Price range in MAJOR units (KD). 0–100 KD covers most KW grocery / spice
-  // SKUs; tenants with a wider catalog get the upper bound auto-extended on
-  // the next render via the data-driven ceil below.
+  // Price range in MAJOR units (EGP). 0–5000 EGP covers most catalogue SKUs;
+  // see PRICE_SLIDER_MAX.
   const [priceMin, setPriceMin] = useState(0);
-  const [priceMax, setPriceMax] = useState(100);
+  const [priceMax, setPriceMax] = useState(PRICE_SLIDER_MAX);
 
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
@@ -367,11 +371,11 @@ export default function ProductsClient({
         if (sortBy === 'price-desc') params.sort = 'price_desc';
         if (sortBy === 'featured') params.featured = 'true';
         if (sortBy === 'best_seller' || isVirtualBestSellers) params.sort = 'best_seller';
-        // API stores prices as integer fils — multiply major units by 1000.
+        // API stores prices as integer piastres — multiply major units by 1000.
         // Skip the bound when it equals the slider's natural rest position so
         // we don't restrict the result set unnecessarily.
-        if (priceMin > 0) params.minPrice = String(Math.round(priceMin * 1000));
-        if (priceMax < 100) params.maxPrice = String(Math.round(priceMax * 1000));
+        if (priceMin > 0) params.minPrice = String(roundToMinor(priceMin));
+        if (priceMax < PRICE_SLIDER_MAX) params.maxPrice = String(roundToMinor(priceMax));
 
         // Pass active option filters — API serialises them to ?opt_<name>=val1,val2
         const activeOptionFilters =
@@ -647,7 +651,8 @@ export default function ProductsClient({
                   priceMin={priceMin}
                   priceMax={priceMax}
                   priceFloor={0}
-                  priceCeil={100}
+                  priceCeil={PRICE_SLIDER_MAX}
+                  priceStep={PRICE_SLIDER_STEP}
                   onPriceChange={(min, max) => {
                     setPriceMin(min);
                     setPriceMax(max);

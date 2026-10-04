@@ -13,39 +13,39 @@ import {
   parseStatementOfx,
 } from '../../apps/api/src/services/accounting/bank-statement-parser';
 
-// ─── Fils conversion ──────────────────────────────────────────────────────────
+// ─── Piastres conversion ──────────────────────────────────────────────────────────
 
 describe('decimalStringToFils — money precision', () => {
-  it('converts a standard 3-decimal KWD amount', () => {
-    expect(decimalStringToFils('12.345')).toBe(12345);
+  it('converts a standard 2-decimal EGP amount', () => {
+    expect(decimalStringToFils('12.34')).toBe(1234);
   });
 
-  it('converts a 2-decimal amount (padded to 3 decimal places)', () => {
-    expect(decimalStringToFils('1.50')).toBe(1500);
+  it('converts an amount padded to 2 decimal places', () => {
+    expect(decimalStringToFils('1.50')).toBe(150);
   });
 
   it('converts a 1-decimal amount', () => {
-    expect(decimalStringToFils('10.5')).toBe(10500);
+    expect(decimalStringToFils('10.5')).toBe(1050);
   });
 
   it('converts a whole number (no decimal point)', () => {
-    expect(decimalStringToFils('100')).toBe(100000);
+    expect(decimalStringToFils('100')).toBe(10000);
   });
 
-  it('converts the smallest unit: 0.001 KWD → 1 fil', () => {
-    expect(decimalStringToFils('0.001')).toBe(1);
+  it('converts the smallest unit: 0.01 EGP → 1 piastre', () => {
+    expect(decimalStringToFils('0.01')).toBe(1);
   });
 
   it('converts zero', () => {
-    expect(decimalStringToFils('0.000')).toBe(0);
+    expect(decimalStringToFils('0.00')).toBe(0);
   });
 
   it('handles negative amounts (debit direction)', () => {
-    expect(decimalStringToFils('-12.500')).toBe(-12500);
+    expect(decimalStringToFils('-12.50')).toBe(-1250);
   });
 
   it('strips thousands separators', () => {
-    expect(decimalStringToFils('1,234.567')).toBe(1234567);
+    expect(decimalStringToFils('1,234.56')).toBe(123456);
   });
 
   it('returns 0 for empty string', () => {
@@ -53,17 +53,17 @@ describe('decimalStringToFils — money precision', () => {
   });
 
   it('normalises Arabic-Indic digits', () => {
-    // ١٢.٣٤٥ → 12.345
-    expect(decimalStringToFils('١٢.٣٤٥')).toBe(12345);
+    // ١٢.٣٤ → 12.34
+    expect(decimalStringToFils('١٢.٣٤')).toBe(1234);
   });
 
-  it('truncates to 3 decimal places (no rounding up beyond fils)', () => {
-    // "1.0009" → frac = "000" (first 3 chars), so 1000 fils
-    expect(decimalStringToFils('1.0009')).toBe(1000);
+  it('truncates to 2 decimal places (no rounding up beyond piastres)', () => {
+    // "1.0099" → frac = "00" (first 2 chars), so 100 piastres — never rounded up to 101
+    expect(decimalStringToFils('1.0099')).toBe(100);
   });
 
   it('converts large amounts correctly', () => {
-    expect(decimalStringToFils('99999.999')).toBe(99999999);
+    expect(decimalStringToFils('99999.99')).toBe(9999999);
   });
 });
 
@@ -77,8 +77,8 @@ describe('parseStatementCsv — English headers', () => {
   it('parses a standard debit/credit CSV', () => {
     const csv = [
       'Date,Description,Debit,Credit,Reference',
-      '2026-01-10,Coffee shop,1.500,,CHQ001',
-      '2026-01-11,Salary deposit,,500.000,SAL001',
+      '2026-01-10,Coffee shop,15.00,,CHQ001',
+      '2026-01-11,Salary deposit,,5000.00,SAL001',
     ].join('\n');
 
     const { rows, skipped, errors } = parseStatementCsv(buf(csv));
@@ -100,8 +100,8 @@ describe('parseStatementCsv — English headers', () => {
   it('parses a single amount column (positive = credit, negative = debit)', () => {
     const csv = [
       'Date,Description,Amount',
-      '2026-02-01,Purchase,-25.000',
-      '2026-02-02,Refund,10.000',
+      '2026-02-01,Purchase,-250.00',
+      '2026-02-02,Refund,100.00',
     ].join('\n');
 
     const { rows } = parseStatementCsv(buf(csv));
@@ -115,8 +115,8 @@ describe('parseStatementCsv — English headers', () => {
   it('skips rows with zero amount', () => {
     const csv = [
       'Date,Description,Debit,Credit',
-      '2026-01-01,Zero row,0.000,0.000',
-      '2026-01-02,Real row,5.000,',
+      '2026-01-01,Zero row,0.00,0.00',
+      '2026-01-02,Real row,50.00,',
     ].join('\n');
 
     const { rows, skipped } = parseStatementCsv(buf(csv));
@@ -127,8 +127,8 @@ describe('parseStatementCsv — English headers', () => {
   it('skips rows with invalid date and records an error', () => {
     const csv = [
       'Date,Description,Debit,Credit',
-      'not-a-date,Bad row,5.000,',
-      '2026-01-02,Good row,3.000,',
+      'not-a-date,Bad row,50.00,',
+      '2026-01-02,Good row,30.00,',
     ].join('\n');
 
     const { rows, skipped, errors } = parseStatementCsv(buf(csv));
@@ -145,13 +145,13 @@ describe('parseStatementCsv — English headers', () => {
   });
 
   it('returns an error when no date column found', () => {
-    const csv = ['Description,Amount', 'Purchase,10.000'].join('\n');
+    const csv = ['Description,Amount', 'Purchase,100.00'].join('\n');
     const { errors } = parseStatementCsv(buf(csv));
     expect(errors[0]).toContain('date column');
   });
 
   it('handles semicolon-separated CSV', () => {
-    const csv = ['Date;Description;Debit;Credit', '2026-03-01;Shop;20.000;'].join('\n');
+    const csv = ['Date;Description;Debit;Credit', '2026-03-01;Shop;200.00;'].join('\n');
 
     const { rows } = parseStatementCsv(buf(csv));
     expect(rows).toHaveLength(1);
@@ -163,8 +163,8 @@ describe('parseStatementCsv — Arabic headers', () => {
   it('parses Arabic column names correctly', () => {
     const csv = [
       'تاريخ,الوصف,مدين,دائن',
-      '2026-04-05,شراء أثاث,150.000,',
-      '2026-04-06,إيداع راتب,,1000.000',
+      '2026-04-05,شراء أثاث,1500.00,',
+      '2026-04-06,إيداع راتب,,10000.00',
     ].join('\n');
 
     const { rows, errors } = parseStatementCsv(buf(csv));
@@ -181,7 +181,7 @@ describe('parseStatementCsv — idempotent row hashing', () => {
   it('produces the same rowHash for the same row data', () => {
     const csv = [
       'Date,Description,Debit,Credit,Reference',
-      '2026-01-10,Coffee shop,1.500,,CHQ001',
+      '2026-01-10,Coffee shop,15.00,,CHQ001',
     ].join('\n');
 
     const r1 = parseStatementCsv(buf(csv));
@@ -190,8 +190,8 @@ describe('parseStatementCsv — idempotent row hashing', () => {
   });
 
   it('produces different rowHash for different amounts', () => {
-    const csv1 = 'Date,Description,Debit\n2026-01-10,Coffee,1.500';
-    const csv2 = 'Date,Description,Debit\n2026-01-10,Coffee,2.000';
+    const csv1 = 'Date,Description,Debit\n2026-01-10,Coffee,15.00';
+    const csv2 = 'Date,Description,Debit\n2026-01-10,Coffee,20.00';
     const r1 = parseStatementCsv(buf(csv1));
     const r2 = parseStatementCsv(buf(csv2));
     expect(r1.rows[0].rowHash).not.toBe(r2.rows[0].rowHash);
@@ -213,14 +213,14 @@ VERSION:102
 <STMTTRN>
 <TRNTYPE>DEBIT
 <DTPOSTED>20260115
-<TRNAMT>-25.500
+<TRNAMT>-255.00
 <FITID>TXN001
 <NAME>Supermarket
 </STMTTRN>
 <STMTTRN>
 <TRNTYPE>CREDIT
 <DTPOSTED>20260116120000
-<TRNAMT>500.000
+<TRNAMT>5000.00
 <FITID>TXN002
 <NAME>Salary
 </STMTTRN>
@@ -255,7 +255,7 @@ describe('parseStatementOfx — XML format', () => {
     <BANKTRANLIST>
       <STMTTRN>
         <DTPOSTED>20260201</DTPOSTED>
-        <TRNAMT>-10.000</TRNAMT>
+        <TRNAMT>-100.00</TRNAMT>
         <FITID>X001</FITID>
         <NAME>Grocery</NAME>
       </STMTTRN>
@@ -274,7 +274,7 @@ describe('parseStatementOfx — XML format', () => {
 
 describe('parseStatementOfx — error cases', () => {
   it('reports error for missing DTPOSTED', () => {
-    const ofx = `<OFX><STMTTRN><TRNAMT>-5.000</TRNAMT><FITID>X1</FITID></STMTTRN></OFX>`;
+    const ofx = `<OFX><STMTTRN><TRNAMT>-50.00</TRNAMT><FITID>X1</FITID></STMTTRN></OFX>`;
     const { skipped, errors } = parseStatementOfx(buf(ofx));
     expect(skipped).toBe(1);
     expect(errors[0]).toContain('DTPOSTED');
@@ -330,7 +330,7 @@ vi.mock('@force/database', () => ({
       findFirst: (...a: unknown[]) => mockJournalEntryFindFirst(...a),
     },
   },
-  withRlsBypass: (fn: (tx: unknown) => unknown) => mockWithRlsBypass(fn),
+  withStore: (_storeId: string, fn: (tx: unknown) => unknown) => mockWithRlsBypass(fn),
   runInTenantContext: (sid: string, fn: () => unknown) => mockRunInTenantContext(sid, fn),
 }));
 
@@ -458,7 +458,7 @@ describe('runAutoMatch — matching rules', () => {
 
   it('computes lower confidence for near-miss amount', async () => {
     mockBankTxUpdateMany.mockResolvedValue({});
-    // Bank tx: 10000 fils; ledger line: 10003 fils (diff = 3, within tolerance of 5)
+    // Bank tx: 10000 piastres; ledger line: 10003 piastres (diff = 3, within tolerance of 5)
     mockBankTxFindMany
       .mockResolvedValueOnce([makeTx({ id: 'btx-4', amountFils: 10000, direction: 'debit' })])
       .mockResolvedValueOnce([]);

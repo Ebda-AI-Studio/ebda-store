@@ -2,7 +2,9 @@
 /**
  * Buy-flow parity harness.
  *
- *   node scripts/buy-flow-parity/run.mjs --base 96814545 --head <ref>
+ *   node scripts/buy-flow-parity/run.mjs --base origin/main --head <ref>
+ *   node scripts/buy-flow-parity/run.mjs --api-url-base <url> --api-url-head <url> \
+ *        --pg-url-base <url> --pg-url-head <url> [--redis-url <url>]   # runtime mode
  *
  * Runs the SAME deterministic buy scenarios against two git refs — each ref
  * checked out into its own temporary worktree, built, migrated onto its own
@@ -13,7 +15,9 @@
  * Never touches a remote database, a remote API or a real payment gateway:
  * the API process gets a hand-built environment (no inherited DATABASE_URL,
  * no .env), and every non-loopback network call is intercepted (lib/preload.mjs).
- * See scripts/buy-flow-parity/README.md.
+ * In api-url mode a side is an already-running API (Node-Express, a Cloudflare
+ * Worker, ...): no worktree/build/spawn, the harness only seeds its database and
+ * drives it over HTTP. See scripts/buy-flow-parity/README.md.
  */
 import { spawn, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -22,6 +26,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStub } from './lib/stub.mjs';
+import { PM_SECRET_KEY } from './lib/fixture.mjs';
+import { paymentEndpointProblems } from './lib/guards.mjs';
 import { buildFixture } from './lib/fixture.mjs';
 import { snapshotDb, psqlExec, psqlJson } from './lib/snapshot.mjs';
 import { makeNormalizer, diff, parseAllows, allowFor } from './lib/compare.mjs';
@@ -29,15 +35,22 @@ import { Shopper, Admin, HARNESS_ENV } from './lib/client.mjs';
 import { SCENARIOS } from './lib/scenarios.mjs';
 import { createExecutor } from './lib/inngest-executor.mjs';
 
+// The strict-RLS runtime role of the refs under test (the migration creates it NOLOGIN).
+const APP_ROLE = process.env.PARITY_APP_ROLE || 'ebda_app';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
-const DEFAULT_BASE = '96814545';
 
 // ---------------------------------------------------------------- CLI
 function parseArgs(argv) {
   const a = {
-    base: DEFAULT_BASE,
+    base: null,
     head: 'HEAD',
+    apiUrlBase: null,
+    apiUrlHead: null,
+    pgUrlBase: null,
+    pgUrlHead: null,
+    redisUrlBase: null,
+    redisUrlHead: null,
     only: null,
     allow: [],
     keepWorktrees: false,
@@ -59,6 +72,13 @@ function parseArgs(argv) {
     else if (k === '--keep-db') a.keepDb = true;
     else if (k === '--pg-url') a.pgUrl = v();
     else if (k === '--redis-url') a.redisUrl = v();
+    else if (k === '--api-url-base') a.apiUrlBase = v();
+    else if (k === '--api-url-head') a.apiUrlHead = v();
+    else if (k === '--pg-url-base') a.pgUrlBase = v();
+    else if (k === '--pg-url-head') a.pgUrlHead = v();
+    else if (k === '--redis-url-base') a.redisUrlBase = v();
+    else if (k === '--redis-url-head') a.redisUrlHead = v();
+    else if (k === '--encryption-key') a.encryptionKey = v();
     else if (k === '--api-port') a.apiPort = Number(v());
     else if (k === '--stub-port') a.stubPort = Number(v());
     else if (k === '--out') a.out = path.resolve(v());
@@ -196,6 +216,36 @@ const withDb = (url, db) => {
   u.pathname = `/${db}`;
   return u.toString();
 };
+
+/**
+ * api-url mode: the API under test is already connected to its database, so the
+ * database cannot be dropped and recreated. Instead every table is TRUNCATEd
+ * (except Prisma's migration ledger) and the fixture is seeded again, so a side
+ * can be re-run any number of times. The schema must already be migrated.
+ */
+const KEEP_TABLES = new Set(['_prisma_migrations']);
+function resetData(owner) {
+  const tables = psqlJson(
+    owner,
+    `SELECT coalesce(json_agg(tablename), '[]'::json) FROM pg_tables WHERE schemaname = 'public'`
+  ).filter(t => !KEEP_TABLES.has(t));
+  if (!tables.length) throw new Error('no tables in the target database — was it migrated?');
+  psqlExec(
+    owner,
+    `TRUNCATE ${tables.map(t => `public."${t}"`).join(', ')} RESTART IDENTITY CASCADE;`
+  );
+}
+
+async function waitForApi(origin, logFile) {
+  await waitFor(
+    async () => {
+      const r = await fetch(`${origin}/health`).catch(() => null);
+      return r && r.status < 500;
+    },
+    `API /health at ${origin}${logFile ? ` (see ${logFile})` : ''}`,
+    90000
+  );
+}
 
 // ---------------------------------------------------------------- refs
 function resolveRef(ref) {
@@ -358,44 +408,66 @@ function withDrain(client) {
   return client;
 }
 
-async function runRef({ label, sha, dir, infra, args, stub, scenarios, logDir }) {
+async function runRef({ label, sha, dir, infra, args, stub, scenarios, logDir, external }) {
   const t0 = Date.now();
-  const db = `bfp_${label}_${sha.slice(0, 10)}_${process.pid}`;
-  const owner = withDb(infra.pgUrl, db);
-  const admin = infra.pgUrl;
-  psqlExec(admin, `DROP DATABASE IF EXISTS ${db};\nCREATE DATABASE ${db};`);
-  log(`[${label}] migrating ${db}`);
-  run(
-    path.join(dir, 'node_modules', '.bin', 'prisma'),
-    ['migrate', 'deploy', '--schema', 'packages/database/prisma/schema.prisma'],
-    dir,
-    { PATH: process.env.PATH, HOME: process.env.HOME, DATABASE_URL: owner, DIRECT_URL: owner },
-    path.join(logDir, `${label}-migrate.log`)
-  );
-  // The API runs as the non-bypass RLS role, exactly like production and CI.
-  psqlExec(owner, `ALTER ROLE force_app WITH PASSWORD 'bfp-parity-force-app' LOGIN;`);
+  const db = external ? null : `bfp_${label}_${sha.slice(0, 10)}_${process.pid}`;
+  let owner;
+  let admin;
+  let redisUrl;
+  let api;
+  let origin;
+  if (external) {
+    // Already-running API: only its database is ours to prepare.
+    owner = external.pgUrl;
+    redisUrl = external.redisUrl;
+    origin = external.apiUrl.replace(/\/+$/, '');
+    log(`[${label}] resetting data in ${new URL(owner).pathname.slice(1)} (api ${origin})`);
+    resetData(owner);
+    if (redisUrl) await redisCmd(redisUrl, 'FLUSHALL');
+    else log(`[${label}] no redis url for this side — redis state is NOT reset`);
+    await waitForApi(origin);
+    api = { async stop() {} };
+  } else {
+    owner = withDb(infra.pgUrl, db);
+    admin = infra.pgUrl;
+    redisUrl = infra.redisUrl;
+    psqlExec(admin, `DROP DATABASE IF EXISTS ${db};\nCREATE DATABASE ${db};`);
+    log(`[${label}] migrating ${db}`);
+    run(
+      path.join(dir, 'node_modules', '.bin', 'prisma'),
+      ['migrate', 'deploy', '--schema', 'packages/database/prisma/schema.prisma'],
+      dir,
+      { PATH: process.env.PATH, HOME: process.env.HOME, DATABASE_URL: owner, DIRECT_URL: owner },
+      path.join(logDir, `${label}-migrate.log`)
+    );
+    // The API runs as the non-bypass RLS role, exactly like production and CI.
+    psqlExec(owner, `ALTER ROLE ${APP_ROLE} WITH PASSWORD 'bfp-parity-force-app' LOGIN;`);
+    await redisCmd(redisUrl, 'FLUSHALL');
+  }
   const appUrl = (() => {
     const u = new URL(owner);
-    u.username = 'force_app';
+    u.username = APP_ROLE;
     u.password = 'bfp-parity-force-app';
     return u.toString();
   })();
-  await redisCmd(infra.redisUrl, 'FLUSHALL');
 
-  const fixture = buildFixture({ encryptionKey: SECRETS.ENCRYPTION_KEY, scenarios });
+  const fixture = buildFixture({ encryptionKey: args.encryptionKey, scenarios });
   psqlExec(owner, fixture.sql);
 
-  const api = await startApi({
-    dir,
-    dbUrlApp: appUrl,
-    dbUrlOwner: owner,
-    redisUrl: infra.redisUrl,
-    port: args.apiPort,
-    stubUrl: `http://127.0.0.1:${args.stubPort}`,
-    logFile: path.join(logDir, `${label}-api.log`),
-  });
-  const apiBase = `http://127.0.0.1:${args.apiPort}/api/v1`;
-  const executor = createExecutor({ stub, apiOrigin: `http://127.0.0.1:${args.apiPort}` });
+  if (!external) {
+    api = await startApi({
+      dir,
+      dbUrlApp: appUrl,
+      dbUrlOwner: owner,
+      redisUrl,
+      port: args.apiPort,
+      stubUrl: `http://127.0.0.1:${args.stubPort}`,
+      logFile: path.join(logDir, `${label}-api.log`),
+    });
+    origin = `http://127.0.0.1:${args.apiPort}`;
+  }
+  const apiBase = `${origin}/api/v1`;
+  const executor = createExecutor({ stub, apiOrigin: origin });
   currentExecutor = executor;
   const results = {};
   try {
@@ -407,11 +479,16 @@ async function runRef({ label, sha, dir, infra, args, stub, scenarios, logDir })
       const cat = fixture.catalog[sc.id];
       const steps = [];
       const notes = [];
+      const expectations = [];
       const ctx = {
         stub,
         steps,
         orderIds: [],
         note: n => notes.push(n),
+        // A payment-endpoint expectation: step `name` must have run, and every run of it must
+        // have answered one of `codes`. Checked after the scenario (see below).
+        expectations,
+        expect: (name, codes) => expectations.push({ name, codes }),
         skip: reason => {
           throw new SkipError(reason);
         },
@@ -457,6 +534,16 @@ async function runRef({ label, sha, dir, infra, args, stub, scenarios, logDir })
         ...steps.filter(s => s.status === 429).map(s => s.step),
         ...inngestRuns.filter(r => r.http === 429).map(r => `inngest:${r.function}`),
       ];
+      // PAYMENT ENDPOINTS MUST BE REAL. A scenario whose payment call answers 404 has not
+      // exercised the payment path (a route that is gone, or a read RLS hides from the app role):
+      // both sides being equally broken must read as an ERROR, never as "identical, PASS".
+      if (status === 'ran') {
+        const problems = paymentEndpointProblems(steps, expectations);
+        if (problems.length) {
+          status = 'error';
+          error = problems.join('; ');
+        }
+      }
       if (throttled.length && status === 'ran') {
         status = 'error';
         error = `harness was rate-limited (429) at: ${throttled.join(', ')}`;
@@ -497,7 +584,7 @@ async function runRef({ label, sha, dir, infra, args, stub, scenarios, logDir })
           ),
           db: dbSnap,
           gateway: {
-            myfatoorah: gateway.filter(r => r.service === 'myfatoorah'),
+            paymob: gateway.filter(r => r.service === 'paymob'),
             inngestEvents: gateway.filter(r => r.service === 'inngest').map(r => r.event),
           },
           inngestRuns: keyRuns(inngestRuns),
@@ -511,9 +598,14 @@ async function runRef({ label, sha, dir, infra, args, stub, scenarios, logDir })
     }
   } finally {
     await api.stop();
-    if (!args.keepDb) psqlExec(admin, `DROP DATABASE IF EXISTS ${db};`);
+    if (!external && !args.keepDb) psqlExec(admin, `DROP DATABASE IF EXISTS ${db};`);
   }
-  return { sha, db, seconds: Math.round((Date.now() - t0) / 1000), results };
+  return {
+    sha,
+    db: db ?? new URL(owner).pathname.slice(1),
+    seconds: Math.round((Date.now() - t0) / 1000),
+    results,
+  };
 }
 
 // ---------------------------------------------------------------- report
@@ -594,57 +686,89 @@ async function main() {
       `unknown scenario in --only: ${args.only.filter(o => !SCENARIOS.some(s => s.id === o)).join(', ')}`
     );
   }
+  args.encryptionKey = args.encryptionKey ?? SECRETS.ENCRYPTION_KEY;
+
+  // A side is either a git ref (built + spawned here) or an already-running API.
+  const sideSpec = label => {
+    const L = label === 'base' ? 'Base' : 'Head';
+    const apiUrl = args[`apiUrl${L}`];
+    if (!apiUrl) return { label, mode: 'ref', ref: args[label] };
+    const pgUrl = args[`pgUrl${L}`] ?? args.pgUrl;
+    const redisUrl = args[`redisUrl${L}`] ?? args.redisUrl;
+    if (!pgUrl) {
+      throw new Error(
+        `--api-url-${label} needs --pg-url-${label} (or --pg-url): the fixture is seeded per side`
+      );
+    }
+    assertLocal(pgUrl, `--pg-url-${label}`);
+    if (redisUrl) assertLocal(redisUrl, `--redis-url-${label}`);
+    new URL(apiUrl);
+    return { label, mode: 'url', apiUrl, pgUrl, redisUrl };
+  };
+  const sides = [sideSpec('base'), sideSpec('head')];
+  const refSides = sides.filter(x => x.mode === 'ref');
+  for (const x of refSides) {
+    if (!x.ref) {
+      throw new Error(
+        `ref mode needs --${x.label} <ref> (there is no default baseline; use e.g. --base origin/main)`
+      );
+    }
+  }
   if (args.pgUrl) assertLocal(args.pgUrl, '--pg-url');
   if (args.redisUrl) assertLocal(args.redisUrl, '--redis-url');
+  if (sides[0].mode === 'url' && sides[1].mode === 'url' && sides[0].apiUrl === sides[1].apiUrl) {
+    const [b, h] = sides;
+    if (b.pgUrl === h.pgUrl) {
+      log('note: both sides share one API and one database — it is re-seeded between sides');
+    }
+  }
 
-  const bareBefore = coreBare();
-  const baseSha = resolveRef(args.base);
-  const headSha = resolveRef(args.head);
+  const bareBefore = refSides.length ? coreBare() : '';
+  for (const x of sides) {
+    x.id = x.mode === 'ref' ? resolveRef(x.ref) : x.apiUrl;
+    x.tag = x.mode === 'ref' ? x.id.slice(0, 8) : `url-${x.label}`;
+  }
+  const [baseSide, headSide] = sides;
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const outDir = path.join(args.out, `${stamp}_${baseSha.slice(0, 8)}_vs_${headSha.slice(0, 8)}`);
+  const outDir = path.join(args.out, `${stamp}_${baseSide.tag}_vs_${headSide.tag}`);
   fs.mkdirSync(outDir, { recursive: true });
-  log(`base ${baseSha.slice(0, 12)}  head ${headSha.slice(0, 12)}  → ${outDir}`);
+  log(`base ${baseSide.id}  head ${headSide.id}  → ${outDir}`);
 
-  const infra = await ensureInfra(args);
-  const stub = createStub();
+  const infra = refSides.length ? await ensureInfra(args) : null;
+  const stub = createStub({ secretKey: PM_SECRET_KEY });
   await stub.listen(args.stubPort);
   const built = new Map();
-  let base;
-  let head;
+  const results = {};
   const tStart = Date.now();
   try {
-    for (const sha of new Set([baseSha, headSha])) built.set(sha, prepareRef(sha, outDir));
-    base = await runRef({
-      label: 'base',
-      sha: baseSha,
-      dir: built.get(baseSha),
-      infra,
-      args,
-      stub,
-      scenarios,
-      logDir: outDir,
-    });
-    head = await runRef({
-      label: 'head',
-      sha: headSha,
-      dir: built.get(headSha),
-      infra,
-      args,
-      stub,
-      scenarios,
-      logDir: outDir,
-    });
+    for (const x of refSides) if (!built.has(x.id)) built.set(x.id, prepareRef(x.id, outDir));
+    for (const x of sides) {
+      results[x.label] = await runRef({
+        label: x.label,
+        sha: x.id,
+        dir: x.mode === 'ref' ? built.get(x.id) : null,
+        infra,
+        args,
+        stub,
+        scenarios,
+        logDir: outDir,
+        external: x.mode === 'url' ? x : null,
+      });
+    }
   } finally {
     await stub.close();
     if (!args.keepWorktrees) for (const dir of built.values()) removeWorktree(dir);
-    const bareAfter = coreBare();
-    if (bareAfter !== bareBefore) {
-      console.error(
-        `[bfp] !!! core.bare changed from ${bareBefore} to ${bareAfter} — restore with: git config core.bare ${bareBefore}`
-      );
-      process.exitCode = 3;
+    if (refSides.length) {
+      const bareAfter = coreBare();
+      if (bareAfter !== bareBefore) {
+        console.error(
+          `[bfp] !!! core.bare changed from ${bareBefore} to ${bareAfter} — restore with: git config core.bare ${bareBefore}`
+        );
+        process.exitCode = 3;
+      }
     }
   }
+  const { base, head } = results;
 
   const rows = compareRuns(base, head, scenarios, allows);
   fs.writeFileSync(path.join(outDir, 'base.json'), JSON.stringify(base, null, 2));
@@ -657,7 +781,7 @@ async function main() {
   fs.writeFileSync(path.join(outDir, 'report.md'), md);
 
   console.log(
-    `\nbuy-flow parity  base ${base.sha.slice(0, 8)} vs head ${head.sha.slice(0, 8)}  (${Math.round((Date.now() - tStart) / 1000)}s)`
+    `\nbuy-flow parity  base ${baseSide.tag} vs head ${headSide.tag}  (${Math.round((Date.now() - tStart) / 1000)}s)`
   );
   for (const r of rows) {
     console.log(

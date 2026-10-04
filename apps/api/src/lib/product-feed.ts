@@ -1,8 +1,9 @@
+import { minorToDecimalString } from '@force/shared';
 /**
  * Pure builder for the public AI product feed (agent_feed feature).
  * Field naming follows the OpenAI Product Feed conventions:
  * item_id / title / description / link / image_link / price / sale_price / availability.
- * Prices are stored in fils; rendered as "12.500 KWD".
+ * Prices are stored in piastres; rendered as "125.00 EGP".
  */
 export interface FeedStore {
   id: string;
@@ -84,7 +85,8 @@ export interface ProductFeedJson {
   products: ProductFeedItem[];
 }
 
-const money = (fils: number, currency: string) => `${(fils / 1000).toFixed(3)} ${currency}`;
+const money = (piastres: number, currency: string) =>
+  `${minorToDecimalString(piastres, currency)} ${currency}`;
 
 export function buildProductFeed(
   store: FeedStore,

@@ -3,7 +3,7 @@
  * Issue #1356 — the remove/reorder controls on UploadPreview and
  * MultiImageGrid must reveal on HOVER CAPABILITY (`(hover: hover) and
  * (pointer: fine)`), not on a `md:` (768px) viewport-width breakpoint. A
- * touch-only tablet (iPad, >=768px) is a realistic device for a Kuwait
+ * touch-only tablet (iPad, >=768px) is a realistic device for an Egypt
  * merchant editing product images and was left with these controls
  * permanently invisible under the width-based gate. This test pins the
  * class-name contract: no viewport-width opacity gating anywhere on these

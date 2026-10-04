@@ -4,7 +4,7 @@
  * THIS FILE EXISTS BECAUSE OF A SCAR. A CSRF fix once shipped with the
  * sentence "guest checkout is unaffected — /public/ returns early" in its PR
  * body. That sentence was wrong and untested; 17 orders on a live merchant
- * (~379 KWD) went unpaid for two days while a curl monitor stayed green. The
+ * (~379 EGP) went unpaid for two days while a curl monitor stayed green. The
  * standing rule since: **a change's claim about who it does NOT affect is the
  * least-tested sentence in it.**
  *

@@ -147,7 +147,7 @@ describe('POST /public/:storeId/coupons/validate — targeting', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    // 15% of 10000 fils lineTotal = 1500 fils.
+    // 15% of 10000 piastres lineTotal = 1500 piastres.
     expect(res.body.data.discount).toBe(1500);
   });
 
@@ -321,7 +321,7 @@ describe('POST /public/:storeId/coupons/validate — storefront cart lines (#136
       .send({ code: 'VIP', orderTotal: 10000, cartItems: STOREFRONT_ITEMS });
 
     expect(res.status).toBe(200);
-    // 10% of the 10000 fils line.
+    // 10% of the 10000 piastres line.
     expect(res.body.data.discount).toBe(1000);
   });
 

@@ -1,0 +1,102 @@
+/**
+ * Ebda's CI runs on GitHub-hosted runners only (SP4 task 9, Ahmad's decision):
+ * "it needs no Umbra". Umbra is FWB's self-hosted runner fleet; nothing in
+ * Ebda may depend on it, because Ebda's workflows must keep working when no
+ * such runner exists (GitHub QUEUES a job whose labels match no online runner
+ * for up to ~24h instead of failing it, so a leftover label silently hangs
+ * the workflow).
+ *
+ * This replaces the FWB-era runner-selector test, which pinned the
+ * `vars.USE_SELF_HOSTED` / `vars.SCHEDULED_ON_CLOUD` switch forms. Those
+ * switches are gone: every `runs-on` is the literal `ubuntu-latest`.
+ */
+import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const ROOT = path.resolve(__dirname, '../..');
+const GITHUB_DIR = path.join(ROOT, '.github');
+
+function walk(dir: string, acc: string[] = []): string[] {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) walk(p, acc);
+    else acc.push(p);
+  }
+  return acc;
+}
+
+const WORKFLOWS = path.join(GITHUB_DIR, 'workflows');
+const workflowFiles = fs.readdirSync(WORKFLOWS).filter(f => /\.ya?ml$/.test(f));
+
+/** Every `runs-on:` value, with its file and line (comments excluded). */
+function runsOnValues(): Array<{ file: string; line: number; value: string }> {
+  return workflowFiles.flatMap(file =>
+    fs
+      .readFileSync(path.join(WORKFLOWS, file), 'utf8')
+      .split('\n')
+      .map((text, i) => ({ text, line: i + 1 }))
+      .filter(({ text }) => /^\s{2,}runs-on:\s*\S/.test(text))
+      .map(({ text, line }) => ({
+        file,
+        line,
+        value: text.replace(/^\s*runs-on:\s*/, '').trim(),
+      }))
+  );
+}
+
+describe('every workflow job runs on a GitHub-hosted runner', () => {
+  it('actually reads the workflows (the walk is not silently empty)', () => {
+    expect(workflowFiles).toEqual(
+      expect.arrayContaining(['ci.yml', 'gitleaks.yml', 'semgrep.yml', 'blast-radius.yml'])
+    );
+    expect(runsOnValues().length).toBeGreaterThan(10);
+  });
+
+  it('every runs-on is exactly ubuntu-latest', () => {
+    const bad = runsOnValues().filter(r => r.value !== 'ubuntu-latest');
+    expect(
+      bad.map(r => `${r.file}:${r.line} -> ${r.value}`),
+      'runs-on must be the literal `ubuntu-latest`: no label arrays, no ${{ }} expressions'
+    ).toEqual([]);
+  });
+});
+
+describe('nothing under .github mentions a self-hosted runner or its switches', () => {
+  // Comments are prose and may explain WHY a switch is gone; only code counts.
+  const FORBIDDEN = [
+    /self-hosted/i,
+    /USE_SELF_HOSTED/,
+    /SCHEDULED_ON_CLOUD/,
+    /force_cloud/,
+    /\bumbra\b/i,
+    /\bwsl2?\b/i,
+    /fwb-ci/i,
+  ];
+
+  const files = walk(GITHUB_DIR).filter(f => /\.(ya?ml|mjs|js|sh|md|json)$/.test(f));
+
+  it('scans a non-empty file set', () => {
+    expect(files.length).toBeGreaterThan(4);
+  });
+
+  it.each(files.map(f => [path.relative(ROOT, f), f] as const))('%s', (_rel, file) => {
+    const code = fs
+      .readFileSync(file, 'utf8')
+      .split('\n')
+      .filter(l => !/^\s*#/.test(l))
+      .join('\n');
+    for (const re of FORBIDDEN) {
+      expect(code, `${_rel} matches ${re}`).not.toMatch(re);
+    }
+  });
+
+  it('the vars/runner switches are absent from every workflow, comments included', () => {
+    for (const f of workflowFiles) {
+      const raw = fs.readFileSync(path.join(WORKFLOWS, f), 'utf8');
+      expect(raw, f).not.toMatch(
+        /vars\.USE_SELF_HOSTED|vars\.SCHEDULED_ON_CLOUD|inputs\.force_cloud/
+      );
+    }
+  });
+});

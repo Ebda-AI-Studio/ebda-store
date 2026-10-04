@@ -17,6 +17,15 @@ vi.mock('@force/database', () => ({
   prisma: { store: { findFirst: (...a: unknown[]) => findFirst(...a) } },
 }));
 
+// Host / slug -> store id goes through the `ebda_resolve_store_id` definer; `findFirst` keeps
+// standing for "the store row that host or slug names".
+vi.mock('../../apps/api/src/lib/definer', () => ({
+  resolveStoreId: async (match: { slug?: string | null; domain?: string | null }) => {
+    const where = match.domain ? { domain: match.domain } : { slug: match.slug };
+    return ((await findFirst({ where })) as { id: string } | null)?.id ?? null;
+  },
+}));
+
 const isFeatureEnabled = vi.fn();
 vi.mock('../../apps/api/src/services/feature.service', () => ({
   featureService: { isFeatureEnabled: (...a: unknown[]) => isFeatureEnabled(...a) },

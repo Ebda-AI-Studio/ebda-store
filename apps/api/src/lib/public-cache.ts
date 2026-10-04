@@ -2,6 +2,7 @@ import { redis } from '../services/redis.service';
 import { BoundedMap } from './bounded-map';
 import { revalidateStorefront } from './revalidate-storefront';
 import { retryTransientRead } from './db-retry';
+import { isWorkers } from './runtime';
 
 /**
  * Public-route response cache. Used by the storefront-facing endpoints
@@ -48,7 +49,9 @@ export async function getCached<T>(
     // Redis unavailable, fall through.
   }
 
-  const memEntry = memoryCache.get(key);
+  // Workers: no in-process L1. An isolate cannot see another isolate's invalidation, so a
+  // write would stay invisible here for the whole TTL; KV is the one shared cache.
+  const memEntry = isWorkers ? undefined : memoryCache.get(key);
   if (memEntry && memEntry.expiresAt > Date.now()) {
     return memEntry.data as T;
   }
@@ -71,7 +74,7 @@ export async function getCached<T>(
     } catch {
       // Redis unavailable, memory cache below is the fallback.
     }
-    memoryCache.set(key, { data, expiresAt: Date.now() + ttlSeconds * 1000 });
+    if (!isWorkers) memoryCache.set(key, { data, expiresAt: Date.now() + ttlSeconds * 1000 });
     return data;
   })();
 

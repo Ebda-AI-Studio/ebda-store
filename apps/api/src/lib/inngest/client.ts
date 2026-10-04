@@ -171,12 +171,22 @@ type InsightsRollupRequestedEvent = EventPayload & {
   };
 };
 
+type ShipmentCreateRequestedEvent = EventPayload & {
+  name: 'shipment/create.requested';
+  data: {
+    storeId: string;
+    orderId: string;
+    /** Absent = the store's default carrier. */
+    carrier?: string;
+  };
+};
+
 type PaymentWebhookReceivedEvent = EventPayload & {
   name: 'payment/webhook.received';
   data: {
     /// PK of the WebhookEvent inbox row persisted by the route before send.
     webhookEventId: string;
-    /// 'tap' | 'myfatoorah' | 'hesabe' | 'upayments'
+    /// 'paymob' | 'kashier' | 'fawry'
     provider: string;
     /// Idempotency key (also the inbox row's unique key) for log correlation.
     idempotencyKey: string;
@@ -317,6 +327,7 @@ export type AppEvent =
   | AccountingExpenseOcrProcessEvent
   | InsightsRollupRequestedEvent
   | PaymentWebhookReceivedEvent
+  | ShipmentCreateRequestedEvent
   | BulkAiBalanceDescriptionsEvent
   | BulkAiRevertBalanceEvent
   | BulkAiCategorizeEvent

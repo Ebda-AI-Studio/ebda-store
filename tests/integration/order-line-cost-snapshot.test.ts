@@ -93,7 +93,7 @@ describe.skipIf(!hasDb)('order lines snapshot the variant cost (finding 2)', () 
 
     const order = await OrderService.create(store.storeId, undefined, sessionId, {
       shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
-      paymentMethod: 'myfatoorah',
+      paymentMethod: 'paymob',
     });
 
     const byLine = (variantId: string | null, productId: string) =>
@@ -136,7 +136,7 @@ describe.skipIf(!hasDb)('order lines snapshot the variant cost (finding 2)', () 
     await addBundleToCart(store.storeId, sessionId, bundleId, 1);
     const order = await OrderService.create(store.storeId, undefined, sessionId, {
       shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
-      paymentMethod: 'myfatoorah',
+      paymentMethod: 'paymob',
     });
     expect(order.items.find(i => i.variantId === fx.costed.id)!.costPrice).toBe(700);
     expect(order.items.find(i => i.productId === fx.simpleId)!.costPrice).toBe(500);

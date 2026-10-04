@@ -42,7 +42,7 @@ describe('cartView', () => {
       subtotal: 3000 * 2 + 12000,
     };
 
-    const view = cartView('cart-1', cart, 'KWD');
+    const view = cartView('cart-1', cart, 'EGP');
 
     expect(view.items).toEqual([
       {
@@ -93,7 +93,7 @@ describe('cartView', () => {
       subtotal: 2500,
     };
 
-    const view = cartView('cart-2', cart, 'KWD');
+    const view = cartView('cart-2', cart, 'EGP');
 
     expect(view.items).toEqual([
       {
@@ -115,7 +115,7 @@ describe('cartView', () => {
       items: [],
       subtotal: 0,
     };
-    const view = cartView('cart-3', cart, 'KWD');
+    const view = cartView('cart-3', cart, 'EGP');
     expect(view.bundles).toEqual([]);
   });
 
@@ -142,7 +142,7 @@ describe('cartView', () => {
       bundles: [],
       subtotal: 3000,
     };
-    const view = cartView('cart-1', cart, 'KWD');
+    const view = cartView('cart-1', cart, 'EGP');
     expect(view.items[0]).not.toHaveProperty('unavailable');
     expect(view.items[1]).toMatchObject({ productId: 'p-gone', unavailable: true });
   });

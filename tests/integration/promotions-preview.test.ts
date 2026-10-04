@@ -64,7 +64,7 @@ async function seedStore(slug: string) {
         name: `promo-preview ${slug}`,
         slug: `promo-preview-${slug}`,
         template: 'modern',
-        currency: 'KWD',
+        currency: 'EGP',
         ownerId: owner.id,
         status: 'active',
       },
@@ -105,7 +105,7 @@ describe.skipIf(!hasDb)('POST /public/:storeId/promotions/preview', () => {
     otherStoreId = other.id;
     createdStoreIds.push(store.id, other.id);
 
-    // 10.000 KWD per unit.
+    // 10.000 EGP per unit.
     productId = (await seedProduct(storeId, `preview-prod-${suffix}`, 10_000)).id;
     otherStoreProductId = (await seedProduct(otherStoreId, `other-prod-${suffix}`, 99_000)).id;
 
@@ -136,7 +136,7 @@ describe.skipIf(!hasDb)('POST /public/:storeId/promotions/preview', () => {
     const res = await preview({ items: [{ productId, quantity: 2 }] });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    // 2 x 10.000 KWD = 20.000; 10% = 2.000 KWD = 2000 fils.
+    // 2 x 10.000 EGP = 20.000; 10% = 2.000 EGP = 2000 piastres.
     expect(res.body.data.promotion).toMatchObject({ discount: 2000 });
     expect(res.body.data.promotion.id).toEqual(expect.any(String));
   });
@@ -164,7 +164,7 @@ describe.skipIf(!hasDb)('POST /public/:storeId/promotions/preview', () => {
       ],
     });
     expect(res.status).toBe(200);
-    // Only the real line counted: 10.000 KWD x 10% = 1000 fils. If the unknown
+    // Only the real line counted: 10.000 EGP x 10% = 1000 piastres. If the unknown
     // line had been priced (or defaulted to 0 and still counted) this differs.
     expect(res.body.data.promotion).toMatchObject({ discount: 1000 });
   });
@@ -172,9 +172,9 @@ describe.skipIf(!hasDb)('POST /public/:storeId/promotions/preview', () => {
   it("does NOT price another store's product into this store's cart", async () => {
     const res = await preview({ items: [{ productId: otherStoreProductId, quantity: 1 }] });
     expect(res.status).toBe(200);
-    // The 99.000 KWD product belongs to otherStore; scoped out, the cart is
+    // The 99.000 EGP product belongs to otherStore; scoped out, the cart is
     // empty and no promotion applies. A storeId-blind lookup would return
-    // a 9900-fils discount here.
+    // a 9900-piastres discount here.
     expect(res.body.data.promotion).toBeNull();
   });
 

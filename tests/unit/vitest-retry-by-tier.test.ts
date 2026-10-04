@@ -33,9 +33,15 @@ describe('vitest retry is scoped by tier, not a global default', () => {
 
   it('the required Unit Tests job does not opt back into masking retries', () => {
     const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
-    const unitRun = ci.split('\n').find(l => l.includes('vitest run tests/unit'));
-    expect(unitRun, "ci.yml's unit command moved — re-point this test").toBeTruthy();
+    const unitRun = ci
+      .split('\n')
+      .find(l => l.includes('vitest run tests/unit packages/shared/src'));
+    expect(unitRun, "ci.yml's main-lane unit command moved — re-point this test").toBeTruthy();
     expect(unitRun, 'the unit tier must never request retry > 0').not.toMatch(/--retry=[1-9]/);
+    // The PR lane's affected-paths run is the same tier: also no masking retry.
+    const prRun = ci.split('\n').find(l => l.includes('vitest run $UNIT_PATHS'));
+    expect(prRun, "ci.yml's PR-lane unit command moved — re-point this test").toBeTruthy();
+    expect(prRun, 'the PR unit tier must never request retry > 0').toMatch(/--retry=0(\s|$)/);
   });
 
   it('the network/DB-backed tiers explicitly opt into one retry at the call site', () => {
@@ -60,14 +66,14 @@ describe('vitest retry is scoped by tier, not a global default', () => {
     ).toMatch(/--retry=1/);
   });
 
-  it('the force_app RLS proof is an explicit, deliberate no-retry tier (issue 2101)', () => {
+  it('the ebda_app RLS proof is an explicit, deliberate no-retry tier (issue 2101)', () => {
     // ci.yml names FOUR tiers (unit / integration / RLS proof / e2e). The RLS
     // proof used to inherit retry 0 silently when the policy moved retries to
     // the call site; it is now explicit so neither direction can drift.
     const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
     const rlsRun = ci
       .split('\n')
-      .find(l => l.includes('vitest run tests/integration/rls-force-app.test.ts'));
+      .find(l => l.includes('vitest run tests/integration/rls-ebda-app.test.ts'));
     expect(rlsRun, "ci.yml's RLS proof command moved — re-point this test").toBeTruthy();
     expect(
       rlsRun,

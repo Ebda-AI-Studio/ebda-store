@@ -1,9 +1,10 @@
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass } from '@force/database';
+import { prisma } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 import { handleStuckRefundClaimSweep } from './refund-claim-stuck-sweep';
+import { sweepAcrossStores } from '../../cross-store';
 
 /**
  * Stuck refund-reversal sweep — scheduled safety net (every 5 min).
@@ -97,39 +98,42 @@ export async function handleRefundReversalStuckSweep(
 
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
   const stuck: StuckReversal[] = await step.run('find-stuck-reversals', async () =>
-    withRlsBypass(tx =>
-      tx.order.findMany({
-        where: {
-          refundReversedAt: null,
-          // Window: reversal is overdue, but NOT older than the recency floor —
-          // so the historical back-catalog is never re-fired.
-          OR: [
-            // Every whole-order stock-restoring enqueue stamps this
-            // (applyRefundEffects). Status-agnostic (a manual full return
-            // leaves the order `delivered`, #839) and immutable (a later
-            // tracking edit or webhook does not move it, #855).
-            { refundReversalRequestedAt: { lt: cutoff, gt: floorCutoff } },
-            // Legacy rows cancelled before that column existed: the original
-            // status + updatedAt predicate, unchanged. Empty within one
-            // recency floor of the deploy.
-            {
-              refundReversalRequestedAt: null,
-              status: { in: ['cancelled', 'refunded'] },
-              updatedAt: { lt: cutoff, gt: floorCutoff },
-            },
-          ],
-        },
-        select: {
-          id: true,
-          storeId: true,
-          status: true,
-          updatedAt: true,
-          refundReversalRequestedAt: true,
-        },
-        orderBy: { updatedAt: 'asc' },
-        take: SWEEP_TAKE,
-      })
-    )
+    sweepAcrossStores({
+      fetch: () =>
+        prisma.order.findMany({
+          where: {
+            refundReversedAt: null,
+            // Window: reversal is overdue, but NOT older than the recency floor —
+            // so the historical back-catalog is never re-fired.
+            OR: [
+              // Every whole-order stock-restoring enqueue stamps this
+              // (applyRefundEffects). Status-agnostic (a manual full return
+              // leaves the order `delivered`, #839) and immutable (a later
+              // tracking edit or webhook does not move it, #855).
+              { refundReversalRequestedAt: { lt: cutoff, gt: floorCutoff } },
+              // Legacy rows cancelled before that column existed: the original
+              // status + updatedAt predicate, unchanged. Empty within one
+              // recency floor of the deploy.
+              {
+                refundReversalRequestedAt: null,
+                status: { in: ['cancelled', 'refunded'] },
+                updatedAt: { lt: cutoff, gt: floorCutoff },
+              },
+            ],
+          },
+          select: {
+            id: true,
+            storeId: true,
+            status: true,
+            updatedAt: true,
+            refundReversalRequestedAt: true,
+          },
+          orderBy: { updatedAt: 'asc' },
+          take: SWEEP_TAKE,
+        }),
+      orderKey: r => r.updatedAt,
+      take: SWEEP_TAKE,
+    })
   );
 
   if (stuck.length === 0) return { swept: 0, resent: 0, alerted: 0 };
@@ -225,28 +229,31 @@ export async function handlePartialReturnReversalSweep(
   const cutoff = new Date(Date.now() - REFUND_REVERSAL_STUCK_MINUTES * 60_000);
 
   const stuck: StuckPartialReturn[] = await step.run('find-stuck-partial-returns', async () =>
-    withRlsBypass(tx =>
-      tx.return.findMany({
-        where: {
-          reversalAppliedAt: null,
-          // NO recency floor (PR 2279 audit): the column is new and NULL for
-          // every historical return, so there is no back-catalog to protect,
-          // and this sweep is the ONLY recovery — a floor would silently
-          // abandon a return armed before a >12h Inngest outage.
-          reversalRequestedAt: { lt: cutoff },
-        },
-        select: {
-          id: true,
-          storeId: true,
-          orderId: true,
-          refundAmount: true,
-          reversalRequestedAt: true,
-          items: { select: { orderItemId: true, quantity: true } },
-        },
-        orderBy: { reversalRequestedAt: 'asc' },
-        take: SWEEP_TAKE,
-      })
-    )
+    sweepAcrossStores({
+      fetch: () =>
+        prisma.return.findMany({
+          where: {
+            reversalAppliedAt: null,
+            // NO recency floor (PR 2279 audit): the column is new and NULL for
+            // every historical return, so there is no back-catalog to protect,
+            // and this sweep is the ONLY recovery — a floor would silently
+            // abandon a return armed before a >12h Inngest outage.
+            reversalRequestedAt: { lt: cutoff },
+          },
+          select: {
+            id: true,
+            storeId: true,
+            orderId: true,
+            refundAmount: true,
+            reversalRequestedAt: true,
+            items: { select: { orderItemId: true, quantity: true } },
+          },
+          orderBy: { reversalRequestedAt: 'asc' },
+          take: SWEEP_TAKE,
+        }),
+      orderKey: r => r.reversalRequestedAt ?? 0,
+      take: SWEEP_TAKE,
+    })
   );
 
   if (stuck.length === 0) return { swept: 0, resent: 0, alerted: 0 };

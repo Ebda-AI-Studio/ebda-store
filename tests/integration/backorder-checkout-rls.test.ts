@@ -1,6 +1,6 @@
 /**
  * Guest checkout of a BACKORDERED line, over HTTP, against the API running as
- * `force_app` (issue 2044).
+ * `ebda_app` (issue 2044).
  *
  * `backorder_lines` has a STRICT RLS policy — no contextless allowance — and
  * the public checkout (`POST /public/orders` → `OrderService.create`) runs with
@@ -11,10 +11,10 @@
  * backordered SKU gets a 500 with no order — the loud half of the class the
  * RLS cutover checklist carried alone.
  *
- * Nothing else walked this path as force_app: the RLS parity harness stops at
- * the cart, the unit tests stub `setTenantGucs` away, and rls-force-app.test.ts
- * proves the helper on a synthetic table, not the route. CI's integration job
- * runs the API server as `force_app` (ci.yml "Give force_app a CI-only login
+ * Nothing else walked this path as ebda_app: the RLS parity harness stops at
+ * the cart, the unit tests stub `setTenantGucs` away, and rls-ebda-app.test.ts
+ * proves the helper on every table, not the route. CI's integration job
+ * runs the API server as `ebda_app` (ci.yml "Give ebda_app a CI-only login
  * for the API server"); fixtures here are written through the test harness's
  * superuser connection, like public-store-faqs-rls.test.ts.
  *
@@ -47,7 +47,7 @@ async function seedBackorderStore() {
       slug: `backorder-rls-${suffix}`,
       ownerId: owner.id,
       status: 'active',
-      currency: 'KWD',
+      currency: 'EGP',
       marketingPixels: {},
     },
   });
@@ -114,7 +114,7 @@ describe.skipIf(!hasDb)(
         body: JSON.stringify({
           shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS,
           // Non-COD: keeps the COD notification fanout out of a test about RLS.
-          paymentMethod: 'myfatoorah',
+          paymentMethod: 'paymob',
         }),
       });
       const body = (await res.json()) as {

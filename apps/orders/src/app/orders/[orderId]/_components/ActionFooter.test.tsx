@@ -2,7 +2,7 @@
 /**
  * #1936 — the orders PWA kept its own stale transition map (no `cancelled`
  * key), and its footer treated `cancelled` as final, so a paid, cancelled
- * order could not be marked refunded from orders.force-ai.co.
+ * order could not be marked refunded from orders.ebda.app.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -30,7 +30,7 @@ function order(status: string, paymentStatus: string): OrderDetail {
     storeId: 's1',
     orderNumber: 'ORD-1',
     total: 5000,
-    currency: 'KWD',
+    currency: 'EGP',
     status,
     paymentStatus,
     createdAt: '2026-09-01T00:00:00.000Z',
@@ -80,5 +80,34 @@ describe('orders PWA ActionFooter — status action (#1936)', () => {
     const onStatusChange = renderFooter(order('shipped', 'paid'));
     fireEvent.click(screen.getByText('delivered'));
     expect(onStatusChange).toHaveBeenCalledWith('delivered');
+  });
+});
+
+// SP6a — InstaPay awaiting confirmation: the one-thumb "payment received" control.
+vi.mock('@/components/ConfirmInstapayButton', () => ({
+  ConfirmInstapayButton: ({ amountMinor }: { amountMinor: number }) => (
+    <button data-testid="confirm-instapay" data-amount={amountMinor}>
+      confirm
+    </button>
+  ),
+}));
+
+describe('orders PWA ActionFooter - InstaPay', () => {
+  const awaiting = () =>
+    ({
+      ...order('awaiting_payment_confirmation', 'unpaid'),
+      payments: [{ provider: 'instapay', status: 'pending', transactionId: 'instapay_k1' }],
+    }) as unknown as OrderDetail;
+
+  it('shows the confirm control with the exact amount, and never offers to ship', () => {
+    renderFooter(awaiting());
+    expect(screen.getByTestId('confirm-instapay').getAttribute('data-amount')).toBe('5000');
+    expect(screen.queryByText('processing')).toBeNull();
+    expect(screen.queryByText('shipped')).toBeNull();
+  });
+
+  it('shows no confirm control on an ordinary confirmed order', () => {
+    renderFooter(order('confirmed', 'paid'));
+    expect(screen.queryByTestId('confirm-instapay')).toBeNull();
   });
 });

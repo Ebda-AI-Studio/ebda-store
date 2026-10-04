@@ -8,6 +8,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 
+import { REGION } from '@force/shared';
 export default function ProfileClient() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading, refreshUser } = useAuth();
@@ -183,7 +184,7 @@ export default function ProfileClient() {
               type="tel"
               value={profile.phone}
               onChange={e => setProfile({ ...profile, phone: e.target.value })}
-              placeholder="+965 XXXX XXXX"
+              placeholder={REGION.phone.placeholderIntl}
             />
 
             <Button type="submit" isLoading={isSaving}>

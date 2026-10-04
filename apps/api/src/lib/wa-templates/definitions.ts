@@ -1,5 +1,5 @@
 /**
- * Canonical Force AI WhatsApp template library.
+ * Canonical Ebda WhatsApp template library.
  *
  * Six templates × two languages (en + ar) = twelve total Meta template
  * submissions per merchant. All variables-only — merchants pick from this
@@ -12,6 +12,7 @@
  * lets us iterate template text without orphaning existing approvals
  * (e.g. `force_order_paid_v1` → `force_order_paid_v2` next iteration).
  */
+import { BRAND } from '@force/shared';
 
 export type TemplateLanguage = 'en' | 'ar';
 export type TemplateCategory = 'UTILITY' | 'MARKETING' | 'AUTHENTICATION';
@@ -85,7 +86,7 @@ export const TEMPLATES: TemplateDefinition[] = [
         type: 'BODY',
         text: 'Hi {{1}}, your order {{2}} for {{3}} from {{4}} has been received. Thank you!',
         example: {
-          body_text: [['Ahmad', 'ORD-1042', '5.500 KWD', 'Wady Aljuz']],
+          body_text: [['Ahmad', 'ORD-1042', '55.00 EGP', 'Wady Aljuz']],
         },
       },
       {
@@ -108,7 +109,7 @@ export const TEMPLATES: TemplateDefinition[] = [
         type: 'BODY',
         text: 'مرحبًا {{1}}، تم استلام طلبك {{2}} بقيمة {{3}} من {{4}}. شكرًا لك!',
         example: {
-          body_text: [['أحمد', 'ORD-1042', '5.500 د.ك', 'وادي الجوز']],
+          body_text: [['أحمد', 'ORD-1042', '55.00 ج.م', 'وادي الجوز']],
         },
       },
       {
@@ -145,7 +146,7 @@ export const TEMPLATES: TemplateDefinition[] = [
         // {{5}} and uses a TRK- prefixed example.
         text: 'Hi {{1}}, your order {{2}} for {{3}} from {{4}} is on the way. Track it with reference {{5}} — we will message you when it arrives.',
         example: {
-          body_text: [['Ahmad', 'ORD-1042', '5.500 KWD', 'Wady Aljuz', 'TRK-12345']],
+          body_text: [['Ahmad', 'ORD-1042', '55.00 EGP', 'Wady Aljuz', 'TRK-12345']],
         },
       },
     ],
@@ -164,7 +165,7 @@ export const TEMPLATES: TemplateDefinition[] = [
         type: 'BODY',
         text: 'مرحبًا {{1}}، طلبك {{2}} بقيمة {{3}} من {{4}} في الطريق. تتبّعه برقم {{5}} وسنُعلمك فور الوصول.',
         example: {
-          body_text: [['أحمد', 'ORD-1042', '5.500 د.ك', 'وادي الجوز', 'TRK-12345']],
+          body_text: [['أحمد', 'ORD-1042', '55.00 ج.م', 'وادي الجوز', 'TRK-12345']],
         },
       },
     ],
@@ -188,7 +189,7 @@ export const TEMPLATES: TemplateDefinition[] = [
         // earlier and ends with substantive thanks text.
         text: 'Hi {{1}}, your order {{2}} for {{3}} from {{4}} has been delivered. Thanks for shopping with us, we hope you love it.',
         example: {
-          body_text: [['Ahmad', 'ORD-1042', '5.500 KWD', 'Wady Aljuz']],
+          body_text: [['Ahmad', 'ORD-1042', '55.00 EGP', 'Wady Aljuz']],
         },
       },
       {
@@ -211,7 +212,7 @@ export const TEMPLATES: TemplateDefinition[] = [
         type: 'BODY',
         text: 'مرحبًا {{1}}، تم تسليم طلبك {{2}} بقيمة {{3}} من {{4}}. شكرًا لتسوقك معنا، ونأمل أن يعجبك.',
         example: {
-          body_text: [['أحمد', 'ORD-1042', '5.500 د.ك', 'وادي الجوز']],
+          body_text: [['أحمد', 'ORD-1042', '55.00 ج.م', 'وادي الجوز']],
         },
       },
       {
@@ -276,7 +277,7 @@ export const TEMPLATES: TemplateDefinition[] = [
         type: 'BODY',
         text: 'Hi {{1}}, you left {{2}} worth of items in your cart at {{3}}. Reply "checkout" to complete your order.',
         example: {
-          body_text: [['Ahmad', '5.500 KWD', 'Wady Aljuz']],
+          body_text: [['Ahmad', '55.00 EGP', 'Wady Aljuz']],
         },
       },
     ],
@@ -295,7 +296,7 @@ export const TEMPLATES: TemplateDefinition[] = [
         type: 'BODY',
         text: 'مرحبًا {{1}}، لديك منتجات بقيمة {{2}} في سلتك في {{3}}. اكتب "إتمام الطلب" لإكمال الشراء.',
         example: {
-          body_text: [['أحمد', '5.500 د.ك', 'وادي الجوز']],
+          body_text: [['أحمد', '55.00 ج.م', 'وادي الجوز']],
         },
       },
     ],
@@ -319,8 +320,8 @@ export const TEMPLATES: TemplateDefinition[] = [
           body_text: [
             [
               'Ahmad',
-              '5.500',
-              'KWD',
+              '55.00',
+              'EGP',
               'Wady Aljuz',
               'https://wadyaljuz.com/checkout?waToken=abc123',
             ],
@@ -329,7 +330,7 @@ export const TEMPLATES: TemplateDefinition[] = [
       },
       {
         type: 'FOOTER',
-        text: 'Powered by Force AI',
+        text: `Powered by ${BRAND.name}`,
       },
     ],
   },
@@ -348,13 +349,13 @@ export const TEMPLATES: TemplateDefinition[] = [
         text: 'مرحبًا {{1}}، هذا رابط الدفع من {{4}} بقيمة {{2}} {{3}}: {{5}}. الرابط صالح لمدة 30 دقيقة.',
         example: {
           body_text: [
-            ['أحمد', '5.500', 'د.ك', 'وادي الجوز', 'https://wadyaljuz.com/checkout?waToken=abc123'],
+            ['أحمد', '55.00', 'ج.م', 'وادي الجوز', 'https://wadyaljuz.com/checkout?waToken=abc123'],
           ],
         },
       },
       {
         type: 'FOOTER',
-        text: 'مدعوم بواسطة Force AI',
+        text: `مدعوم بواسطة ${BRAND.nameAr}`,
       },
     ],
   },

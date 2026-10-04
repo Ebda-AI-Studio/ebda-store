@@ -97,7 +97,7 @@ describe('tax routes answer on every plan (issue 2358)', () => {
 
 describe('fields the charge does not read are rejected (issue 2357)', () => {
   it.each([
-    ['country', { country: 'KW' }],
+    ['country', { country: 'EG' }],
     ['state', { state: 'Capital' }],
     ['priority', { priority: 2 }],
     ['isCompound', { isCompound: true }],

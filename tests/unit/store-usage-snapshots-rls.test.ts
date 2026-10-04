@@ -4,7 +4,7 @@
 // same RLS omission merchant_api_keys was fixed for, and deliberately left it
 // for its own dedicated change. This pins that follow-up migration, plus the
 // static verification (both current call sites already use withRlsBypass)
-// that made it safe to land.
+// that made it safe to land (updated for the strict-RLS cutover: store scopes, no bypass).
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -56,35 +56,29 @@ describe('store_usage_snapshots RLS follow-up (#1059)', () => {
     expect(sql).not.toMatch(/^\s*(INSERT|UPDATE|DELETE)\s+/im);
   });
 
-  it('both current call sites this migration relies on being safe still use withRlsBypass', () => {
-    // The migration's own safety argument is "nothing reads/writes this table
-    // without already bypassing RLS". If either site stops doing that, this
-    // test must catch it BEFORE the migration is assumed still harmless.
+  it('both call sites read and write the table inside a store scope (strict RLS, no bypass)', () => {
+    // The old migration's safety argument was "nothing touches this table without bypassing
+    // RLS". Under the strict model (20261004000000_ebda_strict_rls) the table's policy is
+    // `store_id = current_store_id`, so every site must run in ONE store's scope.
     const cron = readFileSync(
       resolve(ROOT, 'apps/api/src/lib/inngest/functions/store-usage-snapshot.ts'),
       'utf8'
     );
     const upsertIdx = cron.indexOf('storeUsageSnapshot.upsert');
-    const nearestWithRlsBypassBeforeUpsert = cron.lastIndexOf('withRlsBypass', upsertIdx);
     expect(upsertIdx, 'storeUsageSnapshot.upsert call moved — re-point this test').toBeGreaterThan(
       -1
     );
-    expect(
-      // The withRlsBypass call wraps a per-store data object built inline
-      // before the upsert, so the gap is real — 2000 chars comfortably
-      // covers that while still failing if the upsert moved to a
-      // differently-scoped, unguarded call far from any withRlsBypass.
-      upsertIdx - nearestWithRlsBypassBeforeUpsert,
-      'cron upsert moved outside withRlsBypass'
-    ).toBeLessThan(2000);
+    const scopeBeforeUpsert = cron.lastIndexOf('withStore(', upsertIdx);
+    expect(scopeBeforeUpsert, 'the cron upsert is no longer inside withStore').toBeGreaterThan(-1);
+    expect(upsertIdx - scopeBeforeUpsert, 'cron upsert moved outside withStore').toBeLessThan(2000);
+    expect(cron).not.toMatch(/import[^;]*withRlsBypass/);
 
     const admin = readFileSync(resolve(ROOT, 'apps/api/src/routes/admin.routes.ts'), 'utf8');
-    // The usage-history reads live in `loadUsageHistoryRows(tx, months)`
-    // (issue 2329), which takes the transaction client it must read on. Two
-    // things must hold: the ONLY caller hands it a withRlsBypass tx, and the
-    // helper reads the table through that `tx`, never the bare `prisma`.
-    expect(admin, 'the usage-history route no longer reads inside withRlsBypass').toContain(
-      'withRlsBypass(tx => loadUsageHistoryRows(tx, months))'
+    // The usage-history reads live in `loadUsageHistoryRows(tx, months)` (issue 2329), which
+    // takes the client it must read on. The ONLY caller runs it once per store through
+    // `acrossStores`, and the helper reads the table through that client, never the bare `prisma`.
+    expect(admin, 'the usage-history route no longer reads store by store').toContain(
+      'acrossStores(() =>\n    loadUsageHistoryRows('
     );
     expect(admin.split('loadUsageHistoryRows(').length - 1, 'a second caller appeared').toBe(2);
     const helper = admin.slice(
@@ -94,5 +88,6 @@ describe('store_usage_snapshots RLS follow-up (#1059)', () => {
     expect(helper).toContain('tx.storeUsageSnapshot.groupBy');
     expect(helper).toContain('tx.storeUsageSnapshot.findMany');
     expect(admin).not.toMatch(/\bprisma\.storeUsageSnapshot\./);
+    expect(admin).not.toMatch(/import[^;]*withRlsBypass/);
   });
 });

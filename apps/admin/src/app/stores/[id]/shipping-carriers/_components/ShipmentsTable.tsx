@@ -21,6 +21,8 @@ interface ShipmentsTableProps {
 const CARRIER_LABEL_KEYS: Record<string, string> = {
   icarry: 'carrierNames.icarry',
   aramex: 'carrierNames.aramex',
+  bosta: 'carrierNames.bosta',
+  manual: 'carrierNames.manual',
 };
 
 /**
@@ -137,6 +139,8 @@ export function ShipmentsTable({
               <option value="all">{t('filters.allCarriers')}</option>
               <option value="icarry">{t('carrierNames.icarry')}</option>
               <option value="aramex">{t('carrierNames.aramex')}</option>
+              <option value="bosta">{t('carrierNames.bosta')}</option>
+              <option value="manual">{t('carrierNames.manual')}</option>
             </select>
             <select
               value={statusFilter}
@@ -153,6 +157,7 @@ export function ShipmentsTable({
               <option value="failed">{t('statuses.failed')}</option>
               <option value="returned">{t('statuses.returned')}</option>
               <option value="cancelled">{t('statuses.cancelled')}</option>
+              <option value="creation_failed">{t('statuses.creation_failed')}</option>
             </select>
           </div>
         </div>

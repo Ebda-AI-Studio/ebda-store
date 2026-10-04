@@ -1,11 +1,12 @@
+import { roundToMinor } from '@force/shared';
 // Pure helpers shared by AreaRateEditor. Kept in a plain .ts module (no JSX)
 // so they can be unit tested directly, without pulling in the client
 // component's React/next-intl/@force/ui dependency graph.
 
-export function kwdToFils(kwd: string): number {
-  const n = parseFloat(kwd);
+export function majorToMinor(major: string): number {
+  const n = parseFloat(major);
   if (isNaN(n) || n < 0) return 0;
-  return Math.round(n * 1000);
+  return roundToMinor(n);
 }
 
 export interface IncompleteRowCheckInput {
@@ -13,13 +14,13 @@ export interface IncompleteRowCheckInput {
   id?: string;
   area: string;
   isActive: boolean;
-  feeKwd: string;
+  feeMajor: string;
 }
 
 /**
  * Brand-new custom zones/areas (never persisted — no `id`) that are still
  * inactive with no fee. `AreaRateEditor`'s `submitAddArea`/`submitAddLoc`
- * default `isActive` to `feeKwd !== ''`, so adding a zone without a fee
+ * default `isActive` to `feeMajor !== ''`, so adding a zone without a fee
  * creates exactly this row. `handleSave`'s bulk-payload builder silently
  * filters rows matching `!isActive && fee === 0` — for these unsaved rows
  * that means the merchant's new zone never reaches the server, even though
@@ -27,5 +28,5 @@ export interface IncompleteRowCheckInput {
  * merchant which zones need attention.
  */
 export function getIncompleteNewRows<T extends IncompleteRowCheckInput>(customRows: T[]): T[] {
-  return customRows.filter(row => !row.id && !row.isActive && kwdToFils(row.feeKwd) === 0);
+  return customRows.filter(row => !row.id && !row.isActive && majorToMinor(row.feeMajor) === 0);
 }

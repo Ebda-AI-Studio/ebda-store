@@ -7,18 +7,18 @@ import { computeDiscountAmount, applyDiscount, deriveDiscountInput } from './dis
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('computeDiscountAmount', () => {
-  it('percentage: 10% of 5 000 fils = 500 fils', () => {
+  it('percentage: 10% of 5 000 piastres = 500 piastres', () => {
     // 10% = 1000 basis points
     expect(computeDiscountAmount(5000, 'percentage', 1000)).toBe(500);
   });
 
-  it('percentage: 12.5% of 10 000 fils = 1 250 fils', () => {
+  it('percentage: 12.5% of 10 000 piastres = 1 250 piastres', () => {
     // 12.5% = 1250 basis points
     expect(computeDiscountAmount(10000, 'percentage', 1250)).toBe(1250);
   });
 
-  it('percentage: rounds fractional fils', () => {
-    // 33.33% of 10 fils — 0.3333 fils rounds to 0
+  it('percentage: rounds fractional piastres', () => {
+    // 33.33% of 10 piastres — 0.3333 piastres rounds to 0
     expect(computeDiscountAmount(10, 'percentage', 3333)).toBe(3);
   });
 

@@ -626,7 +626,7 @@ export async function apiRequest<T = unknown>(
     // Bearer token from localStorage. The HTTP-only cookie is the primary
     // auth path for browsers, but iOS Safari/WebKit purges third-party
     // cookies aggressively for installed PWAs (the admin is at
-    // app.forcemediakw.com, the API at api.force-ai.co —
+    // app.ebda.app, the API at api.ebda.app —
     // a third-party cookie from WebKit's perspective). Sending the token
     // explicitly in the Authorization header keeps the iOS admin PWA
     // signed in even after WebKit drops the cookie. The API's auth
@@ -716,7 +716,11 @@ export async function apiRequest<T = unknown>(
         data: null,
         error: {
           code: data.error?.code || 'SERVER_ERROR',
-          message: data.error?.message || `Request failed with status ${response.status}`,
+          message: localizedApiMessage(
+            data.error?.code,
+            data.error?.message || `Request failed with status ${response.status}`,
+            data.error?.details
+          ),
           status: response.status,
           details: data.error?.details,
         },
@@ -843,7 +847,11 @@ export async function apiGetPage<T = unknown>(
         meta: null,
         error: {
           code: body?.error?.code || 'SERVER_ERROR',
-          message: body?.error?.message || `Request failed with status ${response.status}`,
+          message: localizedApiMessage(
+            body?.error?.code,
+            body?.error?.message || `Request failed with status ${response.status}`,
+            body?.error?.details
+          ),
           status: response.status,
           details: body?.error?.details,
         },
@@ -902,6 +910,23 @@ export async function apiPatch<T = unknown>(endpoint: string, body?: unknown) {
     method: 'PATCH',
     body: body ? JSON.stringify(body) : undefined,
   });
+}
+
+/**
+ * The API answers a plan-limit stop with 402 PLAN_LIMIT_REACHED and the text in
+ * both languages (`details.messageEn` / `details.messageAr`). Every admin page
+ * shows `error.message` as-is, so pick the Arabic text here, once, when the UI
+ * is RTL — platform-level, no per-page handling.
+ */
+function localizedApiMessage(
+  code: string | undefined,
+  message: string,
+  details: Record<string, unknown> | undefined
+): string {
+  if (code !== 'PLAN_LIMIT_REACHED') return message;
+  const isArabic = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
+  const text = isArabic ? details?.messageAr : details?.messageEn;
+  return typeof text === 'string' && text ? text : message;
 }
 
 /**

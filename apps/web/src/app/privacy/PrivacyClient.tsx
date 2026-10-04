@@ -193,8 +193,8 @@ function PrivacyFallback() {
             <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
               <li>
                 {t(
-                  'Payment gateways (such as MyFatoorah, Tap, Hesabe, or UPayments) — to process your payments securely. We never store your full card details.',
-                  'بوابات الدفع (مثل ماي فاتورة، تاب، هيسبة، أو يو بايمنتس) — لمعالجة مدفوعاتك بأمان. لا نقوم مطلقاً بتخزين تفاصيل بطاقتك كاملة.'
+                  'Payment gateways (such as Paymob, Kashier, or Fawry) — to process your payments securely. We never store your full card details.',
+                  'بوابات الدفع (مثل باي موب أو كاشير أو فوري) — لمعالجة مدفوعاتك بأمان. لا نقوم مطلقاً بتخزين تفاصيل بطاقتك كاملة.'
                 )}
               </li>
               <li>

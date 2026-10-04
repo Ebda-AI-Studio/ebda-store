@@ -43,6 +43,33 @@ vi.mock('@force/database', () => ({
     },
   },
   runInTenantContext: vi.fn((_storeId: string, fn: () => unknown) => fn()),
+  // the repeat-count flush is one short store-scoped statement
+  runInStoreScope: vi.fn((_storeId: string, fn: () => unknown) => fn()),
+}));
+
+// The fallback row (a failed reserving insert) is written by the audit-insert definer; it stays
+// observable through `auditLog.create`.
+vi.mock('@api/lib/definer', () => ({
+  insertAuditLog: (e: {
+    action: string;
+    resourceType: string;
+    resourceId?: string | null;
+    storeId?: string | null;
+    ip?: string | null;
+    userAgent?: string | null;
+    details?: unknown;
+  }) =>
+    mockAuditLogCreate({
+      data: {
+        action: e.action,
+        resourceType: e.resourceType,
+        resourceId: e.resourceId,
+        storeId: e.storeId,
+        ipAddress: e.ip,
+        userAgent: e.userAgent,
+        details: e.details,
+      },
+    }),
 }));
 
 vi.mock('@api/middleware/security', () => ({ auditLog: (...a: unknown[]) => mockAuditLog(...a) }));
@@ -69,7 +96,7 @@ vi.mock('@api/lib/logger', () => ({
 import { auditAgentWrite, type McpAgentContext } from '@api/mcp/agent-auth';
 import { classifyAgentDenials, type AgentDenialRow } from '@api/mcp/agent-denial-alerts';
 
-const store = { id: 'store-1', name: 'Demo', slug: 'demo', currency: 'KWD', domain: null };
+const store = { id: 'store-1', name: 'Demo', slug: 'demo', currency: 'EGP', domain: null };
 
 const context: McpAgentContext = {
   storeSlug: 'demo',

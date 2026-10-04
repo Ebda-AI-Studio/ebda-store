@@ -68,7 +68,7 @@ async function order(
       shipping: 0,
       discount: 0,
       total,
-      currency: 'KWD',
+      currency: 'EGP',
       shippingAddress: address,
       billingAddress: address,
       items: {

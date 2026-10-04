@@ -33,7 +33,7 @@ function order(overrides: Partial<OrderDetail>): OrderDetail {
     shipping: 0,
     discount: 0,
     total: 10_000,
-    currency: 'KWD',
+    currency: 'EGP',
     ...overrides,
   } as OrderDetail;
 }
@@ -50,7 +50,7 @@ describe('SummaryCard — loyalty points line (#197)', () => {
       />
     );
     expect(screen.getByText('loyaltyPoints (1,000)')).toBeTruthy();
-    expect(screen.getByText('2.000 KWD')).toBeTruthy();
+    expect(screen.getByText('20.00 EGP')).toBeTruthy();
     // Not folded into the generic "discount" bucket alongside it.
     expect(screen.queryByText(/^discount/)).toBeNull();
   });
@@ -70,11 +70,11 @@ describe('SummaryCard — loyalty points line (#197)', () => {
     expect(screen.getByText('coupon')).toBeTruthy();
     expect(screen.getByText('promotion')).toBeTruthy();
     expect(screen.getByText('loyaltyPoints (800)')).toBeTruthy();
-    // The unexplained remainder (500 fils) still shows as the generic bucket.
+    // The unexplained remainder (500 piastres) still shows as the generic bucket.
     expect(screen.getByText(/^discount/)).toBeTruthy();
-    // #2261 — its percentage is of the 500 fils shown (5% of 10,000), not the
+    // #2261 — its percentage is of the 500 piastres shown (5% of 10,000), not the
     // whole-order 50%.
-    expect(screen.getByText('0.500 KWD (5%)')).toBeTruthy();
+    expect(screen.getByText('5.00 EGP (5%)')).toBeTruthy();
     expect(screen.queryByText(/\(50%\)/)).toBeNull();
   });
 

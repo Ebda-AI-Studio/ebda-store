@@ -2,7 +2,8 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Request } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext, runInStoreScope } from '@force/database';
+import { insertAuditLog } from '../lib/definer';
 import type { McpStore } from './resolve-store';
 import { encryption } from '../services/encryption.service';
 import { featureService } from '../services/feature.service';
@@ -675,10 +676,8 @@ async function createCoalescedAuditRow(
 
 /**
  * Flush a window's count onto its row. A single, non-transactional UPDATE by
- * primary key — no `runInTenantContext`, no interactive transaction.
- * `audit_logs`'s RLS policy (`rls_audit_logs_tenant`) admits it the same way
- * it admits an unscoped insert: `current_store_id() IS NULL` outside any
- * tenant transaction. Returns false when the update failed.
+ * primary key, inside `runInStoreScope` (one short store-scoped statement, no
+ * interactive transaction held open). Returns false when the update failed.
  */
 async function flushCount(
   rowId: string,
@@ -688,10 +687,13 @@ async function flushCount(
   tool: string
 ): Promise<boolean> {
   try {
-    await prisma.auditLog.update({
-      where: { id: rowId },
-      data: { details: JSON.parse(JSON.stringify({ ...baseDetails, count })) },
-    });
+    // One short store-scoped statement (strict RLS: an unscoped UPDATE matches no row).
+    await runInStoreScope(store.id, () =>
+      prisma.auditLog.update({
+        where: { id: rowId },
+        data: { details: JSON.parse(JSON.stringify({ ...baseDetails, count })) },
+      })
+    );
     return true;
   } catch (err) {
     logger.warn(
@@ -816,18 +818,14 @@ export async function auditAgentWrite(params: {
         '[mcp agent-auth] coalesced audit insert failed — writing an unscoped row instead'
       );
       const now = reservation === 'reserved' ? await readAttemptCount(dedupeKey) : null;
-      await prisma.auditLog.create({
-        data: {
-          action,
-          resourceType: 'mcp_tool',
-          resourceId: tool,
-          storeId: store.id,
-          ipAddress: context.ip,
-          userAgent: context.userAgent,
-          details: JSON.parse(
-            JSON.stringify({ ...baseDetails, count: now !== null ? Math.max(now - base, 1) : 1 })
-          ),
-        },
+      await insertAuditLog({
+        action,
+        resourceType: 'mcp_tool',
+        resourceId: tool,
+        storeId: store.id,
+        ip: context.ip,
+        userAgent: context.userAgent,
+        details: { ...baseDetails, count: now !== null ? Math.max(now - base, 1) : 1 },
       });
       return;
     }

@@ -1,7 +1,9 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useLayoutEffect, ReactNode } from 'react';
+import { BRAND } from '@force/shared';
 
+import { resolveDefaultLanguage } from '@force/shared';
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 type Language = 'en' | 'ar';
@@ -25,13 +27,13 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 // hydration mismatch). localStorage is the fallback for the cookie-lost
 // edge case (private windows that cleared cookies).
 function getInitialLanguage(storeDefault?: Language): Language {
-  if (typeof window === 'undefined') return storeDefault || 'en';
+  if (typeof window === 'undefined') return storeDefault || resolveDefaultLanguage(undefined);
   if (storeDefault === 'en' || storeDefault === 'ar') return storeDefault;
   const savedLang = localStorage.getItem('force-language') as Language;
   if (savedLang && ['en', 'ar'].includes(savedLang)) {
     return savedLang;
   }
-  return 'en';
+  return resolveDefaultLanguage(undefined);
 }
 
 // Cookie helpers — used so the user's locale choice survives full page
@@ -199,15 +201,15 @@ export const translations = {
   'Loading...': 'جاري التحميل...',
   Error: 'خطأ',
   Success: 'تم بنجاح',
-  KWD: 'د.ك',
+  EGP: 'ج.م',
   Retry: 'إعادة المحاولة',
   'Something went wrong': 'حدث خطأ ما',
   'Try Again': 'حاول مرة أخرى',
   'Go Home': 'العودة للرئيسية',
 
   // Shipping
-  'Free delivery on orders over 20 KWD': 'توصيل مجاني للطلبات فوق 20 د.ك',
-  'Same-day delivery across Kuwait': 'توصيل في نفس اليوم في جميع أنحاء الكويت',
+  'Free delivery on orders over 20 EGP': 'توصيل مجاني للطلبات فوق 20 ج.م',
+  'Same-day delivery across Egypt': 'توصيل في نفس اليوم في جميع أنحاء مصر',
 
   // Auth
   Login: 'دخول',
@@ -242,7 +244,7 @@ export const translations = {
   'is currently undergoing maintenance. Please check back later.':
     'يخضع حالياً لأعمال الصيانة. يرجى المحاولة مرة أخرى لاحقاً.',
   'Need to reach us?': 'تحتاج للتواصل معنا؟',
-  'Powered by Force AI': 'مدعوم من Force AI',
+  'Powered by Ebda': `مدعوم من ${BRAND.nameAr}`,
 
   // Campaign unsubscribe page (/unsubscribe, D2 email campaigns).
   'Email preferences': 'تفضيلات البريد الإلكتروني',
@@ -274,11 +276,11 @@ export const translations = {
   'You will not receive SMS offers from us.': 'لن تصلك عروض عبر الرسائل القصيرة منا بعد الآن.',
   'This link is invalid.': 'هذا الرابط غير صالح.',
 
-  // Platform-host 404 (PlatformNotFound — store.force-ai.co/<unknown>).
+  // Platform-host 404 (PlatformNotFound — ebda.app/<unknown>).
   'This page doesn’t exist': 'هذه الصفحة غير موجودة',
   'The store you’re looking for may have moved, or the link may be wrong.':
     'ربما انتقل المتجر الذي تبحث عنه، أو قد يكون الرابط غير صحيح.',
-  'Go to Force AI': 'الانتقال إلى Force AI',
+  'Go to Ebda': `الانتقال إلى ${BRAND.nameAr}`,
 
   // Route error fallback — Try Again while the refresh is in flight.
   'Retrying…': 'جارٍ إعادة المحاولة…',

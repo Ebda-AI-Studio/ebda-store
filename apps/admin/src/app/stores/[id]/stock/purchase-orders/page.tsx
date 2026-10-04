@@ -8,7 +8,7 @@ import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGetPage, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
-import { filsToKwd } from '@/lib/format';
+import { minorToMajor } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -167,7 +167,9 @@ export default function PurchaseOrdersPage() {
               alignEnd: true,
               className: 'w-28',
               cell: po => (
-                <span className="font-mono text-xs font-semibold">{filsToKwd(po.totalCost)}</span>
+                <span className="font-mono text-xs font-semibold">
+                  {minorToMajor(po.totalCost)}
+                </span>
               ),
             },
             {

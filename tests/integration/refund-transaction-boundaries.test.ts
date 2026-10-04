@@ -17,7 +17,7 @@
  *     transaction, which rolls back on any 5xx. A failure after the provider
  *     paid out erased every record of it, so the retry paid again.
  *
- * The provider is the only thing stubbed: `TapPaymentProvider.prototype.refund`.
+ * The provider is the only thing stubbed: `V2ProviderBridge.prototype.refund`.
  * Self-skips without a real DATABASE_URL, like every DB-direct test here.
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
@@ -29,7 +29,7 @@ vi.mock('@api/services/encryption.service', () => ({
 
 import { PaymentService } from '@api/services/payment-providers/payment.factory';
 import { ReturnService } from '@api/services/return.service';
-import { TapPaymentProvider } from '@api/services/payment-providers/tap.provider';
+import { V2ProviderBridge } from '@api/services/payment-providers/v2-bridge';
 import { ProviderRejectedError } from '@api/services/payment-providers/refund-outcome';
 
 const hasDb =
@@ -57,7 +57,7 @@ describe.skipIf(!hasDb)('PaymentService.refund — transaction boundaries (real 
           name: 'rtb-test-store',
           slug: `rtb-test-${suffix}`,
           template: 'modern',
-          currency: 'KWD',
+          currency: 'EGP',
           ownerId: owner.id,
         },
       });
@@ -65,7 +65,7 @@ describe.skipIf(!hasDb)('PaymentService.refund — transaction boundaries (real 
       await tx.paymentConfig.create({
         data: {
           storeId,
-          provider: 'tap',
+          provider: 'kashier',
           isEnabled: true,
           isDefault: true,
           apiKey: 'sk_test_rtb',
@@ -134,7 +134,7 @@ describe.skipIf(!hasDb)('PaymentService.refund — transaction boundaries (real 
       const payment = await tx.payment.create({
         data: {
           orderId: order.id,
-          provider: 'tap',
+          provider: 'kashier',
           status: 'completed',
           amount,
           transactionId: `chg_${n}`,
@@ -156,9 +156,9 @@ describe.skipIf(!hasDb)('PaymentService.refund — transaction boundaries (real 
     ).map(e => e.eventType);
 
   function providerPays(refundId: string) {
-    return vi.spyOn(TapPaymentProvider.prototype, 'refund').mockImplementation(async req => ({
+    return vi.spyOn(V2ProviderBridge.prototype, 'refund').mockImplementation(async req => ({
       success: true,
-      provider: 'tap',
+      provider: 'kashier',
       refundId,
       transactionId: req.transactionId,
       amount: req.amount ?? 0,
@@ -249,7 +249,7 @@ describe.skipIf(!hasDb)('PaymentService.refund — transaction boundaries (real 
 
   it('keeps the claim when the provider gives no clear answer', async () => {
     const { paymentId, transactionId } = await paidOrder();
-    vi.spyOn(TapPaymentProvider.prototype, 'refund').mockRejectedValue(
+    vi.spyOn(V2ProviderBridge.prototype, 'refund').mockRejectedValue(
       new Error('The operation was aborted due to timeout')
     );
 
@@ -266,7 +266,7 @@ describe.skipIf(!hasDb)('PaymentService.refund — transaction boundaries (real 
 
   it('releases the claim when the provider refuses', async () => {
     const { paymentId, transactionId } = await paidOrder();
-    vi.spyOn(TapPaymentProvider.prototype, 'refund').mockRejectedValue(
+    vi.spyOn(V2ProviderBridge.prototype, 'refund').mockRejectedValue(
       new ProviderRejectedError('Refund amount exceeds the captured amount', 400)
     );
 
@@ -347,7 +347,7 @@ describe.skipIf(!hasDb)('PaymentService.refund — transaction boundaries (real 
     it('a record-only completion after an indeterminate refund settles the open claim', async () => {
       const { orderId, paymentId } = await paidOrder();
       const ret = await receivedReturn(orderId);
-      vi.spyOn(TapPaymentProvider.prototype, 'refund').mockRejectedValue(
+      vi.spyOn(V2ProviderBridge.prototype, 'refund').mockRejectedValue(
         new Error('The operation was aborted due to timeout')
       );
 

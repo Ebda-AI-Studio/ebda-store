@@ -1,8 +1,9 @@
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass } from '@force/database';
+import { prisma } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
+import { sweepAcrossStores } from '../../cross-store';
 
 /**
  * Stuck order-created sweep — scheduled safety net (every 5 min).
@@ -65,21 +66,24 @@ export async function handleOrderCreatedStuckSweep(
 
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
   const stuck: StuckOrder[] = await step.run('find-stuck', async () =>
-    withRlsBypass(tx =>
-      tx.order.findMany({
-        where: {
-          paymentStatus: 'paid',
-          orderCreatedNotifiedAt: null,
-          status: { not: 'cancelled' },
-          // Window: older than the notify grace period, but NOT older than the
-          // recency floor — so the historical back-catalog is never re-notified.
-          createdAt: { lt: cutoff, gt: floorCutoff },
-        },
-        select: { id: true, storeId: true, locale: true, createdAt: true },
-        orderBy: { createdAt: 'asc' },
-        take: SWEEP_TAKE,
-      })
-    )
+    sweepAcrossStores({
+      fetch: () =>
+        prisma.order.findMany({
+          where: {
+            paymentStatus: 'paid',
+            orderCreatedNotifiedAt: null,
+            status: { not: 'cancelled' },
+            // Window: older than the notify grace period, but NOT older than the
+            // recency floor — so the historical back-catalog is never re-notified.
+            createdAt: { lt: cutoff, gt: floorCutoff },
+          },
+          select: { id: true, storeId: true, locale: true, createdAt: true },
+          orderBy: { createdAt: 'asc' },
+          take: SWEEP_TAKE,
+        }),
+      orderKey: r => r.createdAt,
+      take: SWEEP_TAKE,
+    })
   );
 
   if (stuck.length === 0) return { swept: 0, resent: 0, alerted: 0 };

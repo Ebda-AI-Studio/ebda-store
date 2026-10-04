@@ -58,7 +58,7 @@ describe('ai-eval helpers', () => {
 
   it('tokenOverlapRatio: low overlap for genuinely new content', () => {
     const desc = 'A handmade ceramic mug, dishwasher safe, holds 350ml.';
-    const newInfo = 'Delivery within Kuwait takes 2-4 business days from order confirmation.';
+    const newInfo = 'Delivery within Egypt takes 2-4 business days from order confirmation.';
     expect(tokenOverlapRatio(newInfo, desc)).toBeLessThan(0.3);
   });
 
@@ -73,12 +73,12 @@ describe('ai-eval helpers', () => {
   });
 
   it('mentionsPaymentGatewayCompany', () => {
-    expect(mentionsPaymentGatewayCompany('We use MyFatoorah to process payments.')).toBe(true);
-    expect(mentionsPaymentGatewayCompany('We accept KNET, Visa, and Mastercard.')).toBe(false);
+    expect(mentionsPaymentGatewayCompany('We use Paymob to process payments.')).toBe(true);
+    expect(mentionsPaymentGatewayCompany('We accept Visa, Meeza, and Mastercard.')).toBe(false);
   });
 
   it('mentionsPriceOrStockClaim', () => {
-    expect(mentionsPriceOrStockClaim('Only 3 KWD, order now!')).toBe(true);
+    expect(mentionsPriceOrStockClaim('Only 3 EGP, order now!')).toBe(true);
     expect(mentionsPriceOrStockClaim('Currently out of stock.')).toBe(true);
     expect(mentionsPriceOrStockClaim('A handmade ceramic mug.')).toBe(false);
   });
