@@ -26,6 +26,9 @@ export default defineConfig({
       'tests/smoke/**',
       // apps/status runs on workerd via @cloudflare/vitest-pool-workers (npm run test:status).
       'apps/status/**',
+      // apps/api/workers-test runs the BUILT Worker on workerd via @cloudflare/vitest-pool-workers
+      // (npm run cf:test -w apps/api).
+      'apps/api/workers-test/**',
     ],
     coverage: {
       provider: 'v8',

@@ -1,0 +1,22 @@
+# Copy to .dev.vars (gitignored) for `wrangler dev` and the workerd tests. Local, fake values only.
+# Deployed secrets are set with `wrangler secret put <NAME>`; never put real ones in a file.
+NODE_ENV=development
+WEB_URL=http://localhost:3000
+ADMIN_URL=http://localhost:3001
+API_URL=http://localhost:8787
+BUILD_COMMIT_SHA=dev
+JWT_SECRET=dev-only-jwt-secret-change-me-0123456789abcdef
+ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
+# Real Inngest / Resend / Sentry / Gemini / payment-provider keys are secrets: wrangler secret put
+# INNGEST_SIGNING_KEY=
+# INNGEST_EVENT_KEY=
+# RESEND_API_KEY=
+# SENTRY_DSN=
+# GEMINI_API_KEY=
+# Fake Tap credentials: the payment-webhook replay in the exit test signs with TAP_WEBHOOK_SECRET
+TAP_API_KEY=dev-only-tap-api-key
+TAP_SECRET_KEY=dev-only-tap-secret-key
+TAP_WEBHOOK_SECRET=dev-only-tap-webhook-secret
+# Dev mode (NODE_ENV != production) sends events to http://localhost:8288; scripts/stage1-exit-test.mjs
+# starts a stand-in for it there (a failing outbound fetch from `wrangler dev` is noisy and slow).
+INNGEST_EVENT_KEY=local-dev-event-key
