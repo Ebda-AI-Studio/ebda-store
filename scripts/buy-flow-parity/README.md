@@ -152,10 +152,11 @@ Pass your own loopback Postgres 16 and Redis; the harness then never touches
 `container`. The Postgres role needs `CREATEDB` (superuser is simplest):
 
 ```bash
-su postgres -c "psql -c \"CREATE ROLE parity SUPERUSER LOGIN PASSWORD 'parity'\""
+PARITY_PW=parity   # local password of the harness role, used as ${PARITY_PW} in the URLs below
+su postgres -c "psql -c \"CREATE ROLE parity SUPERUSER LOGIN PASSWORD '$PARITY_PW'\""
 redis-server --daemonize yes --port 56379
 node scripts/buy-flow-parity/run.mjs --base origin/main --head HEAD \
-  --pg-url postgresql://parity:parity@127.0.0.1:5432/postgres --redis-url redis://127.0.0.1:56379
+  --pg-url postgresql://parity:${PARITY_PW}@127.0.0.1:5432/postgres --redis-url redis://127.0.0.1:56379
 ```
 
 ### api-url mode: same code on two runtimes
@@ -197,13 +198,33 @@ NOT block other outbound calls: the API under test must be configured so that no
 real email/push/analytics credential exists.
 
 ```bash
-P=postgresql://parity:parity@127.0.0.1:5432
+P=postgresql://parity:${PARITY_PW}@127.0.0.1:5432
 node scripts/buy-flow-parity/run.mjs \
   --api-url-base http://127.0.0.1:4611 --api-url-head http://127.0.0.1:4612 \
   --pg-url-base $P/bfp_a --pg-url-head $P/bfp_b --redis-url redis://127.0.0.1:56379
 ```
 
 Always read `out/<stamp>/result.json` (`rows[].verdict`), not just the exit code.
+
+**Card-testing guard.** `payments/create` is limited per IP (10 / 10 min) and per store
+by `card-testing-guard.service.ts`, and the load-test token does not skip it. One run
+makes 12+ payment attempts from 127.0.0.1, so raise the budgets on BOTH sides:
+`PAYMENT_ATTEMPTS_PER_IP_10M=100000 PAYMENT_ATTEMPTS_PER_STORE_10M=100000
+PAYMENT_SESSION_MAX_DECLINES=1000 PAYMENT_IP_MAX_DECLINES=100000`. The counters of a
+Worker live in its AuthState Durable Object, which the harness cannot reset: start
+`wrangler dev` fresh (and with `--persist-to <empty dir>`) for every run.
+
+### A Cloudflare Worker as one side
+
+Head = `wrangler dev` of `apps/api` (workerd), base = the same code on Node. Each side
+has its own database; the Worker reaches its database through the Hyperdrive binding, so
+point that at the head database with
+`WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=postgresql://...` (a pgbouncer in
+transaction mode, or the database directly). The harness variables of the table above are
+passed as `wrangler dev --var NAME:value` (`NODE_ENV`, `API_URL`, `JWT_SECRET`,
+`ENCRYPTION_KEY`, `INNGEST_BASE_URL`, `INNGEST_DEV`, `BFP_STUB_URL`, `LOAD_TEST_BYPASS_TOKEN`,
+`MYFATOORAH_BASE_URL`, `PAYMENT_PROVIDER_STUB`, the four `PAYMENT_*` budgets above). The full
+procedure and the verdict are in `docs/ebda/design/stage2-parity.md`.
 
 ### Results (2026-10-03, Linux, Postgres 16 + Redis 7)
 
