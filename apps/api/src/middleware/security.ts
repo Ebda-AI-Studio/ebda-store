@@ -10,6 +10,8 @@ import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
+import { isWorkers } from '../lib/runtime';
+import { CfRateLimitStore } from '../cf/rate-limit-store';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { config } from '../config';
 import { abuseConfig } from '../lib/abuse-config';
@@ -34,16 +36,20 @@ const csrfTokensMemory = new BoundedMap<string, { value: string; expiresAt: Date
   MAX_CSRF_TOKENS
 );
 
-// Periodic cleanup of expired CSRF tokens
-setInterval(
-  () => {
-    const now = new Date();
-    for (const [key, value] of csrfTokensMemory) {
-      if (value.expiresAt < now) csrfTokensMemory.delete(key);
-    }
-  },
-  5 * 60 * 1000
-); // Every 5 minutes
+// Periodic cleanup of expired CSRF tokens. Not on Workers: a timer in global
+// scope is a disallowed operation there, an isolate is short-lived, and the
+// shared CSRF store is the Durable Object (see cf/ioredis-cf.ts).
+if (!isWorkers) {
+  setInterval(
+    () => {
+      const now = new Date();
+      for (const [key, value] of csrfTokensMemory) {
+        if (value.expiresAt < now) csrfTokensMemory.delete(key);
+      }
+    },
+    5 * 60 * 1000
+  ); // Every 5 minutes
+}
 
 /**
  * Principal a CSRF token is bound to when the minting request had no
@@ -745,7 +751,11 @@ class RedisOrMemoryStore implements Store {
   readonly prefix: string;
   // Keys are shared across replicas whenever Redis is up.
   readonly localKeys = false;
-  private readonly memory = new MemoryStore();
+  // Workers: counters live in the AuthState Durable Object (exact, shared by every
+  // isolate). No MemoryStore there: it starts a timer at init, which workerd forbids
+  // in global scope, and a per-isolate count is worthless on an ephemeral isolate.
+  private readonly memory = isWorkers ? undefined : new MemoryStore();
+  private readonly cfStore: CfRateLimitStore | undefined;
   private redisStore: RedisStore | undefined;
   private redisStoreClient: RedisCaller | undefined;
   private options: Options | undefined;
@@ -755,14 +765,21 @@ class RedisOrMemoryStore implements Store {
     name: string
   ) {
     this.prefix = `rl:${name}:`;
+    if (isWorkers) this.cfStore = new CfRateLimitStore(this.prefix);
   }
 
   init(options: Options): void {
     this.options = options;
-    this.memory.init(options);
+    this.memory?.init(options);
+    this.cfStore?.init(options);
   }
 
   private current(): Store {
+    if (this.cfStore) {
+      recordSharedCounting();
+      return this.cfStore;
+    }
+    const memory = this.memory as MemoryStore;
     const client = this.resolveClient();
     if (!client) {
       // issue 1963: never silent — counted, summarised, alerted once.
@@ -770,7 +787,7 @@ class RedisOrMemoryStore implements Store {
         this.prefix,
         rateLimitSharedEnabled() ? 'redis-unavailable' : 'disabled'
       );
-      return this.memory;
+      return memory;
     }
     recordSharedCounting();
     if (!this.redisStore || this.redisStoreClient !== client) {
