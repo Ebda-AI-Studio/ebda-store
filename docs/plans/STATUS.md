@@ -1,23 +1,35 @@
-# Ebda — status
+# Ebda — status (updated 2026-10-04)
 
-Spend is an estimate from token counts (the cloud session does not expose a dollar meter).
+Spend is an ESTIMATE from sub-agent token counts (the cloud session exposes no dollar meter). All SPs are inside their allocation so far.
 
 | SP | State | Evidence / PRs | Est. spend |
 |---|---|---|---|
-| SP10 research | **done** 2026-10-03 | 4 briefs in `docs/research/` — [Whisky-11/ebda#1](https://github.com/Whisky-11/ebda/pull/1) | ~$4 |
-| SP3 design + spike | **done** 2026-10-03 (gate taken under "do not stop", see R-EBDA-001) | `docs/design/cloudflare-backend.md`, `spikes/workers-api/` (17/17 on workerd, 0 leaks, mutation-checked), `docs/design/express-on-workerd-experiment.md` — [Whisky-11/ebda#1](https://github.com/Whisky-11/ebda/pull/1) | ~$12 |
-| SP4 clone + rebrand | in progress | `main` = FWB history (2,135 commits, fork point `dbe8293d`), FWB `upstream` push-disabled; integration branch `claude/ebda-sp4` (plan: `docs/ebda/plans/2026-10-03-sp4-clone-rebrand.md`) | — |
-| SP5 self-serve + billing | not started | — | $0 |
+| SP10 research | **done** | `docs/ebda/research/` (4 briefs). [Whisky-11/ebda#1](https://github.com/Whisky-11/ebda/pull/1) | ~$4 |
+| SP3 design + spike | **done** (gate taken under "do not stop", R-EBDA-001) | `docs/ebda/design/`, `spikes/workers-api/` (17/17 on workerd, 0 leaks, mutation-checked) | ~$12 |
+| SP4 clone + rebrand | **in progress** (tasks 0–5, 7, 8 merged; 6 Worker shell + 9 lean CI running) | [Whisky-11/ebda#2](https://github.com/Whisky-11/ebda/pull/2) | ~$30 |
+| SP5 self-serve + billing | **mostly done** (tasks 1–4 merged; 5 unaided E2E + timed run pending) | same PR (stacked on SP4) | ~$20 |
 | SP6 payments | not started | — | $0 |
 | SP7 shipping | not started | — | $0 |
-| SP8 WhatsApp free tier | not started | — | $0 |
-| SP9 site/docs/help/status | not started | — | $0 |
+| SP8 WhatsApp free tier | **done** | wa.me helper, PDP/thank-you/tracking buttons, order email, admin; no API calls (tested) | ~$2 |
+| SP9 site/docs/help/status | **done (build + gates)**; deploy waits on credentials | `apps/marketing`, `apps/docs`, `apps/help`, `apps/status` — axe 0 serious; status incident test green on workerd | ~$5 |
 
-## Notes
-- 2026-10-03: Ahmad said "go", then "do not stop and continue everything in the plan". The SP3 approval gate is therefore recorded as a Ruling for after-the-fact review rather than a hard stop.
-- **Ahmad, pricing numbers needed** (after reading `docs/research/pricing-and-packaging.md`): price per tier, free-tier caps, platform fee bps. The engine ships with configurable placeholders until then.
-- SP10 caveat: vendor pages were blocked by the sandbox proxy; figures come from search summaries and conflicting ones are marked unverified.
-- **SP3 decision for Ahmad's review (R-EBDA-001):** keep FWB's Express API and run it on Cloudflare Workers (no Hono rewrite); per-request Prisma client over Hyperdrive (cache off) to Neon; strict RLS on every tenant table; Cloudflare Containers is the fallback if the Stage 1 concurrency test fails. Overturning it is free until SP4 Stage 1 lands.
-- SP3 parity: FWB's buy-flow harness cannot target a Worker yet (it spawns Express itself); the spike suite covers the RLS/cart/webhook assertions, and SP4 adds an `--api-url` mode to the harness.
-- Still unproven until a Cloudflare token + Neon project exist: the real Hyperdrive pooler (spike used pgbouncer in transaction mode), edge CPU/cold start.
-- From SP4 on, Ebda's working docs live on `main` under `docs/ebda/` (this `plan` branch copy is frozen after SP3). FWB's deploy/cron/self-hosted workflows were removed from Ebda so nothing touches FWB infrastructure.
+## Verified on the integration branch (`claude/ebda-sp4` @ 4215b444)
+- Unit: 468 files, 6,099 passed, 0 failed. Typecheck clean.
+- Full suite including integration + e2e with the API as `ebda_app` (strict RLS), on the DB branch before the final merges: 7,931 tests, 0 failures.
+
+## Ahmad — decisions / inputs needed
+1. **Prices** per plan, free-tier caps, platform fee bps (engine ships with placeholders; paid checkout refuses null prices).
+2. **Amelia Aurum catalogue export** (CSV; Shopify format works). Egress policy blocks ameliaaurum.com from the cloud session.
+3. **Credentials** (none needed to keep building): Cloudflare token + Neon project (deploy, real Hyperdrive proof), Kashier sandbox + written recurring enablement, Resend key + verified `ebda.app` sender, then Paymob/Fawry/Bosta/Aramex sandboxes.
+4. **GitHub:** enable Actions on `whisky-11/ebda` and set the default branch to `main` (no workflow is registered today, so PRs show no checks).
+5. **Review R-EBDA-001** (Express on Workers, Containers as fallback) and **R-EBDA-002** (strict RLS; `stores` table RLS is an accepted residual with a follow-up plan: `docs/ebda/plans/sp4-stores-rls-followup.md`).
+6. Tax: new stores get an active 14% VAT rate but `taxEnabled=false` (inherited ruling TAX-1). Enable by default?
+7. Legal pages (`/legal`, `/privacy`, `/terms`) are DRAFT placeholders for counsel.
+
+## Notable findings fixed along the way
+- Custom-domain hijack of Ebda hosts (`rival.ebda.app` as a "custom domain") — blocked; unverified domains are never served (pending → verified, 72h release).
+- Login lockout bypass by re-casing the email — fixed.
+- Mutating SECURITY DEFINER functions without caller checks — guarded (42501).
+- FWB bulk import failed on new categories (one outer tx) — fixed.
+- Prisma driver-adapter error shapes broke P2002 handling and deadlock retry — fixed.
+- site-kit source hidden by the global `build/` ignore — fixed.
