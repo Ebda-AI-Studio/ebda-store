@@ -119,6 +119,17 @@ export async function confirmPaymentFromProviderStatus(
   const { payment, order, providerStatus, source, triggeredByUserId = null } = input;
   const status = providerStatus.status;
 
+  // InstaPay has no provider to ask: the ONLY thing that confirms it is the
+  // merchant's confirm (InstapayService.confirm). A pull-side reconciliation must
+  // never mark such an order paid, whatever a caller passes in.
+  if (payment.provider === 'instapay') {
+    return {
+      paymentStatus: order.paymentStatus === 'paid' ? 'paid' : 'unpaid',
+      providerStatus: status,
+      statusChanged: false,
+    };
+  }
+
   // Determine whether this is a genuine transition vs a redundant call.
   // We compare against the ORDER's current paymentStatus (the durable
   // signal a customer/merchant sees) so a duplicate verify or a webhook

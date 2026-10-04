@@ -51,32 +51,33 @@ export const instapayReferenceSchema = z
  * customer at checkout, so they live in `payment_configs.settings`, not in the
  * encrypted credential columns.
  */
-export const instapaySettingsSchema = z
-  .object({
-    /** InstaPay address, e.g. `amelia@instapay`. */
-    handle: z.string().trim().regex(INSTAPAY_HANDLE_REGEX).optional(),
-    /** Mobile number the merchant's InstaPay account is linked to (Egyptian mobile). */
-    phone: z
-      .string()
-      .trim()
-      .regex(/^(?:\+?20|0020|0)?1[0125]\d{8}$/)
-      .optional(),
-    /** Name the transfer shows (so the customer can check they are paying the right account). */
-    accountName: z.string().trim().max(80).optional(),
-    expiryHours: z
-      .number()
-      .int()
-      .min(INSTAPAY_MIN_EXPIRY_HOURS)
-      .max(INSTAPAY_MAX_EXPIRY_HOURS)
-      .default(INSTAPAY_DEFAULT_EXPIRY_HOURS),
-    /** Free text shown under the transfer details (EN / AR). */
-    noteEn: z.string().trim().max(300).optional(),
-    noteAr: z.string().trim().max(300).optional(),
-  })
-  .refine(v => Boolean(v.handle || v.phone), {
-    message: 'Provide an InstaPay handle or a phone number',
-    path: ['handle'],
-  });
+export const instapaySettingsBaseSchema = z.object({
+  /** InstaPay address, e.g. `amelia@instapay`. */
+  handle: z.string().trim().regex(INSTAPAY_HANDLE_REGEX).optional(),
+  /** Mobile number the merchant's InstaPay account is linked to (Egyptian mobile). */
+  phone: z
+    .string()
+    .trim()
+    .regex(/^(?:\+?20|0020|0)?1[0125]\d{8}$/)
+    .optional(),
+  /** Name the transfer shows (so the customer can check they are paying the right account). */
+  accountName: z.string().trim().max(80).optional(),
+  expiryHours: z
+    .number()
+    .int()
+    .min(INSTAPAY_MIN_EXPIRY_HOURS)
+    .max(INSTAPAY_MAX_EXPIRY_HOURS)
+    .default(INSTAPAY_DEFAULT_EXPIRY_HOURS),
+  /** Free text shown under the transfer details (EN / AR). */
+  noteEn: z.string().trim().max(300).optional(),
+  noteAr: z.string().trim().max(300).optional(),
+});
+
+/** The enabled form: at least one way to pay (handle or phone) must be set. */
+export const instapaySettingsSchema = instapaySettingsBaseSchema.refine(
+  v => Boolean(v.handle || v.phone),
+  { message: 'Provide an InstaPay handle or a phone number', path: ['handle'] }
+);
 export type InstapaySettings = z.infer<typeof instapaySettingsSchema>;
 
 /** The instruction the checkout renders for an InstaPay order (what to pay, to whom, quoting what). */

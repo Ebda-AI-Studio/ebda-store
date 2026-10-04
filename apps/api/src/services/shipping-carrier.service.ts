@@ -17,6 +17,7 @@ import { ShippingCarrierProvider, CarrierCode, ShipmentAddress } from './carrier
 import type { OrderStatus } from '@prisma/client';
 import { AppError } from '../middleware/error-handler';
 import { assertValidTransition } from './order-status-machine';
+import { assertOrderFulfillable } from '../lib/order-fulfilment-guard';
 
 const CARRIER_REGISTRY: Record<CarrierCode, ShippingCarrierProvider> = {
   icarry: iCarryCarrier,
@@ -296,6 +297,9 @@ class ShippingCarrierService {
     if (!order) {
       throw new Error(`Order ${orderId} not found in store ${storeId}`);
     }
+
+    // An unconfirmed InstaPay order never ships (SP6a): refuse BEFORE any carrier call.
+    assertOrderFulfillable(order);
 
     // Determine which carrier to use
     const resolvedCarrierCode = carrierCode ?? (await this.getDefaultCarrierCode(storeId));

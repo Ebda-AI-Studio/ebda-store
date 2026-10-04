@@ -787,6 +787,71 @@ export class OneSignalService {
   }
 
   /**
+   * InstaPay manual orders (SP6a): tell the store's admins an order is waiting for
+   * them to confirm the transfer (`awaiting`), or that the hold ran out and the
+   * order was cancelled (`expired`). Store admins only: the money question is the
+   * merchant's, not the platform's.
+   */
+  static async notifyAdminsOfInstapay(
+    input: Omit<NotifyOrderInput, 'customerName' | 'paymentMethod'> & {
+      kind: 'awaiting' | 'expired';
+    }
+  ): Promise<void> {
+    if (!isAdminConfigured()) {
+      logger.warn('Admin OneSignal not configured — skipping InstaPay notification');
+      return;
+    }
+    const url = adminOrderUrl(input.storeId, input.orderId);
+    const moneyText = formatMoney(input.total, input.currency);
+    const awaiting = input.kind === 'awaiting';
+    const storeAdminPlayerIds = await this.getAdminPlayerIds({
+      role: 'store_admin',
+      ownsStoreId: input.storeId,
+    });
+    const body = {
+      app_id: config.onesignalAdminAppId,
+      url,
+      web_buttons: [{ id: 'view-order', text: 'View order', url }],
+      data: {
+        type: awaiting ? 'order.instapay_awaiting' : 'order.instapay_expired',
+        orderId: input.orderId,
+        storeId: input.storeId,
+        storeName: input.storeName,
+      },
+      headings: awaiting
+        ? { en: 'InstaPay transfer to confirm', ar: 'تحويل إنستاباي بانتظار التأكيد' }
+        : { en: 'InstaPay order expired', ar: 'انتهت مهلة طلب إنستاباي' },
+      contents: awaiting
+        ? {
+            en: `${input.orderNumber} — ${moneyText}. Confirm once the transfer arrives.`,
+            ar: `${input.orderNumber} — ${moneyText}. أكّد الطلب بمجرد وصول التحويل.`,
+          }
+        : {
+            en: `${input.orderNumber} — ${moneyText}. No confirmation in time: cancelled, stock released.`,
+            ar: `${input.orderNumber} — ${moneyText}. لم يتم التأكيد في الوقت المحدد: أُلغي الطلب وأُعيد المخزون.`,
+          },
+      ...(storeAdminPlayerIds.length > 0
+        ? { include_player_ids: storeAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
+    };
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Key ${config.onesignalAdminRestApiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        logger.error({ status: res.status, kind: input.kind }, 'OneSignal InstaPay push failed');
+      }
+    } catch (err) {
+      logger.error({ err, kind: input.kind }, 'OneSignal InstaPay push threw');
+    }
+  }
+
+  /**
    * Resolve the OneSignal player_ids for a given admin audience by
    * joining `User` (filtered by role / store ownership) against
    * `OneSignalSubscription`. Used by `notifyAdminsOfOrder` to target

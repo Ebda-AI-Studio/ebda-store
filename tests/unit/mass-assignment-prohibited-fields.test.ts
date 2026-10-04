@@ -522,6 +522,9 @@ const ROUTE_INVENTORY: Record<string, Coverage> = {
   "order.routes.ts POST '/:orderId/mark-paid'": {
     exempt: 'reads no request body — orderId/storeId come from the URL params',
   },
+  "order.routes.ts POST '/:orderId/confirm-instapay'": {
+    exempt: 'reads no request body — orderId/storeId come from the URL params',
+  },
   "order.routes.ts POST '/bulk-mark-paid'": {
     exempt: 'body is `{ orderIds: string[] }` only, validated inline; storeId from the URL param',
   },

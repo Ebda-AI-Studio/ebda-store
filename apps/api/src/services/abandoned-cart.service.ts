@@ -979,7 +979,7 @@ class AbandonedCartService {
         AND ac.status = 'recovered'
         AND o.store_id = ${storeId}
         AND o.deleted_at IS NULL
-        AND o.status NOT IN ('cancelled', 'refunded')
+        AND o.status NOT IN ('cancelled', 'refunded', 'awaiting_payment_confirmation')
         AND o.payment_status <> 'failed'
     `;
     const recoveredRevenue = Number(revenueRows[0]?.revenue ?? 0);

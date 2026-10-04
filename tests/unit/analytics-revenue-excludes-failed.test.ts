@@ -4,7 +4,7 @@
  * The Customers KPI strip reads the same population (countsTowardSpend), so
  * every revenue read here must carry the same predicate, or the two pages
  * disagree again. Source-level sweep: each `status notIn [cancelled,
- * refunded]` revenue filter must be paired with the failed-payment exclusion.
+ * refunded, awaiting_payment_confirmation]` revenue filter must be paired with the failed-payment exclusion.
  * The one deliberate exception is `getRevenueByPaymentStatus`, which is a
  * breakdown BY payment status and must keep showing the failed bucket.
  */
@@ -21,9 +21,9 @@ const src = readFileSync(
 describe('revenue population excludes failed payments (issue 2235)', () => {
   it('every Prisma revenue filter outside the payment-status breakdown excludes failed', () => {
     const breakdownAt = src.indexOf('static async getRevenueByPaymentStatus');
-    const filters = [...src.matchAll(/status: \{ notIn: \['cancelled', 'refunded'\] \},/g)].map(
-      m => m.index!
-    );
+    const filters = [
+      ...src.matchAll(/status: \{ notIn: \[\.\.\.NON_REVENUE_ORDER_STATUSES\] \},/g),
+    ].map(m => m.index!);
     const outside = filters.filter(i => i < breakdownAt || i > breakdownAt + 1500);
     expect(outside.length).toBeGreaterThanOrEqual(4);
     for (const i of outside) {
@@ -32,9 +32,11 @@ describe('revenue population excludes failed payments (issue 2235)', () => {
   });
 
   it('every raw-SQL revenue filter excludes failed', () => {
-    const sqlFilters = [...src.matchAll(/status NOT IN \('cancelled', 'refunded'\)/g)].map(
-      m => m.index!
-    );
+    const sqlFilters = [
+      ...src.matchAll(
+        /status NOT IN \('cancelled', 'refunded', 'awaiting_payment_confirmation'\)/g
+      ),
+    ].map(m => m.index!);
     expect(sqlFilters.length).toBe(2);
     for (const i of sqlFilters) {
       expect(src.slice(i, i + 120)).toMatch(/payment_status <> 'failed'/);

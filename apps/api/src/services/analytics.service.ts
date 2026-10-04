@@ -3,7 +3,12 @@ import { ON_HAND_SQL, storeStockValueFils } from '../lib/effective-inventory-sql
 import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
 import { redis } from './redis.service';
 import { profitAndLoss } from './accounting/reports.service';
-import { pickSalesGranularity, type AnalyticsPeriod, type SalesGranularity } from '@force/shared';
+import {
+  NON_REVENUE_ORDER_STATUSES,
+  pickSalesGranularity,
+  type AnalyticsPeriod,
+  type SalesGranularity,
+} from '@force/shared';
 
 // ==========================================
 // Simple cache-aside helper for analytics queries (60s TTL).
@@ -347,7 +352,7 @@ export class AnalyticsService {
       storeId,
       deletedAt: null,
       createdAt: { gte: startDate, lte: endDate },
-      status: { notIn: ['cancelled', 'refunded'] },
+      status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
       paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
     };
 
@@ -387,7 +392,7 @@ export class AnalyticsService {
           AND o.deleted_at IS NULL
           AND o.created_at >= ${startDate}
           AND o.created_at <= ${endDate}
-          AND o.status NOT IN ('cancelled', 'refunded')
+          AND o.status NOT IN ('cancelled', 'refunded', 'awaiting_payment_confirmation')
           AND o.payment_status <> 'failed'
       `,
     ]);
@@ -473,7 +478,7 @@ export class AnalyticsService {
       WHERE store_id = ${storeId}
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}
-        AND status NOT IN ('cancelled', 'refunded')
+        AND status NOT IN ('cancelled', 'refunded', 'awaiting_payment_confirmation')
         AND payment_status <> 'failed'
       GROUP BY period
       ORDER BY period ASC
@@ -526,7 +531,7 @@ export class AnalyticsService {
         order: {
           storeId,
           createdAt: { gte: startDate, lte: endDate },
-          status: { notIn: ['cancelled', 'refunded'] },
+          status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
           paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
         },
       },
@@ -593,7 +598,7 @@ export class AnalyticsService {
         order: {
           storeId,
           createdAt: { gte: startDate, lte: endDate },
-          status: { notIn: ['cancelled', 'refunded'] },
+          status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
           paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
         },
       },
@@ -717,7 +722,7 @@ export class AnalyticsService {
         where: {
           storeId,
           deletedAt: null,
-          status: { notIn: ['cancelled', 'refunded'] },
+          status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
           paymentStatus: { not: 'failed' }, // revenue excludes FAILED payments (issue 2235); unpaid COD still counts
         },
         _sum: { total: true },
@@ -848,7 +853,7 @@ export class AnalyticsService {
         storeId,
         deletedAt: null,
         createdAt: { gte: startDate, lte: endDate },
-        status: { notIn: ['cancelled', 'refunded'] },
+        status: { notIn: [...NON_REVENUE_ORDER_STATUSES] },
       },
       _sum: { total: true },
       _count: true,
