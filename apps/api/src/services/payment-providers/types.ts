@@ -3,7 +3,16 @@
 // Common interfaces for all payment gateways
 // ==========================================
 
-export type PaymentProvider = 'tap' | 'myfatoorah' | 'hesabe' | 'upayments' | 'cod' | 'instapay';
+export type PaymentProvider =
+  | 'tap'
+  | 'myfatoorah'
+  | 'hesabe'
+  | 'upayments'
+  | 'cod'
+  | 'instapay'
+  | 'paymob'
+  | 'kashier'
+  | 'fawry';
 
 export type PaymentMethod =
   | 'knet'
