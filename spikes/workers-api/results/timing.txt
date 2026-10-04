@@ -1,0 +1,25 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+
+ RUN  v4.1.11 /home/user/ebda/spikes/workers-api
+
+stdout | test/timing.test.ts > sequential per-request timings
+[timing] first request in isolate (wasm init + cold connect): 869ms
+
+stdout | test/timing.test.ts > sequential per-request timings
+[timing] GET /products: end-to-end p50=14.0ms p95=22.0ms min=12.0ms | in-handler tx(incl. connect+BEGIN..COMMIT) p50=11.0ms p95=17.0ms min=10.0ms
+
+stdout | test/timing.test.ts > sequential per-request timings
+[timing] POST /cart/items: end-to-end p50=21.0ms p95=28.0ms min=18.0ms | in-handler tx(incl. connect+BEGIN..COMMIT) p50=17.0ms p95=23.0ms min=14.0ms
+
+stdout | test/timing.test.ts > sequential per-request timings
+[timing] POST /webhooks/payments/fakepay: end-to-end p50=19.0ms p95=26.0ms min=16.0ms | in-handler tx(incl. connect+BEGIN..COMMIT) p50=12.0ms p95=15.0ms min=11.0ms
+
+ ✓ test/timing.test.ts > sequential per-request timings 3432ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  18:31:10
+   Duration  4.34s (transform 346ms, setup 0ms, import 330ms, tests 3.43s, environment 0ms)
+

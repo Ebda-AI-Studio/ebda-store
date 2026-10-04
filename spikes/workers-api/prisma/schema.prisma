@@ -1,0 +1,71 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+  output     = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Store {
+  id           String    @id
+  slug         String    @unique
+  name         String
+  customDomain String?   @unique @map("custom_domain")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  products     Product[]
+  carts        Cart[]
+  @@map("stores")
+}
+
+model Product {
+  id            String     @id
+  storeId       String     @map("store_id")
+  name          String
+  pricePiastres Int        @map("price_piastres")
+  active        Boolean    @default(true)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  store         Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  cartItems     CartItem[]
+  @@index([storeId])
+  @@map("products")
+}
+
+model Cart {
+  id        String     @id
+  storeId   String     @map("store_id")
+  userId    String?    @map("user_id")
+  sessionId String     @map("session_id")
+  status    String     @default("open")
+  paidAt    DateTime?  @map("paid_at")
+  createdAt DateTime   @default(now()) @map("created_at")
+  store     Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  @@unique([storeId, sessionId])
+  @@map("carts")
+}
+
+model CartItem {
+  id        String  @id
+  cartId    String  @map("cart_id")
+  productId String  @map("product_id")
+  quantity  Int
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+  @@unique([cartId, productId])
+  @@map("cart_items")
+}
+
+model WebhookEvent {
+  id         String   @id
+  storeId    String   @map("store_id")
+  provider   String
+  eventId    String   @map("event_id")
+  rawBody    String   @map("raw_body")
+  status     String   @default("received")
+  receivedAt DateTime @default(now()) @map("received_at")
+  @@unique([provider, eventId], map: "webhook_events_provider_event_id_key")
+  @@map("webhook_events")
+}
