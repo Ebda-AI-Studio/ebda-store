@@ -13,6 +13,24 @@ ALTER TYPE "PaymentProvider" ADD VALUE IF NOT EXISTS 'paymob';
 ALTER TYPE "PaymentProvider" ADD VALUE IF NOT EXISTS 'kashier';
 ALTER TYPE "PaymentProvider" ADD VALUE IF NOT EXISTS 'fawry';
 
+-- A payment id -> its store id (exact primary key), for the customer's retry route
+-- which holds only the payment id. UNGUARDED ON PURPOSE, like ebda_order_store_id: it
+-- answers with a store id, never row data, and the route then reads and authorises
+-- inside that store's scope.
+CREATE OR REPLACE FUNCTION public.ebda_payment_store_id(p_payment_id text)
+RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+  SELECT o.store_id
+  FROM public.payments p
+  JOIN public.orders o ON o.id = p.order_id
+  WHERE p.id = p_payment_id
+$fn$;
+
+REVOKE ALL ON FUNCTION public.ebda_payment_store_id(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ebda_payment_store_id(text) TO ebda_app;
+
 -- A payment (or one of its events) -> the store that owns it, for the admin
 -- payment timeline. GUARDED by DATA, not by a flag: the acting user must be an
 -- active super_admin, or the owner / a staff member of that payment's store.

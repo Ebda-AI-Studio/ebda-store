@@ -9,7 +9,7 @@
  *  2. THE MONEY MAY HAVE MOVED: the request reached the provider and we never
  *     got a clear answer (timeout, dropped connection, 5xx), or the provider
  *     said yes and something after that failed. Releasing here and letting the
- *     merchant retry pays the customer twice. Tap, MyFatoorah and KNET have no
+ *     merchant retry pays the customer twice. Gateway refunds have no
  *     undo API.
  *
  * Callers used to infer which one happened by re-reading

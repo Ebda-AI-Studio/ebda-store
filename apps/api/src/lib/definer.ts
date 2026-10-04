@@ -185,6 +185,30 @@ export async function getOrderStoreId(orderId: string): Promise<string | null> {
   return rows[0]?.id ?? null;
 }
 
+/** A payment id -> its store id (exact primary key). The caller then reads and authorises inside that store. */
+export async function getPaymentStoreId(paymentId: string): Promise<string | null> {
+  const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
+    SELECT public.ebda_payment_store_id(${paymentId}) AS id`;
+  return rows[0]?.id ?? null;
+}
+
+/**
+ * The store that owns a payment (or one of its events), for the admin payment timeline.
+ * GUARDED in SQL by data: the acting user must be an active super_admin, or the owner / a
+ * staff member of that payment's store; anyone else (and an unknown id) gets `null`.
+ */
+export async function resolvePaymentEventsStore(input: {
+  actorUserId: string;
+  paymentId?: string;
+  eventId?: string;
+}): Promise<{ storeId: string; paymentId: string } | null> {
+  const rows = await prisma.$queryRaw<Array<{ store_id: string; payment_id: string }>>`
+    SELECT store_id, payment_id FROM public.ebda_payment_events_store(
+      ${input.actorUserId}, ${input.paymentId ?? null}, ${input.eventId ?? null})`;
+  const r = rows[0];
+  return r ? { storeId: r.store_id, paymentId: r.payment_id } : null;
+}
+
 export interface WebhookInboxRow {
   id: string;
   provider: string;

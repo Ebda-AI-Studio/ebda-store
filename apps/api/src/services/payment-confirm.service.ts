@@ -13,7 +13,7 @@
  *      (`POST /stores/:storeId/orders/:orderId/refresh-payment-status`).
  *   3. The GUEST verify-on-return endpoint
  *      (`POST /public/orders/:orderId/verify-payment`) — the reliable
- *      primary confirmation path, because MyFatoorah's webhook is
+ *      primary confirmation path, because a gateway's webhook can be
  *      configured account-level in their portal and never fires per-invoice.
  *   4. The auto-cancel sweep (`order-auto-cancel-unpaid`) — the last-resort
  *      net. Before cancelling a stale unpaid order it asks the provider, and
@@ -152,8 +152,7 @@ export async function confirmPaymentFromProviderStatus(
     // The provider says the invoice is "Paid", but that alone doesn't prove
     // the AMOUNT paid matches what we expect. `providerStatus.paidAmount`
     // (piastres) is only populated by providers that distinguish invoiced vs
-    // settled amount (currently MyFatoorah's GetPaymentStatus —
-    // `PaidCurrencyValue`); Tap/Hesabe/UPayments never set it. Only gate
+    // settled amount (`paidAmount` on the status answer); a gateway that does not send it leaves it unset. Only gate
     // when it's actually present + parseable and the currencies line up —
     // never block on missing/ambiguous data, since a false block here
     // would hold a legitimately-paid customer's order hostage.

@@ -13,11 +13,18 @@ import { tenantContext } from '../middleware/tenant-context';
 import {
   REGION,
   codSettingsSchema,
+  fawrySettingsSchema,
   instapaySettingsBaseSchema,
   instapaySettingsSchema,
+  kashierSettingsSchema,
+  paymobSettingsBaseSchema,
+  paymobSettingsSchema,
 } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
 import { providerHealth } from '../services/payment-providers/provider-health';
+import { toProviderCredentials } from '../services/payment-providers/credentials';
+import { getProviderV2, MANUAL_PROVIDERS } from '../services/payment-providers/registry';
+import { PaymentProviderError } from '../services/payment-providers/types';
 const router = Router();
 
 // Mounted bare at '/payment-settings' in routes/index.ts — the global
@@ -36,7 +43,7 @@ router.param('storeId', tenantContext);
 // ==========================================
 
 const paymentConfigSchema = z.object({
-  provider: z.enum(['tap', 'myfatoorah', 'hesabe', 'upayments', 'cod', 'instapay']),
+  provider: z.enum(['cod', 'instapay', 'paymob', 'kashier', 'fawry']),
   isEnabled: z.boolean().default(false),
   isDefault: z.boolean().default(false),
   displayName: z.string().optional(),
@@ -126,7 +133,73 @@ export function normalizeProviderSettings(
     }
     return parsed.data;
   }
+  // The Egyptian gateways: only their NON-secret settings live here (the keys are in the
+  // encrypted columns). An enabled Paymob needs its public key and an integration id.
+  const gatewaySchema =
+    provider === 'paymob'
+      ? isEnabled
+        ? paymobSettingsSchema
+        : paymobSettingsBaseSchema
+      : provider === 'kashier'
+        ? kashierSettingsSchema
+        : provider === 'fawry'
+          ? fawrySettingsSchema
+          : null;
+  if (gatewaySchema) {
+    const parsed = gatewaySchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new AppError(
+        422,
+        'INVALID_PAYMENT_SETTINGS',
+        parsed.error.issues.map(i => `${i.path.join('.') || 'settings'}: ${i.message}`).join('; ')
+      );
+    }
+    return parsed.data;
+  }
   return {};
+}
+
+/**
+ * The credentials an enabled gateway cannot work without, by provider. An enabled gateway with a
+ * missing key would be offered at checkout and fail for every customer, so enabling is refused
+ * until they are all saved (a saved credential counts: the form leaves it blank to keep it).
+ */
+const REQUIRED_CREDENTIALS: Record<string, Array<keyof CredentialPresence>> = {
+  paymob: ['apiKey', 'webhookSecret'],
+  kashier: ['merchantId', 'apiKey', 'secretKey'],
+  fawry: ['merchantId', 'apiKey'],
+};
+interface CredentialPresence {
+  apiKey: boolean;
+  secretKey: boolean;
+  merchantId: boolean;
+  webhookSecret: boolean;
+}
+const CREDENTIAL_LABEL: Record<string, string> = {
+  apiKey: 'API / secret key',
+  secretKey: 'secret key',
+  merchantId: 'merchant ID',
+  webhookSecret: 'HMAC / webhook secret',
+};
+
+export function assertGatewayCredentials(
+  provider: string,
+  isEnabled: boolean,
+  saved: Partial<Record<keyof CredentialPresence, string | null | undefined>>,
+  incoming: Partial<Record<keyof CredentialPresence, string | null | undefined>>
+): void {
+  const required = REQUIRED_CREDENTIALS[provider];
+  if (!isEnabled || !required) return;
+  const missing = required.filter(
+    k => !(saved[k] || (incoming[k] && !incoming[k]!.includes('****')))
+  );
+  if (missing.length > 0) {
+    throw new AppError(
+      422,
+      'INVALID_PAYMENT_SETTINGS',
+      `Cannot enable ${provider}: missing ${missing.map(k => CREDENTIAL_LABEL[k]).join(', ')}`
+    );
+  }
 }
 
 function encryptCredentials(data: {
@@ -635,70 +708,38 @@ router.post(
         return;
       }
 
-      // Decrypt credentials for testing
-      const apiKey = config.apiKey ? encryption.decrypt(config.apiKey) : '';
-
-      // Test the connection based on provider
+      // Test the connection with the merchant's own decrypted credentials. The probe asks the
+      // gateway about a payment that cannot exist: "not found" proves the keys were accepted,
+      // a credential refusal is "invalid keys", and anything else (timeout, 5xx) is the gateway.
       let testResult: { success: boolean; message: string; latency?: number } = {
         success: false,
         message: 'Unknown provider',
       };
-
       const startTime = Date.now();
-
-      try {
-        switch (provider) {
-          case 'tap': {
-            const tapResponse = await fetch('https://api.tap.company/v2/test', {
-              method: 'GET',
-              headers: { Authorization: `Bearer ${apiKey}` },
-            });
+      const adapter = getProviderV2(provider);
+      if (adapter && !MANUAL_PROVIDERS.has(provider)) {
+        try {
+          await adapter.getStatus(
+            `ebda-connection-test-${Date.now()}`,
+            toProviderCredentials(config)
+          );
+          testResult = { success: true, message: 'Connection successful' };
+        } catch (error) {
+          if (error instanceof PaymentProviderError && error.code === 'PAYMENT_NOT_FOUND') {
+            testResult = { success: true, message: 'Connection successful' };
+          } else if (
+            error instanceof PaymentProviderError &&
+            error.code === 'PROVIDER_MISCONFIGURED'
+          ) {
+            testResult = { success: false, message: 'The gateway refused these credentials' };
+          } else {
             testResult = {
-              success: tapResponse.ok,
-              message: tapResponse.ok ? 'Connection successful' : 'Connection failed',
-              latency: Date.now() - startTime,
+              success: false,
+              message: error instanceof Error ? error.message : 'Connection test failed',
             };
-            break;
           }
-
-          case 'myfatoorah': {
-            const mfResponse = await fetch(
-              config.testMode
-                ? 'https://apitest.myfatoorah.com/v2/GetPaymentStatus'
-                : 'https://api.myfatoorah.com/v2/GetPaymentStatus',
-              {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${apiKey}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ Key: 'test', KeyType: 'InvoiceId' }),
-              }
-            );
-            testResult = {
-              success: mfResponse.status !== 401,
-              message: mfResponse.status === 401 ? 'Invalid API key' : 'Connection successful',
-              latency: Date.now() - startTime,
-            };
-            break;
-          }
-
-          case 'hesabe':
-          case 'upayments':
-            // Simple connectivity check
-            testResult = {
-              success: !!apiKey,
-              message: apiKey ? 'API key configured' : 'API key not configured',
-              latency: Date.now() - startTime,
-            };
-            break;
         }
-      } catch (error) {
-        testResult = {
-          success: false,
-          message: error instanceof Error ? error.message : 'Connection test failed',
-          latency: Date.now() - startTime,
-        };
+        testResult.latency = Date.now() - startTime;
       }
 
       // Update health status
@@ -911,6 +952,8 @@ router.post(
         });
       }
 
+      assertGatewayCredentials(data.provider, data.isEnabled, {}, data);
+
       // Encrypt credentials before storing
       const encryptedCreds = encryptCredentials(data);
 
@@ -1064,6 +1107,8 @@ router.put(
       } else {
         delete updateData.webhookSecret;
       }
+
+      assertGatewayCredentials(provider, data.isEnabled ?? existing.isEnabled, existing, data);
 
       if (data.settings !== undefined || data.isEnabled !== undefined) {
         updateData.settings = normalizeProviderSettings(

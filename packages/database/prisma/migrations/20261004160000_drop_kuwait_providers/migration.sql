@@ -17,3 +17,6 @@ CREATE TYPE "PaymentProvider" AS ENUM ('cod', 'instapay', 'paymob', 'kashier', '
 ALTER TABLE "payment_configs"
   ALTER COLUMN "provider" TYPE "PaymentProvider" USING ("provider"::text::"PaymentProvider");
 DROP TYPE "PaymentProvider_old";
+
+-- `payments.provider` defaulted to 'tap': a payment row must now name its provider.
+ALTER TABLE "payments" ALTER COLUMN "provider" DROP DEFAULT;

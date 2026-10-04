@@ -3,26 +3,17 @@
 // Common interfaces for all payment gateways
 // ==========================================
 
-export type PaymentProvider =
-  | 'tap'
-  | 'myfatoorah'
-  | 'hesabe'
-  | 'upayments'
-  | 'cod'
-  | 'instapay'
-  | 'paymob'
-  | 'kashier'
-  | 'fawry';
+export type PaymentProvider = 'cod' | 'instapay' | 'paymob' | 'kashier' | 'fawry';
 
+/** Customer-facing methods of the Egyptian gateways (a gateway adapter's `capabilities.methods`). */
 export type PaymentMethod =
-  | 'knet'
-  | 'visa'
-  | 'mastercard'
-  | 'amex'
-  | 'mada'
-  | 'apple_pay'
-  | 'google_pay'
-  | 'samsung_pay';
+  | 'card'
+  | 'meeza'
+  | 'wallet'
+  | 'valu'
+  | 'payatfawry'
+  | 'instapay'
+  | 'cod';
 
 export type PaymentStatus =
   | 'pending'
@@ -88,14 +79,10 @@ export interface CreatePaymentRequest {
   /**
    * Optional channels the provider should use to notify the customer
    * about the generated payment URL. Defaults to 'link' (just return
-   * the URL, no provider-side send). MyFatoorah supports this natively
-   * via `NotificationOption`; other providers may ignore it.
+   * the URL, no provider-side send). None of the Egyptian gateways sends the
+   * customer anything for us, so 'link' is the only channel that is honoured.
    *
    *   - 'link': return URL only, merchant copies/shares manually
-   *   - 'email': provider sends email with the link
-   *   - 'all': provider sends via every available channel
-   *
-   * SMS intentionally NOT exposed yet (Ahmad 2026-05-16).
    */
   notifyVia?: 'link' | 'email' | 'all';
 }
@@ -105,7 +92,10 @@ export interface PaymentResponse {
   provider: PaymentProvider;
   transactionId: string;
   invoiceId?: string;
+  /** Redirect target; '' for a payment the customer completes another way (a Fawry reference code). */
   paymentUrl: string;
+  /** What the customer must do next, when it is more than "follow the link" (SP6b). */
+  instruction?: PaymentInstruction;
   paymentMethods?: AvailablePaymentMethod[];
   expiresAt?: Date;
   metadata?: Record<string, unknown>;
@@ -179,8 +169,7 @@ export interface RefundStatusResponse {
   success: boolean;
   provider: PaymentProvider;
   refundId: string;
-  /** Normalized status across providers. MyFatoorah's "Refunded" =>
-   *  completed, "Pending" => pending, "Canceled" => failed. */
+  /** Normalized status across providers: executed => completed, queued => pending, refused => failed. */
   status: 'pending' | 'completed' | 'failed';
   amount?: number;
   refundedAmount?: number;
@@ -204,12 +193,11 @@ export interface WebhookPayload {
    *  separate code path that updates Payment.metadata.refundStatus
    *  without re-mutating the order's payment lifecycle. */
   refund?: {
-    /** Provider's own refund ID (RefundId for MyFatoorah). Maps to
-     *  Payment.refundId we saved when MakeRefund returned. */
+    /** Provider's own refund ID. Maps to the Payment.refundId we saved when the refund call returned. */
     refundId: string;
     refundReference?: string;
     /** Normalized refund status: completed = funds returned to customer's
-     *  card; pending = queued (MyFatoorah finance team); failed = canceled. */
+     *  card; pending = queued at the gateway; failed = canceled. */
     status: 'pending' | 'completed' | 'failed';
     /** Refund amount in piastres. */
     amount?: number;
@@ -251,7 +239,7 @@ export interface IPaymentProvider {
 
   /**
    * Look up refund status (for providers whose refunds are not instant —
-   * MyFatoorah queues refunds for finance team review). Returns the
+   * a gateway may queue refunds for review). Returns the
    * latest status of the refund identified by `refundId` (provider's own
    * refund ID, NOT our internal Payment.id). Optional — providers whose
    * refunds settle synchronously may not implement this.
@@ -262,6 +250,15 @@ export interface IPaymentProvider {
    * Verify webhook signature
    */
   verifyWebhook(payload: unknown, signature: string): boolean;
+
+  /**
+   * v2 adapters: verify the RAW body against the signature the route extracted, and parse it
+   * in one step (the signature of some gateways covers parsed fields, not the bytes). Throws
+   * `PaymentProviderError('WEBHOOK_BAD_SIGNATURE' | 'WEBHOOK_MALFORMED')`; never returns a
+   * payload for a delivery it did not verify. When present, `handleWebhook` uses it instead
+   * of `verifyWebhook` + `parseWebhook`.
+   */
+  verifyAndParseWebhook?(rawBody: string, signature: string): WebhookPayload;
 
   /**
    * Parse webhook payload

@@ -897,12 +897,11 @@ router.get(
 
 // POST /orders/:id/verify-payment — GUEST-SAFE verify-on-return.
 //
-// THE PRIMARY payment-confirmation path. MyFatoorah's webhook is
-// configured account-level in their portal and does NOT fire per
-// invoice for FWB, so the storefront success page must actively ask
-// the provider "is this invoice paid?" on return and reconcile our DB.
-// The webhook path remains as a backup (when a store DOES wire the
-// portal webhook).
+// THE PRIMARY payment-confirmation path. A gateway's webhook can be late,
+// lost, or never wired by the merchant (a Fawry reference code is paid hours
+// later, at an outlet), so the storefront success page actively asks the
+// provider "is this payment paid?" on return and reconciles our DB. The webhook
+// path remains as the other half.
 //
 // AUTHZ (guest-safe, IDOR-resistant — most buyers are not logged in):
 //   1. The orderId in the path is a v4 UUID handed back from
@@ -916,7 +915,7 @@ router.get(
 //      GetPaymentStatus answer for THIS order's stored invoice/
 //      transaction id. A caller cannot fabricate "paid" — even if they
 //      somehow guessed a UUID, the order only flips to paid when
-//      MyFatoorah independently reports that invoice as Paid. The
+//      the gateway independently reports that payment as paid. The
 //      optional `paymentId` from the redirect URL is recorded for the
 //      audit trail but is never trusted as proof of payment on its own.
 //
@@ -924,8 +923,8 @@ router.get(
 // confirmPaymentFromProviderStatus helper only writes + fans out on a
 // real transition, so a later webhook (or a second verify) is a no-op.
 const verifyPaymentSchema = z.object({
-  // MyFatoorah appends ?paymentId=<id> (sometimes ?Id=) to the success
-  // URL. Optional + recorded for audit only — authorization rides on the
+  // A gateway may append its own payment id to the success URL.
+  // Optional + recorded for audit only — authorization rides on the
   // order UUID + the provider's status answer, not on this value.
   paymentId: z.string().trim().min(1).max(128).optional(),
 });

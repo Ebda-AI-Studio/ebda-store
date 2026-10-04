@@ -112,8 +112,8 @@ export function hasCaseInsensitiveDuplicates(items: string[]): boolean {
   return false;
 }
 
-/** Regex guard: output must not mention payment-gateway backend company names — customers only see method names (KNET/Visa/etc), never Tap/MyFatoorah/Hesabe/UPayments. Mirrors the bulk-ai-faq-aeo prompt's own explicit rule. */
-const GATEWAY_COMPANY_NAMES = /\b(tap payments|myfatoorah|hesabe|upayments)\b/i;
+/** Regex guard: output must not mention payment-gateway backend company names — customers only see method names (Visa/Meeza/Pay at Fawry/etc), never Paymob/Kashier. Mirrors the bulk-ai-faq-aeo prompt's own explicit rule. */
+const GATEWAY_COMPANY_NAMES = /\b(paymob|kashier)\b/i;
 export function mentionsPaymentGatewayCompany(v: unknown): boolean {
   return typeof v === 'string' && GATEWAY_COMPANY_NAMES.test(v);
 }

@@ -23,7 +23,7 @@
  *
  * issue 2074: the original sweep matched only the dotted spelling and missed
  * `(store?.settings as Record<string, unknown>)?.acceptedPaymentMethods`
- * (the cart's "We accept" block), so a KNET-only store silently reverted to
+ * (the cart's "We accept" block), so a card-only store silently reverted to
  * advertising Visa/Mastercard/Apple Pay. The cast spelling — often split
  * across lines — is idiomatic here, so the list is now pinned by
  * tests/unit/public-store-settings.test.ts, which scans apps/web + apps/orders

@@ -1661,7 +1661,7 @@ export class OrderService {
     }
 
     // Notifications: only fire NOW for COD orders. For online-payment orders
-    // (Tap / MyFatoorah / Hesabe / UPayments) the customer hasn't actually
+    // (Paymob / Kashier / Fawry) the customer hasn't actually
     // paid yet at this point — firing emails / push / dispatcher here would
     // produce "new order" pings that turn into ghosts when the customer
     // abandons at the gateway and the order rolls back. Online-payment
@@ -2399,7 +2399,7 @@ export class OrderService {
    * NEVER trust client-asserted price/total.
    *
    * Creates the order in 'pending' / 'unpaid' state; the admin can
-   * then issue a MyFatoorah payment link via the existing
+   * then issue a payment link via the existing
    * /orders/:id/payment-link endpoint, OR mark it COD-paid, OR call
    * mark-paid once cash is collected. Ahmad 2026-05-16: 'admin can
    * land an order ... and copy the payment link'.
@@ -2419,7 +2419,7 @@ export class OrderService {
         quantity: number;
       }>;
       paymentMethod?: 'online' | 'cod';
-      paymentProvider?: 'tap' | 'myfatoorah' | 'hesabe' | 'upayments' | 'cod';
+      paymentProvider?: 'paymob' | 'kashier' | 'fawry' | 'instapay' | 'cod';
       notes?: string;
       couponCode?: string;
       currency?: string;

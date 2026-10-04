@@ -430,7 +430,7 @@ router.post(
 
       // Issue 2024: `returns:write` authorises COMPLETING a return, and staff
       // hold it; a gateway method additionally sends a real, irreversible
-      // Tap/MyFatoorah/KNET refund, which is `orders:refund` — the permission
+      // gateway refund, which is `orders:refund` — the permission
       // staff deliberately lack (rbac.ts, and the sibling order refund route).
       // Store credit / bank transfer / cash / manual record money only.
       if (

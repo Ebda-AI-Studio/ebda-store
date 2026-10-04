@@ -348,10 +348,10 @@ const bulkAiFaqAeoFn = inngest.createFunction(
             .slice(0, 500) || 'none';
 
         const PROVIDER_METHODS: Record<string, string[]> = {
-          tap: ['KNET', 'Visa', 'Mastercard', 'Apple Pay'],
-          myfatoorah: ['KNET', 'Visa', 'Mastercard', 'Apple Pay'],
-          hesabe: ['KNET', 'Visa', 'Mastercard'],
-          upayments: ['KNET', 'Visa', 'Mastercard'],
+          paymob: ['Visa', 'Mastercard', 'Meeza', 'Mobile wallets', 'valU installments'],
+          kashier: ['Visa', 'Mastercard', 'Mobile wallets'],
+          fawry: ['Pay at Fawry', 'Visa', 'Mastercard'],
+          instapay: ['InstaPay'],
           cod: ['Cash on Delivery'],
         };
         const methodSet = new Set<string>();
@@ -388,7 +388,7 @@ Sample products: ${prodNames}
 
 Draft exactly ${count} FAQs that real customers in Egypt would ask. Cover:
 - Delivery / shipping (Egypt city, governorates, GCC)
-- Payment methods. This store accepts EXACTLY: ${paymentMethodsList}. List those method names; do NOT name payment-gateway companies (Tap, MyFatoorah, Hesabe, UPayments) — customers tap KNET / Visa / Mastercard / Apple Pay buttons, they don't know which back-end gateway processes them.
+- Payment methods. This store accepts EXACTLY: ${paymentMethodsList}. List those method names; do NOT name payment-gateway companies (Paymob, Kashier) — customers pick Visa / Mastercard / Meeza / a mobile wallet / Pay at Fawry / InstaPay, they don't know which back-end gateway processes them.
 - Returns and exchanges policy
 - Product care / usage relevant to this store's category
 - Store hours / how to contact support

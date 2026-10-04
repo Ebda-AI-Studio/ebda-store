@@ -39,7 +39,7 @@ const HOUR_S = 60 * 60;
 export interface PaymentAttemptContext {
   storeId: string;
   orderId: string;
-  /** Gateway id ('tap', 'myfatoorah', 'cod', …). `cod` is exempt. */
+  /** Gateway id ('paymob', 'kashier', 'cod', …). `cod` is exempt. */
   provider: string;
   /** Client IP (`req.ip`). */
   ip: string | undefined;

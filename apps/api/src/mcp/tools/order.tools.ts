@@ -345,46 +345,49 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           // same callback/error URL convention, same
           // `.../webhooks/payment/<provider>` webhook shape — provider is
           // resolved explicitly above rather than left undefined.
-          const payment = await runInTenantContext(store.id, async () => {
-            const created = await PaymentService.createPayment(
-              {
-                orderId: order.id,
-                orderNumber: order.orderNumber,
-                amount: order.total,
-                currency: order.currency as Currency,
-                customer: {
-                  id: `guest-${order.id}`,
-                  name: customer.name,
-                  email: customer.email ?? '',
-                  phone: customer.phone,
-                },
-                // Same collapse every other payment-provider call site uses
-                // (`payment.routes.ts` /create, `order.routes.ts` payment-link,
-                // `payment.factory.ts` retry — see `payment-line-items.ts`'s I3
-                // note): a bundle box must reach the gateway's hosted page as
-                // ONE line at the bundle price, never its per-component
-                // allocated shares. This call site mapped `order.items` raw and
-                // was the one instance final review missed.
-                items: buildPaymentLineItems(order.items),
-                callbackUrl: `${base}/checkout/success`,
-                errorUrl: `${base}/checkout/error`,
-                webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${provider}`,
-              },
-              provider,
-              store.id
-            );
-            acceptedInvoice = {
-              storeId: store.id,
-              orderId: order.id,
-              orderNumber: order.orderNumber,
-              provider: created.provider,
-              transactionId: created.transactionId,
-              amount: order.total,
-              currency: order.currency,
-              source: 'agent',
-            };
-            return created;
-          });
+          //
+          // THE PROVIDER CALL HAS NO TRANSACTION OPEN (SP6b): the order above is already
+          // committed, the gateway is asked with nothing held (behind its deadline and the
+          // per-store breaker), and only the Payment row + its audit event are written in a
+          // short transaction of their own.
+          const paymentRequest = {
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            amount: order.total,
+            currency: order.currency as Currency,
+            customer: {
+              id: `guest-${order.id}`,
+              name: customer.name,
+              email: customer.email ?? '',
+              phone: customer.phone,
+            },
+            // Same collapse every other payment-provider call site uses
+            // (`payment.routes.ts` /create, `order.routes.ts` payment-link,
+            // `payment.factory.ts` retry — see `payment-line-items.ts`'s I3
+            // note): a bundle box must reach the gateway's hosted page as
+            // ONE line at the bundle price, never its per-component
+            // allocated shares. This call site mapped `order.items` raw and
+            // was the one instance final review missed.
+            items: buildPaymentLineItems(order.items),
+            callbackUrl: `${base}/checkout/success`,
+            errorUrl: `${base}/checkout/error`,
+            webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${provider}`,
+          };
+          const { providerName: acceptedBy, response: payment } =
+            await PaymentService.requestProviderPayment(paymentRequest, provider, store.id);
+          acceptedInvoice = {
+            storeId: store.id,
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            provider: payment.provider,
+            transactionId: payment.transactionId,
+            amount: order.total,
+            currency: order.currency,
+            source: 'agent',
+          };
+          await runInTenantContext(store.id, () =>
+            PaymentService.recordProviderPayment(acceptedBy, paymentRequest, payment, store.id)
+          );
           // The Payment row is committed: the order is paid-for-pending now,
           // and must never be rolled back from here on.
           rollbackOrderId = null;

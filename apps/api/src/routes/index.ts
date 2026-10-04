@@ -80,6 +80,8 @@ import realtimeRoutes from './realtime.routes';
 import {
   tenantContext,
   aiRouteContext,
+  orderRouteContext,
+  storeScopeContext,
   publicStoreContext,
   billingRouteContext,
 } from '../middleware/tenant-context';
@@ -236,7 +238,10 @@ router.use('/stores/:storeId/categories', tenantContext, categoryRoutes);
 router.use('/stores/:storeId/ai', aiRouteContext, aiRoutes);
 router.use('/stores/:storeId/typography', tenantContext, typographyRoutes);
 router.use('/stores/:storeId/cart', tenantContext, cartRoutes);
-router.use('/stores/:storeId/orders', tenantContext, orderRoutes);
+// Context per request (SP6b): the admin payment link calls a payment gateway, so it runs
+// under store scope (no long transaction held across the call); every other order route
+// keeps its one request transaction. See `orderRouteContext`.
+router.use('/stores/:storeId/orders', orderRouteContext, orderRoutes);
 // Customers export (.xlsx). Mounted at /stores/:storeId so the route
 // has access to storeId via mergeParams.
 router.use('/stores/:storeId', tenantContext, customersRoutes);
@@ -411,7 +416,9 @@ router.use('/stores', tenantContext, merchantKeyRoutes);
 router.use('/stores/:id/wa-templates', tenantContext, waTemplatesRoutes);
 
 // Phase 7: merchant-initiated payment links via WhatsApp
-router.use('/stores/:id/payment-links', tenantContext, paymentLinksRoutes);
+// Calls a payment gateway (and WhatsApp), so it runs under store scope (SP6b): no transaction
+// is held across those calls.
+router.use('/stores/:id/payment-links', storeScopeContext, paymentLinksRoutes);
 
 // Finance routes (COA tree + general ledger journal).
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): the

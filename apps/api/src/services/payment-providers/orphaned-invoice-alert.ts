@@ -9,7 +9,7 @@ import logger from '../../lib/logger';
  * transaction, and the Payment row it writes is only durable once that
  * transaction COMMITs. If the COMMIT fails or times out after the provider
  * said yes, the order is rolled back (stock, coupon, cart restored) but the
- * invoice is still live at the gateway. MyFatoorah can notify the customer
+ * invoice is still live at the gateway. A gateway can notify the customer
  * directly, so they can still pay it — and the settle webhook then matches no
  * Payment row, resolves no store, and is rejected: money captured, nothing
  * recorded.

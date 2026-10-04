@@ -123,7 +123,7 @@ async function lockOrderReturns(orderId: string): Promise<void> {
 /**
  * The same lock, for the CUSTOMER-facing `create()` — bounded (issues 2004 /
  * 2030). `complete()` holds this key across the provider refund round-trip
- * (up to ~16s for MyFatoorah's two calls), and a storefront return submission
+ * (a gateway refund can take several seconds), and a storefront return submission
  * must not sit on a pooled connection behind a merchant's refund until its own
  * 30s transaction times out as a P2028 500. It polls the non-blocking
  * `pg_try_advisory_xact_lock` for a short window — long enough for a racing
@@ -657,7 +657,7 @@ export class ReturnService {
     // `refundedAt` is the claim marker: nullable, only ever set at completion,
     // and updateMany's WHERE is evaluated atomically, so exactly one caller can
     // transition null -> now. Losing the race is a 409, not a second refund —
-    // gateway refunds are terminal at Tap/MyFatoorah/KNET with no undo API.
+    // gateway refunds are terminal at the gateway with no undo API.
     //
     // The claim lives in the request transaction, so a crash or any 5xx rolls
     // it back with everything else: it cannot strand a return (#1349, #1361).

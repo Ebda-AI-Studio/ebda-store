@@ -190,10 +190,6 @@ export class CircuitBreakerRegistry {
 export const circuitBreaker = new CircuitBreakerRegistry();
 
 // Register default circuits
-circuitBreaker.register('payment-tap', { failureThreshold: 3, timeout: 60000 });
-circuitBreaker.register('payment-myfatoorah', { failureThreshold: 3, timeout: 60000 });
-circuitBreaker.register('payment-hesabe', { failureThreshold: 3, timeout: 60000 });
-circuitBreaker.register('payment-upayments', { failureThreshold: 3, timeout: 60000 });
 circuitBreaker.register('email', { failureThreshold: 5, timeout: 30000 });
 circuitBreaker.register('sms', { failureThreshold: 5, timeout: 30000 });
 circuitBreaker.register('storage', { failureThreshold: 5, timeout: 30000 });
