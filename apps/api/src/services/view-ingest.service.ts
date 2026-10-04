@@ -21,6 +21,7 @@
 import { withStore } from '@force/database';
 import { regionDayStart } from '@force/shared';
 import { BoundedMap } from '../lib/bounded-map';
+import { isWorkers } from '../lib/runtime';
 import logger from '../lib/logger';
 
 // ---------------------------------------------------------------------------
@@ -41,15 +42,18 @@ const sessionViewDebounce = new BoundedMap<string, number>(MAX_DEBOUNCE_ENTRIES)
 
 // Periodic cleanup: remove expired debounce entries every 5 minutes to prevent
 // false positives once the BoundedMap starts evicting the oldest entry.
-const _cleanupInterval = setInterval(
-  () => {
-    const now = Date.now();
-    for (const [key, expiresAt] of sessionViewDebounce) {
-      if (expiresAt <= now) sessionViewDebounce.delete(key);
-    }
-  },
-  5 * 60 * 1000
-);
+// Not on Workers (no timers in global scope; the isolate is short-lived).
+const _cleanupInterval = isWorkers
+  ? undefined
+  : setInterval(
+      () => {
+        const now = Date.now();
+        for (const [key, expiresAt] of sessionViewDebounce) {
+          if (expiresAt <= now) sessionViewDebounce.delete(key);
+        }
+      },
+      5 * 60 * 1000
+    );
 
 // ---------------------------------------------------------------------------
 // Core ingest function

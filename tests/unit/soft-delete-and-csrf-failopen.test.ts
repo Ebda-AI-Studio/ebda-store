@@ -37,7 +37,7 @@ describe('#1530 — CSRF does not fail open when cookies were never parsed', () 
   });
 
   it('cookieParser is still mounted before csrfProtection (what made it survivable)', () => {
-    const idx = readFileSync(join(ROOT, 'apps/api/src/index.ts'), 'utf8');
+    const idx = readFileSync(join(ROOT, 'apps/api/src/app.ts'), 'utf8');
     const cp = idx.indexOf('app.use(cookieParser())');
     const csrf = idx.indexOf('app.use(csrfProtection)');
     expect(cp, 'cookieParser not mounted').toBeGreaterThan(-1);

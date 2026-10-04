@@ -2,6 +2,7 @@ import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { Express } from 'express';
 import { config } from '../config';
+import { isWorkers } from '../lib/runtime';
 import { BRAND, BRAND_MARKETING_URL, BRAND_API_URL } from '@force/shared';
 
 const options: swaggerJsdoc.Options = {
@@ -421,6 +422,11 @@ const swaggerSpec = swaggerJsdoc(options);
 export function setupSwagger(app: Express) {
   // Disable Swagger UI in production to avoid exposing API surface
   if (process.env.NODE_ENV === 'production') {
+    return;
+  }
+  // Workers: swagger-jsdoc scans files through fs and swagger-ui serves static
+  // assets from disk. The API reference lives at docs.ebda.app (SP9).
+  if (isWorkers) {
     return;
   }
 

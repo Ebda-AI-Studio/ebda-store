@@ -274,19 +274,21 @@ export class AuthService {
   private static readonly SALT_ROUNDS = 12;
 
   /**
-   * Pre-computed bcrypt hash of a value no caller can ever provide
-   * (32 random bytes generated once at boot). Used to equalize the
-   * login response time when the user record doesn't exist — without
-   * this dummy compare, "no user" returns ~50ms faster than "user
-   * exists, password wrong" and an attacker can enumerate registered
-   * emails by timing the response. The hash itself is irrelevant
-   * (compare always fails); we only care that the caller waits the
-   * same wall-clock time as the happy path.
+   * Pre-computed bcrypt hash (cost 12) of a value no caller can ever provide:
+   * 32 random bytes whose plaintext was discarded when the constant was
+   * generated. Used to equalize the login response time when the user record
+   * doesn't exist — without this dummy compare, "no user" returns ~50ms faster
+   * than "user exists, password wrong" and an attacker can enumerate registered
+   * emails by timing the response. The hash itself is irrelevant (compare
+   * always fails); we only care that the caller waits the same wall-clock time
+   * as the happy path.
+   *
+   * A constant rather than `bcrypt.hashSync(randomBytes(32), 12)` at class
+   * init: that ran ~250ms of CPU plus `crypto.randomBytes` in GLOBAL scope on
+   * every cold start, which workerd forbids (R-EBDA-001, experiment B2c).
    */
-  private static readonly DUMMY_PASSWORD_HASH: string = bcrypt.hashSync(
-    crypto.randomBytes(32).toString('hex'),
-    12
-  );
+  private static readonly DUMMY_PASSWORD_HASH: string =
+    '$2b$12$OW.xBchkmJbVjXDhBSQ6ke4cdbV/iuOcgjbbGK9ZslpcF5fkkynha';
 
   static async register(data: {
     email: string;

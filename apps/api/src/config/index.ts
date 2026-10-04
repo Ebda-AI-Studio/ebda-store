@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { BRAND, brandUrl } from '@force/shared';
+import { isWorkers } from '../lib/runtime';
 
 import { REGION } from '@force/shared';
 dotenv.config();
@@ -51,13 +52,16 @@ export const config = {
   ordersUrl: process.env.ORDERS_URL || 'http://localhost:3002',
 
   // Database
-  databaseUrl: getRequiredSecret('DATABASE_URL', 'Database URL'),
+  // On Workers the database is the HYPERDRIVE binding (worker.ts binds a client per
+  // request); there is no connection string in the environment, and the owner-role
+  // DIRECT_URL is migration tooling that never reaches the runtime.
+  databaseUrl: isWorkers ? '' : getRequiredSecret('DATABASE_URL', 'Database URL'),
   // DIRECT_URL is the non-pooled Neon connection used for migrations
   // (prisma migrate deploy / interactive transactions). Without it, the
   // Railway preDeployCommand silently runs the pooled URL which doesn't
   // support DDL on Neon serverless — migrations vanish. Surfaced by the
   // 2026-05-22 audit (P1-6).
-  directUrl: getRequiredSecret('DIRECT_URL', 'Direct (non-pooled) Database URL'),
+  directUrl: isWorkers ? '' : getRequiredSecret('DIRECT_URL', 'Direct (non-pooled) Database URL'),
 
   // Redis
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
