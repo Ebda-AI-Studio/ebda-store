@@ -69,11 +69,11 @@ literal `100`/`1000`; the factory's `Currency` union and default configs become 
 
 ## 3. Shipping carriers — SP7
 
-| File                                                   | Spot                                                                                                               |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `apps/api/src/services/carriers/aramex.carrier.ts:205` | `Value: data.codAmount / 1000, CurrencyCode: 'KWD'` — **will be wrong for EGP COD** until the adapter is rewritten |
-| `apps/api/src/services/carriers/types.ts`              | "Kuwait-specific" field comments; `value`/`codAmount` documented in fils (now minor units)                         |
-| `apps/admin/src/i18n/messages/{en,ar}.json`            | Aramex `accountEntity` example `KWI`                                                                               |
+| File                                                   | Spot                                                                                                                                         |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/services/carriers/aramex.carrier.ts:205` | `Value: data.codAmount / 1000, CurrencyCode: 'KWD'` — **fixed in SP7**: EGP from integer piastres, and refused until Aramex confirms EGP COD |
+| `apps/api/src/services/carriers/types.ts`              | "Kuwait-specific" field comments; `value`/`codAmount` documented in fils — **fixed in SP7** (piastres)                                       |
+| `apps/admin/src/i18n/messages/{en,ar}.json`            | Aramex `accountEntity` example `KWI` — **fixed in SP7** (`CAI`; Kuwait pickup fields replaced by Egypt ones)                                 |
 
 ## 4. Brand / marketing / legal copy — owned by the rebrand task (SP4 task 1) and SP9
 

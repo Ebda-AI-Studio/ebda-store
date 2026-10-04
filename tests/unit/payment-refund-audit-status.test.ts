@@ -18,6 +18,14 @@ const h = vi.hoisted(() => ({
 vi.mock('@force/database', () => ({
   prisma: { payment: { findFirst: (...a: unknown[]) => h.paymentFindFirst(...a) } },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
+  withStore: (_s: string, fn: () => unknown) => fn(),
+}));
+// The store comes from the provider reference through a definer (strict RLS hides a contextless read).
+vi.mock('@api/lib/definer', () => ({
+  getOrderStoreId: vi.fn(),
+  getPaymentStoreId: vi.fn(),
+  resolvePaymentEventsStore: vi.fn(),
+  resolveStoreFromWebhookRef: vi.fn().mockResolvedValue('s1'),
 }));
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {

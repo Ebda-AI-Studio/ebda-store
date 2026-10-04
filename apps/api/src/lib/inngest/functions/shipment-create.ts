@@ -89,7 +89,10 @@ export async function bookShipment(data: Data) {
 /** The retries ran out: tell the merchant (the row is `creation_failed`, the order is intact). */
 export async function handleShipmentCreateFailure(data: Data, error: Error) {
   if (!data.storeId || !data.orderId) return;
-  logger.error({ ...data, err: error }, 'shipment-create: retries exhausted');
+  logger.error(
+    { storeId: data.storeId, orderId: data.orderId, err: error },
+    'shipment-create: retries exhausted'
+  );
   await notifyMerchant(data, error?.message ?? 'carrier unavailable');
 }
 
