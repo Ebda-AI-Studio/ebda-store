@@ -728,25 +728,51 @@ router.post('/shipping/icarry', express.json(), async (req: Request, res: Respon
   }
 });
 
-/**
- * POST /webhooks/shipping/aramex
- * Receive push notifications from Aramex
- */
-router.post('/shipping/aramex', express.json(), async (req: Request, res: Response) => {
-  if (!verifyCarrierWebhookSecret(req, config.aramexWebhookSecret)) {
-    logger.warn({ ip: req.ip }, '[WEBHOOK] Aramex webhook rejected — bad/missing secret');
-    res.sendStatus(401);
-    return;
+/** The JSON body of a carrier callback (the webhook router is mounted behind `express.raw`). */
+function carrierWebhookBody(req: Request): unknown {
+  if (Buffer.isBuffer(req.body)) {
+    try {
+      return JSON.parse(req.body.toString('utf8'));
+    } catch {
+      return null;
+    }
   }
+  return req.body;
+}
+
+/**
+ * POST /webhooks/shipping/bosta/:storeId/:token
+ *
+ * Bosta signs nothing, so the callback URL it is given per delivery carries this store's
+ * secret token (the `webhookSecret` in the store's encrypted Bosta credentials). A wrong
+ * token, an unknown store and a store without Bosta are all the same 401, so the response is
+ * no oracle; a valid call is always answered 200 (an unrecognised or repeated event is a
+ * no-op), so Bosta does not retry what we have already taken in.
+ *
+ * Aramex has no tracking push: it is polled by the tracking cron instead.
+ */
+router.post('/shipping/bosta/:storeId/:token', async (req: Request, res: Response) => {
   try {
     const headers = Object.fromEntries(
       Object.entries(req.headers).map(([k, v]) => [k, String(v ?? '')])
     );
-    await shippingCarrierService.processWebhook('aramex', req.body, headers);
+    const outcome = await shippingCarrierService.processCarrierWebhook(
+      'bosta',
+      req.params.storeId,
+      req.params.token,
+      carrierWebhookBody(req),
+      headers
+    );
+    if (outcome === 'unauthorized') {
+      logger.warn({ ip: req.ip }, '[WEBHOOK] Bosta webhook rejected: bad secret or unknown store');
+      res.sendStatus(401);
+      return;
+    }
     res.sendStatus(200);
   } catch (err) {
-    logger.error({ err }, '[WEBHOOK] Aramex shipping webhook error');
-    res.sendStatus(200); // Always 200 to prevent carrier retries
+    logger.error({ err }, '[WEBHOOK] Bosta shipping webhook error');
+    // Bosta retries a non-2xx: an error on our side is worth a retry
+    res.sendStatus(500);
   }
 });
 

@@ -458,6 +458,7 @@ model Store {
   aiRecommendations        AiRecommendation[]
   shippingCarrierConfigs   ShippingCarrierConfig[]
   shipments                Shipment[]
+  codRemittances           CodRemittance[]
   affiliates               Affiliate[]
   affiliateReferrals       AffiliateReferral[]
   affiliatePayouts         AffiliatePayout[]
@@ -2249,32 +2250,72 @@ model ShippingCarrierConfig {
 }
 
 model Shipment {
-  id                  String    @id @default(uuid())
-  storeId             String    @map("store_id")
-  orderId             String    @unique @map("order_id")
-  carrier             String
-  trackingNumber      String?   @map("tracking_number")
-  trackingUrl         String?   @map("tracking_url")
-  labelUrl            String?   @map("label_url")
-  status              String    @default("created")
-  carrierShipmentId   String?   @map("carrier_shipment_id")
-  pickupAddress       Json      @map("pickup_address")
-  deliveryAddress     Json      @map("delivery_address")
-  weight              Decimal?  @db.Decimal(8, 2)
-  dimensions          Json?
-  estimatedDeliveryAt DateTime? @map("estimated_delivery_at")
-  statusHistory       Json      @default("[]") @map("status_history")
-  error               String?
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
+  id                   String    @id @default(uuid())
+  storeId              String    @map("store_id")
+  orderId              String    @unique @map("order_id")
+  carrier              String
+  trackingNumber       String?   @map("tracking_number")
+  trackingUrl          String?   @map("tracking_url")
+  labelUrl             String?   @map("label_url")
+  status               String    @default("created")
+  carrierShipmentId    String?   @map("carrier_shipment_id")
+  pickupAddress        Json      @map("pickup_address")
+  deliveryAddress      Json      @map("delivery_address")
+  weight               Decimal?  @db.Decimal(8, 2)
+  dimensions           Json?
+  estimatedDeliveryAt  DateTime? @map("estimated_delivery_at")
+  statusHistory        Json      @default("[]") @map("status_history")
+  error                String?
+  // SP7. COD the carrier must collect, in PIASTRES (0 = prepaid). Snapshot at booking time.
+  codAmount            Int       @default(0) @map("cod_amount")
+  // The carrier's own transaction / delivery id when it differs from `carrierShipmentId`.
+  carrierTransactionId String?   @map("carrier_transaction_id")
+  // Manual carrier: the name the merchant typed ("Sprint", "Egypt Post", ...).
+  carrierName          String?   @map("carrier_name")
+  // How many times booking with the carrier was tried (the Inngest retry counts here).
+  createAttempts       Int       @default(0) @map("create_attempts")
+  lastPolledAt         DateTime? @map("last_polled_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
-  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  store          Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  codRemittances CodRemittance[]
 
   @@index([storeId])
   @@index([trackingNumber])
   @@index([storeId, status])
   @@map("shipments")
+}
+
+// SP7. One line of a carrier's COD settlement: money the carrier collected for a shipment
+// and what it remitted after its own fees. Append-only facts in PIASTRES; the match against
+// the shipment's expected COD is computed (see cod-reconciliation.service), never stored.
+// A shipment can have several lines (partial remittances).
+model CodRemittance {
+  id             String   @id @default(uuid())
+  storeId        String   @map("store_id")
+  shipmentId     String?  @map("shipment_id")
+  carrier        String
+  trackingNumber String   @map("tracking_number")
+  // Idempotency key of the line (the carrier's own reference, else a content hash), so
+  // re-uploading the same statement changes nothing.
+  lineRef        String   @map("line_ref")
+  batchId        String?  @map("batch_id")
+  grossAmount    Int      @map("gross_amount")
+  feeAmount      Int      @default(0) @map("fee_amount")
+  netAmount      Int      @map("net_amount")
+  remittedAt     DateTime @map("remitted_at")
+  source         String   @default("csv")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  shipment Shipment? @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, carrier, lineRef])
+  @@index([storeId, shipmentId])
+  @@index([storeId, trackingNumber])
+  @@map("cod_remittances")
 }
 
 // ==========================================

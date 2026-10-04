@@ -45,6 +45,7 @@ import { aiAutofillSweep } from './ai-autofill-sweep';
 import { orderCapiConversion } from './order-capi-conversion';
 import { orderAutoCancelUnpaid } from './order-auto-cancel-unpaid';
 import { instapayExpiry } from './instapay-expiry';
+import { shipmentCreate } from './shipment-create';
 import { storeUsageSnapshot } from './store-usage-snapshot';
 import { billingRenewalDaily } from './billing-renewal';
 import { domainClaimSweep } from './domain-claim-sweep';
@@ -141,6 +142,8 @@ const allInngestFunctions: InngestFunction.Any[] = [
   // Auto-cancel stale unpaid orders past AUTO_CANCEL_UNPAID_DAYS (daily cron).
   orderAutoCancelUnpaid,
   instapayExpiry,
+  // SP7: carrier booking off the order path, retried, merchant notified when it gives up.
+  shipmentCreate,
   storeUsageSnapshot,
   billingRenewalDaily,
   domainClaimSweep,

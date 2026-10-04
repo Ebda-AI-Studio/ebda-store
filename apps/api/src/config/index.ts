@@ -254,7 +254,6 @@ export const config = {
   // (fail-closed) — without this an attacker who knows the URL could
   // forge "delivered" status updates on any tracking number.
   icarryWebhookSecret: process.env.ICARRY_WEBHOOK_SECRET || '',
-  aramexWebhookSecret: process.env.ARAMEX_WEBHOOK_SECRET || '',
 
   // Ebda WhatsApp Business Platform bridge
   // Base URL of the WBS backend. In production: https://whatsapp-api.ebda.app

@@ -8,6 +8,7 @@ import {
   CarrierShipmentRequest,
   CarrierShipmentResponse,
   CarrierTrackingResponse,
+  CarrierCapabilities,
   CarrierWebhookResult,
   ShipmentStatus,
   ShippingCarrierProvider,
@@ -92,6 +93,13 @@ export async function resolveBaseUrl(credentials: ICarryCredentials): Promise<st
 export class ICarryCarrier implements ShippingCarrierProvider {
   readonly name = 'iCarry';
   readonly code = 'icarry';
+  readonly capabilities: CarrierCapabilities = {
+    quote: false,
+    label: false,
+    webhooks: true,
+    polling: true,
+    cod: false,
+  };
 
   async createShipment(
     credentials: ICarryCredentials,

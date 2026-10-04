@@ -854,6 +854,64 @@ export class OneSignalService {
   }
 
   /**
+   * Shipping (SP7): tell the store's admins a carrier booking failed for good (after the
+   * automatic retries), so they can fix the cause (credentials, address, COD support) or ship
+   * the order by hand. The order itself is already placed and unaffected.
+   */
+  static async notifyAdminsOfShipmentFailure(input: {
+    storeId: string;
+    storeName: string;
+    orderId: string;
+    orderNumber: string;
+    carrier: string;
+    reason: string;
+  }): Promise<void> {
+    if (!isAdminConfigured()) {
+      logger.warn('Admin OneSignal not configured — skipping shipment failure notification');
+      return;
+    }
+    const url = adminOrderUrl(input.storeId, input.orderId);
+    const storeAdminPlayerIds = await this.getAdminPlayerIds({
+      role: 'store_admin',
+      ownsStoreId: input.storeId,
+    });
+    const body = {
+      app_id: config.onesignalAdminAppId,
+      url,
+      web_buttons: [{ id: 'view-order', text: 'View order', url }],
+      data: {
+        type: 'order.shipment_failed',
+        orderId: input.orderId,
+        storeId: input.storeId,
+        storeName: input.storeName,
+      },
+      headings: { en: 'Shipment not booked', ar: 'لم يتم حجز الشحنة' },
+      contents: {
+        en: `${input.orderNumber}: ${input.carrier} could not book this order (${input.reason}). Open the order to retry or ship it manually.`,
+        ar: `${input.orderNumber}: تعذّر حجز الشحنة لدى ${input.carrier} (${input.reason}). افتح الطلب لإعادة المحاولة أو الشحن يدويًا.`,
+      },
+      ...(storeAdminPlayerIds.length > 0
+        ? { include_player_ids: storeAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
+    };
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Key ${config.onesignalAdminRestApiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        logger.error({ status: res.status }, 'OneSignal shipment failure push failed');
+      }
+    } catch (err) {
+      logger.error({ err }, 'OneSignal shipment failure push threw');
+    }
+  }
+
+  /**
    * Resolve the OneSignal player_ids for a given admin audience by
    * joining `User` (filtered by role / store ownership) against
    * `OneSignalSubscription`. Used by `notifyAdminsOfOrder` to target

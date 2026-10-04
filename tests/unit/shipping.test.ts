@@ -38,8 +38,13 @@ describe('SHIPMENT_STATUSES', () => {
 // ─── CARRIER_CODES ────────────────────────────────────────────────────────────
 
 describe('CARRIER_CODES', () => {
-  it('has exactly 2 entries', () => {
-    expect(CARRIER_CODES).toHaveLength(2);
+  it('has exactly 4 entries (iCarry legacy, Aramex, Bosta, manual)', () => {
+    expect(CARRIER_CODES).toHaveLength(4);
+  });
+
+  it('contains bosta and manual (SP7)', () => {
+    expect(CARRIER_CODES).toContain('bosta');
+    expect(CARRIER_CODES).toContain('manual');
   });
 
   it('contains icarry', () => {

@@ -2,11 +2,23 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
+import { shippingCarrierRouteContext } from '../middleware/tenant-context';
 import { requireFeature } from '../middleware/feature-gate';
 import { shippingCarrierService } from '../services/shipping-carrier.service';
-import { CARRIER_CODES, CarrierCode } from '../services/carriers/types';
+import {
+  CARRIER_CODES,
+  CarrierCode,
+  CarrierError,
+  SHIPMENT_STATUSES,
+} from '../services/carriers/types';
+import { codReconciliationService } from '../services/cod-reconciliation.service';
+import { AppError } from '../middleware/error-handler';
 
 const router = Router();
+
+// Mounted at the bare `/stores` prefix, which never sees `:storeId`: the store scope is
+// registered here, per request (reads one transaction, carrier calls and writes store scope).
+router.param('storeId', (req, res, next) => shippingCarrierRouteContext(req, res, next));
 
 // ==========================================
 // Validation schemas
@@ -49,9 +61,62 @@ export const carrierConfigSchema = z.object({
   settings: z.record(z.string(), z.unknown()).optional(),
 });
 
-const shipOrderSchema = z.object({
-  carrier: z.enum(CARRIER_CODES).optional(),
+const shipOrderSchema = z
+  .object({
+    carrier: z.enum(CARRIER_CODES).optional(),
+    // The manual carrier: the merchant types the courier's name and the tracking number.
+    manual: z
+      .object({
+        carrierName: z.string().trim().min(1).max(80),
+        trackingNumber: z.string().trim().min(1).max(80),
+      })
+      .optional(),
+  })
+  .refine(v => v.carrier !== 'manual' || !!v.manual, {
+    message: 'manual shipments need a carrier name and a tracking number',
+    path: ['manual'],
+  });
+
+const cancelShipmentSchema = z.object({ force: z.boolean().optional() });
+const manualStatusSchema = z.object({ status: z.enum(SHIPMENT_STATUSES as [string, ...string[]]) });
+const importSettlementSchema = z.object({
+  carrier: z.enum(CARRIER_CODES),
+  // the statement as text: a CSV a merchant downloads from their carrier's portal
+  csv: z.string().min(1).max(2_000_000),
 });
+const codReportSchema = z.object({
+  carrier: z.enum(CARRIER_CODES).optional(),
+  status: z
+    .enum(['awaiting', 'partial', 'settled', 'over_remitted', 'mismatch', 'flagged'])
+    .optional(),
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+});
+
+/** Carrier failures as HTTP answers: an outage is a 502 (the order is untouched), a refusal a 4xx. */
+function carrierErrorToHttp(err: unknown): unknown {
+  if (!(err instanceof CarrierError)) return err;
+  switch (err.code) {
+    case 'CARRIER_UNAVAILABLE':
+      return new AppError(
+        502,
+        'CARRIER_UNAVAILABLE',
+        'The carrier is not answering. The order is unchanged; booking is retried automatically, or try again shortly.'
+      );
+    case 'CARRIER_MISCONFIGURED':
+      return new AppError(
+        409,
+        'CARRIER_MISCONFIGURED',
+        'The carrier refused the saved credentials. Check them in the carrier settings.'
+      );
+    case 'COD_NOT_SUPPORTED':
+      return new AppError(409, 'COD_NOT_SUPPORTED', err.message);
+    case 'NEEDS_MAPPING':
+      return new AppError(422, 'NEEDS_MAPPING', err.message);
+    default:
+      return new AppError(422, 'CARRIER_REJECTED', err.message);
+  }
+}
 
 const listShipmentsSchema = z.object({
   page: z.coerce.number().int().positive().optional(),
@@ -262,17 +327,18 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
-      const { carrier } = shipOrderSchema.parse(req.body);
+      const { carrier, manual } = shipOrderSchema.parse(req.body);
 
       const shipment = await shippingCarrierService.createShipmentForOrder(
         storeId,
         orderId,
-        carrier
+        carrier,
+        { manual }
       );
 
       res.status(201).json({ success: true, data: { shipment } });
     } catch (error) {
-      next(error);
+      next(carrierErrorToHttp(error));
     }
   }
 );
@@ -301,9 +367,152 @@ router.post(
         return;
       }
 
-      const shipment = await shippingCarrierService.cancelShipment(existing.id);
+      const { force } = cancelShipmentSchema.parse(req.body ?? {});
+      const shipment = await shippingCarrierService.cancelShipment(existing.id, { force });
 
       res.json({ success: true, data: { shipment } });
+    } catch (error) {
+      next(carrierErrorToHttp(error));
+    }
+  }
+);
+
+// ==========================================
+// GET /:storeId/orders/:orderId/shipment
+// The order page's shipping card: the shipment (if any), the carriers that can be used,
+// and the COD the carrier would have to collect.
+// ==========================================
+
+router.get(
+  '/:storeId/orders/:orderId/shipment',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, orderId } = req.params;
+      const data = await shippingCarrierService.getShipmentForOrder(storeId, orderId);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ==========================================
+// GET /:storeId/shipments/:id/label
+// The printable label: a hosted URL, or the PDF as base64.
+// ==========================================
+
+router.get(
+  '/:storeId/shipments/:id/label',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, id } = req.params;
+      const { prisma } = await import('@force/database');
+      const existing = await prisma.shipment.findFirst({ where: { id, storeId } });
+      if (!existing) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Shipment not found' },
+        });
+        return;
+      }
+      const label = await shippingCarrierService.getLabel(id);
+      res.json({ success: true, data: { label } });
+    } catch (error) {
+      next(carrierErrorToHttp(error));
+    }
+  }
+);
+
+// ==========================================
+// POST /:storeId/shipments/:id/status
+// Manual carrier only: the merchant moves the shipment along.
+// ==========================================
+
+router.post(
+  '/:storeId/shipments/:id/status',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, id } = req.params;
+      const { status } = manualStatusSchema.parse(req.body);
+      const { prisma } = await import('@force/database');
+      const existing = await prisma.shipment.findFirst({ where: { id, storeId } });
+      if (!existing) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Shipment not found' },
+        });
+        return;
+      }
+      const shipment = await shippingCarrierService.manualUpdateStatus(
+        id,
+        status as (typeof SHIPMENT_STATUSES)[number]
+      );
+      res.json({ success: true, data: { shipment } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ==========================================
+// POST /:storeId/shipping-carriers/webhook-secret/:carrier/rotate
+// Replace the secret in the carrier's callback URL (the old URL stops working).
+// ==========================================
+
+router.post(
+  '/:storeId/shipping-carriers/webhook-secret/:carrier/rotate',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, carrier } = req.params;
+      if (!isValidCarrier(carrier)) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_CARRIER', message: `Unknown carrier: ${carrier}` },
+        });
+        return;
+      }
+      await shippingCarrierService.rotateWebhookSecret(storeId, carrier);
+      res.json({ success: true, data: { message: 'Webhook secret rotated' } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ==========================================
+// COD reconciliation
+// GET  /:storeId/cod-reconciliation          shipments, matches, totals, unmatched lines
+// POST /:storeId/cod-reconciliation/import   a carrier's settlement statement (CSV text)
+// ==========================================
+
+router.get(
+  '/:storeId/cod-reconciliation',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const q = codReportSchema.parse(req.query);
+      const report = await codReconciliationService.getReport(storeId, q);
+      res.json({ success: true, data: report });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/:storeId/cod-reconciliation/import',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { carrier, csv } = importSettlementSchema.parse(req.body);
+      const result = await codReconciliationService.importSettlement(storeId, carrier, csv);
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }
@@ -402,7 +611,7 @@ router.post(
 
       res.json({ success: true, data: { shipment } });
     } catch (error) {
-      next(error);
+      next(carrierErrorToHttp(error));
     }
   }
 );
@@ -469,7 +678,8 @@ router.get(
       }
 
       const shipment = await prisma.shipment.findFirst({
-        where: { orderId, storeId },
+        // a booking that failed or is in flight is the merchant's business, not the customer's
+        where: { orderId, storeId, status: { notIn: ['creation_failed', 'creating'] } },
         select: {
           id: true,
           carrier: true,
