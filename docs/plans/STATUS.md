@@ -1,4 +1,4 @@
-# Ebda — status (updated 2026-10-04, all sub-projects built; remaining items need Ahmad)
+# Ebda — status (updated 2026-10-05, prices locked; Amelia last)
 
 Spend is an ESTIMATE from sub-agent token counts (the cloud session exposes no dollar meter). All SPs are inside their allocation so far.
 
@@ -19,17 +19,20 @@ Spend is a rough estimate from token counts (no dollar meter in the cloud sessio
 - Unit: 489 files, 6,736 passed, 0 failed. Typecheck clean.
 - Full suite including integration + e2e with the API as `ebda_app` (strict RLS), on the DB branch before the final merges: 7,931 tests, 0 failures.
 
+## Pricing (locked 2026-10-05)
+
+See `docs/plans/2026-10-05-pricing-decisions.md`. Short form: no public free plan; 0 platform fee; no per-order commission; Basic / Growth / Business at **1,490 / 3,490 / 9,990 EGP/mo** (annual 25% off); 14-day trial on Growth; custom domain on every paid plan; order cap soft then hard after 7 days; invoices flat until Ahmad registers for VAT. Engine on `main` still needs these numbers filled in.
+
 ## Ahmad — decisions / inputs needed
-1. **Prices** per plan, free-tier caps, platform fee bps (engine ships with placeholders; paid checkout refuses null prices).
-2. **Amelia Aurum catalogue export** (CSV; Shopify format works). Egress policy blocks ameliaaurum.com from the cloud session.
-3. **Credentials** (none needed to keep building): Cloudflare token + Neon project (deploy, real Hyperdrive proof), Kashier sandbox + written recurring enablement, Resend key + verified `ebda.app` sender, then Paymob/Fawry/Bosta/Aramex sandboxes.
-4. **GitHub:** enable Actions on `whisky-11/ebda` and set the default branch to `main` (no workflow is registered today, so PRs show no checks).
-5. **Review R-EBDA-001** (Express on Workers, Containers as fallback) and **R-EBDA-002** (strict RLS; `stores` table RLS is an accepted residual with a follow-up plan: `docs/ebda/plans/sp4-stores-rls-followup.md`).
-6. Tax: new stores get an active 14% VAT rate but `taxEnabled=false` (inherited ruling TAX-1). Enable by default?
-7. **Timed manual run** of self-serve onboarding (<10 min target): the exact clicks are in `docs/ebda/plans/sp4-sp5-evidence.md`.
-8. **CI trade-off** (`docs/ebda/ci.md`): to fit 2,000 min/month, PRs run lint/typecheck/unit on changed paths; RLS proof nightly; integration + e2e + mutation weekly (Sunday) — an integration regression can surface up to a week after merge. Approve, or raise the budget.
-9. Carrier/gateway facts to confirm in writing: Aramex domestic COD in EGP; Kashier recurring enablement; Bosta governorate→city map.
-10. Legal pages (`/legal`, `/privacy`, `/terms`) are DRAFT placeholders for counsel.
+1. **Amelia Aurum** — leave for the end (CSV export + `founding_free`). Egress policy blocks ameliaaurum.com from the cloud session.
+2. **Credentials** (none needed to keep building): Cloudflare token + Neon project (deploy, real Hyperdrive proof), Kashier sandbox + written recurring enablement, Resend key + verified `ebda.app` sender, then Paymob/Fawry/Bosta/Aramex sandboxes.
+3. **GitHub:** enable Actions on `whisky-11/ebda` and set the default branch to `main` (no workflow is registered today, so PRs show no checks).
+4. **Review R-EBDA-001** (Express on Workers, Containers as fallback) and **R-EBDA-002** (strict RLS; `stores` table RLS is an accepted residual with a follow-up plan: `docs/ebda/plans/sp4-stores-rls-followup.md`).
+5. Tax: new stores get an active 14% VAT rate but `taxEnabled=false` (inherited ruling TAX-1). Enable by default?
+6. **Timed manual run** of self-serve onboarding (<10 min target): the exact clicks are in `docs/ebda/plans/sp4-sp5-evidence.md`.
+7. **CI trade-off** (`docs/ebda/ci.md`): to fit 2,000 min/month, PRs run lint/typecheck/unit on changed paths; RLS proof nightly; integration + e2e + mutation weekly (Sunday) — an integration regression can surface up to a week after merge. Approve, or raise the budget.
+8. Carrier/gateway facts to confirm in writing: Aramex domestic COD in EGP; Kashier recurring enablement; Bosta governorate→city map.
+9. Legal pages (`/legal`, `/privacy`, `/terms`) are DRAFT placeholders for counsel.
 
 ## Notable findings fixed along the way
 - Custom-domain hijack of Ebda hosts (`rival.ebda.app` as a "custom domain") — blocked; unverified domains are never served (pending → verified, 72h release).
