@@ -81,6 +81,8 @@ export interface Order {
   status: string;
   paymentStatus: string;
   createdAt: string;
+  /** InstaPay hold deadline (ISO) while the order awaits the merchant's confirmation. */
+  paymentConfirmationExpiresAt?: string | null;
   payments?: OrderPayment[];
   items?: OrderLineItem[];
 }
@@ -143,6 +145,13 @@ export interface OrderDetail extends Order {
   updatedAt: string;
   items: OrderLineItem[];
   payments?: OrderPayment[];
+  /** InstaPay summary for the merchant (the customer's entered reference, the handle paid to). */
+  instapay?: {
+    customerReference: string | null;
+    customerReferenceAt: string | null;
+    handle: string | null;
+    expiresAt: string | null;
+  } | null;
 }
 
 export interface Pagination {
@@ -172,7 +181,16 @@ export const statusOptionsFor = orderStatusOptions;
  * client-side concept derived from paymentStatus rather than a status enum
  * value — see filterMatches below.
  */
-export const STATUS_FILTERS = ['all', 'new', 'paid', 'processing', 'shipped', 'delivered'] as const;
+export const STATUS_FILTERS = [
+  'all',
+  'new',
+  // InstaPay orders waiting for the merchant's "payment received" (SP6a).
+  'awaiting',
+  'paid',
+  'processing',
+  'shipped',
+  'delivered',
+] as const;
 
 export type StatusFilter = (typeof STATUS_FILTERS)[number];
 
@@ -183,6 +201,7 @@ export type StatusFilter = (typeof STATUS_FILTERS)[number];
 export function filterToApiStatus(filter: StatusFilter): string | undefined {
   if (filter === 'all' || filter === 'paid') return undefined;
   if (filter === 'new') return 'pending';
+  if (filter === 'awaiting') return 'awaiting_payment_confirmation';
   return filter;
 }
 
@@ -194,6 +213,7 @@ export function clientFilterMatches(order: Order, filter: StatusFilter): boolean
 
 export const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-warning/15 text-warning-foreground border-warning/30',
+  awaiting_payment_confirmation: 'bg-primary/15 text-primary-ink border-primary/30',
   confirmed: 'bg-info/15 text-info-ink border-info/30',
   processing: 'bg-info/15 text-info-ink border-info/30',
   shipped: 'bg-primary/15 text-primary-ink border-primary/30',

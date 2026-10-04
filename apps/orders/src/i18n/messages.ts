@@ -74,6 +74,20 @@ export interface Messages {
   };
   filters: Record<string, string>;
   status: Record<string, string>;
+  /** InstaPay: the merchant confirms a manual transfer arrived (one-thumb flow). */
+  instapay: {
+    confirm: string;
+    sheetTitle: string;
+    sheetBody: string;
+    sheetYes: string;
+    sheetNo: string;
+    confirmed: string;
+    alreadyConfirmed: string;
+    failed: string;
+    expired: string;
+    reference: string;
+    waiting: string;
+  };
   detail: {
     back: string;
     customer: string;
@@ -281,6 +295,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     filters: {
       all: 'All',
       new: 'New',
+      awaiting: 'Awaiting InstaPay',
       paid: 'Paid',
       processing: 'Processing',
       shipped: 'Shipped',
@@ -288,12 +303,27 @@ export const MESSAGES: Record<Locale, Messages> = {
     },
     status: {
       pending: 'New',
+      awaiting_payment_confirmation: 'Awaiting InstaPay',
       confirmed: 'Confirmed',
       processing: 'Processing',
       shipped: 'Shipped',
       delivered: 'Delivered',
       cancelled: 'Cancelled',
       refunded: 'Refunded',
+    },
+    instapay: {
+      confirm: 'Payment received',
+      sheetTitle: 'Did the transfer arrive?',
+      sheetBody:
+        'Confirm only if you can see {amount} in your InstaPay account. The order then becomes confirmed and can ship.',
+      sheetYes: 'Yes, payment received',
+      sheetNo: 'Not yet',
+      confirmed: 'Payment confirmed',
+      alreadyConfirmed: 'Already confirmed',
+      failed: 'Could not confirm the payment',
+      expired: 'The confirmation window has expired',
+      reference: 'Customer reference',
+      waiting: 'Waiting for the transfer',
     },
     detail: {
       back: 'Back',
@@ -502,6 +532,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     filters: {
       all: 'الكل',
       new: 'جديد',
+      awaiting: 'بانتظار إنستاباي',
       paid: 'مدفوع',
       processing: 'قيد التجهيز',
       shipped: 'تم الشحن',
@@ -509,12 +540,27 @@ export const MESSAGES: Record<Locale, Messages> = {
     },
     status: {
       pending: 'جديد',
+      awaiting_payment_confirmation: 'بانتظار إنستاباي',
       confirmed: 'مؤكّد',
       processing: 'قيد التجهيز',
       shipped: 'تم الشحن',
       delivered: 'تم التوصيل',
       cancelled: 'ملغى',
       refunded: 'مُسترد',
+    },
+    instapay: {
+      confirm: 'تم استلام المبلغ',
+      sheetTitle: 'هل وصل التحويل؟',
+      sheetBody:
+        'أكّد فقط إذا رأيت {amount} في حساب إنستاباي الخاص بك. سيصبح الطلب مؤكداً وجاهزاً للشحن.',
+      sheetYes: 'نعم، تم استلام المبلغ',
+      sheetNo: 'ليس بعد',
+      confirmed: 'تم تأكيد الدفع',
+      alreadyConfirmed: 'تم تأكيده من قبل',
+      failed: 'تعذّر تأكيد الدفع',
+      expired: 'انتهت مهلة التأكيد',
+      reference: 'مرجع العميل',
+      waiting: 'بانتظار التحويل',
     },
     detail: {
       back: 'رجوع',

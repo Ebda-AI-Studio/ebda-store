@@ -8,6 +8,7 @@ import { RefreshPaymentButton } from './RefreshPaymentButton';
 import { RefundButton } from './RefundButton';
 import { RefreshRefundStatusButton } from './RefreshRefundStatusButton';
 import { InvoiceButton } from './InvoiceButton';
+import { ConfirmInstapayButton } from '@/components/ConfirmInstapayButton';
 
 interface ActionFooterProps {
   order: OrderDetail;
@@ -52,8 +53,13 @@ export function ActionFooter({
   const isFinal = transitions.length === 0;
 
   // Shared with the admin ActionFooter — one gating rule for both surfaces.
-  const { showMarkPaid, showManualMarkPaid, showRefundViaProvider, showRefreshRefundStatus } =
-    orderActionVisibility(order);
+  const {
+    showMarkPaid,
+    showManualMarkPaid,
+    showConfirmInstapay,
+    showRefundViaProvider,
+    showRefreshRefundStatus,
+  } = orderActionVisibility(order);
 
   const existingPaymentUrl =
     [...(order.payments ?? [])]
@@ -77,6 +83,16 @@ export function ActionFooter({
       aria-label="Order actions"
     >
       <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-2">
+        {/* InstaPay: the one primary action while the transfer is unconfirmed. */}
+        {showConfirmInstapay && (
+          <ConfirmInstapayButton
+            storeId={storeId}
+            orderId={order.id}
+            amountMinor={Math.max(0, order.total - (order.walletAmount ?? 0))}
+            currency={order.currency ?? 'EGP'}
+            onConfirmed={onRefetch}
+          />
+        )}
         {nextStatus && !isFinal && (
           <button
             type="button"
