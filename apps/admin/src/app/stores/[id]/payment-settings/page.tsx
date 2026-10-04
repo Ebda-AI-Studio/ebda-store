@@ -15,17 +15,9 @@ import {
 } from './_components/ProviderCard';
 
 const PROVIDERS: ProviderDef[] = [
-  { id: 'tap', name: 'Tap Payments', nameAr: 'تاب للمدفوعات', color: '#00D4AA', kind: 'gateway' },
-  { id: 'myfatoorah', name: 'MyFatoorah', nameAr: 'ماي فاتورة', color: '#00A651', kind: 'gateway' },
-  { id: 'hesabe', name: 'Hesabe', nameAr: 'حسابي', color: '#E31837', kind: 'gateway' },
-  { id: 'upayments', name: 'UPayments', nameAr: 'يو بيمنتس', color: '#1E88E5', kind: 'gateway' },
-  {
-    id: 'cod',
-    name: 'Cash on Delivery',
-    nameAr: 'الدفع عند الاستلام',
-    color: '#64748B',
-    kind: 'cod',
-  },
+  { id: 'paymob', name: 'Paymob', nameAr: 'باي موب', color: '#0B5FFF', kind: 'paymob' },
+  { id: 'kashier', name: 'Kashier', nameAr: 'كاشير', color: '#00A19A', kind: 'kashier' },
+  { id: 'fawry', name: 'Fawry', nameAr: 'فوري', color: '#F2B705', kind: 'fawry' },
   {
     id: 'instapay',
     name: 'InstaPay',
@@ -33,30 +25,12 @@ const PROVIDERS: ProviderDef[] = [
     color: '#6B3FA0',
     kind: 'instapay',
   },
-  // Egypt gateways land in SP6b; shown so merchants can see what is coming.
   {
-    id: 'paymob',
-    name: 'Paymob',
-    nameAr: 'باي موب',
-    color: '#0B5FFF',
-    kind: 'gateway',
-    comingSoon: true,
-  },
-  {
-    id: 'kashier',
-    name: 'Kashier',
-    nameAr: 'كاشير',
-    color: '#00A19A',
-    kind: 'gateway',
-    comingSoon: true,
-  },
-  {
-    id: 'fawry',
-    name: 'Fawry',
-    nameAr: 'فوري',
-    color: '#F2B705',
-    kind: 'gateway',
-    comingSoon: true,
+    id: 'cod',
+    name: 'Cash on Delivery',
+    nameAr: 'الدفع عند الاستلام',
+    color: '#64748B',
+    kind: 'cod',
   },
 ];
 
@@ -200,10 +174,15 @@ export default function StorePaymentSettingsPage() {
               provider: formData.provider,
               isEnabled: formData.isEnabled,
               testMode: formData.testMode,
+              // A credential left as the saved, masked value (`****abcd`) is ignored by the API
+              // (it keeps the stored one); only a newly typed key replaces it.
               ...(formData.apiKey ? { apiKey: formData.apiKey } : {}),
               ...(formData.secretKey ? { secretKey: formData.secretKey } : {}),
               ...(formData.webhookSecret ? { webhookSecret: formData.webhookSecret } : {}),
               ...(formData.merchantId ? { merchantId: formData.merchantId } : {}),
+              // The NON-secret part: Paymob's public key and integration ids, the methods a
+              // Kashier / Fawry page offers, Fawry's code lifetime.
+              settings: formData.settings ?? {},
             };
 
       const endpoint = isNew

@@ -4,24 +4,29 @@ interface PaymentIconProps {
   className?: string;
 }
 
-export function KNETIcon({ className = 'h-5 w-5' }: PaymentIconProps) {
+/** A small lettered badge for a method that has no pictogram (Meeza, valU, Fawry, wallets). */
+function BadgeIcon({ label, className }: { label: string; className: string }) {
   return (
-    <div className="flex h-8 w-12 items-center justify-center rounded bg-info">
-      <svg
-        className={`${className} text-white`}
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-        />
-      </svg>
+    <div className={`flex h-8 w-12 items-center justify-center rounded text-white ${className}`}>
+      <span className="text-[10px] font-bold leading-none">{label}</span>
     </div>
   );
+}
+
+export function MeezaIcon() {
+  return <BadgeIcon label="Meeza" className="bg-emerald-600" />;
+}
+
+export function WalletIcon() {
+  return <BadgeIcon label="Wallet" className="bg-red-600" />;
+}
+
+export function ValuIcon() {
+  return <BadgeIcon label="valU" className="bg-indigo-600" />;
+}
+
+export function FawryIcon() {
+  return <BadgeIcon label="Fawry" className="bg-amber-500" />;
 }
 
 export function VisaIcon({ className = 'h-4 w-4' }: PaymentIconProps) {
@@ -149,8 +154,13 @@ export function DefaultPaymentIcon({ className = 'h-5 w-5' }: PaymentIconProps) 
 // Payment provider ID to icon mapping
 export function getPaymentIcon(providerId: string): React.ReactNode {
   const iconMap: Record<string, React.ReactNode> = {
-    knet: <KNETIcon />,
-    tap: <CreditCardIcons />,
+    paymob: <CreditCardIcons />,
+    kashier: <CreditCardIcons />,
+    fawry: <FawryIcon />,
+    payatfawry: <FawryIcon />,
+    meeza: <MeezaIcon />,
+    wallet: <WalletIcon />,
+    valu: <ValuIcon />,
     credit_card: <CreditCardIcons />,
     card: <CreditCardIcons />,
     visa: <VisaIcon />,
@@ -183,26 +193,44 @@ export interface PaymentProviderInfo {
 // Default payment providers with display info
 export const DEFAULT_PAYMENT_PROVIDERS: PaymentProviderInfo[] = [
   {
-    id: 'knet',
-    name: 'KNET',
-    description: 'Pay with your local bank card',
-    descriptionAr: 'ادفع ببطاقتك البنكية المحلية',
-    icon: <KNETIcon />,
-  },
-  {
-    id: 'tap',
+    id: 'card',
     name: 'Credit / Debit Card',
     nameAr: 'بطاقة ائتمان / خصم',
-    description: 'Visa, Mastercard, American Express',
-    descriptionAr: 'فيزا، ماستركارد، أمريكان إكسبريس',
+    description: 'Visa, Mastercard',
+    descriptionAr: 'فيزا، ماستركارد',
     icon: <CreditCardIcons />,
   },
   {
-    id: 'apple_pay',
-    name: 'Apple Pay',
-    description: 'Fast and secure payment',
-    descriptionAr: 'دفع سريع وآمن',
-    icon: <ApplePayIcon />,
+    id: 'meeza',
+    name: 'Meeza',
+    nameAr: 'ميزة',
+    description: 'Pay with your Meeza card',
+    descriptionAr: 'ادفع ببطاقة ميزة',
+    icon: <MeezaIcon />,
+  },
+  {
+    id: 'wallet',
+    name: 'Mobile wallet',
+    nameAr: 'محفظة إلكترونية',
+    description: 'Vodafone Cash, Orange Cash, e& money',
+    descriptionAr: 'فودافون كاش، أورنج كاش، اتصالات كاش',
+    icon: <WalletIcon />,
+  },
+  {
+    id: 'valu',
+    name: 'valU installments',
+    nameAr: 'تقسيط فاليو',
+    description: 'Pay in installments',
+    descriptionAr: 'قسّط مشترياتك',
+    icon: <ValuIcon />,
+  },
+  {
+    id: 'payatfawry',
+    name: 'Pay at Fawry',
+    nameAr: 'ادفع في فوري',
+    description: 'Get a reference code and pay at any Fawry outlet',
+    descriptionAr: 'احصل على كود الدفع وادفع في أي منفذ فوري',
+    icon: <FawryIcon />,
   },
   {
     id: 'cod',

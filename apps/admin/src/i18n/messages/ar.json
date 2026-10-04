@@ -146,7 +146,7 @@
           },
           "paymentMethod": {
             "title": "فعّل وسيلة دفع واحدة على الأقل",
-            "subtitle": "فعّل Tap أو MyFatoorah أو Hesabe أو UPayments أو الدفع عند الاستلام.",
+            "subtitle": "فعّل Paymob أو Kashier أو فوري أو إنستاباي أو الدفع عند الاستلام.",
             "cta": "إعداد الدفع"
           },
           "shipping": {
@@ -1148,7 +1148,7 @@
         "itemCount": "{count, plural, zero {{count, number, latn} عنصر} one {عنصر واحد} two {عنصران} few {{count, number, latn} عناصر} many {{count, number, latn} عنصرًا} other {{count, number, latn} عنصر}}",
         "creating": "جارٍ الإنشاء…",
         "placeOrder": "إتمام الطلب",
-        "unpaidHint": "أُنشئ الطلب بحالة غير مدفوع. أصدر رابط دفع عبر MyFatoorah من صفحة تفاصيل الطلب بعد الحفظ."
+        "unpaidHint": "أُنشئ الطلب بحالة غير مدفوع. أصدر رابط دفع من صفحة تفاصيل الطلب بعد الحفظ."
       },
       "errors": {
         "noItems": "أضف منتجًا واحدًا على الأقل قبل إتمام الطلب",
@@ -1239,7 +1239,7 @@
         "button": "استرداد عبر مزوّد الدفع",
         "buttonTooltip": "استرداد المبلغ للعميل عبر مزوّد الدفع الأصلي",
         "modalTitle": "استرداد الطلب {orderNumber}؟",
-        "modalBodyIntro": "سيتم إرسال طلب استرداد بقيمة <b>{amount} {currency}</b> إلى مزوّد الدفع. عادةً ما تنعكس عملية الاسترداد على بطاقة العميل خلال 1-3 أيام عمل (يراجع فريق MyFatoorah المالي طلبات الاسترداد قبل تنفيذها).",
+        "modalBodyIntro": "سيتم إرسال طلب استرداد بقيمة <b>{amount} {currency}</b> إلى مزوّد الدفع. عادةً ما تنعكس عملية الاسترداد على بطاقة العميل خلال 1-3 أيام عمل (تراجع بعض البوابات طلبات الاسترداد قبل تنفيذها).",
         "modalBodySideEffects": "سيتم إعادة المخزون، وخصم استخدام الكوبون، وعكس نقاط الولاء، وإشعار العميل عبر البريد الإلكتروني. لا يمكن التراجع عن هذا الإجراء.",
         "reasonLabel": "السبب (اختياري، يظهر للعميل)",
         "reasonPlaceholder": "نفاد المخزون، طلب العميل، خصم مكرر…",
@@ -1834,26 +1834,19 @@
       "linkCopied": "تم نسخ الرابط إلى الحافظة",
       "clipboardError": "تعذّر الوصول إلى الحافظة — انسخ الرابط يدويًا",
       "issueFailed": "تعذّر إصدار رابط الدفع",
-      "emailSent": "تم إرسال البريد الإلكتروني إلى {email}",
-      "customerFallback": "العميل",
       "copyAria": "نسخ رابط الدفع",
       "openAria": "فتح رابط الدفع",
       "issueNewLink": "إصدار رابط جديد",
       "buttonLabel": "رابط الدفع",
       "modalTitle": "إصدار رابط دفع",
-      "modalSubtitle": "الطلب {orderNumber} — إنشاء رابط MyFatoorah لتحصيل الدفع.",
+      "modalSubtitle": "الطلب {orderNumber} — إنشاء رابط دفع لتحصيل المبلغ.",
       "option": {
         "copyLink": {
           "title": "نسخ الرابط",
           "description": "أنشئ الرابط — انسخه وشاركه عبر واتساب أو البريد الإلكتروني أو أي وسيلة تفضّلها."
-        },
-        "email": {
-          "title": "إرسال عبر البريد الإلكتروني",
-          "description": "يرسل MyFatoorah رابط الدفع مباشرة إلى البريد الإلكتروني المسجّل للعميل."
         }
       },
       "issuing": "جارٍ إصدار رابط الدفع…",
-      "successEmailSent": "✓ تم إرسال البريد الإلكتروني إلى {email}",
       "successGenerated": "✓ تم إنشاء رابط الدفع",
       "paymentUrlLabel": "رابط الدفع",
       "copyButton": "نسخ",
@@ -2193,7 +2186,7 @@
       },
       "paymentSettings": {
         "title": "إعدادات الدفع",
-        "description": "تكوين مزوّدي الدفع: Tap، MyFatoorah، Hesabe، UPayments"
+        "description": "تكوين مزوّدي الدفع: Paymob وKashier وفوري وإنستاباي والدفع عند الاستلام"
       },
       "shipping": {
         "title": "الشحن",
@@ -3565,7 +3558,8 @@
       },
       "methods": {
         "bank_transfer": "تحويل بنكي",
-        "knet": "KNET",
+        "instapay": "إنستاباي",
+        "wallet": "محفظة إلكترونية",
         "cash": "نقدًا",
         "manual": "يدوي"
       }
@@ -4673,18 +4667,6 @@
       "connectionError": "تعذّر الاتصال بالخادم. يرجى التحقق من الاتصال والمحاولة مرة أخرى.",
       "retry": "إعادة المحاولة"
     },
-    "providers": {
-      "tapName": "Tap Payments",
-      "tapNameAr": "تاب للمدفوعات",
-      "myfatoorahName": "MyFatoorah",
-      "myfatoorahNameAr": "ماي فاتورة",
-      "hesabeName": "Hesabe",
-      "hesabeNameAr": "حسابي",
-      "upaymentsName": "UPayments",
-      "upaymentsNameAr": "يو بيمنتس",
-      "codName": "الدفع عند الاستلام",
-      "codNameAr": "الدفع عند الاستلام"
-    },
     "toggle": {
       "enabled": "مفعّل",
       "disabled": "معطّل"
@@ -4713,7 +4695,11 @@
       "webhookSecretLabel": "سر webhook",
       "webhookSecretPlaceholder": "أدخل سر webhook",
       "webhookUrlLabel": "رابط الـ Webhook (الصقه في لوحة مزود الدفع)",
-      "webhookUrlDescription": "أضف هذا الرابط في لوحة مزود الدفع الخاص بك حتى تصل أحداث الدفع إلى متجرك. رابط واحد يخدم جميع المتاجر — يربط النظام كل عملية دفع بمتجرك عبر رقم العملية الصادر من المزود، ثم يتحقّق من التوقيع باستخدام «سر webhook» الخاص بمتجرك (المُحدَّد أعلاه).",
+      "webhookUrlDescription": {
+        "paymob": "في لوحة Paymob، الصق هذا الرابط في «Transaction processed callback» لتكاملاتك. تضيف Paymob توقيعها إليه، ونتحقق منه بسر HMAC الخاص بك (أعلاه).",
+        "kashier": "يُرسَل هذا الرابط إلى Kashier مع كل عملية دفع، فلا حاجة للصقه. يظهر هنا للعلم فقط: تُتحقَّق أحداث الدفع بمفتاح Payment API الخاص بك (أعلاه).",
+        "fawry": "في بوابة تجّار فوري، اضبط هذا الرابط كرابط إشعارات الخادم. نتحقق من كل إشعار بمفتاحك الآمن (أعلاه)."
+      },
       "webhookUrlCopy": "نسخ",
       "webhookUrlCopied": "تم النسخ!",
       "merchantIdLabel": "معرّف التاجر",
@@ -4752,7 +4738,62 @@
       "unknown": "لم يُفحص بعد",
       "note": "عند تعطّل مزوّد الدفع أو انتهاء مهلته تُخفى هذه الطريقة وحدها من صفحة الدفع لدقيقة أو دقيقتين، وتبقى بقية الطرق (مثل الدفع عند الاستلام) تعمل."
     },
-    "comingSoon": "قريباً"
+    "paymob": {
+      "secretKeyLabel": "المفتاح السري",
+      "secretKeyHelp": "لوحة Paymob > الإعدادات > معلومات الحساب. يُستخدم في كل طلب من الخادم.",
+      "secretKeyPlaceholder": "الصق المفتاح السري",
+      "hmacLabel": "سر HMAC",
+      "hmacHelp": "لوحة Paymob > الإعدادات > معلومات الحساب > HMAC. يتحقّق من إشعارات Paymob.",
+      "hmacPlaceholder": "الصق سر HMAC",
+      "publicKeyLabel": "المفتاح العام",
+      "publicKeyHelp": "يظهر في رابط الدفع وليس سرّاً.",
+      "publicKeyPlaceholder": "الصق المفتاح العام",
+      "integrationsTitle": "طرق الدفع",
+      "integrationsHelp": "الصق معرّف التكامل (Integration ID) لكل طريقة تريد عرضها (لوحة Paymob > Developers > Payment Integrations). اترك الطريقة فارغة لإخفائها.",
+      "integrationPlaceholder": "معرّف التكامل",
+      "methods": {
+        "card": "بطاقة",
+        "meeza": "ميزة",
+        "wallet": "محفظة إلكترونية (فودافون كاش، أورنج، اتصالات)",
+        "valu": "تقسيط فاليو"
+      }
+    },
+    "kashier": {
+      "merchantIdLabel": "معرّف التاجر (MID)",
+      "merchantIdHelp": "لوحة Kashier > Integrations. يبدو هكذا: MID-1234-56.",
+      "merchantIdPlaceholder": "MID-...",
+      "apiKeyLabel": "مفتاح Payment API",
+      "apiKeyHelp": "لوحة Kashier > Integrations. يتحقّق أيضاً من إشعارات Kashier.",
+      "apiKeyPlaceholder": "الصق مفتاح Payment API",
+      "secretKeyLabel": "المفتاح السري",
+      "secretKeyHelp": "لوحة Kashier > Integrations. يُستخدم في كل طلب من الخادم.",
+      "secretKeyPlaceholder": "الصق المفتاح السري",
+      "displayLabel": "لغة صفحة الدفع",
+      "display": {
+        "ar": "العربية",
+        "en": "الإنجليزية"
+      },
+      "methodsTitle": "الطرق في صفحة الدفع",
+      "methods": {
+        "card": "بطاقة",
+        "wallet": "محفظة إلكترونية"
+      }
+    },
+    "fawry": {
+      "merchantCodeLabel": "كود التاجر",
+      "merchantCodeHelp": "تمنحه فوري عند فتح حسابك.",
+      "merchantCodePlaceholder": "الصق كود التاجر",
+      "secureKeyLabel": "المفتاح الآمن",
+      "secureKeyHelp": "يوقّع كل طلب ويتحقّق من كل إشعار من فوري.",
+      "secureKeyPlaceholder": "الصق المفتاح الآمن",
+      "expiryLabel": "مدة صلاحية كود الدفع (ساعات)",
+      "expiryHelp": "المدة التي يملكها العميل لدفع الكود في أي منفذ. الافتراضي ٧٢.",
+      "methodsTitle": "الطرق",
+      "methods": {
+        "payatfawry": "ادفع في فوري (كود دفع)",
+        "card": "بطاقة"
+      }
+    }
   },
   "hero": {
     "page": {
@@ -7509,7 +7550,7 @@
       "savedBody": "تم تحديث إعدادات تحديثات الطلب."
     },
     "paymentLink": {
-      "description": "أرسل للعميل رابط دفع عبر WhatsApp بضغطة واحدة مدعوم بفاتورة MyFatoorah. اختر منتجات من الكتالوج، أو أضف مبلغاً مخصصاً، أو كلاهما — العميل يضغط مرة واحدة، وينتقل إلى صفحة الدفع الخاصة بـ MyFatoorah لإتمام العملية. يظل الرابط فعالاً حتى يتم دفع الطلب أو إلغاؤه.",
+      "description": "أرسل للعميل رابط دفع عبر WhatsApp بضغطة واحدة من بوابة الدفع الخاصة بك. اختر منتجات من الكتالوج، أو أضف مبلغاً مخصصاً، أو كلاهما — العميل يضغط مرة واحدة، وينتقل إلى صفحة الدفع لإتمام العملية. يظل الرابط فعالاً حتى يتم دفع الطلب أو إلغاؤه.",
       "phoneLabel": "رقم WhatsApp الخاص بالعميل (بالصيغة الدولية E.164)",
       "phoneError": "يجب أن يبدأ بـ + وأن يتراوح طوله بين 8 و 16 رقماً.",
       "nameLabel": "اسم العميل (اختياري)",
@@ -7519,7 +7560,7 @@
       "searchProducts": "البحث في {count} من المنتجات بالاسم أو رمز SKU…",
       "change": "تغيير",
       "customAmountLabel": "مبلغ مخصص (اختياري)",
-      "customAmountHint": "أضف رسوماً ليست ضمن منتجات الكتالوج — مثل عرض سعر مخصص، أو رسوم خدمة، أو عربون. سيتم إدراجها ضمن إجمالي الطلب وتسويتها عند استلام رد MyFatoorah.",
+      "customAmountHint": "أضف رسوماً ليست ضمن منتجات الكتالوج — مثل عرض سعر مخصص، أو رسوم خدمة، أو عربون. سيتم إدراجها ضمن إجمالي الطلب وتسويتها عند استلام رد البوابة.",
       "customAmountNote": "ما الغرض من هذا المبلغ؟ (اختياري)",
       "itemsSubtotal": "إجمالي المنتجات",
       "customAmount": "مبلغ مخصص",
@@ -7528,7 +7569,7 @@
       "sending": "جاري الإرسال…",
       "sendLink": "إرسال رابط الدفع عبر WhatsApp",
       "sentTitle": "تم الإرسال بنجاح",
-      "sentDescription": "سوف يستلم العميل رسالة WhatsApp فوراً. رابط الدفع من MyFatoorah سيظل فعالاً حتى يتم دفع الطلب أو إلغاؤه.",
+      "sentDescription": "سوف يستلم العميل رسالة WhatsApp فوراً. رابط الدفع سيظل فعالاً حتى يتم دفع الطلب أو إلغاؤه.",
       "viewOrder": "عرض الطلب →",
       "requirements": "المتطلبات: يجب أن يتم اعتماد قالب paymentLink بواسطة Meta. قم بزيارة تبويب القوالب لإنشاء ومزامنة القوالب.",
       "langEn": "الإنجليزية",
@@ -7537,7 +7578,7 @@
       "toastCouldNotSendTitle": "تعذّر الإرسال",
       "toastUnknownError": "خطأ غير معروف",
       "toastSentTitle": "تم إرسال رابط الدفع",
-      "toastSentBody": "سيستلم {phone} رابط دفع MyFatoorah عبر واتساب.",
+      "toastSentBody": "سيستلم {phone} رابط الدفع عبر واتساب.",
       "toastSendFailedTitle": "فشل الإرسال",
       "removeItemAriaLabel": "إزالة المنتج",
       "orderNumberLabel": "الطلب رقم {orderNumber}",
@@ -8539,12 +8580,10 @@
       },
       "payment": {
         "title": "كيف سيدفع عملاؤك؟",
-        "subtitle": "الدفع عند الاستلام مفعّل افتراضيًا. طرق أخرى قادمة قريبًا.",
+        "subtitle": "الدفع عند الاستلام مفعّل افتراضيًا.",
         "cod": "الدفع عند الاستلام",
         "codDesc": "يدفع العميل للمندوب عند وصول الطلب.",
-        "instapay": "إنستاباي",
-        "cards": "البطاقات والمحافظ",
-        "comingSoon": "قريبًا",
+        "moreLater": "البطاقات وميزة والمحافظ الإلكترونية وفاليو والدفع في فوري وإنستاباي تُعدّ لاحقًا من الإعدادات > المدفوعات، بحسابك الخاص في Paymob أو Kashier أو فوري.",
         "saveFailed": "تعذّر حفظ إعدادات الدفع. حاول مرة أخرى.",
         "needOne": "أبقِ طريقة دفع واحدة على الأقل مفعّلة."
       },

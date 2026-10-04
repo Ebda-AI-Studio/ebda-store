@@ -162,13 +162,10 @@ export interface Messages {
       copyLink: string;
       linkCopied: string;
       clipboardError: string;
-      sendEmail: string;
       issueModalTitle: string;
       issueModalDesc: string;
       copyLinkDesc: string;
-      sendEmailDesc: string;
       issuing: string;
-      emailSent: string;
       linkGenerated: string;
       paymentUrl: string;
       done: string;
@@ -396,13 +393,10 @@ export const MESSAGES: Record<Locale, Messages> = {
         copyLink: 'Copy link',
         linkCopied: 'Link copied to clipboard',
         clipboardError: 'Could not access clipboard — copy the link manually',
-        sendEmail: 'Send via email',
         issueModalTitle: 'Issue payment link',
-        issueModalDesc: 'Order {order} — generate a MyFatoorah link to collect payment.',
+        issueModalDesc: 'Order {order} — generate a payment link to collect payment.',
         copyLinkDesc: 'Generate the URL — copy and share via WhatsApp, email, or any channel.',
-        sendEmailDesc: 'MyFatoorah delivers the payment link directly to the customer’s email.',
         issuing: 'Issuing payment link…',
-        emailSent: 'Email sent to {email}',
         linkGenerated: 'Payment link generated',
         paymentUrl: 'Payment URL',
         done: 'Done',
@@ -633,13 +627,10 @@ export const MESSAGES: Record<Locale, Messages> = {
         copyLink: 'نسخ الرابط',
         linkCopied: 'تم نسخ الرابط',
         clipboardError: 'تعذّر الوصول إلى الحافظة — انسخ الرابط يدويًا',
-        sendEmail: 'إرسال عبر البريد',
         issueModalTitle: 'إصدار رابط دفع',
-        issueModalDesc: 'الطلب {order} — أنشئ رابط MyFatoorah لتحصيل الدفع.',
+        issueModalDesc: 'الطلب {order} — أنشئ رابط دفع لتحصيل المبلغ.',
         copyLinkDesc: 'أنشئ الرابط — انسخه وشاركه عبر واتساب أو البريد أو أي قناة.',
-        sendEmailDesc: 'يرسل MyFatoorah رابط الدفع مباشرة إلى بريد العميل.',
         issuing: 'جارٍ إصدار رابط الدفع…',
-        emailSent: 'تم إرسال البريد إلى {email}',
         linkGenerated: 'تم إنشاء رابط الدفع',
         paymentUrl: 'رابط الدفع',
         done: 'تم',

@@ -424,7 +424,7 @@ export default function StoreOrdersPage() {
             {isExporting ? t('export.exporting') : t('export.button')}
           </Button>
           {/* Admin phone-order entry. Lets merchants take an order over
-              the phone, then issue a MyFatoorah payment link from the
+              the phone, then issue a payment link from the
               order detail page (Ahmad 2026-05-16). */}
           <Link href={`/stores/${storeId}/orders/new`}>
             <Button type="button">+ New order</Button>

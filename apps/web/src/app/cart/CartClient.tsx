@@ -1178,7 +1178,7 @@ export default function CartClient() {
                           const methods =
                             configured && configured.length
                               ? configured
-                              : ['KNET', 'Visa', 'Mastercard', 'Apple Pay'];
+                              : ['Visa', 'Mastercard', 'Meeza', 'Fawry'];
                           return methods.map(method => (
                             <div
                               key={method}

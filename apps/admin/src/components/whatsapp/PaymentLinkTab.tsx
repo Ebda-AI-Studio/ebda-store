@@ -2,7 +2,7 @@
 
 /**
  * PaymentLinkTab — extracted from /stores/[id]/payment-link/page.tsx.
- * Merchant-initiated MyFatoorah payment links via WhatsApp.
+ * Merchant-initiated payment links (from the store's own gateway) via WhatsApp.
  */
 
 import { useState, useEffect, useCallback } from 'react';
