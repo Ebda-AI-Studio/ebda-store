@@ -974,6 +974,7 @@
       "filters": {
         "all": "All Orders",
         "pending": "Pending",
+        "awaiting_payment_confirmation": "Awaiting InstaPay",
         "confirmed": "Confirmed",
         "processing": "Processing",
         "shipped": "Shipped",
@@ -1043,7 +1044,9 @@
         "cancel": "Cancel",
         "manualRefundTitle": "Mark Order as Refunded?",
         "manualRefundDescription": "This only records a refund. It restores stock, reverses the coupon and loyalty points, and tells the customer a refund was issued — but it does NOT send any money back. To actually return a card payment, open the order and use \"Refund via provider\".",
-        "manualRefundDescriptionCancelled": "This order was cancelled, so its stock, coupon and loyalty points were already reversed at cancellation. This only records the refund on the order — it does NOT send any money back, and the customer is not sent a new notice. To actually return a card payment, use \"Refund via provider\"."
+        "manualRefundDescriptionCancelled": "This order was cancelled, so its stock, coupon and loyalty points were already reversed at cancellation. This only records the refund on the order — it does NOT send any money back, and the customer is not sent a new notice. To actually return a card payment, use \"Refund via provider\".",
+        "instapayTitle": "Confirm the InstaPay transfer?",
+        "instapayDescription": "Confirm that the money for this order is in your InstaPay account. The order is then confirmed and can be shipped. Tapping twice is safe."
       },
       "toast": {
         "errorTitle": "Error",
@@ -1052,7 +1055,9 @@
         "markedPaidTitle": "Marked as Paid",
         "markedPaidDescription": "Order has been marked as paid.",
         "bulkUpdateTitle": "Bulk Update",
-        "bulkUpdateDescription": "{count} order(s) marked as paid."
+        "bulkUpdateDescription": "{count} order(s) marked as paid.",
+        "instapayConfirmed": "Payment confirmed",
+        "instapayAlready": "Already confirmed"
       },
       "export": {
         "button": "Export orders",
@@ -1065,12 +1070,14 @@
         "statusUpdate": "Failed to update status",
         "markPaid": "Failed to mark as paid",
         "bulkMarkPaid": "Failed to bulk mark as paid",
-        "retry": "Retry"
+        "retry": "Retry",
+        "confirmInstapay": "Could not confirm the InstaPay payment"
       },
       "agentBadge": "Agent"
     },
     "status": {
       "pending": "Pending",
+      "awaiting_payment_confirmation": "Awaiting InstaPay confirmation",
       "confirmed": "Confirmed",
       "processing": "Processing",
       "shipped": "Shipped",
@@ -1206,7 +1213,8 @@
         "markPaid": "Mark Paid",
         "addNote": "Add Note",
         "refund": "Refund",
-        "toolbarLabel": "Order actions"
+        "toolbarLabel": "Order actions",
+        "confirmInstapay": "Payment received"
       },
       "loading": "Loading order…",
       "errors": {
@@ -1260,7 +1268,17 @@
         "toastNoChange": "Refund still {status} (no change)"
       },
       "paidFromWallet": "Paid from wallet",
-      "amountDue": "Amount due"
+      "amountDue": "Amount due",
+      "instapay": {
+        "title": "InstaPay transfer",
+        "waiting": "Waiting for the transfer. Confirm only after you see {amount} in your InstaPay account.",
+        "expires": "Held until {when}. After that the order is cancelled and the stock is released.",
+        "expired": "The hold has run out. The order will be cancelled and cannot be confirmed.",
+        "customerReference": "Reference entered by the customer",
+        "noReference": "The customer has not entered a reference yet.",
+        "payTo": "Paid to",
+        "orderRef": "Quote in the transfer note"
+      }
     },
     "layout": {
       "title": "Storefront layout",
@@ -4040,7 +4058,8 @@
         "ALREADY_REFUNDED": "This payment has already been refunded in full.",
         "REFUND_EXCEEDS_REMAINING": "The refund is more than what is left un-refunded on this payment. Refresh the page — part of it was refunded elsewhere.",
         "INVALID_REFUND_AMOUNT": "This return has no refund amount. Set the refund amount before completing it.",
-        "AMBIGUOUS_PAYMENT": "This payment reference matches more than one payment, so nothing was refunded and the return was not completed. Refund it from the payment provider dashboard and contact support."
+        "AMBIGUOUS_PAYMENT": "This payment reference matches more than one payment, so nothing was refunded and the return was not completed. Refund it from the payment provider dashboard and contact support.",
+        "MANUAL_PROVIDER_REFUND": "This order was paid by InstaPay, which cannot refund through the system. Send the money back from your InstaPay app, then complete the return with \"Already refunded — record only\"."
       }
     },
     "modal": {
@@ -4682,7 +4701,9 @@
       "fixedFeeHelpPrefix": "Extra charge added to the order when the customer pays cash on delivery. Enter",
       "fixedFeeHelpZero": "0",
       "fixedFeeHelpSuffix": "for free COD.",
-      "infoBanner": "COD orders bypass the payment gateway. The customer confirms the order, and you mark it as paid from the Orders page once cash is collected."
+      "infoBanner": "COD orders bypass the payment gateway. The customer confirms the order, and you mark it as paid from the Orders page once cash is collected.",
+      "percentLabel": "Percentage surcharge (%)",
+      "percentHelp": "Optional: a percentage of the order total added to the fixed fee, rounded to the piastre."
     },
     "gateway": {
       "apiKeyLabel": "API Key",
@@ -4710,7 +4731,27 @@
       "unableToConnect": "Unable to connect to the server"
     },
     "save": "Save",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "instapay": {
+      "handleLabel": "InstaPay address (IPA)",
+      "handlePlaceholder": "yourname@instapay",
+      "phoneLabel": "Linked mobile number",
+      "phonePlaceholder": "01012345678",
+      "accountNameLabel": "Account name shown on the transfer",
+      "expiryLabel": "Hold the order for (hours)",
+      "expiryHelp": "If you have not confirmed the transfer by then, the order is cancelled, the stock goes back on sale and the customer is told. Default 48.",
+      "noteEnLabel": "Note to the customer (English)",
+      "noteArLabel": "Note to the customer (Arabic)",
+      "infoBanner": "InstaPay has no merchant API. The customer transfers to your address or number and quotes the order number; you confirm \"Payment received\" on the order (admin or the Orders app). Until then the order is held, does not ship and does not count as revenue.",
+      "needHandleOrPhone": "Add an InstaPay address or a phone number before turning InstaPay on."
+    },
+    "health": {
+      "healthy": "Working",
+      "degraded": "Having trouble",
+      "down": "Down: hidden at checkout",
+      "unknown": "Not checked yet",
+      "note": "When a provider times out or is unreachable, only that method is hidden from checkout for a minute or two. Cash on delivery and your other methods keep working."
+    }
   },
   "hero": {
     "page": {

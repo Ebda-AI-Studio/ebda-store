@@ -140,4 +140,13 @@ export interface OrderDetail {
   } | null;
   items: OrderItemDetail[];
   payments: OrderPaymentDetail[];
+  /** InstaPay hold deadline (ISO); null for every other order. */
+  paymentConfirmationExpiresAt?: string | null;
+  /** InstaPay summary for the merchant: what the customer entered, the handle paid to. */
+  instapay?: {
+    customerReference: string | null;
+    customerReferenceAt: string | null;
+    handle: string | null;
+    expiresAt: string | null;
+  } | null;
 }
