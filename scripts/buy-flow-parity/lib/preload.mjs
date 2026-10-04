@@ -3,9 +3,9 @@
  * `node --import <this file> apps/api/dist/index.js`, so it is byte-identical
  * for the base and the head ref and no application code is modified.
  *
- * - MyFatoorah (api.myfatoorah.com / apitest.myfatoorah.com) is rewritten to the
- *   harness stub (`$BFP_STUB_URL/mf/...`). The provider hardcodes its base URL,
- *   so this is the only way to stub it without editing the ref.
+ * - Paymob (accept.paymob.com) is rewritten to the harness stub
+ *   (`$BFP_STUB_URL/paymob/...`). The adapter's default base URL is the real host, so
+ *   this stubs it for a ref that has no `PAYMOB_BASE_URL` override.
  * - Loopback traffic (Postgres, Redis, the stub itself) passes through.
  * - EVERY other host is refused: fetch() is rewritten to the stub's
  *   `/__outbound/<host>/<path>` sink (recorded, answered 503), and http/https
@@ -22,7 +22,7 @@ if (!STUB) {
   );
 }
 const stubUrl = new URL(STUB);
-const MF_HOSTS = new Set(['api.myfatoorah.com', 'apitest.myfatoorah.com']);
+const PAYMOB_HOSTS = new Set(['accept.paymob.com']);
 
 function isLoopback(host) {
   const h = String(host || '').replace(/^\[|\]$/g, '');
@@ -31,7 +31,7 @@ function isLoopback(host) {
 
 function rewrite(urlStr) {
   const u = new URL(urlStr);
-  if (MF_HOSTS.has(u.hostname)) return `${STUB}/mf${u.pathname}${u.search}`;
+  if (PAYMOB_HOSTS.has(u.hostname)) return `${STUB}/paymob${u.pathname}${u.search}`;
   if (isLoopback(u.hostname)) return null;
   return `${STUB}/__outbound/${u.hostname}${u.pathname}${u.search}`;
 }

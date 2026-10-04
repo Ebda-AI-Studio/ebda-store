@@ -17,8 +17,12 @@ export const OWNER_PASSWORD = 'BfpOwner!Parity2026';
 // nosemgrep: generic.secrets.security.detected-bcrypt-hash.detected-bcrypt-hash -- hash of the throwaway local-harness password above, only ever seeded into a disposable local database
 const OWNER_HASH = '$2b$10$YZe6BZQ1L6DcDfyLDvHQLOXyy9PqCJ1Ml.fS6JBxcdoaNwOo0nEQi';
 
-export const MF_API_KEY = 'bfp-parity-myfatoorah-api-key';
-export const MF_WEBHOOK_SECRET = 'bfp-parity-myfatoorah-webhook-secret';
+// Paymob (the harness gateway): the Secret key (`Authorization: Token`), the HMAC secret that signs
+// the transaction callback, the public key, and one integration id per method.
+export const PM_SECRET_KEY = 'bfp-parity-paymob-secret-key';
+export const PM_HMAC_SECRET = 'bfp-parity-paymob-hmac-secret';
+export const PM_PUBLIC_KEY = 'bfp-parity-paymob-public-key';
+export const PM_INTEGRATIONS = { card: 11, meeza: 22, wallet: 33, valu: 44 };
 export const COD_FEE = 500; // piastres (5.00 EGP)
 export const VAT_RATE = '14.00';
 
@@ -116,17 +120,18 @@ export function buildFixture({ encryptionKey, scenarios }) {
     }
     sql.push(
       insert('payment_configs', {
-        id: reg(`paycfg:${key}:myfatoorah`),
+        id: reg(`paycfg:${key}:paymob`),
         store_id: storeId,
-        provider: 'myfatoorah',
+        provider: 'paymob',
         is_enabled: true,
         is_default: true,
-        display_name: 'MyFatoorah',
-        api_key: encryptSecret(MF_API_KEY, encryptionKey),
-        webhook_secret: encryptSecret(MF_WEBHOOK_SECRET, encryptionKey),
+        display_name: 'Paymob',
+        api_key: encryptSecret(PM_SECRET_KEY, encryptionKey),
+        webhook_secret: encryptSecret(PM_HMAC_SECRET, encryptionKey),
         test_mode: true,
-        supported_methods: ['visa', 'mastercard'],
+        supported_methods: ['card', 'meeza', 'wallet', 'valu'],
         supported_currencies: ['EGP'],
+        settings: { publicKey: PM_PUBLIC_KEY, integrationIds: PM_INTEGRATIONS },
         updated_at: ts,
       })
     );

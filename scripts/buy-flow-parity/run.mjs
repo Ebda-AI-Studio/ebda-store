@@ -26,6 +26,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStub } from './lib/stub.mjs';
+import { PM_SECRET_KEY } from './lib/fixture.mjs';
+import { paymentEndpointProblems } from './lib/guards.mjs';
 import { buildFixture } from './lib/fixture.mjs';
 import { snapshotDb, psqlExec, psqlJson } from './lib/snapshot.mjs';
 import { makeNormalizer, diff, parseAllows, allowFor } from './lib/compare.mjs';
@@ -477,11 +479,16 @@ async function runRef({ label, sha, dir, infra, args, stub, scenarios, logDir, e
       const cat = fixture.catalog[sc.id];
       const steps = [];
       const notes = [];
+      const expectations = [];
       const ctx = {
         stub,
         steps,
         orderIds: [],
         note: n => notes.push(n),
+        // A payment-endpoint expectation: step `name` must have run, and every run of it must
+        // have answered one of `codes`. Checked after the scenario (see below).
+        expectations,
+        expect: (name, codes) => expectations.push({ name, codes }),
         skip: reason => {
           throw new SkipError(reason);
         },
@@ -527,6 +534,16 @@ async function runRef({ label, sha, dir, infra, args, stub, scenarios, logDir, e
         ...steps.filter(s => s.status === 429).map(s => s.step),
         ...inngestRuns.filter(r => r.http === 429).map(r => `inngest:${r.function}`),
       ];
+      // PAYMENT ENDPOINTS MUST BE REAL. A scenario whose payment call answers 404 has not
+      // exercised the payment path (a route that is gone, or a read RLS hides from the app role):
+      // both sides being equally broken must read as an ERROR, never as "identical, PASS".
+      if (status === 'ran') {
+        const problems = paymentEndpointProblems(steps, expectations);
+        if (problems.length) {
+          status = 'error';
+          error = problems.join('; ');
+        }
+      }
       if (throttled.length && status === 'ran') {
         status = 'error';
         error = `harness was rate-limited (429) at: ${throttled.join(', ')}`;
@@ -567,7 +584,7 @@ async function runRef({ label, sha, dir, infra, args, stub, scenarios, logDir, e
           ),
           db: dbSnap,
           gateway: {
-            myfatoorah: gateway.filter(r => r.service === 'myfatoorah'),
+            paymob: gateway.filter(r => r.service === 'paymob'),
             inngestEvents: gateway.filter(r => r.service === 'inngest').map(r => r.event),
           },
           inngestRuns: keyRuns(inngestRuns),
@@ -718,7 +735,7 @@ async function main() {
   log(`base ${baseSide.id}  head ${headSide.id}  → ${outDir}`);
 
   const infra = refSides.length ? await ensureInfra(args) : null;
-  const stub = createStub();
+  const stub = createStub({ secretKey: PM_SECRET_KEY });
   await stub.listen(args.stubPort);
   const built = new Map();
   const results = {};
