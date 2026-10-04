@@ -844,7 +844,7 @@ class ShippingCarrierService {
     }
   }
 
-  private async runTrackingCron() {
+  async runTrackingCron() {
     // Find all shipments that are not in a terminal state
     const activeShipments = await prisma.shipment.findMany({
       where: {
