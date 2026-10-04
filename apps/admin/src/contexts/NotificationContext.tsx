@@ -91,7 +91,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       const accessToken =
         typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
+      // WebSocket only: on Cloudflare the API's realtime is a Durable Object that speaks the
+      // Socket.IO protocol over a plain WebSocket (no long-polling session). `uid` routes the
+      // socket to the user's Durable Object; the token (auth) must belong to that user.
       socketRef.current = io(apiUrl, {
+        transports: ['websocket'],
+        query: { uid: user.id },
         withCredentials: true,
         reconnection: true,
         reconnectionAttempts: 5,
