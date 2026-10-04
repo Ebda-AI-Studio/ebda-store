@@ -7,6 +7,8 @@ node_modules
 # Build outputs
 dist/
 build/
+# site-kit's build helpers are SOURCE (MDX/OpenAPI renderers), not output.
+!packages/site-kit/src/build/
 .next/
 .nuxt/
 .output/
