@@ -33,6 +33,31 @@ const PROVIDERS: ProviderDef[] = [
     color: '#6B3FA0',
     kind: 'instapay',
   },
+  // Egypt gateways land in SP6b; shown so merchants can see what is coming.
+  {
+    id: 'paymob',
+    name: 'Paymob',
+    nameAr: 'باي موب',
+    color: '#0B5FFF',
+    kind: 'gateway',
+    comingSoon: true,
+  },
+  {
+    id: 'kashier',
+    name: 'Kashier',
+    nameAr: 'كاشير',
+    color: '#00A19A',
+    kind: 'gateway',
+    comingSoon: true,
+  },
+  {
+    id: 'fawry',
+    name: 'Fawry',
+    nameAr: 'فوري',
+    color: '#F2B705',
+    kind: 'gateway',
+    comingSoon: true,
+  },
 ];
 
 const emptyConfig = (provider: string): StorePaymentConfig => ({

@@ -4751,7 +4751,8 @@
       "down": "Down: hidden at checkout",
       "unknown": "Not checked yet",
       "note": "When a provider times out or is unreachable, only that method is hidden from checkout for a minute or two. Cash on delivery and your other methods keep working."
-    }
+    },
+    "comingSoon": "Coming soon"
   },
   "hero": {
     "page": {

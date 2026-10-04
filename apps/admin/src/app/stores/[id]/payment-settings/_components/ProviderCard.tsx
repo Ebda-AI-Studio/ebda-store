@@ -44,6 +44,8 @@ export interface ProviderDef {
   nameAr: string;
   color: string;
   kind: ProviderKind;
+  /** Egypt gateway not wired yet (SP6b): shown so merchants know what is coming; cannot be enabled. */
+  comingSoon?: boolean;
 }
 
 export interface ProviderSaveMessage {
@@ -101,47 +103,56 @@ export function ProviderCard({
           {provider.kind === 'gateway' && form.isEnabled && <HealthChip form={form} />}
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {form.isEnabled ? t('toggle.enabled') : t('toggle.disabled')}
-            </span>
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={form.isEnabled}
-                onChange={e => onToggle(e.target.checked)}
-                disabled={saving}
-                className="sr-only peer"
-              />
-              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-400/30 peer-disabled:opacity-50" />
-            </label>
-          </div>
-
-          <button
-            type="button"
-            onClick={onToggleExpanded}
-            className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors"
+        {provider.comingSoon ? (
+          <span
+            className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground"
+            data-testid="coming-soon"
           >
-            {t('configure')}
-            <svg
-              className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+            {t('comingSoon')}
+          </span>
+        ) : (
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                {form.isEnabled ? t('toggle.enabled') : t('toggle.disabled')}
+              </span>
+              <label className="relative inline-flex cursor-pointer items-center">
+                <input
+                  type="checkbox"
+                  checked={form.isEnabled}
+                  onChange={e => onToggle(e.target.checked)}
+                  disabled={saving}
+                  className="sr-only peer"
+                />
+                <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-400/30 peer-disabled:opacity-50" />
+              </label>
+            </div>
+
+            <button
+              type="button"
+              onClick={onToggleExpanded}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </button>
-        </div>
+              {t('configure')}
+              <svg
+                className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
 
-      {expanded && (
+      {expanded && !provider.comingSoon && (
         <div className="border-t bg-muted p-6 space-y-5">
           {provider.kind === 'cod' ? (
             <CodFields form={form} onUpdateField={onUpdateField} />
