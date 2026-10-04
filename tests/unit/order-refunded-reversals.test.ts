@@ -97,9 +97,14 @@ vi.mock('@force/database', () => ({
       h.moneyTxDepth.n--;
     }
   },
-  withRlsBypass: async (fn: (b: unknown) => unknown) => {
+}));
+
+// The pre-cutover `order.admin_created` actor row carries no store, so it is answered by the
+// `ebda_audit_log_exists` definer (`auditLogExists`); `auditLogFindFirst` stands for that row.
+vi.mock('@api/lib/definer', () => ({
+  auditLogExists: async () => {
     if (h.moneyTxDepth.n > 0) h.bypassCalledInsideMoneyTx();
-    return fn({ auditLog: { findFirst: h.auditLogFindFirst } });
+    return !!(await h.auditLogFindFirst());
   },
 }));
 
@@ -337,7 +342,7 @@ describe('order-refunded fanout — reverse-coupon step', () => {
     expect(couponMarkers).toHaveLength(1); // marker written once
   });
 
-  // Issue 2359: the pre-cutover admin-order lookup is a withRlsBypass read —
+  // Issue 2359: the pre-cutover admin-order lookup is a definer read —
   // a fresh $transaction on a second pool connection. It must run in its own
   // step BEFORE the coupon withMoneyTx opens, never inside it.
   it('pre-cutover admin order: looks up admin_created OUTSIDE the money tx and skips the decrement', async () => {

@@ -60,7 +60,7 @@ export async function createExpense(input: CreateExpenseInput): Promise<ExpenseW
   // Issue 2291: with no ambient tenant transaction (the expense-OCR Inngest
   // job) the guard below opened its own transient transaction, but every
   // statement after it — the paid-from lookup and the INSERT, both on STRICT
-  // RLS tables — ran GUC-less: under force_app the lookup reads nothing (a
+  // RLS tables — ran GUC-less: under ebda_app the lookup reads nothing (a
   // misleading 400 INVALID_PAID_FROM) and the insert is rejected. The whole
   // body now runs in ONE store-scoped transaction, which also closes the
   // guard-vs-write window. The HTTP route already wraps it, so there it joins.

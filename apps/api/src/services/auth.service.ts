@@ -1,7 +1,20 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { prisma, Prisma, hasTenantContext, withMoneyTx, withRlsBypass } from '@force/database';
+import {
+  prisma,
+  Prisma,
+  hasTenantContext,
+  runInTenantContext,
+  withStore,
+  withUser,
+} from '@force/database';
+import {
+  deleteUserAddresses,
+  findUserIdByEmail,
+  getUserState,
+  revokeUserSessionsRow,
+} from '../lib/definer';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
@@ -17,7 +30,6 @@ import { sendAlert } from './alerts.service';
 import { SEND_CAP_WINDOW_MS } from './campaign.service';
 import { inngest } from '../lib/inngest/client';
 import { WalletService } from './wallet.service';
-import { withScopedRlsBypass } from '../lib/scoped-rls-bypass';
 
 interface TokenPayload {
   userId: string;
@@ -72,6 +84,39 @@ function authScope(email: string, storeId: string | null) {
     throw new AppError(400, 'VALIDATION_ERROR', 'Email is required');
   }
   return storeId === null ? { email, storeId: null as null } : { email, storeId };
+}
+
+/**
+ * Find a user by email inside ONE namespace (`storeId` null = the admin
+ * namespace) and read the row.
+ *
+ * `users` is under strict RLS and a login/forgot-password caller is not scoped
+ * to anyone yet, so the id comes from the `ebda_auth_find_user_id` definer
+ * (exact email + namespace, id only) and the row is then read AS that user —
+ * `withUser` joins an ambient transaction for the same user, else opens a short
+ * one. Soft-deleted users are excluded unless `includeDeleted`.
+ */
+async function findUserInScope<T extends Prisma.UserDefaultArgs>(
+  email: string,
+  storeId: string | null,
+  args: T,
+  opts: { includeDeleted?: boolean } = {}
+): Promise<Prisma.UserGetPayload<T> | null> {
+  // Same sink guard as `authScope`: only a scalar email may reach the lookup.
+  if (typeof email !== 'string') {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Email is required');
+  }
+  const id = await findUserIdByEmail(email, storeId, opts);
+  if (!id) return null;
+  return withUser(
+    id,
+    tx =>
+      tx.user.findUnique({
+        where: { id },
+        ...args,
+      } as Prisma.UserFindUniqueArgs) as Promise<Prisma.UserGetPayload<T> | null>,
+    storeId ?? undefined
+  );
 }
 
 /**
@@ -263,17 +308,25 @@ export class AuthService {
 
     // Check if user exists in the target scope. Customers in different
     // stores can share an email — the lookup must use the composite key.
-    const existingUser = await prisma.user.findFirst({
-      where: authScope(data.email, storeId),
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        storeId: true,
-        language: true,
-      },
-    });
+    // `users` is under strict RLS: a storefront registration is read inside the
+    // store's scope. The admin namespace (no storeId) is not registrable here —
+    // store owners and staff are provisioned (ProvisioningService, staff invite),
+    // never self-registered — so there is nothing to look up for it.
+    const existingUser = storeId
+      ? await withStore(storeId, tx =>
+          tx.user.findFirst({
+            where: authScope(data.email, storeId),
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              storeId: true,
+              language: true,
+            },
+          })
+        )
+      : null;
 
     // Parse name into first/last if provided
     let firstName = data.firstName;
@@ -340,28 +393,40 @@ export class AuthService {
       return { emailVerificationSent: true } as const;
     }
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email: data.email,
-        storeId,
-        passwordHash,
-        firstName: firstName || '',
-        lastName: lastName || '',
-        role: 'customer',
-        emailVerified: false,
-      },
-      select: {
-        id: true,
-        email: true,
-        storeId: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        emailVerified: true,
-        createdAt: true,
-      },
-    });
+    if (!storeId) {
+      // No store, no account: same generic answer as every other branch (the
+      // enumeration close above), nothing created, no email sent.
+      logger.info(
+        { email: maskEmail(data.email) },
+        'Registration without a storeId — admin accounts are provisioned, not self-registered'
+      );
+      return { emailVerificationSent: true } as const;
+    }
+
+    // Create user (inside the store's scope: users.store_id must match it)
+    const user = await withStore(storeId, tx =>
+      tx.user.create({
+        data: {
+          email: data.email,
+          storeId,
+          passwordHash,
+          firstName: firstName || '',
+          lastName: lastName || '',
+          role: 'customer',
+          emailVerified: false,
+        },
+        select: {
+          id: true,
+          email: true,
+          storeId: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          emailVerified: true,
+          createdAt: true,
+        },
+      })
+    );
 
     // Verification email goes out fire-and-forget so a slow / unreachable
     // SMTP host can't stall the registration response. If delivery fails
@@ -461,23 +526,31 @@ export class AuthService {
         type: 'email',
         usedAt: null,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            emailVerified: true,
-            storeId: true,
-            language: true,
-            deletedAt: true,
-          },
-        },
-      },
     });
 
     if (!verificationToken) {
+      throw new AppError(400, 'TOKEN_INVALID', 'Invalid verification token');
+    }
+
+    // The user is read as themselves (`users` is RLS-scoped to app.current_user_id);
+    // a join from the token would hide the row. The token is the credential: it is
+    // looked up by its hash before any identity is known.
+    const tokenUser = await withUser(verificationToken.userId, tx =>
+      tx.user.findUnique({
+        where: { id: verificationToken.userId },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          emailVerified: true,
+          storeId: true,
+          language: true,
+          deletedAt: true,
+        },
+      })
+    );
+    if (!tokenUser) {
       throw new AppError(400, 'TOKEN_INVALID', 'Invalid verification token');
     }
 
@@ -493,34 +566,36 @@ export class AuthService {
       );
     }
 
-    if (verificationToken.user.emailVerified) {
+    if (tokenUser.emailVerified) {
       return { success: true, message: 'Email already verified' };
     }
 
     // Update user as verified and mark token as used
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: verificationToken.userId },
-        data: { emailVerified: true },
-      }),
-      prisma.verificationToken.update({
-        where: { id: verificationToken.id },
-        data: { usedAt: new Date() },
-      }),
-    ]);
+    await withUser(
+      verificationToken.userId,
+      async tx => {
+        await tx.user.update({
+          where: { id: verificationToken.userId },
+          data: { emailVerified: true },
+        });
+        await tx.verificationToken.update({
+          where: { id: verificationToken.id },
+          data: { usedAt: new Date() },
+        });
+      },
+      tokenUser.storeId ?? undefined
+    );
 
     // Welcome email is a follow-up — fire-and-forget so SMTP latency can't
     // delay the verify-email API response.
-    if (verificationToken.user.storeId) {
+    if (tokenUser.storeId) {
       void EmailService.sendWelcome(
-        verificationToken.user.storeId,
+        tokenUser.storeId,
         {
-          email: verificationToken.user.email,
-          name:
-            `${verificationToken.user.firstName} ${verificationToken.user.lastName}`.trim() ||
-            verificationToken.user.email,
+          email: tokenUser.email,
+          name: `${tokenUser.firstName} ${tokenUser.lastName}`.trim() || tokenUser.email,
         },
-        (verificationToken.user.language as 'en' | 'ar' | undefined) ?? undefined
+        (tokenUser.language as 'en' | 'ar' | undefined) ?? undefined
       ).catch(err =>
         logger.error(
           { err, userId: verificationToken.userId },
@@ -540,18 +615,22 @@ export class AuthService {
     email: string,
     storeId: string | null = null
   ): Promise<{ success: boolean; message: string }> {
-    const user = await prisma.user.findFirst({
-      where: authScope(email, storeId),
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        storeId: true,
-        emailVerified: true,
-        language: true,
+    const user = await findUserInScope(
+      email,
+      storeId,
+      {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          storeId: true,
+          emailVerified: true,
+          language: true,
+        },
       },
-    });
+      { includeDeleted: true }
+    );
 
     if (!user) {
       // Don't reveal if user exists
@@ -616,8 +695,7 @@ export class AuthService {
     // login is one of the few places that legitimately needs them, so it asks
     // for them by name. Dropping this opt-in makes bcrypt.compare below run
     // against undefined and every login fail.
-    const user = await prisma.user.findFirst({
-      where: { ...authScope(email, storeId), deletedAt: null },
+    const user = await findUserInScope(email, storeId, {
       omit: { passwordHash: false, mfaSecret: false },
     });
 
@@ -926,14 +1004,35 @@ export class AuthService {
     // Hash the token to look it up
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
 
-    const storedToken = await prisma.refreshToken.findUnique({
+    const storedRow = await prisma.refreshToken.findUnique({
       where: { token: tokenHash },
-      include: { user: true },
     });
 
-    if (!storedToken) {
+    if (!storedRow) {
       throw new AppError(401, 'TOKEN_INVALID', 'Invalid refresh token');
     }
+
+    // The owning user is read AS themselves (`users` is RLS-scoped to
+    // app.current_user_id), not joined from the token: the token is the
+    // credential and is looked up by its hash before any identity is known.
+    const tokenOwner = await withUser(storedRow.userId, tx =>
+      tx.user.findUnique({
+        where: { id: storedRow.userId },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          storeId: true,
+          status: true,
+          deletedAt: true,
+          tokenVersion: true,
+        },
+      })
+    );
+    if (!tokenOwner) {
+      throw new AppError(401, 'TOKEN_INVALID', 'Invalid refresh token');
+    }
+    const storedToken = { ...storedRow, user: tokenOwner };
 
     // Reuse detection (OWASP refresh-token rotation guidance): once a
     // refresh token has been rotated or revoked, any subsequent
@@ -1123,10 +1222,7 @@ export class AuthService {
     // it after the write is a cheap primary-key check that closes the window:
     // if it moved, the revocation happened under us and this token dies with
     // the rest.
-    const currentVersion = await prisma.user.findUnique({
-      where: { id: storedToken.userId },
-      select: { tokenVersion: true },
-    });
+    const currentVersion = await getUserState(storedToken.userId);
     if (!currentVersion || currentVersion.tokenVersion !== storedToken.user.tokenVersion) {
       await prisma.refreshToken.updateMany({
         where: { token: newHash, revokedAt: null },
@@ -1190,27 +1286,29 @@ export class AuthService {
   }
 
   static async getProfile(userId: string) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        role: true,
-        avatar: true,
-        emailVerified: true,
-        // MFA status — every client reads these from /auth/me to render the
-        // 2FA toggle (admin Security page) and to gate the Orders PWA login.
-        // Omitting them made /auth/me report MFA as undefined → "disabled"
-        // everywhere, even for fully-enrolled accounts.
-        mfaEnabled: true,
-        mfaEnrolledAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    const user = await withUser(userId, tx =>
+      tx.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          role: true,
+          avatar: true,
+          emailVerified: true,
+          // MFA status — every client reads these from /auth/me to render the
+          // 2FA toggle (admin Security page) and to gate the Orders PWA login.
+          // Omitting them made /auth/me report MFA as undefined → "disabled"
+          // everywhere, even for fully-enrolled accounts.
+          mfaEnabled: true,
+          mfaEnrolledAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      })
+    );
 
     if (!user) {
       throw new AppError(404, 'NOT_FOUND', 'User not found');
@@ -1223,41 +1321,45 @@ export class AuthService {
     userId: string,
     data: { firstName?: string; lastName?: string; phone?: string }
   ) {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw new AppError(404, 'NOT_FOUND', 'User not found');
-    }
+    return withUser(userId, async () => {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        throw new AppError(404, 'NOT_FOUND', 'User not found');
+      }
 
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        ...(data.firstName !== undefined && { firstName: data.firstName }),
-        ...(data.lastName !== undefined && { lastName: data.lastName }),
-        ...(data.phone !== undefined && { phone: data.phone }),
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        role: true,
-        avatar: true,
-        emailVerified: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      const updated = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          ...(data.firstName !== undefined && { firstName: data.firstName }),
+          ...(data.lastName !== undefined && { lastName: data.lastName }),
+          ...(data.phone !== undefined && { phone: data.phone }),
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          role: true,
+          avatar: true,
+          emailVerified: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      return updated;
     });
-
-    return updated;
   }
 
   static async changePassword(userId: string, currentPassword: string, newPassword: string) {
     // Needs the hash to verify the CURRENT password — opt back in by name.
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      omit: { passwordHash: false },
-    });
+    const user = await withUser(userId, tx =>
+      tx.user.findUnique({
+        where: { id: userId },
+        omit: { passwordHash: false },
+      })
+    );
     if (!user) {
       throw new AppError(404, 'NOT_FOUND', 'User not found');
     }
@@ -1268,10 +1370,12 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
-    await prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash },
-    });
+    await withUser(userId, tx =>
+      tx.user.update({
+        where: { id: userId },
+        data: { passwordHash },
+      })
+    );
 
     // ONE call, and it runs BEFORE anything else observes the change.
     //
@@ -1303,12 +1407,24 @@ export class AuthService {
     userId: string,
     reason: 'revoke_all' | 'password_changed' | 'password_reset' = 'revoke_all'
   ): Promise<void> {
-    // Atomically increment tokenVersion and read the new value.
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data: { tokenVersion: { increment: 1 } },
-      select: { tokenVersion: true },
-    });
+    // Atomically increment tokenVersion and read the new value — and revoke the
+    // user's merchant MCP keys in EVERY store they hold one for. One definer call
+    // (`ebda_user_revoke_sessions`): it runs inside the caller's transaction (so
+    // an ambient request transaction stays atomic with it, #1859), and it is the
+    // only way to reach another user's row or another store's keys under strict
+    // RLS. A partial "sign out all devices" is worse than a failed one, so the
+    // key revocation is not left to a store-scoped query.
+    //
+    // The definer only answers the user themself, a super_admin, or a caller scoped
+    // to the user's own store (SQLSTATE 42501 otherwise). With an ambient
+    // transaction the request's own scope decides (admin editing a user, a
+    // merchant acting on its customer). With none (logout-all, password change,
+    // MFA change, and a password reset whose token was just validated) the caller
+    // has already established that it is acting for this user, so the call runs AS
+    // that user, in its own short transaction that commits before the cache push.
+    const updated = hasTenantContext()
+      ? await revokeUserSessionsRow(userId)
+      : await withUser(userId, () => revokeUserSessionsRow(userId));
 
     // Warm the Redis cache with the new version so the middleware sees it
     // immediately without a DB round-trip on the next request.
@@ -1358,41 +1474,26 @@ export class AuthService {
     await prisma.refreshToken.deleteMany({
       where: { userId, token: { startsWith: 'reset:' } },
     });
-
-    // …and every merchant MCP key this user holds. "Sign out all devices" has
-    // to mean ALL devices: a merchant key is a long-lived credential acting as
-    // this user, so leaving it live would make the strongest lever the platform
-    // has a partial one. `verifyMerchantKey` also refuses a suspended or
-    // soft-deleted user on every call, so this is the second of two
-    // independent checks rather than the only one.
-    // `withRlsBypass`: this is CROSS-TENANT by nature — it revokes this user's
-    // keys in every store they hold one for. `revokeAllSessions` is called
-    // from request handlers that may already be inside a tenant context
-    // (auth.routes logout-all, mfa.routes), and under the table's RLS policy
-    // that would silently revoke only the current store's keys while reporting
-    // success. A partial "sign out all devices" is worse than a failed one.
-    await withRlsBypass(tx =>
-      tx.merchantApiKey.updateMany({
-        where: { userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      })
-    );
   }
 
   static async requestPasswordReset(email: string, storeId: string | null = null): Promise<void> {
     // Tenant-scoped lookup so a Store A reset request doesn't leak the
     // existence of an account on Store B with the same email.
-    const user = await prisma.user.findFirst({
-      where: authScope(email, storeId),
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        storeId: true,
-        language: true,
+    const user = await findUserInScope(
+      email,
+      storeId,
+      {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          storeId: true,
+          language: true,
+        },
       },
-    });
+      { includeDeleted: true }
+    );
 
     if (!user) {
       // Silently return to prevent email enumeration
@@ -1452,7 +1553,6 @@ export class AuthService {
         expiresAt: { gt: new Date() },
         revokedAt: null,
       },
-      include: { user: true },
     });
 
     if (!storedToken) {
@@ -1462,11 +1562,13 @@ export class AuthService {
     // Hash new password
     const passwordHash = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
 
-    // Update user password
-    await prisma.user.update({
-      where: { id: storedToken.userId },
-      data: { passwordHash },
-    });
+    // Update user password (as that user: `users` is RLS-scoped to app.current_user_id)
+    await withUser(storedToken.userId, tx =>
+      tx.user.update({
+        where: { id: storedToken.userId },
+        data: { passwordHash },
+      })
+    );
 
     // Delete the reset token (single-use, no reuse-detection value).
     await prisma.refreshToken.delete({
@@ -1526,20 +1628,28 @@ export class AuthService {
     opts: { scopeStoreId?: string; actorId?: string } = {}
   ): Promise<EraseOutcome> {
     const actorId = opts.actorId ?? 'system';
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        storeId: true,
-        role: true,
-        avatar: true,
-        // Needed to reach the `customers` CRM row, which is keyed by
-        // phone/email rather than by a FK to `users` — see the scrub
-        // inside `anonymize` below.
-        email: true,
-        phone: true,
-      },
-    });
+    const eraseUserSelect = {
+      id: true,
+      storeId: true,
+      role: true,
+      avatar: true,
+      // Needed to reach the `customers` CRM row, which is keyed by
+      // phone/email rather than by a FK to `users` — see the scrub
+      // inside `anonymize` below.
+      email: true,
+      phone: true,
+    } as const;
+    // Merchant route: the ambient store transaction already shows the shopper
+    // (users.store_id = its store). Self-service and the retention cron have no
+    // ambient scope — or the shopper belongs to another store — so read them as
+    // themselves (`users` is RLS-scoped to app.current_user_id).
+    const user =
+      (hasTenantContext()
+        ? await prisma.user.findUnique({ where: { id: userId }, select: eraseUserSelect })
+        : null) ??
+      (await withUser(userId, tx =>
+        tx.user.findUnique({ where: { id: userId }, select: eraseUserSelect })
+      ));
     if (!user) {
       throw new AppError(404, 'NOT_FOUND', 'User not found');
     }
@@ -1616,26 +1726,16 @@ export class AuthService {
       // Pure-PII child rows — no business reason to retain. The FK
       // column names vary across models (some use `userId`, some
       // `customerId`) — match each model's actual schema.
-      // `addresses` is the ONE erasure target with a USER-scoped RLS policy:
-      // `rls_addresses_user` (20260702170000_rls_close_denyall_tables) admits a
-      // row only when `user_id = current_user_id()`. On the merchant-initiated
-      // path `app.current_user_id` is the MERCHANT's id — `tenantContext` sets
-      // it from `req.user?.userId` — not the shopper's, so under force_app this
-      // deleteMany matches ZERO rows and returns `{count: 0}` with NO error.
-      // The shopper's name, phone, block/street and postal code would survive
-      // an "erased" account while the audit row records a completed erasure.
-      // Inert today only because prod still connects as neondb_owner
-      // (BYPASSRLS); it goes live the day the force_app cutover flips.
-      //
-      // SET LOCAL on the AMBIENT transaction — deliberately NOT `withRlsBypass`,
-      // which is `basePrisma.$transaction`: a SECOND connection that commits
-      // independently of this request. That is precisely the hazard eraseAccount
-      // was just moved off, and using it here would make the address delete
-      // non-atomic with the rest of the erasure. `withScopedRlsBypass` sets it
-      // on THIS transaction and restores the prior value in a `finally`
-      // (#2037), so every remaining delete still runs under normal RLS — even
-      // if the delete throws and a caller catches it.
-      await withScopedRlsBypass(tx, () => tx.address.deleteMany({ where: { userId } }));
+      // `addresses` is the ONE erasure target with a USER-scoped RLS policy
+      // (`user_id = app.current_user_id`). On the merchant-initiated path the
+      // GUC is the MERCHANT's id, not the shopper's, so a plain deleteMany would
+      // match ZERO rows with NO error and an "erased" account would keep the
+      // shopper's name, phone, block/street and postal code. A definer
+      // (`ebda_user_addresses_delete`) deletes by the shopper's id INSIDE this
+      // transaction, so it stays atomic with the rest of the erasure (a second
+      // connection would commit independently — the hazard eraseAccount was
+      // moved off).
+      await deleteUserAddresses(userId);
 
       await tx.abandonedCart.deleteMany({ where: { customerId: userId } });
       await tx.cart.deleteMany({ where: { customerId: userId } });
@@ -1899,9 +1999,15 @@ export class AuthService {
       await anonymize(prisma as unknown as Prisma.TransactionClient);
     } else {
       // No tenant context — self-service `POST /auth/me/erase`, the
-      // `soft-deleted-user-anonymize` retention cron, scripts. Own money-safe
-      // transaction, exactly as before.
-      await withMoneyTx(prisma, anonymize);
+      // `soft-deleted-user-anonymize` retention cron, scripts. Own transaction
+      // (same 10s/30s limits as `withMoneyTx`) scoped to the shopper's store AND
+      // to the shopper: the store GUC reaches their carts, CRM row and consents,
+      // the user GUC their `users` row.
+      await runInTenantContext(
+        user.storeId ?? undefined,
+        () => anonymize(prisma as unknown as Prisma.TransactionClient),
+        userId
+      );
     }
 
     // Push the bumped token version into the tv cache the authenticate
@@ -1963,30 +2069,45 @@ export class AuthService {
    * names match the schema for transparency.
    */
   static async exportAccount(userId: string) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        storeId: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        role: true,
-        status: true,
-        emailVerified: true,
-        avatar: true,
-        dateOfBirth: true,
-        language: true,
-        lastLoginAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    const user = await withUser(userId, tx =>
+      tx.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          storeId: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          role: true,
+          status: true,
+          emailVerified: true,
+          avatar: true,
+          dateOfBirth: true,
+          language: true,
+          lastLoginAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      })
+    );
     if (!user) {
       throw new AppError(404, 'NOT_FOUND', 'User not found');
     }
 
+    // The shopper's rows live in their store. A self-service export has no
+    // ambient scope, so gather them under the shopper's store + user; on the
+    // merchant route the request transaction is already that store's.
+    const gather = () => AuthService.gatherExport(userId, user);
+    return hasTenantContext()
+      ? gather()
+      : runInTenantContext(user.storeId ?? undefined, gather, userId);
+  }
+
+  private static async gatherExport(
+    userId: string,
+    user: { id: string; storeId: string | null } & Record<string, unknown>
+  ) {
     const [
       addresses,
       orders,
@@ -2005,11 +2126,10 @@ export class AuthService {
       // Same user-scoped RLS policy as the erase path above: on the
       // merchant-initiated export `current_user_id()` is the MERCHANT, so a
       // plain read returns an EMPTY addresses section and ships an incomplete
-      // Art. 20 portability bundle that looks complete. `withRlsBypass` is the
-      // right tool HERE — unlike the erase, this is read-only, so a second
-      // connection carries no atomicity or independent-commit hazard — and it
-      // is the repo's deliberate, greppable cross-user read.
-      withRlsBypass(tx => tx.address.findMany({ where: { userId } })),
+      // Art. 20 portability bundle that looks complete. `withUser` reads them AS
+      // the shopper — unlike the erase, this is read-only, so a second
+      // connection carries no atomicity or independent-commit hazard.
+      withUser(userId, tx => tx.address.findMany({ where: { userId } })),
       prisma.order.findMany({
         where: { customerId: userId },
         include: { items: true, payments: true },

@@ -4,11 +4,11 @@
  * `ai_usage` carries a STRICT RLS policy. `assertAiQuota` is called from
  * inside `runInStoreScope` (every bulk-AI sweep) and inside `tenantContext`
  * (the interactive AI routes), where an ambient `prisma.aiUsage.count()` is
- * filtered to the ONE store under force_app. The two platform counts
- * therefore have to run under `withRlsBypass`; only the per-store slice may
- * use the ambient (scoped) client.
+ * filtered to the ONE store under ebda_app. The two platform counts
+ * therefore go through the `ebda_ai_usage_count` SECURITY DEFINER function
+ * (`countAiUsage`); only the per-store slice may use the ambient (scoped) client.
  *
- * The fake below makes the two paths disagree the way force_app does: the
+ * The fake below makes the two paths disagree the way ebda_app does: the
  * ambient client sees only this store's rows (0), the bypass sees the
  * platform total (500). Mutation-proof: moving the global counts back onto
  * `prisma.aiUsage.count` makes both "trips the global …" cases pass through
@@ -24,7 +24,11 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@force/database', () => ({
   prisma: { aiUsage: { count: h.ambientCount } },
-  withRlsBypass: h.withRlsBypass,
+}));
+// The two platform counts go through the SECURITY DEFINER `ebda_ai_usage_count` (a single
+// aggregate across stores); `bypassCount` stands for it.
+vi.mock('../../apps/api/src/lib/definer', () => ({
+  countAiUsage: (o: { since: Date }) => h.withRlsBypass(o),
 }));
 
 import { assertAiQuota } from '../../apps/api/src/lib/ai-quota';
@@ -36,8 +40,8 @@ describe('assertAiQuota — global caps are cross-tenant (issue 2040, issue 2043
     h.bypassCount.mockReset().mockResolvedValue(500); // the platform total
     h.withRlsBypass
       .mockReset()
-      .mockImplementation(async (fn: (tx: unknown) => unknown) =>
-        fn({ aiUsage: { count: h.bypassCount } })
+      .mockImplementation(async (o: { since: Date }) =>
+        h.bypassCount({ where: { createdAt: { gte: o.since } } })
       );
     process.env.AI_DAILY_REQUEST_CAP = '450';
     process.env.AI_MONTHLY_REQUEST_CAP = '20000';
@@ -51,7 +55,7 @@ describe('assertAiQuota — global caps are cross-tenant (issue 2040, issue 2043
     await expect(assertAiQuota({ storeId: 'store-a', bulk: true })).rejects.toMatchObject({
       code: 'AI_QUOTA_DAILY_EXCEEDED',
     });
-    expect(h.withRlsBypass).toHaveBeenCalledTimes(1);
+    expect(h.withRlsBypass).toHaveBeenCalled(); // the platform count, not the ambient one
   });
 
   it('trips the global MONTHLY cap on the platform total', async () => {

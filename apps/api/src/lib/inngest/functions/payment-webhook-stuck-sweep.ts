@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass } from '@force/database';
+import { webhookInbox } from '../../definer';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -71,26 +71,10 @@ export const paymentWebhookStuckSweep: InngestFunction.Any = inngest.createFunct
     const cutoff = new Date(Date.now() - STUCK_WEBHOOK_MINUTES * 60_000);
 
     // Cross-tenant read of the inbox (storeId may be null) — withRlsBypass.
+    // Cross-store by nature (the inbox spans every store, including rows with a
+    // NULL store): one definer call, `ebda_webhook_inbox_stuck`.
     const stuck: StuckRow[] = await step.run('find-stuck', async () =>
-      withRlsBypass(tx =>
-        tx.webhookEvent.findMany({
-          where: {
-            status: { in: ['received', 'processing'] },
-            receivedAt: { lt: cutoff },
-          },
-          select: {
-            id: true,
-            provider: true,
-            idempotencyKey: true,
-            storeId: true,
-            status: true,
-            attempts: true,
-            receivedAt: true,
-          },
-          orderBy: { receivedAt: 'asc' },
-          take: SWEEP_TAKE,
-        })
-      )
+      webhookInbox.stuck(cutoff, SWEEP_TAKE)
     );
 
     if (stuck.length === 0) return { swept: 0, resent: 0, alerted: 0 };

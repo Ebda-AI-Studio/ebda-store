@@ -15,7 +15,7 @@ import { notificationConfigService } from './notification-config.service';
 import { smsQueue } from './sms-queue.service';
 import { pushService } from './push.service';
 import { redis } from './redis.service';
-import { withRlsBypass } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import logger from '../lib/logger';
 import { config } from '../config';
 import { SmsConsentService } from './sms-consent.service';
@@ -185,9 +185,10 @@ class NotificationDispatcherService {
       // notification_event_configs is under FORCE-RLS; dispatch() runs from
       // background fan-out with no tenant GUC, where findUnique would return
       // null → we'd silently fall back to all-on. Trusted internal read scoped
-      // by the storeId+event unique key, so bypass RLS for a context-independent
-      // read (defaults stay all-on only when the row genuinely doesn't exist).
-      const row = await withRlsBypass(tx =>
+      // by the storeId+event unique key, so it enters the store's scope itself
+      // (withStore) for a context-independent read (defaults stay all-on only
+      // when the row genuinely doesn't exist).
+      const row = await withStore(storeId, tx =>
         tx.notificationEventConfig.findUnique({
           where: { storeId_event: { storeId, event } },
           select: { sms: true, push: true },
@@ -351,9 +352,11 @@ const OPT_OUT_BASE_TTL_MS = 120_000;
 const optOutBaseCache = new BoundedMap<string, { base: Promise<string>; expiresAt: number }>(2000);
 
 async function readStorefrontBase(storeId: string): Promise<{ base: string; found: boolean }> {
-  const store = await withRlsBypass(tx =>
-    tx.store.findUnique({ where: { id: storeId }, select: { domain: true, slug: true } })
-  );
+  // `stores` carries no RLS: a plain read.
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { domain: true, slug: true },
+  });
   const base = store ? storefrontOrigin(store) : config.webUrl;
   return { base, found: !!store };
 }

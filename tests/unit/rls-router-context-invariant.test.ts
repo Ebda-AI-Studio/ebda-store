@@ -39,7 +39,7 @@
  * ALS-aware `prisma` proxy, before it's safe to wrap them.
  *
  * This test is a lightweight static + behavioral regression guard — NOT a
- * full integration test (those require the force_app CI job planned for
+ * full integration test (those require the ebda_app CI job planned for
  * RLS-3). It:
  *   1. Asserts the live Express dependency still resolves route params
  *      before firing `router.param()` callbacks (the core assumption the

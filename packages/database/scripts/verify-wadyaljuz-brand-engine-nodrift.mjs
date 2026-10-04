@@ -2,10 +2,10 @@
 // 4 brand color/foreground pairs BYTE-IDENTICAL to wadyaljuz's stored theme.
 // If any of the 8 vars differ, wadyaljuz would visually move — that is a fail.
 //   run:  node packages/database/scripts/verify-wadyaljuz-brand-engine-nodrift.mjs
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '@force/database';
 import { deriveBrandRoles } from '@force/shared';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
 
 const PAIRS = [
   ['--primary', 'primaryColor', '--primary-foreground', 'primaryForeground'],

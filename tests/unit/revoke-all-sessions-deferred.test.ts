@@ -63,6 +63,12 @@ const { mockPrisma, redisMock, sendMock, sendAlertMock } = vi.hoisted(() => {
   return { mockPrisma, redisMock, sendMock, sendAlertMock };
 });
 
+// The tokenVersion bump and the merchant-key revocation are ONE `ebda_user_revoke_sessions`
+// definer call (`revokeUserSessionsRow`); `user.update` stands in for it here.
+vi.mock('@api/lib/definer', () => ({
+  revokeUserSessionsRow: (userId: string) => mockPrisma.user.update({ where: { id: userId } }),
+}));
+
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: sendAlertMock }));
 
 vi.mock('@api/services/redis.service', () => ({ redis: redisMock }));
@@ -72,6 +78,9 @@ vi.mock('@force/database', () => ({
   prisma: mockPrisma,
   Prisma: {},
   hasTenantContext: () => false,
+  // no ambient transaction: the revoke runs AS the target user (own short transaction)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  withUser: (_userId: string, fn: any) => fn(mockPrisma),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   withMoneyTx: (client: any, fn: any) => fn(client),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -142,8 +151,9 @@ describe('#1859 AuthService.revokeAllSessions — Redis tv bump defers past the 
     expect(mockPrisma.refreshToken.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { userId: USER_ID, revokedAt: null } })
     );
-    expect(mockPrisma.merchantApiKey.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { userId: USER_ID, revokedAt: null } })
+    // merchant keys are revoked inside the same definer call as the tokenVersion bump
+    expect(mockPrisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: USER_ID } })
     );
   });
 });

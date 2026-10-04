@@ -1,7 +1,8 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Request } from 'express';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
-import { prisma, withRlsBypass } from '@force/database';
+import { withStore } from '@force/database';
+import { getUserState } from '../lib/definer';
 import type { McpStore } from './resolve-store';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
@@ -158,12 +159,11 @@ export async function verifyMerchantKey(req: Request, store: McpStore): Promise<
   }
 
   const digest = hashMerchantKey(presented);
-  // `withRlsBypass`: this lookup is what DETERMINES the tenant, so it cannot
-  // set `app.current_store_id` before running — the same category as
-  // `requireStoreAccess`'s staff lookup. Without it, the RLS policy this
-  // table now carries would make every valid key read nothing once the
-  // cutover lands, and the surface would 404 with no way to tell why.
-  const key = await withRlsBypass(tx =>
+  // The store is already resolved (from the URL slug), so the key is read under
+  // that store's scope. A key that belongs to ANOTHER store is simply not
+  // visible here: the miss is the same 404 as an unknown key, and the
+  // `wrong_store` case below stays only as defence in depth.
+  const key = await withStore(store.id, tx =>
     tx.merchantApiKey.findUnique({
       where: { keyHash: digest },
       select: {
@@ -174,23 +174,28 @@ export async function verifyMerchantKey(req: Request, store: McpStore): Promise<
         scopes: true,
         revokedAt: true,
         expiresAt: true,
-        // The OWNING USER is read on every verification, not just at mint.
-        //
-        // A key is a device acting AS a person, and the platform's levers for
-        // stopping a person — suspend, soft-delete, "sign out all devices" —
-        // all act on the User row. Without this join a suspended or deleted
-        // admin loses every dashboard session and keeps a fully working
-        // merchant key: `admin_get_order` returns line items, customer names,
-        // addresses and phones with no redaction, indefinitely if no expiry was
-        // set. Phase 2 and 3 land writes on this same path, which would turn a
-        // read leak into store mutation by a revoked principal.
-        user: { select: { status: true, deletedAt: true } },
       },
     })
   );
+  // The OWNING USER is read on every verification, not just at mint.
+  //
+  // A key is a device acting AS a person, and the platform's levers for
+  // stopping a person — suspend, soft-delete, "sign out all devices" —
+  // all act on the User row. Without this check a suspended or deleted
+  // admin loses every dashboard session and keeps a fully working
+  // merchant key: `admin_get_order` returns line items, customer names,
+  // addresses and phones with no redaction, indefinitely if no expiry was
+  // set. Phase 2 and 3 land writes on this same path, which would turn a
+  // read leak into store mutation by a revoked principal.
+  //
+  // Read through the `ebda_user_state` definer, not a join: `users` is under
+  // strict RLS, and an owner/staff row that has since left the store is not
+  // visible from its scope — a join would throw on the required relation
+  // instead of refusing the key.
+  const keyUser = key ? await getUserState(key.userId) : null;
 
   const now = new Date();
-  const userActive = !!key?.user && key.user.deletedAt === null && key.user.status === 'active';
+  const userActive = !!keyUser && keyUser.deletedAt === null && keyUser.status === 'active';
   const valid =
     !!key &&
     digestsMatch(key.keyHash, digest) &&
@@ -227,8 +232,7 @@ export async function verifyMerchantKey(req: Request, store: McpStore): Promise<
   // Fire-and-forget: a failed last-used stamp must never fail the request, and
   // this is telemetry, not a gate. Awaiting it would also put a write on the
   // hot path of every read tool call.
-  // Same reason as the lookup above: no tenant GUC is set on this path.
-  void withRlsBypass(tx =>
+  void withStore(store.id, tx =>
     tx.merchantApiKey.update({ where: { id: key.id }, data: { lastUsedAt: now } })
   ).catch(() => undefined);
 

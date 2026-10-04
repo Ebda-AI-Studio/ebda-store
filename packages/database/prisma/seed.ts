@@ -9,11 +9,11 @@
  * Run with: npx ts-node --esm src/seed.ts
  */
 
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '../src/client';
 import * as bcrypt from 'bcryptjs';
 
 import { roundToMinor, REGION } from '@force/shared';
-const prisma = new PrismaClient();
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
 
 // ============================================
 // Helper Functions

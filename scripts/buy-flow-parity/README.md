@@ -40,7 +40,7 @@ For each ref: `git worktree add --detach` into `$TMPDIR/fwb-buy-flow-parity/`
 and after), `npm ci` via npm@10 with `HUSKY=0`, `prisma generate`, then a build
 of `packages/database`, `packages/shared` and `apps/api`. `prisma migrate deploy`
 runs on a **fresh local database per ref**. The fixture is seeded as plain SQL (so
-it is identical for both refs), and the built API starts **as the `force_app` RLS
+it is identical for both refs), and the built API starts **as the `ebda_app` RLS (override: `PARITY_APP_ROLE`)
 role**, the same way production and CI run it. The scenarios then run over HTTP.
 
 - **Postgres 16 + Redis 7** run as Apple `container`s `fwb-buyflow-pg`
@@ -178,14 +178,14 @@ given. All URLs must be loopback.
 The API under test must be started by you with the harness environment (the
 harness cannot inject it):
 
-| env var                                               | value                                                     |
-| ----------------------------------------------------- | --------------------------------------------------------- |
-| `DATABASE_URL`                                        | the side's DB as the `force_app` RLS role (like prod/CI)  |
-| `ENCRYPTION_KEY`                                      | harness key (default in `run.mjs`; or `--encryption-key`) |
-| `LOAD_TEST_BYPASS_TOKEN`                              | `bfp-parity-load-test-token`                              |
-| `INNGEST_BASE_URL` and `INNGEST_DEV`                  | `http://127.0.0.1:4690` (the harness stub)                |
-| `MYFATOORAH_BASE_URL`                                 | `http://127.0.0.1:4690/mf`                                |
-| `NODE_ENV=development` (or `PAYMENT_PROVIDER_STUB=1`) | required for the override to be honoured                  |
+| env var                                               | value                                                                                 |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                        | the side's DB as the `ebda_app` RLS (override: `PARITY_APP_ROLE`) role (like prod/CI) |
+| `ENCRYPTION_KEY`                                      | harness key (default in `run.mjs`; or `--encryption-key`)                             |
+| `LOAD_TEST_BYPASS_TOKEN`                              | `bfp-parity-load-test-token`                                                          |
+| `INNGEST_BASE_URL` and `INNGEST_DEV`                  | `http://127.0.0.1:4690` (the harness stub)                                            |
+| `MYFATOORAH_BASE_URL`                                 | `http://127.0.0.1:4690/mf`                                                            |
+| `NODE_ENV=development` (or `PAYMENT_PROVIDER_STUB=1`) | required for the override to be honoured                                              |
 
 `MYFATOORAH_BASE_URL` (documented in `docs/ENVIRONMENT.md`) is the runtime-agnostic
 replacement for the `node --import` preload: the provider calls the stub directly,

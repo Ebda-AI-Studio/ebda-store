@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -37,11 +37,11 @@ export const accountingPeriodReconciliation: InngestFunction.Any = inngest.creat
         // Cross-tenant cron — Inngest workers run without any HTTP context
         // so no tenant GUC is set. With FORCE ROW LEVEL SECURITY in place
         // (migration 20260530000000_force_rls_enforcement) the orders policy
-        // runs for every connection, including `force_app`. Wrapping with
-        // withRlsBypass ensures the aggregate sees ALL rows for this store
-        // regardless of GUC state, while the explicit storeId + paymentStatus
-        // WHERE clause preserves application-level scoping as defense-in-depth.
-        withRlsBypass(async tx => {
+        // runs for every connection, including `ebda_app`. Wrapping with
+        // withStore scopes the read to this store (no ambient GUC to rely on),
+        // while the explicit storeId + paymentStatus WHERE clause preserves
+        // application-level scoping as defense-in-depth.
+        withStore(store.id, async tx => {
           const result = await tx.order.aggregate({
             // Exclude cancelled/refunded orders: their revenue was intentionally
             // REVERSED in the GL (net-zero credits), so counting their total on
@@ -63,9 +63,10 @@ export const accountingPeriodReconciliation: InngestFunction.Any = inngest.creat
 
       const gl = await step.run(`gl-${store.id}`, async () => {
         // Cross-tenant cron — no tenant context; RLS would filter these
-        // accounting reads to 0 rows. withRlsBypass sets the GUC inside
+        // accounting reads to 0 rows. withStore sets the GUC inside
         // a transaction so the raw SQL sees actual posted journal lines.
-        const rows = await withRlsBypass(
+        const rows = await withStore(
+          store.id,
           tx => tx.$queryRaw<{ total: bigint }[]>`
             SELECT COALESCE(SUM(l.credit), 0) AS total
             FROM public.journal_lines l

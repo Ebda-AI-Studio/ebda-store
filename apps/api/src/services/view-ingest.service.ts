@@ -14,11 +14,11 @@
  *
  * Scaling: uses a raw `$executeRaw` upsert (INSERT … ON CONFLICT DO UPDATE)
  * so one SQL round-trip handles the counter increment without a separate read.
- * The `withRlsBypass` wrapper is required because this runs outside a tenant
- * context (public endpoint, no JWT) and the table has RLS enabled.
+ * The `withStore` wrapper is required because this runs outside a tenant
+ * request context (public endpoint, no JWT) and the table has RLS enabled.
  */
 
-import { prisma, withRlsBypass } from '@force/database';
+import { withStore } from '@force/database';
 import { regionDayStart } from '@force/shared';
 import { BoundedMap } from '../lib/bounded-map';
 import logger from '../lib/logger';
@@ -85,8 +85,10 @@ export async function recordProductView(
 
   try {
     // Single-round-trip upsert: increment count or create a new row for today.
-    // We bypass RLS because this runs outside a tenant JWT context.
-    await withRlsBypass(
+    // Runs outside a tenant request context (public storefront beacon), so it
+    // enters the store's scope itself.
+    await withStore(
+      storeId,
       tx =>
         tx.$executeRaw`
         INSERT INTO product_daily_views (id, store_id, product_id, date, count)

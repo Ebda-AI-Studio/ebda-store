@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { Prisma } from '@force/database';
+import { uniqueViolationTarget } from '../lib/prisma-errors';
 import logger from '../lib/logger';
 
 export class AppError extends Error {
@@ -80,8 +81,7 @@ export function isExpectedClientError(err: unknown): boolean {
     // row, an idempotency key — is our own double write and is captured
     // (issue 2005).
     if (err.code === 'P2002') {
-      const target = (err.meta as { target?: unknown } | undefined)?.target;
-      const fields = Array.isArray(target) ? target.map(String) : [String(target ?? '')];
+      const fields = uniqueViolationTarget(err);
       return fields.some(f => MERCHANT_TYPED_UNIQUE_FIELDS.has(f) || /_(sku|slug)_key$/.test(f));
     }
     return false;
@@ -225,8 +225,7 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
     };
 
     if (err.code === 'P2002') {
-      const target = err.meta?.target;
-      const columns = Array.isArray(target) ? target.map(String) : [];
+      const columns = uniqueViolationTarget(err);
       // Ignore tenant-scoping columns — "store_id + sku is taken" is noise to a
       // merchant who only ever operates inside their own store.
       const named = columns

@@ -49,9 +49,11 @@ const tx = {
   },
 };
 
-vi.mock('@force/database', () => ({
-  prisma: {},
-  withRlsBypass: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
+vi.mock('@force/database', async () => ({
+  ...(await import('./helpers/database-mock')).databaseMock({
+    // `tx` is initialised after this hoisted factory runs: resolve it lazily.
+    prisma: new Proxy({}, { get: (_t, k) => (tx as Record<string | symbol, unknown>)[k] }),
+  }),
 }));
 
 vi.mock('../../apps/api/src/services/accounting/gemini-ai.service', () => ({

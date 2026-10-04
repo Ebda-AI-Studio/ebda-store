@@ -24,7 +24,9 @@
  *    after `failed` DOES settle (the money was taken).
  */
 import crypto from 'crypto';
-import { withRlsBypass, type Prisma } from '@force/database';
+import { prisma, withStore, acrossStores, type Prisma } from '@force/database';
+import { getBillingRefundStoreId, getEntityStoreId } from '../../lib/definer';
+import { pageAcrossStores } from '../../lib/cross-store';
 import { AppError } from '../../middleware/error-handler';
 import { config } from '../../config';
 import logger from '../../lib/logger';
@@ -108,13 +110,28 @@ interface ClaimInput {
 }
 
 /**
+ * `billing_events` and `store_subscriptions` are under strict RLS: every access
+ * runs in the owning store's scope. A ledger row / subscription named only by its
+ * id (a cron step, a webhook) is resolved to its store through the
+ * `ebda_entity_store_id` definer first.
+ */
+async function inEventStore<T>(
+  eventId: string,
+  fn: (tx: Tx) => Promise<T>,
+  whenMissing: T
+): Promise<T> {
+  const storeId = await getEntityStoreId('billing_event', eventId);
+  return storeId ? withStore(storeId, fn) : whenMissing;
+}
+
+/**
  * Claim an idempotency key. Returns the new row's id, or null when the key was
  * already claimed (another run / a retry): the caller must NOT call the provider.
  * `ON CONFLICT DO NOTHING` — a duplicate never aborts the surrounding tx.
  */
 async function claimEvent(input: ClaimInput): Promise<string | null> {
   const id = crypto.randomUUID();
-  const { count } = await withRlsBypass(tx =>
+  const { count } = await withStore(input.storeId, tx =>
     tx.billingEvent.createMany({
       data: [
         {
@@ -141,15 +158,18 @@ async function claimEvent(input: ClaimInput): Promise<string | null> {
 }
 
 async function markFailedUnlessSettled(id: string, reason: string, raw?: unknown): Promise<void> {
-  await withRlsBypass(tx =>
-    tx.billingEvent.updateMany({
-      where: { id, status: 'pending' },
-      data: {
-        status: 'failed',
-        failureReason: reason,
-        raw: (raw ?? undefined) as Prisma.InputJsonValue,
-      },
-    })
+  await inEventStore(
+    id,
+    tx =>
+      tx.billingEvent.updateMany({
+        where: { id, status: 'pending' },
+        data: {
+          status: 'failed',
+          failureReason: reason,
+          raw: (raw ?? undefined) as Prisma.InputJsonValue,
+        },
+      }),
+    { count: 0 }
   );
 }
 
@@ -364,7 +384,9 @@ export async function settleInTx(
 
 async function settleCharge(eventId: string, o: Outcome, now: Date) {
   const effects: BillingEffect[] = [];
-  const res = await withRlsBypass(tx => settleInTx(tx, eventId, o, now, effects));
+  const res = await inEventStore(eventId, tx => settleInTx(tx, eventId, o, now, effects), {
+    transitioned: false,
+  });
   await runBillingEffects(effects);
   return res;
 }
@@ -412,11 +434,14 @@ async function chargeAndSettle(args: {
     return { settled: 'pending', reason: (err as Error).message };
   }
   if (res.status === 'pending') {
-    await withRlsBypass(tx =>
-      tx.billingEvent.updateMany({
-        where: { id: args.eventId, status: 'pending' },
-        data: { providerRef: res.chargeId ?? undefined },
-      })
+    await inEventStore(
+      args.eventId,
+      tx =>
+        tx.billingEvent.updateMany({
+          where: { id: args.eventId, status: 'pending' },
+          data: { providerRef: res.chargeId ?? undefined },
+        }),
+      { count: 0 }
     );
     return { settled: 'pending' };
   }
@@ -436,11 +461,11 @@ async function chargeAndSettle(args: {
 // ───────────────────────────── checkout ───────────────────────────────────
 
 async function loadSub(storeId: string) {
-  return withRlsBypass(tx => tx.storeSubscription.findUnique({ where: { storeId } }));
+  return withStore(storeId, tx => tx.storeSubscription.findUnique({ where: { storeId } }));
 }
 
 async function loadPayablePlan(planCode: string, interval: BillingInterval) {
-  const plan = await withRlsBypass(tx => tx.plan.findUnique({ where: { code: planCode } }));
+  const plan = await prisma.plan.findUnique({ where: { code: planCode } });
   if (!plan) throw new AppError(404, 'PLAN_NOT_FOUND', 'Plan not found');
   if (plan.code === FREE_PLAN_CODE || plan.code === COMPED_PLAN_CODE) {
     throw new AppError(400, 'PLAN_NOT_PURCHASABLE', 'This plan cannot be purchased');
@@ -472,7 +497,7 @@ export async function startCheckout(args: {
 
   const [sub, store] = await Promise.all([
     loadSub(args.storeId),
-    withRlsBypass(tx =>
+    withStore(args.storeId, tx =>
       tx.store.findUnique({
         where: { id: args.storeId },
         select: {
@@ -522,7 +547,7 @@ export async function startCheckout(args: {
       webhookUrl: `${config.apiUrl}/api/v1/webhooks/billing/${provider.name}`,
       locale: lang,
     });
-    await withRlsBypass(tx =>
+    await withStore(args.storeId, tx =>
       tx.billingEvent.updateMany({
         where: { id: eventId, status: 'pending' },
         data: { raw: { providerSessionId: out.providerSessionId } },
@@ -548,9 +573,12 @@ export async function renewSubscription(
   now: Date = new Date(),
   provider: BillingProvider = getBillingProvider()
 ): Promise<RenewalResult> {
-  const sub = await withRlsBypass(tx =>
-    tx.storeSubscription.findUnique({ where: { id: subscriptionId } })
-  );
+  const subStoreId = await getEntityStoreId('store_subscription', subscriptionId);
+  const sub = subStoreId
+    ? await withStore(subStoreId, tx =>
+        tx.storeSubscription.findUnique({ where: { id: subscriptionId } })
+      )
+    : null;
   if (!sub) return { action: 'skipped', reason: 'not_found' };
   // Comped is NEVER charged (checked on both the status and the plan).
   if (sub.status === 'comped' || sub.planCode === COMPED_PLAN_CODE) {
@@ -564,7 +592,7 @@ export async function renewSubscription(
   // Cancel-at-period-end (or a downgrade to free): finalize once the period is over.
   if (sub.cancelAtPeriodEnd && periodEnd.getTime() <= now.getTime()) {
     const effects: BillingEffect[] = [];
-    await withRlsBypass(tx => downgradeToFree(tx, sub.storeId, 'canceled', effects));
+    await withStore(sub.storeId, tx => downgradeToFree(tx, sub.storeId, 'canceled', effects));
     await runBillingEffects(effects);
     return { action: 'canceled' };
   }
@@ -579,7 +607,7 @@ export async function renewSubscription(
   // A trial that ended with no saved card moves to free (same shape as dunning).
   if (trialEnd && (!sub.provider || !sub.providerPaymentMethodRef)) {
     const effects: BillingEffect[] = [];
-    await withRlsBypass(tx => downgradeToFree(tx, sub.storeId, 'trial_ended', effects));
+    await withStore(sub.storeId, tx => downgradeToFree(tx, sub.storeId, 'trial_ended', effects));
     await runBillingEffects(effects);
     return { action: 'no_payment_method_downgrade' };
   }
@@ -587,14 +615,16 @@ export async function renewSubscription(
 
   if (!sub.providerPaymentMethodRef) {
     const effects: BillingEffect[] = [];
-    await withRlsBypass(tx => downgradeToFree(tx, sub.storeId, 'no_payment_method', effects));
+    await withStore(sub.storeId, tx =>
+      downgradeToFree(tx, sub.storeId, 'no_payment_method', effects)
+    );
     await runBillingEffects(effects);
     return { action: 'no_payment_method_downgrade' };
   }
 
   const interval = isInterval(sub.billingInterval) ? sub.billingInterval : 'monthly';
   const targetCode = sub.pendingPlanCode ?? sub.planCode;
-  const plan = await withRlsBypass(tx => tx.plan.findUnique({ where: { code: targetCode } }));
+  const plan = await prisma.plan.findUnique({ where: { code: targetCode } });
   const price = plan ? priceFor(plan, interval) : null;
   if (!plan || price === null || price <= 0) {
     logger.error({ subscriptionId, targetCode }, '[billing] renewal skipped: plan price not set');
@@ -655,37 +685,47 @@ export async function findDueSubscriptionIds(
   now: Date,
   only?: { subscriptionIds?: string[] }
 ): Promise<string[]> {
-  const rows = await withRlsBypass(tx =>
-    tx.storeSubscription.findMany({
-      where: {
-        ...(only?.subscriptionIds ? { id: { in: only.subscriptionIds } } : {}),
-        planCode: { notIn: [COMPED_PLAN_CODE, FREE_PLAN_CODE] },
-        OR: [
-          {
-            status: { in: ['active', 'trialing'] },
-            currentPeriodEnd: { lte: now },
-            OR: [{ provider: { not: null } }, { cancelAtPeriodEnd: true }],
-          },
-          { status: 'trialing', trialEndsAt: { lte: now } },
-          { status: 'past_due', nextRetryAt: { lte: now } },
-        ],
-      },
-      select: { id: true },
-      orderBy: { currentPeriodEnd: 'asc' },
-    })
+  // Per store, each in its own scope (store_subscriptions is strict-RLS): no
+  // bypass, and a store whose scope fails does not hide the rest.
+  const parts = await acrossStores(
+    () =>
+      prisma.storeSubscription.findMany({
+        where: {
+          ...(only?.subscriptionIds ? { id: { in: only.subscriptionIds } } : {}),
+          planCode: { notIn: [COMPED_PLAN_CODE, FREE_PLAN_CODE] },
+          OR: [
+            {
+              status: { in: ['active', 'trialing'] },
+              currentPeriodEnd: { lte: now },
+              OR: [{ provider: { not: null } }, { cancelAtPeriodEnd: true }],
+            },
+            { status: 'trialing', trialEndsAt: { lte: now } },
+            { status: 'past_due', nextRetryAt: { lte: now } },
+          ],
+        },
+        select: { id: true, currentPeriodEnd: true },
+      }),
+    { onStoreError: (storeId, err) => logger.error({ err, storeId }, '[billing] due scan failed') }
   );
+  const seen = new Set<string>();
+  const rows = parts
+    .flatMap(p => p.value)
+    .filter(r => (seen.has(r.id) ? false : (seen.add(r.id), true)))
+    .sort((x, y) => (x.currentPeriodEnd?.getTime() ?? 0) - (y.currentPeriodEnd?.getTime() ?? 0));
   return rows.map(r => r.id);
 }
 
 export async function expireStaleCheckouts(now: Date): Promise<number> {
   const cutoff = new Date(now.getTime() - STALE_CHECKOUT_MS);
-  const r = await withRlsBypass(tx =>
-    tx.billingEvent.updateMany({
-      where: { type: 'checkout', status: 'pending', createdAt: { lt: cutoff } },
-      data: { status: 'failed', failureReason: 'abandoned' },
-    })
+  const parts = await acrossStores(
+    () =>
+      prisma.billingEvent.updateMany({
+        where: { type: 'checkout', status: 'pending', createdAt: { lt: cutoff } },
+        data: { status: 'failed', failureReason: 'abandoned' },
+      }),
+    { onStoreError: (storeId, err) => logger.error({ err, storeId }, '[billing] expiry failed') }
   );
-  return r.count;
+  return parts.reduce((n, p) => n + p.value.count, 0);
 }
 
 /** One pass of the daily cycle. Idempotent: running it twice charges once. */
@@ -754,12 +794,12 @@ export async function changePlan(args: {
   if (!sub.providerPaymentMethodRef || !sub.provider || sub.status !== 'active') {
     throw new AppError(409, 'NO_PAYMENT_METHOD', 'Start a checkout to add a payment method first');
   }
-  const current = await withRlsBypass(tx => tx.plan.findUnique({ where: { code: sub.planCode } }));
+  const current = await prisma.plan.findUnique({ where: { code: sub.planCode } });
   const currentPrice = (current && priceFor(current, interval)) || 0;
 
   if (price > currentPrice) {
     // UPGRADE — immediate, full charge, fresh period from now (no proration).
-    const prior = await withRlsBypass(tx =>
+    const prior = await withStore(args.storeId, tx =>
       tx.billingEvent.findMany({
         where: {
           subscriptionId: sub.id,
@@ -810,7 +850,7 @@ export async function changePlan(args: {
   }
 
   // DOWNGRADE — at the period end; renewal then charges the cheaper plan.
-  await withRlsBypass(tx =>
+  await withStore(args.storeId, tx =>
     tx.storeSubscription.update({
       where: { storeId: args.storeId },
       data: { pendingPlanCode: plan.code, cancelAtPeriodEnd: false },
@@ -830,11 +870,11 @@ export async function cancelSubscription(args: {
     throw new AppError(409, 'STORE_COMPED', 'Comped stores are not billed');
   if (sub.status === 'past_due' || !sub.currentPeriodEnd) {
     const effects: BillingEffect[] = [];
-    await withRlsBypass(tx => downgradeToFree(tx, args.storeId, 'canceled', effects));
+    await withStore(args.storeId, tx => downgradeToFree(tx, args.storeId, 'canceled', effects));
     await runBillingEffects(effects);
     return { mode: 'immediate', effectiveAt: null };
   }
-  await withRlsBypass(tx =>
+  await withStore(args.storeId, tx =>
     tx.storeSubscription.update({
       where: { storeId: args.storeId },
       data: { cancelAtPeriodEnd: true, pendingPlanCode: null },
@@ -848,7 +888,7 @@ export async function resumeSubscription(args: { storeId: string }): Promise<voi
   if (!sub || !['active', 'trialing'].includes(sub.status)) {
     throw new AppError(409, 'NOTHING_TO_RESUME', 'Nothing to resume');
   }
-  await withRlsBypass(tx =>
+  await withStore(args.storeId, tx =>
     tx.storeSubscription.update({
       where: { storeId: args.storeId },
       data: { cancelAtPeriodEnd: false, pendingPlanCode: null },
@@ -875,7 +915,23 @@ export async function applyWebhookEvent(
   now: Date = new Date()
 ): Promise<WebhookResult> {
   const effects: BillingEffect[] = [];
-  const result = await withRlsBypass(async (tx): Promise<WebhookResult> => {
+  // A signed provider callback names a ledger row or a provider reference, not a
+  // store: the store comes from a definer, and the dedupe + settlement then run
+  // in ONE transaction scoped to it. With no resolvable store only the (store-less)
+  // dedupe ledger is touched and the event is ignored.
+  let webhookStoreId: string | null = null;
+  if (event.kind === 'refund.succeeded' || event.kind === 'refund.failed') {
+    webhookStoreId = event.providerRef
+      ? await getBillingRefundStoreId(providerName, event.providerRef)
+      : null;
+  } else if (
+    event.kind !== 'ignored' &&
+    event.merchantOrderId &&
+    UUID_RE.test(event.merchantOrderId)
+  ) {
+    webhookStoreId = await getEntityStoreId('billing_event', event.merchantOrderId);
+  }
+  const apply = async (tx: Tx): Promise<WebhookResult> => {
     const ins = await tx.billingWebhookEvent.createMany({
       data: [
         {
@@ -951,7 +1007,10 @@ export async function applyWebhookEvent(
       effects
     );
     return { duplicate: false, outcome: 'processed' };
-  });
+  };
+  const result = webhookStoreId
+    ? await withStore(webhookStoreId, apply)
+    : await apply(prisma as unknown as Tx);
   await runBillingEffects(effects);
   return result;
 }
@@ -1009,15 +1068,18 @@ export async function refundCharge(args: {
   provider?: BillingProvider;
 }): Promise<{ refundEventId: string; status: 'succeeded' | 'failed' | 'pending' }> {
   const provider = args.provider ?? getBillingProvider();
-  const charge = await withRlsBypass(tx =>
-    tx.billingEvent.findUnique({ where: { id: args.eventId } })
-  );
+  const chargeStoreId = await getEntityStoreId('billing_event', args.eventId);
+  const charge = chargeStoreId
+    ? await withStore(chargeStoreId, tx =>
+        tx.billingEvent.findUnique({ where: { id: args.eventId } })
+      )
+    : null;
   if (!charge || charge.type === 'refund')
     throw new AppError(404, 'CHARGE_NOT_FOUND', 'Charge not found');
   if (charge.status !== 'succeeded' || !charge.providerRef) {
     throw new AppError(409, 'NOT_REFUNDABLE', 'Only a succeeded charge can be refunded');
   }
-  const prior = await withRlsBypass(tx =>
+  const prior = await withStore(charge.storeId, tx =>
     tx.billingEvent.findMany({
       where: {
         relatedEventId: charge.id,
@@ -1057,7 +1119,7 @@ export async function refundCharge(args: {
       amountMinor: amount,
       idempotencyKey: key,
     });
-    await withRlsBypass(async tx => {
+    await withStore(charge.storeId, async tx => {
       await tx.billingEvent.updateMany({
         where: { id: refundId, status: 'pending' },
         data: { providerRef: res.refundId ?? undefined, raw: res.raw as Prisma.InputJsonValue },
@@ -1094,7 +1156,7 @@ const PUBLIC_FIELDS = {
 
 /** Merchant view: their own charges/invoices, newest first (no provider payloads). */
 export async function listStoreCharges(storeId: string, limit = 50) {
-  const rows = await withRlsBypass(tx =>
+  const rows = await withStore(storeId, tx =>
     tx.billingEvent.findMany({
       where: { storeId },
       orderBy: { createdAt: 'desc' },
@@ -1122,19 +1184,34 @@ export async function listLedger(args: {
   before?: Date;
 }) {
   const take = Math.min(Math.max(args.limit ?? 50, 1), 200);
-  const rows = await withRlsBypass(tx =>
-    tx.billingEvent.findMany({
-      where: {
+  // Cross-store, super_admin only (route): one window per store, merged by time.
+  type LedgerRow = Prisma.BillingEventGetPayload<{
+    include: { store: { select: { name: true; slug: true } } };
+  }>;
+  const { rows } = await pageAcrossStores<LedgerRow>({
+    storeIds: args.storeId ? [args.storeId] : undefined,
+    skip: 0,
+    take,
+    orderKey: r => r.createdAt,
+    fetch: async window => {
+      const where = {
         ...(args.storeId ? { storeId: args.storeId } : {}),
         ...(args.status ? { status: args.status } : {}),
         ...(args.type ? { type: args.type } : {}),
         ...(args.before ? { createdAt: { lt: args.before } } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take,
-      include: { store: { select: { name: true, slug: true } } },
-    })
-  );
+      };
+      const [found, total] = await Promise.all([
+        prisma.billingEvent.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          take: window,
+          include: { store: { select: { name: true, slug: true } } },
+        }),
+        prisma.billingEvent.count({ where }),
+      ]);
+      return { rows: found, total };
+    },
+  });
   const stuckBefore = Date.now() - 3_600_000;
   return rows.map(r => ({
     id: r.id,

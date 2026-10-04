@@ -31,9 +31,9 @@
 //
 //   run: railway run node packages/database/scripts/migrate-legacy-hero-to-slide.mjs
 //   (DO NOT run against a remote DB without an explicit go-ahead + a fresh backup.)
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '@force/database';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
 
 const stores = await prisma.store.findMany({
   where: { deletedAt: null },

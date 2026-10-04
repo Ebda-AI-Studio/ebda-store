@@ -11,9 +11,8 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@force/database', () => ({
-  prisma: {},
-  withRlsBypass: async (fn: (tx: unknown) => unknown) =>
-    fn({ store: { findUnique: h.findUnique } }),
+  // `stores` carries no RLS: a plain read on the bare client.
+  prisma: { store: { findUnique: h.findUnique } },
 }));
 vi.mock('@api/services/feature.service', () => ({ featureService: {} }));
 vi.mock('@api/services/notification-config.service', () => ({ notificationConfigService: {} }));

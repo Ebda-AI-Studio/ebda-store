@@ -13,33 +13,71 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuditFindMany, mockAuditGroupBy, mockOrderFindMany, mockSendAlert, mockRlsBypass } =
-  vi.hoisted(() => {
-    const findMany = vi.fn();
-    // #1656: the watcher now discovers WHICH stores had any denial in the
-    // window via a groupBy, then pulls each store's own bounded slice —
-    // rather than one global `take` that a single noisy store could fill.
-    // Defaults to no active stores (empty window); tests that configure rows
-    // via `setDenials` below configure this alongside `findMany`.
-    const groupBy = vi.fn(async () => [] as { storeId: string | null }[]);
-    // The watcher makes a SECOND cross-tenant read: which of the stores in this
-    // window have ever completed an agent order. That flag is what separates a
-    // broken pre-existing integration from crawler noise, so the stub has to
-    // answer it — defaulting to "no prior agent activity", which is what every
-    // pre-existing case in this file assumes.
-    const orderFindMany = vi.fn(async () => []);
-    return {
-      mockAuditFindMany: findMany,
-      mockAuditGroupBy: groupBy,
-      mockOrderFindMany: orderFindMany,
-      mockSendAlert: vi.fn(),
-      mockRlsBypass: vi.fn((fn: (tx: unknown) => unknown) =>
-        fn({ auditLog: { findMany, groupBy }, order: { findMany: orderFindMany } })
-      ),
-    };
-  });
+const {
+  mockAuditFindMany,
+  mockAuditGroupBy,
+  mockAuditCount,
+  mockOrderFindMany,
+  mockSendAlert,
+  mockRlsBypass,
+} = vi.hoisted(() => {
+  const findMany = vi.fn();
+  // #1656: the watcher now discovers WHICH stores had any denial in the
+  // window via a groupBy, then pulls each store's own bounded slice —
+  // rather than one global `take` that a single noisy store could fill.
+  // Defaults to no active stores (empty window); tests that configure rows
+  // via `setDenials` below configure this alongside `findMany`.
+  const groupBy = vi.fn(async () => [] as { storeId: string | null }[]);
+  // The watcher makes a SECOND cross-tenant read: which of the stores in this
+  // window have ever completed an agent order. That flag is what separates a
+  // broken pre-existing integration from crawler noise, so the stub has to
+  // answer it — defaulting to "no prior agent activity", which is what every
+  // pre-existing case in this file assumes.
+  const orderFindMany = vi.fn(async () => []);
+  return {
+    mockAuditFindMany: findMany,
+    mockAuditGroupBy: groupBy,
+    // one store's count of denials in the window: the argument is what the watcher asked for
+    mockAuditCount: vi.fn(),
+    mockOrderFindMany: orderFindMany,
+    mockSendAlert: vi.fn(),
+    // `withStore(storeId, fn)`: one short tenant transaction per store read.
+    mockRlsBypass: vi.fn((_storeId: string, fn: (tx: unknown) => unknown) =>
+      fn({ auditLog: { findMany } })
+    ),
+  };
+});
 
-vi.mock('@force/database', () => ({ withRlsBypass: mockRlsBypass }));
+// `acrossStores` visits every store in its own tenant transaction. The stand-in answers the
+// two questions the watcher asks of it without a database: the per-store denial counts
+// (`groupBy` stub) and which of the given stores have ever had an agent order (`orderFindMany`).
+vi.mock('@force/database', () => ({
+  prisma: { auditLog: { count: (...a: unknown[]) => mockAuditCount(...a) } },
+  withStore: mockRlsBypass,
+  acrossStores: async (fn: (storeId: string) => Promise<unknown>, o?: { storeIds?: string[] }) => {
+    if (!o?.storeIds) {
+      // Per-store denial counts: each active store (the `groupBy` stub names them and their
+      // counts) is visited and `fn` runs for it, so the query the watcher builds is observable.
+      const groups = (await mockAuditGroupBy()) as Array<{
+        storeId: string | null;
+        _count?: { _all: number };
+      }>;
+      const out: Array<{ storeId: string; value: unknown }> = [];
+      for (const g of groups) {
+        mockAuditCount.mockResolvedValueOnce(g._count?._all ?? 0);
+        out.push({ storeId: g.storeId as string, value: await fn(g.storeId as string) });
+      }
+      return out;
+    }
+    const rows = (await mockOrderFindMany({ where: { source: 'agent' } })) as Array<{
+      storeId: string;
+    }>;
+    return o.storeIds.map(storeId => ({
+      storeId,
+      value: rows.some(r => r.storeId === storeId) ? { storeId } : null,
+    }));
+  },
+}));
 vi.mock('@api/lib/inngest/client', () => ({
   inngest: { send: vi.fn(), createFunction: vi.fn(() => ({})) },
 }));
@@ -92,8 +130,10 @@ describe('agent-write-denied-watch — what it reads', () => {
   it('discovers active stores via a groupBy scoped to the same action + window', async () => {
     await handleAgentWriteDeniedWatch();
 
-    expect(mockRlsBypass).toHaveBeenCalled(); // audit_logs is RLS-protected
-    const args = mockAuditGroupBy.mock.calls[0][0];
+    // audit_logs is RLS-protected: the discovery runs per store, through acrossStores.
+    setDenials([deniedRow('none', '1.1.1.1')]);
+    await handleAgentWriteDeniedWatch();
+    const args = mockAuditCount.mock.calls[0][0];
     expect(args.where.action).toBe('agent.write.denied');
 
     const since = args.where.createdAt.gte as Date;
@@ -104,7 +144,7 @@ describe('agent-write-denied-watch — what it reads', () => {
     expect(windowMs).toBeLessThan((DENIAL_WINDOW_MINUTES + 1) * 60_000);
   });
 
-  it('reads ONLY agent.write.denied rows for an active store, within the declared window, past RLS', async () => {
+  it('reads ONLY agent.write.denied rows for an active store, within the declared window, in that store scope', async () => {
     setDenials([deniedRow('none', '1.1.1.1')]);
 
     await handleAgentWriteDeniedWatch();
@@ -319,9 +359,8 @@ describe('agent-write-denied-watch — bounded fan-out (issue 2055, issue 2060)'
     );
     expect(perStoreReads).toHaveLength(100);
     expect(perStoreReads).toContain('store-149');
-    // 1 groupBy + 10 batches of 10 + 1 prior-agent-order read — never one
-    // transaction spanning the whole fan-out.
-    expect(mockRlsBypass).toHaveBeenCalledTimes(12);
+    // One short tenant transaction per store — never one spanning the whole fan-out.
+    expect(mockRlsBypass).toHaveBeenCalledTimes(100);
   });
 
   it('marks the tick truncated when whole stores were dropped', async () => {

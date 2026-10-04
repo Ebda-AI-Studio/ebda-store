@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass } from '@force/database';
+import { prisma, withStore, acrossStoresFlat } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -79,11 +79,11 @@ export const storeUsageSnapshot: InngestFunction.Any = inngest.createFunction(
     const end = new Date(periodEnd);
 
     const rows = await step.run('collect', async () =>
-      withRlsBypass(async tx => {
-        // One pass per concern, joined in SQL rather than N queries per store —
-        // this runs over every store on the platform and must not become an
-        // N+1 as the tenant count grows.
-        return tx.$queryRaw<
+      // Every table read below is store-scoped under RLS, so the collection runs
+      // store by store (`acrossStoresFlat`: one short tenant transaction each),
+      // one joined SQL pass per store rather than N queries per store.
+      acrossStoresFlat(async storeId => {
+        return prisma.$queryRaw<
           Array<{
             store_id: string;
             products: bigint;
@@ -166,7 +166,7 @@ export const storeUsageSnapshot: InngestFunction.Any = inngest.createFunction(
                 AND a.cached_hit = false AND a.cost_micros IS NULL) AS ai_unpriced_calls
 
           FROM stores s
-          WHERE s.deleted_at IS NULL
+          WHERE s.id = ${storeId} AND s.deleted_at IS NULL
         `;
       }).then(toJsonSafeRows)
     );
@@ -174,7 +174,7 @@ export const storeUsageSnapshot: InngestFunction.Any = inngest.createFunction(
     let written = 0;
     for (const r of rows) {
       await step.run(`upsert-${r.store_id}`, async () =>
-        withRlsBypass(async tx => {
+        withStore(r.store_id, async tx => {
           const data = {
             products: Number(r.products),
             productsActive: Number(r.products_active),

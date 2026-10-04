@@ -24,7 +24,7 @@
  * This is consistent with the owner being the admin managing the store.
  */
 
-import { withRlsBypass } from '@force/database';
+import { withStore } from '@force/database';
 import { redis } from '../redis.service';
 import { effectiveInventory } from '../../lib/effective-inventory';
 import logger from '../../lib/logger';
@@ -131,17 +131,17 @@ export async function clearSentinel(storeId: string, productId: string): Promise
 
 export async function runLowStockScan(storeId: string): Promise<LowStockScanResult> {
   // -------------------------------------------------------------------------
-  // Step 1: DB reads ONLY inside withRlsBypass.
+  // Step 1: DB reads ONLY inside withStore.
   //
-  // withRlsBypass opens an *interactive* Postgres transaction (no tenant GUC,
-  // so an Inngest cron can read past FORCE RLS). It is critical that NOTHING
+  // withStore opens an *interactive* Postgres transaction scoped to the store
+  // (so an Inngest cron reads its own tenant under FORCE RLS). It is critical that NOTHING
   // slow runs inside it: the per-product Redis sentinel round-trips used to
   // live in here, and on a large catalogue N sequential Redis calls serialized
   // inside the transaction blew the 30s interactive-tx timeout
   // ("Transaction already closed ... 39532 ms passed"). Keep this block to the
   // two reads and get out fast — all sentinel I/O happens AFTER, off the tx.
   // -------------------------------------------------------------------------
-  const data = await withRlsBypass(async tx => {
+  const data = await withStore(storeId, async tx => {
     const store = await tx.store.findUnique({
       where: { id: storeId },
       select: {

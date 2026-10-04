@@ -1,4 +1,4 @@
-import { prisma, Prisma, withMoneyTx, withRlsBypass } from '@force/database';
+import { prisma, Prisma, withMoneyTx, withStore } from '@force/database';
 import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@force/shared';
 import { redis } from './redis.service';
 import { bustStoreCaches } from './store.service';
@@ -27,7 +27,7 @@ const CACHE_TTL = 300; // 5 minutes
 // pooler these are transient — a dropped idle connection or a compute blip —
 // and FORCE-API-2D / 2E were each a single one of them 500ing
 // `GET /public/store/resolve` from inside `readFromDb`. One retry on a FRESH
-// transaction (`withRlsBypass` opens its own, so a dead connection is not
+// transaction (`withStore` opens its own when there is no ambient one, so a dead connection is not
 // reused) absorbs them. Deliberately NOT a stale-value fallback: this map gates
 // paid features, so a second failure still throws (fail closed) instead of
 // serving a map that might say ON for something that was turned off.
@@ -166,9 +166,8 @@ class FeatureService {
     // (order-created / abandoned-cart Inngest jobs) which have no tenant GUC —
     // and without it the per-store override rows return empty, so a feature
     // enabled/disabled by override would be mis-resolved (and the wrong value
-    // Redis-cached). `stores` itself has RLS disabled, but read both inside one
-    // bypass tx — trusted internal read already scoped by `where: { storeId }`.
-    const [store, rows, flags] = await withRlsBypass(async tx => {
+    // Redis-cached). Everything is read inside one store-scope tx.
+    const [store, rows, flags] = await withStore(storeId, async tx => {
       const [storeRow, featureRows] = await Promise.all([
         tx.store.findUnique({ where: { id: storeId }, select: { plan: true } }),
         tx.storeFeature.findMany({
@@ -176,7 +175,7 @@ class FeatureService {
           select: { featureKey: true, enabled: true },
         }),
       ]);
-      // The plans engine's automation flags, read in the SAME bypass tx (one
+      // The plans engine's automation flags, read in the SAME store-scope tx (one
       // connection; a transient failure retries and fails closed together).
       const planFlags = storeRow
         ? await getAutomationFlags(storeId, tx, { legacyPlan: storeRow.plan })
@@ -223,9 +222,11 @@ class FeatureService {
    */
   private async bustPublicStoreCache(storeId: string): Promise<void> {
     try {
-      const store = await withRlsBypass(tx =>
-        tx.store.findUnique({ where: { id: storeId }, select: { slug: true, domain: true } })
-      );
+      // `stores` carries no RLS: a plain read.
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { slug: true, domain: true },
+      });
       if (!store) return;
       await bustStoreCaches(storeId, store.slug, store.domain);
     } catch (err) {
@@ -427,7 +428,7 @@ class FeatureService {
       data: { plan, updatedAt: new Date() },
     });
     // Keep the subscription (limits) on the plan the enum now names (SP5).
-    await withRlsBypass(tx => syncSubscriptionFromLegacyPlan(tx, storeId, plan));
+    await withStore(storeId, tx => syncSubscriptionFromLegacyPlan(tx, storeId, plan));
     await this.invalidateCache(storeId);
     await this.bustPublicStoreCache(storeId);
     logger.info(

@@ -15,6 +15,18 @@ const { storeCreate, taxRateCreate } = vi.hoisted(() => ({
 vi.mock('@force/database', () => {
   const tx = {
     $executeRaw: vi.fn(),
+    // the owner is found-or-created by the `ebda_admin_user_ensure` definer, run on this tx
+    $queryRaw: vi.fn(async () => [
+      {
+        user_id: 'u1',
+        created: true,
+        role: 'store_admin',
+        status: 'active',
+        email: 'o@x.com',
+        first_name: 'Owner',
+        last_name: 'One',
+      },
+    ]),
     user: {
       findFirst: vi.fn(async () => null),
       create: vi.fn(async () => ({ id: 'u1', email: 'o@x.com' })),
@@ -30,7 +42,7 @@ vi.mock('@force/database', () => {
     Prisma: {},
     StoreStatus: {},
     withMoneyTx: vi.fn(async (_p: unknown, fn: (t: unknown) => unknown) => fn(tx)),
-    withRlsBypass: vi.fn(),
+    setTenantGucs: vi.fn(),
   };
 });
 vi.mock('bcryptjs', () => ({ default: { hash: vi.fn(async () => 'hash') } }));

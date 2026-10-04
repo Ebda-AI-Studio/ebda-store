@@ -4,7 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { tenantContext } from '../middleware/tenant-context';
 import { requireStoreAccess } from '../middleware/store-access';
-import { Prisma, prisma, StoreStatus } from '@force/database';
+import { Prisma, prisma, StoreStatus, withUser } from '@force/database';
 import { StoreService } from '../services/store.service';
 import { resolveDomainService } from '../services/domain-provider';
 import { DomainClaimService, normalizeDomain } from '../services/domain-claim.service';
@@ -445,11 +445,15 @@ router.get(
     try {
       const { page, limit } = req.query;
 
-      const result = await StoreService.list({
-        page: page ? parseInt(page as string) : undefined,
-        limit: limit ? parseInt(limit as string) : undefined,
-        ownerId: req.user!.role === 'store_admin' ? req.user!.userId : undefined,
-      });
+      // The store payload names its owner (`users`, identity-scoped under strict RLS): read
+      // as the acting user, who is either a super_admin (sees every owner) or the owner.
+      const result = await withUser(req.user!.userId, () =>
+        StoreService.list({
+          page: page ? parseInt(page as string) : undefined,
+          limit: limit ? parseInt(limit as string) : undefined,
+          ownerId: req.user!.role === 'store_admin' ? req.user!.userId : undefined,
+        })
+      );
 
       res.json({
         success: true,
@@ -673,7 +677,7 @@ router.delete(
       const { id } = req.params;
       const user = getAuthUser(req);
 
-      const deleted = await StoreService.delete(id);
+      const deleted = await StoreService.delete(id, user.userId);
 
       await auditLog({
         action: 'STORE_DELETED',

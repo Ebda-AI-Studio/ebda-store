@@ -3,7 +3,7 @@
  * `plan-entitlements.ts`; the guard lives in `plan-limit.service.ts`.
  */
 
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import {
   planLimitsSchema,
   type AssignSubscriptionInput,
@@ -15,6 +15,9 @@ import { featureService } from './feature.service';
 import { bustStoreCaches } from './store.service';
 import { parseLimits } from './plan-entitlements';
 import logger from '../lib/logger';
+import { planSubscriberCounts, storeIdsOnPlan } from '../lib/definer';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface PlanDto {
   code: string;
@@ -60,16 +63,15 @@ function toDto(
 export const planService = {
   /** Every plan, cheapest first, with how many stores sit on each. */
   async listPlans(opts: { publicOnly?: boolean } = {}): Promise<PlanDto[]> {
-    const [plans, counts] = await withRlsBypass(tx =>
-      Promise.all([
-        tx.plan.findMany({
-          where: opts.publicOnly ? { isPublic: true } : undefined,
-          orderBy: [{ sort: 'asc' }, { code: 'asc' }],
-        }),
-        tx.storeSubscription.groupBy({ by: ['planCode'], _count: { _all: true } }),
-      ])
-    );
-    const byCode = new Map(counts.map(c => [c.planCode, c._count._all]));
+    // `plans` is the global catalog (no tenant). The per-plan subscriber counts
+    // span every store, so they come from a super_admin-only definer; the public
+    // pricing/billing lists do not carry them.
+    const plans = await prisma.plan.findMany({
+      where: opts.publicOnly ? { isPublic: true } : undefined,
+      orderBy: [{ sort: 'asc' }, { code: 'asc' }],
+    });
+    if (opts.publicOnly) return plans.map(p => toDto(p));
+    const byCode = await planSubscriberCounts();
     return plans.map(p => toDto(p, byCode.get(p.code) ?? 0));
   },
 
@@ -101,16 +103,12 @@ export const planService = {
         limits,
       },
     });
-    const stores = await withRlsBypass(tx =>
-      tx.storeSubscription.findMany({ where: { planCode: code }, select: { storeId: true } })
-    );
+    const storeIds = await storeIdsOnPlan(code);
     await Promise.all(
-      stores.map(s =>
+      storeIds.map(storeId =>
         featureService
-          .invalidateCache(s.storeId)
-          .catch(err =>
-            logger.warn({ err, storeId: s.storeId }, '[plan] feature cache bust failed')
-          )
+          .invalidateCache(storeId)
+          .catch(err => logger.warn({ err, storeId }, '[plan] feature cache bust failed'))
       )
     );
     return toDto(updated);
@@ -135,7 +133,9 @@ export const planService = {
       throw new AppError(400, 'INVALID_STATUS', 'Only the comped plan can have status comped');
     }
 
-    const store = await withRlsBypass(async tx => {
+    if (!UUID_RE.test(storeId)) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+    // The subscription is written in the store's own scope (strict RLS).
+    const store = await withStore(storeId, async tx => {
       const s = await tx.store.findUnique({
         where: { id: storeId },
         select: { id: true, slug: true, domain: true },

@@ -1,5 +1,6 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
+import { webhookInbox } from '../../definer';
 import { PaymentService } from '../../../services/payment-providers/payment.factory';
 import type { PaymentProvider } from '../../../services/payment-providers/types';
 import logger from '../../logger';
@@ -69,23 +70,9 @@ export const paymentWebhookProcess: InngestFunction.Any = inngest.createFunction
     // 1. Load the durable inbox row (cross-tenant — storeId may be null and we
     //    must read it BEFORE entering tenant context). withRlsBypass mirrors the
     //    route's checkIdempotency / resolveStoreIdFromWebhookPayload reads.
-    const row = await step.run('load-inbox', async () =>
-      withRlsBypass(tx =>
-        tx.webhookEvent.findUnique({
-          where: { id: webhookEventId },
-          select: {
-            id: true,
-            provider: true,
-            idempotencyKey: true,
-            storeId: true,
-            payload: true,
-            rawBody: true,
-            signature: true,
-            status: true,
-          },
-        })
-      )
-    );
+    // The inbox row must be read BEFORE a store scope exists (store_id may be
+    // NULL), so every inbox access here is a SECURITY DEFINER function.
+    const row = await step.run('load-inbox', async () => webhookInbox.get(webhookEventId));
 
     if (!row) {
       logger.error(
@@ -111,12 +98,7 @@ export const paymentWebhookProcess: InngestFunction.Any = inngest.createFunction
     // counter at 1. The `process` step re-runs on every retry, so the increment
     // there reflects the real attempt count for spotting a poison row.
     await step.run('mark-processing', async () =>
-      withRlsBypass(tx =>
-        tx.webhookEvent.update({
-          where: { id: webhookEventId },
-          data: { status: 'processing' },
-        })
-      )
+      webhookInbox.update(webhookEventId, { status: 'processing' })
     );
 
     const provider = row.provider as PaymentProvider;
@@ -133,12 +115,7 @@ export const paymentWebhookProcess: InngestFunction.Any = inngest.createFunction
         // attempts++ here (NOT in the memoized mark-processing step) so the
         // counter reflects real retries — Inngest replays mark-processing from
         // cache but re-executes this step body on every retry.
-        await withRlsBypass(tx =>
-          tx.webhookEvent.update({
-            where: { id: webhookEventId },
-            data: { attempts: { increment: 1 } },
-          })
-        );
+        await webhookInbox.update(webhookEventId, { incrementAttempts: true });
         const apply = async (): Promise<{
           success: boolean;
           status?: string;
@@ -200,12 +177,10 @@ export const paymentWebhookProcess: InngestFunction.Any = inngest.createFunction
       if (isTerminalClientError) {
         await step
           .run('mark-rejected', async () =>
-            withRlsBypass(tx =>
-              tx.webhookEvent.update({
-                where: { id: webhookEventId },
-                data: { status: 'rejected', lastError: message.slice(0, 1000) },
-              })
-            )
+            webhookInbox.update(webhookEventId, {
+              status: 'rejected',
+              lastError: message.slice(0, 1000),
+            })
           )
           .catch(() => undefined);
         logger.warn(
@@ -222,12 +197,10 @@ export const paymentWebhookProcess: InngestFunction.Any = inngest.createFunction
       // silent. The 'failed' WebhookEvent row is what an operator replays from.
       await step
         .run('mark-failed', async () =>
-          withRlsBypass(tx =>
-            tx.webhookEvent.update({
-              where: { id: webhookEventId },
-              data: { status: 'failed', lastError: message.slice(0, 1000) },
-            })
-          )
+          webhookInbox.update(webhookEventId, {
+            status: 'failed',
+            lastError: message.slice(0, 1000),
+          })
         )
         .catch(() => undefined);
       logger.error(
@@ -239,18 +212,13 @@ export const paymentWebhookProcess: InngestFunction.Any = inngest.createFunction
 
     // 3. Finalize — mark the inbox row processed with the result for audit.
     await step.run('finalize', async () =>
-      withRlsBypass(tx =>
-        tx.webhookEvent.update({
-          where: { id: webhookEventId },
-          data: {
-            status: 'processed',
-            processedAt: new Date(),
-            lastError: null,
-            resultOrderId: result.orderId ?? null,
-            resultStatus: result.status ?? null,
-          },
-        })
-      )
+      webhookInbox.update(webhookEventId, {
+        status: 'processed',
+        markProcessed: {
+          resultOrderId: result.orderId ?? null,
+          resultStatus: result.status ?? null,
+        },
+      })
     );
 
     logger.info(

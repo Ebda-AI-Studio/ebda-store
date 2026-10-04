@@ -50,7 +50,7 @@ vi.mock('@force/database', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
-    withRlsBypass: async (fn: (tx: unknown) => unknown) => fn({}),
+    withStore: async (_storeId: string, fn: (tx: unknown) => unknown) => fn({}),
     prisma: {
       store: {
         findUnique: vi.fn().mockResolvedValue({ slug: 'demo' }),
@@ -59,6 +59,12 @@ vi.mock('@force/database', async importOriginal => {
     },
   };
 });
+
+// The router wraps every request in the acting user's tenant transaction (`userContext`); this
+// file is about the handlers, so the wrapper is a pass-through (it has its own DB-backed coverage).
+vi.mock('@api/middleware/tenant-context', () => ({
+  userContext: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
 
 import adminRoutes from '@api/routes/admin.routes';
 import { errorHandler } from '@api/middleware/error-handler';

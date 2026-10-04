@@ -86,10 +86,8 @@ vi.mock('@api/services/redis.service', () => ({
 
 // withRlsBypass passes its callback a `tx` argument that mirrors prisma.
 // We capture the callback and call it immediately with the hoisted mock tx.
-vi.mock('@force/database', () => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  withRlsBypass: vi.fn(async (fn: (tx: any) => unknown) => fn(mockTx)),
-  prisma: mockTx,
+vi.mock('@force/database', async () => ({
+  ...(await import('./helpers/database-mock')).databaseMock({ prisma: mockTx }),
 }));
 
 vi.mock('@api/lib/logger', () => ({

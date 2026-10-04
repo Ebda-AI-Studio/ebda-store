@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import { AppError } from './error-handler';
 import { auditLog } from './security';
 
@@ -103,7 +103,7 @@ export async function requireStoreAccess(
 
     // Staff users can access stores they are explicitly added to
     if (user.role === 'staff') {
-      const membership = await withRlsBypass(tx =>
+      const membership = await withStore(storeId, tx =>
         tx.storeStaff.findUnique({
           where: { userId_storeId: { userId: user.userId, storeId } },
           select: { id: true },
@@ -172,7 +172,7 @@ export async function checkStoreAccess(
     return { ok: true, store };
   }
   if (user.role === 'staff') {
-    const membership = await withRlsBypass(tx =>
+    const membership = await withStore(storeId, tx =>
       tx.storeStaff.findUnique({
         where: { userId_storeId: { userId: user.userId, storeId } },
         select: { id: true },

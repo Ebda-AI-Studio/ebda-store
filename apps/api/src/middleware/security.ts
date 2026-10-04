@@ -8,7 +8,6 @@ import rateLimit, {
 import { RedisStore } from 'rate-limit-redis';
 import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { prisma } from '@force/database';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
 import { isPlatformOrigin } from '../lib/cors-cache';
@@ -21,6 +20,7 @@ import {
   recordSharedCounting,
 } from '../lib/rate-limit-telemetry';
 import { withSavepoint } from '../lib/savepoint';
+import { insertAuditLog } from '../lib/definer';
 
 // ==========================================
 // CSRF Protection with Redis + In-Memory Fallback
@@ -1708,18 +1708,20 @@ export async function auditLog(entry: AuditLogEntry) {
     // tenant transaction, and the catch below swallows — an unguarded failure
     // aborted that transaction, so the write the client was told succeeded
     // rolled back at COMMIT.
+    //
+    // Through the append-only definer `ebda_audit_log_insert` (lib/definer.ts):
+    // `audit_logs` is store-scoped under strict RLS, but platform events carry
+    // no store, and a request may log against a store other than its own.
     await withSavepoint(() =>
-      prisma.auditLog.create({
-        data: {
-          action: entry.action,
-          userId: entry.userId,
-          storeId: entry.storeId,
-          resourceType: entry.resourceType,
-          resourceId: entry.resourceId,
-          details: entry.details ? JSON.parse(JSON.stringify(entry.details)) : {},
-          ipAddress: entry.ip,
-          userAgent: entry.userAgent,
-        },
+      insertAuditLog({
+        action: entry.action,
+        userId: entry.userId,
+        storeId: entry.storeId,
+        resourceType: entry.resourceType,
+        resourceId: entry.resourceId,
+        details: entry.details ? JSON.parse(JSON.stringify(entry.details)) : {},
+        ip: entry.ip,
+        userAgent: entry.userAgent,
       })
     );
   } catch (error) {

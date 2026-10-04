@@ -26,7 +26,7 @@
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { chunk, BULK_AI_BATCH_SIZE } from '../batch-utils';
@@ -136,19 +136,17 @@ const gscIngestCronFn = inngest.createFunction(
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
     // stores table does not filter to 0 rows (no tenant GUC is set yet).
     const stores = await step.run('list-stores', () =>
-      withRlsBypass(tx =>
-        tx.store.findMany({
-          where: {
-            deletedAt: null,
-            status: 'active',
-            domain: { not: null },
-            aiFeaturesEnabled: true,
-            // free (lapsed-payment / demo) plans are excluded from AI spend.
-            ...aiEligiblePlanFilter,
-          },
-          select: { id: true },
-        })
-      )
+      prisma.store.findMany({
+        where: {
+          deletedAt: null,
+          status: 'active',
+          domain: { not: null },
+          aiFeaturesEnabled: true,
+          // free (lapsed-payment / demo) plans are excluded from AI spend.
+          ...aiEligiblePlanFilter,
+        },
+        select: { id: true },
+      })
     );
 
     const batches = chunk(stores, BULK_AI_BATCH_SIZE);
@@ -214,9 +212,7 @@ export const gscIngestOnDemand: InngestFunction.Any = inngest.createFunction(
     // this on-demand twin must apply the same exclusion (mirrors
     // `stock-reorder-scan.ts` / `answer-engine-citation-scan.ts`'s on-demand
     // plan gate).
-    const store = await withRlsBypass(tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-    );
+    const store = await prisma.store.findUnique({ where: { id: storeId }, select: { plan: true } });
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },

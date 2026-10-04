@@ -1,10 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
+import { runInTenantContext, withUser } from '@force/database';
 import { authenticate, customerUserId } from '../middleware/auth';
 import { publicLimiter, writeLimiter } from '../middleware/security';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
 import { verifySmsOptOutToken } from '../lib/sms-consent';
+import { getSmsConsentById } from '../lib/definer';
 import { maskPhone } from '../lib/pii-mask';
 import { SmsConsentService } from '../services/sms-consent.service';
 import { notificationDispatcher } from '../services/notification-dispatcher.service';
@@ -47,10 +48,12 @@ async function customerContext(req: Request, res: Response) {
     return null;
   }
   const storeId = await getStoreIdFromRequest(req);
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { phone: true, storeId: true },
-  });
+  const user = await withUser(userId, tx =>
+    tx.user.findUnique({
+      where: { id: userId },
+      select: { phone: true, storeId: true },
+    })
+  );
   // A store-scoped account belongs to one store; a legacy account
   // (storeId NULL) may hold consent in any store it shops at.
   if (!user || (user.storeId && user.storeId !== storeId)) {
@@ -156,18 +159,8 @@ async function consentFromToken(req: Request) {
   const raw = typeof req.query.t === 'string' ? req.query.t : (req.body as { t?: unknown })?.t;
   const consentId = verifySmsOptOutToken(raw);
   if (!consentId) return null;
-  return withRlsBypass(tx =>
-    tx.smsMarketingConsent.findUnique({
-      where: { id: consentId },
-      select: {
-        id: true,
-        storeId: true,
-        phone: true,
-        granted: true,
-        store: { select: { name: true, nameAr: true } },
-      },
-    })
-  );
+  // A definer: the token names a consent row and the store is on the row.
+  return getSmsConsentById(consentId);
 }
 
 publicRouter.get(

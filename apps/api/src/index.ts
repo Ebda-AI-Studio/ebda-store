@@ -607,12 +607,12 @@ const server = httpServer.listen(config.port, () => {
   (async () => {
     try {
       const rows = await prisma.$queryRaw<Array<{ currentUser: string; rolbypassrls: boolean }>>`
-        SELECT current_user AS "currentUser", rolbypassrls FROM pg_roles WHERE rolname = current_user
+        SELECT current_user::text AS "currentUser", (rolbypassrls OR rolsuper) AS rolbypassrls FROM pg_roles WHERE rolname = current_user
       `;
       const bypassRls = rows[0]?.rolbypassrls === true;
       // Positive, always-on record of the role the API actually connected as
       // (#1940). CI greps this exact line after /health is up and fails the
-      // integration job unless it reads `current_user=force_app
+      // integration job unless it reads `current_user=ebda_app
       // rolbypassrls=false` — a liveness probe alone passes identically as a
       // superuser, so a silent relapse to a bypass role would stay green.
       // Values are in the message (not only the object) so the grep works
@@ -624,19 +624,19 @@ const server = httpServer.listen(config.port, () => {
       if (bypassRls) {
         // Explicit escape hatch. Production currently connects as `neondb_owner`
         // (a BYPASSRLS role); cutting DATABASE_URL over to the non-owner
-        // `force_app` role is a tracked RLS-cutover follow-up, NOT a P0 change.
+        // `ebda_app` role is a tracked RLS-cutover follow-up, NOT a P0 change.
         // Until then, ALLOW_BYPASSRLS_ROLE=true keeps the API serving (loud
         // warning, not exit) so a routine redeploy can't take the whole platform
         // down. Verified 2026-06-27: this guard `process.exit(1)` crash-looped
         // prod the moment a redeploy first built it. Remove the env once
-        // force_app is live and DATABASE_URL no longer uses a bypass role.
+        // ebda_app is live and DATABASE_URL no longer uses a bypass role.
         const allowBypassRls = process.env.ALLOW_BYPASSRLS_ROLE === 'true';
         if (config.nodeEnv === 'production' && !allowBypassRls) {
           logger.fatal(
             { currentUser: 'see pg_roles', rolbypassrls: true },
             '[SECURITY FATAL] DATABASE_URL connects as a BYPASSRLS role — ' +
               'all RLS tenant isolation is disabled. ' +
-              'Switch DATABASE_URL to the non-owner role (force_app) and redeploy, ' +
+              'Switch DATABASE_URL to the non-owner role (ebda_app) and redeploy, ' +
               'or set ALLOW_BYPASSRLS_ROLE=true to explicitly accept this.'
           );
           process.exit(1);
@@ -644,7 +644,7 @@ const server = httpServer.listen(config.port, () => {
           logger.warn(
             { rolbypassrls: true },
             '[SECURITY WARN] DB role has BYPASSRLS — RLS is not enforced in this environment. ' +
-              'Use the force_app role in production.'
+              'Use the ebda_app role in production.'
           );
         }
       }

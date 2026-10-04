@@ -330,7 +330,7 @@ vi.mock('@force/database', () => ({
       findFirst: (...a: unknown[]) => mockJournalEntryFindFirst(...a),
     },
   },
-  withRlsBypass: (fn: (tx: unknown) => unknown) => mockWithRlsBypass(fn),
+  withStore: (_storeId: string, fn: (tx: unknown) => unknown) => mockWithRlsBypass(fn),
   runInTenantContext: (sid: string, fn: () => unknown) => mockRunInTenantContext(sid, fn),
 }));
 

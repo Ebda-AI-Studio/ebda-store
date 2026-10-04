@@ -1022,7 +1022,7 @@ export class OrderService {
     const order = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       // The public checkout (`POST /public/orders`) and the MCP `place_order`
       // tool reach this with NO tenant context, and `backorder_lines` (written
-      // below for backordered lines) has a STRICT RLS policy: under `force_app`
+      // below for backordered lines) has a STRICT RLS policy: under `ebda_app`
       // that insert is rejected and the whole order rolls back. Set the store
       // on this transaction's own connection. Inert on the owner role; a
       // no-op repeat when the caller's context already carried it.

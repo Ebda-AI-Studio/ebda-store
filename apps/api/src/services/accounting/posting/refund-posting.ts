@@ -1,4 +1,4 @@
-import { withRlsBypass } from '@force/database';
+import { withScopedToOrderStore } from './order-scope';
 import type { Prisma } from '@prisma/client';
 import { reverseEntry } from '../journal.service';
 import logger from '../../../lib/logger';
@@ -40,7 +40,7 @@ export async function postRefundJournal(args: {
   tx?: Prisma.TransactionClient;
 }): Promise<{ reversed: number }> {
   if (!args.tx) {
-    return withRlsBypass(tx => postRefundJournal({ ...args, tx }));
+    return withScopedToOrderStore(args, tx => postRefundJournal({ ...args, tx }), { reversed: 0 });
   }
   const { orderId, reason, storeId, tx } = args;
 

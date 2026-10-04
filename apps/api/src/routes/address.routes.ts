@@ -21,14 +21,14 @@ const router = Router();
 // sets `app.current_user_id` via `runInTenantContext(undefined, fn, userId)`
 // (storeId undefined — addresses have none), giving the `rls_addresses_user`
 // policy (20260702170000_rls_close_denyall_tables) a real per-user DB
-// backstop once force_app is live. INERT today: `neondb_owner` (BYPASSRLS)
+// backstop once ebda_app is live. INERT today: `neondb_owner` (BYPASSRLS)
 // skips every policy, so this changes zero request behavior — it only wraps
 // each handler in the same interactive-tx pattern already used by
 // `tenantContext`-wrapped routers.
 //
 // Cutover behavior note (NOT today): the PUT/DELETE ownership checks below
 // (`existing.userId !== userId` → 403) currently 403 a cross-user probe.
-// Once force_app is live, the RLS policy makes another user's address
+// Once ebda_app is live, the RLS policy makes another user's address
 // invisible to `findUnique` BEFORE that check ever runs, so the SAME probe
 // will 404 instead of 403 — the DB backstop doing its job (don't reveal
 // existence of another user's row). Expected; do not try to preserve 403.

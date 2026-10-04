@@ -22,7 +22,7 @@
  *                 tracked yet (follow-up).
  */
 
-import { prisma, withRlsBypass, type Prisma } from '@force/database';
+import { prisma, withStore, type Prisma } from '@force/database';
 import {
   PLAN_LIMIT_ERROR_CODE,
   isNumericLimitKey,
@@ -70,7 +70,7 @@ export async function countUsage(
         return null; // automation flags are capabilities, not counts
     }
   };
-  return tx ? run(tx) : withRlsBypass(run);
+  return tx ? run(tx) : withStore(storeId, run);
 }
 
 /**
@@ -151,7 +151,7 @@ export async function noteOrderCreated(storeId: string): Promise<{ over: boolean
 
     const ym = regionYearMonth(new Date());
     const monthKey = new Date(`${ym}-01T00:00:00.000Z`);
-    const claimed = await withRlsBypass(async tx => {
+    const claimed = await withStore(storeId, async tx => {
       // Atomic claim: exactly one order per month wins the right to notify.
       const sub = await tx.storeSubscription.upsert({
         where: { storeId },
@@ -182,7 +182,7 @@ async function notifyMerchantOverOrderLimit(
   used: number,
   limit: number
 ): Promise<void> {
-  const store = await withRlsBypass(tx =>
+  const store = await withStore(storeId, tx =>
     tx.store.findUnique({
       where: { id: storeId },
       select: { name: true, settings: true, owner: { select: { email: true } } },

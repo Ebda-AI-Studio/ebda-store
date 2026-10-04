@@ -3,26 +3,26 @@
  * rls-payload-parity.mjs — the gate that would have caught the 2026-09-25
  * RLS cutover rollback.
  *
- * WHAT HAPPENED: production's API was switched to the non-bypass `force_app`
+ * WHAT HAPPENED: production's API was switched to the non-bypass `ebda_app`
  * role after the full integration suite passed with the API running as
- * force_app. Within minutes the public store payloads came back with
+ * ebda_app. Within minutes the public store payloads came back with
  * `faqs: []` / `howtos: []` for stores that have 24/9 active rows. The
  * `store_faqs` / `store_howtos` policies are STRICT (no contextless
  * allowance) and the public routes read them with no tenant context, so RLS
  * filtered every row out. Nothing errored. Every test that ran was green,
  * because no test compared WHAT CAME BACK as owner against what came back as
- * force_app.
+ * ebda_app.
  *
  * WHAT THIS DOES: boots the built API twice against the SAME database —
  * once with DATABASE_URL as the owner/superuser (RLS bypassed, i.e. today's
- * production) and once as `force_app` (RLS enforced, i.e. the cutover) —
+ * production) and once as `ebda_app` (RLS enforced, i.e. the cutover) —
  * calls a fixed list of public/storefront endpoints for every store in the
  * DB, and deep-diffs the JSON. A silent RLS filter shows up here as an array
  * that shrank or a field that disappeared, and fails the run.
  *
  * Usage:
  *   PARITY_OWNER_DATABASE_URL=<owner or superuser URL> \
- *   PARITY_APP_DATABASE_URL=<force_app login URL, same database> \
+ *   PARITY_APP_DATABASE_URL=<ebda_app login URL, same database> \
  *   node scripts/rls-payload-parity.mjs [--seed] [--report out.json]
  *
  *   --seed     insert two realistic fixture stores first (FAQs, howtos,
@@ -46,7 +46,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '@force/database';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -563,10 +563,10 @@ async function loadStores(db) {
 }
 
 async function roleBypasses(url) {
-  const db = new PrismaClient({ datasourceUrl: url });
+  const db = createPrismaClient({ connectionString: url, max: 2 });
   try {
     const rows = await db.$queryRaw`
-      SELECT r.rolname AS role, (r.rolbypassrls OR r.rolsuper) AS bypass
+      SELECT r.rolname::text AS role, (r.rolbypassrls OR r.rolsuper) AS bypass
       FROM pg_roles r WHERE r.rolname = current_user`;
     return rows[0];
   } finally {
@@ -578,7 +578,7 @@ async function main() {
   if (!OWNER_URL || !APP_URL) {
     die(
       2,
-      'set PARITY_OWNER_DATABASE_URL (owner/superuser) and PARITY_APP_DATABASE_URL (force_app)'
+      'set PARITY_OWNER_DATABASE_URL (owner/superuser) and PARITY_APP_DATABASE_URL (ebda_app)'
     );
   }
   assertLocal(OWNER_URL, 'PARITY_OWNER_DATABASE_URL');
@@ -593,7 +593,7 @@ async function main() {
   if (appRole.bypass) die(2, 'the app URL bypasses RLS — this run could not detect anything');
   if (!ownerRole.bypass) die(2, 'the owner URL does not bypass RLS — there is no baseline');
 
-  const db = new PrismaClient({ datasourceUrl: OWNER_URL });
+  const db = createPrismaClient({ connectionString: OWNER_URL, max: 2 });
   let stores;
   try {
     if (SEED) await seedFixtures(db);
@@ -680,9 +680,9 @@ async function main() {
   if (ownerElements === 0)
     die(2, 'the owner server returned no array data at all — nothing was compared');
   if (failed.length) {
-    die(1, `PARITY BROKEN: ${failed.length} of ${results.length} comparisons differ as force_app`);
+    die(1, `PARITY BROKEN: ${failed.length} of ${results.length} comparisons differ as ebda_app`);
   }
-  console.log('[parity] PASS — force_app payloads match the owner payloads');
+  console.log('[parity] PASS — ebda_app payloads match the owner payloads');
 }
 
 main().catch(err => {

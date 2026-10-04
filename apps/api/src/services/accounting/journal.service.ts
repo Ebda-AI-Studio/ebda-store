@@ -1,4 +1,5 @@
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withStore } from '@force/database';
+import { getEntityStoreId } from '../../lib/definer';
 import type { JournalEntry, JournalEntrySource, Prisma } from '@prisma/client';
 import { Prisma as PrismaNs } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
@@ -70,13 +71,12 @@ export async function postEntry(input: PostEntryInput): Promise<JournalEntry> {
   // jobs and other background workers call postEntry directly via the
   // proxy, which falls through to basePrisma with no app.current_store_id
   // GUC set. The journal_entries RLS policy then filters every INSERT /
-  // SELECT to invisible — silent no-op, no error. Wrap in withRlsBypass
+  // SELECT to invisible — silent no-op, no error. Wrap in withStore
   // when standalone so the GUC is set inside our own transaction.
-  // Caller-provided tx is assumed to have either app.current_store_id
-  // set (from request middleware) OR bypass_rls (from store-delete style
-  // ops).
+  // Caller-provided tx is assumed to have app.current_store_id set (from
+  // request middleware or a store-scoped delete).
   if (!input.tx) {
-    return withRlsBypass(tx => postEntry({ ...input, tx }));
+    return withStore(input.storeId, tx => postEntry({ ...input, tx }));
   }
 
   // Fast-path idempotency check (skipped if no sourceId — manual entries are
@@ -273,12 +273,21 @@ export async function reverseEntry(
 
     return reversal;
   };
-  // When no caller-provided tx, wrap in withRlsBypass — Inngest reversal
+  // When no caller-provided tx, wrap in withStore — Inngest reversal
   // paths (refund posting, profit-anomaly remediation) run without tenant
   // context, so RLS on journal_entries would silently filter every read
   // and the create would fail WITH CHECK. See journal.service.postEntry
   // for the same pattern + feedback-postgres-rls-silent-filter-trap.md.
-  const reversal = await (tx ? run(tx) : withRlsBypass(run));
+  let reversal: JournalEntry;
+  if (tx) {
+    reversal = await run(tx);
+  } else {
+    // The entry's store is found by primary key through a definer, and the
+    // reversal runs inside it.
+    const originalStoreId = await getEntityStoreId('journal_entry', originalId);
+    if (!originalStoreId) throw new Error(`JournalEntry ${originalId} not found`);
+    reversal = await withStore(originalStoreId, t => run(t as unknown as Prisma.TransactionClient));
+  }
 
   // Non-blocking UI refresh signal — best-effort, never throws
   broadcastToStore(reversal.storeId, {

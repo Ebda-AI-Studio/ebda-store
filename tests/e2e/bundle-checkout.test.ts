@@ -205,7 +205,8 @@ describe.skipIf(!hasDb)('bundle storefront rendering — one row, never the spli
       expect(html.includes(share)).toBe(false);
     }
     expect(html.includes('Ramadan Box')).toBe(true);
-    expect(html.includes('12.000')).toBe(true);
+    // 12000 minor units at EGP's 2-decimal exponent = 120.00 (the fixture was written for KWD's 3).
+    expect(html.includes('120.00')).toBe(true);
   });
 
   it('the emailed order-confirmation HTML never contains an allocated per-component share', async () => {

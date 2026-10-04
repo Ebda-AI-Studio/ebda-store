@@ -35,7 +35,7 @@ vi.mock('@force/database', () => ({
   },
   Prisma: {},
   withMoneyTx: vi.fn(),
-  withRlsBypass: vi.fn(async (fn: (tx: unknown) => unknown) =>
+  withStore: vi.fn(async (_storeId: string, fn: (tx: unknown) => unknown) =>
     fn({
       store: { findUnique: mockStoreFindUnique },
       storeFeature: { findMany: mockStoreFeatureFindMany },

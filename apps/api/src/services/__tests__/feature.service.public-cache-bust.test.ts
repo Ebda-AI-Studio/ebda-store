@@ -61,13 +61,13 @@ vi.mock('@force/database', () => ({
       deleteMany: mockStoreFeatureDeleteMany,
       findMany: mockStoreFeatureFindMany,
     },
-    store: { update: mockStoreUpdate },
+    store: { update: mockStoreUpdate, findUnique: mockStoreFindUnique },
   },
   Prisma: {},
   withMoneyTx: mockWithMoneyTx,
-  // `bustPublicStoreCache` reads the store's slug/domain via withRlsBypass,
+  // `bustPublicStoreCache` reads the store's slug/domain via withStore,
   // same shape as the existing single-flight test's mock.
-  withRlsBypass: vi.fn(async (fn: (tx: unknown) => unknown) =>
+  withStore: vi.fn(async (_storeId: string, fn: (tx: unknown) => unknown) =>
     fn({
       store: { findUnique: mockStoreFindUnique },
       storeFeature: { findMany: mockStoreFeatureFindMany, upsert: mockStoreFeatureUpsert },

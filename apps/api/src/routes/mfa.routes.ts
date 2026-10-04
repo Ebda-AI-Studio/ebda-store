@@ -3,7 +3,7 @@ import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { authenticate, rejectImpersonated } from '../middleware/auth';
 import { authLimiter } from '../middleware/security';
-import { prisma } from '@force/database';
+import { withUser } from '@force/database';
 import { encryption } from '../services/encryption.service';
 import { MfaService } from '../services/mfa.service';
 import { AuthService } from '../services/auth.service';
@@ -62,10 +62,12 @@ router.post('/enroll/begin', authenticate, rejectImpersonated, async (req, res, 
       throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
     }
     const { code } = parsed.data;
-    const existing = await prisma.user.findUnique({
-      where: { id: req.user!.userId },
-      select: { mfaEnabled: true, mfaSecret: true },
-    });
+    const existing = await withUser(req.user!.userId, tx =>
+      tx.user.findUnique({
+        where: { id: req.user!.userId },
+        select: { mfaEnabled: true, mfaSecret: true },
+      })
+    );
 
     if (existing?.mfaEnabled) {
       // Re-enrollment requires proof of the current second factor.
@@ -79,10 +81,12 @@ router.post('/enroll/begin', authenticate, rejectImpersonated, async (req, res, 
     }
 
     const { secret, otpauthUrl } = MfaService.generateEnrollment(req.user!.email);
-    await prisma.user.update({
-      where: { id: req.user!.userId },
-      data: { mfaSecret: encryption.encrypt(secret) },
-    });
+    await withUser(req.user!.userId, tx =>
+      tx.user.update({
+        where: { id: req.user!.userId },
+        data: { mfaSecret: encryption.encrypt(secret) },
+      })
+    );
     res.json({
       success: true,
       data: { secret, qr: await MfaService.qrDataUrl(otpauthUrl) },
@@ -110,10 +114,12 @@ router.post(
         throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
       }
       const { code } = parsed.data;
-      const u = await prisma.user.findUnique({
-        where: { id: req.user!.userId },
-        select: { mfaSecret: true },
-      });
+      const u = await withUser(req.user!.userId, tx =>
+        tx.user.findUnique({
+          where: { id: req.user!.userId },
+          select: { mfaSecret: true },
+        })
+      );
       if (!u?.mfaSecret) {
         throw new AppError(400, 'MFA_NOT_STARTED', 'Begin enrollment first');
       }
@@ -121,14 +127,16 @@ router.post(
         throw new AppError(400, 'MFA_BAD_CODE', 'Invalid code');
       }
       const { plain, hashed } = await MfaService.generateBackupCodes();
-      await prisma.user.update({
-        where: { id: req.user!.userId },
-        data: {
-          mfaEnabled: true,
-          mfaEnrolledAt: new Date(),
-          mfaBackupCodes: hashed,
-        },
-      });
+      await withUser(req.user!.userId, tx =>
+        tx.user.update({
+          where: { id: req.user!.userId },
+          data: {
+            mfaEnabled: true,
+            mfaEnrolledAt: new Date(),
+            mfaBackupCodes: hashed,
+          },
+        })
+      );
       res.json({ success: true, data: { backupCodes: plain } });
     } catch (error) {
       next(error);
@@ -200,10 +208,12 @@ router.post('/verify', authLimiter, async (req, res, next) => {
     // MFA verify needs both the TOTP secret and the backup-code list, which are
     // globally omitted — ask for them by name. Without this, `u.mfaSecret` is
     // undefined and every verify fails with MFA_NOT_ENABLED.
-    const u = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      omit: { mfaSecret: false, mfaBackupCodes: false },
-    });
+    const u = await withUser(payload.userId, tx =>
+      tx.user.findUnique({
+        where: { id: payload.userId },
+        omit: { mfaSecret: false, mfaBackupCodes: false },
+      })
+    );
     if (!u?.mfaSecret) {
       throw new AppError(400, 'MFA_NOT_ENABLED', 'MFA not enabled for this account');
     }
@@ -214,10 +224,12 @@ router.post('/verify', authLimiter, async (req, res, next) => {
       const r = await MfaService.consumeBackupCode(u.mfaBackupCodes, code);
       if (r.matched) {
         ok = true;
-        await prisma.user.update({
-          where: { id: u.id },
-          data: { mfaBackupCodes: r.remaining },
-        });
+        await withUser(u.id, tx =>
+          tx.user.update({
+            where: { id: u.id },
+            data: { mfaBackupCodes: r.remaining },
+          })
+        );
       }
     }
     if (!ok) {
@@ -269,22 +281,26 @@ router.post('/disable', authenticate, rejectImpersonated, authLimiter, async (re
       throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
     }
     const { code } = parsed.data;
-    const u = await prisma.user.findUnique({
-      where: { id: req.user!.userId },
-      select: { mfaSecret: true },
-    });
+    const u = await withUser(req.user!.userId, tx =>
+      tx.user.findUnique({
+        where: { id: req.user!.userId },
+        select: { mfaSecret: true },
+      })
+    );
     if (!u?.mfaSecret || !MfaService.verifyCode(encryption.decrypt(u.mfaSecret), code)) {
       throw new AppError(400, 'MFA_BAD_CODE', 'Invalid code — MFA disable rejected');
     }
-    await prisma.user.update({
-      where: { id: req.user!.userId },
-      data: {
-        mfaEnabled: false,
-        mfaSecret: null,
-        mfaBackupCodes: [],
-        mfaEnrolledAt: null,
-      },
-    });
+    await withUser(req.user!.userId, tx =>
+      tx.user.update({
+        where: { id: req.user!.userId },
+        data: {
+          mfaEnabled: false,
+          mfaSecret: null,
+          mfaBackupCodes: [],
+          mfaEnrolledAt: null,
+        },
+      })
+    );
     await AuthService.revokeAllSessions(req.user!.userId);
     res.json({ success: true, data: { message: 'MFA disabled' } });
   } catch (error) {

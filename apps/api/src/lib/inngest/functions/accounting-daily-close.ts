@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -23,12 +23,10 @@ export const accountingDailyClose: InngestFunction.Any = inngest.createFunction(
   async ({ step }) => {
     // FORCE RLS: cross-tenant cron — use withRlsBypass to enumerate stores.
     const stores = await step.run('list-stores-with-accounting', () =>
-      withRlsBypass(tx =>
-        tx.store.findMany({
-          where: { accountingEnabled: true, deletedAt: null },
-          select: { id: true, name: true, slug: true },
-        })
-      )
+      prisma.store.findMany({
+        where: { accountingEnabled: true, deletedAt: null },
+        select: { id: true, name: true, slug: true },
+      })
     );
 
     let drifts = 0;
@@ -36,8 +34,9 @@ export const accountingDailyClose: InngestFunction.Any = inngest.createFunction(
       const result = await step.run(`drift-${store.id}`, async () => {
         // Cross-tenant cron — no tenant context on this connection.
         // RLS on journal_entries/journal_lines would filter every read
-        // to 0 rows. Wrap in withRlsBypass for accurate sums.
-        const sums = await withRlsBypass(
+        // to 0 rows. Read each store in its own scope for accurate sums.
+        const sums = await withStore(
+          store.id,
           tx => tx.$queryRaw<{ total_debit: bigint; total_credit: bigint }[]>`
             SELECT
               COALESCE(SUM(l.debit), 0)  AS total_debit,

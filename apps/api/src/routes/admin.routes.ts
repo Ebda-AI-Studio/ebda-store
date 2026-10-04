@@ -25,7 +25,10 @@ import { redis } from '../services/redis.service';
 import { maskEmail, maskPhone } from '../lib/pii-mask';
 import {
   prisma,
-  withRlsBypass,
+  acrossStores,
+  acrossStoresFlat,
+  withStore,
+  withUser,
   Prisma,
   UserRole,
   ProductStatus,
@@ -40,6 +43,9 @@ import {
   updatePlanSchema,
   assignSubscriptionSchema,
 } from '@force/shared';
+import { userContext } from '../middleware/tenant-context';
+import { getEntityStoreId, platformAuditLogs, webhookInbox } from '../lib/definer';
+import { ownedStoreIds, pageAcrossStores } from '../lib/cross-store';
 import { planService } from '../services/plan.service';
 
 const router = Router();
@@ -59,9 +65,33 @@ router.use(authenticate);
 // never reach this middleware, so enrollment is always reachable.
 router.use(requireMfaEnrolled);
 
+// Every authenticated /admin request runs in ONE request transaction scoped to
+// the acting user (`app.current_user_id`). `users` is RLS-scoped to the user —
+// a super_admin principal sees the whole platform directory, a store admin sees
+// themselves and their stores' owners/staff — so the owner joins on store lists,
+// the user directory and the role checks all resolve under it. Exports stream
+// for longer than the 30s request-transaction budget, so they stay outside it
+// and scope themselves (they fan out per store).
+const adminUserContext = userContext(req => req.user?.userId);
+router.use((req: Request, res: Response, next: NextFunction) =>
+  req.path.startsWith('/export') ? next() : adminUserContext(req, res, next)
+);
+
 // Helper: enforce ownership when a store_admin is the caller. Super admins
 // pass through unscoped. Returns the userId to filter by, or undefined
 // when no scoping is needed.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The stores a super-admin list is limited to by its `storeId` query filter:
+ * none given = every store; a malformed id matches no store (as before, an
+ * empty page rather than an error).
+ */
+function storeIdsFromFilter(storeId: unknown): string[] | undefined {
+  if (!storeId) return undefined;
+  return UUID_RE.test(String(storeId)) ? [String(storeId)] : [];
+}
+
 function ownerScopeForReq(req: Request): string | undefined {
   if (req.user?.role === 'super_admin') return undefined;
   return req.user?.userId;
@@ -166,12 +196,12 @@ router.get(
 
       // Staff users are scoped to the stores they are explicitly added to.
       if (req.user?.role === 'staff') {
-        const memberships = await withRlsBypass(tx =>
-          tx.storeStaff.findMany({
-            where: { userId: req.user!.userId },
-            select: { storeId: true },
-          })
-        );
+        // store_staff matches `user_id = app.current_user_id`, which the
+        // /admin user context sets to the acting staff member.
+        const memberships = await prisma.storeStaff.findMany({
+          where: { userId: req.user!.userId },
+          select: { storeId: true },
+        });
         const storeIds = memberships.map(m => m.storeId);
         if (storeIds.length === 0) {
           res.json({
@@ -181,12 +211,10 @@ router.get(
           return;
         }
         // Fetch the actual store rows for these ids
-        const stores = await withRlsBypass(tx =>
-          tx.store.findMany({
-            where: { id: { in: storeIds } },
-            select: { id: true, name: true, nameAr: true, logo: true, slug: true, status: true },
-          })
-        );
+        const stores = await prisma.store.findMany({
+          where: { id: { in: storeIds } },
+          select: { id: true, name: true, nameAr: true, logo: true, slug: true, status: true },
+        });
         res.json({ success: true, data: { stores } });
         return;
       }
@@ -464,7 +492,7 @@ router.put(
       // FIRST, exactly as `featureService.setStorePlan` does.
       // Keep the subscription (limits) on the same plan the enum now names.
       if (plan !== undefined) {
-        await withRlsBypass(tx => syncSubscriptionFromLegacyPlan(tx, store.id, plan));
+        await withStore(store.id, tx => syncSubscriptionFromLegacyPlan(tx, store.id, plan));
         await featureService.invalidateCache(store.id);
       }
       await bustStoreCaches(store.id, store.slug, store.domain);
@@ -531,26 +559,28 @@ router.get(
       }
 
       const [users, total] = await Promise.all([
-        prisma.user.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy: { createdAt: 'desc' },
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-            status: true,
-            createdAt: true,
-            lastLoginAt: true,
-            stores: {
-              select: { id: true, name: true },
+        withUser(req.user!.userId, tx =>
+          tx.user.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { createdAt: 'desc' },
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+              status: true,
+              createdAt: true,
+              lastLoginAt: true,
+              stores: {
+                select: { id: true, name: true },
+              },
             },
-          },
-        }),
-        prisma.user.count({ where }),
+          })
+        ),
+        withUser(req.user!.userId, tx => tx.user.count({ where })),
       ]);
 
       res.json({
@@ -599,10 +629,12 @@ router.post(
       const data = schema.parse(req.body);
       const email = data.email.toLowerCase();
 
-      const existing = await prisma.user.findFirst({
-        where: { email, storeId: null },
-        select: { id: true },
-      });
+      const existing = await withUser(req.user!.userId, tx =>
+        tx.user.findFirst({
+          where: { email, storeId: null },
+          select: { id: true },
+        })
+      );
       if (existing) {
         res.status(409).json({
           success: false,
@@ -611,29 +643,32 @@ router.post(
         return;
       }
 
-      const user = await prisma.user.create({
-        data: {
-          email,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          passwordHash: await bcrypt.hash(data.password, 12),
-          role: data.role as UserRole,
-          status: 'active',
-          emailVerified: true,
-          language: 'en',
-        },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          status: true,
-          createdAt: true,
-          lastLoginAt: true,
-          stores: { select: { id: true, name: true } },
-        },
-      });
+      const newPasswordHash = await bcrypt.hash(data.password, 12);
+      const user = await withUser(req.user!.userId, tx =>
+        tx.user.create({
+          data: {
+            email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            passwordHash: newPasswordHash,
+            role: data.role as UserRole,
+            status: 'active',
+            emailVerified: true,
+            language: 'en',
+          },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            status: true,
+            createdAt: true,
+            lastLoginAt: true,
+            stores: { select: { id: true, name: true } },
+          },
+        })
+      );
 
       await auditLog({
         action: 'user.created',
@@ -663,22 +698,24 @@ router.get(
     try {
       const { id } = req.params;
 
-      const user = await prisma.user.findUnique({
-        where: { id },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          status: true,
-          createdAt: true,
-          lastLoginAt: true,
-          stores: {
-            select: { id: true, name: true, slug: true },
+      const user = await withUser(req.user!.userId, tx =>
+        tx.user.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            status: true,
+            createdAt: true,
+            lastLoginAt: true,
+            stores: {
+              select: { id: true, name: true, slug: true },
+            },
           },
-        },
-      });
+        })
+      );
 
       if (!user) {
         res.status(404).json({
@@ -723,7 +760,9 @@ router.put(
       });
       const data = schema.parse(req.body);
 
-      const existing = await prisma.user.findUnique({ where: { id } });
+      const existing = await withUser(req.user!.userId, tx =>
+        tx.user.findUnique({ where: { id } })
+      );
       if (!existing) {
         res.status(404).json({
           success: false,
@@ -734,10 +773,13 @@ router.put(
 
       // Email collision: if changing email, ensure no other user has it.
       if (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()) {
-        const collide = await prisma.user.findFirst({
-          where: { email: data.email.toLowerCase(), id: { not: id } },
-          select: { id: true },
-        });
+        const newEmail = data.email.toLowerCase();
+        const collide = await withUser(req.user!.userId, tx =>
+          tx.user.findFirst({
+            where: { email: newEmail, id: { not: id } },
+            select: { id: true },
+          })
+        );
         if (collide) {
           res.status(409).json({
             success: false,
@@ -760,23 +802,25 @@ router.put(
         updateData.passwordHash = await bcrypt.hash(data.password, 12);
       }
 
-      const user = await prisma.user.update({
-        where: { id },
-        data: updateData,
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          status: true,
-          createdAt: true,
-          lastLoginAt: true,
-          stores: {
-            select: { id: true, name: true, slug: true },
+      const user = await withUser(req.user!.userId, tx =>
+        tx.user.update({
+          where: { id },
+          data: updateData,
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            status: true,
+            createdAt: true,
+            lastLoginAt: true,
+            stores: {
+              select: { id: true, name: true, slug: true },
+            },
           },
-        },
-      });
+        })
+      );
 
       // Don't include `password` in the audit metadata — only that it
       // changed. Same treatment as auth.service.changePassword.
@@ -867,15 +911,17 @@ router.delete(
         return;
       }
 
-      const target = await prisma.user.findUnique({
-        where: { id },
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          stores: { select: { id: true, name: true } },
-        },
-      });
+      const target = await withUser(req.user!.userId, tx =>
+        tx.user.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            stores: { select: { id: true, name: true } },
+          },
+        })
+      );
       if (!target) {
         res.status(404).json({
           success: false,
@@ -885,7 +931,9 @@ router.delete(
       }
 
       if (target.role === 'super_admin') {
-        const supers = await prisma.user.count({ where: { role: 'super_admin' } });
+        const supers = await withUser(req.user!.userId, tx =>
+          tx.user.count({ where: { role: 'super_admin' } })
+        );
         if (supers <= 1) {
           res.status(400).json({
             success: false,
@@ -901,7 +949,7 @@ router.delete(
       // Store ownership is independent of role — a super_admin (or any user)
       // can be a store's `ownerId`. The guard must key on ownership, NOT on
       // role: gating on `role === 'store_admin'` let an owning super_admin fall
-      // through to prisma.user.delete(), which then violated stores_owner_id_fkey
+      // through to withUser(req.user!.userId, tx => tx.user.delete()), which then violated stores_owner_id_fkey
       // and 500'd (Sentry: DELETE /admin/users/:id — FK constraint). Reassign or
       // delete the owned stores first.
       if (target.stores.length > 0) {
@@ -917,7 +965,7 @@ router.delete(
       }
 
       try {
-        await prisma.user.delete({ where: { id } });
+        await withUser(req.user!.userId, tx => tx.user.delete({ where: { id } }));
       } catch (delErr) {
         // Any remaining FK reference (beyond the store-ownership guard above)
         // surfaces as a clean 409 instead of a raw 500.
@@ -969,24 +1017,30 @@ router.get(
         ? { store: { ownerId: ownerScope } }
         : {};
 
-      // orders/customers are on RLS-protected tables. The dashboard is a
-      // cross-tenant read (super_admin sees all stores; store_admin sees all
-      // their own stores, which is still cross-tenant). Wrap order queries in
-      // withRlsBypass so no tenant GUC is needed — the where clause provides
-      // the application-level scoping via storeFilter/orderFilter.
-      const [storeCount, userCount, orderCount, revenueResult, recentStores, recentOrders] =
+      // orders/customers are on RLS-protected tables, so the platform-wide
+      // aggregate is assembled store by store (`acrossStores`: one short tenant
+      // transaction per store) and merged here. A store admin's dashboard spans
+      // only the stores they own.
+      const dashboardStoreIds = await ownedStoreIds(ownerScope);
+      const [storeCount, userCount, orderTotals, recentStores, recentOrdersPage] =
         await Promise.all([
           prisma.store.count({ where: storeFilter }),
           // User count is platform-wide and only meaningful for super admins.
           // Store admins don't have access to the cross-tenant user table —
           // return 0 so the dashboard widget renders without leaking data.
           ownerScope ? Promise.resolve(0) : prisma.user.count(),
-          withRlsBypass((tx: Prisma.TransactionClient) => tx.order.count({ where: orderFilter })),
-          withRlsBypass((tx: Prisma.TransactionClient) =>
-            tx.order.aggregate({
-              where: { ...orderFilter, paymentStatus: 'paid' },
-              _sum: { total: true },
-            })
+          acrossStores(
+            async () => {
+              const [count, revenue] = await Promise.all([
+                prisma.order.count(),
+                prisma.order.aggregate({
+                  where: { paymentStatus: 'paid' },
+                  _sum: { total: true },
+                }),
+              ]);
+              return { count, revenue: revenue._sum.total ?? 0 };
+            },
+            { storeIds: dashboardStoreIds }
           ),
           prisma.store.findMany({
             where: storeFilter,
@@ -996,18 +1050,30 @@ router.get(
               owner: { select: { email: true } },
             },
           }),
-          withRlsBypass((tx: Prisma.TransactionClient) =>
-            tx.order.findMany({
-              where: orderFilter,
-              take: 10,
-              orderBy: { createdAt: 'desc' },
-              include: {
-                customer: { select: { email: true, firstName: true, lastName: true } },
-                store: { select: { name: true } },
-              },
-            })
-          ),
+          pageAcrossStores({
+            storeIds: dashboardStoreIds,
+            skip: 0,
+            take: 10,
+
+            orderKey: (row: { createdAt: Date }) => row.createdAt,
+            fetch: async window => ({
+              rows: await prisma.order.findMany({
+                take: window,
+                orderBy: { createdAt: 'desc' },
+                include: {
+                  customer: { select: { email: true, firstName: true, lastName: true } },
+                  store: { select: { name: true } },
+                },
+              }),
+              total: 0,
+            }),
+          }),
         ]);
+      const orderCount = orderTotals.reduce((n, r) => n + r.value.count, 0);
+      const revenueResult = {
+        _sum: { total: orderTotals.reduce((n, r) => n + r.value.revenue, 0) },
+      };
+      const recentOrders = recentOrdersPage.rows;
 
       res.json({
         success: true,
@@ -1041,7 +1107,6 @@ router.get(
       const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
       const where: Prisma.ProductWhereInput = {};
-      if (storeId) where.storeId = storeId as string;
       if (status) where.status = status as ProductStatus;
       if (search) {
         where.OR = [
@@ -1050,24 +1115,31 @@ router.get(
         ];
       }
 
-      // products is RLS-protected; this is a cross-tenant super-admin list.
-      // withRlsBypass allows reading across all stores; the where clause
-      // (storeId / status / search) provides application-level scoping.
-      const [products, total] = await withRlsBypass((tx: Prisma.TransactionClient) =>
-        Promise.all([
-          tx.product.findMany({
-            where,
-            skip,
-            take: limit,
-            orderBy: { createdAt: 'desc' },
-            include: {
-              store: { select: { id: true, name: true } },
-              images: { take: 1 },
-            },
-          }),
-          tx.product.count({ where }),
-        ])
-      );
+      // products is RLS-protected; this is a cross-store super-admin list, so it
+      // is read store by store and merged (see lib/cross-store.ts). The `storeId`
+      // query filter narrows which stores are visited.
+      const { rows: products, total } = await pageAcrossStores({
+        storeIds: storeIdsFromFilter(storeId),
+        skip,
+        take: limit,
+
+        orderKey: (row: { createdAt: Date }) => row.createdAt,
+        fetch: async window => {
+          const [rows, count] = await Promise.all([
+            prisma.product.findMany({
+              where,
+              take: window,
+              orderBy: { createdAt: 'desc' },
+              include: {
+                store: { select: { id: true, name: true } },
+                images: { take: 1 },
+              },
+            }),
+            prisma.product.count({ where }),
+          ]);
+          return { rows, total: count };
+        },
+      });
 
       res.json({
         success: true,
@@ -1098,33 +1170,35 @@ router.get(
     try {
       const { id } = req.params;
 
-      // products is RLS-protected. The tenantContext middleware sets the GUC
-      // to req.params.id here, which is a product UUID, not a store UUID —
-      // that would cause RLS to filter to zero rows. Use withRlsBypass instead
-      // so the lookup works regardless of which store owns the product.
-      const product = await withRlsBypass((tx: Prisma.TransactionClient) =>
-        tx.product.findUnique({
-          where: { id },
-          include: {
-            store: { select: { id: true, name: true, slug: true } },
-            images: { orderBy: { position: 'asc' } },
-            categories: {
-              include: { category: { select: { id: true, name: true } } },
-            },
-            variants: {
+      // products is RLS-protected and the id alone does not say which store owns
+      // it: a definer (`ebda_entity_store_id`, exact primary-key match, store id
+      // only) finds the store, and the read runs in that store's scope.
+      const productStoreId = await getEntityStoreId('product', id);
+      const product = productStoreId
+        ? await withStore(productStoreId, tx =>
+            tx.product.findUnique({
+              where: { id },
               include: {
-                options: {
+                store: { select: { id: true, name: true, slug: true } },
+                images: { orderBy: { position: 'asc' } },
+                categories: {
+                  include: { category: { select: { id: true, name: true } } },
+                },
+                variants: {
                   include: {
-                    value: {
-                      include: { option: true },
+                    options: {
+                      include: {
+                        value: {
+                          include: { option: true },
+                        },
+                      },
                     },
                   },
                 },
               },
-            },
-          },
-        })
-      );
+            })
+          )
+        : null;
 
       if (!product) {
         res.status(404).json({
@@ -1163,29 +1237,34 @@ router.get(
       const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
       const where: Prisma.OrderWhereInput = {};
-      if (storeId) where.storeId = storeId as string;
       if (status) where.status = status as OrderStatus;
       if (paymentStatus) where.paymentStatus = paymentStatus as OrderPaymentStatus;
 
-      // orders is RLS-protected; this is a cross-tenant super-admin list.
-      // withRlsBypass allows reading across all stores; the where clause
-      // (storeId / status / paymentStatus) provides application-level scoping.
-      const [orders, total] = await withRlsBypass((tx: Prisma.TransactionClient) =>
-        Promise.all([
-          tx.order.findMany({
-            where,
-            skip,
-            take: limit,
-            orderBy: { createdAt: 'desc' },
-            include: {
-              store: { select: { id: true, name: true } },
-              customer: { select: { id: true, email: true, firstName: true, lastName: true } },
-              items: { take: 3 },
-            },
-          }),
-          tx.order.count({ where }),
-        ])
-      );
+      // orders is RLS-protected; this is a cross-store super-admin list, read
+      // store by store and merged (see lib/cross-store.ts).
+      const { rows: orders, total } = await pageAcrossStores({
+        storeIds: storeIdsFromFilter(storeId),
+        skip,
+        take: limit,
+
+        orderKey: (row: { createdAt: Date }) => row.createdAt,
+        fetch: async window => {
+          const [rows, count] = await Promise.all([
+            prisma.order.findMany({
+              where,
+              take: window,
+              orderBy: { createdAt: 'desc' },
+              include: {
+                store: { select: { id: true, name: true } },
+                customer: { select: { id: true, email: true, firstName: true, lastName: true } },
+                items: { take: 3 },
+              },
+            }),
+            prisma.order.count({ where }),
+          ]);
+          return { rows, total: count };
+        },
+      });
 
       res.json({
         success: true,
@@ -1218,7 +1297,6 @@ router.get(
       const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
       const where: Prisma.CustomerWhereInput = {};
-      if (storeId) where.storeId = storeId as string;
       if (search) {
         where.OR = [
           { email: { contains: search as string, mode: 'insensitive' } },
@@ -1227,31 +1305,37 @@ router.get(
         ];
       }
 
-      // customers is RLS-protected; this is a cross-tenant super-admin list.
-      // withRlsBypass allows reading across all stores; the where clause
-      // (storeId / search) provides application-level scoping.
-      const [customers, total] = await withRlsBypass((tx: Prisma.TransactionClient) =>
-        Promise.all([
-          tx.customer.findMany({
-            where,
-            skip,
-            take: limit,
-            orderBy: { createdAt: 'desc' },
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phone: true,
-              totalOrders: true,
-              totalSpent: true,
-              createdAt: true,
-              store: { select: { id: true, name: true } },
-            },
-          }),
-          tx.customer.count({ where }),
-        ])
-      );
+      // customers is RLS-protected; this is a cross-store super-admin list, read
+      // store by store and merged (see lib/cross-store.ts).
+      const { rows: customers, total } = await pageAcrossStores({
+        storeIds: storeIdsFromFilter(storeId),
+        skip,
+        take: limit,
+
+        orderKey: (row: { createdAt: Date }) => row.createdAt,
+        fetch: async window => {
+          const [rows, count] = await Promise.all([
+            prisma.customer.findMany({
+              where,
+              take: window,
+              orderBy: { createdAt: 'desc' },
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+                totalOrders: true,
+                totalSpent: true,
+                createdAt: true,
+                store: { select: { id: true, name: true } },
+              },
+            }),
+            prisma.customer.count({ where }),
+          ]);
+          return { rows, total: count };
+        },
+      });
 
       res.json({
         success: true,
@@ -1283,30 +1367,18 @@ router.get(
       const { page: pageStr, limit: limitStr, action, userId, resourceType } = req.query;
       const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
-      const where: Prisma.AuditLogWhereInput = {};
-      if (action) where.action = { contains: action as string };
-      if (userId) where.userId = userId as string;
-      if (resourceType) where.resourceType = resourceType as string;
-
-      // audit_logs is RLS-protected; this is a cross-tenant super-admin viewer.
-      // withRlsBypass allows reading across all stores; the where clause
-      // (action / userId / resourceType) provides application-level scoping.
-      const [logs, total] = await withRlsBypass((tx: Prisma.TransactionClient) =>
-        Promise.all([
-          tx.auditLog.findMany({
-            where,
-            skip,
-            take: limit,
-            orderBy: { createdAt: 'desc' },
-            include: {
-              user: {
-                select: { id: true, email: true, firstName: true, lastName: true },
-              },
-            },
-          }),
-          tx.auditLog.count({ where }),
-        ])
-      );
+      // audit_logs is store-scoped under RLS and also holds platform events with
+      // NO store (login failures, user management, impersonation). The
+      // cross-store viewer is therefore a definer that checks the actor is an
+      // active super_admin and leaves its own audit row.
+      const { rows: logs, total } = await platformAuditLogs.list({
+        actorUserId: req.user!.userId,
+        action: typeof action === 'string' && action ? action : undefined,
+        userId: typeof userId === 'string' && userId ? userId : undefined,
+        resourceType: typeof resourceType === 'string' && resourceType ? resourceType : undefined,
+        limit,
+        offset: skip,
+      });
 
       res.json({
         success: true,
@@ -1365,31 +1437,28 @@ router.get(
       startOfMonth.setUTCDate(1);
       startOfMonth.setUTCHours(0, 0, 0, 0);
 
-      // withRlsBypass: aiUsage has RLS — must bypass to aggregate cross-tenant
-      const result = await withRlsBypass(async tx => {
-        // Platform-level totals
-        const [platformToday, platformMonth, platformCached] = await Promise.all([
-          tx.aiUsage.count({ where: { createdAt: { gte: startOfDay }, cachedHit: false } }),
-          tx.aiUsage.count({ where: { createdAt: { gte: startOfMonth }, cachedHit: false } }),
-          tx.aiUsage.count({ where: { createdAt: { gte: startOfMonth }, cachedHit: true } }),
-        ]);
-        const platformUncached = platformMonth;
-        const totalCalls = platformCached + platformUncached;
-        const cacheHitRatio = totalCalls > 0 ? platformCached / totalCalls : 0;
-
-        // Per-store aggregations: today count, month count, last call, feature breakdown
-        const storeStats = await tx.$queryRaw<
-          Array<{
-            store_id: string;
-            today_count: bigint;
-            month_count: bigint;
-            last_call_at: Date | null;
-            feature: string;
-            feature_count: bigint;
-            month_cost_micros: bigint | null;
-            month_unpriced: bigint;
-          }>
-        >`
+      // aiUsage has RLS: aggregate store by store (`acrossStores`, one short tenant
+      // transaction each) and merge the per-store partials.
+      const result = await (async () => {
+        const perStore = await acrossStores(async () => {
+          const [today, month, cached] = await Promise.all([
+            prisma.aiUsage.count({ where: { createdAt: { gte: startOfDay }, cachedHit: false } }),
+            prisma.aiUsage.count({ where: { createdAt: { gte: startOfMonth }, cachedHit: false } }),
+            prisma.aiUsage.count({ where: { createdAt: { gte: startOfMonth }, cachedHit: true } }),
+          ]);
+          // Per-store aggregations: today count, month count, last call, feature breakdown
+          const stats = await prisma.$queryRaw<
+            Array<{
+              store_id: string;
+              today_count: bigint;
+              month_count: bigint;
+              last_call_at: Date | null;
+              feature: string;
+              feature_count: bigint;
+              month_cost_micros: bigint | null;
+              month_unpriced: bigint;
+            }>
+          >`
           SELECT
             store_id,
             COUNT(*) FILTER (WHERE created_at >= ${startOfDay} AND cached_hit = false) AS today_count,
@@ -1411,11 +1480,20 @@ router.get(
           FROM ai_usage
           GROUP BY store_id, feature
         `;
+          return { today, month, cached, stats };
+        });
+        const platformToday = perStore.reduce((n, p) => n + p.value.today, 0);
+        const platformMonth = perStore.reduce((n, p) => n + p.value.month, 0);
+        const platformCached = perStore.reduce((n, p) => n + p.value.cached, 0);
+        const platformUncached = platformMonth;
+        const totalCalls = platformCached + platformUncached;
+        const cacheHitRatio = totalCalls > 0 ? platformCached / totalCalls : 0;
+        const storeStats = perStore.flatMap(p => p.value.stats);
 
         // Fetch store metadata for all referenced storeIds
         const storeIds = [...new Set(storeStats.map(r => r.store_id))];
 
-        const stores = await tx.store.findMany({
+        const stores = await prisma.store.findMany({
           where: { id: { in: storeIds } },
           select: { id: true, slug: true, name: true, plan: true },
         });
@@ -1517,7 +1595,7 @@ router.get(
           },
           stores: storeRows,
         };
-      });
+      })();
 
       res.json({ success: true, data: result });
     } catch (error) {
@@ -1553,6 +1631,25 @@ export async function loadUsageHistoryRows(tx: Prisma.TransactionClient, months:
 }
 
 /**
+ * `loadUsageHistoryRows` across every store: each store's newest `months`
+ * periods are read in its own tenant transaction, then the newest `months`
+ * DISTINCT periods of the union are kept (a store's rows inside the global top
+ * `months` are always inside that store's own top `months`).
+ */
+export async function loadUsageHistoryRowsAcrossStores(months: number) {
+  const perStore = await acrossStores(() =>
+    loadUsageHistoryRows(prisma as unknown as Prisma.TransactionClient, months)
+  );
+  const rows = perStore.flatMap(p => p.value);
+  const keep = new Set(
+    [...new Set(rows.map(r => r.periodStart.getTime()))].sort((a, b) => b - a).slice(0, months)
+  );
+  return rows
+    .filter(r => keep.has(r.periodStart.getTime()))
+    .sort((a, b) => b.periodStart.getTime() - a.periodStart.getTime());
+}
+
+/**
  * GET /admin/super-admin/usage-history?months=12
  *
  * The per-store monthly usage history written by the `store-usage-snapshot`
@@ -1571,14 +1668,14 @@ router.get(
         36
       );
 
-      // Cross-tenant by nature — withRlsBypass, same as the ai-usage summary.
+      // Cross-tenant by nature — read store by store, same as the ai-usage summary.
       //
       // Paged by PERIOD, not by a flat row budget (PR 2301 audit): the old
       // `take: months * 200` let the newest months consume the whole budget on
       // a platform past 200 stores, so older months came back silently partial
       // while the viewer rendered them as complete. Pick the newest `months`
       // distinct periods first, then read every row of those periods.
-      const rows = await withRlsBypass(tx => loadUsageHistoryRows(tx, months));
+      const rows = await loadUsageHistoryRowsAcrossStores(months);
 
       const byPeriod = new Map<string, Array<Record<string, unknown>>>();
       for (const r of rows) {
@@ -1672,7 +1769,6 @@ router.get(
       const { storeId, status, paymentStatus, from, to } = req.query;
 
       const where: Prisma.OrderWhereInput = {};
-      if (storeId) where.storeId = storeId as string;
       if (status) where.status = status as OrderStatus;
       if (paymentStatus) where.paymentStatus = paymentStatus as OrderPaymentStatus;
       if (from || to) {
@@ -1692,70 +1788,79 @@ router.get(
         'shipping_area,created_at\n';
       res.write(header);
 
-      let cursor: string | undefined;
       let totalRows = 0;
 
-      // Cursor-based streaming loop: each iteration opens a fresh bypass tx,
-      // fetches one page, streams it to the response, then closes the tx.
-      // This keeps individual transaction lifetimes to <1s even on large exports.
-      while (true) {
-        // Each chunk gets its own withRlsBypass transaction (not one long tx).
-        const rows = await withRlsBypass((tx: Prisma.TransactionClient) =>
-          tx.order.findMany({
-            where,
-            orderBy: { id: 'asc' }, // stable cursor anchor
-            take: EXPORT_CHUNK_SIZE,
-            // Prisma cursor: skip the cursor row itself (skip: 1) on every
-            // page after the first. The `id` field is a UUID primary key so
-            // it uniquely identifies the last-seen row.
-            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-            select: {
-              id: true,
-              orderNumber: true,
-              storeId: true,
-              status: true,
-              paymentStatus: true,
-              total: true,
-              shippingAddress: true,
-              createdAt: true,
-              store: { select: { name: true } },
-              customer: {
-                select: { email: true, firstName: true, lastName: true },
-              },
-            },
-          })
+      // Store by store, each chunk in its own short tenant transaction: the
+      // cursor loop fetches one page, streams it to the response, then closes the
+      // transaction, which keeps lifetimes <1s even on large exports (a single
+      // long one would blow the 30s budget).
+      const exportStoreIds =
+        storeIdsFromFilter(storeId) ??
+        (await prisma.store.findMany({ select: { id: true }, orderBy: { id: 'asc' } })).map(
+          st => st.id
         );
+      for (const exportStoreId of exportStoreIds) {
+        let cursor: string | undefined;
+        while (true) {
+          const rows = await withStore(exportStoreId, tx =>
+            tx.order.findMany({
+              where,
+              orderBy: { id: 'asc' }, // stable cursor anchor
+              take: EXPORT_CHUNK_SIZE,
+              // Prisma cursor: skip the cursor row itself (skip: 1) on every
+              // page after the first. The `id` field is a UUID primary key so
+              // it uniquely identifies the last-seen row.
+              ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+              select: {
+                id: true,
+                orderNumber: true,
+                storeId: true,
+                status: true,
+                paymentStatus: true,
+                total: true,
+                shippingAddress: true,
+                createdAt: true,
+                store: { select: { name: true } },
+                customer: {
+                  select: { email: true, firstName: true, lastName: true },
+                },
+              },
+            })
+          );
 
-        if (rows.length === 0) break;
+          if (rows.length === 0) break;
 
-        // Build and flush this chunk to the TCP buffer
-        const chunk = rows
-          .map(o => {
-            const addr = o.shippingAddress as Record<string, string> | null;
-            return [
-              csvField(o.orderNumber),
-              csvField(o.storeId),
-              csvField(o.store?.name),
-              csvField(o.status),
-              csvField(o.paymentStatus),
-              csvField(o.total),
-              csvField(o.customer?.email),
-              csvField(o.customer ? `${o.customer.firstName} ${o.customer.lastName}`.trim() : null),
-              csvField(addr?.country),
-              csvField(addr?.city),
-              csvField(addr?.area),
-              csvField(o.createdAt),
-            ].join(',');
-          })
-          .join('\n');
+          // Build and flush this chunk to the TCP buffer
+          const chunk = rows
+            .map(o => {
+              const addr = o.shippingAddress as Record<string, string> | null;
+              return [
+                csvField(o.orderNumber),
+                csvField(o.storeId),
+                csvField(o.store?.name),
+                csvField(o.status),
+                csvField(o.paymentStatus),
+                csvField(o.total),
+                csvField(o.customer?.email),
+                csvField(
+                  o.customer ? `${o.customer.firstName} ${o.customer.lastName}`.trim() : null
+                ),
+                csvField(addr?.country),
+                csvField(addr?.city),
+                csvField(addr?.area),
+                csvField(o.createdAt),
+              ].join(',');
+            })
+            .join('\n');
 
-        res.write(chunk + '\n');
+          res.write(chunk + '\n');
 
-        cursor = rows[rows.length - 1].id;
-        totalRows += rows.length;
+          cursor = rows[rows.length - 1].id;
+          totalRows += rows.length;
 
-        // Finished if we got fewer rows than the page size
-        if (rows.length < EXPORT_CHUNK_SIZE) break;
+          // Finished if we got fewer rows than the page size
+          if (rows.length < EXPORT_CHUNK_SIZE) break;
+        }
       }
 
       logger.info(
@@ -1795,7 +1900,6 @@ router.get(
       const { storeId, status, paymentStatus, from, to } = req.query;
 
       const where: Prisma.OrderWhereInput = {};
-      if (storeId) where.storeId = storeId as string;
       if (status) where.status = status as OrderStatus;
       if (paymentStatus) where.paymentStatus = paymentStatus as OrderPaymentStatus;
       if (from || to) {
@@ -1804,27 +1908,35 @@ router.get(
         if (to) where.createdAt.lte = new Date(to as string);
       }
 
-      const orders = await withRlsBypass((tx: Prisma.TransactionClient) =>
-        tx.order.findMany({
-          where,
-          orderBy: { createdAt: 'asc' },
-          take: 50000,
-          select: {
-            id: true,
-            orderNumber: true,
-            storeId: true,
-            status: true,
-            paymentStatus: true,
-            total: true,
-            shippingAddress: true,
-            createdAt: true,
-            store: { select: { name: true } },
-            customer: {
-              select: { email: true, firstName: true, lastName: true },
-            },
-          },
-        })
-      );
+      // Per store (each in its own tenant transaction), merged oldest-first and
+      // cut to the same 50 000-row ceiling as before.
+      const orders = (
+        await acrossStoresFlat(
+          () =>
+            prisma.order.findMany({
+              where,
+              orderBy: { createdAt: 'asc' },
+              take: 50000,
+              select: {
+                id: true,
+                orderNumber: true,
+                storeId: true,
+                status: true,
+                paymentStatus: true,
+                total: true,
+                shippingAddress: true,
+                createdAt: true,
+                store: { select: { name: true } },
+                customer: {
+                  select: { email: true, firstName: true, lastName: true },
+                },
+              },
+            }),
+          { storeIds: storeIdsFromFilter(storeId) }
+        )
+      )
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+        .slice(0, 50000);
 
       const rows = orders.map(o => {
         const addr = o.shippingAddress as Record<string, string> | null;
@@ -1940,7 +2052,7 @@ router.post(
       }
       const { userId } = parsed.data;
 
-      // users table has no RLS — plain lookup works under force_app without bypass.
+      // users table has no RLS — plain lookup works under ebda_app without bypass.
       // We intentionally leave this as-is: adding withRlsBypass here would be
       // over-engineering (the policy doesn't exist) and would waste a tx slot.
       const target = await prisma.user.findUnique({
@@ -2063,32 +2175,15 @@ router.get(
     try {
       const { page: pageStr, limit: limitStr, status, provider } = req.query;
       const { page, limit, skip } = parsePagination(pageStr, limitStr);
-      const where: Record<string, unknown> = {};
-      if (typeof status === 'string' && status) where.status = status;
-      if (typeof provider === 'string' && provider) where.provider = provider;
-      const [events, total] = await withRlsBypass(tx =>
-        Promise.all([
-          tx.webhookEvent.findMany({
-            where,
-            select: {
-              id: true,
-              provider: true,
-              storeId: true,
-              status: true,
-              attempts: true,
-              lastError: true,
-              resultOrderId: true,
-              resultStatus: true,
-              idempotencyKey: true,
-              receivedAt: true,
-            },
-            orderBy: { receivedAt: 'desc' },
-            skip,
-            take: limit,
-          }),
-          tx.webhookEvent.count({ where }),
-        ])
-      );
+      // The inbox spans every store (and holds NULL-store rows), so the viewer is
+      // a definer that checks the actor is an active super_admin and audits the read.
+      const { events, total } = await webhookInbox.adminList({
+        actorUserId: req.user!.userId,
+        status: typeof status === 'string' && status ? status : undefined,
+        provider: typeof provider === 'string' && provider ? provider : undefined,
+        limit,
+        offset: skip,
+      });
       res.json({
         success: true,
         data: {
@@ -2109,12 +2204,7 @@ router.post(
     try {
       const { id } = req.params;
       const force = req.body?.force === true || req.query.force === 'true';
-      const row = await withRlsBypass(tx =>
-        tx.webhookEvent.findUnique({
-          where: { id },
-          select: { id: true, provider: true, idempotencyKey: true, storeId: true, status: true },
-        })
-      );
+      const row = await webhookInbox.get(id);
       if (!row) {
         res.status(404).json({
           success: false,
@@ -2143,12 +2233,7 @@ router.post(
       // received/attempts=0 past STUCK_WEBHOOK_MINUTES by AGE) does not ALSO
       // re-fire this row in the window before the consumer claims it — that
       // would double-send `payment/webhook.received` for one replay.
-      await withRlsBypass(tx =>
-        tx.webhookEvent.update({
-          where: { id },
-          data: { status: 'received', attempts: 0, lastError: null, receivedAt: new Date() },
-        })
-      );
+      await webhookInbox.update(id, { requeue: true });
       await inngest.send({
         name: 'payment/webhook.received',
         data: {

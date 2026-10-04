@@ -49,6 +49,20 @@ function extractRetryCodes(err: unknown): string[] {
   if (typeof code === 'string') codes.push(code);
   const metaCode = (err as { meta?: { code?: unknown } }).meta?.code;
   if (typeof metaCode === 'string') codes.push(metaCode);
+  // Over the driver adapter (`engineType = "client"`) a raw-query failure carries NO `meta.code`:
+  // the Postgres SQLSTATE is `meta.driverAdapterError.cause.originalCode` (40P01 deadlock,
+  // 40001 serialization failure, 57P01 admin shutdown, ...) and an unreachable server is
+  // `cause.kind = 'DatabaseNotReachable'`. Without these the raw-SQL retries (the warehouse
+  // reconcile's FOR UPDATE, the P1001 retry on the feature read) never matched.
+  const cause = (
+    err as {
+      meta?: { driverAdapterError?: { cause?: { originalCode?: unknown; kind?: unknown } } };
+    }
+  ).meta?.driverAdapterError?.cause;
+  if (typeof cause?.originalCode === 'string') codes.push(cause.originalCode);
+  if (cause?.kind === 'DatabaseNotReachable') codes.push('P1001');
+  if (cause?.kind === 'SocketTimeout') codes.push('P1002');
+  if (cause?.kind === 'TransactionWriteConflict') codes.push('P2034');
   // Connection-establishment failures (P1001 "can't reach database server",
   // P1002 "timed out") are thrown as `PrismaClientInitializationError`, whose
   // code lives on `errorCode` — `code` is undefined on that class (issue

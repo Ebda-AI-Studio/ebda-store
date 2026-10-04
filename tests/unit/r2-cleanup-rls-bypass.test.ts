@@ -14,28 +14,45 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { queryRaw, executeRaw, bypassTx, prismaQueryRaw, prismaDecoy, withRlsBypassMock } =
-  vi.hoisted(() => {
-    const queryRaw = vi.fn().mockResolvedValue([{ referenced: false }]);
-    const executeRaw = vi.fn().mockResolvedValue(0);
-    const bypassTx = { $queryRawUnsafe: queryRaw, $executeRaw: executeRaw };
+const {
+  queryRaw,
+  executeRaw,
+  bypassTx,
+  prismaQueryRaw,
+  prismaDecoy,
+  withRlsBypassMock,
+  storeFindMany,
+} = vi.hoisted(() => {
+  const queryRaw = vi.fn().mockResolvedValue([{ referenced: false }]);
+  const executeRaw = vi.fn().mockResolvedValue(0);
+  const bypassTx = { $queryRawUnsafe: queryRaw, $executeRaw: executeRaw };
 
-    // A DISTINCT client from `bypassTx` — if the source under test ever queries
-    // straight through `prisma` instead of `tx`, this decoy would be the one
-    // invoked, and the assertions below would catch it.
-    const prismaQueryRaw = vi.fn().mockResolvedValue([{ referenced: false }]);
-    const prismaDecoy = { $queryRawUnsafe: prismaQueryRaw };
+  // A DISTINCT client from `bypassTx` — if the source under test ever queries
+  // straight through `prisma` instead of `tx`, this decoy would be the one
+  // invoked, and the assertions below would catch it.
+  const prismaQueryRaw = vi.fn().mockResolvedValue([{ referenced: false }]);
+  // `stores` carries no RLS, so the bare client lists them; everything else is read per store.
+  const storeFindMany = vi.fn().mockResolvedValue([{ id: 'store-1' }]);
+  const prismaDecoy = { $queryRawUnsafe: prismaQueryRaw, store: { findMany: storeFindMany } };
 
-    const withRlsBypassMock = vi.fn((fn: (tx: typeof bypassTx) => Promise<unknown>) =>
-      fn(bypassTx)
-    );
+  const withRlsBypassMock = vi.fn(
+    (_storeId: string, fn: (tx: typeof bypassTx) => Promise<unknown>) => fn(bypassTx)
+  );
 
-    return { queryRaw, executeRaw, bypassTx, prismaQueryRaw, prismaDecoy, withRlsBypassMock };
-  });
+  return {
+    queryRaw,
+    executeRaw,
+    bypassTx,
+    prismaQueryRaw,
+    prismaDecoy,
+    withRlsBypassMock,
+    storeFindMany,
+  };
+});
 
 vi.mock('@force/database', () => ({
   prisma: prismaDecoy,
-  withRlsBypass: withRlsBypassMock,
+  withStore: withRlsBypassMock,
 }));
 vi.mock('../../apps/api/src/services/storage.service', () => ({
   StorageService: {
@@ -62,11 +79,11 @@ beforeEach(() => {
   prismaQueryRaw.mockResolvedValue([{ referenced: false }]);
 });
 
-describe('r2-cleanup isStillReferenced runs on an RLS-bypass client (#1599)', () => {
-  it('goes through withRlsBypass, not the bare prisma export', async () => {
+describe('r2-cleanup isStillReferenced reads every store in its own scope (#1599)', () => {
+  it('goes through withStore (one scope per store), not the bare prisma export', async () => {
     await deleteR2ObjectIfOrphan('https://cdn.example.com/products/some-key.jpg');
 
-    expect(withRlsBypassMock).toHaveBeenCalledTimes(1);
+    expect(withRlsBypassMock).toHaveBeenCalledTimes(1); // the one store listed
     // The registry-built probes landed on the bypass client: the exact-URL
     // half first (with the URL), then — because it missed — the substring
     // half over the JSON/HTML columns (with the R2 key). issue 2249.
@@ -87,7 +104,22 @@ describe('r2-cleanup isStillReferenced runs on an RLS-bypass client (#1599)', ()
     expect(bypassTx.$queryRawUnsafe).toBe(queryRaw);
   });
 
-  it('still refuses to delete when the bypass client finds a reference', async () => {
+  it('a reference in ANY store keeps the object (the check is the OR over every store)', async () => {
+    storeFindMany.mockResolvedValueOnce([{ id: 'store-1' }, { id: 'store-2' }]);
+    // store-1: exact + substring miss; store-2: exact hit
+    queryRaw
+      .mockResolvedValueOnce([{ referenced: false }])
+      .mockResolvedValueOnce([{ referenced: false }])
+      .mockResolvedValueOnce([{ referenced: true }]);
+    const { StorageService } = await import('../../apps/api/src/services/storage.service');
+
+    await deleteR2ObjectIfOrphan('https://cdn.example.com/products/shared.jpg');
+
+    expect(withRlsBypassMock.mock.calls.map(c => c[0])).toEqual(['store-1', 'store-2']);
+    expect(StorageService.delete).not.toHaveBeenCalled();
+  });
+
+  it('still refuses to delete when the store scope finds a reference', async () => {
     queryRaw.mockResolvedValueOnce([{ referenced: true }]);
     const { StorageService } = await import('../../apps/api/src/services/storage.service');
 

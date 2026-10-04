@@ -59,16 +59,8 @@ const API_SRC = path.resolve(__dirname, '../../apps/api/src');
  * uncomfortable to leave entries in.
  */
 const REVIEWED_OWN_TRANSACTION: Record<string, string> = {
-  // AuthService.verifyEmail's `prisma.$transaction([...])` — reachable only
-  // via `/auth/*` routes, mounted at `router.use('/auth', authRoutes)` with
-  // NO `tenantContext` (unlike every `/stores/:storeId/...` mount). There is
-  // never an ambient tenant transaction on this path, so this always opens
-  // its own real transaction — the nested-connection hazard this registry
-  // guards against cannot occur here. Surfaced by #1791's per-occurrence
-  // proximity check (the file's OTHER `hasTenantContext()` branch, in a
-  // different method ~1200 lines away, used to clear this one too under the
-  // old whole-file check).
-  'services/auth.service.ts': 'verifyEmail — /auth routes carry no ambient tenant transaction',
+  // (AuthService.verifyEmail used to be listed here: it now runs `withUser`, which joins or opens
+  // the user's own scope itself, so it no longer opens a bare `prisma.$transaction`.)
   // #1787 — the route-level sites the services-only scan could not see. Each
   // is an ARRAY batch of updates/upserts to rows that existed before the
   // request, referencing nothing but `storeId`; the handler writes nothing

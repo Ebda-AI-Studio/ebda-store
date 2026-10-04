@@ -32,6 +32,8 @@ const { prismaMock, runInTenantContextMock, storageMock, loggerMock } = vi.hoist
       // r2-cleanup bounds its orphan scan with set_config('statement_timeout').
       $executeRaw: vi.fn().mockResolvedValue(0),
       affiliateEvent: { create: vi.fn().mockResolvedValue({ id: 'evt-1' }) },
+      // isStillReferenced visits each store (the `stores` table itself carries no RLS).
+      store: { findMany: vi.fn().mockResolvedValue([{ id: 'store-1' }]) },
     },
     runInTenantContextMock: vi.fn(
       async (_storeId: string | undefined, fn: () => Promise<unknown>) => fn()
@@ -45,18 +47,15 @@ const { prismaMock, runInTenantContextMock, storageMock, loggerMock } = vi.hoist
 });
 
 vi.mock('@force/database', () => ({
-  withRlsBypass: (fn: (tx: unknown) => unknown) => fn(prismaMock),
   prisma: prismaMock,
   runInTenantContext: runInTenantContextMock,
   onClosedTenantTxAccess: vi.fn(),
   hasTenantContext: vi.fn(() => false),
-  // #1599: isStillReferenced now runs its probe through `withRlsBypass`,
-  // not the bare `prisma` export — this file's concern is COMMIT-TIMING (the
-  // header docstring), not RLS routing (that has its own dedicated coverage
-  // in tests/unit/r2-cleanup-rls-bypass.test.ts), so this just runs the
-  // callback against the SAME mocks the rest of this file already asserts
-  // against.
-  withRlsBypass: (fn: (tx: typeof prismaMock) => unknown) => fn(prismaMock),
+  // isStillReferenced reads store by store through `withStore`: this file's concern is
+  // COMMIT-TIMING (the header docstring), not RLS routing (that has its own coverage in
+  // tests/unit/r2-cleanup-rls-bypass.test.ts), so the callback runs against the SAME mocks the
+  // rest of this file asserts against.
+  withStore: (_storeId: string, fn: (tx: typeof prismaMock) => unknown) => fn(prismaMock),
 }));
 
 vi.mock('@api/services/storage.service', () => ({ StorageService: storageMock }));

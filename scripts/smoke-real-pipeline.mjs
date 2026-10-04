@@ -23,8 +23,8 @@ if (!process.env.RESEND_API_KEY && !process.env.SMTP_PASSWORD) {
   process.exit(1);
 }
 
-const { PrismaClient } = await import('@prisma/client');
-const prisma = new PrismaClient();
+const { createPrismaClient } = await import('@force/database');
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
 
 const store = await prisma.store.findFirst({
   where: { slug: STORE_SLUG },

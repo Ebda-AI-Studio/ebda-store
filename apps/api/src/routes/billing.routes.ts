@@ -23,7 +23,7 @@ import {
   startCheckout,
 } from '../services/billing/subscription-billing.service';
 import { AppError } from '../middleware/error-handler';
-import { withRlsBypass } from '@force/database';
+import { withStore } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { getUsageSummary } from '../services/plan-limit.service';
@@ -115,7 +115,7 @@ router.get(
       const hint = getBillingProvider().parseReturn(req.query as Record<string, unknown>);
       let status: string | null = null;
       if (hint.merchantOrderId && /^[0-9a-f-]{36}$/i.test(hint.merchantOrderId)) {
-        const row = await withRlsBypass(tx =>
+        const row = await withStore(req.params.storeId, tx =>
           tx.billingEvent.findFirst({
             where: { id: hint.merchantOrderId!, storeId: req.params.storeId },
             select: { status: true },
@@ -176,7 +176,7 @@ router.post(
       const { merchantOrderId, outcome } = z
         .object({ merchantOrderId: z.string().uuid(), outcome: z.enum(['success', 'failure']) })
         .parse(req.body);
-      const row = await withRlsBypass(tx =>
+      const row = await withStore(req.params.storeId, tx =>
         tx.billingEvent.findFirst({
           where: { id: merchantOrderId, storeId: req.params.storeId, status: 'pending' },
         })

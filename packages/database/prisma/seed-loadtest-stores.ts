@@ -15,13 +15,13 @@
  * (comma-separated, single line) for consumption by multi-store-storm.js.
  */
 
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from '../src/client';
 import * as bcrypt from 'bcryptjs';
 import * as fs from 'fs';
 import * as path from 'path';
 
 import { roundToMinor, REGION } from '@force/shared';
-const prisma = new PrismaClient();
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
 
 // ============================================
 // Config

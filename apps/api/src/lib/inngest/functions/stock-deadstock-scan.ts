@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { withRlsBypass } from '@force/database';
+import { prisma } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runDeadstockScan } from '../../../services/accounting/deadstock-scan.service';
@@ -35,18 +35,16 @@ export const stockDeadstockScanCron: InngestFunction.Any = inngest.createFunctio
     // stores table does not filter to 0 rows (no tenant GUC is set).
     // runDeadstockScan() already wraps its own DB work in withRlsBypass.
     const stores = await step.run('list-stores', () =>
-      withRlsBypass(tx =>
-        tx.store.findMany({
-          where: {
-            accountingEnabled: true,
-            aiFeaturesEnabled: true,
-            deletedAt: null,
-            // free (lapsed-payment / demo) plans are excluded from AI spend.
-            ...aiEligiblePlanFilter,
-          },
-          select: { id: true },
-        })
-      )
+      prisma.store.findMany({
+        where: {
+          accountingEnabled: true,
+          aiFeaturesEnabled: true,
+          deletedAt: null,
+          // free (lapsed-payment / demo) plans are excluded from AI spend.
+          ...aiEligiblePlanFilter,
+        },
+        select: { id: true },
+      })
     );
 
     let totalFlagged = 0;
@@ -108,9 +106,7 @@ export const stockDeadstockScanOnDemand: InngestFunction.Any = inngest.createFun
 
     // Plan gate — inventory.basic is in the `free` baseline so a lapsed
     // merchant can still see their stock; it must not buy them AI spend.
-    const store = await withRlsBypass(tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
-    );
+    const store = await prisma.store.findUnique({ where: { id: storeId }, select: { plan: true } });
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },

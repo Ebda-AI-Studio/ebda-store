@@ -2,7 +2,7 @@
  * Public store payloads keep their FAQs + how-tos under enforced RLS.
  *
  * Regression for the 2026-09-25 cutover rollback: with the API on the
- * non-bypass `force_app` role, `GET /public/stores/:slugOrId` and
+ * non-bypass `ebda_app` role, `GET /public/stores/:slugOrId` and
  * `GET /public/store/resolve` returned `faqs: []` / `howtos: []` for stores
  * with 24/9 active rows. `store_faqs` / `store_howtos` have STRICT policies
  * (no contextless allowance) and the routes read them as a nested
@@ -10,8 +10,8 @@
  * away. Nothing errored and every existing test stayed green, because none
  * asserted what the payload CONTAINED.
  *
- * CI's integration job runs the API server as `force_app` (see ci.yml
- * "Give force_app a CI-only login for the API server"), so this file exercises
+ * CI's integration job runs the API server as `ebda_app` (see ci.yml
+ * "Give ebda_app a CI-only login for the API server"), so this file exercises
  * the real enforced path. Fixtures are written through the test harness's
  * superuser connection.
  *

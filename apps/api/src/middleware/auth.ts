@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { AppError } from './error-handler';
 import { redis } from '../services/redis.service';
-import { prisma } from '@force/database';
+import { getUserState } from '../lib/definer';
 import logger from '../lib/logger';
 
 export interface AuthPayload {
@@ -102,10 +102,9 @@ async function resolveTokenVersionAndStatus(
   const cachedTv = await redis.getUserTokenVersion(userId);
   if (cachedTv !== null) return { tokenVersion: cachedTv, blocked: false };
 
-  const u = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { tokenVersion: true, status: true },
-  });
+  // `users` is under strict RLS and the caller is not scoped to anyone yet, so
+  // this exact-id read goes through the `ebda_user_state` definer.
+  const u = await getUserState(userId);
   const currentTv = u?.tokenVersion ?? 0;
   await redis.setUserTokenVersion(userId, currentTv);
   return { tokenVersion: currentTv, blocked: u ? u.status !== 'active' : false };

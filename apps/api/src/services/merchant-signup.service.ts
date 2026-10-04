@@ -12,10 +12,11 @@
  */
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { prisma, Prisma } from '@force/database';
+import { prisma, withUser } from '@force/database';
 import { normalizeEgyptianMobile } from '@force/shared';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
+import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';
 import { AuthService } from './auth.service';
 import { sendMerchantDuplicateSignupNotice } from './platform-mailer';
 
@@ -75,10 +76,18 @@ export class MerchantSignupService {
     // Always hash, even when the address is taken (timing parity).
     const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
 
-    const existing = await prisma.user.findFirst({
-      where: { email: { equals: email, mode: 'insensitive' }, storeId: null, deletedAt: null },
-      select: { id: true, email: true, firstName: true, role: true, emailVerified: true },
-    });
+    // Nobody is signed in, and the admin namespace (users.store_id NULL) is not
+    // visible from any scope: the id comes from the `ebda_auth_find_user_id`
+    // definer (case-insensitive, id only) and the row is read AS that user.
+    const existingId = await findUserIdByEmail(email, null, { caseInsensitive: true });
+    const existing = existingId
+      ? await withUser(existingId, tx =>
+          tx.user.findUnique({
+            where: { id: existingId },
+            select: { id: true, email: true, firstName: true, role: true, emailVerified: true },
+          })
+        )
+      : null;
 
     if (existing && existing.role === 'store_admin' && !existing.emailVerified) {
       // Signed up before but never verified (lost mail): treat as a resend.
@@ -96,29 +105,32 @@ export class MerchantSignupService {
     }
 
     const parts = name.split(/\s+/);
-    let user: { id: string; email: string; firstName: string; lastName: string };
-    try {
-      user = await prisma.user.create({
-        data: {
-          email,
-          storeId: null,
-          passwordHash,
-          firstName: parts[0],
-          lastName: parts.slice(1).join(' '),
-          phone,
-          role: 'store_admin',
-          emailVerified: false,
-          language: language ?? 'ar',
-        },
-        select: { id: true, email: true, firstName: true, lastName: true },
-      });
-    } catch (err) {
-      // Lost a signup race for the same address: indistinguishable from "taken".
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        return GENERIC_SIGNUP_RESULT;
-      }
-      throw err;
-    }
+    // Find-or-create through the `ebda_admin_user_ensure` definer (it can only
+    // mint a store_admin or staff account). `created: false` means another signup
+    // for the same address won the race: indistinguishable from "taken".
+    const created = await ensureAdminUser({
+      email,
+      passwordHash,
+      firstName: parts[0],
+      lastName: parts.slice(1).join(' '),
+      role: 'store_admin',
+      emailVerified: false,
+    });
+    if (!created.created) return GENERIC_SIGNUP_RESULT;
+    // Phone and language are not part of the definer's contract: set them as the
+    // new user (its own row, under its own user scope).
+    await withUser(created.id, tx =>
+      tx.user.update({
+        where: { id: created.id },
+        data: { phone, language: language ?? 'ar' },
+      })
+    );
+    const user = {
+      id: created.id,
+      email: created.email,
+      firstName: created.firstName,
+      lastName: created.lastName,
+    };
 
     await AuthService.sendVerificationEmail(
       user.id,
@@ -139,22 +151,24 @@ export class MerchantSignupService {
    * existing, still-unverified merchant account with no mail in the last minute.
    */
   static async resendVerification(email: string): Promise<typeof GENERIC_SIGNUP_RESULT> {
-    const user = await prisma.user.findFirst({
-      where: {
-        email: { equals: email, mode: 'insensitive' },
-        storeId: null,
-        role: 'store_admin',
-        deletedAt: null,
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        emailVerified: true,
-        language: true,
-      },
-    });
+    const userId = await findUserIdByEmail(email, null, { caseInsensitive: true });
+    const found = userId
+      ? await withUser(userId, tx =>
+          tx.user.findUnique({
+            where: { id: userId },
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              emailVerified: true,
+              language: true,
+              role: true,
+            },
+          })
+        )
+      : null;
+    const user = found?.role === 'store_admin' ? found : null;
 
     if (!user || user.emailVerified) {
       await bcrypt.compare('x', DUMMY_HASH);

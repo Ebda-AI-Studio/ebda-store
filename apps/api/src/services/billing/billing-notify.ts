@@ -3,7 +3,7 @@
  * (socket notification) plus a durable email. Always called AFTER the DB
  * transaction committed; a notification failure never fails billing.
  */
-import { withRlsBypass } from '@force/database';
+import { withStore } from '@force/database';
 import { config } from '../../config';
 import logger from '../../lib/logger';
 import { EmailService } from '../email.service';
@@ -28,7 +28,7 @@ export type BillingEffect =
     };
 
 async function storeContext(storeId: string) {
-  return withRlsBypass(async tx => {
+  return withStore(storeId, async tx => {
     const store = await tx.store.findUnique({
       where: { id: storeId },
       select: {

@@ -73,10 +73,10 @@ describe('classifyOrphans — the R2 delete guard', () => {
 });
 
 // Issue 2251: this bulk-delete collector (the sweep is the other) read the registry with a bare
-// client. Under force_app a contextless read of a STRICT table returns [] and
+// client. Under ebda_app a contextless read of a STRICT table returns [] and
 // `--apply` would delete every file those rows reference.
-describe('r2-orphan-audit reads the registry with the RLS bypass (issue 2251)', () => {
-  it('the runner sets app.bypass_rls BEFORE running the read, inside one transaction', async () => {
+describe('r2-orphan-audit reads the registry as an owner-role connection (issue 2251)', () => {
+  it('the runner runs the read inside one transaction and sets no bypass GUC (the role itself bypasses RLS)', async () => {
     const calls: string[] = [];
     const tx = {
       $executeRaw: vi.fn(async (strings: TemplateStringsArray) => {
@@ -95,8 +95,8 @@ describe('r2-orphan-audit reads the registry with the RLS bypass (issue 2251)', 
     const run = rlsBypassRunner(prisma as any);
     await run(db => db.$queryRawUnsafe('SELECT 1'));
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(calls[0]).toMatch(/SET LOCAL app\.bypass_rls = 'true'/);
-    expect(calls.indexOf('READ')).toBeGreaterThan(0);
+    // Ebda has no `app.bypass_rls`: nothing is set, the read is the first and only statement.
+    expect(calls).toEqual(['READ']);
   });
 
   it('the audit collects through that runner, never a bare client', () => {
@@ -110,19 +110,25 @@ describe('r2-orphan-audit reads the registry with the RLS bypass (issue 2251)', 
   });
 
   it('STRICT_R2_TABLES is exactly the registry tables on the pinned STRICT list', () => {
-    const rls = readFileSync(
-      path.resolve(__dirname, '../../tests/integration/rls-force-app.test.ts'),
+    // Every table with a store_id column is under strict, forced RLS now (migration
+    // 20261004000000_ebda_strict_rls lists them in its header). The guard probes four of them:
+    // each must be a registry table AND on that list, so the probe can never name a table that is
+    // not actually RLS-protected.
+    const migration = readFileSync(
+      path.resolve(
+        __dirname,
+        '../../packages/database/prisma/migrations/20261004000000_ebda_strict_rls/migration.sql'
+      ),
       'utf8'
     );
-    const block = rls.slice(
-      rls.indexOf('const STRICT_TABLES = ['),
-      rls.indexOf('];', rls.indexOf('const STRICT_TABLES = ['))
-    );
-    const strict = new Set([...block.matchAll(/'([a-z_]+)'/g)].map(m => m[1]));
-    expect(strict.size).toBeGreaterThan(10);
     const registry = new Set(R2_REFERENCE_COLUMNS.map(c => c.table));
-    const expected = [...registry].filter(t => strict.has(t)).sort();
-    expect([...STRICT_R2_TABLES].sort()).toEqual(expected);
+    expect(STRICT_R2_TABLES.length).toBeGreaterThan(0);
+    for (const t of STRICT_R2_TABLES) {
+      expect(registry.has(t), `${t} is in the R2 registry`).toBe(true);
+      expect(migration, `${t} is under strict RLS in the migration`).toMatch(
+        new RegExp(`(^|[^a-z_])${t}([^a-z_]|$)`)
+      );
+    }
   });
 
   // Collector (through the bypass runner) sees `seen` rows; the catalog reports
@@ -178,17 +184,19 @@ describe('r2-orphan-audit reads the registry with the RLS bypass (issue 2251)', 
     expect(seeing.calls).toEqual([]);
   });
 
-  // Issue 2354: after the force_app cutover the role cannot ANALYZE (not the
+  // Issue 2354: after the ebda_app cutover the role cannot ANALYZE (not the
   // owner) and a never-populated table stays reltuples -1 forever. A bypass
   // proven through the SAME runner makes a 0 a real 0.
-  const bypassCollector = (seen: number, bypass: string | null) =>
+  const bypassCollector = (seen: number, bypass: string | boolean | null) =>
     (async (fn: (db: unknown) => Promise<unknown>) =>
       fn({
         $queryRawUnsafe: async (sql: string) =>
-          /current_setting\('app\.bypass_rls'/.test(sql) ? [{ bypass }] : [{ n: seen }],
+          /rolbypassrls/.test(sql)
+            ? [{ bypass: bypass === 'true' || bypass === true }]
+            : [{ n: seen }],
       })) as never;
 
-  it('issue 2354: UNKNOWN (-1) passes when the runner proves app.bypass_rls = true', async () => {
+  it('issue 2354: UNKNOWN (-1) passes when the runner proves the role bypasses RLS', async () => {
     const notOwner = catalog(-1, 0, async () => 0); // ANALYZE skipped (WARNING), stays -1
     await expect(
       assertStrictTablesVisible(bypassCollector(0, 'true'), notOwner.db)
@@ -199,7 +207,7 @@ describe('r2-orphan-audit reads the registry with the RLS bypass (issue 2251)', 
     for (const bypass of [null, '', 'false']) {
       await expect(
         assertStrictTablesVisible(bypassCollector(0, bypass), catalog(-1).db)
-      ).rejects.toThrow(/did not prove app\.bypass_rls/);
+      ).rejects.toThrow(/did not prove that the\s+connection role bypasses RLS|did not prove/);
     }
   });
 
