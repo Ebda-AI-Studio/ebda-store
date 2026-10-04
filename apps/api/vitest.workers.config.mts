@@ -11,8 +11,9 @@ const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
  * tests that need a database run only then; the Durable Object / limiter / entry tests never do.
  */
 async function dbReachable(): Promise<boolean> {
+  const { hostname, port } = new URL(LOCAL_DB);
   return new Promise(resolve => {
-    const s = createConnection({ host: '127.0.0.1', port: 6433 });
+    const s = createConnection({ host: hostname, port: Number(port) });
     const done = (ok: boolean) => {
       s.destroy();
       resolve(ok);
@@ -25,9 +26,12 @@ async function dbReachable(): Promise<boolean> {
 
 // The local dev path of apps/api/scripts/cf-pooler.sh: the non-bypass role through pgbouncer. The password
 // is the repo-wide fake one (CI role step, tests/integration/rls-*.test.ts); roles are cluster-wide.
+// EBDA_WORKERS_TEST_DB_URL points the DB-backed tests at another pooler / database (a host with several
+// concurrent runs: each takes its own pgbouncer), default = the cf-pooler.sh one.
 const LOCAL_DB =
+  process.env.EBDA_WORKERS_TEST_DB_URL ||
   ['postgresql://ebda_app', process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw'].join(':') +
-  '@127.0.0.1:6433/ebda_s1';
+    '@127.0.0.1:6433/ebda_s1';
 
 const BUNDLE = here('./dist-cf/worker.js');
 if (!existsSync(BUNDLE)) {
