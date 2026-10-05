@@ -178,11 +178,10 @@ export function AdminLayout({
     // Settings tabs
   };
 
-  // Sync dark mode with localStorage and system preference
+  // Ebda is dark-first; retain an explicitly saved light preference.
   useEffect(() => {
     const stored = localStorage.getItem('admin-theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const shouldBeDark = stored === 'dark' || (!stored && prefersDark);
+    const shouldBeDark = stored !== 'light';
     setIsDark(shouldBeDark);
     document.documentElement.classList.toggle('dark', shouldBeDark);
   }, []);

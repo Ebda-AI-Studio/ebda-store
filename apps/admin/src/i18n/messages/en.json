@@ -8519,7 +8519,7 @@
       "namePlaceholder": "Mona Hassan",
       "email": "Email address",
       "emailPlaceholder": "you@example.com",
-      "phone": "Mobile number (optional)",
+      "phone": "Mobile number",
       "phonePlaceholder": "010 1234 5678",
       "phoneHelp": "An Egyptian mobile, for order and account alerts.",
       "password": "Password",
@@ -8538,7 +8538,8 @@
         "tooFast": "Please wait a moment and submit again",
         "formExpired": "This form expired. Please submit again",
         "rateLimited": "Too many attempts. Please try again in a little while.",
-        "generic": "We could not create your account. Please try again."
+        "generic": "We could not create your account. Please try again.",
+        "phoneRequired": "Enter your mobile number."
       },
       "sent": {
         "title": "Check your email",
@@ -8626,7 +8627,8 @@
         "elegant": "Elegant",
         "elegantDesc": "Refined fashion and beauty look.",
         "selected": "Selected",
-        "saveFailed": "We could not save the template. Please try again."
+        "saveFailed": "We could not save the template. Please try again.",
+        "previewNote": "Illustrative layout — your photos and colors are added in store settings."
       },
       "product": {
         "title": "Add your first product",
@@ -8651,9 +8653,10 @@
         "subtitle": "Cash on delivery is on by default.",
         "cod": "Cash on delivery",
         "codDesc": "Customers pay the courier when the order arrives.",
-        "moreLater": "Cards, Meeza, mobile wallets, valU, Pay at Fawry and InstaPay are set up later in Settings > Payments, with your own Paymob, Kashier or Fawry account.",
+        "moreLater": "Add InstaPay details or configure a supported payment gateway later in Settings > Payments.",
         "saveFailed": "We could not save your payment settings. Please try again.",
-        "needOne": "Keep at least one payment method on."
+        "needOne": "Keep at least one payment method on.",
+        "manualNote": "InstaPay transfers are confirmed manually by you. Add your payment details in the dashboard after setup."
       },
       "live": {
         "title": "Ready to launch",
@@ -8673,7 +8676,8 @@
         "copied": "Copied",
         "whatsapp": "Share on WhatsApp",
         "dashboard": "Go to dashboard"
-      }
+      },
+      "retry": "Try again"
     },
     "setupGuide": {
       "title": "Setup guide",
@@ -8717,6 +8721,22 @@
           "desc": "Send your link to customers on WhatsApp."
         }
       }
+    },
+    "shell": {
+      "eyebrow": "Made for your next chapter",
+      "title": "A store of your own.",
+      "body": "Set up your store, add your products and choose how customers pay. Take it one step at a time.",
+      "store": "Your name, your address",
+      "storeBody": "Choose the link customers will use to find you.",
+      "product": "Products worth sharing",
+      "productBody": "Start with one product. Build your catalogue as you go.",
+      "payment": "A clear way to get paid",
+      "paymentBody": "Start with cash on delivery. Configure other methods in your dashboard.",
+      "terms": "Terms",
+      "privacy": "Privacy",
+      "support": "Need help?",
+      "footer": "Your store. Your brand.",
+      "back": "Back to Ebda"
     }
   },
   "billingEvents": {

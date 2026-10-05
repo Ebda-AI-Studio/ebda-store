@@ -10,22 +10,22 @@
     --card: 0 0% 100%;
     --card-foreground: 20 14% 12%;
 
-    /* Force Orange Primary #ff6e00 - Vibrant and energetic */
-    --primary: 26 100% 50%;
-    --primary-foreground: 0 0% 100%;
-    --primary-glow: 26 100% 50% / 0.15;
+    /* Antique gold: BRAND.colors.gold (#B08D57). Dark ink on gold meets AA. */
+    --primary: 36.4 36.03% 51.57%;
+    --primary-foreground: 210 9% 4.3%;
+    --primary-glow: 36.4 36.03% 51.57% / 0.15;
 
     /* Warm Secondary Tones */
     --secondary: 30 40% 96%;
-    --secondary-foreground: 26 80% 25%;
+    --secondary-foreground: 36 50% 25%;
 
     /* Neutral Tones with warmth */
     --muted: 30 15% 95%;
     --muted-foreground: 20 10% 45%;
 
-    /* Accent - Warm Orange */
+    /* Accent - antique gold tint */
     --accent: 30 60% 95%;
-    --accent-foreground: 26 90% 25%;
+    --accent-foreground: 36 50% 25%;
 
     /* Semantic Colors - Refined */
     --success: 158 64% 40%;
@@ -45,7 +45,7 @@
        text-warning-ink`). The role colour itself fails WCAG AA there — amber
        text on an amber pill measured 1.7:1 (issue 2233). Each pair is pinned
        >= 4.5:1 in both themes by admin-tint-ink-contrast.test.ts. */
-    --primary-ink: 26 100% 33%;
+    --primary-ink: 36 50% 29%;
     --success-ink: 158 64% 24%;
     --warning-ink: 43 96% 24%;
     --info-ink: 210 100% 35%;
@@ -59,7 +59,7 @@
     /* Borders & Inputs */
     --border: 30 15% 90%;
     --input: 30 15% 90%;
-    --ring: 26 100% 50%;
+    --ring: 36.4 36.03% 51.57%;
 
     /* Radius - Softer, more modern */
     --radius: 0.875rem;
@@ -68,49 +68,49 @@
     --sidebar: 30 20% 99%;
     --sidebar-foreground: 20 14% 12%;
     --sidebar-border: 30 15% 92%;
-    --sidebar-accent: 26 100% 97%;
-    --sidebar-accent-foreground: 26 100% 30%;
+    --sidebar-accent: 36 30% 95%;
+    --sidebar-accent-foreground: 36 50% 29%;
 
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.03);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.03);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.03);
     --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.06), 0 8px 10px -6px rgb(0 0 0 / 0.03);
-    --shadow-primary: 0 4px 14px 0 hsl(26 100% 50% / 0.25);
+    --shadow-primary: 0 4px 14px 0 hsl(36.4 36.03% 51.57% / 0.25);
   }
 
   .dark {
-    --background: 222.2 47.4% 6%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 47.4% 8%;
-    --card-foreground: 210 40% 98%;
-    --primary: 26 100% 55%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 26 40% 12%;
-    --secondary-foreground: 30 100% 90%;
-    --muted: 217.2 32.6% 12%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 26 40% 12%;
-    --accent-foreground: 30 100% 90%;
+    --background: 210 9% 4.3%;
+    --foreground: 150 9% 96%;
+    --card: 200 7.69% 7.65%;
+    --card-foreground: 150 9% 96%;
+    --primary: 36.4 36.03% 51.57%;
+    --primary-foreground: 210 9% 4.3%;
+    --secondary: 36 15% 12%;
+    --secondary-foreground: 36 40% 85%;
+    --muted: 165 6% 12%;
+    --muted-foreground: 165 5% 65%;
+    --accent: 36 15% 12%;
+    --accent-foreground: 36 40% 85%;
     --destructive: 0 62.8% 50%;
-    --destructive-foreground: 210 40% 98%;
-    --primary-ink: 26 100% 62%;
+    --destructive-foreground: 150 9% 96%;
+    --primary-ink: 36.14 45.83% 62.35%;
     --success-ink: 158 64% 65%;
     --warning-ink: 43 96% 62%;
     --info-ink: 210 100% 72%;
     --destructive-ink: 0 72% 70%;
-    --muted-ink: 215 20.2% 65.1%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 26 100% 55%;
-    --sidebar: 222.2 47.4% 8%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 17.5%;
+    --muted-ink: 165 5% 65%;
+    --border: 192 6.33% 15.49%;
+    --input: 192 6.33% 15.49%;
+    --ring: 36.4 36.03% 51.57%;
+    --sidebar: 200 7.69% 7.65%;
+    --sidebar-foreground: 150 9% 96%;
+    --sidebar-border: 192 6.33% 15.49%;
   }
 
   /* RTL Support */
   [dir='rtl'] {
-    font-family: 'IBM Plex Arabic', 'Plus Jakarta Sans', system-ui, sans-serif;
+    font-family: var(--font-arabic), system-ui, sans-serif;
   }
 }
 
@@ -134,8 +134,12 @@
 @layer base {
   body {
     @apply bg-background text-foreground;
-    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    font-family: var(--font-sans), system-ui, sans-serif;
     font-feature-settings: 'cv11', 'ss01';
+  }
+
+  html[dir='rtl'] body {
+    font-family: var(--font-arabic), system-ui, sans-serif;
   }
 
   /* Improved focus styles for accessibility */
@@ -627,7 +631,7 @@ main > div {
 
 /* Force Gradient Backgrounds */
 .force-gradient-primary {
-  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(26 100% 40%) 100%);
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(36 36% 42%) 100%);
 }
 
 .force-gradient-subtle {

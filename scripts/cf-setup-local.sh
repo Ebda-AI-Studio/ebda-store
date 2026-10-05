@@ -54,14 +54,8 @@ done
 for app in "${APPS[@]}"; do
   dir="$ROOT/apps/$app"
   [ -d "$dir" ] || { echo "skip config: no apps/$app"; continue; }
-  # NOTE: each branch is ONE $'...' literal (zone hardcoded) so every \n expands.
-  # Interpolating a $VAR mid-string would re-quote the tail and emit literal \n.
-  case "$app" in
-    web)    ROUTES_JSON=$'  "routes": [\n    { "pattern": "store.force-ai.co", "custom_domain": true },\n    { "pattern": "cf.force-ai.co", "custom_domain": true },\n    { "pattern": "pecannbee.com.kw/*", "zone_name": "pecannbee.com.kw" },\n    { "pattern": "www.pecannbee.com.kw/*", "zone_name": "pecannbee.com.kw" },\n    { "pattern": "*/*", "zone_name": "force-ai.co" }\n  ],\n' ;;
-    admin)  ROUTES_JSON=$'  "routes": [\n    { "pattern": "admin.force-ai.co", "custom_domain": true },\n    { "pattern": "admin.force-ai.co/*", "zone_name": "force-ai.co" }\n  ],\n' ;;
-    orders) ROUTES_JSON=$'  "routes": [\n    { "pattern": "orders.force-ai.co", "custom_domain": true },\n    { "pattern": "orders.force-ai.co/*", "zone_name": "force-ai.co" }\n  ],\n' ;;
-    *)      ROUTES_JSON='' ;;
-  esac
+  # Brand authority, not inherited FWB hostnames. CI builds shared first.
+  ROUTES_JSON="$(node "$ROOT/scripts/cf-routes.cjs" "$app")"
   # apps/web deploys a CUSTOM Worker entry (sentry-worker-entry.ts) that wraps the
   # OpenNext handler with @sentry/cloudflare (SSR error capture) AND reverse-proxies
   # the force-ai.co / www company apex to Cloudflare Pages. Other apps deploy the raw
@@ -147,7 +141,8 @@ EOF
     { "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" }
   ] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DOShardedTagCache", "DOQueueHandler"] }],
-${ROUTES_JSON}  "observability": { "enabled": true }
+${ROUTES_JSON}
+  "observability": { "enabled": true }
 }
 EOF
   else
@@ -162,7 +157,8 @@ EOF
   "compatibility_date": "${COMPAT_DATE}",
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
-${ROUTES_JSON}  "observability": { "enabled": true }
+${ROUTES_JSON}
+  "observability": { "enabled": true }
 }
 EOF
   fi

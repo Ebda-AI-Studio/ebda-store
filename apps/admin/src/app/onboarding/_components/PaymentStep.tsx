@@ -75,7 +75,10 @@ export function PaymentStep({
           </button>
         </li>
       </ul>
-      <p className="text-sm text-muted-foreground">{t('moreLater')}</p>
+      <div className="rounded-lg bg-muted/50 p-3 text-sm leading-relaxed text-muted-foreground">
+        <p>{t('moreLater')}</p>
+        <p className="mt-2">{t('manualNote')}</p>
+      </div>
       {!cod && <p className="text-sm text-destructive-ink">{t('needOne')}</p>}
       <div className="flex gap-3">
         <Button type="button" variant="outline" onClick={onBack}>

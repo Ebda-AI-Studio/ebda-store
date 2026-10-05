@@ -5,8 +5,14 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "routes": [
-    { "pattern": "app.ebda.app", "custom_domain": true },
-    { "pattern": "app.ebda.app/*", "zone_name": "ebda.app" }
+    {
+      "pattern": "app.ebda.app",
+      "custom_domain": true
+    },
+    {
+      "pattern": "app.ebda.app/*",
+      "zone_name": "ebda.app"
+    }
   ],
   "observability": { "enabled": true }
 }

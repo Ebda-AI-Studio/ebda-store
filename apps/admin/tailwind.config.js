@@ -6,18 +6,19 @@ module.exports = {
     extend: {
       colors: {
         // Ebda Brand Colors
+        // Legacy utility namespace retained for inherited components; Ebda gold ramp.
         force: {
-          50: '#fff7ed',
-          100: '#ffedd5',
-          200: '#fed7aa',
-          300: '#fdba74',
-          400: '#fb923c',
-          500: '#ff6e00', // Primary Force Orange
-          600: '#ea580c',
-          700: '#c2410c',
-          800: '#9a3412',
-          900: '#7c2d12',
-          950: '#431407',
+          50: '#faf7f1',
+          100: '#f3ebdd',
+          200: '#e7d6b9',
+          300: '#d8bb8f',
+          400: '#CBA873',
+          500: '#B08D57',
+          600: '#92703e',
+          700: '#72552f',
+          800: '#594329',
+          900: '#463623',
+          950: '#271d12',
         },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',

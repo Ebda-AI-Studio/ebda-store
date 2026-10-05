@@ -16,6 +16,7 @@ vi.mock('../../lib/api', () => ({ apiPost, apiGet }));
 vi.mock('../../lib/auth', () => ({
   useAuth: () => ({ isAuthenticated: false, isLoading: false }),
 }));
+vi.mock('next-intl', () => ({ useLocale: () => 'en' }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }));
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
@@ -57,6 +58,14 @@ const submit = () =>
   fireEvent.click(screen.getByRole('button', { name: 'onboarding.signup.submit' }));
 
 describe('signup page', () => {
+  it('blocks an empty mobile number before submitting', async () => {
+    render(<SignupPage />);
+    fill({ name: 'Mona', email: 'mona@x.com', phone: '', password: 'Str0ng!Passw0rd' });
+    submit();
+    expect(await screen.findByText('onboarding.signup.errors.phoneRequired')).toBeTruthy();
+    expect(apiPost).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('onboarding.signup.phone').hasAttribute('required')).toBe(true);
+  });
   it('validates before calling the API (weak password, bad phone, bad email)', async () => {
     render(<SignupPage />);
     fill({ name: 'Mona', email: 'nope', phone: '123', password: 'weak' });
@@ -71,16 +80,22 @@ describe('signup page', () => {
     apiPost.mockResolvedValue({ data: { emailVerificationSent: true }, error: null });
     render(<SignupPage />);
     await act(async () => {}); // let the form-token fetch settle
-    fill({ name: ' Mona Hassan ', email: 'mona@x.com', phone: '', password: 'Str0ng!Passw0rd' });
+    fill({
+      name: ' Mona Hassan ',
+      email: 'mona@x.com',
+      phone: '01012345678',
+      password: 'Str0ng!Passw0rd',
+    });
     submit();
     expect(
       await screen.findByText('onboarding.signup.sent.body:{"email":"mona@x.com"}')
     ).toBeTruthy();
-    // Empty optional phone is omitted, name is trimmed.
+    // Required phone is sent, name is trimmed.
     expect(apiPost).toHaveBeenCalledWith('/api/v1/auth/merchant/signup', {
       email: 'mona@x.com',
       password: 'Str0ng!Passw0rd',
       name: 'Mona Hassan',
+      phone: '01012345678',
       language: 'en',
       // Abuse controls: the server-signed form token and an EMPTY honeypot.
       formToken: 'tok-1',
@@ -88,7 +103,7 @@ describe('signup page', () => {
     });
   });
 
-  it('sends a valid optional phone as typed (the API normalises it)', async () => {
+  it('sends a valid required phone as typed (the API normalises it)', async () => {
     apiPost.mockResolvedValue({ data: { emailVerificationSent: true }, error: null });
     render(<SignupPage />);
     fill({
@@ -108,7 +123,7 @@ describe('signup page', () => {
       error: { code: 'RATE_LIMITED', message: 'x', status: 429 },
     });
     render(<SignupPage />);
-    fill({ name: 'Mona', email: 'mona@x.com', password: 'Str0ng!Passw0rd' });
+    fill({ name: 'Mona', email: 'mona@x.com', phone: '01012345678', password: 'Str0ng!Passw0rd' });
     submit();
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.getByText('onboarding.signup.errors.rateLimited')).toBeTruthy();
@@ -120,7 +135,12 @@ describe('signup page', () => {
       error: { code: 'EMAIL_DOMAIN_NOT_ALLOWED', message: 'x', status: 400 },
     });
     render(<SignupPage />);
-    fill({ name: 'Mona', email: 'mona@mailinator.com', password: 'Str0ng!Passw0rd' });
+    fill({
+      name: 'Mona',
+      email: 'mona@mailinator.com',
+      phone: '01012345678',
+      password: 'Str0ng!Passw0rd',
+    });
     submit();
     expect(await screen.findByText('onboarding.signup.errors.emailDisposable')).toBeTruthy();
   });
@@ -132,7 +152,7 @@ describe('signup page', () => {
     });
     render(<SignupPage />);
     await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(1));
-    fill({ name: 'Mona', email: 'mona@x.com', password: 'Str0ng!Passw0rd' });
+    fill({ name: 'Mona', email: 'mona@x.com', phone: '01012345678', password: 'Str0ng!Passw0rd' });
     submit();
     expect(await screen.findByText('onboarding.signup.errors.tooFast')).toBeTruthy();
     await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
@@ -141,7 +161,7 @@ describe('signup page', () => {
   it('resend goes to the generic resend endpoint', async () => {
     apiPost.mockResolvedValue({ data: { emailVerificationSent: true }, error: null });
     render(<SignupPage />);
-    fill({ name: 'Mona', email: 'mona@x.com', password: 'Str0ng!Passw0rd' });
+    fill({ name: 'Mona', email: 'mona@x.com', phone: '01012345678', password: 'Str0ng!Passw0rd' });
     submit();
     fireEvent.click(await screen.findByRole('button', { name: 'onboarding.signup.sent.resend' }));
     await waitFor(() =>
