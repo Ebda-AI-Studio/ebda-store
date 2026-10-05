@@ -5,6 +5,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 
 const { apiPost } = vi.hoisted(() => ({ apiPost: vi.fn() }));
 vi.mock('../../lib/api', () => ({ apiPost }));
@@ -38,7 +39,11 @@ describe('verify-email page', () => {
   it('posts the token once and shows success', async () => {
     visit('?token=abc123');
     apiPost.mockResolvedValue({ data: { success: true }, error: null });
-    render(<VerifyEmailPage />);
+    render(
+      <NextIntlClientProvider locale="en" messages={{}}>
+        <VerifyEmailPage />
+      </NextIntlClientProvider>
+    );
     expect(await screen.findByText('onboarding.verify.successTitle')).toBeTruthy();
     expect(apiPost).toHaveBeenCalledTimes(1);
     expect(apiPost).toHaveBeenCalledWith('/api/v1/auth/verify-email', { token: 'abc123' });
@@ -51,14 +56,22 @@ describe('verify-email page', () => {
   ])('maps %s to its own message and offers a resend form', async (code, text) => {
     visit('?token=abc123');
     apiPost.mockResolvedValue({ data: null, error: { code, message: 'x', status: 400 } });
-    render(<VerifyEmailPage />);
+    render(
+      <NextIntlClientProvider locale="en" messages={{}}>
+        <VerifyEmailPage />
+      </NextIntlClientProvider>
+    );
     expect(await screen.findByText(text)).toBeTruthy();
     expect(screen.getByLabelText('onboarding.verify.email')).toBeTruthy();
   });
 
   it('a link with no token never calls the API', async () => {
     visit('');
-    render(<VerifyEmailPage />);
+    render(
+      <NextIntlClientProvider locale="en" messages={{}}>
+        <VerifyEmailPage />
+      </NextIntlClientProvider>
+    );
     expect(await screen.findByText('onboarding.verify.missing')).toBeTruthy();
     await waitFor(() => expect(apiPost).not.toHaveBeenCalled());
   });

@@ -1,0 +1,110 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+const m = vi.hoisted(() => ({
+  scope: '',
+  stores: ['store-a', 'store-b'],
+  seen: [] as string[],
+  feature: vi.fn(),
+  send: vi.fn(),
+}));
+vi.mock('@force/database', () => ({
+  prisma: {
+    store: { findMany: async () => m.stores.map(id => ({ id, loyaltySettings: {} })) },
+    storeFeature: {
+      findMany: async () => {
+        if (!m.scope) throw new Error('unscoped feature');
+        return [{ storeId: m.scope }];
+      },
+    },
+    cart: {
+      findMany: async () => {
+        if (!m.scope) throw new Error('unscoped cart');
+        m.seen.push(`cart:${m.scope}`);
+        return [];
+      },
+    },
+    abandonedCartConfig: {
+      findUnique: async () => null,
+      upsert: async () => ({ step1Enabled: true, step1DelayMinutes: 60 }),
+    },
+    abandonedCart: {
+      findMany: async () => {
+        if (!m.scope) throw new Error('unscoped reminder');
+        return [{ id: m.scope, storeId: m.scope, status: 'pending' }];
+      },
+    },
+    loyaltyTransaction: {
+      findMany: async () => {
+        if (!m.scope) throw new Error('unscoped expiration');
+        m.seen.push(`expire:${m.scope}`);
+        return [];
+      },
+    },
+  },
+  runInStoreScope: async (id: string, fn: () => Promise<unknown>) => {
+    m.scope = id;
+    try {
+      return await fn();
+    } finally {
+      m.scope = '';
+    }
+  },
+  acrossStores: vi.fn(),
+  acrossStoresFlat: async (fn: () => Promise<unknown[]>) => {
+    const result: unknown[] = [];
+    for (const id of m.stores) {
+      m.scope = id;
+      try {
+        result.push(...(await fn()));
+      } finally {
+        m.scope = '';
+      }
+    }
+    return result;
+  },
+}));
+vi.mock('@api/services/feature.service', () => ({
+  featureService: { isFeatureEnabled: m.feature },
+}));
+vi.mock('@api/services/redis.service', () => ({ redis: {} }));
+vi.mock('@api/services/notification-dispatcher.service', () => ({ notificationDispatcher: {} }));
+vi.mock('@api/services/bundle.service', () => ({ resolveBundle: vi.fn() }));
+vi.mock('@api/services/wbs-bridge.service', () => ({
+  wbsBridgeService: {},
+  WbsUnauthorizedError: class extends Error {},
+}));
+vi.mock('@api/services/encryption.service', () => ({ encryption: {} }));
+import { loyaltyAutomationService } from '@api/services/loyalty-automation.service';
+import { abandonedCartService } from '@api/services/abandoned-cart.service';
+beforeEach(() => {
+  m.scope = '';
+  m.seen = [];
+  m.feature.mockImplementation(async (id: string) => {
+    expect(m.scope).toBe(id);
+    m.seen.push(`birthday:${id}`);
+    return false;
+  });
+  vi.restoreAllMocks();
+});
+describe('platform cron visits each tenant with its own scope', () => {
+  it('scopes birthday feature reads and expiration scans for both stores', async () => {
+    await loyaltyAutomationService.processBirthdayBonuses();
+    await loyaltyAutomationService.processPointExpiration();
+    expect(m.seen).toEqual([
+      'birthday:store-a',
+      'birthday:store-b',
+      'expire:store-a',
+      'expire:store-b',
+    ]);
+  });
+  it('scopes website cart detection and the complete reminder send', async () => {
+    await abandonedCartService.detectNewAbandonments();
+    expect(m.seen).toEqual(['cart:store-a', 'cart:store-b']);
+    const send = vi.spyOn(abandonedCartService, 'sendStep').mockImplementation(async cart => {
+      expect(m.scope).toBe(cart.storeId);
+      m.seen.push(`send:${cart.storeId}`);
+    });
+    await abandonedCartService.processReminders();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(m.seen.slice(2)).toEqual(['send:store-a', 'send:store-b']);
+  });
+});

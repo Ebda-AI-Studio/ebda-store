@@ -10,7 +10,7 @@
  *     └─ processReminders()       — send scheduled reminder steps
  */
 
-import { prisma, acrossStores, acrossStoresFlat } from '@force/database';
+import { prisma, acrossStores, acrossStoresFlat, runInStoreScope } from '@force/database';
 import { storefrontOrigin } from '@force/shared';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { redis } from './redis.service';
@@ -199,139 +199,141 @@ class AbandonedCartService {
     );
 
     for (const storeId of storeIds) {
-      // Find carts that:
-      // 1. Haven't been active for >1 hour
-      // 2. Have at least one item OR at least one bundle — a bundle-only
-      //    cart (no `CartItem` rows at all; a bundle is never expanded into
-      //    `cart_items`, see cart.service.ts's file doc comment) must be
-      //    detected exactly like a loose-item cart. A store without the
-      //    `bundles` feature can never have a `CartBundle` row (bundle
-      //    creation is itself feature-gated), so this OR arm is a no-op —
-      //    0 extra matches, 0 extra work — for every such store.
-      // 3. Don't already have an AbandonedCart record
-      // 4. Have a customer with email or phone (so we can actually reach them)
-      const carts = await prisma.cart.findMany({
-        where: {
-          storeId,
-          lastActivityAt: { lt: abandonmentCutoff },
-          OR: [{ items: { some: {} } }, { bundles: { some: {} } }],
-          abandonedCart: null,
-          customer: {
-            OR: [{ email: { not: '' } }, { phone: { not: null } }],
+      await runInStoreScope(storeId, async () => {
+        // Find carts that:
+        // 1. Haven't been active for >1 hour
+        // 2. Have at least one item OR at least one bundle — a bundle-only
+        //    cart (no `CartItem` rows at all; a bundle is never expanded into
+        //    `cart_items`, see cart.service.ts's file doc comment) must be
+        //    detected exactly like a loose-item cart. A store without the
+        //    `bundles` feature can never have a `CartBundle` row (bundle
+        //    creation is itself feature-gated), so this OR arm is a no-op —
+        //    0 extra matches, 0 extra work — for every such store.
+        // 3. Don't already have an AbandonedCart record
+        // 4. Have a customer with email or phone (so we can actually reach them)
+        const carts = await prisma.cart.findMany({
+          where: {
+            storeId,
+            lastActivityAt: { lt: abandonmentCutoff },
+            OR: [{ items: { some: {} } }, { bundles: { some: {} } }],
+            abandonedCart: null,
+            customer: {
+              OR: [{ email: { not: '' } }, { phone: { not: null } }],
+            },
           },
-        },
-        include: {
-          customer: {
-            select: { id: true, firstName: true, lastName: true, email: true, phone: true },
-          },
-          items: {
-            include: {
-              product: {
-                include: { images: { take: 1, orderBy: { position: 'asc' } } },
+          include: {
+            customer: {
+              select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+            },
+            items: {
+              include: {
+                product: {
+                  include: { images: { take: 1, orderBy: { position: 'asc' } } },
+                },
+                variant: { select: { price: true } },
               },
-              variant: { select: { price: true } },
             },
+            // Raw rows only — display fields (name/image) and price come from
+            // `resolveBundle` below, recomputed live, same as every other
+            // cart-bundle read in this codebase (see cart.service.ts).
+            bundles: true,
           },
-          // Raw rows only — display fields (name/image) and price come from
-          // `resolveBundle` below, recomputed live, same as every other
-          // cart-bundle read in this codebase (see cart.service.ts).
-          bundles: true,
-        },
-      });
+        });
 
-      // Hoist the per-store config lookup out of the per-cart loop. It's
-      // identical for every iteration of this sweep and previously cost
-      // one query per detected abandoned cart — N+1 against
-      // `abandoned_cart_configs` for no semantic benefit.
-      const storeConfig = await this.getConfig(storeId);
-      const nextStepAtFromConfig = storeConfig.step1Enabled
-        ? () => new Date(Date.now() + storeConfig.step1DelayMinutes * 60 * 1000)
-        : () => null;
+        // Hoist the per-store config lookup out of the per-cart loop. It's
+        // identical for every iteration of this sweep and previously cost
+        // one query per detected abandoned cart — N+1 against
+        // `abandoned_cart_configs` for no semantic benefit.
+        const storeConfig = await this.getConfig(storeId);
+        const nextStepAtFromConfig = storeConfig.step1Enabled
+          ? () => new Date(Date.now() + storeConfig.step1DelayMinutes * 60 * 1000)
+          : () => null;
 
-      for (const cart of carts) {
-        try {
-          // Build a snapshot of cart items at abandonment time
-          const itemSnapshot: CartItemSnapshot[] = cart.items.map(item => ({
-            productName: item.product.name,
-            productImage: item.product.images[0]?.url ?? null,
-            price: cartLineUnitPrice(item),
-            quantity: item.quantity,
-          }));
+        for (const cart of carts) {
+          try {
+            // Build a snapshot of cart items at abandonment time
+            const itemSnapshot: CartItemSnapshot[] = cart.items.map(item => ({
+              productName: item.product.name,
+              productImage: item.product.images[0]?.url ?? null,
+              price: cartLineUnitPrice(item),
+              quantity: item.quantity,
+            }));
 
-          // Each `CartBundle` row becomes ONE snapshot line, priced at
-          // `resolveBundle(...).price` — the bundle's sale price, never the
-          // sum of its per-component allocated shares (`componentSum`,
-          // which never reaches a customer-facing surface — see
-          // `ResolvedBundle`'s doc comment in bundle.service.ts). A bundle
-          // reference that fails to resolve (e.g. a stale/cross-store row —
-          // see `tryResolveCartBundle` in cart.service.ts for the same
-          // defensive pattern) is dropped from the snapshot rather than
-          // failing the whole detection for this cart.
-          const bundleSnapshot: CartItemSnapshot[] = (
-            await Promise.all(
-              cart.bundles.map(async (cb): Promise<CartItemSnapshot | null> => {
-                try {
-                  const resolved = await resolveBundle(prisma, storeId, cb.bundleId);
-                  return {
-                    productName: resolved.name,
-                    productImage: resolved.image,
-                    price: resolved.price,
-                    quantity: cb.quantity,
-                    isBundle: true,
-                  };
-                } catch (err) {
-                  logger.warn(
-                    { err, correlationId, storeId, cartId: cart.id, bundleId: cb.bundleId },
-                    '[AbandonedCart] Failed to resolve cart bundle — omitting from snapshot'
-                  );
-                  return null;
-                }
-              })
-            )
-          ).filter((b): b is CartItemSnapshot => b !== null);
+            // Each `CartBundle` row becomes ONE snapshot line, priced at
+            // `resolveBundle(...).price` — the bundle's sale price, never the
+            // sum of its per-component allocated shares (`componentSum`,
+            // which never reaches a customer-facing surface — see
+            // `ResolvedBundle`'s doc comment in bundle.service.ts). A bundle
+            // reference that fails to resolve (e.g. a stale/cross-store row —
+            // see `tryResolveCartBundle` in cart.service.ts for the same
+            // defensive pattern) is dropped from the snapshot rather than
+            // failing the whole detection for this cart.
+            const bundleSnapshot: CartItemSnapshot[] = (
+              await Promise.all(
+                cart.bundles.map(async (cb): Promise<CartItemSnapshot | null> => {
+                  try {
+                    const resolved = await resolveBundle(prisma, storeId, cb.bundleId);
+                    return {
+                      productName: resolved.name,
+                      productImage: resolved.image,
+                      price: resolved.price,
+                      quantity: cb.quantity,
+                      isBundle: true,
+                    };
+                  } catch (err) {
+                    logger.warn(
+                      { err, correlationId, storeId, cartId: cart.id, bundleId: cb.bundleId },
+                      '[AbandonedCart] Failed to resolve cart bundle — omitting from snapshot'
+                    );
+                    return null;
+                  }
+                })
+              )
+            ).filter((b): b is CartItemSnapshot => b !== null);
 
-          // Calculate total from snapshot (price is in piastres / integer cents) —
-          // per chosen variant price, matching cart/checkout. Bundles add
-          // their resolved bundle price x quantity, exactly like the
-          // storefront cart's own `bundlesSubtotal` (cart.service.ts).
-          const cartTotal =
-            cart.items.reduce((sum, item) => sum + cartLineUnitPrice(item) * item.quantity, 0) +
-            bundleSnapshot.reduce((sum, b) => sum + b.price * b.quantity, 0);
+            // Calculate total from snapshot (price is in piastres / integer cents) —
+            // per chosen variant price, matching cart/checkout. Bundles add
+            // their resolved bundle price x quantity, exactly like the
+            // storefront cart's own `bundlesSubtotal` (cart.service.ts).
+            const cartTotal =
+              cart.items.reduce((sum, item) => sum + cartLineUnitPrice(item) * item.quantity, 0) +
+              bundleSnapshot.reduce((sum, b) => sum + b.price * b.quantity, 0);
 
-          const cartItemCount = cart.items.length + bundleSnapshot.length;
+            const cartItemCount = cart.items.length + bundleSnapshot.length;
 
-          const nextStepAt = nextStepAtFromConfig();
+            const nextStepAt = nextStepAtFromConfig();
 
-          const customerEmail = cart.customer?.email ?? null;
-          const customerPhone = cart.customer?.phone ?? null;
+            const customerEmail = cart.customer?.email ?? null;
+            const customerPhone = cart.customer?.phone ?? null;
 
-          await prisma.abandonedCart.create({
-            data: {
-              storeId,
-              cartId: cart.id,
-              customerId: cart.customerId ?? undefined,
-              sessionId: cart.sessionId,
-              customerEmail: customerEmail ?? undefined,
-              customerPhone: customerPhone ?? undefined,
-              cartTotal: cartTotal,
-              cartItemCount,
-              cartItems: [...itemSnapshot, ...bundleSnapshot] as any,
-              status: 'pending',
-              nextStepAt,
-            },
-          });
+            await prisma.abandonedCart.create({
+              data: {
+                storeId,
+                cartId: cart.id,
+                customerId: cart.customerId ?? undefined,
+                sessionId: cart.sessionId,
+                customerEmail: customerEmail ?? undefined,
+                customerPhone: customerPhone ?? undefined,
+                cartTotal: cartTotal,
+                cartItemCount,
+                cartItems: [...itemSnapshot, ...bundleSnapshot] as any,
+                status: 'pending',
+                nextStepAt,
+              },
+            });
 
-          logger.info(
-            { correlationId, storeId, cartId: cart.id, itemCount: cartItemCount },
-            '[AbandonedCart] New abandoned cart detected'
-          );
-        } catch (err) {
-          logger.error(
-            { err, correlationId, storeId, cartId: cart.id },
-            '[AbandonedCart] Failed to create abandoned cart record — skipping'
-          );
+            logger.info(
+              { correlationId, storeId, cartId: cart.id, itemCount: cartItemCount },
+              '[AbandonedCart] New abandoned cart detected'
+            );
+          } catch (err) {
+            logger.error(
+              { err, correlationId, storeId, cartId: cart.id },
+              '[AbandonedCart] Failed to create abandoned cart record — skipping'
+            );
+          }
         }
-      }
+      });
     }
   }
 
@@ -653,16 +655,18 @@ class AbandonedCartService {
   async processReminders(correlationId?: string): Promise<void> {
     const now = new Date();
 
-    const pending = await prisma.abandonedCart.findMany({
-      where: {
-        status: { in: ['pending', 'step1_sent', 'step2_sent'] },
-        nextStepAt: { lte: now },
-      },
-      include: {
-        store: { select: { id: true, name: true, domain: true, slug: true } },
-        customer: { select: { firstName: true, lastName: true, email: true, phone: true } },
-      },
-    });
+    const pending = await acrossStoresFlat(() =>
+      prisma.abandonedCart.findMany({
+        where: {
+          status: { in: ['pending', 'step1_sent', 'step2_sent'] },
+          nextStepAt: { lte: now },
+        },
+        include: {
+          store: { select: { id: true, name: true, domain: true, slug: true } },
+          customer: { select: { firstName: true, lastName: true, email: true, phone: true } },
+        },
+      })
+    );
 
     logger.info(
       { correlationId, count: pending.length },
@@ -679,7 +683,9 @@ class AbandonedCartService {
         ) {
           const nextStep = this.getNextStep(abandonedCart.status);
           if (nextStep !== null) {
-            await this.sendStep(abandonedCart, nextStep);
+            await runInStoreScope(abandonedCart.storeId, () =>
+              this.sendStep(abandonedCart, nextStep)
+            );
           }
         }
       } catch (err) {

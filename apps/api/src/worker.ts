@@ -29,6 +29,7 @@ import { runWithWaitUntil, setCfBindings, type CfBindings } from './cf/bindings'
 import { devProbe, devStats, noteLease, noteLeaseClosing } from './cf/dev-stats';
 import { handleQueueBatch, type MessageBatchLike } from './cf/queues';
 import { runScheduled } from './cf/cron';
+import { createDatabaseRoleGuard } from './cf/database-role-guard';
 import { isPlatformOrigin } from './lib/cors-cache';
 import { config } from './config';
 import * as Sentry from '@sentry/cloudflare';
@@ -70,16 +71,16 @@ const DRAIN_BUDGET_MS = 25_000;
 
 let isolateDb: IsolateDb | undefined;
 
-let roleChecked = false;
+const validateDatabaseRole = createDatabaseRoleGuard();
 let redisReady: Promise<void> | undefined;
 
 /**
  * The BYPASSRLS guard that index.ts runs at listen() on Node (finding #5): if the
- * connection role bypasses RLS, tenant isolation is off. Once per isolate, off the
- * response path, on a request-bound client (a Worker has no boot moment).
+ * connection role bypasses RLS, tenant isolation is off. Validate before application
+ * work on this invocation's client; cache only success (a Worker has no boot moment).
  */
 async function checkRole(): Promise<void> {
-  try {
+  await validateDatabaseRole(async () => {
     const rows = await prisma.$queryRaw<Array<{ currentUser: string; bypass: boolean }>>`
       SELECT current_user::text AS "currentUser", (rolbypassrls OR rolsuper) AS bypass
       FROM pg_roles WHERE rolname = current_user`;
@@ -88,16 +89,8 @@ async function checkRole(): Promise<void> {
       { currentUser: rows[0]?.currentUser, rolbypassrls: bypass },
       `[SECURITY] DB role check: current_user=${rows[0]?.currentUser ?? 'unknown'} rolbypassrls=${bypass}`
     );
-    if (bypass) {
-      logger.error(
-        { rolbypassrls: true },
-        '[SECURITY FATAL] the Hyperdrive connection role bypasses RLS: tenant isolation is off. ' +
-          'Point the Hyperdrive config at the ebda_app role.'
-      );
-    }
-  } catch (err) {
-    logger.warn({ err }, '[SECURITY] BYPASSRLS guard query failed - skipping check');
-  }
+    return rows;
+  });
 }
 
 /** Overwrite X-Forwarded-For with the address Cloudflare saw, so `trust proxy` cannot be spoofed. */
@@ -141,7 +134,6 @@ async function withWorkerContext<T>(env: CfBindings, ctx: Ctx, fn: () => Promise
   });
   const db = isolateDb;
   let lease: ReturnType<IsolateDb['currentLease']>;
-  let roleCheck: Promise<void> | undefined;
   // Work the request handed to `cfWaitUntil` (a verification email, a webhook fan-out, ...) runs on
   // THIS request's database lease. The lease is returned to the pool only after it has settled:
   // a Prisma call after that would land on the next request's connection.
@@ -165,19 +157,14 @@ async function withWorkerContext<T>(env: CfBindings, ctx: Ctx, fn: () => Promise
       async () => {
         lease = db.currentLease();
         noteLease(lease);
-        if (!roleChecked) {
-          // Runs on THIS request's connection, so the release below must wait for it.
-          roleChecked = true;
-          roleCheck = checkRole();
-          ctx.waitUntil(roleCheck);
-        }
+        await checkRole();
         return fn();
       },
       {
         waitUntil: p => ctx.waitUntil(p),
         // Post-commit work runs on this request's connection and must finish before it closes.
         beforeDisconnect: () =>
-          Promise.all([awaitDeferredWork(DRAIN_BUDGET_MS), roleCheck])
+          awaitDeferredWork(DRAIN_BUDGET_MS)
             .then(drainFloating)
             .finally(() => {
               // The lease is released right after this; its `opened` count is final.

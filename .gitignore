@@ -176,3 +176,6 @@ apps/status/dist/
 
 # wrangler dry-run output (apps/api cf:dry-run)
 dist-cf/
+
+# Generated deployment binding IDs; committed fallback stays local-only.
+apps/api/.wrangler.deploy.jsonc

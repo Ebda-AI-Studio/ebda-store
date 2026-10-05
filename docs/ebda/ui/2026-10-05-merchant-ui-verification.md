@@ -39,3 +39,7 @@ Ruling UI-7 — The inherited graph was rebuilt with AST-only `graphify update .
 Swept `phoneRequired`, signup phone labels/validation, `admin-theme`, brand font/token names, public skip target, onboarding/template/payment text, setup-guide progress and Cloudflare generated hostnames across apps, packages, tests, scripts, CI and docs; compared FWB source read-only. Found and fixed inherited admin palette and generated FWB/Kuwait routes. Backend optional phone remains explicitly assigned to Claude. No production/sibling FWB changes.
 
 Review: https://github.com/Whisky-11/ebda/pull/3. Implementation commit `9d047026`; remote branch SHA independently verified.
+
+## Expanded launch phase
+
+The later launch-readiness task now makes phone required server-side as well. See `docs/ebda/launch-readiness-2026-10-05.md` for current backend proof and blockers; the earlier Claude assignment above records the initial UI-only boundary.

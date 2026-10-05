@@ -11,7 +11,7 @@
  *     └─ processPointExpiration()
  */
 
-import { prisma } from '@force/database';
+import { prisma, runInStoreScope } from '@force/database';
 import { featureService } from './feature.service';
 import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';
@@ -100,157 +100,159 @@ class LoyaltyAutomationService {
       });
 
       for (const store of stores) {
-        // Check feature flag
-        const loyaltyEnabled = await featureService.isFeatureEnabled(store.id, 'loyalty');
-        if (!loyaltyEnabled) continue;
+        await runInStoreScope(store.id, async () => {
+          // Check feature flag
+          const loyaltyEnabled = await featureService.isFeatureEnabled(store.id, 'loyalty');
+          if (!loyaltyEnabled) return;
 
-        const settings = store.loyaltySettings as Record<string, unknown> | null;
-        const birthdayBonus =
-          typeof settings?.birthdayBonus === 'number'
-            ? settings.birthdayBonus
-            : DEFAULT_BIRTHDAY_BONUS;
-        const expirationMonths =
-          typeof settings?.expirationMonths === 'number'
-            ? settings.expirationMonths
-            : DEFAULT_EXPIRATION_MONTHS;
+          const settings = store.loyaltySettings as Record<string, unknown> | null;
+          const birthdayBonus =
+            typeof settings?.birthdayBonus === 'number'
+              ? settings.birthdayBonus
+              : DEFAULT_BIRTHDAY_BONUS;
+          const expirationMonths =
+            typeof settings?.expirationMonths === 'number'
+              ? settings.expirationMonths
+              : DEFAULT_EXPIRATION_MONTHS;
 
-        if (birthdayBonus <= 0) continue;
+          if (birthdayBonus <= 0) return;
 
-        // Find loyalty members in this store whose birthday is today.
-        // Cursor-batch through the table in pages of SCAN_BATCH_SIZE to
-        // avoid a single multi-MB memory spike on stores with 10k+ members.
-        // Birthday-today filtering happens per page in JS; Postgres-side
-        // EXTRACT predicate would be cleaner but isn't reachable from
-        // Prisma's typed API without raw SQL — cursor batching is the
-        // policy-compliant middle ground (see scaling-cliff rule).
-        type LoyaltyMember = {
-          id: string;
-          customerId: string;
-          points: number;
-          totalEarned: number;
-          tier: string;
-          customer: {
+          // Find loyalty members in this store whose birthday is today.
+          // Cursor-batch through the table in pages of SCAN_BATCH_SIZE to
+          // avoid a single multi-MB memory spike on stores with 10k+ members.
+          // Birthday-today filtering happens per page in JS; Postgres-side
+          // EXTRACT predicate would be cleaner but isn't reachable from
+          // Prisma's typed API without raw SQL — cursor batching is the
+          // policy-compliant middle ground (see scaling-cliff rule).
+          type LoyaltyMember = {
             id: string;
-            firstName: string | null;
-            lastName: string | null;
-            dateOfBirth: Date | null;
+            customerId: string;
+            points: number;
+            totalEarned: number;
+            tier: string;
+            customer: {
+              id: string;
+              firstName: string | null;
+              lastName: string | null;
+              dateOfBirth: Date | null;
+            };
           };
-        };
-        const birthdayMembers: LoyaltyMember[] = [];
-        let cursor: string | undefined;
-        while (true) {
-          const batch: LoyaltyMember[] = await prisma.loyaltyPoints.findMany({
-            where: { storeId: store.id },
-            select: {
-              id: true,
-              customerId: true,
-              points: true,
-              totalEarned: true,
-              tier: true,
-              customer: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  dateOfBirth: true,
+          const birthdayMembers: LoyaltyMember[] = [];
+          let cursor: string | undefined;
+          while (true) {
+            const batch: LoyaltyMember[] = await prisma.loyaltyPoints.findMany({
+              where: { storeId: store.id },
+              select: {
+                id: true,
+                customerId: true,
+                points: true,
+                totalEarned: true,
+                tier: true,
+                customer: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    dateOfBirth: true,
+                  },
                 },
               },
-            },
-            take: SCAN_BATCH_SIZE,
-            orderBy: { id: 'asc' },
-            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-          });
+              take: SCAN_BATCH_SIZE,
+              orderBy: { id: 'asc' },
+              ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+            });
 
-          if (batch.length === 0) break;
+            if (batch.length === 0) break;
 
-          for (const m of batch) {
-            const dob = m.customer.dateOfBirth;
-            if (!dob) continue;
-            if (dob.getMonth() + 1 === todayMonth && dob.getDate() === todayDay) {
-              birthdayMembers.push(m);
+            for (const m of batch) {
+              const dob = m.customer.dateOfBirth;
+              if (!dob) continue;
+              if (dob.getMonth() + 1 === todayMonth && dob.getDate() === todayDay) {
+                birthdayMembers.push(m);
+              }
             }
+
+            if (batch.length < SCAN_BATCH_SIZE) break;
+            cursor = batch[batch.length - 1].id;
           }
 
-          if (batch.length < SCAN_BATCH_SIZE) break;
-          cursor = batch[batch.length - 1].id;
-        }
+          // Bulk lookup of customers who already received this year's
+          // birthday bonus. Previously the per-member findFirst loop ran
+          // N queries; on a store with hundreds of birthday-aligned
+          // customers that turned a daily cron into a slow-then-timeout
+          // pathology. One IN-list query is fine even at large N because
+          // we already capped the candidate set above.
+          const yearStart = new Date(thisYear, 0, 1);
+          const candidateIds = birthdayMembers.map(m => m.customerId);
+          const alreadyAwarded =
+            candidateIds.length === 0
+              ? new Set<string>()
+              : new Set(
+                  (
+                    await prisma.loyaltyTransaction.findMany({
+                      where: {
+                        storeId: store.id,
+                        customerId: { in: candidateIds },
+                        type: 'earn_birthday',
+                        createdAt: { gte: yearStart },
+                      },
+                      select: { customerId: true },
+                    })
+                  ).map(t => t.customerId)
+                );
 
-        // Bulk lookup of customers who already received this year's
-        // birthday bonus. Previously the per-member findFirst loop ran
-        // N queries; on a store with hundreds of birthday-aligned
-        // customers that turned a daily cron into a slow-then-timeout
-        // pathology. One IN-list query is fine even at large N because
-        // we already capped the candidate set above.
-        const yearStart = new Date(thisYear, 0, 1);
-        const candidateIds = birthdayMembers.map(m => m.customerId);
-        const alreadyAwarded =
-          candidateIds.length === 0
-            ? new Set<string>()
-            : new Set(
-                (
-                  await prisma.loyaltyTransaction.findMany({
-                    where: {
-                      storeId: store.id,
-                      customerId: { in: candidateIds },
-                      type: 'earn_birthday',
-                      createdAt: { gte: yearStart },
-                    },
-                    select: { customerId: true },
-                  })
-                ).map(t => t.customerId)
-              );
+          for (const member of birthdayMembers) {
+            try {
+              if (alreadyAwarded.has(member.customerId)) {
+                logger.debug(
+                  { storeId: store.id, customerId: member.customerId },
+                  '[LoyaltyAutomation] Birthday bonus already awarded this year — skipping'
+                );
+                continue;
+              }
 
-        for (const member of birthdayMembers) {
-          try {
-            if (alreadyAwarded.has(member.customerId)) {
-              logger.debug(
-                { storeId: store.id, customerId: member.customerId },
-                '[LoyaltyAutomation] Birthday bonus already awarded this year — skipping'
-              );
-              continue;
-            }
+              // Award birthday bonus
+              const expiresAt =
+                expirationMonths > 0
+                  ? new Date(Date.now() + expirationMonths * 30 * 24 * 60 * 60 * 1000)
+                  : null;
 
-            // Award birthday bonus
-            const expiresAt =
-              expirationMonths > 0
-                ? new Date(Date.now() + expirationMonths * 30 * 24 * 60 * 60 * 1000)
-                : null;
+              await prisma.$transaction([
+                prisma.loyaltyPoints.update({
+                  where: { id: member.id },
+                  data: {
+                    points: { increment: birthdayBonus },
+                    totalEarned: { increment: birthdayBonus },
+                  },
+                }),
+                prisma.loyaltyTransaction.create({
+                  data: {
+                    storeId: store.id,
+                    customerId: member.customerId,
+                    type: 'earn_birthday',
+                    points: birthdayBonus,
+                    description: `Happy Birthday! ${birthdayBonus} bonus points`,
+                    expiresAt,
+                  },
+                }),
+              ]);
 
-            await prisma.$transaction([
-              prisma.loyaltyPoints.update({
-                where: { id: member.id },
-                data: {
-                  points: { increment: birthdayBonus },
-                  totalEarned: { increment: birthdayBonus },
-                },
-              }),
-              prisma.loyaltyTransaction.create({
-                data: {
+              logger.info(
+                {
                   storeId: store.id,
                   customerId: member.customerId,
-                  type: 'earn_birthday',
                   points: birthdayBonus,
-                  description: `Happy Birthday! ${birthdayBonus} bonus points`,
-                  expiresAt,
                 },
-              }),
-            ]);
-
-            logger.info(
-              {
-                storeId: store.id,
-                customerId: member.customerId,
-                points: birthdayBonus,
-              },
-              '[LoyaltyAutomation] Birthday bonus awarded'
-            );
-          } catch (err) {
-            logger.error(
-              { err, storeId: store.id, customerId: member.customerId },
-              '[LoyaltyAutomation] Failed to award birthday bonus'
-            );
+                '[LoyaltyAutomation] Birthday bonus awarded'
+              );
+            } catch (err) {
+              logger.error(
+                { err, storeId: store.id, customerId: member.customerId },
+                '[LoyaltyAutomation] Failed to award birthday bonus'
+              );
+            }
           }
-        }
+        });
       }
     } catch (err) {
       logger.error({ err }, '[LoyaltyAutomation] processBirthdayBonuses failed');
@@ -262,6 +264,16 @@ class LoyaltyAutomationService {
   // ──────────────────────────────────────────
 
   async processPointExpiration(): Promise<void> {
+    const stores = await prisma.store.findMany({
+      where: { deletedAt: null },
+      select: { id: true },
+    });
+    for (const store of stores) {
+      await runInStoreScope(store.id, () => this.processStorePointExpiration(store.id));
+    }
+  }
+
+  private async processStorePointExpiration(storeId: string): Promise<void> {
     const now = new Date();
 
     logger.info('[LoyaltyAutomation] Processing point expiration');
@@ -289,6 +301,7 @@ class LoyaltyAutomationService {
       while (true) {
         const batch: ExpiredTxn[] = await prisma.loyaltyTransaction.findMany({
           where: {
+            storeId,
             expiresAt: { lt: now },
             points: { gt: 0 },
             type: {

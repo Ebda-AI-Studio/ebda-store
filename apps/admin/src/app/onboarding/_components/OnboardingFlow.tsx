@@ -88,10 +88,21 @@ export function OnboardingFlow() {
   return (
     <div>
       <StepIndicator current={step} />
-      {step === 'store' || !store ? (
+      {step === 'store' && store ? (
+        <div className="space-y-4">
+          <p className="font-medium text-foreground">{store.name}</p>
+          <p dir="ltr" className="text-sm text-muted-foreground">
+            {store.host}
+          </p>
+          <Button type="button" onClick={() => setStep('template')}>
+            {t('next')}
+          </Button>
+        </div>
+      ) : !store ? (
         <StoreStep
           onCreated={created => {
             setStore(created);
+            setState(prev => (prev ? { ...prev, store: created, codEnabled: true } : prev));
             setStep('template');
           }}
         />

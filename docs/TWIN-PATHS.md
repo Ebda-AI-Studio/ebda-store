@@ -50,3 +50,7 @@ After porting a batch, run the full gates (typecheck, lint, `npm run test:unit`,
 ## Ebda merchant UI divergence (2026-10-05)
 
 PublicShell, admin theme/font tokens and defaults, signup phone validation, onboarding visual previews/copy and dashboard SetupGuideCard are intentionally adapted for Ebda. Do not overwrite these via an upstream sync. `scripts/cf-routes.cjs` and route generation use Ebda BRAND; upstream routes and client domains must never overwrite them. See `docs/ebda/ui/2026-10-05-merchant-ui-verification.md`.
+
+### Launch wiring divergence (2026-10-05)
+
+Ebda also diverges in API merchant mobile validation, Worker role guard, tenant-scoped abandoned-cart/loyalty cron, API routing/provisioning/deployment, CF public API build defaults and admin API CSP. Preserve these when syncing shared FWB paths. Launch proof and remaining inputs: `docs/ebda/launch-readiness-2026-10-05.md`.

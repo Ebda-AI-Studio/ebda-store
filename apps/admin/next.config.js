@@ -42,8 +42,20 @@ const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAG
 const DEFAULT_FRAME_SRC =
   process.env.ADMIN_DEFAULT_FRAME_SRC ?? 'https://ebda.app https://*.ebda.app';
 
+// Match the explicitly configured API, including isolated localhost previews.
+const API_ORIGIN = new URL(process.env.NEXT_PUBLIC_API_URL || 'https://api.ebda.app');
+if (
+  API_ORIGIN.protocol !== 'https:' &&
+  !(API_ORIGIN.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(API_ORIGIN.hostname))
+) {
+  throw new Error('NEXT_PUBLIC_API_URL must use HTTPS or a loopback development origin');
+}
+const API_CONNECT = `${API_ORIGIN.origin} ${API_ORIGIN.origin.replace(/^http/, 'ws')}`;
+
 const CSP_PREFIX =
-  "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.onesignal.com https://*.onesignal.com https://onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://onesignal.com https://*.onesignal.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://api.ebda.app https://api.ebda.app wss://api.ebda.app wss://api.ebda.app https://*.up.railway.app wss://*.up.railway.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com; frame-src https://onesignal.com https://*.onesignal.com ";
+  "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.onesignal.com https://*.onesignal.com https://onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://onesignal.com https://*.onesignal.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' " +
+  API_CONNECT +
+  ' https://*.up.railway.app wss://*.up.railway.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com; frame-src https://onesignal.com https://*.onesignal.com ';
 const CSP_SUFFIX = "; worker-src 'self' blob:; manifest-src 'self'; frame-ancestors 'none'";
 
 /**

@@ -37,6 +37,17 @@ BIN="$ROOT/node_modules/.bin/opennextjs-cloudflare"
 [ -x "$BIN" ] || { echo "cf-build: @opennextjs/cloudflare not installed — run: npm i -D @opennextjs/cloudflare@1.19.11 wrangler@4.116.0 -w @force/$APP" >&2; exit 1; }
 [ -f "$APP_DIR/wrangler.jsonc" ] || { echo "cf-build: missing apps/$APP/wrangler.jsonc (see docs/migration/cloudflare-preview-workers.md)" >&2; exit 1; }
 
+# The API origin must be baked into Next's browser bundle at build time.
+# Runtime Worker vars cannot repair NEXT_PUBLIC_* values after compilation.
+if [ -z "${NEXT_PUBLIC_API_URL:-}" ]; then
+  EBDA_API_HOST="$(node -e "process.stdout.write(require('$ROOT/packages/shared/dist/brand/index.js').BRAND.domains.api)")"
+  if [ "$APP" = web ]; then
+    export NEXT_PUBLIC_API_URL="https://$EBDA_API_HOST/api/v1"
+  else
+    export NEXT_PUBLIC_API_URL="https://$EBDA_API_HOST"
+  fi
+fi
+
 cd "$APP_DIR"
 
 INSTR="instrumentation.ts"

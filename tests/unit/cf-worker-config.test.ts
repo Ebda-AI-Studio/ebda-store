@@ -1,3 +1,4 @@
+import ts from 'typescript';
 /**
  * The Cloudflare Worker's configuration (R-EBDA-001, SP4 Stage 1): what wrangler.jsonc may and may
  * not say, and that the scheduled schedules the code handles are the ones the config declares.
@@ -12,8 +13,10 @@ const api = (p: string) => readFileSync(join(ROOT, 'apps/api', p), 'utf8');
 
 /** wrangler.jsonc is JSON with comments and trailing commas. */
 function parseJsonc(text: string): Record<string, any> {
-  const noComments = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"'\\])\/\/.*$/gm, '$1');
-  return JSON.parse(noComments.replace(/,(\s*[}\]])/g, '$1'));
+  const parsed = ts.parseConfigFileTextToJson('wrangler.jsonc', text);
+  if (parsed.error)
+    throw new Error(ts.flattenDiagnosticMessageText(parsed.error.messageText, '\n'));
+  return parsed.config;
 }
 
 const config = parseJsonc(api('wrangler.jsonc'));
