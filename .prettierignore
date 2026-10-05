@@ -17,3 +17,6 @@ handoff.md
 # so the committed file could never equal the generator's output and the
 # staleness gate would fail on every run regardless of the defences.
 docs/security/defence-mutation-record.md
+
+# AST-generated artifacts; regenerate with graphify update .
+graphify-out/

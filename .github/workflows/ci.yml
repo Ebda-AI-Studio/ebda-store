@@ -322,7 +322,8 @@ jobs:
       - name: Generate the ${{ matrix.app }} worker config (same generator as cf-deploy)
         if: contains(fromJSON('["web","admin","orders"]'), matrix.app)
         env:
-          OPENNEXT_CACHE: ${{ vars.OPENNEXT_CACHE }}
+          # CI dry-runs exercise cache bindings without provisioning resources.
+          OPENNEXT_CACHE: 'true'
           # The pinned adapter + wrangler are already installed by `npm ci`.
           CF_SETUP_SKIP_DEPS: '1'
         run: bash scripts/cf-setup-local.sh ${{ matrix.app }}
@@ -330,7 +331,8 @@ jobs:
       - name: Assert the generated config matches OPENNEXT_CACHE (same assertion as cf-deploy)
         if: contains(fromJSON('["web","admin","orders"]'), matrix.app)
         env:
-          OPENNEXT_CACHE: ${{ vars.OPENNEXT_CACHE }}
+          # CI dry-runs exercise cache bindings without provisioning resources.
+          OPENNEXT_CACHE: 'true'
         run: bash scripts/assert-cf-cache-bindings.sh ${{ matrix.app }}
 
       - name: Build ${{ matrix.app }} for Cloudflare (OpenNext adapter)

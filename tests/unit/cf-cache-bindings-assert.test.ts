@@ -121,7 +121,7 @@ describe('ci.yml worker-dry-run runs generator → assertion → build → dry-r
     expect(assertAt, 'worker-dry-run never asserts the generated config').toBeGreaterThan(setupAt);
     expect(buildAt, 'worker-dry-run builds before generating').toBeGreaterThan(assertAt);
     expect(dryRunAt, 'worker-dry-run never starts wrangler').toBeGreaterThan(buildAt);
-    expect(job).toMatch(/OPENNEXT_CACHE: \$\{\{ vars\.OPENNEXT_CACHE \}\}/);
+    expect(job.match(/OPENNEXT_CACHE: 'true'/g)).toHaveLength(2);
   });
 
   it('runs wrangler on Node 22 (wrangler >= 4.110 needs it) and only for apps with a config', () => {
