@@ -7,6 +7,10 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ebda-api",
   "main": "src/worker.ts",
+  "routes": [
+    { "pattern": "api.ebda.app", "custom_domain": true },
+    { "pattern": "api.ebda.app/*", "zone_name": "ebda.app" }
+  ],
   // Pinned to what the pinned wrangler's workerd supports (4.116.0 rejects 2026-09-01).
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],

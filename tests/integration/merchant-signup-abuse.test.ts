@@ -68,6 +68,7 @@ function body(email: string, extra: Record<string, unknown> = {}) {
     email,
     password: PASSWORD,
     name: 'Mona Hassan',
+    phone: '01012345678',
     formToken: tokenAged(10_000),
     ...extra,
   };

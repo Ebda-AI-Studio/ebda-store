@@ -171,3 +171,17 @@ describe('signup page', () => {
     );
   });
 });
+
+it('reports a failed resend without a success message', async () => {
+  apiPost.mockResolvedValueOnce({ data: { emailVerificationSent: true }, error: null });
+  apiPost.mockResolvedValueOnce({ data: null, error: { status: 503, code: 'UNAVAILABLE' } });
+  render(<SignupPage />);
+  fill({ name: 'Mona', email: 'mona@x.com', phone: '01012345678', password: 'Str0ng!Passw0rd' });
+  submit();
+  fireEvent.click(await screen.findByRole('button', { name: 'onboarding.signup.sent.resend' }));
+  expect(await screen.findByRole('alert')).toHaveProperty(
+    'textContent',
+    'onboarding.signup.errors.generic'
+  );
+  expect(screen.queryByText('onboarding.signup.sent.resent')).toBeNull();
+});

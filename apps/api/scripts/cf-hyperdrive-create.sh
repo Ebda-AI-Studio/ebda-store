@@ -17,5 +17,10 @@ NAME="${1:-ebda-neon}"
 case "$HYPERDRIVE_CONNECTION_STRING" in
   *neondb_owner*|*postgres:*@*) echo "refusing an owner/superuser connection string: use the ebda_app role" >&2; exit 2 ;;
 esac
+ROLE="$(node -e 'process.stdout.write(decodeURIComponent(new URL(process.env.HYPERDRIVE_CONNECTION_STRING).username))')"
+[ "$ROLE" = ebda_app ] || { echo 'refusing an owner/superuser or unreviewed role: use ebda_app' >&2; exit 2; }
+SAFE="$(psql "$HYPERDRIVE_CONNECTION_STRING" -XAt -v ON_ERROR_STOP=1 -c "SELECT NOT (rolsuper OR rolbypassrls) FROM pg_roles WHERE rolname = current_user")"
+[ "$SAFE" = t ] || { echo 'refusing an owner/superuser database role' >&2; exit 2; }
+
 npx wrangler hyperdrive create "$NAME" --connection-string="$HYPERDRIVE_CONNECTION_STRING" --caching-disabled
 echo "Put the printed id into apps/api/wrangler.jsonc (hyperdrive[0].id) for this environment."

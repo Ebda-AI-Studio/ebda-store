@@ -10,13 +10,18 @@ export function VerifyGate({ email, onRefresh }: { email: string; onRefresh: () 
   const t = useT('onboarding.flow.verifyGate');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState(false);
 
   async function handleResend() {
     setSending(true);
     setSent(false);
-    await apiPost('/api/v1/auth/merchant/resend-verification', { email });
+    setError(false);
+    const { error: apiError } = await apiPost('/api/v1/auth/merchant/resend-verification', {
+      email,
+    });
     setSending(false);
-    setSent(true);
+    setError(Boolean(apiError));
+    setSent(!apiError);
   }
 
   return (
@@ -32,6 +37,11 @@ export function VerifyGate({ email, onRefresh }: { email: string; onRefresh: () 
         <Button type="button" variant="outline" disabled={sending} onClick={handleResend}>
           {t('resend')}
         </Button>
+        {error && (
+          <p role="alert" className="text-sm text-destructive-ink">
+            {t('sendFailed')}
+          </p>
+        )}
         {sent && (
           <p role="status" className="text-sm text-muted-foreground">
             {t('resent')}

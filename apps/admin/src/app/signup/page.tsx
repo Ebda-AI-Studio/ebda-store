@@ -92,8 +92,13 @@ export default function SignupPage() {
     if (!sentTo) return;
     setResending(true);
     setResent(false);
-    await apiPost('/api/v1/auth/merchant/resend-verification', { email: sentTo });
+    setFormError('');
+    const { error } = await apiPost('/api/v1/auth/merchant/resend-verification', { email: sentTo });
     setResending(false);
+    if (error) {
+      setFormError(error.status === 429 ? tErr('rateLimited') : tErr('generic'));
+      return;
+    }
     setResent(true);
   }
 
@@ -104,6 +109,11 @@ export default function SignupPage() {
           {tSent('body', { email: sentTo })}
         </p>
         <div className="mt-6 space-y-3">
+          {formError && (
+            <p role="alert" className="text-sm text-destructive-ink">
+              {formError}
+            </p>
+          )}
           <Button
             type="button"
             variant="outline"

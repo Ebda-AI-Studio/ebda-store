@@ -11,6 +11,7 @@
  * branch and deployed a no-op revalidateTag with a green tick. The assertion
  * now demands the mode be exactly 'true' or 'false' for the storefront.
  */
+import { BRAND } from '../../packages/shared/src/brand';
 import { describe, it, expect, afterAll } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -20,9 +21,14 @@ import path from 'node:path';
 const ROOT = path.resolve(__dirname, '../..');
 const scratch = mkdtempSync(path.join(tmpdir(), 'cf-cache-assert-'));
 mkdirSync(path.join(scratch, 'scripts'));
-for (const f of ['cf-setup-local.sh', 'assert-cf-cache-bindings.sh']) {
+for (const f of ['cf-setup-local.sh', 'cf-routes.cjs', 'assert-cf-cache-bindings.sh']) {
   cpSync(path.join(ROOT, 'scripts', f), path.join(scratch, 'scripts', f));
 }
+mkdirSync(path.join(scratch, 'packages/shared/dist/brand'), { recursive: true });
+writeFileSync(
+  path.join(scratch, 'packages/shared/dist/brand/index.js'),
+  `exports.BRAND = ${JSON.stringify(BRAND)};`
+);
 for (const app of ['web', 'admin', 'orders'])
   mkdirSync(path.join(scratch, 'apps', app), { recursive: true });
 

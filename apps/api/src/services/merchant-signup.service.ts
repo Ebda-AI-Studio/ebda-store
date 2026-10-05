@@ -34,14 +34,13 @@ export const merchantSignupSchema = z.object({
   email: z.string().trim().toLowerCase().email('Invalid email address').max(254),
   password: passwordSchema,
   name: z.string().trim().min(1, 'Name is required').max(100),
-  /** Optional. Must be a valid Egyptian mobile; stored as E.164. */
+  /** Required Egyptian mobile; stored as E.164. */
   phone: z
     .string()
     .trim()
     .max(32)
-    .optional()
-    .transform(v => (v ? v : undefined))
-    .refine(v => v === undefined || normalizeEgyptianMobile(v) !== null, {
+    .min(1, 'Mobile number is required')
+    .refine(v => normalizeEgyptianMobile(v) !== null, {
       message: 'Invalid Egyptian mobile number',
     }),
   language: z.enum(['ar', 'en']).optional(),

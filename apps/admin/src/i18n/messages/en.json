@@ -8589,7 +8589,8 @@
         "body": "We sent a verification link to {email}. Open it, then come back and refresh this page.",
         "refresh": "I verified my email",
         "resend": "Send the link again",
-        "resent": "If the address is eligible, a new link is on its way."
+        "resent": "If the address is eligible, a new link is on its way.",
+        "sendFailed": "Could not resend the email. Please try again shortly."
       },
       "store": {
         "title": "Name your store",

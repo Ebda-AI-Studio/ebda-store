@@ -177,6 +177,11 @@ describe('onboarding stepper', () => {
       })
     );
     expect(await screen.findByText('onboarding.flow.template.title')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
+    await screen.findByText('onboarding.flow.product.title');
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.skip' }));
+    await screen.findByText('onboarding.flow.payment.title');
+    expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('true');
     document.documentElement.dir = '';
   });
 
@@ -279,5 +284,32 @@ describe('onboarding stepper', () => {
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.product.add' }));
     expect(await screen.findByText('onboarding.flow.product.priceInvalid')).toBeTruthy();
     expect(apiPost).not.toHaveBeenCalled();
+  });
+});
+
+describe('onboarding error and navigation regressions', () => {
+  it('returns to the created store without offering a second creation', async () => {
+    mockState({ ...verifiedNoStore, store: inactiveStore });
+    render(<OnboardingFlow />);
+    await screen.findByText('onboarding.flow.template.title');
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.back' }));
+    expect(await screen.findByText('My shop')).toBeTruthy();
+    expect(screen.queryByLabelText('onboarding.flow.store.name')).toBeNull();
+    expect(apiPost).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
+    expect(await screen.findByText('onboarding.flow.template.title')).toBeTruthy();
+  });
+  it('does not claim a failed verification resend succeeded', async () => {
+    mockState({ ...verifiedNoStore, user: { ...verifiedNoStore.user, emailVerified: false } });
+    apiPost.mockResolvedValue({ data: null, error: { status: 429, code: 'RATE_LIMITED' } });
+    render(<OnboardingFlow />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'onboarding.flow.verifyGate.resend' })
+    );
+    expect(await screen.findByRole('alert')).toHaveProperty(
+      'textContent',
+      'onboarding.flow.verifyGate.sendFailed'
+    );
+    expect(screen.queryByText('onboarding.flow.verifyGate.resent')).toBeNull();
   });
 });
