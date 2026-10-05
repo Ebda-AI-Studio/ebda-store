@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '@force/ui';
 import { useRouter } from 'next/navigation';
 import { apiGet } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
@@ -63,9 +64,14 @@ export function OnboardingFlow() {
 
   if (loadFailed) {
     return (
-      <p role="alert" className="text-center text-sm text-destructive-ink">
-        {t('loadFailed')}
-      </p>
+      <div className="space-y-3 text-center">
+        <p role="alert" className="text-sm text-destructive-ink">
+          {t('loadFailed')}
+        </p>
+        <Button type="button" variant="outline" onClick={load}>
+          {t('retry')}
+        </Button>
+      </div>
     );
   }
   if (!state) {

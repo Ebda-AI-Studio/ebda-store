@@ -95,9 +95,9 @@ export function SetupGuideCard({
   return (
     <section
       aria-labelledby="setup-guide-title"
-      className="mb-6 rounded-xl border border-border bg-card p-3 md:p-4"
+      className="mb-6 rounded-xl border border-border bg-card p-4 md:p-5"
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h2 id="setup-guide-title" className="text-base font-semibold text-foreground">
             {t('title')}
@@ -120,6 +120,7 @@ export function SetupGuideCard({
           aria-valuemin={0}
           aria-valuemax={guide.totalCount}
           aria-valuenow={guide.doneCount}
+          aria-label={t('progress', { done: guide.doneCount, total: guide.totalCount })}
           className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
         >
           <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
@@ -139,7 +140,7 @@ export function SetupGuideCard({
               key={item.key}
               data-key={item.key}
               data-done={item.done}
-              className="flex items-center gap-3 py-2.5"
+              className="flex flex-wrap items-start gap-3 py-3 sm:flex-nowrap sm:items-center"
             >
               <span
                 aria-hidden="true"
@@ -151,7 +152,7 @@ export function SetupGuideCard({
               >
                 ✓
               </span>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-[calc(100%-2rem)] sm:basis-auto">
                 <p
                   className={`text-sm font-medium ${
                     item.done ? 'text-muted-foreground line-through' : 'text-foreground'
@@ -166,7 +167,7 @@ export function SetupGuideCard({
                 </p>
                 <p className="text-xs text-muted-foreground">{desc}</p>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="ms-8 flex flex-wrap items-center gap-2 sm:ms-0 sm:shrink-0">
                 {item.key === 'share' ? (
                   <a
                     href={waMeShareLink(

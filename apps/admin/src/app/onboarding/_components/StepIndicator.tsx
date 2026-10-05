@@ -23,6 +23,7 @@ export function StepIndicator({ current }: { current: StepKey }) {
           aria-valuemin={1}
           aria-valuemax={total}
           aria-valuenow={index + 1}
+          aria-label={t('stepOf', { current: index + 1, total })}
           className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
         >
           <div
@@ -31,12 +32,12 @@ export function StepIndicator({ current }: { current: StepKey }) {
           />
         </div>
       </div>
-      <ol className="hidden items-center md:flex">
+      <ol className="hidden items-start gap-2 md:flex">
         {STEP_ORDER.map((key, i) => (
-          <li key={key} className="flex flex-1 items-center last:flex-none">
+          <li key={key} className="flex min-w-0 flex-1 items-start">
             <span
               aria-current={key === current ? 'step' : undefined}
-              className={`flex items-center gap-2 text-sm ${
+              className={`flex flex-col gap-2 text-xs ${
                 i <= index ? 'font-medium text-foreground' : 'text-muted-foreground'
               }`}
             >
@@ -49,7 +50,9 @@ export function StepIndicator({ current }: { current: StepKey }) {
               </span>
               {tSteps(key)}
             </span>
-            {i < total - 1 && <span className="mx-3 h-px flex-1 bg-border" aria-hidden="true" />}
+            {i < total - 1 && (
+              <span className="mt-3 ms-2 h-px flex-1 bg-border" aria-hidden="true" />
+            )}
           </li>
         ))}
       </ol>

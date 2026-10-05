@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Plus_Jakarta_Sans, IBM_Plex_Sans_Arabic } from 'next/font/google';
+import { Geist, IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { Providers } from './providers';
@@ -7,11 +7,10 @@ import { intlFormats } from '../i18n/formats';
 import '../styles/globals.css';
 import { BRAND } from '@force/shared';
 
-const plusJakarta = Plus_Jakarta_Sans({
+const geist = Geist({
   subsets: ['latin'],
   variable: '--font-sans',
   display: 'swap',
-  weight: ['400', '500', '600', '700', '800'],
 });
 
 const ibmPlexArabic = IBM_Plex_Sans_Arabic({
@@ -22,13 +21,11 @@ const ibmPlexArabic = IBM_Plex_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
-  // Neutral title — leaked HTML/screenshots don't market the admin panel to
-  // would-be phishers. Force.* branding lives on the storefront, not here.
   title: {
-    default: 'Admin',
-    template: '%s | Admin',
+    default: BRAND.name,
+    template: `%s | ${BRAND.name}`,
   },
-  description: 'Internal merchant dashboard. Not for public use.',
+  description: BRAND.tagline,
   // Tell every crawler to skip this domain entirely. Belt-and-suspenders
   // with `apps/admin/public/robots.txt` and the X-Robots-Tag header in
   // next.config.js — any one of these layers is enough but Google
@@ -97,11 +94,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             Only reads from localStorage — no user input, safe static content. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var s=localStorage.getItem('admin-theme');var p=window.matchMedia('(prefers-color-scheme:dark)').matches;if(s==='dark'||(!s&&p)){document.documentElement.classList.add('dark')}}catch(e){}`,
+            __html: `try{var s=localStorage.getItem('admin-theme');if(s!=='light'){document.documentElement.classList.add('dark')}}catch(e){}`,
           }}
         />
       </head>
-      <body className={`${plusJakarta.variable} ${ibmPlexArabic.variable} font-sans antialiased`}>
+      <body className={`${geist.variable} ${ibmPlexArabic.variable} font-sans antialiased`}>
         <a
           href="#admin-main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:start-4 focus:z-[9999] focus:rounded-lg focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary"

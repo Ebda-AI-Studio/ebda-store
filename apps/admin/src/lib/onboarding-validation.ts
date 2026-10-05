@@ -27,6 +27,7 @@ export type SignupErrorKey =
   | 'emailInvalid'
   | 'emailDisposable'
   | 'passwordWeak'
+  | 'phoneRequired'
   | 'phoneInvalid';
 
 export function validateSignup(
@@ -36,7 +37,8 @@ export function validateSignup(
   if (!f.name.trim()) errors.name = 'nameRequired';
   if (!isValidEmail(f.email.trim())) errors.email = 'emailInvalid';
   if (!isStrongPassword(f.password)) errors.password = 'passwordWeak';
-  if (f.phone.trim() && !isValidEgyptianMobile(f.phone)) errors.phone = 'phoneInvalid';
+  if (!f.phone.trim()) errors.phone = 'phoneRequired';
+  else if (!isValidEgyptianMobile(f.phone)) errors.phone = 'phoneInvalid';
   return errors;
 }
 

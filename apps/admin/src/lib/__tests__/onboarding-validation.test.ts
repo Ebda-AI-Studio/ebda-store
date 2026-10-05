@@ -32,9 +32,10 @@ describe('onboarding validation', () => {
     }
   });
 
-  it('validateSignup keeps phone optional but strict when given', () => {
+  it('validateSignup requires a valid Egyptian mobile', () => {
     const ok = { name: 'Mona', email: 'm@x.com', phone: '', password: 'Str0ng!Passw0rd' };
-    expect(validateSignup(ok)).toEqual({});
+    expect(validateSignup(ok)).toEqual({ phone: 'phoneRequired' });
+    expect(validateSignup({ ...ok, phone: '   ' }).phone).toBe('phoneRequired');
     expect(validateSignup({ ...ok, phone: '010 1234 5678' })).toEqual({});
     expect(validateSignup({ ...ok, phone: '+14155550123' }).phone).toBe('phoneInvalid');
     expect(validateSignup({ ...ok, name: '  ' }).name).toBe('nameRequired');

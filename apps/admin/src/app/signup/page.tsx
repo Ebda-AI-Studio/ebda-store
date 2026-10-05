@@ -65,7 +65,7 @@ export default function SignupPage() {
       email,
       password: fields.password,
       name: fields.name.trim(),
-      ...(fields.phone.trim() ? { phone: fields.phone.trim() } : {}),
+      phone: fields.phone.trim(),
       language: document.documentElement.dir === 'rtl' ? 'ar' : 'en',
       formToken,
       company_site: honeypot,
@@ -178,6 +178,7 @@ export default function SignupPage() {
           <Input
             id="signup-phone"
             name="phone"
+            required
             type="tel"
             dir="ltr"
             inputMode="tel"

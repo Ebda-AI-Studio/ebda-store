@@ -1,39 +1,18 @@
-# Handoff — finance reports count store-local days (owner decision 2026-10-01)
-
-_Updated 2026-10-01. Branch `fix/finance-reports-store-tz`, worktree
-`_worktrees/force-website-builder__fix-finance-reports-store-tz`, off `origin/main` @ 26eae23c
-(#2398 merged there while this was in progress; rebased onto it)._
+# Ebda UI handoff
 
 ## Goal
-
-Finance Reports (P&L, trial balance, balance sheet, tax report and their XLSX/CSV exports) count
-days in the store's time zone (Kuwait, UTC+3), like the finance dashboard — not UTC midnight.
-Replaces Ruling RF-1 (from #2398) with FRT-1; FRT-2 = fall back to Asia/Kuwait.
+Adapt FWB UI to Ebda branding, clarify merchant setup, require signup mobile in UI, verify Cloudflare and push a reviewable branch.
 
 ## Current state
-
-Code, tests, docs and rulings written; see the PR for the gate results. Not deployed.
+Branch `codex/ebda-ui-ux`, worktree `/private/tmp/ebda-ui-20261005`, baseline `89461087`. Root `plan` and unrelated `.handoff/` preserved. PR #3: https://github.com/Whisky-11/ebda/pull/3. Implementation commit `9d047026` pushed and remote SHA verified. No merge/deploy. Local built Worker preview: http://localhost:8788/signup.
 
 ## Done
-
-- `@force/shared` report-range: `DEFAULT_STORE_TIME_ZONE`, `resolveStoreTimeZone`,
-  `zonedDayStart`/`zonedDayEnd`/`zonedIsoDay`/`zonedMonthStartDay`.
-- API: `storeTimeZone()` (`lib/report-range.ts`); `parseFinanceDate` takes the store zone; the tax
-  report routes resolve days in it; tax rows dated in it; export filenames/Filters in it; dashboard
-  no-param default = store's month.
-- Admin Reports page: default pickers in the store's zone; "Days are counted in …" note (en + ar).
-- Tests: `tests/integration/finance-reports-store-tz.test.ts` (6/6 mutants killed), unit updates.
-- Docs: `docs/RULINGS.md` (RF-1 replaced, FRT-1/FRT-2), `docs/uat/tax-reports.md`,
-  `docs/business/02-feature-catalog.md`.
-- Prod evidence (read-only): 8 of 122 journal entries in the 00:00–03:00 Kuwait window move a day;
-  0 move month; 0 are tax-moving.
+UI implementation, bilingual browser checks, 131 targeted tests, admin typecheck, final OpenNext build and Wrangler dry run. Local workerd signup/logo 200; browser rendered both languages. CF generated routes corrected to BRAND authority. AST graph refreshed. Exact evidence and rulings: docs/ebda/ui/2026-10-05-merchant-ui-verification.md.
 
 ## In progress
-
-Nothing.
+Nothing. UI implementation and review branch delivery complete; CI status is reported by GitHub.
 
 ## Left to do
+Claude: make merchantSignupSchema.phone required server-side. API still accepts an omitted number. Live API/payment/order verification requires backend and authorized production checks. Review/merge/deployment belongs to Ahmad's subsequent authorization.
 
-- After this PR merges + deploys: `/health` commit == main, then open Finance → Reports on
-  prod for pecannbee, pick a day that holds one of the 8 moved entries, and check it lands on the
-  Kuwait day (read-only).
+Rulings UI-1 through UI-4: docs/plans/2026-10-05-ebda-merchant-ui.md. UI-5 through UI-7: verification document. Scope keeps payments/money/entitlements/merchant storefront palettes unchanged; only generated CF routing follows owner Cloudflare steering.
