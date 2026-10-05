@@ -14,7 +14,7 @@ Baseline: `origin/main` at `89461087`; UI branch: `codex/ebda-ui-ux`.
 ## Evidence
 
 - 131 tests passed across 9 targeted files (signup, validation, onboarding API request bodies, setup guide, branding, contrast, generated CF routes).
-- Admin TypeScript check exited 0.
+- Admin TypeScript check exited 0. Secretlint exited 0; gitleaks scanned the implementation commit (~19 MB including graph) with no leaks.
 - Final Cloudflare/OpenNext build succeeded: `.open-next/worker.js` generated and instrumentation restored.
 - Wrangler dry run succeeded: 226 asset files; ASSETS binding; no deploy.
 - Local workerd `/signup` and `/logo.svg`: HTTP 200. Browser rendered signup and switched Arabic/English on the built Worker.
@@ -37,3 +37,5 @@ Ruling UI-7 — The inherited graph was rebuilt with AST-only `graphify update .
 ## Blast-radius
 
 Swept `phoneRequired`, signup phone labels/validation, `admin-theme`, brand font/token names, public skip target, onboarding/template/payment text, setup-guide progress and Cloudflare generated hostnames across apps, packages, tests, scripts, CI and docs; compared FWB source read-only. Found and fixed inherited admin palette and generated FWB/Kuwait routes. Backend optional phone remains explicitly assigned to Claude. No production/sibling FWB changes.
+
+Review: https://github.com/Whisky-11/ebda/pull/3. Implementation commit `9d047026`; remote branch SHA independently verified.
