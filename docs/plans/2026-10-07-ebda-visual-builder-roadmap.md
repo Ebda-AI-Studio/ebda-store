@@ -85,3 +85,50 @@ Ruling BUILDER-2 — treat Plasmic as a reference; select no runtime dependency 
 ## Verification for future implementation
 
 Exercise meaningful schema/history unit tests, save/publish/isolation integration tests, bilingual browser E2E, preview/publish load checks and merchant UAT on touched paths. Verify the deployed commit and rendered storefront after deployment. Record what remains unverified, including real provider behavior. This documentation change requires formatting, links, source-path checks and a sweep of existing builder/spec consumers; it does not require application test reruns.
+
+## Store CMS and guided onboarding
+
+Product direction from Ahmad: clients should manage stores through a visual CMS. Join setup and ongoing editing into one journey: choose a business/category preset → add store identity, logo and products → open the populated store in the editor → edit text/images/collections in place → preview mobile/desktop → save draft → publish.
+
+Onboarding and the editor must use the same registry, document and renderer; onboarding is a guided entry to the CMS rather than a second configuration system. Resume unfinished setup without duplicating stores or resetting content. Populate previews with the merchant's own products when available; clearly label sample content and require its removal/replacement before publication. Default to a few useful controls, with advanced layout settings available separately. Inline guidance must identify what the merchant needs to supply without exposing implementation jargon.
+
+Acceptance: a first-time Arabic-speaking merchant can complete setup and edit the resulting store without developer assistance; returning merchants reopen the same document; back navigation preserves inputs; retry does not create another store; desktop/mobile previews match the published store. Verify identity/product edits, failed uploads, empty catalogues, draft recovery and publish errors.
+
+## Template discovery and refresh brief
+
+Research date: 2026-10-07. This is a sourced shortlist and evaluation plan, not a claim that these templates have been visually tested, imported or integrated with Ebda. Ahmad considers the current templates unsatisfactory; inspect them against the rubric below before declaring specific defects.
+
+| Source                                                                                        | Verified offering                                                                                                                                                                                                                                                       | Intended Ebda use                                                                                                | Constraints and next check                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Plasmic Marketplace](https://www.plasmic.app/marketplace)                                    | Community templates/components with an ecommerce category, including [E-commerce landing page](https://www.plasmic.app/marketplace/e-commerce-landing-page) and [Commerce storefront website](https://www.plasmic.app/marketplace/commerce-storefront-website) listings | Study CMS-friendly section composition and product presentation; shortlist project designs for merchant previews | Marketplace asset rights are not automatically the repository's MIT license. Check each item's terms, export format, paid requirements and assets. The commerce detail page could not be retrieved during this research; listing presence is verified, contents are not.                                                              |
+| [Next.js Commerce](https://github.com/vercel/commerce) and [demo](https://demo.vercel.store/) | Next.js App Router storefront; upstream currently maintains the Shopify provider                                                                                                                                                                                        | Primary code candidate for selected storefront UI patterns/components, adapted to Ebda's API and renderer        | [MIT license](https://github.com/vercel/commerce/blob/main/license.md) verified. Preserve notices; independently verify asset licenses. Replace provider assumptions and test Cloudflare compatibility; do not adopt Shopify checkout or introduce Vercel hosting. Demo is a link for later visual review, not a reviewed screenshot. |
+| [Shopify Horizon collection](https://themes.shopify.com/collections/horizon-themes)           | Ten free Shopify themes/presets, including Horizon, Fabric, Atelier and Savor                                                                                                                                                                                           | Visual references for catalogue, fashion, premium-brand and food-store layouts                                   | [Horizon source license](https://github.com/Shopify/horizon/blob/main/LICENSE.md) restricts use to Shopify interoperability. Do not import Horizon source into Ebda or redistribute derived themes. Free Shopify availability is not permission for reuse on Ebda. Build original Ebda implementations.                               |
+
+Plasmic has templates, but availability does not mean turnkey Ebda templates: its project definitions, hosting/provider integration, asset rights and editor runtime need separate evaluation. No template or external library is selected for installation by this roadmap. No additional subscription is approved. Whisky's stated current hosting spend is $5/month for Cloudflare; document any incremental template/tool/runtime cost before selection.
+
+### Initial Ebda preset families
+
+Start with four proposed families, subject to merchant validation, rather than a large set of superficial color variants:
+
+1. **Everyday catalogue:** search, clear categories, useful filters, product-focused grid and straightforward delivery/COD information.
+2. **Fashion and boutique:** collection-led navigation, editorial image/text sections, variant/size presentation and mobile product browsing.
+3. **Beauty and premium goods:** restrained typography, product details, genuine reviews and clear delivery/returns information.
+4. **Food and gifts:** category-led browsing, clear product options, availability and delivery details. Do not promise scheduling or other unsupported backend features.
+
+Each family is a Page Definition preset plus theme tokens and registry defaults. Merchants retain the same CMS actions across families. Template previews must show distinct composition with representative catalogue content, not just recolored cards. Existing customers keep their current templates; switching creates a reviewable draft and preserves products, settings and prior published revision.
+
+### Selection rubric and acceptance
+
+Compare existing and shortlisted designs using homepage, collection, product, search, cart and checkout-adjacent views at 360px, tablet and desktop widths. Score product clarity, navigation, typography/spacing, image cropping, CTA visibility, Arabic/RTL, keyboard/focus behavior, contrast, empty/error states and merchant editability. Record screenshots and concrete defects. Do not choose on homepage appearance alone.
+
+For each adopted family, prove onboarding populates it correctly, every editable control has a visible renderer result, collection references belong to the store, long Arabic names/EGP prices fit, images have valid rights and fallbacks, and commerce state remains authoritative. Run storefront performance and Cloudflare build/runtime checks after adaptation. Treat selected code, images, fonts and icons as separate license/dependency decisions.
+
+### Roadmap integration
+
+- Phase 0 includes template inventory, screenshot comparison, merchant needs and source/license checks.
+- Phase 1 defines presets through the same schema/registry as existing layouts.
+- Phase 2 includes the guided onboarding-to-CMS handoff and family preview selector.
+- Phase 3 proves safe template switching/publication with existing-store preservation.
+- Phase 4 introduces additional preset families only with working commerce flows and merchant evidence.
+
+Ruling BUILDER-3 — prefer original Ebda presets and selectively reusable MIT storefront code; treat Plasmic listings and Shopify designs as references until their individual reuse conditions are established. Evidence: marketplace listings exist, Next.js Commerce is MIT, and Horizon is restricted to Shopify use. Cost if wrong: adaptation work may be larger than a properly licensed ready-made template would require.
