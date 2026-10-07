@@ -30,6 +30,7 @@ vi.mock('@/components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 vi.mock('./_components/TaxGeneralSettings', () => ({ TaxGeneralSettings: () => null }));
+vi.mock('./_components/TaxVerificationCard', () => ({ TaxVerificationCard: () => null }));
 vi.mock('./_components/TaxTimeZoneCard', () => ({ TaxTimeZoneCard: () => null }));
 vi.mock('./_components/TaxInfoBox', () => ({ TaxInfoBox: () => null }));
 vi.mock('./_components/TaxRateFormModal', () => ({ TaxRateFormModal: () => null }));

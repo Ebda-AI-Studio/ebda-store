@@ -5,6 +5,10 @@ import type { TaxSettings } from './types';
 
 interface TaxGeneralSettingsProps {
   settings: TaxSettings;
+  /** True only when the store's VAT registration is verified (ruling TAX-2). */
+  vatVerified: boolean;
+  /** Server refusal of the last save (e.g. TAX_NOT_VERIFIED), shown under the toggle. */
+  errorMessage?: string | null;
   savingSettings: boolean;
   onSettingsChange: (settings: TaxSettings) => void;
   onSaveSettings: (patch: Partial<TaxSettings>) => void;
@@ -17,6 +21,8 @@ interface TaxGeneralSettingsProps {
  */
 export function TaxGeneralSettings({
   settings,
+  vatVerified,
+  errorMessage,
   savingSettings,
   onSettingsChange,
   onSaveSettings,
@@ -31,6 +37,19 @@ export function TaxGeneralSettings({
           <div>
             <h3 className="text-sm font-medium text-foreground">{t('enable.title')}</h3>
             <p className="text-sm text-muted-foreground">{t('enable.description')}</p>
+            {!vatVerified && (
+              <p className="text-sm text-muted-foreground">
+                {t('enable.needsVerification')}{' '}
+                <a href="#vat-registration" className="text-primary hover:underline">
+                  {t('enable.needsVerificationLink')}
+                </a>
+              </p>
+            )}
+            {errorMessage && (
+              <p role="alert" className="text-sm text-destructive-ink">
+                {errorMessage}
+              </p>
+            )}
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
@@ -42,7 +61,7 @@ export function TaxGeneralSettings({
                 onSaveSettings({ taxEnabled: e.target.checked });
               }}
               className="sr-only peer"
-              disabled={savingSettings}
+              disabled={savingSettings || (!vatVerified && !settings.taxEnabled)}
             />
             <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
           </label>

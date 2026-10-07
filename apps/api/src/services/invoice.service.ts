@@ -1,5 +1,10 @@
 import { prisma } from '@force/database';
-import { groupOrderLinesForDisplay, orderTaxPlacement, REGION } from '@force/shared';
+import {
+  groupOrderLinesForDisplay,
+  orderTaxPlacement,
+  REGION,
+  taxInvoiceInfo,
+} from '@force/shared';
 import { emailMoney } from './email-templates/_util';
 import {
   EMAIL_COLORS,
@@ -43,6 +48,11 @@ function readBrandColor(theme: unknown, fallback = 'hsl(26 100% 50%)'): string {
 const INVOICE_LABELS = {
   en: {
     invoice: 'Invoice',
+    taxInvoice: 'Tax invoice',
+    sellerTrn: 'Tax registration no.',
+    taxableAmount: 'Taxable amount (excl. VAT)',
+    vat: (rate: number | null) => (rate === null ? 'VAT' : `VAT (${rate}%)`),
+    vatIncluded: (rate: number | null) => (rate === null ? 'Incl. VAT' : `Incl. VAT (${rate}%)`),
     billTo: 'Bill to',
     shipTo: 'Ship to',
     payment: 'Payment',
@@ -72,6 +82,13 @@ const INVOICE_LABELS = {
   },
   ar: {
     invoice: 'فاتورة',
+    taxInvoice: 'فاتورة ضريبية',
+    sellerTrn: 'رقم التسجيل الضريبي',
+    taxableAmount: 'المبلغ الخاضع للضريبة (بدون الضريبة)',
+    vat: (rate: number | null) =>
+      rate === null ? 'ضريبة القيمة المضافة' : `ضريبة القيمة المضافة (${rate}%)`,
+    vatIncluded: (rate: number | null) =>
+      rate === null ? 'شامل ضريبة القيمة المضافة' : `شامل ضريبة القيمة المضافة (${rate}%)`,
     billTo: 'فاتورة إلى',
     shipTo: 'شحن إلى',
     payment: 'الدفع',
@@ -182,6 +199,10 @@ export class InvoiceService {
     // `emailMoney` helper the order emails use.
     const currency = order.currency || order.store.currency || REGION.currency;
     const taxPlacement = orderTaxPlacement(order);
+    // A TAX invoice only when the order froze a verified seller TRN (ruling
+    // TAX-2); otherwise an ordinary invoice with no VAT wording.
+    const taxInfo = taxInvoiceInfo(order);
+    const docTitle = taxInfo ? labels.taxInvoice : labels.invoice;
     const formatPrice = (minor: number) => emailMoney(minor, currency, 'en');
     const shippingAddr = order.shippingAddress as Record<string, string> | null;
     // Bill To should reflect the buyer info entered in checkout, not the
@@ -345,7 +366,7 @@ export class InvoiceService {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>${escapeHtml(labels.invoice)} ${escapeHtml(order.orderNumber)} &middot; ${escapeHtml(order.store.name)}</title>
+  <title>${escapeHtml(docTitle)} ${escapeHtml(order.orderNumber)} &middot; ${escapeHtml(order.store.name)}</title>
   ${arabicFontLink}
   <style>
     :root {
@@ -559,9 +580,11 @@ export class InvoiceService {
           ${order.store.email ? `<div class="store-meta">${escapeHtml(order.store.email)}</div>` : ''}
           ${order.store.phone ? `<div class="store-meta">${escapeHtml(order.store.phone)}</div>` : ''}
           ${order.store.address ? `<div class="store-meta">${escapeHtml(order.store.address)}</div>` : ''}
+          ${taxInfo?.sellerTaxLegalName ? `<div class="store-meta">${escapeHtml(taxInfo.sellerTaxLegalName)}</div>` : ''}
+          ${taxInfo ? `<div class="store-meta seller-trn">${escapeHtml(labels.sellerTrn)}: <span dir="ltr">${escapeHtml(taxInfo.sellerTaxRegistrationNumber)}</span></div>` : ''}
         </div>
         <div class="invoice-side">
-          <div class="invoice-eyebrow">${escapeHtml(labels.invoice)}</div>
+          <div class="invoice-eyebrow">${escapeHtml(docTitle)}</div>
           <div class="invoice-number">${escapeHtml(order.orderNumber)}</div>
           <div class="invoice-date">${escapeHtml(dateText)}</div>
           <span class="badge ${statusClass}">${escapeHtml(statusLabel)}</span>
@@ -643,8 +666,13 @@ export class InvoiceService {
           <div class="row"><span class="label">${escapeHtml(labels.subtotal)}</span><span class="val">${formatPrice(order.subtotal)}</span></div>
           ${discountRowsHtml}
           ${
-            (taxPlacement.taxRow ?? 0) > 0
-              ? `<div class="row"><span class="label">${escapeHtml(labels.tax)}</span><span class="val">${formatPrice(taxPlacement.taxRow ?? 0)}</span></div>`
+            taxInfo
+              ? `<div class="row taxable"><span class="label">${escapeHtml(labels.taxableAmount)}</span><span class="val">${formatPrice(taxInfo.taxableAmount)}</span></div>`
+              : ''
+          }
+          ${
+            (taxPlacement.taxRow ?? 0) > 0 || (taxInfo && !order.taxIncludedInPrice)
+              ? `<div class="row"><span class="label">${escapeHtml(taxInfo ? labels.vat(taxInfo.ratePercent) : labels.tax)}</span><span class="val">${formatPrice(taxPlacement.taxRow ?? 0)}</span></div>`
               : ''
           }
           <div class="row"><span class="label">${escapeHtml(labels.shipping)}</span><span class="val">${order.shipping === 0 ? escapeHtml(labels.free) : formatPrice(order.shipping)}</span></div>
@@ -653,7 +681,7 @@ export class InvoiceService {
             // Inclusive VAT is already inside subtotal/total — a caption after
             // the grand total, never a summed row (issue 2210, Ruling M3-8).
             taxPlacement.includedTaxCaption !== null
-              ? `<div class="row tax-included"><span class="label">${escapeHtml(labels.taxIncluded)}</span><span class="val">${formatPrice(taxPlacement.includedTaxCaption)}</span></div>`
+              ? `<div class="row tax-included"><span class="label">${escapeHtml(taxInfo ? labels.vatIncluded(taxInfo.ratePercent) : labels.taxIncluded)}</span><span class="val">${formatPrice(taxPlacement.includedTaxCaption)}</span></div>`
               : ''
           }
         </div>
@@ -750,6 +778,8 @@ export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string):
   const money = (minor: number) =>
     `<span dir="ltr" style="unicode-bidi:embed;white-space:nowrap;">${emailMoney(minor, currency, 'en')}</span>`;
   const taxPlacement = orderTaxPlacement(order);
+  const taxInfo = taxInvoiceInfo(order);
+  const docTitle = taxInfo ? labels.taxInvoice : labels.invoice;
   const shippingAddr = order.shippingAddress as Record<string, string> | null;
   const billingAddr = (order.billingAddress as Record<string, string> | null) ?? shippingAddr;
   const payment = order.payments?.[0];
@@ -781,9 +811,13 @@ export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string):
   const header = table(
     `<tr>
       <td align="${start}" style="text-align:${start};vertical-align:top;padding:0 0 16px;">
-        <div style="font-size:11px;line-height:16px;font-weight:700;text-transform:uppercase;letter-spacing:0.16em;color:${brand};">${escapeHtml(labels.invoice)}</div>
+        <div style="font-size:11px;line-height:16px;font-weight:700;text-transform:uppercase;letter-spacing:0.16em;color:${brand};">${escapeHtml(docTitle)}</div>
         <div dir="ltr" style="font-size:18px;line-height:24px;font-weight:800;color:${c.ink};text-align:${start};">${escapeHtml(order.orderNumber)}</div>
-        <div style="font-size:12px;line-height:18px;color:${c.inkSoft};">${escapeHtml(dateText)}</div>
+        <div style="font-size:12px;line-height:18px;color:${c.inkSoft};">${escapeHtml(dateText)}</div>${
+          taxInfo
+            ? `${taxInfo.sellerTaxLegalName ? `<div style="font-size:12px;line-height:18px;color:${c.inkSoft};">${escapeHtml(taxInfo.sellerTaxLegalName)}</div>` : ''}<div style="font-size:12px;line-height:18px;color:${c.inkSoft};">${escapeHtml(labels.sellerTrn)}: <span dir="ltr">${escapeHtml(taxInfo.sellerTaxRegistrationNumber)}</span></div>`
+            : ''
+        }
       </td>
       <td align="${end}" width="110" style="text-align:${end};vertical-align:top;padding:0 0 16px;">${emailBadge(escapeHtml(statusLabel), tone)}</td>
     </tr>`,
@@ -915,8 +949,12 @@ export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string):
         )
       : '',
     other > 0 ? totalRow(escapeHtml(labels.discount), minus(other), c.success) : '',
-    (taxPlacement.taxRow ?? 0) > 0
-      ? totalRow(escapeHtml(labels.tax), money(taxPlacement.taxRow ?? 0))
+    taxInfo ? totalRow(escapeHtml(labels.taxableAmount), money(taxInfo.taxableAmount)) : '',
+    (taxPlacement.taxRow ?? 0) > 0 || (taxInfo && !order.taxIncludedInPrice)
+      ? totalRow(
+          escapeHtml(taxInfo ? labels.vat(taxInfo.ratePercent) : labels.tax),
+          money(taxPlacement.taxRow ?? 0)
+        )
       : '',
     totalRow(
       escapeHtml(labels.shipping),
@@ -924,7 +962,7 @@ export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string):
     ),
     `<tr><td style="padding:12px 0 4px;text-align:${start};font-size:16px;line-height:22px;font-weight:800;color:${c.ink};border-top:2px solid ${c.line};">${escapeHtml(labels.grandTotal)}</td><td align="${end}" style="padding:12px 0 4px;text-align:${end};font-size:18px;line-height:22px;font-weight:800;color:${brand};border-top:2px solid ${c.line};">${money(order.total)}</td></tr>`,
     taxPlacement.includedTaxCaption !== null
-      ? `<tr><td colspan="2" align="${end}" style="padding:2px 0 0;text-align:${end};font-size:12px;color:${c.inkSoft};">${escapeHtml(labels.taxIncluded)} ${money(taxPlacement.includedTaxCaption)}</td></tr>`
+      ? `<tr><td colspan="2" align="${end}" style="padding:2px 0 0;text-align:${end};font-size:12px;color:${c.inkSoft};">${escapeHtml(taxInfo ? labels.vatIncluded(taxInfo.ratePercent) : labels.taxIncluded)} ${money(taxPlacement.includedTaxCaption)}</td></tr>`
       : '',
   ].join('');
   const totals = table(totalsRows, 'margin:12px 0 0;');

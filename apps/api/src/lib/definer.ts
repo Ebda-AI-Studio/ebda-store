@@ -667,3 +667,57 @@ export async function getBillingRefundStoreId(
     SELECT public.ebda_billing_refund_store_id(${provider}, ${providerRef}) AS id`;
   return rows[0]?.id ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// VAT gate (ruling TAX-2): the super-admin review queue across every store
+// ---------------------------------------------------------------------------
+
+export interface TaxReviewRow {
+  storeId: string;
+  storeName: string;
+  storeSlug: string;
+  status: string;
+  taxRegistrationNumber: string | null;
+  legalName: string | null;
+  submittedAt: Date | null;
+  reviewedAt: Date | null;
+  verifiedAt: Date | null;
+  rejectionReason: string | null;
+  documentCount: number;
+  /** OTHER stores holding the same TRN in pending/verified — a reviewer signal. */
+  duplicateTrnStores: number;
+}
+
+/** Tax profiles awaiting / past review. `null` = every non-`none` profile. Super_admin only (the function checks). */
+export async function taxProfilesForReview(status: string | null): Promise<TaxReviewRow[]> {
+  const rows = await prisma.$queryRaw<
+    Array<{
+      store_id: string;
+      store_name: string;
+      store_slug: string;
+      status: string;
+      tax_registration_number: string | null;
+      legal_name: string | null;
+      submitted_at: Date | null;
+      reviewed_at: Date | null;
+      verified_at: Date | null;
+      rejection_reason: string | null;
+      document_count: bigint;
+      duplicate_trn_stores: bigint;
+    }>
+  >`SELECT * FROM public.ebda_tax_profiles_for_review(${status})`;
+  return rows.map(r => ({
+    storeId: r.store_id,
+    storeName: r.store_name,
+    storeSlug: r.store_slug,
+    status: r.status,
+    taxRegistrationNumber: r.tax_registration_number,
+    legalName: r.legal_name,
+    submittedAt: r.submitted_at,
+    reviewedAt: r.reviewed_at,
+    verifiedAt: r.verified_at,
+    rejectionReason: r.rejection_reason,
+    documentCount: Number(r.document_count),
+    duplicateTrnStores: Number(r.duplicate_trn_stores),
+  }));
+}

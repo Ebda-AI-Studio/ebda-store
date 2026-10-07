@@ -35,6 +35,7 @@ vi.mock('@force/database', () => ({
     productVariant: { update: vi.fn() },
     store: { findUnique: vi.fn().mockResolvedValue({ name: 'Test Store' }) },
     taxRate: { findMany: vi.fn().mockResolvedValue([]) },
+    storeTaxProfile: { findUnique: vi.fn().mockResolvedValue(null) },
     inventoryHistory: {
       findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({}),

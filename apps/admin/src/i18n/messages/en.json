@@ -3205,14 +3205,17 @@
   },
   "tax": {
     "page": {
-      "title": "Tax Configuration",
-      "subtitle": "Configure tax rates and settings for your store"
+      "title": "Tax & VAT",
+      "subtitle": "VAT registration, tax rates and settings for your store"
     },
     "settings": {
       "title": "General Settings",
       "enable": {
         "title": "Enable Tax Collection",
-        "description": "When enabled, taxes will be calculated and added to orders"
+        "description": "When enabled, taxes will be calculated and added to orders",
+        "needsVerification": "You can turn this on after your VAT registration is verified.",
+        "needsVerificationLink": "Verify your VAT registration",
+        "notVerifiedFallback": "VAT can only be enabled after your VAT registration is verified."
       },
       "included": {
         "title": "Prices Include Tax",
@@ -3237,7 +3240,7 @@
       },
       "empty": {
         "title": "No Tax Rates",
-        "enabled": "Add the tax your store must charge, e.g. VAT 5%",
+        "enabled": "Add the tax your store must charge, e.g. VAT 14%",
         "disabled": "Enable tax collection to start adding tax rates",
         "createFirst": "Create First Rate"
       },
@@ -5764,7 +5767,9 @@
       "hubSectionsAriaLabel": "Hub sections",
       "navPlatformUsageHistory": "Usage history (platform)",
       "navPlatformPlans": "Plans (platform)",
-      "navPlatformBillingEvents": "Billing ledger (platform)"
+      "navPlatformBillingEvents": "Billing ledger (platform)",
+      "navPlatformTaxVerification": "VAT verification (platform)",
+      "navPlatformSettings": "Platform settings"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -8867,5 +8872,156 @@
     "next": "Next",
     "unmatchedTitle": "Lines matching no shipment",
     "unmatchedHelp": "These statement lines name a tracking number that is not one of your shipments. They match automatically if that shipment appears."
+  },
+  "taxVerification": {
+    "title": "VAT registration",
+    "subtitle": "Only businesses registered for VAT may charge it. Ebda reviews your registration before you can turn VAT on.",
+    "loading": "Loading…",
+    "loadFailed": "Could not load your VAT registration. Please try again.",
+    "status": {
+      "none": "Not registered with Ebda for VAT",
+      "pending": "Under review",
+      "verified": "Verified",
+      "rejected": "Rejected",
+      "revoked": "Revoked"
+    },
+    "banner": {
+      "none": "VAT is off. To charge VAT on your orders, submit your VAT registration for review.",
+      "pending": "We received your submission and review each one manually. Details are locked while it is under review.",
+      "verified": "Verified since {date}. You can now enable VAT below.",
+      "rejected": "Your submission was rejected: {reason}. Fix the details and submit again.",
+      "revoked": "Your VAT verification was revoked: {reason}. VAT is switched off until you are verified again."
+    },
+    "verifiedNote": "To change these details, contact Ebda support.",
+    "form": {
+      "trn": "Tax registration number",
+      "trnHint": "9 digits, as printed on your tax card. Spaces and dashes are fine.",
+      "trnPlaceholder": "123-456-789",
+      "legalName": "Legal business name",
+      "legalNameHint": "Exactly as it appears on your tax card or VAT certificate.",
+      "save": "Save details",
+      "saving": "Saving…",
+      "saved": "Details saved",
+      "trnInvalid": "Enter a 9-digit tax registration number.",
+      "legalNameInvalid": "Enter your legal business name (2 to 200 characters).",
+      "locked": "These details cannot be edited right now."
+    },
+    "documents": {
+      "title": "Documents",
+      "hint": "Upload your tax card or VAT registration certificate (PDF, JPG or PNG, up to 10 MB, at most 5 files).",
+      "empty": "No documents uploaded yet.",
+      "view": "View",
+      "delete": "Delete",
+      "deleteConfirm": "Delete this document?",
+      "kind": {
+        "tax_card": "Tax card",
+        "vat_certificate": "VAT registration certificate",
+        "other": "Other document"
+      },
+      "kindLabel": "Document type",
+      "fileLabel": "File",
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "uploaded": "Document uploaded",
+      "invalidType": "Only PDF, JPG or PNG files are accepted.",
+      "tooLarge": "The file is larger than 10 MB.",
+      "noFile": "Choose a file first.",
+      "tooMany": "You can upload at most 5 documents. Delete one first.",
+      "openFailed": "Could not open the document."
+    },
+    "submit": {
+      "attest": "I confirm this business is registered for VAT with the Egyptian Tax Authority",
+      "button": "Submit for review",
+      "submitting": "Submitting…",
+      "submitted": "Submitted for review",
+      "incomplete": "Add your tax registration number, legal name and at least one document first.",
+      "disclaimer": "Ebda does not file taxes or issue e-receipts on your behalf. You stay responsible for your own VAT filings."
+    },
+    "error": "Something went wrong. Please try again."
+  },
+  "taxReview": {
+    "title": "VAT verification",
+    "subtitle": "Review merchants' VAT registration documents before they can charge VAT.",
+    "tabs": {
+      "pending": "Pending",
+      "verified": "Verified",
+      "rejected": "Rejected",
+      "revoked": "Revoked",
+      "all": "All"
+    },
+    "columns": {
+      "store": "Store",
+      "trn": "Tax registration number",
+      "legalName": "Legal name",
+      "submitted": "Submitted",
+      "docs": "Docs",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "pending": "Under review",
+      "verified": "Verified",
+      "rejected": "Rejected",
+      "revoked": "Revoked"
+    },
+    "duplicate": "Same number on {count} other store(s)",
+    "review": "Review",
+    "empty": "No submissions in this view.",
+    "loading": "Loading…",
+    "loadFailed": "Could not load submissions.",
+    "detail": {
+      "title": "Review: {store}",
+      "close": "Close",
+      "loadFailed": "Could not load this submission.",
+      "documents": "Documents",
+      "noDocuments": "No documents.",
+      "view": "Open",
+      "openFailed": "Could not open the document.",
+      "rejectionReason": "Reason on record: {reason}",
+      "reasonLabel": "Reason (shown to the merchant)",
+      "reasonRequired": "Enter a reason of at least 3 characters."
+    },
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "revoke": "Revoke",
+      "confirmReject": "Confirm rejection",
+      "confirmRevoke": "Confirm revoke",
+      "cancel": "Cancel",
+      "working": "Working…",
+      "revokeConfirm": "Revoking switches off VAT for this store. Continue?",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "revoked": "Revoked",
+      "failed": "Decision failed: {message}"
+    }
+  },
+  "platformSettings": {
+    "title": "Platform settings",
+    "subtitle": "Settings that apply to the whole Ebda platform.",
+    "loading": "Loading…",
+    "loadFailed": "Could not load platform settings.",
+    "vat": {
+      "title": "Ebda VAT",
+      "explain": "Off means Ebda subscription invoices carry no VAT. Turn this on only after Ebda itself is registered for VAT.",
+      "enabled": "Charge VAT on subscriptions",
+      "rate": "VAT rate (%)",
+      "mode": "Pricing mode",
+      "modeExclusive": "VAT is added on top of the plan price",
+      "modeInclusive": "The plan price already includes VAT",
+      "trn": "Ebda tax registration number",
+      "legalName": "Ebda legal name",
+      "requiredToEnable": "Enter the tax registration number and legal name before enabling VAT.",
+      "invalidTrn": "Enter a 9-digit tax registration number.",
+      "invalidRate": "Enter a rate above 0 and up to 100.",
+      "confirmEnable": "Switch ON VAT on all subscription invoices from now on?",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "lastSaved": "Current setting: {state}, {rate}%",
+      "stateOn": "ON",
+      "stateOff": "OFF",
+      "saveFailed": "Could not save: {message}"
+    }
   }
 }

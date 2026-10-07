@@ -112,6 +112,10 @@ export const config = {
   storageSecretKey: process.env.STORAGE_SECRET_KEY || '',
   storageBucket: process.env.STORAGE_BUCKET || 'uploads',
   storagePublicUrl: process.env.STORAGE_PUBLIC_URL || '',
+  // PRIVATE bucket for PII evidence (merchant tax cards / VAT certificates,
+  // ruling TAX-4). Same S3 credentials; NO public access. Explicitly set to ''
+  // to disable: uploads that need it are then refused (fail closed).
+  storagePrivateBucket: process.env.STORAGE_PRIVATE_BUCKET ?? 'ebda-private',
 
   // Web Push (VAPID) - platform-wide keys for standards-based Web Push (RFC 8030)
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY || '',

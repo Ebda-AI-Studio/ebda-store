@@ -114,6 +114,8 @@ export function AdminLayout({
     platformUsageHistory: t('navPlatformUsageHistory'),
     platformPlans: t('navPlatformPlans'),
     platformBillingEvents: t('navPlatformBillingEvents'),
+    platformTaxVerification: t('navPlatformTaxVerification'),
+    platformSettings: t('navPlatformSettings'),
     // Super-admin store-scoped
     manageFeatures: t('navManageFeatures'),
   };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -12,6 +12,8 @@ import { TaxTimeZoneCard } from './_components/TaxTimeZoneCard';
 import { TaxRatesTable } from './_components/TaxRatesTable';
 import { TaxRateFormModal } from './_components/TaxRateFormModal';
 import { TaxInfoBox } from './_components/TaxInfoBox';
+import { TaxVerificationCard } from './_components/TaxVerificationCard';
+import { TAX_NOT_VERIFIED_CODE, type TaxProfileStatusValue } from '@force/shared';
 import {
   DEFAULT_FORM,
   type RateFilter,
@@ -23,11 +25,13 @@ import {
 
 export default function TaxSettingsPage() {
   // Not feature-gated (issue 2358, ruling TAX-1a): tax collection is a legal
-  // obligation gated on `taxEnabled` alone, so the on/off switch and the rate
-  // list must work on every plan — including a store that lapsed to `free`.
+  // obligation, not a plan feature, so the on/off switch and the rate list must
+  // work on every plan — including a store that lapsed to `free`. Switching VAT
+  // ON additionally needs a VERIFIED VAT registration (ruling TAX-2).
   const params = useParams();
   const storeId = params.id as string;
   const tPage = useT('tax.page');
+  const tEnable = useT('tax.settings.enable');
 
   const [settings, setSettings] = useState<TaxSettings>({
     taxEnabled: false,
@@ -38,6 +42,10 @@ export default function TaxSettingsPage() {
   const [activeRates, setActiveRates] = useState<TaxRate[]>([]);
   const [rates, setRates] = useState<TaxRate[]>([]);
   const [loading, setLoading] = useState(true);
+  // VAT gate (ruling TAX-2): the enable toggle only unlocks once the profile is verified.
+  const [vatStatus, setVatStatus] = useState<TaxProfileStatusValue | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const lastVatStatus = useRef<TaxProfileStatusValue | null>(null);
   const [saving, setSaving] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -109,20 +117,40 @@ export default function TaxSettingsPage() {
 
   const handleSaveSettings = async (newSettings: Partial<TaxSettings>) => {
     setSavingSettings(true);
+    setSettingsError(null);
     try {
-      const { data } = await apiPut<{ settings: TaxSettings }>(
+      const { data, error } = await apiPut<{ settings: TaxSettings }>(
         `/api/v1/stores/${storeId}/tax/settings`,
         newSettings
       );
       if (data) {
         setSettings(data.settings);
+      } else if (error) {
+        // The optimistic toggle must not stay lit when the server refused it.
+        setSettingsError(
+          error.code === TAX_NOT_VERIFIED_CODE
+            ? error.message || tEnable('notVerifiedFallback')
+            : error.message
+        );
+        await fetchSettings();
       }
     } catch (err) {
       console.error('Failed to save tax settings:', err);
+      await fetchSettings();
     } finally {
       setSavingSettings(false);
     }
   };
+
+  const handleVatStatus = useCallback(
+    (status: TaxProfileStatusValue) => {
+      setVatStatus(status);
+      // A revoke switches VAT off server-side: re-read so the toggle matches.
+      if (lastVatStatus.current !== null && lastVatStatus.current !== status) fetchSettings();
+      lastVatStatus.current = status;
+    },
+    [fetchSettings]
+  );
 
   const handleOpenModal = (rate?: TaxRate) => {
     if (rate) {
@@ -216,7 +244,10 @@ export default function TaxSettingsPage() {
           </div>
         ) : (
           <>
+            <TaxVerificationCard storeId={storeId} onStatusChange={handleVatStatus} />
             <TaxGeneralSettings
+              vatVerified={vatStatus === 'verified'}
+              errorMessage={settingsError}
               settings={settings}
               savingSettings={savingSettings}
               onSettingsChange={setSettings}

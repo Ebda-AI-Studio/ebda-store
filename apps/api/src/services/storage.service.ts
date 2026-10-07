@@ -226,7 +226,10 @@ export class StorageService {
    * `remaining > 0` means objects were orphaned — the caller must treat that as
    * a failure, not a warning.
    */
-  static async deleteByPrefixVerified(prefix: string): Promise<{
+  static async deleteByPrefixVerified(
+    prefix: string,
+    bucket: string = config.storageBucket
+  ): Promise<{
     deleted: number;
     failedKeys: string[];
     remaining: number;
@@ -243,7 +246,7 @@ export class StorageService {
     do {
       const listed = await client.send(
         new (await loadS3()).ListObjectsV2Command({
-          Bucket: config.storageBucket,
+          Bucket: bucket,
           Prefix: prefix,
           ContinuationToken: continuationToken,
         })
@@ -266,7 +269,7 @@ export class StorageService {
         // success having deleted nothing.
         const res = await client.send(
           new (await loadS3()).DeleteObjectsCommand({
-            Bucket: config.storageBucket,
+            Bucket: bucket,
             Delete: { Objects: objects, Quiet: false },
           })
         );
@@ -287,7 +290,7 @@ export class StorageService {
         try {
           const res = await client.send(
             new (await loadS3()).DeleteObjectsCommand({
-              Bucket: config.storageBucket,
+              Bucket: bucket,
               Delete: { Objects: batch, Quiet: false },
             })
           );
@@ -306,7 +309,7 @@ export class StorageService {
     do {
       const check = await client.send(
         new (await loadS3()).ListObjectsV2Command({
-          Bucket: config.storageBucket,
+          Bucket: bucket,
           Prefix: prefix,
           ContinuationToken: verifyToken,
         })
@@ -326,6 +329,72 @@ export class StorageService {
   static async deleteByPrefix(prefix: string): Promise<number> {
     const { deleted } = await this.deleteByPrefixVerified(prefix);
     return deleted;
+  }
+
+  // ── PRIVATE bucket (ruling TAX-4) ───────────────────────────────────────
+  // PII evidence (merchant tax cards / VAT certificates) lives ONLY in
+  // `config.storagePrivateBucket`, a bucket with no public access. Objects are
+  // never given a URL: the API streams them to an authorised caller. FAIL
+  // CLOSED — with no private bucket configured (or one equal to the public
+  // bucket, which would make it public), every private call is refused, so a
+  // tax card can never fall back into the public bucket.
+
+  /** The private bucket name, or a 503 when it is not safely configured. */
+  static privateBucket(): string {
+    const bucket = (config.storagePrivateBucket ?? '').trim();
+    if (!this.isAvailable() || !bucket || bucket === config.storageBucket) {
+      throw new AppError(
+        503,
+        'PRIVATE_STORAGE_NOT_CONFIGURED',
+        'Private document storage is not configured. / تخزين المستندات الخاصة غير مُعَد.'
+      );
+    }
+    return bucket;
+  }
+
+  /** Store bytes in the private bucket under `stores/<storeId>/<folder>/<uuid><ext>`. */
+  static async putPrivate(
+    buffer: Buffer,
+    args: { storeId: string; folder: string; ext: string; contentType: string }
+  ): Promise<{ key: string }> {
+    const bucket = this.privateBucket();
+    const folder = args.folder.replace(/[^a-zA-Z0-9_-]/g, '');
+    const ext = args.ext.replace(/[^a-zA-Z0-9.]/g, '').slice(0, 8);
+    if (!args.storeId || !folder) {
+      throw new AppError(400, 'MISSING_TENANT', 'A private object must be store-scoped');
+    }
+    const key = `stores/${args.storeId}/${folder}/${randomUUID()}${ext}`;
+    const client = await this.getClient();
+    await client.send(
+      new (await loadS3()).PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: args.contentType,
+        CacheControl: 'private, no-store',
+      })
+    );
+    return { key };
+  }
+
+  /** Read a private object's bytes. The caller authorises the request first. */
+  static async getPrivate(key: string): Promise<{ body: Buffer; contentType: string | null }> {
+    const bucket = this.privateBucket();
+    const client = await this.getClient();
+    const out = await client.send(
+      new (await loadS3()).GetObjectCommand({ Bucket: bucket, Key: key })
+    );
+    if (!out.Body) throw new AppError(404, 'NOT_FOUND', 'File not found');
+    const bytes = await (
+      out.Body as { transformToByteArray: () => Promise<Uint8Array> }
+    ).transformToByteArray();
+    return { body: Buffer.from(bytes), contentType: out.ContentType ?? null };
+  }
+
+  static async deletePrivate(key: string): Promise<void> {
+    const bucket = this.privateBucket();
+    const client = await this.getClient();
+    await client.send(new (await loadS3()).DeleteObjectCommand({ Bucket: bucket, Key: key }));
   }
 
   /**
