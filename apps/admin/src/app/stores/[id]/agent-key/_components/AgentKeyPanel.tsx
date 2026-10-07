@@ -2,6 +2,7 @@
 
 import { Button } from '@force/ui';
 import { useT } from '@/i18n/useT';
+import { withNumerals } from '@force/shared';
 
 /**
  * Read-only status + the three actions for the store's MCP agent write
@@ -79,7 +80,9 @@ export function AgentKeyPanel({ status, busy, onIssue, onRevoke }: AgentKeyPanel
     );
   }
 
-  const rotatedLabel = status.rotatedAt ? new Date(status.rotatedAt).toLocaleString() : null;
+  const rotatedLabel = status.rotatedAt
+    ? new Date(status.rotatedAt).toLocaleString(undefined, withNumerals())
+    : null;
 
   return (
     <div className="space-y-4">

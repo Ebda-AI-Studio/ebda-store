@@ -196,8 +196,8 @@ describe('source contract', () => {
 
   it('every builder route is authenticate -> authorize -> requireStoreAccess, mounted under tenantContext', () => {
     const handlers = routes.match(/router\.(get|put|post|delete)\(/g) ?? [];
-    expect(handlers.length).toBe(5);
-    expect((routes.match(/\.\.\.guard/g) ?? []).length).toBe(5);
+    expect(handlers.length).toBe(6); // + preview-token (Phase 2)
+    expect((routes.match(/\.\.\.guard/g) ?? []).length).toBe(handlers.length);
     expect(routes).toMatch(
       /const guard = \[authenticate, authorize\('store_admin', 'super_admin'\), requireStoreAccess\]/
     );

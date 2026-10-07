@@ -1026,7 +1026,7 @@ class ApiClient {
   async subscribeNewsletter(data: {
     email: string;
     language?: 'en' | 'ar';
-    source?: 'footer' | 'popup' | 'manual';
+    source?: 'footer' | 'popup' | 'manual' | 'section';
   }) {
     return this.request<{ alreadySubscribed: boolean }>('/public/newsletter/subscribe', {
       method: 'POST',

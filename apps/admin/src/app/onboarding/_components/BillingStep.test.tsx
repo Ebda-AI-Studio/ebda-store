@@ -170,7 +170,7 @@ describe('BillingStep', () => {
             rateBps: 1400,
             mode: 'exclusive',
             trn: '123456789',
-            legalName: 'Whisky 11',
+            legalName: 'Ebda AI Studio',
           },
           pendingClaims: 0,
         },

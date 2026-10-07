@@ -21,6 +21,7 @@ import { AiUsageSummaryCard } from '../../../../components/ai/AiUsageSummaryCard
 import { DataTable, type DataTableColumn } from '../../../../components/mobile/DataTable';
 import { useT } from '../../../../i18n/useT';
 import { formatSpend } from '../../../../lib/ai-spend';
+import { withNumerals } from '@force/shared';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -132,7 +133,7 @@ export default function AiUsagePage() {
       cell: row => (
         <span className="text-muted-foreground tabular-nums">
           {row.inputTokens + row.outputTokens > 0
-            ? (row.inputTokens + row.outputTokens).toLocaleString()
+            ? (row.inputTokens + row.outputTokens).toLocaleString(undefined, withNumerals())
             : '—'}
         </span>
       ),

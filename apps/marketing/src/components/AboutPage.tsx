@@ -1,0 +1,43 @@
+import Link from 'next/link';
+import { BRAND } from '@force/shared/brand';
+import { COPY } from '../lib/content';
+import { HOME, SECURITY_EMAIL, type Locale } from '../lib/site';
+import { Footer } from './Footer';
+import { Header } from './Header';
+
+export function AboutPage({ locale }: { locale: Locale }) {
+  const c = COPY[locale];
+  const p = c.aboutPage;
+  return (
+    <>
+      <Header locale={locale} page="about" />
+      <main id="main" className="wrap legal">
+        <header className="legal-head">
+          <h1>{p.title}</h1>
+          <p className="legal-notice">{p.company}</p>
+        </header>
+        <article className="legal-doc">
+          <section aria-labelledby="about-story-h">
+            <h2 id="about-story-h">{p.storyH}</h2>
+            {c.about.paras.map(t => (
+              <p key={t}>{t}</p>
+            ))}
+            <p lang="ar">{c.about.close}</p>
+          </section>
+          <section aria-labelledby="about-contact-h">
+            <h2 id="about-contact-h">{p.contactH}</h2>
+            <p>
+              <a href={`mailto:${BRAND.supportEmail}`}>{BRAND.supportEmail}</a>
+              {' · '}
+              <a href={`mailto:${SECURITY_EMAIL}`}>{SECURITY_EMAIL}</a>
+            </p>
+          </section>
+          <p className="legal-back">
+            <Link href={HOME[locale]}>{c.legalPages.back}</Link>
+          </p>
+        </article>
+      </main>
+      <Footer locale={locale} />
+    </>
+  );
+}

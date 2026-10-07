@@ -116,10 +116,10 @@ describe.each(THEMES)('%s OrderSummary — VAT row', (_name, Card) => {
     expect(totalAt).toBeGreaterThan(-1);
     expect(inclAt).toBeGreaterThan(totalAt);
     // The caption combines label + amount in ONE node ("Incl. VAT (5%) —
-    // EGP 10.00"), not a second <dt>/<dd> pair lined up under Subtotal/
+    // EGP 10"), not a second <dt>/<dd> pair lined up under Subtotal/
     // Shipping/Total's tabular-nums amount column.
     const afterIncl = html.slice(inclAt, inclAt + 120);
-    expect(afterIncl).toMatch(/Incl\. VAT \(5%\)[^<]*10\.00/);
+    expect(afterIncl).toMatch(/Incl\. VAT \(5%\)[^<]*\b10\b(?!\.)/);
     expect(afterIncl).not.toMatch(/<dd/);
   });
 

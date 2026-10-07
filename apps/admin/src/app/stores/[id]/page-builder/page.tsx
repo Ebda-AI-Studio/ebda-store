@@ -402,6 +402,12 @@ export default function StoreLayoutPage() {
       subtitle={t('subtitle')}
       actions={
         <div className="flex items-center gap-2">
+          <a
+            href={`/stores/${storeId}/builder`}
+            className="inline-flex items-center gap-2 rounded-xl border border-primary/50 bg-primary/10 px-4 py-2 text-sm font-semibold text-foreground hover:bg-primary/20 transition-colors"
+          >
+            {t('toolbar.tryNewBuilder')}
+          </a>
           <button
             type="button"
             onClick={() => setPaletteOpen(true)}
@@ -3137,7 +3143,7 @@ export default function StoreLayoutPage() {
         </div>
 
         {/* Live preview pane — iframe to the storefront. CSP frame-ancestors
-            was relaxed to allow framing from admin.ebda.app (admin) +
+            was relaxed to allow framing from store.ebda.app (admin) +
             localhost:3001 (dev). 2026-05-20: was a "click to open" link
             because of stricter CSP; now renders inline. */}
         <aside className="hidden lg:block">

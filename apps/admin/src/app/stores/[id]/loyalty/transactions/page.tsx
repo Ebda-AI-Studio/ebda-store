@@ -9,7 +9,7 @@ import { useRequireFeature } from '../../../../../hooks/useRequireFeature';
 import { useLatestRequest } from '../../../../../hooks/useLatestRequest';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
-import { localDayRange, reportRangeParams } from '@force/shared';
+import { localDayRange, reportRangeParams, withNumerals } from '@force/shared';
 
 interface LoyaltyTransaction {
   id: string;
@@ -318,7 +318,7 @@ export default function LoyaltyTransactionsPage() {
               {t('pageOf', {
                 page: meta.page,
                 totalPages: meta.totalPages,
-                total: meta.total.toLocaleString(),
+                total: meta.total.toLocaleString(undefined, withNumerals()),
               })}
             </p>
             <div className="flex gap-2">

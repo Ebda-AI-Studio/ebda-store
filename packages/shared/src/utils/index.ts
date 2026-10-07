@@ -1,6 +1,6 @@
 // Shared Utilities
 
-import { REGION, roundToMinor, formatMoney } from '../region';
+import { REGION, roundToMinor, formatMoney, type Numerals } from '../region';
 
 // Export utility modules
 export * from './platform';
@@ -55,17 +55,17 @@ export { isSafeUrl, sanitizeUrl, safeInternalPath } from './safe-url';
 /**
  * Format a price value as a localised currency string.
  *
- * By default the input is in MINOR units (EGP piastres, 1 EGP = 100 piastres)
- * and the output carries `currencyExponent(currency)` decimals. Pass
- * `{ unit: 'major' }` if the input is already in the major currency unit.
+ * By default the input is in MINOR units (EGP piastres, 1 EGP = 100 piastres).
+ * Pass `{ unit: 'major' }` if the input is already in the major currency unit.
  * Delegates to `formatMoney` (region/index.ts) — the single formatter.
  *
- * `locale` defaults to `'en'` (`EGP 1,299.50`). `locale: 'ar'` renders
- * `1,299.50 ج.م` with Eastern Arabic digits (`١٬٢٩٩٫٥٠ ج.م`) unless
- * `latinDigits` is set.
+ * `locale` defaults to `'en'` (`EGP 1,299.50`, `EGP 450`). `locale: 'ar'`
+ * renders `1,299.50 ج.م` / `450 ج.م` with WESTERN digits; Arabic-Indic
+ * (`١٬٢٩٩٫٥٠ ج.م`) only with `numerals: 'arab'` — the store's opt-in
+ * (Ruling NUMERALS-1). A whole amount drops its zero fraction.
  *
  * @param amount   - The price amount (minor units by default, major if `unit` is `'major'`).
- * @param options  - Optional overrides for unit, currency, and locale.
+ * @param options  - Optional overrides for unit, currency, locale and digits.
  */
 export function formatPrice(
   amount: number,
@@ -73,22 +73,21 @@ export function formatPrice(
     unit?: 'minor' | 'major';
     currency?: string;
     locale?: 'en' | 'ar';
-    /** Arabic currency symbol with Latin digits (`1,299.50 ج.م`) — the admin's
-     *  digit policy (issue 1971). The storefront chooses per merchant. */
-    latinDigits?: boolean;
+    /** Digit system; default `'latn'`. `'arab'` only affects `locale: 'ar'`. */
+    numerals?: Numerals;
+    /** Keep every decimal on whole amounts (`EGP 450.00`) — merchant/accounting surfaces. */
+    fixedDecimals?: boolean;
   }
 ): string {
   const {
     unit = 'minor',
     currency = REGION.currency,
     locale = 'en',
-    latinDigits = false,
+    numerals,
+    fixedDecimals,
   } = options ?? {};
   const minor = unit === 'minor' ? amount : roundToMinor(amount, currency);
-  return formatMoney(minor, locale, {
-    currency,
-    easternArabicDigits: locale === 'ar' && !latinDigits,
-  });
+  return formatMoney(minor, locale, { currency, numerals: numerals ?? 'latn', fixedDecimals });
 }
 
 /** ASCII digit → Eastern Arabic-Indic digit lookup ('0'..'9' → '٠'..'٩'). */

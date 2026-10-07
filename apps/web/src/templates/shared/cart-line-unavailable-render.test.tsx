@@ -20,7 +20,12 @@ vi.mock('../../contexts/LanguageContext', () => ({
   }),
 }));
 vi.mock('../../hooks/useNumerals', () => ({
-  useNumerals: () => ({ localize: (v: string | number) => String(v) }),
+  useNumerals: () => ({
+    localize: (v: string | number) => String(v),
+    money: (minor: number) => String(minor / 100),
+    numerals: 'latn',
+  }),
+  useStoreNumerals: () => 'latn',
 }));
 
 const themes = {

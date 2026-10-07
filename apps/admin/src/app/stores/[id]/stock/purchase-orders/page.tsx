@@ -9,6 +9,7 @@ import { useT } from '@/i18n/useT';
 import { apiGetPage, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { minorToMajor } from '@/lib/format';
+import { withNumerals } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,7 +123,7 @@ export default function PurchaseOrdersPage() {
 
         {meta && (
           <p className="text-sm text-muted-foreground" data-testid="po-total">
-            {t('totalCount', { total: meta.total.toLocaleString() })}
+            {t('totalCount', { total: meta.total.toLocaleString(undefined, withNumerals()) })}
           </p>
         )}
 
@@ -158,7 +159,9 @@ export default function PurchaseOrdersPage() {
               className: 'w-28',
               cell: po => (
                 <span className="text-muted-foreground">
-                  {po.expectedDate ? new Date(po.expectedDate).toLocaleDateString() : '—'}
+                  {po.expectedDate
+                    ? new Date(po.expectedDate).toLocaleDateString(undefined, withNumerals())
+                    : '—'}
                 </span>
               ),
             },
@@ -178,7 +181,7 @@ export default function PurchaseOrdersPage() {
               className: 'w-28',
               cell: po => (
                 <span className="text-muted-foreground">
-                  {new Date(po.createdAt).toLocaleDateString()}
+                  {new Date(po.createdAt).toLocaleDateString(undefined, withNumerals())}
                 </span>
               ),
             },

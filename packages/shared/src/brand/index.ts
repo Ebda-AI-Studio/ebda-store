@@ -12,7 +12,23 @@
 export const BRAND = {
   name: 'Ebda',
   nameAr: 'ابدأ',
-  company: 'Whisky 11',
+  /**
+   * The PRODUCT (the store builder). `name`/`nameAr` above stay the master
+   * brand (logo, brand line); anything that names the product or the Service
+   * reads this (ruling PRODUCT-NAME-1). Future products: Ebda WhatsApp / CRM / ERP.
+   */
+  product: {
+    nameEn: 'Ebda Store',
+    nameAr: 'ابدأ ستور',
+  },
+  /** The company behind Ebda (single source for every operator mention; ruling OPERATOR-1). */
+  company: {
+    legalNameAr: 'ابدأ ستوديو للذكاء الاصطناعي والبرمجيات والتسويق الرقمي',
+    legalNameEn: 'Ebda AI Studio for Artificial Intelligence, Software and Digital Marketing',
+    shortNameAr: 'ابدأ ستوديو',
+    shortNameEn: 'Ebda AI Studio',
+    url: 'https://ebda.app',
+  },
   tagline: 'Your store, live today.',
   taglineAr: 'متجرك أونلاين النهاردة.',
   colors: {
@@ -34,7 +50,12 @@ export const BRAND = {
   },
   domains: {
     marketing: 'ebda.app',
-    admin: 'admin.ebda.app',
+    /**
+     * The Ebda Store merchant app (sign-up, plan, payment, onboarding, dashboard).
+     * `admin.ebda.app` is RETIRED (Ruling HOST-STORE-1): no surface, reserved slug, 404.
+     * Future products follow the same pattern (`whatsapp.`, `crm.`, one login at `accounts.`).
+     */
+    storeApp: 'store.ebda.app',
     api: 'api.ebda.app',
     orders: 'orders.ebda.app',
     storeSuffix: '.ebda.app',
@@ -71,8 +92,8 @@ export function brandUrl(host: string): string {
 
 /** Marketing site origin, e.g. `https://ebda.app`. */
 export const BRAND_MARKETING_URL = brandUrl(BRAND.domains.marketing);
-/** Merchant dashboard origin, e.g. `https://admin.ebda.app`. */
-export const BRAND_ADMIN_URL = brandUrl(BRAND.domains.admin);
+/** Ebda Store merchant app origin, e.g. `https://store.ebda.app`. */
+export const BRAND_STORE_APP_URL = brandUrl(BRAND.domains.storeApp);
 /** API origin, e.g. `https://api.ebda.app`. */
 export const BRAND_API_URL = brandUrl(BRAND.domains.api);
 
@@ -116,8 +137,8 @@ export function isBrandHost(host: string | null | undefined): boolean {
   return h === BRAND.domains.marketing || h.endsWith(BRAND.domains.storeSuffix);
 }
 
-/** RFC 5322 `From:` value, e.g. `Ebda <no-reply@ebda.app>`. */
-export function brandFrom(displayName: string = BRAND.name): string {
+/** RFC 5322 `From:` value, e.g. `Ebda Store <no-reply@ebda.app>`. */
+export function brandFrom(displayName: string = BRAND.product.nameEn): string {
   return `${displayName} <${BRAND.noReplyEmail}>`;
 }
 

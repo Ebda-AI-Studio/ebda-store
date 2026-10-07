@@ -7,6 +7,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet, apiPost } from '../../lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '../../i18n/useT';
+import { withNumerals } from '@force/shared';
 
 /**
  * Super-admin: the SMS queue's dead-letter list (`sms:failed` in Redis) +
@@ -111,7 +112,9 @@ export default function SmsQueuePage() {
     {
       header: t('columns.created'),
       cell: e => (
-        <span className="text-muted-foreground">{new Date(e.createdAt).toLocaleString()}</span>
+        <span className="text-muted-foreground">
+          {new Date(e.createdAt).toLocaleString(undefined, withNumerals())}
+        </span>
       ),
     },
     {

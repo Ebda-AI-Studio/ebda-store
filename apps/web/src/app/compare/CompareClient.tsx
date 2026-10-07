@@ -11,7 +11,6 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { compareStorageKey } from '../../lib/compare';
 
-import { minorToDecimalString } from '@force/shared';
 interface CompareProduct {
   id: string;
   name: string;
@@ -43,7 +42,7 @@ export default function CompareClient() {
   const { addItem } = useCart();
   const storeUrl = useStoreUrl();
   const { t } = useLanguage();
-  const { localize } = useNumerals();
+  const { money } = useNumerals();
 
   function handleAddToCart(product: CompareProduct) {
     addItem({
@@ -237,12 +236,10 @@ export default function CompareClient() {
                 </td>
                 {products.map(product => (
                   <td key={product.id} className="p-4 text-center">
-                    <span className="font-bold text-lg">
-                      {localize(minorToDecimalString(product.price))} EGP
-                    </span>
+                    <span className="font-bold text-lg">{money(product.price)} EGP</span>
                     {isOnSale(product) && (
                       <span className="block text-muted-foreground/70 line-through text-sm">
-                        {localize(minorToDecimalString(product.compareAtPrice))} EGP
+                        {money(product.compareAtPrice)} EGP
                       </span>
                     )}
                   </td>

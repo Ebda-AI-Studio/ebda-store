@@ -6,6 +6,7 @@ import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { NOTIFICATION_COLORS } from './types';
 import type { NotificationLog } from './types';
+import { withNumerals } from '@force/shared';
 
 interface NotificationsLogProps {
   logs: NotificationLog[];
@@ -58,7 +59,7 @@ export function NotificationsLog({
       header: t('columns.timestamp'),
       cell: log => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {new Date(log.createdAt).toLocaleString()}
+          {new Date(log.createdAt).toLocaleString(undefined, withNumerals())}
         </span>
       ),
     },

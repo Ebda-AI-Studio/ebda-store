@@ -11,6 +11,7 @@ import {
   normalizeTaxRegistrationNumber,
   type TaxDocumentKindValue,
   type TaxProfileStatusValue,
+  withNumerals,
 } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { apiDelete, apiFetch, apiGet, apiPost, apiPut } from '@/lib/api';
@@ -130,7 +131,9 @@ export function TaxVerificationCard({ storeId, onStatusChange }: Props) {
   const editable = TAX_PROFILE_EDITABLE_STATUSES.includes(profile.status);
   const status = profile.status;
   const dateFmt = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-GB') : '';
+    iso
+      ? new Date(iso).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-GB', withNumerals())
+      : '';
 
   const banner = t(`banner.${status}`, {
     date: dateFmt(profile.verifiedAt),

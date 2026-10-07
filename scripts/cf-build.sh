@@ -22,7 +22,7 @@
 #
 # Requires the @opennextjs/cloudflare + wrangler devDeps (declared in each
 # app's package.json) and apps/<app>/{wrangler.jsonc,open-next.config.ts}.
-# Those two ARE committed, but only as a local-dev fallback: cf-deploy.yml and
+# Those two ARE committed, but only as a local-dev fallback: cf-{web,admin,orders}-deploy.yml and
 # ci.yml's worker-dry-run both regenerate them with scripts/cf-setup-local.sh
 # before calling this script, so edit the generator, not the committed copies.
 #

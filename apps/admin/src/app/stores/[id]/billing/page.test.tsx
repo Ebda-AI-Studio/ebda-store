@@ -450,7 +450,7 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
           rateBps: 1400,
           mode: 'exclusive',
           trn: '123456789',
-          legalName: 'Whisky 11',
+          legalName: 'Ebda AI Studio',
         },
         status: 'succeeded',
         failureReason: null,

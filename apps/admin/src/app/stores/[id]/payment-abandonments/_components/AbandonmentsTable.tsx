@@ -6,15 +6,19 @@ import type { AbandonmentRecord, ListMeta } from '../_hooks/usePaymentAbandonmen
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 import { formatPrice } from '@/lib/format';
+import { withNumerals } from '@force/shared';
 
 /** Converts piastres (integer) to an EGP display string (2 decimals). */
 const formatMajor = formatPrice;
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
+  return new Date(iso).toLocaleString(
+    undefined,
+    withNumerals({
+      dateStyle: 'short',
+      timeStyle: 'short',
+    })
+  );
 }
 
 /** Display name for a gateway provider slug. */

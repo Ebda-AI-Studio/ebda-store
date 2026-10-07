@@ -7,6 +7,7 @@ import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, getApiUrl, apiFetch, apiPost } from '../../../../lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { withNumerals } from '@force/shared';
 
 /**
  * Admin newsletter page.
@@ -193,7 +194,7 @@ export default function NewsletterPage() {
       header: tTable('subscribedAt'),
       cell: s => (
         <span className="text-muted-foreground">
-          {new Date(s.subscribedAt).toLocaleDateString()}
+          {new Date(s.subscribedAt).toLocaleDateString(undefined, withNumerals())}
         </span>
       ),
     },

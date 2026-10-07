@@ -8,6 +8,7 @@ import { useT } from '@/i18n/useT';
 import { apiGetPage, apiDelete, type PageMeta } from '@/lib/api';
 import { PageControls } from '@/components/PageControls';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
+import { withNumerals } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -257,7 +258,9 @@ export default function BankReconciliationPage() {
               className="border-t border-border px-4 py-3 text-xs text-muted-foreground"
               data-testid="statements-total"
             >
-              {t('totalCount', { total: (meta?.total ?? statements.length).toLocaleString() })}
+              {t('totalCount', {
+                total: (meta?.total ?? statements.length).toLocaleString(undefined, withNumerals()),
+              })}
             </div>
           </div>
         )}

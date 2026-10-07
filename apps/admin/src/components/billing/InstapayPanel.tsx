@@ -23,7 +23,10 @@ export function InstapayPanel({
 }) {
   const t = useT('billing.instapay');
   const [qrFailed, setQrFailed] = useState(false);
-  const amount = instapay.amountMinor !== null ? formatMoney(instapay.amountMinor, locale) : null;
+  const amount =
+    instapay.amountMinor !== null
+      ? formatMoney(instapay.amountMinor, locale, { fixedDecimals: true })
+      : null;
   const vat = instapay.vat && instapay.vat.vatMinor > 0 ? instapay.vat : null;
   const showQr = !!instapay.qrUrl && !qrFailed;
   const rows = [
@@ -76,8 +79,8 @@ export function InstapayPanel({
             <p className="text-xs text-muted-foreground" data-testid="instapay-vat">
               {t('vatLine', {
                 rate: vat.rateBps / 100,
-                vat: formatMoney(vat.vatMinor, locale),
-                net: formatMoney(vat.netMinor, locale),
+                vat: formatMoney(vat.vatMinor, locale, { fixedDecimals: true }),
+                net: formatMoney(vat.netMinor, locale, { fixedDecimals: true }),
               })}
               {vat.legalName || vat.trn
                 ? ` ${t('seller', { name: vat.legalName ?? '', trn: vat.trn ?? '' })}`

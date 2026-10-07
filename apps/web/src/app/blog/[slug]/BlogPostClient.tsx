@@ -1,5 +1,7 @@
 'use client';
 
+import { useStoreNumerals } from '../../../hooks/useNumerals';
+import { intlLocale } from '@force/shared';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ShopChrome } from '../../../components';
@@ -33,6 +35,7 @@ export interface BlogDetail {
  */
 export function BlogPostClient({ post }: { post: BlogDetail | null }) {
   const { isRtl } = useLanguage();
+  const numerals = useStoreNumerals();
   const storeUrl = useStoreUrl();
 
   const body = post ? (isRtl && post.contentAr ? post.contentAr : post.content) : '';
@@ -72,7 +75,7 @@ export function BlogPostClient({ post }: { post: BlogDetail | null }) {
                 </Link>
                 <p className="mt-6 text-xs text-foreground/55">
                   {new Date(post.publishedAt ?? post.createdAt).toLocaleDateString(
-                    isRtl ? 'ar-EG' : 'en-EG',
+                    intlLocale(isRtl ? 'ar' : 'en', numerals),
                     { year: 'numeric', month: 'long', day: 'numeric' }
                   )}
                 </p>

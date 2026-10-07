@@ -227,7 +227,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const { isLoading: templateLoading } = useTemplateComponents();
   const { isEnabled } = useFeatures();
   const { language, t } = useLanguage();
-  const { localize } = useNumerals();
+  const { localize, numerals } = useNumerals();
   const formatPrice = useLocalePrice();
   // Prop layout wins (server-side fetch); ctx layout is the lazy-fetched fallback.
   const resolvedLayout = layout ?? ctxLayout ?? undefined;
@@ -518,7 +518,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     product,
     language === 'ar',
     displayPrice,
-    displayCompare
+    displayCompare,
+    numerals
   );
 
   // Derived inventory (variant-aware)

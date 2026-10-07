@@ -8,6 +8,7 @@ import { apiGet, apiGetPage, apiPost, apiPatch, type PageMeta } from '@/lib/api'
 import { PageControls } from '@/components/PageControls';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { minorToMajor } from '@/lib/format';
+import { withNumerals } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -491,7 +492,9 @@ export default function StatementDetailPage() {
             </button>
           ))}
           <span className="ml-auto text-xs text-muted-foreground self-center">
-            {tx_t('totalCount', { total: (txMeta?.total ?? txs.length).toLocaleString() })}
+            {tx_t('totalCount', {
+              total: (txMeta?.total ?? txs.length).toLocaleString(undefined, withNumerals()),
+            })}
           </span>
         </div>
 

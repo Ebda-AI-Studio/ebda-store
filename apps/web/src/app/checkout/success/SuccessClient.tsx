@@ -17,7 +17,7 @@ import { firePurchasePixelOnce } from '../../../lib/purchase-pixel-guard';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatDate } from '@/lib/format-date';
 import { useLastListing } from '../../../hooks/useLastListing';
-import { groupOrderLinesForDisplay, fromMinor, REGION } from '@force/shared';
+import { groupOrderLinesForDisplay, fromMinor, REGION, storeNumerals } from '@force/shared';
 
 // Payment verification outcome that drives the truthful headline/icon.
 //   verifying → we're asking the API to confirm with the gateway
@@ -281,6 +281,7 @@ function SuccessContent() {
                   {formatDate(order?.createdAt ?? new Date(), {
                     timezone: store.timezone,
                     language,
+                    numerals: storeNumerals(store?.theme),
                     style: 'short',
                   })}
                 </p>

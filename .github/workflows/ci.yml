@@ -18,9 +18,10 @@ name: CI
 #     Sunday cron. A manual dispatch runs everything except mutation, which
 #     needs its `mutation` input ticked.
 #
-# Every `runs-on` is `ubuntu-latest`: no custom runner label and no runner-
-# selection variable. tests/unit/workflow-hosted-runners-only.test.ts fails the
-# build if one appears.
+# Every `runs-on` reads repo variable EBDA_RUNS_ON (the Umbra org runner when set,
+# Ruling CI-UMBRA-1) and falls back to GitHub-hosted `ubuntu-latest` when unset.
+# Delete the variable to go back to hosted runners. tests/unit/workflow-hosted-runners-only.test.ts
+# allows only that exact form.
 on:
   push:
     # main-only: worktree -> PR -> CI -> main is the only flow.
@@ -80,7 +81,7 @@ jobs:
   changes:
     name: Detect affected workspaces
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 5
     outputs:
       code: ${{ steps.affected.outputs.code }}
@@ -109,7 +110,7 @@ jobs:
   # every main push, so it has no `needs` and no `if`.
   guards:
     name: Repo guards
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -180,7 +181,7 @@ jobs:
     name: Lint
     needs: [changes]
     if: needs.changes.outputs.lint != ''
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -208,7 +209,7 @@ jobs:
     name: Type Check
     needs: [changes]
     if: needs.changes.outputs.typecheck != ''
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -248,7 +249,7 @@ jobs:
     name: Unit Tests (affected)
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -282,6 +283,40 @@ jobs:
         if: needs.changes.outputs.status_tests == 'true'
         run: npm run test:status
 
+  # Visual builder editor E2E (Phase 2): the admin builder in a real Chromium,
+  # Arabic (RTL) and English at 390 / 820 / 1280, against the in-memory API
+  # (tests/builder-e2e/mock-api.mjs) and a contract fake of the storefront
+  # canvas. No database, no network beyond localhost. Main lane (nightly /
+  # dispatch, like test-e2e): PRs stay lint + typecheck + affected unit
+  # (docs/ebda/ci.md budget); run it locally before a PR with
+  # `npx playwright test -c playwright.builder.config.ts`.
+  builder-e2e:
+    name: Builder E2E (ar/en x 390/820/1280)
+    needs: [build]
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma Client
+        run: npm run db:generate
+      - name: Build database package
+        run: npm run build -w packages/database
+      - name: Build shared package
+        run: npm run build -w packages/shared
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run builder E2E
+        run: npx playwright test -c playwright.builder.config.ts
+        env:
+          CI: 'true'
+
   # `wrangler deploy --dry-run` for each changed Worker app, on the Node the
   # deploy uses (a plain build never starts wrangler, so it passed while real
   # deploys died on the Node floor, 2026-10-03). `changes` only lists apps that
@@ -293,7 +328,7 @@ jobs:
     name: Worker dry-run (${{ matrix.app }})
     needs: [changes]
     if: needs.changes.outputs.has_workers == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -364,7 +399,7 @@ jobs:
     name: Build
     # FULL lane: Sunday cron or manual dispatch.
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0')
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -404,7 +439,7 @@ jobs:
 
   test-unit:
     name: Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 20
     needs: [build]
     steps:
@@ -493,7 +528,7 @@ jobs:
     # any file present in the first set but not the second. A gate that cannot
     # fail must not report success — this one can, and does today if a colocated
     # test lands outside every job's glob again.
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 15
     needs: [build]
     steps:
@@ -590,7 +625,7 @@ jobs:
 
   test-integration:
     name: Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 25
     needs: [build]
     services:
@@ -788,7 +823,7 @@ jobs:
     name: RLS ebda_app Strict-Policy Proof
     # NIGHTLY lane (every cron) and manual dispatch; independent of `build`.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 15
     services:
       postgres:
@@ -889,7 +924,7 @@ jobs:
 
   test-rls-payload-parity:
     name: RLS Payload Parity (owner vs ebda_app)
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 10
     needs: [build]
     services:
@@ -958,7 +993,7 @@ jobs:
 
   test-e2e:
     name: E2E Tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 25
     needs: [build]
     services:
@@ -1041,7 +1076,7 @@ jobs:
     name: Security Audit
     # FULL lane: Sunday cron or manual dispatch.
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0')
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     # 18: the budget is the SUM of the worst cases, not the audit alone — 3
     # bounded audit attempts (~5.8 min, #1520) + a COLD `npm ci` + checkout and
     # trufflehog. tests/unit/audit-report-verdict.test.ts asserts this sum.
@@ -1092,7 +1127,7 @@ jobs:
   mutation:
     name: Mutation tests
     if: (github.event_name == 'schedule' && github.event.schedule == '17 1 * * 0') || (github.event_name == 'workflow_dispatch' && inputs.mutation)
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1130,7 +1165,7 @@ jobs:
 
   notify-failure:
     name: Notify on failure (main and nightly)
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 2
     needs:
       [
@@ -1143,6 +1178,7 @@ jobs:
         test-rls-ebda-app,
         test-rls-payload-parity,
         test-e2e,
+        builder-e2e,
         mutation,
       ]
     if: always() && failure() && github.event_name != 'pull_request'

@@ -1,4 +1,5 @@
 import type { BillingCard } from './types';
+import { withNumerals } from '@force/shared';
 
 export type UiLocale = 'ar' | 'en';
 
@@ -13,11 +14,14 @@ export function planLabel(
 
 export function fmtDate(iso: string | null | undefined, locale: UiLocale): string {
   if (!iso) return '';
-  return new Date(iso).toLocaleDateString(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  return new Date(iso).toLocaleDateString(
+    locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB',
+    withNumerals({
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+  );
 }
 
 /** "•••• 4242 visa" (brand omitted when unknown). */

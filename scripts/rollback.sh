@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Emergency production rollback for Force Website Builder.
-# Auto-redeploys: Cloudflare Workers web/admin/orders (via cf-deploy.yml → wrangler
+# Auto-redeploys: Cloudflare Workers web/admin/orders (via cf-{web,admin,orders}-deploy.yml → wrangler
 # deploy) + Railway API (git auto-deploy).
 #
 # What it does:
 #   1. Refuses to run if there are uncommitted changes.
 #   2. Warns if HEAD includes a Prisma migration (code rollback won't undo schema).
-#   3. `git revert HEAD --no-edit && git push` — cf-deploy.yml re-runs and wrangler
+#   3. `git revert HEAD --no-edit && git push` — cf-{web,admin,orders}-deploy.yml re-runs and wrangler
 #      deploys the reverted Workers; Railway auto-redeploys the API from main.
 #
 # For the instant per-worker fast-path (`wrangler rollback` / `railway rollback`,
@@ -41,8 +41,8 @@ git push
 
 echo
 echo "✓ Pushed revert commit to main."
-echo "  Cloudflare Workers (apps/web, admin, orders) redeploy via cf-deploy.yml in ~3-5 min."
+echo "  Cloudflare Workers (apps/web, admin, orders) redeploy via cf-{web,admin,orders}-deploy.yml in ~3-5 min."
 echo "  Railway API                                  redeploys in ~2-3 min."
 echo
-echo "  Watch Workers: gh run watch  (or GitHub Actions → cf-deploy.yml)"
+echo "  Watch Workers: gh run watch  (or GitHub Actions → cf-{web,admin,orders}-deploy.yml)"
 echo "  Watch Railway: railway logs --service api -e production"

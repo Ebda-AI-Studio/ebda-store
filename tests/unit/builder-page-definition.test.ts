@@ -231,7 +231,12 @@ describe('adapter round trip', () => {
 
 describe('registry', () => {
   it('owns every legacy section key: the 8 body keys + announcement/header/footer + extraCarousels', () => {
-    const keys = SECTION_REGISTRY.map(d => d.legacyKey).sort();
+    // document-only types (Phase 2) have no legacy key
+    expect(SECTION_REGISTRY.filter(d => d.legacyKey === null).map(d => d.type)).toEqual([
+      'image-text',
+      'newsletter',
+    ]);
+    const keys = SECTION_REGISTRY.flatMap(d => (d.legacyKey === null ? [] : [d.legacyKey])).sort();
     expect(keys).toEqual(
       [...LEGACY_HOME_SECTION_KEYS, 'announcement', 'header', 'footer', 'extraCarousels'].sort()
     );
@@ -496,10 +501,10 @@ describe('validation', () => {
 
   it('unknown section type: an ERROR on write, SKIPPED (never thrown) on render', () => {
     const D = baseDef();
-    D.sections.splice(1, 0, { id: 'future', type: 'image-text', settings: {} });
+    D.sections.splice(1, 0, { id: 'future', type: 'video-hero', settings: {} });
     expect(codes(D)).toContain('UNKNOWN_TYPE');
     const { sections, skipped } = renderableSections(D);
-    expect(skipped).toEqual([{ id: 'future', type: 'image-text' }]);
+    expect(skipped).toEqual([{ id: 'future', type: 'video-hero' }]);
     expect(sections.some(s => s.id === 'future')).toBe(false);
     expect(() => definitionToLayout(D)).not.toThrow();
   });

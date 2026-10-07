@@ -26,7 +26,7 @@ import { DataTable, type DataTableColumn } from '../../components/mobile/DataTab
 import { useT } from '../../i18n/useT';
 import { formatSpend } from '@/lib/ai-spend';
 
-import { formatMoney } from '@force/shared';
+import { formatMoney, withNumerals } from '@force/shared';
 interface UsageStoreRow {
   storeId: string;
   slug: string;
@@ -59,7 +59,7 @@ interface UsagePeriod {
 
 /** Minor units → a fixed-decimal amount in the base currency (EGP: 2 decimals). */
 function formatFils(piastres: string): string {
-  return formatMoney(Number(piastres), 'en', { hideSymbol: true });
+  return formatMoney(Number(piastres), 'en', { hideSymbol: true, fixedDecimals: true });
 }
 
 function formatMonth(periodStart: string, locale: string): string {
@@ -146,14 +146,17 @@ function UsageHistoryInner() {
       alignEnd: true,
       cell: r => (
         <span className="tabular-nums">
-          {r.productsActive.toLocaleString()} / {r.products.toLocaleString()}
+          {r.productsActive.toLocaleString(undefined, withNumerals())} /{' '}
+          {r.products.toLocaleString(undefined, withNumerals())}
         </span>
       ),
     },
     {
       header: t('table.orders'),
       alignEnd: true,
-      cell: r => <span className="tabular-nums">{r.orders.toLocaleString()}</span>,
+      cell: r => (
+        <span className="tabular-nums">{r.orders.toLocaleString(undefined, withNumerals())}</span>
+      ),
     },
     {
       header: t('table.revenue'),
@@ -164,32 +167,46 @@ function UsageHistoryInner() {
       header: t('table.customers'),
       alignEnd: true,
       hideOnMobile: true,
-      cell: r => <span className="tabular-nums">{r.customers.toLocaleString()}</span>,
+      cell: r => (
+        <span className="tabular-nums">
+          {r.customers.toLocaleString(undefined, withNumerals())}
+        </span>
+      ),
     },
     {
       header: t('table.productViews'),
       alignEnd: true,
       hideOnMobile: true,
-      cell: r => <span className="tabular-nums">{Number(r.productViews).toLocaleString()}</span>,
+      cell: r => (
+        <span className="tabular-nums">
+          {Number(r.productViews).toLocaleString(undefined, withNumerals())}
+        </span>
+      ),
     },
     {
       header: t('table.carts'),
       alignEnd: true,
       hideOnMobile: true,
-      cell: r => <span className="tabular-nums">{r.cartsWithItems.toLocaleString()}</span>,
+      cell: r => (
+        <span className="tabular-nums">
+          {r.cartsWithItems.toLocaleString(undefined, withNumerals())}
+        </span>
+      ),
     },
     {
       header: t('table.aiCalls'),
       alignEnd: true,
       cell: r => (
         <div className="tabular-nums">
-          <div>{r.aiCalls.toLocaleString()}</div>
+          <div>{r.aiCalls.toLocaleString(undefined, withNumerals())}</div>
           <div className="text-[11px] text-muted-foreground">
             {formatSpend(Number(r.aiCostMicros))}
           </div>
           {r.aiUnpricedCalls > 0 && (
             <div className="text-[11px] text-amber-600 dark:text-amber-500">
-              {t('table.aiUnpriced', { count: r.aiUnpricedCalls.toLocaleString() })}
+              {t('table.aiUnpriced', {
+                count: r.aiUnpricedCalls.toLocaleString(undefined, withNumerals()),
+              })}
             </div>
           )}
         </div>

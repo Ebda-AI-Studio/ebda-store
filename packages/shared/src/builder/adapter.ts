@@ -41,6 +41,7 @@ import {
   resolveLayoutSettings,
   type StoreLayoutSettings,
 } from '../types/store-layout';
+import type { TemplateId } from '../types/store-theme';
 import {
   LEGACY_HOME_SECTION_KEYS,
   resolveLegacySectionOrder,
@@ -277,6 +278,7 @@ export function definitionToLayout(def: PageDefinition): StoreLayoutSettings {
   for (const node of allSections(def)) {
     const d = getSectionDefinition(node.type);
     if (!d) continue; // unknown type: nothing to project (renderers skip it too)
+    if (d.legacyKey === null) continue; // document-only type: lives in the document alone
     if (d.legacyKey === 'extraCarousels') {
       extras.push(sectionToLegacy(node, 'extraCarousels'));
       continue;
@@ -314,6 +316,47 @@ export function definitionToLayout(def: PageDefinition): StoreLayoutSettings {
 }
 
 /**
+ * Does a PUBLISHED document still agree with `stores.layout_settings`?
+ * `layout` is the row as the public route serves it: resolved against the
+ * store's TEMPLATE baseline. Publish stores `definitionToLayout(def)` (JSONB:
+ * `undefined` keys vanish), so the document side must go through the same
+ * store + template resolve before comparing. Comparing the template-less
+ * projection made every template family and every removed section look like
+ * drift, and every store silently fell back to the layout-derived page
+ * (Ruling BUILDER-PUBLISH-1). Only an out-of-band write to the row disagrees.
+ */
+export function publishedDocumentAgrees(
+  def: PageDefinition,
+  layout: StoreLayoutSettings,
+  templateId: TemplateId | undefined
+): boolean {
+  const json = (v: unknown): unknown => JSON.parse(JSON.stringify(v));
+  const served = resolveLayoutSettings(json(definitionToLayout(def)), templateId);
+  return isDeepEqualJson(json(served), json(layout));
+}
+
+/** Structural equality of two JSON values (object key order ignored). */
+function isDeepEqualJson(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    const bb = b as unknown[];
+    return a.length === bb.length && a.every((v, i) => isDeepEqualJson(v, bb[i]));
+  }
+  const ka = Object.keys(a as object);
+  const kb = Object.keys(b as object);
+  return (
+    ka.length === kb.length &&
+    ka.every(
+      k =>
+        Object.prototype.hasOwnProperty.call(b, k) &&
+        isDeepEqualJson((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k])
+    )
+  );
+}
+
+/**
  * A new, visible section built from a registry preset (the "Add section"
  * picker). `id` must be unique in the document; validate before saving.
  */
@@ -321,7 +364,7 @@ export function sectionFromPreset(type: string, presetIndex: number, id: string)
   const d = getSectionDefinition(type);
   const preset = d?.presets[presetIndex];
   if (!d || !preset) throw new Error(`no preset ${presetIndex} for section type ${type}`);
-  const node = legacyToSection(id, type, d.legacyKey, { ...preset.settings });
+  const node = legacyToSection(id, type, d.legacyKey ?? '', { ...preset.settings });
   node.hidden = false;
   if (d.blocks.length > 0 || preset.blocks)
     node.blocks = (preset.blocks ?? []).map((b, i) => ({
@@ -331,4 +374,40 @@ export function sectionFromPreset(type: string, presetIndex: number, id: string)
     }));
   if (d.legacyKey === 'extraCarousels' && node.settings.id === undefined) node.settings.id = id;
   return node;
+}
+
+/** True for section types that exist only in the document (no `layout_settings` key). */
+export function isDocumentOnlySection(node: SectionNode): boolean {
+  return getSectionDefinition(node.type)?.legacyKey === null;
+}
+
+/**
+ * Carry the DOCUMENT-ONLY sections of `previous` into `next` — a document
+ * rebuilt from `layout_settings` (the legacy page-builder save, the legacy
+ * layout PUT) knows nothing about them and would otherwise delete them.
+ * Each one is re-inserted after the same predecessor id it had in
+ * `previous` (or at the start when that predecessor is gone); ids already in
+ * `next` win. Pure; returns a new document.
+ */
+export function mergeDocumentOnlySections(
+  next: PageDefinition,
+  previous: PageDefinition | null | undefined
+): PageDefinition {
+  if (!previous) return next;
+  const sections = [...next.sections];
+  const ids = new Set(sections.map(s => s.id));
+  previous.sections.forEach((node, i) => {
+    if (!isDocumentOnlySection(node) || ids.has(node.id)) return;
+    let at = 0;
+    for (let j = i - 1; j >= 0; j--) {
+      const k = sections.findIndex(s => s.id === previous.sections[j].id);
+      if (k >= 0) {
+        at = k + 1;
+        break;
+      }
+    }
+    sections.splice(at, 0, node);
+    ids.add(node.id);
+  });
+  return { ...next, sections };
 }

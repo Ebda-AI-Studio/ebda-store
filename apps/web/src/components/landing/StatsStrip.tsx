@@ -39,7 +39,7 @@ function CountUp({
 
   return (
     <span ref={ref}>
-      {n.toLocaleString()}
+      {n.toLocaleString('en-US')}
       {suffix}
     </span>
   );

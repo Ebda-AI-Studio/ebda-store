@@ -20,6 +20,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
+import { withNumerals } from '@force/shared';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -808,7 +809,8 @@ function CountMode({ storeId }: { storeId: string }) {
               >
                 <p className="text-sm font-medium">{s.note || 'Count Session'}</p>
                 <p className="text-xs text-muted-foreground">
-                  {new Date(s.createdAt).toLocaleString()} · {s.lineCount} lines
+                  {new Date(s.createdAt).toLocaleString(undefined, withNumerals())} · {s.lineCount}{' '}
+                  lines
                 </p>
               </button>
             ))}
@@ -1024,7 +1026,9 @@ function CountMode({ storeId }: { storeId: string }) {
       {sessionDone && (
         <div className="rounded-lg bg-muted/30 border border-border px-4 py-3 text-sm text-muted-foreground">
           Session reconciled on{' '}
-          {activeSession.reconciledAt ? new Date(activeSession.reconciledAt).toLocaleString() : '—'}
+          {activeSession.reconciledAt
+            ? new Date(activeSession.reconciledAt).toLocaleString(undefined, withNumerals())
+            : '—'}
           .
           {activeSession.adjustmentId && (
             <p className="text-xs mt-1">Adjustment: {activeSession.adjustmentId.slice(0, 8)}…</p>

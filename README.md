@@ -1,6 +1,6 @@
 # Ebda (ابدأ)
 
-Self-serve, Shopify-style store builder for Egypt, by **Whisky 11**. Sign up, get a live store at `<slug>.ebda.app` with no human in the loop, then bring your own domain when you are ready. Arabic-first (RTL) with English, EGP pricing, and Egyptian payments and shipping behind pluggable interfaces.
+Self-serve, Shopify-style store builder for Egypt, by **Ebda AI Studio**. Sign up, get a live store at `<slug>.ebda.app` with no human in the loop, then bring your own domain when you are ready. Arabic-first (RTL) with English, EGP pricing, and Egyptian payments and shipping behind pluggable interfaces.
 
 > **Proprietary commercial software.** All rights reserved. See [LICENSE](./LICENSE).
 
@@ -9,7 +9,7 @@ Self-serve, Shopify-style store builder for Egypt, by **Whisky 11**. Sign up, ge
 | Host                                                      | What                                                       |
 | --------------------------------------------------------- | ---------------------------------------------------------- |
 | `ebda.app`                                                | Marketing site                                             |
-| `admin.ebda.app`                                          | Merchant dashboard (`apps/admin`)                          |
+| `store.ebda.app`                                          | Merchant dashboard (`apps/admin`)                          |
 | `<slug>.ebda.app` + custom domains                        | Storefronts (`apps/web`)                                   |
 | `orders.ebda.app`                                         | Orders PWA for fulfilment staff (`apps/orders`)            |
 | `api.ebda.app`                                            | API (`apps/api`)                                           |

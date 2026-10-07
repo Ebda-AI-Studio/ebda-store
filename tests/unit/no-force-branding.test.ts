@@ -1,5 +1,5 @@
 /**
- * Ebda is Whisky 11's product. No inherited third-party brand, tenant, domain
+ * Ebda is Ebda AI Studio's product. No inherited third-party brand, tenant, domain
  * or payment-provider string may survive in anything that runs or that a
  * user / merchant / shopper can see: app source, public assets, shipped
  * content (help/docs MDX), package source and the CI workflows.
@@ -181,7 +181,7 @@ describe('no inherited third-party branding in shipped sources', () => {
     ]) {
       expect(violates(s), s).toBe(true);
     } // prettier-ignore
-    for (const s of ['Ebda by Whisky 11', 'EGP', 'Paymob', 'InstaPay', 'afwbc', 'KWDX']) {
+    for (const s of ['Ebda by Ebda AI Studio', 'EGP', 'Paymob', 'InstaPay', 'afwbc', 'KWDX']) {
       expect(violates(s), s).toBe(false);
     }
   });

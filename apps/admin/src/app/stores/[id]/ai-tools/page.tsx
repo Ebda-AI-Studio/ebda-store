@@ -12,6 +12,7 @@ import { AiUsageSummaryCard } from '../../../../components/ai/AiUsageSummaryCard
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { useT } from '../../../../i18n/useT';
 import { DataTable, type DataTableColumn } from '../../../../components/mobile/DataTable';
+import { withNumerals } from '@force/shared';
 
 /**
  * Bulk AI sweeps — kick off a catalogue-wide translation or SEO
@@ -292,7 +293,9 @@ export default function AiToolsPage() {
       header: t('recentRuns.colStarted'),
       primaryOnMobile: true,
       cell: j => (
-        <span className="text-muted-foreground">{new Date(j.createdAt).toLocaleString()}</span>
+        <span className="text-muted-foreground">
+          {new Date(j.createdAt).toLocaleString(undefined, withNumerals())}
+        </span>
       ),
     },
     {
@@ -954,11 +957,15 @@ function ActiveJobCard({
     if (job.status === 'cancelled') return t('activeJob.statusCancelled');
     if (isDone) {
       return job.completedAt
-        ? t('activeJob.statusCompletedAt', { date: new Date(job.completedAt).toLocaleString() })
+        ? t('activeJob.statusCompletedAt', {
+            date: new Date(job.completedAt).toLocaleString(undefined, withNumerals()),
+          })
         : t('activeJob.statusCompleted');
     }
     return job.startedAt
-      ? t('activeJob.statusStartedAt', { date: new Date(job.startedAt).toLocaleString() })
+      ? t('activeJob.statusStartedAt', {
+          date: new Date(job.startedAt).toLocaleString(undefined, withNumerals()),
+        })
       : t('activeJob.statusQueued');
   })();
 

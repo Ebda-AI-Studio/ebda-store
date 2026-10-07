@@ -10,7 +10,7 @@ import { MinimalChrome } from '../../../../components';
 import { useStore, useStoreUrl } from '../../../../contexts/StoreContext';
 import { useLanguage } from '../../../../contexts/LanguageContext';
 
-import { formatMoney } from '@force/shared';
+import { useLocalePrice } from '../../../../hooks/useLocalePrice';
 interface WishlistProduct {
   id: string;
   name: string;
@@ -34,7 +34,8 @@ export default function SharedWishlistClient({ userId }: Props) {
   const router = useRouter();
   const { store } = useStore();
   const storeUrl = useStoreUrl();
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
+  const formatPrice = useLocalePrice();
 
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -266,12 +267,10 @@ export default function SharedWishlistClient({ userId }: Props) {
                     </h3>
                   </Link>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="font-bold">
-                      {formatMoney(item.product.price, language === 'ar' ? 'ar' : 'en')}
-                    </span>
+                    <span className="font-bold">{formatPrice(item.product.price)}</span>
                     {isOnSale(item.product) && (
                       <span className="text-muted-foreground/70 line-through text-sm">
-                        {formatMoney(item.product.compareAtPrice, language === 'ar' ? 'ar' : 'en')}
+                        {formatPrice(item.product.compareAtPrice)}
                       </span>
                     )}
                   </div>

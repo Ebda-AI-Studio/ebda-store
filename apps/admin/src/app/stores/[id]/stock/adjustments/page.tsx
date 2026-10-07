@@ -10,7 +10,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
-import { reportRangeQueryString, minorToDecimalString } from '@force/shared';
+import { reportRangeQueryString, minorToDecimalString, withNumerals } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -107,7 +107,7 @@ export default function StockAdjustmentsPage() {
       className: 'w-32',
       cell: adj => (
         <span className="text-muted-foreground">
-          {new Date(adj.createdAt).toLocaleDateString()}
+          {new Date(adj.createdAt).toLocaleDateString(undefined, withNumerals())}
         </span>
       ),
     },

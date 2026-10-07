@@ -26,7 +26,7 @@ import { smoothScrollLeftTo, smoothScrollLeftBy } from '@/lib/smooth-scroll';
 import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
 import { useNumerals } from '../../hooks/useNumerals';
-import { getProductCardTextSizes, resolveColor, minorToDecimalString, REGION } from '@force/shared';
+import { getProductCardTextSizes, resolveColor, REGION } from '@force/shared';
 import { cn } from '@force/ui';
 import type { ProductCarouselProps } from '../types';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
@@ -97,7 +97,7 @@ export function ProductCarousel({
   // When `store.theme.showQuickAdd === true`, in-stock non-variant
   // products get the overlay button; otherwise it's hidden.
   const { store, layout } = useStore();
-  const { localize } = useNumerals();
+  const { money, numerals } = useNumerals();
   const showQuickAdd = store.theme?.showQuickAdd === true;
   // Item 4 (2026-07-12): when the merchant already has the outer showCardFrame
   // frame on AND opts into frameChromeDedup, suppress the inner pack-style
@@ -333,7 +333,13 @@ export function ProductCarousel({
               const href = `${urlPrefix}/products/${product.slug}`;
               const img = product.images?.[0]?.url;
               const onSale = isOnSale(product);
-              const discountBadgeText = getDiscountBadgeText(product, isRtl ?? false);
+              const discountBadgeText = getDiscountBadgeText(
+                product,
+                isRtl ?? false,
+                undefined,
+                undefined,
+                numerals
+              );
               // Dual-CTA + OOS state for the carousel cards (platform-level
               // 2026-05-16). Products with variants can't add inline because
               // the carousel can't pick a variant — they get a "View" link
@@ -658,14 +664,11 @@ export function ProductCarousel({
                                     {carouselPricing.mode === 'fromMin'
                                       ? `${isRtl ? 'من ' : 'From '}`
                                       : ''}
-                                    {localize(minorToDecimalString(carouselPricing.displayPrice))}{' '}
-                                    {currency}
+                                    {money(carouselPricing.displayPrice)} {currency}
                                   </span>
                                   {carouselPricing.displayCompare && (
                                     <span className="text-sm text-muted-foreground line-through">
-                                      {localize(
-                                        minorToDecimalString(carouselPricing.displayCompare)
-                                      )}
+                                      {money(carouselPricing.displayCompare)}
                                     </span>
                                   )}
                                 </div>
