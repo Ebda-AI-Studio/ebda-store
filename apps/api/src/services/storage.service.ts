@@ -64,6 +64,9 @@ const ALLOWED_TENANT_FOLDERS = new Set<string>([
   // Per-store PWA icon set (source upload + generated sizes), B5:
   // stores/<storeId>/pwa/... — see PWAService.generatePwaIconSet.
   'pwa',
+  // Product 3D models (.glb / .usdz), stores/<storeId>/models/... — written
+  // only by routes/product-model.routes.ts after validateGlb/validateUsdz.
+  'models',
 ]);
 
 /**

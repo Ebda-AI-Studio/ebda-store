@@ -55,12 +55,14 @@ import KNOWN_DEBT from './admin-i18n-known-debt.json';
 
 const ADMIN_SRC = resolve(__dirname, '../../apps/admin/src');
 
-// The 82 files this guard covers (paths relative to apps/admin/src). Part 1
+// The 83 files this guard covers (82 + the 3D model card, 2026-10-07) (paths relative to apps/admin/src). Part 1
 // (55 files, largest-hardcoded-string-count first) per the 2026-09-25 audit;
 // 26 new part-2 files appended below (21 more part-2 files were already
 // covered by part 1 and are not repeated).
 const B2_FILES = [
   'app/stores/[id]/page-builder/page.tsx',
+  // Product 3D models card (2026-10-07) — written translated from day one.
+  'app/stores/[id]/products/[productId]/_components/Product3dModelCard.tsx',
   'app/stores/[id]/floating-widget/page.tsx',
   'app/stores/[id]/ai-tools/_components/AiSweepResultsPanels.tsx',
   'app/stores/[id]/orders/new/page.tsx',
@@ -267,9 +269,9 @@ describe('findHardcodedHits catches a multi-line wrapped JSX text node (#1934)',
 });
 
 describe('admin i18n: no hardcoded strings in the B2-translated files', () => {
-  it('lists exactly the 82 files this guard covers', () => {
-    expect(B2_FILES.length).toBe(82);
-    expect(new Set(B2_FILES).size).toBe(82); // no duplicates
+  it('lists exactly the 83 files this guard covers', () => {
+    expect(B2_FILES.length).toBe(83);
+    expect(new Set(B2_FILES).size).toBe(83); // no duplicates
   });
 
   it.each(B2_FILES)('%s has no un-allowlisted hardcoded strings', relativePath => {

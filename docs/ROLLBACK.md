@@ -212,6 +212,10 @@ Additive table; nothing else references it. To roll the feature back: revert the
 
 Expand step of rulings PROVIDERS-1/2. `payment_configs.provider` became TEXT (+ CHECK on a lowercase code) and three columns were added (`credentials` encrypted blob, `credential_hints`, `connection_test`); the legacy credential columns and the `"PaymentProvider"` enum type are still there. Rollback: revert the code, then `ALTER TABLE payment_configs DROP CONSTRAINT payment_configs_provider_code_check; ALTER TABLE payment_configs DROP COLUMN credentials, DROP COLUMN credential_hints, DROP COLUMN connection_test; ALTER TABLE payment_configs ALTER COLUMN provider TYPE "PaymentProvider" USING (provider::"PaymentProvider");` — the cast fails loudly if a row carries a code outside the enum. Rows saved through the new connect form keep their keys ONLY in `credentials`, so dropping it loses them: the merchant re-enters them (PROVIDERS-1 records 0 merchants in production on 2026-10-07; not re-read from production in this change). Delete the row from `_prisma_migrations` after reverting by hand.
 
+## Product 3D models (`20261007220000_product_3d_models`)
+
+Two additive tables (`product_models`, `product_model_bindings`); every FK into them CASCADEs and nothing else references them. Feature-only rollback without a deploy: a super-admin `StoreFeature` override `product_3d = false` hides the viewer for that store (the public payload drops `model3d`). Code rollback: revert (path B); the PDP then renders photos only. To also drop the data: `DROP TABLE product_model_bindings, product_models;` and delete the row from `_prisma_migrations`; the `.glb`/`.usdz` objects under `stores/<id>/models/` become orphans for the weekly R2 sweep. Re-check RLS state after any restore (`tests/integration/rls-ebda-app.test.ts`).
+
 ## Trace: what migrated when
 
 ```bash

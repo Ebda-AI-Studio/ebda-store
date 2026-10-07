@@ -470,6 +470,8 @@ model Store {
   shipments                Shipment[]
   codRemittances           CodRemittance[]
   pageRevisions            StorePageRevision[]
+  productModels            ProductModel[]
+  productModelBindings     ProductModelBinding[]
   affiliates               Affiliate[]
   affiliateReferrals       AffiliateReferral[]
   affiliatePayouts         AffiliatePayout[]
@@ -969,6 +971,7 @@ model Product {
   countLines           CountLine[]
   dailyViews           ProductDailyView[]
   bundleItems          BundleItem[]
+  model3d              ProductModel?
 
   @@unique([storeId, slug])
   @@unique([storeId, sku]) // Prevent duplicate SKUs within a store (null values are excluded)
@@ -1128,8 +1131,9 @@ model ProductOptionValue {
   position  Int      @default(0)
   createdAt DateTime @default(now()) @map("created_at")
 
-  option   ProductOption          @relation(fields: [optionId], references: [id], onDelete: Cascade)
-  variants ProductVariantOption[]
+  option          ProductOption          @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  variants        ProductVariantOption[]
+  model3dBindings ProductModelBinding[]
 
   @@unique([optionId, value])
   @@map("product_option_values")
@@ -1174,6 +1178,64 @@ model ProductVariant {
   // Barcode lookup — scan resolves to a variant within a product.
   @@index([productId, barcode])
   @@map("product_variants")
+}
+
+// Product 3D model (docs/plans/2026-10-07-product-3d-viewer.md). One per
+// product. UI: admin product page "3D model" card + the storefront PDP viewer.
+model ProductModel {
+  id           String   @id @default(uuid())
+  storeId      String   @map("store_id")
+  productId    String   @unique @map("product_id")
+  // Self-contained binary glTF in R2 (stores/<storeId>/models/...).
+  modelUrl     String   @map("model_url")
+  modelBytes   Int      @map("model_bytes")
+  // Optional merchant-supplied USDZ for iOS Quick Look (else generated on device).
+  usdzUrl      String?  @map("usdz_url")
+  usdzBytes    Int?     @map("usdz_bytes")
+  posterUrl    String?  @map("poster_url")
+  altText      String?  @map("alt_text") @db.VarChar(250)
+  altTextAr    String?  @map("alt_text_ar") @db.VarChar(250)
+  arEnabled    Boolean  @default(true) @map("ar_enabled")
+  // [{ index, name }] extracted at upload — drives the mapping UI.
+  materials    Json     @default("[]")
+  // KHR_materials_variants names.
+  gltfVariants Json     @default("[]") @map("gltf_variants")
+  // { vertices, meshes, materials, textures, extensionsUsed }
+  stats        Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  store    Store                 @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product  Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
+  bindings ProductModelBinding[]
+
+  @@index([storeId])
+  @@map("product_models")
+}
+
+// Option value -> 3D finish (material colour/metal, or a glTF variant).
+// UI: the mapping table in the admin "3D model" card.
+model ProductModelBinding {
+  id            String   @id @default(uuid())
+  storeId       String   @map("store_id")
+  modelId       String   @map("model_id")
+  optionValueId String   @map("option_value_id")
+  // 'material' | 'gltf_variant' (CHECK in the migration)
+  kind          String
+  target        String
+  color         String?
+  metalness     Float?
+  roughness     Float?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  store       Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  model       ProductModel       @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  optionValue ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
+
+  @@unique([modelId, optionValueId, kind, target])
+  @@index([storeId])
+  @@index([optionValueId])
+  @@map("product_model_bindings")
 }
 
 // Junction table linking variants to their option values

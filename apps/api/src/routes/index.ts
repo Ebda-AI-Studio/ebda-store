@@ -34,6 +34,7 @@ import pwaRoutes from './pwa.routes';
 import inventoryRoutes from './inventory.routes';
 import bulkRoutes from './bulk.routes';
 import variantRoutes from './variant.routes';
+import productModelRoutes from './product-model.routes';
 import categoryRoutes from './category.routes';
 import aiRoutes from './ai.routes';
 import wishlistRoutes from './wishlist.routes';
@@ -228,6 +229,14 @@ router.use('/stores', tenantContext, storeRoutes);
 // Pinned by tests/unit/ai-routes-no-request-transaction.test.ts.
 router.use('/stores/:storeId/campaigns', campaignTestSendRouter);
 router.use('/stores/:storeId/campaigns', campaignAiDraftRouter);
+
+// Product 3D models. MUST stay above the `/stores/:storeId/products` and
+// `/stores/:storeId` tenantContext mounts below, for the same prefix-match
+// reason as the campaign routers above: its two uploads must run with NO
+// request transaction open (a 15 MB upload can outlive the 30 s transaction);
+// each route that is DB-only adds `tenantContext` itself. Pinned by
+// tests/unit/product-model-routes-mount.test.ts.
+router.use('/stores/:storeId/product-models', productModelRoutes);
 
 // Store-scoped routes — tenantContext wraps all downstream handlers in an RLS transaction
 router.use('/admin/stores/:storeId/layout', tenantContext, storeLayoutRoutes);

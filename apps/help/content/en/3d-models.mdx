@@ -1,0 +1,52 @@
+---
+title: Add a 3D model to a product
+description: Let shoppers rotate a product, see each colour or metal, and place it in their room with AR.
+section: Selling
+order: 12
+appPath: /stores
+keywords: 3d model glb gltf usdz ar augmented reality viewer ring jewellery colour metal
+---
+
+A 3D model lets a shopper turn the product around on its page, zoom in, see it change when they pick a colour or a metal, and on a phone place it in their room ("View in your space"). It is included in every plan.
+
+## Prepare the file
+
+- Format: **one `.glb` file** (binary glTF 2.0) with the textures inside it. `.gltf` with separate files, `.obj` and `.fbx` are not accepted.
+- Size: up to **15 MB**. Smaller loads faster on mobile data; aim for under 5 MB.
+- Compression: **meshopt** for the mesh and **WebP** for textures work. Draco and KTX2 are not supported yet.
+- Give each part that changes colour its own **named material** in your 3D tool (for example `Band` and `Stone`). That name is what you pick when you map options.
+
+If your file is too big or uses Draco, this one command fixes both:
+
+```bash
+npx @gltf-transform/cli optimize in.glb out.glb --compress meshopt --texture-compress webp
+```
+
+## Upload it
+
+1. Open the product in your dashboard (Products, then the product).
+2. In the **3D model** card, choose **Upload .glb model**.
+3. Check the preview. Drag to rotate, scroll to zoom.
+4. Add a **poster**: either **Use current view as poster** or upload an image. Shoppers see it while the model loads.
+5. Write a short description for screen readers in English and Arabic, then **Save**.
+
+## Colours and metals
+
+If the product has options (for example *Metal: Gold, White gold, Rose gold*), the card lists every option value. For each one:
+
+1. Pick the **part of the model** it changes (a material, or a variant already inside the file).
+2. Pick a **finish**: Gold, White gold, Rose gold, Silver, Platinum, or a custom colour.
+3. Press **Preview** to see it, then **Save mapping**.
+
+On your store the model changes as soon as the shopper taps the option, even before they choose a size. Options with a colour also get a small colour dot.
+
+## AR ("View in your space")
+
+- **iPhone / iPad**: works out of the box. The phone builds the AR file from your model with the finish the shopper picked. If you have your own `.usdz` file, upload it in the card and it is used instead.
+- **Android**: opens Google's AR viewer with your model (it shows the file's default colours).
+- Computers do not show the AR button. You can switch AR off for a product in the card.
+
+<Callout title="Nothing loads until the shopper asks">
+  Your product page stays as fast as before: the 3D model downloads only when a shopper taps "View
+  in 3D".
+</Callout>

@@ -23,6 +23,7 @@
  * admin app uses a simpler 'authToken' approach.
  */
 import { isIosWebkit } from '@force/shared';
+import type { PublicModel3d } from '@force/shared';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
@@ -138,6 +139,8 @@ interface Product {
     answer: string;
     answerAr?: string | null;
   }>;
+  /** Product 3D model (PDP viewer). null/absent = no model, or `product_3d` off for the store. */
+  model3d?: PublicModel3d | null;
   createdAt?: string;
 }
 

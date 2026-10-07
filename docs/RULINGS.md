@@ -18,6 +18,28 @@ Ruling R-EBDA-001: the backend runs FWB's Express API on Cloudflare Workers (`no
 
 ---
 
+## 2026-10-07 — Product 3D models + AR (R-EBDA-3D-\*)
+
+Branch `feat/product-3d`. Design: `docs/plans/2026-10-07-product-3d-viewer.md`.
+
+Ruling R-EBDA-3D-1 — the viewer is built on three.js primitives (`GLTFLoader`, `OrbitControls`, `RoomEnvironment`, `MeshoptDecoder`, `USDZExporter`) in `packages/ui/src/model3d`, not on `<model-viewer>`. Evidence: `@google/model-viewer@4.3.1` (latest, 2026-06-04) declares peer `three@^0.183.0` (= 0.183.x only) and `apps/web` ships `three@0.184.0`; `npm install @google/model-viewer@4.3.1 -w apps/web --dry-run` fails with ERESOLVE. Forcing the peer runs an unverified pair, a second three doubles the 3D bundle, downgrading three touches the hero shader. No new package enters the tree (`three` is MIT and already installed; `packages/ui` now declares it). Cost if wrong: we maintain ~480 lines of viewer that model-viewer would have given us (WebXR, hotspots); revisit when model-viewer accepts three ≥ 0.184.
+
+Ruling R-EBDA-3D-2 — 3D product models are on EVERY plan, Basic included: no plan gate (Ahmad, 2026-10-07, replacing the Growth+ proposal in the first plan draft). `product_3d` is in `STARTER_CORE` and in the `free` fallback baseline, so it resolves ON for Basic/Growth/Business, the hidden pro/comped/founding_free rows and a lapsed store; the key exists only so a super-admin StoreFeature override can switch one store off. The writes (`POST /glb|/usdz`, `PUT`) check it; `GET` and `DELETE` do not, so a switched-off store can still see and remove its model; the public payload drops `model3d` when it is off. Per-file caps stay (15 MB GLB/USDZ, 2 M vertices). The per-plan `maxStorageMb` quota is declared but enforced nowhere today (`plan-limit.service.ts`), so models are not counted against it yet. `apps/marketing/src/lib/plans.ts` also lists plan features but `apps/marketing` belongs to another branch right now: follow-up. Evidence: `tests/unit/product-3d-plan-and-ar.test.ts` (every `STORE_PLANS` baseline and every seeded plan's `featureTier`), `tests/unit/product-model-routes.test.ts` (override off → 403; mutation: removing the gate turns it red). Cost if wrong: a storage-heavy merchant on Basic uploads many 15 MB models before a storage quota exists; the per-store override is the lever.
+
+Ruling R-EBDA-3D-3 — Draco (`KHR_draco_mesh_compression`) and KTX2 (`KHR_texture_basisu`) files are REJECTED in Phase 1 with a message to re-export with meshopt + WebP, instead of self-hosting decoder wasm now. Evidence: three decodes meshopt (bundled JS) and WebP (browser) with no extra download; Draco/Basis need `draco_decoder.wasm` + `basis_transcoder.wasm` served from our origin, which is Phase 2 together with server-side optimisation. Cost if wrong: merchants whose exporter defaults to Draco must run one extra command (documented in the help article).
+
+Ruling R-EBDA-3D-4 — finishes bind to OPTION VALUES (Metal: Gold), not to variants. Evidence: a ring with Size × Metal is 24 variants but 3 metals; a value binding covers every present and future variant carrying it, and the PDP can apply it on a PARTIAL pick (metal chosen, size not yet), which a variant binding cannot. Cost if wrong: a merchant who wants one specific size+metal combination to look different cannot express it in v1.
+
+Ruling R-EBDA-3D-5 — the two upload routes run with NO request transaction (mounted above every `/stores/:storeId` tenantContext mount, pinned by `tests/unit/product-model-routes-mount.test.ts`): validate bytes → R2 put → one short `runInTenantContext` write, and the R2 object is deleted when that write fails. Evidence: a 15 MB upload on a mobile uplink can outlive the 30 s request transaction (FORCE-API-2G class). Cost if wrong: an R2 delete that also fails leaves one orphan object for the weekly sweep (logged).
+
+Ruling R-EBDA-3D-6 — accepted residual: `https://media.ebda.app` sends no CORS headers (probed 2026-10-07: no `access-control-allow-origin` for ebda.app, admin.ebda.app or a custom domain; OPTIONS → 403), so the viewer's `fetch` of the GLB fails in production until the bucket gets a CORS rule. The viewer then keeps the poster and says "3D view unavailable" (and reports `product_3d_load_failed`); iOS AR with an uploaded USDZ and Android Scene Viewer do not need CORS. The one-time `wrangler r2 bucket cors set ebda-media` step is in the plan doc; it was NOT applied by this branch (production change, not asked). Cost if wrong: a merchant uploads a model and shoppers see only the poster until the rule is set.
+
+Ruling R-EBDA-3D-7 — accepted residual: Android Scene Viewer shows the file's default materials, not the shopper's picked finish (it fetches the raw GLB from our bucket). iOS AR carries the finish when it is generated on device from the live scene; an uploaded USDZ shows whatever the merchant exported. Cost if wrong: an Android shopper who picked Rose gold sees the file's default metal in AR.
+
+Ruling R-EBDA-3D-8 — "all templates' product pages + quick view": there is ONE PDP render path (`ProductDetailClient`, both routing trees, all 5 templates; the builder has no product-detail section) and NO quick view exists in `apps/web`. The viewer ships in that one path; quick view is Phase 2 and starts by building quick view. The "3D" chip on product cards (8 card render paths) is also Phase 2. Evidence: `grep -ri quickview apps/web/src` is empty; templates own no product page. Cost if wrong: none for templates; a later quick view must embed the viewer itself.
+
+---
+
 ## 2026-10-07 — Marketing copy and design (R-EBDA-COPY-\*)
 
 Branch `copy/egyptian-arabic`.
