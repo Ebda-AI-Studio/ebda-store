@@ -20,6 +20,7 @@ import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { ResendService } from '../services/resend.service';
+import { storeHidesPoweredBy } from '../services/email.service';
 import { AIService } from '../services/ai.service';
 import {
   CAMPAIGN_STORE_SELECT,
@@ -540,6 +541,7 @@ campaignTestSendRouter.post(
 
       // No transaction is open past this point.
       const locales = (['en', 'ar'] as const).filter(l => isCampaignContentComplete(campaign, l));
+      const hidePoweredBy = await storeHidesPoweredBy(store.id);
       for (const locale of locales) {
         const content = pickCampaignContent(campaign, locale);
         const { subject, html } = renderCampaignEmail({
@@ -548,6 +550,7 @@ campaignTestSendRouter.post(
           subject: `[TEST] ${content.subject}`,
           bodyHtml: content.bodyHtml,
           unsubscribeUrl: null,
+          hidePoweredBy,
         });
         await ResendService.sendMarketingEmail(store as CampaignStoreContext, {
           to: user.email,

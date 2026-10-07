@@ -193,6 +193,12 @@ vi.mock('@api/services/socket.service', () => ({
 vi.mock('@api/lib/inngest/client', () => ({
   inngest: { send: vi.fn().mockResolvedValue({ ids: [] }), createFunction: vi.fn(() => ({})) },
 }));
+// Order-cap gate has its own suite (order-plan-grace.test.ts); stubbed here.
+vi.mock('@api/services/plan-limit.service', () => ({
+  assertOrderAllowed: vi.fn().mockResolvedValue(undefined),
+  noteOrderCreated: vi.fn().mockResolvedValue({ over: false }),
+}));
+
 vi.mock('@api/services/feature.service', () => ({
   featureService: {
     isFeatureEnabled: vi.fn().mockResolvedValue(true),

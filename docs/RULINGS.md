@@ -18,6 +18,32 @@ Ruling R-EBDA-001: the backend runs FWB's Express API on Cloudflare Workers (`no
 
 ---
 
+## 2026-10-07 — Locked pricing (R-EBDA-PRICING-\*)
+
+Source: `docs/plans/2026-10-05-pricing-decisions.md`. Branch `feat/locked-pricing`.
+
+Ruling R-EBDA-PRICING-1: historical `free` / `pro` / `comped` plan codes stay as hidden compatibility rows (zero fees, no price), never deleted or renamed. Evidence: `store_subscriptions.plan_code` references them; `tests/unit/locked-pricing.test.ts` asserts the migration has no DELETE/DROP and `tests/integration/locked-pricing-catalog.test.ts` re-runs it over stores on all four hidden plans. Cost if wrong: hidden rows linger until an explicit subscription migration retires them.
+
+Ruling R-EBDA-PRICING-2: "Powered by Ebda" is removed on Growth and Business only, as the decision doc's entitlement table says (Basic: yes, Growth/Business: off). The decision is the plan limit `brandingRemoval`, resolved server-side into the `remove_branding` feature and shipped in `enabledFeatures`; it covers the storefront footer and customer emails (transactional, newsletter, campaign). The suspended-store maintenance page keeps the attribution because it is platform-operated. A super-admin StoreFeature override still wins. Evidence: `tests/unit/plan-gates.test.ts`, `tests/unit/branding-removal.test.tsx`. Cost if wrong: a Basic merchant could expect an email footer removal we did not sell, or a Growth merchant sees the line on the maintenance page.
+
+Ruling R-EBDA-PRICING-3: the new limit fields on hidden plans are set so no existing store changes behaviour: `maxStores` null (unlimited) on pro/comped, `analyticsTier` advanced, `brandingRemoval` false, `apiAccess` false, except `free`, which has `maxStores` 1 because it is also the fallback a canceled subscription resolves to (a lapsed Business owner must not keep adding stores). Evidence: `plan-gates.test.ts` "hidden legacy plans keep today's behaviour" and the canceled-Business case. Cost if wrong: a legacy `pro` owner could create unlimited stores, or a canceled store is capped at one.
+
+Ruling R-EBDA-PRICING-4: "API / webhook access" is gated as the existing merchant-facing programmatic surface, the merchant-admin MCP (`merchant_mcp`: key issuance routes plus the MCP runtime), by the plan limit `apiAccess` (Business only). No merchant outbound-webhook system exists in the codebase, so there is nothing else to gate. Evidence: `rg webhook apps/api/src/routes` finds only inbound provider webhooks; `plan-gates.test.ts` feature map cases. Cost if wrong: if a merchant webhook feature is added later it must read `apiAccess` too, or it ships ungated.
+
+Ruling R-EBDA-PRICING-5: analytics tiers map onto the existing insights routes: `standard` = insights dashboard and product velocity, `advanced` = cohorts, funnel, segments and RFM; the `/analytics/*` routes are the `basic` tier and stay open. Support tier (email / chat / priority) is a stored label shown to ops, not code-enforceable. The decision doc names the tiers but not the report split, so the split is mine. Evidence: `requireAnalyticsTier` on `insights.routes.ts`, `plan-gates.test.ts`. Cost if wrong: a Basic merchant loses a report Ahmad meant to include; move the one `requireAnalyticsTier` argument.
+
+Ruling R-EBDA-PRICING-6: store count is per owner, decided by the owner's best plan across live stores (a canceled one counts as `free`, 1 store). A second store (only reachable on a plan that allows it) is provisioned on the Business tier with no second Growth trial, to stop trial farming; multi-store billing coupling (what happens to child stores if the parent lapses) is NOT built. `POST /stores` for a merchant's first store still creates a Basic `active` subscription with no checkout, as before. Evidence: `assertOwnerMayCreateStore`, `onboarding-create-store-plan.test.ts`. Cost if wrong: a lapsed Business owner's extra stores stay active until billing learns about parent/child; close with a billing follow-up before launch.
+
+Ruling R-EBDA-PRICING-7: runtime enum-to-plan mapping is `STORE_PLAN_TO_PLAN_CODE` (starter→basic, professional→growth, enterprise→business, free→free); the old `LEGACY_STORE_PLAN_TO_PLAN_CODE` is frozen because a test pins it to the original SP5 backfill. Re-asserting an unchanged enum tier on a store holding a hidden plan keeps its row (an admin re-save cannot demote comped to Business). Evidence: `plan-sync.ts`, `plan-gates.test.ts`. Cost if wrong: an admin who really wants to move a comped store must name a different tier.
+
+Ruling R-EBDA-PRICING-8: `founding_free` is created hidden (unlimited, 0 fee, branding removable, API on) and is an admin-granted class with `comped`: never purchasable, never charged, always status `comped`. Nothing is assigned to it; Amelia stays on `comped` until Ahmad says move her. Evidence: `GRANTED_PLAN_CODES` in `billing/period.ts`, `subscription-billing.test.ts`. Cost if wrong: a billing path that only checks `comped` would charge a founding store, so any new billing path must call `isGrantedPlan`.
+
+Ruling R-EBDA-PRICING-9: the unreleased locked-pricing migration was renamed from `20261005090000_locked_pricing` to `20261007000000_locked_pricing` so it sorts after `20261005090000_sp7_shipping` (same timestamp prefix). It was never applied to any shared database. Cost if wrong: none for a database that has not run it; one that did would re-apply an idempotent upsert.
+
+Ruling R-EBDA-PRICING-10: WhatsApp automation is off on all three locked plans (wa.me only), which turns the `whatsapp` feature (the WhatsApp Business routes) off for them by the plan layer, as the decision requires. Hidden `pro`/`comped` keep it on. Cost if wrong: a merchant relying on WBS templates loses access when moved onto a locked plan.
+
+---
+
 ## 2026-09-25 — OTHER-O2
 
 Context: OTHER-O2 batch (storefront/orders lower-severity issues + Sentry source maps), branch

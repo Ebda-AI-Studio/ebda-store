@@ -17,6 +17,13 @@
  *   automation   not a throwing write: the flags are layered into the feature
  *                map by FeatureService (abandoned_cart / whatsapp), so
  *                `requireFeature(...)` / `isFeatureEnabled(...)` already honour them
+ *   maxStores    StoreService.create (POST /stores) and OnboardingService.createStore,
+ *                via `assertOwnerMayCreateStore`: the owner's best plan across their
+ *                live stores must have room for one more (1 / 1 / 3)
+ *   brandingRemoval / apiAccess  not throwing writes: layered by FeatureService into
+ *                `remove_branding` (storefront footer) and `merchant_mcp` (key
+ *                issuance + the MCP runtime both `requireFeature`/feature-check it)
+ *   analyticsTier  `requireAnalyticsTier` on the insights routes (see below)
  *   maxOrdersPerMonth  blocks after a seven-day grace; see `assertOrderAllowed`.
  *   maxStorageMb  declared + shown, not enforced: R2 usage per store is not
  *                 tracked yet (follow-up).
@@ -100,6 +107,58 @@ function limitError(
     delta,
     planCode: e.planCode,
     messageKey: planLimitMessageKey(limitKey),
+    messageEn,
+    messageAr,
+  });
+}
+
+/**
+ * Store count is per OWNER, not per store (each store has its own subscription,
+ * so the owner's best plan decides). First store always allowed. Any live store
+ * whose plan is unlimited (`maxStores: null`) allows more. A canceled
+ * subscription resolves to the hidden free plan (1 store), so a lapsed Business
+ * owner cannot keep adding stores.
+ */
+export async function assertOwnerMayCreateStore(ownerId: string): Promise<void> {
+  const stores = await prisma.store.findMany({
+    where: { ownerId, deletedAt: null },
+    select: { id: true },
+  });
+  if (stores.length === 0) return;
+  let best = 0;
+  let planCode = 'unknown';
+  for (const s of stores) {
+    const e = await getEntitlements(s.id);
+    if (!e) continue;
+    const limit = e.limits.maxStores;
+    if (limit === null) return;
+    if (limit >= best) {
+      best = limit;
+      planCode = e.planCode;
+    }
+  }
+  if (stores.length + 1 > best) {
+    throw limitError({ planCode } as Entitlements, 'maxStores', best, stores.length, 1);
+  }
+}
+
+export const ANALYTICS_TIER_RANK = { basic: 0, standard: 1, advanced: 2 } as const;
+
+/** Throws 402 unless the store's plan analytics tier is at least `min`. */
+export async function assertAnalyticsTier(
+  storeId: string,
+  min: keyof typeof ANALYTICS_TIER_RANK
+): Promise<void> {
+  const e = await getEntitlements(storeId);
+  if (!e) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  if (ANALYTICS_TIER_RANK[e.limits.analyticsTier] >= ANALYTICS_TIER_RANK[min]) return;
+  const messageEn = `${min === 'advanced' ? 'Advanced' : 'Standard'} analytics are not included in your plan. Upgrade to unlock them.`;
+  const messageAr = `${min === 'advanced' ? 'التحليلات المتقدمة' : 'التحليلات القياسية'} غير متاحة في باقتك. قم بالترقية لفتحها.`;
+  throw new AppError(402, PLAN_LIMIT_ERROR_CODE, messageEn, {
+    limitKey: 'analyticsTier',
+    limit: e.limits.analyticsTier,
+    required: min,
+    planCode: e.planCode,
     messageEn,
     messageAr,
   });

@@ -42,6 +42,6 @@ Engine on `main` still has placeholders. This file is the source of truth until 
 
 Order-cap enforcement is the only hard stop, and only after the 7-day grace.
 
-## Implement next (on `main`, not this branch)
+## Implementation status
 
-Fill `Plan` / entitlements seed so paid checkout no longer sees null prices. Keys: `basic`, `growth`, `business`. Keep `founding_free` in schema, unused until Amelia.
+Implemented on branch `feat/locked-pricing` (see `docs/plans/2026-10-05-pricing-implementation.md` and rulings R-EBDA-PRICING-1 to 10 in `docs/RULINGS.md`). Plan codes in the DB: `basic`, `growth`, `business`; `founding_free` exists hidden and unassigned.

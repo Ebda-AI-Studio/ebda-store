@@ -19,6 +19,7 @@ import { getSocialLinks, SocialGlyph } from '../shared/icons';
 
 export default function ModernFooter({
   branding,
+  hidePoweredBy,
   contact,
   socials,
   navigation = [],
@@ -418,7 +419,7 @@ export default function ModernFooter({
         {/* Bottom bar removed 2026-05-21 — redundant with Company Links. */}
       </div>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <PoweredByForce />
+        <PoweredByForce hidden={hidePoweredBy} />
       </div>
     </footer>
   );

@@ -129,7 +129,12 @@ class FeatureService {
   private rowsToMap(
     plan: StorePlan,
     rows: Array<{ featureKey: string; enabled: boolean }>,
-    flags?: { abandonedCartAutomation: boolean; whatsappAutomation: boolean } | null
+    flags?: {
+      abandonedCartAutomation: boolean;
+      whatsappAutomation: boolean;
+      brandingRemoval: boolean;
+      apiAccess: boolean;
+    } | null
   ): Record<FeatureKey, boolean> {
     // Start with all false.
     const map = Object.fromEntries(FEATURE_KEYS_ARRAY.map(key => [key, false])) as Record<
@@ -143,13 +148,17 @@ class FeatureService {
         map[key as FeatureKey] = true;
       }
     }
-    // Layer 1.5: the plans engine's automation flags (SP5). They decide the
+    // Layer 1.5: the plans engine's flags (SP5 automation + locked-pricing branding/API). They decide the
     // feature keys the engine names, both ways — a plan that turns the flag
     // on enables the feature, one that turns it off disables it — and sit
     // UNDER the per-store overrides so super-admin can still grant/revoke.
     if (flags) {
       map.abandoned_cart = flags.abandonedCartAutomation;
       map.whatsapp = flags.whatsappAutomation;
+      // Locked pricing (2026-10-05): branding removal -> Growth+Business;
+      // merchant API access (the merchant-admin MCP surface) -> Business.
+      map.remove_branding = flags.brandingRemoval;
+      map.merchant_mcp = flags.apiAccess;
     }
     // Layer 2: per-store overrides on top.
     for (const row of rows) {

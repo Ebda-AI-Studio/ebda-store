@@ -14,6 +14,7 @@ import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import { bustStoreCaches } from './store.service';
 import { parseLimits } from './plan-entitlements';
+import { isGrantedPlan } from './billing/period';
 import logger from '../lib/logger';
 import { planSubscriberCounts, storeIdsOnPlan } from '../lib/definer';
 
@@ -126,11 +127,16 @@ export const planService = {
   ): Promise<{ planCode: string; status: SubscriptionStatus }> {
     const plan = await prisma.plan.findUnique({ where: { code: input.planCode } });
     if (!plan) throw new AppError(404, 'PLAN_NOT_FOUND', 'Plan not found');
-    // `comped` is the only plan that is admin-granted; it is always status comped.
-    const status: SubscriptionStatus =
-      plan.code === 'comped' ? 'comped' : (input.status ?? 'active');
-    if (status === 'comped' && plan.code !== 'comped') {
-      throw new AppError(400, 'INVALID_STATUS', 'Only the comped plan can have status comped');
+    // `comped` and `founding_free` are the admin-granted plans; always status comped.
+    const status: SubscriptionStatus = isGrantedPlan(plan.code)
+      ? 'comped'
+      : (input.status ?? 'active');
+    if (status === 'comped' && !isGrantedPlan(plan.code)) {
+      throw new AppError(
+        400,
+        'INVALID_STATUS',
+        'Only an admin-granted plan can have status comped'
+      );
     }
 
     if (!UUID_RE.test(storeId)) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');

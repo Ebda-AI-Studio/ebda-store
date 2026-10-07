@@ -10,6 +10,11 @@ import { z } from 'zod';
  * `platformFeeBps` / `codPlatformFeeBps` are basis points (100 = 1%) charged by
  * the platform per online / COD order; they are NOT gates — SP6 reads them.
  */
+export const ANALYTICS_TIERS = ['basic', 'standard', 'advanced'] as const;
+export type AnalyticsTier = (typeof ANALYTICS_TIERS)[number];
+export const SUPPORT_TIERS = ['email', 'chat', 'priority'] as const;
+export type SupportTier = (typeof SUPPORT_TIERS)[number];
+
 const ceiling = z.number().int().min(0).max(2_147_483_647).nullable();
 const bps = z.number().int().min(0).max(10_000);
 
@@ -19,11 +24,19 @@ export const planLimitsSchema = z
     maxStaff: ceiling,
     maxOrdersPerMonth: ceiling,
     maxStorageMb: ceiling,
+    /** Stores one owner may hold (counted across the owner's non-deleted stores). */
+    maxStores: ceiling,
     customDomain: z.boolean(),
     platformFeeBps: bps,
     codPlatformFeeBps: bps.default(0),
     abandonedCartAutomation: z.boolean(),
     whatsappAutomation: z.boolean(),
+    /** Hide the "Powered by Ebda" storefront footer attribution. */
+    brandingRemoval: z.boolean(),
+    /** Merchant API access: the merchant-admin MCP surface + its keys (no outbound webhooks exist yet). */
+    apiAccess: z.boolean(),
+    analyticsTier: z.enum(ANALYTICS_TIERS),
+    supportTier: z.enum(SUPPORT_TIERS),
   })
   .strict();
 
@@ -36,6 +49,7 @@ export const NUMERIC_LIMIT_KEYS = [
   'maxStaff',
   'maxOrdersPerMonth',
   'maxStorageMb',
+  'maxStores',
 ] as const satisfies readonly PlanLimitKey[];
 export type NumericLimitKey = (typeof NUMERIC_LIMIT_KEYS)[number];
 
@@ -44,6 +58,8 @@ export const BOOLEAN_LIMIT_KEYS = [
   'customDomain',
   'abandonedCartAutomation',
   'whatsappAutomation',
+  'brandingRemoval',
+  'apiAccess',
 ] as const satisfies readonly PlanLimitKey[];
 export type BooleanLimitKey = (typeof BOOLEAN_LIMIT_KEYS)[number];
 
@@ -92,12 +108,24 @@ export const assignSubscriptionSchema = z
   .strict();
 export type AssignSubscriptionInput = z.infer<typeof assignSubscriptionSchema>;
 
-// ── Seed plans ───────────────────────────────────────────────────────────────
-// PLACEHOLDER numbers from docs/ebda/research/pricing-and-packaging.md (ranges,
-// not market-validated) and NO prices — Ahmad sets both in the super-admin
-// Plans page. The migration seeds these exact rows (a unit test pins parity).
+// ── Plan catalog ─────────────────────────────────────────────────────────────
+// The FULL catalog as it stands after migration 20261005090000_locked_pricing:
+// Ahmad's locked public plans (2026-10-05, docs/plans/2026-10-05-pricing-decisions.md)
+// plus the hidden compatibility rows (free / pro / comped / founding_free).
+// Hidden rows exist only so existing `store_subscriptions.plan_code` references
+// keep resolving; they are never offered. Their NEW limit fields (maxStores,
+// brandingRemoval, apiAccess, analyticsTier, supportTier) are set so a store
+// already on one sees NO behaviour change (Ruling EBDA-PRICING-3). A unit test
+// pins parity between this list and the locked_pricing migration.
 
-export type PlanCode = 'free' | 'basic' | 'growth' | 'business' | 'pro' | 'comped';
+export type PlanCode =
+  | 'free'
+  | 'basic'
+  | 'growth'
+  | 'business'
+  | 'pro'
+  | 'comped'
+  | 'founding_free';
 
 export interface PlanSeed {
   code: PlanCode;
@@ -107,6 +135,9 @@ export interface PlanSeed {
   isPublic: boolean;
   /** The legacy `StorePlan` enum tier whose PLAN_BASELINE feature set this plan inherits. */
   featureTier: 'free' | 'starter' | 'professional' | 'enterprise';
+  /** Piastres (EGP minor units); null on hidden rows (never sold). Yearly = 9 months prepaid (25% off). */
+  priceMonthlyMinor: number | null;
+  priceYearlyMinor: number | null;
   limits: PlanLimits;
 }
 
@@ -115,19 +146,53 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
     code: 'free',
     nameEn: 'Free',
     nameAr: 'مجاني',
-    sort: 10,
-    isPublic: true,
+    sort: 80,
+    isPublic: false,
     featureTier: 'free',
+    priceMonthlyMinor: null,
+    priceYearlyMinor: null,
     limits: {
       maxProducts: 50,
       maxStaff: 1,
       maxOrdersPerMonth: 100,
       maxStorageMb: 500,
+      // 1: `free` is also the canceled-subscription fallback, so a lapsed owner cannot keep adding stores.
+      maxStores: 1,
       customDomain: false,
-      platformFeeBps: 150,
+      platformFeeBps: 0,
       codPlatformFeeBps: 0,
       abandonedCartAutomation: false,
       whatsappAutomation: false,
+      brandingRemoval: false,
+      apiAccess: false,
+      analyticsTier: 'advanced',
+      supportTier: 'email',
+    },
+  },
+  {
+    code: 'basic',
+    nameEn: 'Basic',
+    nameAr: 'الأساسية',
+    sort: 10,
+    isPublic: true,
+    featureTier: 'starter',
+    priceMonthlyMinor: 149000,
+    priceYearlyMinor: 1341000,
+    limits: {
+      maxProducts: null,
+      maxStaff: 2,
+      maxOrdersPerMonth: 300,
+      maxStorageMb: null,
+      maxStores: 1,
+      customDomain: true,
+      platformFeeBps: 0,
+      codPlatformFeeBps: 0,
+      abandonedCartAutomation: false,
+      whatsappAutomation: false,
+      brandingRemoval: false,
+      apiAccess: false,
+      analyticsTier: 'basic',
+      supportTier: 'email',
     },
   },
   {
@@ -136,36 +201,76 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
     nameAr: 'النمو',
     sort: 20,
     isPublic: true,
-    featureTier: 'starter',
+    featureTier: 'professional',
+    priceMonthlyMinor: 349000,
+    priceYearlyMinor: 3141000,
     limits: {
-      maxProducts: 1000,
-      maxStaff: 3,
-      maxOrdersPerMonth: 1500,
-      maxStorageMb: 5000,
+      maxProducts: null,
+      maxStaff: 5,
+      maxOrdersPerMonth: 3000,
+      maxStorageMb: null,
+      maxStores: 1,
       customDomain: true,
-      platformFeeBps: 100,
+      platformFeeBps: 0,
       codPlatformFeeBps: 0,
       abandonedCartAutomation: true,
-      whatsappAutomation: true,
+      whatsappAutomation: false,
+      brandingRemoval: true,
+      apiAccess: false,
+      analyticsTier: 'standard',
+      supportTier: 'chat',
+    },
+  },
+  {
+    code: 'business',
+    nameEn: 'Business',
+    nameAr: 'الأعمال',
+    sort: 30,
+    isPublic: true,
+    featureTier: 'enterprise',
+    priceMonthlyMinor: 999000,
+    priceYearlyMinor: 8991000,
+    limits: {
+      maxProducts: null,
+      maxStaff: 15,
+      maxOrdersPerMonth: null,
+      maxStorageMb: null,
+      maxStores: 3,
+      customDomain: true,
+      platformFeeBps: 0,
+      codPlatformFeeBps: 0,
+      abandonedCartAutomation: true,
+      whatsappAutomation: false,
+      brandingRemoval: true,
+      apiAccess: true,
+      analyticsTier: 'advanced',
+      supportTier: 'priority',
     },
   },
   {
     code: 'pro',
     nameEn: 'Pro',
     nameAr: 'احترافي',
-    sort: 30,
-    isPublic: true,
+    sort: 85,
+    isPublic: false,
     featureTier: 'professional',
+    priceMonthlyMinor: null,
+    priceYearlyMinor: null,
     limits: {
       maxProducts: 5000,
       maxStaff: 10,
       maxOrdersPerMonth: 7000,
       maxStorageMb: 20000,
+      maxStores: null,
       customDomain: true,
-      platformFeeBps: 50,
+      platformFeeBps: 0,
       codPlatformFeeBps: 0,
       abandonedCartAutomation: true,
       whatsappAutomation: true,
+      brandingRemoval: false,
+      apiAccess: false,
+      analyticsTier: 'advanced',
+      supportTier: 'chat',
     },
   },
   {
@@ -175,25 +280,63 @@ export const DEFAULT_PLAN_SEEDS: readonly PlanSeed[] = [
     sort: 90,
     isPublic: false,
     featureTier: 'enterprise',
+    priceMonthlyMinor: null,
+    priceYearlyMinor: null,
     limits: {
       maxProducts: null,
       maxStaff: null,
       maxOrdersPerMonth: null,
       maxStorageMb: null,
+      maxStores: null,
       customDomain: true,
       platformFeeBps: 0,
       codPlatformFeeBps: 0,
       abandonedCartAutomation: true,
       whatsappAutomation: true,
+      brandingRemoval: false,
+      apiAccess: false,
+      analyticsTier: 'advanced',
+      supportTier: 'priority',
+    },
+  },
+  {
+    // Amelia Aurum's founding deal: unlimited, 0 fee, admin-granted only. Row exists;
+    // nothing is assigned to it by this change.
+    code: 'founding_free',
+    nameEn: 'Founding (free)',
+    nameAr: 'مؤسس (مجاني)',
+    sort: 95,
+    isPublic: false,
+    featureTier: 'enterprise',
+    priceMonthlyMinor: null,
+    priceYearlyMinor: null,
+    limits: {
+      maxProducts: null,
+      maxStaff: null,
+      maxOrdersPerMonth: null,
+      maxStorageMb: null,
+      maxStores: null,
+      customDomain: true,
+      platformFeeBps: 0,
+      codPlatformFeeBps: 0,
+      abandonedCartAutomation: true,
+      whatsappAutomation: false,
+      brandingRemoval: true,
+      apiAccess: true,
+      analyticsTier: 'advanced',
+      supportTier: 'priority',
     },
   },
 ];
 
+/** Ahmad's locked public catalog, 2026-10-05: Basic / Growth / Business. */
+export const LOCKED_PUBLIC_PLANS = DEFAULT_PLAN_SEEDS.filter(p => p.isPublic);
+
 /**
- * FWB's `Store.plan` enum value → Ebda plan code. Used by the migration's
- * backfill and by the runtime fallback for a store that has no subscription
- * row yet. `enterprise` → `comped`: nobody ever paid for it (FWB's enterprise
- * was an admin-granted "everything on"), and `comped` is exactly that.
+ * FWB's `Store.plan` enum value → Ebda plan code, AS THE ORIGINAL SP5 BACKFILL
+ * MIGRATION (20261003130000) APPLIED IT. Frozen: a unit test pins it to that
+ * migration's CASE (`enterprise` → `comped`: nobody paid for it, it was an
+ * admin-granted "everything on"). Runtime code uses `STORE_PLAN_TO_PLAN_CODE`.
  */
 export const LEGACY_STORE_PLAN_TO_PLAN_CODE: Record<
   'free' | 'starter' | 'professional' | 'enterprise',
@@ -203,6 +346,24 @@ export const LEGACY_STORE_PLAN_TO_PLAN_CODE: Record<
   starter: 'growth',
   professional: 'pro',
   enterprise: 'comped',
+};
+
+/**
+ * `Store.plan` enum → plan code for RUNTIME writes and the no-subscription-row
+ * fallback, after the 2026-10-05 price lock: the three public plans line up
+ * with the three paying feature tiers (starter/professional/enterprise =
+ * Basic/Growth/Business, same as each plan's `featureTier`). `free` stays on
+ * the hidden legacy row; `comped`/`founding_free` are only ever assigned by
+ * name (admin subscription endpoint), never derived from the enum.
+ */
+export const STORE_PLAN_TO_PLAN_CODE: Record<
+  'free' | 'starter' | 'professional' | 'enterprise',
+  PlanCode
+> = {
+  free: 'free',
+  starter: 'basic',
+  professional: 'growth',
+  enterprise: 'business',
 };
 
 /** The plan a store with a canceled subscription falls back to. */
@@ -230,6 +391,10 @@ export function planLimitMessage(
     maxStaff: `Your plan allows up to ${n} staff members. Upgrade to add more.`,
     maxOrdersPerMonth: `Your plan allows up to ${n} orders per month. Upgrade to keep growing.`,
     maxStorageMb: `Your plan allows up to ${n} MB of storage. Upgrade to add more.`,
+    maxStores: `Your plan allows up to ${n} store${n === '1' ? '' : 's'}. Upgrade to add more.`,
+    brandingRemoval:
+      'Removing the "Powered by Ebda" footer is not included in your plan. Upgrade to turn it off.',
+    apiAccess: 'API access is not included in your plan. Upgrade to Business to use it.',
     customDomain:
       'Custom domains are not included in your plan. Upgrade to connect your own domain.',
     abandonedCartAutomation:
@@ -241,76 +406,12 @@ export function planLimitMessage(
     maxStaff: `باقتك تسمح بحد أقصى ${n} من أعضاء الفريق. قم بالترقية لإضافة المزيد.`,
     maxOrdersPerMonth: `باقتك تسمح بحد أقصى ${n} طلب شهرياً. قم بالترقية لمواصلة النمو.`,
     maxStorageMb: `باقتك تسمح بمساحة تخزين حتى ${n} ميجابايت. قم بالترقية لإضافة المزيد.`,
+    maxStores: `باقتك تسمح بحد أقصى ${n} متجر. قم بالترقية لإضافة المزيد.`,
+    brandingRemoval: 'إزالة شعار «مدعوم من ابدأ» غير متاحة في باقتك. قم بالترقية لإخفائه.',
+    apiAccess: 'الوصول عبر API غير متاح في باقتك. قم بالترقية إلى باقة الأعمال لاستخدامه.',
     customDomain: 'النطاق المخصص غير متاح في باقتك. قم بالترقية لربط نطاقك الخاص.',
     abandonedCartAutomation: 'استرداد السلات المتروكة غير متاح في باقتك. قم بالترقية لتفعيله.',
     whatsappAutomation: 'أتمتة واتساب غير متاحة في باقتك. قم بالترقية لتفعيلها.',
   };
   return (lang === 'ar' ? ar : en)[key];
 }
-
-/** Ahmad’s locked public catalog, 2026-10-05. Historical seeds above pin the original migration. */
-export const LOCKED_PUBLIC_PLANS = [
-  {
-    code: 'basic',
-    nameEn: 'Basic',
-    nameAr: 'الأساسية',
-    sort: 10,
-    isPublic: true,
-    featureTier: 'starter',
-    priceMonthlyMinor: 149000,
-    priceYearlyMinor: 1341000,
-    limits: {
-      maxProducts: null,
-      maxStaff: 2,
-      maxOrdersPerMonth: 300,
-      maxStorageMb: null,
-      customDomain: true,
-      platformFeeBps: 0,
-      codPlatformFeeBps: 0,
-      abandonedCartAutomation: false,
-      whatsappAutomation: false,
-    },
-  },
-  {
-    code: 'growth',
-    nameEn: 'Growth',
-    nameAr: 'النمو',
-    sort: 20,
-    isPublic: true,
-    featureTier: 'professional',
-    priceMonthlyMinor: 349000,
-    priceYearlyMinor: 3141000,
-    limits: {
-      maxProducts: null,
-      maxStaff: 5,
-      maxOrdersPerMonth: 3000,
-      maxStorageMb: null,
-      customDomain: true,
-      platformFeeBps: 0,
-      codPlatformFeeBps: 0,
-      abandonedCartAutomation: true,
-      whatsappAutomation: false,
-    },
-  },
-  {
-    code: 'business',
-    nameEn: 'Business',
-    nameAr: 'الأعمال',
-    sort: 30,
-    isPublic: true,
-    featureTier: 'enterprise',
-    priceMonthlyMinor: 999000,
-    priceYearlyMinor: 8991000,
-    limits: {
-      maxProducts: null,
-      maxStaff: 15,
-      maxOrdersPerMonth: null,
-      maxStorageMb: null,
-      customDomain: true,
-      platformFeeBps: 0,
-      codPlatformFeeBps: 0,
-      abandonedCartAutomation: true,
-      whatsappAutomation: false,
-    },
-  },
-] as const;

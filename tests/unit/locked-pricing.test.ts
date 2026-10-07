@@ -1,9 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { LOCKED_PUBLIC_PLANS, planLimitsSchema } from '@force/shared';
+import { DEFAULT_PLAN_SEEDS, LOCKED_PUBLIC_PLANS, planLimitsSchema } from '@force/shared';
 import { PLANS, PRICING_PUBLISHED } from '../../apps/marketing/src/lib/plans';
 
-describe('locked pricing contract', () => {
+const sql = readFileSync(
+  'packages/database/prisma/migrations/20261007000000_locked_pricing/migration.sql',
+  'utf8'
+);
+
+/** One `-- PLAN:<code>` block per plan in the migration. */
+function migrationBlocks(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const chunk of sql.split('-- PLAN:').slice(1)) {
+    out[chunk.slice(0, chunk.indexOf('\n'))] = chunk;
+  }
+  return out;
+}
+
+describe('locked pricing contract (docs/plans/2026-10-05-pricing-decisions.md)', () => {
   it('charges the agreed monthly and annual amounts without platform fees', () => {
     expect(LOCKED_PUBLIC_PLANS.map(p => [p.code, p.priceMonthlyMinor, p.priceYearlyMinor])).toEqual(
       [
@@ -16,28 +30,52 @@ describe('locked pricing contract', () => {
       expect(planLimitsSchema.parse(p.limits).platformFeeBps).toBe(0);
       expect(p.limits.customDomain).toBe(true);
       expect(p.limits.maxProducts).toBeNull();
+      expect(p.limits.whatsappAutomation).toBe(false); // wa.me only
     }
-    expect(LOCKED_PUBLIC_PLANS.map(p => [p.limits.maxStaff, p.limits.maxOrdersPerMonth])).toEqual([
-      [2, 300],
-      [5, 3000],
-      [15, null],
-    ]);
   });
+
+  it('matches the entitlement table lever by lever', () => {
+    const pick = (f: (l: (typeof LOCKED_PUBLIC_PLANS)[number]['limits']) => unknown) =>
+      LOCKED_PUBLIC_PLANS.map(p => f(p.limits));
+    expect(pick(l => l.maxStaff)).toEqual([2, 5, 15]);
+    expect(pick(l => l.maxOrdersPerMonth)).toEqual([300, 3000, null]);
+    expect(pick(l => l.maxStores)).toEqual([1, 1, 3]);
+    expect(pick(l => l.abandonedCartAutomation)).toEqual([false, true, true]);
+    expect(pick(l => l.brandingRemoval)).toEqual([false, true, true]);
+    expect(pick(l => l.apiAccess)).toEqual([false, false, true]);
+    expect(pick(l => l.analyticsTier)).toEqual(['basic', 'standard', 'advanced']);
+    expect(pick(l => l.supportTier)).toEqual(['email', 'chat', 'priority']);
+  });
+
   it('publishes the same amounts as the database catalog', () => {
     expect(PRICING_PUBLISHED).toBe(true);
     expect(PLANS.map(p => [p.id, p.price?.amountMinor, p.annualMinor])).toEqual(
       LOCKED_PUBLIC_PLANS.map(p => [p.code, p.priceMonthlyMinor, p.priceYearlyMinor])
     );
-    const sql = readFileSync(
-      'packages/database/prisma/migrations/20261005090000_locked_pricing/migration.sql',
-      'utf8'
-    );
-    for (const p of LOCKED_PUBLIC_PLANS) {
-      const row = sql
-        .split('\n')
-        .find(line => line.startsWith('INSERT') && line.includes(`'${p.code}'`));
-      expect(row).toContain(`${p.priceMonthlyMinor}, ${p.priceYearlyMinor}`);
-      expect(row).toContain(JSON.stringify(p.limits).replaceAll(':', ': ').replaceAll(',', ', '));
+  });
+
+  it('migration reproduces DEFAULT_PLAN_SEEDS exactly: one block per plan, same price, visibility, sort, tier, limits', () => {
+    const blocks = migrationBlocks();
+    expect(Object.keys(blocks)).toEqual(DEFAULT_PLAN_SEEDS.map(p => p.code));
+    for (const p of DEFAULT_PLAN_SEEDS) {
+      const b = blocks[p.code];
+      const values = b.slice(b.indexOf('VALUES'), b.indexOf('ON CONFLICT'));
+      const json = values.match(/'(\{.*\})'::jsonb/)![1];
+      expect(planLimitsSchema.parse(JSON.parse(json)), p.code).toEqual(p.limits);
+      const pm = p.priceMonthlyMinor === null ? 'NULL' : p.priceMonthlyMinor;
+      const py = p.priceYearlyMinor === null ? 'NULL' : p.priceYearlyMinor;
+      expect(values, p.code).toContain(
+        `${p.sort}, ${p.isPublic}, '${p.featureTier}', ${pm}, ${py}, '`
+      );
+    }
+  });
+
+  it('migration never deletes or renames a plan code (existing subscriptions keep resolving)', () => {
+    expect(sql).not.toMatch(/\bDELETE\b/i);
+    expect(sql).not.toMatch(/\bDROP\b/i);
+    expect(sql).not.toMatch(/\bUPDATE\s+store_subscriptions/i);
+    for (const code of ['free', 'pro', 'comped', 'founding_free']) {
+      expect(migrationBlocks()[code]).toBeDefined();
     }
   });
 });

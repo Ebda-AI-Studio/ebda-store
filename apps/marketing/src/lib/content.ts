@@ -246,7 +246,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           q: 'كم السعر؟',
-          a: 'لم نعلن الأسعار بعد. سننشرها هنا قبل الإطلاق.',
+          a: 'الأساسية ١٬٤٩٠ ج.م شهريًا، والنمو ٣٬٤٩٠ ج.م، والأعمال ٩٬٩٩٠ ج.م، مع خصم ٢٥٪ على الدفع السنوي. لا توجد باقة مجانية ولا عمولة على الطلبات، وتبدأ بتجربة النمو ١٤ يومًا.',
         },
         {
           q: 'ماذا عن بياناتي؟',
@@ -321,7 +321,7 @@ export const COPY: Record<Locale, Copy> = {
           },
           {
             h: 'الخطط والرسوم',
-            p: '[الأسعار غير معلنة بعد. تُضاف الرسوم وشروط الاسترداد بعد اعتمادها.]',
+            p: '[الأسعار معلنة في قسم الأسعار (أساسية ١٬٤٩٠ / نمو ٣٬٤٩٠ / أعمال ٩٬٩٩٠ ج.م شهريًا، دون عمولة على الطلبات). شروط الاسترداد تُضاف بعد اعتمادها.]',
           },
           { h: 'إنهاء الخدمة والمسؤولية', p: '[يحددها المستشار القانوني.]' },
         ],
@@ -501,7 +501,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           q: 'How much does it cost?',
-          a: 'Pricing has not been announced. We will publish it here before launch.',
+          a: 'Basic is EGP 1,490 a month, Growth EGP 3,490 and Business EGP 9,990, with 25% off annual billing. There is no free plan and no commission on orders, and you start with a 14-day Growth trial.',
         },
         {
           q: 'What about my data?',
@@ -576,7 +576,7 @@ export const COPY: Record<Locale, Copy> = {
           },
           {
             h: 'Plans and fees',
-            p: '[Pricing is not announced yet. Fees and refund terms to be added once adopted.]',
+            p: '[Prices are published in the Pricing section (Basic EGP 1,490 / Growth 3,490 / Business 9,990 a month, no commission on orders). Refund terms to be added once adopted.]',
           },
           { h: 'Termination and liability', p: '[To be set by counsel.]' },
         ],

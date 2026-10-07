@@ -4,6 +4,9 @@ export type BillingInterval = 'monthly' | 'yearly';
 
 export const FREE_PLAN_CODE = 'free';
 export const COMPED_PLAN_CODE = 'comped';
+/** Admin-granted plans: never purchasable, never charged, always status `comped` (Amelia's founding deal). */
+export const GRANTED_PLAN_CODES: readonly string[] = [COMPED_PLAN_CODE, 'founding_free'];
+export const isGrantedPlan = (code: string): boolean => GRANTED_PLAN_CODES.includes(code);
 /** Dunning retry offsets in days after the missed period end: day 3, then day 7. */
 export const DUNNING_RETRY_DAYS = [3, 7] as const;
 /** Failed charges for one period before the store is downgraded (day 0 + 2 retries). */

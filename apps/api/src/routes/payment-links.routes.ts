@@ -39,6 +39,7 @@ import { getAuthUser } from '../utils/store-helpers';
 import { generateOrderNumber } from '../utils/order-number';
 import { EFFECTIVE_STOCK_SELECT, isOrderable } from '../lib/effective-inventory';
 import { featureService } from '../services/feature.service';
+import { assertOrderAllowed } from '../services/plan-limit.service';
 import logger from '../lib/logger';
 import type { Currency } from '../services/payment-providers/types';
 
@@ -238,6 +239,10 @@ router.post(
         return sum + (p ? p.price * it.quantity : 0);
       }, 0);
       const totalFils = itemsSubtotal + extraFils;
+
+      // Plan order cap (locked pricing): a WhatsApp payment link creates an order too, so
+      // it passes the same gate as checkout BEFORE any customer/order row is written.
+      await assertOrderAllowed(storeId);
 
       // ── Find or create Customer ────────────────────────────────────────────
       // The User model is the customer record (role='customer', scoped to storeId).

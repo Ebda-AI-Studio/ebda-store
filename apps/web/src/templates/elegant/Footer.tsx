@@ -17,6 +17,7 @@ import { getSocialLinks, SocialGlyph } from '../shared/icons';
 
 export default function ElegantFooter({
   branding,
+  hidePoweredBy,
   contact,
   socials,
   navigation = [],
@@ -379,7 +380,7 @@ export default function ElegantFooter({
           if they want them). PoweredByForce attribution + the per-section
           copyright option are kept. */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <PoweredByForce />
+        <PoweredByForce hidden={hidePoweredBy} />
       </div>
     </footer>
   );

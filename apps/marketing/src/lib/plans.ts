@@ -12,7 +12,7 @@ export interface PlanPrice {
 export interface Plan {
   id: 'basic' | 'growth' | 'business';
   name: Record<Locale, string>;
-  /** null until Ahmad decides; the UI then shows the "pricing coming soon" placeholder. */
+  /** null only if pricing is ever pulled again; the UI then shows the "pricing coming soon" placeholder. */
   price: PlanPrice | null;
   annualMinor: number;
   tagline: Record<Locale, string>;
@@ -27,12 +27,21 @@ export const PLANS: readonly Plan[] = [
     annualMinor: 1341000,
     tagline: { ar: 'لأول متجر', en: 'For your first store' },
     features: {
-      ar: ['٣٠٠ طلب شهريًا', 'عضوان للفريق', 'منتجات غير محدودة', 'دومين خاص وجميع طرق الدفع'],
+      ar: [
+        '٣٠٠ طلب شهريًا',
+        'عضوان للفريق',
+        'متجر واحد',
+        'منتجات غير محدودة',
+        'دومين خاص وجميع طرق الدفع',
+        'تحليلات أساسية ودعم بالبريد',
+      ],
       en: [
         '300 orders/month',
         '2 staff seats',
+        '1 store',
         'Unlimited products',
         'Custom domain and all payment methods',
+        'Basic analytics and email support',
       ],
     },
   },
@@ -43,12 +52,21 @@ export const PLANS: readonly Plan[] = [
     annualMinor: 3141000,
     tagline: { ar: 'لما يكبر البيع', en: 'When sales pick up' },
     features: {
-      ar: ['٣٬٠٠٠ طلب شهريًا', '٥ أعضاء للفريق', 'استعادة السلات المتروكة', 'إزالة علامة ابدأ'],
+      ar: [
+        '٣٬٠٠٠ طلب شهريًا',
+        '٥ أعضاء للفريق',
+        'متجر واحد',
+        'استعادة السلات المتروكة',
+        'إزالة علامة «مدعوم من ابدأ»',
+        'تحليلات قياسية ودعم بالمحادثة',
+      ],
       en: [
         '3,000 orders/month',
         '5 staff seats',
+        '1 store',
         'Abandoned cart recovery',
-        'Remove Ebda branding',
+        'Remove the “Powered by Ebda” footer',
+        'Standard analytics and chat support',
       ],
     },
   },
@@ -59,8 +77,22 @@ export const PLANS: readonly Plan[] = [
     annualMinor: 8991000,
     tagline: { ar: 'لمتاجر بحجم أكبر', en: 'For busier stores' },
     features: {
-      ar: ['طلبات غير محدودة', '١٥ عضوًا للفريق', 'حتى ٣ متاجر', 'دعم بأولوية'],
-      en: ['Unlimited orders', '15 staff seats', 'Up to 3 stores', 'Priority support'],
+      ar: [
+        'طلبات غير محدودة',
+        '١٥ عضوًا للفريق',
+        'حتى ٣ متاجر',
+        'وصول API',
+        'تحليلات متقدمة ودعم بأولوية',
+        'كل ميزات النمو',
+      ],
+      en: [
+        'Unlimited orders',
+        '15 staff seats',
+        'Up to 3 stores',
+        'API access',
+        'Advanced analytics and priority support',
+        'Everything in Growth',
+      ],
     },
   },
 ];

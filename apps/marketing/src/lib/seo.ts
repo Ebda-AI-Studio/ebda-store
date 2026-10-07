@@ -48,7 +48,7 @@ export function pageMetadata(
   };
 }
 
-/** JSON-LD graph: Organization + WebSite + SoftwareApplication. No ratings or offers (pricing undecided). */
+/** JSON-LD graph: Organization + WebSite + SoftwareApplication. No ratings or offers (add Offer nodes from PLANS if wanted). */
 export function jsonLd(locale: Locale) {
   const c = COPY[locale];
   const org = `${SITE_URL}/#organization`;
