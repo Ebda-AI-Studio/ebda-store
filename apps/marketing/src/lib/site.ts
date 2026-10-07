@@ -1,11 +1,11 @@
-import { BRAND, BRAND_ADMIN_URL, BRAND_MARKETING_URL } from '@force/shared/brand';
+import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL } from '@force/shared/brand';
 
 export type Locale = 'ar' | 'en';
 export const LOCALES: readonly Locale[] = ['ar', 'en'] as const;
 
 export const SITE_URL = BRAND_MARKETING_URL;
-export const LOGIN_URL = `${BRAND_ADMIN_URL}/login`;
-export const SIGNUP_URL = `${BRAND_ADMIN_URL}/signup`;
+export const LOGIN_URL = `${BRAND_STORE_APP_URL}/login`;
+export const SIGNUP_URL = `${BRAND_STORE_APP_URL}/signup`;
 export const SECURITY_EMAIL = `security@${BRAND.domains.marketing}`;
 
 /** Home path per locale. Arabic is the default and lives at the root. */
@@ -40,7 +40,6 @@ export const SECTION_ORDER = [
   'story',
   'how',
   'templates',
-  'scenes',
   'breakout',
   'dahab',
   'features',

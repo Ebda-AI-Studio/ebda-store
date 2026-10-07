@@ -54,8 +54,8 @@ env NODE_ENV=development PORT=$API_PORT JWT_SECRET=capture-jwt-secret-local-only
 # OPEN_NEXT_CLOUDFLARE=1: unoptimised images, exactly as the storefront runs on Cloudflare.
 (cd apps/web && OPEN_NEXT_CLOUDFLARE=1 NEXT_PUBLIC_API_URL=http://localhost:$API_PORT/api/v1 npx next build >/dev/null)
 (cd apps/web && OPEN_NEXT_CLOUDFLARE=1 NEXT_PUBLIC_API_URL=http://localhost:$API_PORT/api/v1 npx next start -p "$WEB_PORT" >"$WORK/web.log" 2>&1) & PIDS+=($!)
-until curl -s -o /dev/null -H "Host: souq-demo.ebda.app" "http://127.0.0.1:$WEB_PORT/"; do sleep 1; done
-for id in souq dahab qamar lamma jasmine; do curl -s -o /dev/null -H "Host: $id-demo.ebda.app" "http://127.0.0.1:$WEB_PORT/"; done
+until curl -s -o /dev/null -H "Host: dahab-demo.ebda.app" "http://127.0.0.1:$WEB_PORT/"; do sleep 1; done
+for id in dahab; do curl -s -o /dev/null -H "Host: $id-demo.ebda.app" "http://127.0.0.1:$WEB_PORT/"; done
 
 WEB=http://127.0.0.1:$WEB_PORT API=http://localhost:$API_PORT IMG_DIR="$WORK/img" node "$HERE/capture.mjs" "$WORK/cap"
 cd "$HERE/../.." && node "$HERE/encode.mjs" "$WORK/cap"

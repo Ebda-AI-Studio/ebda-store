@@ -45,7 +45,7 @@ function makeRes() {
   return res as unknown as Response & { statusCode: number; body: { error?: { code?: string } } };
 }
 
-const PLATFORM_ORIGIN = 'https://admin.ebda.app';
+const PLATFORM_ORIGIN = 'https://store.ebda.app';
 const MERCHANT_ORIGIN = 'https://attacker-owned-shop.example';
 
 describe('restrictPlatformOnlyOrigins', () => {

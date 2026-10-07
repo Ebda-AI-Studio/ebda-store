@@ -50,7 +50,12 @@ export const BRAND = {
   },
   domains: {
     marketing: 'ebda.app',
-    admin: 'admin.ebda.app',
+    /**
+     * The Ebda Store merchant app (sign-up, plan, payment, onboarding, dashboard).
+     * `admin.ebda.app` is RETIRED (Ruling HOST-STORE-1): no surface, reserved slug, 404.
+     * Future products follow the same pattern (`whatsapp.`, `crm.`, one login at `accounts.`).
+     */
+    storeApp: 'store.ebda.app',
     api: 'api.ebda.app',
     orders: 'orders.ebda.app',
     storeSuffix: '.ebda.app',
@@ -87,8 +92,8 @@ export function brandUrl(host: string): string {
 
 /** Marketing site origin, e.g. `https://ebda.app`. */
 export const BRAND_MARKETING_URL = brandUrl(BRAND.domains.marketing);
-/** Merchant dashboard origin, e.g. `https://admin.ebda.app`. */
-export const BRAND_ADMIN_URL = brandUrl(BRAND.domains.admin);
+/** Ebda Store merchant app origin, e.g. `https://store.ebda.app`. */
+export const BRAND_STORE_APP_URL = brandUrl(BRAND.domains.storeApp);
 /** API origin, e.g. `https://api.ebda.app`. */
 export const BRAND_API_URL = brandUrl(BRAND.domains.api);
 

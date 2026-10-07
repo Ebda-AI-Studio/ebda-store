@@ -22,9 +22,7 @@ const API = process.env.API || 'http://localhost:4861';
 const IMG_DIR = process.env.IMG_DIR;
 if (!IMG_DIR) throw new Error('set IMG_DIR (prepare-images.mjs output)');
 const out = process.argv[2];
-const ids = process.argv.slice(3).length
-  ? process.argv.slice(3)
-  : ['souq', 'dahab', 'qamar', 'lamma', 'jasmine'];
+const ids = process.argv.slice(3).length ? process.argv.slice(3) : ['dahab'];
 mkdirSync(out, { recursive: true });
 
 /** CSS viewport + DPR of each device, as a real screenshot would be taken. */

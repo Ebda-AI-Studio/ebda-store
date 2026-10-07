@@ -30,6 +30,10 @@ export interface QueueProducerLike {
   sendBatch?(messages: Array<{ body: unknown; delaySeconds?: number }>): Promise<void>;
 }
 
+export interface ServiceBindingLike {
+  fetch(input: string, init?: RequestInit): Promise<Response>;
+}
+
 export interface RateLimitBindingLike {
   limit(opts: { key: string }): Promise<{ success: boolean }>;
 }
@@ -47,6 +51,8 @@ export interface CfBindings {
   /** Coarse per-IP flood guard in front of Express (Workers Rate Limiting binding). */
   RATE_LIMITER?: RateLimitBindingLike;
   CF_VERSION_METADATA?: { id?: string; tag?: string };
+  /** Service Binding to the storefront Worker (ebda-web): cache purge without a public host. */
+  STOREFRONT?: ServiceBindingLike;
   [name: string]: unknown;
 }
 

@@ -144,7 +144,7 @@ describe('parseStoreHost', () => {
     ['apex', 'ebda.app', platform('marketing')],
     ['apex with port', 'ebda.app:443', platform('marketing')],
     ['www alias of the apex', 'www.ebda.app', platform('marketing')],
-    ['admin app', 'admin.ebda.app', platform('admin')],
+    ['ebda store merchant app', 'store.ebda.app', platform('storeApp')],
     ['api', 'api.ebda.app', platform('api')],
     ['orders pwa', 'orders.ebda.app', platform('orders')],
     ['docs', 'docs.ebda.app', platform('docs')],
@@ -153,7 +153,7 @@ describe('parseStoreHost', () => {
     ['whatsapp (reserved)', 'whatsapp.ebda.app', platform('whatsapp')],
     ['workers.dev preview', 'ebda-web.acct.workers.dev', platform('preview')],
     // ── reserved labels with no platform surface are never a store ────────
-    ['store.ebda.app does not exist', 'store.ebda.app', INVALID],
+    ['retired admin host (HOST-STORE-1: reserved, no surface)', 'admin.ebda.app', INVALID],
     ['retired app label (never live; reserved, no surface)', 'app.ebda.app', INVALID],
     ['mail label', 'mail.ebda.app', INVALID],
     ['blog label', 'blog.ebda.app', INVALID],
