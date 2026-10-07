@@ -50,8 +50,11 @@ const lockupSvg = readFileSync(
 );
 const lockupInner = lockupSvg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
 // viewBox is "18 16 288.496 96": scale 2.6 -> ~750x250 box, left-aligned at x=76.
-const ogText = readFileSync(path.join(dir, '..', '..', '..', 'brand', 'logo', 'ebda-og-text.svg'), 'utf8');
-const pathOf = (role) => ogText.match(new RegExp(`data-role="${role}" d="([^"]+)"`))[1];
+const ogText = readFileSync(
+  path.join(dir, '..', '..', '..', 'brand', 'logo', 'ebda-og-text.svg'),
+  'utf8'
+);
+const pathOf = role => ogText.match(new RegExp(`data-role="${role}" d="([^"]+)"`))[1];
 const lockup = `<g transform="translate(76 70) scale(2.6) translate(-18 -16)">${lockupInner}</g>`;
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
