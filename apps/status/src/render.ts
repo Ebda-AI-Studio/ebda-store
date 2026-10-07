@@ -1,5 +1,5 @@
 // Public status page: server-rendered HTML, inline CSS, NO JavaScript, no external requests.
-import { BRAND } from '../../../packages/shared/src/brand/index';
+import { BRAND, brandMarkSvg } from '../../../packages/shared/src/brand/index';
 import { COMPONENTS, HISTORY_DAYS } from './config';
 import type { ComponentSnapshot, ComponentStatus, Incident, Snapshot } from './types';
 
@@ -153,8 +153,8 @@ a{color:var(--lift);text-underline-offset:3px}a:hover{color:var(--fg)}
 .skip:focus{top:8px;color:var(--night)}
 header{border-bottom:1px solid var(--line)}
 .row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:12px}
-.wordmark{display:inline-flex;gap:8px;align-items:baseline;color:var(--fg);text-decoration:none}
-.wm-l{font-weight:700;letter-spacing:.22em}.wm-a{color:var(--lift)}.wm-s{color:var(--muted);font-size:.9rem;border-inline-start:1px solid var(--line);padding-inline-start:8px}
+.wordmark{display:inline-flex;gap:8px;align-items:center;color:var(--fg);text-decoration:none}
+.wm-l{font-weight:600;letter-spacing:.01em}.wm-mk{flex:none}.wm-a{color:var(--lift)}.wm-s{color:var(--muted);font-size:.9rem;border-inline-start:1px solid var(--line);padding-inline-start:8px}
 .lang{padding:6px 10px;border:1px solid var(--line);border-radius:10px;text-decoration:none}
 h1{font-size:clamp(1.5rem,5vw,2.1rem);margin:0;line-height:1.3}
 h2{font-size:1.3rem;margin:2em 0 .6em}h3{font-size:1.05rem;margin:0 0 .2em}
@@ -182,8 +182,9 @@ export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): strin
   const t = T[lang];
   const home = lang === 'ar' ? '/' : '/en';
   const alt = lang === 'ar' ? '/en' : '/';
-  const icon =
-    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230A0B0C'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%23B08D57' stroke-width='3'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%23CBA873'/%3E%3C/svg%3E";
+  const icon = `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" rx="22" fill="${BRAND.colors.night}"/><g transform="translate(60 60) scale(1.0667) translate(-58 -64)"><path d="M30 100 V56 a28 28 0 0 1 56 0 V100" fill="none" stroke="${BRAND.colors.gold}" stroke-width="13" stroke-linecap="round"/><circle cx="58" cy="74" r="9" fill="${BRAND.colors.lift}"/></g></svg>`
+  )}`;
   const active = s.active.length
     ? `<ul class="incs">${s.active.map(i => incident(i, lang)).join('')}</ul>`
     : `<p class="muted">${t.none}</p>`;
@@ -207,7 +208,7 @@ export function renderStatusPage(s: Snapshot, lang: Lang, origin: string): strin
 <body>
 <a class="skip" href="#main">${esc(t.skip)}</a>
 <header><div class="wrap row">
-<a class="wordmark" href="${home}"><span class="wm-l">${BRAND.name.toUpperCase()}</span><span class="wm-a" lang="ar">${BRAND.nameAr}</span><span class="wm-s">${esc(t.site)}</span></a>
+<a class="wordmark" href="${home}">${brandMarkSvg({ size: 24, cls: 'wm-mk' })}<span class="wm-l">${BRAND.name.toLowerCase()}</span><span class="wm-a" lang="ar">${BRAND.nameAr}</span><span class="wm-s">${esc(t.site)}</span></a>
 <a class="lang" href="${alt}" hreflang="${t.otherLang.lang}" lang="${t.otherLang.lang}">${t.otherLang.label}</a>
 </div></header>
 <main id="main" class="wrap">

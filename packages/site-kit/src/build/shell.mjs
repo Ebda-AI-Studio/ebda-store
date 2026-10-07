@@ -65,6 +65,8 @@ export function renderPage(p) {
 <meta property="og:url" content="${esc(p.canonical)}">
 <meta property="og:type" content="website">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>${tokensCss()}</style>
 <link rel="stylesheet" href="/assets/site.css">
 <script>var l=document.createElement('link');l.rel='stylesheet';l.href=${JSON.stringify(BRAND.fonts.googleFontsUrl)};document.head.appendChild(l);</script>
@@ -74,7 +76,7 @@ export function renderPage(p) {
 <a class="skip" href="#main">${esc(p.skipLabel)}</a>
 <header class="site-header">
   <div class="wrap header-row">
-    <a class="wordmark" href="${esc(p.homeHref)}"><span class="wm-latin">${BRAND.name.toUpperCase()}</span><span class="wm-ar" lang="ar">${BRAND.nameAr}</span><span class="wm-site">${esc(p.siteLabel)}</span></a>
+    <a class="wordmark" href="${esc(p.homeHref)}"><img class="wm-lockup" src="/lockup-dark.svg" alt="${BRAND.name.toLowerCase()} ${BRAND.nameAr}" width="84" height="28"><span class="wm-site">${esc(p.siteLabel)}</span></a>
     <nav class="top-nav" aria-label="${esc(p.siteLabel)}"><ul>${nav}</ul></nav>
     <form class="search" role="search" action="${esc(p.search.action)}" method="get">
       <label class="sr-only" for="q">${esc(p.search.label)}</label>

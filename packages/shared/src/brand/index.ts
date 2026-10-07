@@ -72,6 +72,29 @@ export const BRAND_APP_URL = brandUrl(BRAND.domains.app);
 /** API origin, e.g. `https://api.ebda.app`. */
 export const BRAND_API_URL = brandUrl(BRAND.domains.api);
 
+/** Hosted PNG of the mark for transactional email (mail clients drop SVG). */
+export const BRAND_EMAIL_LOGO_URL = `${BRAND_MARKETING_URL}/email-logo.png`;
+
+/**
+ * The approved Ebda "open door" mark as an inline SVG string (90x90 viewBox).
+ * Same geometry as brand/logo/ebda-mark.svg; `arch` / `light` are CSS colours
+ * (a `var(--x)` works inside an HTML page). Decorative by default.
+ */
+export function brandMarkSvg(
+  opts: { arch?: string; light?: string; size?: number; cls?: string } = {}
+): string {
+  const arch = opts.arch ?? BRAND.colors.gold;
+  const light = opts.light ?? BRAND.colors.lift;
+  const size = opts.size ?? 28;
+  const cls = opts.cls ? ` class="${opts.cls}"` : '';
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="13 19 90 90" width="${size}" height="${size}"${cls} aria-hidden="true" focusable="false">` +
+    `<path d="M58 83 L44 100 H72 Z" fill="${arch}" opacity=".35"/>` +
+    `<path d="M30 100 V56 a28 28 0 0 1 56 0 V100" fill="none" stroke="${arch}" stroke-width="9" stroke-linecap="round"/>` +
+    `<circle cx="58" cy="74" r="9" fill="${light}"/></svg>`
+  );
+}
+
 /** Free storefront hostname for a slug: `<slug>.ebda.app`. */
 export function storeHost(slug: string): string {
   return `${slug.trim().toLowerCase()}${BRAND.domains.storeSuffix}`;

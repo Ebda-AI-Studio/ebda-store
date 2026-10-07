@@ -25,8 +25,22 @@ export function PublicShell({
       <div className="mx-auto flex min-h-[calc(100dvh-2.5rem)] max-w-6xl flex-col">
         <header className="flex items-center justify-between gap-4 border-b border-border pb-4">
           <a href={BRAND_MARKETING_URL} aria-label={t('back')} className="flex items-center gap-3">
-            <Image src="/logo.svg" alt={tb('forceMediaAlt')} width={36} height={36} unoptimized />
-            <span className="text-lg font-semibold text-foreground">{BRAND.name}</span>
+            <Image
+              src="/lockup-light.svg"
+              alt={tb('forceMediaAlt')}
+              width={108}
+              height={36}
+              className="dark:hidden"
+              unoptimized
+            />
+            <Image
+              src="/lockup-dark.svg"
+              alt={tb('forceMediaAlt')}
+              width={108}
+              height={36}
+              className="hidden dark:block"
+              unoptimized
+            />
           </a>
           <AdminLanguageSwitcher />
         </header>
