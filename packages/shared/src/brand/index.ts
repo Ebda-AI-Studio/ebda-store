@@ -12,6 +12,15 @@
 export const BRAND = {
   name: 'Ebda',
   nameAr: 'ابدأ',
+  /**
+   * The PRODUCT (the store builder). `name`/`nameAr` above stay the master
+   * brand (logo, brand line); anything that names the product or the Service
+   * reads this (ruling PRODUCT-NAME-1). Future products: Ebda WhatsApp / CRM / ERP.
+   */
+  product: {
+    nameEn: 'Ebda Store',
+    nameAr: 'ابدأ ستور',
+  },
   /** The company behind Ebda (single source for every operator mention; ruling OPERATOR-1). */
   company: {
     legalNameAr: 'ابدأ ستوديو للذكاء الاصطناعي والبرمجيات والتسويق الرقمي',
@@ -123,8 +132,8 @@ export function isBrandHost(host: string | null | undefined): boolean {
   return h === BRAND.domains.marketing || h.endsWith(BRAND.domains.storeSuffix);
 }
 
-/** RFC 5322 `From:` value, e.g. `Ebda <no-reply@ebda.app>`. */
-export function brandFrom(displayName: string = BRAND.name): string {
+/** RFC 5322 `From:` value, e.g. `Ebda Store <no-reply@ebda.app>`. */
+export function brandFrom(displayName: string = BRAND.product.nameEn): string {
   return `${displayName} <${BRAND.noReplyEmail}>`;
 }
 

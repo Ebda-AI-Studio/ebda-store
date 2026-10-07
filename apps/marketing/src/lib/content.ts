@@ -123,9 +123,9 @@ export interface Copy {
 export const COPY: Record<Locale, Copy> = {
   ar: {
     meta: {
-      title: 'ابدأ — بابك لبدء مشروعك. اعمل متجرك أونلاين',
+      title: 'ابدأ ستور — اعمل متجرك أونلاين في دقايق',
       description:
-        'ابدأ — بابك لبدء مشروعك. اعمل متجرك أونلاين في دقايق: لينك باسمك، دفع أونلاين وكاش وإنستا باي، وشحن مع بوسطة وأرامكس.',
+        'ابدأ ستور من ابدأ — بابك لبدء مشروعك. اعمل متجرك أونلاين في دقايق: لينك باسمك، دفع أونلاين وكاش وإنستا باي، وشحن مع بوسطة وأرامكس.',
     },
     skip: 'روح للمحتوى',
     nav: {
@@ -286,8 +286,8 @@ export const COPY: Record<Locale, Copy> = {
     },
     aboutPage: {
       title: 'عن ابدأ',
-      desc: 'ابدأ منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، من ابدأ ستوديو.',
-      company: `ابدأ منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، مملوكة ل${CO.shortNameAr} وتديرها.`,
+      desc: 'ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، من ابدأ ستوديو.',
+      company: `ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، مملوكة ل${CO.shortNameAr} وتديرها.`,
       storyH: 'حكاية ابدأ',
       contactH: 'تواصل معنا',
     },
@@ -309,12 +309,12 @@ export const COPY: Record<Locale, Copy> = {
     start: {
       title: 'الدور عليك.',
       lead: 'اعمل متجرك النهاردة، وابدأ تبيع بكرة.',
-      firstMerchantLabel: 'أول تاجر على ابدأ',
+      firstMerchantLabel: 'أول تاجر على ابدأ ستور',
       cta: 'ابدأ دلوقتي',
       login: 'عندك متجر؟ ادخل',
     },
     footer: {
-      product: `ابدأ — منتج من ${CO.shortNameAr}`,
+      product: `ابدأ ستور — منتج من ${CO.shortNameAr}`,
       legalNav: 'روابط قانونية',
       legal: 'الإشعار القانوني',
       privacy: 'الخصوصية',
@@ -324,15 +324,15 @@ export const COPY: Record<Locale, Copy> = {
       contact: 'تواصل: ahlan@ebda.app',
       legalVersion: 'الإصدار 1.0 من الوثائق القانونية · 2026-10-07.',
       about: 'عن ابدأ',
-      ownership: `ابدأ منتج من ${CO.shortNameAr}. © 2026 ${CO.shortNameAr}. جميع الحقوق محفوظة.`,
+      ownership: `ابدأ ستور منتج من ${CO.shortNameAr}. © 2026 ${CO.shortNameAr}. جميع الحقوق محفوظة.`,
     },
     legalPages: LEGAL_AR,
   },
   en: {
     meta: {
-      title: 'Ebda — Your doorway to business. Open your store online',
+      title: 'Ebda Store — Open your store online in minutes',
       description:
-        'Ebda — Your doorway to business. Open your online store in minutes: your own link, online payments, cash and InstaPay, shipping with Bosta and Aramex.',
+        'Ebda Store, from Ebda — Your doorway to business. Open your online store in minutes: your own link, online payments, cash and InstaPay, shipping with Bosta and Aramex.',
     },
     skip: 'Skip to content',
     nav: {
@@ -514,8 +514,8 @@ export const COPY: Record<Locale, Copy> = {
     },
     aboutPage: {
       title: 'About Ebda',
-      desc: 'Ebda is an online store builder for merchants in Egypt, a product of Ebda AI Studio.',
-      company: `Ebda is an online store builder for merchants in Egypt, a technology platform owned and operated by ${CO.shortNameEn}.`,
+      desc: 'Ebda Store is an online store builder for merchants in Egypt, a product of Ebda AI Studio.',
+      company: `Ebda Store is an online store builder for merchants in Egypt, a technology platform owned and operated by ${CO.shortNameEn}.`,
       storyH: 'The Ebda story',
       contactH: 'Contact',
     },
@@ -537,12 +537,12 @@ export const COPY: Record<Locale, Copy> = {
     start: {
       title: 'Your turn.',
       lead: 'Set up your store today. Start selling tomorrow.',
-      firstMerchantLabel: 'First merchant on Ebda',
+      firstMerchantLabel: 'First merchant on Ebda Store',
       cta: 'Start now',
       login: 'Have a store? Log in',
     },
     footer: {
-      product: `Ebda — a product of ${CO.shortNameEn}`,
+      product: `Ebda Store — a product of ${CO.shortNameEn}`,
       legalNav: 'Legal links',
       legal: 'Legal notice',
       privacy: 'Privacy',
@@ -552,7 +552,7 @@ export const COPY: Record<Locale, Copy> = {
       contact: 'Contact: ahlan@ebda.app',
       legalVersion: 'Legal documents version 1.0 · 2026-10-07.',
       about: 'About Ebda',
-      ownership: `Ebda is a product of ${CO.shortNameEn}. © 2026 ${CO.shortNameEn}. All rights reserved.`,
+      ownership: `Ebda Store is a product of ${CO.shortNameEn}. © 2026 ${CO.shortNameEn}. All rights reserved.`,
     },
     legalPages: LEGAL_EN,
   },

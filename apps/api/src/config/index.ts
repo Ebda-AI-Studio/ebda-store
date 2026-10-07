@@ -179,7 +179,7 @@ export const config = {
   smtpPort: parseInt(process.env.SMTP_PORT || '1025', 10),
   smtpUser: process.env.SMTP_USER || '',
   smtpPassword: process.env.SMTP_PASSWORD || '',
-  smtpFromName: process.env.SMTP_FROM_NAME || BRAND.name,
+  smtpFromName: process.env.SMTP_FROM_NAME || BRAND.product.nameEn,
   smtpFromEmail: process.env.SMTP_FROM_EMAIL || BRAND.noReplyEmail,
 
   // Resend SDK key (single platform-wide account; all merchant domains live
