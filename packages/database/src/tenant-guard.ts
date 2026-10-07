@@ -13,8 +13,8 @@
 // request that differs from the store the request was authorised for.
 //
 // The rules (fail closed, every environment, no flag turns them off):
-//   TENANT models (every model with a `storeId` column, read from the DMMF at boot, so
-//   a NEW tenant model is covered without touching this file):
+//   TENANT models (every model with a `storeId` column, read from the generated schema snapshot,
+//   so a NEW tenant model is covered once the snapshot is regenerated; a unit test fails until it is):
 //     - find*/count/aggregate/groupBy/update*/delete*: `where.storeId` (top level, an
 //       `AND` member, `{ equals }`, an all-equal `{ in }`, or a compound unique key
 //       containing storeId) MUST equal the ambient store;
@@ -38,6 +38,7 @@
 //   `ebda_app`) allows everything.
 import { Prisma } from '@prisma/client';
 import { ambientScope, type AmbientScope } from './tenant-scope';
+import { TENANT_GUARD_SCHEMA } from './tenant-guard-schema.generated';
 
 export class TenantScopeViolation extends Error {
   readonly code = 'TENANT_SCOPE_VIOLATION';
@@ -133,31 +134,33 @@ interface ModelMeta {
 
 let meta: ModelMeta | undefined;
 
-/** The models with a `storeId` scalar column, straight from the generated client. */
+/**
+ * The models with a `storeId` scalar column. Read from the committed schema snapshot, NOT from
+ * `Prisma.dmmf`: the DMMF getter throws on Workers ("Prisma.dmmf is not available when running in
+ * edge runtimes"), which 500'd every API request the first time this guard shipped. The snapshot
+ * is generated from the DMMF (`npm run gen:tenant-guard-schema -w packages/database`) and
+ * tests/unit/tenant-guard-schema-snapshot.test.ts fails when it drifts from the real client.
+ */
 export function storeIdModels(): string[] {
-  return Prisma.dmmf.datamodel.models
-    .filter(m => m.fields.some(f => f.name === 'storeId' && f.kind === 'scalar'))
-    .map(m => m.name);
+  return TENANT_GUARD_SCHEMA.filter(m => m.storeId).map(m => m.name);
 }
 
 function modelMeta(): ModelMeta {
   if (meta) return meta;
-  const models = Prisma.dmmf.datamodel.models;
+  const models = TENANT_GUARD_SCHEMA;
   const tenant = new Set(storeIdModels());
   const child = new Set(TENANT_CHILD_MODELS);
   const relations = new Map<string, Map<string, string>>();
   const guardedTables = new Set<string>();
   for (const m of models) {
-    const rel = new Map<string, string>();
-    for (const f of m.fields) if (f.kind === 'object') rel.set(f.name, f.type);
-    relations.set(m.name, rel);
+    relations.set(m.name, new Map(Object.entries(m.relations)));
     if (tenant.has(m.name) || child.has(m.name) || m.name === STORE_MODEL) {
-      guardedTables.add((m.dbName ?? m.name).toLowerCase());
+      guardedTables.add(m.table.toLowerCase());
     }
   }
   for (const name of Object.keys(USER_KEYED_MODELS)) {
     const um = models.find(x => x.name === name);
-    if (um) guardedTables.add((um.dbName ?? um.name).toLowerCase());
+    if (um) guardedTables.add(um.table.toLowerCase());
   }
   meta = { tenant, child, relations, guardedTables };
   return meta;
