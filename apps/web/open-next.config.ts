@@ -1,6 +1,6 @@
 // ⚠️  REGENERATED AT DEPLOY TIME — EDITING THIS FILE CHANGES NOTHING IN PROD.
 //
-// `.github/workflows/cf-deploy.yml` runs `scripts/cf-setup-local.sh web` BEFORE
+// `.github/workflows/cf-web-deploy.yml` runs `scripts/cf-setup-local.sh web` BEFORE
 // the build, and that script OVERWRITES this file unconditionally. Whatever is
 // committed here is replaced by the generator's output, so a cache override,
 // binding or entry point added here alone is dead weight that deploys as a
@@ -18,7 +18,7 @@
 import { defineCloudflareConfig } from '@opennextjs/cloudflare';
 import r2IncrementalCache from '@opennextjs/cloudflare/overrides/incremental-cache/r2-incremental-cache';
 
-// R2-backed ISR/SSG incremental cache (bucket already exists: force-web-isr-cache,
+// R2-backed ISR/SSG incremental cache (bucket already exists: ebda-web-isr-cache,
 // bound as NEXT_INC_CACHE_R2_BUCKET in wrangler.jsonc). Without this, OpenNext
 // falls back to an in-memory cache that's cold on every Worker isolate restart —
 // every ISR/SSG page revalidates from origin instead of serving from cache.

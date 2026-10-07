@@ -127,7 +127,7 @@ const nextConfig = {
               // conversion runtime from www.googleadservices.com and
               // googleads.g.doubleclick.net; without them the Ads tag loads
               // and every conversion is silently CSP-blocked.
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://connect.facebook.net https://analytics.tiktok.com https://sc-static.net https://static.ads-twitter.com https://s.pinimg.com https://cdn.onesignal.com https://*.onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://static.cloudflareinsights.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://connect.facebook.net https://analytics.tiktok.com https://sc-static.net https://static.ads-twitter.com https://s.pinimg.com https://cdn.onesignal.com https://*.onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://eu-assets.i.posthog.com https://eu.i.posthog.com https://static.cloudflareinsights.com",
               // OneSignal v16 page SDK pulls a stylesheet from
               // https://onesignal.com/sdks/... at runtime — that's the
               // bare apex, not cdn., so include it explicitly.
@@ -140,7 +140,7 @@ const nextConfig = {
               // preconnect to it. googleadservices / googleads.g.doubleclick /
               // www.google.com: Google Ads conversion beacons (fetch/sendBeacon
               // transport), see script-src above.
-              "connect-src 'self' https://api.ebda.app https://*.r2.dev https://*.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://*.facebook.com https://*.tiktok.com wss://api.ebda.app wss://api-production-c058.up.railway.app https://fonts.googleapis.com https://fonts.gstatic.com https://*.onesignal.com wss://*.onesignal.com https://ebda.app https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com",
+              "connect-src 'self' https://api.ebda.app https://*.r2.dev https://*.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://*.facebook.com https://*.tiktok.com wss://api.ebda.app wss://api-production-c058.up.railway.app https://fonts.googleapis.com https://fonts.gstatic.com https://*.onesignal.com wss://*.onesignal.com https://ebda.app https://us.i.posthog.com https://us-assets.i.posthog.com https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com",
               // Required so /OneSignalSDKWorker.js can register as a service
               // worker — Push API mandates same-origin worker scripts.
               "worker-src 'self' blob:",

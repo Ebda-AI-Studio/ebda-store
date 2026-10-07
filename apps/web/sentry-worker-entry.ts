@@ -44,7 +44,7 @@ import { companyHostRoute } from './company-host-route';
 
 interface WorkerEnv {
   /** Server-side Sentry DSN for this Worker. Set via `wrangler deploy --var
-   * SENTRY_DSN:<value>` in .github/workflows/cf-deploy.yml, sourced from the
+   * SENTRY_DSN:<value>` in .github/workflows/cf-web-deploy.yml, sourced from the
    * SAME `NEXT_PUBLIC_SENTRY_DSN_WEB` GitHub repo variable already used for
    * client Sentry (the DSN isn't a secret — it's already shipped in the
    * browser bundle). Absent entirely on unconfigured/preview deploys. */

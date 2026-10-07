@@ -28,7 +28,13 @@ describe('Ebda generated Cloudflare routes', () => {
         orders: BRAND.domains.orders,
       })) {
         const config = JSON.parse(readFileSync(join(root, 'apps', app, 'wrangler.jsonc'), 'utf8'));
-        expect(config.routes).toContainEqual({ pattern: host, custom_domain: true });
+        if (app === 'web') {
+          // Storefront: wildcard subdomains only — claiming the apex (or `*/*`)
+          // would steal ebda.app from the ebda-marketing Worker.
+          expect(config.routes).toEqual([
+            { pattern: `*${BRAND.domains.storeSuffix}/*`, zone_name: BRAND.domains.marketing },
+          ]);
+        } else expect(config.routes).toContainEqual({ pattern: host, custom_domain: true });
         expect(
           config.routes.every(
             (r: { pattern: string; zone_name?: string }) =>
