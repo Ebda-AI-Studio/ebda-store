@@ -73,6 +73,9 @@ if (app === 'api') {
       ...r,
       namespace_id: String(Number(r.namespace_id) + 100),
     })),
+    // The revalidate purge goes Worker-to-Worker over this binding: the PREVIEW storefront, never
+    // production `ebda-web` (the base config's target).
+    services: [{ binding: 'STOREFRONT', service: 'ebda-web-preview' }],
     triggers: { crons: [] },
     vars: {
       ...base.vars,
