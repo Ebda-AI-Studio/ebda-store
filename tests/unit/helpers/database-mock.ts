@@ -33,7 +33,10 @@ export function databaseMock(opts: DatabaseMockOptions = {}): Record<string, unk
     return defaults;
   };
 
-  const acrossStores = async (fn: (id: string) => Promise<unknown>, o?: { storeIds?: string[] }) => {
+  const acrossStores = async (
+    fn: (id: string) => Promise<unknown>,
+    o?: { storeIds?: string[] }
+  ) => {
     const ids = await storeIdsFor(o);
     const out: Array<{ storeId: string; value: unknown }> = [];
     for (const storeId of ids) out.push({ storeId, value: await fn(storeId) });

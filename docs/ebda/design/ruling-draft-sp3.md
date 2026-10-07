@@ -7,6 +7,7 @@
 **Evidence:** `docs/design/cloudflare-backend.md`, `spikes/workers-api/README.md` (17/17 tests, 0 leaks, mutation-checked), `docs/design/express-on-workerd-experiment.md`.
 
 **Binding consequences:**
+
 1. Session-level `SET` / `set_config(..., false)` is forbidden. It leaks across tenants through a transaction pooler, and the spike demonstrated the leak.
 2. Hyperdrive query caching stays disabled unless a cross-tenant test proves a cached path safe.
 3. Unknown host → 404; reserved labels never resolve; cache keys include the host.

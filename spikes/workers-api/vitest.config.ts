@@ -17,9 +17,13 @@ export default defineConfig({
     alias: {
       'pg-protocol': new URL('./node_modules/pg-protocol/dist/index.js', import.meta.url).pathname,
       // `default` condition resolves to dist/empty.js (no workerd condition in Vite's resolver) => CloudflareSocket undefined.
-      'pg-cloudflare': new URL('./node_modules/pg-cloudflare/dist/index.js', import.meta.url).pathname,
+      'pg-cloudflare': new URL('./node_modules/pg-cloudflare/dist/index.js', import.meta.url)
+        .pathname,
     },
   },
   test: {
-    testTimeout: 60_000, hookTimeout: 30_000, include: ['test/**/*.test.ts'] },
+    testTimeout: 60_000,
+    hookTimeout: 30_000,
+    include: ['test/**/*.test.ts'],
+  },
 });
