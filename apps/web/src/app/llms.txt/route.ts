@@ -227,9 +227,9 @@ export function buildPlatformBody(stores: PublicStore[]): string {
     })
     .join('\n');
 
-  return `# ${BRAND.name} — Multi-tenant Storefront Platform
+  return `# ${BRAND.product.nameEn} — Multi-tenant Storefront Platform
 
-> ${BRAND.name} is the per-merchant e-commerce platform by ${BRAND.company}.
+> ${BRAND.product.nameEn} is the per-merchant e-commerce platform by ${BRAND.company.shortNameEn}.
 > Each merchant gets a storefront at \`<slug>${BRAND.domains.storeSuffix}\`
 > with their own products, branding, and contact info. Customers in Egypt can browse + buy across multiple merchants from one
 > platform.

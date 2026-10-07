@@ -172,9 +172,9 @@ describe('marketing honesty', () => {
     expect(ar).toContain('ابدأ — بابك لبدء مشروعك.');
     expect(en).toContain('Ebda — Your doorway to business.');
     expect(en).toContain(
-      'Ebda is a product of Ebda AI Studio. © 2026 Ebda AI Studio. All rights reserved.'
+      'Ebda Store is a product of Ebda AI Studio. © 2026 Ebda AI Studio. All rights reserved.'
     );
-    expect(ar).toContain('ابدأ منتج من ابدأ ستوديو. © 2026 ابدأ ستوديو. جميع الحقوق محفوظة.');
+    expect(ar).toContain('ابدأ ستور منتج من ابدأ ستوديو. © 2026 ابدأ ستوديو. جميع الحقوق محفوظة.');
     // no Arabic-Indic digits anywhere on either home page or any legal page
     expect(ar).not.toMatch(/[٠-٩]/);
     expect(en).not.toMatch(/[٠-٩]/);
@@ -187,9 +187,11 @@ describe('marketing honesty', () => {
   });
   it('the legal notice and terms name the operator without a personal name', () => {
     const ln = renderToStaticMarkup(<LegalPage locale="en" page="legal" />);
-    expect(ln).toContain('Ebda is a technology platform owned and operated by Ebda AI Studio');
+    expect(ln).toContain(
+      'The Service is a technology platform owned and operated by Ebda AI Studio'
+    );
     const lar = renderToStaticMarkup(<LegalPage locale="ar" page="terms" />);
-    expect(lar).toContain('ابدأ منصة تقنية مملوكة لابدأ ستوديو');
+    expect(lar).toContain('اتفاق بينك وبين ابدأ ستوديو');
     for (const l of ['ar', 'en'] as const)
       for (const page of LEGAL_SLUGS) {
         const h = renderToStaticMarkup(<LegalPage locale={l} page={page} />);

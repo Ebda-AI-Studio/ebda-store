@@ -61,7 +61,7 @@ const L = {
     prefix: '/en',
     site: 'Help centre',
     skip: 'Skip to content',
-    homeTitle: `${BRAND.name} help centre`,
+    homeTitle: `${BRAND.product.nameEn} help centre`,
     homeIntro:
       'Straight answers about creating and running your store. Anything not built yet is marked "Coming soon".',
     homeCta: 'Create your store',
@@ -259,7 +259,7 @@ writeFileSync(
 );
 writeFileSync(
   path.join(out, 'llms.txt'),
-  `# ${BRAND.name} help centre\n\n> Merchant help for ${BRAND.name}, in Arabic and English.\n\n${content.en
+  `# ${BRAND.product.nameEn} help centre\n\n> Merchant help for ${BRAND.product.nameEn}, in Arabic and English.\n\n${content.en
     .map(a => `- [${a.data.title}](${ORIGIN}${articleUrl('en', a.slug)}): ${a.data.description}`)
     .join('\n')}\n`
 );

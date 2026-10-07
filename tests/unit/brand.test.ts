@@ -53,9 +53,41 @@ describe('brand helpers', () => {
   it('localises the name, sender and footer', () => {
     expect(brandName('ar-EG')).toBe('ابدأ');
     expect(brandName('en')).toBe('Ebda');
-    expect(brandFrom()).toBe('Ebda <no-reply@ebda.app>');
+    expect(brandFrom()).toBe('Ebda Store <no-reply@ebda.app>');
     expect(poweredByBrand()).toBe('Powered by Ebda');
     expect(poweredByBrand('ar')).toBe('مدعوم من ابدأ');
     expect(brandUrl(BRAND.domains.storeApp)).toBe('https://store.ebda.app');
+  });
+});
+
+describe('product name (PRODUCT-NAME-1)', () => {
+  it('names the product Ebda Store while the master brand stays Ebda', () => {
+    expect(BRAND.product).toEqual({ nameEn: 'Ebda Store', nameAr: 'ابدأ ستور' });
+    expect(BRAND.name).toBe('Ebda');
+    expect(BRAND.nameAr).toBe('ابدأ');
+  });
+
+  it('derives the sender display name, JSON-LD and legal Service name from BRAND.product', async () => {
+    expect(brandFrom()).toBe(`${BRAND.product.nameEn} <${BRAND.noReplyEmail}>`);
+    const { jsonLd } = await import('../../apps/marketing/src/lib/seo');
+    const app = jsonLd('en')['@graph'].find(
+      (n: { '@type': string }) => n['@type'] === 'SoftwareApplication'
+    );
+    expect(app).toMatchObject({ name: BRAND.product.nameEn, alternateName: BRAND.product.nameAr });
+    const { LEGAL_EN } = await import('../../apps/marketing/src/lib/legal-en');
+    const { LEGAL_AR } = await import('../../apps/marketing/src/lib/legal-ar');
+    expect(LEGAL_EN.legal.sections[0].p[0]).toContain(
+      `"${BRAND.product.nameEn}" («${BRAND.product.nameAr}»)`
+    );
+    expect(LEGAL_AR.legal.sections[0].p[0]).toContain(
+      `«${BRAND.product.nameAr}» (${BRAND.product.nameEn})`
+    );
+  });
+
+  it('reserves the product-family slugs', async () => {
+    const { isReservedSlug } = await import('../../packages/shared/src/hosts/reserved-slugs');
+    for (const s of ['store', 'whatsapp', 'crm', 'erp', 'hub', 'id', 'accounts']) {
+      expect(isReservedSlug(s)).toBe(true);
+    }
   });
 });
