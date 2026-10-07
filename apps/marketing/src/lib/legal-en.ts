@@ -27,7 +27,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: 'Contact',
         p: [
-          'General, legal and privacy requests: hello@ebda.app. Security reports: security@ebda.app.',
+          'General, legal and privacy requests: ahlan@ebda.app. Security reports: security@ebda.app.',
         ],
       },
       {
@@ -39,7 +39,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: 'Intellectual property',
         p: [
-          'The Ebda name, logo, website and software belong to us or our licensors. Content in a store belongs to the merchant who published it. If you believe content in a store infringes your rights, write to hello@ebda.app with the store address, the content concerned, and proof of your rights; we will review it and may remove or disable the content.',
+          'The Ebda name, logo, website and software belong to us or our licensors. Content in a store belongs to the merchant who published it. If you believe content in a store infringes your rights, write to ahlan@ebda.app with the store address, the content concerned, and proof of your rights; we will review it and may remove or disable the content.',
         ],
       },
       {
@@ -62,7 +62,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '2. Eligibility and your account',
         p: [
-          'You must be at least 18 and legally able to enter a contract. You must give accurate information and keep it current. You are responsible for your password, for everything done through your account, and for the people you give access to. Tell us promptly at hello@ebda.app if you suspect unauthorised access.',
+          'You must be at least 18 and legally able to enter a contract. You must give accurate information and keep it current. You are responsible for your password, for everything done through your account, and for the people you give access to. Tell us promptly at ahlan@ebda.app if you suspect unauthorised access.',
         ],
       },
       {
@@ -131,7 +131,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '13. Suspension and termination',
         p: [
-          'You may stop using the Service and close your account at any time by writing to hello@ebda.app; fees already paid are not refunded.',
+          'You may stop using the Service and close your account at any time by writing to ahlan@ebda.app; fees already paid are not refunded.',
           'We may suspend, restrict or terminate an account, a store or any feature, with or without notice, if we reasonably believe you breached these terms, the Merchant Agreement or the Acceptable Use Policy; if a store is, or appears to be, unlawful, fraudulent or harmful; if required by law or an authority; if fees are unpaid; or to protect the Service, our users or third parties. We will try to give notice where it is practical and lawful. Where fees are unpaid, the process in the Merchant Agreement applies.',
           'On termination your right to use the Service ends, unpaid fees become due, and your store and data are then deleted as described in the Merchant Agreement and the Privacy Policy. Sections that by their nature should survive (including 5, 10, 11, 12, 14 and 16) survive.',
         ],
@@ -151,13 +151,13 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '16. Governing law and disputes',
         p: [
-          'These terms are governed by the laws of the Arab Republic of Egypt. Before starting any proceeding, both sides will try in good faith to settle the dispute by writing to the other (to us: hello@ebda.app) and allowing 30 days. Failing that, the courts of Cairo have exclusive jurisdiction. This does not take away any right that a consumer has under Consumer Protection Law No. 181 of 2018 where it applies mandatorily.',
+          'These terms are governed by the laws of the Arab Republic of Egypt. Before starting any proceeding, both sides will try in good faith to settle the dispute by writing to the other (to us: ahlan@ebda.app) and allowing 30 days. Failing that, the courts of Cairo have exclusive jurisdiction. This does not take away any right that a consumer has under Consumer Protection Law No. 181 of 2018 where it applies mandatorily.',
         ],
       },
       {
         h: '17. General',
         p: [
-          'These documents are the entire agreement on their subject. If a provision is invalid, the rest remains valid. Our not enforcing a right is not a waiver. You may not transfer your rights without our written consent; we may transfer ours with the business. If the Arabic and English texts differ, the Arabic text prevails. Contact: hello@ebda.app.',
+          'These documents are the entire agreement on their subject. If a provision is invalid, the rest remains valid. Our not enforcing a right is not a waiver. You may not transfer your rights without our written consent; we may transfer ours with the business. If the Arabic and English texts differ, the Arabic text prevails. Contact: ahlan@ebda.app.',
         ],
       },
     ],
@@ -259,7 +259,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '16. Governing law',
         p: [
-          'Egyptian law governs this agreement, and the courts of Cairo have exclusive jurisdiction, after the 30-day good-faith negotiation described in the Terms of Service. Contact: hello@ebda.app.',
+          'Egyptian law governs this agreement, and the courts of Cairo have exclusive jurisdiction, after the 30-day good-faith negotiation described in the Terms of Service. Contact: ahlan@ebda.app.',
         ],
       },
     ],
@@ -301,7 +301,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '6. Enforcement',
         p: [
-          'If we believe this policy has been breached, we may, without notice and at our discretion, remove content or products, hide or suspend a store, restrict features, terminate the account, withhold refunds of fees, and report to authorities or cooperate with lawful requests. We have no duty to monitor, and our not acting is not permission. Report abuse to hello@ebda.app.',
+          'If we believe this policy has been breached, we may, without notice and at our discretion, remove content or products, hide or suspend a store, restrict features, terminate the account, withhold refunds of fees, and report to authorities or cooperate with lawful requests. We have no duty to monitor, and our not acting is not permission. Report abuse to ahlan@ebda.app.',
         ],
       },
     ],
@@ -312,7 +312,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '1. Who this covers',
         p: [
-          "This policy explains how Ebda (a product of Whisky 11) handles personal data under Egypt's Personal Data Protection Law No. 151 of 2020. It covers: merchants and their staff who use Ebda; visitors to ebda.app; and shoppers who buy from a merchant's store. Contact: hello@ebda.app.",
+          "This policy explains how Ebda (a product of Whisky 11) handles personal data under Egypt's Personal Data Protection Law No. 151 of 2020. It covers: merchants and their staff who use Ebda; visitors to ebda.app; and shoppers who buy from a merchant's store. Contact: ahlan@ebda.app.",
         ],
       },
       {
@@ -359,7 +359,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '8. Your rights',
         p: [
-          "Under Law No. 151 of 2020 you may ask to access, correct, update or delete your data, to restrict or object to processing, and to withdraw consent. Write to hello@ebda.app; we may need to verify your identity, and will reply within a reasonable time. Requests about a shopper's data in a merchant's store are passed to that merchant. You may also complain to the Personal Data Protection Centre in Egypt.",
+          "Under Law No. 151 of 2020 you may ask to access, correct, update or delete your data, to restrict or object to processing, and to withdraw consent. Write to ahlan@ebda.app; we may need to verify your identity, and will reply within a reasonable time. Requests about a shopper's data in a merchant's store are passed to that merchant. You may also complain to the Personal Data Protection Centre in Egypt.",
         ],
       },
       {
@@ -383,7 +383,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '12. Changes and contact',
         p: [
-          'We may update this policy and will post the new version here with its date; we will notify merchants of material changes. Questions: hello@ebda.app.',
+          'We may update this policy and will post the new version here with its date; we will notify merchants of material changes. Questions: ahlan@ebda.app.',
         ],
       },
     ],
