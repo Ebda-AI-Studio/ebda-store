@@ -29,3 +29,4 @@ export * from './order-tax-display';
 export * from './tax-profile';
 export * from './setup-guide';
 export * from './whatsapp';
+export * from './builder';

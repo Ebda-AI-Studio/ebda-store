@@ -1,0 +1,89 @@
+{
+  "hero": {
+    "enabled": true,
+    "mode": "slider",
+    "autoplayMs": 6000,
+    "presentation": "framed",
+    "bgColor": "#5b3a29",
+    "slides": [
+      {
+        "image": "https://pub-test.r2.dev/hero/a.jpg",
+        "imageAr": "https://pub-test.r2.dev/hero/a-ar.jpg",
+        "imageMobile": "https://pub-test.r2.dev/hero/a-m.jpg",
+        "headline": "Fresh roasted nuts",
+        "headlineAr": "مكسرات محمصة طازجة",
+        "ctaText": "Shop now",
+        "ctaTextAr": "تسوق الآن",
+        "ctaHref": "/products"
+      },
+      { "image": "https://pub-test.r2.dev/hero/b.jpg", "link": "/categories/dates" }
+    ],
+    "typography": { "heading": { "fontWeight": "700", "color": "token:primary" } }
+  },
+  "categories": {
+    "enabled": true,
+    "layout": "horizontal",
+    "captionPosition": "overlay",
+    "desktopColumns": 4,
+    "mobileColumns": 2,
+    "title": "Our range",
+    "titleAr": "تشكيلتنا",
+    "kicker": "Since 1990",
+    "kickerAr": "منذ ١٩٩٠",
+    "showKickerLines": true,
+    "cardShape": "circle",
+    "cardSize": "sm",
+    "bgColor": "#f7efe6",
+    "dividers": { "above": { "enabled": true, "style": "dashed" } }
+  },
+  "newArrivals": {
+    "enabled": true,
+    "limit": 8,
+    "bgColor": "#5b3a29",
+    "cardFrameStyle": "paper",
+    "showCardFrame": true
+  },
+  "bestSellers": {
+    "enabled": true,
+    "limit": 8,
+    "title": "Loved by Cairo",
+    "titleAr": "الأكثر طلباً"
+  },
+  "testimonials": { "enabled": true, "minRating": 4, "verifiedOnly": true, "bgColor": "#f7efe6" },
+  "brandStory": { "enabled": true, "paddingTop": "loose" },
+  "trustStrip": {
+    "enabled": true,
+    "layout": "horizontal",
+    "size": "sm",
+    "iconColor": "token:accent"
+  },
+  "blogCarousel": { "enabled": false },
+  "sectionOrder": [
+    "hero",
+    "bestSellers",
+    "categories",
+    "newArrivals",
+    "trustStrip",
+    "brandStory",
+    "testimonials",
+    "blogCarousel"
+  ],
+  "extraCarousels": [
+    {
+      "id": "6f1c2a7e-1b4d-4f7e-9a51-0d6c1b2e3f40",
+      "enabled": true,
+      "limit": 6,
+      "productSource": "category",
+      "categorySlug": "dates",
+      "title": "Dates",
+      "titleAr": "تمور",
+      "bgColor": "#5b3a29",
+      "dividers": { "above": { "enabled": true } }
+    }
+  ],
+  "productCardDefaults": {
+    "showCardPrice": true,
+    "cardImageAspect": "4:5",
+    "cardImageRadius": "md"
+  }
+}

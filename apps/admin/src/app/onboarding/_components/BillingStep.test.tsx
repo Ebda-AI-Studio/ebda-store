@@ -143,13 +143,49 @@ describe('BillingStep', () => {
     expect(screen.getByText('ebda@instapay')).toBeTruthy();
     expect(screen.getByText('EGP 3,490.00')).toBeTruthy();
     expect(screen.getByText('EBD-7K2Q')).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: /onboarding\.flow\.billing\.copy/ })).toHaveLength(
-      3
-    );
+    expect(screen.getAllByRole('button', { name: /billing\.instapay\.copy/ })).toHaveLength(3);
+    // No QR configured -> no image at all (never a broken one); no VAT line while VAT is OFF.
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.queryByTestId('instapay-vat')).toBeNull();
     expect(screen.getByText(/instapayHow:\{"date":"20 November 2026"\}/)).toBeTruthy();
     expect(next().disabled).toBe(false);
     fireEvent.click(next());
     expect(onDone).toHaveBeenCalled();
+  });
+
+  it('InstaPay QR + phone steps + VAT line when configured; a QR that fails to load is hidden', () => {
+    setup(
+      billingFixture({
+        trialCardMode: 'pay_at_trial_end',
+        billingMethod: 'instapay',
+        instapay: {
+          available: true,
+          handle: 'voidengineer911@instapay',
+          reference: 'EBD-7K2Q',
+          amountMinor: 397860,
+          qrUrl: 'https://media.ebda.app/platform/instapay-qr.jpg',
+          vat: {
+            netMinor: 349000,
+            vatMinor: 48860,
+            rateBps: 1400,
+            mode: 'exclusive',
+            trn: '123456789',
+            legalName: 'Whisky 11',
+          },
+          pendingClaims: 0,
+        },
+      })
+    );
+    const img = screen.getByRole('img', { name: 'billing.instapay.qrAlt' }) as HTMLImageElement;
+    expect(img.getAttribute('src')).toBe('https://media.ebda.app/platform/instapay-qr.jpg');
+    expect(screen.getByRole('list', { name: 'billing.instapay.phoneTitle' })).toBeTruthy();
+    expect(screen.getByText('EGP 3,978.60')).toBeTruthy();
+    const vat = screen.getByTestId('instapay-vat').textContent ?? '';
+    expect(vat).toContain('"rate":14');
+    expect(vat).toContain('"vat":"EGP 488.60"');
+    expect(vat).toContain('"trn":"123456789"');
+    fireEvent.error(img);
+    expect(screen.queryByRole('img')).toBeNull();
   });
 
   it('with no way to pay it says so clearly and still lets the merchant continue', () => {

@@ -65,12 +65,17 @@ import {
 import { runBillingEffects, type BillingEffect } from './billing-notify';
 import { suspendForBilling } from './account.service';
 import { auditLog } from '../../middleware/security';
-import { instapayHandle, supportWhatsappUrl } from './manual-config';
+import { instapayHandle, instapayQrUrl, supportContact } from './manual-config';
 import { findReminderCandidates, sendDueReminder } from './reminders.service';
-import { subscriptionChargeAmount } from './charge-amount';
-
-/** Plan price -> amount charged. ONE seam for platform VAT (charge-amount.ts). */
-const charged = (priceMinor: number): number => subscriptionChargeAmount(priceMinor).totalMinor;
+import {
+  chargeFor,
+  ledgerVat,
+  resolvePlatformVat,
+  subscriptionChargeAmount,
+  type ChargeAmount,
+  type LedgerVat,
+  type PlatformVat,
+} from './charge-amount';
 
 type Tx = Prisma.TransactionClient;
 
@@ -124,6 +129,8 @@ interface ClaimInput {
   forPeriodEnd?: Date | null;
   attempt?: number;
   amountMinor: number;
+  /** The charge this row records (platform VAT split); absent = no VAT (refunds, card setup). */
+  charge?: ChargeAmount;
   provider: string;
   idempotencyKey: string;
   relatedEventId?: string | null;
@@ -142,6 +149,12 @@ async function inEventStore<T>(
 ): Promise<T> {
   const storeId = await getEntityStoreId('billing_event', eventId);
   return storeId ? withStore(storeId, tx => fn(tx, storeId)) : whenMissing;
+}
+
+/** `billing_events.vat_minor` + `vat` for a charge (no VAT -> 0 / DB NULL). */
+function vatColumns(charge: ChargeAmount | undefined) {
+  const { vatMinor, vat } = charge ? ledgerVat(charge) : { vatMinor: 0, vat: null };
+  return { vatMinor, vat: vat ? (vat as unknown as Prisma.InputJsonValue) : undefined };
 }
 
 /**
@@ -169,6 +182,7 @@ async function claimEvent(input: ClaimInput): Promise<string | null> {
           idempotencyKey: input.idempotencyKey,
           status: 'pending',
           relatedEventId: input.relatedEventId ?? null,
+          ...vatColumns(input.charge),
         },
       ],
       skipDuplicates: true,
@@ -631,13 +645,16 @@ export async function startCheckout(args: {
     throw new AppError(409, 'NO_BILLING_EMAIL', 'The store owner has no email address');
   }
 
+  // ONE VAT read per charge: the ledger row and the provider see the same amount.
+  const amount = await chargeFor(price);
   const eventId = await claimEvent({
     storeId: args.storeId,
     subscriptionId: sub?.id,
     type: 'checkout',
     planCode: plan.code,
     billingInterval: interval,
-    amountMinor: charged(price),
+    amountMinor: amount.totalMinor,
+    charge: amount,
     provider: provider.name,
     // Unique per attempt: each "Upgrade" click is its own checkout session.
     idempotencyKey: `checkout:${args.storeId}:${crypto.randomUUID()}`,
@@ -649,7 +666,7 @@ export async function startCheckout(args: {
   try {
     const out = await provider.createCheckoutForSubscription({
       merchantOrderId: eventId,
-      amountMinor: charged(price),
+      amountMinor: amount.totalMinor,
       currency: 'EGP',
       description: `${plan.nameEn} (${interval})`,
       customer: { reference: args.storeId, email: store.owner.email, name: store.owner.firstName },
@@ -696,7 +713,11 @@ export async function selectTrialPlan(args: {
   if (count === 0) {
     throw new AppError(409, 'NOT_TRIALING', 'The plan can only be chosen here during the trial');
   }
-  return { planCode: plan.code, interval: args.interval, amountMinor: charged(price) };
+  return {
+    planCode: plan.code,
+    interval: args.interval,
+    amountMinor: (await chargeFor(price)).totalMinor,
+  };
 }
 
 /**
@@ -858,6 +879,7 @@ export async function renewSubscription(
   const key = trialEnd
     ? `sub:${sub.id}:trial-end:${periodEnd.toISOString()}`
     : renewalKey(sub.id, periodEnd, attempt);
+  const amount = await chargeFor(price);
   const eventId = await claimEvent({
     storeId: sub.storeId,
     subscriptionId: sub.id,
@@ -866,7 +888,8 @@ export async function renewSubscription(
     billingInterval: interval,
     forPeriodEnd: periodEnd,
     attempt,
-    amountMinor: charged(price),
+    amountMinor: amount.totalMinor,
+    charge: amount,
     provider: provider.name,
     idempotencyKey: key,
   });
@@ -887,7 +910,7 @@ export async function renewSubscription(
     provider,
     eventId,
     token,
-    amountMinor: charged(price),
+    amountMinor: amount.totalMinor,
     idempotencyKey: key,
     description: `${plan.nameEn} subscription (${interval})`,
     now,
@@ -1114,6 +1137,7 @@ export async function changePlan(args: {
     if (prior.some(p => p.status === 'pending')) {
       throw new AppError(409, 'UPGRADE_IN_PROGRESS', 'An upgrade charge is already in progress');
     }
+    const amount = await chargeFor(price);
     const eventId = await claimEvent({
       storeId: args.storeId,
       subscriptionId: sub.id,
@@ -1121,7 +1145,8 @@ export async function changePlan(args: {
       planCode: plan.code,
       billingInterval: interval,
       forPeriodEnd: sub.currentPeriodEnd,
-      amountMinor: charged(price),
+      amountMinor: amount.totalMinor,
+      charge: amount,
       provider: provider.name,
       idempotencyKey: upgradeKey(sub.id, plan.code, sub.currentPeriodEnd, prior.length + 1),
     });
@@ -1142,7 +1167,7 @@ export async function changePlan(args: {
       provider,
       eventId,
       token,
-      amountMinor: charged(price),
+      amountMinor: amount.totalMinor,
       idempotencyKey: upgradeKey(sub.id, plan.code, sub.currentPeriodEnd, prior.length + 1),
       description: `${plan.nameEn} upgrade (${interval})`,
       now,
@@ -1482,6 +1507,9 @@ const PUBLIC_FIELDS = {
   planCode: true,
   billingInterval: true,
   amountMinor: true,
+  /** Ebda VAT inside amountMinor + the snapshot (rate, mode, Ebda TRN/legal name) for the invoice. */
+  vatMinor: true,
+  vat: true,
   currency: true,
   status: true,
   failureReason: true,
@@ -1558,6 +1586,8 @@ export async function listLedger(args: {
     planCode: r.planCode,
     billingInterval: r.billingInterval,
     amountMinor: r.amountMinor,
+    vatMinor: r.vatMinor,
+    vat: r.vat,
     currency: r.currency,
     provider: r.provider,
     providerRef: r.providerRef,
@@ -1596,8 +1626,15 @@ type BillingStateSub = {
  */
 export function nextChargeOf(
   sub: BillingStateSub | null,
-  plans: Array<{ code: string; priceMonthlyMinor: number | null; priceYearlyMinor: number | null }>
-): { at: Date; planCode: string; amountMinor: number | null } | null {
+  plans: Array<{ code: string; priceMonthlyMinor: number | null; priceYearlyMinor: number | null }>,
+  vat: PlatformVat
+): {
+  at: Date;
+  planCode: string;
+  amountMinor: number | null;
+  /** Ebda VAT inside `amountMinor` (null = no VAT line). */
+  vat: LedgerVat | null;
+} | null {
   if (
     !sub ||
     sub.cancelAtPeriodEnd ||
@@ -1621,7 +1658,9 @@ export function nextChargeOf(
     ? sub.billingInterval
     : 'monthly';
   const price = plan ? priceFor(plan, interval) : null;
-  return { at, planCode, amountMinor: price === null ? null : charged(price) };
+  if (price === null) return { at, planCode, amountMinor: null, vat: null };
+  const charge = subscriptionChargeAmount(price, vat);
+  return { at, planCode, amountMinor: charge.totalMinor, vat: ledgerVat(charge).vat };
 }
 
 /** Billing-cycle facts the merchant Billing page needs beyond the entitlements. */
@@ -1643,10 +1682,12 @@ export async function getSubscriptionBillingState(storeId: string) {
   const pendingClaims = await withStore(storeId, tx =>
     tx.manualPaymentClaim.count({ where: { storeId, status: 'pending' } })
   );
-  const next = nextChargeOf(sub, plans);
+  const vat = await resolvePlatformVat();
+  const next = nextChargeOf(sub, plans, vat);
   const now = Date.now();
   const daysLeft = next ? Math.ceil((next.at.getTime() - now) / 86_400_000) : null;
   const handle = instapayHandle();
+  const support = supportContact();
   return {
     billingInterval: sub?.billingInterval ?? 'monthly',
     pendingPlanCode: sub?.pendingPlanCode ?? null,
@@ -1662,6 +1703,10 @@ export async function getSubscriptionBillingState(storeId: string) {
       handle,
       reference: sub?.paymentReference ?? null,
       amountMinor: next?.amountMinor ?? null,
+      /** Ebda VAT inside the amount + Ebda's TRN/legal name; null = no VAT line. */
+      vat: next?.vat ?? null,
+      /** Ebda's InstaPay QR image (EBDA_INSTAPAY_QR_URL); null = no QR shown. */
+      qrUrl: handle ? instapayQrUrl() : null,
       pendingClaims,
     },
     /** Banner input: the next due date when it is within 7 days (or already past). */
@@ -1674,7 +1719,9 @@ export async function getSubscriptionBillingState(storeId: string) {
     suspendAt:
       sub?.billingMethod === 'instapay' && sub.status === 'past_due' ? sub.nextRetryAt : null,
     /** wa.me link to Ebda support (no WhatsApp API); null when not configured. */
-    supportWhatsappUrl: supportWhatsappUrl(),
+    supportWhatsappUrl: support.whatsappUrl,
+    /** Always set (EBDA_SUPPORT_EMAIL, default BRAND.supportEmail): the fallback contact. */
+    supportEmail: support.email,
     suspension: store?.billingSuspendedReason
       ? { reason: store.billingSuspendedReason, at: store.billingSuspendedAt }
       : null,
@@ -1686,7 +1733,7 @@ export async function getSubscriptionBillingState(storeId: string) {
         }
       : null,
     trialEndsAt: sub?.status === 'trialing' ? sub.trialEndsAt : null,
-    nextCharge: nextChargeOf(sub, plans),
+    nextCharge: next,
     trialCardMode,
   };
 }
@@ -1703,6 +1750,7 @@ export async function listSubscriptionsForAdmin(
   const plans = await prisma.plan.findMany({
     select: { code: true, priceMonthlyMinor: true, priceYearlyMinor: true },
   });
+  const vat = await resolvePlatformVat();
   const parts = await acrossStores(
     storeId =>
       prisma.storeSubscription.findMany({
@@ -1728,7 +1776,7 @@ export async function listSubscriptionsForAdmin(
       if (args.view === 'suspended') return !!sub.store.billingSuspendedReason;
       if (args.view === 'overdue') return sub.status === 'past_due';
       if (args.view === 'due') {
-        const n = nextChargeOf(sub, plans);
+        const n = nextChargeOf(sub, plans, vat);
         return !!n && n.at.getTime() <= soon;
       }
       return true;
@@ -1759,6 +1807,6 @@ export async function listSubscriptionsForAdmin(
       dunningAttempts: sub.dunningAttempts,
       nextRetryAt: sub.nextRetryAt,
       currentPeriodEnd: sub.currentPeriodEnd,
-      nextCharge: nextChargeOf(sub, plans),
+      nextCharge: nextChargeOf(sub, plans, vat),
     }));
 }

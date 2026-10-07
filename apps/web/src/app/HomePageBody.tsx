@@ -7,6 +7,8 @@ import {
   resolveLayoutSettings,
   type StoreLayoutSettings,
   resolveDefaultLanguage,
+  pageDefinitionSchema,
+  type PageDefinition,
 } from '@force/shared';
 import { storeJsonLd, breadcrumbJsonLd, itemList, storeAbsoluteUrl } from '../lib/structured-data';
 import { JsonLd } from '../components/JsonLd';
@@ -243,6 +245,16 @@ interface DraftBundle {
   layout: StoreLayoutSettings;
   typography?: unknown;
   theme?: unknown;
+  /** Published builder document (committed path only). Structurally
+   *  validated here; an invalid one is ignored and the page renders from
+   *  `layout` via the adapter, which is what it rendered before. */
+  definition?: PageDefinition;
+}
+
+function parseDefinition(raw: unknown): PageDefinition | undefined {
+  if (!raw) return undefined;
+  const parsed = pageDefinitionSchema.safeParse(raw);
+  return parsed.success ? parsed.data : undefined;
 }
 
 async function fetchLayoutSettings(storeId: string, draftToken?: string): Promise<DraftBundle> {
@@ -269,6 +281,7 @@ async function fetchLayoutSettings(storeId: string, draftToken?: string): Promis
       // served — the committed-layout path returns just `layout`.
       typography: json?.data?.typography,
       theme: json?.data?.theme,
+      definition: draftToken ? undefined : parseDefinition(json?.data?.definition),
     };
   } catch {
     return { layout: resolveLayoutSettings({}) };
@@ -398,6 +411,7 @@ export async function HomePageBody({
         extraProducts={extraProducts}
         storeName={store.name}
         layout={layout}
+        definition={draftBundle.definition}
       />
     </>
   );

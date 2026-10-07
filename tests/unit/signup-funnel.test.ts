@@ -12,6 +12,7 @@ import { KashierBillingProvider } from '@api/services/billing/kashier.provider';
 import { BillingProviderError } from '@api/services/billing/types';
 import { reminderKindAt, reminderDueAt } from '@api/services/billing/reminders.service';
 import { nextChargeOf } from '@api/services/billing/subscription-billing.service';
+import { PLATFORM_VAT_OFF } from '@api/services/billing/charge-amount';
 import { instapayHandle, supportWhatsappUrl } from '@api/services/billing/manual-config';
 
 const DAY = 86_400_000;
@@ -212,16 +213,31 @@ describe('nextChargeOf', () => {
     providerPaymentMethodRef: 'x',
   };
   it('a trial bills the CHOSEN plan at the chosen interval on the trial end', () => {
-    expect(nextChargeOf(sub, plans)).toEqual({
+    expect(nextChargeOf(sub, plans, PLATFORM_VAT_OFF)).toEqual({
       at: later,
       planCode: 'basic',
       amountMinor: 1341000,
+      vat: null,
+    });
+  });
+  it('Ebda VAT exclusive: the next charge adds 14% and carries the VAT line', () => {
+    const vat = {
+      enabled: true,
+      rateBps: 1400,
+      mode: 'exclusive' as const,
+      trn: '1',
+      legalName: 'W',
+    };
+    expect(nextChargeOf(sub, plans, vat)).toMatchObject({
+      amountMinor: 1528740,
+      vat: { netMinor: 1341000, vatMinor: 187740, rateBps: 1400, trn: '1' },
     });
   });
   it('nothing when canceling, comped or free', () => {
-    expect(nextChargeOf({ ...sub, cancelAtPeriodEnd: true }, plans)).toBeNull();
-    expect(nextChargeOf({ ...sub, planCode: 'comped', status: 'comped' }, plans)).toBeNull();
-    expect(nextChargeOf({ ...sub, planCode: 'free', status: 'canceled' }, plans)).toBeNull();
+    const off = PLATFORM_VAT_OFF;
+    expect(nextChargeOf({ ...sub, cancelAtPeriodEnd: true }, plans, off)).toBeNull();
+    expect(nextChargeOf({ ...sub, planCode: 'comped', status: 'comped' }, plans, off)).toBeNull();
+    expect(nextChargeOf({ ...sub, planCode: 'free', status: 'canceled' }, plans, off)).toBeNull();
   });
 });
 
@@ -319,10 +335,9 @@ describe('requireStoreAccess: over_store_limit store', () => {
 
 describe('subscription charge amount (single platform-VAT seam)', () => {
   it('VAT OFF (today): total equals the plan price exactly, no VAT line', async () => {
-    const { subscriptionChargeAmount, resolvePlatformVat } =
+    const { subscriptionChargeAmount, PLATFORM_VAT_OFF: off } =
       await import('@api/services/billing/charge-amount');
-    expect(resolvePlatformVat().enabled).toBe(false);
-    expect(subscriptionChargeAmount(349000)).toEqual({
+    expect(subscriptionChargeAmount(349000, off)).toEqual({
       totalMinor: 349000,
       netMinor: 349000,
       vatMinor: 0,

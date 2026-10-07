@@ -38,6 +38,7 @@ import { getPlatformVat, updatePlatformVat } from '@api/services/platform-vat.se
 import { taxProfilesForReview } from '@api/lib/definer';
 import { StubBillingProvider } from '@api/services/billing';
 import { startCheckout } from '@api/services/billing/subscription-billing.service';
+import { recordManualPayment } from '@api/services/billing/account.service';
 
 // The card checkout path is exercised explicitly; the product default is InstaPay-only.
 process.env.BILLING_TRIAL_CARD_MODE = 'card_on_file';
@@ -368,12 +369,27 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
     expect(audit).toBeGreaterThan(0);
   });
 
+  // Hosted card checkout needs card mode since Ruling EBDA-FUNNEL-17 (InstaPay-only default);
+  // these tests exercise the card path explicitly (Ruling EBDA-BILLFU-4: this test was red on main).
+  const withCardMode = async <T>(fn: () => Promise<T>): Promise<T> => {
+    const prev = process.env.BILLING_TRIAL_CARD_MODE;
+    process.env.BILLING_TRIAL_CARD_MODE = 'card_on_file';
+    try {
+      return await fn();
+    } finally {
+      if (prev === undefined) delete process.env.BILLING_TRIAL_CARD_MODE;
+      else process.env.BILLING_TRIAL_CARD_MODE = prev;
+    }
+  };
+
   it('while Ebda VAT is OFF a subscription checkout is the plan price alone (no VAT)', async () => {
     await owner.systemSetting.deleteMany({ where: { key: 'ebda.vat' } });
     expect((await getPlatformVat()).enabled).toBe(false);
     const s = await mkStore('billing');
     const stub = new StubBillingProvider();
-    await startCheckout({ storeId: s.storeId, planCode: 'growth', provider: stub });
+    await withCardMode(() =>
+      startCheckout({ storeId: s.storeId, planCode: 'growth', provider: stub })
+    );
     const call = stub.checkoutCalls.at(-1) as Record<string, unknown>;
     // Growth = EGP 3,490/month (locked catalog): exactly the plan price.
     expect(call.amountMinor).toBe(349000);
@@ -385,5 +401,92 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
       tx.billingEvent.findFirst({ where: { storeId: s.storeId }, orderBy: { createdAt: 'desc' } })
     );
     expect(row?.amountMinor).toBe(349000);
+    // Ruling EBDA-BILLFU-3: OFF records no VAT on the ledger row.
+    expect(row?.vatMinor).toBe(0);
+    expect(row?.vat).toBeNull();
+  });
+
+  // Ruling EBDA-BILLFU-3: Ebda VAT ON reaches the real charge path (provider + ledger).
+  for (const [mode, total, vatMinor, net] of [
+    ['exclusive', 397860, 48860, 349000],
+    ['inclusive', 349000, 42860, 306140],
+  ] as const) {
+    it(`Ebda VAT ON (${mode}): the checkout charges ${total} and the ledger row records the VAT split + TRN`, async () => {
+      await asApp(() =>
+        updatePlatformVat(
+          { enabled: true, rate: 14, mode, trn: '987654321', legalName: 'Whisky 11' },
+          { userId: superAdminId }
+        )
+      );
+      try {
+        const s = await mkStore(`billing-${mode}`);
+        const stub = new StubBillingProvider();
+        await withCardMode(() =>
+          startCheckout({ storeId: s.storeId, planCode: 'growth', provider: stub })
+        );
+        const call = stub.checkoutCalls.at(-1) as Record<string, unknown>;
+        expect(call.amountMinor).toBe(total);
+        const row = await withRlsBypass(tx =>
+          tx.billingEvent.findFirst({
+            where: { storeId: s.storeId },
+            orderBy: { createdAt: 'desc' },
+          })
+        );
+        expect(row?.amountMinor).toBe(total);
+        expect(row?.vatMinor).toBe(vatMinor);
+        expect(row?.vat).toEqual({
+          netMinor: net,
+          vatMinor,
+          rateBps: 1400,
+          mode,
+          trn: '987654321',
+          legalName: 'Whisky 11',
+        });
+      } finally {
+        await owner.systemSetting.deleteMany({ where: { key: 'ebda.vat' } });
+      }
+    });
+  }
+
+  it('Ebda VAT ON: a recorded InstaPay payment carves the VAT out of the money received; OFF records none', async () => {
+    const pay = (storeId: string, reference: string) =>
+      recordManualPayment({
+        storeId,
+        planCode: 'growth',
+        interval: 'monthly',
+        amountMinor: 397860,
+        method: 'instapay',
+        reference,
+        paidAt: new Date(),
+        periodStart: new Date(),
+        periodEnd: new Date(Date.now() + 30 * 86_400_000),
+        actorId: superAdminId,
+      });
+    const rowOf = (id: string) =>
+      withRlsBypass(tx => tx.billingEvent.findUnique({ where: { id } }));
+
+    const off = await mkStore('manual-off');
+    await owner.systemSetting.deleteMany({ where: { key: 'ebda.vat' } });
+    const r0 = await pay(off.storeId, `IPN-OFF-${run}`);
+    expect((await rowOf(r0.billingEventId))?.vatMinor).toBe(0);
+
+    await asApp(() =>
+      updatePlatformVat(
+        { enabled: true, rate: 14, mode: 'exclusive', trn: '987654321', legalName: 'Whisky 11' },
+        { userId: superAdminId }
+      )
+    );
+    try {
+      const on = await mkStore('manual-on');
+      const r1 = await pay(on.storeId, `IPN-ON-${run}`);
+      const row = await rowOf(r1.billingEventId);
+      expect(row?.amountMinor).toBe(397860);
+      expect(row?.vatMinor).toBe(48860);
+      // Replaying the same reference is idempotent: one row, VAT unchanged.
+      const again = await pay(on.storeId, `IPN-ON-${run}`);
+      expect(again).toEqual({ duplicate: true, billingEventId: r1.billingEventId });
+    } finally {
+      await owner.systemSetting.deleteMany({ where: { key: 'ebda.vat' } });
+    }
   });
 });

@@ -1,12 +1,16 @@
 /**
  * THE single place a subscription charge amount is computed (plan price -> what
- * the merchant pays), so Ebda's platform VAT can be applied in one spot later.
+ * the merchant pays), so Ebda's platform VAT is applied in one spot.
  *
- * `resolvePlatformVat()` is the seam for the VAT agent's `getPlatformVat()`
- * (super-admin switch, default OFF). While it is OFF the total equals the plan
- * price exactly and there is no VAT line — today it always is OFF. Integer
- * piastres only; rate in basis points (14% = 1400).
+ * `resolvePlatformVat()` reads the super-admin "Ebda VAT" setting through
+ * `getPlatformVat()` (default OFF, fail closed, uncached: it decides money).
+ * While it is OFF the total equals the plan price exactly and there is no VAT
+ * line. Integer piastres only; rate in basis points (14% = 1400).
+ * Ruling EBDA-BILLFU-3.
  */
+import type { PlatformVat as StoredPlatformVat } from '@force/shared';
+import { getPlatformVat } from '../platform-vat.service';
+
 export interface PlatformVat {
   enabled: boolean;
   rateBps: number;
@@ -30,17 +34,69 @@ export interface ChargeAmount {
   } | null;
 }
 
-const OFF: PlatformVat = { enabled: false, rateBps: 0, mode: 'exclusive' };
+export const PLATFORM_VAT_OFF: PlatformVat = { enabled: false, rateBps: 0, mode: 'exclusive' };
 
-/** Seam: replace the body with `getPlatformVat()` when the VAT setting lands. */
-export function resolvePlatformVat(): PlatformVat {
-  return OFF;
+/** The stored setting (rate in percent) -> the charge math's shape (basis points). */
+export function toChargeVat(v: StoredPlatformVat): PlatformVat {
+  if (!v.enabled) return PLATFORM_VAT_OFF;
+  return {
+    enabled: true,
+    rateBps: Math.round(v.rate * 100),
+    mode: v.mode,
+    trn: v.trn,
+    legalName: v.legalName,
+  };
 }
 
-export function subscriptionChargeAmount(
-  priceMinor: number,
-  vat: PlatformVat = resolvePlatformVat()
-): ChargeAmount {
+/** Ebda's VAT right now (one indexed read; never cached, see platform-vat.service). */
+export async function resolvePlatformVat(): Promise<PlatformVat> {
+  return toChargeVat(await getPlatformVat());
+}
+
+/**
+ * The amount for a plan price under the CURRENT platform VAT. Call it once per
+ * charge and use the same result for the ledger row and the provider call.
+ */
+export async function chargeFor(priceMinor: number): Promise<ChargeAmount> {
+  return subscriptionChargeAmount(priceMinor, await resolvePlatformVat());
+}
+
+/**
+ * VAT inside an amount already PAID (a manual InstaPay/bank payment the
+ * super-admin records): whatever the mode, the money received is the gross, so
+ * the VAT is carved out of it. OFF -> no VAT.
+ */
+export function vatOfPaidAmount(paidMinor: number, vat: PlatformVat): ChargeAmount {
+  return subscriptionChargeAmount(paidMinor, { ...vat, mode: 'inclusive' });
+}
+
+/** What a `billing_events` row records about VAT (column `vat_minor` + `vat` JSON). */
+export function ledgerVat(a: ChargeAmount): { vatMinor: number; vat: LedgerVat | null } {
+  if (!a.vat) return { vatMinor: 0, vat: null };
+  return {
+    vatMinor: a.vatMinor,
+    vat: {
+      netMinor: a.netMinor,
+      vatMinor: a.vatMinor,
+      rateBps: a.vat.rateBps,
+      mode: a.vat.mode,
+      trn: a.vat.trn,
+      legalName: a.vat.legalName,
+    },
+  };
+}
+
+export interface LedgerVat {
+  netMinor: number;
+  vatMinor: number;
+  rateBps: number;
+  mode: 'inclusive' | 'exclusive';
+  trn: string | null;
+  legalName: string | null;
+}
+
+/** Pure math. `vat` is required on purpose: every caller must decide where VAT comes from. */
+export function subscriptionChargeAmount(priceMinor: number, vat: PlatformVat): ChargeAmount {
   if (!Number.isSafeInteger(priceMinor) || priceMinor < 0) {
     throw new RangeError(`Invalid price ${priceMinor}: integer piastres expected`);
   }

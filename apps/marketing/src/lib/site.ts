@@ -8,14 +8,24 @@ export const LOGIN_URL = `${BRAND_ADMIN_URL}/login`;
 export const SIGNUP_URL = `${BRAND_ADMIN_URL}/signup`;
 export const SECURITY_EMAIL = `security@${BRAND.domains.marketing}`;
 
-/** Every public marketing page (same set in both locales). The sitemap is generated from this. */
-export const SITE_PAGES = ['', 'legal', 'privacy', 'terms'] as const;
-
 /** Home path per locale. Arabic is the default and lives at the root. */
 export const HOME: Record<Locale, string> = { ar: '/', en: '/en' };
 
+export const LEGAL_SLUGS = [
+  'legal',
+  'privacy',
+  'terms',
+  'merchant-agreement',
+  'acceptable-use',
+] as const;
+export type LegalSlug = (typeof LEGAL_SLUGS)[number];
+export type PageSlug = '' | LegalSlug;
+
+/** Every public marketing page (same set in both locales). The sitemap is generated from this. */
+export const SITE_PAGES = ['', ...LEGAL_SLUGS] as const;
+
 /** Page path (no trailing slash except root) for a locale, e.g. pagePath('en','privacy') -> /en/privacy */
-export function pagePath(locale: Locale, page: '' | 'legal' | 'privacy' | 'terms'): string {
+export function pagePath(locale: Locale, page: PageSlug): string {
   const base = locale === 'ar' ? '' : '/en';
   const p = page ? `${base}/${page}` : base;
   return p === '' ? '/' : p;
@@ -24,30 +34,21 @@ export function pagePath(locale: Locale, page: '' | 'legal' | 'privacy' | 'terms
 export const absoluteUrl = (p: string) =>
   `${SITE_URL}${p === '/' ? '/' : p + '/'}`.replace(/\/\/$/, '/');
 
-/** Section ids, in the binding page order (docs/ebda/plans §5 SP9). */
-export const SECTION_ORDER = [
-  'create',
-  'how',
-  'builder',
-  'products',
-  'orders',
-  'payments',
-  'whatsapp',
-  'analytics',
-  'pricing',
-  'stories',
-  'faq',
-  'login',
-] as const;
+/** Section ids, in page order. Ruling R-EBDA-COPY-1 (2026-10-07) replaced the 12-section
+ *  order from docs/ebda/plans/domains-and-marketing-site.md with this shorter one. */
+export const SECTION_ORDER = ['how', 'features', 'payments', 'pricing', 'faq', 'start'] as const;
 export type SectionId = (typeof SECTION_ORDER)[number];
 
 /** Top-nav items other than the wordmark and the two account actions. */
 export const NAV_ANCHORS = [
-  { key: 'features', target: 'builder' },
+  { key: 'features', target: 'features' },
   { key: 'solutions', target: 'how' },
   { key: 'pricing', target: 'pricing' },
   { key: 'resources', target: 'faq' },
 ] as const satisfies readonly { key: string; target: SectionId }[];
+
+/** Company behind Ebda; every mention links here. */
+export const COMPANY_URL = 'https://whisky11.com';
 
 /**
  * Customer-stories placeholder. Amelia Aurum is merchant #1; no quotes are

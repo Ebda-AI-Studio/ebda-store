@@ -44,7 +44,11 @@ export const BRAND = {
     /** Reserved for the post-launch automated WhatsApp tier. */
     whatsapp: 'whatsapp.ebda.app',
   },
-  supportEmail: 'support@ebda.app',
+  /**
+   * The ONE public contact address. Only hello@ and security@ receive mail
+   * (Cloudflare Email Routing), so this must stay hello@ (Ruling EBDA-BILLFU-5).
+   */
+  supportEmail: 'hello@ebda.app',
   noReplyEmail: 'no-reply@ebda.app',
   legalUrls: {
     terms: 'https://ebda.app/terms',

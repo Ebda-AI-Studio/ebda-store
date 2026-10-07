@@ -475,6 +475,7 @@ model Store {
   shippingCarrierConfigs   ShippingCarrierConfig[]
   shipments                Shipment[]
   codRemittances           CodRemittance[]
+  pageRevisions            StorePageRevision[]
   affiliates               Affiliate[]
   affiliateReferrals       AffiliateReferral[]
   affiliatePayouts         AffiliatePayout[]
@@ -1346,14 +1347,14 @@ model CartBundle {
 // ==========================================
 
 model Order {
-  id                    String             @id @default(uuid())
-  storeId               String             @map("store_id")
-  customerId            String?            @map("customer_id")
-  orderNumber           String             @unique @map("order_number")
-  status                OrderStatus        @default(pending)
-  paymentStatus         OrderPaymentStatus @default(unpaid) @map("payment_status")
-  subtotal              Int
-  tax                   Int                @default(0)
+  id                          String             @id @default(uuid())
+  storeId                     String             @map("store_id")
+  customerId                  String?            @map("customer_id")
+  orderNumber                 String             @unique @map("order_number")
+  status                      OrderStatus        @default(pending)
+  paymentStatus               OrderPaymentStatus @default(unpaid) @map("payment_status")
+  subtotal                    Int
+  tax                         Int                @default(0)
   // Did the store's listed prices ALREADY contain `tax` when this order was
   // placed? (ruling M3-7.)
   //   false (the default, and every order placed before this column existed)
@@ -1368,39 +1369,39 @@ model Order {
   // and every post-purchase display via `orderTaxPlacement` (@force/shared) —
   // invoice, confirmation email, admin + orders-app order cards, the account
   // order page — plus the XLSX export's "Tax Included In Price" column.
-  taxIncludedInPrice    Boolean            @default(false) @map("tax_included_in_price")
+  taxIncludedInPrice          Boolean            @default(false) @map("tax_included_in_price")
   // Frozen at creation ONLY when VAT was collected under a VERIFIED tax profile
   // (ruling TAX-2): the seller's tax registration number and legal name as they
   // stood at the sale, and the summed rate in basis points (1400 = 14%). They
   // make the invoice a "tax invoice"; NULL = not a tax invoice (no VAT wording).
   // A later revoke/re-verification never rewrites a past order.
-  sellerTaxRegistrationNumber String?      @map("seller_tax_registration_number")
-  sellerTaxLegalName          String?      @map("seller_tax_legal_name")
-  taxRateBps                  Int?         @map("tax_rate_bps")
-  shipping              Int                @default(0)
-  discount              Int                @default(0)
-  total                 Int
+  sellerTaxRegistrationNumber String?            @map("seller_tax_registration_number")
+  sellerTaxLegalName          String?            @map("seller_tax_legal_name")
+  taxRateBps                  Int?               @map("tax_rate_bps")
+  shipping                    Int                @default(0)
+  discount                    Int                @default(0)
+  total                       Int
   // Extra out-of-catalog amount used by merchant-initiated payment
   // links — a custom service fee, deposit, or quote that doesn't map
   // to a Product. Baked into `total` at order creation; rendered as
   // a synthetic line in admin order detail. extraAmountNote captures
   // what the charge is for ("Photography deposit", "Rush fee", etc.).
-  extraAmount           Int                @default(0) @map("extra_amount")
-  extraAmountNote       String?            @map("extra_amount_note")
-  currency              String             @default("EGP")
-  couponCode            String?            @map("coupon_code")
-  couponDiscount        Int                @default(0) @map("coupon_discount")
-  promotionDiscount     Int                @default(0) @map("promotion_discount")
-  appliedPromotionId    String?            @map("applied_promotion_id")
-  bundleDiscount        Int                @default(0) @map("bundle_discount")
+  extraAmount                 Int                @default(0) @map("extra_amount")
+  extraAmountNote             String?            @map("extra_amount_note")
+  currency                    String             @default("EGP")
+  couponCode                  String?            @map("coupon_code")
+  couponDiscount              Int                @default(0) @map("coupon_discount")
+  promotionDiscount           Int                @default(0) @map("promotion_discount")
+  appliedPromotionId          String?            @map("applied_promotion_id")
+  bundleDiscount              Int                @default(0) @map("bundle_discount")
   // Loyalty redemption applied at checkout. loyaltyPointsRedeemed is the
   // number of points the customer spent on this order (NULL = none redeemed
   // / pre-feature order); loyaltyDiscount is the resulting discount amount in
   // PIASTRES that was folded into `discount` + `total`. Both are written
   // atomically with LoyaltyService.redeemPoints inside the order-create
   // transaction, and read by reverseRedeemedPointsFromOrder on refund/cancel.
-  loyaltyPointsRedeemed Int?               @map("loyalty_points_redeemed")
-  loyaltyDiscount       Int                @default(0) @map("loyalty_discount")
+  loyaltyPointsRedeemed       Int?               @map("loyalty_points_redeemed")
+  loyaltyDiscount             Int                @default(0) @map("loyalty_discount")
   // Customer-wallet (store credit) portion of this order, in PIASTRES. `total`
   // keeps meaning "order value"; the amount any gateway / COD courier collects
   // is `total - walletAmount`. 0 for every order that did not use the wallet
@@ -1409,17 +1410,17 @@ model Order {
   // the `order_payment` ledger row inside the order-create transaction; read
   // by the `order/refunded` fanout to put the wallet portion back.
   // CHECK (wallet_amount >= 0) in migration 20260925150000_customer_wallet.
-  walletAmount          Int                @default(0) @map("wallet_amount")
-  notes                 String?
-  customerNotes         String?            @map("customer_notes")
-  shippingAddress       Json               @map("shipping_address")
-  billingAddress        Json               @map("billing_address")
-  shippedAt             DateTime?          @map("shipped_at")
-  deliveredAt           DateTime?          @map("delivered_at")
-  reviewRequestSentAt   DateTime?          @map("review_request_sent_at")
-  createdAt             DateTime           @default(now()) @map("created_at")
-  updatedAt             DateTime           @updatedAt @map("updated_at")
-  deletedAt             DateTime?          @map("deleted_at") // Soft delete support
+  walletAmount                Int                @default(0) @map("wallet_amount")
+  notes                       String?
+  customerNotes               String?            @map("customer_notes")
+  shippingAddress             Json               @map("shipping_address")
+  billingAddress              Json               @map("billing_address")
+  shippedAt                   DateTime?          @map("shipped_at")
+  deliveredAt                 DateTime?          @map("delivered_at")
+  reviewRequestSentAt         DateTime?          @map("review_request_sent_at")
+  createdAt                   DateTime           @default(now()) @map("created_at")
+  updatedAt                   DateTime           @updatedAt @map("updated_at")
+  deletedAt                   DateTime?          @map("deleted_at") // Soft delete support
 
   // Buyer's UI locale at checkout time ('en' | 'ar'). Used to send
   // transactional emails in the customer's language regardless of the
@@ -4631,6 +4632,10 @@ model BillingEvent {
   /// For a refund row: the charge row it refunds.
   relatedEventId  String?   @map("related_event_id")
   raw             Json?
+  /// Ebda's own VAT inside `amountMinor` (0 = no VAT line). Ruling EBDA-BILLFU-3.
+  vatMinor        Int       @default(0) @map("vat_minor")
+  /// VAT snapshot at charge time { netMinor, vatMinor, rateBps, mode, trn, legalName }; null = no VAT.
+  vat             Json?
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
@@ -4711,6 +4716,44 @@ model BillingWebhookEvent {
 
   @@unique([provider, eventId])
   @@map("billing_webhook_events")
+}
+
+// ===================================}
+
+// Visual builder: page documents (draft / published / archived revisions)
+// ==========================================
+
+// One row per saved revision of a store page's PageDefinition
+// (packages/shared/src/builder). `rev` is monotonic per (store, page) and is
+// the optimistic-concurrency token: a write names the rev it was based on and
+// gets 409 when the page moved. At most one `draft` and one `published` row
+// per page (partial unique indexes in the migration). Publishing back-writes
+// stores.layout_settings through the adapter so every legacy reader keeps
+// working. Strict RLS (R-EBDA-001) in the same migration.
+model StorePageRevision {
+  id            String    @id @default(uuid())
+  storeId       String    @map("store_id")
+  pageKey       String    @map("page_key")
+  rev           Int
+  // draft | published | archived (CHECK constraint in the migration)
+  status        String
+  schemaVersion Int       @map("schema_version")
+  document      Json
+  docBytes      Int       @map("doc_bytes")
+  baseRev       Int?      @map("base_rev")
+  note          String?
+  // User id of the editor. No FK: users are identity-keyed under RLS and an
+  // erased user must not take a store's page history with them.
+  createdBy     String?   @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  publishedAt   DateTime? @map("published_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, pageKey, rev])
+  @@index([storeId, pageKey, createdAt(sort: Desc)])
+  @@map("store_page_revisions")
 }
 
 /// Egypt VAT gate (ruling TAX-2). A merchant may charge VAT only once a

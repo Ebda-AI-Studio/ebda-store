@@ -1325,6 +1325,7 @@
       "saveError": "Failed to save layout",
       "saveErrorLayoutOnly": "Layout saved, but typography failed. Retry the save.",
       "saveErrorTypographyOnly": "Typography saved, but layout failed. Retry the save.",
+      "saveConflict": "This page was changed in another tab or by another editor. Reload the page, then re-apply your change.",
       "loadError": "Failed to load layout",
       "preview": {
         "mobile": "Mobile",
@@ -8583,7 +8584,8 @@
       "chargeSoon": "We'll charge your card {card} on {date}",
       "whatsapp": "Message us on WhatsApp",
       "seePlans": "See plans",
-      "view": "View billing"
+      "view": "View billing",
+      "email": "Email us at {email}"
     },
     "goLive": {
       "title": "Go live",
@@ -8593,7 +8595,25 @@
       "failed": "We could not publish the store. Please try again.",
       "done": "Your store is live"
     },
-    "subscribeBodyInstapay": "Prices in EGP. You pay by InstaPay transfer; your plan is activated as soon as we confirm the payment."
+    "subscribeBodyInstapay": "Prices in EGP. You pay by InstaPay transfer; your plan is activated as soon as we confirm the payment.",
+    "invoiceVat": "incl. VAT {rate}% {vat}",
+    "invoiceTrn": "Ebda TRN {trn}",
+    "taxInvoiceSeller": "Tax invoices issued by {name}, tax registration number {trn}.",
+    "instapay": {
+      "handle": "InstaPay address",
+      "amount": "Exact amount",
+      "reference": "Your reference",
+      "copy": "Copy",
+      "copied": "Copied",
+      "phoneTitle": "Pay from this phone",
+      "phoneStep1": "Copy the InstaPay address below.",
+      "phoneStep2": "Open the InstaPay app, tap Send money and paste the address.",
+      "phoneStep3": "Enter the exact amount and paste your reference in the note.",
+      "qrAlt": "Ebda InstaPay QR code",
+      "qrHint": "Scan with InstaPay on another phone",
+      "vatLine": "Includes VAT {rate}% ({vat}) on {net}.",
+      "seller": "{name}, tax registration number {trn}."
+    }
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
@@ -9058,7 +9078,8 @@
       "rejectFailed": "We could not reject this claim.",
       "rejectSubmit": "Reject claim",
       "rejected": "Claim rejected."
-    }
+    },
+    "vatLine": "incl. VAT {rate}% {vat} · TRN {trn}"
   },
   "codReconciliation": {
     "title": "COD reconciliation",

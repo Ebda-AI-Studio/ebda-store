@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { BRAND } from '@force/shared/brand';
 import { COPY } from '../lib/content';
-import { pagePath, type Locale } from '../lib/site';
+import { COMPANY_URL, pagePath, type Locale } from '../lib/site';
 
 export function Footer({ locale }: { locale: Locale }) {
   const c = COPY[locale].footer;
@@ -19,7 +19,12 @@ export function Footer({ locale }: { locale: Locale }) {
               height={24}
             />
           </p>
-          <p className="muted">{c.by}</p>
+          <p className="muted">
+            {c.byPrefix}{' '}
+            <a href={COMPANY_URL} target="_blank" rel="noopener noreferrer">
+              {BRAND.company}
+            </a>
+          </p>
           <p className="muted">
             <a href={`mailto:${BRAND.supportEmail}`}>{BRAND.supportEmail}</a>
           </p>
@@ -34,6 +39,12 @@ export function Footer({ locale }: { locale: Locale }) {
             </li>
             <li>
               <Link href={pagePath(locale, 'terms')}>{c.terms}</Link>
+            </li>
+            <li>
+              <Link href={pagePath(locale, 'merchant-agreement')}>{c.merchant}</Link>
+            </li>
+            <li>
+              <Link href={pagePath(locale, 'acceptable-use')}>{c.acceptableUse}</Link>
             </li>
           </ul>
           <p className="muted small">{c.draftNote}</p>

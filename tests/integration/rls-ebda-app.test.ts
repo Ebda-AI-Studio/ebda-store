@@ -174,6 +174,7 @@ async function cleanup(): Promise<void> {
       'store_staff',
       'merchant_api_keys',
       'sms_marketing_consents',
+      'store_page_revisions',
     ]) {
       if (t === 'payments')
         await tx.$executeRawUnsafe(
@@ -308,6 +309,20 @@ beforeAll(async () => {
   ids.faqB = (
     await owner.storeFaq.create({ data: { storeId: storeB.id, question: 'q', answer: 'a' } })
   ).id;
+  // Visual builder revisions (migration 20261007170000_store_page_revisions):
+  // real rows in both stores so the isolation assertions are not vacuous.
+  for (const storeId of [storeA.id, storeB.id])
+    await owner.storePageRevision.create({
+      data: {
+        storeId,
+        pageKey: 'home',
+        rev: 1,
+        status: 'published',
+        schemaVersion: 1,
+        document: {},
+        docBytes: 2,
+      },
+    });
   await owner.customer.create({
     data: { storeId: storeA.id, email: `${PREFIX}crm-a@test.com`, firstName: 'c', lastName: 'a' },
   });
@@ -431,6 +446,24 @@ async function tenantTables(): Promise<Array<{ table: string; column: string }>>
 describe('every table with a store_id column is under STRICT, FORCED RLS (auto-enumerated)', () => {
   it('enumerates a non-trivial set (guards the enumeration itself)', async () => {
     expect((await tenantTables()).length).toBeGreaterThanOrEqual(80);
+  });
+
+  it('includes the tables added after the enumeration was written (visual builder revisions)', async () => {
+    const tables = (await tenantTables()).map(t => t.table);
+    expect(tables).toContain('store_page_revisions');
+    const [{ n }] = await owner.$queryRaw<Array<{ n: bigint }>>`
+      SELECT count(*) AS n FROM public.store_page_revisions`;
+    expect(Number(n)).toBeGreaterThanOrEqual(2); // not vacuously empty for the 0-row assertion below
+  });
+
+  it('store_page_revisions: a store scope sees only its own revisions (control: it does see them)', async () => {
+    const seen = await appTx(
+      { storeId: ids.storeA },
+      tx =>
+        tx.$queryRaw<Array<{ store_id: string }>>`SELECT store_id FROM public.store_page_revisions`
+    );
+    expect(seen.length).toBeGreaterThanOrEqual(1);
+    expect(seen.every(r => r.store_id === ids.storeA)).toBe(true);
   });
 
   it('RLS is ENABLED and FORCED, with only ebda_app policies', async () => {
