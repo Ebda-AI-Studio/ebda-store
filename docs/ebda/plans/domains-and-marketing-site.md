@@ -4,29 +4,31 @@ Ebda is a **Whisky 11** product (org `whisky-11`, repo `whisky-11/ebda`, still e
 
 ## Domain map
 
-| Host | Purpose | FWB equivalent today |
-|---|---|---|
-| `ebda.app` | Main marketing website (Shopify.com equivalent) | force-ai.co landing |
-| `app.ebda.app` | Dashboard / merchant application | admin.force-ai.co |
-| `store.ebda.app` | Default store infrastructure (path-based stores, e.g. `store.ebda.app/<slug>`) — "maybe", to confirm | store.force-ai.co/<slug> |
-| `*.ebda.app` | Individual merchant stores (`<slug>.ebda.app`); custom domains on top | per-store custom domains |
-| `api.ebda.app` | API | api.force-ai.co |
-| `docs.ebda.app` | API & developer documentation | — |
-| `whatsapp.ebda.app` | WhatsApp integration | WBS (separate product) |
-| `help.ebda.app` | Help center | — |
-| `status.ebda.app` | System status | — |
+| Host                | Purpose                                                                                              | FWB equivalent today     |
+| ------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------ |
+| `ebda.app`          | Main marketing website (Shopify.com equivalent)                                                      | force-ai.co landing      |
+| `admin.ebda.app`    | Dashboard / merchant application                                                                     | admin.force-ai.co        |
+| `store.ebda.app`    | Default store infrastructure (path-based stores, e.g. `store.ebda.app/<slug>`) — "maybe", to confirm | store.force-ai.co/<slug> |
+| `*.ebda.app`        | Individual merchant stores (`<slug>.ebda.app`); custom domains on top                                | per-store custom domains |
+| `api.ebda.app`      | API                                                                                                  | api.force-ai.co          |
+| `docs.ebda.app`     | API & developer documentation                                                                        | —                        |
+| `whatsapp.ebda.app` | WhatsApp integration                                                                                 | WBS (separate product)   |
+| `help.ebda.app`     | Help center                                                                                          | —                        |
+| `status.ebda.app`   | System status                                                                                        | —                        |
 
 Reserved subdomains (never assignable as a store slug): `app, store, api, docs, whatsapp, help, status, www, admin, orders, mail, cdn, assets, static`, plus anything else the platform takes later — enforce in slug validation from day one.
 
 ## Marketing site (`ebda.app`)
 
-Top nav: **EBDA** · Features · Solutions · Pricing · Resources · `Log in` · **Start selling** (primary CTA → signup on app.ebda.app).
+Top nav: **EBDA** · Features · Solutions · Pricing · Resources · `Log in` · **Start selling** (primary CTA → signup on admin.ebda.app).
 
 Hero:
+
 > **ابدأ بيع أونلاين.**
 > Your business, your store, everything in one place.
 
 Sections, in order:
+
 1. Create your store → signup
 2. How EBDA works
 3. Store builder
@@ -41,6 +43,7 @@ Sections, in order:
 12. Login
 
 ## Decisions (Ahmad, 2026-10-03, later)
+
 - **Self-serve like Shopify, NOT managed like FWB**: merchants sign up, build and run their store alone; no onboarding by us.
 - **Payments: every Egyptian provider** (Paymob, Kashier, Fawry, Valu/BNPL, Meeza, wallets, COD, and the rest available) behind a pluggable provider layer, plus **InstaPay** as a method with ONE manual step (merchant confirms the transfer).
 - **Shipping: every available Egyptian carrier** — Bosta, Aramex, and the rest (e.g. J&T, Mylerz, R2S, Sprint, Egypt Post…) behind a pluggable carrier layer (rates, label, tracking webhooks).
@@ -54,6 +57,7 @@ Sections, in order:
 - Mechanical work runs on Sonnet; Opus only for design/security/ambiguous money.
 
 ## Questions answered above (kept for history)
+
 - `store.ebda.app`: path-based default stores, or only `<slug>.ebda.app`?
 - Language: Arabic-first (RTL default) with English toggle, like FWB storefronts?
 - Pricing shown on the site: EGP 0 / 1,500 / 3,500 per month, 15,000 per year — my reading of "at least one fifty", not yet confirmed.

@@ -11,7 +11,7 @@ Ebda is a fork of FWB (Force Website Builder, a GCC product of Force AI). FWB is
 | Host                                                      | What                                                       |
 | --------------------------------------------------------- | ---------------------------------------------------------- |
 | `ebda.app`                                                | Marketing site                                             |
-| `app.ebda.app`                                            | Merchant dashboard (`apps/admin`)                          |
+| `admin.ebda.app`                                          | Merchant dashboard (`apps/admin`)                          |
 | `<slug>.ebda.app` + custom domains                        | Storefronts (`apps/web`)                                   |
 | `orders.ebda.app`                                         | Orders PWA for fulfilment staff (`apps/orders`)            |
 | `api.ebda.app`                                            | API (`apps/api`)                                           |

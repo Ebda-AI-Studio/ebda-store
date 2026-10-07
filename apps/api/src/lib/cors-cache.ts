@@ -216,16 +216,14 @@ export function isPlatformOrigin(
   // (`<slug>.ebda.app`) and custom domains are validated separately.
   // (The post-launch WhatsApp platform host is NOT listed here.)
   if (origin === brandUrl(BRAND.domains.marketing)) return true;
-  if (origin === brandUrl(BRAND.domains.app)) return true;
+  if (origin === brandUrl(BRAND.domains.admin)) return true;
   if (origin === brandUrl(BRAND.domains.orders)) return true;
 
   // Cloudflare Workers preview deploys for the project (OpenNext migration).
   // SCOPED to OUR account subdomain + our worker names — NOT any *.workers.dev,
   // which (with credentials: true) would let an attacker's worker make
   // credentialed requests to the API.
-  if (
-    /^https:\/\/force-(web|admin|orders)-cf-preview\.ahmed0montaser\.workers\.dev$/.test(origin)
-  ) {
+  if (/^https:\/\/ebda-(web|admin|orders)\.ahmed0montaser\.workers\.dev$/.test(origin)) {
     return true;
   }
 

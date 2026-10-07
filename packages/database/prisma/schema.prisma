@@ -2315,6 +2315,7 @@ model CodRemittance {
 
   @@unique([storeId, carrier, lineRef])
   @@index([storeId, shipmentId])
+  @@index([shipmentId])
   @@index([storeId, trackingNumber])
   @@map("cod_remittances")
 }

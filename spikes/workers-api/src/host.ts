@@ -2,7 +2,16 @@
 // Rules: <slug>.<BASE> => slug; exact custom domain => domain; everything else => null (404).
 // NEVER falls back to a default store.
 
-export const RESERVED_SLUGS = new Set(['app', 'api', 'docs', 'help', 'status', 'whatsapp', 'www', 'admin']);
+export const RESERVED_SLUGS = new Set([
+  'app',
+  'api',
+  'docs',
+  'help',
+  'status',
+  'whatsapp',
+  'www',
+  'admin',
+]);
 const LABEL_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
 export type HostKey = { slug: string; domain: null } | { slug: null; domain: string };

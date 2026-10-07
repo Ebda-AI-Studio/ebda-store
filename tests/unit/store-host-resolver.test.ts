@@ -243,13 +243,13 @@ describe('GET /public/store/resolve — host → store', () => {
   it.each([
     'ebda.app',
     'www.ebda.app',
-    'app.ebda.app',
+    'admin.ebda.app',
     'api.ebda.app',
     'orders.ebda.app',
     'docs.ebda.app',
     'whatsapp.ebda.app',
     'store.ebda.app',
-    'admin.ebda.app',
+    'app.ebda.app', // retired label: never served, never a store
     'mail.ebda.app',
     'x.y.ebda.app',
     'ab.ebda.app', // too short to be a slug
@@ -269,7 +269,7 @@ describe('GET /public/store/resolve — host → store', () => {
 
   it('a reserved slug is a 404 even if a row with that slug exists', async () => {
     world.stores = [{ ...STORE_A, slug: 'app' }];
-    expect((await resolve('app.ebda.app')).status).toBe(404);
+    expect((await resolve('admin.ebda.app')).status).toBe(404);
     expect(storeFindFirst).not.toHaveBeenCalled();
   });
 
@@ -376,7 +376,7 @@ describe('cache isolation (Review Focus 1)', () => {
     expect(unknown.status).toBe(400);
     expect(unknown.body.error.code).toBe('STORE_NOT_RESOLVED');
     expect(JSON.stringify(unknown.body)).not.toContain('store-a');
-    const reserved = await get('app.ebda.app');
+    const reserved = await get('admin.ebda.app');
     expect(reserved.status).toBe(400);
   });
 });

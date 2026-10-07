@@ -509,11 +509,11 @@ async function seedPaymentConfig(storeId: string) {
     return;
   }
 
-  // Create a demo Tap payment config (disabled by default)
+  // Create a demo Paymob payment config (disabled by default)
   await prisma.paymentConfig.create({
     data: {
       storeId,
-      provider: 'tap',
+      provider: 'paymob',
       isEnabled: false,
       testMode: true,
       apiKey: 'pk_test_demo',

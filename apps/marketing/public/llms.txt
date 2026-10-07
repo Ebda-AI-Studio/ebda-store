@@ -15,5 +15,5 @@ Status: pre-launch. Pricing (EGP per month): Basic 1,490, Growth 3,490, Business
 - Payments: cash on delivery; InstaPay with one merchant confirmation step; cards and wallets through Egyptian gateways are coming.
 - WhatsApp: free click-to-chat (wa.me) links. Automated WhatsApp messaging is not available yet.
 - Shipping: carrier integrations (Bosta, Aramex and others) are coming.
-- Sign up: https://app.ebda.app/signup
+- Sign up: https://admin.ebda.app/signup
 - Contact: support@ebda.app; security reports: security@ebda.app

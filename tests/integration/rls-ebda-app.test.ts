@@ -357,8 +357,14 @@ describe('ebda_app: the runtime role', () => {
   });
 
   it('cannot escalate, alter the schema or read the migration table', async () => {
+    // Escalate to the REAL superuser of this database: it is `postgres` on Neon but `test` in the
+    // CI/local service container, and `SET ROLE <nonexistent>` fails with "does not exist", which
+    // proves nothing about privilege.
+    const [{ rolname: superuser }] = await owner.$queryRawUnsafe<Array<{ rolname: string }>>(
+      'SELECT rolname FROM pg_roles WHERE rolsuper ORDER BY oid LIMIT 1'
+    );
     const attempts: Array<[string, string]> = [
-      ['SET ROLE', 'SET ROLE postgres'],
+      ['SET ROLE', `SET ROLE "${superuser}"`],
       ['DROP', 'DROP TABLE public.products'],
       ['ALTER', 'ALTER TABLE public.products DISABLE ROW LEVEL SECURITY'],
       ['migrations', 'SELECT * FROM public._prisma_migrations'],
