@@ -4,6 +4,8 @@ Moved verbatim from `CLAUDE.md` (2026-07-11). Canonical reference for StoreTheme
 
 **Page Builder + Smart Palette are the CANONICAL design system** for all color, font, hero, and per-section layout controls as of 2026-06-09 (PRs #86–#90). The Branding tab's manual color pickers (`ColorPalettePicker`), global font-family picker (`TypographyPicker`), and `backgroundPreset` selector are **retired inputs** — "edit in Page Builder" pointers or read-only swatches. Any code or doc referencing those as the primary color/font editors is stale.
 
+**Section keys and the layout write path (visual builder Phase 1, 2026-10-07):** the section registry (`packages/shared/src/builder/registry.ts`) owns the homepage section keys and their settings schemas; `LEGACY_HOME_SECTION_KEYS` is the one copy of the 8 orderable keys, and the layout Zod schema lives in `packages/shared/src/builder/layout-schema.ts` (re-exported by the API route). `stores.layout_settings` is written by builder publish / rollback (`apps/api/src/services/page-builder.service.ts`, back-write) and by the legacy layout PUT, which now records a published revision in the same transaction so the two never diverge. `hideOnTablet` (unset = legacy two-way visibility) is the only new section knob. Details: `docs/architecture/page-definition.md`.
+
 ## Canonical owners (after 2026-06-16)
 
 | Concern                                                                                                                                                                                   | Canonical editor                           | Notes                                                                                                                                                                                                             |
@@ -56,7 +58,7 @@ All flags ride the `StoreTheme` JSON column except `blogEnabled` (own `Store` co
 
 Invariants:
 
-- Class helpers live in `apps/web/src/templates/shared/card-size.ts` (`ctaShapeClass`/`ctaSizeClass`/`labelShapeClass`/`oosPlacementClass`); Zod-validated in `store-layout.routes.ts` `productCardDefaults` (silent-strip trap — every key must be listed).
+- Class helpers live in `apps/web/src/templates/shared/card-size.ts` (`ctaShapeClass`/`ctaSizeClass`/`labelShapeClass`/`oosPlacementClass`); Zod-validated in `packages/shared/src/builder/layout-schema.ts` `productCardDefaults` (re-exported by `store-layout.routes.ts`) (silent-strip trap — every key must be listed).
 - Cards read via `useStore().layout?.productCardDefaults` with prop fallback (the #380 "T.ProductGrid threads zero props" lesson).
 - **`ctaShape`/`ctaSize` MUST merge via `cn()` (tailwind-merge), NOT string concat** — base buttons hardcode `rounded-2xl`/`rounded-xl` + padding/`min-h`, and Tailwind's fixed source order makes those win over later-in-string classes; plain concat silently dropped every shape except `pill`. Fixed across all 8 paths.
 - **The PDP carries the OOS system too** — `ProductDetailClient.tsx` mounts `OosImageDim` + `OutOfStockRibbon` on the main image from the same `productCardDefaults`, honoring backorder (`orderable = !outOfStock || canBackorder`).

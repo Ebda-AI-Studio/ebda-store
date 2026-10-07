@@ -1,9 +1,17 @@
 import Link from 'next/link';
 import { BRAND } from '@force/shared/brand';
 import { COPY } from '../lib/content';
-import { HOME, LOGIN_URL, NAV_ANCHORS, SIGNUP_URL, pagePath, type Locale } from '../lib/site';
+import {
+  HOME,
+  LOGIN_URL,
+  NAV_ANCHORS,
+  SIGNUP_URL,
+  pagePath,
+  type Locale,
+  type PageSlug,
+} from '../lib/site';
 
-type Page = '' | 'legal' | 'privacy' | 'terms';
+type Page = PageSlug;
 
 export function Header({ locale, page = '' }: { locale: Locale; page?: Page }) {
   const c = COPY[locale];

@@ -1,0 +1,6 @@
+{
+  "sectionOrder": ["bogus", "trustStrip", "trustStrip", "hero"],
+  "extraCarousels": [{ "id": "x", "limit": 2, "productSource": "category" }],
+  "unknownTopLevel": { "a": 1 },
+  "categories": { "layout": "horizontal" }
+}

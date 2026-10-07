@@ -12,7 +12,7 @@ import { featureService } from '../feature.service';
 import { bustStoreCaches } from '../store.service';
 import { reconcileStoreAccess } from './account.service';
 import { instapayDetails } from './account.service';
-import { supportWhatsappUrl } from './manual-config';
+import { supportContact } from './manual-config';
 
 export type BillingEffect =
   | { kind: 'plan_changed'; storeId: string }
@@ -115,11 +115,13 @@ async function runOne(effect: BillingEffect): Promise<void> {
           storeName: store.name,
           planName,
           amountMinor: ip?.amountMinor ?? 0,
+          vat: ip?.vat ?? null,
           billingUrl: `${config.adminUrl ?? ''}${url}`,
           method: 'instapay',
           instapayHandle: ip?.handle ?? null,
           paymentReference: ip?.reference ?? null,
-          whatsappUrl: supportWhatsappUrl(store.name),
+          whatsappUrl: supportContact(store.name).whatsappUrl,
+          supportEmail: supportContact(store.name).email,
         },
         lang
       );
