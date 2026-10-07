@@ -8,6 +8,7 @@ import {
   ACESFilmicToneMapping,
   Color,
   CylinderGeometry,
+  DoubleSide,
   Group,
   LatheGeometry,
   Mesh,
@@ -107,6 +108,7 @@ export function createRingScene(
   camera.lookAt(0, 0.15, 0);
 
   const metal = new MeshPhysicalMaterial({
+    side: DoubleSide,
     color: new Color(METAL_COLOR.gold),
     metalness: 1,
     roughness: 0.16,
@@ -139,6 +141,10 @@ export function createRingScene(
   const collet = new Mesh(new CylinderGeometry(0.16, 0.1, 0.18, 32), metal);
   collet.position.y = 0.0;
   head.add(collet);
+  // A low metal cup cradles the pavilion so the stone sits in the setting, not on a point.
+  const cup = new Mesh(new CylinderGeometry(0.25, 0.15, 0.14, 48, 1, true), metal);
+  cup.position.y = 0.16;
+  head.add(cup);
   const stone = new Mesh(stoneGeometry(), gem);
   stone.scale.setScalar(1.3);
   stone.position.y = 0.42;
