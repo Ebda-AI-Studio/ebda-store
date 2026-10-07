@@ -1,12 +1,7 @@
 import type { Locale } from './site';
 
-/**
- * Pricing is NOT decided (docs/ebda/research/pricing-and-packaging.md leaves
- * numbers to Ahmad). Everything the pricing section renders comes from this one
- * file. To publish: set `price` on each plan to `{ amountMinor, period }` (EGP
- * piastres) and flip PRICING_PUBLISHED. No number is invented here.
- */
-export const PRICING_PUBLISHED = false;
+/** Locked EGP prices, in piastres; annual billing is nine monthly payments. */
+export const PRICING_PUBLISHED = true;
 
 export interface PlanPrice {
   /** EGP in piastres (minor units). */
@@ -15,71 +10,57 @@ export interface PlanPrice {
 }
 
 export interface Plan {
-  id: 'starter' | 'growth' | 'pro' | 'scale';
+  id: 'basic' | 'growth' | 'business';
   name: Record<Locale, string>;
   /** null until Ahmad decides; the UI then shows the "pricing coming soon" placeholder. */
   price: PlanPrice | null;
+  annualMinor: number;
   tagline: Record<Locale, string>;
   features: Record<Locale, string[]>;
 }
 
 export const PLANS: readonly Plan[] = [
   {
-    id: 'starter',
-    name: { ar: 'البداية', en: 'Starter' },
-    price: null,
+    id: 'basic',
+    name: { ar: 'الأساسية', en: 'Basic' },
+    price: { amountMinor: 149000, period: 'month' },
+    annualMinor: 1341000,
     tagline: { ar: 'لأول متجر', en: 'For your first store' },
     features: {
-      ar: [
-        'متجر على <اسمك>.ebda.app',
-        'الدفع عند الاستلام',
-        'زر واتساب (wa.me)',
-        'تحليلات أساسية',
-        'واجهة عربية وإنجليزية',
-      ],
+      ar: ['٣٠٠ طلب شهريًا', 'عضوان للفريق', 'منتجات غير محدودة', 'دومين خاص وجميع طرق الدفع'],
       en: [
-        'A store on <you>.ebda.app',
-        'Cash on delivery',
-        'WhatsApp click-to-chat button',
-        'Basic analytics',
-        'Arabic and English storefront',
+        '300 orders/month',
+        '2 staff seats',
+        'Unlimited products',
+        'Custom domain and all payment methods',
       ],
     },
   },
   {
     id: 'growth',
     name: { ar: 'النمو', en: 'Growth' },
-    price: null,
+    price: { amountMinor: 349000, period: 'month' },
+    annualMinor: 3141000,
     tagline: { ar: 'لما يكبر البيع', en: 'When sales pick up' },
     features: {
-      ar: ['كل مزايا البداية', 'دومين خاص بك', 'إزالة علامة ابدأ', 'طرق دفع أكثر', 'أعضاء فريق'],
+      ar: ['٣٬٠٠٠ طلب شهريًا', '٥ أعضاء للفريق', 'استعادة السلات المتروكة', 'إزالة علامة ابدأ'],
       en: [
-        'Everything in Starter',
-        'Your own custom domain',
+        '3,000 orders/month',
+        '5 staff seats',
+        'Abandoned cart recovery',
         'Remove Ebda branding',
-        'More payment methods',
-        'Team seats',
       ],
     },
   },
   {
-    id: 'pro',
-    name: { ar: 'المحترف', en: 'Pro' },
-    price: null,
+    id: 'business',
+    name: { ar: 'الأعمال', en: 'Business' },
+    price: { amountMinor: 999000, period: 'month' },
+    annualMinor: 8991000,
     tagline: { ar: 'لمتاجر بحجم أكبر', en: 'For busier stores' },
     features: {
-      ar: ['كل مزايا النمو', 'تحليلات متقدمة', 'حدّ أعلى للطلبات', 'دعم بأولوية'],
-      en: ['Everything in Growth', 'Advanced analytics', 'Higher order volume', 'Priority support'],
-    },
-  },
-  {
-    id: 'scale',
-    name: { ar: 'التوسّع', en: 'Scale' },
-    price: null,
-    tagline: { ar: 'لحجم كبير', en: 'For high volume' },
-    features: {
-      ar: ['كل مزايا المحترف', 'أكثر من متجر', 'وصول API وwebhooks', 'عرض سعر مخصص'],
-      en: ['Everything in Pro', 'Multiple stores', 'API access and webhooks', 'Custom quote'],
+      ar: ['طلبات غير محدودة', '١٥ عضوًا للفريق', 'حتى ٣ متاجر', 'دعم بأولوية'],
+      en: ['Unlimited orders', '15 staff seats', 'Up to 3 stores', 'Priority support'],
     },
   },
 ];

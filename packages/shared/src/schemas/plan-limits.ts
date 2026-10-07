@@ -97,7 +97,7 @@ export type AssignSubscriptionInput = z.infer<typeof assignSubscriptionSchema>;
 // not market-validated) and NO prices — Ahmad sets both in the super-admin
 // Plans page. The migration seeds these exact rows (a unit test pins parity).
 
-export type PlanCode = 'free' | 'growth' | 'pro' | 'comped';
+export type PlanCode = 'free' | 'basic' | 'growth' | 'business' | 'pro' | 'comped';
 
 export interface PlanSeed {
   code: PlanCode;
@@ -247,3 +247,70 @@ export function planLimitMessage(
   };
   return (lang === 'ar' ? ar : en)[key];
 }
+
+/** Ahmad’s locked public catalog, 2026-10-05. Historical seeds above pin the original migration. */
+export const LOCKED_PUBLIC_PLANS = [
+  {
+    code: 'basic',
+    nameEn: 'Basic',
+    nameAr: 'الأساسية',
+    sort: 10,
+    isPublic: true,
+    featureTier: 'starter',
+    priceMonthlyMinor: 149000,
+    priceYearlyMinor: 1341000,
+    limits: {
+      maxProducts: null,
+      maxStaff: 2,
+      maxOrdersPerMonth: 300,
+      maxStorageMb: null,
+      customDomain: true,
+      platformFeeBps: 0,
+      codPlatformFeeBps: 0,
+      abandonedCartAutomation: false,
+      whatsappAutomation: false,
+    },
+  },
+  {
+    code: 'growth',
+    nameEn: 'Growth',
+    nameAr: 'النمو',
+    sort: 20,
+    isPublic: true,
+    featureTier: 'professional',
+    priceMonthlyMinor: 349000,
+    priceYearlyMinor: 3141000,
+    limits: {
+      maxProducts: null,
+      maxStaff: 5,
+      maxOrdersPerMonth: 3000,
+      maxStorageMb: null,
+      customDomain: true,
+      platformFeeBps: 0,
+      codPlatformFeeBps: 0,
+      abandonedCartAutomation: true,
+      whatsappAutomation: false,
+    },
+  },
+  {
+    code: 'business',
+    nameEn: 'Business',
+    nameAr: 'الأعمال',
+    sort: 30,
+    isPublic: true,
+    featureTier: 'enterprise',
+    priceMonthlyMinor: 999000,
+    priceYearlyMinor: 8991000,
+    limits: {
+      maxProducts: null,
+      maxStaff: 15,
+      maxOrdersPerMonth: null,
+      maxStorageMb: null,
+      customDomain: true,
+      platformFeeBps: 0,
+      codPlatformFeeBps: 0,
+      abandonedCartAutomation: true,
+      whatsappAutomation: false,
+    },
+  },
+] as const;

@@ -44,7 +44,7 @@ import {
   invalidateCustomersCache,
 } from '../lib/public-cache';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
-import { noteOrderCreated } from './plan-limit.service';
+import { assertOrderAllowed, noteOrderCreated } from './plan-limit.service';
 import { amountOnlyRefundKey } from '../lib/refund-methods';
 import { lineUnitCost } from '../lib/order-line-cost';
 import { customerKeyOf } from '../lib/customer-key';
@@ -560,6 +560,7 @@ export class OrderService {
     data: CreateOrderData,
     referralCode?: string
   ) {
+    await assertOrderAllowed(storeId);
     // Get cart
     const cart = await CartService.getOrCreate(storeId, sessionId, customerId);
     // Raw CartBundle rows ({ id, bundleId, quantity } — one per BOX type in
@@ -2441,6 +2442,7 @@ export class OrderService {
     },
     actor: { role?: string } = {}
   ) {
+    await assertOrderAllowed(storeId);
     if (data.items.length === 0) {
       throw new AppError(400, 'NO_ITEMS', 'Order must have at least one item');
     }

@@ -147,3 +147,7 @@ Design cautions:
 - [sellX](https://sell1x.com/en)
 - [Wise USD/EGP](https://wise.com/gb/currency-converter/usd-to-egp-rate)
 - [XE USD/EGP](https://www.xe.com/en-us/currencyconverter/convert/?Amount=1&From=USD&To=EGP)
+
+## Owner decision, 2026-10-05
+
+The draft tiers above are superseded by `docs/plans/2026-10-05-pricing-decisions.md`: Basic/Growth/Business, no public free plan, zero platform fees. Amelia stays last.
