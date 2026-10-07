@@ -199,7 +199,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
 
   beforeAll(async () => {
     vi.spyOn(inngest, 'send').mockResolvedValue({ ids: [] } as never);
-    owner = createPrismaClient({ connectionString: OWNER_URL, max: 3 });
+    owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
     await redis.connect().catch(() => undefined);
     bostaServer = await serveStub(bosta.fetch);
     shipbluServer = await serveStub(shipblu.fetch);

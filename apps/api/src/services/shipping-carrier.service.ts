@@ -356,7 +356,7 @@ class ShippingCarrierService {
     );
     const latency = Date.now() - startedAt;
     await prisma.shippingCarrierConfig.update({
-      where: { id: row.id },
+      where: { id: row.id, storeId },
       data: { connectionTest: stored as unknown as Prisma.InputJsonValue },
     });
     await this.invalidateCarrierConfigCache(storeId);

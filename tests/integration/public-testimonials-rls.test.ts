@@ -90,7 +90,7 @@ async function seedStoreWithReview(tag: string, firstName: string, rating: numbe
 }
 
 beforeAll(async () => {
-  owner = createPrismaClient({ connectionString: OWNER_URL, max: 3 });
+  owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
   await owner.$executeRawUnsafe(`ALTER ROLE ebda_app WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
   ids.storeA = await seedStoreWithReview('a', 'Nour', 5);
   ids.storeB = await seedStoreWithReview('b', 'Mariam', 5);
