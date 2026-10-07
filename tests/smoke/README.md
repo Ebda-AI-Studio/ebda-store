@@ -48,7 +48,7 @@ Defaults:
   The platform host (`ebda.app`) serves the landing page with no
   product links, so it cannot satisfy the PDP test — the target must be a
   live merchant storefront with at least one published product.
-- Admin: `https://app.ebda.app` (corrected 2026-09-02 — `app.ebda.app`
+- Admin: `https://admin.ebda.app` (corrected 2026-09-02 — `admin.ebda.app`
   now 301-redirects here since the Cloudflare migration; it still "works" via the
   redirect but every baseURL-relative check was really exercising the redirect
   target under the wrong URL)

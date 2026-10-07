@@ -439,9 +439,9 @@ export default function MerchantKeysPage() {
                       type: 'http',
                       // `getApiUrl()`, not string surgery on the admin origin.
                       // `.replace('admin.', 'api.')` only works on
-                      // app.ebda.app: on app.ebda.app it is a
+                      // admin.ebda.app: on admin.ebda.app it is a
                       // no-op and the merchant copies the ADMIN worker's host,
-                      // and on app.ebda.app it yields a host that is
+                      // and on admin.ebda.app it yields a host that is
                       // not the API either. This snippet is the only artifact
                       // handed over alongside a secret that can never be shown
                       // again — a merchant who pastes a wrong host gets a 404

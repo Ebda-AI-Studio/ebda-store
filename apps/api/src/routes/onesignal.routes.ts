@@ -47,14 +47,14 @@ const broadcastSchema = z.object({
  * the SDK without bundling the value at build time.
  */
 router.get('/notifications/onesignal/config', authenticate, (_req: Request, res: Response) => {
-  // The admin frontend lives at https://app.ebda.app which is a
+  // The admin frontend lives at https://admin.ebda.app which is a
   // different origin from the storefront. OneSignal apps are locked to
   // a single chrome_web_origin so we use a dedicated app for admin push
   // (configured via ONESIGNAL_ADMIN_APP_ID). Falls back to the
   // storefront app id when the admin-specific env var isn't set —
   // pushes will subscribe but the SDK will throw an "origin mismatch"
   // error because the storefront app's origin doesn't match
-  // app.ebda.app.
+  // admin.ebda.app.
   res.json({
     success: true,
     data: {

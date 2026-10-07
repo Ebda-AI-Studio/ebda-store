@@ -1,15 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// CORRECTED 2026-09-02 (adversarial audit, P3): app.ebda.app now
-// 301-redirects to app.ebda.app (verified live) — the old default
-// would still "pass" via Playwright following the redirect, but every
-// baseURL-relative assertion in admin.smoke.spec.ts would be checking the
-// redirect target's behavior under a URL that doesn't match what
-// production actually serves at. wadyaljuz.com (the flagship live
-// merchant storefront) is unaffected by the Cloudflare migration and
-// stays as the storefront default.
+// Admin host is admin.ebda.app (Ruling EBDA-HOST-1, 2026-10-07). wadyaljuz.com
+// (the flagship live merchant storefront) is unaffected by the Cloudflare
+// migration and stays as the storefront default.
 const STOREFRONT_BASE_URL = process.env.SMOKE_STOREFRONT_URL ?? 'https://wadyaljuz.com';
-const ADMIN_BASE_URL = process.env.SMOKE_ADMIN_URL ?? 'https://app.ebda.app';
+const ADMIN_BASE_URL = process.env.SMOKE_ADMIN_URL ?? 'https://admin.ebda.app';
 
 export default defineConfig({
   testDir: './tests/smoke',

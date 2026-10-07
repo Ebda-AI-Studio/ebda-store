@@ -6,11 +6,11 @@
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "routes": [
     {
-      "pattern": "app.ebda.app",
+      "pattern": "admin.ebda.app",
       "custom_domain": true
     },
     {
-      "pattern": "app.ebda.app/*",
+      "pattern": "admin.ebda.app/*",
       "zone_name": "ebda.app"
     }
   ],

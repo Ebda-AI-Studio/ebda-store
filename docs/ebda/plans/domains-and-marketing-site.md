@@ -7,7 +7,7 @@ Ebda is a **Whisky 11** product (org `whisky-11`, repo `whisky-11/ebda`, still e
 | Host                | Purpose                                                                                              | FWB equivalent today     |
 | ------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------ |
 | `ebda.app`          | Main marketing website (Shopify.com equivalent)                                                      | force-ai.co landing      |
-| `app.ebda.app`      | Dashboard / merchant application                                                                     | admin.force-ai.co        |
+| `admin.ebda.app`    | Dashboard / merchant application                                                                     | admin.force-ai.co        |
 | `store.ebda.app`    | Default store infrastructure (path-based stores, e.g. `store.ebda.app/<slug>`) — "maybe", to confirm | store.force-ai.co/<slug> |
 | `*.ebda.app`        | Individual merchant stores (`<slug>.ebda.app`); custom domains on top                                | per-store custom domains |
 | `api.ebda.app`      | API                                                                                                  | api.force-ai.co          |
@@ -20,7 +20,7 @@ Reserved subdomains (never assignable as a store slug): `app, store, api, docs, 
 
 ## Marketing site (`ebda.app`)
 
-Top nav: **EBDA** · Features · Solutions · Pricing · Resources · `Log in` · **Start selling** (primary CTA → signup on app.ebda.app).
+Top nav: **EBDA** · Features · Solutions · Pricing · Resources · `Log in` · **Start selling** (primary CTA → signup on admin.ebda.app).
 
 Hero:
 

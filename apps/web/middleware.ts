@@ -248,7 +248,7 @@ function buildStoreTreeUrl(
  * a real storefront visitor who previewed in the same browser (2026-05-28).
  *
  * SameSite=None + Secure so it survives the cross-site iframe context
- * (app.ebda.app framing wadyaljuz.com). TTL 1h matches Redis.
+ * (admin.ebda.app framing wadyaljuz.com). TTL 1h matches Redis.
  */
 function applyDraftCookie(
   request: NextRequest,
@@ -434,7 +434,7 @@ export function middleware(request: NextRequest) {
 
   const parsedHost = parseStoreHost(hostname, { allowDevSuffixes: devSuffixesAllowed() });
 
-  // An IP, `localhost`, a reserved label with no surface (`admin.ebda.app`), a
+  // An IP, `localhost`, a reserved label with no surface (`store.ebda.app`), a
   // multi-label name under `.ebda.app` or any malformed Host is never a store
   // and never a page: 404, with no store lookup and nothing cacheable.
   if (parsedHost.kind === 'invalid') return notFoundResponse();
