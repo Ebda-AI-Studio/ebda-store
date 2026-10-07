@@ -47,6 +47,9 @@ interface LedgerRow {
   attempt: number;
   createdAt: string;
   stuck: boolean;
+  /** Ebda VAT inside amountMinor (0 = none) + snapshot with Ebda's TRN. */
+  vatMinor?: number;
+  vat?: { rateBps: number; trn: string | null } | null;
 }
 
 const STATUS_FILTERS = ['', 'pending', 'succeeded', 'failed', 'refunded'] as const;
@@ -153,6 +156,15 @@ function LedgerPanel({ refreshSignal }: { refreshSignal: number }) {
         <span className="tabular-nums">
           {r.type === 'refund' ? '−' : ''}
           {formatMoney(r.amountMinor, locale)}
+          {r.vat && (r.vatMinor ?? 0) > 0 && (
+            <span className="block text-xs text-muted-foreground">
+              {t('vatLine', {
+                rate: r.vat.rateBps / 100,
+                vat: formatMoney(r.vatMinor ?? 0, locale),
+                trn: r.vat.trn ?? '',
+              })}
+            </span>
+          )}
         </span>
       ),
     },

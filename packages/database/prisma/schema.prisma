@@ -4606,6 +4606,10 @@ model BillingEvent {
   /// For a refund row: the charge row it refunds.
   relatedEventId  String?   @map("related_event_id")
   raw             Json?
+  /// Ebda's own VAT inside `amountMinor` (0 = no VAT line). Ruling EBDA-BILLFU-3.
+  vatMinor        Int       @default(0) @map("vat_minor")
+  /// VAT snapshot at charge time { netMinor, vatMinor, rateBps, mode, trn, legalName }; null = no VAT.
+  vat             Json?
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 

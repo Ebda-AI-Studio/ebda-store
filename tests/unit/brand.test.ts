@@ -18,7 +18,7 @@ describe('BRAND', () => {
     expect(BRAND.colors).toEqual({ night: '#0A0B0C', gold: '#B08D57', lift: '#CBA873' });
     expect(BRAND.fonts.sans).toBe('Geist');
     expect(BRAND.fonts.arabic).toBe('IBM Plex Sans Arabic');
-    expect(BRAND.supportEmail).toBe('support@ebda.app');
+    expect(BRAND.supportEmail).toBe('hello@ebda.app');
     expect(BRAND.noReplyEmail).toBe('no-reply@ebda.app');
   });
 
