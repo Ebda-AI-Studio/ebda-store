@@ -340,8 +340,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '5. Service providers (sub-processors)',
         p: [
-          'We use these providers to run the Service. Each processes data only on our instructions and under its own security and data terms: Cloudflare (website and API hosting, delivery, key-value storage, queues and file/image storage); Neon (database hosting, EU region); Resend (transactional and campaign email); Sentry (error and performance monitoring, EU region); and Inngest (background job processing).',
-          'Optional features, only if enabled (currently not enabled): Google Gemini (AI features; only the text you submit to an AI feature would be sent), PostHog (product analytics, EU region) and OneSignal (push notifications). If we enable one, we will update this list first.',
+          'We use these providers to run the Service. Each processes data only on our instructions and under its own security and data terms: Cloudflare (website and API hosting, delivery, key-value storage, queues and file/image storage); Neon (database hosting, EU region); Resend (transactional and campaign email); Sentry (error and performance monitoring, EU region); Inngest (background job processing); Google Gemini (Google; AI features: only the text you submit to an AI feature is sent); PostHog (EU cloud; product analytics in the merchant dashboard); and OneSignal (United States; push notifications to the merchant dashboard installed as a home-screen app).',
           'We may add or replace providers; the current list is maintained on this page. We do not sell personal data.',
         ],
       },
