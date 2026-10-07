@@ -6,6 +6,7 @@ import { Providers } from './providers';
 import { intlFormats } from '../i18n/formats';
 import '../styles/globals.css';
 import { BRAND } from '@force/shared';
+import { productName } from '../lib/product-name';
 
 const geist = Geist({
   subsets: ['latin'],
@@ -20,51 +21,54 @@ const ibmPlexArabic = IBM_Plex_Sans_Arabic({
   weight: ['400', '500', '600', '700'],
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: BRAND.product.nameEn,
-    template: `%s | ${BRAND.product.nameEn}`,
-  },
-  description: BRAND.tagline,
-  // Tell every crawler to skip this domain entirely. Belt-and-suspenders
-  // with `apps/admin/public/robots.txt` and the X-Robots-Tag header in
-  // next.config.js — any one of these layers is enough but Google
-  // sometimes ignores robots.txt for already-discovered URLs while
-  // honouring the meta tag, and vice-versa.
-  robots: {
-    index: false,
-    follow: false,
-    nocache: true,
-    googleBot: {
+export async function generateMetadata(): Promise<Metadata> {
+  const name = productName(await getLocale());
+  return {
+    title: {
+      default: name,
+      template: `%s · ${name}`,
+    },
+    description: BRAND.tagline,
+    // Tell every crawler to skip this domain entirely. Belt-and-suspenders
+    // with `apps/admin/public/robots.txt` and the X-Robots-Tag header in
+    // next.config.js — any one of these layers is enough but Google
+    // sometimes ignores robots.txt for already-discovered URLs while
+    // honouring the meta tag, and vice-versa.
+    robots: {
       index: false,
       follow: false,
-      noimageindex: true,
-      'max-snippet': -1,
-      'max-image-preview': 'none',
-      'max-video-preview': -1,
+      nocache: true,
+      googleBot: {
+        index: false,
+        follow: false,
+        noimageindex: true,
+        'max-snippet': -1,
+        'max-image-preview': 'none',
+        'max-video-preview': -1,
+      },
     },
-  },
-  // PWA install metadata. apple-* keys exist because iOS Safari requires
-  // an installed PWA before granting Web Push permission, and the install
-  // prompt picks up these tags rather than the manifest.
-  applicationName: `${BRAND.product.nameEn} Admin`,
-  appleWebApp: {
-    capable: true,
-    title: `${BRAND.product.nameEn} Admin`,
-    statusBarStyle: 'default',
-  },
-  formatDetection: {
-    telephone: false,
-  },
-  icons: {
-    icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
-      { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/favicon-16.png', sizes: '16x16', type: 'image/png' },
-    ],
-    apple: '/apple-touch-icon.png',
-  },
-};
+    // PWA install metadata. apple-* keys exist because iOS Safari requires
+    // an installed PWA before granting Web Push permission, and the install
+    // prompt picks up these tags rather than the manifest.
+    applicationName: name,
+    appleWebApp: {
+      capable: true,
+      title: name,
+      statusBarStyle: 'default',
+    },
+    formatDetection: {
+      telephone: false,
+    },
+    icons: {
+      icon: [
+        { url: '/favicon.svg', type: 'image/svg+xml' },
+        { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
+        { url: '/favicon-16.png', sizes: '16x16', type: 'image/png' },
+      ],
+      apple: '/apple-touch-icon.png',
+    },
+  };
+}
 
 export const viewport = {
   width: 'device-width',
