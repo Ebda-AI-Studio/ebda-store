@@ -1,6 +1,12 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { BRAND } from '@force/shared/brand';
 import { type Locale } from '../lib/site';
+
+/** BRAND's font URL plus IBM Plex Sans Arabic 700 for the Arabic display headlines. */
+const FONTS_URL = BRAND.fonts.googleFontsUrl.replace(
+  'IBM+Plex+Sans+Arabic:wght@400;500',
+  'IBM+Plex+Sans+Arabic:wght@400;500;700'
+);
 import '@/app/globals.css';
 
 /** Brand tokens come from BRAND (single source of truth); everything else lives in globals.css. */
@@ -25,11 +31,11 @@ export function RootShell({ locale, children }: { locale: Locale; children: Reac
         {/* Fonts load non-blocking (swap): system fallbacks paint first. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `var l=document.createElement('link');l.rel='stylesheet';l.href=${JSON.stringify(BRAND.fonts.googleFontsUrl)};document.head.appendChild(l);`,
+            __html: `var l=document.createElement('link');l.rel='stylesheet';l.href=${JSON.stringify(FONTS_URL)};document.head.appendChild(l);`,
           }}
         />
         <noscript>
-          <link rel="stylesheet" href={BRAND.fonts.googleFontsUrl} />
+          <link rel="stylesheet" href={FONTS_URL} />
         </noscript>
       </head>
       <body>{children}</body>

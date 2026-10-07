@@ -21,10 +21,10 @@ describe('marketing nav', () => {
   it('has the five links in order with correct targets (en)', () => {
     const nav = en.match(/<nav aria-label="Main navigation".*?<\/nav>/s)![0];
     const labels = [...nav.matchAll(/<a href="([^"]+)">([^<]+)<\/a>/g)].slice(0, 4);
-    expect(labels.map(m => m[2])).toEqual(['Features', 'Solutions', 'Pricing', 'Resources']);
-    expect(labels.map(m => m[1])).toEqual(['#builder', '#how', '#pricing', '#faq']);
+    expect(labels.map(m => m[2])).toEqual(['Features', 'How it works', 'Pricing', 'FAQ']);
+    expect(labels.map(m => m[1])).toEqual(['#features', '#how', '#pricing', '#faq']);
   });
-  it('Log in -> app login, Start selling -> app signup, in both locales', () => {
+  it('Log in -> app login, Start now -> app signup, in both locales', () => {
     expect(LOGIN_URL).toBe('https://admin.ebda.app/login');
     expect(SIGNUP_URL).toBe('https://admin.ebda.app/signup');
     for (const html of [ar, en]) {
@@ -32,7 +32,8 @@ describe('marketing nav', () => {
       expect(html).toMatch(/<a href="https:\/\/admin\.ebda\.app\/signup" class="btn btn-primary">/);
     }
     expect(en).toContain('>Log in<');
-    expect(en).toContain('>Start selling<');
+    expect(en).toContain('>Start now<');
+    expect(ar).toContain('>ابدأ دلوقتي<');
   });
   it('has a language toggle between / and /en', () => {
     expect(ar).toMatch(/href="\/en\/?"[^>]*hrefLang="en"|hrefLang="en"[^>]*href="\/en\/?"/i);
@@ -41,30 +42,17 @@ describe('marketing nav', () => {
 });
 
 describe('marketing hero and structure', () => {
-  it('shows the mandated hero copy', () => {
-    for (const html of [ar, en]) {
-      expect(html).toContain('ابدأ بيع أونلاين.');
-      expect(html).toContain('Your business, your store, everything in one place.');
-    }
+  it('shows the hero in each locale (Egyptian Arabic at /, English at /en)', () => {
+    expect(ar).toContain('ابدأ متجرك أونلاين في دقايق.');
+    expect(en).toContain('Open your online store in minutes.');
+    // No English sentence on the Arabic hero any more (R-EBDA-COPY-1).
+    expect(ar).not.toContain('Your business, your store');
   });
   it('renders sections in the exact required order', () => {
-    const expected = [
-      'create',
-      'how',
-      'builder',
-      'products',
-      'orders',
-      'payments',
-      'whatsapp',
-      'analytics',
-      'pricing',
-      'stories',
-      'faq',
-      'login',
-    ];
+    const expected = ['how', 'features', 'payments', 'pricing', 'faq', 'start'];
     expect([...SECTION_ORDER]).toEqual(expected);
     for (const html of [ar, en]) {
-      const ids = [...html.matchAll(/<section id="([a-z]+)" class="section"/g)].map(m => m[1]);
+      const ids = [...html.matchAll(/<section id="([a-z]+)" class="section[" ]/g)].map(m => m[1]);
       expect(ids).toEqual(expected);
     }
   });
@@ -120,12 +108,36 @@ describe('marketing honesty', () => {
     expect(section(en)).toContain('Start with Growth');
     expect(section(ar)).toContain('ابدأ بباقة النمو');
   });
-  it('payments mark unbuilt methods as coming and WhatsApp does not promise automation', () => {
-    const pay = en.match(/<section id="payments".*?<\/section>/s)![0];
-    expect(pay).toMatch(/Cards and wallets.*?badge-coming">Coming/s);
-    expect(pay).toContain('InstaPay');
-    expect(en).toContain('Automated messages: not available yet');
-    expect(en).toMatch(/Bosta, Aramex and others are coming/);
+  it('payments and carriers mark unbuilt items as coming; WhatsApp does not promise automation', () => {
+    for (const [html, coming] of [
+      [en, 'Coming soon'],
+      [ar, 'قريب'],
+    ] as const) {
+      const pay = html.match(/<section id="payments".*?<\/section>/s)![0];
+      expect(pay).toMatch(
+        new RegExp(`(Cards and wallets|كروت ومحافظ).*?badge-coming">${coming}<`, 's')
+      );
+      expect(pay).toMatch(
+        new RegExp(`(Bosta and Aramex|بوسطة وأرامكس).*?badge-coming">${coming}<`, 's')
+      );
+      expect(pay).toMatch(/InstaPay|إنستا باي/);
+    }
+    expect(en).toContain('Does WhatsApp send messages by itself?');
+    expect(en).toContain('Not yet.');
+  });
+  it('prices use Western digits and ج.م on the Arabic page', () => {
+    const s = ar.match(/<section id="pricing".*?<\/section>/s)![0];
+    expect(s).toContain('1,490 ج.م');
+    expect(s).not.toMatch(/[٠-٩]/);
+  });
+  it('every Whisky 11 mention in the footer links to whisky11.com in a new tab', () => {
+    for (const html of [ar, en]) {
+      expect(html).toContain(
+        '<a href="https://whisky11.com" target="_blank" rel="noopener noreferrer">Whisky 11</a>'
+      );
+    }
+    const org = jsonLd('en')['@graph'][0] as { parentOrganization: { url: string } };
+    expect(org.parentOrganization.url).toBe('https://whisky11.com');
   });
   it('first-merchant block carries no invented quote', () => {
     expect(en).toContain('data-testid="first-merchant"');

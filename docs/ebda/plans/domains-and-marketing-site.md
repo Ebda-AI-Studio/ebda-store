@@ -20,27 +20,21 @@ Reserved subdomains (never assignable as a store slug): `app, store, api, docs, 
 
 ## Marketing site (`ebda.app`)
 
-Top nav: **EBDA** · Features · Solutions · Pricing · Resources · `Log in` · **Start selling** (primary CTA → signup on admin.ebda.app).
+Superseded 2026-10-07 by Ruling R-EBDA-COPY-1 (`docs/RULINGS.md`): Ahmad asked for Egyptian colloquial Arabic and at least half the text. The original 12-section brief is kept below for history.
 
-Hero:
+Top nav (now): logo · Features · How it works · Pricing · FAQ · `Log in` · **Start now** (→ signup on admin.ebda.app). Arabic: المميزات · إزاي بيشتغل · الأسعار · أسئلة · دخول · ابدأ دلوقتي.
 
-> **ابدأ بيع أونلاين.**
-> Your business, your store, everything in one place.
+Hero (now), per locale, over the Nile-at-night canvas (static inline poster first, canvas fades in):
 
-Sections, in order:
+> **ابدأ متجرك أونلاين في دقايق.** / **Open your online store in minutes.**
 
-1. Create your store → signup
-2. How EBDA works
-3. Store builder
-4. Products & inventory
-5. Orders
-6. Payments
-7. WhatsApp integration
-8. Analytics
-9. Pricing
-10. Customer stories
-11. FAQ
-12. Login
+Sections (now), in order (`SECTION_ORDER` in `apps/marketing/src/lib/site.ts`): How it works (3 steps) · Features (phone storefront mock) · Payments and shipping (status ledger) · Pricing · FAQ (max 6) · Closing call to action (with the first-merchant chip).
+
+Original brief (2026-10-03, superseded):
+
+- Top nav: EBDA · Features · Solutions · Pricing · Resources · Log in · Start selling.
+- Hero: "ابدأ بيع أونلاين." / "Your business, your store, everything in one place."
+- Sections: Create your store, How EBDA works, Store builder, Products & inventory, Orders, Payments, WhatsApp integration, Analytics, Pricing, Customer stories, FAQ, Login.
 
 ## Decisions (Ahmad, 2026-10-03, later)
 
