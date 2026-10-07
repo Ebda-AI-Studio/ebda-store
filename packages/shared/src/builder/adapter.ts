@@ -41,6 +41,7 @@ import {
   resolveLayoutSettings,
   type StoreLayoutSettings,
 } from '../types/store-layout';
+import type { TemplateId } from '../types/store-theme';
 import {
   LEGACY_HOME_SECTION_KEYS,
   resolveLegacySectionOrder,
@@ -312,6 +313,47 @@ export function definitionToLayout(def: PageDefinition): StoreLayoutSettings {
 
   for (const [k, v] of Object.entries(def.siteSettings)) out[k] = v;
   return resolveLayoutSettings(out);
+}
+
+/**
+ * Does a PUBLISHED document still agree with `stores.layout_settings`?
+ * `layout` is the row as the public route serves it: resolved against the
+ * store's TEMPLATE baseline. Publish stores `definitionToLayout(def)` (JSONB:
+ * `undefined` keys vanish), so the document side must go through the same
+ * store + template resolve before comparing. Comparing the template-less
+ * projection made every template family and every removed section look like
+ * drift, and every store silently fell back to the layout-derived page
+ * (Ruling BUILDER-PUBLISH-1). Only an out-of-band write to the row disagrees.
+ */
+export function publishedDocumentAgrees(
+  def: PageDefinition,
+  layout: StoreLayoutSettings,
+  templateId: TemplateId | undefined
+): boolean {
+  const json = (v: unknown): unknown => JSON.parse(JSON.stringify(v));
+  const served = resolveLayoutSettings(json(definitionToLayout(def)), templateId);
+  return isDeepEqualJson(json(served), json(layout));
+}
+
+/** Structural equality of two JSON values (object key order ignored). */
+function isDeepEqualJson(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    const bb = b as unknown[];
+    return a.length === bb.length && a.every((v, i) => isDeepEqualJson(v, bb[i]));
+  }
+  const ka = Object.keys(a as object);
+  const kb = Object.keys(b as object);
+  return (
+    ka.length === kb.length &&
+    ka.every(
+      k =>
+        Object.prototype.hasOwnProperty.call(b, k) &&
+        isDeepEqualJson((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k])
+    )
+  );
 }
 
 /**
