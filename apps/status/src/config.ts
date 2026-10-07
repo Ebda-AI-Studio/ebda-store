@@ -16,7 +16,7 @@ export const COMPONENTS: readonly ComponentConfig[] = [
   {
     id: 'admin',
     name: { en: 'Merchant dashboard', ar: 'لوحة التحكم' },
-    url: `https://${d.admin}/health`,
+    url: `https://${d.storeApp}/health`,
     expectStatus: 200,
     expectBody: '"status":\\s*"ok"',
   },

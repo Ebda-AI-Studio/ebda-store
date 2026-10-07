@@ -8,7 +8,7 @@ vulnerability and what to expect.
 
 - **Email:** [security@ebda.app](mailto:security@ebda.app)
 - Machine-readable contact: [`/.well-known/security.txt`](https://ebda.app/.well-known/security.txt)
-  (RFC 9116), served on `ebda.app`, `admin.ebda.app`, and
+  (RFC 9116), served on `ebda.app`, `store.ebda.app`, and
   `orders.ebda.app`.
 
 Please include: the affected URL/endpoint, steps to reproduce, and the impact

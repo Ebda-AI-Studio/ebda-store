@@ -128,7 +128,7 @@ describe('billing notice email', () => {
     storeName: 'Amelia',
     planName: 'Growth',
     amountMinor: 349000,
-    billingUrl: 'https://admin.ebda.app/stores/s1/billing',
+    billingUrl: 'https://store.ebda.app/stores/s1/billing',
     dueOn: '2026-11-20',
     daysLeft: 3,
     method: 'instapay' as const,

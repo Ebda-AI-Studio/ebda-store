@@ -269,8 +269,8 @@ describe('ebda-builder:v1 protocol', () => {
   it('accepts a valid message from the expected origin AND source only', () => {
     expect(
       acceptMessage(
-        { origin: 'https://admin.ebda.app', source: parent, data: msg },
-        'https://admin.ebda.app',
+        { origin: 'https://store.ebda.app', source: parent, data: msg },
+        'https://store.ebda.app',
         parent,
         childToParentSchema
       )
@@ -278,22 +278,22 @@ describe('ebda-builder:v1 protocol', () => {
     expect(
       acceptMessage(
         { origin: 'https://evil.example', source: parent, data: msg },
-        'https://admin.ebda.app',
+        'https://store.ebda.app',
         parent,
         childToParentSchema
       )
     ).toBeNull();
     expect(
       acceptMessage(
-        { origin: 'https://admin.ebda.app', source: { id: 'other' }, data: msg },
-        'https://admin.ebda.app',
+        { origin: 'https://store.ebda.app', source: { id: 'other' }, data: msg },
+        'https://store.ebda.app',
         parent,
         childToParentSchema
       )
     ).toBeNull();
     expect(
       acceptMessage(
-        { origin: 'https://admin.ebda.app', source: parent, data: msg },
+        { origin: 'https://store.ebda.app', source: parent, data: msg },
         null,
         parent,
         childToParentSchema

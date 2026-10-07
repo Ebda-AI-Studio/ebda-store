@@ -1,10 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Admin host is admin.ebda.app (Ruling EBDA-HOST-1, 2026-10-07). demo-shop.example
+// Merchant app host is store.ebda.app (Ruling HOST-STORE-1, 2026-10-07; admin.ebda.app retired). demo-shop.example
 // (the flagship live merchant storefront) is unaffected by the Cloudflare
 // migration and stays as the storefront default.
 const STOREFRONT_BASE_URL = process.env.SMOKE_STOREFRONT_URL ?? 'https://demo-shop.example';
-const ADMIN_BASE_URL = process.env.SMOKE_ADMIN_URL ?? 'https://admin.ebda.app';
+const ADMIN_BASE_URL = process.env.SMOKE_ADMIN_URL ?? 'https://store.ebda.app';
 
 export default defineConfig({
   testDir: './tests/smoke',

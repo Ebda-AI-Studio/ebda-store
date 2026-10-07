@@ -4,7 +4,7 @@
 // Route ownership in the ebda.app zone (Ruling EBDA-DEPLOY-1):
 //   ebda.app (apex)        → ebda-marketing (its own custom domain; NEVER claimed here)
 //   api.ebda.app           → ebda-api (`api.ebda.app/*` route + custom domain)
-//   admin./orders.ebda.app → ebda-admin / ebda-orders (custom domain + a specific
+//   store./orders.ebda.app → ebda-admin / ebda-orders (custom domain + a specific
 //                            `<host>/*` zone route — the route is what beats the
 //                            storefront wildcard, which runs BEFORE custom domains)
 //   <slug>.ebda.app        → ebda-web via the `*.ebda.app/*` zone route
@@ -16,7 +16,7 @@
 const { BRAND } = require('../packages/shared/dist/brand/index.js');
 const app = process.argv[2];
 const zone = BRAND.domains.marketing;
-const host = { admin: BRAND.domains.admin, orders: BRAND.domains.orders }[app];
+const host = { admin: BRAND.domains.storeApp, orders: BRAND.domains.orders }[app];
 let routes;
 if (app === 'web') {
   routes = [{ pattern: `*${BRAND.domains.storeSuffix}/*`, zone_name: zone }];
