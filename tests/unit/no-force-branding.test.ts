@@ -67,6 +67,8 @@ const PHASE_B_PENDING: Record<string, string> = {
     'PecannbeeProductCard rename (blocked on templates workstream)',
   'apps/web/src/app/tenant-store/[tenant]/[locale]/layout.tsx':
     'builder/templates/layout workstream (excluded)',
+  'apps/web/src/builder/sections/FeaturedCollectionSection.tsx':
+    'PecannbeeProductCard rename (blocked on templates workstream)',
   'apps/web/src/components/FrequentlyBoughtTogether.tsx':
     'PecannbeeProductCard rename (blocked on templates workstream)',
   'apps/web/src/components/YouMightAlsoLike.tsx':

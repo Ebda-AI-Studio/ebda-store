@@ -78,6 +78,21 @@ const templates: Record<TemplateId, () => Promise<TemplateComponents>> = {
       EmptyState: m.EmptyState,
       FormCard: m.FormCard,
     })),
+  dahab: () =>
+    import('./dahab').then(m => ({
+      Header: m.Header,
+      Footer: m.Footer,
+      Hero: m.Hero,
+      ProductCard: m.ProductCard,
+      ProductGrid: m.ProductGrid,
+      CategoryCard: m.CategoryCard,
+      CategoryGrid: m.CategoryGrid,
+      AnnouncementBar: m.AnnouncementBar,
+      CartTable: m.CartTable,
+      OrderSummary: m.OrderSummary,
+      EmptyState: m.EmptyState,
+      FormCard: m.FormCard,
+    })),
 };
 
 /**
@@ -95,7 +110,14 @@ export async function getTemplateComponents(templateId: TemplateId): Promise<Tem
 /**
  * All available template IDs
  */
-export const TEMPLATE_IDS: TemplateId[] = ['modern', 'classic', 'minimal', 'bold', 'elegant'];
+export const TEMPLATE_IDS: TemplateId[] = [
+  'modern',
+  'classic',
+  'minimal',
+  'bold',
+  'elegant',
+  'dahab',
+];
 
 // Re-export types
 export type { TemplateComponents } from './types';

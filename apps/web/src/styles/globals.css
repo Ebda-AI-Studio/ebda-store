@@ -1070,3 +1070,100 @@ html {
     outline-width: 3px;
   }
 }
+
+/*
+ * Dahab template (builder Phase 3 pilot) — docs/ebda/templates/dahab.md.
+ * `.font-display` is the pack's display face; outside a pack that sets one it
+ * inherits, so builder sections that use it look unchanged on other skins.
+ * Marcellus carries Latin, Amiri carries Arabic (Arabic pages put Amiri first
+ * so mixed lines keep one voice). `font-size-adjust` is reset: the platform's
+ * x-height normalisation (0.5) is tuned for IBM Plex Sans Arabic and would
+ * inflate Amiri.
+ */
+.font-display {
+  font-family: var(--font-display, inherit);
+}
+[data-pack='dahab'] {
+  --font-display: var(--font-dahab-latin), var(--font-dahab-ar), 'Times New Roman', serif;
+}
+html[dir='rtl'] [data-pack='dahab'] {
+  --font-display: var(--font-dahab-ar), var(--font-dahab-latin), serif;
+}
+[data-pack='dahab'] .font-display {
+  font-size-adjust: none;
+  font-weight: 400;
+}
+html[dir='rtl'] [data-pack='dahab'] .font-display {
+  font-weight: 700;
+}
+
+/* The page's one orchestrated motion: hero rule draws, copy rises. */
+@keyframes dahab-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes dahab-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dahab-hero-copy .dahab-draw {
+    animation: dahab-draw 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .dahab-hero-copy > :not(.dahab-draw) {
+    animation: dahab-rise 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .dahab-hero-copy > :nth-child(2) {
+    animation-delay: 120ms;
+  }
+  .dahab-hero-copy > :nth-child(3) {
+    animation-delay: 220ms;
+  }
+  .dahab-hero-copy > :nth-child(4) {
+    animation-delay: 320ms;
+  }
+}
+
+/* Dahab skin on the two Phase 2 document sections (no markup change, so
+   every other store renders exactly as before): display-face headings, the
+   arch frame on the image, and a quieter newsletter field. */
+[data-pack='dahab'] [data-section='image-text'] h2,
+[data-pack='dahab'] [data-section='newsletter'] h2 {
+  font-family: var(--font-display);
+  font-size-adjust: none;
+  font-weight: 400;
+  font-size: clamp(1.6rem, 1.15rem + 1.5vw, 2.5rem);
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+html[dir='rtl'] [data-pack='dahab'] [data-section='image-text'] h2,
+html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
+  font-weight: 700;
+  line-height: 1.45;
+}
+[data-pack='dahab'] [data-section='image-text'] img,
+[data-pack='dahab'] [data-section='image-text'] img + div,
+[data-pack='dahab'] [data-section='image-text'] .bg-muted {
+  border-radius: 999px 999px var(--radius) var(--radius);
+}
+[data-pack='dahab'] [data-section='image-text'] p {
+  font-size: 1rem;
+  line-height: 1.75;
+  max-width: 46ch;
+}
+[data-pack='dahab'] [data-section='newsletter'] input {
+  background: transparent;
+}
+[data-pack='dahab'] [data-section='newsletter'] > div {
+  max-width: 38rem;
+}

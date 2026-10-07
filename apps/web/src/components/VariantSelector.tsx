@@ -14,6 +14,21 @@ interface VariantSelectorProps {
   /** Fires when the shopper taps a pill (never for the auto-selected single
    *  variant), so the page can tell a real pick from the pre-selection. */
   onShopperSelect?: () => void;
+  /**
+   * `pill` (default, every existing store): filled primary pill when picked.
+   * `swatch` (Dahab): outlined chips with a metal-colour dot for gold
+   * colours. Presentation only — selection and availability logic is shared.
+   */
+  appearance?: 'pill' | 'swatch';
+}
+
+/** Metal colour dot for a gold-colour option value (`swatch` appearance). */
+export function metalSwatchColor(value: string, valueAr?: string | null): string | null {
+  const v = `${value} ${valueAr ?? ''}`.toLowerCase();
+  if (/rose|pink|وردي|روز/.test(v)) return '#D9A08B';
+  if (/white|platinum|silver|أبيض|ابيض|فضة|فضي|بلاتين/.test(v)) return '#E4E4E0';
+  if (/yellow|gold|أصفر|اصفر|ذهبي/.test(v)) return '#D4AF5A';
+  return null;
 }
 
 export function VariantSelector({
@@ -21,7 +36,9 @@ export function VariantSelector({
   options,
   onVariantSelect,
   onShopperSelect,
+  appearance = 'pill',
 }: VariantSelectorProps) {
+  const swatch = appearance === 'swatch';
   const { t, isRtl } = useLanguage();
   // Track selected value per option name. A product with exactly one
   // (tappable) variant starts with it picked — there is nothing to choose.
@@ -124,7 +141,13 @@ export function VariantSelector({
         return (
           <div key={option.name}>
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-medium text-foreground">{axisLabel}:</span>
+              <span
+                className={
+                  swatch ? 'text-sm text-muted-foreground' : 'text-sm font-medium text-foreground'
+                }
+              >
+                {axisLabel}:
+              </span>
               {selectedDisplay && (
                 <span className="text-sm text-muted-foreground">{selectedDisplay}</span>
               )}
@@ -137,6 +160,7 @@ export function VariantSelector({
                 // Pill text: merchant Arabic wins; else unit tokens are
                 // localised ("185 Gram" → "185 جرام"); else English.
                 const pillLabel = localizeOptionValue(value, valueAr, isRtl);
+                const metal = swatch ? metalSwatchColor(value, valueAr) : null;
                 return (
                   <button
                     key={value}
@@ -144,16 +168,36 @@ export function VariantSelector({
                     disabled={!available}
                     aria-pressed={isSelected}
                     title={!available ? t('Out of Stock', 'غير متوفر') : undefined}
-                    className={[
-                      'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition-all',
-                      thumbnail ? 'inline-flex items-center gap-2' : '',
-                      isSelected
-                        ? 'border-primary bg-primary text-white shadow-md shadow-primary/25'
-                        : available
-                          ? 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted'
-                          : 'cursor-not-allowed border-border bg-muted text-muted-foreground opacity-50',
-                    ].join(' ')}
+                    className={
+                      swatch
+                        ? [
+                            'relative inline-flex min-h-[44px] min-w-[3rem] items-center justify-center gap-2 rounded-[var(--radius)] border px-3.5 text-sm tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                            isSelected
+                              ? 'border-primary text-foreground ring-1 ring-inset ring-primary'
+                              : available
+                                ? 'border-border text-foreground/85 hover:border-primary/60'
+                                : 'cursor-not-allowed border-border text-muted-foreground opacity-50',
+                          ].join(' ')
+                        : [
+                            'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition-all',
+                            thumbnail ? 'inline-flex items-center gap-2' : '',
+                            isSelected
+                              ? 'border-primary bg-primary text-white shadow-md shadow-primary/25'
+                              : available
+                                ? 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted'
+                                : 'cursor-not-allowed border-border bg-muted text-muted-foreground opacity-50',
+                          ].join(' ')
+                    }
                   >
+                    {metal && (
+                      <span
+                        aria-hidden="true"
+                        className="inline-block h-4 w-4 shrink-0 rounded-full ring-1 ring-foreground/20"
+                        style={{
+                          background: `radial-gradient(circle at 35% 30%, #fff8 0, transparent 45%), ${metal}`,
+                        }}
+                      />
+                    )}
                     {thumbnail && (
                       <span
                         aria-hidden="true"
