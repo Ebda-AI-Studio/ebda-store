@@ -1,5 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { BRAND } from '@force/shared';
+import { getLocale, getTranslations } from 'next-intl/server';
+import { productName } from '../lib/product-name';
 
 /**
  * Admin PWA manifest. Why this matters:
@@ -13,11 +15,16 @@ import { BRAND } from '@force/shared';
  * surface, so the values are constant. The storefront keeps its own
  * per-store manifest at apps/web/src/app/manifest.ts.
  */
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const locale = await getLocale();
+  const t = await getTranslations('pwa.appManifest');
+  const name = productName(locale);
   return {
-    name: `${BRAND.product.nameEn} Admin`,
-    short_name: `${BRAND.product.nameEn} Admin`,
-    description: `${BRAND.product.nameEn} merchant dashboard`,
+    name,
+    short_name: name,
+    description: t('description'),
+    lang: locale,
+    dir: locale === 'ar' ? 'rtl' : 'ltr',
     start_url: '/',
     scope: '/',
     display: 'standalone',

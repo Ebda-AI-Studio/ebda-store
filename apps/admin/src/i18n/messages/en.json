@@ -20,12 +20,12 @@
       "notFound": {
         "code": "404",
         "title": "Page not found",
-        "message": "The admin page you are looking for does not exist or has been moved.",
+        "message": "The page you are looking for does not exist or has been moved.",
         "goHome": "Go to Dashboard"
       },
       "boundary": {
         "title": "Something went wrong",
-        "message": "An unexpected error occurred in the admin panel.",
+        "message": "An unexpected error occurred in Ebda Store.",
         "errorId": "Error ID: {id}",
         "unknown": "Unknown error",
         "generic": "An unexpected error occurred.",
@@ -33,8 +33,8 @@
         "goHome": "Go to Dashboard"
       },
       "global": {
-        "title": "Admin Error",
-        "message": "A critical error occurred in the admin application."
+        "title": "Ebda Store error",
+        "message": "A critical error occurred in Ebda Store."
       },
       "somethingWrong": "Something went wrong"
     },
@@ -3428,12 +3428,15 @@
     }
   },
   "pwa": {
+    "appManifest": {
+      "description": "Ebda Store merchant dashboard"
+    },
     "installHint": {
-      "title": "Install Ebda Store Admin to receive push notifications",
+      "title": "Install Ebda Store to receive push notifications",
       "description": "iPhone needs the app added to your home screen before push notifications can work.",
       "step1": "Tap the Share icon in Safari",
       "step2": "Choose Add to Home Screen",
-      "step3": "Open Ebda Store Admin from the home screen and allow notifications",
+      "step3": "Open Ebda Store from the home screen and allow notifications",
       "dismiss": "Dismiss"
     },
     "page": {
@@ -5510,7 +5513,7 @@
   },
   "auth": {
     "login": {
-      "title": "Admin Login",
+      "title": "Sign in",
       "subtitle": "Sign in to access Ebda Store",
       "email": "Email address",
       "emailPlaceholder": "you@example.com",
@@ -5519,7 +5522,7 @@
       "signIn": "Sign in",
       "signingIn": "Signing in…",
       "loginFailed": "Login failed",
-      "footer": "Ebda Store Admin Panel",
+      "footer": "Ebda Store",
       "brandTitle": "Ebda Store",
       "brandSubtitle": "Manage your e-commerce stores, users, and platform settings from one powerful dashboard.",
       "statActiveStores": "Active Stores",
@@ -5792,7 +5795,7 @@
       "goBack": "Go back",
       "viewStore": "View Store",
       "forcePlatformBrand": "Platform",
-      "forceAdminBrand": "Admin",
+      "forceAdminBrand": "Store",
       "forceBrandPrefix": "Ebda",
       "languageLabel": "Language",
       "focusMode": {
@@ -5818,7 +5821,9 @@
       "loadFailed": "Could not load this data. Please try again."
     },
     "languageSwitcher": {
-      "ariaLabel": "Language"
+      "ariaLabel": "Language",
+      "nativeEn": "English",
+      "nativeAr": "العربية"
     },
     "brand": {
       "forceMediaAlt": "Ebda",

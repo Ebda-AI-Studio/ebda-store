@@ -9,16 +9,16 @@
 
 const MESSAGES = {
   en: {
-    title: 'Admin Error',
-    message: 'A critical error occurred in the admin application.',
+    title: 'Ebda Store error',
+    message: 'A critical error occurred in Ebda Store.',
     errorId: (id: string) => `Error ID: ${id}`,
     unknown: 'Unknown error',
     retry: 'Try Again',
     goHome: 'Go to Dashboard',
   },
   ar: {
-    title: 'خطأ في لوحة التحكم',
-    message: 'حدث خطأ جسيم في تطبيق لوحة التحكم.',
+    title: 'خطأ في ابدأ ستور',
+    message: 'حدث خطأ جسيم في ابدأ ستور.',
     errorId: (id: string) => `معرّف الخطأ: ${id}`,
     unknown: 'خطأ غير معروف',
     retry: 'حاول مرة أخرى',
@@ -29,9 +29,9 @@ const MESSAGES = {
 type Locale = keyof typeof MESSAGES;
 
 function readLocale(): Locale {
-  if (typeof document === 'undefined') return 'en';
+  if (typeof document === 'undefined') return 'ar';
   const match = document.cookie.match(/(?:^|;\s*)admin-lang=(en|ar)/);
-  return (match?.[1] as Locale) ?? 'en';
+  return (match?.[1] as Locale) ?? 'ar';
 }
 
 export default function GlobalError({
