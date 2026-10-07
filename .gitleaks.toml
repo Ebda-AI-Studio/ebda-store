@@ -19,6 +19,15 @@ useDefault = true
 description = "CI-only test secrets (not real credentials)"
 regexTarget = "line"
 regexes = [
+  # Paymob OFFICIAL DOCS example values (public, test-mode) used verbatim in
+  # tests/contracts/paymob/*.official.json contract fixtures — not credentials.
+  '''egy_csk_test_94042f793419c5a0f14a4cadfda9d626''',
+  '''eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9\.eyJ1c2VyX2lkIjo0Mzk5NTYs''',
+  '''ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SjFjMlZ5WDJsa0lqb3pNREk0TlRJ''',
+  # Fake provider-key fixtures (provider-connect / fawry contract tests) — CI-only.
+  '''wrong-key-123456''',
+  '''pak_live_0123456789abcdef''',
+  '''pak_test_0123456789abcdef''',
   # Synthetic shipping auth fixtures, exercised only by contract/integration tests.
   '''a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718''',
   '''plain-bosta-key-123456''',
