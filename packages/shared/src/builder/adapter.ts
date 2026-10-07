@@ -277,6 +277,7 @@ export function definitionToLayout(def: PageDefinition): StoreLayoutSettings {
   for (const node of allSections(def)) {
     const d = getSectionDefinition(node.type);
     if (!d) continue; // unknown type: nothing to project (renderers skip it too)
+    if (d.legacyKey === null) continue; // document-only type: lives in the document alone
     if (d.legacyKey === 'extraCarousels') {
       extras.push(sectionToLegacy(node, 'extraCarousels'));
       continue;
@@ -321,7 +322,7 @@ export function sectionFromPreset(type: string, presetIndex: number, id: string)
   const d = getSectionDefinition(type);
   const preset = d?.presets[presetIndex];
   if (!d || !preset) throw new Error(`no preset ${presetIndex} for section type ${type}`);
-  const node = legacyToSection(id, type, d.legacyKey, { ...preset.settings });
+  const node = legacyToSection(id, type, d.legacyKey ?? '', { ...preset.settings });
   node.hidden = false;
   if (d.blocks.length > 0 || preset.blocks)
     node.blocks = (preset.blocks ?? []).map((b, i) => ({
@@ -331,4 +332,40 @@ export function sectionFromPreset(type: string, presetIndex: number, id: string)
     }));
   if (d.legacyKey === 'extraCarousels' && node.settings.id === undefined) node.settings.id = id;
   return node;
+}
+
+/** True for section types that exist only in the document (no `layout_settings` key). */
+export function isDocumentOnlySection(node: SectionNode): boolean {
+  return getSectionDefinition(node.type)?.legacyKey === null;
+}
+
+/**
+ * Carry the DOCUMENT-ONLY sections of `previous` into `next` — a document
+ * rebuilt from `layout_settings` (the legacy page-builder save, the legacy
+ * layout PUT) knows nothing about them and would otherwise delete them.
+ * Each one is re-inserted after the same predecessor id it had in
+ * `previous` (or at the start when that predecessor is gone); ids already in
+ * `next` win. Pure; returns a new document.
+ */
+export function mergeDocumentOnlySections(
+  next: PageDefinition,
+  previous: PageDefinition | null | undefined
+): PageDefinition {
+  if (!previous) return next;
+  const sections = [...next.sections];
+  const ids = new Set(sections.map(s => s.id));
+  previous.sections.forEach((node, i) => {
+    if (!isDocumentOnlySection(node) || ids.has(node.id)) return;
+    let at = 0;
+    for (let j = i - 1; j >= 0; j--) {
+      const k = sections.findIndex(s => s.id === previous.sections[j].id);
+      if (k >= 0) {
+        at = k + 1;
+        break;
+      }
+    }
+    sections.splice(at, 0, node);
+    ids.add(node.id);
+  });
+  return { ...next, sections };
 }
