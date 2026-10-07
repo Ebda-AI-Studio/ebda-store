@@ -181,7 +181,11 @@ describe('onboarding stepper', () => {
     await screen.findByText('onboarding.flow.product.title');
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.skip' }));
     await screen.findByText('onboarding.flow.payment.title');
-    expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('true');
+    expect(
+      screen
+        .getByRole('switch', { name: 'onboarding.flow.payment.cod' })
+        .getAttribute('aria-checked')
+    ).toBe('true');
     document.documentElement.dir = '';
   });
 
@@ -267,6 +271,53 @@ describe('onboarding stepper', () => {
       (screen.getByRole('button', { name: 'onboarding.flow.next' }) as HTMLButtonElement).disabled
     ).toBe(true);
     expect(screen.getAllByText('onboarding.flow.payment.needOne').length).toBeGreaterThan(0);
+  });
+
+  it('enables InstaPay with its handle during onboarding (FIX-006)', async () => {
+    mockState({ ...verifiedNoStore, store: inactiveStore, codEnabled: true });
+    render(<OnboardingFlow />);
+    await screen.findByText('onboarding.flow.template.title');
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'onboarding.flow.skip' }));
+    await screen.findByText('onboarding.flow.payment.title');
+    const next = () =>
+      screen.getByRole('button', { name: 'onboarding.flow.next' }) as HTMLButtonElement;
+    fireEvent.click(screen.getByRole('switch', { name: 'onboarding.flow.payment.instapay' }));
+    // On with no handle/phone: blocked, with the reason shown.
+    expect(next().disabled).toBe(true);
+    expect(screen.getByText('onboarding.flow.payment.needHandleOrPhone')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('onboarding.flow.payment.handleLabel'), {
+      target: { value: ' amelia@instapay ' },
+    });
+    expect(next().disabled).toBe(false);
+    fireEvent.click(next());
+    await waitFor(() =>
+      expect(apiPut).toHaveBeenCalledWith('/api/v1/onboarding/stores/s1/payment-methods', {
+        cod: true,
+        instapay: { enabled: true, handle: 'amelia@instapay' },
+      })
+    );
+  });
+
+  it('allows InstaPay alone (COD off) once InstaPay has a handle', async () => {
+    mockState({ ...verifiedNoStore, store: inactiveStore, codEnabled: true });
+    render(<OnboardingFlow />);
+    await screen.findByText('onboarding.flow.template.title');
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'onboarding.flow.skip' }));
+    await screen.findByText('onboarding.flow.payment.title');
+    fireEvent.click(screen.getByRole('switch', { name: 'onboarding.flow.payment.cod' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'onboarding.flow.payment.instapay' }));
+    fireEvent.change(screen.getByLabelText('onboarding.flow.payment.phoneLabel'), {
+      target: { value: '01012345678' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
+    await waitFor(() =>
+      expect(apiPut).toHaveBeenCalledWith('/api/v1/onboarding/stores/s1/payment-methods', {
+        cod: false,
+        instapay: { enabled: true, phone: '01012345678' },
+      })
+    );
   });
 
   it('rejects a non-positive price before calling the API', async () => {

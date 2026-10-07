@@ -117,7 +117,7 @@ npm run db:generate|db:migrate|db:push|db:seed|db:studio
 npm run test|test:unit|test:integration|test:e2e|test:coverage
 npm run test:defence-mutations           # deletes each security guard, asserts its test goes red
 DATABASE_URL=<migrated pg> npm run test:defence-mutations -- --write --tier=all   # regenerate the committed record (integration tier needs the DB)
-npm run audit:high | npm run secrets
+npm run audit:strict | npm run secrets
 ```
 
 CI (`ci.yml`): lint → typecheck → build → unit → integration (Postgres 16 + Redis 7 services) → e2e → audit + trufflehog; gitleaks separate workflow. The pre-push hook mirrors CI locally + runs blast-radius + a deduped Opus AI diff review (`SKIP_AI_GATE=1` skips the AI part).

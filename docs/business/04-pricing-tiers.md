@@ -152,12 +152,12 @@ add-on available at any tier; Affiliate requires Enterprise). A merchant on Prof
 WhatsApp activation + Affiliate (Enterprise) adds ~250-500 KWD setup + ~15-35 KWD/month to the
 base.
 
-> **AI Product Feed (`agent_feed`) — plan-independent add-on, available at any tier.** Not part of
-> any plan baseline (Starter, Professional, and Enterprise all default to disabled); a super-admin
-> enables it per store via a `StoreFeature` override once sold. Publishes a machine-readable
+> **AI Product Feed (`agent_feed`) — included in every paid plan (not an add-on).** In the paid
+> plan baselines (Starter, Professional, and Enterprise all default to enabled; `free` is off) since the
+> 2026-07-21 AI-first policy; a super-admin can restrict a specific store via a `StoreFeature`
+> override. Publishes a machine-readable
 > product feed at `/feeds/products.json` so AI shopping assistants (ChatGPT, Perplexity, agent
-> crawlers) can read and recommend the store's catalog. Priced individually per quote — not a
-> fixed price band yet.
+> crawlers) can read and recommend the store's catalog. No separate price: it is part of the plan fee.
 
 > **Product Bundles (`bundles`) — plan-independent add-on, available at any tier.** Not part of any
 > plan baseline (Starter, Professional, and Enterprise all default to disabled); a super-admin

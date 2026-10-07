@@ -6,6 +6,7 @@ import { requireVerifiedEmail } from '../middleware/require-verified-email';
 import { tenantContext } from '../middleware/tenant-context';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { OnboardingService, SELF_SERVE_TEMPLATES } from '../services/onboarding.service';
+import { applyOnboardingInstapay } from '../services/onboarding-instapay';
 
 /**
  * Self-serve onboarding, mounted at `/onboarding`.
@@ -87,9 +88,25 @@ router.post(
   }
 );
 
-const paymentSchema = z.object({ cod: z.boolean() }).strict();
+const paymentSchema = z
+  .object({
+    cod: z.boolean(),
+    // Optional so a COD-only client (the original contract) keeps working. When
+    // `enabled`, a handle or phone is required (validated by the shared InstaPay schema).
+    instapay: z
+      .object({
+        enabled: z.boolean(),
+        handle: z.string().trim().max(120).optional(),
+        phone: z.string().trim().max(32).optional(),
+        accountName: z.string().trim().max(80).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
-// PUT /onboarding/stores/:storeId/payment-methods - COD on/off (gateways: SP6).
+// PUT /onboarding/stores/:storeId/payment-methods - COD and InstaPay on/off (card gateways are
+// set up later in Settings > Payments).
 router.put(
   '/stores/:storeId/payment-methods',
   ...merchantOnly,
@@ -97,10 +114,27 @@ router.put(
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = paymentSchema.parse(req.body);
+      const { cod, instapay } = paymentSchema.parse(req.body);
+      // InstaPay first: `setPaymentMethods` then sees the new state when it enforces
+      // "at least one method stays on". An error rolls the whole request transaction back.
+      const instapayResult = instapay
+        ? await applyOnboardingInstapay(req.params.storeId, instapay)
+        : undefined;
+      const data = await OnboardingService.setPaymentMethods(req.params.storeId, { cod });
+      if (instapayResult?.configId) {
+        await auditLog({
+          action: 'store_payment_config.updated',
+          userId: req.user!.userId,
+          resourceType: 'payment_config',
+          resourceId: instapayResult.configId,
+          details: { storeId: req.params.storeId, provider: 'instapay', via: 'onboarding' },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+      }
       res.json({
         success: true,
-        data: await OnboardingService.setPaymentMethods(req.params.storeId, data),
+        data: instapayResult ? { ...data, instapay: instapayResult.instapay } : data,
       });
     } catch (error) {
       next(error);

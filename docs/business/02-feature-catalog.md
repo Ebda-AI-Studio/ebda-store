@@ -453,7 +453,7 @@ The affiliate program is available as a premium add-on. Affiliates, influencers,
 
 ### AI Product Feed (خلاصة المنتجات للذكاء الاصطناعي)
 
-Available as an individually-priced add-on, sold separately from any plan tier. Publishes a machine-readable product feed at `/feeds/products.json` so AI assistants and shopping agents (ChatGPT, Perplexity, and agent crawlers) can read, cite, and recommend the store's products — following the OpenAI Product Feed field conventions (title, price, availability, image, and category per product). The feed URL returns a 404 for any store that hasn't purchased the add-on, so its existence is never revealed to stores without it. Once enabled, the store's `llms.txt` index also links to the feed for AI crawlers.
+Included in every paid plan (Starter, Professional, Enterprise) under the AI-first policy; not available on the `free` lapsed/demo plan, and a super-admin can restrict a specific store via a `StoreFeature` override. Publishes a machine-readable product feed at `/feeds/products.json` so AI assistants and shopping agents (ChatGPT, Perplexity, and agent crawlers) can read, cite, and recommend the store's products — following the OpenAI Product Feed field conventions (title, price, availability, image, and category per product). The feed URL returns a 404 for any store where the feature is disabled (for example on the `free` plan or after a restriction override), so its existence is never revealed. Once enabled, the store's `llms.txt` index also links to the feed for AI crawlers.
 
 ### Product Bundles (باقات المنتجات)
 
