@@ -2463,8 +2463,10 @@
         "hint": "يمكن للعملاء إضافة المنتج إلى السلة بنقرة واحدة مباشرة من الصفحة الرئيسية — دون الحاجة لفتح صفحة المنتج. عند التفعيل يختفي زر \"إضافة للسلة\" أسفل كل بطاقة في الكاروسيل (يحل الزر + محله)."
       },
       "arabicNumerals": {
-        "title": "الأرقام العربية (٠١٢٣)",
-        "hint": "إظهار الأرقام الهندية الشرقية في نسخة المتجر العربية. الوضع الافتراضي (إيقاف) يعرض الأرقام الغربية (0-9) في كل مكان."
+        "title": "شكل الأرقام في المتجر: 123 / ١٢٣",
+        "hint": "شكل الأرقام في نسخة متجرك العربية (الأسعار، الكميات، التواريخ). 123 هو الافتراضي؛ ١٢٣ يعرض الأرقام الهندية للعملاء الذين يتصفحون بالعربية فقط. الصفحات الإنجليزية وأرقام الطلبات ولوحة التحكم تستخدم 123 دائمًا.",
+        "western": "أرقام غربية (123) — الافتراضي",
+        "arabic": "أرقام هندية (١٢٣)"
       },
       "socialIconColors": {
         "title": "ألوان أيقونات التواصل الاجتماعي",
@@ -2586,11 +2588,11 @@
       "phone": "الهاتف",
       "phoneAr": "الهاتف (عرض عربي)",
       "phonePlaceholder": "+20 1XX XXX XXXX",
-      "phoneArPlaceholder": "٩٦٥ XXXX XXXX+",
+      "phoneArPlaceholder": "965 XXXX XXXX+",
       "address": "العنوان",
       "addressAr": "العنوان (بالعربية)",
       "addressPlaceholder": "123 Street, City, Egypt",
-      "addressArPlaceholder": "١٢٣ شارع، المدينة، مصر",
+      "addressArPlaceholder": "123 شارع، المدينة، مصر",
       "addressUrl": "رابط الخريطة",
       "addressUrlPlaceholder": "https://maps.app.goo.gl/...",
       "addressUrlHint": "ألصق رابط Google Maps أو Apple Maps لموقع المتجر. سيصبح العنوان في تذييل المتجر قابلاً للنقر ويفتح هذا الرابط في تبويب جديد.",
@@ -2746,7 +2748,7 @@
       "nameLabel": "الاسم *",
       "namePlaceholder": "خصم الصيف 20٪",
       "nameArLabel": "الاسم (بالعربية)",
-      "nameArPlaceholder": "خصم الصيف ٢٠٪",
+      "nameArPlaceholder": "خصم الصيف 20٪",
       "descriptionLabel": "الوصف",
       "descriptionPlaceholder": "احصل على خصم 20٪ على جميع منتجات الصيف",
       "descriptionArLabel": "الوصف (بالعربية)",
@@ -4931,7 +4933,7 @@
       "textEnglish": "نص الإعلان (الإنجليزية)",
       "textEnglishPlaceholder": "Free shipping on orders over 10 EGP!",
       "textArabic": "نص الإعلان (العربية)",
-      "textArabicPlaceholder": "شحن مجاني للطلبات فوق ١٠ ج.م!",
+      "textArabicPlaceholder": "شحن مجاني للطلبات فوق 10 ج.م!",
       "linkUrl": "رابط URL (اختياري)",
       "linkUrlPlaceholder": "https://example.com/sale",
       "linkUrlHint": "سيرتبط الشريط بالكامل بهذا الرابط عند النقر",
@@ -9179,7 +9181,7 @@
     "form": {
       "trn": "رقم التسجيل الضريبي",
       "trnHint": "٩ أرقام كما هي مطبوعة على بطاقتك الضريبية. يمكنك استخدام مسافات أو شرطات.",
-      "trnPlaceholder": "١٢٣-٤٥٦-٧٨٩",
+      "trnPlaceholder": "123-456-789",
       "legalName": "الاسم القانوني للمنشأة",
       "legalNameHint": "كما هو مكتوب تمامًا على البطاقة الضريبية أو شهادة التسجيل.",
       "save": "حفظ البيانات",

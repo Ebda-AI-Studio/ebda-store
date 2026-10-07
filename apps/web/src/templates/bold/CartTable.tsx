@@ -7,7 +7,7 @@ import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 
-import { minorToDecimalString, REGION } from '@force/shared';
+import { REGION } from '@force/shared';
 /**
  * Bold template — cart as heavy-blocked rows with strong borders,
  * uppercase labels, and sharp contrast. Matches Bold's ProductCard +
@@ -23,9 +23,9 @@ export default function BoldCartTable({
   typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
-  const { localize } = useNumerals();
+  const { localize, money } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const format = (price: number) => `${localize(minorToDecimalString(price))} ${currency}`;
+  const format = (price: number) => `${money(price)} ${currency}`;
 
   return (
     <div className="space-y-4" dir={isRtl ? 'rtl' : 'ltr'}>

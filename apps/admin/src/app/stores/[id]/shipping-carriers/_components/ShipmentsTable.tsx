@@ -5,6 +5,7 @@ import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { SHIPMENT_COLORS } from './types';
 import type { Shipment } from './types';
+import { withNumerals } from '@force/shared';
 
 interface ShipmentsTableProps {
   shipments: Shipment[];
@@ -86,7 +87,7 @@ export function ShipmentsTable({
       header: t('columns.created'),
       cell: shipment => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {new Date(shipment.createdAt).toLocaleDateString()}
+          {new Date(shipment.createdAt).toLocaleDateString(undefined, withNumerals())}
         </span>
       ),
     },

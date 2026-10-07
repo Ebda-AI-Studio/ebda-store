@@ -21,7 +21,7 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge, Button, Input, Select, useToast } from '@force/ui';
-import { formatMoney, type PlanLimits } from '@force/shared';
+import { formatMoney, type PlanLimits, withNumerals } from '@force/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
@@ -426,14 +426,17 @@ export default function StoreBillingPage() {
     locale === 'ar' ? p.nameAr : p.nameEn;
   const fmtDate = (iso: string | null) =>
     iso
-      ? new Date(iso).toLocaleDateString(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        })
+      ? new Date(iso).toLocaleDateString(
+          locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB',
+          withNumerals({
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })
+        )
       : null;
   const fmtPrice = (minor: number | null) =>
-    minor === null ? t('priceTbd') : formatMoney(minor, locale);
+    minor === null ? t('priceTbd') : formatMoney(minor, locale, { fixedDecimals: true });
   const planPrice = (p: PlanSummary) =>
     interval === 'yearly' ? p.priceYearlyMinor : p.priceMonthlyMinor;
 
@@ -692,7 +695,9 @@ export default function StoreBillingPage() {
                     <dd className="text-end tabular-nums">
                       {info.nextCharge.amountMinor !== null
                         ? t('trial.nextChargeLine', {
-                            amount: formatMoney(info.nextCharge.amountMinor, locale),
+                            amount: formatMoney(info.nextCharge.amountMinor, locale, {
+                              fixedDecimals: true,
+                            }),
                             plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
                             date: fmtBillingDate(info.nextCharge.at, locale),
                           })
@@ -810,7 +815,7 @@ export default function StoreBillingPage() {
                           </Badge>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {formatMoney(c.amountMinor, locale)} ·{' '}
+                          {formatMoney(c.amountMinor, locale, { fixedDecimals: true })} ·{' '}
                           {fmtBillingDate(c.createdAt, locale)}
                         </p>
                         {c.reviewNote && <p className="mt-1">{c.reviewNote}</p>}
@@ -1048,12 +1053,12 @@ export default function StoreBillingPage() {
                         </td>
                         <td className="py-2 pe-3 tabular-nums">
                           {c.type === 'refund' ? '−' : ''}
-                          {formatMoney(c.amountMinor, locale)}
+                          {formatMoney(c.amountMinor, locale, { fixedDecimals: true })}
                           {c.vat && (c.vatMinor ?? 0) > 0 && (
                             <span className="block text-xs text-muted-foreground">
                               {t('invoiceVat', {
                                 rate: c.vat.rateBps / 100,
-                                vat: formatMoney(c.vatMinor ?? 0, locale),
+                                vat: formatMoney(c.vatMinor ?? 0, locale, { fixedDecimals: true }),
                               })}
                               {c.vat.trn ? ` · ${t('invoiceTrn', { trn: c.vat.trn })}` : ''}
                             </span>

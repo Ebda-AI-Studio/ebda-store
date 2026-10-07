@@ -7,6 +7,7 @@ import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 import { minorToMajor } from '@/lib/format';
+import { withNumerals } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -101,7 +102,7 @@ export default function JournalDetailPage() {
   return (
     <AdminLayout
       title={entry.entryNumber}
-      subtitle={`${new Date(entry.postedAt).toLocaleString()} · ${entry.source.replace(/_/g, ' ')}`}
+      subtitle={`${new Date(entry.postedAt).toLocaleString(undefined, withNumerals())} · ${entry.source.replace(/_/g, ' ')}`}
     >
       <div className="max-w-3xl space-y-5">
         {/* Back link */}

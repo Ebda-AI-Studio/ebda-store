@@ -126,7 +126,11 @@ export function ClaimsPanel({
     },
     {
       header: t('columns.amount'),
-      cell: r => <span className="tabular-nums">{formatMoney(r.amountMinor, locale)}</span>,
+      cell: r => (
+        <span className="tabular-nums">
+          {formatMoney(r.amountMinor, locale, { fixedDecimals: true })}
+        </span>
+      ),
     },
     {
       header: t('columns.payerReference'),

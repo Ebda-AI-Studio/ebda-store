@@ -12,7 +12,12 @@ import {
   formatDate as formatStoreDate,
   formatDateTime as formatStoreDateTime,
 } from '@/lib/format-date';
-import { groupOrderLinesForDisplay, orderTaxPlacement } from '@force/shared';
+import {
+  groupOrderLinesForDisplay,
+  orderTaxPlacement,
+  storeNumerals,
+  intlLocale,
+} from '@force/shared';
 import { WaMeOrderQuestionButton } from '../../../../templates/shared/WaMeButtons';
 
 interface OrderDetail {
@@ -198,6 +203,7 @@ export default function OrderDetailClient() {
     return formatStoreDate(date, {
       timezone: store.timezone,
       language,
+      numerals: storeNumerals(store?.theme),
       style: 'long',
     });
   }
@@ -206,6 +212,7 @@ export default function OrderDetailClient() {
     return formatStoreDateTime(date, {
       timezone: store.timezone,
       language,
+      numerals: storeNumerals(store?.theme),
     });
   }
 
@@ -661,7 +668,9 @@ export default function OrderDetailClient() {
                           '\u0646\u0642\u0627\u0637 \u0627\u0644\u0648\u0644\u0627\u0621'
                         )}
                         {order.loyaltyPointsRedeemed
-                          ? ` (${order.loyaltyPointsRedeemed.toLocaleString(language === 'ar' ? 'ar' : 'en')})`
+                          ? ` (${order.loyaltyPointsRedeemed.toLocaleString(
+                              intlLocale(language, storeNumerals(store?.theme))
+                            )})`
                           : ''}
                       </span>
                       <span className="text-success-ink">-{formatPrice(loyaltyPortion)}</span>
@@ -1060,10 +1069,13 @@ export default function OrderDetailClient() {
                         dateTime={row.at}
                         className="mt-0.5 block text-xs text-muted-foreground"
                       >
-                        {new Date(row.at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US', {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        })}
+                        {new Date(row.at).toLocaleString(
+                          intlLocale(language, storeNumerals(store?.theme)),
+                          {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          }
+                        )}
                       </time>
                     </div>
                   </li>

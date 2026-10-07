@@ -156,7 +156,7 @@ export function BillingStep({
               <p className="text-sm text-muted-foreground">
                 {nextCharge && nextCharge.amountMinor !== null
                   ? t('cardBody', {
-                      amount: formatMoney(nextCharge.amountMinor, locale),
+                      amount: formatMoney(nextCharge.amountMinor, locale, { fixedDecimals: true }),
                       plan: chargePlan,
                       date: chargeDate,
                     })

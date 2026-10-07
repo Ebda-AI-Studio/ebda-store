@@ -1,4 +1,4 @@
-import { formatMoney } from '@force/shared';
+import { formatMoney, localizeDigits, type Numerals } from '@force/shared';
 /**
  * Variant-aware pricing helpers for storefront + admin product cards.
  *
@@ -47,7 +47,7 @@ interface DiscountProductLike {
  *
  * Two forms:
  *   - Fixed-EGP discount (`discountType === 'fixed'`):
- *       EN: "Save EGP 20.00"   AR: "وفّر ٢٠٫٠٠ ج.م"
+ *       EN: "Save EGP 20"   AR: "وفّر 20 ج.م" (Arabic-Indic only for an opted-in store)
  *   - Percentage / legacy (anything else with compareAtPrice):
  *       EN: "-17%"             AR: "-17%"  (unchanged from prior behaviour)
  *
@@ -60,12 +60,14 @@ interface DiscountProductLike {
  * @param isRtl      - Whether the storefront is in RTL/Arabic mode.
  * @param displayPrice   - Optional override (variant-resolved price, in piastres).
  * @param displayCompare - Optional override (variant-resolved compareAtPrice, in piastres).
+ * @param numerals       - The render's digit system (`useStoreNumerals()`); default Western.
  */
 export function getDiscountBadgeText(
   product: DiscountProductLike,
   isRtl: boolean,
   displayPrice?: number,
-  displayCompare?: number | null
+  displayCompare?: number | null,
+  numerals: Numerals = 'latn'
 ): string | null {
   const effectivePrice = displayPrice ?? product.price;
   const effectiveCompare = displayCompare !== undefined ? displayCompare : product.compareAtPrice;
@@ -77,15 +79,16 @@ export function getDiscountBadgeText(
     // Saving = difference in piastres, rendered in EGP (2 decimals).
     const savingMinor = effectiveCompare - effectivePrice;
     if (isRtl) {
-      // Arabic "وفّر" prefix + the single money formatter (Eastern digits, ج.م).
-      return `وفّر ${formatMoney(savingMinor, 'ar', { easternArabicDigits: true })}`;
+      // Arabic "وفّر" prefix + the single money formatter (Western digits
+      // unless the store opted into Arabic-Indic — Ruling NUMERALS-1).
+      return `وفّر ${formatMoney(savingMinor, 'ar', { numerals })}`;
     }
     return `Save ${formatMoney(savingMinor, 'en')}`;
   }
 
   // Percentage / legacy path — same inline text the templates previously computed.
   const pct = Math.round((1 - effectivePrice / effectiveCompare) * 100);
-  return `-${pct}%`;
+  return `-${isRtl ? localizeDigits(pct, numerals) : pct}%`;
 }
 
 interface ProductLike {

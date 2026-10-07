@@ -7,6 +7,7 @@ import { useT } from '@/i18n/useT';
 import { useAuth } from '@/lib/auth';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
+import { withNumerals } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -223,7 +224,9 @@ export default function DeadstockPage() {
             <p className="text-sm text-muted-foreground">{t('description')}</p>
             {lastScanned && (
               <p className="text-xs text-muted-foreground">
-                {t('lastScanned', { time: new Date(lastScanned).toLocaleString() })}
+                {t('lastScanned', {
+                  time: new Date(lastScanned).toLocaleString(undefined, withNumerals()),
+                })}
               </p>
             )}
           </div>

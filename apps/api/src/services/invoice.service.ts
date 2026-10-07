@@ -1,6 +1,7 @@
 import { prisma } from '@force/database';
 import {
   groupOrderLinesForDisplay,
+  intlLocale,
   orderTaxPlacement,
   REGION,
   taxInvoiceInfo,
@@ -271,7 +272,8 @@ export class InvoiceService {
     // invoice doesn't show the UTC day on edge-of-midnight orders. Falls back
     // to Africa/Cairo when a tenant hasn't set a timezone yet (matches the
     // storefront default).
-    const dateLocale = ar ? 'ar-EG' : 'en-US';
+    // Western digits in both languages (Ruling NUMERALS-1): bare `ar-EG` is ٠-٩.
+    const dateLocale = intlLocale(ar ? 'ar' : 'en');
     const dateText = new Date(order.createdAt).toLocaleDateString(dateLocale, {
       year: 'numeric',
       month: 'long',
@@ -793,7 +795,7 @@ export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string):
   }[status];
   const tone = status === 'paid' ? 'success' : status === 'unpaid' ? 'warning' : 'danger';
 
-  const dateText = new Date(order.createdAt).toLocaleDateString(ar ? 'ar-EG' : 'en-US', {
+  const dateText = new Date(order.createdAt).toLocaleDateString(intlLocale(ar ? 'ar' : 'en'), {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

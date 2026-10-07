@@ -6,6 +6,7 @@ import { AdminLayout } from '../../../components/AdminLayout';
 import { apiPost, apiGet } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
 import { useT } from '@/i18n/useT';
+import { withNumerals } from '@force/shared';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -420,11 +421,14 @@ export default function SecurityPage() {
                     </p>
                     {status?.mfaEnabled && status.mfaEnrolledAt && (
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {new Date(status.mfaEnrolledAt).toLocaleDateString(undefined, {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })}
+                        {new Date(status.mfaEnrolledAt).toLocaleDateString(
+                          undefined,
+                          withNumerals({
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })
+                        )}
                       </p>
                     )}
                   </div>

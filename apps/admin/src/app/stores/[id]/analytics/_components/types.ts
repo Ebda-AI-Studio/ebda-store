@@ -176,7 +176,7 @@ export type ChartType = 'revenue' | 'orders';
  * Amounts are stored as piastres (1 EGP = 100 piastres); `formatMoney` scales.
  */
 export function formatCurrency(amount: number): string {
-  return formatMoney(amount, 'en');
+  return formatMoney(amount, 'en', { fixedDecimals: true });
 }
 
 /** Shortens large integers with K/M suffixes for compact stat display. */

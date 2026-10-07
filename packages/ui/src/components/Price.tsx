@@ -2,7 +2,7 @@
 
 import { forwardRef } from 'react';
 import { cn } from '../utils/cn';
-import { formatPrice, REGION } from '@force/shared';
+import { formatPrice, localizeDigits, REGION, type Numerals } from '@force/shared';
 
 export interface PriceProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Price in piastres (1 EGP = 100 piastres). For products with variants
@@ -17,6 +17,9 @@ export interface PriceProps extends React.HTMLAttributes<HTMLDivElement> {
   currency?: string;
   /** Show in RTL format */
   isRtl?: boolean;
+  /** Digit system (Ruling NUMERALS-1). Default Western `'latn'`; pass the
+   *  store's opt-in (`'arab'`) and it applies only to the Arabic locale. */
+  numerals?: Numerals;
   /** Size variant */
   size?: 'sm' | 'md' | 'lg' | 'xl';
   /** Show discount percentage badge */
@@ -55,6 +58,7 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
       compareAtPrice,
       currency = REGION.currency,
       isRtl = false,
+      numerals = 'latn',
       size = 'md',
       showDiscount = true,
       discountLabel,
@@ -68,6 +72,7 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
       formatPrice(amount, {
         currency,
         locale: isRtl ? 'ar' : 'en',
+        numerals,
       });
 
     const discount =
@@ -105,7 +110,8 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
         {/* Discount Badge */}
         {hasDiscount && showDiscount && (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-destructive text-destructive-foreground">
-            {discountLabel || (isRtl ? `${discount}% خصم` : `-${discount}%`)}
+            {discountLabel ||
+              (isRtl ? `${localizeDigits(discount, numerals)}% خصم` : `-${discount}%`)}
           </span>
         )}
       </div>

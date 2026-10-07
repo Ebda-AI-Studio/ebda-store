@@ -40,7 +40,7 @@ interface Props {
 }
 
 function fmtMoney(minor: number) {
-  return formatMoney(minor, 'en', { hideSymbol: true });
+  return formatMoney(minor, 'en', { hideSymbol: true, fixedDecimals: true });
 }
 
 /**

@@ -247,14 +247,14 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         }
       ),
       s.select('desktopColumns', 'Columns (desktop)', 'الأعمدة (سطح المكتب)', [
-        opt(2, '2', '٢'),
-        opt(3, '3', '٣'),
-        opt(4, '4', '٤'),
+        opt(2, '2', '2'),
+        opt(3, '3', '3'),
+        opt(4, '4', '4'),
       ]),
       s.select('mobileColumns', 'Columns (mobile)', 'الأعمدة (الجوال)', [
-        opt(1, '1', '١'),
-        opt(2, '2', '٢'),
-        opt(3, '3', '٣'),
+        opt(1, '1', '1'),
+        opt(2, '2', '2'),
+        opt(3, '3', '3'),
       ]),
       ...cardSettings(),
       ...styleSettings(),

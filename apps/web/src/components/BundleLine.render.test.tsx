@@ -19,7 +19,12 @@ vi.mock('../contexts/LanguageContext', () => ({
   }),
 }));
 vi.mock('../hooks/useNumerals', () => ({
-  useNumerals: () => ({ localize: (s: unknown) => String(s) }),
+  useNumerals: () => ({
+    localize: (v: string | number) => String(v),
+    money: (minor: number) => String(minor / 100),
+    numerals: 'latn',
+  }),
+  useStoreNumerals: () => 'latn',
 }));
 vi.mock('../hooks/useLocalePrice', () => ({
   useLocalePrice: () => (n: number) => `${n / 1000} EGP`,

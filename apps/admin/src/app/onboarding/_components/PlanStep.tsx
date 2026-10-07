@@ -102,7 +102,7 @@ export function PlanStep({
               <span className="mt-1 block text-sm tabular-nums text-muted-foreground">
                 {price === null
                   ? t('priceTbd')
-                  : `${formatMoney(price, locale)} ${
+                  : `${formatMoney(price, locale, { fixedDecimals: true })} ${
                       selection.interval === 'yearly' ? t('perYear') : t('perMonth')
                     }`}
               </span>

@@ -289,7 +289,7 @@ export function OrderSummary({
                   {t('Use loyalty points', 'استخدام نقاط الولاء')}
                 </span>
                 <span className="block text-xs text-muted-foreground">
-                  {t('Balance', 'الرصيد')}: {localize(loyalty.points.toLocaleString())}{' '}
+                  {t('Balance', 'الرصيد')}: {localize(loyalty.points.toLocaleString('en-US'))}{' '}
                   {t('points', 'نقطة')}
                   {' · '}
                   {t('worth', 'بقيمة')} {pointsValueLabel(loyalty.points)}
@@ -328,7 +328,7 @@ export function OrderSummary({
                 {loyalty.pointsToRedeem > 0 && loyalty.pointsToRedeem < loyalty.minRedeemPoints && (
                   <p className="mt-2 text-sm text-destructive-ink">
                     {t('Minimum', 'الحد الأدنى')}{' '}
-                    {localize(loyalty.minRedeemPoints.toLocaleString())}{' '}
+                    {localize(loyalty.minRedeemPoints.toLocaleString('en-US'))}{' '}
                     {t('points to redeem', 'نقطة للاستخدام')}
                   </p>
                 )}

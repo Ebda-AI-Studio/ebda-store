@@ -9,7 +9,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice, minorToMajor } from '@/lib/format';
 
-import { minorToDecimalString } from '@force/shared';
+import { minorToDecimalString, withNumerals } from '@force/shared';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface POItem {
@@ -279,12 +279,14 @@ export default function PurchaseOrderDetailPage() {
           <div className="text-sm text-muted-foreground space-x-4">
             {po.expectedDate && (
               <span>
-                {t('expectedDate')}: {new Date(po.expectedDate).toLocaleDateString()}
+                {t('expectedDate')}:{' '}
+                {new Date(po.expectedDate).toLocaleDateString(undefined, withNumerals())}
               </span>
             )}
             {po.receivedDate && (
               <span>
-                {t('receivedDate')}: {new Date(po.receivedDate).toLocaleDateString()}
+                {t('receivedDate')}:{' '}
+                {new Date(po.receivedDate).toLocaleDateString(undefined, withNumerals())}
               </span>
             )}
             <span>

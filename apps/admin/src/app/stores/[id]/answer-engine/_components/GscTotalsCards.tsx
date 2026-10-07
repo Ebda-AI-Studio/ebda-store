@@ -2,6 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import { formatPercent, formatPosition, type GscDashboardTotals } from './types';
+import { withNumerals } from '@force/shared';
 
 interface GscTotalsCardsProps {
   totals: GscDashboardTotals;
@@ -13,8 +14,11 @@ export function GscTotalsCards({ totals }: GscTotalsCardsProps) {
   const t = useT('answerEngine.gsc');
 
   const cards = [
-    { label: t('impressions'), value: totals.impressions.toLocaleString() },
-    { label: t('clicks'), value: totals.clicks.toLocaleString() },
+    {
+      label: t('impressions'),
+      value: totals.impressions.toLocaleString(undefined, withNumerals()),
+    },
+    { label: t('clicks'), value: totals.clicks.toLocaleString(undefined, withNumerals()) },
     { label: t('ctr'), value: formatPercent(totals.ctr) },
     { label: t('avgPosition'), value: formatPosition(totals.avgPosition) },
   ];

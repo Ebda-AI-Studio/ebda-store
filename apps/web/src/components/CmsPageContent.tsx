@@ -1,5 +1,6 @@
 'use client';
 
+import { storeNumerals } from '@force/shared';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useStore } from '../contexts/StoreContext';
@@ -187,7 +188,12 @@ export function CmsPageContent({ slug, defaultTitle, fallback }: CmsPageContentP
         {(slug === 'privacy' || slug === 'terms') && page.updatedAt && (
           <p className="mt-2 text-muted-foreground">
             {t('Last updated:', 'آخر تحديث:')}{' '}
-            {formatDate(page.updatedAt, { timezone: store.timezone, language, style: 'long' })}
+            {formatDate(page.updatedAt, {
+              timezone: store.timezone,
+              language,
+              numerals: storeNumerals(store?.theme),
+              style: 'long',
+            })}
           </p>
         )}
       </div>

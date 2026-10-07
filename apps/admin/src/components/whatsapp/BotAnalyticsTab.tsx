@@ -26,6 +26,7 @@ import { useT } from '../../i18n/useT';
 import type { Period, ResolvedDateRange } from '../../app/stores/[id]/analytics/_components/types';
 import { resolveDateRange } from '../../app/stores/[id]/analytics/_components/types';
 import { DataTable, type DataTableColumn } from '../mobile/DataTable';
+import { withNumerals } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,7 +89,7 @@ function FunnelBar({ step, maxCount }: { step: FunnelStep; maxCount: number }) {
           <span className="text-sm font-medium truncate text-primary">{step.label}</span>
         </div>
         <span className="text-sm tabular-nums text-foreground shrink-0">
-          {step.count.toLocaleString()}
+          {step.count.toLocaleString(undefined, withNumerals())}
         </span>
       </div>
     </div>
@@ -184,7 +185,9 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
     {
       header: t('intentColCount'),
       alignEnd: true,
-      cell: ([, count]) => <span className="tabular-nums">{count.toLocaleString()}</span>,
+      cell: ([, count]) => (
+        <span className="tabular-nums">{count.toLocaleString(undefined, withNumerals())}</span>
+      ),
     },
   ];
 
@@ -214,12 +217,15 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard
               label={t('totalSessions')}
-              value={data.totalSessions.toLocaleString()}
+              value={data.totalSessions.toLocaleString(undefined, withNumerals())}
               sub={t('sessionsBot')}
             />
             <StatCard
               label={t('paidOrders')}
-              value={(data.funnel.find(s => s.step === 'order_paid')?.count ?? 0).toLocaleString()}
+              value={(data.funnel.find(s => s.step === 'order_paid')?.count ?? 0).toLocaleString(
+                undefined,
+                withNumerals()
+              )}
               sub={t('confirmedPayments')}
             />
             <StatCard
@@ -229,7 +235,7 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
             />
             <StatCard
               label={t('llmCalls')}
-              value={data.llmStats.totalLlmCalls.toLocaleString()}
+              value={data.llmStats.totalLlmCalls.toLocaleString(undefined, withNumerals())}
               sub={
                 data.llmStats.avgConfidence != null
                   ? t('avgConfidenceSub', { pct: (data.llmStats.avgConfidence * 100).toFixed(0) })
@@ -284,7 +290,7 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
                     <div key={key} className="rounded-lg bg-muted/40 p-3">
                       <div className="text-xs text-muted-foreground">{label}</div>
                       <div className="text-lg font-semibold tabular-nums">
-                        {count.toLocaleString()}
+                        {count.toLocaleString(undefined, withNumerals())}
                       </div>
                       <div className="text-xs text-muted-foreground">{share}%</div>
                     </div>
@@ -307,7 +313,7 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
                           <div className="flex justify-between text-sm mb-1">
                             <span className="uppercase font-medium">{lang}</span>
                             <span className="tabular-nums text-muted-foreground">
-                              {count.toLocaleString()} ({pct}%)
+                              {count.toLocaleString(undefined, withNumerals())} ({pct}%)
                             </span>
                           </div>
                           <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
@@ -331,7 +337,7 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
             <div>
               <span className="text-muted-foreground me-1">{t('totalLlmCallsLabel')}</span>
               <span className="font-medium tabular-nums">
-                {data.llmStats.totalLlmCalls.toLocaleString()}
+                {data.llmStats.totalLlmCalls.toLocaleString(undefined, withNumerals())}
               </span>
             </div>
             {data.llmStats.avgConfidence != null && (
@@ -345,7 +351,7 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
             <div>
               <span className="text-muted-foreground me-1">{t('keywordFallbacksLabel')}</span>
               <span className="font-medium tabular-nums">
-                {data.llmStats.fallbackToKeyword.toLocaleString()}
+                {data.llmStats.fallbackToKeyword.toLocaleString(undefined, withNumerals())}
               </span>
             </div>
           </div>
