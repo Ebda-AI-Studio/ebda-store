@@ -1,0 +1,27 @@
+# Demo store photo credits
+
+The example stores on ebda.app are illustrations; no real shop or product is shown. Photos are openly licensed stock (found via Openverse), resized and cropped. CC BY photos require the attribution below.
+
+| File | Photo | Author | Source | License |
+|---|---|---|---|---|
+| souq-headphones | [Close speakers black headphones red](https://www.rawpixel.com/image/11524237/photo-image-headphones-public-domain-technology) | unknown (public domain) | rawpixel | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| souq-earbuds | [Black-colored earbuds held in hand.](https://wordpress.org/photos/photo/93565c0ca1/) | [binitagothe](https://wordpress.org/photos/author/binitagothe/) | wordpress | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| souq-speaker | [Small bluetooth speaker](https://www.rawpixel.com/image/11524277/small-bluetooth-speaker) | unknown (public domain) | rawpixel | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| souq-watch | [Smart Watch](https://stocksnap.io/photo/smart-watch-HN5PDS7HLL) | [Design by Matt](https://mattbango.com) | stocksnap | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| dahab-solitaire | [Simple elegant diamond ring](https://www.rawpixel.com/image/6036013/photo-image-public-domain-gold-fashion) | unknown (public domain) | rawpixel | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| dahab-bands | [Gold Wedding Rings](https://www.rawpixel.com/image/5925647/gold-wedding-rings-free-public-domain-cc0-photo) | unknown (public domain) | rawpixel | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| dahab-bangle | [Electrotype copy gold bracelet](https://www.rawpixel.com/image/9182917/electrotype-copy-gold-bracelet) | themet | rawpixel | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| dahab-chain | [Gold chain recovered from the royal cemetery of Ur, Iraq 2550-2450 BCE](https://www.flickr.com/photos/44124324682@N01/33434970232) | [mharrsch](https://www.flickr.com/photos/44124324682@N01) | flickr | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| qamar-dress | [White beige dresses hangers store](https://www.rawpixel.com/image/3303632/free-photo-image-apparel-boutique-cc0) | unknown (public domain) | rawpixel | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| qamar-shoes | [Leather shoe with brush on white background](https://www.flickr.com/photos/26344495@N05/47679639132) | [Ivan Radic](https://www.flickr.com/photos/26344495@N05) | flickr | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| qamar-shirt | [White tome shirts](https://www.rawpixel.com/image/6029979/white-tome-shirts-free-public-domain-cc0-photo) | unknown (public domain) | rawpixel | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| qamar-bag | [motto genuine leather bag.](https://www.flickr.com/photos/7940758@N07/8586064098) | [MIKI Yoshihito. (#mikiyoshihito)](https://www.flickr.com/photos/7940758@N07) | flickr | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| qamar-scarf | [Sari Scarf](https://stocksnap.io/photo/sari-scarf-TDLN0K7OLA) | [Seacoast Sage](https://seacoastsage.com) | stocksnap | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| lamma-mahshi | [Stuffed Grape Leaves (Dolmas)](https://www.flickr.com/photos/90155432@N02/8524696545) | [Thriving Vegetarian](https://www.flickr.com/photos/90155432@N02) | flickr | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| lamma-cake | [Chocolate Cake](https://stocksnap.io/photo/chocolate-cake-XTNRPGQBYL) | [Oriana Ortiz](https://instagram.com/orianaortiz) | stocksnap | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| lamma-torshi | [pickled apples](https://www.flickr.com/photos/7927684@N03/4993761699) | [jeffreyw](https://www.flickr.com/photos/7927684@N03) | flickr | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| lamma-kahk | [kahk](https://www.flickr.com/photos/33834418@N05/4006916955) | [Michelle Sym](https://www.flickr.com/photos/33834418@N05) | flickr | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| jasmine-serum | [Dropper bottle, blank retro label](https://www.rawpixel.com/image/11515770/dropper-bottle-blank-retro-label) | unknown (public domain) | rawpixel | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| jasmine-toner | [A beauty product - Credit to https://homegets.com/](https://www.flickr.com/photos/141436406@N04/49713669747) | [homegets.com](https://www.flickr.com/photos/141436406@N04) | flickr | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| jasmine-soap | [Soap Bath](https://stocksnap.io/photo/soap-bath-AULHEZDSCC) | [Healthy Living](https://stocksnap.io) | stocksnap | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| jasmine-soaps | [photo](https://www.rawpixel.com/image/5947458/free-public-domain-cc0-photo) | unknown (public domain) | rawpixel | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
