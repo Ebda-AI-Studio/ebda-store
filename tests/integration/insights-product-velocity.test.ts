@@ -11,6 +11,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import { prisma } from '@force/database';
+import { planService } from '../../apps/api/src/services/plan.service';
 import { productVelocityResponseSchema } from '../../packages/shared/src/schemas/analytics';
 
 vi.mock('@api/middleware/auth', () => ({
@@ -86,6 +87,8 @@ beforeAll(async () => {
     data: { name: `velocity-${suffix}`, slug: `velocity-${suffix}`, ownerId: OWNER },
   });
   storeId = s.id;
+  // Locked pricing: product velocity is the `standard` and funnel the `advanced` analytics tier (Business); a default (Basic) store gets 402.
+  await planService.assignPlan(storeId, { planCode: 'business' });
 
   const variant = await prisma.product.create({
     data: {

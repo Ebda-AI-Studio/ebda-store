@@ -65,6 +65,10 @@ vi.mock('@api/middleware/auth', () => ({
 vi.mock('@api/middleware/require-mfa', () => ({
   requireMfaEnrolled: (_req: any, _res: any, next: any) => next(),
 }));
+// Analytics-tier gate is proven in plan-gates.test.ts; pass-through here.
+vi.mock('@api/middleware/analytics-tier', () => ({
+  requireAnalyticsTier: () => (_req: any, _res: any, next: any) => next(),
+}));
 vi.mock('@api/middleware/store-access', () => ({
   requireStoreAccess: (_req: any, _res: any, next: any) => next(),
 }));

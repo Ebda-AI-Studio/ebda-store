@@ -208,8 +208,8 @@ export const COPY: Record<Locale, Copy> = {
     pricing: {
       eyebrow: '9 · الأسعار',
       title: 'خطط لكل مرحلة من متجرك.',
-      lead: 'نعمل على الباقات الآن. هذه أسماء الخطط والمزايا المتوقعة، والأسعار تُعلن قريبًا.',
-      note: 'المزايا والحدود مبدئية وقابلة للتغيير قبل الإعلان.',
+      lead: 'جرّب باقة النمو لمدة ١٤ يومًا. لا توجد باقة مجانية أو عمولة على الطلبات.',
+      note: 'وفر ٢٥٪ بالدفع السنوي. رسوم بوابة الدفع منفصلة. بعد تجاوز حد الطلبات، لديك مهلة ٧ أيام للترقية.',
       cta: 'ابدأ البيع',
     },
     stories: {
@@ -246,7 +246,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           q: 'كم السعر؟',
-          a: 'لم نعلن الأسعار بعد. سننشرها هنا قبل الإطلاق.',
+          a: 'الأساسية ١٬٤٩٠ ج.م شهريًا، والنمو ٣٬٤٩٠ ج.م، والأعمال ٩٬٩٩٠ ج.م، مع خصم ٢٥٪ على الدفع السنوي. لا توجد باقة مجانية ولا عمولة على الطلبات، وتبدأ بتجربة النمو ١٤ يومًا.',
         },
         {
           q: 'ماذا عن بياناتي؟',
@@ -321,7 +321,7 @@ export const COPY: Record<Locale, Copy> = {
           },
           {
             h: 'الخطط والرسوم',
-            p: '[الأسعار غير معلنة بعد. تُضاف الرسوم وشروط الاسترداد بعد اعتمادها.]',
+            p: '[الأسعار معلنة في قسم الأسعار (أساسية ١٬٤٩٠ / نمو ٣٬٤٩٠ / أعمال ٩٬٩٩٠ ج.م شهريًا، دون عمولة على الطلبات). شروط الاسترداد تُضاف بعد اعتمادها.]',
           },
           { h: 'إنهاء الخدمة والمسؤولية', p: '[يحددها المستشار القانوني.]' },
         ],
@@ -462,8 +462,8 @@ export const COPY: Record<Locale, Copy> = {
     pricing: {
       eyebrow: '9 · Pricing',
       title: 'Plans for every stage of your store.',
-      lead: 'We are shaping the plans now. These are the plan names and the features we expect; prices will be announced soon.',
-      note: 'Features and limits are provisional and may change before announcement.',
+      lead: 'Try Growth for 14 days. No free plan and no platform commission on orders.',
+      note: 'Save 25% with annual billing. Gateway fees are separate. After exceeding the order cap, you have 7 days to upgrade.',
       cta: 'Start selling',
     },
     stories: {
@@ -489,7 +489,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           q: 'Do I need a domain?',
-          a: 'No. Every store gets a free <you>.ebda.app address, and you can attach your own custom domain on top (this may need a paid plan, to be announced).',
+          a: 'No. Every store gets a free <you>.ebda.app address, and you can attach your own custom domain on top (included in every paid plan).',
         },
         {
           q: 'Is the store in Arabic and English?',
@@ -501,7 +501,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           q: 'How much does it cost?',
-          a: 'Pricing has not been announced. We will publish it here before launch.',
+          a: 'Basic is EGP 1,490 a month, Growth EGP 3,490 and Business EGP 9,990, with 25% off annual billing. There is no free plan and no commission on orders, and you start with a 14-day Growth trial.',
         },
         {
           q: 'What about my data?',
@@ -576,7 +576,7 @@ export const COPY: Record<Locale, Copy> = {
           },
           {
             h: 'Plans and fees',
-            p: '[Pricing is not announced yet. Fees and refund terms to be added once adopted.]',
+            p: '[Prices are published in the Pricing section (Basic EGP 1,490 / Growth 3,490 / Business 9,990 a month, no commission on orders). Refund terms to be added once adopted.]',
           },
           { h: 'Termination and liability', p: '[To be set by counsel.]' },
         ],

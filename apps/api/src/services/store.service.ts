@@ -19,7 +19,7 @@ import {
   STORE_SLUG_ERROR_MESSAGES,
   storeHost,
   REGION,
-  LEGACY_STORE_PLAN_TO_PLAN_CODE,
+  STORE_PLAN_TO_PLAN_CODE,
 } from '@force/shared';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
@@ -30,7 +30,11 @@ import { StorageService } from './storage.service';
 import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
 import { bustCorsCache } from '../lib/cors-cache';
-import { assertPlanAllows, assertWithinLimit } from './plan-limit.service';
+import {
+  assertOwnerMayCreateStore,
+  assertPlanAllows,
+  assertWithinLimit,
+} from './plan-limit.service';
 import { storeDomainWhere } from '../lib/store-host';
 import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
 
@@ -332,8 +336,13 @@ export class StoreService {
   static async create(
     ownerId: string,
     data: CreateStoreData,
-    opts: { allowProtectedSlug?: boolean } = {}
+    opts: { allowProtectedSlug?: boolean; platformOperator?: boolean } = {}
   ) {
+    // Plan gate (locked pricing): the owner's best plan must have room for one
+    // more store (1 / 1 / 3). A super-admin acting as the platform operator is
+    // not plan-bound.
+    if (!opts.platformOperator) await assertOwnerMayCreateStore(ownerId);
+
     // Same class as the product-slug defect: an empty slugify result made the
     // de-duplication loop mint '-1'/'-2' store slugs. A store is even less
     // recoverable than a product, so it gets the same guarantee.
@@ -378,7 +387,7 @@ export class StoreService {
     // Plan gate (SP5): a brand-new store starts on the default plan, which
     // decides whether it may carry a custom domain at creation.
     if (data.domain) {
-      await assertPlanAllows(LEGACY_STORE_PLAN_TO_PLAN_CODE[NEW_STORE_LEGACY_PLAN], 'customDomain');
+      await assertPlanAllows(STORE_PLAN_TO_PLAN_CODE[NEW_STORE_LEGACY_PLAN], 'customDomain');
     }
 
     const store = await prisma.store.create({

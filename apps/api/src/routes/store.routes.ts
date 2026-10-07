@@ -587,7 +587,7 @@ router.post(
         StoreService.create(
           actor.userId,
           { ...data, settings: data.settings as Prisma.InputJsonValue },
-          { allowProtectedSlug: isSuperAdmin }
+          { allowProtectedSlug: isSuperAdmin, platformOperator: isSuperAdmin }
         );
       // Per-account daily cap (SP5 task 4), inside a per-owner lock.
       const store = isSuperAdmin

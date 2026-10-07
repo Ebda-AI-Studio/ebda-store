@@ -18,6 +18,7 @@ import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'crypto';
 import { prisma } from '@force/database';
+import { planService } from '@api/services/plan.service';
 import merchantSignupRoutes from '@api/routes/merchant-signup.routes';
 import authRoutes from '@api/routes/auth.routes';
 import onboardingRoutes from '@api/routes/onboarding.routes';
@@ -85,6 +86,8 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
         email,
         password: PASSWORD,
         name: 'Mona Hassan',
+        // The signup schema requires a phone (already true on main); unique per call.
+        phone: `010${crypto.randomInt(10_000_000, 99_999_999)}`,
         formToken: tok.body.data.token,
         ...extra,
       });
@@ -347,19 +350,37 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
       expect(dup.body.error.code).toBe('SLUG_TAKEN');
     });
 
-    it('caps stores per owner', async () => {
+    it('caps stores per owner: a Growth-trial owner is refused a 2nd store (402), Business may hold 3, then the lifetime cap', async () => {
       const { jwt } = await verifiedMerchant('cap');
-      for (let i = 0; i < 3; i++) {
-        const r = await api()
+      const make = (i: number) =>
+        api()
           .post('/api/v1/onboarding/store')
           .set(bearer(jwt))
           .send({ name: `S${i}`, slug: mkSlug(`cap${i}`) });
+      const first = await make(0);
+      expect(first.status).toBe(201);
+
+      // Locked pricing: stores are 1 / 1 / 3 and the 14-day trial is Growth (1 store).
+      const refused = await make(1);
+      expect(refused.status).toBe(402);
+      expect(refused.body.error.code).toBe('PLAN_LIMIT_REACHED');
+      expect(refused.body.error.details).toMatchObject({
+        limitKey: 'maxStores',
+        limit: 1,
+        used: 1,
+      });
+
+      await planService.assignPlan(first.body.data.store.id, { planCode: 'business' });
+      for (const i of [1, 2]) {
+        const r = await make(i);
         expect(r.status).toBe(201);
+        // an extra store rides the Business plan: no second Growth trial
+        const sub = await prisma.storeSubscription.findUniqueOrThrow({
+          where: { storeId: r.body.data.store.id },
+        });
+        expect([sub.planCode, sub.status]).toEqual(['business', 'active']);
       }
-      const over = await api()
-        .post('/api/v1/onboarding/store')
-        .set(bearer(jwt))
-        .send({ name: 'S4', slug: mkSlug('cap4') });
+      const over = await make(3);
       expect(over.status).toBe(409);
       expect(over.body.error.code).toBe('STORE_LIMIT_REACHED');
     });
@@ -388,13 +409,16 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
       expect(created.status).toBe(201);
       const storeId = created.body.data.store.id as string;
 
-      // Inactive on the free plan; COD seeded; NOT reachable yet.
+      // Inactive, on the locked 14-day Growth trial (no free plan); COD seeded; NOT reachable yet.
       const row = await prisma.store.findUniqueOrThrow({ where: { id: storeId } });
       expect(row.status).toBe('inactive');
-      expect(row.plan).toBe('free');
+      expect(row.plan).toBe('professional');
       const sub = await prisma.storeSubscription.findUniqueOrThrow({ where: { storeId } });
-      expect(sub.planCode).toBe('free');
-      expect(['active', 'trialing']).toContain(sub.status);
+      expect(sub.planCode).toBe('growth');
+      expect(sub.status).toBe('trialing');
+      const trialDays = (sub.trialEndsAt!.getTime() - Date.now()) / 86_400_000;
+      expect(trialDays).toBeGreaterThan(13.9);
+      expect(trialDays).toBeLessThanOrEqual(14);
       const hostProducts = () =>
         api().get('/api/v1/public/products?limit=10').set('x-store-domain', host);
       expect((await hostProducts()).status).toBe(400);
@@ -432,7 +456,7 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
       expect(names).toContain('Cotton Scarf');
 
       state = (await api().get('/api/v1/onboarding/state').set(bearer(jwt))).body.data;
-      expect(state.store).toMatchObject({ status: 'active', planCode: 'free', host });
+      expect(state.store).toMatchObject({ status: 'active', planCode: 'growth', host });
       expect(state.productCount).toBe(1);
       expect(state.codEnabled).toBe(true);
 

@@ -50,6 +50,11 @@ const lim = {
   codPlatformFeeBps: 0,
   abandonedCartAutomation: false,
   whatsappAutomation: false,
+  maxStores: 1,
+  brandingRemoval: false,
+  apiAccess: false,
+  analyticsTier: 'basic',
+  supportTier: 'email',
 };
 
 afterEach(() => {

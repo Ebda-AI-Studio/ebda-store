@@ -69,6 +69,10 @@ export const FEATURE_KEYS_ARRAY = [
   // until a super-admin turns it on, and the endpoint 404s while off — the
   // correct default for a surface that can change anything in a store.
   'merchant_mcp',
+  // Hide the "Powered by Ebda" storefront footer (2026-10-07). Decided by the
+  // PLAN (`brandingRemoval` limit: Growth + Business) via FeatureService's plan
+  // layer — in NO PLAN_BASELINE; a super-admin StoreFeature override still wins.
+  'remove_branding',
   // Accounting sub-features (2026-05-27)
   'accounting.basic',
   'accounting.expenses',
@@ -604,6 +608,19 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'أو أي عميل MCP بدلاً من لوحة التحكم — قراءة التحليلات وتصفّح المنتجات وتعديلها وإدارة الطلبات. ' +
       'يختلف عن الشراء عبر الوكلاء الموجّه للمشترين: هذا لا يستجيب أبداً بدون مفتاح التاجر.',
     category: 'marketing',
+    tier: 'addon',
+  },
+  remove_branding: {
+    key: 'remove_branding',
+    name: 'Remove "Powered by Ebda"',
+    nameAr: 'إزالة «مدعوم من ابدأ»',
+    description:
+      'Hides the "Powered by Ebda" attribution in the storefront footer. Included in Growth ' +
+      'and Business; granted per store by a super-admin override otherwise.',
+    descriptionAr:
+      'يخفي عبارة «مدعوم من ابدأ» من تذييل المتجر. مضمّن في باقتي النمو والأعمال، ' +
+      'ويُمنح لمتجر بعينه عبر تجاوز من المشرف العام.',
+    category: 'storefront',
     tier: 'addon',
   },
   bundles: {

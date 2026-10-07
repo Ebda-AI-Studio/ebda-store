@@ -35,8 +35,24 @@ interface PlanRow {
   subscriberCount?: number;
 }
 
-const NUMERIC_KEYS = ['maxProducts', 'maxStaff', 'maxOrdersPerMonth', 'maxStorageMb'] as const;
-const BOOLEAN_KEYS = ['customDomain', 'abandonedCartAutomation', 'whatsappAutomation'] as const;
+const NUMERIC_KEYS = [
+  'maxProducts',
+  'maxStaff',
+  'maxOrdersPerMonth',
+  'maxStorageMb',
+  'maxStores',
+] as const;
+const BOOLEAN_KEYS = [
+  'customDomain',
+  'abandonedCartAutomation',
+  'whatsappAutomation',
+  'brandingRemoval',
+  'apiAccess',
+] as const;
+const TIER_KEYS = [
+  { key: 'analyticsTier', options: ['basic', 'standard', 'advanced'] },
+  { key: 'supportTier', options: ['email', 'chat', 'priority'] },
+] as const;
 const BPS_KEYS = ['platformFeeBps', 'codPlatformFeeBps'] as const;
 
 /** Piastres -> the EGP string in an input ('' = not set). */
@@ -354,6 +370,24 @@ function PlansInner() {
                       />
                       <span className="text-sm">{t(`limits.${k}`)}</span>
                     </div>
+                  ))}
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {TIER_KEYS.map(({ key, options }) => (
+                    <label key={key} className="space-y-1 text-sm">
+                      <span>{t(`limits.${key}`)}</span>
+                      <select
+                        className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={limits[key]}
+                        onChange={e => setLimits(l => (l ? { ...l, [key]: e.target.value } : l))}
+                      >
+                        {options.map(o => (
+                          <option key={o} value={o}>
+                            {t(`tiers.${o}`)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   ))}
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">{t('form.bpsHint')}</p>

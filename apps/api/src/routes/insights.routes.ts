@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { prisma, runInTenantContext, RfmSegment } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
+import { requireAnalyticsTier } from '../middleware/analytics-tier';
 import { requireStoreAccess } from '../middleware/store-access';
 import { generateInsightNarration } from '../services/accounting/insights-narration.service';
 import { inngest } from '../lib/inngest/client';
@@ -145,6 +146,7 @@ router.get(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireAnalyticsTier('standard'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const storeId = req.params.storeId;
@@ -336,6 +338,7 @@ router.get(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireAnalyticsTier('advanced'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const storeId = req.params.storeId;
@@ -377,6 +380,7 @@ router.get(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireAnalyticsTier('advanced'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const storeId = req.params.storeId;
@@ -426,6 +430,7 @@ router.get(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireAnalyticsTier('advanced'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const storeId = req.params.storeId;
@@ -476,6 +481,7 @@ router.get(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireAnalyticsTier('standard'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const storeId = req.params.storeId;
@@ -589,6 +595,7 @@ router.get(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireAnalyticsTier('advanced'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const storeId = req.params.storeId;
@@ -617,6 +624,7 @@ router.get(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireAnalyticsTier('advanced'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, customerId } = req.params;

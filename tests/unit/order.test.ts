@@ -152,6 +152,12 @@ vi.mock('@api/lib/inngest/client', () => ({
 // The order service checks the inventory.backorder feature flag before
 // creating BackorderLine rows. Default to enabled so existing tests that
 // don't care about this flag still pass unmodified.
+// Order-cap gate has its own suite (order-plan-grace.test.ts); stubbed here.
+vi.mock('@api/services/plan-limit.service', () => ({
+  assertOrderAllowed: vi.fn().mockResolvedValue(undefined),
+  noteOrderCreated: vi.fn().mockResolvedValue({ over: false }),
+}));
+
 vi.mock('@api/services/feature.service', () => ({
   featureService: {
     isFeatureEnabled: vi.fn().mockResolvedValue(true),
@@ -161,6 +167,7 @@ vi.mock('@api/services/feature.service', () => ({
 }));
 
 import { CartService } from '@api/services/cart.service';
+import { assertOrderAllowed } from '@api/services/plan-limit.service';
 import { inngest } from '@api/lib/inngest/client';
 
 describe('OrderService', () => {
@@ -464,6 +471,23 @@ describe('OrderService', () => {
       await expect(
         OrderService.create(mockStoreId, mockCustomerId, mockSessionId, createOrderData)
       ).rejects.toThrow(/no longer available/i);
+    });
+
+    it('order-cap gate: both order-creation entry points stop BEFORE any cart/stock/transaction work', async () => {
+      const capped = Object.assign(new Error('cap'), { statusCode: 402 });
+      vi.mocked(assertOrderAllowed).mockRejectedValueOnce(capped);
+      await expect(
+        OrderService.create(mockStoreId, mockCustomerId, mockSessionId, createOrderData)
+      ).rejects.toBe(capped);
+      expect(CartService.getOrCreate).not.toHaveBeenCalled();
+
+      vi.mocked(assertOrderAllowed).mockRejectedValueOnce(capped);
+      await expect(
+        OrderService.createAdminOrder(mockStoreId, 'admin-1', { items: [] } as never)
+      ).rejects.toBe(capped);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(assertOrderAllowed).toHaveBeenCalledTimes(2);
+      expect(assertOrderAllowed).toHaveBeenCalledWith(mockStoreId);
     });
 
     it('should throw error if cart is empty', async () => {

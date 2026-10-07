@@ -8385,7 +8385,20 @@
       "platformFeeBps": "Platform fee, online orders (bps)",
       "codPlatformFeeBps": "Platform fee, cash on delivery (bps)",
       "abandonedCartAutomation": "Abandoned-cart recovery",
-      "whatsappAutomation": "WhatsApp automation"
+      "whatsappAutomation": "WhatsApp automation",
+      "maxStores": "Stores per owner",
+      "brandingRemoval": "Remove \"Powered by Ebda\"",
+      "apiAccess": "API access",
+      "analyticsTier": "Analytics tier",
+      "supportTier": "Support tier"
+    },
+    "tiers": {
+      "basic": "Basic",
+      "standard": "Standard",
+      "advanced": "Advanced",
+      "email": "Email",
+      "chat": "Chat",
+      "priority": "Priority"
     },
     "errors": {
       "invalidNumber": "Enter valid numbers for the price and sort order.",
@@ -8509,7 +8522,11 @@
     "maxStorageMb": "Your plan allows up to {limit} MB of storage. Upgrade to add more.",
     "customDomain": "Custom domains are not included in your plan. Upgrade to connect your own domain.",
     "abandonedCartAutomation": "Abandoned-cart recovery is not included in your plan. Upgrade to turn it on.",
-    "whatsappAutomation": "WhatsApp automation is not included in your plan. Upgrade to turn it on."
+    "whatsappAutomation": "WhatsApp automation is not included in your plan. Upgrade to turn it on.",
+    "maxStores": "Your plan allows up to {limit} store(s). Upgrade to add more.",
+    "brandingRemoval": "Removing the \"Powered by Ebda\" footer is not included in your plan. Upgrade to turn it off.",
+    "apiAccess": "API access is not included in your plan. Upgrade to Business to use it.",
+    "analyticsTier": "This analytics view is not included in your plan. Upgrade to unlock it."
   },
   "onboarding": {
     "signup": {

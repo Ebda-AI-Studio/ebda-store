@@ -7,6 +7,7 @@ import { chunk } from '../batch-utils';
 import { signUnsubscribeToken } from '../../campaign-unsubscribe-token';
 import { awaitCampaignSendSlot } from '../../campaign-send-pacer';
 import { ResendService, ResendSendError } from '../../../services/resend.service';
+import { storeHidesPoweredBy } from '../../../services/email.service';
 import { sendAlert } from '../../../services/alerts.service';
 import {
   CAMPAIGN_STORE_SELECT,
@@ -342,6 +343,8 @@ const campaignSendFn = inngest.createFunction(
 
       const startedAt = Date.now();
       let deferred = false;
+      // Plan decision, resolved once per batch (Growth + Business hide the line).
+      const hidePoweredBy = await storeHidesPoweredBy(storeId);
       for (const recipientId of recipientIds) {
         // Stop inside the wall-clock budget (issue 2115); the rest stay
         // `queued` and resume in a later step.
@@ -385,6 +388,7 @@ const campaignSendFn = inngest.createFunction(
         const token = signUnsubscribeToken(storeId, r.id);
         const { subject, html } = renderCampaignEmail({
           store,
+          hidePoweredBy,
           locale: content.locale,
           subject: content.subject,
           bodyHtml: content.bodyHtml,

@@ -10,9 +10,9 @@
  */
 
 import type { Prisma } from '@force/database';
-import { LEGACY_STORE_PLAN_TO_PLAN_CODE } from '@force/shared';
+import { DEFAULT_PLAN_SEEDS, STORE_PLAN_TO_PLAN_CODE } from '@force/shared';
 
-type LegacyPlan = keyof typeof LEGACY_STORE_PLAN_TO_PLAN_CODE;
+type LegacyPlan = keyof typeof STORE_PLAN_TO_PLAN_CODE;
 
 /** Mirrors `Store.plan @default(starter)` in schema.prisma — what a new store starts on. */
 export const NEW_STORE_LEGACY_PLAN: LegacyPlan = 'starter';
@@ -24,8 +24,14 @@ export async function syncSubscriptionFromLegacyPlan(
   storeId: string,
   plan: LegacyPlan
 ): Promise<void> {
-  const planCode = LEGACY_STORE_PLAN_TO_PLAN_CODE[plan];
-  const status = planCode === 'comped' ? 'comped' : 'active';
+  const planCode = STORE_PLAN_TO_PLAN_CODE[plan];
+  const status = 'active';
+  // A store on a hidden compatibility plan (comped / founding_free / pro / free)
+  // whose enum tier is re-asserted unchanged keeps its row: re-saving a store
+  // must never demote an admin-granted plan onto a paid public one.
+  const existing = await db.storeSubscription.findUnique({ where: { storeId } });
+  const held = existing && DEFAULT_PLAN_SEEDS.find(p => p.code === existing.planCode);
+  if (held && !held.isPublic && held.featureTier === plan) return;
   await db.storeSubscription.upsert({
     where: { storeId },
     create: { storeId, planCode, status },

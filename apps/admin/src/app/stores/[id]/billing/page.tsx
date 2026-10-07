@@ -513,7 +513,7 @@ export default function StoreBillingPage() {
               {data.availablePlans.map(p => {
                 const price = planPrice(p);
                 const isCurrent = p.code === data.plan.subscribedPlanCode;
-                const paid = p.code !== 'free' && p.code !== 'comped';
+                const paid = p.code !== 'free' && p.code !== 'comped' && p.code !== 'founding_free';
                 const hasCard =
                   !!data.billing?.hasPaymentMethod && data.subscription.status === 'active';
                 return (

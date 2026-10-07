@@ -21,8 +21,13 @@ import { BRAND, BRAND_MARKETING_URL } from '@force/shared';
  * changes weren't rendering). Tightened margin-top from mt-6 to mt-3 to
  * close the visible white-space gap above the credit on short footers.
  */
-export function PoweredByForce() {
+export function PoweredByForce({ hidden = false }: { hidden?: boolean }) {
   const { t, language } = useLanguage();
+  // Plan decision made server-side: the API resolves `remove_branding` from the
+  // store's plan (Growth + Business) or a super-admin override and ships it in
+  // `enabledFeatures`; ShopChrome turns that into this prop. Absent/unknown ->
+  // keep the attribution (fail toward showing it).
+  if (hidden) return null;
   const align = language === 'ar' ? 'text-right' : 'text-left';
   return (
     <div

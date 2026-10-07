@@ -248,6 +248,8 @@ export function renderCampaignEmail(args: {
   subject: string;
   bodyHtml: string;
   unsubscribeUrl: string | null;
+  /** Drop the "Powered by Ebda" line (resolve with `storeHidesPoweredBy`). */
+  hidePoweredBy?: boolean;
 }): { subject: string; html: string } {
   const { store, locale } = args;
   const storeName = escapeHtml(locale === 'ar' && store.nameAr ? store.nameAr : store.name);
@@ -266,6 +268,7 @@ export function renderCampaignEmail(args: {
     address: store.address,
     theme: store.theme as { primaryColor?: string | null; primary?: string | null } | null,
     defaultLanguage: locale,
+    hidePoweredBy: args.hidePoweredBy,
   });
   return { subject: sanitizeSubject(args.subject), html };
 }
