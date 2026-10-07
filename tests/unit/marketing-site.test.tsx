@@ -131,7 +131,7 @@ describe('marketing honesty', () => {
         expect(pay).toContain(`/logos/${logo}.webp`);
       expect(pay).toMatch(/Cash on delivery|الدفع عند الاستلام/);
       expect(pay).toMatch(/Your own delivery|توصيل بنفسك/);
-      expect(pay).toContain('mailto:hello@ebda.app');
+      expect(pay).toContain('mailto:ahlan@ebda.app');
     }
     expect(en).not.toMatch(/coming soon/i);
     expect(ar).not.toMatch(/>قريب</);
@@ -228,7 +228,7 @@ describe('marketing SEO and trust surface', () => {
       for (const page of LEGAL_SLUGS) {
         const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);
         expect(html).toContain('2026-10-07');
-        expect(html).toContain('hello@ebda.app');
+        expect(html).toContain('ahlan@ebda.app');
         expect(html).not.toMatch(/\[[^\]]*\]/);
         expect(html.match(/<section/g)!.length).toBeGreaterThanOrEqual(5);
       }

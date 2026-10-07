@@ -19,4 +19,4 @@ Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billi
 - Shipping: Bosta, ShipBlu, Mylerz and Aramex, or the merchant's own delivery.
 - Also: AI product descriptions and Arabic/English translation, VAT for registered merchants, a dashboard installable on the phone with order notifications, analytics, wa.me WhatsApp order buttons.
 - Sign up: https://admin.ebda.app/signup
-- Contact: hello@ebda.app; security reports: security@ebda.app
+- Contact: ahlan@ebda.app; security reports: security@ebda.app
