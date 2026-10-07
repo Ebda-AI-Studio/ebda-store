@@ -29,8 +29,8 @@ Every DB table whose rows have business meaning MUST have a UI surface. Plan tim
 
 **Every UI/UX/feature change lands platform-level — NEVER tenant-scoped, NEVER theme-specific without explicit reason.** Per-tenant CONFIG (theme choice, colors, hero) is data and fine; per-tenant CODE is not.
 
-1. **Product-card UX** → ALL render paths: `shared/PecannbeeProductCard.tsx`, the 5 `templates/{modern,elegant,classic,minimal,bold}/ProductCard.tsx`, `shared/ProductCarousel.tsx` (+ `ProductListItem` for the CTA/OOS system = 8 paths). Grep all; if the pattern isn't in all of them, it isn't shipped.
-2. **Header/footer/nav** → all 5 themes Ship the active merchant's theme first; the same batch or an immediate follow-up lands the other 4.
+1. **Product-card UX** → ALL render paths: `shared/PecannbeeProductCard.tsx`, the 5 `templates/{modern,elegant,classic,minimal,bold}/ProductCard.tsx`, `shared/ProductCarousel.tsx` (+ `ProductListItem` for the CTA/OOS system = 8 paths), plus `templates/dahab/ProductCard.tsx` + `ProductCarousel.tsx` — the Dahab skin, which the shared card and carousel hand over to (`docs/ebda/templates/dahab.md`). Grep all; if the pattern isn't in all of them, it isn't shipped.
+2. **Header/footer/nav** → all 5 themes + Dahab (`templates/dahab/`) Ship the active merchant's theme first; the same batch or an immediate follow-up lands the other 4.
 3. **Storefront copy** → `apps/web/src/contexts/LanguageContext.tsx` translations map (EN + AR). Never hardcode user-facing strings in a theme.
 4. **Schema/API/business logic** → `apps/api` + `packages/database`, per-store scoping via `storeId`. Never branch on a `store.slug`.
 5. **Admin tooling** → built once in `apps/admin` for every store. Never wire to a tenant ID.

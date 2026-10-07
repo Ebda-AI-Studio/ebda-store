@@ -212,6 +212,10 @@ Additive table; nothing else references it. To roll the feature back: revert the
 
 Expand step of rulings PROVIDERS-1/2. `payment_configs.provider` became TEXT (+ CHECK on a lowercase code) and three columns were added (`credentials` encrypted blob, `credential_hints`, `connection_test`); the legacy credential columns and the `"PaymentProvider"` enum type are still there. Rollback: revert the code, then `ALTER TABLE payment_configs DROP CONSTRAINT payment_configs_provider_code_check; ALTER TABLE payment_configs DROP COLUMN credentials, DROP COLUMN credential_hints, DROP COLUMN connection_test; ALTER TABLE payment_configs ALTER COLUMN provider TYPE "PaymentProvider" USING (provider::"PaymentProvider");` — the cast fails loudly if a row carries a code outside the enum. Rows saved through the new connect form keep their keys ONLY in `credentials`, so dropping it loses them: the merchant re-enters them (PROVIDERS-1 records 0 merchants in production on 2026-10-07; not re-read from production in this change). Delete the row from `_prisma_migrations` after reverting by hand.
 
+## Dahab template enum value (`20261008000000_store_template_dahab`)
+
+Adds `dahab` to the `"StoreTemplate"` enum (builder Phase 3 pilot). Postgres cannot drop an enum value, so a rollback is: revert the code, move any store on the new value back (`UPDATE stores SET template = 'elegant' WHERE template = 'dahab';` — re-check RLS policy state after, per the note above), and leave the value unused. Delete the row from `_prisma_migrations` only if you also restore from a pre-migration branch.
+
 ## Trace: what migrated when
 
 ```bash
