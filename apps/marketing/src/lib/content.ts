@@ -258,7 +258,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           q: 'ماذا عن بياناتي؟',
-          a: 'منتجاتك وطلباتك وعملاؤك بياناتك. تفاصيل المعالجة في صفحة الخصوصية (مسودة قيد المراجعة القانونية)، وأدوات التصدير على خارطة الطريق.',
+          a: 'منتجاتك وطلباتك وعملاؤك بياناتك. تفاصيل المعالجة في صفحة الخصوصية، وأدوات التصدير على خارطة الطريق.',
         },
       ],
     },
@@ -462,7 +462,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           q: 'What about my data?',
-          a: 'Your products, orders and customers are yours. How data is handled is described on the Privacy page (a draft awaiting legal review); export tools are on the roadmap.',
+          a: 'Your products, orders and customers are yours. How data is handled is described on the Privacy page; export tools are on the roadmap.',
         },
       ],
     },

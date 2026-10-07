@@ -169,12 +169,12 @@ describe('marketing SEO and trust surface', () => {
     expect(exp).toBeLessThan(now + 366 * 24 * 3600 * 1000);
     expect(t).toContain('Canonical: https://ebda.app/.well-known/security.txt');
   });
-  it('llms.txt and og assets exist; legal pages are marked DRAFT with no registration numbers', () => {
+  it('llms.txt and og assets exist; legal pages show their version with no registration numbers', () => {
     expect(pub('llms.txt')).toMatch(/^# Ebda/);
     expect(pub('og.png').length).toBeGreaterThan(1000);
     for (const [locale, badge] of [
-      ['ar', 'مسودة'],
-      ['en', 'DRAFT'],
+      ['ar', 'الإصدار 1.0'],
+      ['en', 'Version 1.0'],
     ] as const) {
       for (const page of LEGAL_SLUGS) {
         const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);

@@ -5,9 +5,9 @@ import type { LegalPages } from './legal-types';
  * common protective structure of SaaS store-builder terms; not reviewed by counsel.
  */
 export const LEGAL_EN: LegalPages = {
-  draftBadge: 'Version 1.0 · 2026-10-07 · DRAFT',
+  draftBadge: 'Version 1.0 · 2026-10-07',
   draftBody:
-    'First version of this document. We may update it as described in the "Changes" section. The Arabic text is the primary text.',
+    'Version 1.0 of this document. We may update it as described in the "Changes" section. The Arabic text is the primary text.',
   back: 'Back to home',
   legal: {
     title: 'Legal notice',
@@ -133,7 +133,7 @@ export const LEGAL_EN: LegalPages = {
         p: [
           'You may stop using the Service and close your account at any time by writing to hello@ebda.app; fees already paid are not refunded.',
           'We may suspend, restrict or terminate an account, a store or any feature, with or without notice, if we reasonably believe you breached these terms, the Merchant Agreement or the Acceptable Use Policy; if a store is, or appears to be, unlawful, fraudulent or harmful; if required by law or an authority; if fees are unpaid; or to protect the Service, our users or third parties. We will try to give notice where it is practical and lawful. Where fees are unpaid, the process in the Merchant Agreement applies.',
-          'On termination your right to use the Service ends, unpaid fees become due, and we may delete your store and data after the retention period in the Merchant Agreement. Sections that by their nature should survive (including 5, 10, 11, 12, 14 and 16) survive.',
+          'On termination your right to use the Service ends, unpaid fees become due, and your store and data are then deleted as described in the Merchant Agreement and the Privacy Policy. Sections that by their nature should survive (including 5, 10, 11, 12, 14 and 16) survive.',
         ],
       },
       {
@@ -223,7 +223,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '10. Billing, reminders and non-payment',
         p: [
-          'For now, plans are paid manually by InstaPay. We send payment reminders 7, 3 and 1 days before the due date and on the due date. If payment is not received within 3 days after the due date (the "grace period"), we may suspend the store. A suspended store is not shown to customers and orders cannot be placed until the account is settled; the Merchant stays responsible for orders already placed and for fees due. After payment is confirmed we will lift the suspension. If the account remains unpaid, we may terminate it and delete the store and its data after 90 days from the suspension, after a final notice by email.',
+          'For now, plans are paid manually by InstaPay. We send payment reminders 7, 3 and 1 days before the due date and on the due date. If payment is not received within 3 days after the due date (the "grace period"), we may suspend the store. A suspended store is not shown to customers and orders cannot be placed until the account is settled; the Merchant stays responsible for orders already placed and for fees due. The dashboard stays accessible so the Merchant can pay. After payment is confirmed we will lift the suspension. Suspension does not delete the store or its data. If the account remains unpaid, we may terminate it after notice by email.',
         ],
       },
       {
@@ -247,7 +247,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '14. Suspension, termination and data on exit',
         p: [
-          'The suspension and termination rights in the Terms of Service apply. On termination, the Merchant should export what it needs; after the periods above we may delete the store. We may keep records that the law or our legitimate interests (such as fraud prevention and dispute defence) require, as described in the Privacy Policy.',
+          'The suspension and termination rights in the Terms of Service apply. On termination or closure, the Merchant should export what it needs. Ebda keeps the store and its data until the Merchant asks for deletion or the account is closed, and then deletes them within 90 days, subject to the records described in the Privacy Policy. We may keep records that the law or our legitimate interests (such as fraud prevention and dispute defence) require, as described in the Privacy Policy.',
         ],
       },
       {
@@ -340,7 +340,8 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '5. Service providers (sub-processors)',
         p: [
-          'We use these providers to run the Service. Each processes data only on our instructions and under its own security and data terms: Cloudflare (website hosting, delivery, and file/image storage); Railway (API hosting and cache); Neon (database hosting, EU region); Resend (transactional and campaign email); Sentry (error and performance monitoring, EU region); Inngest (background job processing); Google Gemini (AI features: only the text you submit to an AI feature is sent); PostHog (product analytics in the merchant dashboard, EU region, where enabled); and OneSignal (push notifications, where enabled).',
+          'We use these providers to run the Service. Each processes data only on our instructions and under its own security and data terms: Cloudflare (website and API hosting, delivery, key-value storage, queues and file/image storage); Neon (database hosting, EU region); Resend (transactional and campaign email); Sentry (error and performance monitoring, EU region); and Inngest (background job processing).',
+          'Optional features, only if enabled (currently not enabled): Google Gemini (AI features; only the text you submit to an AI feature would be sent), PostHog (product analytics, EU region) and OneSignal (push notifications). If we enable one, we will update this list first.',
           'We may add or replace providers; the current list is maintained on this page. We do not sell personal data.',
         ],
       },
@@ -353,7 +354,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '7. Retention',
         p: [
-          'We keep data for as long as the account is active and as needed for the purposes above. After account closure we generally delete or anonymise a store and its data within 90 days of suspension or termination, except records we must or reasonably need to keep (for example billing and tax records, audit and security logs, and material needed to prevent fraud or defend claims), which are kept only as long as necessary. Backups age out on their normal cycle.',
+          'We keep data for as long as the account is active and as needed for the purposes above. We keep a store and its data, including while it is suspended, until the merchant asks us to delete it or the account is closed; we then delete or anonymise them within 90 days, except records we must or reasonably need to keep (for example billing and tax records, audit and security logs, and material needed to prevent fraud or defend claims), which are kept only as long as necessary. Backups age out on their normal cycle.',
         ],
       },
       {
