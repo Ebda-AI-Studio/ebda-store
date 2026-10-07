@@ -10,15 +10,15 @@ Meta bills the WhatsApp Business Platform per delivered message (since 2025-07-0
 
 ## Decision table
 
-| Decision | Recommendation | Basis |
-|---|---|---|
-| Free tier | wa.me click-to-chat with prefilled order text | No API needed; zero Meta cost |
-| Paid tier connectivity | Ebda as a Tech Provider/BSP-style layer over Cloud API, each merchant on their own WABA | Cloud API is the only infrastructure; BSPs add tooling |
+| Decision               | Recommendation                                                                                 | Basis                                                         |
+| ---------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Free tier              | wa.me click-to-chat with prefilled order text                                                  | No API needed; zero Meta cost                                 |
+| Paid tier connectivity | Ebda as a Tech Provider/BSP-style layer over Cloud API, each merchant on their own WABA        | Cloud API is the only infrastructure; BSPs add tooling        |
 | Meta cost pass-through | Bill actual Meta per-message charges by category and country, no hidden markup on Meta portion | Meta rate is identical across BSPs; only platform fee differs |
-| Ebda margin | Separate, visible platform fee (flat monthly and/or small per-message) | Keeps pricing legible; Ahmad sets numbers |
-| Service messages | Meter after 1,000 free per number per month | Oct 2026 rule |
-| Marketing messages | Prepaid credit/wallet only, opt-in required | Highest per-message cost (about 18x utility) |
-| Verification | Require merchant Meta Business verification before enabling API | Needed for limits and features |
+| Ebda margin            | Separate, visible platform fee (flat monthly and/or small per-message)                         | Keeps pricing legible; Ahmad sets numbers                     |
+| Service messages       | Meter after 1,000 free per number per month                                                    | Oct 2026 rule                                                 |
+| Marketing messages     | Prepaid credit/wallet only, opt-in required                                                    | Highest per-message cost (about 18x utility)                  |
+| Verification           | Require merchant Meta Business verification before enabling API                                | Needed for limits and features                                |
 
 ## Current pricing model (as of 2026-10-03)
 
@@ -34,12 +34,12 @@ Meta bills the WhatsApp Business Platform per delivered message (since 2025-07-0
 
 ## Egypt rates per category
 
-| Category | Rate USD per message (most-cited) | EGP at 52.24 | Conflicting figure | Status |
-|---|---|---|---|---|
-| Marketing | 0.0644 | about 3.36 | 0.0694 ([flowcall](https://www.flowcall.co/blog/whatsapp-business-api-pricing)); 0.1073 ([Ominiflow](https://ominiflow.com/whatsapp-api-pricing/egypt), likely older rate) | **unverified** |
-| Utility | 0.0036 | about 0.19 | 0.0086 (same conflicting source) | **unverified** |
-| Authentication | 0.0036 | about 0.19 | 0.0086; international-authentication 0.070 | **unverified** |
-| Service | free for first 1,000/number/month, then utility rate | about 0.19 after allowance | n/a | rule per Meta notice summaries; Egypt rate **unverified** |
+| Category       | Rate USD per message (most-cited)                    | EGP at 52.24               | Conflicting figure                                                                                                                                                         | Status                                                    |
+| -------------- | ---------------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Marketing      | 0.0644                                               | about 3.36                 | 0.0694 ([flowcall](https://www.flowcall.co/blog/whatsapp-business-api-pricing)); 0.1073 ([Ominiflow](https://ominiflow.com/whatsapp-api-pricing/egypt), likely older rate) | **unverified**                                            |
+| Utility        | 0.0036                                               | about 0.19                 | 0.0086 (same conflicting source)                                                                                                                                           | **unverified**                                            |
+| Authentication | 0.0036                                               | about 0.19                 | 0.0086; international-authentication 0.070                                                                                                                                 | **unverified**                                            |
+| Service        | free for first 1,000/number/month, then utility rate | about 0.19 after allowance | n/a                                                                                                                                                                        | rule per Meta notice summaries; Egypt rate **unverified** |
 
 - The 0.0644/0.0036/0.0036 set is reported as "effective July 1, 2026, from Meta's official USD rate card" by [Chatmaxima](https://chatmaxima.com/whatsapp-api-pricing/egypt/) and [ArabyBot](https://arabybot.com/guides/whatsapp-api-pricing-egypt?lang=en) (search summaries). I could not confirm it against Meta's CSV, and the Oct 2026 refresh may have changed it. Do not hard-code until verified.
 - FX: 1 USD = 52.24 EGP, mid-market 2026-10-03 ([Wise](https://wise.com/gb/currency-converter/usd-to-egp-rate)).
@@ -47,12 +47,12 @@ Meta bills the WhatsApp Business Platform per delivered message (since 2025-07-0
 
 ## Free allowances
 
-| Allowance | Detail | Source |
-|---|---|---|
-| Customer service window | 24 hours after the customer's last message; free-form replies allowed. Since 2026-10-01 not free by default: first 1,000 service messages/phone number/month free, then utility rate | [360dialog](https://360dialog.com/blog/whatsapp-service-message-charging-october-2026/), [Sendpulse](https://sendpulse.com/blog/whatsapp-service-message-pricing) (2026-10-03) |
-| Free entry points | Click-to-WhatsApp ads and Facebook Page CTA open a 72-hour window; replies in that window are free | [respond.io](https://respond.io/blog/whatsapp-pricing-change-2026) (2026-10-03) |
-| WhatsApp Business App | Free; manual use, not API | same |
-| Utility templates in open window | Free 2025-07-01 to 2026-09-30; charged from 2026-10-01 | [Pickyassist](https://pickyassist.com/blog/whatsapp-pricing-changes-october-2026/) |
+| Allowance                        | Detail                                                                                                                                                                               | Source                                                                                                                                                                         |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Customer service window          | 24 hours after the customer's last message; free-form replies allowed. Since 2026-10-01 not free by default: first 1,000 service messages/phone number/month free, then utility rate | [360dialog](https://360dialog.com/blog/whatsapp-service-message-charging-october-2026/), [Sendpulse](https://sendpulse.com/blog/whatsapp-service-message-pricing) (2026-10-03) |
+| Free entry points                | Click-to-WhatsApp ads and Facebook Page CTA open a 72-hour window; replies in that window are free                                                                                   | [respond.io](https://respond.io/blog/whatsapp-pricing-change-2026) (2026-10-03)                                                                                                |
+| WhatsApp Business App            | Free; manual use, not API                                                                                                                                                            | same                                                                                                                                                                           |
+| Utility templates in open window | Free 2025-07-01 to 2026-09-30; charged from 2026-10-01                                                                                                                               | [Pickyassist](https://pickyassist.com/blog/whatsapp-pricing-changes-october-2026/)                                                                                             |
 
 ## Volume tiers
 
@@ -76,13 +76,13 @@ Meta bills the WhatsApp Business Platform per delivered message (since 2025-07-0
 
 ## What wa.me click-to-chat can and cannot do
 
-| Can | Cannot |
-|---|---|
-| Open a chat with the merchant's number and prefill text (e.g. order summary, product link) | Send anything automatically; nothing is delivered until the customer presses send |
-| Work on mobile and desktop, zero cost, no verification | Receive webhooks, track clicks-to-sent, delivery or read status |
-| Be shown as a button on product, cart and thank-you pages | Send order confirmations, shipping updates, abandoned-cart or marketing messages |
-| Carry URL-encoded text (order id, items, total) | Manage templates, broadcast, or run bots; prefill is visible and editable by customer |
-| Be used by the merchant on the free WhatsApp Business App (free) | Provide server-side audit trail or reliable attribution |
+| Can                                                                                        | Cannot                                                                                |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Open a chat with the merchant's number and prefill text (e.g. order summary, product link) | Send anything automatically; nothing is delivered until the customer presses send     |
+| Work on mobile and desktop, zero cost, no verification                                     | Receive webhooks, track clicks-to-sent, delivery or read status                       |
+| Be shown as a button on product, cart and thank-you pages                                  | Send order confirmations, shipping updates, abandoned-cart or marketing messages      |
+| Carry URL-encoded text (order id, items, total)                                            | Manage templates, broadcast, or run bots; prefill is visible and editable by customer |
+| Be used by the merchant on the free WhatsApp Business App (free)                           | Provide server-side audit trail or reliable attribution                               |
 
 Source: [Qualimero](https://qualimero.com/en/blog/whatsapp-link), [Unipile](https://www.unipile.com/api-whatsapp-link/), [Quadlayers](https://quadlayers.com/how-to-create-a-whatsapp-link-wa-me-with-a-pre-filled-message/) (search summaries, 2026-10-03). Implementation note: URL-encode text or it truncates at the first space.
 
