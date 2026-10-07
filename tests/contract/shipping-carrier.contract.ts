@@ -65,6 +65,8 @@ export interface ShippingContractTarget {
   control?: ShippingContractControl;
   /** Statuses this carrier can report (default: every ShipmentStatus but `created`). */
   reportable?: ShipmentStatus[];
+  /** The carrier documents NO cancel API: a fresh parcel answers `not_cancellable`, no network call. */
+  noCancelApi?: boolean;
   /** A request body the manual carrier needs. */
   manual?: { carrierName: string; trackingNumber: string };
 }
@@ -237,7 +239,7 @@ export function runShippingCarrierContract(
         const out = normalizeCancel(
           await t.carrier.cancelShipment(t.credentials, r.carrierShipmentId, t.ctx)
         );
-        expect(out.status).toBe('cancelled');
+        expect(out.status).toBe(t.noCancelApi ? 'not_cancellable' : 'cancelled');
       });
 
       it('refuses (not_cancellable) once the courier has it, and never reports it cancelled', async () => {

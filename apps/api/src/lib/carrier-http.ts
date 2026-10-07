@@ -166,3 +166,120 @@ export function egpToPiastres(value: number | string): number {
   if (!m) throw new CarrierError('CARRIER_REJECTED', `not a valid EGP amount: ${s}`);
   return Number(m[1]) * 100 + Number((m[2] ?? '').padEnd(2, '0') || '0');
 }
+
+/**
+ * Like `carrierRequest`, for an endpoint that answers BINARY (a PDF label): same timeout race,
+ * same transport choice, same failure mapping, but the body comes back as raw bytes, never
+ * decoded as text. A non-2xx never echoes the body into the message.
+ */
+export async function carrierRequestBinary(
+  op: string,
+  base: ResolvedBase,
+  path: string,
+  init: RequestInit,
+  opts: CarrierHttpOptions & { acceptStatus?: number[] } = {}
+): Promise<{ status: number; bytes: Buffer }> {
+  const fetchImpl: FetchLike =
+    opts.fetchImpl ?? (base.stubbed ? (u, i) => globalThis.fetch(u, i) : safeFetch);
+  const ms = opts.timeoutMs ?? timeoutMs();
+  const ctrl = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      ctrl.abort();
+      reject(new CarrierError('CARRIER_UNAVAILABLE', `${op} timed out after ${ms}ms`));
+    }, ms);
+  });
+  let status: number;
+  let ok: boolean;
+  let bytes: Buffer;
+  try {
+    const done = (async () => {
+      const r = await fetchImpl(`${base.url}${path}`, { ...init, signal: ctrl.signal });
+      return { status: r.status, ok: r.ok, bytes: Buffer.from(await r.arrayBuffer()) };
+    })();
+    done.catch(() => undefined);
+    const out = await Promise.race([done, timeout]);
+    status = out.status;
+    ok = out.ok;
+    bytes = out.bytes;
+  } catch (err) {
+    if (err instanceof CarrierError) throw err;
+    throw new CarrierError(
+      'CARRIER_UNAVAILABLE',
+      `${op} failed: ${err instanceof Error ? err.message : 'unknown error'}`
+    );
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+  if (ok || opts.acceptStatus?.includes(status)) return { status, bytes };
+  if (status === 401 || status === 403) {
+    throw new CarrierError(
+      'CARRIER_MISCONFIGURED',
+      `${op}: the carrier refused the merchant credentials (HTTP ${status})`
+    );
+  }
+  if (status >= 500 || status === 429 || status === 408) {
+    throw new CarrierError('CARRIER_UNAVAILABLE', `${op}: carrier HTTP ${status}`);
+  }
+  throw new CarrierError('CARRIER_REJECTED', `${op}: carrier HTTP ${status}`);
+}
+
+/**
+ * Like `carrierRequest`, for an endpoint that answers TEXT that is not JSON (Aramex SOAP/XML):
+ * same timeout race, same transport choice, same 401/403 / 5xx / 429 / 4xx mapping, but the body
+ * comes back verbatim as `text`. `acceptStatus` lets the caller read a body it must interpret
+ * itself (a SOAP Fault arrives as HTTP 500). A non-accepted status never echoes the body.
+ */
+export async function carrierRequestText(
+  op: string,
+  base: ResolvedBase,
+  path: string,
+  init: RequestInit,
+  opts: CarrierHttpOptions & { acceptStatus?: number[] } = {}
+): Promise<{ status: number; text: string }> {
+  const fetchImpl: FetchLike =
+    opts.fetchImpl ?? (base.stubbed ? (u, i) => globalThis.fetch(u, i) : safeFetch);
+  const ms = opts.timeoutMs ?? timeoutMs();
+  const ctrl = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      ctrl.abort();
+      reject(new CarrierError('CARRIER_UNAVAILABLE', `${op} timed out after ${ms}ms`));
+    }, ms);
+  });
+  let status: number;
+  let ok: boolean;
+  let text: string;
+  try {
+    const done = (async () => {
+      const r = await fetchImpl(`${base.url}${path}`, { ...init, signal: ctrl.signal });
+      return { status: r.status, ok: r.ok, text: await r.text() };
+    })();
+    done.catch(() => undefined);
+    const out = await Promise.race([done, timeout]);
+    status = out.status;
+    ok = out.ok;
+    text = out.text;
+  } catch (err) {
+    if (err instanceof CarrierError) throw err;
+    throw new CarrierError(
+      'CARRIER_UNAVAILABLE',
+      `${op} failed: ${err instanceof Error ? err.message : 'unknown error'}`
+    );
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+  if (ok || opts.acceptStatus?.includes(status)) return { status, text };
+  if (status === 401 || status === 403) {
+    throw new CarrierError(
+      'CARRIER_MISCONFIGURED',
+      `${op}: the carrier refused the merchant credentials (HTTP ${status})`
+    );
+  }
+  if (status >= 500 || status === 429 || status === 408) {
+    throw new CarrierError('CARRIER_UNAVAILABLE', `${op}: carrier HTTP ${status}`);
+  }
+  throw new CarrierError('CARRIER_REJECTED', `${op}: carrier HTTP ${status}`);
+}

@@ -12,6 +12,8 @@ import {
   SHIPMENT_STATUSES,
 } from '../services/carriers/types';
 import { codReconciliationService } from '../services/cod-reconciliation.service';
+import { assertMayConfigureCarrier } from '../services/carriers/carrier-connection.service';
+import { auditLog } from '../middleware/security';
 import { AppError } from '../middleware/error-handler';
 
 const router = Router();
@@ -25,39 +27,22 @@ router.param('storeId', (req, res, next) => shippingCarrierRouteContext(req, res
 // ==========================================
 
 /**
- * `credentials` is an open string map because each carrier declares its own
- * key set. One key is special: `baseUrl` reaches a server-side `fetch()` in
- * the carrier client, so unchecked it is an SSRF primitive (see
- * `carriers/icarry.carrier.ts` and `tests/unit/carrier-ssrf.test.ts`).
+ * Saving a carrier: credential FIELDS of one mode (write-only; the catalog is the authority on
+ * which keys exist, which are required and their format, checked in the service), optional
+ * activation of that mode, the enable/default switches and the non-secret settings (pickup
+ * address, default weight, COD switch...).
  *
- * The carrier client is the authority — it resolves the host and blocks
- * private/loopback/link-local targets at call time, which is the only check
- * that survives a DNS record changing after the write. This refinement is the
- * cheap edge half: it rejects an obviously-wrong value while the merchant is
- * still looking at the form, instead of silently storing it and failing later.
+ * No credential is a URL: every adapter resolves its host from code (sandbox or live) or an
+ * ENV override, never from merchant input, so a merchant cannot point the API host at an
+ * internal address (SSRF). `settings` is a plain object and may not carry `sandbox` (the mode
+ * is the row's `testMode`; the service drops the key).
  */
 export const carrierConfigSchema = z.object({
-  enabled: z.boolean(),
+  mode: z.enum(['sandbox', 'live']).optional(),
+  credentials: z.record(z.string(), z.union([z.string().max(2000), z.null()])).optional(),
+  activate: z.boolean().optional(),
+  enabled: z.boolean().optional(),
   isDefault: z.boolean().optional(),
-  credentials: z.record(z.string(), z.string()).refine(
-    creds => {
-      const baseUrl = creds.baseUrl?.trim();
-      if (!baseUrl) return true;
-      // An unchanged field resubmits the `****` mask maskCredentials()
-      // emitted (preserveMaskedCredentials merges it back to the real
-      // stored value AFTER this parse) — validating that as a URL runs
-      // `new URL('****')`, which throws, and would 400 a save the
-      // merchant made no baseUrl edit in at all.
-      if (baseUrl.includes('****')) return true;
-      try {
-        const u = new URL(baseUrl);
-        return u.protocol === 'https:' || u.protocol === 'http:';
-      } catch {
-        return false;
-      }
-    },
-    { message: 'credentials.baseUrl must be an http(s) URL', path: ['baseUrl'] }
-  ),
   settings: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -138,7 +123,7 @@ const adminMiddleware = [
 
 // ==========================================
 // GET /:storeId/shipping-carriers/configs
-// List all carrier configs for a store
+// List all carrier configs for a store (write-only credentials: hints only)
 // ==========================================
 
 router.get(
@@ -147,15 +132,8 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const configs = await shippingCarrierService.getCarrierConfigs(storeId);
-
-      // Mask credentials in response
-      const safe = configs.map((c: any) => ({
-        ...c,
-        credentials: maskCredentials(c.credentials),
-      }));
-
-      res.json({ success: true, data: { configs: safe } });
+      const configs = await shippingCarrierService.getPublicCarrierConfigs(storeId);
+      res.json({ success: true, data: { configs } });
     } catch (error) {
       next(error);
     }
@@ -182,13 +160,10 @@ router.get(
         return;
       }
 
-      const config = await shippingCarrierService.getCarrierConfig(storeId, carrier);
-
+      const configs = await shippingCarrierService.getPublicCarrierConfigs(storeId);
       res.json({
         success: true,
-        data: {
-          config: config ? { ...config, credentials: maskCredentials(config.credentials) } : null,
-        },
+        data: { config: configs.find(c => c.carrier === carrier) ?? null },
       });
     } catch (error) {
       next(error);
@@ -198,7 +173,7 @@ router.get(
 
 // ==========================================
 // PUT /:storeId/shipping-carriers/configs/:carrier
-// Upsert a carrier config
+// Save credentials (write-only) / switch mode / enable / settings for one carrier
 // ==========================================
 
 router.put(
@@ -215,14 +190,44 @@ router.put(
         });
         return;
       }
+      assertMayConfigureCarrier(carrier, req.user?.role ?? '');
 
-      const data = carrierConfigSchema.parse(req.body);
-      const result = await shippingCarrierService.upsertCarrierConfig(storeId, carrier, data);
-
-      res.json({
-        success: true,
-        data: { config: { ...result, credentials: undefined } },
+      const body = carrierConfigSchema.parse(req.body);
+      if ((body.credentials || body.activate) && !body.mode) {
+        throw new AppError(422, 'MODE_REQUIRED', 'Say which mode (sandbox or live) these are for');
+      }
+      const result = await shippingCarrierService.upsertCarrierConfig(storeId, carrier, {
+        credentials: body.credentials
+          ? { mode: body.mode!, fields: body.credentials }
+          : body.activate && body.mode
+            ? { mode: body.mode, fields: {} }
+            : undefined,
+        activate: body.activate,
+        enabled: body.enabled,
+        isDefault: body.isDefault,
+        settings: body.settings,
       });
+
+      // Names of the fields that changed, never their values.
+      await auditLog({
+        action: 'shipping_carrier_config.updated',
+        storeId,
+        userId: req.user?.userId,
+        resourceType: 'shipping_carrier_config',
+        resourceId: String(result.config.id),
+        details: {
+          storeId,
+          carrier,
+          mode: body.mode,
+          fields: result.changed,
+          enabled: result.config.enabled,
+          disabledUntilRetested: result.disabledUntilRetested,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }
@@ -250,6 +255,16 @@ router.delete(
       }
 
       await shippingCarrierService.deleteCarrierConfig(storeId, carrier);
+      await auditLog({
+        action: 'shipping_carrier_config.deleted',
+        storeId,
+        userId: req.user?.userId,
+        resourceType: 'shipping_carrier_config',
+        resourceId: carrier,
+        details: { storeId, carrier },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
       res.json({ success: true, data: { message: 'Carrier config deleted' } });
     } catch (error) {
@@ -278,7 +293,24 @@ router.post(
         return;
       }
 
+      assertMayConfigureCarrier(carrier, req.user?.role ?? '');
       const result = await shippingCarrierService.testConnection(storeId, carrier);
+      await auditLog({
+        action: 'shipping_carrier_config.connection_tested',
+        storeId,
+        userId: req.user?.userId,
+        resourceType: 'shipping_carrier_config',
+        resourceId: carrier,
+        details: {
+          storeId,
+          carrier,
+          mode: result.mode,
+          ok: result.test.ok,
+          code: result.test.code,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
       res.json({ success: true, data: result });
     } catch (error) {
@@ -308,6 +340,16 @@ router.post(
       }
 
       await shippingCarrierService.setDefaultCarrier(storeId, carrier);
+      await auditLog({
+        action: 'shipping_carrier_config.default_set',
+        storeId,
+        userId: req.user?.userId,
+        resourceType: 'shipping_carrier_config',
+        resourceId: carrier,
+        details: { storeId, carrier },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
       res.json({ success: true, data: { message: `${carrier} set as default carrier` } });
     } catch (error) {
@@ -476,6 +518,16 @@ router.post(
         return;
       }
       await shippingCarrierService.rotateWebhookSecret(storeId, carrier);
+      await auditLog({
+        action: 'shipping_carrier_config.webhook_secret_rotated',
+        storeId,
+        userId: req.user?.userId,
+        resourceType: 'shipping_carrier_config',
+        resourceId: carrier,
+        details: { storeId, carrier },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
       res.json({ success: true, data: { message: 'Webhook secret rotated' } });
     } catch (error) {
       next(error);
@@ -712,18 +764,6 @@ router.get(
 
 function isValidCarrier(carrier: string): carrier is CarrierCode {
   return (CARRIER_CODES as readonly string[]).includes(carrier);
-}
-
-function maskCredentials(credentials: Record<string, string>): Record<string, string> {
-  const masked: Record<string, string> = {};
-  for (const [key, value] of Object.entries(credentials)) {
-    if (typeof value === 'string' && value.length > 4) {
-      masked[key] = `${value.slice(0, 4)}${'*'.repeat(Math.max(4, value.length - 4))}`;
-    } else {
-      masked[key] = '****';
-    }
-  }
-  return masked;
 }
 
 export default router;

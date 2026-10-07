@@ -100,7 +100,7 @@
 
 ### Shipping
 
-- [x] iCarry integration — rate calculation and tracking
+- [x] Carrier integrations on the provider catalog — Bosta, ShipBlu, Mylerz, Aramex (+ manual delivery): booking, label, quote, tracking, cancel; each stays "coming soon" until verified against its sandbox (iCarry removed)
 - [x] Aramex integration — rate calculation and tracking
 - [x] Egypt shipping zones — governorate and city structure
 - [x] Cash on delivery — flat-fee option

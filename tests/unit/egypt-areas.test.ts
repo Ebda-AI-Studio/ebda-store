@@ -1,51 +1,91 @@
+/**
+ * Egypt address mapping shared by the carrier adapters: governorate spellings in both languages
+ * resolve to one key, and `pickByName` never guesses between two candidates.
+ */
 import { describe, it, expect } from 'vitest';
 import {
   EGYPT_GOVERNORATES,
-  REGION,
-  areasForGovernorate,
-  findGovernorateByArea,
-  findGovernorate,
-} from '@force/shared';
+  canonicalGovernorate,
+  normalizeName,
+  pickByName,
+} from '@api/services/carriers/egypt-areas';
 
-describe('egypt-areas dataset', () => {
-  it('has exactly 27 governorates, matching REGION.governorates', () => {
+describe('governorates', () => {
+  it('lists the 27 governorates with unique keys', () => {
     expect(EGYPT_GOVERNORATES).toHaveLength(27);
-    expect(REGION.governorates).toHaveLength(27);
-    expect(EGYPT_GOVERNORATES.map(g => g.code)).toEqual(REGION.governorates.map(g => g.code));
+    expect(new Set(EGYPT_GOVERNORATES.map(g => g.key)).size).toBe(27);
   });
-  it('governorate codes are unique ISO 3166-2:EG style codes and names are non-empty', () => {
-    expect(new Set(REGION.governorates.map(g => g.code)).size).toBe(27);
-    for (const g of REGION.governorates) {
-      expect(g.code).toMatch(/^[A-Z]{1,3}$/);
-      expect(g.nameEn.trim()).not.toBe('');
-      expect(g.nameAr.trim()).not.toBe('');
-    }
-  });
-  it('every governorate has at least one area with non-empty EN and AR', () => {
+
+  it('no two governorates share a spelling (a shared alias would mis-route a parcel)', () => {
+    const seen = new Map<string, string>();
     for (const g of EGYPT_GOVERNORATES) {
-      expect(g.areas.length).toBeGreaterThan(0);
-      for (const a of g.areas) {
-        expect(a.en.trim()).not.toBe('');
-        expect(a.ar.trim()).not.toBe('');
+      for (const n of [g.en, g.ar, ...g.aliases]) {
+        const k = normalizeName(n);
+        expect(seen.get(k) ?? g.key, `${n} (${g.key}) vs ${seen.get(k)}`).toBe(g.key);
+        seen.set(k, g.key);
       }
     }
   });
-  it('has no duplicate area EN names within a governorate', () => {
-    for (const g of EGYPT_GOVERNORATES) {
-      const ens = g.areas.map(a => a.en);
-      expect(new Set(ens).size).toBe(ens.length);
-    }
+
+  it.each([
+    ['القاهرة', 'cairo'],
+    ['محافظة القاهرة', 'cairo'],
+    ['القاهره', 'cairo'],
+    ['Cairo', 'cairo'],
+    ['Al Qahirah', 'cairo'],
+    ['الجيزه', 'giza'],
+    ['Giza Governorate', 'giza'],
+    ['الاسكندريه', 'alexandria'],
+    ['الإسكندرية', 'alexandria'],
+    ['Alex', 'alexandria'],
+    ['El Kalioubia', null], // Bosta's own spelling is matched against ITS list (pickByName), not here
+    ['Kalyoubia', 'qalyubia'],
+    ['Sharkia', 'sharqia'],
+    ['بور سعيد', 'port-said'],
+    ['PortSaid', 'port-said'],
+    ['شمال سيناء', 'north-sinai'],
+    ['Asyut', 'assiut'],
+    ['مرسي مطروح', null],
+    ['Matruh', 'matrouh'],
+    ['', null],
+  ])('"%s" -> %s', (input, key) => {
+    expect(canonicalGovernorate(input)?.key ?? null).toBe(key);
   });
-  it('areasForGovernorate returns Cairo areas incl. Maadi', () => {
-    expect(areasForGovernorate('Cairo').some(a => a.en === 'Maadi')).toBe(true);
+});
+
+describe('normalizeName', () => {
+  it('folds alef / ya / ta marbuta variants, diacritics, tatweel and Arabic-Indic digits', () => {
+    expect(normalizeName('الإِسْكَنْدَرِيَّة')).toBe(normalizeName('الاسكندريه'));
+    expect(normalizeName('القـــاهرة')).toBe(normalizeName('القاهره'));
+    expect(normalizeName('التجمع ٣')).toBe(normalizeName('التجمع 3'));
   });
-  it('findGovernorateByArea maps Dokki → Giza', () => {
-    expect(findGovernorateByArea('Dokki')?.en).toBe('Giza');
+});
+
+describe('pickByName', () => {
+  const zones = [
+    { id: 1, name: 'التجمع الثالث - 3rd Settlement' },
+    { id: 2, name: 'التجمع الخامس - 5th Settlement' },
+    { id: 3, name: 'مدينة نصر - Nasr City' },
+    { id: 4, name: 'Nasr City Extension' },
+  ];
+  const names = (z: { name: string }) => [z.name];
+
+  it('matches either side of a bilingual label, exactly', () => {
+    expect(pickByName(zones, names, 'التجمع الخامس')?.id).toBe(2);
+    expect(pickByName(zones, names, '5th Settlement')?.id).toBe(2);
+    expect(pickByName(zones, names, 'nasr city')?.id).toBe(3);
   });
-  it('findGovernorate resolves by code, English and Arabic name', () => {
-    expect(findGovernorate('ALX')?.nameEn).toBe('Alexandria');
-    expect(findGovernorate('alexandria')?.code).toBe('ALX');
-    expect(findGovernorate('الإسكندرية')?.code).toBe('ALX');
-    expect(findGovernorate('Atlantis')).toBeUndefined();
+
+  it('a unique partial match is accepted, an ambiguous one is not guessed', () => {
+    expect(pickByName(zones, names, 'Extension')?.id).toBe(4);
+    expect(pickByName(zones, names, 'التجمع')).toBeNull(); // 2 candidates
+    expect(pickByName(zones, names, 'Settlement')).toBeNull(); // 2 candidates
+  });
+
+  it('an unknown or empty query is null (NEEDS_MAPPING), never the first item', () => {
+    expect(pickByName(zones, names, 'Atlantis')).toBeNull();
+    expect(pickByName(zones, names, '')).toBeNull();
+    expect(pickByName(zones, names, undefined)).toBeNull();
+    expect(pickByName([], names, 'Cairo')).toBeNull();
   });
 });
