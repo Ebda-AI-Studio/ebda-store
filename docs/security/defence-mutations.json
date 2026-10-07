@@ -1952,12 +1952,12 @@
       "test": "tests/unit/tenant-guard.test.ts"
     },
     {
-      "id": "tenant-guard-storeidmodels-reads-the-dmmf",
+      "id": "tenant-guard-storeidmodels-reads-the-schema-snapshot",
       "domain": "tenant / RLS",
       "tier": "unit",
-      "why": "the set of tenant models is derived from the generated schema (every model with a storeId column), so a new tenant table is guarded automatically; an empty set would leave every tenant model unguarded",
+      "why": "the set of tenant models is derived from the committed schema snapshot (every model with a storeId column; the snapshot is checked against the generated client by a unit test), so a new tenant table is guarded automatically; an empty set would leave every tenant model unguarded",
       "source": "packages/database/src/tenant-guard.ts",
-      "find": "  return Prisma.dmmf.datamodel.models\n    .filter(m => m.fields.some(f => f.name === 'storeId' && f.kind === 'scalar'))\n    .map(m => m.name);",
+      "find": "  return TENANT_GUARD_SCHEMA.filter(m => m.storeId).map(m => m.name);",
       "replace": "  return [];",
       "test": "tests/unit/tenant-guard-models.test.ts"
     }
