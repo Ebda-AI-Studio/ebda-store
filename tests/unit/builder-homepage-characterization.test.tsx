@@ -22,7 +22,12 @@ import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import path from 'node:path';
-import { resolveLayoutSettings, layoutToDefinition, type TemplateId } from '@force/shared';
+import {
+  resolveLayoutSettings,
+  layoutToDefinition,
+  reduceDocument,
+  type TemplateId,
+} from '@force/shared';
 import {
   LAYOUT_FIXTURES,
   TEMPLATES,
@@ -204,5 +209,57 @@ describe('builder render path stays out of the editor bundle', () => {
       .filter(f => /@dnd-kit|apps\/admin/.test(fs.readFileSync(path.join(dir, f), 'utf8')));
     expect(files.some(f => f.endsWith('PageRenderer.tsx'))).toBe(true);
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('PageRenderer: document-only sections and the editor canvas markers', () => {
+  const asStorefront = (t: TemplateId) =>
+    resolveLayoutSettings(JSON.parse(JSON.stringify(resolveLayoutSettings({}, t))));
+
+  it('image-text + newsletter render in document order on the PUBLIC page, with no editor markers', () => {
+    let def = layoutToDefinition(asStorefront('modern'));
+    def = reduceDocument(def, {
+      type: 'addSection',
+      list: 'template',
+      sectionType: 'image-text',
+      presetIndex: 0,
+      index: 1,
+    }).doc;
+    def = reduceDocument(def, {
+      type: 'addSection',
+      list: 'template',
+      sectionType: 'newsletter',
+      presetIndex: 0,
+    }).doc;
+    for (const t of TEMPLATES) {
+      const html = renderHome('default', 'A', t, 'ar', { definition: def });
+      expect(html).toContain('data-section="image-text"');
+      expect(html).toContain('حكايتنا');
+      expect(html.indexOf('data-section="hero"')).toBeLessThan(
+        html.indexOf('data-section="image-text"')
+      );
+      expect(html.indexOf('data-section="image-text"')).toBeLessThan(
+        html.indexOf('data-section="categories"')
+      );
+      expect(html).toContain('data-section="newsletter"');
+      expect(html).not.toContain('data-builder-id');
+    }
+  });
+
+  it('editor mode wraps every rendered section in a display:contents marker; hidden doc-only sections are skipped', () => {
+    let def = layoutToDefinition(asStorefront('modern'));
+    def = reduceDocument(def, {
+      type: 'addSection',
+      list: 'template',
+      sectionType: 'image-text',
+      presetIndex: 0,
+    }).doc;
+    const html = renderHome('default', 'A', 'modern', 'en', { definition: def, editorMode: true });
+    for (const id of ['hero', 'categories', 'new-arrivals', 'best-sellers', 'image-text-1'])
+      expect(html).toContain(`data-builder-id="${id}" style="display:contents"`);
+    def = reduceDocument(def, { type: 'setSectionHidden', id: 'image-text-1', hidden: true }).doc;
+    expect(renderHome('default', 'A', 'modern', 'en', { definition: def })).not.toContain(
+      'data-section="image-text"'
+    );
   });
 });
