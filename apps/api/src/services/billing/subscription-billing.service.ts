@@ -22,6 +22,13 @@
  *  - Out-of-order safe: `failed` only applies to a `pending` charge, so a late
  *    "failed" delivery after `succeeded` changes nothing. A late `succeeded`
  *    after `failed` DOES settle (the money was taken).
+ *  - Signup funnel (Ruling EBDA-FUNNEL-1..9): a `card_setup` row (amount 0)
+ *    saves a card with NOTHING charged; only a `card.saved`/`card.failed`
+ *    delivery may settle it, and a card event can never settle a money row.
+ *    The trial runs on Growth; `pendingPlanCode` + `billingInterval` hold the
+ *    plan chosen at signup, which the trial-end charge bills. In
+ *    `pay_at_trial_end` mode (no card during the trial) the trial end moves
+ *    the store into the dunning window with a pay-now notice instead.
  */
 import crypto from 'crypto';
 import { prisma, withStore, acrossStores, type Prisma } from '@force/database';
@@ -38,12 +45,14 @@ import {
   type BillingWebhookEvent,
   type ChargeResult,
 } from './types';
-import { getBillingProvider, getBillingProviderByName } from './index';
+import { getBillingProvider, getBillingProviderByName, resolveTrialCardMode } from './index';
 import {
   DUNNING_RETRY_DAYS,
   FREE_PLAN_CODE,
   GRANTED_PLAN_CODES,
   MAX_DUNNING_ATTEMPTS,
+  INSTAPAY_GRACE_DAYS,
+  TRIAL_DAYS,
   isGrantedPlan,
   addDays,
   addInterval,
@@ -54,6 +63,10 @@ import {
   type BillingInterval,
 } from './period';
 import { runBillingEffects, type BillingEffect } from './billing-notify';
+import { suspendForBilling } from './account.service';
+import { auditLog } from '../../middleware/security';
+import { instapayHandle, supportWhatsappUrl } from './manual-config';
+import { findReminderCandidates, sendDueReminder } from './reminders.service';
 
 type Tx = Prisma.TransactionClient;
 
@@ -77,6 +90,8 @@ export interface Outcome {
   failureReason?: string;
   raw?: unknown;
   cardToken?: string;
+  cardLast4?: string;
+  cardBrand?: string;
   customerRef?: string;
 }
 
@@ -99,7 +114,7 @@ interface LedgerRow {
 interface ClaimInput {
   storeId: string;
   subscriptionId?: string | null;
-  type: 'checkout' | 'renewal' | 'upgrade' | 'refund';
+  type: 'checkout' | 'renewal' | 'upgrade' | 'refund' | 'card_setup';
   planCode?: string | null;
   billingInterval?: BillingInterval | null;
   forPeriodEnd?: Date | null;
@@ -215,6 +230,10 @@ async function applySuccess(
   now: Date,
   effects: BillingEffect[]
 ): Promise<void> {
+  if (row.type === 'card_setup') {
+    await applyCardSaved(tx, row, o, now);
+    return;
+  }
   if (row.type === 'checkout' || row.type === 'upgrade') {
     if (!row.planCode) return;
     const interval = isInterval(row.billingInterval) ? row.billingInterval : 'monthly';
@@ -237,7 +256,7 @@ async function applySuccess(
       dunningAttempts: 0,
       nextRetryAt: null,
       provider: row.provider,
-      ...(token ? { providerPaymentMethodRef: token } : {}),
+      ...(token ? { providerPaymentMethodRef: token, billingMethod: 'card' } : {}),
       ...(o.customerRef ? { providerCustomerId: o.customerRef } : {}),
     };
     if (existing) {
@@ -247,6 +266,7 @@ async function applySuccess(
     }
     await applyPlan(tx, row.storeId, row.planCode);
     effects.push({ kind: 'plan_changed', storeId: row.storeId });
+    effects.push({ kind: 'payment_recorded', storeId: row.storeId });
     return;
   }
 
@@ -296,7 +316,44 @@ async function applySuccess(
       await applyPlan(tx, row.storeId, planCode);
       effects.push({ kind: 'plan_changed', storeId: row.storeId });
     }
+    effects.push({ kind: 'payment_recorded', storeId: row.storeId });
   }
+}
+
+/**
+ * A card saved with nothing charged (card_setup). The FIRST card saved while
+ * trialing starts the 14-day trial clock from now (Ruling EBDA-FUNNEL-4): the
+ * store could not go live before it, so the merchant never loses trial days to
+ * setup. A replacement card changes only the payment method.
+ */
+async function applyCardSaved(tx: Tx, row: LedgerRow, o: Outcome, now: Date): Promise<void> {
+  if (!o.cardToken) return; // settleInTx refuses a token-less card_setup success
+  const sub = await tx.storeSubscription.findUnique({ where: { storeId: row.storeId } });
+  if (!sub) {
+    logger.error(
+      { storeId: row.storeId, eventId: row.id },
+      '[billing] card saved for no subscription'
+    );
+    return;
+  }
+  const restartTrial = sub.status === 'trialing' && !sub.providerPaymentMethodRef;
+  const trialEndsAt = addDays(now, TRIAL_DAYS);
+  const last4 = o.cardLast4 && /^[0-9]{4}$/.test(o.cardLast4) ? o.cardLast4 : null;
+  await tx.storeSubscription.update({
+    where: { storeId: row.storeId },
+    data: {
+      provider: row.provider,
+      billingMethod: 'card',
+      providerPaymentMethodRef: encryption.encrypt(o.cardToken),
+      paymentMethodLast4: last4,
+      paymentMethodBrand: o.cardBrand ? o.cardBrand.slice(0, 32) : null,
+      paymentMethodSavedAt: now,
+      ...(o.customerRef ? { providerCustomerId: o.customerRef } : {}),
+      ...(restartTrial
+        ? { trialEndsAt, currentPeriodStart: now, currentPeriodEnd: trialEndsAt }
+        : {}),
+    },
+  });
 }
 
 async function applyFailure(tx: Tx, row: LedgerRow, effects: BillingEffect[]): Promise<void> {
@@ -355,6 +412,10 @@ export async function settleInTx(
   const row = await tx.billingEvent.findUnique({ where: { id: eventId } });
   if (!row) return { transitioned: false };
   const raw = (o.raw ?? undefined) as Prisma.InputJsonValue | undefined;
+  if (o.status === 'succeeded' && row.type === 'card_setup' && !o.cardToken) {
+    // "Saved" with no token saves nothing: the store must not pass the go-live gate.
+    o = { ...o, status: 'failed', failureReason: 'card_setup_without_token' };
+  }
   if (o.status === 'succeeded') {
     const upd = await tx.billingEvent.updateMany({
       where: { id: eventId, status: { in: ['pending', 'failed'] } },
@@ -390,6 +451,39 @@ async function settleCharge(eventId: string, o: Outcome, now: Date) {
   });
   await runBillingEffects(effects);
   return res;
+}
+
+/** Test seam: the pause between settle retries (ms per attempt). */
+export const settleRetry = { delayMs: 250, attempts: 3 };
+
+/**
+ * Settle a DEFINITIVE provider answer, retrying the DB write (Ruling EBDA-FUNNEL-6).
+ * The money already moved (or was declined), so the outcome must not be lost to
+ * one dropped connection. Settlement is idempotent (guarded transitions), so a
+ * retry after a commit whose ack was lost is a no-op. If every attempt fails the
+ * claimed row stays `pending` — still OWNED: no later run can re-send its key —
+ * and a P1 alert carries the provider reference for the operator / webhook.
+ */
+async function settleDefinitive(eventId: string, o: Outcome, now: Date) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await settleCharge(eventId, o, now);
+    } catch (err) {
+      if (attempt >= settleRetry.attempts) {
+        logger.error(
+          { err, eventId, outcome: o.status },
+          '[billing] settle failed after a provider answer'
+        );
+        void sendAlert({
+          level: 'p1',
+          title: 'Billing: provider answered but the ledger could not be settled',
+          body: `billing_events ${eventId}: provider said ${o.status} (ref ${o.providerRef ?? 'n/a'}). Row left pending; reconcile from /billing-events.`,
+        }).catch(() => undefined);
+        throw err;
+      }
+      await new Promise(r => setTimeout(r, settleRetry.delayMs * attempt));
+    }
+  }
 }
 
 // ───────────────────────── provider call (outside tx) ─────────────────────
@@ -446,7 +540,7 @@ async function chargeAndSettle(args: {
     );
     return { settled: 'pending' };
   }
-  await settleCharge(
+  await settleDefinitive(
     args.eventId,
     {
       status: res.status,
@@ -465,7 +559,8 @@ async function loadSub(storeId: string) {
   return withStore(storeId, tx => tx.storeSubscription.findUnique({ where: { storeId } }));
 }
 
-async function loadPayablePlan(planCode: string, interval: BillingInterval) {
+/** A public-or-hidden plan that can be paid for at `interval` (price set, not free/granted). */
+export async function loadPayablePlan(planCode: string, interval: BillingInterval) {
   const plan = await prisma.plan.findUnique({ where: { code: planCode } });
   if (!plan) throw new AppError(404, 'PLAN_NOT_FOUND', 'Plan not found');
   if (plan.code === FREE_PLAN_CODE || isGrantedPlan(plan.code)) {
@@ -562,12 +657,117 @@ export async function startCheckout(args: {
   }
 }
 
+// ─────────────────────── signup funnel: plan + card ───────────────────────
+
+/**
+ * Record the plan chosen at signup while the store is on its Growth trial. The
+ * trial-end charge bills `pendingPlanCode` at `billingInterval` (Ruling EBDA-FUNNEL-3).
+ * Only a public, priced plan is accepted (same check as checkout).
+ */
+export async function selectTrialPlan(args: {
+  storeId: string;
+  planCode: string;
+  interval: BillingInterval;
+}): Promise<{ planCode: string; interval: BillingInterval; amountMinor: number }> {
+  const { plan, price } = await loadPayablePlan(args.planCode, args.interval);
+  if (!plan.isPublic)
+    throw new AppError(400, 'PLAN_NOT_PURCHASABLE', 'This plan cannot be purchased');
+  const { count } = await withStore(args.storeId, tx =>
+    tx.storeSubscription.updateMany({
+      where: { storeId: args.storeId, status: 'trialing' },
+      data: { pendingPlanCode: plan.code, billingInterval: args.interval },
+    })
+  );
+  if (count === 0) {
+    throw new AppError(409, 'NOT_TRIALING', 'The plan can only be chosen here during the trial');
+  }
+  return { planCode: plan.code, interval: args.interval, amountMinor: price };
+}
+
+/**
+ * Start a hosted "save your card" page. NOTHING is charged: the ledger row is a
+ * `card_setup` of amount 0, settled only by a signed `card.saved`/`card.failed`
+ * delivery. Refused (409 CARD_SETUP_UNAVAILABLE) when the trial runs in
+ * `pay_at_trial_end` mode — the provider cannot save a card without a charge.
+ */
+export async function startCardSetup(args: {
+  storeId: string;
+  provider?: BillingProvider;
+  returnUrl?: string;
+}): Promise<{ redirectUrl: string; billingEventId: string }> {
+  const provider = args.provider ?? getBillingProvider();
+  if (resolveTrialCardMode(provider) !== 'card_on_file') {
+    throw new AppError(
+      409,
+      'CARD_SETUP_UNAVAILABLE',
+      'Saving a card without a charge is not available; you will pay at the end of the trial'
+    );
+  }
+  const [sub, store] = await Promise.all([
+    loadSub(args.storeId),
+    withStore(args.storeId, tx =>
+      tx.store.findUnique({
+        where: { id: args.storeId },
+        select: { id: true, settings: true, owner: { select: { email: true, firstName: true } } },
+      })
+    ),
+  ]);
+  if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  if (
+    !sub ||
+    !['trialing', 'active', 'past_due'].includes(sub.status) ||
+    isGrantedPlan(sub.planCode)
+  ) {
+    throw new AppError(
+      409,
+      'NO_BILLABLE_SUBSCRIPTION',
+      'This store has no subscription to save a card for'
+    );
+  }
+  if (!store.owner?.email) {
+    throw new AppError(409, 'NO_BILLING_EMAIL', 'The store owner has no email address');
+  }
+  const eventId = await claimEvent({
+    storeId: args.storeId,
+    subscriptionId: sub.id,
+    type: 'card_setup',
+    planCode: sub.pendingPlanCode ?? sub.planCode,
+    billingInterval: isInterval(sub.billingInterval) ? sub.billingInterval : 'monthly',
+    amountMinor: 0,
+    provider: provider.name,
+    idempotencyKey: `card_setup:${args.storeId}:${crypto.randomUUID()}`,
+  });
+  if (!eventId) throw new AppError(409, 'CARD_SETUP_IN_PROGRESS', 'Card setup already in progress');
+  const lang: 'ar' | 'en' =
+    (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'en' ? 'en' : 'ar';
+  try {
+    const out = await provider.createCardSetupSession({
+      merchantOrderId: eventId,
+      customer: { reference: args.storeId, email: store.owner.email, name: store.owner.firstName },
+      returnUrl: args.returnUrl ?? `${config.adminUrl}/onboarding?card=return`,
+      webhookUrl: `${config.apiUrl}/api/v1/webhooks/billing/${provider.name}`,
+      locale: lang,
+    });
+    await withStore(args.storeId, tx =>
+      tx.billingEvent.updateMany({
+        where: { id: eventId, status: 'pending' },
+        data: { raw: { providerSessionId: out.providerSessionId } },
+      })
+    );
+    return { redirectUrl: out.redirectUrl, billingEventId: eventId };
+  } catch (err) {
+    await markFailedUnlessSettled(eventId, `checkout_error: ${(err as Error).message}`);
+    logger.error({ err, storeId: args.storeId }, '[billing] createCardSetupSession failed');
+    throw new AppError(502, 'BILLING_PROVIDER_ERROR', 'Could not open the card page, try again');
+  }
+}
+
 // ───────────────────────────── renewal / dunning ──────────────────────────
 
 export type RenewalResult =
   | { action: 'skipped'; reason: string }
   | { action: 'charged'; status: 'succeeded' | 'failed' | 'pending'; eventId: string }
-  | { action: 'canceled' | 'no_payment_method_downgrade' };
+  | { action: 'canceled' | 'no_payment_method_downgrade' | 'suspended' };
 
 export async function renewSubscription(
   subscriptionId: string,
@@ -605,8 +805,13 @@ export async function renewSubscription(
       : periodEnd.getTime() <= now.getTime();
   if (!due) return { action: 'skipped', reason: 'not_due' };
 
-  // A trial that ended with no saved card moves to free (same shape as dunning).
-  if (trialEnd && (!sub.provider || !sub.providerPaymentMethodRef)) {
+  // InstaPay (manual) subscriptions are never charged by the provider: on the due
+  // day they go past_due, and after the grace period the store is suspended until
+  // a super-admin records the payment (Ruling EBDA-FUNNEL-11).
+  if (sub.billingMethod === 'instapay') return manualPayDue(sub, periodEnd, now);
+  const noCard = !sub.provider || !sub.providerPaymentMethodRef;
+  // A trial that ended with no saved card (and no payment method chosen) moves to free.
+  if (trialEnd && noCard) {
     const effects: BillingEffect[] = [];
     await withStore(sub.storeId, tx => downgradeToFree(tx, sub.storeId, 'trial_ended', effects));
     await runBillingEffects(effects);
@@ -672,6 +877,57 @@ export async function renewSubscription(
   return { action: 'charged', status: r.settled, eventId };
 }
 
+type SubRow = NonNullable<Awaited<ReturnType<typeof loadSub>>>;
+
+/**
+ * One step of the manual-payment policy (no money moves, so no ledger row):
+ *  - due day, not yet past_due  -> past_due, retry (= suspension) at due + grace;
+ *  - grace over, still unpaid   -> store suspended (`unpaid`), retry cleared.
+ * Both are compare-and-set on the row's state, so a second run the same day is
+ * a no-op. A recorded payment (manual or card) makes the row active again and
+ * lifts the suspension (reconcileStoreAccess).
+ */
+async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<RenewalResult> {
+  if (sub.status !== 'past_due') {
+    const { count } = await withStore(sub.storeId, tx =>
+      tx.storeSubscription.updateMany({
+        where: { id: sub.id, status: sub.status, billingMethod: 'instapay' },
+        data: {
+          status: 'past_due',
+          currentPeriodEnd: periodEnd,
+          nextRetryAt: addDays(periodEnd, INSTAPAY_GRACE_DAYS),
+        },
+      })
+    );
+    if (count === 1) {
+      await auditLog({
+        action: 'billing.manual_payment_overdue',
+        resourceType: 'store_subscription',
+        resourceId: sub.id,
+        storeId: sub.storeId,
+        details: { dueAt: periodEnd.toISOString(), graceDays: INSTAPAY_GRACE_DAYS },
+      });
+    }
+    return {
+      action: 'skipped',
+      reason: count === 1 ? 'awaiting_manual_payment' : 'already_advanced',
+    };
+  }
+  if (!sub.nextRetryAt || sub.nextRetryAt.getTime() > now.getTime()) {
+    return { action: 'skipped', reason: 'not_due' };
+  }
+  const { count } = await withStore(sub.storeId, tx =>
+    tx.storeSubscription.updateMany({
+      where: { id: sub.id, status: 'past_due', nextRetryAt: sub.nextRetryAt },
+      data: { nextRetryAt: null },
+    })
+  );
+  if (count === 0) return { action: 'skipped', reason: 'already_advanced' };
+  const suspended = await suspendForBilling(sub.storeId, 'unpaid', now);
+  await runBillingEffects([{ kind: 'store_suspended', storeId: sub.storeId, applied: suspended }]);
+  return { action: 'suspended' };
+}
+
 export interface CycleSummary {
   examined: number;
   charged: number;
@@ -679,6 +935,8 @@ export interface CycleSummary {
   canceled: number;
   errors: number;
   expiredCheckouts: number;
+  reminders: number;
+  suspended: number;
 }
 
 /** Subscription ids that need attention at `now` (renewal due, dunning retry due, cancellation due). */
@@ -698,7 +956,11 @@ export async function findDueSubscriptionIds(
             {
               status: { in: ['active', 'trialing'] },
               currentPeriodEnd: { lte: now },
-              OR: [{ provider: { not: null } }, { cancelAtPeriodEnd: true }],
+              OR: [
+                { provider: { not: null } },
+                { cancelAtPeriodEnd: true },
+                { billingMethod: 'instapay' },
+              ],
             },
             { status: 'trialing', trialEndsAt: { lte: now } },
             { status: 'past_due', nextRetryAt: { lte: now } },
@@ -721,7 +983,11 @@ export async function expireStaleCheckouts(now: Date): Promise<number> {
   const parts = await acrossStores(
     () =>
       prisma.billingEvent.updateMany({
-        where: { type: 'checkout', status: 'pending', createdAt: { lt: cutoff } },
+        where: {
+          type: { in: ['checkout', 'card_setup'] },
+          status: 'pending',
+          createdAt: { lt: cutoff },
+        },
         data: { status: 'failed', failureReason: 'abandoned' },
       }),
     { onStoreError: (storeId, err) => logger.error({ err, storeId }, '[billing] expiry failed') }
@@ -743,7 +1009,19 @@ export async function runBillingCycle(
     canceled: 0,
     errors: 0,
     expiredCheckouts: await expireStaleCheckouts(now),
+    reminders: 0,
+    suspended: 0,
   };
+  if (!only) {
+    for (const id of await findReminderCandidates(now)) {
+      try {
+        if ((await sendDueReminder(id, now)).sent) summary.reminders++;
+      } catch (err) {
+        summary.errors++;
+        logger.error({ err, subscriptionId: id }, '[billing] reminder threw');
+      }
+    }
+  }
   const ids = await findDueSubscriptionIds(now, only);
   for (const id of ids) {
     summary.examined++;
@@ -751,6 +1029,7 @@ export async function runBillingCycle(
       const r = await renewSubscription(id, now, provider);
       if (r.action === 'charged') summary.charged++;
       else if (r.action === 'skipped') summary.skipped++;
+      else if (r.action === 'suspended') summary.suspended++;
       else summary.canceled++;
     } catch (err) {
       summary.errors++;
@@ -986,6 +1265,17 @@ export async function applyWebhookEvent(
       logger.warn({ providerName, eventId: event.eventId }, '[billing] webhook for unknown order');
       return ignore('unknown_order');
     }
+    // A card event settles ONLY a card_setup row, and a charge event never does:
+    // otherwise a "card saved" delivery could activate a paid plan with no money,
+    // or a charge could be booked against a no-charge setup.
+    const isCardEvent = event.kind === 'card.saved' || event.kind === 'card.failed';
+    if (isCardEvent !== (row.type === 'card_setup')) {
+      logger.error(
+        { eventId: event.eventId, kind: event.kind, rowType: row.type },
+        '[billing] webhook kind does not match the ledger row'
+      );
+      return ignore('kind_mismatch');
+    }
     if (event.amountMinor !== null && event.amountMinor !== row.amountMinor) {
       logger.error(
         { eventId: event.eventId, expected: row.amountMinor, got: event.amountMinor },
@@ -997,11 +1287,14 @@ export async function applyWebhookEvent(
       tx,
       row.id,
       {
-        status: event.kind === 'charge.succeeded' ? 'succeeded' : 'failed',
+        status:
+          event.kind === 'charge.succeeded' || event.kind === 'card.saved' ? 'succeeded' : 'failed',
         providerRef: event.providerRef,
         failureReason: event.failureReason,
         raw: event.raw,
         cardToken: event.card?.token,
+        cardLast4: event.card?.last4,
+        cardBrand: event.card?.brand,
         customerRef: event.customerRef,
       },
       now,
@@ -1077,6 +1370,10 @@ export async function refundCharge(args: {
     : null;
   if (!charge || charge.type === 'refund')
     throw new AppError(404, 'CHARGE_NOT_FOUND', 'Charge not found');
+  if (charge.type === 'manual_payment' || charge.type === 'card_setup') {
+    // A manual payment was never taken by the gateway; a card setup took nothing.
+    throw new AppError(409, 'NOT_REFUNDABLE', 'Refund manual payments outside the gateway');
+  }
   if (charge.status !== 'succeeded' || !charge.providerRef) {
     throw new AppError(409, 'NOT_REFUNDABLE', 'Only a succeeded charge can be refunded');
   }
@@ -1234,13 +1531,83 @@ export async function listLedger(args: {
     raw: r.raw,
     createdAt: r.createdAt,
     /** A pending charge older than an hour: outcome unknown, reconcile manually. */
-    stuck: r.status === 'pending' && r.type !== 'checkout' && r.createdAt.getTime() < stuckBefore,
+    stuck:
+      r.status === 'pending' &&
+      r.type !== 'checkout' &&
+      r.type !== 'card_setup' &&
+      r.createdAt.getTime() < stuckBefore,
   }));
+}
+
+type BillingStateSub = {
+  status: string;
+  planCode: string;
+  pendingPlanCode: string | null;
+  billingInterval: string;
+  trialEndsAt: Date | null;
+  currentPeriodEnd: Date | null;
+  nextRetryAt: Date | null;
+  cancelAtPeriodEnd: boolean;
+  providerPaymentMethodRef: string | null;
+};
+
+/**
+ * When and what the store is charged next (null = nothing scheduled): the trial
+ * end bills the chosen plan, an active plan its renewal, past_due its retry.
+ * Pure, so the merchant page, onboarding and the super-admin table agree.
+ */
+export function nextChargeOf(
+  sub: BillingStateSub | null,
+  plans: Array<{ code: string; priceMonthlyMinor: number | null; priceYearlyMinor: number | null }>
+): { at: Date; planCode: string; amountMinor: number | null } | null {
+  if (
+    !sub ||
+    sub.cancelAtPeriodEnd ||
+    isGrantedPlan(sub.planCode) ||
+    sub.planCode === FREE_PLAN_CODE
+  ) {
+    return null;
+  }
+  const at =
+    sub.status === 'trialing'
+      ? (sub.trialEndsAt ?? sub.currentPeriodEnd)
+      : sub.status === 'active'
+        ? sub.currentPeriodEnd
+        : sub.status === 'past_due'
+          ? sub.nextRetryAt
+          : null;
+  if (!at) return null;
+  const planCode = sub.pendingPlanCode ?? sub.planCode;
+  const plan = plans.find(p => p.code === planCode);
+  const interval: BillingInterval = isInterval(sub.billingInterval)
+    ? sub.billingInterval
+    : 'monthly';
+  return { at, planCode, amountMinor: plan ? priceFor(plan, interval) : null };
 }
 
 /** Billing-cycle facts the merchant Billing page needs beyond the entitlements. */
 export async function getSubscriptionBillingState(storeId: string) {
   const sub = await loadSub(storeId);
+  const plans = await prisma.plan.findMany({
+    select: { code: true, priceMonthlyMinor: true, priceYearlyMinor: true },
+  });
+  let trialCardMode: 'card_on_file' | 'pay_at_trial_end' | null = null;
+  try {
+    trialCardMode = resolveTrialCardMode();
+  } catch {
+    trialCardMode = null;
+  }
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { status: true, billingSuspendedReason: true, billingSuspendedAt: true },
+  });
+  const pendingClaims = await withStore(storeId, tx =>
+    tx.manualPaymentClaim.count({ where: { storeId, status: 'pending' } })
+  );
+  const next = nextChargeOf(sub, plans);
+  const now = Date.now();
+  const daysLeft = next ? Math.ceil((next.at.getTime() - now) / 86_400_000) : null;
+  const handle = instapayHandle();
   return {
     billingInterval: sub?.billingInterval ?? 'monthly',
     pendingPlanCode: sub?.pendingPlanCode ?? null,
@@ -1248,5 +1615,111 @@ export async function getSubscriptionBillingState(storeId: string) {
     dunningAttempts: sub?.dunningAttempts ?? 0,
     hasPaymentMethod: !!sub?.providerPaymentMethodRef,
     billedByPlatform: !!sub?.provider,
+    /** card | instapay | null (not chosen). */
+    billingMethod: (sub?.billingMethod ?? null) as 'card' | 'instapay' | null,
+    /** InstaPay instructions; `handle` null = InstaPay not offered (not configured). */
+    instapay: {
+      available: !!handle,
+      handle,
+      reference: sub?.paymentReference ?? null,
+      amountMinor: next?.amountMinor ?? null,
+      pendingClaims,
+    },
+    /** Banner input: the next due date when it is within 7 days (or already past). */
+    dueSoon:
+      next && daysLeft !== null && daysLeft <= 7
+        ? { dueAt: next.at, daysLeft: Math.max(daysLeft, 0) }
+        : null,
+    overdue: sub?.status === 'past_due',
+    /** InstaPay: the store is suspended at this time if still unpaid. */
+    suspendAt:
+      sub?.billingMethod === 'instapay' && sub.status === 'past_due' ? sub.nextRetryAt : null,
+    /** wa.me link to Ebda support (no WhatsApp API); null when not configured. */
+    supportWhatsappUrl: supportWhatsappUrl(),
+    suspension: store?.billingSuspendedReason
+      ? { reason: store.billingSuspendedReason, at: store.billingSuspendedAt }
+      : null,
+    card: sub?.providerPaymentMethodRef
+      ? {
+          last4: sub.paymentMethodLast4,
+          brand: sub.paymentMethodBrand,
+          savedAt: sub.paymentMethodSavedAt,
+        }
+      : null,
+    trialEndsAt: sub?.status === 'trialing' ? sub.trialEndsAt : null,
+    nextCharge: nextChargeOf(sub, plans),
+    trialCardMode,
   };
+}
+
+/**
+ * Super-admin: every store's subscription with card + next charge (one row per
+ * store, newest store first). Cross-store, so it reads each store in its own
+ * scope (store_subscriptions is strict RLS).
+ */
+export async function listSubscriptionsForAdmin(
+  args: { status?: string; view?: 'due' | 'overdue' | 'suspended'; limit?: number } = {}
+) {
+  const take = Math.min(Math.max(args.limit ?? 100, 1), 500);
+  const plans = await prisma.plan.findMany({
+    select: { code: true, priceMonthlyMinor: true, priceYearlyMinor: true },
+  });
+  const parts = await acrossStores(
+    () =>
+      prisma.storeSubscription.findMany({
+        where: args.status ? { status: args.status as never } : {},
+        include: {
+          store: {
+            select: {
+              name: true,
+              slug: true,
+              status: true,
+              createdAt: true,
+              billingSuspendedReason: true,
+            },
+          },
+        },
+      }),
+    { onStoreError: (storeId, err) => logger.error({ err, storeId }, '[billing] sub list failed') }
+  );
+  const soon = Date.now() + 7 * 86_400_000;
+  return parts
+    .flatMap(p => p.value)
+    .filter(sub => {
+      if (args.view === 'suspended') return !!sub.store.billingSuspendedReason;
+      if (args.view === 'overdue') return sub.status === 'past_due';
+      if (args.view === 'due') {
+        const n = nextChargeOf(sub, plans);
+        return !!n && n.at.getTime() <= soon;
+      }
+      return true;
+    })
+    .sort((a, b) => b.store.createdAt.getTime() - a.store.createdAt.getTime())
+    .slice(0, take)
+    .map(sub => ({
+      storeId: sub.storeId,
+      storeName: sub.store.name,
+      storeSlug: sub.store.slug,
+      storeStatus: sub.store.status,
+      planCode: sub.planCode,
+      chosenPlanCode: sub.pendingPlanCode,
+      billingInterval: sub.billingInterval,
+      status: sub.status,
+      trialEndsAt: sub.status === 'trialing' ? sub.trialEndsAt : null,
+      card: sub.providerPaymentMethodRef
+        ? {
+            last4: sub.paymentMethodLast4,
+            brand: sub.paymentMethodBrand,
+            savedAt: sub.paymentMethodSavedAt,
+          }
+        : null,
+      provider: sub.provider,
+      billingMethod: sub.billingMethod,
+      paymentReference: sub.paymentReference,
+      suspendedReason: sub.store.billingSuspendedReason,
+      dunningAttempts: sub.dunningAttempts,
+      nextRetryAt: sub.nextRetryAt,
+      currentPeriodEnd: sub.currentPeriodEnd,
+      nextCharge: nextChargeOf(sub, plans),
+    }));
 }

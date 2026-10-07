@@ -33,6 +33,25 @@ export interface CheckoutRequest {
   locale?: 'ar' | 'en';
 }
 
+/**
+ * Save a card WITHOUT charging it (signup funnel, Ruling EBDA-FUNNEL-2). Only
+ * providers whose `capabilities.cardSetupWithoutCharge` is true implement it;
+ * the others throw `BillingProviderError(notCharged: true)`.
+ */
+export interface CardSetupRequest {
+  /** Our reference for this attempt (the `billing_events.id`, type `card_setup`). */
+  merchantOrderId: string;
+  customer: { reference: string; email: string; name?: string };
+  returnUrl: string;
+  webhookUrl: string;
+  locale?: 'ar' | 'en';
+}
+
+export interface BillingProviderCapabilities {
+  /** The provider can tokenize a card with NO money moving (no charge, no auth hold). */
+  cardSetupWithoutCharge: boolean;
+}
+
 export interface CheckoutResult {
   redirectUrl: string;
   providerSessionId: string | null;
@@ -77,6 +96,8 @@ export type BillingWebhookKind =
   | 'charge.failed'
   | 'refund.succeeded'
   | 'refund.failed'
+  | 'card.saved'
+  | 'card.failed'
   | 'ignored';
 
 /** A verified, typed provider event. */
@@ -111,6 +132,9 @@ export type HeaderBag = Record<string, string | string[] | undefined>;
 
 export interface BillingProvider {
   readonly name: BillingProviderName;
+  readonly capabilities: BillingProviderCapabilities;
+  /** Hosted page that ONLY saves a card (nothing charged). See `CardSetupRequest`. */
+  createCardSetupSession(req: CardSetupRequest): Promise<CheckoutResult>;
   /** Hosted page that saves a card and takes the first charge. */
   createCheckoutForSubscription(req: CheckoutRequest): Promise<CheckoutResult>;
   chargeSavedCard(req: ChargeRequest): Promise<ChargeResult>;

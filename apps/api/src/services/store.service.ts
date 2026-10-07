@@ -37,6 +37,7 @@ import {
 } from './plan-limit.service';
 import { storeDomainWhere } from '../lib/store-host';
 import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
+import { startSignupTrial } from './billing/trial';
 
 /**
  * Bust every public-cache entry that depends on a store record. The
@@ -345,6 +346,17 @@ export class StoreService {
     // more store (1 / 1 / 3). A super-admin acting as the platform operator is
     // not plan-bound.
     if (!opts.platformOperator) await assertOwnerMayCreateStore(ownerId);
+    // Signup funnel (Ruling EBDA-FUNNEL-7): a merchant-created store is never
+    // public and never Basic-active for free. It starts `inactive`; the FIRST
+    // store goes on the 14-day Growth trial (go-live then needs a card, see
+    // go-live-gate.ts), an additional one (only reachable on a multi-store plan)
+    // rides the owner's Business plan — the same shapes as self-serve onboarding.
+    // The platform operator keeps the old behaviour (active, default plan).
+    const merchantCreate = !opts.platformOperator
+      ? {
+          firstStore: (await prisma.store.count({ where: { ownerId, deletedAt: null } })) === 0,
+        }
+      : null;
 
     // Same class as the product-slug defect: an empty slugify result made the
     // de-duplication loop mint '-1'/'-2' store slugs. A store is even less
@@ -403,6 +415,12 @@ export class StoreService {
         domain: data.domain,
         ...(data.domain ? { domainStatus: 'active', domainVerifiedAt: new Date() } : {}),
         ownerId,
+        ...(merchantCreate
+          ? {
+              status: 'inactive' as const,
+              plan: merchantCreate.firstStore ? ('professional' as const) : ('enterprise' as const),
+            }
+          : {}),
         settings: data.settings || {
           currency: REGION.currency,
           locale: 'ar-EG',
@@ -436,6 +454,7 @@ export class StoreService {
     // `Store.taxEnabled`, ruling TAX-1); it is editable per store like any other.
     await withStore(store.id, async tx => {
       await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
+      if (merchantCreate?.firstStore) await startSignupTrial(tx, store.id);
       await tx.taxRate.create({
         data: {
           storeId: store.id,

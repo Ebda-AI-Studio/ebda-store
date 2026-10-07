@@ -29,6 +29,7 @@
  *                 tracked yet (follow-up).
  */
 
+import { upgradePlanFor } from '@force/shared';
 import { prisma, withStore, type Prisma } from '@force/database';
 import {
   PLAN_LIMIT_ERROR_CODE,
@@ -106,6 +107,8 @@ function limitError(
     used,
     delta,
     planCode: e.planCode,
+    // Upsell target (Ruling EBDA-FUNNEL-14): the cheapest public plan that fits.
+    upgradeTo: upgradePlanFor(limitKey, typeof limit === 'number' ? (used ?? 0) + delta : true),
     messageKey: planLimitMessageKey(limitKey),
     messageEn,
     messageAr,
@@ -120,25 +123,28 @@ function limitError(
  * owner cannot keep adding stores.
  */
 export async function assertOwnerMayCreateStore(ownerId: string): Promise<void> {
+  // The OLDEST live store is the billing parent: its plan sets the allowance
+  // (Ruling EBDA-FUNNEL-13; same rule as account.service ownerStoreAllowance).
+  // An additional store's own subscription never grants more stores, so a
+  // lapsed parent cannot be worked around through a child.
   const stores = await prisma.store.findMany({
     where: { ownerId, deletedAt: null },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     select: { id: true },
   });
   if (stores.length === 0) return;
-  let best = 0;
-  let planCode = 'unknown';
-  for (const s of stores) {
-    const e = await getEntitlements(s.id);
-    if (!e) continue;
-    const limit = e.limits.maxStores;
-    if (limit === null) return;
-    if (limit >= best) {
-      best = limit;
-      planCode = e.planCode;
-    }
-  }
-  if (stores.length + 1 > best) {
-    throw limitError({ planCode } as Entitlements, 'maxStores', best, stores.length, 1);
+  const e = await getEntitlements(stores[0].id);
+  const max = e?.limits.maxStores;
+  if (max === null) return;
+  const allowance = typeof max === 'number' && max >= 1 ? max : 1;
+  if (stores.length + 1 > allowance) {
+    throw limitError(
+      (e ?? { planCode: 'unknown' }) as Entitlements,
+      'maxStores',
+      allowance,
+      stores.length,
+      1
+    );
   }
 }
 
@@ -159,6 +165,7 @@ export async function assertAnalyticsTier(
     limit: e.limits.analyticsTier,
     required: min,
     planCode: e.planCode,
+    upgradeTo: upgradePlanFor('analyticsTier', min),
     messageEn,
     messageAr,
   });
@@ -193,7 +200,11 @@ export async function assertOrderAllowed(storeId: string): Promise<void> {
     e.status === 'canceled' ||
     (e.status === 'trialing' && (!e.trialEndsAt || e.trialEndsAt.getTime() <= Date.now()))
   ) {
-    throw new AppError(402, 'SUBSCRIPTION_REQUIRED', 'Choose a paid plan to accept new orders');
+    throw new AppError(402, 'SUBSCRIPTION_REQUIRED', 'Choose a paid plan to accept new orders', {
+      messageEn: 'Choose a paid plan to accept new orders',
+      messageAr: 'اختر باقة مدفوعة لاستقبال طلبات جديدة',
+      upgradeTo: null,
+    });
   }
   const limit = e.limits.maxOrdersPerMonth;
   if (limit === null) return;

@@ -415,3 +415,35 @@ export function planLimitMessage(
   };
   return (lang === 'ar' ? ar : en)[key];
 }
+
+const ANALYTICS_RANK: Record<string, number> = { basic: 0, standard: 1, advanced: 2 };
+
+/**
+ * The cheapest PUBLIC plan that satisfies a refused limit (upsell target for a
+ * 402): a numeric limit needs `need` units (null = unlimited passes), a boolean
+ * needs `true`, `analyticsTier` needs at least the named tier. Null when no
+ * public plan satisfies it (the UI then links to the plan page without a name).
+ */
+export function upgradePlanFor(
+  limitKey: string,
+  need: unknown
+): { code: string; nameEn: string; nameAr: string } | null {
+  const plans = [...LOCKED_PUBLIC_PLANS].sort(
+    (a, b) => (a.priceMonthlyMinor ?? Infinity) - (b.priceMonthlyMinor ?? Infinity)
+  );
+  for (const p of plans) {
+    const v = (p.limits as Record<string, unknown>)[limitKey];
+    let ok = false;
+    if (limitKey === 'analyticsTier') {
+      ok = (ANALYTICS_RANK[String(v)] ?? -1) >= (ANALYTICS_RANK[String(need)] ?? 99);
+    } else if (typeof v === 'boolean') {
+      ok = v === true;
+    } else if (v === null) {
+      ok = true;
+    } else if (typeof v === 'number') {
+      ok = typeof need === 'number' ? v >= need : false;
+    }
+    if (ok) return { code: p.code, nameEn: p.nameEn, nameAr: p.nameAr };
+  }
+  return null;
+}

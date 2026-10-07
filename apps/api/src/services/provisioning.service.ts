@@ -12,6 +12,7 @@ import {
 import { ensureAdminUser } from '../lib/definer';
 import { bustStoreCaches } from './store.service';
 import { syncSubscriptionFromLegacyPlan } from './plan-sync';
+import { startSignupTrial, type TrialChoice } from './billing/trial';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
@@ -49,6 +50,8 @@ export interface ProvisionStoreInput {
   status?: 'active' | 'inactive';
   /** Self-serve only: starts Growth trial inside the provisioning transaction. */
   growthTrial?: boolean;
+  /** Self-serve only: the plan + interval chosen at signup, billed at trial end. */
+  trialChoice?: TrialChoice;
   /** Initial storefront template; defaults to the schema default. */
   template?: 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
   storeNameAr?: string;
@@ -228,18 +231,7 @@ export class ProvisioningService {
         // Super-admin provisioning is platform-controlled, so a custom domain
         // here is NOT plan-gated (the operator is assigning the plan).
         await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
-        if (input.growthTrial) {
-          const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-          await tx.storeSubscription.update({
-            where: { storeId: store.id },
-            data: {
-              planCode: 'growth',
-              status: 'trialing',
-              trialEndsAt,
-              currentPeriodEnd: trialEndsAt,
-            },
-          });
-        }
+        if (input.growthTrial) await startSignupTrial(tx, store.id, input.trialChoice);
 
         // Default VAT (Ebda: `REGION.defaultVatBps` = 14%), seeded as an ACTIVE
         // editable rate. The charge itself stays gated on `Store.taxEnabled`

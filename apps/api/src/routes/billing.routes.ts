@@ -20,10 +20,20 @@ import {
   handleBillingWebhook,
   listStoreCharges,
   resumeSubscription,
+  selectTrialPlan,
+  startCardSetup,
   startCheckout,
 } from '../services/billing/subscription-billing.service';
+import { SIGNUP_PLAN_CODES } from '../services/billing/trial';
+import {
+  chooseInstapay,
+  createPaymentClaim,
+  listStoreClaims,
+} from '../services/billing/account.service';
+import { auditLog } from '../middleware/security';
+import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
-import { withStore } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { getUsageSummary } from '../services/plan-limit.service';
@@ -67,6 +77,10 @@ router.get(
           availablePlans,
           billing: await getSubscriptionBillingState(storeId),
           provider: getBillingProvider().name,
+          /** `inactive` until the go-live gate passes (onboarding / this page). */
+          storeStatus:
+            (await prisma.store.findUnique({ where: { id: storeId }, select: { status: true } }))
+              ?.status ?? null,
         },
       });
     } catch (err) {
@@ -130,6 +144,125 @@ router.get(
   }
 );
 
+/**
+ * PUT /trial-plan — the plan (and interval) billed when the Growth trial ends
+ * (signup funnel, Ruling EBDA-FUNNEL-3). Only while trialing.
+ */
+router.put('/trial-plan', ...guard, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = z
+      .object({
+        planCode: z.enum(SIGNUP_PLAN_CODES),
+        interval: z.enum(['monthly', 'yearly']),
+      })
+      .strict()
+      .parse(req.body);
+    res.json({
+      success: true,
+      data: await selectTrialPlan({ storeId: req.params.storeId, ...input }),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /card-setup — hosted "save your card" page; NOTHING is charged. `from`
+ * picks where the browser comes back (onboarding or this billing page); the
+ * return URL is built here from config, never taken from the client.
+ */
+router.post('/card-setup', ...guard, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { from } = z
+      .object({ from: z.enum(['onboarding', 'billing']).default('onboarding') })
+      .parse(req.body ?? {});
+    const returnUrl =
+      from === 'billing'
+        ? `${config.adminUrl}/stores/${req.params.storeId}/billing?card=return`
+        : `${config.adminUrl}/onboarding?card=return`;
+    const out = await startCardSetup({ storeId: req.params.storeId, returnUrl });
+    res.status(201).json({ success: true, data: out });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /payment-method — the merchant pays by InstaPay instead of a card (Ruling
+ * EBDA-FUNNEL-9). Returns the unique payment reference to write on transfers.
+ */
+router.post(
+  '/payment-method',
+  ...guard,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      z.object({ method: z.literal('instapay') })
+        .strict()
+        .parse(req.body);
+      const out = await chooseInstapay(req.params.storeId);
+      await auditLog({
+        action: 'billing.method_chosen',
+        userId: req.user!.userId,
+        storeId: req.params.storeId,
+        resourceType: 'store_subscription',
+        resourceId: req.params.storeId,
+        details: { method: 'instapay' },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: out });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/** GET /payment-claims — this store's "I paid" submissions and their review status. */
+router.get('/payment-claims', ...guard, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({ success: true, data: { claims: await listStoreClaims(req.params.storeId) } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /payment-claims — "I paid by InstaPay": the transfer reference (and an
+ * optional screenshot URL from the upload endpoint). Goes to the super-admin
+ * queue; it NEVER activates anything by itself.
+ */
+router.post(
+  '/payment-claims',
+  ...guard,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const input = z
+        .object({
+          payerReference: z.string().trim().min(4).max(64),
+          proofUrl: z.string().url().max(500).optional().nullable(),
+        })
+        .strict()
+        .parse(req.body);
+      const claim = await createPaymentClaim({ storeId: req.params.storeId, ...input });
+      await auditLog({
+        action: 'billing.payment_claimed',
+        userId: req.user!.userId,
+        storeId: req.params.storeId,
+        resourceType: 'manual_payment_claim',
+        resourceId: claim.id,
+        details: { amountMinor: claim.amountMinor, planCode: claim.planCode },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res
+        .status(201)
+        .json({ success: true, data: { claim: { id: claim.id, status: claim.status } } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 router.post('/change-plan', ...guard, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { planCode } = z.object({ planCode: z.string().min(1).max(64) }).parse(req.body);
@@ -183,15 +316,24 @@ router.post(
       );
       if (!row) throw new AppError(404, 'NOT_FOUND', 'No pending checkout');
       const ok = outcome === 'success';
+      const setup = row.type === 'card_setup';
       const { rawBody, headers } = StubBillingProvider.signedWebhook(
         {
           id: `stub_evt_${row.id}_${ok ? 'paid' : 'declined'}`,
-          type: ok ? 'charge.succeeded' : 'charge.failed',
+          type: setup
+            ? ok
+              ? 'card.saved'
+              : 'card.failed'
+            : ok
+              ? 'charge.succeeded'
+              : 'charge.failed',
           merchantOrderId: row.id,
           chargeId: `stub_ch_${row.id.slice(0, 12)}`,
           amountMinor: row.amountMinor,
           currency: 'EGP',
           token: ok ? `tok_stub_${row.storeId.slice(0, 8)}` : undefined,
+          last4: ok && setup ? '4242' : undefined,
+          brand: ok && setup ? 'visa' : undefined,
           failureReason: ok ? undefined : 'stub: card declined',
         },
         STUB_WEBHOOK_SECRET

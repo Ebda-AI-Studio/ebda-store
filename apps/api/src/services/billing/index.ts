@@ -85,4 +85,42 @@ export function assertBillingConfigAtBoot(env: Env = process.env): void {
   if ((env.BILLING_PROVIDER ?? '').trim().toLowerCase() === 'stub') {
     resolveBillingProviderName(env);
   }
+  // An explicit trial mode the provider cannot honour is a config error: stop at boot.
+  if ((env.BILLING_TRIAL_CARD_MODE ?? '').trim() !== '' && (env.BILLING_PROVIDER ?? '').trim()) {
+    resolveTrialCardMode(createBillingProvider(resolveBillingProviderName(env), env), env);
+  }
+}
+
+/**
+ * How the signup trial secures payment (Ruling EBDA-FUNNEL-2):
+ *  - `card_on_file`: a card is saved with NOTHING charged before the store may go
+ *    live; the trial-end job charges it on day 15.
+ *  - `pay_at_trial_end`: no card during the trial; at trial end the merchant pays
+ *    the chosen plan on the hosted checkout (dunning window, then downgrade).
+ *
+ * `BILLING_TRIAL_CARD_MODE` picks one explicitly; unset follows the provider's
+ * capability. `card_on_file` on a provider that cannot save a card without a
+ * charge is refused (it would block every go-live, or charge at signup).
+ */
+export type TrialCardMode = 'card_on_file' | 'pay_at_trial_end';
+
+export function resolveTrialCardMode(
+  provider: Pick<BillingProvider, 'name' | 'capabilities'> = getBillingProvider(),
+  env: Env = process.env
+): TrialCardMode {
+  const raw = (env.BILLING_TRIAL_CARD_MODE ?? '').trim().toLowerCase();
+  const capable = provider.capabilities.cardSetupWithoutCharge;
+  if (raw === '') return capable ? 'card_on_file' : 'pay_at_trial_end';
+  if (raw === 'pay_at_trial_end') return 'pay_at_trial_end';
+  if (raw === 'card_on_file') {
+    if (!capable) {
+      throw new Error(
+        `BILLING_TRIAL_CARD_MODE=card_on_file but provider "${provider.name}" cannot save a card without a charge`
+      );
+    }
+    return 'card_on_file';
+  }
+  throw new Error(
+    `Unknown BILLING_TRIAL_CARD_MODE "${raw}" (expected card_on_file|pay_at_trial_end)`
+  );
 }

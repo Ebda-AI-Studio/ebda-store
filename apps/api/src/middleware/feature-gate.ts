@@ -3,6 +3,18 @@ import { FeatureKey } from '@force/shared';
 import { featureService } from '../services/feature.service';
 import { resolvePublicStoreId } from '../utils/store-helpers';
 import logger from '../lib/logger';
+import { getEntitlements } from '../services/plan-entitlements';
+import { PLAN_LIMIT_ERROR_CODE, planLimitMessage, upgradePlanFor } from '@force/shared';
+
+/** Features whose availability comes from the plan's boolean limits. */
+const PLAN_GATED_FEATURES: Record<
+  string,
+  'apiAccess' | 'brandingRemoval' | 'abandonedCartAutomation'
+> = {
+  merchant_mcp: 'apiAccess',
+  remove_branding: 'brandingRemoval',
+  abandoned_cart: 'abandonedCartAutomation',
+};
 
 /**
  * Feature Gate Middleware — Fail Closed
@@ -65,6 +77,32 @@ export function requireFeature(featureKey: FeatureKey) {
 
       if (!enabled) {
         logger.debug({ storeId, featureKey }, '[requireFeature] Feature disabled');
+        // A feature the PLAN withholds is an upsell (402 + upgrade target), not
+        // a toggle the merchant switched off (Ruling EBDA-FUNNEL-14).
+        const planKey = PLAN_GATED_FEATURES[featureKey as string];
+        if (planKey) {
+          const e = await getEntitlements(storeId);
+          if (e && e.limits[planKey] !== true) {
+            const messageEn = planLimitMessage(planKey, false, 'en');
+            const messageAr = planLimitMessage(planKey, false, 'ar');
+            res.status(402).json({
+              success: false,
+              error: {
+                code: PLAN_LIMIT_ERROR_CODE,
+                message: messageEn,
+                details: {
+                  limitKey: planKey,
+                  limit: false,
+                  planCode: e.planCode,
+                  upgradeTo: upgradePlanFor(planKey, true),
+                  messageEn,
+                  messageAr,
+                },
+              },
+            });
+            return;
+          }
+        }
         res.status(403).json({
           success: false,
           error: 'Feature not available',

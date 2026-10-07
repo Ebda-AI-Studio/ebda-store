@@ -21,6 +21,7 @@ import {
   type BillingProvider,
   type BillingWebhookEvent,
   type BillingWebhookKind,
+  type CardSetupRequest,
   type ChargeRequest,
   type ChargeResult,
   type CheckoutRequest,
@@ -43,6 +44,9 @@ export interface StubWebhookPayload {
   currency?: string;
   failureReason?: string;
   token?: string;
+  /** Card display details on a `card.saved` delivery. */
+  last4?: string;
+  brand?: string;
   occurredAt?: string;
 }
 
@@ -52,13 +56,21 @@ function short(s: string): string {
 
 export class StubBillingProvider implements BillingProvider {
   readonly name = 'stub' as const;
+  readonly capabilities = { cardSetupWithoutCharge: true };
   declineAll = false;
   private failRemaining = 0;
   private pendingRemaining = 0;
   /** Every NEW charge the stub processed (replays of a key are not counted). */
   readonly chargeCalls: ChargeRequest[] = [];
+  /**
+   * EVERY charge request, replays included. A real gateway (Kashier has no
+   * idempotency header) would charge a replayed request again, so tests that
+   * prove "never sent twice" must count these, not `chargeCalls`.
+   */
+  readonly chargeRequests: ChargeRequest[] = [];
   readonly refundCalls: RefundRequest[] = [];
   readonly checkoutCalls: CheckoutRequest[] = [];
+  readonly cardSetupCalls: CardSetupRequest[] = [];
   private readonly charges = new Map<string, ChargeResult>();
   private readonly refunds = new Map<string, RefundResult>();
 
@@ -75,8 +87,10 @@ export class StubBillingProvider implements BillingProvider {
     this.failRemaining = 0;
     this.pendingRemaining = 0;
     this.chargeCalls.length = 0;
+    this.chargeRequests.length = 0;
     this.refundCalls.length = 0;
     this.checkoutCalls.length = 0;
+    this.cardSetupCalls.length = 0;
     this.charges.clear();
     this.refunds.clear();
   }
@@ -90,7 +104,17 @@ export class StubBillingProvider implements BillingProvider {
     };
   }
 
+  async createCardSetupSession(req: CardSetupRequest): Promise<CheckoutResult> {
+    this.cardSetupCalls.push(req);
+    const sep = req.returnUrl.includes('?') ? '&' : '?';
+    return {
+      redirectUrl: `${req.returnUrl}${sep}stub=1&merchantOrderId=${encodeURIComponent(req.merchantOrderId)}`,
+      providerSessionId: `stub_setup_${short(req.merchantOrderId)}`,
+    };
+  }
+
   async chargeSavedCard(req: ChargeRequest): Promise<ChargeResult> {
+    this.chargeRequests.push(req);
     const seen = this.charges.get(req.idempotencyKey);
     if (seen) return seen;
     this.chargeCalls.push(req);
@@ -156,7 +180,7 @@ export class StubBillingProvider implements BillingProvider {
       amountMinor: p.amountMinor ?? null,
       currency: p.currency ?? 'EGP',
       failureReason: p.failureReason,
-      card: p.token ? { token: p.token } : undefined,
+      card: p.token ? { token: p.token, last4: p.last4, brand: p.brand } : undefined,
       occurredAt: p.occurredAt ? new Date(p.occurredAt) : new Date(),
       raw: { ...p, token: undefined },
     };

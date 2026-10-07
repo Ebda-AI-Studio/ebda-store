@@ -18,6 +18,7 @@ vi.mock('@force/database', () => ({
     store: {
       findUnique: (a: unknown) => findUnique(a),
       findMany: async () => [], // owner holds no store yet -> plan gate passes
+      count: async () => 0, // first store -> signup trial (Ruling EBDA-FUNNEL-7)
       create: (a: unknown) => storeCreate(a),
     },
   },
@@ -29,6 +30,7 @@ vi.mock('@force/database', () => ({
     fn({
       storeSubscription: {
         upsert: vi.fn().mockResolvedValue({}),
+        update: vi.fn().mockResolvedValue({}),
         findUnique: vi.fn().mockResolvedValue(null),
       },
       taxRate: { create: vi.fn().mockResolvedValue({}) },

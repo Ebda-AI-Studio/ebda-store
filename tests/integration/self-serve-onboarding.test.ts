@@ -26,7 +26,8 @@ import setupGuideRoutes from '@api/routes/setup-guide.routes';
 import productRoutes from '@api/routes/product.routes';
 import publicRoutes from '@api/routes/public.routes';
 import storeRoutes from '@api/routes/store.routes';
-import { tenantContext } from '@api/middleware/tenant-context';
+import { tenantContext, billingRouteContext } from '@api/middleware/tenant-context';
+import billingRoutes from '@api/routes/billing.routes';
 import { errorHandler } from '@api/middleware/error-handler';
 import {
   clearCapturedMail,
@@ -61,6 +62,7 @@ function buildApp(): Express {
   app.use('/api/v1/onboarding', onboardingRoutes);
   app.use('/api/v1/stores', tenantContext, setupGuideRoutes);
   app.use('/api/v1/stores/:storeId/products', tenantContext, productRoutes);
+  app.use('/api/v1/stores/:storeId/billing', billingRouteContext, billingRoutes);
   app.use('/api/v1/stores', storeRoutes);
   app.use('/api/v1/public', publicRoutes);
   app.use(errorHandler);
@@ -101,6 +103,19 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
     const res = await api().post('/api/v1/auth/login').send({ email, password: PASSWORD });
     expect(res.status).toBe(200);
     return res.body.data.accessToken as string;
+  }
+  /** Signup funnel: save a card on the stub provider (nothing charged). */
+  async function saveCard(jwt: string, storeId: string) {
+    const setup = await api()
+      .post(`/api/v1/stores/${storeId}/billing/card-setup`)
+      .set(bearer(jwt))
+      .send({ from: 'onboarding' });
+    expect(setup.status).toBe(201);
+    const confirm = await api()
+      .post(`/api/v1/stores/${storeId}/billing/checkout/stub-confirm`)
+      .set(bearer(jwt))
+      .send({ merchantOrderId: setup.body.data.billingEventId, outcome: 'success' });
+    expect(confirm.status).toBe(200);
   }
   async function verifiedMerchant(tag: string) {
     const email = mkEmail(tag);
@@ -444,6 +459,14 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
         .send({ cod: true });
       expect(pay.status).toBe(200);
 
+      // Signup funnel: no card (and no InstaPay choice) -> the store cannot go live.
+      const refused = await api()
+        .post(`/api/v1/onboarding/stores/${storeId}/go-live`)
+        .set(bearer(jwt));
+      expect(refused.status).toBe(402);
+      expect(refused.body.error.code).toBe('PAYMENT_METHOD_REQUIRED');
+      await saveCard(jwt, storeId);
+
       const live = await api()
         .post(`/api/v1/onboarding/stores/${storeId}/go-live`)
         .set(bearer(jwt));
@@ -476,7 +499,9 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
         .send({ cod: false });
       expect(off.status).toBe(400);
       expect(off.body.error.code).toBe('NO_PAYMENT_METHOD');
-      // Force the invalid state and prove go-live refuses it.
+      // Force the invalid state and prove go-live refuses it (billing is secured
+      // first, so the refusal below is the storefront-payment check).
+      await saveCard(jwt, storeId);
       await prisma.paymentConfig.updateMany({ where: { storeId }, data: { isEnabled: false } });
       const live = await api()
         .post(`/api/v1/onboarding/stores/${storeId}/go-live`)
