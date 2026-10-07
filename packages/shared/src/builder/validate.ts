@@ -180,6 +180,11 @@ function validateSection(
         )
       );
     blockIds.add(b.id);
+    if (bd.propsSchema) {
+      const parsedBlock = bd.propsSchema.safeParse(b.settings);
+      if (!parsedBlock.success)
+        errors.push(...zodIssues(parsedBlock.error, `${path}/blocks/${j}/settings`));
+    }
     blockCounts.set(b.type, (blockCounts.get(b.type) ?? 0) + 1);
   });
   for (const bd of d.blocks)
@@ -300,7 +305,10 @@ export function validateDefinitionSync(input: unknown): ValidationResult {
   return { ok: errors.length === 0, definition: def, errors, warnings };
 }
 
-/** Collect catalogue refs held by product-carousel sections. */
+/** Section types whose settings hold catalogue refs (`categorySlug` / `manualProductIds`). */
+const REF_SECTION_TYPES = new Set(['product-carousel', 'featured-collection', 'product-spotlight']);
+
+/** Collect catalogue refs held by product sections and collection tiles. */
 export function collectRefs(def: PageDefinition): {
   categorySlugs: string[];
   productIds: string[];
@@ -308,7 +316,11 @@ export function collectRefs(def: PageDefinition): {
   const categorySlugs = new Set<string>();
   const productIds = new Set<string>();
   for (const n of def.sections) {
-    if (n.type !== 'product-carousel') continue;
+    if (n.type === 'collection-list')
+      for (const b of n.blocks ?? [])
+        if (typeof b.settings.categorySlug === 'string' && b.settings.categorySlug)
+          categorySlugs.add(b.settings.categorySlug);
+    if (!REF_SECTION_TYPES.has(n.type)) continue;
     if (typeof n.settings.categorySlug === 'string' && n.settings.categorySlug)
       categorySlugs.add(n.settings.categorySlug);
     if (Array.isArray(n.settings.manualProductIds))
@@ -327,7 +339,20 @@ export async function validateDefinition(
   if (refs.categorySlugs.length === 0 && refs.productIds.length === 0) return res;
   const found = await opts.resolveRefs(refs);
   res.definition.sections.forEach((n, i) => {
-    if (n.type !== 'product-carousel') return;
+    if (n.type === 'collection-list')
+      (n.blocks ?? []).forEach((b, j) => {
+        const s = b.settings.categorySlug;
+        if (typeof s === 'string' && s && !found.categorySlugs.has(s))
+          res.warnings.push(
+            issue(
+              'REF_NOT_FOUND',
+              `/sections/${i}/blocks/${j}/settings/categorySlug`,
+              `Category "${s}" is not in this store; the tile links to all products.`,
+              `الفئة "${s}" غير موجودة في هذا المتجر؛ ستفتح البطاقة كل المنتجات.`
+            )
+          );
+      });
+    if (!REF_SECTION_TYPES.has(n.type)) return;
     const slug = n.settings.categorySlug;
     if (typeof slug === 'string' && slug && !found.categorySlugs.has(slug))
       res.warnings.push(
