@@ -254,7 +254,13 @@ async function fetchLayoutSettings(storeId: string, draftToken?: string): Promis
       ? `${API_URL}/public/stores/${storeId}/layout?_layoutDraft=${encodeURIComponent(draftToken)}`
       : `${API_URL}/public/stores/${storeId}/layout`;
     // Drafts bypass cache (per-iteration unique). Committed layouts cache 60s.
-    const res = await fetch(url, draftToken ? { cache: 'no-store' } : { next: { revalidate: 60 } });
+    const res = await fetch(
+      url,
+      draftToken
+        ? { cache: 'no-store' }
+        : // Tagged so a layout save can purge it (api `bustStoreCaches` -> /api/revalidate).
+          { next: { revalidate: 60, tags: [`layout:${storeId}`] } }
+    );
     if (!res.ok) return { layout: resolveLayoutSettings({}) };
     const json = await res.json();
     return {

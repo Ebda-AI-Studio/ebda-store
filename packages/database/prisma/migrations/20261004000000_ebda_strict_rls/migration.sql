@@ -198,7 +198,19 @@ BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ebda_app') THEN
     CREATE ROLE ebda_app NOLOGIN;
   END IF;
-  ALTER ROLE ebda_app NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION;
+  -- Only normalise a PRE-EXISTING role that actually deviates. `CREATE ROLE` above
+  -- already yields NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION, and
+  -- on Neon the project owner is not a real superuser, so an unconditional ALTER
+  -- ("Only roles with the SUPERUSER attribute may change the SUPERUSER attribute")
+  -- made a fresh Neon project unmigratable. If the role deviates and the owner
+  -- cannot fix it, the ALTER still fails loudly: that is a real hazard.
+  IF EXISTS (
+    SELECT 1 FROM pg_roles
+    WHERE rolname = 'ebda_app'
+      AND (rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole OR rolreplication)
+  ) THEN
+    ALTER ROLE ebda_app NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION;
+  END IF;
 END
 $role$;
 
