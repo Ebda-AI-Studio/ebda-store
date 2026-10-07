@@ -1,0 +1,84 @@
+'use client';
+
+/**
+ * Heading row shared by the Phase 3 builder sections: title (and optional
+ * subheading) at the inline start, an optional link at the inline end, a
+ * hairline under both. Uses `font-display`, which is the pack's display face
+ * where a pack defines one (Dahab) and the body face everywhere else.
+ */
+import Link from 'next/link';
+
+export function SectionHeader({
+  title,
+  subtitle,
+  linkLabel,
+  linkHref,
+  editTitle,
+  editSubtitle,
+  editLink,
+  center = false,
+}: {
+  title?: string;
+  subtitle?: string;
+  linkLabel?: string;
+  linkHref?: string;
+  editTitle?: Record<string, string>;
+  editSubtitle?: Record<string, string>;
+  editLink?: Record<string, string>;
+  center?: boolean;
+}) {
+  if (!title && !subtitle && !linkLabel) return null;
+  return (
+    <div className={center ? 'mb-8 text-center sm:mb-10' : 'mb-8 sm:mb-10'}>
+      <div
+        className={`flex flex-wrap items-end gap-x-6 gap-y-2 ${center ? 'justify-center' : 'justify-between'}`}
+      >
+        <div className="min-w-0">
+          {title && (
+            <h2
+              className="font-display text-balance text-[clamp(1.5rem,1.1rem+1.4vw,2.35rem)] leading-tight text-foreground rtl:leading-[1.45]"
+              {...editTitle}
+            >
+              {title}
+            </h2>
+          )}
+          {subtitle && (
+            <p
+              className="mt-2 max-w-[56ch] text-pretty text-[15px] leading-relaxed text-muted-foreground"
+              {...editSubtitle}
+            >
+              {subtitle}
+            </p>
+          )}
+        </div>
+        {linkLabel && linkHref && !center && (
+          <Link
+            href={linkHref}
+            className="inline-flex min-h-[44px] items-center gap-1 text-sm text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            {...editLink}
+          >
+            {linkLabel}
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              className="h-3.5 w-3.5 rtl:-scale-x-100"
+              aria-hidden="true"
+            >
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+          </Link>
+        )}
+      </div>
+      <div
+        aria-hidden="true"
+        className={
+          center
+            ? 'mx-auto mt-5 h-px max-w-[180px] bg-gradient-to-r from-transparent via-primary/60 to-transparent'
+            : 'mt-5 h-px bg-gradient-to-r from-primary/50 via-border to-transparent rtl:bg-gradient-to-l'
+        }
+      />
+    </div>
+  );
+}

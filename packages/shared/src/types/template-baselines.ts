@@ -190,7 +190,10 @@ export function buildTemplateBaseline(identity: TemplateIdentity): StoreLayoutSe
 }
 
 /** Per-template identities. elegant = the calibrated base (no delta). */
-export const TEMPLATE_IDENTITIES: Record<Exclude<TemplateId, 'elegant'>, TemplateIdentity> = {
+export const TEMPLATE_IDENTITIES: Record<
+  Exclude<TemplateId, 'elegant' | 'dahab'>,
+  TemplateIdentity
+> = {
   // Modern — clean airy grid: rounded-square category tiles, caption below, framed.
   modern: {
     productCardSize: 'sm',
@@ -257,6 +260,53 @@ export const TEMPLATE_IDENTITIES: Record<Exclude<TemplateId, 'elegant'>, Templat
   },
 };
 
+/**
+ * Dahab (jewellery, builder Phase 3 pilot). Not an identity delta on the
+ * branded base: that base paints whole sections in `token:primary` /
+ * `token:card` blocks, which on Dahab's night surface would flood the page in
+ * gold. Dahab keeps every section on the night page token and lets the pack
+ * components carry the gold (hairlines, prices, buttons), so the base's
+ * section colours and typography colours are dropped here.
+ */
+export function buildDahabBaseline(): StoreLayoutSettings {
+  const b = clone(BASE_BRANDED_LAYOUT);
+  b.hero = {
+    enabled: true,
+    mode: 'slider',
+    autoplayMs: 6000,
+    slides: [],
+    presentation: 'full-bleed',
+  };
+  b.categories = {
+    enabled: true,
+    layout: 'grid',
+    captionPosition: 'below',
+    desktopColumns: 4,
+    mobileColumns: 2,
+    cardGap: 'normal',
+    cardSize: 'md',
+    cardShape: 'portrait',
+    showCardFrame: false,
+  };
+  for (const key of ['newArrivals', 'bestSellers'] as const) {
+    b[key] = {
+      enabled: true,
+      limit: key === 'newArrivals' ? 8 : 12,
+      cardGap: 'normal',
+      cardSize: 'md',
+      cardShape: 'square',
+      cardAspect: 'portrait',
+      showCardFrame: false,
+    };
+  }
+  b.testimonials = { enabled: true, minRating: 4, verifiedOnly: true };
+  b.trustStrip = {};
+  b.footer = {};
+  b.productCardDefaults = { cardSize: 'md', cardShape: 'square', showCardFrame: false };
+  b.sizing = { heroAspect: '16:9', productImageAspect: '3:4', categoryImageAspect: '3:4' };
+  return b;
+}
+
 /** The packaged per-template baselines. Stores with empty layout inherit by template. */
 export const TEMPLATE_LAYOUT_BASELINES: Record<TemplateId, StoreLayoutSettings> = {
   elegant: BASE_BRANDED_LAYOUT,
@@ -264,6 +314,7 @@ export const TEMPLATE_LAYOUT_BASELINES: Record<TemplateId, StoreLayoutSettings> 
   classic: buildTemplateBaseline(TEMPLATE_IDENTITIES.classic),
   minimal: buildTemplateBaseline(TEMPLATE_IDENTITIES.minimal),
   bold: buildTemplateBaseline(TEMPLATE_IDENTITIES.bold),
+  dahab: buildDahabBaseline(),
 };
 
 /** Safe lookup. Unknown id → the bare global default (back-compat behavior). */

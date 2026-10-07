@@ -9,6 +9,7 @@
  * skins (`TemplateId`: modern/elegant/classic/minimal/bold).
  */
 import type { PageDefinition, SectionNode } from './schema';
+import type { TemplateId } from '../types/store-theme';
 import { getSectionDefinition } from './registry';
 import { sectionFromPreset } from './adapter';
 import { uniqueSectionId } from './editor/document-reducer';
@@ -23,6 +24,8 @@ export interface TemplateFamily {
   sectionTypes: readonly string[];
   /** Section types it needs that are not in the registry yet (empty since Phase 2). */
   pendingSectionTypes: readonly string[];
+  /** The component skin (`stores.template`) built for this family, when it has its own. */
+  skin?: TemplateId;
 }
 
 export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
@@ -51,13 +54,20 @@ export const TEMPLATE_FAMILIES: readonly TemplateFamily[] = [
     labelAr: 'دهب',
     verticalEn: 'Jewellery and handmade',
     verticalAr: 'مجوهرات ومشغولات يدوية',
+    // Phase 3 pilot (2026-10-07): the first family built to completion, with
+    // its own component skin (`TemplateId` 'dahab') and theme defaults
+    // (`TEMPLATE_THEMES.dahab`). docs/ebda/templates/dahab.md.
+    skin: 'dahab',
     sectionTypes: [
+      'announcement',
       'header',
       'hero',
-      'product-carousel',
+      'collection-list',
+      'featured-collection',
       'image-text',
-      'brand-story',
+      'product-spotlight',
       'testimonials',
+      'trust-badges',
       'newsletter',
       'footer',
     ],

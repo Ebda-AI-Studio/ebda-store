@@ -20,9 +20,10 @@ interface ShipmentsTableProps {
 }
 
 const CARRIER_LABEL_KEYS: Record<string, string> = {
-  icarry: 'carrierNames.icarry',
-  aramex: 'carrierNames.aramex',
   bosta: 'carrierNames.bosta',
+  shipblu: 'carrierNames.shipblu',
+  mylerz: 'carrierNames.mylerz',
+  aramex: 'carrierNames.aramex',
   manual: 'carrierNames.manual',
 };
 
@@ -138,9 +139,10 @@ export function ShipmentsTable({
               className="px-3 py-1.5 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             >
               <option value="all">{t('filters.allCarriers')}</option>
-              <option value="icarry">{t('carrierNames.icarry')}</option>
-              <option value="aramex">{t('carrierNames.aramex')}</option>
               <option value="bosta">{t('carrierNames.bosta')}</option>
+              <option value="shipblu">{t('carrierNames.shipblu')}</option>
+              <option value="mylerz">{t('carrierNames.mylerz')}</option>
+              <option value="aramex">{t('carrierNames.aramex')}</option>
               <option value="manual">{t('carrierNames.manual')}</option>
             </select>
             <select

@@ -1,0 +1,342 @@
+// Dahab (دهب) demo catalogue — a sample Egyptian jewellery brand used to show
+// the Dahab template (builder Phase 3 pilot). SAMPLE CONTENT: product names,
+// prices and reviews are illustrative; the photographs are Unsplash-licensed
+// (scripts/dahab-demo/CREDITS.md). Prices are EGP, written as the merchant
+// would type them; gold prices reflect 18K / 21K at roughly 2026 Cairo rates.
+
+export const COLLECTIONS = [
+  { slug: 'rings', name: 'Rings', nameAr: 'خواتم', image: 'collection-rings' },
+  { slug: 'necklaces', name: 'Necklaces', nameAr: 'سلاسل', image: 'collection-necklaces' },
+  { slug: 'bracelets', name: 'Bracelets', nameAr: 'أساور', image: 'collection-bracelets' },
+  { slug: 'earrings', name: 'Earrings', nameAr: 'حلقان', image: 'collection-earrings' },
+];
+
+/** Arabic for option names / values (the CSV import carries English only). */
+export const OPTION_AR = {
+  Size: 'المقاس',
+  Karat: 'العيار',
+  Length: 'الطول',
+  Colour: 'اللون',
+};
+export const VALUE_AR = {
+  '18K': 'عيار 18',
+  '21K': 'عيار 21',
+  'Yellow gold': 'ذهب أصفر',
+  'White gold': 'ذهب أبيض',
+  '45 cm': '45 سم',
+  '50 cm': '50 سم',
+};
+
+const p = o => o;
+
+/**
+ * `variants`: rows of { options: {Name: Value}, price, compareAt? }.
+ * Products without variants carry `price` directly.
+ */
+export const PRODUCTS = [
+  // ── Rings ──────────────────────────────────────────────────────────────
+  p({
+    handle: 'solitaire-ring',
+    collection: 'rings',
+    name: 'Solitaire ring',
+    nameAr: 'خاتم سوليتير',
+    body: 'A single brilliant held in four claws on a slim 18K band. About 2.8 g, stamped by the Egyptian Assay Office.',
+    bodyAr:
+      'فص واحد لامع على أربع مخالب فوق دبلة رفيعة من الذهب عيار 18. وزن تقريبي 2.8 جرام، ومدموغ من مصلحة الدمغة والموازين.',
+    images: ['ring-solitaire-1', 'ring-solitaire-2'],
+    isNew: true,
+    featured: true,
+    variants: [
+      { options: { Colour: 'Yellow gold', Size: '16' }, price: 18750 },
+      { options: { Colour: 'Yellow gold', Size: '17' }, price: 18750 },
+      { options: { Colour: 'Yellow gold', Size: '18' }, price: 18950 },
+      { options: { Colour: 'White gold', Size: '16' }, price: 19400 },
+      { options: { Colour: 'White gold', Size: '17' }, price: 19400 },
+      { options: { Colour: 'White gold', Size: '18' }, price: 19600 },
+    ],
+  }),
+  p({
+    handle: 'braided-band-ring',
+    collection: 'rings',
+    name: 'Braided band ring',
+    nameAr: 'خاتم مجدول',
+    body: 'Three strands of gold braided by hand into one band. Comfortable enough to wear every day.',
+    bodyAr: 'ثلاث خيوط ذهب مجدولة يدوياً في دبلة واحدة. مريح للبس اليومي.',
+    images: ['ring-braided-1', 'ring-braided-2'],
+    variants: [
+      { options: { Karat: '18K' }, price: 12400 },
+      { options: { Karat: '21K' }, price: 14200 },
+    ],
+  }),
+  p({
+    handle: 'emerald-ring',
+    collection: 'rings',
+    name: 'Emerald ring',
+    nameAr: 'خاتم بفص زمرد',
+    body: 'A step-cut green stone set low in 21K gold, so it never catches on sleeves.',
+    bodyAr: 'فص أخضر بقطع مدرّج مركّب على ارتفاع منخفض في ذهب عيار 21 عشان ميشبكش في الهدوم.',
+    images: ['ring-emerald-1', 'ring-emerald-2'],
+    price: 21900,
+    compareAt: 24500,
+  }),
+  p({
+    handle: 'wedding-bands',
+    collection: 'rings',
+    name: 'Pair of wedding bands',
+    nameAr: 'دبلتين خطوبة',
+    body: 'Two classic court-profile bands, sized separately after you order. Engraving inside is free.',
+    bodyAr: 'دبلتين بقصّة كلاسيك، المقاس لكل واحدة بيتحدد بعد الطلب. الحفر من جوه مجاناً.',
+    images: ['ring-bands-1', 'ring-bands-2'],
+    variants: [
+      { options: { Karat: '18K' }, price: 21800 },
+      { options: { Karat: '21K' }, price: 25600 },
+    ],
+  }),
+  p({
+    handle: 'dome-ring',
+    collection: 'rings',
+    name: 'Sculpted dome ring',
+    nameAr: 'خاتم قبة',
+    body: 'A rounded dome of polished 21K gold. Bold on its own, quiet next to a band.',
+    bodyAr: 'قبة مدورة من ذهب عيار 21 ملمّع. لافت لوحده وهادي جنب دبلة.',
+    images: ['ring-bold-1', 'ring-bold-2'],
+    price: 15300,
+    isNew: true,
+  }),
+
+  // ── Necklaces ──────────────────────────────────────────────────────────
+  p({
+    handle: 'teardrop-pendant',
+    collection: 'necklaces',
+    name: 'Teardrop pendant necklace',
+    nameAr: 'سلسلة بدلاية دمعة',
+    body: 'A pierced teardrop on a fine curb chain, in 18K yellow gold.',
+    bodyAr: 'دلاية دمعة مفرّغة على سلسلة رفيعة من الذهب الأصفر عيار 18.',
+    images: ['necklace-teardrop-1', 'necklace-teardrop-2'],
+    isNew: true,
+    featured: true,
+    variants: [
+      { options: { Length: '45 cm' }, price: 13900 },
+      { options: { Length: '50 cm' }, price: 14450 },
+    ],
+  }),
+  p({
+    handle: 'cuban-chain',
+    collection: 'necklaces',
+    name: 'Cuban link chain',
+    nameAr: 'سلسلة كوبي',
+    body: 'Heavy, flat cuban links with a box clasp. About 9 g in 18K, 10 g in 21K.',
+    bodyAr: 'حلقات كوبي مبططة وتقيلة بقفل علبة. وزن تقريبي 9 جرام عيار 18 و10 جرام عيار 21.',
+    images: ['necklace-cuban-1', 'necklace-cuban-2'],
+    featured: true,
+    variants: [
+      { options: { Karat: '18K' }, price: 38500 },
+      { options: { Karat: '21K' }, price: 44200 },
+    ],
+  }),
+  p({
+    handle: 'crown-pendant',
+    collection: 'necklaces',
+    name: 'Crown pendant on rope chain',
+    nameAr: 'سلسلة حبل بدلاية تاج',
+    body: 'A small enamelled crown on a twisted rope chain, 21K.',
+    bodyAr: 'تاج صغير بالمينا على سلسلة حبل مجدولة، عيار 21.',
+    images: ['necklace-crown-1', 'necklace-crown-2'],
+    price: 16750,
+  }),
+  p({
+    handle: 'pearl-blossom-necklace',
+    collection: 'necklaces',
+    name: 'Pearl blossom necklace',
+    nameAr: 'سلسلة وردة اللولي',
+    body: 'Five mother-of-pearl petals with green stones at the heart. Made in small batches.',
+    bodyAr: 'خمس بتلات من الصدف وفصوص خضرا في القلب. بتتعمل بكميات صغيرة.',
+    images: ['necklace-flower-1', 'necklace-flower-2'],
+    isNew: true,
+    price: 19400,
+    featured: true,
+    badge: 'Limited',
+    badgeAr: 'كمية محدودة',
+  }),
+  p({
+    handle: 'coin-layered-necklace',
+    collection: 'necklaces',
+    name: 'Layered coin necklace',
+    nameAr: 'سلسلة عملة بطبقات',
+    body: 'Three fine chains at three lengths, finished with a stamped coin.',
+    bodyAr: 'تلات سلاسل رفيعة بأطوال مختلفة تنتهي بعملة مدموغة.',
+    images: ['necklace-coin-1', 'necklace-coin-2'],
+    price: 11600,
+  }),
+  p({
+    handle: 'fringe-collar',
+    collection: 'necklaces',
+    name: 'Fringe collar necklace',
+    nameAr: 'طوق ذهب بشراشيب',
+    body: 'A statement collar of 21K gold fringe, for weddings and big evenings.',
+    bodyAr: 'طوق لافت بشراشيب من الذهب عيار 21، للأفراح والسهرات الكبيرة.',
+    images: ['necklace-classic-1', 'necklace-classic-2'],
+    price: 52000,
+  }),
+
+  // ── Bracelets ──────────────────────────────────────────────────────────
+  p({
+    handle: 'evil-eye-bracelet',
+    collection: 'bracelets',
+    name: 'Evil-eye chain bracelet',
+    nameAr: 'إسورة عين',
+    body: 'A blue enamel eye on a fine 18K chain. Adjustable from 16 to 19 cm.',
+    bodyAr: 'عين بالمينا الزرقا على سلسلة رفيعة عيار 18. مقاسها بيتظبط من 16 لـ 19 سم.',
+    images: ['bracelet-eye-1', 'bracelet-eye-2'],
+    isNew: true,
+    price: 7450,
+    featured: true,
+  }),
+  p({
+    handle: 'stone-cuff',
+    collection: 'bracelets',
+    name: 'Open cuff with stones',
+    nameAr: 'إسورة مفتوحة بفصوص',
+    body: 'A polished open cuff set with three warm-toned stones.',
+    bodyAr: 'إسورة مفتوحة ملمّعة مركّب فيها تلات فصوص بألوان دافية.',
+    images: ['bracelet-cuff-1', 'bracelet-cuff-2'],
+    price: 14800,
+  }),
+  p({
+    handle: 'gourmette-bracelet',
+    collection: 'bracelets',
+    name: 'Gourmette chain bracelet',
+    nameAr: 'إسورة جورميه',
+    body: 'Chunky, rounded links in 21K gold with a lobster clasp.',
+    bodyAr: 'حلقات مدورة وتقيلة من ذهب عيار 21 بقفل كلّاب.',
+    images: ['bracelet-gourmet-1', 'bracelet-gourmet-2'],
+    price: 17900,
+    isNew: true,
+  }),
+  p({
+    handle: 'stone-bangles-set',
+    collection: 'bracelets',
+    name: 'Set of stone bangles',
+    nameAr: 'طقم غوايش بفصوص',
+    body: 'Two bangles paved with clear stones, 21K. Sold as a pair.',
+    bodyAr: 'غويشتين مرصّعين بفصوص شفافة، عيار 21. بيتباعوا مع بعض.',
+    images: ['bracelet-bangles-1', 'bracelet-bangles-2'],
+    price: 48000,
+  }),
+  p({
+    handle: 'fine-chain-bracelet',
+    collection: 'bracelets',
+    name: 'Fine chain bracelet',
+    nameAr: 'إسورة سلسلة رفيعة',
+    body: 'The lightest piece we make: a fine chain with a small engraved tag.',
+    bodyAr: 'أخف قطعة بنعملها: سلسلة رفيعة بتاج صغير ممكن نحفر عليه.',
+    images: ['bracelet-fine-1', 'bracelet-fine-2'],
+    price: 5900,
+  }),
+
+  // ── Earrings ───────────────────────────────────────────────────────────
+  p({
+    handle: 'drop-earrings',
+    collection: 'earrings',
+    name: 'Liquid drop earrings',
+    nameAr: 'حلق دمعة',
+    body: 'Hollow 18K drops, light enough for all day.',
+    bodyAr: 'دموع مجوّفة من الذهب عيار 18، خفيفة تلبسيها طول اليوم.',
+    images: ['earring-drop-1', 'earring-drop-2'],
+    isNew: true,
+    price: 9650,
+    featured: true,
+  }),
+  p({
+    handle: 'bold-hoops',
+    collection: 'earrings',
+    name: 'Bold hoop earrings',
+    nameAr: 'حلق دوائر عريض',
+    body: 'Thick, polished 21K hoops with a hinged post.',
+    bodyAr: 'دواير عريضة ملمّعة من ذهب عيار 21 بقفل مفصلي.',
+    images: ['earring-hoop-1', 'earring-hoop-2'],
+    price: 12300,
+  }),
+  p({
+    handle: 'twisted-hoops',
+    collection: 'earrings',
+    name: 'Twisted hoop earrings',
+    nameAr: 'حلق مجدول',
+    body: 'Rope-twisted hoops in 18K gold.',
+    bodyAr: 'حلق دواير مجدولة زي الحبل من الذهب عيار 18.',
+    images: ['earring-twist-1', 'earring-twist-2'],
+    price: 8450,
+  }),
+  p({
+    handle: 'ribbed-huggies',
+    collection: 'earrings',
+    name: 'Ribbed huggie earrings',
+    nameAr: 'حلق صغير مضلّع',
+    body: 'Small ribbed huggies that sit close to the lobe.',
+    bodyAr: 'حلق صغير مضلّع بيلف على شحمة الودن.',
+    images: ['earring-huggie-1', 'earring-huggie-2'],
+    price: 6900,
+  }),
+  p({
+    handle: 'hammered-studs',
+    collection: 'earrings',
+    name: 'Hammered wave studs',
+    nameAr: 'حلق مطروق',
+    body: 'Square studs hammered by hand, so no two pairs catch the light the same way.',
+    bodyAr: 'حلق مربع مطروق باليد، فمفيش جوزين بيعكسوا النور بنفس الطريقة.',
+    images: ['earring-wave-1', 'earring-wave-2'],
+    price: 7800,
+    isNew: true,
+  }),
+  p({
+    handle: 'chain-link-hoops',
+    collection: 'earrings',
+    name: 'Chain-link hoops',
+    nameAr: 'حلق حلقات سلسلة',
+    body: 'Hoops built from three oval links, 18K.',
+    bodyAr: 'حلق دواير معمول من تلات حلقات بيضاوي، عيار 18.',
+    images: ['earring-link-1', 'earring-link-2'],
+    price: 10200,
+    compareAt: 11500,
+  }),
+];
+
+/** Demo reviews (published, verified purchases of the demo orders). */
+export const REVIEWS = [
+  {
+    product: 'solitaire-ring',
+    name: ['Nour', 'Hassan'],
+    rating: 5,
+    body: 'الخاتم أحلى من الصور، والمقاس مظبوط. وصلني في علبة شيك جداً.',
+  },
+  {
+    product: 'evil-eye-bracelet',
+    name: ['Mariam', 'Adel'],
+    rating: 5,
+    body: 'جبتها هدية لماما وعجبتها جداً. التغليف كان حلو والتوصيل في يومين.',
+  },
+  {
+    product: 'cuban-chain',
+    name: ['Youssef', 'Samir'],
+    rating: 5,
+    body: 'الشغل نضيف والسلسلة تقيلة زي ما مكتوب. الدفع عند الاستلام سهّل الموضوع.',
+  },
+  {
+    product: 'drop-earrings',
+    name: ['Salma', 'Mostafa'],
+    rating: 4,
+    body: 'خفاف جداً ومريحين، لابساهم كل يوم.',
+  },
+  {
+    product: 'wedding-bands',
+    name: ['Ahmed', 'Farouk'],
+    rating: 5,
+    body: 'حفروا لنا التاريخ جوه الدبلتين من غير أي تكلفة زيادة.',
+  },
+  {
+    product: 'pearl-blossom-necklace',
+    name: ['Habiba', 'Kamal'],
+    rating: 5,
+    body: 'قطعة مختلفة عن أي حاجة في محلات الصاغة. كل اللي شافوها سألوا عليها.',
+  },
+];

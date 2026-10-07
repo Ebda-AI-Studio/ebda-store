@@ -721,49 +721,6 @@ router.get('/payment/error', async (req: Request, res: Response) => {
 // Shipping Carrier Webhooks
 // ==========================================
 
-/**
- * Verify a shared-secret bearer token on a carrier webhook. iCarry /
- * Aramex don't sign their payloads, so we configure a shared secret
- * in both control panels and check `Authorization: Bearer <secret>`
- * (or `X-Webhook-Secret`) on every inbound POST. Fail-closed: if the
- * env var isn't configured, refuse every webhook — better to lose a
- * tracking-status push than to accept arbitrary "delivered" forgeries.
- *
- * Uses timing-safe equality so a stopwatch attacker can't probe for
- * the secret one byte at a time.
- */
-function verifyCarrierWebhookSecret(req: Request, expected: string): boolean {
-  if (!expected) return false;
-  const auth = (req.headers.authorization as string | undefined) || '';
-  const fromBearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7) : '';
-  const fromHeader = (req.headers['x-webhook-secret'] as string | undefined) || '';
-  const presented = fromBearer || fromHeader;
-  if (!presented || presented.length !== expected.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(presented), Buffer.from(expected));
-}
-
-/**
- * POST /webhooks/shipping/icarry
- * Receive push notifications from iCarry
- */
-router.post('/shipping/icarry', express.json(), async (req: Request, res: Response) => {
-  if (!verifyCarrierWebhookSecret(req, config.icarryWebhookSecret)) {
-    logger.warn({ ip: req.ip }, '[WEBHOOK] iCarry webhook rejected — bad/missing secret');
-    res.sendStatus(401);
-    return;
-  }
-  try {
-    const headers = Object.fromEntries(
-      Object.entries(req.headers).map(([k, v]) => [k, String(v ?? '')])
-    );
-    await shippingCarrierService.processWebhook('icarry', req.body, headers);
-    res.sendStatus(200);
-  } catch (err) {
-    logger.error({ err }, '[WEBHOOK] iCarry shipping webhook error');
-    res.sendStatus(200); // Always 200 to prevent carrier retries
-  }
-});
-
 /** The JSON body of a carrier callback (the webhook router is mounted behind `express.raw`). */
 function carrierWebhookBody(req: Request): unknown {
   if (Buffer.isBuffer(req.body)) {
@@ -780,8 +737,10 @@ function carrierWebhookBody(req: Request): unknown {
  * POST /webhooks/shipping/bosta/:storeId/:token
  *
  * Bosta signs nothing, so the callback URL it is given per delivery carries this store's
- * secret token (the `webhookSecret` in the store's encrypted Bosta credentials). A wrong
- * token, an unknown store and a store without Bosta are all the same 401, so the response is
+ * secret token (the `webhookSecret` in the store's encrypted Bosta credentials) AND Bosta echoes
+ * a custom header Ebda set on that delivery (`webhookCustomHeaders`, a value derived from the
+ * secret): the service requires both (ruling PROVIDERS-12). A wrong token, a missing or wrong
+ * header, an unknown store and a store without Bosta are all the same 401, so the response is
  * no oracle; a valid call is always answered 200 (an unrecognised or repeated event is a
  * no-op), so Bosta does not retry what we have already taken in.
  *

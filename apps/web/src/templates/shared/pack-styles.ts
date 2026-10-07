@@ -204,6 +204,29 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     testimonialCard: 'border-t border-foreground/15 bg-transparent py-10',
     testimonialAuthor: 'text-sm font-light ui-caps-toggle tracking-[0.22em] text-foreground/80',
   },
+  // Dahab (builder Phase 3 pilot): its homepage sections and cards are its own
+  // components (templates/dahab); this row styles the shared surfaces that
+  // remain (section headings on CMS pages, the list-view row, brand story).
+  dahab: {
+    card: 'rounded-[var(--radius)] bg-card ring-1 ring-inset ring-foreground/[0.06] transition-colors duration-300 hover:ring-primary/40',
+    categoryFrame:
+      'rounded-t-[999px] rounded-b-[var(--radius)] bg-card ring-1 ring-inset ring-primary/25',
+    categoryCaption:
+      'font-display text-lg text-foreground group-hover:text-primary transition-colors',
+    productCardName: 'text-foreground leading-snug',
+    productCardPrice: 'text-primary tabular-nums',
+    productCardCta:
+      'whitespace-nowrap rounded-[var(--radius)] bg-primary px-5 py-3 text-sm font-medium text-primary-foreground hover:bg-accent transition-colors duration-300 min-h-[44px]',
+    sectionHeading:
+      'font-display text-[clamp(1.6rem,1.15rem+1.5vw,2.4rem)] leading-[1.15] text-foreground text-balance',
+    sectionSeeAll: 'text-sm text-primary hover:text-accent transition-colors',
+    heroOverlay: 'bg-gradient-to-t from-background via-background/30 to-transparent',
+    heroHeadline: 'font-display text-4xl sm:text-5xl md:text-6xl leading-[1.08]',
+    heroCta:
+      'rounded-[var(--radius)] bg-primary px-7 py-3.5 text-sm font-medium text-primary-foreground hover:bg-accent transition-colors min-h-[48px]',
+    testimonialCard: 'border-t border-primary/40 bg-transparent pt-6',
+    testimonialAuthor: 'text-sm text-muted-foreground',
+  },
 };
 
 export function getPackStyles(pack: TemplateId | undefined): PackStyles {

@@ -147,6 +147,8 @@ export default function ProductsClient({
     return fromUrl && allowed.has(fromUrl) ? fromUrl : 'default';
   });
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  // Dahab skin: shopper-chosen grid density on wide screens (3 or 4 across).
+  const [dahabCols, setDahabCols] = useState<3 | 4>(3);
   const [page, setPage] = useState(1);
   // How many products to load per page. The user can pick from a small
   // allow-list (12 / 24 / 48 / 96); we persist their choice to localStorage
@@ -600,7 +602,7 @@ export default function ProductsClient({
           {/* Header */}
           <div className="mb-8">
             <h1
-              className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
+              className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
               style={{ ...zoneStyle(plpHeadingZone, plpScale), ...plpHeadingColorStyle }}
             >
               {t(ctxEn, ctxAr)}
@@ -664,12 +666,17 @@ export default function ProductsClient({
                   bgTriplet={
                     filterSidebar?.bgColor
                       ? colorToHslTriplet(filterSidebar.bgColor, store.theme) || undefined
-                      : undefined
+                      : templateId === 'dahab'
+                        ? // Dahab: a night card panel, not a gold slab (merchant colour still wins).
+                          colorToHslTriplet('token:card', store.theme) || undefined
+                        : undefined
                   }
                   fgTriplet={
                     filterSidebar?.textColor
                       ? colorToHslTriplet(filterSidebar.textColor, store.theme) || undefined
-                      : undefined
+                      : templateId === 'dahab'
+                        ? colorToHslTriplet('token:foreground', store.theme) || undefined
+                        : undefined
                   }
                 />
                 {/* View Mode */}
@@ -784,9 +791,35 @@ export default function ProductsClient({
                 top-START, full-width pill CTA). 6 cols desktop / 3 tablet /
                 2 mobile per spec § 4.4. The per-pack visual treatment comes
                 from the `pack` prop (see templates/shared/pack-styles.ts). */}
+              {!isLoading && !error && viewMode === 'grid' && templateId === 'dahab' && (
+                <div className="mb-6 hidden items-center justify-end gap-2 text-[13px] text-muted-foreground lg:flex">
+                  <span id="plp-density-label">{t('Pieces per row', 'عدد القطع في الصف')}</span>
+                  <div
+                    role="group"
+                    aria-labelledby="plp-density-label"
+                    className="flex rounded-[var(--radius)] border border-border"
+                  >
+                    {([3, 4] as const).map(n => (
+                      <button
+                        key={n}
+                        type="button"
+                        aria-pressed={dahabCols === n}
+                        onClick={() => setDahabCols(n)}
+                        className={`h-9 w-10 tabular-nums transition-colors ${dahabCols === n ? 'text-primary' : 'hover:text-foreground'}`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {!isLoading && !error && viewMode === 'grid' && (
                 <div
-                  className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`}
+                  className={
+                    templateId === 'dahab'
+                      ? `grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-10 md:grid-cols-3 ${dahabCols === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`
+                      : `grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`
+                  }
                   dir={language === 'ar' ? 'rtl' : 'ltr'}
                 >
                   {products.map((p, i) => (

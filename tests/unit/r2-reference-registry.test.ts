@@ -104,8 +104,12 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'NotificationLog.metadata': 'delivery log metadata',
   'AbandonedCart.recoveredOrderId': 'order id (matched on "cover" in "recovered")',
   'ShippingCarrierConfig.settings': 'carrier API settings',
+  'ShippingCarrierConfig.credentialHints': 'non-secret credential display hints (set + last 4)',
+  'ShippingCarrierConfig.connectionTest':
+    'last Test connection result (ok, code, mode, time, fingerprint)',
   'Shipment.trackingUrl': 'carrier-hosted tracking page',
-  'Shipment.labelUrl': 'carrier-hosted label URL returned by Aramex/iCarry, never uploaded to R2',
+  'Shipment.labelUrl':
+    'carrier-hosted label URL returned by Aramex (and the other carriers), never uploaded to R2',
   'Shipment.pickupAddress': 'postal address',
   'Shipment.deliveryAddress': 'postal address',
   'Shipment.dimensions': 'parcel dimensions',

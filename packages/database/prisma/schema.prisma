@@ -835,6 +835,7 @@ enum StoreTemplate {
   minimal
   bold
   elegant
+  dahab
 }
 
 // ==========================================
@@ -1925,15 +1926,15 @@ enum ReturnStatus {
 // ==========================================
 
 model PaymentConfig {
-  id            String          @id @default(uuid())
-  storeId       String?         @map("store_id") // null = global default
+  id            String  @id @default(uuid())
+  storeId       String? @map("store_id") // null = global default
   /// Catalog provider code ('paymob', 'kashier', 'fawry', 'cod', 'instapay', ...), validated against
   /// packages/shared/src/providers/catalog.ts (was the closed enum PaymentProvider until 2026-10-07).
   provider      String
-  isEnabled     Boolean         @default(false) @map("is_enabled")
-  isDefault     Boolean         @default(false) @map("is_default")
-  displayName   String?         @map("display_name")
-  displayNameAr String?         @map("display_name_ar")
+  isEnabled     Boolean @default(false) @map("is_enabled")
+  isDefault     Boolean @default(false) @map("is_default")
+  displayName   String? @map("display_name")
+  displayNameAr String? @map("display_name_ar")
 
   // Encrypted credentials (stored encrypted)
   apiKey        String? @map("api_key")
@@ -2292,15 +2293,25 @@ model AiRecommendation {
 // ==========================================
 
 model ShippingCarrierConfig {
-  id          String   @id @default(uuid())
-  storeId     String   @map("store_id")
-  carrier     String // 'icarry' | 'aramex'
-  credentials String   @default("") // Encrypted JSON string
-  enabled     Boolean  @default(false)
-  isDefault   Boolean  @default(false) @map("is_default")
-  settings    Json     @default("{}") // pickup address, default weight, etc.
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id              String   @id @default(uuid())
+  storeId         String   @map("store_id")
+  /// Catalog carrier code ('bosta' | 'shipblu' | 'mylerz' | 'aramex'), validated against
+  /// packages/shared/src/providers/catalog.ts. ('manual' needs no row.)
+  carrier         String
+  /// AES-256-GCM ciphertext of {"sandbox": {field: value}, "live": {...}, "webhookSecret": "..."}
+  /// keyed by the catalog's field keys (a flat legacy map is still read; see carrier-credentials.ts).
+  credentials     String   @default("")
+  enabled         Boolean  @default(false)
+  isDefault       Boolean  @default(false) @map("is_default")
+  settings        Json     @default("{}") // pickup address, default weight, etc.
+  /// Active mode of the stored credentials (true = sandbox).
+  testMode        Boolean  @default(false) @map("test_mode")
+  /// Non-secret display data ({set,last4} / {set,value}) per mode and field.
+  credentialHints Json     @default("{}") @map("credential_hints")
+  /// Last Test connection {ok, code, mode, at, fingerprint}: the enable gate.
+  connectionTest  Json?    @map("connection_test")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
