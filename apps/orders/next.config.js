@@ -83,7 +83,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://*.onesignal.com; " +
               "font-src 'self' data: https://fonts.gstatic.com; " +
               "img-src 'self' data: https: blob:; " +
-              "connect-src 'self' https://api.ebda.app wss://api.ebda.app https://*.up.railway.app wss://*.up.railway.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com; " +
+              "connect-src 'self' https://api.ebda.app wss://api.ebda.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://eu.i.posthog.com https://eu-assets.i.posthog.com https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com; " +
               'frame-src https://onesignal.com https://*.onesignal.com; ' +
               "worker-src 'self' blob:; " +
               "manifest-src 'self'; " +
