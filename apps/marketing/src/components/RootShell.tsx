@@ -1,13 +1,19 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { BRAND } from '@force/shared/brand';
 import { type Locale } from '../lib/site';
+import '@/app/globals.css';
 
 /** BRAND's font URL plus IBM Plex Sans Arabic 700 for the Arabic display headlines. */
 const FONTS_URL = BRAND.fonts.googleFontsUrl.replace(
   'IBM+Plex+Sans+Arabic:wght@400;500',
   'IBM+Plex+Sans+Arabic:wght@400;500;700'
 );
-import '@/app/globals.css';
+// Fail the build loudly if BRAND's font URL changes shape and the 700 weight would silently vanish.
+if (!FONTS_URL.includes('IBM+Plex+Sans+Arabic:wght@400;500;700')) {
+  throw new Error(
+    'RootShell: could not add IBM Plex Sans Arabic 700 to BRAND.fonts.googleFontsUrl'
+  );
+}
 
 /** Brand tokens come from BRAND (single source of truth); everything else lives in globals.css. */
 const tokens = {
