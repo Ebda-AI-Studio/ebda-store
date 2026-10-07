@@ -2,29 +2,33 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { DEMO_STORES, TEMPLATE_IDS, type TemplateId } from '../lib/demo-stores';
+import { DEVICE_SHOTS, STORY_STRIP } from '../lib/device-shots';
 import type { Locale } from '../lib/site';
-import { DemoStore, Laptop, Phone, Tablet } from './Devices';
+import { Laptop, Phone, Screen, Tablet } from './Devices';
 
 const reducedMotion = () =>
   typeof window.matchMedia === 'function' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** Palettes the story phone cycles through on step 3 (products stay the same). */
-const STORY_PALETTES: TemplateId[] = ['lamma', 'jasmine', 'dahab', 'qamar', 'lamma'];
+/** Templates the story phone flips through on step 3 ("restyle it in one tap"). */
+const STORY_SWAPS: TemplateId[] = ['jasmine', 'dahab', 'qamar', 'souq', 'lamma'];
+
+/** How far the full-page strip can scroll inside the phone, as % of the strip's height. */
+const PHONE_VIEWPORT = { w: 390, h: 844 };
+const STRIP_MAX_PCT =
+  (1 - PHONE_VIEWPORT.h / PHONE_VIEWPORT.w / (STORY_STRIP.h / STORY_STRIP.w)) * 100;
 
 /**
  * The pinned scroll story. The server renders the finished state (step 4) so no-JS,
  * reduced-motion and crawlers see the whole store; on scroll we drive --p and data-step.
  */
 export function StoryScroll({
-  locale,
   title,
   steps,
   orderTitle,
   orderBody,
   phoneLabel,
 }: {
-  locale: Locale;
   title: string;
   steps: string[];
   orderTitle: string;
@@ -32,13 +36,13 @@ export function StoryScroll({
   phoneLabel: string;
 }) {
   const ref = useRef<HTMLElement>(null);
-  const [palette, setPalette] = useState<TemplateId>('lamma');
+  const [swap, setSwap] = useState<TemplateId | null>(null);
 
   useEffect(() => {
     const el = ref.current;
     if (!el || reducedMotion()) return;
     let raf = 0;
-    let lastPal: TemplateId = 'lamma';
+    let lastSwap: TemplateId | null = null;
     const update = () => {
       raf = 0;
       const r = el.getBoundingClientRect();
@@ -48,11 +52,16 @@ export function StoryScroll({
       el.style.setProperty('--p', p.toFixed(4));
       el.style.setProperty('--in', Math.min(1, p / 0.12).toFixed(4));
       el.dataset.step = String(step);
-      const pal =
-        step === 3 ? STORY_PALETTES[Math.min(4, Math.floor(((p - 0.5) / 0.28) * 5))] : 'lamma';
-      if (pal !== lastPal) {
-        lastPal = pal;
-        setPalette(pal);
+      // Steps 1-2: the real Lamma storefront scrolls inside the phone down to its products.
+      el.style.setProperty(
+        '--scroll',
+        (Math.min(1, Math.max(0, (p - 0.12) / 0.33)) * 0.62).toFixed(4)
+      );
+      // Step 3: the same phone flips through the other real templates.
+      const next = step === 3 ? STORY_SWAPS[Math.min(4, Math.floor(((p - 0.5) / 0.28) * 5))] : null;
+      if (next !== lastSwap) {
+        lastSwap = next;
+        setSwap(next === 'lamma' ? null : next);
       }
     };
     const onScroll = () => {
@@ -99,7 +108,42 @@ export function StoryScroll({
           <div className="story-stage" role="img" aria-label={phoneLabel}>
             <div className="story-glow" />
             <Phone className="story-phone">
-              <DemoStore tpl="lamma" palette={palette} locale={locale} sizes="140px" />
+              <div
+                className="story-screen"
+                style={{ '--strip-max': `${STRIP_MAX_PCT.toFixed(3)}%` } as React.CSSProperties}
+              >
+                <picture className="story-strip">
+                  <source type="image/avif" srcSet="/devices/lamma-story-600.avif" />
+                  <img
+                    src="/devices/lamma-story-600.webp"
+                    width={STORY_STRIP.w}
+                    height={STORY_STRIP.h}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </picture>
+                {'bar' in DEVICE_SHOTS.lamma && (
+                  <picture className="story-bar">
+                    <source type="image/avif" srcSet="/devices/lamma-bar-600.avif" />
+                    <img
+                      src="/devices/lamma-bar-600.webp"
+                      width={600}
+                      height={Math.round(
+                        (600 * DEVICE_SHOTS.lamma.bar.h) / DEVICE_SHOTS.lamma.bar.w
+                      )}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </picture>
+                )}
+                {STORY_SWAPS.filter(t => t !== 'lamma').map(t => (
+                  <div key={t} className="story-swap" data-on={swap === t ? '1' : undefined}>
+                    <Screen tpl={t} device="phone" sizes="300px" />
+                  </div>
+                ))}
+              </div>
               <div className="story-toast" aria-hidden="true">
                 <span className="toast-mark" />
                 <span>
@@ -150,13 +194,13 @@ export function TemplateShowcase({
         aria-label={`${devicesLabel}: ${DEMO_STORES[tpl].template[locale]}`}
       >
         <Laptop className="devices-laptop">
-          <DemoStore tpl={tpl} locale={locale} sizes="(min-width: 900px) 140px, 90px" />
+          <Screen tpl={tpl} device="laptop" sizes="(min-width: 700px) 620px, 92vw" />
         </Laptop>
         <Tablet className="devices-tablet">
-          <DemoStore tpl={tpl} locale={locale} sizes="110px" />
+          <Screen tpl={tpl} device="tablet" sizes="200px" />
         </Tablet>
         <Phone className="devices-phone">
-          <DemoStore tpl={tpl} locale={locale} sizes="80px" />
+          <Screen tpl={tpl} device="phone" sizes="140px" />
         </Phone>
       </div>
     </div>

@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
-import { BRAND } from '@force/shared/brand';
-import { DEMO_STORES, DEMO_UI, egp, type TemplateId } from '../lib/demo-stores';
-import type { Locale } from '../lib/site';
+import type { TemplateId } from '../lib/demo-stores';
+import { DEVICE_SHOTS } from '../lib/device-shots';
 
-/** Device frames drawn in CSS (bezel, glass, reflections); the screen content is real HTML. */
+/** Device frames drawn in CSS (bezel, glass, reflections); the screen shows a real capture. */
 export function Phone({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <div className={`dev-phone ${className}`.trim()}>
@@ -34,84 +33,45 @@ export function Laptop({ children, className = '' }: { children: ReactNode; clas
   );
 }
 
-function Photo({ img, sizes }: { img: string; sizes: string }) {
-  const set = (ext: string) => `/demo/${img}-240.${ext} 240w, /demo/${img}-480.${ext} 480w`;
+type DeviceKind = 'phone' | 'tablet' | 'laptop';
+const SRC_WIDTHS: Record<DeviceKind, [number, number]> = {
+  phone: [300, 600],
+  tablet: [420, 840],
+  laptop: [640, 1280],
+};
+
+/**
+ * A real storefront capture (apps/web, rendered at the device's true viewport) filling a
+ * device screen, scaled as a whole like a screenshot. `eager` only for the first frame in view.
+ */
+export function Screen({
+  tpl,
+  device,
+  sizes,
+  eager = false,
+}: {
+  tpl: TemplateId;
+  device: DeviceKind;
+  sizes: string;
+  eager?: boolean;
+}) {
+  const shot = DEVICE_SHOTS[tpl][device];
+  const [a, b] = SRC_WIDTHS[device];
+  const set = (ext: string) =>
+    `/devices/${tpl}-${device}-${a}.${ext} ${a}w, /devices/${tpl}-${device}-${b}.${ext} ${b}w`;
   return (
-    <picture>
+    <picture className="shot">
       <source type="image/avif" srcSet={set('avif')} sizes={sizes} />
       <img
-        src={`/demo/${img}-480.webp`}
+        src={`/devices/${tpl}-${device}-${b}.webp`}
         srcSet={set('webp')}
         sizes={sizes}
-        width={480}
-        height={480}
+        width={shot.w}
+        height={shot.h}
         alt=""
-        loading="lazy"
+        loading={eager ? 'eager' : 'lazy'}
         decoding="async"
       />
     </picture>
-  );
-}
-
-/**
- * A storefront in one of the five template families. `palette` restyles it without
- * changing the products (used by the scroll story); the grid reflows by container width.
- */
-export function DemoStore({
-  tpl,
-  locale,
-  palette,
-  sizes = '120px',
-}: {
-  tpl: TemplateId;
-  locale: Locale;
-  palette?: TemplateId;
-  sizes?: string;
-}) {
-  const s = DEMO_STORES[tpl];
-  const ui = DEMO_UI[locale];
-  return (
-    <div className="store" data-pal={palette ?? tpl} aria-hidden="true">
-      <div className="store-in">
-        <div className="st-url" dir="ltr">
-          {tpl}
-          {BRAND.domains.storeSuffix}
-        </div>
-        <div className="st-head st-logo">
-          <span className="st-mark">{s.name[locale].charAt(0)}</span>
-          <span className="st-name">{s.name[locale]}</span>
-          <svg className="st-cart" viewBox="0 0 24 24" width="16" height="16">
-            <path
-              d="M3 4h2l2.4 11h10.2L20 7H6.2M9 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm8 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-        <div className="st-hero st-logo">
-          <p>{s.tagline[locale]}</p>
-          <span className="st-btn">{ui.shop}</span>
-        </div>
-        <p className="st-sec">{ui.bestsellers}</p>
-        <ul className="st-grid">
-          {s.products.map((p, i) => (
-            <li key={p.img} style={{ '--i': i } as React.CSSProperties}>
-              <span className="st-img">
-                <Photo img={p.img} sizes={sizes} />
-              </span>
-              <span className="st-pname">{p.name[locale]}</span>
-              <span className="st-price">{egp(locale, p.price)}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="st-bar">
-          <span className="st-cod">{ui.cod}</span>
-          <span className="st-wa">{ui.order}</span>
-        </div>
-      </div>
-    </div>
   );
 }

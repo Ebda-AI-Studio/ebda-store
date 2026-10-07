@@ -36,6 +36,10 @@ Ruling R-EBDA-COPY-6 — the demo-store photos are openly licensed stock (CC0 / 
 
 Ruling R-EBDA-COPY-7 — provider logos are shown on light plates in their own colours to name the integrations (nominative use); sources in `apps/marketing/public/logos/SOURCES.md`. Cost if wrong: a provider asks for its logo to be removed and the plate falls back to its name.
 
+Ruling R-EBDA-COPY-8 — what is inside the device frames on ebda.app is the REAL storefront: the five example stores (one per template family, `applyTemplateFamily`) are seeded into a throw-away local Postgres, served by the real API as `ebda_app` and a production build of apps/web, and captured at true device viewports (phone 390x844 @3x, tablet 820x1180 @2x, laptop 1440x900 @2x), then scaled down whole. Pipeline: `npm run capture:stores -w apps/marketing` (`scripts/storefront-capture/`, needs a checkout with the builder families, currently PR #23). Captures are Arabic only (Arabic-first storefront) and shown on both locales. Evidence: Ahmad 2026-10-07 via the coordinator; pipeline run end to end 2026-10-07. Cost if wrong: the captures go stale when the templates change, until someone re-runs the pipeline.
+
+Ruling R-EBDA-COPY-9 — provider marks are shown transparent, in one cream ink, with brand colours on hover, and no tiles; the FawryPay mark is the official badge with its yellow ground removed (blue ink only). Supersedes the plates in R-EBDA-COPY-7. Evidence: Ahmad 2026-10-07. Cost if wrong: Fawry asks for the badge form and the file is swapped back.
+
 ## 2026-10-07 — Locked pricing (R-EBDA-PRICING-\*)
 
 Source: `docs/plans/2026-10-05-pricing-decisions.md`. Branch `feat/locked-pricing`.

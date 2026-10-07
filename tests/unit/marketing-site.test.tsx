@@ -129,6 +129,8 @@ describe('marketing honesty', () => {
         'aramex',
       ])
         expect(pay).toContain(`/logos/${logo}.webp`);
+      // Transparent marks in one ink: no tiles or cards behind them.
+      expect(pay).not.toMatch(/class="plate/);
       expect(pay).toMatch(/Cash on delivery|الدفع عند الاستلام/);
       expect(pay).toMatch(/Your own delivery|توصيل بنفسك/);
       expect(pay).toContain('mailto:ahlan@ebda.app');
@@ -152,10 +154,13 @@ describe('marketing honesty', () => {
     expect(s).toContain('EGP 13,410');
     expect(s).toContain('EGP 89,910');
   });
-  it('the five template families render with real product photos', () => {
+  it('the five template families show real storefront captures', () => {
     for (const id of ['souq', 'dahab', 'qamar', 'lamma', 'jasmine'])
       expect(en).toContain(`data-pal="${id}"`);
-    expect(en).toMatch(/\/demo\/souq-headphones-480\.webp/);
+    // Real storefront captures (apps/web) at true device sizes, never a hand-made mock.
+    for (const d of ['phone-600', 'tablet-840', 'laptop-1280'])
+      expect(en).toContain(`/devices/souq-${d}.webp`);
+    expect(en).toContain('/devices/lamma-story-600.webp');
     expect(en).not.toMatch(/lorem|placeholder/i);
   });
   it('prices use Western digits and ج.م on the Arabic page', () => {

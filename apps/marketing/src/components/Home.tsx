@@ -21,7 +21,7 @@ import { NileNight } from './NileNight';
 
 function ProviderIcon({ kind }: { kind: 'cash' | 'truck' }) {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" className="plate-icon">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" className="mark-icon">
       {kind === 'cash' ? (
         <path
           d="M3 7h18v10H3zM7 7a4 4 0 0 1-4 4m14-4a4 4 0 0 0 4 4M7 17a4 4 0 0 0-4-4m14 4a4 4 0 0 1 4-4M12 14.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"
@@ -70,7 +70,6 @@ export function Home({ locale }: { locale: Locale }) {
   const renderers: Record<SectionId, () => React.ReactNode> = {
     story: () => (
       <StoryScroll
-        locale={locale}
         title={c.story.title}
         steps={c.story.steps}
         orderTitle={c.story.orderTitle}
@@ -112,7 +111,7 @@ export function Home({ locale }: { locale: Locale }) {
               <dd>
                 <ul>
                   {(list as Provider[]).map(p => (
-                    <li key={p.name} className={p.dark ? 'plate plate-dark' : 'plate'}>
+                    <li key={p.name} className="mark" data-logo={p.logo ?? 'icon'}>
                       {p.logo ? (
                         <img
                           src={`/logos/${p.logo}.webp`}

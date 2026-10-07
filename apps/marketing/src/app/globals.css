@@ -549,222 +549,48 @@ html[lang='ar'] .section h2 {
   background: rgba(0, 0, 0, 0.22);
 }
 
-/* ---------- the example store inside a device (reflows by container width) ---------- */
+/* swatches on the template switcher: each example store's own theme colours */
 [data-pal='souq'] {
   --s-bg: #ffffff;
-  --s-fg: #14171c;
   --s-surface: #eef1f5;
-  --s-accent: #1d4ed8;
-  --s-on-accent: #fff;
-  --s-price: #1d4ed8;
-  --s-r: 8px;
-  --s-r-btn: 6px;
+  --s-accent: #1f56d6;
 }
 [data-pal='dahab'] {
-  --s-bg: #0e0d0b;
-  --s-fg: #f1e8d6;
-  --s-surface: #1d1a14;
+  --s-bg: #120f0b;
+  --s-surface: #231d16;
   --s-accent: #c9a25f;
-  --s-on-accent: #0e0d0b;
-  --s-price: #d8b878;
-  --s-r: 2px;
-  --s-r-btn: 2px;
 }
 [data-pal='qamar'] {
   --s-bg: #f6f1ea;
-  --s-fg: #2a221d;
   --s-surface: #e9dfd2;
   --s-accent: #a8462a;
-  --s-on-accent: #fff;
-  --s-price: #a8462a;
-  --s-r: 0px;
-  --s-r-btn: 0px;
 }
 [data-pal='lamma'] {
   --s-bg: #fff4df;
-  --s-fg: #3a2210;
   --s-surface: #ffd98a;
   --s-accent: #c2410c;
-  --s-on-accent: #fff;
-  --s-price: #b23c0b;
-  --s-r: 16px;
-  --s-r-btn: 999px;
 }
 [data-pal='jasmine'] {
   --s-bg: #fbf1f2;
-  --s-fg: #3b282c;
   --s-surface: #f3dde1;
   --s-accent: #a9435d;
-  --s-on-accent: #fff;
-  --s-price: #a9435d;
-  --s-r: 14px;
-  --s-r-btn: 999px;
 }
-.store,
-.st-hero,
-.st-mark,
-.st-btn,
-.st-img {
-  transition:
-    background-color 0.5s var(--ease),
-    color 0.5s var(--ease),
-    border-radius 0.5s var(--ease);
-}
-.store {
-  height: 100%;
-  background: var(--s-bg);
-  color: var(--s-fg);
-  overflow: hidden;
-}
-.store-in {
-  display: flex;
-  flex-direction: column;
-  gap: 0.7em;
-  height: 100%;
-  padding: 0.8em 0.9em 1em;
-  font-size: clamp(6px, 4.4cqi, 13px);
-  line-height: 1.35;
-}
-.dev-phone .store-in {
-  padding-top: 3.4em;
-}
-.st-url {
-  align-self: center;
-  font-family: var(--font-sans);
-  font-size: 0.72em;
-  padding: 0.2em 1.1em;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--s-fg) 8%, transparent);
-  opacity: 0.75;
-}
-.dev-phone .st-url {
-  display: none;
-}
-.st-head {
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
-}
-.st-mark {
-  display: grid;
-  place-items: center;
-  width: 2em;
-  height: 2em;
-  border-radius: calc(var(--s-r) * 0.6 + 2px);
-  background: var(--s-accent);
-  color: var(--s-on-accent);
-  font-weight: 700;
-}
-.st-name {
-  flex: 1;
-  font-weight: 700;
-  font-size: 1.15em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.st-cart {
-  width: 1.4em;
-  height: 1.4em;
-}
-.st-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6em;
-  padding: 0.9em 1em;
-  border-radius: var(--s-r);
-  background: var(--s-surface);
-}
-.st-hero p {
-  margin: 0;
-  font-weight: 600;
-}
-.st-btn {
-  padding: 0.35em 0.9em;
-  border-radius: var(--s-r-btn);
-  background: var(--s-accent);
-  color: var(--s-on-accent);
-  font-size: 0.85em;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.st-sec {
-  margin: 0;
-  font-size: 0.9em;
-  font-weight: 700;
-  opacity: 0.75;
-}
-.st-grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.7em;
-}
-/* a laptop screen is always "desktop": four products a row, desktop-sized type */
-.dev-laptop .store-in {
-  font-size: clamp(5px, 2.3cqi, 13px);
-}
-.dev-laptop .st-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-.st-img {
+
+/* ---------- real storefront captures inside the device screens ---------- */
+.shot {
   display: block;
-  aspect-ratio: 1;
-  overflow: hidden;
-  border-radius: var(--s-r);
-  background: var(--s-surface);
+  width: 100%;
+  height: 100%;
 }
-.st-img img {
+.shot img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: top center;
 }
-.st-pname {
-  display: block;
-  margin-top: 0.35em;
-  font-size: 0.92em;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.st-price {
-  display: block;
-  color: var(--s-price);
-  font-family: var(--font-sans);
-  font-size: 0.9em;
-  font-weight: 700;
-}
-html[lang='ar'] .st-price {
-  font-family: var(--font-ar);
-}
-.st-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
-  margin-top: auto;
-}
-.st-cod {
-  padding: 0.2em 0.7em;
-  border: 1px solid color-mix(in srgb, var(--s-fg) 35%, transparent);
-  border-radius: 999px;
-  font-size: 0.75em;
-  white-space: nowrap;
-}
-.st-wa {
-  flex: 1;
-  padding: 0.55em;
-  border-radius: var(--s-r-btn);
-  background: #136c3a;
-  color: #fff;
-  text-align: center;
-  font-size: 0.9em;
-  font-weight: 700;
-  white-space: nowrap;
+.dev-screen {
+  background: #0d0e0f;
 }
 
 /* ---------- story: the store assembles in a phone as you scroll ---------- */
@@ -867,25 +693,42 @@ html[lang='ar'] .story h2 {
 .story:not([data-live]) .story-phone {
   --w: min(300px, 70vw);
 }
-/* assembly: logo (step 1), products drop in (step 2), the toast (step 4) */
-.story-phone .st-logo,
-.story-phone .st-sec,
-.story-phone .st-bar,
-.story-phone .st-grid li {
-  transition:
-    opacity 0.5s var(--ease),
-    transform 0.8s var(--ease);
+/* the real Lamma storefront scrolls inside the phone (steps 1-2), then flips templates (3) */
+.story-screen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
-.story-phone .st-grid li {
-  transition-delay: calc(var(--i) * 90ms);
+.story-strip {
+  position: absolute;
+  inset: 0 0 auto;
 }
-.story[data-step='0'] .story-phone .st-logo {
+.story-strip img {
+  display: block;
+  width: 100%;
+  height: auto;
+  transform: translateY(calc(var(--scroll, 0) * -1 * var(--strip-max, 0%)));
+  will-change: transform;
+}
+.story-bar {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 2;
+}
+.story-bar img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.story-swap {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
   opacity: 0;
-  transform: translateY(-12px);
+  transition: opacity 0.45s var(--ease);
 }
-.story:is([data-step='0'], [data-step='1']) .story-phone :is(.st-sec, .st-bar, .st-grid li) {
-  opacity: 0;
-  transform: translateY(-48px) scale(0.94);
+.story-swap[data-on] {
+  opacity: 1;
 }
 .story-toast {
   position: absolute;
@@ -1545,37 +1388,60 @@ html[lang='ar'] .legal-doc p {
   border-top: 1px solid var(--line);
 }
 
-/* ---------- provider logo plates ---------- */
-.rails li.plate {
+/* ---------- provider marks: transparent, monochrome, one baseline ---------- */
+.rails ul {
+  align-items: center;
+  gap: 18px 36px;
+}
+.rails li.mark {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 56px;
-  padding: 12px 20px;
+  padding: 0;
   border: 0;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #ffffff, #e9ecea);
-  color: #1b1d1f;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 8px 20px -10px rgba(0, 0, 0, 0.7);
+  background: none;
+  box-shadow: none;
+  color: #d9d4ca;
+  font-weight: 600;
 }
-.rails li.plate-dark {
-  background: linear-gradient(180deg, #2a2d2f, #16181a);
-  color: var(--fg);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 8px 20px -10px rgba(0, 0, 0, 0.7);
-}
-.plate img {
+.mark img {
   display: block;
-  height: 28px;
+  height: 26px;
   width: auto;
-  max-width: 120px;
+  max-width: 140px;
   object-fit: contain;
+  /* one cream ink for every mark; the brand colours return on hover */
+  filter: brightness(0) invert(0.88) sepia(0.12);
+  opacity: 0.86;
+  transition:
+    filter 0.35s var(--ease),
+    opacity 0.35s var(--ease);
 }
-.plate-icon {
-  color: #2a6b3f;
+.mark[data-logo='instapay'] img {
+  height: 34px;
+}
+.mark[data-logo='aramex'] img {
+  height: 21px;
+}
+.mark[data-logo='paymob'] img,
+.mark[data-logo='kashier'] img {
+  height: 24px;
+}
+.mark:hover img {
+  filter: drop-shadow(0 0 12px rgba(203, 168, 115, 0.35));
+  opacity: 1;
+}
+.mark[data-logo='icon']:hover {
+  color: var(--fg);
+  text-shadow: 0 0 12px rgba(203, 168, 115, 0.35);
+}
+.mark-icon {
+  color: var(--lift);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mark img {
+    transition: none;
+  }
 }
 
 /* ---------- full plan comparison ---------- */

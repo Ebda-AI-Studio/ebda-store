@@ -1,6 +1,6 @@
 # Provider logos
 
-Trademarks of their owners, shown only to name the payment and shipping providers Ebda integrates with. Trimmed and resized to WebP.
+Trademarks of their owners, shown only to name the payment and shipping providers Ebda integrates with (nominative use). Trimmed, made transparent and resized to WebP; the page renders them in one monochrome cream ink (CSS filter) and in their own colours on hover. FawryPay: the official badge's yellow ground was removed so only the blue mark remains (the mark on a transparent background).
 
 | File          | Source                                                                |
 | ------------- | --------------------------------------------------------------------- |

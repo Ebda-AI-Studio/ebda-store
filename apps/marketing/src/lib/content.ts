@@ -7,8 +7,6 @@ import type { Locale } from './site';
 export interface Provider {
   name: string;
   logo?: string;
-  /** The logo has white parts, so it sits on a dark plate. */
-  dark?: boolean;
   icon?: 'cash' | 'truck';
 }
 
@@ -156,7 +154,7 @@ export const COPY: Record<Locale, Copy> = {
       ship: [
         { name: 'Bosta', logo: 'bosta' },
         { name: 'ShipBlu', logo: 'shipblu' },
-        { name: 'Mylerz', logo: 'mylerz', dark: true },
+        { name: 'Mylerz', logo: 'mylerz' },
         { name: 'Aramex', logo: 'aramex' },
         { name: 'توصيل بنفسك', icon: 'truck' },
       ],
@@ -312,7 +310,7 @@ export const COPY: Record<Locale, Copy> = {
       ship: [
         { name: 'Bosta', logo: 'bosta' },
         { name: 'ShipBlu', logo: 'shipblu' },
-        { name: 'Mylerz', logo: 'mylerz', dark: true },
+        { name: 'Mylerz', logo: 'mylerz' },
         { name: 'Aramex', logo: 'aramex' },
         { name: 'Your own delivery', icon: 'truck' },
       ],

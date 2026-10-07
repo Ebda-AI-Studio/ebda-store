@@ -1,9 +1,10 @@
 import type { Locale } from './site';
 
 /**
- * Example stores shown inside the device mocks, one per storefront template family
- * (TEMPLATE_FAMILIES ids: souq, dahab, qamar, lamma, jasmine). They are illustrations:
- * no real merchant. Photos are openly licensed stock, see public/demo/CREDITS.md.
+ * The five EXAMPLE stores, one per storefront template family (TEMPLATE_FAMILIES ids:
+ * souq, dahab, qamar, lamma, jasmine). scripts/storefront-capture seeds them into a local
+ * Ebda and captures the real apps/web storefront for the device frames; the template
+ * switcher reads their labels. No real merchant. Photos: public/demo/CREDITS.md.
  */
 export const TEMPLATE_IDS = ['souq', 'dahab', 'qamar', 'lamma', 'jasmine'] as const;
 export type TemplateId = (typeof TEMPLATE_IDS)[number];
@@ -25,24 +26,6 @@ export interface DemoStore {
   tagline: L;
   products: [DemoProduct, DemoProduct, DemoProduct, DemoProduct];
 }
-
-export const DEMO_UI: Record<
-  Locale,
-  { shop: string; bestsellers: string; order: string; cod: string }
-> = {
-  ar: {
-    shop: 'تسوّق',
-    bestsellers: 'الأكثر مبيعًا',
-    order: 'اطلب على واتساب',
-    cod: 'الدفع عند الاستلام',
-  },
-  en: {
-    shop: 'Shop',
-    bestsellers: 'Best sellers',
-    order: 'Order on WhatsApp',
-    cod: 'Cash on delivery',
-  },
-};
 
 export const DEMO_STORES: Record<TemplateId, DemoStore> = {
   souq: {
