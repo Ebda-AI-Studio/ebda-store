@@ -1,26 +1,21 @@
 /**
- * SSRF on the iCarry carrier client.
+ * SSRF on the carrier clients.
  *
- * `shipping-carrier.routes.ts` validates a carrier's credentials as
- * `z.record(z.string(), z.string())` — any key, any string. `ICarryCredentials`
- * declares `baseUrl?: string  // allow override`, and `resolveBaseUrl` returned
- * that merchant-supplied string VERBATIM into four `fetch()` calls
- * (createShipment, trackShipment, cancelShipment, testConnection).
+ * The original defect: a carrier took a merchant-supplied `baseUrl` credential and handed it
+ * VERBATIM to `fetch()`, so a merchant admin could press "Test connection" with
+ * `baseUrl = http://169.254.169.254/latest/meta-data` and read the cloud metadata endpoint back
+ * through the error text. That carrier (iCarry) is gone (shipping batch, PROVIDERS-7), and the
+ * class is closed at the root now:
  *
- * So a merchant admin could set
- *   credentials.baseUrl = "http://169.254.169.254/latest/meta-data"
- * and press "Test connection". The API host fetches it and hands back
- * `HTTP <status>: <body.message>` — a status-code and partial-body oracle
- * against the Railway internal network and the cloud metadata endpoint.
- *
- * `lib/safe-fetch.ts` already had the guard. The ESLint rule that enforces it
- * was scoped to `routes/**` on the reasoning that a service taking a URL from
- * a route "is a review point". This is that review point, missed: the fetch
- * lives in `services/`, so the class was invisible to the only mechanism that
- * would have caught it.
- *
- * These tests pin BOTH halves — the blocklist, and that the carrier actually
- * routes through it.
+ *   1. NO carrier credential is a host. The catalog declares the fields; the connect route and
+ *      `mergeCredentialFields` refuse any key the catalog does not list, so `baseUrl` cannot be
+ *      stored (tests/unit/shipping-provider-connect.test.ts), and no adapter reads one.
+ *   2. Every adapter resolves its host from code (sandbox / live constants) or an ENV override
+ *      that is honoured only outside production: asserted below by driving each real adapter
+ *      with an attacker host in every place a merchant could put one.
+ *   3. The default transport (`safeFetch`) still resolves-and-blocks private ranges and
+ *      re-validates every redirect hop (a public host 302ing to 169.254.169.254).
+ *   4. A registry gate (bottom): a carrier source may not call `fetch`/`request`/`axios` bare.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -34,181 +29,55 @@ vi.mock('@api/lib/logger', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-import {
-  resolveBaseUrl,
-  ICARRY_BASE_URL,
-  iCarryCarrier,
-} from '@api/services/carriers/icarry.carrier';
+import { carrierRequest } from '@api/lib/carrier-http';
+import { CARRIER_REGISTRY } from '@api/services/carriers/registry';
+import { CARRIER_CODES } from '@api/services/carriers/types';
 
-/** Hosts that resolve to a public address, so only the URL itself is on trial. */
 function resolvesPublic() {
   lookup.mockResolvedValue([{ address: '93.184.216.34' }]);
 }
 
-describe('resolveBaseUrl — merchant-supplied baseUrl is SSRF-validated', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    resolvesPublic();
-  });
-
-  it('returns the hardcoded default when the merchant sets no override', async () => {
-    await expect(resolveBaseUrl({ apiKey: 'k' })).resolves.toBe(ICARRY_BASE_URL);
-  });
-
-  it('does not spend a DNS lookup validating our own constant', async () => {
-    await resolveBaseUrl({ apiKey: 'k' });
-    expect(lookup).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ['cloud metadata (the prize)', 'http://169.254.169.254/latest/meta-data'],
-    ['loopback', 'http://127.0.0.1:8080'],
-    ['loopback, IPv6', 'http://[::1]:8080'],
-    ['IPv4-mapped loopback', 'http://[::ffff:127.0.0.1]'],
-    ['RFC1918 10/8', 'http://10.0.0.5/v1'],
-    ['RFC1918 172.16/12', 'http://172.16.31.9/v1'],
-    ['RFC1918 192.168/16', 'http://192.168.1.1/v1'],
-    ['CGNAT 100.64/10', 'http://100.64.3.2/v1'],
-    ['unspecified', 'http://0.0.0.0/v1'],
-    ['link-local IPv6', 'http://[fe80::1]/v1'],
-    ['unique-local IPv6', 'http://[fd00::1]/v1'],
-  ])('blocks %s', async (_label, url) => {
-    await expect(resolveBaseUrl({ apiKey: 'k', baseUrl: url })).rejects.toThrow(/SSRF_BLOCKED/);
-  });
-
-  it.each([
-    ['file', 'file:///etc/passwd'],
-    ['gopher', 'gopher://127.0.0.1:11211/_stats'],
-    ['data', 'data:text/plain,hi'],
-  ])('blocks the %s scheme', async (_label, url) => {
-    await expect(resolveBaseUrl({ apiKey: 'k', baseUrl: url })).rejects.toThrow(/SSRF_BLOCKED/);
-  });
-
-  it('blocks a malformed URL rather than string-concatenating it into a path', async () => {
-    await expect(resolveBaseUrl({ apiKey: 'k', baseUrl: 'not a url' })).rejects.toThrow(
-      /SSRF_BLOCKED/
-    );
-  });
-
-  it('blocks *.railway.internal — the platform-internal name that does not resolve publicly', async () => {
-    lookup.mockRejectedValue(new Error('ENOTFOUND'));
-    await expect(
-      resolveBaseUrl({ apiKey: 'k', baseUrl: 'http://api.railway.internal' })
-    ).rejects.toThrow(/SSRF_BLOCKED/);
-  });
-
-  it('blocks a public NAME that resolves to a private address (DNS-based bypass)', async () => {
-    lookup.mockResolvedValue([{ address: '10.1.2.3' }]);
-    await expect(
-      resolveBaseUrl({ apiKey: 'k', baseUrl: 'https://evil.example.com' })
-    ).rejects.toThrow(/SSRF_BLOCKED/);
-  });
-
-  it('blocks when ANY resolved address is private, not just the first', async () => {
-    lookup.mockResolvedValue([{ address: '93.184.216.34' }, { address: '127.0.0.1' }]);
-    await expect(
-      resolveBaseUrl({ apiKey: 'k', baseUrl: 'https://split-horizon.example.com' })
-    ).rejects.toThrow(/SSRF_BLOCKED/);
-  });
-
-  it('accepts a genuine public override and strips the trailing slash', async () => {
-    await expect(
-      resolveBaseUrl({ apiKey: 'k', baseUrl: 'https://sandbox.icarry.com/v2/' })
-    ).resolves.toBe('https://sandbox.icarry.com/v2');
-  });
+const redirect = (location: string, status = 302) => ({
+  status,
+  ok: false,
+  headers: { get: (h: string) => (h.toLowerCase() === 'location' ? location : null) },
+  text: () => Promise.resolve(''),
 });
 
-describe('every iCarry method routes its base URL through the guard', () => {
+describe('the default carrier transport re-validates every redirect hop', () => {
   const fetchSpy = vi.fn();
+  const base = { url: 'https://attacker.example.com', stubbed: false };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    lookup.mockResolvedValue([{ address: '169.254.169.254' }]);
+    fetchSpy.mockReset();
     vi.stubGlobal('fetch', fetchSpy);
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  const BAD = { apiKey: 'k', baseUrl: 'http://169.254.169.254' };
-
-  it('createShipment refuses and never calls fetch', async () => {
-    await expect(
-      iCarryCarrier.createShipment(BAD, {
-        orderId: 'o1',
-        orderNumber: 'ORD-1',
-        pickupAddress: {} as never,
-        deliveryAddress: {} as never,
-        items: [],
-      } as never)
-    ).rejects.toThrow(/SSRF_BLOCKED/);
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it('trackShipment refuses and never calls fetch', async () => {
-    await expect(iCarryCarrier.trackShipment(BAD, 'TRACK-1')).rejects.toThrow(/SSRF_BLOCKED/);
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it('cancelShipment refuses and never calls fetch', async () => {
-    await expect(iCarryCarrier.cancelShipment(BAD, 'SHIP-1')).rejects.toThrow(/SSRF_BLOCKED/);
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it('testConnection — the reachable one — returns a failure instead of probing', async () => {
-    const result = await iCarryCarrier.testConnection(BAD);
-    expect(result.success).toBe(false);
-    expect(fetchSpy).not.toHaveBeenCalled();
-    // The merchant gets the VERDICT, never the reason: `assertPublicHttpUrl`
-    // distinguishes "does not resolve" from "resolves to a private address",
-    // and surfacing that turns this endpoint into a boolean oracle over the
-    // API host's resolver. The detailed reason stays in the log line.
-    expect(result.error).toBe('Base URL must be a public http(s) address.');
-    expect(result.error).not.toMatch(/SSRF_BLOCKED|resolve|private/i);
-  });
-});
-
-describe('redirects are re-validated — a pre-flight check alone is not a guard', () => {
-  const fetchSpy = vi.fn();
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.stubGlobal('fetch', fetchSpy);
-  });
-  afterEach(() => vi.unstubAllGlobals());
-
-  /**
-   * The attacker controls a GENUINELY PUBLIC host, so the pre-flight
-   * `assertPublicHttpUrl` on the base URL passes — and then the host 302s to
-   * the cloud metadata endpoint. `fetch` defaults to `redirect: 'follow'`, so
-   * before `safeFetch` this walked straight through the new guard.
-   */
   it('refuses a 302 from a public host to 169.254.169.254', async () => {
     lookup.mockImplementation((host: string) =>
       host === 'attacker.example.com'
         ? Promise.resolve([{ address: '93.184.216.34' }])
         : Promise.resolve([{ address: '169.254.169.254' }])
     );
-    fetchSpy.mockResolvedValue({
-      status: 302,
-      headers: {
-        get: (h: string) => (h === 'location' ? 'http://169.254.169.254/latest/meta-data' : null),
-      },
-    });
-
-    await expect(
-      iCarryCarrier.trackShipment({ apiKey: 'k', baseUrl: 'https://attacker.example.com' }, 'T1')
-    ).rejects.toThrow(/SSRF_BLOCKED/);
-
-    // The first hop was made (that is how we learned about the redirect);
-    // the SECOND must never be.
+    fetchSpy.mockResolvedValue(redirect('http://169.254.169.254/latest/meta-data'));
+    await expect(carrierRequest('t', base, '/x', { method: 'GET' })).rejects.toThrow(
+      /SSRF_BLOCKED/
+    );
+    // the first hop was made (that is how the redirect was learned); the SECOND never is
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('asks undici for manual redirects — the option is what makes the loop possible', async () => {
+  it('asks undici for manual redirects: the option is what makes the loop possible', async () => {
     resolvesPublic();
-    fetchSpy.mockResolvedValue({ status: 200, json: () => Promise.resolve({}), ok: true });
-    await iCarryCarrier
-      .testConnection({ apiKey: 'k', baseUrl: 'https://sandbox.icarry.com' })
-      .catch(() => undefined);
+    fetchSpy.mockResolvedValue({
+      status: 200,
+      ok: true,
+      headers: { get: () => null },
+      text: () => Promise.resolve('{}'),
+    });
+    await carrierRequest('t', base, '/x', { method: 'GET' }).catch(() => undefined);
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ redirect: 'manual' })
@@ -217,173 +86,106 @@ describe('redirects are re-validated — a pre-flight check alone is not a guard
 
   it('refuses a redirect chain longer than the cap', async () => {
     resolvesPublic();
-    fetchSpy.mockResolvedValue({
-      status: 302,
-      headers: { get: () => 'https://public.example.com/next' },
-    });
-    await expect(
-      iCarryCarrier.trackShipment({ apiKey: 'k', baseUrl: 'https://public.example.com' }, 'T1')
-    ).rejects.toThrow(/SSRF_BLOCKED: too many redirects/);
+    fetchSpy.mockResolvedValue(redirect('https://attacker.example.com/next'));
+    await expect(carrierRequest('t', base, '/x', { method: 'GET' })).rejects.toThrow(
+      /SSRF_BLOCKED: too many redirects/
+    );
+  });
+
+  it.each([
+    ['cloud metadata', 'http://169.254.169.254/latest/meta-data'],
+    ['loopback', 'http://127.0.0.1:8080'],
+    ['RFC1918', 'http://10.0.0.5/v1'],
+    ['*.railway.internal', 'http://api.railway.internal'],
+  ])('blocks a host that is %s before any request', async (_label, url) => {
+    lookup.mockResolvedValue([
+      { address: url.includes('169.254') ? '169.254.169.254' : '10.0.0.5' },
+    ]);
+    await expect(carrierRequest('t', { url, stubbed: false }, '/x', {})).rejects.toThrow(
+      /SSRF_BLOCKED/
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 
-/**
- * The half a pre-flight assert cannot cover.
- *
- * `assertPublicHttpUrl` only ever sees the FIRST URL. A merchant who owns a
- * public host passes it trivially and then answers the request with
- * `302 Location: http://169.254.169.254/…`; bare `fetch()` defaults to
- * `redirect: 'follow'`, so undici walks there and `testConnection` reports the
- * status and `body.message` back — the same oracle, one hop later. The fix is
- * the transport (`safeFetch`), not the assert, and these are the tests that
- * tell the difference: every URL fed in here is PUBLIC.
- */
-describe('a public baseUrl that redirects to a private address', () => {
+describe('no adapter takes a host from the merchant', () => {
   const fetchSpy = vi.fn();
+  const ATTACKER = 'attacker.example.com';
+  // every place a merchant could smuggle a host: a credential, a setting, a legacy key
+  const hostile = {
+    baseUrl: `https://${ATTACKER}`,
+    url: `https://${ATTACKER}`,
+    host: ATTACKER,
+    endpoint: `https://${ATTACKER}`,
+    apiKey: 'k',
+    username: 'u',
+    password: 'p',
+    warehouseName: 'w',
+    accountNumber: '123456',
+    accountPin: '1',
+    accountEntity: 'CAI',
+    accountCountryCode: 'EG',
+    webhookSecret: 'secret',
+  };
+  const ctx = {
+    settings: {
+      sandbox: false,
+      baseUrl: `https://${ATTACKER}`,
+      apiUrl: `https://${ATTACKER}`,
+      host: ATTACKER,
+    },
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // mockReset, not clearAllMocks: an undrained mockResolvedValueOnce queue
-    // survives a clear and feeds the next test's first call — the exact
-    // state-pollution the retry-0 unit gate exists to expose.
     fetchSpy.mockReset();
-    resolvesPublic(); // every NAME resolves public — only the hop is on trial
-    vi.stubGlobal('fetch', fetchSpy);
-  });
-  afterEach(() => vi.unstubAllGlobals());
-
-  const SNEAKY = { apiKey: 'k', baseUrl: 'https://redirector.example.com' };
-  const METADATA = 'http://169.254.169.254/latest/meta-data/iam/security-credentials/';
-
-  function redirect(location: string, status = 302) {
-    return {
-      status,
-      ok: false,
-      statusText: 'Found',
-      headers: { get: (n: string) => (n.toLowerCase() === 'location' ? location : null) },
-      json: async () => ({}),
-    };
-  }
-  function ok(body: unknown = {}) {
-    return {
-      status: 200,
-      ok: true,
-      statusText: 'OK',
-      headers: { get: () => null },
-      json: async () => body,
-    };
-  }
-  /** The metadata endpoint was never contacted, whatever the call returned. */
-  function neverReachedMetadata() {
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(String(fetchSpy.mock.calls[0][0])).toBe('https://redirector.example.com/merchants/me');
-  }
-
-  it('testConnection — the reachable one — refuses the hop instead of reporting it', async () => {
-    fetchSpy.mockResolvedValue(redirect(METADATA));
-
-    const result = await iCarryCarrier.testConnection(SNEAKY);
-
-    expect(result.success).toBe(false);
-    neverReachedMetadata();
-    // The merchant is told the VERDICT, never which check fired.
-    // `assertPublicHttpUrl` distinguishes "does not resolve" from "resolves to
-    // a private address", and surfacing that turns this endpoint into a
-    // boolean oracle over the API host's resolver. The reason stays in the log.
-    expect(result.error).toBe('Base URL must be a public http(s) address.');
-    expect(result.error).not.toMatch(/SSRF_BLOCKED|resolve|private|169\.254/i);
-  });
-
-  const SHIPMENT = {
-    orderId: 'o1',
-    orderNumber: 'ORD-1',
-    pickupAddress: {} as never,
-    deliveryAddress: {} as never,
-    items: [],
-  } as never;
-
-  /** Exactly one request went out, and it went to the merchant's own host. */
-  function stoppedAtTheFirstHop() {
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(String(fetchSpy.mock.calls[0][0])).toMatch(/^https:\/\/redirector\.example\.com\//);
-  }
-
-  it('createShipment refuses the hop', async () => {
-    fetchSpy.mockResolvedValue(redirect(METADATA));
-    await expect(iCarryCarrier.createShipment(SNEAKY, SHIPMENT)).rejects.toThrow(/SSRF_BLOCKED/);
-    stoppedAtTheFirstHop();
-  });
-
-  it('trackShipment refuses the hop', async () => {
-    fetchSpy.mockResolvedValue(redirect(METADATA));
-    await expect(iCarryCarrier.trackShipment(SNEAKY, 'TRACK-1')).rejects.toThrow(/SSRF_BLOCKED/);
-    stoppedAtTheFirstHop();
-  });
-
-  it('cancelShipment refuses the hop (its contract is false, not a throw)', async () => {
-    fetchSpy.mockResolvedValue(redirect(METADATA));
-    await expect(iCarryCarrier.cancelShipment(SNEAKY, 'SHIP-1')).resolves.toBe(false);
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it('blocks a redirect chain that only turns private on the second hop', async () => {
-    fetchSpy
-      .mockResolvedValueOnce(redirect('https://hop-two.example.com/next'))
-      .mockResolvedValueOnce(redirect('http://127.0.0.1:6379/'));
-
-    const result = await iCarryCarrier.testConnection(SNEAKY);
-
-    expect(result.success).toBe(false);
-    // Generic message, same as every other blocked case — see the oracle note
-    // on the testConnection test above.
-    expect(result.error).toBe('Base URL must be a public http(s) address.');
-    expect(fetchSpy).toHaveBeenCalledTimes(2); // hop 3 never went out
-  });
-
-  it('still follows a legitimate public redirect — the guard is not a blanket ban', async () => {
-    fetchSpy
-      .mockResolvedValueOnce(redirect('https://api2.icarry.com/merchants/me'))
-      .mockResolvedValueOnce(ok());
-
-    await expect(iCarryCarrier.testConnection(SNEAKY)).resolves.toEqual({ success: true });
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not hand the merchant API key to a host the redirect chose', async () => {
-    fetchSpy
-      .mockResolvedValueOnce(redirect('https://collector.example.com/merchants/me'))
-      .mockResolvedValueOnce(ok());
-
-    await iCarryCarrier.testConnection(SNEAKY);
-
-    const firstHop = new Headers(fetchSpy.mock.calls[0][1].headers);
-    const secondHop = new Headers(fetchSpy.mock.calls[1][1].headers);
-    expect(firstHop.get('authorization')).toBe('Bearer k');
-    expect(secondHop.get('authorization')).toBeNull();
-  });
-
-  it('keeps the API key on a same-origin redirect', async () => {
-    fetchSpy.mockResolvedValueOnce(redirect('/v2/merchants/me')).mockResolvedValueOnce(ok());
-
-    await iCarryCarrier.testConnection(SNEAKY);
-
-    expect(String(fetchSpy.mock.calls[1][0])).toBe(
-      'https://redirector.example.com/v2/merchants/me'
+    resolvesPublic();
+    fetchSpy.mockImplementation(() =>
+      Promise.resolve({
+        status: 200,
+        ok: true,
+        headers: { get: () => null },
+        text: () => Promise.resolve('{}'),
+      })
     );
-    expect(new Headers(fetchSpy.mock.calls[1][1].headers).get('authorization')).toBe('Bearer k');
+    vi.stubGlobal('fetch', fetchSpy);
+    // the ENV override is the only legitimate seam and is ignored in production
+    vi.stubEnv('NODE_ENV', 'production');
+    for (const c of ['BOSTA', 'SHIPBLU', 'MYLERZ', 'ARAMEX']) vi.stubEnv(`${c}_BASE_URL`, '');
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
-  it('does not re-POST the shipment payload to a redirect target', async () => {
-    fetchSpy
-      .mockResolvedValueOnce(redirect('https://collector.example.com/orders'))
-      .mockResolvedValueOnce(ok({ id: 'x', tracking_number: 't' }));
+  const apiCarriers = CARRIER_CODES.filter(c => c !== 'manual');
 
-    await iCarryCarrier.createShipment(SNEAKY, SHIPMENT);
+  it.each(apiCarriers)(
+    '%s: Test connection never sends a request to a merchant host',
+    async code => {
+      const adapter = CARRIER_REGISTRY[code];
+      await adapter.testConnection(hostile, ctx).catch(() => undefined);
+      for (const [url] of fetchSpy.mock.calls) {
+        expect(new URL(String(url)).host, `${code} called ${String(url)}`).not.toBe(ATTACKER);
+      }
+      expect(
+        fetchSpy.mock.calls.length,
+        `${code} made no request at all: the probe proves nothing`
+      ).toBeGreaterThan(0);
+    }
+  );
 
-    expect(fetchSpy.mock.calls[0][1].method).toBe('POST');
-    expect(fetchSpy.mock.calls[1][1].method).toBe('GET');
-    expect(fetchSpy.mock.calls[1][1].body).toBeUndefined();
-  });
+  it.each(apiCarriers)(
+    '%s: track and cancel never send a request to a merchant host',
+    async code => {
+      const adapter = CARRIER_REGISTRY[code];
+      await adapter.trackShipment(hostile, 'TRK1', ctx).catch(() => undefined);
+      await Promise.resolve(adapter.cancelShipment(hostile, 'TRK1', ctx)).catch(() => undefined);
+      for (const [url] of fetchSpy.mock.calls) {
+        expect(new URL(String(url)).host, `${code} called ${String(url)}`).not.toBe(ATTACKER);
+      }
+    }
+  );
 });
 
 /**
@@ -445,14 +247,16 @@ describe('carrier registry — every fetching carrier routes through the guard',
 
   it('finds the carrier sources (guards against an empty-set pass)', () => {
     expect(carrierFiles.length).toBeGreaterThanOrEqual(2);
-    expect(carrierFiles).toContain('icarry.carrier.ts');
+    for (const f of ['bosta', 'shipblu', 'mylerz', 'aramex']) {
+      expect(carrierFiles).toContain(`${f}.carrier.ts`);
+    }
   });
 
   /**
    * Strips block comments, line comments and template/string literals before
-   * scanning. Without this the gate matches its own prose: icarry's docstring
-   * contains the words "server-side `fetch()`", and the first run of this
-   * assertion failed on that comment rather than on any code — the same
+   * scanning. Without this the gate matches its own prose: a docstring that
+   * mentions "server-side `fetch()`" failed the first run of this
+   * assertion on that comment rather than on any code — the same
    * comment-matching defect already filed as issue #1678 against another gate.
    */
   const stripNonCode = (src: string) =>

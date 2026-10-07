@@ -685,11 +685,11 @@
       "id": "ssrf-carrier-merchant-base-url",
       "domain": "SSRF",
       "tier": "unit",
-      "why": "merchant-supplied carrier baseUrl reaches fetch() unvalidated — cloud metadata at 169.254.169.254 from the API host",
-      "source": "apps/api/src/services/carriers/icarry.carrier.ts",
-      "find": "  await assertPublicHttpUrl(trimmed);\n  return trimmed;",
-      "replace": "  return trimmed;",
-      "test": "tests/unit/carrier-ssrf.test.ts"
+      "why": "a merchant can store a `baseUrl` (or any key the catalog does not list) as a carrier credential, so the next Test connection fetches an internal address from the API host (cloud metadata at 169.254.169.254)",
+      "source": "apps/api/src/services/payment-providers/provider-connection.service.ts",
+      "find": "    if (!field) {\n      errors.push(`${key}: not a ${entry.code} credential`);\n      continue;\n    }",
+      "replace": "    if (!field) {\n      next[key] = String(raw);\n      continue;\n    }",
+      "test": "tests/unit/shipping-provider-connect.test.ts"
     },
     {
       "id": "impersonation-account-soft-delete",
@@ -1105,29 +1105,29 @@
       "id": "carrier-merge-base-not-cached",
       "domain": "credential integrity",
       "tier": "unit",
-      "why": "the masked-resubmit merge base is read through a 300s Redis cache — a stale or wrong-shaped entry reads as \"no credentials\" and the merchant's carrier secret is dropped and overwritten",
+      "why": "the credential merge base is read through a 300s Redis cache: a stale or wrong-shaped entry reads as \"no credentials\" and the merchant's carrier secret is dropped and overwritten",
       "source": "apps/api/src/services/shipping-carrier.service.ts",
-      "find": "          const current = await prisma.shippingCarrierConfig.findUnique({\n            where: { storeId_carrier: { storeId, carrier } },\n            select: { credentials: true },\n          });\n          stored = current?.credentials ? this.decryptCredentials(current.credentials) : {};",
-      "replace": "          const current = await this.getCarrierConfig(storeId, carrier);\n          stored = ((current?.credentials as Record<string, string>) ?? {}) as Record<string, string>;",
+      "find": "      const existing = await tx.shippingCarrierConfig.findUnique({\n        where: { storeId_carrier: { storeId, carrier } },\n      });\n",
+      "replace": "      const existing = (await this.getCarrierConfig(storeId, carrier)) as any;\n",
       "test": "tests/unit/carrier-credentials-merge.test.ts"
     },
     {
       "id": "carrier-masked-field-refuses-drop",
       "domain": "credential integrity",
       "tier": "unit",
-      "why": "an unresolvable masked field is silently dropped instead of refusing the save, persisting a truncated credential set over a working Aramex/iCarry secret",
+      "why": "an unreadable stored credential blob is merged over instead of refusing the save, persisting a truncated credential set over a working carrier secret",
       "source": "apps/api/src/services/shipping-carrier.service.ts",
-      "find": "        } else {\n          throw new AppError(\n            400,\n            'CARRIER_CREDENTIALS_UNRESOLVED',\n            `Re-enter the ${carrier} credentials: the saved value for \"${key}\" could not be read, and saving now would erase it.`\n          );\n        }",
-      "replace": "        }",
+      "find": "          if (err instanceof AppError) throw err;\n",
+      "replace": "        throw err;\n",
       "test": "tests/unit/carrier-credentials-merge.test.ts"
     },
     {
       "id": "carrier-credentials-shape-fails-loudly",
       "domain": "credential integrity",
       "tier": "unit",
-      "why": "an already-decrypted (pre-v2 cache) credentials value falls into the catch and returns {}, indistinguishable from an unconfigured carrier — carrier auth fails on live orders and the erasing merge is fed",
+      "why": "an already-decrypted (pre-v3 cache) credentials value falls into the catch and returns {}, indistinguishable from an unconfigured carrier: carrier auth fails on live orders and the erasing merge is fed",
       "source": "apps/api/src/services/shipping-carrier.service.ts",
-      "find": "    if (typeof encryptedCredentials !== 'string') {\n      throw new Error(\n        '[ShippingCarrierService] credentials are not an encrypted string — refusing to read them as empty'\n      );\n    }\n",
+      "find": "    if (row.credentials && typeof row.credentials !== 'string') {\n      throw new Error(\n        '[ShippingCarrierService] credentials are not an encrypted string: refusing to read them as empty'\n      );\n    }\n",
       "replace": "",
       "test": "tests/unit/carrier-credentials-merge.test.ts"
     },
@@ -1840,6 +1840,76 @@
       "find": "    if (urlStoreId && urlStoreId !== storeIdForWebhook) {",
       "replace": "    if (false) {",
       "test": "tests/integration/egypt-gateway-webhooks.test.ts"
+    },
+    {
+      "id": "carrier-webhook-url-token-required",
+      "domain": "webhook authenticity",
+      "tier": "unit",
+      "why": "a carrier callback is applied without the per-store URL secret, so anyone who knows a store id can forge a \"delivered\" status on any tracking number",
+      "source": "apps/api/src/services/shipping-carrier.service.ts",
+      "find": "      if (!verifyWebhookToken(secret, token)) return 'unauthorized' as const;\n",
+      "replace": "",
+      "test": "tests/unit/carrier-webhook-auth.test.ts"
+    },
+    {
+      "id": "carrier-webhook-header-required",
+      "domain": "webhook authenticity",
+      "tier": "unit",
+      "why": "Bosta callbacks are accepted on the URL token alone, so a leaked callback URL is enough to forge tracking updates (the derived header is the second factor)",
+      "source": "apps/api/src/services/shipping-carrier.service.ts",
+      "find": "        if (!presented || !safeEqual(presented, impl.webhookHeader.valueFor(secret))) {",
+      "replace": "        if (false) {",
+      "test": "tests/unit/carrier-webhook-auth.test.ts"
+    },
+    {
+      "id": "carrier-enable-requires-current-test",
+      "domain": "provider gate",
+      "tier": "unit",
+      "why": "a carrier is enabled with credentials no Test connection has proven (or whose proof predates an edit or a mode switch), so bookings fail on live orders",
+      "source": "apps/api/src/services/carriers/carrier-connection.service.ts",
+      "find": "  if (!carrierTestIsCurrent(row)) {\n    throw new AppError(\n      409,\n      'CONNECTION_NOT_TESTED',",
+      "replace": "  if (false) {\n    throw new AppError(\n      409,\n      'CONNECTION_NOT_TESTED',",
+      "test": "tests/unit/shipping-provider-connect.test.ts"
+    },
+    {
+      "id": "carrier-enable-requires-verified",
+      "domain": "provider gate",
+      "tier": "unit",
+      "why": "a carrier that never completed a flow against its real sandbox (PROVIDERS-2) can be enabled by a merchant",
+      "source": "apps/api/src/services/carriers/carrier-connection.service.ts",
+      "find": "  if (!isProviderUsable(row.carrier)) {\n    throw new AppError(\n      409,\n      'PROVIDER_NOT_VERIFIED',",
+      "replace": "  if (false) {\n    throw new AppError(\n      409,\n      'PROVIDER_NOT_VERIFIED',",
+      "test": "tests/unit/shipping-provider-connect.test.ts"
+    },
+    {
+      "id": "carrier-test-fingerprint-checked",
+      "domain": "provider gate",
+      "tier": "unit",
+      "why": "the last successful Test connection is accepted for ANY credentials, so an edited key or a sandbox-to-live switch rides on a stale proof",
+      "source": "apps/api/src/services/carriers/carrier-connection.service.ts",
+      "find": "    return t.fingerprint === carrierFingerprint(row.carrier, mode, activeFieldSet(row));",
+      "replace": "    return true;",
+      "test": "tests/unit/shipping-provider-connect.test.ts"
+    },
+    {
+      "id": "carrier-credentials-write-only",
+      "domain": "credential integrity",
+      "tier": "unit",
+      "why": "the carrier config view returned to the browser still carries the ciphertext (and with it the webhook secret and every key)",
+      "source": "apps/api/src/services/carriers/carrier-connection.service.ts",
+      "find": "  delete rest.credentials;\n",
+      "replace": "",
+      "test": "tests/unit/shipping-provider-connect.test.ts"
+    },
+    {
+      "id": "carrier-save-locks-row",
+      "domain": "credential integrity",
+      "tier": "unit",
+      "why": "two concurrent carrier saves each merge over the same snapshot and the later write silently reverts the earlier one (a saved key or a rotated webhook secret is lost)",
+      "source": "apps/api/src/services/shipping-carrier.service.ts",
+      "find": "      await tx.$queryRaw`SELECT 1 FROM shipping_carrier_configs WHERE store_id = ${storeId} AND carrier = ${carrier} FOR UPDATE`;\n      // Straight from Prisma, never the cache",
+      "replace": "      // Straight from Prisma, never the cache",
+      "test": "tests/unit/carrier-credentials-merge.test.ts"
     }
   ]
 }
