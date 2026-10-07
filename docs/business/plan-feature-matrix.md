@@ -8,7 +8,8 @@
 >
 > **Prior sync 2026-07-21.** Added `bundles` (fixed-kit product bundles) — in no plan baseline,
 > same "sold as an add-on, enable per store via `StoreFeature`" shape as `agent_feed` and
-> `agent_checkout`; see the "Not plan-gated" section below.
+> `agent_checkout` WERE originally; both of those have since moved into every paid plan baseline
+> (AI-first policy, 2026-07-21 — see `plan-baselines.ts`), so only `bundles` stays add-on; see the "Not plan-gated" section below.
 >
 > **Prior sync 2026-07-02.** Multi-currency, bank reconciliation, barcode scanning, and
 > multi-warehouse are shipped Enterprise features (not roadmap). Tax reports (XLSX export),

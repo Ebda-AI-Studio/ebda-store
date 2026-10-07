@@ -1,25 +1,38 @@
 ---
 title: InstaPay manual confirmation
-description: InstaPay is coming soon. What it will do and what to use until it arrives.
+description: Let customers pay by InstaPay transfer, and confirm each payment by hand once the money arrives.
 section: Selling
 order: 4
-status: soon
-keywords: instapay transfer manual confirm
+appPath: /stores
+keywords: instapay transfer manual confirm payment received
 ---
 
-<Callout type="soon" title="Coming soon">
-  InstaPay is not available yet. In the setup flow it appears as "Coming soon" and cannot be turned
-  on.
-</Callout>
+InstaPay has no merchant API, so Ebda cannot see a transfer on its own. The customer transfers to your InstaPay address or mobile number, and **you** confirm each payment after you see the money in your banking app.
 
-## What is planned
+## Turn it on
 
-Customers will pay by InstaPay transfer, and you will confirm each payment by hand after you see it in your banking app. The design rules we are building to:
+You can do it in two places:
+
+- **During setup**, on the payment step: switch on **InstaPay** and enter your InstaPay address (for example `yourname@instapay`) or the Egyptian mobile number linked to your account. An account name is optional.
+- **Later**, in **Settings > Payments**, open the InstaPay card. There you can also change how long an order is held (default 48 hours) and add a note for customers in English and Arabic.
+
+InstaPay needs an address or a mobile number before it can be turned on. It is in Egyptian pounds only.
+
+## What your customer sees
+
+At checkout the customer picks InstaPay. After placing the order they see your InstaPay address or number, the exact amount, the order number to quote in the transfer note, and the deadline. They can optionally type the transfer reference from their banking app, which you will see on the order.
+
+## What you do
+
+1. The order appears as **Awaiting InstaPay**. Check your banking app for the amount.
+2. When the money is there, open the order and tap **Payment received** (in the dashboard or in the Orders app).
+3. The order is confirmed and can be shipped.
+
+## The rules
 
 - An order waiting for confirmation is **not shipped** and is **not counted as paid revenue**.
-- If you do not confirm it in time, the order **expires**.
-- An order can be confirmed **only once**.
+- If you do not confirm it before the deadline, the order **expires**: it is cancelled, the stock goes back on sale, and you and the customer are notified.
+- An order can be confirmed **only once**. Tapping twice is safe.
+- Only confirm after you have seen the money. Ebda cannot check it for you.
 
-## Until then
-
-Use [cash on delivery](/en/orders-and-cod/). We will announce InstaPay in this help centre when it is ready, and the status page will not change for it.
+See also [Orders and cash on delivery](/en/orders-and-cod/).

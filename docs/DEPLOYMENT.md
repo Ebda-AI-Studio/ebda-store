@@ -2,7 +2,7 @@
 
 > **2026-05-22 update:** prior versions of this doc described a Cloudflare Pages + Supabase topology that was never the production state. The canonical production stack is below. The old doc misled incident responders during the 2026-05-22 audit (P1-7).
 >
-> **2026-07-05 update:** `apps/web`, `apps/admin`, and `apps/orders` have since fully MIGRATED off Vercel to **Cloudflare Workers** (OpenNext, deployed via GitHub→CF Workers Builds — `force-web-cf-preview` / `force-admin-cf-preview` / `force-orders-cf-preview`, serving `store.force-ai.co` / `admin.force-ai.co` / `orders.force-ai.co`). The old Vercel projects (`force-admin`, `force-web`, `force-orders`) are decommissioned. Steps below that reference Vercel setup/rollback are kept for history where useful but no longer reflect where to actually deploy — see `docs/migration/cloudflare-ci-deploy.md` and `docs/migration/cloudflare-cutover-runbook.md` for the current procedure.
+> **2026-07-05 update:** `apps/web`, `apps/admin`, and `apps/orders` have since fully MIGRATED off Vercel to **Cloudflare Workers** (OpenNext, deployed by GitHub Actions via `wrangler deploy` (Ebda: only the API workflow `.github/workflows/cf-api-deploy.yml` exists, manual `workflow_dispatch` on `main`; there is no `cf-deploy.yml` for web/admin/orders yet) — `force-web-cf-preview` / `force-admin-cf-preview` / `force-orders-cf-preview`, serving `store.force-ai.co` / `admin.force-ai.co` / `orders.force-ai.co`). The old Vercel projects (`force-admin`, `force-web`, `force-orders`) are decommissioned. Steps below that reference Vercel setup/rollback are kept for history where useful but no longer reflect where to actually deploy — see `docs/migration/cloudflare-ci-deploy.md` and `docs/migration/cloudflare-cutover-runbook.md` for the current procedure.
 
 ## CI gate
 
@@ -26,7 +26,7 @@ To run the full gate manually: `bash scripts/safe-deploy.sh`
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│              CLOUDFLARE WORKERS (GitHub→CF Workers Builds)       │
+│              CLOUDFLARE WORKERS (GitHub Actions, wrangler deploy)│
 │  ┌──────────────────────────┐  ┌──────────────────────────┐      │
 │  │ force-admin-cf-preview   │  │ force-web-cf-preview     │      │
 │  │  admin.force-ai.co       │  │  store.force-ai.co       │      │
@@ -145,7 +145,7 @@ SMTP_FROM_EMAIL=noreply@yourdomain.com
 
 > ⚠️ **NOTE (updated 2026-07-05):** Production storefront, admin, and orders PWA run on **Cloudflare Workers** (OpenNext), NOT Vercel. Worker names: `force-admin-cf-preview` (`admin.force-ai.co`), `force-web-cf-preview` (`store.force-ai.co` + per-tenant custom domains), `force-orders-cf-preview` (`orders.force-ai.co`). The Vercel projects that previously hosted these apps are decommissioned.
 
-All three apps deploy automatically via GitHub→CF Workers Builds on push to `main` touching their respective `apps/*/**` path (`.github/workflows/cf-deploy.yml`, runs on the self-hosted runner). The per-app filter diffs against the **last successful `cf-deploy` run on `main`**, not `HEAD~1`, so a run cancelled by a newer merge never strands its changes; if that lookup fails, all three deploy (details: `docs/migration/cloudflare-ci-deploy.md`). No manual per-push steps needed — the workflow builds each app with OpenNext and runs `wrangler deploy`. Per-tenant custom domain provisioning is handled by the API via Cloudflare-for-SaaS (see `apps/api/src/services/cloudflare-domain.service.ts` / `docs/migration/cloudflare-cutover-runbook.md`). Setup details: `docs/migration/cloudflare-ci-deploy.md`.
+**Ebda status:** the Cloudflare API Worker deploys through the GitHub Actions workflow `.github/workflows/cf-api-deploy.yml` (manual `workflow_dispatch`, `main` only, `ubuntu-latest`). This repo has no `cf-deploy.yml` and does not use Cloudflare's Workers Builds Git integration; web/admin/orders CI deploy is not wired yet. The paragraph below is inherited from FWB (where `cf-deploy.yml` auto-deploys on push to `main`) and describes that pipeline: All three apps deploy via GitHub Actions on push to `main` touching their respective `apps/*/**` path (`.github/workflows/cf-deploy.yml`, runs on the self-hosted runner). The per-app filter diffs against the **last successful `cf-deploy` run on `main`**, not `HEAD~1`, so a run cancelled by a newer merge never strands its changes; if that lookup fails, all three deploy (details: `docs/migration/cloudflare-ci-deploy.md`). No manual per-push steps needed — the workflow builds each app with OpenNext and runs `wrangler deploy`. Per-tenant custom domain provisioning is handled by the API via Cloudflare-for-SaaS (see `apps/api/src/services/cloudflare-domain.service.ts` / `docs/migration/cloudflare-cutover-runbook.md`). Setup details: `docs/migration/cloudflare-ci-deploy.md`.
 
 ---
 
@@ -229,7 +229,7 @@ Custom domains for per-tenant storefronts are auto-registered via `apps/api/src/
 
 ### Monitoring
 
-- [ ] Set up Sentry for error tracking (SENTRY_DSN on Railway + NEXT_PUBLIC_SENTRY_DSN_ADMIN/WEB/ORDERS as CF Workers Builds env vars / GitHub repo variables)
+- [ ] Set up Sentry for error tracking (SENTRY_DSN on Railway + NEXT_PUBLIC_SENTRY_DSN_ADMIN/WEB/ORDERS as GitHub Actions repo variables at build time)
 - [ ] Add the `SENTRY_AUTH_TOKEN` repo secret (+ `SENTRY_ORG` / `SENTRY_PROJECT_{WEB,ADMIN,ORDERS}` repo variables) — `cf-deploy.yml` already passes them to the web/admin/orders builds; see docs/ENVIRONMENT.md "Sentry build-time config" (optional — deploys succeed without it, just with minified stack traces)
 - [ ] Enable Railway metrics alerts
 - [ ] Confirm Neon compute usage alerts are configured in the Neon dashboard
@@ -315,7 +315,7 @@ npx prisma migrate dev --name rollback_xxx
 
 ## Environments & staging posture
 
-**Current posture (2026-05-15, "option C" — safe-by-default Preview)**: there is no separate staging Railway service. Preview deployments for web/admin (whether the historical Vercel Preview flow or the Cloudflare Workers Builds preview environment) have `NEXT_PUBLIC_API_URL=http://localhost:4000` so PR previews are **non-functional by default** — they can't talk to production. A contributor who wants their preview to reach an API must override the env var on their PR explicitly. This blocks the worst-case data-integrity gap (a PR preview from a contributor writing to prod Neon) at zero cost.
+**Current posture (2026-05-15, "option C" — safe-by-default Preview)**: there is no separate staging Railway service. Preview deployments for web/admin (whether the historical Vercel Preview flow or the Cloudflare Workers preview environment) have `NEXT_PUBLIC_API_URL=http://localhost:4000` so PR previews are **non-functional by default** — they can't talk to production. A contributor who wants their preview to reach an API must override the env var on their PR explicitly. This blocks the worst-case data-integrity gap (a PR preview from a contributor writing to prod Neon) at zero cost.
 
 **Correction (2026-09-02):** the paragraph above used to also claim a CI gate, `preview-env-isolation.yml`, "verifies the production-vs-preview value differs and passes." That gate only ever checked **Vercel** project env vars via the Vercel API; FWB's Vercel projects were decommissioned in the 2026-07 Cloudflare migration, so it had no `VERCEL_API_TOKEN` / `VERCEL_PROJECT_ID_*` to read and fell through its own "unset → warn + exit 0" branches on every run — green on every PR while checking nothing (verified: last 5 runs all `success`; no Vercel secret/vars configured on the repo). It has been deleted rather than left as false assurance. The safe-by-default `localhost:4000` value above is the actual, still-real mitigation; there is currently no automated CI check that this default hasn't been overridden to point at production — that's a real gap, not (as the deleted workflow implied) a covered one. If/when Cloudflare Workers Builds gets a real per-PR preview environment, build an isolation check against that surface instead of resurrecting the Vercel one.
 
@@ -503,17 +503,17 @@ Renewal verification: re-check these in the per-provider dashboard quarterly —
 
 ### Account ownership
 
-| Service                | Account email          | Project / org                                                                                        |
-| ---------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------- |
-| Cloudflare             | forceai.0ps1@gmail.com | Workers Builds hosting `force-web`/`force-admin`/`force-orders-cf-preview` (replaced Vercel 2026-07) |
-| Railway                | forceai.0ps1@gmail.com | project `force-website-builder`                                                                      |
-| Neon                   | forceai.0ps1@gmail.com | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1)                                                |
-| Sentry                 | forceai.0ps1@gmail.com | one org with four projects: `api`, `web`, `admin`, `orders`                                          |
-| PostHog                | forceai.0ps1@gmail.com | EU region, single project covering web + admin                                                       |
-| UptimeRobot            | forceai.0ps1@gmail.com | free tier, 2 monitors currently                                                                      |
-| Axiom                  | (Ahmad's account)      | free tier (500GB/30d) — dataset `force-api-railway`                                                  |
-| Resend                 | platform-wide          | one account; per-merchant domains added under it                                                     |
-| @ForceAI1_bot Telegram | personal DM to Ahmad   | chat_id `1943728711`                                                                                 |
+| Service                | Account email          | Project / org                                                                                                              |
+| ---------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Cloudflare             | forceai.0ps1@gmail.com | Workers hosting (deployed by GitHub Actions) `force-web`/`force-admin`/`force-orders-cf-preview` (replaced Vercel 2026-07) |
+| Railway                | forceai.0ps1@gmail.com | project `force-website-builder`                                                                                            |
+| Neon                   | forceai.0ps1@gmail.com | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1)                                                                      |
+| Sentry                 | forceai.0ps1@gmail.com | one org with four projects: `api`, `web`, `admin`, `orders`                                                                |
+| PostHog                | forceai.0ps1@gmail.com | EU region, single project covering web + admin                                                                             |
+| UptimeRobot            | forceai.0ps1@gmail.com | free tier, 2 monitors currently                                                                                            |
+| Axiom                  | (Ahmad's account)      | free tier (500GB/30d) — dataset `force-api-railway`                                                                        |
+| Resend                 | platform-wide          | one account; per-merchant domains added under it                                                                           |
+| @ForceAI1_bot Telegram | personal DM to Ahmad   | chat_id `1943728711`                                                                                                       |
 
 ---
 

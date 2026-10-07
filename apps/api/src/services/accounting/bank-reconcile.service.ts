@@ -25,6 +25,7 @@ import { prisma, runInTenantContext, withStore } from '@force/database';
 import type { BankMatchStatus, BankTransaction, Prisma } from '@prisma/client';
 import { parseStatementCsv, parseStatementOfx, type ParsedRow } from './bank-statement-parser';
 import { assertStoreOwns } from './assert-store-owns';
+import { AppError } from '../../middleware/error-handler';
 import { COUNTED_STATUSES_SQL } from './reports.service';
 
 import { minorToDecimalString } from '@force/shared';
@@ -36,6 +37,26 @@ const AMOUNT_TOLERANCE_FILS = 5;
 /** Maximum days difference between bank transaction date and journal posting date. */
 const DATE_TOLERANCE_DAYS = 3;
 const DATE_TOLERANCE_MS = DATE_TOLERANCE_DAYS * 24 * 60 * 60 * 1000;
+
+/**
+ * Hard row cap per statement (FIX-013, audit 2026-10-05). Import upserts every
+ * row inside one interactive transaction and auto-match runs inline in the
+ * request, so work scales linearly with row count and there was no bound but
+ * the 5MB upload limit (tens of thousands of rows). Not benchmarked: 2000 is a
+ * conservative ceiling (a month of a small merchant's bank activity is far
+ * below it); split larger statements by period. Raise only after measuring.
+ */
+export const MAX_STATEMENT_ROWS = 2000;
+
+function assertWithinRowCap(rowCount: number): void {
+  if (rowCount > MAX_STATEMENT_ROWS) {
+    throw new AppError(
+      422,
+      'STATEMENT_TOO_LARGE',
+      `Statement has ${rowCount} rows; the maximum is ${MAX_STATEMENT_ROWS}. Split the file by period and import each part.`
+    );
+  }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -130,6 +151,7 @@ export async function importBankStatement(
   const parsed = fileType === 'ofx' ? parseStatementOfx(buffer) : parseStatementCsv(buffer);
 
   const { rows, skipped, errors: parseErrors } = parsed;
+  assertWithinRowCap(rows.length);
 
   // Derive period from parsed rows
   const dates = rows.map(r => r.date.getTime());
@@ -272,6 +294,9 @@ export async function runAutoMatch(
         direction: true,
       },
     });
+    // Throwing inside the tx rolls back the reset above, so an oversized
+    // (legacy, pre-cap) statement is left exactly as it was.
+    assertWithinRowCap(bankTxs.length);
 
     // Already-matched journal entry ids for this store — fetched ONCE here
     // rather than re-fetched on every bank-tx-row iteration.
