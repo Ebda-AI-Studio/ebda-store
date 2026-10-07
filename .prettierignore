@@ -30,3 +30,5 @@ docs/**/*.html
 docs/test-reports/
 # wrangler configs are parsed by repo scripts; keep them byte-stable (no trailing commas)
 **/wrangler.jsonc
+# byte-exact render snapshots (characterization tests)
+tests/fixtures/**/__snapshots__/
