@@ -431,9 +431,9 @@ export class StoreService {
     // store's own scope (store_subscriptions is under strict RLS).
     //
     // Default VAT (Ebda: 14%, `REGION.defaultVatBps`) is seeded in the same
-    // scope as an ACTIVE rate row so the merchant's tax page shows it and only
-    // has to flip `taxEnabled` once VAT-registered (the charge is gated on
-    // `Store.taxEnabled`, ruling TAX-1); it is editable per store like any other.
+    // scope as an INACTIVE rate row (ruling TAX-2): a new store starts with VAT
+    // OFF and no active rate. The merchant activates it after a super-admin
+    // verifies its VAT registration; the charge is gated on that verification.
     await withStore(store.id, async tx => {
       await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
       await tx.taxRate.create({
@@ -442,7 +442,7 @@ export class StoreService {
           name: 'VAT',
           nameAr: 'ضريبة القيمة المضافة',
           rate: REGION.defaultVatBps / 100,
-          isActive: true,
+          isActive: false,
         },
       });
     });
@@ -768,6 +768,32 @@ export class StoreService {
       logger.warn(
         { err: err instanceof Error ? err.message : 'unknown', storeId },
         '[STORE_DELETE] R2 prefix purge failed (objects orphaned, DB delete stands)'
+      );
+    }
+
+    // The PRIVATE bucket holds this store's VAT evidence (ruling TAX-4) under
+    // the same `stores/<storeId>/` prefix; reclaim it too, same alerting.
+    try {
+      const privateBucket = StorageService.privateBucket();
+      const { deleted, failedKeys, remaining } = await StorageService.deleteByPrefixVerified(
+        `stores/${storeId}/`,
+        privateBucket
+      );
+      logger.info({ storeId, deleted, remaining }, '[STORE_DELETE] purged private R2 objects');
+      if (remaining > 0) {
+        void sendAlert({
+          level: 'p1',
+          scope: 'platform',
+          source: 'store.delete.r2_private_orphaned',
+          title: 'Private R2 purge incomplete after store delete',
+          body: `${remaining} private object(s) (tax documents) survived the purge of stores/${storeId}/ in the private bucket. Delete the prefix manually.`,
+          context: { storeId, deleted, remaining, failedKeys: failedKeys.slice(0, 20) },
+        }).catch(() => undefined);
+      }
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown', storeId },
+        '[STORE_DELETE] private R2 prefix purge failed or not configured (DB delete stands)'
       );
     }
 

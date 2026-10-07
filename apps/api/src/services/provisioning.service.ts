@@ -241,16 +241,17 @@ export class ProvisioningService {
           });
         }
 
-        // Default VAT (Ebda: `REGION.defaultVatBps` = 14%), seeded as an ACTIVE
-        // editable rate. The charge itself stays gated on `Store.taxEnabled`
-        // (ruling TAX-1), which the merchant flips once VAT-registered.
+        // Default VAT (Ebda: `REGION.defaultVatBps` = 14%), seeded as an
+        // INACTIVE editable rate: a new store starts with VAT OFF and no active
+        // rate (ruling TAX-2). It is activated after the store's VAT
+        // registration is verified by a super-admin.
         await tx.taxRate.create({
           data: {
             storeId: store.id,
             name: 'VAT',
             nameAr: 'ضريبة القيمة المضافة',
             rate: REGION.defaultVatBps / 100,
-            isActive: true,
+            isActive: false,
           },
         });
 

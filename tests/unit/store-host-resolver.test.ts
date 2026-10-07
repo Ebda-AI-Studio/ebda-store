@@ -111,7 +111,11 @@ vi.mock('@api/lib/store-scoped-read', () => ({
   readInStoreContext: (_id: string, fn: () => unknown) => fn(),
 }));
 vi.mock('@api/lib/order-tax', () => ({
-  resolveActiveTaxRate: vi.fn().mockResolvedValue({ ratePercent: 0 }),
+  resolveActiveTaxRate: vi.fn().mockResolvedValue({ ratePercent: 0, seller: null }),
+  effectiveTaxFields: (t: { ratePercent: number }) => ({
+    taxRatePercent: t.ratePercent,
+    taxEnabled: t.ratePercent > 0,
+  }),
 }));
 vi.mock('@api/services/notification-dispatcher.service', () => ({
   notificationDispatcher: { isSmsMarketingAvailable: vi.fn().mockResolvedValue(false) },

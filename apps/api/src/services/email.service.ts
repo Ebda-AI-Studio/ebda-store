@@ -242,6 +242,11 @@ export interface OrderEmailData {
    *  and prints as an "incl. VAT" caption after Total, never a summed row
    *  (orderTaxPlacement, issue 2210). */
   taxIncludedInPrice?: boolean | null;
+  /** Frozen on the order ONLY when VAT was collected under a verified profile
+   *  (ruling TAX-2): makes the email show the seller TRN and "VAT (14%)". */
+  sellerTaxRegistrationNumber?: string | null;
+  sellerTaxLegalName?: string | null;
+  taxRateBps?: number | null;
   shipping: number;
   discount?: number;
   /** The levers `discount` is made of (issue 2239) — see order.service create(). */

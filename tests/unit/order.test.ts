@@ -56,6 +56,10 @@ vi.mock('@force/database', () => ({
     taxRate: {
       findMany: vi.fn().mockResolvedValue([]),
     },
+    // VAT gate (ruling TAX-2): no profile = not verified = no VAT.
+    storeTaxProfile: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
     inventoryHistory: {
       // findFirst is the return_stock idempotency marker (return null =
       // "not yet restored" so the restore proceeds).
@@ -1102,6 +1106,12 @@ describe('OrderService', () => {
         taxEnabled: true,
       } as any);
       vi.mocked(prisma.taxRate.findMany).mockResolvedValue([{ rate: 5 }] as any);
+      // VAT is charged only under a VERIFIED tax profile (ruling TAX-2).
+      vi.mocked(prisma.storeTaxProfile.findUnique).mockResolvedValue({
+        status: 'verified',
+        taxRegistrationNumber: '123456789',
+        legalName: 'Test Store LLC',
+      } as any);
       vi.mocked(prisma.coupon.findFirst).mockResolvedValue({
         id: 'coupon-vat',
         storeId: mockStoreId,
@@ -1140,6 +1150,10 @@ describe('OrderService', () => {
       expect(data.subtotal).toBe(5000);
       expect(data.tax).toBe(225);
       expect(data.total).toBe(5000 - 500 + 225 + data.shipping);
+      // The tax-invoice identity is frozen onto the order (ruling TAX-2).
+      expect(data.sellerTaxRegistrationNumber).toBe('123456789');
+      expect(data.sellerTaxLegalName).toBe('Test Store LLC');
+      expect(data.taxRateBps).toBe(500);
     });
 
     // Money-integrity audit gap (2026-07-02, #498 follow-up): createAdminOrder

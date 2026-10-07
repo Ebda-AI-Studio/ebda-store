@@ -76,6 +76,8 @@ const URL_SHAPED =
  * column, or that is also registered, fails the suite.
  */
 const NOT_R2_REFERENCES: Record<string, string> = {
+  'StoreTaxDocument.profileId': 'foreign key to store_tax_profiles, never a URL',
+  'StoreTaxDocument.fileName': "the uploader's original file name (display only), never a URL",
   'Store.googleMapsUrl': 'Google Maps link typed by the merchant, never an upload',
   'StoreLocation.mapsUrl': 'Google Maps link, never an upload',
   'StoreLocation.mapsEmbedUrl': 'Google Maps embed URL, never an upload',

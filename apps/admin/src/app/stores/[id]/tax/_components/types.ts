@@ -39,7 +39,7 @@ export interface TaxTemplate {
 }
 
 export const COMMON_TAX_TYPES: TaxTemplate[] = [
-  { name: 'VAT', nameAr: 'ضريبة القيمة المضافة', rate: 5 },
+  { name: 'VAT', nameAr: 'ضريبة القيمة المضافة', rate: 14 },
   { name: 'GST', nameAr: 'ضريبة السلع والخدمات', rate: 5 },
   { name: 'Sales Tax', nameAr: 'ضريبة المبيعات', rate: 10 },
   { name: 'Luxury Tax', nameAr: 'ضريبة السلع الفاخرة', rate: 15 },
