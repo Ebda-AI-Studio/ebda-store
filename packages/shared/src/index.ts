@@ -28,3 +28,4 @@ export * from './payments';
 export * from './order-tax-display';
 export * from './setup-guide';
 export * from './whatsapp';
+export * from './builder';

@@ -13,6 +13,7 @@
  * filter sidebar on PLP, testimonials.
  */
 
+import type { LegacyHomeSectionKey } from '../builder/section-keys';
 import type { TemplateId } from './store-theme';
 import { getTemplateBaseline } from './template-baselines';
 
@@ -37,6 +38,14 @@ export interface SectionPaddingMaxWidthVisibility {
   hideOnMobile?: boolean;
   /** Hide on desktop (≥ 768px viewport). Default false. */
   hideOnDesktop?: boolean;
+  /**
+   * Visual builder (BUILDER-PREVIEW-1): hide on tablet (768–1023px) only.
+   * Unset = legacy behaviour, where `hideOnDesktop` covers every width
+   * from 768px up. Set (true OR false) = three-way mode: `hideOnDesktop`
+   * then means >= 1024px only. Written by the builder adapter when a
+   * document's tablet and desktop visibility differ.
+   */
+  hideOnTablet?: boolean;
 }
 
 /**
@@ -960,16 +969,7 @@ export interface StoreLayoutSettings {
    * hardcoded sequence. Unknown keys are skipped; missing known keys append
    * at the end so new sections appear automatically on existing stores.
    */
-  sectionOrder?: Array<
-    | 'hero'
-    | 'categories'
-    | 'newArrivals'
-    | 'bestSellers'
-    | 'brandStory'
-    | 'blogCarousel'
-    | 'trustStrip'
-    | 'testimonials'
-  >;
+  sectionOrder?: Array<LegacyHomeSectionKey>;
 }
 
 /**
