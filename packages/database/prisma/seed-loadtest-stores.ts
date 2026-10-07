@@ -21,7 +21,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { roundToMinor, REGION } from '@force/shared';
-const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
+const prisma = createPrismaClient({
+  connectionString: process.env.DATABASE_URL ?? '',
+  role: 'owner',
+});
 
 // ============================================
 // Config

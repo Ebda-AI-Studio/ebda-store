@@ -5,7 +5,7 @@
 import { createPrismaClient } from '@force/database';
 import { deriveBrandRoles } from '@force/shared';
 
-const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '', role: 'owner' });
 
 const PAIRS = [
   ['--primary', 'primaryColor', '--primary-foreground', 'primaryForeground'],

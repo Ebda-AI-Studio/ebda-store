@@ -35,7 +35,7 @@ if (!process.env.RESEND_API_KEY) {
 const { createPrismaClient } = await import('@force/database');
 const { Resend } = await import('resend');
 
-const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '', role: 'owner' });
 
 try {
   const store = await prisma.store.findFirst({

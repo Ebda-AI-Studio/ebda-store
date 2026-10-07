@@ -6,7 +6,7 @@
 // with no reseed.
 //   run: railway run node packages/database/scripts/demos-content-only-layout.mjs
 import { createPrismaClient } from '@force/database';
-const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '', role: 'owner' });
 
 const demos = await prisma.store.findMany({
   where: { slug: { startsWith: 'demo-' } },

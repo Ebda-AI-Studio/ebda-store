@@ -112,7 +112,7 @@ describe.skipIf(!haveBouncer)('tenant isolation behind a transaction-mode pooler
 
   beforeAll(async () => {
     const o = new URL(OWNER_URL);
-    owner = createPrismaClient({ connectionString: OWNER_URL, max: 2 });
+    owner = createPrismaClient({ connectionString: OWNER_URL, max: 2, role: 'owner' });
     await owner.$executeRawUnsafe(`ALTER ROLE ebda_app WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
     const [{ verifier }] = await owner.$queryRawUnsafe<Array<{ verifier: string }>>(
       `SELECT rolpassword AS verifier FROM pg_authid WHERE rolname = 'ebda_app'`

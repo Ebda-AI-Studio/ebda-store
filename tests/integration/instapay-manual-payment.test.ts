@@ -139,7 +139,7 @@ describe.skipIf(!hasDb)('InstaPay manual payment', () => {
     });
 
   beforeAll(async () => {
-    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4 });
+    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4, role: 'owner' });
     await redis.connect().catch(() => undefined);
     const user = await owner.user.create({
       data: {

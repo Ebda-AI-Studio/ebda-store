@@ -8,7 +8,10 @@
  */
 import { createPrismaClient } from '../src/client';
 
-const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
+const prisma = createPrismaClient({
+  connectionString: process.env.DATABASE_URL ?? '',
+  role: 'owner',
+});
 const APPLY = process.argv.includes('--apply');
 
 async function main() {

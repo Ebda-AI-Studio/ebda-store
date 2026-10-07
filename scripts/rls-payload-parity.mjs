@@ -593,7 +593,7 @@ async function main() {
   if (appRole.bypass) die(2, 'the app URL bypasses RLS — this run could not detect anything');
   if (!ownerRole.bypass) die(2, 'the owner URL does not bypass RLS — there is no baseline');
 
-  const db = createPrismaClient({ connectionString: OWNER_URL, max: 2 });
+  const db = createPrismaClient({ connectionString: OWNER_URL, max: 2, role: 'owner' });
   let stores;
   try {
     if (SEED) await seedFixtures(db);

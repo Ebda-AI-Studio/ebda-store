@@ -225,7 +225,7 @@ describe.skipIf(!hasDb)('Egyptian gateway webhooks: route, inbox, definer, handl
   let sendSpy: ReturnType<typeof vi.spyOn>;
 
   beforeAll(async () => {
-    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4 });
+    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4, role: 'owner' });
     await redis.connect().catch(() => undefined);
     // The stubs mint small, repeating transaction ids and the inbox dedupes on them, so rows left by
     // an earlier (possibly aborted) run of this file would read as replays. Purge them first.

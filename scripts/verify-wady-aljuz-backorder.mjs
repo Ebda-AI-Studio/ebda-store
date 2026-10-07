@@ -28,7 +28,7 @@ if (!process.env.DATABASE_URL) {
   }
 }
 
-const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '', role: 'owner' });
 const STORE_SLUG = 'wadyaljuz';
 const FEATURE_KEY = 'inventory.backorder';
 

@@ -30,7 +30,10 @@
 import { type StoreTemplate, type Prisma } from '@prisma/client';
 import { createPrismaClient } from '../src/client';
 
-const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
+const prisma = createPrismaClient({
+  connectionString: process.env.DATABASE_URL ?? '',
+  role: 'owner',
+});
 
 /**
  * Build a demo store's layout: ONLY the source store's CONTENT (hero slides +

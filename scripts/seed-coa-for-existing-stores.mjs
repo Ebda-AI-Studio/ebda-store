@@ -16,7 +16,7 @@ import { createPrismaClient } from '@force/database';
 import { seedCoaForStore } from '../apps/api/dist/services/accounting/account.service.js';
 
 const APPLY = process.argv.includes('--apply');
-const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '', role: 'owner' });
 
 async function main() {
   const stores = await prisma.store.findMany({

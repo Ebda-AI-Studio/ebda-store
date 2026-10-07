@@ -115,7 +115,7 @@ describe.skipIf(!hasDb)('payment routes resolve their store under strict RLS', (
   let b: Awaited<ReturnType<typeof mkStore>>;
 
   beforeAll(async () => {
-    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4 });
+    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4, role: 'owner' });
     await redis.connect().catch(() => undefined);
     app = express();
     app.set('trust proxy', true);

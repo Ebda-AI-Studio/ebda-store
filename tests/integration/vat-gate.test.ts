@@ -162,7 +162,7 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
     );
 
   beforeAll(async () => {
-    owner = createPrismaClient({ connectionString: OWNER_URL, max: 3 });
+    owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
     superAdminId = await mkUser('super_admin', 'root');
   });
 

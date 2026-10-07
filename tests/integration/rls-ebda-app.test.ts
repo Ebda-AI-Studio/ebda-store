@@ -27,6 +27,10 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import pg from 'pg';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { TextFallbackClient } from '../../packages/database/src/client';
 import {
   createPrismaClient,
   runWithRequestDb,
@@ -81,7 +85,22 @@ const DOCUMENTED_NON_RLS: Record<string, string> = {
 };
 
 let owner: AppPrismaClient;
-const makeApp = () => createPrismaClient({ connectionString: appUrl(), max: 2 });
+/**
+ * The ebda_app client for THIS file is deliberately built WITHOUT the code-level tenant
+ * guard (R-EBDA-003). This file proves the DATABASE layer on its own: most cases issue a
+ * query that is NOT scoped in code (a contextless count, another store's id) and assert RLS
+ * answers zero rows or rejects the write. Through the factory's client the guard would refuse
+ * those queries before Postgres saw them, so the RLS proof would prove nothing. The guard is
+ * proven on its own (and with RLS behind it) in tests/integration/tenant-guard-ebda-app.test.ts.
+ * Same adapter shape as the factory (`TextFallbackClient`), so catalog `name` columns decode.
+ */
+const makeApp = (): AppPrismaClient =>
+  new PrismaClient({
+    adapter: new PrismaPg(
+      new pg.Pool({ connectionString: appUrl(), max: 2, Client: TextFallbackClient }),
+      { disposeExternalPool: true }
+    ),
+  }) as unknown as AppPrismaClient;
 
 function appUrl(): string {
   const u = new URL(OWNER_URL);
@@ -181,7 +200,7 @@ async function cleanup(): Promise<void> {
 }
 
 beforeAll(async () => {
-  owner = createPrismaClient({ connectionString: OWNER_URL, max: 3 });
+  owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
   // ops gives ebda_app its LOGIN + password per environment; the migration creates it NOLOGIN.
   await owner.$executeRawUnsafe(`ALTER ROLE ebda_app WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
   await cleanup();

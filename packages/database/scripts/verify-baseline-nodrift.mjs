@@ -66,7 +66,7 @@ export const GATED_STORE_COUNT = GATED_STORE_IDS.size + GATED_STORE_SLUGS.size;
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 async function main() {
-  const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
+  const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '', role: 'owner' });
   const stores = await prisma.store.findMany({
     where: {
       OR: [

@@ -182,7 +182,7 @@ describe.skipIf(!hasDb)('SP7 shipping (ebda_app, strict RLS)', () => {
   const auth = (j: string) => ({ Authorization: `Bearer ${j}` });
 
   beforeAll(async () => {
-    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4 });
+    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4, role: 'owner' });
     await redis.connect().catch(() => undefined);
     bostaServer = await serveStub(bosta.fetch);
     aramexServer = await serveStub(aramex.fetch);
