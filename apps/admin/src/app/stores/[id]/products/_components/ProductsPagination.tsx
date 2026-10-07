@@ -4,7 +4,7 @@ import { Button } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import type { Pagination } from './types';
 
-// 500 covers the largest catalog we've seen from a tenant (Wady Aljuz at
+// 500 covers the largest catalog we've seen from a tenant (Demo Shop at
 // 264) on a single page. Server caps at 500 in product.service.ts; keep
 // the two in sync if either is changed.
 const PER_PAGE_OPTIONS = [10, 25, 50, 100, 200, 500] as const;

@@ -2,7 +2,7 @@
  * ONE-OFF, NOT YET APPLIED — Ahmad reviews the dry run and applies it.
  *
  * Turns every product that has exactly ONE variant into a plain (simple)
- * product. Owner report 2026-09-30 (pecannbee): a product whose only variant
+ * product. Owner report 2026-09-30 (demo-store): a product whose only variant
  * is "Size: 380 Gram" shows a one-option picker and a disabled
  * "اختر الخيارات" button until the shopper taps the only option.
  *
@@ -100,9 +100,9 @@
  * transaction. A restore skips a product that already has a variant again.
  *
  * Usage (repo root; DATABASE_URL = the target DB, owner role):
- *   npx tsx scripts/flatten-single-variant-products-2026-09-30.ts --store pecannbee
+ *   npx tsx scripts/flatten-single-variant-products-2026-09-30.ts --store demo-store
  *   npx tsx scripts/flatten-single-variant-products-2026-09-30.ts --all-stores
- *   npx tsx scripts/flatten-single-variant-products-2026-09-30.ts --store pecannbee --apply [--unlink-order-lines] [--keep-product-codes] [--only <productId,...>] [--no-bust-caches]
+ *   npx tsx scripts/flatten-single-variant-products-2026-09-30.ts --store demo-store --apply [--unlink-order-lines] [--keep-product-codes] [--only <productId,...>] [--no-bust-caches]
  *   npx tsx scripts/flatten-single-variant-products-2026-09-30.ts --restore <backup.json> [--apply] [--no-bust-caches]
  * Dry runs (the default, and --restore without --apply) run every read inside
  * a READ ONLY transaction, so they cannot write.
@@ -339,7 +339,7 @@ export interface PlanOptions {
   unlinkOrderLines: boolean;
   /**
    * Keep the product's own SKU/barcode when it has one, instead of the
-   * variant's. The brief says copy the variant's; on pecannbee most variant
+   * variant's. The brief says copy the variant's; on demo-store most variant
    * SKUs are the product SKU plus a size suffix ("743" vs "743-1 Kg"), so a
    * re-import keyed on the old SKU would miss them — Ahmad's call.
    */

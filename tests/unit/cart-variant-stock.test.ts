@@ -1,7 +1,7 @@
 /**
  * Regression: CartService.updateItem checked the PARENT product's inventory
  * for a variant cart line. On a variant product the parent column is not
- * stock (and had drifted negative in production — 92 active pecannbee
+ * stock (and had drifted negative in production — 92 active demo-store
  * products), so every quantity change threw INSUFFICIENT_INVENTORY no matter
  * how much variant stock existed. `addItem` and `validate` had always
  * resolved `variant ? variant.inventory : product.inventory`; only

@@ -487,7 +487,7 @@ export default function CheckoutClient() {
   }, [formData, checkoutStorageKey]);
 
   // Phase 6 (Option C): WaTokenHydrator stashes the customer's WhatsApp phone
-  // under `fwb.wa-customer-phone` when a customer arrives via the WhatsApp
+  // under `ebda.wa-customer-phone` when a customer arrives via the WhatsApp
   // ordering flow. Pre-fill the shipping phone with that value when the form
   // is otherwise blank — never overwrite a value the customer already typed.
   // The marker is removed once consumed so a later session-storage hit can't
@@ -497,7 +497,7 @@ export default function CheckoutClient() {
     if (formData.phone.trim() !== '') return;
     let waPhone: string | null = null;
     try {
-      waPhone = window.sessionStorage.getItem('fwb.wa-customer-phone');
+      waPhone = window.sessionStorage.getItem('ebda.wa-customer-phone');
     } catch {
       return;
     }
@@ -506,7 +506,7 @@ export default function CheckoutClient() {
     if (!normalized) return;
     setFormData(prev => (prev.phone.trim() === '' ? { ...prev, phone: normalized } : prev));
     try {
-      window.sessionStorage.removeItem('fwb.wa-customer-phone');
+      window.sessionStorage.removeItem('ebda.wa-customer-phone');
     } catch {
       // Non-fatal.
     }
@@ -1304,7 +1304,7 @@ export default function CheckoutClient() {
           city: '',
           // Use the country from the rate row when available (multi-country stores),
           // falling back to "Egypt" — matches the Address.country default + the
-          // "Egypt" value every Egypt rate row carries (don't mix "KW" / "Egypt").
+          // "Egypt" value every Egypt rate row carries (don't mix legacy codes / "Egypt").
           country: rateRow?.country ?? REGION.countryName.en,
           phone: formData.phone,
           email: formData.email,

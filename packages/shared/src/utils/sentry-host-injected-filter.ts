@@ -9,7 +9,7 @@
  * Next.js frame rewrite) at lines 190-464, while the served HTML is 11-12
  * lines and no `/_next/static/chunks/*.js` file we ship is longer than 51
  * lines — so no line of ours can be at 226:63. The same line:col positions
- * recur across FWB releases two weeks apart (2214be88 → ad17d6e4), while the
+ * recur across Ebda releases two weeks apart (2214be88 → ad17d6e4), while the
  * Closure-style function names change in lockstep with the CHROME version
  * (152: Nk↔Pk, 154: Ok↔Qk). That is Chrome for iOS's own injected
  * WKUserScript, which WebKit reports under the page URL. We cannot fix it and

@@ -10,7 +10,7 @@
  *
  * - PRODUCT PAGINATION: `/public/products` hard-clamps `limit` at 100
  *   (`ProductService.listPublic`), so the sitemap must page until
- *   `meta.totalPages` is exhausted (pecannbee: 100 of 160 live was the bug).
+ *   `meta.totalPages` is exhausted (demo-store: 100 of 160 live was the bug).
  * - COULD-NOT-ASK vs EMPTY (#2127): a 5xx from the API fails the render so
  *   Google keeps its last-good copy, instead of a 200 empty `<urlset/>`.
  */
@@ -191,17 +191,17 @@ describe('sitemap — host routing', () => {
   });
 
   it('a <slug>.ebda.app host lists only its own store, rooted at that host', async () => {
-    hostRef.host = 'palora.ebda.app';
+    hostRef.host = 'demo-boutique.ebda.app';
     installFetchMock({
-      tenant: { id: 's1', slug: 'palora' },
+      tenant: { id: 's1', slug: 'demo-boutique' },
       stores: [{ id: 's2', slug: 'other', createdAt: '2026-01-01T00:00:00.000Z' }],
       productCounts: { s1: 2, s2: 9 },
     });
     const entries = await sitemap();
     expect(entries.length).toBeGreaterThan(0);
     for (const e of entries) {
-      expect(e.url.startsWith('https://palora.ebda.app')).toBe(true);
-      expect(e.url).not.toContain('/palora/');
+      expect(e.url.startsWith('https://demo-boutique.ebda.app')).toBe(true);
+      expect(e.url).not.toContain('/demo-boutique/');
       expect(e.url).not.toContain('s2-p');
     }
     expect(entries.filter(e => e.url.includes('/products/'))).toHaveLength(2);

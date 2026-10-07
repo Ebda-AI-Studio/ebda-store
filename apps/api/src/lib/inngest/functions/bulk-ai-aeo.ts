@@ -110,7 +110,7 @@ function stripFences(text: string): string {
  *
  *   1. The merchant's footerLinks default has the FAQ row with
  *      `enabled: false` (hide-when-empty default — see
- *      `feedback-fwb-cms-and-tenant-control.md`). Once the sweep
+ *      the CMS/tenant-control notes). Once the sweep
  *      writes 8 FAQs, the link should obviously turn on; without
  *      this helper it stays hidden until the merchant manually
  *      toggles it in admin.

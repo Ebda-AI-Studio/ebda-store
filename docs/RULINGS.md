@@ -10,9 +10,9 @@ mentioned reads as fixed, so it is recorded here instead.
 
 ## 2026-10-03 — Ebda fork (R-EBDA-\*)
 
-Ebda rulings sit on top of the inherited FWB ledger below. Where an Ebda ruling and an FWB ruling disagree, the Ebda ruling wins in this repo.
+Ebda rulings sit on top of the inherited ledger below. Where an Ebda ruling and an inherited ruling disagree, the Ebda ruling wins in this repo.
 
-Ruling R-EBDA-000: Ebda is a separate product on a copy of FWB's history. FWB (`upstream`) is read-only: fetch only, with the push URL disabled. Fixes come across by hand through `scripts/twin-diff.sh`, and nothing flows back. Evidence: Ahmad, 2026-10-03. Cost if wrong: an Ebda change leaks into a GCC production product.
+Ruling R-EBDA-000: Ebda is a separate product with its own history and release train. Evidence: Ahmad, 2026-10-03. Cost if wrong: a change meant for another product ships into Ebda production.
 
 Ruling R-EBDA-001: the backend runs FWB's Express API on Cloudflare Workers (`nodejs_compat` + `httpServerHandler`). Each request gets its own Prisma client (`@prisma/adapter-pg`, `engineType="client"`) over Hyperdrive (query cache OFF) to Neon, as a non-bypass role, with strict RLS on every tenant table and only transaction-local GUCs. No Hono rewrite. Cloudflare Containers is the fallback if the Stage 1 concurrency exit test fails. This decision was taken under Ahmad's "do not stop" instruction and awaits his review. Evidence: `docs/ebda/design/cloudflare-backend.md`; `spikes/workers-api/` (17/17 tests on workerd, 0 leaks through a transaction-mode pooler, mutation-checked). Cost if wrong: the Stage 1 port work is redone on Containers.
 

@@ -1,4 +1,4 @@
-# FWB Design — sizing rules (ahmad standing preference)
+# Ebda Design — sizing rules (ahmad standing preference)
 
 Ahmad's standing rule, codified 2026-05-16 after multiple rounds of
 "things are still too big": **default to compact ecommerce sizing on
@@ -6,7 +6,7 @@ both desktop and mobile.** No oversized cards, hero-tier imagery, or
 marketing-page chrome inside transactional surfaces.
 
 When in doubt, lean SMALLER. Reference for sane defaults is the
-pecannbee + alkahraman + similar Kuwait/GCC stores.
+compact Egyptian storefronts.
 
 ## Industry benchmark sizes (apply these)
 
@@ -72,7 +72,7 @@ opts up via admin if their brand needs heading prominence.
 
 ## Image asset standards (canonical designer brief — 2026-05-17 night)
 
-**Hand this section to any designer / photographer / merchant uploading visual assets.** Every image-bearing surface on FWB expects the dimensions below. Anything off-spec gets cropped or scaled by the storefront and reads as broken (unsafe-zone text disappears, faces get clipped, logos rasterize). Sourced from the zFloos theme brief Ahmad shared 2026-05-17; cross-checked against current FWB component aspect-ratios.
+**Hand this section to any designer / photographer / merchant uploading visual assets.** Every image-bearing surface on Ebda expects the dimensions below. Anything off-spec gets cropped or scaled by the storefront and reads as broken (unsafe-zone text disappears, faces get clipped, logos rasterize). Sourced from the zFloos theme brief Ahmad shared 2026-05-17; cross-checked against current Ebda component aspect-ratios.
 
 ### Why standardize the sizes
 
@@ -195,7 +195,7 @@ Storefront rendering stays **structurally uniform** across all 5 templates — `
 
 ### Theme 1 — Modern (persona: tech / SaaS / DTC software-y)
 
-**Who buys it:** founders launching a new D2C brand that reads as a startup, a SaaS company selling physical merch, a Kuwait tech retailer. Reference: stripe.com / linear.app aesthetic translated to retail.
+**Who buys it:** founders launching a new D2C brand that reads as a startup, a SaaS company selling physical merch, an Egyptian tech retailer. Reference: stripe.com / linear.app aesthetic translated to retail.
 
 **Mood:** crisp, electric, current. Optimistic. Single accent color does ALL the heavy lifting.
 
@@ -233,7 +233,7 @@ Storefront rendering stays **structurally uniform** across all 5 templates — `
 
 ### Theme 2 — Classic (persona: heritage / luxury / traditional retail)
 
-**Who buys it:** family-run watch shop, Kuwaiti gold/jewelry merchant, established perfume house, oud retailer. Reference: tiffany.com / vacheron-constantin.com translated to ecommerce-ready.
+**Who buys it:** family-run watch shop, Egyptian gold/jewelry merchant, established perfume house, oud retailer. Reference: tiffany.com / vacheron-constantin.com translated to ecommerce-ready.
 
 **Mood:** restrained, monumental, time-tested. Serif everywhere; ornamental dividers; deep neutrals.
 
@@ -379,7 +379,7 @@ Storefront rendering stays **structurally uniform** across all 5 templates — `
 2. **700ms** motion is slowest of all themes — luxury pacing.
 3. **Hairline borders** at `/10` opacity — others go `/40+`.
 
-**Mockup:** As shipped on wadyaljuz.com (live reference).
+**Mockup:** As shipped on a live reference store.
 
 ---
 
@@ -392,9 +392,9 @@ Storefront rendering stays **structurally uniform** across all 5 templates — `
 - **Cart icon** stays the canonical SVG across all 5 themes (see CLAUDE.md).
 - **Logo sizing override** is a firm max bounding box: h-14/max-w-[150px] mobile / md:h-20/md:max-w-[210px] desktop, object-contain (updated 2026-06-17 'still very huge' — the missing WIDTH cap was the real cause; see CLAUDE.md).
 
-### Token-name conventions (FWB house style)
+### Token-name conventions (Ebda house style)
 
-Inspired by Shopify Polaris + Material Design Tokens, adapted to FWB's simpler 5-theme system. Future tokens should follow this naming:
+Inspired by Shopify Polaris + Material Design Tokens, adapted to Ebda's simpler 5-theme system. Future tokens should follow this naming:
 
 | Pattern                     | Example                                          | Use                                                  |
 | --------------------------- | ------------------------------------------------ | ---------------------------------------------------- |
@@ -413,7 +413,7 @@ Inspired by Shopify Polaris + Material Design Tokens, adapted to FWB's simpler 5
 
 **Role-coloured text (admin + orders):** status text is `text-<role>-ink`, never `text-<role>` — on its own tint (a pill: `bg-<role>/10 text-<role>-ink`), under a `hover:` tint, and on the plain card alike. The role colour itself fails WCAG AA there (amber on amber 1.7:1, issue 2233; amber on white 1.8:1, issue 2332). `-ink` exists for `primary`, `success`, `warning`, `info`, `destructive` in both the light and dark blocks of `apps/admin/src/styles/globals.css` AND `apps/orders/src/app/globals.css` (issues 2341, 2349), exposed as `text-<role>-ink` by each app's tailwind config. `tests/unit/admin-tint-ink-contrast.test.ts` measures every class string in both apps **per theme and per state** — at rest and on `hover:`, the tint alpha and text class that actually apply in light and in `dark:` (a dark half is `dark:bg-<role>/30 dark:text-<role>-ink`, issue 2323) — from that app's own globals.css: 4.5:1 for text, 3:1 for an icon (a fixed `h-*` + `w-*` box, which may keep the bare role colour when it clears 3:1 — a warning icon does not). Bare `text-primary` is checked on a resting tint only: on the plain surface and under hover it is the brand link colour (Ruling YWA-TXT-1). Banned in both apps: arbitrary-value role colours (`bg-[hsl(var(--success))]/10` — use `bg-success/10`, issue 2322). Banned on EVERY app including the storefront and `packages/ui`: opacity modifiers Tailwind 3 cannot build (`bg-x/30/30`, or a step off the 5-unit scale such as `/8` — issues 2313, 2342), because they emit no CSS at all. **Storefront (`apps/web`, issue 2349, owner option A 2026-09-30):** status-message text — warning / info / success / error banners, pills and inline messages on cart, checkout, auth, account, returns, search, compare, wishlist and reviews — is `text-<role>-ink` for `success`, `warning`, `info`, `destructive` (`primary` stays the merchant's brand colour). Unlike admin, the storefront's inks are NOT fixed tokens: each store's `--<role>-ink` is derived from ITS palette by `statusInkVars` (`@force/shared`) — the role hue at the nearest lightness that reads ≥4.5:1 on its card and page, bare and under every tint up to 30%; where NO lightness of the hue reads on both (a light card on a dark page or the reverse — reachable from the legacy Smart Palette, whose card is darker than its page), the ink is `var(--<role>)`, exactly the old colour, never black/white (issues 2399–2402) — and emitted with the theme (SSR style tag + the `StoreContext` mirror); a merchant page colour on cart/checkout/PDP/PLP re-derives them on the wrapper (`pageSurfaceStyle`). `apps/web/src/styles/globals.css` holds the no-theme fallback (light + `.dark`). A store whose theme sets `legacyBannerContrast: true` gets `--<role>-ink: var(--<role>)` — the old colours, pixel-identical (pecannbee, pinned through data; Ruling BC-1). Rating stars, the wishlist heart and the merchant-coloured footers' newsletter error keep the role colour (graphics / unmeasured surface — exempt by name in the gate). Gated by `tests/unit/admin-tint-ink-contrast.test.ts` (fallback tokens, every class string) and `tests/unit/storefront-status-ink.test.ts` (per-palette derivation across the 5 template themes, dark stores, surfaces on opposite sides of the lightness range, `colorScheme: 'light'` on a dark page, legacy pass-through; a pass-through is accepted only where an independent sweep proves no lightness of the hue reads, and no ink may measure below the bare role colour).
 
-### Token architecture (Polaris-inspired, FWB-adapted)
+### Token architecture (Polaris-inspired, Ebda-adapted)
 
 The 5-theme architecture should follow Shopify Polaris's two-layer pattern so future themes are cheap to add:
 
@@ -422,21 +422,21 @@ The 5-theme architecture should follow Shopify Polaris's two-layer pattern so fu
 
 **Key Polaris patterns to adopt (verified 2026-05-17 by reading `/tmp/polaris-react-audit/polaris-tokens/src/themes/base/`):**
 
-| Pattern                                   | What it means                                                                                                                                                                      | Why for FWB                                                                                                                                                                                                                                      |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`bg-fill` vs `bg-surface`** split       | `bg-fill` = opaque solid regions (buttons, chips, badges). `bg-surface` = container backgrounds (cards, modals, page). Same color role, different element context.                 | Eliminates ambiguity. A "primary background" on a button (`bg-fill-brand`) ≠ a "primary background" on a card (`bg-surface-brand`).                                                                                                              |
-| **Text composites, not size-only tokens** | Bundle each text variant as size + weight + line-height + letter-spacing. Don't token-ize just `font-size`. Polaris has `heading-md` / `body-sm` etc. composite tokens.            | Per-theme bold/minimal differences become a one-line composite override (`text-heading-md`) instead of 4 separate weight/size/tracking/leading overrides per usage site.                                                                         |
-| **Dark mode as partial override**         | A dark theme is a DIFF against the base theme, not a separate file. Only the tokens that differ get redefined.                                                                     | When FWB ships dark mode (deferred), each of the 5 themes gets a 10-30-line dark override instead of a fork.                                                                                                                                     |
-| **Mobile-first breakpoints**              | Polaris: `xs:0`, `sm:490`, `md:768`, `lg:1040`, `xl:1440`. FWB currently uses Tailwind defaults (`sm:640`, `md:768`, `lg:1024`).                                                   | Polaris's `sm:490` better fits Kuwait mobile traffic (most phones 390-430px wide — Tailwind's `sm:640` skips the iPhone Plus / Galaxy S Ultra range). Consider a future migration.                                                               |
-| **4px base × non-linear scale**           | Polaris space scale: `0, 025, 050, 100, 150, 200, 300, 400, 500, 600, 800, 1000, 1200, 1600, 2000, 2400, 2800, 3200`. Gaps at 700/900/1100 intentional — no design calls for them. | FWB should NOT generate every spacing step from 0 to 80px — keep the scale sparse so merchants can't pick weird values. Tailwind's full scale is fine for code; the AI auto-fill should restrict to: `space-1, 2, 3, 4, 6, 8, 12, 16` (8 steps). |
-| **Z-index in hundreds**                   | Polaris: `z-0=auto, z-1=100, z-2=200, ...`. Insert layers without renaming.                                                                                                        | When FWB adds sticky CTA + chat widget + cookie banner stacking (already 3 fixed-bottom layers), use 100/200/300/400 instead of 10/20/30/40 so we can interleave.                                                                                |
-| **Component-specific aliases**            | Polaris exposes `space-card-padding`, `space-button-group-gap` as one-step aliases on top of the scale. Components reference the alias, never the scale step.                      | FWB pack-styles already does this informally (`productCardName`, `sectionKicker`). Formalise it — every component "knows" only its alias; per-theme overrides change the alias mapping.                                                          |
+| Pattern                                   | What it means                                                                                                                                                                      | Why for Ebda                                                                                                                                                                                                                                      |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`bg-fill` vs `bg-surface`** split       | `bg-fill` = opaque solid regions (buttons, chips, badges). `bg-surface` = container backgrounds (cards, modals, page). Same color role, different element context.                 | Eliminates ambiguity. A "primary background" on a button (`bg-fill-brand`) ≠ a "primary background" on a card (`bg-surface-brand`).                                                                                                               |
+| **Text composites, not size-only tokens** | Bundle each text variant as size + weight + line-height + letter-spacing. Don't token-ize just `font-size`. Polaris has `heading-md` / `body-sm` etc. composite tokens.            | Per-theme bold/minimal differences become a one-line composite override (`text-heading-md`) instead of 4 separate weight/size/tracking/leading overrides per usage site.                                                                          |
+| **Dark mode as partial override**         | A dark theme is a DIFF against the base theme, not a separate file. Only the tokens that differ get redefined.                                                                     | When Ebda ships dark mode (deferred), each of the 5 themes gets a 10-30-line dark override instead of a fork.                                                                                                                                     |
+| **Mobile-first breakpoints**              | Polaris: `xs:0`, `sm:490`, `md:768`, `lg:1040`, `xl:1440`. Ebda currently uses Tailwind defaults (`sm:640`, `md:768`, `lg:1024`).                                                  | Polaris's `sm:490` better fits Egyptian mobile traffic (most phones 390-430px wide — Tailwind's `sm:640` skips the iPhone Plus / Galaxy S Ultra range). Consider a future migration.                                                              |
+| **4px base × non-linear scale**           | Polaris space scale: `0, 025, 050, 100, 150, 200, 300, 400, 500, 600, 800, 1000, 1200, 1600, 2000, 2400, 2800, 3200`. Gaps at 700/900/1100 intentional — no design calls for them. | Ebda should NOT generate every spacing step from 0 to 80px — keep the scale sparse so merchants can't pick weird values. Tailwind's full scale is fine for code; the AI auto-fill should restrict to: `space-1, 2, 3, 4, 6, 8, 12, 16` (8 steps). |
+| **Z-index in hundreds**                   | Polaris: `z-0=auto, z-1=100, z-2=200, ...`. Insert layers without renaming.                                                                                                        | When Ebda adds sticky CTA + chat widget + cookie banner stacking (already 3 fixed-bottom layers), use 100/200/300/400 instead of 10/20/30/40 so we can interleave.                                                                                |
+| **Component-specific aliases**            | Polaris exposes `space-card-padding`, `space-button-group-gap` as one-step aliases on top of the scale. Components reference the alias, never the scale step.                      | Ebda pack-styles already does this informally (`productCardName`, `sectionKicker`). Formalise it — every component "knows" only its alias; per-theme overrides change the alias mapping.                                                          |
 
 **What NOT to copy:**
 
-- Polaris's full ~183 color tokens. FWB's 5-theme system only needs ~12-15 color aliases. Don't over-tokenise.
-- Polaris's 13-step font-size scale. FWB's 16px floor + 4-step scale (12 / 14 / 16 / 18 / 22) covers everything.
-- Polaris's `color.text.magic` / `color.bg.fill.magic` — that's an AI-feature signature color. FWB doesn't have that surface concept.
+- Polaris's full ~183 color tokens. Ebda's 5-theme system only needs ~12-15 color aliases. Don't over-tokenise.
+- Polaris's 13-step font-size scale. Ebda's 16px floor + 4-step scale (12 / 14 / 16 / 18 / 22) covers everything.
+- Polaris's `color.text.magic` / `color.bg.fill.magic` — that's an AI-feature signature color. Ebda doesn't have that surface concept.
 
 ---
 
@@ -447,7 +447,7 @@ The 5-theme architecture should follow Shopify Polaris's two-layer pattern so fu
 3. **Don't go above h-16 (64px) for mobile logos** without the `max-w-[50%]` guard on the centered Link wrapper. The guard clamps logo width to half the viewport so even h-16 stays safe between hamburger + actions on a 320px screen. h-18+ tends to bleed into the actions row regardless.
 4. **Don't use gap-4 / gap-6 in product GRIDS at mobile** — gap-3 is the floor; gap-4 only at md+ where viewport allows.
 5. **Don't use `p-5 sm:p-6` for any card body** — that's marketing-page padding, not transactional. Cards: `p-3 sm:p-4` max.
-6. **Don't cap category cards above 180px desktop** — pecannbee/alkahraman top out at ~150-160px. Bigger reads as "feature tile", not "category nav".
+6. **Don't cap category cards above 180px desktop** — reference stores top out at ~150-160px. Bigger reads as "feature tile", not "category nav".
 
 ## When Ahmad says "still too big"
 

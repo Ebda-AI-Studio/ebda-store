@@ -79,7 +79,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * so the request is one transaction again. A different scope still opens its
  * own, exactly as before.
  */
-const REQUEST_TENANT_SCOPE = Symbol('fwb.requestTenantScope');
+const REQUEST_TENANT_SCOPE = Symbol('ebda.requestTenantScope');
 type TenantScope = { storeId: string; userId: string | undefined };
 
 export function tenantContext(req: Request, res: Response, next: NextFunction): void {

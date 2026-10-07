@@ -356,7 +356,7 @@ export default function StoreDomainPage() {
                 //                                  green "live at https://X" message
                 //                                  while customers visiting X actually
                 //                                  land on the registrar parking page —
-                //                                  what bit us on wadyaljuz.com 2026-05-13.
+                //                                  what bit us on demo-shop.example 2026-05-13.
                 //   verified=true, misconfig=f  → "live" — true end-to-end pointing at us
                 const isVerified = domainStatus?.verified === true;
                 const isMisconfigured = domainStatus?.misconfigured === true;
@@ -367,7 +367,7 @@ export default function StoreDomainPage() {
                 // The single panel mixes both record families; if we hide
                 // it the moment storefront goes live, the email DNS rows
                 // disappear too and the merchant loses the panel mid-setup
-                // (caught on wadyaljuz.com 2026-05-14 — records flashed
+                // (caught on demo-shop.example 2026-05-14 — records flashed
                 // in then disappeared on every page refresh).
                 const emailVerified = domainStatus?.emailSender?.status === 'verified';
                 const needsDnsRecords = !isFullyLive || !emailVerified;

@@ -1,5 +1,5 @@
 /**
- * Canonical image-asset sizes for every merchant-uploadable surface on FWB.
+ * Canonical image-asset sizes for every merchant-uploadable surface on Ebda.
  * Single source of truth for the admin "Recommended size: X × Y px" hints
  * + the design.md image-standards table + (future) server-side validators.
  *
@@ -7,7 +7,7 @@
  * designer brief)" — keep both in sync when standards change.
  *
  * Sourced from the zFloos theme brief Ahmad shared 2026-05-17 +
- * cross-checked against FWB's actual rendered aspect ratios.
+ * cross-checked against Ebda's actual rendered aspect ratios.
  */
 
 import type { TemplateId } from './store-theme';
@@ -396,7 +396,7 @@ export const IMAGE_STANDARDS = {
     // Brands with a circular / square mark (think Instagram avatar style)
     // can ship a 1:1 logo instead of the 2:1 wordmark. Header renders the
     // square at the same h-24 / h-36 height — narrower footprint, more
-    // brand-friendly for icon-led identities (e.g. Wady Aljuz's circular
+    // brand-friendly for icon-led identities (e.g. Demo Shop's circular
     // olive-jar mark, verified prod 2026-05-17).
     width: 400,
     height: 400,

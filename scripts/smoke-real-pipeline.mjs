@@ -16,7 +16,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: resolve(__dirname, '../apps/api/.env') });
 
 const RECIPIENT = process.env.SMOKE_RECIPIENT || 'ahmed0montaser@gmail.com';
-const STORE_SLUG = process.env.SMOKE_STORE_SLUG || 'wady-aljuz';
+const STORE_SLUG = process.env.SMOKE_STORE_SLUG || 'demo-shop';
 
 if (!process.env.RESEND_API_KEY && !process.env.SMTP_PASSWORD) {
   console.error('✗ neither RESEND_API_KEY nor SMTP_PASSWORD is set.');
@@ -74,7 +74,7 @@ try {
   await EmailService.sendOrderConfirmation(store.id, sampleOrder);
   console.log('✓ pipeline returned cleanly');
   console.log(`\n→ Check inbox at ${RECIPIENT}.`);
-  console.log("  Header should show Wady Aljuz's logo over a wine-red bar (HSL 348 68% 25%).");
+  console.log("  Header should show Demo Shop's logo over a wine-red bar (HSL 348 68% 25%).");
   console.log('  Body should render RTL because defaultLanguage = ar.');
 } catch (err) {
   console.error('✗ pipeline failed:', err);

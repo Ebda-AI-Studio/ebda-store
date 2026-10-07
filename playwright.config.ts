@@ -1,9 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Admin host is admin.ebda.app (Ruling EBDA-HOST-1, 2026-10-07). wadyaljuz.com
+// Admin host is admin.ebda.app (Ruling EBDA-HOST-1, 2026-10-07). demo-shop.example
 // (the flagship live merchant storefront) is unaffected by the Cloudflare
 // migration and stays as the storefront default.
-const STOREFRONT_BASE_URL = process.env.SMOKE_STOREFRONT_URL ?? 'https://wadyaljuz.com';
+const STOREFRONT_BASE_URL = process.env.SMOKE_STOREFRONT_URL ?? 'https://demo-shop.example';
 const ADMIN_BASE_URL = process.env.SMOKE_ADMIN_URL ?? 'https://admin.ebda.app';
 
 export default defineConfig({
@@ -58,7 +58,7 @@ export default defineConfig({
       testMatch: /admin.*\.smoke\.spec\.ts$/,
       use: { ...devices['Desktop Safari'], baseURL: ADMIN_BASE_URL },
     },
-    // Mobile Safari (iPhone 14 — primary Kuwait market browser)
+    // Mobile Safari (iPhone 14 — primary mobile browser)
     {
       name: 'storefront-mobile-safari',
       testMatch: /storefront.*\.smoke\.spec\.ts$/,

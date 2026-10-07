@@ -7,7 +7,7 @@ import type { ResolvedStore } from '../lib/store-resolver';
  *
  * HARD multi-tenant rule: a store must NEVER show the Ebda platform
  * landing or link to `ebda.app` to its own customers. A bad URL on
- * `wadyaljuz.com` shows Wady Aljuz's OWN "page not available", not the
+ * `demo-shop.example` shows Demo Shop's OWN "page not available", not the
  * platform pitch (which also linked to competing merchants). Inherits the
  * store's theme CSS vars (set by the root layout) so it matches the brand.
  */

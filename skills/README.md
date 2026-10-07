@@ -1,4 +1,4 @@
-# Agent skills for Force AI Store merchants
+# Agent skills for Ebda merchants
 
 Portable `SKILL.md` packages a merchant can drop into Claude Code — or any
 agent client that reads the skill format — to run a real store task against
@@ -22,8 +22,8 @@ rather than breaking a merchant's Monday.
   "mcpServers": {
     "my-store": {
       "type": "http",
-      "url": "https://api.force-ai.co/api/v1/mcp/admin/<store-slug>",
-      "headers": { "x-merchant-key": "fwbm_..." }
+      "url": "https://api.ebda.app/api/v1/mcp/admin/<store-slug>",
+      "headers": { "x-merchant-key": "ebdam_..." }
     }
   }
 }

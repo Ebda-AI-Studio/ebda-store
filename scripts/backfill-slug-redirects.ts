@@ -7,7 +7,7 @@
  * happened via a CSV bulk import *before* that capture existed left no
  * SlugRedirect row — those old product URLs 404 instead of 301-ing.
  *
- * FWB retains the raw CSV text of every bulk import forever
+ * Ebda retains the raw CSV text of every bulk import forever
  * (BulkImportJob.csvData, @db.Text — see packages/database/prisma/schema.prisma).
  * This script mines that retained history to reconstruct old -> new handle
  * mappings, joined by SKU:
@@ -19,7 +19,7 @@
  *   - The CURRENT live product row for that SKU tells us the handle it
  *     answers to now.
  *   - old-handle -> current-handle is therefore a VERIFIED fact recovered
- *     from data FWB already has on disk — never a guess, never a
+ *     from data Ebda already has on disk — never a guess, never a
  *     slug-stripping heuristic. If a SKU can't be joined (no `sku` column in
  *     the CSV, or no live product for that SKU), we skip it and report it —
  *     we do not fabricate a mapping.

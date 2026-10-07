@@ -807,7 +807,7 @@ export class StoreService {
     // charged (a gateway webhook landed the payment but a fulfillment
     // worker hasn't moved the order forward yet). Without the paymentStatus
     // arm, dashboards showed Revenue=0 even when money had been collected.
-    // Ahmad 2026-05-21 — Wadyaljuz had 23 orders, EGP 0.000 revenue.
+    // Ahmad 2026-05-21 — Demo Shop had 23 orders, EGP 0.000 revenue.
     const [productCount, orderCount, customerCount, totalRevenue, recentOrders] = await Promise.all(
       [
         prisma.product.count({ where: { storeId, status: 'active' } }),

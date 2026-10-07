@@ -24,7 +24,7 @@ export const CONTENT_SWEEPS_GOLDEN: GoldenCase[] = [
   {
     id: 'howto-guide-place-order',
     type: 'howto-guide',
-    input: { storeName: 'Wady Aljuz' },
+    input: { storeName: 'Demo Shop' },
     output: [
       {
         title: 'How to Place an Order',
@@ -49,11 +49,11 @@ export const CONTENT_SWEEPS_GOLDEN: GoldenCase[] = [
     type: 'meta-aeo',
     input: {
       kind: 'store',
-      name: 'Wady Aljuz',
+      name: 'Demo Shop',
       description: 'Egypt-based online store for handmade home goods.',
     },
     output: {
-      en: 'Wady Aljuz is an Egypt-based online store specialising in handmade home goods, from ceramics to textiles.',
+      en: 'Demo Shop is an Egypt-based online store specialising in handmade home goods, from ceramics to textiles.',
       ar: 'وادي الجوز هو متجر إلكتروني مصري متخصص في المنتجات المنزلية اليدوية، من السيراميك إلى المنسوجات.',
     },
   },
@@ -61,7 +61,7 @@ export const CONTENT_SWEEPS_GOLDEN: GoldenCase[] = [
     id: 'llms-txt-basic-store',
     type: 'llms-txt',
     input: {
-      storeName: 'Wady Aljuz',
+      storeName: 'Demo Shop',
       categoryNames: ['Kitchen & Dining', 'Home Decor'],
       productNames: ['Handmade Ceramic Mug'],
     },
@@ -72,7 +72,7 @@ export const CONTENT_SWEEPS_GOLDEN: GoldenCase[] = [
     // A golden fixture asserting the dead shape would let that regression
     // pass this eval gate again.
     output:
-      '# Wady Aljuz\n\n> Egypt-based online store for handmade home goods.\n\n## Store pages\n- Home: https://wady-aljuz.ebda.app\n\n## Product categories\n- Kitchen & Dining: https://wady-aljuz.ebda.app/products?category=kitchen-dining\n- Home Decor: https://wady-aljuz.ebda.app/products?category=home-decor\n\n## Notes\n- Bilingual (Arabic/English), currency EGP, ships within Egypt.',
+      '# Demo Shop\n\n> Egypt-based online store for handmade home goods.\n\n## Store pages\n- Home: https://demo-shop.ebda.app\n\n## Product categories\n- Kitchen & Dining: https://demo-shop.ebda.app/products?category=kitchen-dining\n- Home Decor: https://demo-shop.ebda.app/products?category=home-decor\n\n## Notes\n- Bilingual (Arabic/English), currency EGP, ships within Egypt.',
   },
   {
     id: 'citation-copy-mug',

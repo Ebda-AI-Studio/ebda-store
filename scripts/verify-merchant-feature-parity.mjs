@@ -1,7 +1,7 @@
 /**
  * verify-merchant-feature-parity.mjs
  *
- * Verifies that the resolved feature flags for Wady Aljuz and Palora
+ * Verifies that the resolved feature flags for Demo Shop and Demo Boutique
  * (the two real merchants) are identical before and after the
  * 4-layer feature enforcement PR.
  *
@@ -22,7 +22,7 @@ import { prisma } from '@force/database';
 import { PLAN_BASELINE, FEATURE_KEYS_ARRAY } from '@force/shared';
 
 // The two real merchants (slugs are stable across environments).
-const TARGET_SLUGS = ['wadyaljuz', 'palora'];
+const TARGET_SLUGS = ['demo-shop', 'demo-boutique'];
 
 /**
  * Replicates featureService.rowsToMap() without importing the full service

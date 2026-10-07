@@ -160,10 +160,10 @@ jobs:
         if: github.event_name != 'push'
         run: npm ci
 
-      # Ebda must not ship FWB / Force AI branding; always cheap, always run.
-      - name: No-FWB-branding test
+      # Ebda must not ship upstream-product branding; always cheap, always run.
+      - name: No-inherited-branding test
         if: github.event_name != 'push'
-        run: npx vitest run tests/unit/no-fwb-branding.test.ts --reporter=verbose --retry=0
+        run: npx vitest run tests/unit/no-force-branding.test.ts --reporter=verbose --retry=0
 
       # Prettier on the files the PR changed (the main lane checks the whole
       # tree). `--diff-filter=d` skips deletions; prettier skips .prettierignore.
@@ -650,7 +650,7 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           ADMIN_PASSWORD: test-admin-password-ci
-          ADMIN_EMAIL: admin@forcemedia.com
+          ADMIN_EMAIL: admin@ebda.app
 
       - name: Build API
         run: npm run build -w apps/api
@@ -758,7 +758,7 @@ jobs:
           # Match the value passed to the seed step above so the login test
           # can authenticate with the seeded super admin.
           ADMIN_PASSWORD: test-admin-password-ci
-          ADMIN_EMAIL: admin@forcemedia.com
+          ADMIN_EMAIL: admin@ebda.app
 
       - name: Stop API server
         if: always()
@@ -936,7 +936,7 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           ADMIN_PASSWORD: test-admin-password-ci
-          ADMIN_EMAIL: admin@forcemedia.com
+          ADMIN_EMAIL: admin@ebda.app
 
       - name: Give ebda_app a CI-only login
         # Same disposable per-job password as the jobs above; never exists

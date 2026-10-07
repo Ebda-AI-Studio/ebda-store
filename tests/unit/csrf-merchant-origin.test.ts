@@ -213,7 +213,7 @@ describe('csrfProtection — merchant origins are no longer exempt', () => {
       // shipping/tax calculate, promotions preview and POST /payments/create
       // are unauthenticated by design, and `generateCsrfToken` is reachable
       // only from login and refresh. Requiring a token from them 403'd every
-      // guest card payment on pecannbee.com.kw for two days.
+      // guest card payment on demo-store.example for two days.
       //
       // The impersonation case this replaced stays covered above by 'rejects a
       // pair minted in the attacker session but replayed on the victim cookie',

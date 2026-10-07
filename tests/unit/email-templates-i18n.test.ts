@@ -24,7 +24,7 @@ import { orderShippedTemplate } from '@api/services/email-templates/order-shippe
 import { returnConfirmationTemplate } from '@api/services/email-templates/return-confirmation';
 import { returnStatusUpdateTemplate } from '@api/services/email-templates/return-status-update';
 
-const STORE = 'Wady Aljuz';
+const STORE = 'Demo Shop';
 const WEB_URL = 'https://store.test';
 const XSS = '<script>alert(1)</script>';
 

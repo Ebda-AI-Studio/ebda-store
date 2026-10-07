@@ -1,4 +1,4 @@
-# Force AI Store — Product Roadmap
+# Ebda — Product Roadmap
 
 **Internal document. Last updated: 2026-06-01.**
 
@@ -18,7 +18,7 @@
 ### Commerce Core
 
 - [x] Product management — categories, variants, inventory tracking, image galleries
-- [x] Product discount engine — per-product discount dropdown (None / Percentage % / Fixed KWD) with live discounted-price preview; `compareAtPrice` is now derived automatically
+- [x] Product discount engine — per-product discount dropdown (None / Percentage % / Fixed EGP) with live discounted-price preview; `compareAtPrice` is now derived automatically
 - [x] Order lifecycle — cart, checkout, payment processing, status transitions with notification triggers
 - [x] Abandoned cart recovery — sweeps website carts + WhatsApp DM carts in one unified job
 - [x] Upsell & cross-sell — AI co-purchase signal driving "Frequently Bought Together" recommendations
@@ -52,12 +52,12 @@
 - [x] Journal entries — auto-posted on paid orders (sales, cost of goods, refunds); manual entry UI
 - [x] Profit & Loss — live P&L report reflecting actual store activity
 - [x] Expense tracking — categorized expense entry with receipt attachment and monthly summary (Professional+)
-- [x] Invoicing — Kuwait-compliant invoice generation, bilingual layout, PDF export (Professional+)
+- [x] Invoicing — Egypt-compliant invoice generation, bilingual layout, PDF export (Professional+)
 - [x] Tax reports — VAT/sales-tax export per reporting period (Enterprise+)
-- [x] Multi-currency — FX tracking with automatic KWD conversion at book-keeping level (Enterprise+)
+- [x] Multi-currency — FX tracking with automatic EGP conversion at book-keeping level (Enterprise+)
 - [x] Profit anomaly watch — AI-driven margin watcher that flags below-cost sales (Enterprise+)
 - [x] Bank reconciliation — CSV/OFX import with automated ledger matching (Enterprise+)
-- [x] Payment audit trail — append-only `payment_events` table with raw provider webhook payload; every Tap/MyFatoorah/Hesabe/UPayments event preserved
+- [x] Payment audit trail — append-only `payment_events` table with raw provider webhook payload; every provider event preserved
 
 ### Inventory (tiered by plan)
 
@@ -75,12 +75,10 @@
 - [x] Layered feature baselines in `packages/shared/src/plan-baselines.ts` — strict superset invariant unit-tested
 - [x] Super-admin per-store feature overrides — preserved across plan changes
 
-### Kuwait Payment Stack
+### Egypt Payment Stack
 
-- [x] Tap Payments — KNET + Visa + Mastercard + Apple Pay
-- [x] MyFatoorah — KNET + cards + Apple Pay + STC Pay
-- [x] Hesabe — KNET + Visa/Mastercard
-- [x] UPayments — KNET + digital wallets
+- [x] Paymob, Kashier, Fawry — cards + wallets
+- [x] InstaPay — manual payments with confirmation
 - [x] Cash on Delivery — flat-fee option, no provider account required
 - [x] Smart payment links — typeahead product picker + custom amount, all 4 gateways
 
@@ -88,7 +86,7 @@
 
 - [x] WhatsApp order notifications — 4 lifecycle templates (placed, confirmed, shipped, delivered), per-event per-channel toggles
 - [x] Customer DM ordering bot — Gemini NLU, natural Arabic/English, voice transcription, product photo matching, returning-customer personalization
-- [x] One-click Meta Commerce catalog provisioning — auto-creates catalog under Force AI parent BM via Graph API; no merchant BM setup required
+- [x] One-click Meta Commerce catalog provisioning — auto-creates catalog under the platform parent BM via Graph API; no merchant BM setup required
 - [x] Bot analytics — funnel, intent breakdown, LLM stats, date range pickers
 - [x] Origin-aware delivery — WhatsApp-origin orders receive WhatsApp-only (no placeholder email)
 - [x] Abandoned cart recovery sweeps both website + WhatsApp DM carts
@@ -104,7 +102,7 @@
 
 - [x] iCarry integration — rate calculation and tracking
 - [x] Aramex integration — rate calculation and tracking
-- [x] Kuwait shipping zones — governorate and district structure
+- [x] Egypt shipping zones — governorate and city structure
 - [x] Cash on delivery — flat-fee option
 
 ### Other
@@ -140,23 +138,23 @@ These items are sequenced from `docs/HANDOFF-2026-06-01.md`. Priority order is a
 
 ## Tech Stack
 
-| Layer               | Technology                                                         |
-| ------------------- | ------------------------------------------------------------------ |
-| **API**             | Express.js 4 + TypeScript                                          |
-| **Admin Dashboard** | Next.js 16 (App Router)                                            |
-| **Storefront**      | Next.js 16 (App Router)                                            |
-| **Database**        | Neon PostgreSQL (serverless) + Prisma ORM                          |
-| **Cache & Queues**  | Redis                                                              |
-| **Storage**         | Cloudflare R2 (S3-compatible)                                      |
-| **Real-time**       | Socket.io (WebSocket notifications)                                |
-| **Auth**            | Custom JWT (HTTP-only cookies)                                     |
-| **Async Jobs**      | Inngest                                                            |
-| **AI**              | Google Gemini Flash Lite (`GOOGLE_GENERATIVE_AI_KEY`)              |
-| **Payments**        | Tap Payments, MyFatoorah, Hesabe, UPayments (Kuwait KNET gateways) |
-| **Email**           | Resend                                                             |
-| **Push**            | OneSignal + Web Push (VAPID)                                       |
-| **Hosting**         | Cloudflare Workers (admin + storefront + orders) + Railway (API)   |
-| **Testing**         | Vitest (332+ tests)                                                |
+| Layer               | Technology                                                       |
+| ------------------- | ---------------------------------------------------------------- |
+| **API**             | Express.js 4 + TypeScript                                        |
+| **Admin Dashboard** | Next.js 16 (App Router)                                          |
+| **Storefront**      | Next.js 16 (App Router)                                          |
+| **Database**        | Neon PostgreSQL (serverless) + Prisma ORM                        |
+| **Cache & Queues**  | Redis                                                            |
+| **Storage**         | Cloudflare R2 (S3-compatible)                                    |
+| **Real-time**       | Socket.io (WebSocket notifications)                              |
+| **Auth**            | Custom JWT (HTTP-only cookies)                                   |
+| **Async Jobs**      | Inngest                                                          |
+| **AI**              | Google Gemini Flash Lite (`GOOGLE_GENERATIVE_AI_KEY`)            |
+| **Payments**        | Paymob, Kashier, Fawry, InstaPay                                 |
+| **Email**           | Resend                                                           |
+| **Push**            | OneSignal + Web Push (VAPID)                                     |
+| **Hosting**         | Cloudflare Workers (admin + storefront + orders) + Railway (API) |
+| **Testing**         | Vitest (332+ tests)                                              |
 
 ---
 

@@ -38,7 +38,10 @@ describe('heroSlideSchema — link (banner link)', () => {
   });
 
   it('accepts a safe absolute https URL', () => {
-    const result = heroSlideSchema.safeParse({ ...baseSlide, link: 'https://wadyaljuz.com/sale' });
+    const result = heroSlideSchema.safeParse({
+      ...baseSlide,
+      link: 'https://demo-shop.example/sale',
+    });
     expect(result.success).toBe(true);
   });
 
@@ -68,12 +71,12 @@ describe('heroSlideSchema — link (banner link)', () => {
     const result = heroSlideSchema.safeParse({
       ...baseSlide,
       ctaHref: '/products',
-      link: 'https://wadyaljuz.com/sale',
+      link: 'https://demo-shop.example/sale',
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.ctaHref).toBe('/products');
-      expect(result.data.link).toBe('https://wadyaljuz.com/sale');
+      expect(result.data.link).toBe('https://demo-shop.example/sale');
     }
   });
 });

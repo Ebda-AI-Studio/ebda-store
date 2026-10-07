@@ -195,40 +195,40 @@ describe('the global mutation limiter skips the merchant-admin MCP surface (#173
   const mcpReq = (opts: { key?: string; path?: string; method?: string } = {}): Request =>
     req({
       method: opts.method ?? 'POST',
-      path: opts.path ?? '/api/v1/mcp/admin/pecannbee',
+      path: opts.path ?? '/api/v1/mcp/admin/demo-store',
       header: (name: string) => (name.toLowerCase() === 'x-merchant-key' ? opts.key : undefined),
     });
 
   it('lets POST /api/v1/mcp/admin/:storeSlug past uncounted, with or without a credential', () => {
     expect(skipGlobalRateLimit(mcpReq())).toBe(true);
-    expect(skipGlobalRateLimit(mcpReq({ key: 'fwbm_whatever' }))).toBe(true);
+    expect(skipGlobalRateLimit(mcpReq({ key: 'ebdam_whatever' }))).toBe(true);
   });
 
   it('does not open the bypass to lookalike paths', () => {
     // The negative control. A prefix match without the trailing slash inside
     // 'admin/' would let a similarly-named but DIFFERENT path through too.
     for (const path of [
-      '/api/v1/mcp/admin-x/pecannbee',
-      '/api/v1/mcp-admin/pecannbee',
+      '/api/v1/mcp/admin-x/demo-store',
+      '/api/v1/mcp-admin/demo-store',
       '/api/v1/mcp/adminx',
-      '/mcp/admin/pecannbee',
-      '/api/v2/mcp/admin/pecannbee',
-      '/api/v1/mcp/admin/pecannbee/../../auth/login',
+      '/mcp/admin/demo-store',
+      '/api/v2/mcp/admin/demo-store',
+      '/api/v1/mcp/admin/demo-store/../../auth/login',
     ]) {
-      expect(skipGlobalRateLimit(mcpReq({ path, key: 'fwbm_whatever' })), path).toBe(false);
+      expect(skipGlobalRateLimit(mcpReq({ path, key: 'ebdam_whatever' })), path).toBe(false);
     }
   });
 
   it('does not extend the bypass to other mutating methods on that path', () => {
     for (const method of ['PUT', 'PATCH', 'DELETE']) {
-      expect(skipGlobalRateLimit(mcpReq({ method, key: 'fwbm_whatever' })), method).toBe(false);
+      expect(skipGlobalRateLimit(mcpReq({ method, key: 'ebdam_whatever' })), method).toBe(false);
     }
     // GET already bypasses via bypass 2 (safe methods), not this branch.
     expect(skipGlobalRateLimit(mcpReq({ method: 'GET' }))).toBe(true);
   });
 
   it('does NOT extend the bypass to the anonymous buyer-facing /mcp/:storeSlug surface (no per-caller identity, verified or not, to bind a tighter bucket to)', () => {
-    expect(skipGlobalRateLimit(req({ path: '/api/v1/mcp/pecannbee' }))).toBe(false);
+    expect(skipGlobalRateLimit(req({ path: '/api/v1/mcp/demo-store' }))).toBe(false);
   });
 
   it('still counts every other mutation', () => {

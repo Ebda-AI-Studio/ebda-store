@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
 import { enforceMaxDimensions } from '../../apps/api/src/services/image-resize.service';
 
-// On 2026-05-01 the palora catalog uploaded 19 images averaging 8 MB, including
+// On 2026-05-01 the demo-boutique catalog uploaded 19 images averaging 8 MB, including
 // a 4160x6240 PNG at 28 MB, and those product pages shipped exactly that to
 // mobile customers until 2026-08-09. The cause: resizeToAspect is opt-in via
 // `?aspect=`, no product-upload surface sends it, and there was no other

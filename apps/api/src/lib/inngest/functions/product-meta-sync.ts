@@ -9,7 +9,7 @@ interface SyncArgs {
   // The upsert emitter (product.service) sends `op: 'create'|'update'`, NOT `action`.
   // One handler serves both product.upserted and product.deleted, so `action` is
   // derived from the EVENT NAME below — reading event.data.action made it undefined
-  // on every upsert, so FWB POSTed action:undefined and WBS rejected it with 400
+  // on every upsert, so Ebda POSTed action:undefined and WBS rejected it with 400
   // "missing required fields" (product→Meta sync silently failed on every save).
   event: {
     name?: string;
@@ -73,7 +73,7 @@ export const productMetaSync = async ({
         select: {
           metaCatalogId: true,
           settings: true,
-          // For the Meta catalog feed fields (link / brand / currency) — FWB owns
+          // For the Meta catalog feed fields (link / brand / currency) — Ebda owns
           // the storefront-URL truth; WBS just maps what we send.
           name: true,
           slug: true,

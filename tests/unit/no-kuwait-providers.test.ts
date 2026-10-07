@@ -1,10 +1,10 @@
 /**
- * Ebda is for Egypt: the Kuwait payment gateways of its FWB parent (Tap, MyFatoorah, Hesabe,
+ * Ebda is for Egypt: the Kuwait payment gateways of its Ebda parent (Tap, MyFatoorah, Hesabe,
  * UPayments, and the KNET method) are gone from everything that ships to a user or a
- * deployment (SP6b). FWB upstream keeps them; Ebda's git history keeps their adapters.
+ * deployment (SP6b). Ebda upstream keeps them; Ebda's git history keeps their adapters.
  *
  * Scope: text under apps/<app>/{src,public,content}, packages/<pkg>/src, and the env / compose
- * examples. docs/, tests/, scripts/ and migrations are NOT scanned (inherited FWB docs and
+ * examples. docs/, tests/, scripts/ and migrations are NOT scanned (inherited Ebda docs and
  * immutable migration history live there on purpose). A dangling import of a removed adapter is
  * a compile error, so `npm run typecheck` is the other half of this guarantee.
  */
@@ -18,10 +18,7 @@ const FORBIDDEN =
   /\b(myfatoorah|hesabe|upayments|knet)\b|tap payments|\bTAP_(API|SECRET|WEBHOOK)_|tap_payments|\btapApiKey\b|x-tap-signature|\btap-signature\b|tap\.provider/i;
 
 /** repo-relative path -> why it may still name one (brand-impersonation protection, not a gateway). */
-const ALLOWLIST: Record<string, string> = {
-  'packages/shared/src/abuse/protected-slugs.ts':
-    'reserved store slugs: a merchant must not register a lookalike of a payment brand',
-};
+const ALLOWLIST: Record<string, string> = {};
 
 const SKIP_DIRS = new Set(['node_modules', '.next', '.open-next', 'dist', '.turbo', 'coverage']);
 const TEXT_EXT = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.mdx', '.md', '.css', '.html', '.svg', '.yml', '.yaml', '.prisma']); // prettier-ignore

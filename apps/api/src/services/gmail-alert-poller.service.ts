@@ -17,7 +17,7 @@ import { sendAlert } from './alerts.service';
  * Setup (one-time):
  *   1. Owner enables 2FA on the Gmail account (myaccount.google.com)
  *   2. Owner generates an App Password at myaccount.google.com/apppasswords
- *      named "FWB Alert Poller" — Google returns a 16-char password
+ *      named "Ebda Alert Poller" — Google returns a 16-char password
  *   3. Set Railway env vars:
  *        GMAIL_IMAP_USER             = ahmed0montaser@gmail.com
  *        GMAIL_IMAP_APP_PASSWORD     = <the 16-char password>
@@ -147,9 +147,9 @@ function resolveSource(fromAddress: string): string {
  * email have details about the platform and project name, include them
  * so i know which project").
  *
- * Order matters — first match wins. Most specific first (FWB-API before
- * FWB-Web before FWB, etc.) so a Sentry email mentioning both
- * `force-website-builder` and `api` lands as FWB-API not bare FWB.
+ * Order matters — first match wins. Most specific first (Ebda-API before
+ * Ebda-Web before Ebda) so a Sentry email mentioning both
+ * `ebda` and `api` lands as Ebda-API not bare Ebda.
  *
  * Senders that follow the `[<Project Name>] <Title>` subject convention
  * (Sentry, Vercel, PostHog, Neon) get caught by the bracket-prefix step
@@ -158,25 +158,11 @@ function resolveSource(fromAddress: string): string {
  * deployment notifications, BetterStack incidents).
  */
 const PROJECT_MARKERS: Array<{ tag: string; patterns: RegExp[] }> = [
-  // FWB sub-projects — match BEFORE plain FWB so the most specific tag wins
-  {
-    tag: 'FWB-API',
-    patterns: [/force-website-builder.*api/i, /api\.ebda\.app/i, /api-production-c058/i],
-  },
-  { tag: 'FWB-Admin', patterns: [/force-admin/i, /\badmin\.ebda\.app/i] },
-  {
-    tag: 'FWB-Web',
-    patterns: [/force-web\b/i, /wadyaljuz/i, /\bebda\.app/i, /force-web-sigma/i],
-  },
-  { tag: 'FWB', patterns: [/force-website-builder/i, /\bfwb\b/i] },
-  // Other Force projects
-  {
-    tag: 'WBS',
-    patterns: [/whatsapp.?saas/i, /whatsapp.?bulk/i, /\bwhatsapp\.ebda\.app/i, /\bwbs\b/i],
-  },
-  { tag: 'CRM', patterns: [/force.media.crm/i, /\bcrm\.ebda\.app/i] },
-  { tag: 'Landing', patterns: [/force.media.landing/i, /^www\.ebda\.app/i] },
-  { tag: 'OmHassan', patterns: [/om.?hassan/i] },
+  // Ebda sub-projects — most specific first
+  { tag: 'Ebda-API', patterns: [/ebda.*\bapi\b/i, /api\.ebda\.app/i] },
+  { tag: 'Ebda-Admin', patterns: [/ebda.admin/i, /\badmin\.ebda\.app/i] },
+  { tag: 'Ebda-Web', patterns: [/ebda.web/i, /\bebda\.app/i] },
+  { tag: 'Ebda', patterns: [/\bebda\b/i] },
 ];
 
 /**
@@ -185,15 +171,15 @@ const PROJECT_MARKERS: Array<{ tag: string; patterns: RegExp[] }> = [
  *
  * Two-pass strategy:
  *  1. Parse the bracketed prefix Sentry/Vercel/PostHog use
- *     (`[force-web] Build failed`) → match against PROJECT_MARKERS;
+ *     (`[ebda-web] Build failed`) → match against PROJECT_MARKERS;
  *     if no map hit, return the literal bracket contents (truncated)
  *     so unknown-project alerts still surface a hint.
  *  2. Scan the first 1KB of subject+body for any marker pattern —
  *     catches senders that put the project name in body text only.
  */
 function extractProject(subject: string, body: string): string | null {
-  // 1. Bracketed-prefix path. Sentry: `[force-website-builder/api] ...`
-  //    Vercel:  `[force-web] Build failed`
+  // 1. Bracketed-prefix path. Sentry: `[ebda/api] ...`
+  //    Vercel:  `[ebda-web] Build failed`
   //    PostHog: `[Ebda] Insight...`
   const bracketMatch = subject.match(/^\s*\[([^\]]+)\]/);
   if (bracketMatch) {

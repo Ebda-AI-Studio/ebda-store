@@ -2653,8 +2653,8 @@
       "phNameAr": "e.g. Main Branch",
       "phCountry": "e.g. Egypt",
       "phCountryAr": "e.g. Egypt",
-      "phAddress": "e.g. Block 5, Salem Al Mubarak St, Salmiya",
-      "phAddressAr": "e.g. Block 5, Salem Al Mubarak St, Salmiya",
+      "phAddress": "e.g. 12 Tahrir St, Dokki, Giza",
+      "phAddressAr": "e.g. 12 Tahrir St, Dokki, Giza",
       "phPhone": "e.g. +20 2 2222 2222",
       "phWhatsapp": "e.g. +201012345678",
       "phHours": "e.g. Sat–Thu 9am–10pm",
@@ -3117,10 +3117,10 @@
       "zoneNameArLabel": "Zone Name (Arabic)",
       "zoneNameArPlaceholder": "e.g., منطقة العاصمة",
       "areasLabel": "Areas",
-      "areasPlaceholder": "Separate areas with commas: Capital, Hawalli, Farwaniya",
+      "areasPlaceholder": "Separate areas with commas: Cairo, Giza, Alexandria",
       "addAllEgyptGovernorates": "+ Add All Egypt Governorates",
       "areasArLabel": "Areas (Arabic)",
-      "areasArPlaceholder": "العاصمة، حولي، الفروانية",
+      "areasArPlaceholder": "القاهرة، الجيزة، الإسكندرية",
       "deliveryFeeLabel": "Delivery Fee (EGP)",
       "deliveryFeePlaceholder": "1.000",
       "freeShippingLabel": "Free Shipping Over (EGP)",
@@ -5103,7 +5103,7 @@
       "aeoTitle": "Answer Engine Optimization",
       "aeoHint": "Conversational copy for AI answer engines (Perplexity, Google AI Overview, Bing Copilot). Auto-filled by the AEO sweep; you can edit per-entity.",
       "aeoLabelEn": "AEO meta description (EN)",
-      "aeoPlaceholderEn": "Conversational answer-engine copy. e.g. «Wady Aljuz is an Egypt-based online grocery store specializing in…»",
+      "aeoPlaceholderEn": "Conversational answer-engine copy. e.g. «Demo Shop is an Egypt-based online grocery store specializing in…»",
       "aeoHintText": "Direct-answer style, 130–160 chars. Leave blank to let the AEO sweep fill it.",
       "aeoLabelAr": "AEO meta description (AR)",
       "aeoPlaceholderAr": "نسخة عربية لمحركات الإجابة — مثال: «وادي الجوز متجر إلكتروني مصري متخصص في…»",
@@ -5780,7 +5780,8 @@
       "ariaLabel": "Language"
     },
     "brand": {
-      "forceMediaAlt": "Ebda"
+      "forceMediaAlt": "Ebda",
+      "brandAlt": "Ebda"
     },
     "aiUsageSummaryCard": {
       "loading": "Loading AI quota…",

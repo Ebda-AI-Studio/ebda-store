@@ -57,7 +57,7 @@ interface WorkerEnv {
  * Ebda COMPANY-page carve-out (2026-07-09).
  *
  * `ebda.app` / `ebda.app` are the Ebda *company* umbrella page —
- * a separate static site hosted on Cloudflare Pages (`force-ai-landing-preview`).
+ * a separate static site hosted on Cloudflare Pages (`ebda-marketing`).
  * But this storefront Worker owns the WHOLE `ebda.app` zone via the SaaS
  * wildcard catch-all route (needed for `ebda.app` + every merchant
  * custom hostname), and Worker routes take priority over Pages custom domains —

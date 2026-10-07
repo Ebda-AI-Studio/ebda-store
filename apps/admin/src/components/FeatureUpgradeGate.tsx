@@ -22,6 +22,7 @@ import { Button } from '@force/ui';
 import { AdminLayout } from './AdminLayout';
 import {
   FEATURE_REGISTRY,
+  BRAND,
   PLAN_LABELS,
   lowestPlanForFeature,
   type FeatureKey,
@@ -30,16 +31,13 @@ import {
 // ─── Contact constant ─────────────────────────────────────────────────────────
 
 /**
- * Ebda sales WhatsApp — same number used on the storefront platform
- * landing page (apps/web PlatformLanding.tsx: +965 41169141).
- * Format: wa.me/<international-number-without-plus>
+ * Upgrade requests go to the Ebda support mailbox (BRAND.supportEmail).
  * The message is pre-filled with the store ID and feature name.
  */
-const UPGRADE_CONTACT_BASE = 'https://wa.me/96541169141';
 
-function buildWhatsAppLink(storeId: string, featureName: string): string {
+function buildUpgradeMailto(storeId: string, featureName: string): string {
   const message = `I'd like to upgrade my store (${storeId}) to unlock "${featureName}".`;
-  return `${UPGRADE_CONTACT_BASE}?text=${encodeURIComponent(message)}`;
+  return `mailto:${BRAND.supportEmail}?subject=${encodeURIComponent('Upgrade request')}&body=${encodeURIComponent(message)}`;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -69,7 +67,7 @@ export function FeatureUpgradeGate({ featureKey, storeId }: Props) {
       : PLAN_LABELS[unlockingPlan].en
     : null;
 
-  const whatsappLink = buildWhatsAppLink(storeId, featureName);
+  const upgradeLink = buildUpgradeMailto(storeId, featureName);
 
   // Up to 3 sibling features from the same category — same plan gate or higher —
   // shown as an "also included" list to reinforce upsell value.
@@ -154,7 +152,7 @@ export function FeatureUpgradeGate({ featureKey, storeId }: Props) {
               {/* CTA buttons */}
               <div className="flex flex-col sm:flex-row gap-3">
                 {/* Primary: upgrade */}
-                <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="flex-1">
+                <a href={upgradeLink} target="_blank" rel="noopener noreferrer" className="flex-1">
                   <Button
                     type="button"
                     className="w-full bg-orange-500 hover:bg-orange-600 text-white border-0 font-semibold"
@@ -164,7 +162,7 @@ export function FeatureUpgradeGate({ featureKey, storeId }: Props) {
                 </a>
 
                 {/* Secondary: talk to us */}
-                <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="flex-1">
+                <a href={upgradeLink} target="_blank" rel="noopener noreferrer" className="flex-1">
                   <Button type="button" variant="outline" className="w-full">
                     {t('contactCta')}
                   </Button>

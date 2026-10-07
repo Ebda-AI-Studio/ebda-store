@@ -48,11 +48,11 @@ export interface FloatingButton {
    *  R2-hosted PNG/SVG. Mostly used by `kind: 'custom'`. */
   iconUrl?: string;
   /** kind=whatsapp: full phone in international format, no spaces or +
-   *  (e.g. "96522668490"). Opens https://wa.me/<phone>?text=<label>.  */
+   *  (e.g. "201001234567"). Opens https://wa.me/<phone>?text=<label>.  */
   whatsappPhone?: string;
   /** kind=whatsapp: optional prefilled message text. */
   whatsappMessage?: string;
-  /** kind=instagram: Instagram handle without the @ (e.g. "wadyaljuz"). */
+  /** kind=instagram: Instagram handle without the @ (e.g. "demo-shop"). */
   instagramHandle?: string;
   /** kind=phone: full phone in international format. Opens tel: link. */
   phoneNumber?: string;
@@ -68,17 +68,17 @@ export interface FloatingButton {
   musicLoop?: boolean;
   /** kind=custom: target URL. Opens in new tab. */
   customHref?: string;
-  /** kind=tiktok: TikTok handle without the @ (e.g. "wadyaljuz"). */
+  /** kind=tiktok: TikTok handle without the @ (e.g. "demo-shop"). */
   tiktokHandle?: string;
-  /** kind=snapchat: Snapchat username without the @ (e.g. "wadyaljuz"). */
+  /** kind=snapchat: Snapchat username without the @ (e.g. "demo-shop"). */
   snapchatHandle?: string;
   /** kind=youtube: Full YouTube channel / video URL (https://youtube.com/...). */
   youtubeUrl?: string;
   /** kind=facebook: Full Facebook page URL (https://facebook.com/...). */
   facebookUrl?: string;
-  /** kind=x: X (Twitter) handle without the @ (e.g. "wadyaljuz"). */
+  /** kind=x: X (Twitter) handle without the @ (e.g. "demo-shop"). */
   xHandle?: string;
-  /** kind=telegram: Telegram handle without the @ (e.g. "wadyaljuz").
+  /** kind=telegram: Telegram handle without the @ (e.g. "demo-shop").
    *  Opens https://t.me/<handle>. */
   telegramHandle?: string;
 }

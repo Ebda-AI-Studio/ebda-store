@@ -15,7 +15,7 @@ import { buildProductMetadata } from './ProductDetailBody';
  * — the whole point is that the caller MUST thread it through.
  */
 
-const STORE = { name: 'Pecannbee', slug: 'pecannbee', domain: undefined };
+const STORE = { name: 'Demo Store', slug: 'demo-store', domain: undefined };
 
 const ARABIC_RANGE = /[؀-ۿ]/;
 
@@ -113,7 +113,7 @@ describe('Arabic fallback description names (#1857)', () => {
     expect(meta.description).toContain('عرض المدارس');
     expect(meta.description).toContain('بيكان بي');
     expect(meta.description).not.toContain('School Offer');
-    expect(meta.description).not.toContain('Pecannbee');
+    expect(meta.description).not.toContain('Demo Store');
   });
 
   it('falls back to the English names when no Arabic ones exist', () => {
@@ -131,7 +131,12 @@ describe('Arabic fallback description names (#1857)', () => {
  * already satisfy).
  */
 describe('buildProductMetadata — Arabic name/store fallback (#1857)', () => {
-  const STORE_AR = { name: 'Pecannbee', nameAr: 'بيكان بي', slug: 'pecannbee', domain: undefined };
+  const STORE_AR = {
+    name: 'Demo Store',
+    nameAr: 'بيكان بي',
+    slug: 'demo-store',
+    domain: undefined,
+  };
 
   it('ar locale, no AEO/SEO/descriptionAr copy at all: title, description, openGraph and twitter titles all use the Arabic product + store names, never the English ones', () => {
     const product = {
@@ -148,23 +153,23 @@ describe('buildProductMetadata — Arabic name/store fallback (#1857)', () => {
     expect(meta.description).toContain('عرض المدرسة');
     expect(meta.description).toContain('بيكان بي');
     expect(meta.description).not.toContain('School Offer');
-    expect(meta.description).not.toContain('Pecannbee');
+    expect(meta.description).not.toContain('Demo Store');
     expect(meta.openGraph?.title).toBe('عرض المدرسة | بيكان بي');
     expect(meta.openGraph?.title).not.toContain('School Offer');
-    expect(meta.openGraph?.title).not.toContain('Pecannbee');
+    expect(meta.openGraph?.title).not.toContain('Demo Store');
     const twitterTitle = meta.twitter && 'title' in meta.twitter ? meta.twitter.title : undefined;
     expect(twitterTitle).toBe('عرض المدرسة | بيكان بي');
   });
 
   it('ar locale, product/store have no Arabic name set: falls back to the English name rather than going blank', () => {
     const product = { name: 'School Offer', slug: 'schools-offer', price: 5000 };
-    const storeNoAr = { name: 'Pecannbee', slug: 'pecannbee', domain: undefined };
+    const storeNoAr = { name: 'Demo Store', slug: 'demo-store', domain: undefined };
 
     const meta = buildProductMetadata(product, storeNoAr, 'ar');
 
     expect(meta.title).toBe('School Offer');
     expect(meta.description).toContain('School Offer');
-    expect(meta.description).toContain('Pecannbee');
+    expect(meta.description).toContain('Demo Store');
   });
 
   it('en locale (same product/store data): title, description and titles stay English even though nameAr is set', () => {
@@ -179,8 +184,8 @@ describe('buildProductMetadata — Arabic name/store fallback (#1857)', () => {
 
     expect(meta.title).toBe('School Offer');
     expect(meta.description).toContain('School Offer');
-    expect(meta.description).toContain('Pecannbee');
+    expect(meta.description).toContain('Demo Store');
     expect(meta.description).not.toContain('عرض المدرسة');
-    expect(meta.openGraph?.title).toBe('School Offer | Pecannbee');
+    expect(meta.openGraph?.title).toBe('School Offer | Demo Store');
   });
 });

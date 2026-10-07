@@ -20,7 +20,7 @@ vi.mock('../../contexts/LanguageContext', async importOriginal => {
   };
 });
 
-const storeState = { store: { id: 'store-1', slug: 'pecannbee' } };
+const storeState = { store: { id: 'store-1', slug: 'demo-store' } };
 // Host class is an INDEPENDENT signal (#2223): the unresolved 'demo' sentinel
 // occurs on a merchant's custom domain too (a transient resolve failure there
 // also leaves the client holding it). Deriving isPlatform from the sentinel
@@ -59,7 +59,7 @@ import { STORE_UNAVAILABLE_DIGEST } from '../../lib/store-unavailable';
 afterEach(() => {
   cleanup();
   languageState.language = 'en';
-  storeState.store = { id: 'store-1', slug: 'pecannbee' };
+  storeState.store = { id: 'store-1', slug: 'demo-store' };
   hostState.isPlatform = false;
   refresh.mockReset();
 });

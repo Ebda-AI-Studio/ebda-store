@@ -5,8 +5,8 @@
  * (`packages/shared/src/region`).
  *
  * ROUNDING RULE under test: round HALF UP to the piastre, integer math only
- * (FWB's existing `Math.round` rule, kept so VAT / discounts stay identical to
- * FWB apart from the scale). Mutation proofs are recorded in the commit body
+ * (Ebda's existing `Math.round` rule, kept so VAT / discounts stay identical to
+ * Ebda apart from the scale). Mutation proofs are recorded in the commit body
  * (floor instead of half-up; tax on the pre-discount subtotal; accepting a 3rd
  * decimal).
  */
@@ -66,7 +66,7 @@ describe('REGION', () => {
     expect(REGION.currencyDecimals).toBe(currencyExponent(REGION.currency));
     expect(currencyExponent('EGP')).toBe(2);
     expect(currencyExponent('USD')).toBe(2);
-    expect(currencyExponent('KWD')).toBe(3);
+    expect(currencyExponent('BHD')).toBe(3);
     expect(currencyExponent('JPY')).toBe(0);
     expect(currencyExponent('egp')).toBe(2);
     expect(currencyExponent('XYZ')).toBe(2); // ISO majority default
@@ -118,9 +118,9 @@ describe('toMinor / tryToMinor', () => {
     expect(toMinor('-1.50')).toBe(-150);
   });
 
-  it('is currency-aware: KWD keeps 3 decimals, EGP rejects them', () => {
-    expect(toMinor('1.999', 'KWD')).toBe(1999);
-    expect(tryToMinor('1.9999', 'KWD')).toBeNull();
+  it('is currency-aware: BHD keeps 3 decimals, EGP rejects them', () => {
+    expect(toMinor('1.999', 'BHD')).toBe(1999);
+    expect(tryToMinor('1.9999', 'BHD')).toBeNull();
     expect(toMinor('5', 'JPY')).toBe(5);
     expect(tryToMinor('5.5', 'JPY')).toBeNull();
   });
@@ -142,7 +142,7 @@ describe('fromMinor / minorToDecimalString', () => {
     expect(minorToDecimalString(19_999)).toBe('199.99');
     expect(minorToDecimalString(5)).toBe('0.05');
     expect(minorToDecimalString(-150)).toBe('-1.50');
-    expect(minorToDecimalString(1500, 'KWD')).toBe('1.500');
+    expect(minorToDecimalString(1500, 'BHD')).toBe('1.500');
     expect(fromMinor(19_999)).toBe(199.99);
   });
 });
@@ -172,7 +172,7 @@ describe('formatMoney', () => {
 
   it('always shows exactly the currency exponent in decimals; foreign codes keep their own', () => {
     expect(formatMoney(100, 'en')).toBe('EGP 1.00');
-    expect(formatMoney(1500, 'en', { currency: 'KWD' })).toBe('KWD 1.500');
+    expect(formatMoney(1500, 'en', { currency: 'BHD' })).toBe('BHD 1.500');
     expect(formatMoney(1500, 'en', { currency: 'USD' })).toBe('USD 15.00');
     expect(formatMoney(129_950, 'ar', { hideSymbol: true })).toBe('1,299.50');
   });
@@ -495,12 +495,12 @@ describe('convertMinor — exponent-aware FX into the base currency', () => {
     expect(convertMinor(100, 50.5, 'USD')).toBe(5_050);
   });
 
-  it('KWD fils (3 decimals) → EGP piastres divides by 10 (the FWB scale bug)', () => {
-    expect(convertMinor(1_000, 165, 'KWD')).toBe(16_500);
+  it('BHD fils (3 decimals) → EGP piastres divides by 10 (the Ebda scale bug)', () => {
+    expect(convertMinor(1_000, 165, 'BHD')).toBe(16_500);
   });
 
-  it('EGP piastres → KWD fils multiplies by 10', () => {
-    expect(convertMinor(16_500, 1 / 165, 'EGP', 'KWD')).toBe(1_000);
+  it('EGP piastres → BHD fils multiplies by 10', () => {
+    expect(convertMinor(16_500, 1 / 165, 'EGP', 'BHD')).toBe(1_000);
   });
 
   it('rounds half up and rejects a non-positive rate', () => {
@@ -557,7 +557,7 @@ describe('excelMoneyFormat', () => {
   it('has the currency exponent in decimals', () => {
     expect(excelMoneyFormat()).toBe('0.00');
     expect(excelMoneyFormat({ grouped: true })).toBe('#,##0.00');
-    expect(excelMoneyFormat({ currency: 'KWD' })).toBe('0.000');
+    expect(excelMoneyFormat({ currency: 'BHD' })).toBe('0.000');
     expect(excelMoneyFormat({ currency: 'JPY', grouped: true })).toBe('#,##0');
   });
 });

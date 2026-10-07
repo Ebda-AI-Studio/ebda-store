@@ -73,7 +73,7 @@ describe('default sale badge — top corner, reading-start side', () => {
     expect(r.discountBadgePositionCls).toBe('top-12 left-3');
   });
 
-  it('takes the top-end corner on the Pecannbee card, whose heart holds top-start', () => {
+  it('takes the top-end corner on the Demo Store card, whose heart holds top-start', () => {
     const r = resolveCardBadges({ ...base, isRtl: false, topStartReserved: true });
     expect(r.discountBadgePositionCls).toBe('top-3 right-3');
     const rtl = resolveCardBadges({ ...base, isRtl: true, topStartReserved: true });
@@ -190,7 +190,7 @@ describe('every corner-chip render path derives the placement from the per-store
     it(`${rel} passes saleBadgeTopCorner from theme.saleBadgeLegacyCorner, never a slug`, () => {
       const src = readFileSync(resolve(ROOT, rel), 'utf8');
       expect(src).toContain('saleBadgeTopCorner: store.theme?.saleBadgeLegacyCorner !== true');
-      expect(src).not.toMatch(/slug\s*===\s*['"]pecannbee['"]/);
+      expect(src).not.toMatch(/slug\s*===\s*['"]demo-store['"]/);
     });
   }
 });
@@ -253,7 +253,7 @@ describe('pinned sale badge vs a merchant custom badge in a top corner (issue 23
 });
 
 /**
- * Owner rule (2026-09-30): pecannbee — `saleBadgeLegacyCorner` — must not change
+ * Owner rule (2026-09-30): demo-store — `saleBadgeLegacyCorner` — must not change
  * visually. Every card path renders its chips from `resolveCardBadges` alone, so
  * the legacy flag's output over EVERY input combination is frozen here. The
  * hash was taken from the pre-issue-2343 resolver (and an exhaustive old-vs-new

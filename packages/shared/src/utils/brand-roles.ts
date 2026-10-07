@@ -32,7 +32,7 @@ function toCss(v: string | undefined): string | undefined {
 /**
  * Build the storefront CSS-var map for a theme with GUARANTEED-readable
  * foregrounds. A stored foreground that reads fine against its surface is kept
- * verbatim (so configured stores — wadyaljuz — are unchanged). A missing or
+ * verbatim (so configured stores — demo-shop — are unchanged). A missing or
  * unreadable foreground is replaced with pickReadableForeground(surface).
  */
 export function deriveBrandRoles(theme: StoreTheme): Record<string, string> {

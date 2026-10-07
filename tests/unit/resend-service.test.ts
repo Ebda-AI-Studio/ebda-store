@@ -49,18 +49,18 @@ describe('ResendService.provisionStoreDomain', () => {
   it('creates a Resend domain and persists the returned id + initial records', async () => {
     prismaFindUniqueMock.mockResolvedValue({
       id: 'store-1',
-      domain: 'wadyaljuz.com',
+      domain: 'demo-shop.example',
       emailDomainId: null,
     });
     mockDomainsCreate.mockResolvedValue({
       data: {
         id: 'd_abc123',
-        name: 'wadyaljuz.com',
+        name: 'demo-shop.example',
         status: 'pending',
         records: [
           {
             type: 'TXT',
-            name: 'send.wadyaljuz.com',
+            name: 'send.demo-shop.example',
             value: 'v=spf1 include:amazonses.com ~all',
             ttl: 'Auto',
           },
@@ -77,26 +77,26 @@ describe('ResendService.provisionStoreDomain', () => {
 
     const records = await ResendService.provisionStoreDomain('store-1');
 
-    expect(mockDomainsCreate).toHaveBeenCalledWith({ name: 'wadyaljuz.com' });
+    expect(mockDomainsCreate).toHaveBeenCalledWith({ name: 'demo-shop.example' });
     expect(prismaUpdateMock).toHaveBeenCalledWith({
       where: { id: 'store-1' },
       data: { emailDomainId: 'd_abc123', emailDomainStatus: 'pending' },
     });
     expect(records).toHaveLength(2);
-    expect(records[0]).toMatchObject({ type: 'TXT', name: 'send.wadyaljuz.com' });
+    expect(records[0]).toMatchObject({ type: 'TXT', name: 'send.demo-shop.example' });
   });
 
   it('is idempotent — if store already has emailDomainId, just refresh and return the records', async () => {
     prismaFindUniqueMock.mockResolvedValue({
       id: 'store-1',
-      domain: 'wadyaljuz.com',
+      domain: 'demo-shop.example',
       emailDomainId: 'd_existing',
     });
     mockDomainsGet.mockResolvedValue({
       data: {
         id: 'd_existing',
         status: 'verified',
-        records: [{ type: 'TXT', name: 'send.wadyaljuz.com', value: '...', ttl: 'Auto' }],
+        records: [{ type: 'TXT', name: 'send.demo-shop.example', value: '...', ttl: 'Auto' }],
       },
       error: null,
     });
@@ -123,7 +123,7 @@ describe('ResendService.provisionStoreDomain', () => {
   it('throws when Resend returns an error', async () => {
     prismaFindUniqueMock.mockResolvedValue({
       id: 'store-1',
-      domain: 'wadyaljuz.com',
+      domain: 'demo-shop.example',
       emailDomainId: null,
     });
     mockDomainsCreate.mockResolvedValue({
@@ -146,7 +146,7 @@ describe('ResendService.refreshDomainStatus', () => {
       data: {
         id: 'd_abc123',
         status: 'verified',
-        records: [{ type: 'TXT', name: 'send.wadyaljuz.com', value: '...' }],
+        records: [{ type: 'TXT', name: 'send.demo-shop.example', value: '...' }],
       },
       error: null,
     });
@@ -231,9 +231,9 @@ describe('ResendService.sendBrandedEmail', () => {
   it('resolves sender from store, sends via SDK, returns provider id', async () => {
     prismaFindUniqueMock.mockResolvedValue({
       id: 'store-1',
-      name: 'Wady Aljuz',
-      domain: 'wadyaljuz.com',
-      email: 'hi@wadyaljuz.com',
+      name: 'Demo Shop',
+      domain: 'demo-shop.example',
+      email: 'hi@demo-shop.example',
       emailSenderLocalPart: 'noreply',
       emailDomainStatus: 'verified',
     });
@@ -246,9 +246,9 @@ describe('ResendService.sendBrandedEmail', () => {
     });
 
     expect(mockEmailsSend).toHaveBeenCalledWith({
-      from: 'Wady Aljuz <noreply@wadyaljuz.com>',
+      from: 'Demo Shop <noreply@demo-shop.example>',
       to: ['customer@example.com'],
-      replyTo: 'hi@wadyaljuz.com',
+      replyTo: 'hi@demo-shop.example',
       subject: 'Order #123 confirmed',
       html: '<p>thanks</p>',
     });
@@ -258,7 +258,7 @@ describe('ResendService.sendBrandedEmail', () => {
   it('falls back to platform domain when store has no verified custom domain', async () => {
     prismaFindUniqueMock.mockResolvedValue({
       id: 'store-1',
-      name: 'Palora',
+      name: 'Demo Boutique',
       domain: null,
       email: null,
       emailSenderLocalPart: 'noreply',
@@ -273,14 +273,14 @@ describe('ResendService.sendBrandedEmail', () => {
     });
 
     expect(mockEmailsSend).toHaveBeenCalledWith(
-      expect.objectContaining({ from: 'Palora <noreply@ebda.app>' })
+      expect.objectContaining({ from: 'Demo Boutique <noreply@ebda.app>' })
     );
   });
 
   it('throws when Resend send returns an error', async () => {
     prismaFindUniqueMock.mockResolvedValue({
       id: 'store-1',
-      name: 'Palora',
+      name: 'Demo Boutique',
       domain: null,
       email: null,
       emailSenderLocalPart: 'noreply',

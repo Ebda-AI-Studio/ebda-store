@@ -21,7 +21,7 @@
 #   DRY_RUN=1            — print Telegram message instead of sending it (safe for testing)
 #   GRAPH_ROOT=<path>    — override root where graphify-out/ is found (default: auto-detect)
 #   BLAST_TOP_N=20       — max dependent files shown in report (default 20)
-#   GH_USER=ForceAI-KW   — GitHub username/org owning the repos
+#   GH_USER=Whisky-11    — GitHub username/org owning the repos
 #
 # Exit codes:
 #   0 — ran successfully (even if zero dependents found)
@@ -30,7 +30,7 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 NOTIFY="$HERE/notify.sh"
-GH_USER="${GH_USER:-ForceAI-KW}"
+GH_USER="${GH_USER:-Whisky-11}"
 BLAST_TOP_N="${BLAST_TOP_N:-20}"
 DRY_RUN="${DRY_RUN:-0}"
 
@@ -54,11 +54,7 @@ command -v python3 >/dev/null || { echo "blast-radius: python3 missing" >&2; exi
 # Locate the repo root (for graph.json lookup)
 # ---------------------------------------------------------------------------
 KNOWN_ROOTS=(
-  "$HOME/Desktop/projects/force-website-builder"
-  "$HOME/Desktop/projects/whatsapp-broadcaster"
-  "$HOME/Desktop/projects/Force-Media-CRM"
-  "$HOME/Desktop/projects/om-hassan-menu"
-  "$HOME/Desktop/projects/digital-card"
+  "$HOME/Desktop/projects/Whisky-11/business/ebda/ebda"
 )
 
 find_graph_json() {

@@ -11,12 +11,12 @@
  *    float, never a decimal string, in storage or in arithmetic.
  *  - VAT is charged AFTER discount: `vat = round(max(0, subtotal - discount) * rate)`.
  *  - ROUNDING RULE: round HALF UP to the minor unit (0.5 piastre -> 1). This is
- *    the rule FWB already used everywhere (`Math.round` on non-negative values);
+ *    the rule Ebda already used everywhere (`Math.round` on non-negative values);
  *    it is kept so VAT, percentage discounts and refund proration stay
- *    byte-identical to FWB except for the scale. All of it is done in integer
+ *    byte-identical to Ebda except for the scale. All of it is done in integer
  *    arithmetic (`mulDivRound`) — no float multiplication of a rate.
  *  - Legacy naming: identifiers/columns spelled `*Fils` / `*_fils` in this repo
- *    are MINOR units (they were fils in FWB); they were not renamed because the
+ *    are MINOR units (they were fils in Ebda); they were not renamed because the
  *    DB columns would need a rename migration. They are piastres in Ebda.
  */
 
@@ -39,7 +39,6 @@ const CURRENCY_EXPONENTS: Readonly<Record<string, number>> = {
   TRY: 2,
   INR: 2,
   CNY: 2,
-  KWD: 3,
   BHD: 3,
   OMR: 3,
   JOD: 3,
@@ -47,7 +46,7 @@ const CURRENCY_EXPONENTS: Readonly<Record<string, number>> = {
 };
 
 /**
- * Number of decimal places of a currency's minor unit (EGP 2, KWD 3, USD 2,
+ * Number of decimal places of a currency's minor unit (EGP 2, BHD 3, USD 2,
  * JPY 0). Unknown codes default to 2 (the ISO-4217 majority). This is the ONLY
  * place a scale is derived — everything else calls this.
  */
@@ -55,7 +54,7 @@ export function currencyExponent(code: string): number {
   return CURRENCY_EXPONENTS[String(code).toUpperCase()] ?? 2;
 }
 
-/** Minor units in one major unit of `code` (EGP 100, KWD 1000). */
+/** Minor units in one major unit of `code` (EGP 100, BHD 1000). */
 export function minorUnitsPerMajor(code: string = 'EGP'): number {
   return 10 ** currencyExponent(code);
 }
@@ -428,7 +427,7 @@ export function regionMonthStart(ym: string, timeZone: string = REGION.timezone)
  * Convert minor units of `fromCurrency` into minor units of `toCurrency`
  * (default: the platform base, `REGION.currency`) at `rate` = how many MAJOR
  * units of `toCurrency` one MAJOR unit of `fromCurrency` is worth. Exponent-aware
- * (USD cents → EGP piastres, EGP piastres → KWD fils), rounded half up.
+ * (USD cents → EGP piastres, EGP piastres → BHD fils), rounded half up.
  */
 export function convertMinor(
   amountMinor: number,

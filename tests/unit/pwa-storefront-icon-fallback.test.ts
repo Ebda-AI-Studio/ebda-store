@@ -15,8 +15,8 @@ import type { ResolvedStore } from '@web/lib/store-resolver';
 function baseStore(overrides: Partial<ResolvedStore> = {}): ResolvedStore {
   return {
     id: 'store-1',
-    name: 'Palora',
-    slug: 'palora',
+    name: 'Demo Boutique',
+    slug: 'demo-boutique',
     status: 'active',
     currency: 'EGP',
     timezone: 'Africa/Cairo',

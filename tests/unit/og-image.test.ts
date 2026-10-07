@@ -4,7 +4,7 @@ import { resolveStoreOgImage, OG_IMAGE_WIDTH, OG_IMAGE_HEIGHT } from '@web/lib/s
 const SITE_URL = 'https://example.com';
 const ALT = 'Test Store';
 
-const SLUG = 'pecannbee';
+const SLUG = 'demo-store';
 
 describe('resolveStoreOgImage', () => {
   it('uses an explicit https RASTER ogImage URL verbatim', () => {

@@ -63,7 +63,7 @@ interface ProductForJsonLd {
 /**
  * schema.org Brand.
  *
- * Agents use brand to group and compare products across sellers. FWB stores are
+ * Agents use brand to group and compare products across sellers. Ebda stores are
  * single-brand and there is no per-product brand column, so the store name IS
  * the brand — there is nothing more specific to prefer over it.
  */

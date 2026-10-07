@@ -15,9 +15,9 @@ import {
  */
 const store = {
   id: 's1',
-  name: 'Wady Aljuz',
+  name: 'Demo Shop',
   nameAr: 'وادي الجوز',
-  slug: 'wady',
+  slug: 'demo-shop',
   currency: 'EGP',
   status: 'active',
   theme: {},
@@ -65,7 +65,7 @@ describe('productJsonLd — locale (#2196)', () => {
   it('en (default): unchanged English output (control)', () => {
     const ld = productJsonLd(product, store) as unknown as Ld;
     expect(ld.name).toBe('School Offer');
-    expect(ld.brand.name).toBe('Wady Aljuz');
+    expect(ld.brand.name).toBe('Demo Shop');
     expect(ld.description).toBe('English copy');
   });
 });
@@ -88,7 +88,7 @@ describe('bundleJsonLd / organizationJsonLd — locale (#2196)', () => {
   });
   it('organization ar: Arabic store name', () => {
     expect((organizationJsonLd(store, 'ar') as Record<string, unknown>).name).toBe('وادي الجوز');
-    expect((organizationJsonLd(store, 'en') as Record<string, unknown>).name).toBe('Wady Aljuz');
+    expect((organizationJsonLd(store, 'en') as Record<string, unknown>).name).toBe('Demo Shop');
   });
   it('breadcrumb labels exist for both locales', () => {
     expect(BREADCRUMB_LABELS.ar.home).toBe('الرئيسية');

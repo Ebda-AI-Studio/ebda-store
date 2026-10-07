@@ -13,7 +13,7 @@ describe('buildProductFaqPrompt', () => {
   it('renders variant options as usable facts and the size-accuracy rule', () => {
     const prompt = buildProductFaqPrompt({
       storeId: 's1',
-      storeName: 'Pecannbee',
+      storeName: 'Demo Store',
       product: {
         name: 'PB Dragee Pecan Caramel',
         nameAr: 'بي بي دراجيه بيكان كراميل',
@@ -48,7 +48,7 @@ describe('buildProductFaqPrompt', () => {
   it('asks for UP TO the count (quality over quantity) and forbids meta/SKU filler', () => {
     const prompt = buildProductFaqPrompt({
       storeId: 's1',
-      storeName: 'Pecannbee',
+      storeName: 'Demo Store',
       product: { name: 'PB Dragee', description: 'Pecans.' },
       count: 5,
     });
@@ -65,7 +65,7 @@ describe('buildProductFaqPrompt', () => {
   it('omits the facts block entirely for a simple product with no options', () => {
     const prompt = buildProductFaqPrompt({
       storeId: 's1',
-      storeName: 'Pecannbee',
+      storeName: 'Demo Store',
       product: {
         name: 'Gift Card',
         description: 'A digital gift card.',

@@ -5,8 +5,8 @@ import { fixCategoryLinks, buildPerStoreBody, buildPlatformBody, perStoreRespons
  * A4-2 (2026-09-22 AEO audit): `/categories/<slug>` is not a real route
  * anywhere in this Next.js app (category browsing lives at
  * `/products?category=<slug>` — see `ProductsPageBody.tsx`). Verified live
- * 2026-09-22: every `/categories/*` link in both pecannbee.com.kw's and
- * wadyaljuz.com's served llms.txt 404'd (18/18, not just the two the audit
+ * 2026-09-22: every `/categories/*` link in both demo-store.example's and
+ * demo-shop.example's served llms.txt 404'd (18/18, not just the two the audit
  * sampled).
  *
  * "Add a test that every link the generator emits resolves to an existing
@@ -19,30 +19,30 @@ const LIVE_CATEGORIES = [{ slug: 'nuts' }, { slug: 'dried-fruit' }];
 
 describe('fixCategoryLinks', () => {
   it('rewrites a live category slug to the real /products?category= URL', () => {
-    const body = '- Nuts / مكسرات: https://pecannbee.com.kw/categories/nuts';
+    const body = '- Nuts / مكسرات: https://demo-store.example/categories/nuts';
     const out = fixCategoryLinks(body, LIVE_CATEGORIES);
-    expect(out).toBe('- Nuts / مكسرات: https://pecannbee.com.kw/products?category=nuts');
+    expect(out).toBe('- Nuts / مكسرات: https://demo-store.example/products?category=nuts');
   });
 
   it('drops the whole line for a slug that matches no live category (hallucinated or deleted)', () => {
     const body = [
-      '- Nuts / مكسرات: https://pecannbee.com.kw/categories/nuts',
-      '- Honey and olive oil: https://pecannbee.com.kw/categories/honey-and-olive-oil',
-      '- Dragee: https://pecannbee.com.kw/categories/dragee',
+      '- Nuts / مكسرات: https://demo-store.example/categories/nuts',
+      '- Honey and olive oil: https://demo-store.example/categories/honey-and-olive-oil',
+      '- Dragee: https://demo-store.example/categories/dragee',
     ].join('\n');
 
     const out = fixCategoryLinks(body, LIVE_CATEGORIES);
 
-    expect(out).toBe('- Nuts / مكسرات: https://pecannbee.com.kw/products?category=nuts');
+    expect(out).toBe('- Nuts / مكسرات: https://demo-store.example/products?category=nuts');
     expect(out).not.toContain('honey-and-olive-oil');
     expect(out).not.toContain('dragee');
   });
 
   it('every surviving category link resolves to a slug in the live category set', () => {
     const body = [
-      '- [Nuts](https://wadyaljuz.com/categories/nuts)',
-      '- [Ghost category](https://wadyaljuz.com/categories/does-not-exist)',
-      '- [Dried Fruit](https://wadyaljuz.com/categories/dried-fruit)',
+      '- [Nuts](https://demo-shop.example/categories/nuts)',
+      '- [Ghost category](https://demo-shop.example/categories/does-not-exist)',
+      '- [Dried Fruit](https://demo-shop.example/categories/dried-fruit)',
     ].join('\n');
 
     const out = fixCategoryLinks(body, LIVE_CATEGORIES);
@@ -62,18 +62,18 @@ describe('fixCategoryLinks', () => {
   });
 
   it('store genuinely has zero categories: every /categories/ line is dropped', () => {
-    const body = '- Nuts: https://pecannbee.com.kw/categories/nuts';
+    const body = '- Nuts: https://demo-store.example/categories/nuts';
     expect(fixCategoryLinks(body, [])).toBe('');
   });
 });
 
 describe('buildPerStoreBody — category link shape', () => {
   it('the auto-built body links categories to /products?category=<slug>, never /categories/<slug>', () => {
-    const store = { id: 's1', name: 'Wady Aljuz', slug: 'wady-aljuz', domain: 'wadyaljuz.com' };
+    const store = { id: 's1', name: 'Demo Shop', slug: 'demo-shop', domain: 'demo-shop.example' };
     const categories = [{ name: 'Nuts', slug: 'nuts' }];
     const body = buildPerStoreBody(store, categories, [], 0);
 
-    expect(body).toContain('https://wadyaljuz.com/products?category=nuts');
+    expect(body).toContain('https://demo-shop.example/products?category=nuts');
     expect(body).not.toContain('/categories/nuts');
   });
 });
@@ -83,11 +83,11 @@ describe('fixCategoryLinks — Arabic slugs (#1854)', () => {
 
   it('rewrites a fully-Arabic live slug instead of passing the dead link through', () => {
     const out = fixCategoryLinks(
-      '- مكسرات: https://pecannbee.com.kw/categories/مكسرات',
+      '- مكسرات: https://demo-store.example/categories/مكسرات',
       AR_CATEGORIES
     );
     expect(out).toBe(
-      `- مكسرات: https://pecannbee.com.kw/products?category=${encodeURIComponent('مكسرات')}`
+      `- مكسرات: https://demo-store.example/products?category=${encodeURIComponent('مكسرات')}`
     );
   });
 
@@ -152,15 +152,15 @@ describe('perStoreResponse — the served body, not just the builder', () => {
     );
 
   const override = [
-    '# Pecannbee',
-    '- Nuts: https://pecannbee.com.kw/categories/nuts',
-    '- Dragee: https://pecannbee.com.kw/categories/dragee',
+    '# Demo Store',
+    '- Nuts: https://demo-store.example/categories/nuts',
+    '- Dragee: https://demo-store.example/categories/dragee',
   ].join('\n');
   const store = {
     id: 'store_1',
-    name: 'Pecannbee',
-    slug: 'pecannbee',
-    domain: 'pecannbee.com.kw',
+    name: 'Demo Store',
+    slug: 'demo-store',
+    domain: 'demo-store.example',
     status: 'active',
     llmsTxt: override,
   };
@@ -185,7 +185,7 @@ describe('perStoreResponse — the served body, not just the builder', () => {
     stubApi(okCategories(['nuts']));
     const res = await perStoreResponse(store);
     const body = await res.text();
-    expect(body).toContain('https://pecannbee.com.kw/products?category=nuts');
+    expect(body).toContain('https://demo-store.example/products?category=nuts');
     expect(body).not.toContain('dragee');
     expect(res.headers.get('Cache-Control')).toBe(
       'public, s-maxage=600, stale-while-revalidate=86400'
@@ -198,11 +198,11 @@ describe('perStoreResponse — the served body, not just the builder', () => {
     const body = await (
       await perStoreResponse({ ...store, enabledFeatures: ['agent_checkout', 'agent_feed'] })
     ).text();
-    expect(body.startsWith('# Pecannbee')).toBe(true);
+    expect(body.startsWith('# Demo Store')).toBe(true);
     expect(body).toContain('## Agentic checkout (MCP)');
-    expect(body).toContain('/mcp/pecannbee');
+    expect(body).toContain('/mcp/demo-store');
     expect(body).toContain('x-agent-key');
-    expect(body).toContain('https://pecannbee.com.kw/feeds/products.json');
+    expect(body).toContain('https://demo-store.example/feeds/products.json');
   });
 
   it('does not duplicate the MCP section when the stored text already carries it', async () => {

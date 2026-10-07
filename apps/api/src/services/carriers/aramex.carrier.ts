@@ -176,7 +176,7 @@ export class AramexCarrier implements ShippingCarrierProvider {
     }
     if (cod > 0 && ctx?.settings?.codEgpConfirmed !== true) {
       // Refuse rather than book a COD parcel whose collected currency we cannot vouch for: the
-      // old code sent `amount / 1000` as KWD, which would have mis-priced EGP orders.
+      // old code sent `amount / 1000` in a 3-decimal currency, which would have mis-priced EGP orders.
       throw new CarrierError(
         'COD_NOT_SUPPORTED',
         'Aramex cash on delivery in EGP is not confirmed for this account. Ask Aramex to confirm in writing, then tick "COD in EGP confirmed" in the Aramex settings; until then ship COD orders with another carrier.'
@@ -198,7 +198,7 @@ export class AramexCarrier implements ShippingCarrierProvider {
   ): Promise<CarrierShipmentResponse> {
     const domestic = data.pickupAddress.country === data.deliveryAddress.country;
     // UNVERIFIED: domestic Egypt products are ProductGroup DOM / ProductType OND; the old
-    // Kuwait defaults (EXP / PPX) stay for cross-border.
+    // Default product groups (EXP / PPX) stay for cross-border.
     const productGroup = domestic ? 'DOM' : 'EXP';
     const productType = domestic ? 'OND' : 'PPX';
 

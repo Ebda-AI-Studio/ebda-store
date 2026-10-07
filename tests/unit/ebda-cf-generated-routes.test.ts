@@ -33,7 +33,7 @@ describe('Ebda generated Cloudflare routes', () => {
           config.routes.every(
             (r: { pattern: string; zone_name?: string }) =>
               (!r.zone_name || r.zone_name === BRAND.domains.marketing) &&
-              !/force-ai|pecannbee/.test(r.pattern)
+              !/force-ai|demo-store/.test(r.pattern)
           )
         ).toBe(true);
         if (app !== 'web')

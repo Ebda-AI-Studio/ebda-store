@@ -7,7 +7,7 @@
  * remove-from-wishlist) or a quick-add/CTA overlay occupies.
  *
  * Every case below is checked in BOTH reading directions — the production
- * bug this fixes (pecannbee.com.kw, Arabic, the "عرض" custom badge under the
+ * bug this fixes (demo-store.example, Arabic, the "عرض" custom badge under the
  * heart) only reproduced in RTL, because the badge system is PHYSICAL
  * (non-mirroring) while the heart/compare/quick-add system is LOGICAL
  * (start/end, mirrors with direction) — so a corner that's safe in LTR can
@@ -58,7 +58,7 @@ describe('resolveCardBadges — heart/compare avoidance (issue #548 class)', () 
     expect(r.customBadgePositionCls).toBe('top-3 right-3');
   });
 
-  it('the pecannbee live bug: heart at top-start collides with an explicit top-right badge in RTL', () => {
+  it('the demo-store live bug: heart at top-start collides with an explicit top-right badge in RTL', () => {
     // PecannbeeProductCard's heart is logical top-start — physical top-RIGHT
     // in RTL. A merchant who placed the custom badge at "top-right" (a
     // perfectly normal choice, safe in LTR) got it hidden under the heart

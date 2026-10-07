@@ -236,8 +236,8 @@ function PrivacyFallback() {
             </p>
             <p className="mt-2 text-muted-foreground">
               {t(
-                'Data retention: we keep your information for as long as your account is active or as needed to provide our services and meet legal obligations (such as Kuwait commercial and tax record-keeping requirements).',
-                'الاحتفاظ بالبيانات: نحتفظ بمعلوماتك طالما ظل حسابك نشطاً أو حسب الحاجة لتقديم خدماتنا والوفاء بالالتزامات القانونية (مثل متطلبات حفظ السجلات التجارية والضريبية في الكويت).'
+                'Data retention: we keep your information for as long as your account is active or as needed to provide our services and meet legal obligations (such as Egyptian commercial and tax record-keeping requirements).',
+                'الاحتفاظ بالبيانات: نحتفظ بمعلوماتك طالما ظل حسابك نشطاً أو حسب الحاجة لتقديم خدماتنا والوفاء بالالتزامات القانونية (مثل متطلبات حفظ السجلات التجارية والضريبية في مصر).'
               )}
             </p>
           </section>
@@ -274,8 +274,6 @@ function PrivacyFallback() {
             </p>
             <p className="mt-2 text-muted-foreground">
               {t('Email:', 'البريد الإلكتروني:')} {privacyEmail}
-              <br />
-              {t('Address: Kuwait City, Kuwait', 'العنوان: مدينة الكويت، الكويت')}
             </p>
           </section>
         </div>

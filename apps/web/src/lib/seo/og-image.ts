@@ -44,7 +44,7 @@ const RASTER_EXT = /\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i;
  * host-resolved store (custom domains).
  *
  * @param ogImage  - Merchant's explicit og image URL (store.ogImage)
- * @param siteUrl  - Canonical store base URL (e.g. "https://wadyaljuz.com")
+ * @param siteUrl  - Canonical store base URL (e.g. "https://demo-shop.example")
  * @param alt      - Alt text / store name for accessibility and screen readers
  * @param slug     - Store slug, threaded into the generated-card fallback URL
  */

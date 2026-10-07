@@ -33,7 +33,7 @@ import {
 } from '@api/services/email.service';
 
 const baseStore = (overrides: Partial<EmailStoreContext> = {}): EmailStoreContext => ({
-  name: 'Wady Aljuz',
+  name: 'Demo Shop',
   logo: null,
   theme: null,
   email: null,
@@ -46,14 +46,14 @@ const baseStore = (overrides: Partial<EmailStoreContext> = {}): EmailStoreContex
 describe('renderBrandedShell', () => {
   it('uses store name in header when no logo', () => {
     const html = renderBrandedShell('<p>hi</p>', baseStore());
-    expect(html).toMatch(/<div class="store-name"[^>]*>Wady Aljuz<\/div>/);
-    expect(html).toContain('© ' + new Date().getFullYear() + ' Wady Aljuz');
+    expect(html).toMatch(/<div class="store-name"[^>]*>Demo Shop<\/div>/);
+    expect(html).toContain('© ' + new Date().getFullYear() + ' Demo Shop');
   });
 
   it('renders logo img when logo url present (no store-name fallback)', () => {
     const html = renderBrandedShell('<p>hi</p>', baseStore({ logo: 'https://r2.dev/logo.png' }));
     expect(html).toContain('<img src="https://r2.dev/logo.png"');
-    expect(html).not.toMatch(/<div class="store-name"[^>]*>Wady Aljuz<\/div>/);
+    expect(html).not.toMatch(/<div class="store-name"[^>]*>Demo Shop<\/div>/);
   });
 
   it('uses store theme primary color when set as hex (canonical primaryColor key)', () => {

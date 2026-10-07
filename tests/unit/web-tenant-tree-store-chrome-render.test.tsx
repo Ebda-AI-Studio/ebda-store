@@ -33,9 +33,9 @@ const WEB = '../../apps/web/src';
 
 const STORE = {
   id: 'store-1',
-  name: 'Wady Al Juz',
-  slug: 'wadyaljuz',
-  domain: 'wadyaljuz.com',
+  name: 'Demo Shop',
+  slug: 'demo-shop',
+  domain: 'demo-shop.example',
   status: 'active',
   description: 'Nuts and dates',
   theme: { primaryColor: '#123456' },
@@ -59,7 +59,7 @@ vi.mock('next/headers', () => ({
     };
     return { get: (name: string) => (name in jar ? { name, value: jar[name] } : undefined) };
   },
-  headers: async () => new Headers({ host: 'wadyaljuz.com', 'x-is-platform': '0' }),
+  headers: async () => new Headers({ host: 'demo-shop.example', 'x-is-platform': '0' }),
 }));
 
 vi.mock('next/font/google', () => ({
@@ -138,7 +138,7 @@ async function renderFlagOff(): Promise<string> {
 async function renderFlagOn(): Promise<string> {
   const tenantTree = await TenantStoreLayout({
     children: PAGE,
-    params: Promise.resolve({ tenant: 'wadyaljuz.com', locale: 'ar' }),
+    params: Promise.resolve({ tenant: 'demo-shop.example', locale: 'ar' }),
   });
   return renderToStaticMarkup(await RootLayout({ children: tenantTree }));
 }
@@ -215,7 +215,7 @@ describe('document metadata is identical flag off and flag on (issue 2407)', () 
       languageCookie.value = cookie;
       const off = await rootMetadata();
       const nested = await tenantLayoutMetadata({
-        params: Promise.resolve({ tenant: 'wadyaljuz.com', locale: middlewareSegment(cookie) }),
+        params: Promise.resolve({ tenant: 'demo-shop.example', locale: middlewareSegment(cookie) }),
       });
       const on = { ...off, ...nested };
       expect(on).toEqual(off);
@@ -263,9 +263,9 @@ describe('allowlisted store: route segment and metadata agree with the store def
   function routeSegment(storesToken: string, cookie: string | undefined): string {
     process.env.STOREFRONT_TENANT_ROUTING_STORES = storesToken;
     const res = middleware(
-      new NextRequest('https://wadyaljuz.com/about', {
+      new NextRequest('https://demo-shop.example/about', {
         headers: {
-          host: 'wadyaljuz.com',
+          host: 'demo-shop.example',
           ...(cookie ? { cookie: `force-language=${cookie}` } : {}),
         },
       })
@@ -280,14 +280,14 @@ describe('allowlisted store: route segment and metadata agree with the store def
   async function mergedMetadata(segment: string) {
     const off = await rootMetadata();
     const nested = await tenantLayoutMetadata({
-      params: Promise.resolve({ tenant: 'wadyaljuz.com', locale: segment }),
+      params: Promise.resolve({ tenant: 'demo-shop.example', locale: segment }),
     });
     return { off, on: { ...off, ...nested } };
   }
 
   it('AR-default store, no cookie: the route key is ar and the metadata is Arabic', async () => {
     STORE.settings.defaultLanguage = 'ar';
-    const segment = routeSegment('wadyaljuz.com:ar', undefined);
+    const segment = routeSegment('demo-shop.example:ar', undefined);
     expect(segment).toBe('ar');
     const { off, on } = await mergedMetadata(segment);
     expect(ogLocale(on)).toBe('ar_KW');
@@ -297,7 +297,7 @@ describe('allowlisted store: route segment and metadata agree with the store def
   it('AR-default store, en cookie: the route key is en and the metadata is English', async () => {
     STORE.settings.defaultLanguage = 'ar';
     languageCookie.value = 'en';
-    const segment = routeSegment('wadyaljuz.com:ar', 'en');
+    const segment = routeSegment('demo-shop.example:ar', 'en');
     expect(segment).toBe('en');
     const { off, on } = await mergedMetadata(segment);
     expect(ogLocale(on)).toBe('en_KW');
@@ -306,7 +306,7 @@ describe('allowlisted store: route segment and metadata agree with the store def
 
   it('EN-default store, no cookie: the route key is en and the metadata is English', async () => {
     STORE.settings.defaultLanguage = 'en';
-    const segment = routeSegment('wadyaljuz.com', undefined);
+    const segment = routeSegment('demo-shop.example', undefined);
     expect(segment).toBe('en');
     const { off, on } = await mergedMetadata(segment);
     expect(ogLocale(on)).toBe('en_KW');

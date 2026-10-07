@@ -5,7 +5,7 @@
 #
 # On 2026-09-03 a correct security fix (removing the merchant-origin CSRF
 # exemption) made POST /payments/create unreachable for cookieless guests, and
-# pecannbee.com.kw took 17 orders over two days without a single payment row.
+# demo-store.example took 17 orders over two days without a single payment row.
 # This asserts the ADMISSION decision only: a deliberately non-existent order
 # id means a healthy API answers 404 NOT_FOUND — the request cleared CSRF and
 # reached business logic — and nothing is created. A CSRF_* code means guests
@@ -33,7 +33,7 @@
 # Requires curl and node on PATH.
 set -euo pipefail
 
-: "${API_BASE:?API_BASE is required (e.g. https://api.force-ai.co)}"
+: "${API_BASE:?API_BASE is required (e.g. https://api.ebda.app)}"
 SESSION_ID="${PROBE_SESSION_ID:-admission-probe}"
 ATTEMPTS="${PROBE_ATTEMPTS:-5}"
 SLEEP_SECS="${PROBE_SLEEP_SECS:-5}"

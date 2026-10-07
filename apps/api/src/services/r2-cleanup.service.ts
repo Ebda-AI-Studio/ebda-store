@@ -13,7 +13,7 @@ import logger from '../lib/logger';
  * NEVER deleted the underlying R2 object. Every edit leaked storage,
  * and the leaked objects then made periodic orphan-audit cleanups
  * dangerous (it became hard to tell "real orphan" from "in-flight
- * upload"). One Palora's worth of data already vanished that way — the
+ * upload"). One Demo Boutique's worth of data already vanished that way — the
  * audit deleted objects that the audit thought were orphans but the
  * still-pointing DB rows had stale URLs.
  *

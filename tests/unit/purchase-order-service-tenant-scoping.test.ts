@@ -5,7 +5,7 @@
  * up the ReorderSuggestion with an unscoped `findUnique({ where: { id } })`
  * then write a PurchaseOrder using the suggestion's OWN storeId — so a
  * store_admin authenticated for store A could pass a suggestion id
- * belonging to store B and have FWB draft (and pay for) a PO on store B's
+ * belonging to store B and have Ebda draft (and pay for) a PO on store B's
  * behalf. Fix: the authenticated storeId is now a required parameter and
  * the lookup is `findFirst({ id, storeId })`.
  */

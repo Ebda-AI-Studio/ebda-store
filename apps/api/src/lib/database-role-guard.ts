@@ -12,7 +12,7 @@
  * fatal exactly like an unsafe one.
  *
  * `ALLOW_BYPASSRLS_ROLE=true` stays as the explicit, LOUD escape hatch
- * inherited from FWB (whose production runs as `neondb_owner`). It accepts a
+ * inherited from Ebda (whose production runs as `neondb_owner`). It accepts a
  * bypassing role only — never an unverifiable one. Ebda's intended runtime
  * role is `ebda_app` (NOBYPASSRLS, Ruling R-EBDA-002).
  */

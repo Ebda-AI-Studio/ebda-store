@@ -1,7 +1,7 @@
 /**
  * Dynamic-route param decoding.
  *
- * WHY THIS EXISTS (bug, 2026-07-29 — pecannbee Arabic product 404s):
+ * WHY THIS EXISTS (bug, 2026-07-29 — demo-store Arabic product 404s):
  * Next.js does NOT hand the same value to `generateMetadata` and to the page
  * component for the same dynamic segment. For
  * `/products/%D8%AE%D8%A8%D9%8A%D8%B5%D9%87`:

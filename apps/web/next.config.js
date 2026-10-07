@@ -96,7 +96,7 @@ const nextConfig = {
           // still showing "This content is blocked" because some browsers
           // (notably Safari and older Chrome variants) honor X-Frame-Options
           // OVER CSP frame-ancestors when both are present. SAMEORIGIN
-          // blocked admin.ebda.app → wadyaljuz.com framing even
+          // blocked admin.ebda.app → demo-shop.example framing even
           // though CSP frame-ancestors allowed it. CSP frame-ancestors below
           // is the canonical gate. Modern browsers ignore the absence of
           // X-Frame-Options; legacy browsers (IE) just allow framing.
@@ -140,7 +140,7 @@ const nextConfig = {
               // preconnect to it. googleadservices / googleads.g.doubleclick /
               // www.google.com: Google Ads conversion beacons (fetch/sendBeacon
               // transport), see script-src above.
-              "connect-src 'self' https://api.ebda.app https://api-production-c058.up.railway.app https://*.r2.dev https://*.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://*.facebook.com https://*.tiktok.com wss://api.ebda.app wss://api-production-c058.up.railway.app https://fonts.googleapis.com https://fonts.gstatic.com https://*.onesignal.com wss://*.onesignal.com https://ebda.app https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com",
+              "connect-src 'self' https://api.ebda.app https://*.r2.dev https://*.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://*.facebook.com https://*.tiktok.com wss://api.ebda.app wss://api-production-c058.up.railway.app https://fonts.googleapis.com https://fonts.gstatic.com https://*.onesignal.com wss://*.onesignal.com https://ebda.app https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com",
               // Required so /OneSignalSDKWorker.js can register as a service
               // worker — Push API mandates same-origin worker scripts.
               "worker-src 'self' blob:",

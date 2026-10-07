@@ -164,7 +164,7 @@ CREATE TABLE public.products (
 --
 
 COPY public.stores (id, name, slug, created_at) FROM stdin;
-str_1	Wady Al Juz	wady-al-juz	2026-01-04 10:00:00
+str_1	Demo Shop	demo-shop	2026-01-04 10:00:00
 str_2	Om Hassan	om-hassan	2026-02-11 09:30:00
 \.
 

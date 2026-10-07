@@ -171,7 +171,7 @@ export function buildStorefrontMetadata(
     // EVERY page with no canonical of its own (privacy, terms, about, faq,
     // contact, cart, checkout, account/*, ...) at the STORE HOME instead of
     // having none — verified live: `/privacy` picked up
-    // `<link rel="canonical" href="https://pecannbee.com.kw">`, telling
+    // `<link rel="canonical" href="https://demo-store.example">`, telling
     // crawlers the privacy policy is a duplicate of the homepage. The home
     // canonical (A3, 2026-09-22 AEO audit) is set at the actual home ROUTE
     // instead — `app/page.tsx` and `app/tenant-store/[tenant]/[locale]/page.tsx`

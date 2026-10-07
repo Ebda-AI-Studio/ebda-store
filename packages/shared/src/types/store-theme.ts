@@ -196,8 +196,8 @@ export interface StoreTheme {
 
   /**
    * Header logo sizing (per-store, so changing one store's logo never affects
-   * another — the previous shared Tailwind class meant shrinking pecannbee
-   * shrank wady-aljuz too). Edited via Branding → Theme.
+   * another — the previous shared Tailwind class meant shrinking demo-store
+   * shrank demo-shop too). Edited via Branding → Theme.
    * - `auto` (default): the StoreLogo component fits each logo by its measured
    *   aspect ratio within safe min/max thresholds — wide wordmarks get more
    *   width so they don't render tiny; square/tall logos use the base box.
@@ -317,9 +317,9 @@ export interface StoreTheme {
    * shape vocabulary), and bold (bordered header + inverted footer). Chrome
    * only — never touches card size, product name/price typography, fonts,
    * or colors (uses existing theme tokens). Default false/undefined so
-   * every EXISTING store (incl. wady-aljuz + Pecannbee) renders exactly as
+   * every EXISTING store (incl. demo-shop + Demo Store) renders exactly as
    * today. Seeded `true` at store-creation time for NEW stores only
-   * (`StoreService.create`) and for demo clones (`clone-demo-stores.ts`);
+   * (`StoreService.create`) and for demo clones;
    * existing stores can still opt in manually via Branding → Theme.
    */
   personaChromeV2?: boolean;
@@ -343,10 +343,10 @@ export interface StoreTheme {
    * reference (see `COLOR_TOKENS`) or a raw hex/hsl string, resolved via
    * `resolveColor`. Default (undefined): renders the platform's original
    * hardcoded terracotta `hsl(15 60% 33%)` — zero visual change for every
-   * EXISTING store (incl. wady-aljuz + Pecannbee), no backfill. Seeded to a
+   * EXISTING store (incl. demo-shop + Demo Store), no backfill. Seeded to a
    * neutral slate (`#6b7280`, matching `DEFAULT_THEME.mutedForeground`'s hue)
    * at store-creation time for NEW stores only (`StoreService.create`) and
-   * for demo clones (`clone-demo-stores.ts`) — same seeding path as
+   * for demo clones — same seeding path as
    * `personaChromeV2`/`frameChromeDedup`; existing stores can opt in
    * manually. 2026-07-12 design-sweep batch.
    */
@@ -357,10 +357,10 @@ export interface StoreTheme {
    * (`←` in Arabic, `→` in English) instead of always rendering `→`
    * regardless of reading direction. Chrome only — no layout, color, or
    * copy change. Default false/undefined so every EXISTING store (incl.
-   * wady-aljuz, which uses the elegant template) keeps today's
+   * demo-shop, which uses the elegant template) keeps today's
    * always-`→` rendering. Seeded `true` at store-creation time for NEW
    * stores only (`StoreService.create`) and for demo clones
-   * (`clone-demo-stores.ts`) — same seeding path as `personaChromeV2`;
+   * (demo clones) — same seeding path as `personaChromeV2`;
    * existing stores can opt in manually via Branding → Theme. 2026-07-12
    * design-sweep batch.
    */
@@ -458,7 +458,7 @@ export interface StoreTheme {
    * listing the store's published Locations (name + address, linked to
    * `mapsUrl` when present, phone as a `tel:` link when present). Default
    * false/undefined — a store that has locations enabled for the /locations
-   * page is UNAFFECTED until it explicitly opts in here (e.g. pecannbee's 8
+   * page is UNAFFECTED until it explicitly opts in here (e.g. demo-store's 8
    * locations render nowhere in the footer until this flag is set). Also
    * requires `Store.locationsEnabled === true` and at least one published
    * location — either gate missing means no column. Toggled via
@@ -481,7 +481,7 @@ export interface StoreTheme {
    * pill / heart / out-of-stock ribbon, so the add-to-cart band can never cover
    * it or lift it mid-image. true: the unset badge stays bottom-left (lifted
    * over the mobile add-to-cart band), exactly as before #1998. Per-store DATA —
-   * set for a store by `scripts/set-sale-badge-legacy-corner.mjs` or the Page
+   * set for a store by an operator script or the Page
    * Builder toggle (Product cards → Discount / sale badge; ThemeTab is at its
    * 7-toggle ceiling). A merchant-chosen corner is unaffected either way.
    */
@@ -493,7 +493,7 @@ export interface StoreTheme {
    * `-ink` shade of their role (>= 4.5:1 on the card, the page and every tint
    * up to 30%), derived per store by `statusInkVars`. true: every
    * `--<role>-ink` is `var(--<role>)`, so the message text renders in the bare
-   * role colour exactly as before. Per-store DATA — set for pecannbee by a
+   * role colour exactly as before. Per-store DATA — set for demo-store by a
    * jsonb merge before the code deploys, or by the Page Builder toggle (Cart
    * page → Message colours). The storefront never branches on a slug.
    */
@@ -924,7 +924,7 @@ export function themeToCssVars(theme: StoreTheme): Record<string, string> {
     // Brand engine (2026-06-05) — overrides the 4 brand color/foreground
     // pairs (primary/secondary/accent/card) with CONTRAST-SAFE foregrounds.
     // A stored foreground that reads fine on its surface is kept verbatim
-    // (so configured stores — wadyaljuz — are pixel-identical); a missing or
+    // (so configured stores — demo-shop — are pixel-identical); a missing or
     // unreadable foreground is replaced via pickReadableForeground(surface).
     // Spread LAST so it wins over the raw values above. See utils/brand-roles.ts.
     ...deriveBrandRoles(theme),

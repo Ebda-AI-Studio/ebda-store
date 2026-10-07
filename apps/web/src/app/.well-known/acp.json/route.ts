@@ -23,7 +23,7 @@ import { REGION } from '@force/shared';
  *
  * ## Served per store, on three hosts
  *
- *   wadyaljuz.com/.well-known/acp.json          → that merchant
+ *   demo-shop.example/.well-known/acp.json          → that merchant
  *   <slug>.ebda.app/.well-known/…      → that merchant
  *   ebda.app/.well-known/…             → 404 (the platform is not a shop)
  *

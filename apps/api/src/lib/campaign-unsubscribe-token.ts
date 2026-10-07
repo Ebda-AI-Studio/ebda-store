@@ -30,7 +30,7 @@ import { derivedSecret } from './derived-secret';
  */
 function signingKey(): string | Buffer {
   return (
-    process.env.CAMPAIGN_UNSUBSCRIBE_SECRET || derivedSecret('fwb:campaign-unsubscribe-mac:v1')
+    process.env.CAMPAIGN_UNSUBSCRIBE_SECRET || derivedSecret('ebda:campaign-unsubscribe-mac:v1')
   );
 }
 
@@ -38,7 +38,7 @@ function verifyKeys(): Array<string | Buffer> {
   const dedicated = process.env.CAMPAIGN_UNSUBSCRIBE_SECRET;
   return dedicated
     ? [dedicated]
-    : [derivedSecret('fwb:campaign-unsubscribe-mac:v1'), config.jwtSecret];
+    : [derivedSecret('ebda:campaign-unsubscribe-mac:v1'), config.jwtSecret];
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -25,7 +25,7 @@ if ! git diff --quiet || ! git diff --staged --quiet; then
   exit 1
 fi
 
-# FWB writes hand-built migrations under packages/database/prisma/migrations/<TS>_<name>/migration.sql
+# Ebda writes hand-built migrations under packages/database/prisma/migrations/<TS>_<name>/migration.sql
 if git diff HEAD~1 HEAD --name-only | grep -qE "packages/database/prisma/migrations|migration\.sql$"; then
   echo "⚠️  HEAD includes a Prisma migration. Code rollback won't undo schema changes."
   echo "   See docs/ROLLBACK.md → 'C. Migration rollback'"
