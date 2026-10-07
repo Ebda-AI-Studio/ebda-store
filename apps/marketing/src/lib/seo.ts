@@ -1,9 +1,17 @@
 import type { Metadata } from 'next';
 import { BRAND } from '@force/shared/brand';
 import { COPY } from './content';
-import { HOME, SIGNUP_URL, SITE_URL, absoluteUrl, pagePath, type Locale } from './site';
+import {
+  HOME,
+  SIGNUP_URL,
+  SITE_URL,
+  absoluteUrl,
+  pagePath,
+  type Locale,
+  type PageSlug,
+} from './site';
 
-type Page = '' | 'legal' | 'privacy' | 'terms';
+type Page = PageSlug;
 
 const OG_IMAGE = {
   url: '/og.png',

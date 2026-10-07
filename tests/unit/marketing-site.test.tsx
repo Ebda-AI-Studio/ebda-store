@@ -10,7 +10,12 @@ import { Home } from '../../apps/marketing/src/components/Home';
 import { LegalPage } from '../../apps/marketing/src/components/LegalPage';
 import { pageMetadata, jsonLd } from '../../apps/marketing/src/lib/seo';
 import { PLANS, PRICING_PUBLISHED } from '../../apps/marketing/src/lib/plans';
-import { SECTION_ORDER, LOGIN_URL, SIGNUP_URL } from '../../apps/marketing/src/lib/site';
+import {
+  LEGAL_SLUGS,
+  SECTION_ORDER,
+  LOGIN_URL,
+  SIGNUP_URL,
+} from '../../apps/marketing/src/lib/site';
 
 const pub = (f: string) =>
   readFileSync(path.resolve(__dirname, '../../apps/marketing/public', f), 'utf8');
@@ -155,17 +160,27 @@ describe('marketing SEO and trust surface', () => {
       ['ar', 'مسودة'],
       ['en', 'DRAFT'],
     ] as const) {
-      for (const page of ['legal', 'privacy', 'terms'] as const) {
+      for (const page of LEGAL_SLUGS) {
         const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);
         expect(html).toContain(badge);
         expect(html).not.toMatch(/\b\d{5,}\b/);
       }
     }
   });
+  it('every legal page (both locales) is versioned, names the contact, and has no placeholders', () => {
+    for (const locale of ['ar', 'en'] as const)
+      for (const page of LEGAL_SLUGS) {
+        const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);
+        expect(html).toContain('2026-10-07');
+        expect(html).toContain('hello@ebda.app');
+        expect(html).not.toMatch(/\[[^\]]*\]/);
+        expect(html.match(/<section/g)!.length).toBeGreaterThanOrEqual(5);
+      }
+  });
   it('no inherited third-party branding in any rendered page or public file', () => {
     const bad = /Force AI|ForceAI|Force Website Builder|force-ai|\bFWB\b|\bForce\b/i;
     const all = [ar, en, pub('llms.txt'), pub('.well-known/security.txt'), pub('og.svg')];
-    for (const p of ['legal', 'privacy', 'terms'] as const)
+    for (const p of LEGAL_SLUGS)
       for (const l of ['ar', 'en'] as const)
         all.push(renderToStaticMarkup(<LegalPage locale={l} page={p} />));
     for (const s of all) expect(s).not.toMatch(bad);

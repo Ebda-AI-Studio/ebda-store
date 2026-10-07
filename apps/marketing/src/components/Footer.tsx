@@ -35,6 +35,12 @@ export function Footer({ locale }: { locale: Locale }) {
             <li>
               <Link href={pagePath(locale, 'terms')}>{c.terms}</Link>
             </li>
+            <li>
+              <Link href={pagePath(locale, 'merchant-agreement')}>{c.merchant}</Link>
+            </li>
+            <li>
+              <Link href={pagePath(locale, 'acceptable-use')}>{c.acceptableUse}</Link>
+            </li>
           </ul>
           <p className="muted small">{c.draftNote}</p>
         </nav>
