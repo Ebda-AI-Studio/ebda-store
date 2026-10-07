@@ -39,7 +39,15 @@ const MAIN_LANE = [
   'security',
   'mutation',
 ];
-const PR_LANE = ['changes', 'guards', 'lint', 'typecheck', 'unit', 'worker-dry-run'];
+const PR_LANE = [
+  'changes',
+  'guards',
+  'lint',
+  'typecheck',
+  'unit',
+  'worker-dry-run',
+  'api-workerd-smoke',
+];
 
 /** Does the job (or, through `needs`, a job it waits on) skip on pull_request? */
 function skipsOnPr(name: string, seen = new Set<string>()): boolean {

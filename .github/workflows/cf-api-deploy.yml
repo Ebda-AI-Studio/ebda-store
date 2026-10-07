@@ -12,6 +12,22 @@ jobs:
     runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 20
     environment: production
+    # Throwaway Postgres for the pre-deploy workerd smoke (Ruling DEPLOY-SAFETY-1); never production.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: ebda_smoke
+        ports:
+          - 5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 30s
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -38,6 +54,14 @@ jobs:
         run: |
           npx wrangler secret list --config .wrangler.deploy.jsonc > /tmp/ebda-secret-names.json
           node -e 'const names = new Set(require("/tmp/ebda-secret-names.json").map(x => x.name)); for (const name of ["JWT_SECRET", "ENCRYPTION_KEY", "RESEND_API_KEY"]) { if (!names.has(name)) throw new Error(`Missing Worker secret: ${name}`); }'
+      - name: Pre-deploy smoke - boot THIS Worker on workerd (refuse to deploy a Worker that cannot boot)
+        # Ruling DEPLOY-SAFETY-1. Fresh Postgres migrated from scratch, the Worker built from the
+        # deploy config and booted in local workerd; /health and a tenant-scoped public read must
+        # answer without a 5xx. Runs BEFORE production is migrated: a build that cannot boot must
+        # not change the production schema either.
+        env:
+          SMOKE_PG_PORT: ${{ job.services.postgres.ports['5432'] }}
+        run: bash scripts/ci/workerd-smoke.sh --config .wrangler.deploy.jsonc
       - name: Apply database migrations
         # Schema first, Worker second: a failed migrate fails the job, so no deploy runs
         # against a schema the new code does not match. The URL stays in step env (masked
@@ -49,19 +73,25 @@ jobs:
         run: |
           test -n "$DATABASE_URL" || { echo "::error::EBDA_MIGRATE_DATABASE_URL is not set in the production environment"; exit 1; }
           npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
+      - name: Record the version serving production (rollback target)
+        id: previous
+        run: node scripts/ci/deploy-guard.mjs previous --name ebda-api --cwd apps/api --config .wrangler.deploy.jsonc
       - name: Deploy reviewed API
         working-directory: apps/api
         run: npx wrangler deploy --config .wrangler.deploy.jsonc --var BUILD_COMMIT_SHA:$GITHUB_SHA
-      - name: Verify running build identity
+      - name: Verify the live API, roll back automatically if it is unhealthy
+        # Ruling DEPLOY-SAFETY-2. Poll (right after `wrangler deploy` the edge can still serve the
+        # previous version for a few seconds): /health must be ok on THIS commit AND a second route
+        # (an unknown store through the database path) must be a clean 404. If not within 90s,
+        # `wrangler rollback <recorded version>`, confirm it serves, and fail the job. Code
+        # rollback does NOT undo the migration above: migrations stay expand-then-contract
+        # (Ruling CF-MIGRATE-1).
+        env:
+          PREVIOUS_VERSION: ${{ steps.previous.outputs.previous }}
         run: |
-          # Poll: right after `wrangler deploy` the edge can still serve the previous
-          # version for a few seconds, so a single read fails a good deploy.
-          # Positive control: the loop prints the commit it saw each attempt.
-          for i in $(seq 1 18); do
-            commit=$(curl --fail --silent --show-error https://api.ebda.app/health | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const h=JSON.parse(s);process.stdout.write(h.status==="ok"?String(h.commit):"not-ok")})') || commit="unreachable"
-            echo "attempt $i: live=$commit want=$GITHUB_SHA"
-            [ "$commit" = "$GITHUB_SHA" ] && exit 0
-            sleep 5
-          done
-          echo "Running API does not match this deployment after 90s" >&2
-          exit 1
+          node scripts/ci/deploy-guard.mjs verify --name ebda-api --cwd apps/api \
+            --config .wrangler.deploy.jsonc --previous "$PREVIOUS_VERSION" --sha "$GITHUB_SHA" \
+            --probe "https://api.ebda.app/health|200|commit=$GITHUB_SHA" \
+            --probe "https://api.ebda.app/api/v1/public/stores/ebda-deploy-probe-nonexistent|404" \
+            --rollback-probe "https://api.ebda.app/health|200" \
+            --rollback-probe "https://api.ebda.app/api/v1/public/stores/ebda-deploy-probe-nonexistent|404"

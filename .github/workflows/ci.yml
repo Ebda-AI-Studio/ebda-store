@@ -389,6 +389,47 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
 
+  # Boot the API Worker in workerd (Ruling DEPLOY-SAFETY-1). Node unit/integration tests cannot
+  # see code that throws only on Workers (2026-10-08: `Prisma.dmmf` -> error 1101 on every request
+  # for ~4 minutes with every Node test green). Fresh Postgres migrated from scratch, the Worker
+  # built from the real wrangler config (always on a PR: a shared package or root config can break
+  # the Worker as easily as apps/api), then /health + a tenant-scoped public read must not 5xx.
+  api-workerd-smoke:
+    name: API Worker boots on workerd
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: ebda_smoke
+        ports:
+          - 5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 30s
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run build -w packages/shared
+      - run: npm run build -w packages/database
+      - name: Migrate from scratch and boot the Worker on workerd
+        env:
+          SMOKE_PG_PORT: ${{ job.services.postgres.ports['5432'] }}
+        run: bash scripts/ci/workerd-smoke.sh
+
   # ---------------------------------------------------------------------------
   # Scheduled / manual lanes. Never on a pull request or a push.
   #   FULL    = Sunday cron or a manual dispatch

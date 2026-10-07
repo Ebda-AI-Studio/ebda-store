@@ -40,21 +40,20 @@ jobs:
           for f in out/index.html out/en/index.html out/sitemap.xml out/robots.txt out/llms.txt out/.well-known/security.txt; do
             test -s "apps/marketing/$f" || { echo "::error::missing build output $f"; exit 1; }
           done
+      - name: Record the version serving production (rollback target)
+        id: previous
+        working-directory: apps/marketing
+        run: node ../../scripts/ci/deploy-guard.mjs previous --name ebda-marketing
       - name: Deploy marketing Worker
         working-directory: apps/marketing
         run: npx wrangler deploy
-      - name: Verify the live site
+      - name: Verify the live site, roll back automatically if it is unhealthy
+        # Ruling DEPLOY-SAFETY-2: poll 90s; any non-200 or 5xx -> wrangler rollback to the recorded
+        # version, confirm it serves, fail the job.
+        env:
+          PREVIOUS_VERSION: ${{ steps.previous.outputs.previous }}
         run: |
-          # Poll: right after `wrangler deploy` the edge can still serve the previous
-          # state (or nothing, on the first deploy) for a few seconds, so a single read
-          # fails a good deploy. Each attempt prints the status it saw.
-          for url in https://ebda.app/sitemap.xml https://ebda.app/; do
-            ok=0
-            for i in $(seq 1 18); do
-              code=$(curl --silent --output /dev/null --write-out '%{http_code}' "$url") || code="unreachable"
-              echo "$url attempt $i: status=$code"
-              [ "$code" = "200" ] && ok=1 && break
-              sleep 5
-            done
-            [ "$ok" = "1" ] || { echo "::error::$url not 200 after 90s"; exit 1; }
-          done
+          node scripts/ci/deploy-guard.mjs verify --name ebda-marketing --cwd apps/marketing \
+            --previous "$PREVIOUS_VERSION" --sha "$GITHUB_SHA" \
+            --probe "https://ebda.app/|200" --probe "https://ebda.app/sitemap.xml|200" \
+            --rollback-probe "https://ebda.app/|200" --rollback-probe "https://ebda.app/sitemap.xml|200"

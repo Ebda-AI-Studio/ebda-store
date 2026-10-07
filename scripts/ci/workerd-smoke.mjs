@@ -1,0 +1,178 @@
+#!/usr/bin/env node
+/**
+ * Workerd boot smoke (Ruling DEPLOY-SAFETY-1). Node unit/integration tests cannot see a Worker
+ * that dies at boot or on every request in workerd (2026-10-08: `Prisma.dmmf` threw -> Cloudflare
+ * 1101 on every request, all Node tests green). This boots the Worker the way `wrangler deploy`
+ * would build it (same config, same esbuild alias block) in a local workerd, against a REAL
+ * migrated Postgres, and fails on any boot error or 5xx.
+ *
+ *   SMOKE_OWNER_DATABASE_URL  owner role, schema already migrated from scratch (seeds two stores)
+ *   SMOKE_APP_DATABASE_URL    the non-bypass `ebda_app` login the Worker connects as
+ *   node scripts/ci/workerd-smoke.mjs [--config .wrangler.deploy.jsonc] [--port 8799]
+ *
+ * Needs `wrangler` from the repo and `npx prisma` (to run the seed). Fake secrets only.
+ */
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, rmSync, writeFileSync, createWriteStream, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { tmpdir } from 'node:os';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const API = path.join(ROOT, 'apps/api');
+
+/** Pure verdict on a set of observed responses; exported for the unit test. */
+export function smokeProblems(observed) {
+  const problems = [];
+  for (const o of observed) {
+    if (o.status >= 500 || o.status === 0)
+      problems.push(
+        `${o.path} answered ${o.status || 'no response'} (5xx/no response is never acceptable)`
+      );
+    else if (o.status !== o.want) problems.push(`${o.path} answered ${o.status}, want ${o.want}`);
+    else if (o.check && !o.check(o.body))
+      problems.push(`${o.path} body shape wrong: ${String(o.body).slice(0, 200)}`);
+  }
+  return problems;
+}
+
+export const CHECKS = [
+  { path: '/health', want: 200, check: b => safe(b)?.status === 'ok' },
+  // Tenant-scoped public read through RLS (ebda_app role): a seeded store resolves ...
+  { path: '/api/v1/public/stores/alpha', want: 200, check: b => /Alpha Store/.test(b) },
+  // ... and an unknown one is a clean 404, not a 500 and not "first store".
+  { path: '/api/v1/public/stores/smoke-no-such-store', want: 404 },
+  { path: '/api/v1/definitely-not-a-route', want: 404 },
+];
+
+function safe(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+async function get(base, p) {
+  try {
+    const res = await fetch(base + p, {
+      headers: { 'cf-connecting-ip': '10.0.0.7' },
+      signal: AbortSignal.timeout(30_000),
+    });
+    return { status: res.status, body: await res.text() };
+  } catch {
+    return { status: 0, body: '' };
+  }
+}
+
+async function main() {
+  const arg = n => {
+    const i = process.argv.indexOf(`--${n}`);
+    return i > 0 ? process.argv[i + 1] : undefined;
+  };
+  const owner = process.env.SMOKE_OWNER_DATABASE_URL;
+  const app = process.env.SMOKE_APP_DATABASE_URL;
+  if (!owner || !app)
+    throw new Error('SMOKE_OWNER_DATABASE_URL and SMOKE_APP_DATABASE_URL are required');
+  const config = arg('config') ?? 'wrangler.jsonc';
+  const port = Number(arg('port') ?? 8799);
+  const base = `http://127.0.0.1:${port}`;
+
+  const seed = spawnSync(
+    'npx',
+    ['prisma', 'db', 'execute', '--url', owner, '--file', path.join(API, 'scripts/cf-seed.sql')],
+    { cwd: ROOT, encoding: 'utf8' }
+  );
+  if (seed.status !== 0) throw new Error(`seed failed: ${seed.stderr || seed.stdout}`);
+
+  const devVars = path.join(API, '.dev.vars');
+  if (existsSync(devVars))
+    throw new Error(`${devVars} exists; refusing to overwrite a developer file`);
+  writeFileSync(
+    devVars,
+    [
+      'NODE_ENV=development',
+      'WEB_URL=http://localhost:3000',
+      'ADMIN_URL=http://localhost:3001',
+      `API_URL=${base}`,
+      'BUILD_COMMIT_SHA=smoke',
+      'JWT_SECRET=smoke-only-jwt-secret-0123456789abcdef',
+      `ENCRYPTION_KEY=${'0'.repeat(64)}`,
+      'TAP_API_KEY=k',
+      'TAP_SECRET_KEY=s',
+      'TAP_WEBHOOK_SECRET=smoke-only-tap-webhook-secret',
+      'INNGEST_EVENT_KEY=smoke',
+    ].join('\n') + '\n'
+  );
+
+  const logPath = path.join(tmpdir(), `workerd-smoke-${process.pid}.log`);
+  const log = createWriteStream(logPath);
+  const child = spawn(
+    'npx',
+    ['wrangler', 'dev', '--local', '--port', String(port), '--config', config],
+    {
+      cwd: API,
+      detached: true,
+      env: {
+        ...process.env,
+        NO_PROXY: '127.0.0.1,localhost',
+        CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: app,
+      },
+    }
+  );
+  child.stdout.pipe(log);
+  child.stderr.pipe(log);
+  let exited = null;
+  child.on('exit', c => (exited = c ?? 'signal'));
+  const stop = () => {
+    try {
+      process.kill(-child.pid, 'SIGKILL');
+    } catch {}
+    rmSync(devVars, { force: true });
+  };
+
+  let failure = null;
+  try {
+    let ready = false;
+    for (let i = 0; i < 60 && exited === null && !ready; i++) {
+      // `wrangler dev` does NOT exit on a failed bundle: it keeps listening and never answers.
+      // Treat a logged build/boot error as the failure it is instead of waiting out the clock.
+      const text = existsSync(logPath) ? readFileSync(logPath, 'utf8') : '';
+      if (/\[ERROR\]|Build failed|Uncaught/.test(text.replace(/\x1b\[[0-9;]*m/g, '')))
+        throw new Error('wrangler dev logged a build/boot error');
+      ready = (await get(base, '/health')).status !== 0;
+      if (!ready) await new Promise(r => setTimeout(r, 2000));
+    }
+    if (!ready)
+      throw new Error(
+        exited !== null
+          ? `wrangler dev exited (${exited}) before serving`
+          : 'worker never started serving in 120s'
+      );
+
+    const observed = [];
+    for (const c of CHECKS) observed.push({ ...c, ...(await get(base, c.path)) });
+    for (const o of observed) console.log(`${o.status}  ${o.path}`);
+    const problems = smokeProblems(observed);
+    if (problems.length) throw new Error(problems.join('\n'));
+    console.log(`workerd smoke OK (${CHECKS.length} probes, no 5xx)`);
+  } catch (err) {
+    failure = err;
+  } finally {
+    stop();
+    log.end();
+  }
+  if (failure) {
+    console.log(`::error::workerd smoke FAILED:\n${failure.message}`);
+    try {
+      console.log(
+        '--- wrangler dev log (tail) ---\n' +
+          readFileSync(logPath, 'utf8').split('\n').slice(-60).join('\n')
+      );
+    } catch {}
+    process.exit(1);
+  }
+}
+
+import { pathToFileURL } from 'node:url';
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) main();
