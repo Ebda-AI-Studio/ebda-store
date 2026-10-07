@@ -23,8 +23,14 @@ import { bustStoreCaches } from '../store.service';
 import { featureService } from '../feature.service';
 import { isInterval, type BillingInterval } from './period';
 import { loadPayablePlan } from './subscription-billing.service';
-import { instapayHandle } from './manual-config';
-import { subscriptionChargeAmount } from './charge-amount';
+import { instapayHandle, instapayQrUrl } from './manual-config';
+import {
+  chargeFor,
+  ledgerVat,
+  resolvePlatformVat,
+  vatOfPaidAmount,
+  type LedgerVat,
+} from './charge-amount';
 
 type Tx = Prisma.TransactionClient;
 export type BillingSuspendReason = 'unpaid' | 'over_store_limit';
@@ -213,14 +219,18 @@ export async function instapayDetails(storeId: string) {
       ? plan.priceYearlyMinor
       : plan.priceMonthlyMinor
     : null;
-  // Through the ONE charge-amount seam (platform VAT lands there).
-  const amountMinor = listPrice === null ? null : subscriptionChargeAmount(listPrice).totalMinor;
+  // Through the ONE charge-amount seam (Ebda platform VAT applied there).
+  const charge = listPrice === null ? null : await chargeFor(listPrice);
+  const vat: LedgerVat | null = charge ? ledgerVat(charge).vat : null;
   return {
     handle,
+    qrUrl: handle ? instapayQrUrl() : null,
     reference: sub.paymentReference,
     planCode,
     interval,
-    amountMinor,
+    amountMinor: charge ? charge.totalMinor : null,
+    /** Ebda VAT inside the amount + TRN/legal name; null = no VAT line. */
+    vat,
   };
 }
 
@@ -440,6 +450,8 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
   }
   const { plan } = await loadPayablePlan(input.planCode, input.interval);
   const key = manualPaymentKey(input.method, reference);
+  // The money received is the gross: carve Ebda's VAT (if ON) out of it for the ledger.
+  const paidVat = ledgerVat(vatOfPaidAmount(input.amountMinor, await resolvePlatformVat()));
   const store = await prisma.store.findUnique({
     where: { id: input.storeId },
     select: { id: true },
@@ -476,6 +488,8 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
           providerRef: reference,
           idempotencyKey: key,
           status: 'succeeded',
+          vatMinor: paidVat.vatMinor,
+          vat: paidVat.vat ? (paidVat.vat as unknown as Prisma.InputJsonValue) : undefined,
           raw: {
             method: input.method,
             paidAt: input.paidAt.toISOString(),
