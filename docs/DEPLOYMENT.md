@@ -147,6 +147,14 @@ SMTP_FROM_EMAIL=noreply@yourdomain.com
 
 **Ebda status (2026-10-07):** all four Workers deploy from GitHub Actions on `ubuntu-latest`, `environment: production`, `main` only. `cf-api-deploy.yml` (manual `workflow_dispatch`) deploys `ebda-api`; `cf-admin-deploy.yml`, `cf-web-deploy.yml` and `cf-orders-deploy.yml` deploy `ebda-admin` (`store.ebda.app`), `ebda-web` (every `<slug>.ebda.app` store) and `ebda-orders` (`orders.ebda.app`) on a push to `main` touching their app (or `packages/shared`, `packages/ui`, the lockfile, the CF scripts), or by `workflow_dispatch`. Each one: `npm ci` → route tests → `scripts/cf-setup-local.sh <app>` (routes from BRAND via `scripts/cf-routes.cjs`; web with `OPENNEXT_CACHE=true` on R2 bucket `ebda-web-isr-cache` + DO tag cache) → `scripts/cf-build.sh <app>` with the `NEXT_PUBLIC_*` build env → required Worker secrets check (web: `REVALIDATE_SECRET`) → `wrangler deploy` → POLL until `/_next/static/<BUILD_ID>/_buildManifest.js` (exists only in this build) is 200 and the probe page answers (admin `/signup` 200, orders `/login` 200, web an unknown store host 404). The first deploy of all three was run locally from the same build on 2026-10-07. The FWB `cf-deploy.yml` described below does not exist in this repo.
 
+### Deploy safety (Rulings DEPLOY-SAFETY-1..5, 2026-10-08)
+
+Two gates exist because a Worker that throws only on workerd (`Prisma.dmmf`, 2026-10-08, error 1101 on every request for ~4 minutes) passes every Node test.
+
+1. **Refuse to deploy a Worker that cannot boot.** `scripts/ci/workerd-smoke.sh` migrates a throwaway Postgres from scratch, boots the API Worker with `wrangler dev --local` and requires `/health` 200, a seeded store 200, an unknown store 404 and an unknown route 404, with no 5xx. It runs as the `api-workerd-smoke` job on every PR and in `cf-api-deploy.yml` before the production migrate and deploy. Locally: create an empty database, `SMOKE_OWNER_DATABASE_URL=postgresql://<owner>@localhost:5432/<db> bash scripts/ci/workerd-smoke.sh` (needs the packages built: `npm run db:generate && npm run build -w packages/shared -w packages/database`). No storefront smoke yet (DEPLOY-SAFETY-4a).
+2. **Roll back automatically when production health fails.** Each deploy workflow records the live version (`node scripts/ci/deploy-guard.mjs previous --name <worker>`), deploys, then `deploy-guard.mjs verify` polls its probes (api: `/health` on this commit + an unknown-store 404; web: this build's manifest + the unknown-store host 404; admin: manifest + `/signup` + `/login`; orders: manifest + `/login`; marketing: `/` + `/sitemap.xml`). On failure it runs `wrangler rollback <recorded version> --yes`, polls again to confirm the old version serves, and fails the job: exit 1 = rolled back and serving, exit 2 = NOT confirmed restored (act now). Tests: `tests/unit/deploy-guard.test.ts`, `tests/unit/workerd-smoke.test.ts`.
+3. **A code rollback does not undo migrations.** The API migrates production first, so migrations stay expand-then-contract (CF-MIGRATE-1); the rollback path prints this warning. After an auto-rollback, fix forward on `main` and redeploy (run history cannot see the rollback).
+
 ### Storefront wildcard and the ebda.app route table
 
 Zone routes run BEFORE Workers custom domains, so the storefront's `*.ebda.app/*` route would catch every subdomain that has no more-specific route. Current table (verify with `GET /zones/<zone>/workers/routes` + `GET /accounts/<acct>/workers/domains`):
@@ -314,7 +322,7 @@ and cannot be renamed.
 ### Cloudflare Workers (Web, Admin & Orders)
 
 1. `bash scripts/rollback.sh` (git revert + push) re-triggers `cf-{web,admin,orders}-deploy.yml`, redeploying the reverted build to `ebda-web` / `ebda-admin` / `ebda-orders`.
-2. To roll back a single Worker without a code revert: `wrangler deployments list` (per app dir) then `wrangler rollback <deployment-id>`.
+2. To roll back a single Worker without a code revert: `wrangler deployments list` (per app dir) to find the previous **version id**, then `wrangler rollback <version-id> --yes`. (Every deploy workflow now does this itself when its post-deploy probes fail, see "Deploy safety" below.)
 
 See `docs/ROLLBACK.md` §A for the full fast-path procedure.
 

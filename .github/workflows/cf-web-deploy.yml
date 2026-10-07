@@ -68,6 +68,10 @@ jobs:
         run: |
           npx wrangler secret list --name ebda-web > "$RUNNER_TEMP/ebda-web-secret-names.json"
           node -e 'const names = new Set(require(process.argv[1]).map(x => x.name)); for (const name of process.argv.slice(2)) { if (!names.has(name)) throw new Error(`Missing Worker secret on ebda-web: ${name}`); }' "$RUNNER_TEMP/ebda-web-secret-names.json" REVALIDATE_SECRET
+      - name: Record the version serving production (rollback target)
+        id: previous
+        working-directory: apps/web
+        run: node ../../scripts/ci/deploy-guard.mjs previous --name ebda-web
       - name: Deploy ebda-web Worker
         working-directory: apps/web
         env:
@@ -75,24 +79,19 @@ jobs:
         run: |
           # Server-side Sentry DSN for sentry-worker-entry.ts; omitted (clean no-op) when unset.
           if [ -n "$SENTRY_DSN" ]; then npx wrangler deploy --var "SENTRY_DSN:$SENTRY_DSN"; else npx wrangler deploy; fi
-      - name: Verify the live Worker serves THIS build
+      - name: Verify the live Worker serves THIS build, roll back automatically if not
+        # Ruling DEPLOY-SAFETY-2. Poll (right after `wrangler deploy` the edge can still serve the
+        # previous version for a few seconds). Identity: /_next/static/<BUILD_ID>/_buildManifest.js
+        # exists only in this build's assets; the page probe must not 5xx. On failure within 120s:
+        # `wrangler rollback <recorded version>`, confirm the old version serves, fail the job.
+        # --resolve-ip pins the zone's edge IP so a probe never depends on the runner's DNS cache.
+        env:
+          PREVIOUS_VERSION: ${{ steps.previous.outputs.previous }}
         run: |
-          # Poll: right after `wrangler deploy` the edge can still serve the previous
-          # version for a few seconds, so a single read fails a good deploy.
-          # Identity: /_next/static/<BUILD_ID>/_buildManifest.js exists only in this
-          # build's assets. Then a store host that exists for no merchant must get the storefront's
-          # store-not-found page (404 from ebda-web, not a Cloudflare error).
-          # --resolve pins the zone's edge IP so the probe never depends on the
-          # runner's DNS cache. Each attempt prints what it saw (positive control).
-          host=ebda-deploy-probe.ebda.app
           ip=$(dig +short api.ebda.app | head -1)
           test -n "$ip" || { echo "::error::could not resolve the ebda.app edge IP"; exit 1; }
-          for i in $(seq 1 24); do
-            id=$(curl --silent --resolve "$host:443:$ip" --output /dev/null --write-out '%{http_code}' "https://$host/_next/static/$BUILD_ID/_buildManifest.js") || id="unreachable"
-            page=$(curl --silent --resolve "$host:443:$ip" --output /dev/null --write-out '%{http_code}' "https://$host/") || page="unreachable"
-            echo "attempt $i: build=$BUILD_ID manifest=$id /=$page"
-            [ "$id" = "200" ] && [ "$page" = "404" ] && exit 0
-            sleep 5
-          done
-          echo "::error::ebda-web does not serve build $BUILD_ID with /=404 after 120s"
-          exit 1
+          node scripts/ci/deploy-guard.mjs verify --name ebda-web --cwd apps/web \
+            --previous "$PREVIOUS_VERSION" --sha "$GITHUB_SHA" --window 120 --resolve-ip "$ip" \
+            --probe "https://ebda-deploy-probe.ebda.app/_next/static/$BUILD_ID/_buildManifest.js|200" \
+            --probe "https://ebda-deploy-probe.ebda.app/|404" \
+            --rollback-probe "https://ebda-deploy-probe.ebda.app/|404"
