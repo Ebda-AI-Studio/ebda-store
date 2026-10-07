@@ -35,9 +35,9 @@ export function Laptop({ children, className = '' }: { children: ReactNode; clas
 
 type DeviceKind = 'phone' | 'tablet' | 'laptop';
 const SRC_WIDTHS: Record<DeviceKind, [number, number]> = {
-  phone: [300, 600],
-  tablet: [420, 840],
-  laptop: [640, 1280],
+  phone: [600, 900],
+  tablet: [840, 1240],
+  laptop: [1280, 1920],
 };
 
 /**

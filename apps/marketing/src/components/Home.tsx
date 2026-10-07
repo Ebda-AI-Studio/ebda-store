@@ -18,7 +18,7 @@ import { Header } from './Header';
 import { JsonLd } from './JsonLd';
 import { About } from './About';
 import { Breakout } from './Breakout';
-import { Reveal, StoryScroll, TemplateShowcase } from './Motion';
+import { DevicesShowcase, Reveal, StoryScroll } from './Motion';
 import { Ring3D } from './ring/Ring3D';
 import { NileNight } from './NileNight';
 
@@ -114,11 +114,7 @@ export function Home({ locale }: { locale: Locale }) {
     templates: () => (
       <Section id="templates" title={c.templates.title} className="templates">
         <p className="lead">{c.templates.lead}</p>
-        <TemplateShowcase
-          locale={locale}
-          groupLabel={c.templates.groupLabel}
-          devicesLabel={c.templates.devicesLabel}
-        />
+        <DevicesShowcase devicesLabel={c.templates.devicesLabel} />
       </Section>
     ),
     features: () => (

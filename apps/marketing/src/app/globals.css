@@ -549,33 +549,6 @@ html[lang='ar'] .section h2 {
   background: rgba(0, 0, 0, 0.22);
 }
 
-/* swatches on the template switcher: each example store's own theme colours */
-[data-pal='souq'] {
-  --s-bg: #ffffff;
-  --s-surface: #eef1f5;
-  --s-accent: #1f56d6;
-}
-[data-pal='dahab'] {
-  --s-bg: #120f0b;
-  --s-surface: #231d16;
-  --s-accent: #c9a25f;
-}
-[data-pal='qamar'] {
-  --s-bg: #f6f1ea;
-  --s-surface: #e9dfd2;
-  --s-accent: #a8462a;
-}
-[data-pal='lamma'] {
-  --s-bg: #fff4df;
-  --s-surface: #ffd98a;
-  --s-accent: #c2410c;
-}
-[data-pal='jasmine'] {
-  --s-bg: #fbf1f2;
-  --s-surface: #f3dde1;
-  --s-accent: #a9435d;
-}
-
 /* ---------- real storefront captures inside the device screens ---------- */
 .shot {
   display: block;
@@ -693,7 +666,7 @@ html[lang='ar'] .story h2 {
 .story:not([data-live]) .story-phone {
   --w: min(300px, 70vw);
 }
-/* the real Lamma storefront scrolls inside the phone (steps 1-2), then flips templates (3) */
+/* the real store scrolls inside the phone (steps 1-3), then the notifications arrive */
 .story-screen {
   position: absolute;
   inset: 0;
@@ -719,16 +692,6 @@ html[lang='ar'] .story h2 {
   display: block;
   width: 100%;
   height: auto;
-}
-.story-swap {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  opacity: 0;
-  transition: opacity 0.45s var(--ease);
-}
-.story-swap[data-on] {
-  opacity: 1;
 }
 .story-toasts {
   position: absolute;
@@ -817,76 +780,7 @@ html[lang='ar'] .story h2 {
   display: grid;
   gap: 32px;
 }
-.tpl-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.tpl-tab {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  column-gap: 10px;
-  align-items: center;
-  min-height: 52px;
-  padding: 8px 18px 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--panel);
-  color: var(--fg);
-  font: inherit;
-  line-height: 1.3;
-  text-align: start;
-  cursor: pointer;
-  transition:
-    border-color 0.3s var(--ease),
-    background-color 0.3s var(--ease),
-    box-shadow 0.4s var(--ease);
-}
-.tpl-tab:hover {
-  border-color: rgba(203, 168, 115, 0.6);
-}
-.tpl-tab[aria-pressed='true'] {
-  border-color: var(--gold);
-  background: #17150f;
-  box-shadow: 0 0 28px -8px rgba(203, 168, 115, 0.45);
-}
-.tpl-swatch {
-  grid-row: span 2;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: conic-gradient(var(--s-accent) 0 50%, var(--s-bg) 0 75%, var(--s-surface) 0);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
-}
-.tpl-name {
-  font-weight: 700;
-}
 @media (max-width: 599px) {
-  .tpl-tabs {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 6px;
-  }
-  .tpl-tab {
-    grid-template-columns: 1fr;
-    justify-items: center;
-    row-gap: 4px;
-    padding: 8px 2px;
-    font-size: 0.85rem;
-    text-align: center;
-  }
-  .tpl-swatch {
-    grid-row: auto;
-    width: 24px;
-    height: 24px;
-  }
-  .tpl-kind {
-    display: none;
-  }
-}
-.tpl-kind {
-  color: var(--muted);
-  font-size: 0.85rem;
 }
 .devices {
   position: relative;
