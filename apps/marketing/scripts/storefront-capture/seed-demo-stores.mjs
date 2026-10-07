@@ -155,6 +155,8 @@ function theme(id) {
     borderColor: dark ? '40 12% 18%' : '220 13% 88%',
     inputColor: dark ? '40 12% 18%' : '220 13% 88%',
     borderRadius: l.radius,
+    // Western digits on the Arabic storefront too (the template preset opts into Eastern ones).
+    arabicNumerals: false,
   };
 }
 

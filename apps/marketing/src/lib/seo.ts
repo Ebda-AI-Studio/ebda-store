@@ -19,7 +19,7 @@ const OG_IMAGE = {
   url: '/og.png',
   width: 1200,
   height: 630,
-  alt: 'ابدأ Ebda: ابدأ متجرك أونلاين',
+  alt: 'ابدأ Ebda — بابك لبدء مشروعك. Your doorway to business.',
 };
 
 /** Metadata for a page in a locale, incl. canonical + hreflang alternates. */

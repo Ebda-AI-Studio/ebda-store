@@ -16,7 +16,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: 'Who we are',
         p: [
-          'Ebda (ابدأ), available at ebda.app, is an online store builder for merchants in Egypt. It is a product of Whisky 11 ("Ebda", "we", "us").',
+          'Ebda (ابدأ), available at ebda.app, is an online store builder for merchants in Egypt. Ebda is a technology platform owned and operated by Whisky 11 ("Ebda", "we", "us").',
         ],
       },
       {
@@ -57,7 +57,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '1. Acceptance',
         p: [
-          'These terms are an agreement between you and Ebda (operated by Whisky 11). By creating an account, opening a store or using the website or any Ebda service (the "Service"), you accept these terms, the Merchant Agreement, the Acceptable Use Policy and the Privacy Policy. If you do not accept them, do not use the Service. If you accept on behalf of a business, you confirm that you have authority to do so.',
+          'These terms are an agreement between you and Ebda. Ebda is a technology platform owned and operated by Whisky 11. By creating an account, opening a store or using the website or any Ebda service (the "Service"), you accept these terms, the Merchant Agreement, the Acceptable Use Policy and the Privacy Policy. If you do not accept them, do not use the Service. If you accept on behalf of a business, you confirm that you have authority to do so.',
         ],
       },
       {

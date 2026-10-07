@@ -154,6 +154,8 @@ export function comparisonRows(locale: Locale): { label: string; cells: Cell[] }
     ),
     row(ar ? 'شيل «مدعوم من ابدأ»' : 'Remove “Powered by Ebda”', p => p.limits.brandingRemoval),
     row(ar ? 'ربط API وMCP' : 'API and MCP access', p => p.limits.apiAccess),
+    // Not a plan limit: every plan includes it (Ahmad 2026-10-07; R-EBDA-COPY-12).
+    row(ar ? 'موديلات 3D للمنتجات' : '3D product models', () => true),
     row(ar ? 'التحليلات' : 'Analytics', p => tiers[p.limits.analyticsTier]),
     row(ar ? 'الدعم' : 'Support', p => tiers[p.limits.supportTier]),
   ];

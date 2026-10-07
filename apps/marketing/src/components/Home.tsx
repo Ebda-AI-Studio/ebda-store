@@ -16,6 +16,7 @@ import {
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { JsonLd } from './JsonLd';
+import { About } from './About';
 import { Breakout } from './Breakout';
 import { Reveal, StoryScroll, TemplateShowcase } from './Motion';
 import { Ring3D } from './ring/Ring3D';
@@ -101,6 +102,14 @@ export function Home({ locale }: { locale: Locale }) {
         <p className="lead">{c.scenes.lead}</p>
         <Scenes items={c.scenes.items} />
       </Section>
+    ),
+    about: () => (
+      <About
+        title={c.about.title}
+        paras={c.about.paras}
+        close={c.about.close}
+        markLabel={c.about.markLabel}
+      />
     ),
     breakout: () => <Breakout title={c.breakout.title} words={c.breakout.words} />,
     dahab: () => (
@@ -307,6 +316,7 @@ export function Home({ locale }: { locale: Locale }) {
           />
           <NileNight className="nile" mirror={rtl} />
           <div className="wrap hero-inner">
+            <p className="hero-brand">{c.hero.brand}</p>
             <h1 id="hero-h">{c.hero.h1}</h1>
             <p className="hero-sub">{c.hero.sub}</p>
             <p className="actions">

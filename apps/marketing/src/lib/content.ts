@@ -36,7 +36,17 @@ export interface Copy {
     switchTo: string;
     switchLabel: string;
   };
-  hero: { h1: string; sub: string; cta: string; secondary: string; slugLabel: string };
+  hero: {
+    /** The brand line, «ابدأ — بابك لبدء مشروعك.» */
+    brand: string;
+    h1: string;
+    sub: string;
+    cta: string;
+    secondary: string;
+    slugLabel: string;
+  };
+  /** «حكاية ابدأ»: why the name and the open-door mark. */
+  about: { title: string; paras: string[]; close: string; markLabel: string };
   /** The pinned scroll story: a store assembling inside a phone. */
   story: {
     title: string;
@@ -80,7 +90,7 @@ export interface Copy {
   };
   faq: { title: string; items: { q: string; a: string }[] };
   /** Footer contact block; `company` precedes the linked company name ("Ebda by Whisky 11"). */
-  contact: { title: string; hello: string; security: string; company: string };
+  contact: { title: string; hello: string; security: string };
   start: {
     title: string;
     lead: string;
@@ -98,6 +108,8 @@ export interface Copy {
     acceptableUse: string;
     contact: string;
     legalVersion: string;
+    /** Ownership line around the linked company name: `${before}Whisky 11${after}`. */
+    ownership: { before: string; after: string };
   };
   legalPages: LegalPages;
 }
@@ -105,9 +117,9 @@ export interface Copy {
 export const COPY: Record<Locale, Copy> = {
   ar: {
     meta: {
-      title: 'ابدأ | اعمل متجرك أونلاين في دقايق',
+      title: 'ابدأ — بابك لبدء مشروعك. اعمل متجرك أونلاين',
       description:
-        'اعمل متجرك أونلاين في دقايق: لينك باسمك، 5 قوالب، دفع أونلاين وكاش وإنستا باي، وشحن مع بوسطة وأرامكس. ومن غير عمولة على طلباتك.',
+        'ابدأ — بابك لبدء مشروعك. اعمل متجرك أونلاين في دقايق: لينك باسمك، دفع أونلاين وكاش وإنستا باي، وشحن مع بوسطة وأرامكس.',
     },
     skip: 'روح للمحتوى',
     nav: {
@@ -123,6 +135,7 @@ export const COPY: Record<Locale, Copy> = {
       switchLabel: 'Switch to English',
     },
     hero: {
+      brand: 'ابدأ — بابك لبدء مشروعك.',
       h1: 'ابدأ متجرك أونلاين في دقايق.',
       sub: 'لينك باسمك، منتجاتك، وطلباتك. كله من موبايلك.',
       cta: 'ابدأ دلوقتي',
@@ -265,11 +278,20 @@ export const COPY: Record<Locale, Copy> = {
         },
       ],
     },
+    about: {
+      title: 'حكاية ابدأ',
+      paras: [
+        'كل مشروع بيبدأ قبل ما يبقى مشروع، بيبدأ بجملة: «عندي فكرة».',
+        'وبين الفكرة وأول عميل فيه أبواب كتير: موقع، وطلبات، وكلام مع العملاء، ومنتجات، ودفع، وتوصيل، وتكنولوجيا.',
+        'ابدأ موجودة علشان تسهّل أول باب. علشان كده اللوجو باب، واللي جوّاه هو صاحب الفكرة، واقف على العتبة. مش محتاج يفهم في منصات التجارة الإلكترونية ولا الـ API ولا البنية التحتية ولا ربط واتساب. محتاج بس ياخد أول خطوة.',
+      ],
+      close: 'ابدأ.',
+      markLabel: 'لوجو ابدأ: باب مفتوح، وصاحب الفكرة بيعدّي منه',
+    },
     contact: {
       title: 'تواصل معانا',
       hello: 'أسئلة واستفسارات',
       security: 'الإبلاغ عن ثغرة أمنية',
-      company: 'ابدأ من',
     },
     start: {
       title: 'الدور عليك.',
@@ -288,14 +310,15 @@ export const COPY: Record<Locale, Copy> = {
       acceptableUse: 'الاستخدام المقبول',
       contact: 'تواصل: ahlan@ebda.app',
       legalVersion: 'الإصدار 1.0 من الوثائق القانونية · 2026-10-07.',
+      ownership: { before: 'ابدأ منتج من ', after: '. © 2026 Whisky 11. جميع الحقوق محفوظة.' },
     },
     legalPages: LEGAL_AR,
   },
   en: {
     meta: {
-      title: 'Ebda | Open your online store in minutes',
+      title: 'Ebda — Your doorway to business. Open your store online',
       description:
-        'Open your online store in minutes: your own link, 5 templates, online payments, cash and InstaPay, shipping with Bosta and Aramex. No commission.',
+        'Ebda — Your doorway to business. Open your online store in minutes: your own link, online payments, cash and InstaPay, shipping with Bosta and Aramex.',
     },
     skip: 'Skip to content',
     nav: {
@@ -311,6 +334,7 @@ export const COPY: Record<Locale, Copy> = {
       switchLabel: 'التبديل إلى العربية',
     },
     hero: {
+      brand: 'Ebda — Your doorway to business.',
       h1: 'Open your online store in minutes.',
       sub: 'Your own link, products and orders. All from your phone.',
       cta: 'Start now',
@@ -474,11 +498,20 @@ export const COPY: Record<Locale, Copy> = {
         },
       ],
     },
+    about: {
+      title: 'The Ebda story',
+      paras: [
+        'Every business starts before it becomes a business. It starts with “I have an idea.”',
+        'Between the idea and the first customer there are too many doors: a website, orders, talking to customers, products, payments, delivery, technology.',
+        'Ebda exists to make the first door simple. That’s why the logo is a doorway, and the shape inside is the person with the idea, standing at the entrance. They don’t need to know e-commerce platforms, APIs, infrastructure or WhatsApp integrations. They just take the first step.',
+      ],
+      close: 'ابدأ.',
+      markLabel: 'The Ebda mark: an open doorway, with the person with the idea stepping through',
+    },
     contact: {
       title: 'Contact us',
       hello: 'Questions and help',
       security: 'Report a security issue',
-      company: 'Ebda by',
     },
     start: {
       title: 'Your turn.',
@@ -497,6 +530,10 @@ export const COPY: Record<Locale, Copy> = {
       acceptableUse: 'Acceptable use',
       contact: 'Contact: ahlan@ebda.app',
       legalVersion: 'Legal documents version 1.0 · 2026-10-07.',
+      ownership: {
+        before: 'Ebda is a product of ',
+        after: '. © 2026 Whisky 11. All rights reserved.',
+      },
     },
     legalPages: LEGAL_EN,
   },

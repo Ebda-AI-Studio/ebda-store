@@ -45,6 +45,7 @@ export const SECTION_ORDER = [
   'dahab',
   'features',
   'payments',
+  'about',
   'pricing',
   'faq',
   'start',

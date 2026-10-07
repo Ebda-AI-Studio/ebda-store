@@ -19,12 +19,6 @@ export function Footer({ locale }: { locale: Locale }) {
               height={24}
             />
           </p>
-          <p className="muted">
-            {k.company}{' '}
-            <a href={COMPANY_URL} target="_blank" rel="noopener noreferrer">
-              {BRAND.company}
-            </a>
-          </p>
           <p className="footer-h">{k.title}</p>
           <dl className="footer-contact">
             <div>
@@ -61,6 +55,15 @@ export function Footer({ locale }: { locale: Locale }) {
           </ul>
           <p className="muted small">{c.legalVersion}</p>
         </nav>
+      </div>
+      <div className="wrap footer-legal">
+        <p className="muted small">
+          {c.ownership.before}
+          <a href={COMPANY_URL} target="_blank" rel="noopener noreferrer">
+            {BRAND.company}
+          </a>
+          {c.ownership.after}
+        </p>
       </div>
     </footer>
   );

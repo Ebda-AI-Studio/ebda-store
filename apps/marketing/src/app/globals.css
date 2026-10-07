@@ -1891,3 +1891,83 @@ html[dir='rtl'] .not-found .lead {
 [data-stone='ruby'] .swatch-dot {
   background: radial-gradient(circle at 35% 30%, #ffb0c0, #c0143c 55%, #6a0a20);
 }
+
+/* ---------- hero brand line ---------- */
+.hero-brand {
+  margin: 0 0 14px;
+  color: var(--lift);
+  font-size: clamp(1rem, 2.2vw, 1.25rem);
+  font-weight: 600;
+}
+
+/* ---------- the Ebda story + the open door ---------- */
+.about-grid {
+  display: grid;
+  gap: 40px;
+  align-items: center;
+}
+@media (min-width: 900px) {
+  .about-grid {
+    grid-template-columns: 0.8fr 1.2fr;
+    gap: 80px;
+  }
+}
+.door-wrap {
+  display: grid;
+  place-items: center;
+}
+.door {
+  width: min(280px, 60vw);
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 0 40px rgba(203, 168, 115, 0.25));
+}
+.about-copy h2 {
+  margin-bottom: 24px;
+}
+.about-copy p {
+  max-width: 56ch;
+  font-size: 1.12rem;
+  color: #d6dbd9;
+}
+.about-copy .about-close {
+  margin-top: 8px;
+  font-family: var(--font-ar);
+  font-size: clamp(2.4rem, 6vw, 3.6rem);
+  font-weight: 700;
+  color: var(--lift) !important;
+}
+/* on reveal: the light comes up, the person steps through the doorway toward us */
+.door-wrap.armed .door-glow {
+  opacity: 0;
+}
+.door-wrap.armed .door-person {
+  transform: translateY(-10px) scale(0.72);
+  opacity: 0.4;
+}
+.door-glow,
+.door-person {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.door-wrap.armed.in .door-glow {
+  opacity: 1;
+  transition: opacity 1.6s var(--ease) 0.2s;
+}
+.door-wrap.armed.in .door-person {
+  transform: none;
+  opacity: 1;
+  transition:
+    transform 1.8s var(--ease) 0.5s,
+    opacity 1.2s var(--ease) 0.5s;
+}
+
+/* ---------- footer ownership line ---------- */
+.footer-legal {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.footer-legal p {
+  margin: 0;
+}

@@ -63,6 +63,7 @@ describe('marketing hero and structure', () => {
       'dahab',
       'features',
       'payments',
+      'about',
       'pricing',
       'faq',
       'start',
@@ -165,6 +166,36 @@ describe('marketing honesty', () => {
       expect(s).toContain(label);
     expect(s).toContain('EGP 13,410');
     expect(s).toContain('EGP 89,910');
+  });
+  it('brand line, footer ownership line and Western digits everywhere', () => {
+    expect(ar).toContain('ابدأ — بابك لبدء مشروعك.');
+    expect(en).toContain('Ebda — Your doorway to business.');
+    expect(en).toContain(
+      'Ebda is a product of <a href="https://whisky11.com" target="_blank" rel="noopener noreferrer">Whisky 11</a>. © 2026 Whisky 11. All rights reserved.'
+    );
+    expect(ar).toContain(
+      'ابدأ منتج من <a href="https://whisky11.com" target="_blank" rel="noopener noreferrer">Whisky 11</a>. © 2026 Whisky 11. جميع الحقوق محفوظة.'
+    );
+    // no Arabic-Indic digits anywhere on either home page or any legal page
+    expect(ar).not.toMatch(/[٠-٩]/);
+    expect(en).not.toMatch(/[٠-٩]/);
+    for (const l of ['ar', 'en'] as const)
+      for (const page of LEGAL_SLUGS)
+        expect(renderToStaticMarkup(<LegalPage locale={l} page={page} />)).not.toMatch(/[٠-٩]/);
+    // 3D product models: included on every plan
+    const row = en.match(/<tr><th scope="row">3D product models<\/th>.*?<\/tr>/s)![0];
+    expect(row.match(/class="yes"/g)).toHaveLength(3);
+  });
+  it('the legal notice and terms name the operator without a personal name', () => {
+    const ln = renderToStaticMarkup(<LegalPage locale="en" page="legal" />);
+    expect(ln).toContain('Ebda is a technology platform owned and operated by');
+    const lar = renderToStaticMarkup(<LegalPage locale="ar" page="terms" />);
+    expect(lar).toContain('ابدأ منصة تقنية مملوكة لـ');
+    for (const l of ['ar', 'en'] as const)
+      for (const page of LEGAL_SLUGS) {
+        const h = renderToStaticMarkup(<LegalPage locale={l} page={page} />);
+        expect(h).not.toMatch(/Ahmad|أحمد|Sharaf|شرف/);
+      }
   });
   it('the new motion sections ship their real assets and accessible controls', () => {
     for (const html of [ar, en]) {
