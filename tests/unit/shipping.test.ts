@@ -1,6 +1,6 @@
 /**
  * Shipping Carrier Integrations — Unit Tests
- * Tests for carrier types, status constants, status mappings, and registry
+ * Tests for carrier types, status constants and the registry (per-carrier mapping lives in each carrier's contract tests)
  */
 
 import { describe, it, expect } from 'vitest';
@@ -11,10 +11,7 @@ import {
   type ShipmentStatus,
 } from '../../apps/api/src/services/carriers/types';
 
-import { ICarryCarrier } from '../../apps/api/src/services/carriers/icarry.carrier';
-import { AramexCarrier } from '../../apps/api/src/services/carriers/aramex.carrier';
-import { iCarryCarrier } from '../../apps/api/src/services/carriers/icarry.carrier';
-import { aramexCarrier } from '../../apps/api/src/services/carriers/aramex.carrier';
+import { CARRIER_REGISTRY } from '../../apps/api/src/services/carriers/registry';
 
 // ─── SHIPMENT_STATUSES ────────────────────────────────────────────────────────
 
@@ -38,166 +35,40 @@ describe('SHIPMENT_STATUSES', () => {
 // ─── CARRIER_CODES ────────────────────────────────────────────────────────────
 
 describe('CARRIER_CODES', () => {
-  it('has exactly 4 entries (iCarry legacy, Aramex, Bosta, manual)', () => {
-    expect(CARRIER_CODES).toHaveLength(4);
+  it('has exactly 5 entries (Bosta, ShipBlu, Mylerz, Aramex, manual: ruling PROVIDERS-3)', () => {
+    expect([...CARRIER_CODES].sort()).toEqual(['aramex', 'bosta', 'manual', 'mylerz', 'shipblu']);
   });
 
-  it('contains bosta and manual (SP7)', () => {
-    expect(CARRIER_CODES).toContain('bosta');
-    expect(CARRIER_CODES).toContain('manual');
-  });
-
-  it('contains icarry', () => {
-    expect(CARRIER_CODES).toContain('icarry');
-  });
-
-  it('contains aramex', () => {
-    expect(CARRIER_CODES).toContain('aramex');
-  });
-});
-
-// ─── iCarry status mapping ────────────────────────────────────────────────────
-
-describe('iCarry status mapping via processWebhook', () => {
-  const carrier = new ICarryCarrier();
-
-  const cases: Array<[string, ShipmentStatus]> = [
-    ['pending', 'created'],
-    ['created', 'created'],
-    ['picked_up', 'picked_up'],
-    ['on_the_way', 'in_transit'],
-    ['in_transit', 'in_transit'],
-    ['out_for_delivery', 'out_for_delivery'],
-    ['arrived', 'out_for_delivery'],
-    ['delivered', 'delivered'],
-    ['failed', 'failed'],
-    ['failed_delivery', 'failed'],
-    ['cancelled', 'cancelled'],
-    ['returned', 'returned'],
-    ['return_in_transit', 'returned'],
-  ];
-
-  it('covers all ShipmentStatus values in its mapping', () => {
-    const mappedStatuses = new Set(cases.map(([, expected]) => expected));
-    for (const status of SHIPMENT_STATUSES) {
-      expect(mappedStatuses).toContain(status);
-    }
-  });
-
-  cases.forEach(([rawStatus, expectedNormalized]) => {
-    it(`maps iCarry status "${rawStatus}" → "${expectedNormalized}"`, () => {
-      const result = carrier.processWebhook({ tracking_number: 'TRK-001', status: rawStatus }, {});
-      expect(result).not.toBeNull();
-      expect(result!.status).toBe(expectedNormalized);
-    });
-  });
-
-  it('returns null for payload missing tracking_number', () => {
-    const result = carrier.processWebhook({ status: 'delivered' }, {});
-    expect(result).toBeNull();
-  });
-
-  it('returns null for payload missing status', () => {
-    const result = carrier.processWebhook({ tracking_number: 'TRK-001' }, {});
-    expect(result).toBeNull();
-  });
-
-  it('returns null for non-object payload', () => {
-    const result = carrier.processWebhook('not-an-object', {});
-    expect(result).toBeNull();
-  });
-});
-
-// ─── Aramex status mapping ────────────────────────────────────────────────────
-
-describe('Aramex status mapping via processWebhook', () => {
-  const carrier = new AramexCarrier();
-
-  const cases: Array<[string, ShipmentStatus]> = [
-    ['SH005', 'created'],
-    ['SH006', 'created'],
-    ['SH010', 'picked_up'],
-    ['SH011', 'picked_up'],
-    ['SH012', 'picked_up'],
-    ['SH020', 'in_transit'],
-    ['SH021', 'in_transit'],
-    ['SH022', 'in_transit'],
-    ['SH023', 'in_transit'],
-    ['SH024', 'in_transit'],
-    ['SH025', 'in_transit'],
-    ['SH030', 'in_transit'],
-    ['SH040', 'out_for_delivery'],
-    ['SH041', 'out_for_delivery'],
-    ['SH050', 'delivered'],
-    ['SH051', 'delivered'],
-    ['SH060', 'failed'],
-    ['SH061', 'failed'],
-    ['SH062', 'failed'],
-    ['SH063', 'failed'],
-    ['SH064', 'failed'],
-    ['SH070', 'returned'],
-    ['SH071', 'returned'],
-    ['SH072', 'returned'],
-    ['SH080', 'cancelled'],
-    ['SH081', 'cancelled'],
-  ];
-
-  it('covers all ShipmentStatus values in its mapping', () => {
-    const mappedStatuses = new Set(cases.map(([, expected]) => expected));
-    for (const status of SHIPMENT_STATUSES) {
-      expect(mappedStatuses).toContain(status);
-    }
-  });
-
-  cases.forEach(([updateCode, expectedNormalized]) => {
-    it(`maps Aramex UpdateCode "${updateCode}" → "${expectedNormalized}"`, () => {
-      const result = carrier.processWebhook(
-        { WaybillNumber: 'AWB-123', UpdateCode: updateCode },
-        {}
-      );
-      expect(result).not.toBeNull();
-      expect(result!.status).toBe(expectedNormalized);
-    });
-  });
-
-  it('returns null for payload missing WaybillNumber and ShipmentNumber', () => {
-    const result = carrier.processWebhook({ UpdateCode: 'SH050' }, {});
-    expect(result).toBeNull();
-  });
-
-  it('returns null for payload missing UpdateCode', () => {
-    const result = carrier.processWebhook({ WaybillNumber: 'AWB-123' }, {});
-    expect(result).toBeNull();
-  });
-
-  it('returns null for non-object payload', () => {
-    const result = carrier.processWebhook(null, {});
-    expect(result).toBeNull();
+  it('iCarry is gone (ruling PROVIDERS-7)', () => {
+    expect(CARRIER_CODES as readonly string[]).not.toContain('icarry');
   });
 });
 
 // ─── Carrier registry ─────────────────────────────────────────────────────────
 
 describe('Carrier registry', () => {
-  it('resolves icarry to an ICarryCarrier instance', () => {
-    expect(iCarryCarrier).toBeInstanceOf(ICarryCarrier);
-    expect(iCarryCarrier.code).toBe('icarry');
-    expect(iCarryCarrier.name).toBe('iCarry');
+  it('has one adapter per carrier code, each carrying its own code', () => {
+    expect(Object.keys(CARRIER_REGISTRY).sort()).toEqual([...CARRIER_CODES].sort());
+    for (const code of CARRIER_CODES) expect(CARRIER_REGISTRY[code].code).toBe(code);
   });
 
-  it('resolves aramex to an AramexCarrier instance', () => {
-    expect(aramexCarrier).toBeInstanceOf(AramexCarrier);
-    expect(aramexCarrier.code).toBe('aramex');
-    expect(aramexCarrier.name).toBe('Aramex');
-  });
-
-  it('both carriers implement the ShippingCarrierProvider interface', () => {
-    for (const carrier of [iCarryCarrier, aramexCarrier]) {
+  it('every carrier implements the ShippingCarrierProvider interface', () => {
+    for (const carrier of Object.values(CARRIER_REGISTRY)) {
       expect(typeof carrier.createShipment).toBe('function');
       expect(typeof carrier.trackShipment).toBe('function');
       expect(typeof carrier.cancelShipment).toBe('function');
       expect(typeof carrier.processWebhook).toBe('function');
       expect(typeof carrier.testConnection).toBe('function');
+    }
+  });
+
+  it('declares only capabilities it implements', () => {
+    for (const carrier of Object.values(CARRIER_REGISTRY)) {
+      expect(!!carrier.quote, carrier.code).toBe(carrier.capabilities.quote);
+      expect(!!carrier.getLabel, carrier.code).toBe(carrier.capabilities.label);
+      // a webhook carrier must say how it is authenticated beyond the URL token or declare none
+      if (!carrier.capabilities.webhooks)
+        expect(carrier.webhookHeader, carrier.code).toBeUndefined();
     }
   });
 });

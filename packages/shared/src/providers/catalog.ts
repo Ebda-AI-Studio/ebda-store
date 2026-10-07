@@ -8,8 +8,11 @@
  * this file declares (per mode: sandbox and live), runs Test connection, then enables it.
  *
  * SCOPE (Ahmad, 2026-10-07): payments = Paymob, Kashier, FawryPay (+ COD and InstaPay, manual);
- * shipping = Bosta, ShipBlu, Mylerz, Aramex (+ manual delivery). Nothing else is added here; a
- * merchant who needs another provider is pointed at the support address instead.
+ * shipping = Bosta, ShipBlu, Mylerz, Aramex (+ manual delivery; ruling PROVIDERS-3). Nothing else
+ * is added here; a merchant who needs another provider is pointed at the support address instead.
+ *
+ * SHIPPING entries: a field's `bind` is `settings.<key>` and means "lands under this key in the flat
+ * credentials map the carrier adapter takes" (carriers have no apiKey/secretKey slots).
  *
  * `verified` (PROVIDERS-2): a provider that has NOT completed a full flow against its real
  * sandbox is shown to merchants as "coming soon" and can never be enabled. It flips to true only
@@ -110,6 +113,10 @@ export interface ProviderCatalogEntry {
 const PAYMOB_DOCS = 'https://developers.paymob.com/paymob-docs';
 const KASHIER_DOCS = 'https://developers.kashier.io';
 const FAWRY_DOCS = 'https://developer.fawrystaging.com';
+const BOSTA_DOCS = 'https://docs.bosta.co';
+const ARAMEX_DEVELOPERS = 'https://www.aramex.com/developers/aramex-apis';
+const SHIPBLU_DOCS = 'https://docs.shipblu.com';
+const MYLERZ_SWAGGER = 'https://integration.mylerz.net/swagger/ui/index';
 
 const integrationIdField = (
   key: string,
@@ -431,10 +438,345 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     docs: { overview: '', credentials: '' },
     webhook: null,
   },
+
+  // ------------------------------------------------------------------ shipping
+  {
+    code: 'bosta',
+    kind: 'shipping',
+    name: { en: 'Bosta', ar: 'بوسطة' },
+    logo: { monogram: 'B', color: '#E3262B' },
+    manual: false,
+    verified: false,
+    verification: {
+      sandboxVerifiedAt: null,
+      note: 'Built from the official OpenAPI (docs.bosta.co/api/api.yaml) and the how-to pages; not yet run against a Bosta test account (scripts/provider-sandbox-check.mjs bosta). stg-app.bosta.co is named only by Bosta’s SDK, not the docs. Unconfirmed: decimal COD, duplicate-reference error, webhook retries, which delivery states allow terminate.',
+    },
+    capabilities: {
+      methods: ['cod', 'label', 'quote', 'pickup', 'cancel', 'tracking-webhook'],
+      refunds: false,
+      partialRefunds: false,
+      webhooks: true,
+    },
+    fields: [
+      {
+        key: 'apiKey',
+        label: { en: 'API key', ar: 'مفتاح الـ API' },
+        help: {
+          en: 'Lets Ebda create deliveries, print labels and read tracking on your Bosta account. Give it Read/Write access, or Full access if you want Ebda to cancel deliveries.',
+          ar: 'بيسمح لإبدأ تعمل شحنات وتطبع بوالص وتتابع التتبع على حسابك في بوسطة. اديله صلاحية Read/Write، أو Full لو عايز إبدأ تلغي الشحنات.',
+        },
+        whereToFind: {
+          en: 'Bosta dashboard > Settings > API Integration > Request OTP > Create API key. Bosta shows the key once: copy it straight away.',
+          ar: 'لوحة بوسطة > Settings > API Integration > Request OTP > Create API key. بوسطة بتعرض المفتاح مرة واحدة بس: انسخه فورًا.',
+        },
+        secret: true,
+        type: 'string',
+        required: true,
+        maxLength: 300,
+        bind: 'settings.apiKey',
+      },
+      {
+        key: 'businessLocationId',
+        label: { en: 'Pickup location ID (optional)', ar: 'رقم موقع الاستلام (اختياري)' },
+        help: {
+          en: 'The Bosta pickup location parcels are collected from. Leave empty to use your default location.',
+          ar: 'موقع الاستلام في بوسطة اللي الشحنات بتتسحب منه. سيبه فاضي علشان يستخدم موقعك الافتراضي.',
+        },
+        whereToFind: {
+          en: 'Bosta dashboard > Settings > Pickup locations (the location ID). Test connection also lists the location IDs Bosta has for you.',
+          ar: 'لوحة بوسطة > Settings > Pickup locations (رقم الموقع). اختبار الاتصال كمان بيعرض لك أرقام المواقع المسجلة.',
+        },
+        secret: false,
+        type: 'string',
+        required: false,
+        pattern: '^[A-Za-z0-9_-]{3,40}$',
+        maxLength: 40,
+        bind: 'settings.businessLocationId',
+      },
+    ],
+    docs: {
+      overview: `${BOSTA_DOCS}/`,
+      credentials: `${BOSTA_DOCS}/docs/how-to/get-your-api-key`,
+      dashboard: 'https://business.bosta.co/',
+    },
+    webhook: {
+      // Bosta takes a per-delivery webhookUrl + webhookCustomHeaders on create: nothing to paste.
+      delivery: 'per-request',
+      signature:
+        'No HMAC (Bosta signs nothing). Ebda sends a per-store secret in the callback URL path AND a derived secret in a custom header (webhookCustomHeaders) on every delivery; both are required, constant-time compared',
+      setupHelp: {
+        en: 'Nothing to paste: Ebda gives Bosta the callback URL and a secret header with every delivery. Bosta calls it from 34.89.199.241 and 35.246.223.19.',
+        ar: 'مش محتاج تلزق حاجة: إبدأ بيدي بوسطة رابط الإشعارات وهيدر سري مع كل شحنة. بوسطة بتتصل من 34.89.199.241 و 35.246.223.19.',
+      },
+    },
+  },
+  {
+    code: 'shipblu',
+    kind: 'shipping',
+    name: { en: 'ShipBlu', ar: 'شيب بلو' },
+    logo: { monogram: 'S', color: '#1D4ED8' },
+    manual: false,
+    verified: false,
+    verification: {
+      sandboxVerifiedAt: null,
+      note: 'Built from docs.shipblu.com + the official OpenAPI (api.shipblu.com/docs/?format=openapi); no ShipBlu staging key yet (scripts/provider-sandbox-check.mjs shipblu). Unconfirmed in the docs: cancel, webhooks (none documented), COD unit, duplicate-reference behaviour.',
+    },
+    capabilities: {
+      methods: ['cod', 'label', 'quote', 'pickup'],
+      refunds: false,
+      partialRefunds: false,
+      webhooks: false,
+    },
+    fields: [
+      {
+        key: 'apiKey',
+        label: { en: 'API key', ar: 'مفتاح الـ API' },
+        help: {
+          en: 'Lets Ebda book parcels, print labels and read tracking on your ShipBlu account.',
+          ar: 'بيسمح لإبدأ تحجز الشحنات وتطبع البوالص وتتابع التتبع على حسابك في شيب بلو.',
+        },
+        whereToFind: {
+          en: 'ShipBlu merchant dashboard (shipblu.com) > Integrations tab > the (+) button at the top right. The sandbox key is separate: email tech@shipblu.com with your business account name to get a staging account.',
+          ar: 'لوحة تاجر شيب بلو (shipblu.com) > تبويب Integrations > زرار (+) فوق على اليمين. مفتاح التجربة منفصل: ابعت إيميل لـ tech@shipblu.com باسم حسابك علشان يفتحولك حساب تجريبي.',
+        },
+        secret: true,
+        type: 'string',
+        required: true,
+        maxLength: 300,
+        bind: 'settings.apiKey',
+      },
+    ],
+    docs: {
+      overview: `${SHIPBLU_DOCS}/`,
+      credentials: `${SHIPBLU_DOCS}/quick-start`,
+      dashboard: 'https://shipblu.com/',
+    },
+    webhook: null,
+  },
+  {
+    code: 'mylerz',
+    kind: 'shipping',
+    name: { en: 'Mylerz', ar: 'ميليرز' },
+    logo: { monogram: 'M', color: '#E11D48' },
+    manual: false,
+    verified: false,
+    verification: {
+      sandboxVerifiedAt: null,
+      note: 'Built from the official Swagger (integration.mylerz.net/swagger/docs/v1). Mylerz publishes NO sandbox: sandbox mode needs a staging host from Mylerz (MYLERZ_BASE_URL outside production), so a live run needs a real merchant account. Unconfirmed: status table, COD unit, duplicate-reference behaviour, webhook payload.',
+    },
+    capabilities: {
+      methods: ['cod', 'label', 'quote', 'pickup', 'cancel'],
+      refunds: false,
+      partialRefunds: false,
+      webhooks: false,
+    },
+    fields: [
+      {
+        key: 'username',
+        label: { en: 'Username', ar: 'اسم المستخدم' },
+        help: {
+          en: 'The login Mylerz gave your business for the integration API.',
+          ar: 'اسم الدخول اللي ميليرز إدّاه لشركتك علشان الربط البرمجي.',
+        },
+        whereToFind: {
+          en: 'Issued by your Mylerz account manager together with the password (the same login as the Mylerz merchant portal). Ask Mylerz support if you do not have it.',
+          ar: 'بيوصلك من مدير حسابك في ميليرز مع كلمة السر (نفس دخول بوابة التاجر). اطلبه من دعم ميليرز لو مش معاك.',
+        },
+        secret: false,
+        type: 'string',
+        required: true,
+        maxLength: 200,
+        bind: 'settings.username',
+      },
+      {
+        key: 'password',
+        label: { en: 'Password', ar: 'كلمة السر' },
+        help: {
+          en: 'Used only to ask Mylerz for an access token. Never shown again after saving.',
+          ar: 'بتتستخدم بس علشان نطلب توكن من ميليرز. مش بتظهر تاني بعد الحفظ.',
+        },
+        whereToFind: {
+          en: 'Issued by your Mylerz account manager with the username.',
+          ar: 'بيوصلك من مدير حسابك في ميليرز مع اسم المستخدم.',
+        },
+        secret: true,
+        type: 'string',
+        required: true,
+        maxLength: 200,
+        bind: 'settings.password',
+      },
+      {
+        key: 'warehouseName',
+        label: { en: 'Pickup warehouse name', ar: 'اسم مخزن الاستلام' },
+        help: {
+          en: 'The warehouse registered at Mylerz that parcels are collected from. Must match exactly.',
+          ar: 'اسم المخزن المسجل عند ميليرز اللي الشحنات بتتسحب منه. لازم يطابق بالظبط.',
+        },
+        whereToFind: {
+          en: 'Mylerz merchant portal > Warehouses (the "Name" column). Test connection lists the names Mylerz has for you.',
+          ar: 'بوابة تاجر ميليرز > Warehouses (عمود "Name"). اختبار الاتصال بيجيب لك الأسماء المسجلة عند ميليرز.',
+        },
+        secret: false,
+        type: 'string',
+        required: true,
+        maxLength: 200,
+        bind: 'settings.warehouseName',
+      },
+    ],
+    docs: {
+      overview: MYLERZ_SWAGGER,
+      credentials: MYLERZ_SWAGGER,
+      dashboard: 'https://mylerz.net/login',
+    },
+    webhook: null,
+  },
+  {
+    code: 'aramex',
+    kind: 'shipping',
+    name: { en: 'Aramex', ar: 'أرامكس' },
+    logo: { monogram: 'A', color: '#D40511' },
+    manual: false,
+    verified: false,
+    verification: {
+      sandboxVerifiedAt: null,
+      note: 'Built from the four public WSDLs on ws.aramex.net (SOAP element order from the schema). Aramex’s manual and developer pages return 403 to our tools, so product types, report ids, update-code table, EGP COD and the test host are UNVERIFIED (scripts/provider-sandbox-check.mjs aramex). The API has no cancel-shipment operation.',
+    },
+    capabilities: {
+      methods: ['cod', 'label', 'quote', 'pickup'],
+      refunds: false,
+      partialRefunds: false,
+      webhooks: false,
+    },
+    fields: [
+      {
+        key: 'username',
+        label: { en: 'Username (email)', ar: 'اسم المستخدم (الإيميل)' },
+        help: {
+          en: 'The login of your Aramex account used for the shipping API.',
+          ar: 'اسم دخول حساب أرامكس بتاعك اللي بيُستخدم للـ API.',
+        },
+        whereToFind: {
+          en: 'Provided by Aramex when your shipping API access is set up (the same email as your Aramex account). Ask your Aramex account manager.',
+          ar: 'بيوصلك من أرامكس لما بيتفعل لك الـ API (نفس إيميل حسابك). اسأل مدير حسابك في أرامكس.',
+        },
+        secret: false,
+        type: 'string',
+        required: true,
+        maxLength: 200,
+        bind: 'settings.username',
+      },
+      {
+        key: 'password',
+        label: { en: 'Password', ar: 'كلمة السر' },
+        help: {
+          en: 'The password for that login. Never shown again after saving.',
+          ar: 'كلمة سر نفس الدخول. مش بتظهر تاني بعد الحفظ.',
+        },
+        whereToFind: {
+          en: 'Provided by Aramex with the username.',
+          ar: 'بتوصلك من أرامكس مع اسم المستخدم.',
+        },
+        secret: true,
+        type: 'string',
+        required: true,
+        maxLength: 200,
+        bind: 'settings.password',
+      },
+      {
+        key: 'accountNumber',
+        label: { en: 'Account number', ar: 'رقم الحساب' },
+        help: { en: 'Your Aramex account number.', ar: 'رقم حسابك في أرامكس.' },
+        whereToFind: {
+          en: 'Provided by Aramex with your API access, and printed on your Aramex invoices.',
+          ar: 'بتوصلك من أرامكس مع تفعيل الـ API، ومكتوبة في فواتير أرامكس.',
+        },
+        secret: false,
+        type: 'string',
+        required: true,
+        pattern: '^[0-9]{3,12}$',
+        maxLength: 12,
+        bind: 'settings.accountNumber',
+      },
+      {
+        key: 'accountPin',
+        label: { en: 'Account PIN', ar: 'الرقم السري للحساب (PIN)' },
+        help: {
+          en: 'The PIN that goes with the account number.',
+          ar: 'الـ PIN المرتبط برقم الحساب.',
+        },
+        whereToFind: {
+          en: 'Provided by Aramex with your account number.',
+          ar: 'بيوصلك من أرامكس مع رقم الحساب.',
+        },
+        secret: true,
+        type: 'string',
+        required: true,
+        maxLength: 50,
+        bind: 'settings.accountPin',
+      },
+      {
+        key: 'accountEntity',
+        label: { en: 'Account entity', ar: 'كود الفرع (Entity)' },
+        help: {
+          en: 'The 3-letter code of the Aramex office your account belongs to (for example CAI for Cairo).',
+          ar: 'كود من 3 حروف لفرع أرامكس اللي حسابك تابع له (مثلًا CAI للقاهرة).',
+        },
+        whereToFind: {
+          en: 'Provided by Aramex with your account number. Ask your account manager if you do not know it.',
+          ar: 'بيوصلك من أرامكس مع رقم الحساب. اسأل مدير حسابك لو مش عارفه.',
+        },
+        secret: false,
+        type: 'string',
+        required: true,
+        pattern: '^[A-Za-z]{3}$',
+        maxLength: 3,
+        bind: 'settings.accountEntity',
+      },
+      {
+        key: 'accountCountryCode',
+        label: { en: 'Account country code', ar: 'كود دولة الحساب' },
+        help: { en: 'EG for an Egyptian account.', ar: 'EG لحساب مصري.' },
+        whereToFind: {
+          en: 'Provided by Aramex with your account number (EG for Egypt).',
+          ar: 'بيوصلك من أرامكس مع رقم الحساب (EG لمصر).',
+        },
+        secret: false,
+        type: 'string',
+        required: true,
+        pattern: '^[A-Za-z]{2}$',
+        maxLength: 2,
+        bind: 'settings.accountCountryCode',
+      },
+    ],
+    docs: {
+      overview: ARAMEX_DEVELOPERS,
+      credentials: ARAMEX_DEVELOPERS,
+      dashboard: 'https://www.aramex.com/eg/en',
+    },
+    webhook: null,
+  },
+  {
+    code: 'manual',
+    kind: 'shipping',
+    name: { en: 'Manual delivery', ar: 'توصيل يدوي' },
+    logo: { monogram: 'D', color: '#64748B' },
+    manual: true,
+    verified: true,
+    verification: { sandboxVerifiedAt: null, note: 'Manual: no carrier API.' },
+    capabilities: { methods: ['cod'], refunds: false, partialRefunds: false, webhooks: false },
+    fields: [],
+    docs: { overview: '', credentials: '' },
+    webhook: null,
+  },
 ];
 
 /** Codes of every payment provider in the catalog. */
 export const PAYMENT_PROVIDER_CODES = PROVIDER_CATALOG.filter(p => p.kind === 'payments').map(
+  p => p.code
+);
+
+/** Codes of every shipping carrier in the catalog (manual delivery included). */
+export const SHIPPING_PROVIDER_CODES = PROVIDER_CATALOG.filter(p => p.kind === 'shipping').map(
   p => p.code
 );
 

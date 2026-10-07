@@ -250,15 +250,6 @@ export const config = {
   inngestEventKey: process.env.INNGEST_EVENT_KEY || '',
   inngestSigningKey: process.env.INNGEST_SIGNING_KEY || '',
 
-  // Shipping carrier webhook shared secrets. iCarry / Aramex push
-  // shipment status updates to /webhooks/shipping/<carrier>. The
-  // carriers don't sign their payloads, so we require a shared secret
-  // configured on both sides as `Authorization: Bearer <secret>` on
-  // the inbound POST. When unset the endpoint refuses every webhook
-  // (fail-closed) — without this an attacker who knows the URL could
-  // forge "delivered" status updates on any tracking number.
-  icarryWebhookSecret: process.env.ICARRY_WEBHOOK_SECRET || '',
-
   // Ebda WhatsApp Business Platform bridge
   // Base URL of the WBS backend. In production: https://whatsapp-api.ebda.app
   // Leave unset in dev — the bridge will skip sends gracefully when store.wbsEnabled=false.

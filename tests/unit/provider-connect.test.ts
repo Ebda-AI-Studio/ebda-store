@@ -38,6 +38,14 @@ const OFFICIAL_HOSTS = [
   'merchant.kashier.io',
   'developer.fawrystaging.com',
   'atfawry.fawrystaging.com',
+  // shipping carriers (the shipping batch)
+  'docs.bosta.co',
+  'business.bosta.co',
+  'docs.shipblu.com',
+  'shipblu.com',
+  'integration.mylerz.net',
+  'mylerz.net',
+  'www.aramex.com',
 ];
 
 const paymob = getProviderEntry('paymob')!;
