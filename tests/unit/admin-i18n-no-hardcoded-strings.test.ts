@@ -60,6 +60,16 @@ const ADMIN_SRC = resolve(__dirname, '../../apps/admin/src');
 // 26 new part-2 files appended below (21 more part-2 files were already
 // covered by part 1 and are not repeated).
 const B2_FILES = [
+  // Visual builder Phase 2 (2026-10-07) — new files, strict from day one.
+  'app/stores/[id]/builder/page.tsx',
+  'app/stores/[id]/builder/_components/BuilderEditor.tsx',
+  'app/stores/[id]/builder/_components/SectionTree.tsx',
+  'app/stores/[id]/builder/_components/AddSectionDialog.tsx',
+  'app/stores/[id]/builder/_components/SettingsPanel.tsx',
+  'app/stores/[id]/builder/_components/MediaPicker.tsx',
+  'app/stores/[id]/builder/_components/ThemeSettingsPanel.tsx',
+  'app/stores/[id]/builder/_components/RevisionsPanel.tsx',
+  'app/stores/[id]/builder/_components/Canvas.tsx',
   'app/stores/[id]/page-builder/page.tsx',
   'app/stores/[id]/floating-widget/page.tsx',
   'app/stores/[id]/ai-tools/_components/AiSweepResultsPanels.tsx',
@@ -267,9 +277,9 @@ describe('findHardcodedHits catches a multi-line wrapped JSX text node (#1934)',
 });
 
 describe('admin i18n: no hardcoded strings in the B2-translated files', () => {
-  it('lists exactly the 82 files this guard covers', () => {
-    expect(B2_FILES.length).toBe(82);
-    expect(new Set(B2_FILES).size).toBe(82); // no duplicates
+  it('lists exactly the 91 files this guard covers', () => {
+    expect(B2_FILES.length).toBe(91); // 82 + 9 visual builder files
+    expect(new Set(B2_FILES).size).toBe(91); // no duplicates
   });
 
   it.each(B2_FILES)('%s has no un-allowlisted hardcoded strings', relativePath => {

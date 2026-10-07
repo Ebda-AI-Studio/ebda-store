@@ -73,7 +73,6 @@ export function ImageTextSection({
       >
         <div className={imageFirst ? 'md:order-1' : 'md:order-2'}>
           {image ? (
-            // eslint-disable-next-line @next/next/no-img-element -- merchant media, any host
             <img
               src={image}
               alt={alt}

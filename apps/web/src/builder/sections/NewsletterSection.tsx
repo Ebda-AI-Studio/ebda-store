@@ -116,7 +116,7 @@ export function NewsletterSection({
                 if (state !== 'idle') setState('idle');
               }}
               placeholder={tr('Your email')}
-              className="min-h-[44px] flex-1 rounded-[var(--radius)] border border-border bg-background px-3 text-sm text-foreground"
+              className="min-h-[44px] flex-1 rounded-[var(--radius)] border border-border bg-background px-3 text-base text-foreground sm:text-sm"
             />
             <button
               type="submit"
