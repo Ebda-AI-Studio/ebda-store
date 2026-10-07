@@ -17,7 +17,7 @@ vi.mock('@api/lib/public-cache', () => ({
 }));
 vi.mock('@api/lib/revalidate-storefront', () => ({ revalidateStorefront: vi.fn() }));
 
-import { corsCustomDomainWhere, corsDomainCache } from '@api/lib/cors-cache';
+import { corsCustomDomainWhere, corsDomainCache, corsStoreOriginWhere } from '@api/lib/cors-cache';
 import { bustStoreCaches } from '@api/services/store.service';
 
 /** Evaluate the where clause the way Postgres would, against a candidate row. */
@@ -46,7 +46,14 @@ describe('#1214 custom-domain CORS trust requires a live store', () => {
 
   it('is the clause the CORS handler actually queries with', () => {
     const src = fs.readFileSync(path.resolve(process.cwd(), 'apps/api/src/app.ts'), 'utf8');
-    expect(src).toMatch(/findFirst\(\{\s*where:\s*storeOriginWhere\.where/);
+    // `stores` is RLS-scoped, so the handler resolves the host through the `lookupStore` definer
+    // with the SAME live-store predicate (`match` + `statuses`) rather than a Prisma `where`.
+    expect(src).toMatch(
+      /lookupStore\(\s*storeOriginWhere\.match,\s*storeOriginWhere\.statuses\s*\)/
+    );
+    const origin = corsStoreOriginWhere(host)!;
+    expect(origin.statuses).toEqual(corsCustomDomainWhere(host).status.in);
+    expect(origin.match).toEqual({ domain: host });
   });
 
   it('a store-cache bust (status change, delete) also drops the cached CORS verdict', async () => {

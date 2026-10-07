@@ -1,7 +1,7 @@
 /**
  * A wide store read must never carry the agent (MCP) write credential.
  *
- * `Store.agentApiKey` holds the AES-256-GCM ciphertext of the per-store agent
+ * `StoreCredential.agentApiKey` (formerly `Store.agentApiKey`) holds the AES-256-GCM ciphertext of the per-store agent
  * key. Prisma returns EVERY scalar column by default, so the three
  * `StoreService` reads that hand a whole Store row to a caller —
  * `GET /stores/:id`, the admin store list, and the slug read that also writes
@@ -54,6 +54,11 @@ vi.mock('@force/database', () => ({
   acrossStores: async (_fn: unknown, o?: { storeIds?: string[] }) =>
     (o?.storeIds ?? []).map(storeId => ({ storeId, value: { products: 0, orders: 0 } })),
 }));
+// slug -> id is the `ebda_store_id_by_slug` definer; the row is then read inside `withStore`.
+vi.mock('../../apps/api/src/lib/definer', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../apps/api/src/lib/definer')>()),
+  storeIdBySlug: vi.fn(async () => '11111111-1111-1111-1111-111111111111'),
+}));
 vi.mock('@force/shared', async importOriginal => ({
   // Keep the real region config (REGION is read at import time by api config/services).
   ...(await importOriginal<typeof import('@force/shared')>()),
@@ -92,26 +97,29 @@ beforeEach(() => {
   redisGetMock.mockResolvedValue(null);
 });
 
-describe('StoreService omits the agent credential at every wide read', () => {
-  it('getById asks Prisma to omit agentApiKey', async () => {
+describe('StoreService never selects the StoreCredential row at a wide read', () => {
+  // The credentials moved off `Store` into `StoreCredential`; the Prisma client
+  // omits them from a plain Store read, so the guarantee is now the absence of
+  // `credentials` / `agentApiKey` in the arguments of every wide read.
+  const noCredentials = (call: unknown[]) => {
+    const raw = JSON.stringify(call);
+    expect(raw).not.toContain('credentials');
+    expect(raw).not.toContain('agentApiKey"');
+  };
+
+  it('getById does not ask Prisma for the credential row', async () => {
     await StoreService.getById(STORE_ID);
-    expect(findUniqueMock).toHaveBeenCalledWith(
-      expect.objectContaining({ omit: { agentApiKey: true } })
-    );
+    noCredentials(findUniqueMock.mock.calls[0]);
   });
 
-  it('list asks Prisma to omit agentApiKey', async () => {
+  it('list does not ask Prisma for the credential row', async () => {
     await StoreService.list({});
-    expect(findManyMock).toHaveBeenCalledWith(
-      expect.objectContaining({ omit: { agentApiKey: true } })
-    );
+    noCredentials(findManyMock.mock.calls[0]);
   });
 
-  it('getBySlug asks Prisma to omit agentApiKey BEFORE writing the row to Redis', async () => {
+  it('getBySlug does not ask for the credential row BEFORE writing the row to Redis', async () => {
     await StoreService.getBySlug('acme');
-    expect(findUniqueMock).toHaveBeenCalledWith(
-      expect.objectContaining({ omit: { agentApiKey: true } })
-    );
+    noCredentials(findUniqueMock.mock.calls[0]);
     // Whatever was cached is what every subsequent reader gets for 120s.
     expect(redisSetMock).toHaveBeenCalled();
     expect(JSON.stringify(redisSetMock.mock.calls[0])).not.toContain('agentApiKey');

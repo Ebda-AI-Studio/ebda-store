@@ -67,9 +67,10 @@ export async function handleOrderCreatedStuckSweep(
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
   const stuck: StuckOrder[] = await step.run('find-stuck', async () =>
     sweepAcrossStores({
-      fetch: () =>
+      fetch: storeId =>
         prisma.order.findMany({
           where: {
+            storeId,
             paymentStatus: 'paid',
             orderCreatedNotifiedAt: null,
             status: { not: 'cancelled' },

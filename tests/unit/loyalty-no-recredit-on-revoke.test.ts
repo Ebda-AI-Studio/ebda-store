@@ -43,27 +43,32 @@ const pointsUpdate = vi.fn();
 const pointsFindUnique = vi.fn();
 const transaction = vi.fn();
 
-vi.mock('@force/database', () => ({
-  prisma: {
-    loyaltyTransaction: {
-      findFirst: (...a: unknown[]) => txFindFirst(...a),
-      findMany: (...a: unknown[]) => txFindMany(...a),
-      create: (...a: unknown[]) => txCreate(...a),
+vi.mock('@force/database', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod: Record<string, any> = {
+    prisma: {
+      loyaltyTransaction: {
+        findFirst: (...a: unknown[]) => txFindFirst(...a),
+        findMany: (...a: unknown[]) => txFindMany(...a),
+        create: (...a: unknown[]) => txCreate(...a),
+      },
+      loyaltyPoints: {
+        update: (...a: unknown[]) => pointsUpdate(...a),
+        findUnique: (...a: unknown[]) => pointsFindUnique(...a),
+        upsert: vi.fn(),
+      },
+      store: { findUnique: vi.fn(() => Promise.resolve({ loyaltySettings: {} })) },
+      $transaction: (...a: unknown[]) => transaction(...a),
     },
-    loyaltyPoints: {
-      update: (...a: unknown[]) => pointsUpdate(...a),
-      findUnique: (...a: unknown[]) => pointsFindUnique(...a),
-      upsert: vi.fn(),
+    Prisma: {
+      PrismaClientKnownRequestError: class extends Error {
+        code = 'P2002';
+      },
     },
-    store: { findUnique: vi.fn(() => Promise.resolve({ loyaltySettings: {} })) },
-    $transaction: (...a: unknown[]) => transaction(...a),
-  },
-  Prisma: {
-    PrismaClientKnownRequestError: class extends Error {
-      code = 'P2002';
-    },
-  },
-}));
+  };
+  mod.withStore = (_id: string, fn: (tx: unknown) => unknown) => fn(mod.prisma);
+  return mod;
+});
 
 vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: () => Promise.resolve(true) },

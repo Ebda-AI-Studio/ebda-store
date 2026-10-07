@@ -33,6 +33,7 @@ let paymentFindManyOverride: ((...a: unknown[]) => Promise<unknown[]>) | null = 
 const txMock = vi.fn((ops: unknown[]) => Promise.all(ops));
 
 vi.mock('@force/database', () => ({
+  currentStoreId: () => STORE_ID,
   prisma: {
     payment: {
       findFirst: (...a: unknown[]) => paymentFindFirst(...a),
@@ -353,7 +354,7 @@ describe('PaymentService.handleWebhook — state machine guard (sites 2/3 & 3/3)
 
     expect(assertValidTransitionMock).toHaveBeenCalledWith('pending', 'confirmed');
     expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: ORDER_ID },
+      where: { id: ORDER_ID, storeId: STORE_ID },
       data: { status: 'confirmed', paymentStatus: 'paid' },
     });
   });
@@ -721,7 +722,7 @@ describe('refund webhook — whole-order effects only for a refund that exhausts
 
     expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
     expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: ORDER_ID },
+      where: { id: ORDER_ID, storeId: STORE_ID },
       data: { status: 'refunded', paymentStatus: 'refunded' },
     });
     expect(refundWrite()?.status).toBe('refunded');
@@ -961,7 +962,9 @@ describe('handleWebhook — a provider id matching MORE than one payment is refu
     paymentFindManyOverride = async () => [row('pay-a', 'store-a'), row('pay-b', 'store-b')];
     try {
       await expect(
-        PaymentService.handleWebhook('paymob', { fake: true }, 'sig')
+        // The store is always resolved before a webhook is handled: the global
+        // (store-less) provider-config fallback is gone, so a store-less call is refused.
+        PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID)
       ).rejects.toMatchObject({ statusCode: 409, code: 'AMBIGUOUS_PAYMENT' });
       expect(paymentUpdateMany).not.toHaveBeenCalled();
       expect(paymentUpdate).not.toHaveBeenCalled();

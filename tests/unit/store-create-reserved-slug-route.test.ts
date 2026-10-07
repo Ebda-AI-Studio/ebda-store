@@ -52,6 +52,18 @@ vi.mock('@force/database', () => ({
   Prisma: { DbNull: null },
   StoreStatus: { active: 'active', suspended: 'suspended' },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  withStore: async (_s: string, fn: any) => fn((await import('@force/database')).prisma),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  withUser: async (_u: string, fn: any) => fn((await import('@force/database')).prisma),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  asPlatformOperator: (_u: string, fn: any) => fn(),
+}));
+vi.mock('@api/middleware/tenant-context', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tenantContext: (_req: any, _res: any, next: any) => next(),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  storeScopeContext: (_req: any, _res: any, next: any) => next(),
 }));
 
 // The per-account daily cap (SP5 task 4) is covered in self-serve-abuse.test.ts;

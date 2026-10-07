@@ -59,9 +59,9 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
     // Store-scoped table: counted and purged store by store, each in its own scope.
     const candidateCount = await step.run('count-candidates', async () =>
       (
-        await acrossStores(() =>
+        await acrossStores(storeId =>
           prisma.abandonedCart.count({
-            where: { createdAt: { lt: cutoff }, customerId: null },
+            where: { storeId, createdAt: { lt: cutoff }, customerId: null },
           })
         )
       ).reduce((n, r) => n + r.value, 0)
@@ -74,16 +74,16 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
 
     const deleted = await step.run('delete-batch', async () => {
       let removed = 0;
-      for (const { value } of await acrossStores(async () => {
+      for (const { value } of await acrossStores(async storeId => {
         const candidates = await prisma.abandonedCart.findMany({
-          where: { createdAt: { lt: cutoff }, customerId: null },
+          where: { storeId, createdAt: { lt: cutoff }, customerId: null },
           select: { id: true },
           orderBy: { createdAt: 'asc' },
           take: ABANDONED_CART_BATCH_CAP,
         });
         if (candidates.length === 0) return 0;
         const result = await prisma.abandonedCart.deleteMany({
-          where: { id: { in: candidates.map(c => c.id) } },
+          where: { id: { in: candidates.map(c => c.id) }, storeId },
         });
         return result.count;
       })) {
@@ -114,9 +114,10 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
     // Customers live in their store's scope: found store by store.
     const candidates = await step.run('find-candidates', async () =>
       (
-        await acrossStoresFlat(() =>
+        await acrossStoresFlat(storeId =>
           prisma.user.findMany({
             where: {
+              storeId,
               role: 'customer',
               deletedAt: { not: null, lt: cutoff },
               NOT: { email: { startsWith: 'erased-' } },
@@ -206,9 +207,10 @@ export const orderAnonymizeAtFiveYears: InngestFunction.Any = inngest.createFunc
     // FORCE RLS: cross-tenant cron — use withRlsBypass throughout.
     const candidates = await step.run('find-candidates', async () =>
       (
-        await acrossStoresFlat(() =>
+        await acrossStoresFlat(storeId =>
           prisma.order.findMany({
             where: {
+              storeId,
               createdAt: { lt: cutoff },
               NOT: {
                 shippingAddress: {
@@ -242,7 +244,7 @@ export const orderAnonymizeAtFiveYears: InngestFunction.Any = inngest.createFunc
         await step.run(`anonymize-${id}`, () =>
           withStore(storeId, tx =>
             tx.order.update({
-              where: { id },
+              where: { id, storeId },
               data: {
                 customerId: null,
                 shippingAddress: anonymizedJson,

@@ -13,7 +13,14 @@ const h = vi.hoisted(() => ({ findMany: vi.fn(), queryRaw: vi.fn() }));
 
 vi.mock('@force/database', async importOriginal => ({
   ...(await importOriginal<typeof import('@force/database')>()),
-  prisma: { user: { findMany: h.findMany }, $queryRaw: h.queryRaw },
+  prisma: {
+    // the customer lookup now reads THROUGH this store's orders (groupBy by customerId)
+    order: {
+      groupBy: async (...a: unknown[]) =>
+        ((await h.findMany(...a)) as { id: string }[]).map(r => ({ customerId: r.id })),
+    },
+    $queryRaw: h.queryRaw,
+  },
 }));
 vi.mock('@api/lib/inngest/client', () => ({
   inngest: { send: vi.fn(async () => ({ ids: [] })), createFunction: vi.fn(() => ({})) },

@@ -24,7 +24,7 @@
  */
 
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { storeDirectory } from '@force/database';
 import { withLeaderLock } from '../../leader-election';
 import { sweepStore } from '../../../services/ai-autofill.service';
 import { recommendationService } from '../../../services/recommendation.service';
@@ -66,10 +66,8 @@ const aiAutofillSweepFn = inngest.createFunction(
       // suspended / inactive / churned stores. Loaded ONCE so batch
       // boundaries are stable across retries.
       const storeIds = await step.run('load-stores', async () => {
-        const stores = await prisma.store.findMany({
-          where: { deletedAt: null, status: 'active' },
-          select: { id: true },
-        });
+        // `stores` is under RLS: a cron lists stores through the directory definer.
+        const stores = await storeDirectory(s => s.status === 'active');
         return stores.map(s => s.id);
       });
 

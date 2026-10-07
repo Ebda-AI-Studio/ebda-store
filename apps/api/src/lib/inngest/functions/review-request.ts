@@ -53,7 +53,7 @@ export const reviewRequest: InngestFunction.Any = inngest.createFunction(
     const order = await step.run('load-order', () =>
       runInTenantContext(storeId, () =>
         prisma.order.findUnique({
-          where: { id: orderId },
+          where: { id: orderId, storeId },
           select: {
             id: true,
             status: true,
@@ -177,7 +177,7 @@ export const reviewRequest: InngestFunction.Any = inngest.createFunction(
     await step.run('mark-sent', () =>
       runInTenantContext(storeId, () =>
         prisma.order.update({
-          where: { id: orderId },
+          where: { id: orderId, storeId },
           data: { reviewRequestSentAt: new Date() },
         })
       )

@@ -38,7 +38,7 @@ export const invoiceEmail: InngestFunction.Any = inngest.createFunction(
     const order = await step.run('load-order-number', () =>
       runInTenantContext(storeId, async () => {
         const row = await prisma.order.findUnique({
-          where: { id: orderId },
+          where: { id: orderId, storeId },
           select: { orderNumber: true, locale: true },
         });
         if (!row) throw new Error(`Order ${orderId} not found`);

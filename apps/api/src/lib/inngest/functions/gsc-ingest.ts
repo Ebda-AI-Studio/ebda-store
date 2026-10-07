@@ -26,11 +26,12 @@
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext, storeDirectory, withStore } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { chunk, BULK_AI_BATCH_SIZE } from '../batch-utils';
-import { aiEligiblePlanFilter, isAiEligiblePlan } from '../../ai-plan-eligibility';
+import { isAiEligiblePlan } from '../../ai-plan-eligibility';
+import type { StorePlan } from '@force/shared';
 import { featureService } from '../../../services/feature.service';
 import { isGscConfigured } from '../../../services/answer-engine/gsc-client';
 import {
@@ -136,17 +137,15 @@ const gscIngestCronFn = inngest.createFunction(
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
     // stores table does not filter to 0 rows (no tenant GUC is set yet).
     const stores = await step.run('list-stores', () =>
-      prisma.store.findMany({
-        where: {
-          deletedAt: null,
-          status: 'active',
-          domain: { not: null },
-          aiFeaturesEnabled: true,
+      // `stores` is under RLS: a cron lists stores through the directory definer.
+      storeDirectory(
+        s =>
+          s.status === 'active' &&
+          s.hasDomain &&
+          s.aiFeaturesEnabled &&
           // free (lapsed-payment / demo) plans are excluded from AI spend.
-          ...aiEligiblePlanFilter,
-        },
-        select: { id: true },
-      })
+          isAiEligiblePlan(s.plan as StorePlan)
+      ).then(list => list.map(s => ({ id: s.id })))
     );
 
     const batches = chunk(stores, BULK_AI_BATCH_SIZE);
@@ -208,11 +207,13 @@ export const gscIngestOnDemand: InngestFunction.Any = inngest.createFunction(
 
     // Plan gate — a super-admin `StoreFeature` override can force-enable
     // `answer_engine_insights` on a `free`/lapsed store; the CRON already
-    // excludes those via `aiEligiblePlanFilter` when enumerating stores, so
+    // excludes those via `isAiEligiblePlan` when enumerating stores, so
     // this on-demand twin must apply the same exclusion (mirrors
     // `stock-reorder-scan.ts` / `answer-engine-citation-scan.ts`'s on-demand
     // plan gate).
-    const store = await prisma.store.findUnique({ where: { id: storeId }, select: { plan: true } });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+    );
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },

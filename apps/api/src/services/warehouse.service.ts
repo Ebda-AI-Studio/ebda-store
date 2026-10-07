@@ -321,7 +321,7 @@ export class WarehouseService {
     }
 
     const updated = await prisma.warehouse.update({
-      where: { id: warehouseId },
+      where: { id: warehouseId, storeId },
       data: {
         ...(input.name !== undefined && { name: input.name }),
         ...(input.nameAr !== undefined && { nameAr: input.nameAr }),
@@ -368,7 +368,7 @@ export class WarehouseService {
     }
 
     await prisma.warehouse.update({
-      where: { id: warehouseId },
+      where: { id: warehouseId, storeId },
       data: { isActive: false, isDefault: false },
     });
 
@@ -571,7 +571,7 @@ export class WarehouseService {
           // stale; it never affects the persisted quantity itself (that's the
           // actual bug this task fixes).
           const before = await tx.warehouseStock.findFirst({
-            where: { warehouseId, productId: input.productId, variantId },
+            where: { storeId, warehouseId, productId: input.productId, variantId },
             select: { quantity: true },
           });
           const previousQty = before?.quantity ?? 0;

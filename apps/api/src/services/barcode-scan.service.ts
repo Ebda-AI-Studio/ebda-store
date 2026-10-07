@@ -221,7 +221,7 @@ export async function receiveByBarcode(
   const previousInventory =
     (
       await prisma.product.findFirst({
-        where: { id: lookup.productId },
+        where: { id: lookup.productId, storeId },
         select: { inventory: true },
       })
     )?.inventory ?? 0;
@@ -475,7 +475,7 @@ export async function closeCountSession(
     throw new AppError(409, 'SESSION_NOT_OPEN', 'Session is not open');
   }
   const updated = await prisma.countSession.update({
-    where: { id: sessionId },
+    where: { id: sessionId, storeId },
     data: { status: 'closed', closedAt: new Date() },
     select: { id: true, status: true, closedAt: true },
   });
@@ -537,7 +537,7 @@ export async function reconcileCountSession(
 
   // Mark session as reconciled and record the adjustment link
   await prisma.countSession.update({
-    where: { id: sessionId },
+    where: { id: sessionId, storeId },
     data: {
       status: 'reconciled',
       reconciledAt: new Date(),

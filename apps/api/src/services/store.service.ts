@@ -1,7 +1,8 @@
 import {
   prisma,
   Prisma,
-  setTenantGucs,
+  scopeTransaction,
+  asPlatformOperator,
   acrossStores,
   withStore,
   withUser,
@@ -9,7 +10,14 @@ import {
   StoreStatus,
 } from '@force/database';
 import type { StoreTemplate } from '@force/database';
-import { detachStoreAuditLogs, unlinkUserAuditLogs } from '../lib/definer';
+import {
+  deleteUserTokens,
+  detachStoreAuditLogs,
+  lookupStore,
+  storeIdByDomain,
+  storeIdBySlug,
+  unlinkUserAuditLogs,
+} from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import {
@@ -36,7 +44,6 @@ import {
   assertPlanAllows,
   assertWithinLimit,
 } from './plan-limit.service';
-import { storeDomainWhere } from '../lib/store-host';
 import { NEW_STORE_LEGACY_PLAN, syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { startSignupTrial } from './billing/trial';
 
@@ -97,10 +104,12 @@ export async function bustStoreCaches(
  * wrong namespace entirely for store-level content.
  */
 export async function bustStoreCachesById(storeId: string): Promise<void> {
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: { slug: true, domain: true },
-  });
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({
+      where: { id: storeId },
+      select: { slug: true, domain: true },
+    })
+  );
   if (!store) return;
   await bustStoreCaches(storeId, store.slug, store.domain);
 }
@@ -155,9 +164,9 @@ async function countStoreRows(
 ): Promise<{ products: number; categories: number; orders?: number }> {
   return withStore(storeId, async tx => {
     const [products, categories, orders] = await Promise.all([
-      tx.product.count(),
-      tx.category.count(),
-      opts.orders ? tx.order.count() : Promise.resolve(undefined),
+      tx.product.count({ where: { storeId } }),
+      tx.category.count({ where: { storeId } }),
+      opts.orders ? tx.order.count({ where: { storeId } }) : Promise.resolve(undefined),
     ]);
     return opts.orders
       ? { products, categories, orders: orders as number }
@@ -198,12 +207,6 @@ export class StoreService {
         where,
         skip,
         take: limit,
-        // The per-store agent (MCP) WRITE credential is a secret, even encrypted:
-        // it has no consumer outside `mcp/agent-auth.ts` (which reads it with its
-        // own explicit select), so it is omitted at the service boundary rather
-        // than left to every caller to remember to strip. Same reasoning as
-        // `maskMarketingPixelSecrets` on `GET /stores/:id`.
-        omit: { agentApiKey: true },
         include: {
           owner: {
             select: { id: true, email: true, firstName: true, lastName: true },
@@ -219,9 +222,9 @@ export class StoreService {
     const counts = new Map(
       (
         await acrossStores(
-          async () => ({
-            products: await prisma.product.count(),
-            orders: await prisma.order.count(),
+          async storeId => ({
+            products: await prisma.product.count({ where: { storeId } }),
+            orders: await prisma.order.count({ where: { storeId } }),
           }),
           { storeIds: stores.map(st => st.id) }
         )
@@ -258,10 +261,12 @@ export class StoreService {
    * path does.
    */
   static async setStatus(storeId: string, status: StoreStatus) {
-    const store = await prisma.store.update({
-      where: { id: storeId },
-      data: { status },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { status },
+      })
+    );
     await bustStoreCaches(store.id, store.slug, store.domain);
     return store;
   }
@@ -272,12 +277,6 @@ export class StoreService {
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        // The per-store agent (MCP) WRITE credential is a secret, even encrypted:
-        // it has no consumer outside `mcp/agent-auth.ts` (which reads it with its
-        // own explicit select), so it is omitted at the service boundary rather
-        // than left to every caller to remember to strip. Same reasoning as
-        // `maskMarketingPixelSecrets` on `GET /stores/:id`.
-        omit: { agentApiKey: true },
         include: {
           owner: {
             select: { id: true, email: true, firstName: true, lastName: true },
@@ -308,15 +307,12 @@ export class StoreService {
       );
     }
 
-    const store = await prisma.store.findUnique({
-      where: { slug },
-      // The per-store agent (MCP) WRITE credential is a secret, even encrypted:
-      // it has no consumer outside `mcp/agent-auth.ts` (which reads it with its
-      // own explicit select), so it is omitted at the service boundary rather
-      // than left to every caller to remember to strip. Same reasoning as
-      // `maskMarketingPixelSecrets` on `GET /stores/:id`.
-      omit: { agentApiKey: true },
-    });
+    // `stores` is under RLS (R-EBDA-005): slug -> id through the definer, then the row
+    // is read inside that store's own scope.
+    const slugStoreId = await storeIdBySlug(slug);
+    const store = slugStoreId
+      ? await withStore(slugStoreId, tx => tx.store.findUnique({ where: { id: slugStoreId } }))
+      : null;
 
     if (!store) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
@@ -355,7 +351,10 @@ export class StoreService {
     // The platform operator keeps the old behaviour (active, default plan).
     const merchantCreate = !opts.platformOperator
       ? {
-          firstStore: (await prisma.store.count({ where: { ownerId, deletedAt: null } })) === 0,
+          firstStore:
+            (await withUser(ownerId, tx =>
+              tx.store.count({ where: { ownerId, deletedAt: null } })
+            )) === 0,
         }
       : null;
 
@@ -383,7 +382,7 @@ export class StoreService {
     // Auto-deduplicate slug
     let slug = baseSlug;
     let suffix = 0;
-    while (isReservedSlug(slug) || (await prisma.store.findUnique({ where: { slug } }))) {
+    while (isReservedSlug(slug) || (await storeIdBySlug(slug))) {
       suffix++;
       if (suffix > 100) throw new AppError(409, 'SLUG_COLLISION', 'Too many slug collisions');
       slug = `${baseSlug.slice(0, 40 - String(suffix).length - 1)}-${suffix}`;
@@ -391,11 +390,7 @@ export class StoreService {
 
     // Check domain uniqueness
     if (data.domain) {
-      const existingDomain = await prisma.store.findUnique({
-        where: { domain: data.domain },
-      });
-
-      if (existingDomain) {
+      if (await storeIdByDomain(data.domain)) {
         throw new AppError(409, 'ALREADY_EXISTS', 'Store with this domain already exists');
       }
     }
@@ -406,44 +401,50 @@ export class StoreService {
       await assertPlanAllows(STORE_PLAN_TO_PLAN_CODE[NEW_STORE_LEGACY_PLAN], 'customDomain');
     }
 
-    const store = await prisma.store.create({
-      data: {
-        name: data.name,
-        slug,
-        // Reachable only for a super_admin (the routes drop `domain` for anyone
-        // else): an operator-assigned domain is trusted, so it starts `active`.
-        // Merchants claim a domain through PUT /stores/:id/domain (pending).
-        domain: data.domain,
-        ...(data.domain ? { domainStatus: 'active', domainVerifiedAt: new Date() } : {}),
-        ownerId,
-        ...(merchantCreate
-          ? {
-              status: 'inactive' as const,
-              plan: merchantCreate.firstStore ? ('professional' as const) : ('enterprise' as const),
-            }
-          : {}),
-        settings: data.settings || {
-          currency: REGION.currency,
-          locale: 'ar-EG',
-          defaultLanguage: REGION.defaultLocale,
+    // `stores` is under RLS (R-EBDA-005): the row is inserted AS its owner (the policy's
+    // WITH CHECK and the tenant guard both key a new store on the acting owner).
+    const store = await withUser(ownerId, () =>
+      prisma.store.create({
+        data: {
+          name: data.name,
+          slug,
+          // Reachable only for a super_admin (the routes drop `domain` for anyone
+          // else): an operator-assigned domain is trusted, so it starts `active`.
+          // Merchants claim a domain through PUT /stores/:id/domain (pending).
+          domain: data.domain,
+          ...(data.domain ? { domainStatus: 'active', domainVerifiedAt: new Date() } : {}),
+          ownerId,
+          ...(merchantCreate
+            ? {
+                status: 'inactive' as const,
+                plan: merchantCreate.firstStore
+                  ? ('professional' as const)
+                  : ('enterprise' as const),
+              }
+            : {}),
+          settings: data.settings || {
+            currency: REGION.currency,
+            locale: 'ar-EG',
+            defaultLanguage: REGION.defaultLocale,
+          },
+          // 2026-07-12 design structural batch: new stores get the persona-chrome
+          // completion + card-frame dedup ON by default (Ahmad-approved for NEW
+          // stores only — every existing store keeps these flags undefined/false
+          // and renders unchanged). Merchant can still toggle either off via
+          // Branding → Theme.
+          // 2026-07-12 design-sweep batch: new stores also get a neutral-slate
+          // OOS ribbon (harmonizes better than the platform's original fixed
+          // terracotta) + rtlPolish (RTL-correct empty-state CTA arrow on
+          // elegant). Existing stores keep both undefined and render unchanged.
+          theme: {
+            personaChromeV2: true,
+            frameChromeDedup: true,
+            oosRibbonColor: '#6b7280',
+            rtlPolish: true,
+          },
         },
-        // 2026-07-12 design structural batch: new stores get the persona-chrome
-        // completion + card-frame dedup ON by default (Ahmad-approved for NEW
-        // stores only — every existing store keeps these flags undefined/false
-        // and renders unchanged). Merchant can still toggle either off via
-        // Branding → Theme.
-        // 2026-07-12 design-sweep batch: new stores also get a neutral-slate
-        // OOS ribbon (harmonizes better than the platform's original fixed
-        // terracotta) + rtlPolish (RTL-correct empty-state CTA arrow on
-        // elegant). Existing stores keep both undefined and render unchanged.
-        theme: {
-          personaChromeV2: true,
-          frameChromeDedup: true,
-          oosRibbonColor: '#6b7280',
-          rtlPolish: true,
-        },
-      },
-    });
+      })
+    );
 
     // Every store gets a subscription row from day one (SP5): the plan the
     // enum default put it on, mapped onto a plan code. Written in the new
@@ -499,7 +500,7 @@ export class StoreService {
       const baseSlug = assertStoreSlug(data.slug, { allowProtected: opts.allowProtectedSlug });
       data.slug = baseSlug;
       let suffix = 0;
-      while (await prisma.store.findUnique({ where: { slug: data.slug } })) {
+      while (await storeIdBySlug(data.slug)) {
         suffix++;
         if (suffix > 100) throw new AppError(409, 'SLUG_COLLISION', 'Too many slug collisions');
         data.slug = `${baseSlug.slice(0, 40 - String(suffix).length - 1)}-${suffix}`;
@@ -510,11 +511,7 @@ export class StoreService {
     if (data.domain && data.domain !== store.domain) {
       // Plan gate (SP5): attaching a custom domain needs the plan capability.
       await assertWithinLimit(storeId, 'customDomain');
-      const existingDomain = await prisma.store.findUnique({
-        where: { domain: data.domain },
-      });
-
-      if (existingDomain) {
+      if (await storeIdByDomain(data.domain)) {
         throw new AppError(409, 'ALREADY_EXISTS', 'Store with this domain already exists');
       }
     }
@@ -665,84 +662,96 @@ export class StoreService {
       // happens AFTER the store row is gone, so the definer's "user of the caller's
       // store" test cannot match; the caller's own role (ebda_is_super_admin) is
       // what authorises it.
-      await setTenantGucs(tx, { storeId, ...(actorUserId ? { userId: actorUserId } : {}) });
+      // `scopeTransaction` also makes this the ambient tenant transaction, so the
+      // code-level tenant guard (R-EBDA-003) sees the store the GUCs name.
+      return scopeTransaction(
+        tx,
+        { storeId, ...(actorUserId ? { userId: actorUserId } : {}) },
+        async () => {
+          logger.info({ storeId }, '[STORE_DELETE] start (raw sql, store-scoped)');
 
-      logger.info({ storeId }, '[STORE_DELETE] start (raw sql, store-scoped)');
+          const reviewCount =
+            await tx.$executeRaw`DELETE FROM public.reviews WHERE store_id = ${storeId}`;
+          logger.info({ storeId, count: reviewCount }, '[STORE_DELETE] reviews');
 
-      const reviewCount =
-        await tx.$executeRaw`DELETE FROM public.reviews WHERE store_id = ${storeId}`;
-      logger.info({ storeId, count: reviewCount }, '[STORE_DELETE] reviews');
+          const returnCount =
+            await tx.$executeRaw`DELETE FROM public.returns WHERE store_id = ${storeId}`;
+          logger.info({ storeId, count: returnCount }, '[STORE_DELETE] returns');
 
-      const returnCount =
-        await tx.$executeRaw`DELETE FROM public.returns WHERE store_id = ${storeId}`;
-      logger.info({ storeId, count: returnCount }, '[STORE_DELETE] returns');
+          const orderCount =
+            await tx.$executeRaw`DELETE FROM public.orders WHERE store_id = ${storeId}`;
+          logger.info({ storeId, count: orderCount }, '[STORE_DELETE] orders');
 
-      const orderCount =
-        await tx.$executeRaw`DELETE FROM public.orders WHERE store_id = ${storeId}`;
-      logger.info({ storeId, count: orderCount }, '[STORE_DELETE] orders');
+          const expenseCount =
+            await tx.$executeRaw`DELETE FROM public.expenses WHERE store_id = ${storeId}`;
+          logger.info({ storeId, count: expenseCount }, '[STORE_DELETE] expenses');
 
-      const expenseCount =
-        await tx.$executeRaw`DELETE FROM public.expenses WHERE store_id = ${storeId}`;
-      logger.info({ storeId, count: expenseCount }, '[STORE_DELETE] expenses');
+          const stockAdjCount =
+            await tx.$executeRaw`DELETE FROM public.stock_adjustments WHERE store_id = ${storeId}`;
+          logger.info({ storeId, count: stockAdjCount }, '[STORE_DELETE] stockAdjustments');
 
-      const stockAdjCount =
-        await tx.$executeRaw`DELETE FROM public.stock_adjustments WHERE store_id = ${storeId}`;
-      logger.info({ storeId, count: stockAdjCount }, '[STORE_DELETE] stockAdjustments');
+          const poCount =
+            await tx.$executeRaw`DELETE FROM public.purchase_orders WHERE store_id = ${storeId}`;
+          logger.info({ storeId, count: poCount }, '[STORE_DELETE] purchaseOrders');
 
-      const poCount =
-        await tx.$executeRaw`DELETE FROM public.purchase_orders WHERE store_id = ${storeId}`;
-      logger.info({ storeId, count: poCount }, '[STORE_DELETE] purchaseOrders');
+          const journalCount =
+            await tx.$executeRaw`DELETE FROM public.journal_entries WHERE store_id = ${storeId}`;
+          logger.info({ storeId, count: journalCount }, '[STORE_DELETE] journalEntries');
 
-      const journalCount =
-        await tx.$executeRaw`DELETE FROM public.journal_entries WHERE store_id = ${storeId}`;
-      logger.info({ storeId, count: journalCount }, '[STORE_DELETE] journalEntries');
+          const backorderCount =
+            await tx.$executeRaw`DELETE FROM public.backorder_lines WHERE store_id = ${storeId}`;
+          logger.info({ storeId, count: backorderCount }, '[STORE_DELETE] backorderLines');
 
-      const backorderCount =
-        await tx.$executeRaw`DELETE FROM public.backorder_lines WHERE store_id = ${storeId}`;
-      logger.info({ storeId, count: backorderCount }, '[STORE_DELETE] backorderLines');
+          // Detach historical audit logs by nulling their storeId (preserves trail).
+          // A definer: nulling store_id leaves the store scope, which the policy's
+          // WITH CHECK would reject.
+          const auditCount = await detachStoreAuditLogs(storeId, tx);
+          logger.info({ storeId, count: auditCount }, '[STORE_DELETE] auditLogs (detached)');
 
-      // Detach historical audit logs by nulling their storeId (preserves trail).
-      // A definer: nulling store_id leaves the store scope, which the policy's
-      // WITH CHECK would reject.
-      const auditCount = await detachStoreAuditLogs(storeId, tx);
-      logger.info({ storeId, count: auditCount }, '[STORE_DELETE] auditLogs (detached)');
+          // Verification: count any rows that would still block the store delete.
+          // If any of these come back > 0, we know exactly which table.
+          const blocking = await tx.$queryRaw<Array<{ table_name: string; cnt: bigint }>>`
+          SELECT 'orders' AS table_name, COUNT(*)::bigint AS cnt FROM public.orders WHERE store_id = ${storeId}
+          UNION ALL SELECT 'journal_entries', COUNT(*)::bigint FROM public.journal_entries WHERE store_id = ${storeId}
+          UNION ALL SELECT 'expenses', COUNT(*)::bigint FROM public.expenses WHERE store_id = ${storeId}
+          UNION ALL SELECT 'stock_adjustments', COUNT(*)::bigint FROM public.stock_adjustments WHERE store_id = ${storeId}
+          UNION ALL SELECT 'purchase_orders', COUNT(*)::bigint FROM public.purchase_orders WHERE store_id = ${storeId}
+        `;
+          const stillBlocking = blocking.filter(b => Number(b.cnt) > 0);
+          if (stillBlocking.length > 0) {
+            logger.error({ storeId, stillBlocking }, '[STORE_DELETE] BLOCKING rows still exist');
+          }
 
-      // Verification: count any rows that would still block the store delete.
-      // If any of these come back > 0, we know exactly which table.
-      const blocking = await tx.$queryRaw<Array<{ table_name: string; cnt: bigint }>>`
-        SELECT 'orders' AS table_name, COUNT(*)::bigint AS cnt FROM public.orders WHERE store_id = ${storeId}
-        UNION ALL SELECT 'journal_entries', COUNT(*)::bigint FROM public.journal_entries WHERE store_id = ${storeId}
-        UNION ALL SELECT 'expenses', COUNT(*)::bigint FROM public.expenses WHERE store_id = ${storeId}
-        UNION ALL SELECT 'stock_adjustments', COUNT(*)::bigint FROM public.stock_adjustments WHERE store_id = ${storeId}
-        UNION ALL SELECT 'purchase_orders', COUNT(*)::bigint FROM public.purchase_orders WHERE store_id = ${storeId}
-      `;
-      const stillBlocking = blocking.filter(b => Number(b.cnt) > 0);
-      if (stillBlocking.length > 0) {
-        logger.error({ storeId, stillBlocking }, '[STORE_DELETE] BLOCKING rows still exist');
-      }
+          // Final delete — cascades products, categories, customers, pages,
+          // carts, coupons, accounts, suppliers, backorders, etc.
+          await tx.$executeRaw`DELETE FROM public.stores WHERE id = ${storeId}`;
+          logger.info({ storeId }, '[STORE_DELETE] store deleted');
 
-      // Final delete — cascades products, categories, customers, pages,
-      // carts, coupons, accounts, suppliers, backorders, etc.
-      await tx.$executeRaw`DELETE FROM public.stores WHERE id = ${storeId}`;
-      logger.info({ storeId }, '[STORE_DELETE] store deleted');
-
-      // If the owner was a store_admin and this was their only store,
-      // delete the user too. Otherwise they remain in the system as a
-      // login-able account with no stores to manage — confusing UI and
-      // dead weight on the users list. Super-admins are never deleted
-      // here (they own the platform, not specific stores). Cleaned up
-      // historically by `scripts/admin-cleanup-orphan-store-admins.mjs`.
-      const owner = await tx.user.findUnique({
-        where: { id: store.ownerId },
-        select: { id: true, role: true, _count: { select: { stores: true } } },
-      });
-      if (owner && owner.role === 'store_admin' && owner._count.stores === 0) {
-        await unlinkUserAuditLogs(owner.id, tx);
-        await tx.refreshToken.deleteMany({ where: { userId: owner.id } });
-        await tx.verificationToken.deleteMany({ where: { userId: owner.id } });
-        await tx.oneSignalSubscription.deleteMany({ where: { userId: owner.id } });
-        await tx.user.delete({ where: { id: owner.id } });
-      }
+          // If the owner was a store_admin and this was their only store,
+          // delete the user too. Otherwise they remain in the system as a
+          // login-able account with no stores to manage — confusing UI and
+          // dead weight on the users list. Super-admins are never deleted
+          // here (they own the platform, not specific stores). Cleaned up
+          // historically by `scripts/admin-cleanup-orphan-store-admins.mjs`.
+          // The owner's row is outside this store's scope (users.store_id NULL): only the
+          // platform operator may read and delete it ('platform-operator' hatch, checked by
+          // `ebda_is_super_admin()` in this same transaction).
+          if (!actorUserId) return;
+          await asPlatformOperator(actorUserId, async () => {
+            const owner = await tx.user.findUnique({
+              where: { id: store.ownerId },
+              select: { id: true, role: true, _count: { select: { stores: true } } },
+            });
+            if (owner && owner.role === 'store_admin' && owner._count.stores === 0) {
+              await unlinkUserAuditLogs(owner.id, tx);
+              // User-keyed rows: deleted through the guarded definer (the acting user is
+              // the super_admin, not the owner).
+              await deleteUserTokens(owner.id);
+              await tx.user.delete({ where: { id: owner.id } });
+            }
+          });
+        }
+      );
     });
 
     // Invalidate store cache (best-effort, post-commit)
@@ -880,7 +889,12 @@ export class StoreService {
 
     // VERIFIED domains only (domainStatus 'active'): an unverified claim is
     // never a storefront (SP5 task 4).
-    const found = await prisma.store.findFirst({ where: storeDomainWhere(domain) });
+    // `stores` is under RLS (R-EBDA-005): a VERIFIED-domain match through the lookup
+    // definer (any status, not deleted), then the row inside that store's scope.
+    const domainHit = await lookupStore({ domain }, ['active', 'inactive', 'suspended']);
+    const found = domainHit
+      ? await withStore(domainHit.id, tx => tx.store.findUnique({ where: { id: domainHit.id } }))
+      : null;
 
     if (!found) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
@@ -912,10 +926,12 @@ export class StoreService {
       );
     }
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: { template: template as StoreTemplate },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { template: template as StoreTemplate },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -936,10 +952,12 @@ export class StoreService {
     const existingTheme = (store.theme as Record<string, unknown>) || {};
     const mergedTheme = { ...existingTheme, ...theme };
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: { theme: mergedTheme as Prisma.InputJsonValue },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { theme: mergedTheme as Prisma.InputJsonValue },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -960,18 +978,20 @@ export class StoreService {
   ) {
     const store = await this.getById(storeId);
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        name: branding.name,
-        nameAr: branding.nameAr,
-        logo: branding.logo,
-        logoAr: branding.logoAr,
-        favicon: branding.favicon,
-        description: branding.description,
-        descriptionAr: branding.descriptionAr,
-      },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: {
+          name: branding.name,
+          nameAr: branding.nameAr,
+          logo: branding.logo,
+          logoAr: branding.logoAr,
+          favicon: branding.favicon,
+          description: branding.description,
+          descriptionAr: branding.descriptionAr,
+        },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -1010,10 +1030,12 @@ export class StoreService {
   static async updateSocialLinks(storeId: string, socialLinks: Prisma.InputJsonValue) {
     const store = await this.getById(storeId);
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: { socialLinks },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { socialLinks },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -1037,19 +1059,21 @@ export class StoreService {
   ) {
     const store = await this.getById(storeId);
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        email: contact.email,
-        phone: contact.phone,
-        phoneAr: contact.phoneAr,
-        whatsapp: contact.whatsapp,
-        address: contact.address,
-        addressAr: contact.addressAr,
-        businessHours: contact.businessHours,
-        googleMapsUrl: contact.googleMapsUrl,
-      },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: {
+          email: contact.email,
+          phone: contact.phone,
+          phoneAr: contact.phoneAr,
+          whatsapp: contact.whatsapp,
+          address: contact.address,
+          addressAr: contact.addressAr,
+          businessHours: contact.businessHours,
+          googleMapsUrl: contact.googleMapsUrl,
+        },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -1071,10 +1095,12 @@ export class StoreService {
         : {};
     const merged = { ...existing, ...announcementBar };
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: { announcementBar: merged as Prisma.InputJsonValue },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { announcementBar: merged as Prisma.InputJsonValue },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -1096,10 +1122,12 @@ export class StoreService {
     const existingSettings = (store.settings as Record<string, unknown>) || {};
     const mergedSettings = { ...existingSettings, floatingWidget };
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: { settings: mergedSettings as Prisma.InputJsonValue },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { settings: mergedSettings as Prisma.InputJsonValue },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -1124,25 +1152,27 @@ export class StoreService {
     const store = await this.getById(storeId);
     const previousOgImage = (store as { ogImage?: string | null }).ogImage ?? null;
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        metaTitle: seo.metaTitle,
-        metaTitleAr: seo.metaTitleAr,
-        metaDescription: seo.metaDescription,
-        metaDescriptionAr: seo.metaDescriptionAr,
-        ...(seo.metaDescriptionAeo !== undefined
-          ? { metaDescriptionAeo: seo.metaDescriptionAeo }
-          : {}),
-        ...(seo.metaDescriptionAeoAr !== undefined
-          ? { metaDescriptionAeoAr: seo.metaDescriptionAeoAr }
-          : {}),
-        ogImage: seo.ogImage,
-        twitterHandle: seo.twitterHandle,
-        googleSiteVerification: seo.googleSiteVerification,
-        emailSenderLocalPart: seo.emailSenderLocalPart,
-      },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: {
+          metaTitle: seo.metaTitle,
+          metaTitleAr: seo.metaTitleAr,
+          metaDescription: seo.metaDescription,
+          metaDescriptionAr: seo.metaDescriptionAr,
+          ...(seo.metaDescriptionAeo !== undefined
+            ? { metaDescriptionAeo: seo.metaDescriptionAeo }
+            : {}),
+          ...(seo.metaDescriptionAeoAr !== undefined
+            ? { metaDescriptionAeoAr: seo.metaDescriptionAeoAr }
+            : {}),
+          ogImage: seo.ogImage,
+          twitterHandle: seo.twitterHandle,
+          googleSiteVerification: seo.googleSiteVerification,
+          emailSenderLocalPart: seo.emailSenderLocalPart,
+        },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -1172,24 +1202,26 @@ export class StoreService {
       }
     >;
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        marketingPixels,
-        metaPixelId: pixels.meta?.enabled ? pixels.meta.pixelId : null,
-        tiktokPixelId: pixels.tiktok?.enabled ? pixels.tiktok.pixelId : null,
-        snapchatPixelId: pixels.snapchat?.enabled ? pixels.snapchat.pixelId : null,
-        googleAnalyticsId: pixels.googleAnalytics?.enabled
-          ? pixels.googleAnalytics.measurementId
-          : null,
-        googleTagManagerId: pixels.googleTagManager?.enabled
-          ? pixels.googleTagManager.containerId
-          : null,
-        googleAdsId: pixels.googleAds?.enabled ? pixels.googleAds.conversionId : null,
-        twitterPixelId: pixels.twitter?.enabled ? pixels.twitter.pixelId : null,
-        pinterestTagId: pixels.pinterest?.enabled ? pixels.pinterest.tagId : null,
-      },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: {
+          marketingPixels,
+          metaPixelId: pixels.meta?.enabled ? pixels.meta.pixelId : null,
+          tiktokPixelId: pixels.tiktok?.enabled ? pixels.tiktok.pixelId : null,
+          snapchatPixelId: pixels.snapchat?.enabled ? pixels.snapchat.pixelId : null,
+          googleAnalyticsId: pixels.googleAnalytics?.enabled
+            ? pixels.googleAnalytics.measurementId
+            : null,
+          googleTagManagerId: pixels.googleTagManager?.enabled
+            ? pixels.googleTagManager.containerId
+            : null,
+          googleAdsId: pixels.googleAds?.enabled ? pixels.googleAds.conversionId : null,
+          twitterPixelId: pixels.twitter?.enabled ? pixels.twitter.pixelId : null,
+          pinterestTagId: pixels.pinterest?.enabled ? pixels.pinterest.tagId : null,
+        },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);

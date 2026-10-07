@@ -157,7 +157,7 @@ export class VariantService {
     // Mark product as having variants if it's the first option
     if (!product.hasVariants) {
       await prisma.product.update({
-        where: { id: productId },
+        where: { id: productId, storeId },
         data: { hasVariants: true },
       });
     }
@@ -234,7 +234,7 @@ export class VariantService {
         // If no more options, mark product as not having variants
         if (option.product.options.length <= 1) {
           await tx.product.update({
-            where: { id: productId },
+            where: { id: productId, storeId },
             data: { hasVariants: false },
           });
         }

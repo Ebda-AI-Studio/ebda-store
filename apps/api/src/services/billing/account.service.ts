@@ -14,7 +14,7 @@
  *    reference. A merchant's "I paid" claim never activates anything by itself.
  */
 import crypto from 'crypto';
-import { prisma, withStore, acrossStores, type Prisma } from '@force/database';
+import { prisma, withStore, withUser, acrossStores, type Prisma } from '@force/database';
 import { AppError } from '../../middleware/error-handler';
 import { auditLog } from '../../middleware/security';
 import logger from '../../lib/logger';
@@ -22,6 +22,7 @@ import { getEntitlements } from '../plan-entitlements';
 import { bustStoreCaches } from '../store.service';
 import { featureService } from '../feature.service';
 import { isInterval, type BillingInterval } from './period';
+import { lookupStore } from '../../lib/definer';
 import { loadPayablePlan } from './subscription-billing.service';
 import { instapayHandle, instapayQrUrl } from './manual-config';
 import {
@@ -48,10 +49,13 @@ export async function suspendForBilling(
   reason: BillingSuspendReason,
   now: Date = new Date()
 ): Promise<boolean> {
-  const { count } = await prisma.store.updateMany({
-    where: { id: storeId, status: 'active', billingSuspendedReason: null, deletedAt: null },
-    data: { status: 'suspended', billingSuspendedReason: reason, billingSuspendedAt: now },
-  });
+  // The billing cycle runs outside any store scope: open this store's own.
+  const { count } = await withStore(storeId, tx =>
+    tx.store.updateMany({
+      where: { id: storeId, status: 'active', billingSuspendedReason: null, deletedAt: null },
+      data: { status: 'suspended', billingSuspendedReason: reason, billingSuspendedAt: now },
+    })
+  );
   if (count === 0) return false;
   await afterStatusChange(storeId);
   await auditLog({
@@ -72,10 +76,12 @@ export async function restoreFromBilling(
   storeId: string,
   reason: BillingSuspendReason
 ): Promise<boolean> {
-  const { count } = await prisma.store.updateMany({
-    where: { id: storeId, status: 'suspended', billingSuspendedReason: reason },
-    data: { status: 'active', billingSuspendedReason: null, billingSuspendedAt: null },
-  });
+  const { count } = await withStore(storeId, tx =>
+    tx.store.updateMany({
+      where: { id: storeId, status: 'suspended', billingSuspendedReason: reason },
+      data: { status: 'active', billingSuspendedReason: null, billingSuspendedAt: null },
+    })
+  );
   if (count === 0) return false;
   await afterStatusChange(storeId);
   await auditLog({
@@ -89,10 +95,12 @@ export async function restoreFromBilling(
 }
 
 async function afterStatusChange(storeId: string): Promise<void> {
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: { id: true, slug: true, domain: true },
-  });
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({
+      where: { id: storeId },
+      select: { id: true, slug: true, domain: true },
+    })
+  );
   if (!store) return;
   // Account status is NEVER-stale: every public resolve/slug/id cache goes.
   await bustStoreCaches(store.id, store.slug, store.domain);
@@ -103,11 +111,13 @@ async function afterStatusChange(storeId: string): Promise<void> {
 
 /** Owner's stores, oldest first (the order that decides who is kept). */
 async function ownerStores(ownerId: string) {
-  return prisma.store.findMany({
-    where: { ownerId, deletedAt: null },
-    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    select: { id: true, status: true, billingSuspendedReason: true },
-  });
+  return withUser(ownerId, tx =>
+    tx.store.findMany({
+      where: { ownerId, deletedAt: null },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: { id: true, status: true, billingSuspendedReason: true },
+    })
+  );
 }
 
 /**
@@ -126,10 +136,9 @@ export async function ownerStoreAllowance(ownerId: string): Promise<number> {
 
 /** Index (0 = oldest) of the store among its owner's stores, or -1. */
 export async function storeRank(storeId: string): Promise<{ rank: number; allowance: number }> {
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: { ownerId: true },
-  });
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({ where: { id: storeId }, select: { ownerId: true } })
+  );
   if (!store?.ownerId) return { rank: -1, allowance: 1 };
   const stores = await ownerStores(store.ownerId);
   return {
@@ -175,10 +184,12 @@ export async function enforceStoreAllowance(
  * subscription is in good standing, then re-apply the owner's store allowance.
  */
 export async function reconcileStoreAccess(storeId: string): Promise<void> {
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: { ownerId: true, billingSuspendedReason: true },
-  });
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({
+      where: { id: storeId },
+      select: { ownerId: true, billingSuspendedReason: true },
+    })
+  );
   if (!store) return;
   if (store.billingSuspendedReason === 'unpaid') {
     const sub = await withStore(storeId, tx =>
@@ -357,9 +368,9 @@ export async function listStoreClaims(storeId: string) {
 
 /** Super-admin queue: claims across stores (each read in its own store scope). */
 export async function listClaimsForAdmin(status: 'pending' | 'confirmed' | 'rejected' = 'pending') {
-  const parts = await acrossStores(() =>
+  const parts = await acrossStores(storeId =>
     prisma.manualPaymentClaim.findMany({
-      where: { status },
+      where: { storeId, status },
       include: { store: { select: { name: true, slug: true, status: true } } },
       orderBy: { createdAt: 'asc' },
       take: 200,
@@ -452,14 +463,15 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
   const key = manualPaymentKey(input.method, reference);
   // The money received is the gross: carve Ebda's VAT (if ON) out of it for the ledger.
   const paidVat = ledgerVat(vatOfPaidAmount(input.amountMinor, await resolvePlatformVat()));
-  const store = await prisma.store.findUnique({
-    where: { id: input.storeId },
-    select: { id: true },
-  });
+  // Runs from the super-admin route with no store scope: resolve the store through
+  // the definer (any status), then do the writes inside withStore below.
+  const store = await lookupStore({ id: input.storeId }, ['active', 'inactive', 'suspended']);
   if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
   const result = await withStore(input.storeId, async (tx: Tx) => {
-    const existing = await tx.billingEvent.findUnique({ where: { idempotencyKey: key } });
+    const existing = await tx.billingEvent.findUnique({
+      where: { idempotencyKey: key, storeId: input.storeId },
+    });
     if (existing) {
       if (existing.storeId !== input.storeId) {
         throw new AppError(
@@ -504,7 +516,9 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     if (count === 0) {
       // The key exists but is not visible in this store's scope: the same
       // reference was recorded for ANOTHER store (strict RLS hides it). Refuse.
-      const winner = await tx.billingEvent.findUnique({ where: { idempotencyKey: key } });
+      const winner = await tx.billingEvent.findUnique({
+        where: { idempotencyKey: key, storeId: input.storeId },
+      });
       if (!winner) {
         throw new AppError(
           409,

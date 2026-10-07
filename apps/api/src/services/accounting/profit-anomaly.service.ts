@@ -23,7 +23,7 @@
  * the same (storeId, metric) in the last 24 hours.
  */
 
-import { prisma, AnomalyScope, AnomalyMetric, AnomalySeverity } from '@force/database';
+import { prisma, AnomalyScope, AnomalyMetric, AnomalySeverity, withStore } from '@force/database';
 import logger from '../../lib/logger';
 import { profitAndLoss } from './reports.service';
 import { callGemini } from './gemini-ai.service';
@@ -280,10 +280,12 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
   }
 
   // ---- 6. Load store info for alert context ----
-  const store = await prisma.store.findUniqueOrThrow({
-    where: { id: storeId },
-    select: { id: true, name: true, slug: true },
-  });
+  const store = await withStore(storeId, tx =>
+    tx.store.findUniqueOrThrow({
+      where: { id: storeId },
+      select: { id: true, name: true, slug: true },
+    })
+  );
 
   // ---- 7. Gather context for Gemini explanations ----
   const [recentInventoryChanges, recentRefunds, topCoupons] = await Promise.all([

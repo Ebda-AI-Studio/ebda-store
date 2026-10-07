@@ -1,3 +1,4 @@
+import { currentStoreId } from '@force/database';
 import { withScopedToOrderStore } from './order-scope';
 import type { Prisma } from '@prisma/client';
 import { getSystemAccountIdByCode } from '../account.service';
@@ -102,7 +103,7 @@ export async function postPartialReturnJournal(
   const { orderId, refundKey, items, tx } = args;
 
   const order = await tx.order.findUnique({
-    where: { id: orderId },
+    where: { id: orderId, storeId: args.storeId ?? currentStoreId() },
     include: {
       items: true,
       // NOT `status: 'completed'` alone. ReturnService.complete calls
@@ -168,7 +169,7 @@ export async function postPartialReturnJournal(
   // a partial can never post against a sale mid-reversal.
   await tx.$queryRaw`SELECT id FROM public.journal_entries WHERE id = ${cashOriginal.id} FOR UPDATE`;
   const cashStatus = await tx.journalEntry.findUnique({
-    where: { id: cashOriginal.id },
+    where: { id: cashOriginal.id, storeId },
     select: { status: true },
   });
   if (cashStatus?.status === 'reversed') {
@@ -500,7 +501,7 @@ export async function postAmountOnlyRefundJournal(args: {
     return { posted: 0, skipped: 'invalid-amount' };
   }
   const order = await tx.order.findUnique({
-    where: { id: orderId },
+    where: { id: orderId, storeId: args.storeId ?? currentStoreId() },
     select: { id: true, storeId: true, orderNumber: true },
   });
   if (!order) return { posted: 0, skipped: 'order-not-found' };
@@ -541,7 +542,7 @@ export async function postAmountOnlyRefundJournal(args: {
   // Same lock as postPartialReturnJournal / postRefundJournal (issue 1187).
   await tx.$queryRaw`SELECT id FROM public.journal_entries WHERE id = ${sale.id} FOR UPDATE`;
   const saleStatus = await tx.journalEntry.findUnique({
-    where: { id: sale.id },
+    where: { id: sale.id, storeId },
     select: { status: true },
   });
   if (saleStatus?.status === 'reversed') {

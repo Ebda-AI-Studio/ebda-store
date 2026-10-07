@@ -175,7 +175,7 @@ describe('resolveCustomerContext', () => {
 
     expect(ctx.customerGroupId).toBe('vip');
     expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
-      where: { id: 'cust-1' },
+      where: { id: 'cust-1', storeId: STORE },
       select: { phone: true, email: true },
     });
     expect(mockPrisma.customer.findFirst).toHaveBeenCalledWith({

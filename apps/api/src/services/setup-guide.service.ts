@@ -12,7 +12,7 @@
  * zones are RLS-protected): routes mount it behind `tenantContext`; other
  * callers wrap it in `readInStoreContext`.
  */
-import { prisma } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import {
   SETUP_GUIDE_ITEMS,
   isSetupGuideKey,
@@ -41,10 +41,12 @@ function hasBrandColor(theme: unknown): boolean {
 
 export class SetupGuideService {
   static async get(storeId: string): Promise<SetupGuideState> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { logo: true, theme: true, domain: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { logo: true, theme: true, domain: true, settings: true },
+      })
+    );
     if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
     const [products, zones, orders, otherMethods] = await Promise.all([

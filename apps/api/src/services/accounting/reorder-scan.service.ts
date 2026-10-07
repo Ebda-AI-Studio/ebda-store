@@ -117,9 +117,13 @@ export async function pickLastSupplierForProduct(
 // ---------------------------------------------------------------------------
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function getSupplierLeadTime(supplierId: string, tx: any): Promise<number | null> {
+async function getSupplierLeadTime(
+  storeId: string,
+  supplierId: string,
+  tx: any
+): Promise<number | null> {
   const row = await tx.supplier.findUnique({
-    where: { id: supplierId },
+    where: { id: supplierId, storeId },
     select: { leadTimeDays: true },
   });
   return row?.leadTimeDays ?? null;
@@ -405,7 +409,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const leadTimeFor = async (supplierId: string, tx: any): Promise<number | null> => {
     if (!leadTimeBySupplier.has(supplierId)) {
-      leadTimeBySupplier.set(supplierId, await getSupplierLeadTime(supplierId, tx));
+      leadTimeBySupplier.set(supplierId, await getSupplierLeadTime(storeId, supplierId, tx));
     }
     return leadTimeBySupplier.get(supplierId) ?? null;
   };
@@ -630,7 +634,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
 
             if (existing) {
               await tx.reorderSuggestion.update({
-                where: { id: existing.id },
+                where: { id: existing.id, storeId },
                 data: { ...payload, scannedAt: scanStartedAt },
               });
             } else {

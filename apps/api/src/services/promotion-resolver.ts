@@ -47,7 +47,7 @@ export async function resolveCustomerContext(
     isFirstOrder = priorCount === 0;
 
     const user = await prisma.user.findUnique({
-      where: { id: id.customerId },
+      where: { id: id.customerId, storeId },
       select: { phone: true, email: true },
     });
     groupPhone = user?.phone ?? id.phone;

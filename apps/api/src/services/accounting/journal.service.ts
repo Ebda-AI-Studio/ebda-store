@@ -1,4 +1,4 @@
-import { prisma, withStore } from '@force/database';
+import { prisma, withStore, currentStoreId } from '@force/database';
 import { getEntityStoreId } from '../../lib/definer';
 import type { JournalEntry, JournalEntrySource, Prisma } from '@prisma/client';
 import { Prisma as PrismaNs } from '@prisma/client';
@@ -221,7 +221,7 @@ export async function reverseEntry(
 ): Promise<JournalEntry> {
   const run = async (t: Prisma.TransactionClient) => {
     const original = await t.journalEntry.findUnique({
-      where: { id: originalId },
+      where: { id: originalId, storeId: currentStoreId() },
       include: { lines: true },
     });
     if (!original) throw new Error(`JournalEntry ${originalId} not found`);
@@ -267,7 +267,7 @@ export async function reverseEntry(
 
     // Mark original as reversed + link via reversedById (FK side of "Reversal")
     await t.journalEntry.update({
-      where: { id: original.id },
+      where: { id: original.id, storeId: original.storeId },
       data: { status: 'reversed', reversedById: reversal.id },
     });
 

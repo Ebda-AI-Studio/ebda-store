@@ -542,14 +542,14 @@ router.get(
         return;
       }
 
-      // Audit rows keyed by resourceId=returnId. Some older rows may have
-      // been written without storeId on the audit call — include them via
-      // OR so we never miss history on old data.
+      // Audit rows keyed by resourceId=returnId, scoped to the store (the tenant
+      // guard refuses an OR over storeId; store-less legacy rows are not visible
+      // to a store scope under strict RLS anyway).
       const auditRows = await prisma.auditLog.findMany({
         where: {
           resourceType: 'return',
           resourceId: returnId,
-          OR: [{ storeId }, { storeId: null }],
+          storeId,
         },
         include: { user: { select: { firstName: true, lastName: true, role: true } } },
         orderBy: { createdAt: 'desc' },

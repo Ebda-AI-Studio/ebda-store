@@ -130,7 +130,7 @@ export async function cancelBackorder(
     // Re-read under the row lock the claim now holds: a PO receive may have
     // fulfilled part of the line since the read above.
     const line = await tx.backorderLine.findUniqueOrThrow({
-      where: { id: backorderId },
+      where: { id: backorderId, storeId },
       select: { qty: true, qtyFulfilled: true },
     });
     const quantity = Math.max(0, line.qty - line.qtyFulfilled);
@@ -139,6 +139,7 @@ export async function cancelBackorder(
     const remainingOpen = await tx.backorderLine.count({
       where: {
         orderItemId: bo.orderItemId,
+        storeId,
         id: { not: backorderId },
         fulfilledAt: null,
         cancelledAt: null,
@@ -191,7 +192,7 @@ export async function cancelBackorder(
     // the same allocation the GL posts (so the customer's notification and
     // the journal state one number).
     const order = await tx.order.findUniqueOrThrow({
-      where: { id: orderId },
+      where: { id: orderId, storeId },
       select: {
         subtotal: true,
         discount: true,

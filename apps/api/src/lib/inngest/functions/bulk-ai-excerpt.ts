@@ -97,7 +97,7 @@ const bulkAiExcerptFn = inngest.createFunction(
     return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), force },
         })
       );
@@ -117,7 +117,7 @@ const bulkAiExcerptFn = inngest.createFunction(
           select: { id: true },
         });
         await prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { total: products.length },
         });
         return { storeName: store?.name ?? storeId, productIds: products.map(p => p.id) };
@@ -137,7 +137,7 @@ const bulkAiExcerptFn = inngest.createFunction(
 
         const result: BatchResult = await step.run(`batch-${i}`, async () => {
           const currentJob = await prisma.bulkAiJob.findUnique({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             select: { status: true },
           });
           if (currentJob?.status === 'cancelled') {
@@ -153,7 +153,7 @@ const bulkAiExcerptFn = inngest.createFunction(
           }
 
           const items = await prisma.product.findMany({
-            where: { id: { in: batchIds } },
+            where: { id: { in: batchIds }, storeId },
             select: {
               id: true,
               name: true,
@@ -221,7 +221,7 @@ const bulkAiExcerptFn = inngest.createFunction(
                 bSkipped++;
               } else {
                 await prisma.product.update({
-                  where: { id: product.id },
+                  where: { id: product.id, storeId },
                   data: {
                     excerpt: result.excerpt || product.excerpt,
                     excerptAr: result.excerptAr || product.excerptAr,
@@ -279,7 +279,7 @@ const bulkAiExcerptFn = inngest.createFunction(
 
         await step.run(`progress-${i}`, () =>
           prisma.bulkAiJob.update({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             data: { processed, filled, skipped, failed, errors: errors as object },
           })
         );
@@ -306,7 +306,7 @@ const bulkAiExcerptFn = inngest.createFunction(
       }
 
       const finalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         select: { status: true },
       });
 
@@ -319,7 +319,7 @@ const bulkAiExcerptFn = inngest.createFunction(
       // via the tag the public fetches carry.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await prisma.bulkAiJob.update({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         data: {
           status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
           processed,

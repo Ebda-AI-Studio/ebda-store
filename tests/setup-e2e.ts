@@ -104,7 +104,18 @@ function resolveTestDatabaseUrl(): void {
 
 /**
  * Reset the Prisma singleton so it re-initialises against the resolved
- * DATABASE_URL rather than whatever the module-load default was.
+ * DATABASE_URL rather than whatever the module-load default was, and make that
+ * singleton the OWNER-ROLE client (R-EBDA-003).
+ *
+ * The integration test process builds fixtures (and asserts on rows) with the bare
+ * `prisma` and no tenant context. On the app client the code-level tenant guard
+ * refuses exactly that, by design. Test fixtures are one of the named owner-role
+ * uses (`createPrismaClient({ role: 'owner' })`, the client form of `withOwnerTx`):
+ * no guard, and it refuses to run unless DATABASE_URL's role bypasses RLS, so a
+ * DATABASE_URL pointed at `ebda_app` fails loudly instead of building nothing.
+ * The code under test is still proven under BOTH layers: the API server these
+ * suites call runs the app client as `ebda_app`, and suites that bind an app
+ * client with `runWithRequestDb` get the guarded client.
  */
 async function resetPrismaSingleton(): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,6 +123,12 @@ async function resetPrismaSingleton(): Promise<void> {
   if (g.prisma) {
     await g.prisma.$disconnect().catch(() => {});
     g.prisma = undefined;
+  }
+  if (process.env.DATABASE_URL) {
+    // Imported here, not at module load: unit test files share this setup file and
+    // must not load the real database package (many of them mock it).
+    const { createPrismaClient } = await import('@force/database');
+    g.prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL, role: 'owner' });
   }
 }
 

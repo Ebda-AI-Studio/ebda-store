@@ -22,7 +22,8 @@
  * `stores` has RLS disabled (Ruling FRT-3), so these reads/writes need no tenant
  * context and stay in the existing plain-prisma style.
  */
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma, storeDirectory, withStore } from '@force/database';
+import { storeIdByDomain, storeIdsClaimingDomain } from '../lib/definer';
 import { abuseConfig } from '../lib/abuse-config';
 import { bustCorsCache } from '../lib/cors-cache';
 import { invalidateCached } from '../lib/public-cache';
@@ -83,7 +84,9 @@ export class DomainClaimService {
     now: Date = new Date()
   ): Promise<{ state: DomainClaimState; domain: string }> {
     const domain = normalizeDomain(rawDomain);
-    const store = await prisma.store.findUnique({ where: { id: storeId }, select: claimSelect });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: claimSelect })
+    );
     if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
     // Already the store's verified domain: just drop any other pending claim.
@@ -98,19 +101,21 @@ export class DomainClaimService {
     }
 
     // A domain ACTIVE on another store is never claimable.
-    const activeElsewhere = await prisma.store.findFirst({
-      where: { domain, id: { not: storeId } },
-      select: { id: true },
-    });
-    if (activeElsewhere) {
+    // `stores` is under RLS (R-EBDA-005): other stores are probed through definers.
+    const activeOwner = await storeIdByDomain(domain);
+    if (activeOwner && activeOwner !== storeId) {
       throw new AppError(400, 'DOMAIN_TAKEN', 'Domain is already in use by another store');
     }
 
     // Another store's PENDING claim blocks while fresh; a stale one is released.
-    const pendingElsewhere = await prisma.store.findMany({
-      where: { pendingDomain: domain, id: { not: storeId } },
-      select: claimSelect,
-    });
+    const claimants = (await storeIdsClaimingDomain(domain)).filter(id => id !== storeId);
+    const pendingElsewhere = (
+      await Promise.all(
+        claimants.map(id =>
+          withStore(id, tx => tx.store.findUnique({ where: { id }, select: claimSelect }))
+        )
+      )
+    ).filter((r): r is NonNullable<typeof r> => r !== null);
     for (const other of pendingElsewhere) {
       if (!isClaimStale(other.domainClaimedAt, now)) {
         throw new AppError(400, 'DOMAIN_TAKEN', 'Domain is already in use by another store');
@@ -133,10 +138,12 @@ export class DomainClaimService {
 
     const previousPending = store.pendingDomain;
     try {
-      await prisma.store.update({
-        where: { id: storeId },
-        data: { pendingDomain: domain, domainStatus: 'pending', domainClaimedAt: now },
-      });
+      await withStore(storeId, tx =>
+        tx.store.update({
+          where: { id: storeId },
+          data: { pendingDomain: domain, domainStatus: 'pending', domainClaimedAt: now },
+        })
+      );
     } catch (err) {
       // The provider holds a hostname no row references: take it back.
       await removeFromProvider(provider, domain);
@@ -152,16 +159,20 @@ export class DomainClaimService {
 
   /** Drop this store's unverified claim (the merchant changed their mind). */
   static async cancelPending(storeId: string, provider: DomainProvider): Promise<void> {
-    const store = await prisma.store.findUnique({ where: { id: storeId }, select: claimSelect });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: claimSelect })
+    );
     if (!store?.pendingDomain) return;
-    await prisma.store.updateMany({
-      where: { id: storeId, pendingDomain: store.pendingDomain },
-      data: {
-        pendingDomain: null,
-        domainClaimedAt: null,
-        domainStatus: store.domain ? 'active' : null,
-      },
-    });
+    await withStore(storeId, tx =>
+      tx.store.updateMany({
+        where: { id: storeId, pendingDomain: store.pendingDomain },
+        data: {
+          pendingDomain: null,
+          domainClaimedAt: null,
+          domainStatus: store.domain ? 'active' : null,
+        },
+      })
+    );
     await removeFromProvider(provider, store.pendingDomain);
   }
 
@@ -173,23 +184,24 @@ export class DomainClaimService {
     storeId: string,
     provider: DomainProvider
   ): Promise<{ released: string | null }> {
-    const store = await prisma.store.findUnique({ where: { id: storeId }, select: claimSelect });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: claimSelect })
+    );
     const pending = store?.pendingDomain ?? null;
     if (!store || !pending) return { released: null };
-    const res = await prisma.store.updateMany({
-      where: { id: storeId, pendingDomain: pending },
-      data: {
-        pendingDomain: null,
-        domainClaimedAt: null,
-        domainStatus: store.domain ? 'active' : null,
-      },
-    });
+    const res = await withStore(storeId, tx =>
+      tx.store.updateMany({
+        where: { id: storeId, pendingDomain: pending },
+        data: {
+          pendingDomain: null,
+          domainClaimedAt: null,
+          domainStatus: store.domain ? 'active' : null,
+        },
+      })
+    );
     if (res.count === 0) return { released: null }; // lost a race with activate/release
     // Never tear down a hostname another store has since verified.
-    const owner = await prisma.store.findFirst({
-      where: { domain: pending },
-      select: { id: true },
-    });
+    const owner = await storeIdByDomain(pending);
     if (!owner) await removeFromProvider(provider, pending);
     logger.info({ storeId, domain: pending }, '[DOMAIN CLAIM] released');
     return { released: pending };
@@ -206,7 +218,9 @@ export class DomainClaimService {
     provider: DomainProvider,
     now: Date = new Date()
   ): Promise<{ action: 'none' | 'activated' | 'failed' | 'released' | 'pending' }> {
-    const store = await prisma.store.findUnique({ where: { id: storeId }, select: claimSelect });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: claimSelect })
+    );
     const pending = store?.pendingDomain;
     if (!store || !pending) return { action: 'none' };
 
@@ -228,10 +242,12 @@ export class DomainClaimService {
       return { action: 'released' };
     }
     if (verifiedStatus?.failed && store.domainStatus !== 'failed') {
-      await prisma.store.updateMany({
-        where: { id: storeId, pendingDomain: pending },
-        data: { domainStatus: 'failed' },
-      });
+      await withStore(storeId, tx =>
+        tx.store.updateMany({
+          where: { id: storeId, pendingDomain: pending },
+          data: { domainStatus: 'failed' },
+        })
+      );
       return { action: 'failed' };
     }
     return { action: 'pending' };
@@ -249,27 +265,33 @@ export class DomainClaimService {
     provider: DomainProvider,
     now: Date = new Date()
   ): Promise<boolean> {
-    const before = await prisma.store.findUnique({ where: { id: storeId }, select: claimSelect });
+    const before = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: claimSelect })
+    );
     if (!before || before.pendingDomain !== pending) return false;
     const oldDomain = before.domain;
     try {
-      const res = await prisma.store.updateMany({
-        where: { id: storeId, pendingDomain: pending },
-        data: {
-          domain: pending,
-          domainStatus: 'active',
-          domainVerifiedAt: now,
-          pendingDomain: null,
-          domainClaimedAt: null,
-        },
-      });
+      const res = await withStore(storeId, tx =>
+        tx.store.updateMany({
+          where: { id: storeId, pendingDomain: pending },
+          data: {
+            domain: pending,
+            domainStatus: 'active',
+            domainVerifiedAt: now,
+            pendingDomain: null,
+            domainClaimedAt: null,
+          },
+        })
+      );
       if (res.count === 0) return false;
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        await prisma.store.updateMany({
-          where: { id: storeId, pendingDomain: pending },
-          data: { domainStatus: 'failed' },
-        });
+        await withStore(storeId, tx =>
+          tx.store.updateMany({
+            where: { id: storeId, pendingDomain: pending },
+            data: { domainStatus: 'failed' },
+          })
+        );
         return false;
       }
       throw err;
@@ -302,16 +324,18 @@ export class DomainClaimService {
     const { storeId, slug, oldDomain, newDomain, provider } = input;
     if (oldDomain === newDomain) return;
 
-    await prisma.store
-      .update({ where: { id: storeId }, data: { llmsTxt: null } })
-      .catch(err => logger.warn({ err, storeId }, '[DOMAIN CLAIM] failed to clear stale llms.txt'));
+    await withStore(storeId, tx =>
+      tx.store.update({ where: { id: storeId }, data: { llmsTxt: null } })
+    ).catch(err => logger.warn({ err, storeId }, '[DOMAIN CLAIM] failed to clear stale llms.txt'));
 
     // Resend: remove the OLD sender domain BEFORE provisioning the new one
     // (provisionStoreDomain would overwrite the row's emailDomainId otherwise).
-    const emailRow = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { emailDomainId: true },
-    });
+    const emailRow = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { emailDomainId: true },
+      })
+    );
     if (emailRow?.emailDomainId) {
       await ResendService.removeStoreDomain(storeId).catch(err =>
         logger.error({ err, storeId }, '[DOMAIN CLAIM] failed to remove old Resend domain')
@@ -349,12 +373,9 @@ export class DomainClaimService {
     now: Date = new Date(),
     limit = 200
   ): Promise<{ examined: number; activated: number; failed: number; released: number }> {
-    const rows = await prisma.store.findMany({
-      where: { pendingDomain: { not: null } },
-      select: { id: true },
-      orderBy: { domainClaimedAt: 'asc' },
-      take: limit,
-    });
+    // `stores` is under RLS (R-EBDA-005): the cron lists claimants through the store
+    // directory (id order; the per-store `sync` reads each claim in its own scope).
+    const rows = (await storeDirectory(s => s.hasPendingDomain)).slice(0, limit);
     const out = { examined: rows.length, activated: 0, failed: 0, released: 0 };
     for (const { id } of rows) {
       try {

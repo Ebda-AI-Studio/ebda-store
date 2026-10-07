@@ -95,7 +95,7 @@ const bulkAiImageAltFn = inngest.createFunction(
     return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date() },
         })
       );
@@ -111,7 +111,7 @@ const bulkAiImageAltFn = inngest.createFunction(
           select: { id: true },
         });
         await prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { total: products.length },
         });
         return products.map(p => p.id);
@@ -131,7 +131,7 @@ const bulkAiImageAltFn = inngest.createFunction(
 
         const result: BatchResult = await step.run(`batch-${i}`, async () => {
           const currentJob = await prisma.bulkAiJob.findUnique({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             select: { status: true },
           });
           if (currentJob?.status === 'cancelled') {
@@ -151,7 +151,7 @@ const bulkAiImageAltFn = inngest.createFunction(
           // (this batch retried, or the per-product endpoint) drop out of
           // `missingAlt` naturally.
           const items = await prisma.product.findMany({
-            where: { id: { in: batchIds } },
+            where: { id: { in: batchIds }, storeId },
             select: {
               id: true,
               name: true,
@@ -272,7 +272,7 @@ const bulkAiImageAltFn = inngest.createFunction(
 
         await step.run(`progress-${i}`, () =>
           prisma.bulkAiJob.update({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             data: { processed, filled, skipped, failed, errors: errors as object },
           })
         );
@@ -299,7 +299,7 @@ const bulkAiImageAltFn = inngest.createFunction(
       }
 
       const finalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         select: { status: true },
       });
 
@@ -312,7 +312,7 @@ const bulkAiImageAltFn = inngest.createFunction(
       // via the tag the public fetches carry.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await prisma.bulkAiJob.update({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         data: {
           status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
           processed,

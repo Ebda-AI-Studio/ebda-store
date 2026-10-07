@@ -7,7 +7,7 @@
  */
 
 import webpush from 'web-push';
-import { prisma, withStore, runInTenantContext } from '@force/database';
+import { currentStoreId, prisma, withStore, runInTenantContext } from '@force/database';
 import logger from '../lib/logger';
 import { config } from '../config';
 import { notificationConfigService } from './notification-config.service';
@@ -364,7 +364,9 @@ class PushService {
    * Unsubscribe a device by its endpoint.
    */
   async unsubscribe(endpoint: string): Promise<void> {
-    await prisma.pushSubscription.deleteMany({ where: { endpoint } });
+    await prisma.pushSubscription.deleteMany({
+      where: { endpoint, storeId: currentStoreId() },
+    });
     logger.info({ endpoint }, '[PushService] Push subscription removed');
   }
 

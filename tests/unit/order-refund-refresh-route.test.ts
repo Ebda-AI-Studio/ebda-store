@@ -225,7 +225,7 @@ describe('POST /:orderId/refresh-refund-status', () => {
     expect(res.body.success).toBe(true);
     expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
     expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: ORDER_ID },
+      where: { id: ORDER_ID, storeId: STORE_ID },
       data: { status: 'refunded', paymentStatus: 'refunded' },
     });
   });
@@ -329,7 +329,7 @@ describe('POST /:orderId/refresh-refund-status — partial out-of-band refunds',
     // The whole-order reversal chain must run — the money is gone.
     expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
     expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: ORDER_ID },
+      where: { id: ORDER_ID, storeId: STORE_ID },
       data: { status: 'refunded', paymentStatus: 'refunded' },
     });
   });
@@ -372,7 +372,7 @@ describe('POST /:orderId/refresh-refund-status — partial out-of-band refunds',
     expect(data.refundedAmount).toBe(5000);
     expect(applyRefundEffects).toHaveBeenCalledTimes(1);
     expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: ORDER_ID },
+      where: { id: ORDER_ID, storeId: STORE_ID },
       data: { status: 'refunded', paymentStatus: 'refunded' },
     });
   });

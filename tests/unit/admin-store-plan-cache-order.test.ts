@@ -50,6 +50,7 @@ vi.mock('@force/database', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
+    asPlatformOperator: (_userId: string, fn: () => unknown) => fn(),
     withStore: async (_storeId: string, fn: (tx: unknown) => unknown) => fn({}),
     prisma: {
       store: {

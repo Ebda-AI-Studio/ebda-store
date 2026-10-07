@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import sharp from 'sharp';
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma, withStore } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import { StorageService } from './storage.service';
@@ -268,14 +268,16 @@ export class PWAService {
    * Get store PWA settings
    */
   static async getSettings(storeId: string): Promise<PWASettingsResponse> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        name: true,
-        pwaEnabled: true,
-        pwaSettings: true,
-      },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: {
+          name: true,
+          pwaEnabled: true,
+          pwaSettings: true,
+        },
+      })
+    );
 
     if (!store) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
@@ -305,10 +307,12 @@ export class PWAService {
     data: { pwaEnabled?: boolean; settings?: Partial<PWASettings> }
   ): Promise<PWASettingsResponse> {
     // Verify store exists
-    const existing = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, pwaSettings: true },
-    });
+    const existing = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, pwaSettings: true },
+      })
+    );
 
     if (!existing) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
@@ -326,17 +330,19 @@ export class PWAService {
       ? { ...currentSettings, ...data.settings }
       : currentSettings;
 
-    const store = await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        pwaEnabled: data.pwaEnabled,
-        pwaSettings: updatedSettings as unknown as Prisma.InputJsonValue,
-      },
-      select: {
-        pwaEnabled: true,
-        pwaSettings: true,
-      },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: {
+          pwaEnabled: data.pwaEnabled,
+          pwaSettings: updatedSettings as unknown as Prisma.InputJsonValue,
+        },
+        select: {
+          pwaEnabled: true,
+          pwaSettings: true,
+        },
+      })
+    );
 
     // Every write here can change what /public/:storeId/manifest.json and
     // the storefront's home-screen icon look like. The manifest route itself
@@ -360,14 +366,16 @@ export class PWAService {
    */
   static async generateManifest(storeId: string): Promise<object | null> {
     const [store, pwaEnabled] = await Promise.all([
-      prisma.store.findUnique({
-        where: { id: storeId },
-        select: {
-          name: true,
-          nameAr: true,
-          pwaSettings: true,
-        },
-      }),
+      withStore(storeId, tx =>
+        tx.store.findUnique({
+          where: { id: storeId },
+          select: {
+            name: true,
+            nameAr: true,
+            pwaSettings: true,
+          },
+        })
+      ),
       featureService.isFeatureEnabled(storeId, 'pwa'),
     ]);
 
@@ -484,12 +492,14 @@ export class PWAService {
     pushEnabled: boolean;
   }> {
     const [store, pwaEnabled] = await Promise.all([
-      prisma.store.findUnique({
-        where: { id: storeId },
-        select: {
-          pwaSettings: true,
-        },
-      }),
+      withStore(storeId, tx =>
+        tx.store.findUnique({
+          where: { id: storeId },
+          select: {
+            pwaSettings: true,
+          },
+        })
+      ),
       featureService.isFeatureEnabled(storeId, 'pwa'),
     ]);
 
@@ -520,14 +530,16 @@ export class PWAService {
     title: string;
   } | null> {
     const [store, pwaEnabled] = await Promise.all([
-      prisma.store.findUnique({
-        where: { id: storeId },
-        select: {
-          name: true,
-          nameAr: true,
-          pwaSettings: true,
-        },
-      }),
+      withStore(storeId, tx =>
+        tx.store.findUnique({
+          where: { id: storeId },
+          select: {
+            name: true,
+            nameAr: true,
+            pwaSettings: true,
+          },
+        })
+      ),
       featureService.isFeatureEnabled(storeId, 'pwa'),
     ]);
 

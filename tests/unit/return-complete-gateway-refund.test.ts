@@ -676,7 +676,11 @@ describe('ReturnService.complete — one refund per return, one completion per o
     ).rejects.toMatchObject({ code: 'REFUND_ALREADY_ISSUED' });
 
     expect(providerRefund, 'the customer must not be paid twice').not.toHaveBeenCalled();
-    expect(findOutstandingRefundClaims).toHaveBeenCalledWith('pay-1', `return:${RETURN_ID}`);
+    expect(findOutstandingRefundClaims).toHaveBeenCalledWith(
+      'pay-1',
+      `return:${RETURN_ID}`,
+      STORE_ID
+    );
     // A manual method records it without touching the gateway.
     await expect(
       ReturnService.complete(STORE_ID, RETURN_ID, 'user-1', 'manual')

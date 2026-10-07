@@ -677,9 +677,13 @@ describe.skipIf(!hasDb)('signup funnel', () => {
           last4: '4242',
         });
         expect(r.outcome).toBe('processed');
-        await expect(assertStoreMayGoLive(a.storeId)).resolves.toMatchObject({ ok: true });
-        expect((await getSubscriptionBillingState(a.storeId)).card).toMatchObject({
-          last4: '4242',
+        // The go-live gate and the billing-state read run in the store's scope
+        // in production (router.param tenantContext), as goLive does below.
+        await runInStoreScope(a.storeId, async () => {
+          await expect(assertStoreMayGoLive(a.storeId)).resolves.toMatchObject({ ok: true });
+          expect((await getSubscriptionBillingState(a.storeId)).card).toMatchObject({
+            last4: '4242',
+          });
         });
       });
 

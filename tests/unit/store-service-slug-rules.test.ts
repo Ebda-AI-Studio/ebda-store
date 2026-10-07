@@ -9,16 +9,13 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const findUnique = vi.fn();
 const storeCreate = vi.fn();
 const storeGate = vi.hoisted(() => vi.fn());
 
 vi.mock('@force/database', () => ({
   prisma: {
     store: {
-      findUnique: (a: unknown) => findUnique(a),
       findMany: async () => [], // owner holds no store yet -> plan gate passes
-      count: async () => 0, // first store -> signup trial (Ruling EBDA-FUNNEL-7)
       create: (a: unknown) => storeCreate(a),
     },
   },
@@ -39,7 +36,18 @@ vi.mock('@force/database', () => ({
   StoreStatus: {},
   // the created store is returned with its owner row, read as the owner (identity-scoped)
   withUser: async (_id: string, fn: (tx: unknown) => unknown) =>
-    fn({ user: { findUnique: async () => ({ id: 'owner-1', email: 'o@x.com' }) } }),
+    fn({
+      user: { findUnique: async () => ({ id: 'owner-1', email: 'o@x.com' }) },
+      // first store -> signup trial (Ruling EBDA-FUNNEL-7); `stores` is read as its owner
+      store: { count: async () => 0 },
+    }),
+}));
+// `stores` is under RLS (R-EBDA-005): slug / domain uniqueness probes are the
+// `ebda_store_id_by_slug` / `ebda_store_id_by_domain` definers (an id, or null when free).
+vi.mock('@api/lib/definer', async orig => ({
+  ...(await orig<typeof import('@api/lib/definer')>()),
+  storeIdBySlug: vi.fn(async (slug: string) => (taken.has(slug) ? 'existing' : null)),
+  storeIdByDomain: vi.fn(async () => null),
 }));
 vi.mock('@api/services/redis.service', () => ({
   redis: { get: vi.fn(), set: vi.fn(), delete: vi.fn() },
@@ -76,10 +84,6 @@ let taken: Set<string>;
 
 beforeEach(() => {
   taken = new Set();
-  findUnique.mockReset();
-  findUnique.mockImplementation(async ({ where }: { where: { slug?: string; domain?: string } }) =>
-    where.slug && taken.has(where.slug) ? { id: 'existing' } : null
-  );
   storeCreate.mockReset();
   storeGate.mockReset().mockResolvedValue(undefined);
   storeCreate.mockImplementation(async ({ data }: { data: { slug: string } }) => ({

@@ -1230,7 +1230,7 @@ router.post('/templates/status', waBridgeAuth, async (req: Request, res: Respons
     }
 
     await prisma.whatsAppTemplate.update({
-      where: { id: existing.id },
+      where: { id: existing.id, storeId: fwbStoreId },
       data: {
         status,
         rejectionReason: status === 'rejected' ? rejectionReason || null : null,
@@ -1283,7 +1283,11 @@ router.get('/store/meta-catalog-config', waBridgeAuth, async (req: Request, res:
     const storeId = req.bridgeStore!.id;
     const store = await prisma.store.findUnique({
       where: { id: storeId },
-      select: { metaCatalogId: true, metaBusinessId: true, metaAccessToken: true },
+      select: {
+        metaCatalogId: true,
+        metaBusinessId: true,
+        credentials: { select: { metaAccessToken: true } },
+      },
     });
     if (!store) {
       res.status(404).json({ success: false, error: { code: 'STORE_NOT_FOUND' } });
@@ -1296,7 +1300,7 @@ router.get('/store/meta-catalog-config', waBridgeAuth, async (req: Request, res:
         businessId: store.metaBusinessId ?? null,
         // Never return the encrypted token — WBS reads it server-to-server via
         // the inngest-receiver which uses the token stored on the client row.
-        hasToken: Boolean(store.metaAccessToken),
+        hasToken: Boolean(store.credentials?.metaAccessToken),
       },
     });
   } catch (err) {
@@ -1339,7 +1343,10 @@ router.post('/store/meta-catalog-config', waBridgeAuth, async (req: Request, res
     if (businessId !== undefined) updateData.metaBusinessId = businessId;
     // Encrypt the token at the boundary — never store plaintext
     if (accessToken !== undefined) {
-      updateData.metaAccessToken = encryption.encrypt(accessToken);
+      const metaAccessToken = encryption.encrypt(accessToken);
+      updateData.credentials = {
+        upsert: { create: { metaAccessToken }, update: { metaAccessToken } },
+      };
     }
 
     await prisma.store.update({

@@ -107,7 +107,7 @@ export const orderCapiConversion: InngestFunction.Any = inngest.createFunction(
       runInTenantContext(storeId, () =>
         prisma.order
           .findUnique({
-            where: { id: orderId },
+            where: { id: orderId, storeId },
             select: {
               id: true,
               total: true,

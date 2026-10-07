@@ -126,7 +126,7 @@ router.post(
           slug: true,
           currency: true,
           wbsEnabled: true,
-          wbsApiKey: true,
+          credentials: { select: { wbsApiKey: true } },
         },
       });
       if (!store) {
@@ -136,7 +136,7 @@ router.post(
         });
         return;
       }
-      if (!store.wbsEnabled || !store.wbsApiKey) {
+      if (!store.wbsEnabled || !store.credentials?.wbsApiKey) {
         res.status(400).json({
           success: false,
           error: {
@@ -341,7 +341,7 @@ router.post(
       const providerName = await PaymentService.getDefaultProvider(storeId);
       if (!providerName) {
         // Don't leave the draft Order orphaned — clean it up.
-        await prisma.order.delete({ where: { id: draftOrder.id } }).catch(() => null);
+        await prisma.order.delete({ where: { id: draftOrder.id, storeId } }).catch(() => null);
         res.status(400).json({
           success: false,
           error: {
@@ -385,10 +385,10 @@ router.post(
       // ── Send via WBS paymentLink template ──────────────────────────────────
       let wbsApiKey: string;
       try {
-        wbsApiKey = encryption.decrypt(store.wbsApiKey);
+        wbsApiKey = encryption.decrypt(store.credentials.wbsApiKey);
       } catch {
         // Clean up the draft order before failing
-        await prisma.order.delete({ where: { id: draftOrderId } }).catch(() => {});
+        await prisma.order.delete({ where: { id: draftOrderId, storeId } }).catch(() => {});
         draftOrderId = null;
         res.status(400).json({
           success: false,
@@ -444,7 +444,7 @@ router.post(
           '[payment-links] WBS send failed'
         );
         // Clean up the orphan draft order
-        await prisma.order.delete({ where: { id: draftOrderId } }).catch(() => {});
+        await prisma.order.delete({ where: { id: draftOrderId, storeId } }).catch(() => {});
         draftOrderId = null;
         res.status(502).json({
           success: false,
@@ -508,7 +508,7 @@ router.post(
       // If we created a draft order but something failed after, delete it
       // to avoid orphaned unpaid orders cluttering the merchant's order list.
       if (draftOrderId) {
-        await prisma.order.delete({ where: { id: draftOrderId } }).catch(() => {});
+        await prisma.order.delete({ where: { id: draftOrderId, storeId } }).catch(() => {});
       }
       logger.error({ err: (err as Error).message }, '[payment-links] create failed');
       next(err);

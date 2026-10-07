@@ -32,6 +32,7 @@ vi.mock('@api/middleware/feature-gate', () => ({
 }));
 vi.mock('@api/middleware/tenant-context', () => ({
   tenantContext: (_req: any, _res: any, next: any) => next(),
+  storeScopeContext: (_req: any, _res: any, next: any) => next(),
 }));
 vi.mock('@api/middleware/security', () => ({ auditLog: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@api/services/plan-limit.service', () => ({ assertWithinLimit: guard }));

@@ -30,6 +30,9 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@force/database', () => ({
+  // tests/setup-e2e.ts builds the owner-role fixture client from this export;
+  // these suites never touch a database, so a stub is enough.
+  createPrismaClient: vi.fn(),
   prisma: {
     order: { findFirst: (...a: unknown[]) => h.orderFindFirst(...a), update: vi.fn() },
     payment: {
@@ -40,7 +43,9 @@ vi.mock('@force/database', () => ({
     store: { findUnique: (...a: unknown[]) => h.storeFindUnique(...a) },
   },
   runInTenantContext: async (_s: string, fn: () => unknown) => fn(),
-  withStore: async (_s: string, fn: () => unknown) => fn(),
+  // The store row is read in the store's own scope (withStore passes its tx).
+  withStore: async (_s: string, fn: (tx: unknown) => unknown) =>
+    fn({ store: { findUnique: (...a: unknown[]) => h.storeFindUnique(...a) } }),
 }));
 // The route resolves the order's store through a SECURITY DEFINER lookup, then reads inside that scope.
 vi.mock('@api/lib/definer', () => ({ getOrderStoreId: async () => 'store-from-order' }));

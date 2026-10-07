@@ -34,7 +34,7 @@
  * `gsc-client` module functions) so integration tests never make a live GSC
  * call — see tests/integration/answer-engine/gsc-ingest.test.ts.
  */
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma, withStore } from '@force/database';
 import logger from '../../lib/logger';
 import {
   gscSiteUrlsForDomain,
@@ -87,10 +87,12 @@ export async function runGscIngest(
   const client = opts.client ?? defaultClient;
   const date = opts.date ?? yesterdayUtc();
 
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: { domain: true },
-  });
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({
+      where: { id: storeId },
+      select: { domain: true },
+    })
+  );
 
   if (!store?.domain) {
     logger.info({ storeId, date }, 'gsc-ingest: store has no domain configured, skipping');

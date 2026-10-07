@@ -1,7 +1,15 @@
 // Database Package - Prisma Client Export
-import { PrismaClient, Prisma } from '@prisma/client';
-import { AsyncLocalStorage } from 'node:async_hooks';
+import { PrismaClient } from '@prisma/client';
+import type { AsyncLocalStorage } from 'node:async_hooks';
 import { applyGucs, gucStatements, type TenantGucs } from './tenant-gucs';
+import {
+  tenantStorage as tenantStorageRaw,
+  txGucs,
+  storeScope,
+  guardHatch,
+  ambientScope as ambientScopeImpl,
+} from './tenant-scope';
+import { setTenantGucs as setTenantGucsImpl } from './tenant-gucs';
 import type { AppPrismaClient } from './client';
 import { baseClient } from './request-db';
 
@@ -20,9 +28,35 @@ export {
   type IsolateDbOptions,
 } from './request-db';
 export { ClientPool, ClientPoolTimeout, ConnectionScope } from './client-pool';
+export {
+  TenantScopeViolation,
+  assertTenantScoped,
+  assertRawScoped,
+  storeIdModels,
+  TENANT_CHILD_MODELS,
+  IDENTITY_MODELS,
+  USER_KEYED_MODELS,
+  GLOBAL_MODELS,
+} from './tenant-guard';
+export { ambientScope, type AmbientScope, type TenantGuardHatch } from './tenant-scope';
 export type { ClientLease, ClientPoolOptions } from './client-pool';
 
 const basePrisma = (): AppPrismaClient => baseClient();
+
+/**
+ * Run `fn` and AWAIT its result inside the caller's async-context scope.
+ *
+ * A Prisma query is LAZY: `tx.user.findUnique(...)` returns a PrismaPromise that does
+ * nothing until something calls `.then`, and the code-level tenant guard (R-EBDA-003)
+ * reads the ambient scope at that moment. `scope.run(x, fn)` with an `fn` that RETURNS
+ * such a promise (`withUser(id, tx => tx.user.findUnique(...))`) hands it back out of the
+ * scope unawaited, so the `.then` (and the guard) ran outside it and saw no tenant at all,
+ * while the query itself still ran on the scoped transaction. Awaiting inside the scope
+ * keeps both on the same side. Every `*.run(...)` in this module goes through here.
+ */
+async function settleInScope<T>(fn: () => T | PromiseLike<T>): Promise<T> {
+  return await fn();
+}
 
 /**
  * The client the exported `prisma` resolves to right now — an explicit handle
@@ -42,20 +76,15 @@ type TenantTx = Omit<
   '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
 >;
 
-/** Stores the active tenant transaction for the current async context. */
-const tenantStorage = new AsyncLocalStorage<TenantTx>();
-
 /**
- * The RLS settings each tenant transaction was opened with, so a SECOND
- * transaction started from inside it can carry the same ones (see
- * `$transaction` in the proxy below).
+ * The active tenant transaction for the current async context, and (`txGucs`, in
+ * `tenant-scope.ts`) the RLS settings it was opened with, so a SECOND transaction
+ * started from inside it can carry the same ones (see `$transaction` in the proxy
+ * below). `storeScope` is a store scope WITHOUT a long-lived transaction — see
+ * `runInStoreScope`. The state lives in `tenant-scope.ts` because the code-level
+ * tenant guard (`tenant-guard.ts`), installed by the client factory, reads it too.
  */
-const txGucs = new WeakMap<object, TenantGucs>();
-
-/**
- * A store scope WITHOUT a long-lived transaction — see `runInStoreScope`.
- */
-const storeScope = new AsyncLocalStorage<{ storeId: string }>();
+const tenantStorage = tenantStorageRaw as unknown as AsyncLocalStorage<TenantTx>;
 
 /** The RLS settings in force on this async context, if any. */
 function ambientGucs(): TenantGucs | undefined {
@@ -331,6 +360,22 @@ export function hasTenantContext(): boolean {
  * (the user-scoped routers) opens a transaction with NO store GUC, and a
  * strict-table read on it returns `[]` (issue 2041).
  */
+/**
+ * The store the current code is scoped to (the ambient tenant transaction's store, else the
+ * `runInStoreScope` store). THROWS when there is none: it exists to fill `where: { storeId }`
+ * deep in a call chain that only has a row id, so the code-level tenant guard (R-EBDA-003)
+ * and the SQL both carry the store filter. Prefer the caller's own `storeId` when it has one.
+ */
+export function currentStoreId(): string {
+  const id = ambientScopeImpl().storeId;
+  if (!id) {
+    throw new Error(
+      'currentStoreId(): no ambient store (run inside runInTenantContext / withStore / runInStoreScope)'
+    );
+  }
+  return id;
+}
+
 export function currentTenantGucs(): TenantGucs | undefined {
   const tx = tenantStorage.getStore();
   return tx ? txGucs.get(tx as object) : undefined;
@@ -533,7 +578,7 @@ export async function runInTenantContext<T>(
       await applyGucs(tx, { storeId, userId });
       txGucs.set(tx as object, { storeId, userId });
       try {
-        const result = await tenantStorage.run(tx, fn);
+        const result = await tenantStorage.run(tx, () => settleInScope(fn));
         // The callback RESOLVED, so Prisma is about to COMMIT. #1598: tag it
         // BEFORE the shared `finally` below runs, so a reporter sees
         // 'committed' — the real defect this module exists to catch.
@@ -578,7 +623,9 @@ export async function withTenantContext<T>(
   return basePrisma().$transaction(
     async tx => {
       await applyGucs(tx, { storeId });
-      return fn(tx);
+      // Ambient for the code-level tenant guard (and the proxy), like runInTenantContext.
+      txGucs.set(tx as object, { storeId });
+      return tenantStorage.run(tx, () => settleInScope(() => fn(tx)));
     },
     { maxWait: 10000, timeout: 30000 }
   );
@@ -608,7 +655,7 @@ export function runInStoreScope<T>(storeId: string, fn: () => Promise<T>): Promi
   if (!UUID_RE.test(storeId)) {
     throw new Error('Invalid store ID format');
   }
-  return storeScope.run({ storeId }, fn);
+  return storeScope.run({ storeId }, () => settleInScope(fn));
 }
 
 // ---------------------------------------------------------------------------
@@ -677,11 +724,108 @@ export function withUser<T>(
   return runInTenantContext(storeId, run, userId);
 }
 
+/**
+ * One row of the store DIRECTORY: the routing facts and feature flags of a store that is
+ * not soft-deleted, read through the `ebda_store_directory()` SECURITY DEFINER function
+ * (`stores` is under RLS: a cron has no scope that could read it directly). No secret,
+ * no settings: a sweep filters on these, then works on each store inside its OWN tenant
+ * transaction (`acrossStores` / `withStore`).
+ */
+export interface StoreDirectoryEntry {
+  id: string;
+  slug: string;
+  name: string;
+  status: string;
+  plan: string;
+  accountingEnabled: boolean;
+  aiFeaturesEnabled: boolean;
+  loyaltyEnabled: boolean;
+  wbsEnabled: boolean;
+  hasDomain: boolean;
+  hasPendingDomain: boolean;
+}
+
+/** Every store that is not soft-deleted (id order), optionally filtered. See `StoreDirectoryEntry`. */
+export async function storeDirectory(
+  filter?: (s: StoreDirectoryEntry) => boolean,
+  opts: { includeDeleted?: boolean } = {}
+): Promise<StoreDirectoryEntry[]> {
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      slug: string;
+      name: string;
+      status: string;
+      plan: string;
+      accounting_enabled: boolean;
+      ai_features_enabled: boolean;
+      loyalty_enabled: boolean;
+      wbs_enabled: boolean;
+      has_domain: boolean;
+      has_pending_domain: boolean;
+    }>
+  >`SELECT * FROM public.ebda_store_directory(${opts.includeDeleted === true})`;
+  const all = rows.map(r => ({
+    id: r.id,
+    slug: r.slug,
+    name: r.name,
+    status: r.status,
+    plan: r.plan,
+    accountingEnabled: r.accounting_enabled,
+    aiFeaturesEnabled: r.ai_features_enabled,
+    loyaltyEnabled: r.loyalty_enabled,
+    wbsEnabled: r.wbs_enabled,
+    hasDomain: r.has_domain,
+    hasPendingDomain: r.has_pending_domain,
+  }));
+  return filter ? all.filter(filter) : all;
+}
+
+/**
+ * Bind a transaction the CALLER opened (`withMoneyTx`, `prisma.$transaction`) to a tenant
+ * scope for the rest of `fn`: sets the RLS GUCs on it (transaction-locally, validated like
+ * `runInTenantContext`) AND makes it the ambient tenant transaction, so the `prisma` proxy
+ * routes to it and the code-level tenant guard (R-EBDA-003) sees its store. Replaces a bare
+ * `setTenantGucs(tx, ...)`, which set the GUCs but left the guard (and the proxy) blind.
+ * Used where a store row is created first and its tenant rows in the same transaction
+ * (provisioning), or a public flow opens its own transaction.
+ */
+export async function scopeTransaction<Tx extends object, T>(
+  tx: Tx,
+  gucs: TenantGucs,
+  fn: (tx: Tx) => Promise<T>
+): Promise<T> {
+  await setTenantGucsImpl(tx as unknown as Parameters<typeof setTenantGucsImpl>[0], gucs);
+  txGucs.set(tx, { ...gucs });
+  return tenantStorage.run(tx as unknown as TenantTx, () => settleInScope(() => fn(tx)));
+}
+
+/**
+ * Hatch 'platform-operator' (R-EBDA-003): run `fn` as `userId` with the code-level tenant
+ * guard opened for the PLATFORM DIRECTORY only (`Store`, `User`, `StoreStaff` without a
+ * store scope), after the `ebda_is_super_admin()` definer confirmed IN THE SAME TRANSACTION
+ * that `userId` is an ACTIVE super_admin. RLS still applies underneath (the `stores` and
+ * `users` policies admit an active super_admin principal). Store-scoped tenant tables stay
+ * closed: a super-admin view of orders or products goes through `acrossStores` or a definer.
+ * The callers are enumerated in tests/unit/no-rls-bypass-in-runtime.test.ts.
+ */
+export function asPlatformOperator<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  return withUser(userId, async () => {
+    const rows = await prisma.$queryRaw<
+      Array<{ ok: boolean }>
+    >`SELECT public.ebda_is_super_admin() AS ok`;
+    if (rows[0]?.ok !== true) {
+      throw new Error('asPlatformOperator: the acting user is not an active super_admin');
+    }
+    return guardHatch.run('platform-operator', () => settleInScope(fn));
+  });
+}
+
 export interface AcrossStoresOptions {
-  /** Restrict to these stores (default: every store that is not soft-deleted). */
+  /** Restrict to these stores (default: every store in the directory, i.e. not soft-deleted). */
   storeIds?: string[];
-  /** Extra `Store` filter, e.g. `{ accountingEnabled: true }`. */
-  where?: Prisma.StoreWhereInput;
+  /** Keep only the directory entries this returns true for, e.g. `s => s.accountingEnabled`. */
+  filter?: (s: StoreDirectoryEntry) => boolean;
   /** Stores processed at once, each in its own transaction. Default 4. */
   concurrency?: number;
   /**
@@ -702,22 +846,14 @@ export interface AcrossStoresOptions {
  * Result-shape contract: `fn` sees only ONE store's rows, so a global
  * `take`/`orderBy`/`count` becomes per-store. The caller merges (sum the
  * counts, concatenate the rows, then sort and cut to the global limit).
- * `stores` carries no RLS (it is the tenant root and holds routing data), so
- * listing store ids needs no definer function.
+ * The store ids come from the `ebda_store_directory()` definer: `stores` is
+ * under RLS too (R-EBDA-005), so a contextless cron cannot list it directly.
  */
 export async function acrossStores<T>(
   fn: (storeId: string) => Promise<T>,
   opts: AcrossStoresOptions = {}
 ): Promise<Array<{ storeId: string; value: T }>> {
-  const storeIds =
-    opts.storeIds ??
-    (
-      await prisma.store.findMany({
-        where: { deletedAt: null, ...opts.where },
-        select: { id: true },
-        orderBy: { id: 'asc' },
-      })
-    ).map(s => s.id);
+  const storeIds = opts.storeIds ?? (await storeDirectory(opts.filter)).map(s => s.id);
 
   const out: Array<{ storeId: string; value: T } | undefined> = new Array(storeIds.length);
   let next = 0;
@@ -758,7 +894,7 @@ export async function acrossStoresFlat<T>(
  * a NAME, not a bypass: it opens no table to `ebda_app`, and only the definers
  * that list it (`ebda_is_system_job`) consult it.
  */
-export type SystemJob = 'audit-log-retention' | 'webhook-inbox';
+export type SystemJob = 'audit-log-retention' | 'webhook-inbox' | 'token-retention';
 
 /**
  * Run `fn` with `app.system_job = job` set TRANSACTION-LOCALLY, so the definer
@@ -785,7 +921,7 @@ export async function withSystemJob<T>(job: SystemJob, fn: () => Promise<T>): Pr
   return basePrisma().$transaction(
     async tx => {
       await setJob(tx, job);
-      return tenantStorage.run(tx, fn);
+      return tenantStorage.run(tx, () => settleInScope(fn));
     },
     { maxWait: 10000, timeout: 30000 }
   );
@@ -843,7 +979,11 @@ export async function withOwnerTx<T>(fn: (tx: TenantTx) => Promise<T>): Promise<
         'bypass. Use withStore(), withUser(), acrossStores() or a SECURITY DEFINER function.'
     );
   }
-  return client.$transaction(tx => fn(tx), { maxWait: 10000, timeout: 30000 });
+  // Hatch 'owner-role-tx' (R-EBDA-003): the role was just proven to bypass RLS, so the
+  // code-level tenant guard stands aside for this transaction only.
+  return guardHatch.run('owner-role-tx', () =>
+    client.$transaction(tx => fn(tx), { maxWait: 10000, timeout: 30000 })
+  );
 }
 
 /** @deprecated Ebda's name. Same as `withOwnerTx`: no GUC, owner role only. */

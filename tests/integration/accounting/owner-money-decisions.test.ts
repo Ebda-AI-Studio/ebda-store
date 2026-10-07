@@ -27,8 +27,8 @@ vi.mock('@api/services/encryption.service', () => ({
 }));
 
 import { seedCoaForStore } from '@api/services/accounting/account.service';
-import { postOrderPaymentJournal } from '@api/services/accounting/posting/order-posting';
-import { postRefundJournal } from '@api/services/accounting/posting/refund-posting';
+import { postOrderPaymentJournal as postOrderPaymentJournalRaw } from '@api/services/accounting/posting/order-posting';
+import { postRefundJournal as postRefundJournalRaw } from '@api/services/accounting/posting/refund-posting';
 import {
   postAmountOnlyRefundJournal,
   postPartialReturnJournal,
@@ -57,6 +57,12 @@ const uid = (label: string) => `${TAG}-${label}-${++seq}-${Math.random().toStrin
 describe.skipIf(!hasDb)('owner money decisions 2026-10-01', () => {
   let ownerId: string;
   let storeId: string;
+  // Production runs these inside runInTenantContext(storeId); the tenant guard
+  // needs the same ambient store here.
+  const postOrderPaymentJournal = (a: Parameters<typeof postOrderPaymentJournalRaw>[0]) =>
+    runInTenantContext(storeId, () => postOrderPaymentJournalRaw(a));
+  const postRefundJournal = (a: Parameters<typeof postRefundJournalRaw>[0]) =>
+    runInTenantContext(storeId, () => postRefundJournalRaw(a));
   let productA: string; // 1333 piastres, cost 611
   let productB: string; // 777 piastres, cost 409
   const code = new Map<string, string>(); // account code -> id

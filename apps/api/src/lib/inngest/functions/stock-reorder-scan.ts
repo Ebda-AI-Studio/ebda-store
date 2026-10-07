@@ -1,9 +1,10 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, storeDirectory, withStore } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runReorderScan } from '../../../services/accounting/reorder-scan.service';
-import { aiEligiblePlanFilter, isAiEligiblePlan } from '../../ai-plan-eligibility';
+import { isAiEligiblePlan } from '../../ai-plan-eligibility';
+import type { StorePlan } from '@force/shared';
 import { featureService } from '../../../services/feature.service';
 
 import { REGION } from '@force/shared';
@@ -32,16 +33,14 @@ export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
     // FORCE RLS: cron has no storeId — use withRlsBypass to enumerate stores.
     // runReorderScan already calls withRlsBypass internally for its per-store reads.
     const stores = await step.run('list-stores', () =>
-      prisma.store.findMany({
-        where: {
-          accountingEnabled: true,
-          aiFeaturesEnabled: true,
-          deletedAt: null,
+      // `stores` is under RLS: a cron lists stores through the directory definer.
+      storeDirectory(
+        s =>
+          s.accountingEnabled &&
+          s.aiFeaturesEnabled &&
           // free (lapsed-payment / demo) plans are excluded from AI spend.
-          ...aiEligiblePlanFilter,
-        },
-        select: { id: true },
-      })
+          isAiEligiblePlan(s.plan as StorePlan)
+      ).then(list => list.map(s => ({ id: s.id })))
     );
 
     let totalSuggested = 0;
@@ -106,7 +105,9 @@ export const stockReorderScanOnDemand: InngestFunction.Any = inngest.createFunct
 
     // Plan gate — inventory.basic is in the `free` baseline so a lapsed
     // merchant can still see their stock; it must not buy them AI spend.
-    const store = await prisma.store.findUnique({ where: { id: storeId }, select: { plan: true } });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+    );
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },

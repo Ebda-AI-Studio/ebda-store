@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@force/database';
+import { runInTenantContext, storeDirectory } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runProfitAnomalyScan } from '../../../services/accounting/profit-anomaly.service';
@@ -32,10 +32,10 @@ export const accountingProfitAnomalyCron: InngestFunction.Any = inngest.createFu
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
     // stores table does not filter to 0 rows (no tenant GUC is set).
     const stores = await step.run('list-stores', () =>
-      prisma.store.findMany({
-        where: { accountingEnabled: true, aiFeaturesEnabled: true, deletedAt: null },
-        select: { id: true },
-      })
+      // `stores` is under RLS: a cron lists stores through the directory definer.
+      storeDirectory(s => s.accountingEnabled && s.aiFeaturesEnabled).then(list =>
+        list.map(s => ({ id: s.id }))
+      )
     );
 
     let totalDetected = 0;

@@ -1,4 +1,4 @@
-import { prisma, Prisma, LoyaltyTransactionType, withMoneyTx } from '@force/database';
+import { prisma, Prisma, LoyaltyTransactionType, withMoneyTx, withStore } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { featureService } from './feature.service';
@@ -161,13 +161,15 @@ export class LoyaltyService {
    * Get store loyalty settings
    */
   static async getSettings(storeId: string): Promise<LoyaltySettingsResponse> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        loyaltyEnabled: true,
-        loyaltySettings: true,
-      },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: {
+          loyaltyEnabled: true,
+          loyaltySettings: true,
+        },
+      })
+    );
 
     if (!store) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
@@ -192,10 +194,12 @@ export class LoyaltyService {
     data: { loyaltyEnabled?: boolean; settings?: Partial<LoyaltySettings> }
   ): Promise<LoyaltySettingsResponse> {
     // Verify store exists
-    const existing = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { loyaltySettings: true },
-    });
+    const existing = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { loyaltySettings: true },
+      })
+    );
 
     if (!existing) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
@@ -210,17 +214,19 @@ export class LoyaltyService {
       ? { ...currentSettings, ...data.settings }
       : currentSettings;
 
-    const store = await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        loyaltyEnabled: data.loyaltyEnabled,
-        loyaltySettings: updatedSettings as unknown as Prisma.InputJsonValue,
-      },
-      select: {
-        loyaltyEnabled: true,
-        loyaltySettings: true,
-      },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: {
+          loyaltyEnabled: data.loyaltyEnabled,
+          loyaltySettings: updatedSettings as unknown as Prisma.InputJsonValue,
+        },
+        select: {
+          loyaltyEnabled: true,
+          loyaltySettings: true,
+        },
+      })
+    );
 
     return {
       loyaltyEnabled: store.loyaltyEnabled,
@@ -241,12 +247,14 @@ export class LoyaltyService {
           storeId_customerId: { storeId, customerId },
         },
       }),
-      prisma.store.findUnique({
-        where: { id: storeId },
-        select: {
-          loyaltySettings: true,
-        },
-      }),
+      withStore(storeId, tx =>
+        tx.store.findUnique({
+          where: { id: storeId },
+          select: {
+            loyaltySettings: true,
+          },
+        })
+      ),
       featureService.isFeatureEnabled(storeId, 'loyalty'),
     ]);
 
@@ -288,12 +296,14 @@ export class LoyaltyService {
     giveSignupBonus = true
   ): Promise<CustomerPointsInfo> {
     const [store, loyaltyEnabled] = await Promise.all([
-      prisma.store.findUnique({
-        where: { id: storeId },
-        select: {
-          loyaltySettings: true,
-        },
-      }),
+      withStore(storeId, tx =>
+        tx.store.findUnique({
+          where: { id: storeId },
+          select: {
+            loyaltySettings: true,
+          },
+        })
+      ),
       featureService.isFeatureEnabled(storeId, 'loyalty'),
     ]);
 
@@ -377,12 +387,14 @@ export class LoyaltyService {
     orderTotalFils: number
   ): Promise<{ pointsEarned: number; newBalance: number }> {
     const [store, loyaltyEnabled] = await Promise.all([
-      prisma.store.findUnique({
-        where: { id: storeId },
-        select: {
-          loyaltySettings: true,
-        },
-      }),
+      withStore(storeId, tx =>
+        tx.store.findUnique({
+          where: { id: storeId },
+          select: {
+            loyaltySettings: true,
+          },
+        })
+      ),
       featureService.isFeatureEnabled(storeId, 'loyalty'),
     ]);
 
@@ -453,7 +465,7 @@ export class LoyaltyService {
 
     const txs: Prisma.PrismaPromise<unknown>[] = [
       prisma.loyaltyPoints.update({
-        where: { id: loyalty.id },
+        where: { id: loyalty.id, storeId },
         data: {
           points: { increment: pointsEarned },
           totalEarned: { increment: pointsEarned },
@@ -560,10 +572,12 @@ export class LoyaltyService {
     }
 
     const [store, loyaltyEnabled] = await Promise.all([
-      prisma.store.findUnique({
-        where: { id: storeId },
-        select: { loyaltySettings: true },
-      }),
+      withStore(storeId, tx =>
+        tx.store.findUnique({
+          where: { id: storeId },
+          select: { loyaltySettings: true },
+        })
+      ),
       featureService.isFeatureEnabled(storeId, 'loyalty'),
     ]);
     if (!store) return null;
@@ -607,7 +621,7 @@ export class LoyaltyService {
 
         const newTier = this.calculateTier(newTotalEarned, settings);
         const updated = await tx.loyaltyPoints.update({
-          where: { id: loyalty.id },
+          where: { id: loyalty.id, storeId },
           data: {
             points: newPoints,
             totalEarned: newTotalEarned,
@@ -680,10 +694,12 @@ export class LoyaltyService {
     customerId: string
   ): Promise<{ settings: LoyaltySettings; availablePoints: number } | null> {
     const [store, loyaltyEnabled, loyalty] = await Promise.all([
-      prisma.store.findUnique({
-        where: { id: storeId },
-        select: { loyaltySettings: true, loyaltyEnabled: true },
-      }),
+      withStore(storeId, tx =>
+        tx.store.findUnique({
+          where: { id: storeId },
+          select: { loyaltySettings: true, loyaltyEnabled: true },
+        })
+      ),
       featureService.isFeatureEnabled(storeId, 'loyalty'),
       prisma.loyaltyPoints.findUnique({
         where: { storeId_customerId: { storeId, customerId } },
@@ -869,7 +885,7 @@ export class LoyaltyService {
         if (raced) return { pointsRecredited: 0, newBalance: loyalty.points };
 
         const updated = await tx.loyaltyPoints.update({
-          where: { id: loyalty.id },
+          where: { id: loyalty.id, storeId },
           data: {
             points: { increment: pointsToRecredit },
             totalRedeemed: Math.max(0, loyalty.totalRedeemed - pointsToRecredit),
@@ -914,12 +930,14 @@ export class LoyaltyService {
     description?: string
   ): Promise<{ newBalance: number }> {
     const [store, loyaltyEnabled] = await Promise.all([
-      prisma.store.findUnique({
-        where: { id: storeId },
-        select: {
-          loyaltySettings: true,
-        },
-      }),
+      withStore(storeId, tx =>
+        tx.store.findUnique({
+          where: { id: storeId },
+          select: {
+            loyaltySettings: true,
+          },
+        })
+      ),
       featureService.isFeatureEnabled(storeId, 'loyalty'),
     ]);
 
@@ -955,7 +973,7 @@ export class LoyaltyService {
     const isPositive = points > 0;
     const [updated] = await prisma.$transaction([
       prisma.loyaltyPoints.update({
-        where: { id: loyalty.id },
+        where: { id: loyalty.id, storeId },
         data: {
           points: { increment: points },
           totalEarned: isPositive ? { increment: points } : undefined,
@@ -995,10 +1013,12 @@ export class LoyaltyService {
     reviewId: string
   ): Promise<{ awarded: boolean; points: number }> {
     const [store, loyaltyEnabled] = await Promise.all([
-      prisma.store.findUnique({
-        where: { id: storeId },
-        select: { loyaltySettings: true, loyaltyEnabled: true },
-      }),
+      withStore(storeId, tx =>
+        tx.store.findUnique({
+          where: { id: storeId },
+          select: { loyaltySettings: true, loyaltyEnabled: true },
+        })
+      ),
       featureService.isFeatureEnabled(storeId, 'loyalty'),
     ]);
 
@@ -1062,7 +1082,7 @@ export class LoyaltyService {
 
     await prisma.$transaction([
       prisma.loyaltyPoints.update({
-        where: { id: loyalty.id },
+        where: { id: loyalty.id, storeId },
         data: {
           points: { increment: reviewBonus },
           totalEarned: { increment: reviewBonus },

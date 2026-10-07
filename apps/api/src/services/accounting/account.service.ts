@@ -271,7 +271,7 @@ export async function setAccountActive(storeId: string, accountId: string, isAct
   });
   if (!acct) throw new Error('Account not found');
   if (acct.isSystem) throw new Error('System accounts cannot be disabled');
-  return prisma.account.update({ where: { id: accountId }, data: { isActive } });
+  return prisma.account.update({ where: { id: accountId, storeId }, data: { isActive } });
 }
 
 /**

@@ -67,7 +67,7 @@ async function markWebhookProcessed(
   if (!scopeStoreId) return;
   await withStore(scopeStoreId, tx =>
     tx.order.update({
-      where: { id: orderId },
+      where: { id: orderId, storeId: scopeStoreId },
       data: { idempotencyKey, webhookProcessedAt: new Date() },
     })
   );

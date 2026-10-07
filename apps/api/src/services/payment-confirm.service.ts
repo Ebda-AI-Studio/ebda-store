@@ -33,7 +33,7 @@
  * idempotency) is only enqueued on the first transition into `paid`.
  */
 
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext, withStore } from '@force/database';
 import type { PaymentStatus } from '@force/database';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
@@ -199,9 +199,9 @@ export async function confirmPaymentFromProviderStatus(
         },
       });
 
-      const alertStore = await prisma.store
-        .findUnique({ where: { id: order.storeId }, select: { name: true } })
-        .catch(() => null);
+      const alertStore = await withStore(order.storeId, tx =>
+        tx.store.findUnique({ where: { id: order.storeId }, select: { name: true } })
+      ).catch(() => null);
       void sendAlert({
         level: 'p0',
         scope: 'store',
@@ -234,7 +234,7 @@ export async function confirmPaymentFromProviderStatus(
     // `order` snapshot may be stale by the time we settle). pending→confirmed
     // (normal) and confirmed→confirmed (no-op) pass; refunded/cancelled throw.
     const currentOrder = await prisma.order.findUnique({
-      where: { id: order.id },
+      where: { id: order.id, storeId: order.storeId },
       select: { status: true },
     });
     if (!currentOrder) throw new Error(`Order ${order.id} not found during confirmation`);
@@ -255,7 +255,7 @@ export async function confirmPaymentFromProviderStatus(
         },
       }),
       prisma.order.update({
-        where: { id: order.id },
+        where: { id: order.id, storeId: order.storeId },
         data: { status: 'confirmed', paymentStatus: 'paid' },
       }),
     ]);
@@ -318,7 +318,7 @@ export async function confirmPaymentFromProviderStatus(
     cfWaitUntil(
       runInTenantContext(order.storeId, async () => {
         const detail = await prisma.order.findUnique({
-          where: { id: order.id },
+          where: { id: order.id, storeId: order.storeId },
           select: {
             orderNumber: true,
             total: true,
@@ -372,7 +372,7 @@ export async function confirmPaymentFromProviderStatus(
         data: { status },
       }),
       prisma.order.update({
-        where: { id: order.id },
+        where: { id: order.id, storeId: order.storeId },
         data: { paymentStatus: 'failed' },
       }),
     ]);

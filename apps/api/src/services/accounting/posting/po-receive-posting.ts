@@ -36,7 +36,7 @@ export interface PoReceiveJournalInput {
  */
 export async function postPoReceiveJournal(args: PoReceiveJournalInput): Promise<void> {
   const po = await prisma.purchaseOrder.findUnique({
-    where: { id: args.poId },
+    where: { id: args.poId, storeId: args.storeId },
     include: { items: true, store: { select: { accountingEnabled: true } } },
   });
   if (!po) {

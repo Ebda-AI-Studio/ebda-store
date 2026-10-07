@@ -13,7 +13,10 @@ import { createPrismaClient } from '../src/client';
 import * as bcrypt from 'bcryptjs';
 
 import { roundToMinor, REGION } from '@force/shared';
-const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
+const prisma = createPrismaClient({
+  connectionString: process.env.DATABASE_URL ?? '',
+  role: 'owner',
+});
 
 // ============================================
 // Helper Functions

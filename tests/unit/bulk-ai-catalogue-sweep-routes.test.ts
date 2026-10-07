@@ -24,6 +24,7 @@ vi.mock('@force/database', () => ({
   },
   // withSavepoint (lib/savepoint.ts) asks this; no request transaction here.
   hasTenantContext: () => false,
+  currentStoreId: () => 'store-1',
 }));
 
 const mockInngestSend = vi.fn();
@@ -165,7 +166,7 @@ describe.each([
 
     expect(mockBulkAiJobUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'job-1' },
+        where: { id: 'job-1', storeId: 'store-1' },
         data: expect.objectContaining({ status: 'failed' }),
       })
     );

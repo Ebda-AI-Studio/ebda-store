@@ -71,9 +71,10 @@ export const paymentAbandonmentSweep: InngestFunction.Any = inngest.createFuncti
     // Cross-tenant sweep — bypass RLS (no HTTP tenant GUC on a cron).
     const candidates = (await step.run('find-gateway-abandoners', () =>
       sweepAcrossStores({
-        fetch: () =>
+        fetch: storeId =>
           prisma.order.findMany({
             where: {
+              storeId,
               status: 'pending',
               paymentStatus: 'unpaid',
               paymentGatewayAbandonedAt: null,

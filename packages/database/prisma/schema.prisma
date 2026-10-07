@@ -331,7 +331,9 @@ model Store {
   //   channels defaults: { whatsapp: true, email: true } when absent (backward-compatible)
   wbsEnabled                Boolean @default(false) @map("wbs_enabled")
   wbsClientId               String? @map("wbs_client_id")
-  wbsApiKey                 String? @map("wbs_api_key")
+  /// MOVED to `StoreCredential.wbsApiKey` (R-EBDA-005). The column stays until the contract
+  /// migration drops it; `@ignore` keeps it out of the client so nothing reads it.
+  wbsApiKey                 String? @map("wbs_api_key") @ignore
   wbsTemplates              Json?   @map("wbs_templates")
   /// Phase 7 opt-in (2026-05-22): when true, generate templates with a
   /// HEADER IMAGE component pinned to Store.logo. Customer sees the store
@@ -361,7 +363,8 @@ model Store {
   /// resolved to, so a key minted for store A can never authorise a write on
   /// store B. Read tools need no credential. NEVER returned in plaintext
   /// except once, in the response to the mint/rotate call that generated it.
-  agentApiKey          String?   @map("agent_api_key")
+  /// MOVED to `StoreCredential.agentApiKey` (R-EBDA-005); column dropped by the contract migration.
+  agentApiKey          String?   @map("agent_api_key") @ignore
   agentApiKeyRotatedAt DateTime? @map("agent_api_key_rotated_at")
 
   // GEO (Generative Engine Optimization) — LLM-search visibility fields.
@@ -419,10 +422,13 @@ model Store {
   metaBusinessId  String? @map("meta_business_id")
   /// Long-lived User Access Token for the Meta Catalog API, encrypted via
   /// CREDENTIAL_ENCRYPTION_KEY (same pattern as wbsApiKey). NEVER returned plain.
-  metaAccessToken String? @map("meta_access_token")
+  /// MOVED to `StoreCredential.metaAccessToken` (R-EBDA-005); column dropped by the contract migration.
+  metaAccessToken String? @map("meta_access_token") @ignore
 
   // Relations
   owner                    User                       @relation(fields: [ownerId], references: [id])
+  /// Encrypted provider credentials, split out of the routing table (R-EBDA-005).
+  credentials              StoreCredential?
   // Customer accounts that authenticate against this store. Distinct from
   // `customers` (which is the per-store order-history record).
   customerUsers            User[]                     @relation("StoreCustomers")
@@ -525,6 +531,26 @@ model Store {
   @@index([createdAt])
   @@index([pendingDomain])
   @@map("stores")
+}
+
+/// Encrypted per-store provider credentials (R-EBDA-005, closes R-EBDA-002): moved out of
+/// `stores` so the routing table holds no secret. Strict store RLS. One row per store, created
+/// on first write (`credentials: { upsert: ... }`). Every value is AES-256-GCM ciphertext from
+/// apps/api/src/services/encryption.service.ts; the client omits all three by default, so a
+/// reader names the field it needs in a `select`.
+model StoreCredential {
+  storeId         String   @id @map("store_id")
+  /// WhatsApp Bulk Sender API key (was `stores.wbs_api_key`).
+  wbsApiKey       String?  @map("wbs_api_key")
+  /// Meta Catalog long-lived access token (was `stores.meta_access_token`).
+  metaAccessToken String?  @map("meta_access_token")
+  /// Agent (MCP) write credential (was `stores.agent_api_key`).
+  agentApiKey     String?  @map("agent_api_key")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("store_credentials")
 }
 
 // ==========================================

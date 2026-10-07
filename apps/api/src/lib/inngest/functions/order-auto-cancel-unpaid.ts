@@ -147,9 +147,10 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
     // rows (no HTTP tenant GUC on a cron).
     const stale = await step.run('find-stale-unpaid', () =>
       sweepAcrossStores({
-        fetch: () =>
+        fetch: storeId =>
           prisma.order.findMany({
             where: {
+              storeId,
               status: 'pending',
               paymentStatus: 'unpaid',
               deletedAt: null,

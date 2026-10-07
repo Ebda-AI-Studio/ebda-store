@@ -48,7 +48,7 @@ export async function healBackorderStockDebt(
 
   const healed = Math.min(quantity, -row.inventory);
   await tx.product.update({
-    where: { id: productId },
+    where: { id: productId, storeId },
     data: { inventory: { increment: healed } },
   });
   await tx.inventoryHistory.create({

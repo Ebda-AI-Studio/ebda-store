@@ -32,8 +32,6 @@ const { prismaMock, runInTenantContextMock, storageMock, loggerMock } = vi.hoist
       // r2-cleanup bounds its orphan scan with set_config('statement_timeout').
       $executeRaw: vi.fn().mockResolvedValue(0),
       affiliateEvent: { create: vi.fn().mockResolvedValue({ id: 'evt-1' }) },
-      // isStillReferenced visits each store (the `stores` table itself carries no RLS).
-      store: { findMany: vi.fn().mockResolvedValue([{ id: 'store-1' }]) },
     },
     runInTenantContextMock: vi.fn(
       async (_storeId: string | undefined, fn: () => Promise<unknown>) => fn()
@@ -48,6 +46,8 @@ const { prismaMock, runInTenantContextMock, storageMock, loggerMock } = vi.hoist
 
 vi.mock('@force/database', () => ({
   prisma: prismaMock,
+  // isStillReferenced lists the stores through the directory definer (`stores` is under RLS).
+  storeDirectory: vi.fn().mockResolvedValue([{ id: 'store-1' }]),
   runInTenantContext: runInTenantContextMock,
   onClosedTenantTxAccess: vi.fn(),
   hasTenantContext: vi.fn(() => false),

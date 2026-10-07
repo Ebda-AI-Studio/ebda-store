@@ -27,7 +27,7 @@
  */
 
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@force/database';
+import { runInTenantContext, storeDirectory } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import {
@@ -87,11 +87,8 @@ export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunct
     // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
     // stores table does not filter to 0 rows (no tenant GUC is set). Ids only.
     const stores = await step.run('list-stores', () =>
-      prisma.store.findMany({
-        where: { accountingEnabled: true, deletedAt: null },
-        select: { id: true },
-        orderBy: { id: 'asc' },
-      })
+      // `stores` is under RLS: a cron lists stores through the directory definer (id order).
+      storeDirectory(s => s.accountingEnabled).then(list => list.map(s => ({ id: s.id })))
     );
 
     // One event per store, sent in bounded batches: the per-store work runs in

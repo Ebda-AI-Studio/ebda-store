@@ -301,7 +301,7 @@ const campaignSendFn = inngest.createFunction(
           skipDuplicates: true,
         });
         await prisma.campaign.update({
-          where: { id: campaignId },
+          where: { id: campaignId, storeId },
           data: { recipientCount: audience.length },
         });
       });
@@ -376,7 +376,7 @@ const campaignSendFn = inngest.createFunction(
         if (!r.subscriber || !r.subscriber.isActive || r.subscriber.unsubscribedAt) {
           await runInTenantContext(storeId, () =>
             prisma.campaignRecipient.updateMany({
-              where: { id: r.id, status: 'queued' },
+              where: { id: r.id, storeId, status: 'queued' },
               data: { status: 'unsubscribed', error: 'CONSENT_WITHDRAWN_BEFORE_SEND' },
             })
           );
@@ -418,7 +418,7 @@ const campaignSendFn = inngest.createFunction(
           const message = (err instanceof Error ? err.message : 'send failed').slice(0, ERROR_MAX);
           await runInTenantContext(storeId, () =>
             prisma.campaignRecipient.updateMany({
-              where: { id: r.id, status: 'queued' },
+              where: { id: r.id, storeId, status: 'queued' },
               data: { status: 'failed', error: message },
             })
           );
@@ -439,7 +439,7 @@ const campaignSendFn = inngest.createFunction(
         // is still `queued`, and the idempotency key makes the resend a no-op.
         await runInTenantContext(storeId, () =>
           prisma.campaignRecipient.updateMany({
-            where: { id: r.id, status: 'queued' },
+            where: { id: r.id, storeId, status: 'queued' },
             data: {
               status: 'sent',
               providerMessageId: messageId,
