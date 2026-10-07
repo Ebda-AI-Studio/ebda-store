@@ -21,7 +21,7 @@ concurrency:
 jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 30
     environment: production
     env:
@@ -75,7 +75,7 @@ jobs:
           # build's assets. Then the /signup page must render (200).
           # --resolve pins the zone's edge IP so the probe never depends on the
           # runner's DNS cache. Each attempt prints what it saw (positive control).
-          host=admin.ebda.app
+          host=store.ebda.app
           ip=$(dig +short api.ebda.app | head -1)
           test -n "$ip" || { echo "::error::could not resolve the ebda.app edge IP"; exit 1; }
           for i in $(seq 1 24); do

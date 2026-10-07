@@ -94,9 +94,9 @@ export async function sendMerchantVerificationEmail(
   language?: Lang
 ): Promise<void> {
   const lang: Lang = language ?? resolveDefaultLanguage(undefined);
-  const content = emailVerificationTemplate[lang](data, BRAND.name);
+  const content = emailVerificationTemplate[lang](data, BRAND.product.nameEn);
   const html = renderBrandedShell(content, {
-    name: BRAND.name,
+    name: BRAND.product.nameEn,
     nameAr: null,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
@@ -129,7 +129,7 @@ export async function sendMerchantDuplicateSignupNotice(
       ? `<h2>لديك حساب مسبقاً</h2><p>مرحباً ${name}،</p><p>حاول شخص ما (ربما أنت) إنشاء متجر جديد بهذا البريد، لكن لديك حساب بالفعل. إذا كنت أنت، سجّل الدخول مباشرة.</p><p style="text-align:center;margin:24px 0;"><a href="${loginUrl}" class="button">تسجيل الدخول</a></p><p style="font-size:14px;color:#666;">إذا لم تكن أنت فتجاهل هذه الرسالة؛ لم يتغير شيء في حسابك.</p>`
       : `<h2>You already have an account</h2><p>Hi ${name},</p><p>Someone (possibly you) just tried to start a new store with this email, but an account already exists. If it was you, just sign in.</p><p style="text-align:center;margin:24px 0;"><a href="${loginUrl}" class="button">Sign in</a></p><p style="font-size:14px;color:#666;">If this wasn't you, ignore this email; nothing changed on your account.</p>`;
   const html = renderBrandedShell(content, {
-    name: BRAND.name,
+    name: BRAND.product.nameEn,
     nameAr: null,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,

@@ -8,6 +8,8 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { Home } from '../../apps/marketing/src/components/Home';
 import { LegalPage } from '../../apps/marketing/src/components/LegalPage';
+import { AboutPage } from '../../apps/marketing/src/components/AboutPage';
+import sitemap from '../../apps/marketing/src/app/sitemap';
 import { pageMetadata, jsonLd } from '../../apps/marketing/src/lib/seo';
 import { PLANS, PRICING_PUBLISHED } from '../../apps/marketing/src/lib/plans';
 import {
@@ -30,11 +32,11 @@ describe('marketing nav', () => {
     expect(labels.map(m => m[1])).toEqual(['#features', '#how', '#pricing', '#faq']);
   });
   it('Log in -> app login, Start now -> app signup, in both locales', () => {
-    expect(LOGIN_URL).toBe('https://admin.ebda.app/login');
-    expect(SIGNUP_URL).toBe('https://admin.ebda.app/signup');
+    expect(LOGIN_URL).toBe('https://store.ebda.app/login');
+    expect(SIGNUP_URL).toBe('https://store.ebda.app/signup');
     for (const html of [ar, en]) {
-      expect(html).toContain('<a href="https://admin.ebda.app/login" class="link-login">');
-      expect(html).toMatch(/<a href="https:\/\/admin\.ebda\.app\/signup" class="btn btn-primary">/);
+      expect(html).toContain('<a href="https://store.ebda.app/login" class="link-login">');
+      expect(html).toMatch(/<a href="https:\/\/store\.ebda\.app\/signup" class="btn btn-primary">/);
     }
     expect(en).toContain('>Log in<');
     expect(en).toContain('>Start now<');
@@ -58,7 +60,6 @@ describe('marketing hero and structure', () => {
       'story',
       'how',
       'templates',
-      'scenes',
       'breakout',
       'dahab',
       'features',
@@ -171,11 +172,9 @@ describe('marketing honesty', () => {
     expect(ar).toContain('ابدأ — بابك لبدء مشروعك.');
     expect(en).toContain('Ebda — Your doorway to business.');
     expect(en).toContain(
-      'Ebda is a product of <a href="https://whisky11.com" target="_blank" rel="noopener noreferrer">Whisky 11</a>. © 2026 Whisky 11. All rights reserved.'
+      'Ebda Store is a product of Ebda AI Studio. © 2026 Ebda AI Studio. All rights reserved.'
     );
-    expect(ar).toContain(
-      'ابدأ منتج من <a href="https://whisky11.com" target="_blank" rel="noopener noreferrer">Whisky 11</a>. © 2026 Whisky 11. جميع الحقوق محفوظة.'
-    );
+    expect(ar).toContain('ابدأ ستور منتج من ابدأ ستوديو. © 2026 ابدأ ستوديو. جميع الحقوق محفوظة.');
     // no Arabic-Indic digits anywhere on either home page or any legal page
     expect(ar).not.toMatch(/[٠-٩]/);
     expect(en).not.toMatch(/[٠-٩]/);
@@ -188,9 +187,11 @@ describe('marketing honesty', () => {
   });
   it('the legal notice and terms name the operator without a personal name', () => {
     const ln = renderToStaticMarkup(<LegalPage locale="en" page="legal" />);
-    expect(ln).toContain('Ebda is a technology platform owned and operated by');
+    expect(ln).toContain(
+      'The Service is a technology platform owned and operated by Ebda AI Studio'
+    );
     const lar = renderToStaticMarkup(<LegalPage locale="ar" page="terms" />);
-    expect(lar).toContain('ابدأ منصة تقنية مملوكة لـ');
+    expect(lar).toContain('اتفاق بينك وبين ابدأ ستوديو');
     for (const l of ['ar', 'en'] as const)
       for (const page of LEGAL_SLUGS) {
         const h = renderToStaticMarkup(<LegalPage locale={l} page={page} />);
@@ -202,9 +203,6 @@ describe('marketing honesty', () => {
       // four numbered steps, a real sequence
       expect(html.match(/class="step4"/g)).toHaveLength(4);
       expect(html).toContain('>01<');
-      // composited room scenes, one per template family, with alt text
-      for (const id of ['souq', 'lamma', 'dahab', 'qamar', 'jasmine'])
-        expect(html).toContain(`/scenes/${id}-1200.webp`);
       // 3D ring: poster first, swatches are real buttons with pressed state
       expect(html).toContain('/ring/ring-gold-diamond.webp');
       expect(html.match(/class="swatch"/g)).toHaveLength(6);
@@ -217,13 +215,18 @@ describe('marketing honesty', () => {
     expect(ar).toContain('بوسطة استلمت الشحنة');
     expect(ar).toContain('وصلك دفع إنستا باي');
   });
-  it('the five template families show real storefront captures', () => {
-    for (const id of ['souq', 'dahab', 'qamar', 'lamma', 'jasmine'])
-      expect(en).toContain(`data-pal="${id}"`);
+  it('shows ONE real store (Dahab) on every device, high-res, and no food anywhere', () => {
     // Real storefront captures (apps/web) at true device sizes, never a hand-made mock.
-    for (const d of ['phone-600', 'tablet-840', 'laptop-1280'])
-      expect(en).toContain(`/devices/souq-${d}.webp`);
-    expect(en).toContain('/devices/lamma-story-600.webp');
+    for (const d of ['phone-600', 'phone-900', 'tablet-840', 'laptop-1280', 'laptop-1920'])
+      expect(en).toContain(`/devices/dahab-${d}.webp`);
+    expect(en).toContain('/devices/dahab-story-900.webp');
+    for (const html of [ar, en]) {
+      expect(html).not.toMatch(/souq-|qamar-|lamma-|jasmine-|data-pal=/);
+      // no template switcher promising looks that are not shown
+      expect(html).not.toMatch(/tpl-tab|Five templates|خمس قوالب/);
+    }
+    expect(ar).not.toMatch(/كيكة|أكل بيتي|طبيخ|محشي|ورق عنب/);
+    expect(en).not.toMatch(/cake|home-food|home food|kitchen/i);
     expect(en).not.toMatch(/lorem|placeholder/i);
   });
   it('prices use Western digits and ج.م on the Arabic page', () => {
@@ -231,14 +234,33 @@ describe('marketing honesty', () => {
     expect(s).toContain('1,490 ج.م');
     expect(s).not.toMatch(/[٠-٩]/);
   });
-  it('every Whisky 11 mention in the footer links to whisky11.com in a new tab', () => {
-    for (const html of [ar, en]) {
+  it('no customer-facing surface names the old operator or links whisky11.com; JSON-LD names Ebda AI Studio', () => {
+    const pages = LEGAL_SLUGS.flatMap(page =>
+      (['ar', 'en'] as const).map(l => renderToStaticMarkup(<LegalPage locale={l} page={page} />))
+    );
+    for (const html of [ar, en, ...pages]) expect(html).not.toMatch(/whisky/i);
+    const org = jsonLd('en')['@graph'][0] as Record<string, unknown>;
+    expect(org.name).toBe('Ebda AI Studio');
+    expect(org.alternateName).toBe('ابدأ ستوديو');
+    expect(org.url).toBe('https://ebda.app');
+    expect(org).not.toHaveProperty('parentOrganization');
+    expect(JSON.stringify(org)).not.toMatch(/whisky/i);
+  });
+  it('the about page carries the company line, the story and both contact addresses', () => {
+    for (const l of ['ar', 'en'] as const) {
+      const html = renderToStaticMarkup(<AboutPage locale={l} />);
       expect(html).toContain(
-        '<a href="https://whisky11.com" target="_blank" rel="noopener noreferrer">Whisky 11</a>'
+        l === 'en' ? 'owned and operated by Ebda AI Studio' : 'مملوكة لابدأ ستوديو'
       );
+      expect(html).toContain('ahlan@ebda.app');
+      expect(html).toContain('security@ebda.app');
+      expect(html).not.toMatch(/whisky/i);
     }
-    const org = jsonLd('en')['@graph'][0] as { parentOrganization: { url: string } };
-    expect(org.parentOrganization.url).toBe('https://whisky11.com');
+  });
+  it('the about page is in the sitemap for both locales', () => {
+    const urls = sitemap().map(e => e.url);
+    expect(urls).toContain('https://ebda.app/about/');
+    expect(urls).toContain('https://ebda.app/en/about/');
   });
   it('first-merchant block carries no invented quote', () => {
     expect(en).toContain('data-testid="first-merchant"');

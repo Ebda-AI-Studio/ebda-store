@@ -41,6 +41,12 @@ describe('RESERVED_SLUGS — the single source of truth', () => {
         'billing',
         'support',
         'blog',
+        // suite products + identity (PRODUCT-NAME-1, 2026-10-07)
+        'crm',
+        'erp',
+        'hub',
+        'id',
+        'accounts',
       ].sort()
     );
   });
@@ -106,9 +112,11 @@ describe('store slug validation', () => {
     for (const slug of RESERVED_SLUGS) {
       const result = validateStoreSlug(slug);
       expect(result.ok).toBe(false);
-      // `app`/`api` are 3 chars; the 2-char labels would hit TOO_SHORT first, but
-      // none of the reserved labels is shorter than 3.
-      if (!result.ok) expect(result.code).toBe('SLUG_RESERVED');
+      // 2-char reserved labels (e.g. `id`) hit SLUG_TOO_SHORT first — still refused.
+      if (!result.ok)
+        expect(slug.length < 3 ? ['SLUG_TOO_SHORT', 'SLUG_RESERVED'] : ['SLUG_RESERVED']).toContain(
+          result.code
+        );
     }
   });
 
@@ -136,7 +144,7 @@ describe('parseStoreHost', () => {
     ['apex', 'ebda.app', platform('marketing')],
     ['apex with port', 'ebda.app:443', platform('marketing')],
     ['www alias of the apex', 'www.ebda.app', platform('marketing')],
-    ['admin app', 'admin.ebda.app', platform('admin')],
+    ['ebda store merchant app', 'store.ebda.app', platform('storeApp')],
     ['api', 'api.ebda.app', platform('api')],
     ['orders pwa', 'orders.ebda.app', platform('orders')],
     ['docs', 'docs.ebda.app', platform('docs')],
@@ -145,7 +153,7 @@ describe('parseStoreHost', () => {
     ['whatsapp (reserved)', 'whatsapp.ebda.app', platform('whatsapp')],
     ['workers.dev preview', 'ebda-web.acct.workers.dev', platform('preview')],
     // ── reserved labels with no platform surface are never a store ────────
-    ['store.ebda.app does not exist', 'store.ebda.app', INVALID],
+    ['retired admin host (HOST-STORE-1: reserved, no surface)', 'admin.ebda.app', INVALID],
     ['retired app label (never live; reserved, no surface)', 'app.ebda.app', INVALID],
     ['mail label', 'mail.ebda.app', INVALID],
     ['blog label', 'blog.ebda.app', INVALID],

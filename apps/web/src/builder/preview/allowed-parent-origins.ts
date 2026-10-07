@@ -11,7 +11,7 @@ export function allowedParentOrigins(
   const raw =
     env.STOREFRONT_FRAME_ANCESTORS ??
     (env.NODE_ENV === 'production'
-      ? 'https://admin.ebda.app'
-      : 'https://admin.ebda.app http://localhost:3001 http://localhost:3000');
+      ? 'https://store.ebda.app'
+      : 'https://store.ebda.app http://localhost:3001 http://localhost:3000');
   return raw.split(/\s+/).filter(o => /^https?:\/\/[^/\s]+$/.test(o));
 }

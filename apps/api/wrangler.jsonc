@@ -45,6 +45,11 @@
       { "name": "STORE_REALTIME", "class_name": "StoreRealtime" },
     ],
   },
+  // Storefront cache purge (POST /api/revalidate on ebda-web) over a Service Binding, not a
+  // public hostname: no host to keep pointed at the storefront wildcard, no public hop
+  // (Ruling HOST-STORE-1; store.ebda.app is the merchant app now). See lib/revalidate-storefront.ts.
+  "services": [{ "binding": "STOREFRONT", "service": "ebda-web" }],
+
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AuthState", "StoreRealtime"] }],
 
   "queues": {
@@ -112,8 +117,8 @@
     "NODE_ENV": "production",
     "APP_VERSION": "1.0.0",
     "BUILD_COMMIT_SHA": "",
-    "WEB_URL": "https://admin.ebda.app",
-    "ADMIN_URL": "https://admin.ebda.app",
+    "WEB_URL": "https://store.ebda.app",
+    "ADMIN_URL": "https://store.ebda.app",
     "API_URL": "https://api.ebda.app",
     "TRUST_PROXY_HOPS": "1",
     "INNGEST_SERVE_HOST": "https://api.ebda.app",

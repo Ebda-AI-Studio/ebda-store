@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { BRAND } from '@force/shared/brand';
 import { COPY } from '../lib/content';
-import { COMPANY_URL, SECURITY_EMAIL, pagePath, type Locale } from '../lib/site';
+import { SECURITY_EMAIL, pagePath, type Locale } from '../lib/site';
 
 export function Footer({ locale }: { locale: Locale }) {
   const c = COPY[locale].footer;
@@ -38,6 +38,9 @@ export function Footer({ locale }: { locale: Locale }) {
         <nav aria-label={c.legalNav}>
           <ul className="footer-links">
             <li>
+              <Link href={pagePath(locale, 'about')}>{c.about}</Link>
+            </li>
+            <li>
               <Link href={pagePath(locale, 'legal')}>{c.legal}</Link>
             </li>
             <li>
@@ -57,13 +60,7 @@ export function Footer({ locale }: { locale: Locale }) {
         </nav>
       </div>
       <div className="wrap footer-legal">
-        <p className="muted small">
-          {c.ownership.before}
-          <a href={COMPANY_URL} target="_blank" rel="noopener noreferrer">
-            {BRAND.company}
-          </a>
-          {c.ownership.after}
-        </p>
+        <p className="muted small">{c.ownership}</p>
       </div>
     </footer>
   );

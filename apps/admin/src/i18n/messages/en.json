@@ -3402,11 +3402,11 @@
   },
   "pwa": {
     "installHint": {
-      "title": "Install Ebda Admin to receive push notifications",
+      "title": "Install Ebda Store Admin to receive push notifications",
       "description": "iPhone needs the app added to your home screen before push notifications can work.",
       "step1": "Tap the Share icon in Safari",
       "step2": "Choose Add to Home Screen",
-      "step3": "Open Ebda Admin from the home screen and allow notifications",
+      "step3": "Open Ebda Store Admin from the home screen and allow notifications",
       "dismiss": "Dismiss"
     },
     "page": {
@@ -5484,7 +5484,7 @@
   "auth": {
     "login": {
       "title": "Admin Login",
-      "subtitle": "Sign in to access the Ebda Platform",
+      "subtitle": "Sign in to access Ebda Store",
       "email": "Email address",
       "emailPlaceholder": "you@example.com",
       "password": "Password",
@@ -5492,8 +5492,8 @@
       "signIn": "Sign in",
       "signingIn": "Signing in…",
       "loginFailed": "Login failed",
-      "footer": "Ebda Platform Admin Panel",
-      "brandTitle": "Ebda",
+      "footer": "Ebda Store Admin Panel",
+      "brandTitle": "Ebda Store",
       "brandSubtitle": "Manage your e-commerce stores, users, and platform settings from one powerful dashboard.",
       "statActiveStores": "Active Stores",
       "statProducts": "Products",
@@ -8679,7 +8679,7 @@
         "resent": "If the address is eligible, a new link is on its way.",
         "backToLogin": "Back to sign in"
       },
-      "noAccount": "New to Ebda?",
+      "noAccount": "New to Ebda Store?",
       "createStore": "Create your store",
       "plan": {
         "chip": "Selected plan: {plan} · {interval} — 14-day Growth trial",

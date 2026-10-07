@@ -4,17 +4,16 @@ Ebda is a **Whisky 11** product (org `whisky-11`, repo `whisky-11/ebda`, still e
 
 ## Domain map
 
-| Host                | Purpose                                                                                              | FWB equivalent today     |
-| ------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------ |
-| `ebda.app`          | Main marketing website (Shopify.com equivalent)                                                      | force-ai.co landing      |
-| `admin.ebda.app`    | Dashboard / merchant application                                                                     | admin.force-ai.co        |
-| `store.ebda.app`    | Default store infrastructure (path-based stores, e.g. `store.ebda.app/<slug>`) — "maybe", to confirm | store.force-ai.co/<slug> |
-| `*.ebda.app`        | Individual merchant stores (`<slug>.ebda.app`); custom domains on top                                | per-store custom domains |
-| `api.ebda.app`      | API                                                                                                  | api.force-ai.co          |
-| `docs.ebda.app`     | API & developer documentation                                                                        | —                        |
-| `whatsapp.ebda.app` | WhatsApp integration                                                                                 | WBS (separate product)   |
-| `help.ebda.app`     | Help center                                                                                          | —                        |
-| `status.ebda.app`   | System status                                                                                        | —                        |
+| Host                | Purpose                                                                                                                | FWB equivalent today     |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `ebda.app`          | Main marketing website (Shopify.com equivalent)                                                                        | force-ai.co landing      |
+| `store.ebda.app`    | Ebda Store merchant app: sign-up, plan, payment, onboarding, dashboard (Ruling HOST-STORE-1; `admin.ebda.app` retired) | admin.force-ai.co        |
+| `*.ebda.app`        | Individual merchant stores (`<slug>.ebda.app`); custom domains on top                                                  | per-store custom domains |
+| `api.ebda.app`      | API                                                                                                                    | api.force-ai.co          |
+| `docs.ebda.app`     | API & developer documentation                                                                                          | —                        |
+| `whatsapp.ebda.app` | WhatsApp integration                                                                                                   | WBS (separate product)   |
+| `help.ebda.app`     | Help center                                                                                                            | —                        |
+| `status.ebda.app`   | System status                                                                                                          | —                        |
 
 Reserved subdomains (never assignable as a store slug): `app, store, api, docs, whatsapp, help, status, www, admin, orders, mail, cdn, assets, static`, plus anything else the platform takes later — enforce in slug validation from day one.
 
@@ -22,13 +21,13 @@ Reserved subdomains (never assignable as a store slug): `app, store, api, docs, 
 
 Superseded 2026-10-07 by Ruling R-EBDA-COPY-1 (`docs/RULINGS.md`): Ahmad asked for Egyptian colloquial Arabic and at least half the text. The original 12-section brief is kept below for history.
 
-Top nav (now): logo · Features · How it works · Pricing · FAQ · `Log in` · **Start now** (→ signup on admin.ebda.app). Arabic: المميزات · إزاي بيشتغل · الأسعار · أسئلة · دخول · ابدأ دلوقتي.
+Top nav (now): logo · Features · How it works · Pricing · FAQ · `Log in` · **Start now** (→ signup on store.ebda.app). Arabic: المميزات · إزاي بيشتغل · الأسعار · أسئلة · دخول · ابدأ دلوقتي.
 
 Brand line (2026-10-07): «ابدأ — بابك لبدء مشروعك.» / "Ebda — Your doorway to business." (hero, meta, OG). Hero (now), per locale, over the Nile-at-night canvas (static inline poster first, canvas fades in):
 
 > **ابدأ متجرك أونلاين في دقايق.** / **Open your online store in minutes.**
 
-Sections (now, R-EBDA-COPY-5/8/10/11), in order (`SECTION_ORDER` in `apps/marketing/src/lib/site.ts`): Story (pinned scroll: the real Lamma storefront scrolls inside a phone, flips through the other templates, then a stream of four notifications) · How it works (four numbered cards, a gold line draws each in) · Templates (real captures of the five families on laptop, tablet and phone, live switcher) · Scenes (the captures composited into five real rooms) · Break-out (pinned: the Dahab ring leaves the phone while gold wipes up and giant outlined «ابدأ / متجرك / دلوقتي» drift) · Dahab (live three.js ring, drag + scroll, metal and stone swatches) · Features · Payments and shipping (provider marks) · The Ebda story («حكاية ابدأ», the open-door mark animates: the light comes up, the person steps through) · Pricing (cards + full comparison table from the shared plan catalogue) · FAQ · Closing call to action. Footer: contact (ahlan@, security@) and "Ebda by Whisky 11" linked to whisky11.com.
+Sections (now, R-EBDA-COPY-5/8/10/11), in order (`SECTION_ORDER` in `apps/marketing/src/lib/site.ts`): Story (pinned scroll: the real Dahab storefront scrolls inside a phone, then a stream of four notifications) · How it works (four numbered cards, a gold line draws each in) · Devices (one real store, Dahab, on laptop, tablet and phone; no switcher until the Phase 3 templates, R-EBDA-COPY-14) · Break-out (pinned: the Dahab ring leaves the phone while gold wipes up and giant outlined «ابدأ / متجرك / دلوقتي» drift) · Dahab (live three.js ring, drag + scroll, metal and stone swatches) · Features · Payments and shipping (provider marks) · The Ebda story («حكاية ابدأ», the open-door mark animates: the light comes up, the person steps through) · Pricing (cards + full comparison table from the shared plan catalogue) · FAQ · Closing call to action. Footer: contact (ahlan@, security@) and "Ebda by Whisky 11" linked to whisky11.com.
 
 Original brief (2026-10-03, superseded):
 

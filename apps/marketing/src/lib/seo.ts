@@ -3,7 +3,6 @@ import { BRAND } from '@force/shared/brand';
 import { COPY } from './content';
 import { PLANS, PRICING_PUBLISHED } from './plans';
 import {
-  COMPANY_URL,
   HOME,
   SIGNUP_URL,
   SITE_URL,
@@ -44,7 +43,7 @@ export function pageMetadata(
     alternates: { canonical: pagePath(locale, page), languages },
     openGraph: {
       type: 'website',
-      siteName: `${BRAND.name} · ${BRAND.nameAr}`,
+      siteName: `${BRAND.product.nameEn} · ${BRAND.product.nameAr}`,
       title: t,
       description: d,
       url: pagePath(locale, page),
@@ -76,26 +75,26 @@ export function jsonLd(locale: Locale) {
       {
         '@type': 'Organization',
         '@id': org,
-        name: BRAND.name,
-        alternateName: BRAND.nameAr,
+        name: BRAND.company.shortNameEn,
+        alternateName: BRAND.company.shortNameAr,
+        legalName: BRAND.company.legalNameEn,
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         email: BRAND.supportEmail,
         sameAs: [] as string[],
-        parentOrganization: { '@type': 'Organization', name: BRAND.company, url: COMPANY_URL },
       },
       {
         '@type': 'WebSite',
         '@id': site,
         url: absoluteUrl(HOME[locale]),
-        name: BRAND.name,
+        name: BRAND.product.nameEn,
         inLanguage: locale,
         publisher: { '@id': org },
       },
       {
         '@type': 'SoftwareApplication',
-        name: BRAND.name,
-        alternateName: BRAND.nameAr,
+        name: BRAND.product.nameEn,
+        alternateName: BRAND.product.nameAr,
         applicationCategory: 'BusinessApplication',
         operatingSystem: 'Web',
         description: c.meta.description,

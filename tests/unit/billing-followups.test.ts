@@ -29,7 +29,7 @@ const ON = (mode: 'exclusive' | 'inclusive'): PlatformVat => ({
   rate: 14,
   mode,
   trn: '123456789',
-  legalName: 'Whisky 11 LLC',
+  legalName: 'Ebda AI Studio',
 });
 
 beforeEach(() => h.getPlatformVat.mockReset());
@@ -58,7 +58,7 @@ describe('Ebda VAT on subscription charges (one seam, read per charge)', () => {
         rateBps: 1400,
         mode: 'exclusive',
         trn: '123456789',
-        legalName: 'Whisky 11 LLC',
+        legalName: 'Ebda AI Studio',
       },
     });
   });
@@ -128,7 +128,7 @@ describe('billing notice email', () => {
     storeName: 'Amelia',
     planName: 'Growth',
     amountMinor: 349000,
-    billingUrl: 'https://admin.ebda.app/stores/s1/billing',
+    billingUrl: 'https://store.ebda.app/stores/s1/billing',
     dueOn: '2026-11-20',
     daysLeft: 3,
     method: 'instapay' as const,
@@ -160,12 +160,12 @@ describe('billing notice email', () => {
           vatMinor: 48860,
           rateBps: 1400,
           trn: '123456789',
-          legalName: 'Whisky 11',
+          legalName: 'Ebda AI Studio',
         },
       });
       expect(on).toMatch(lang === 'en' ? /includes VAT 14%/ : /ضريبة القيمة المضافة 14%/);
       expect(on).toContain('123456789');
-      expect(on).toContain('Whisky 11');
+      expect(on).toContain('Ebda AI Studio');
     });
   }
 });

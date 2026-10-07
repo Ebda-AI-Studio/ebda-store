@@ -22,8 +22,8 @@ const ibmPlexArabic = IBM_Plex_Sans_Arabic({
 
 export const metadata: Metadata = {
   title: {
-    default: BRAND.name,
-    template: `%s | ${BRAND.name}`,
+    default: BRAND.product.nameEn,
+    template: `%s | ${BRAND.product.nameEn}`,
   },
   description: BRAND.tagline,
   // Tell every crawler to skip this domain entirely. Belt-and-suspenders
@@ -47,10 +47,10 @@ export const metadata: Metadata = {
   // PWA install metadata. apple-* keys exist because iOS Safari requires
   // an installed PWA before granting Web Push permission, and the install
   // prompt picks up these tags rather than the manifest.
-  applicationName: `${BRAND.name} Admin`,
+  applicationName: `${BRAND.product.nameEn} Admin`,
   appleWebApp: {
     capable: true,
-    title: `${BRAND.name} Admin`,
+    title: `${BRAND.product.nameEn} Admin`,
     statusBarStyle: 'default',
   },
   formatDetection: {

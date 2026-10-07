@@ -3,7 +3,7 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRAND, BRAND_ADMIN_URL, BRAND_MARKETING_URL } from '@force/shared/brand';
+import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL } from '@force/shared/brand';
 import { renderMdx } from '@force/site-kit/build/mdx';
 import {
   esc,
@@ -30,7 +30,7 @@ const EN = {
   skip: 'Skip to content',
   nav: [
     { href: BRAND_MARKETING_URL, label: BRAND.name },
-    { href: BRAND_ADMIN_URL, label: 'Dashboard' },
+    { href: BRAND_STORE_APP_URL, label: 'Dashboard' },
     { href: `https://${BRAND.domains.help}`, label: 'Help centre' },
     { href: `https://${BRAND.domains.status}`, label: 'Status' },
   ],
@@ -202,7 +202,7 @@ for (const p of pages) {
     homeHref: '/ar/',
     nav: [
       { href: BRAND_MARKETING_URL, label: BRAND.nameAr },
-      { href: BRAND_ADMIN_URL, label: 'لوحة التحكم' },
+      { href: BRAND_STORE_APP_URL, label: 'لوحة التحكم' },
       { href: `https://${BRAND.domains.help}`, label: 'مركز المساعدة' },
       { href: `https://${BRAND.domains.status}`, label: 'حالة الخدمة' },
     ],

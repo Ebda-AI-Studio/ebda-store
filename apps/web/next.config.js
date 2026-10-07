@@ -111,7 +111,7 @@ const nextConfig = {
           // still showing "This content is blocked" because some browsers
           // (notably Safari and older Chrome variants) honor X-Frame-Options
           // OVER CSP frame-ancestors when both are present. SAMEORIGIN
-          // blocked admin.ebda.app → demo-shop.example framing even
+          // blocked store.ebda.app → demo-shop.example framing even
           // though CSP frame-ancestors allowed it. CSP frame-ancestors below
           // is the canonical gate. Modern browsers ignore the absence of
           // X-Frame-Options; legacy browsers (IE) just allow framing.
@@ -177,7 +177,7 @@ const nextConfig = {
               // non-frameable so clickjacking via other origins stays blocked.
               `frame-ancestors 'self' ${
                 process.env.STOREFRONT_FRAME_ANCESTORS ??
-                // admin.ebda.app is the Cloudflare admin host — without it
+                // store.ebda.app is the Ebda Store merchant app — without it
                 // the page-builder live-preview iframe is CSP-blocked on CF
                 // (the storefront refuses to be framed). Kept alongside the
                 // (no legacy admin host in Ebda).
@@ -189,10 +189,10 @@ const nextConfig = {
                 // entry), so this fallback IS the live prod value. Only
                 // include the dev origins when NOT building for production;
                 // the prod value is unchanged otherwise (still 'self'
-                // https://admin.ebda.app).
+                // https://store.ebda.app).
                 (process.env.NODE_ENV === 'production'
-                  ? 'https://admin.ebda.app'
-                  : 'https://admin.ebda.app http://localhost:3001 http://localhost:3000')
+                  ? 'https://store.ebda.app'
+                  : 'https://store.ebda.app http://localhost:3001 http://localhost:3000')
               }`,
             ].join('; '),
           },

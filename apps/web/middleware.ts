@@ -248,7 +248,7 @@ function buildStoreTreeUrl(
  * a real storefront visitor who previewed in the same browser (2026-05-28).
  *
  * SameSite=None + Secure so it survives the cross-site iframe context
- * (admin.ebda.app framing demo-shop.example). TTL 1h matches Redis.
+ * (store.ebda.app framing demo-shop.example). TTL 1h matches Redis.
  */
 function applyDraftCookie(
   request: NextRequest,
