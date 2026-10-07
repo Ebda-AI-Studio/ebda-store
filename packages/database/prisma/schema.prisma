@@ -325,15 +325,12 @@ model Store {
   locationsEnabled Boolean @default(false) @map("locations_enabled")
 
   // Ebda WhatsApp Business Platform integration (opt-in per store)
-  // wbsApiKey is encrypted via AES-GCM using apps/api/src/services/encryption.service.ts
+  // The WBS API key lives in `StoreCredential.wbsApiKey` (R-EBDA-005), AES-GCM encrypted.
   // wbsTemplates shape: { orderPaid?, orderShipped?, orderDelivered? }
   //   each entry: { name: string, languageCode: string, channels?: { whatsapp: boolean, email: boolean } }
   //   channels defaults: { whatsapp: true, email: true } when absent (backward-compatible)
   wbsEnabled                Boolean @default(false) @map("wbs_enabled")
   wbsClientId               String? @map("wbs_client_id")
-  /// MOVED to `StoreCredential.wbsApiKey` (R-EBDA-005). The column stays until the contract
-  /// migration drops it; `@ignore` keeps it out of the client so nothing reads it.
-  wbsApiKey                 String? @map("wbs_api_key") @ignore
   wbsTemplates              Json?   @map("wbs_templates")
   /// Phase 7 opt-in (2026-05-22): when true, generate templates with a
   /// HEADER IMAGE component pinned to Store.logo. Customer sees the store
@@ -354,17 +351,8 @@ model Store {
   /// Supports {storeName}, {customerName}, {items}, {total}, {currency} placeholder vars.
   botCopy                   Json?   @map("bot_copy")
 
-  /// Agent (MCP) WRITE credential — per store, opt-in, NULL for every store
-  /// until a merchant mints one. Encrypted at rest with the SAME AES-256-GCM
-  /// scheme as `wbsApiKey` above (apps/api/src/services/encryption.service.ts,
-  /// keyed off ENCRYPTION_KEY) rather than a second credential scheme.
-  /// Presented by an agent as the `X-Agent-Key` header on
-  /// POST /api/v1/mcp/:storeSlug and compared ONLY against the store the slug
-  /// resolved to, so a key minted for store A can never authorise a write on
-  /// store B. Read tools need no credential. NEVER returned in plaintext
-  /// except once, in the response to the mint/rotate call that generated it.
-  /// MOVED to `StoreCredential.agentApiKey` (R-EBDA-005); column dropped by the contract migration.
-  agentApiKey          String?   @map("agent_api_key") @ignore
+  /// When the agent (MCP) write credential was last minted / revoked. The credential
+  /// itself is `StoreCredential.agentApiKey` (R-EBDA-005).
   agentApiKeyRotatedAt DateTime? @map("agent_api_key_rotated_at")
 
   // GEO (Generative Engine Optimization) — LLM-search visibility fields.
@@ -420,10 +408,6 @@ model Store {
   metaCatalogId   String? @map("meta_catalog_id")
   /// FB Business Manager ID
   metaBusinessId  String? @map("meta_business_id")
-  /// Long-lived User Access Token for the Meta Catalog API, encrypted via
-  /// CREDENTIAL_ENCRYPTION_KEY (same pattern as wbsApiKey). NEVER returned plain.
-  /// MOVED to `StoreCredential.metaAccessToken` (R-EBDA-005); column dropped by the contract migration.
-  metaAccessToken String? @map("meta_access_token") @ignore
 
   // Relations
   owner                    User                       @relation(fields: [ownerId], references: [id])
@@ -4531,10 +4515,10 @@ model AnswerEngineProviderConfig {
 }
 
 /// Per-store, per-device credential for the MERCHANT-ADMIN MCP surface
-/// (`POST /api/v1/mcp/admin/:storeSlug`). Distinct from `Store.agentApiKey`,
+/// (`POST /api/v1/mcp/admin/:storeSlug`). Distinct from `StoreCredential.agentApiKey`,
 /// which is the BUYER surface's single per-store key.
 ///
-/// Three deliberate differences from `Store.agentApiKey`:
+/// Three deliberate differences from `StoreCredential.agentApiKey`:
 ///
 ///  1. **Hashed, never encrypted.** The buyer key is displayed back to the
 ///     merchant, so it must be reversible. An admin key is shown exactly once,

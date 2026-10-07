@@ -73,12 +73,13 @@ const PREFIX = 'rlsea-';
 const uid = () => crypto.randomUUID();
 
 /** Tables that are DELIBERATELY not under RLS, with the reason (see the migration header). */
+/**
+ * The GLOBAL allowlist: tables DELIBERATELY not under RLS because they hold no tenant and no
+ * user data. Since R-EBDA-005 (contract migration 20261008000100) `stores` and the user-keyed
+ * token tables are under RLS too, so this list is platform config and bookkeeping only.
+ */
 const DOCUMENTED_NON_RLS: Record<string, string> = {
-  stores: 'tenant root / routing table; no store_id; secret columns omitted by the client',
-  refresh_tokens: 'credential-keyed (token hash) before identity is known',
-  verification_tokens: 'credential-keyed (token hash) before identity is known',
-  onesignal_subscriptions: 'user-keyed push registrations',
-  answer_engine_provider_configs: 'platform-global provider credentials',
+  answer_engine_provider_configs: 'platform-global provider credentials (no tenant, no user)',
   _prisma_migrations: 'migration bookkeeping; not granted to ebda_app',
   plans: 'platform-global plan catalog (config; no tenant data, no store_id)',
   billing_webhook_events: 'provider-event dedupe ledger (no store_id, no tenant data)',
@@ -1525,5 +1526,107 @@ describe('runWithRequestDb binds a client per request', () => {
     expect(released).toBeDefined();
     await released;
     expect(drained).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `stores` and the user-keyed tables (R-EBDA-005, contract migration
+// 20261008000100_tenant_defence_contract)
+// ---------------------------------------------------------------------------
+describe('stores and the user-keyed token tables are under strict RLS too (R-EBDA-005)', () => {
+  const USER_KEYED = ['refresh_tokens', 'verification_tokens', 'onesignal_subscriptions'];
+
+  it('every forced table outside the global allowlist has at least one policy, ebda_app only', async () => {
+    const rows = await owner.$queryRaw<
+      Array<{ relname: string; npol: number; other_roles: number }>
+    >`
+      SELECT c.relname::text AS relname,
+             (SELECT count(*)::int FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = c.relname) AS npol,
+             (SELECT count(*)::int FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = c.relname
+                AND NOT (p.roles = ARRAY['ebda_app']::name[])) AS other_roles
+      FROM pg_class c WHERE c.relkind = 'r' AND c.relnamespace = 'public'::regnamespace
+        AND c.relrowsecurity AND c.relforcerowsecurity`;
+    const bad = rows.filter(
+      r => !(r.relname in DOCUMENTED_NON_RLS) && (r.npol < 1 || r.other_roles > 0)
+    );
+    expect(bad, JSON.stringify(bad)).toEqual([]);
+    for (const t of ['stores', ...USER_KEYED]) {
+      expect(
+        rows.map(r => r.relname),
+        `${t} is forced`
+      ).toContain(t);
+    }
+  });
+
+  it('contextless: no store row and no token row is visible (fixtures prove the tables are not empty)', async () => {
+    const [{ n }] = await owner.$queryRawUnsafe<Array<{ n: bigint }>>(
+      `SELECT count(*) AS n FROM public.stores`
+    );
+    expect(Number(n)).toBeGreaterThan(0);
+    await appTx({}, async tx => {
+      for (const t of ['stores', ...USER_KEYED]) {
+        const [{ n: seen }] = await tx.$queryRawUnsafe<Array<{ n: bigint }>>(
+          `SELECT count(*) AS n FROM public."${t}"`
+        );
+        expect(Number(seen), t).toBe(0);
+      }
+    });
+  });
+
+  it('a store scope sees only its own store row, and cannot touch another', async () => {
+    const seen = await appTx(
+      { storeId: ids.storeA },
+      tx => tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM public.stores`
+    );
+    expect(seen.map(r => r.id)).toEqual([ids.storeA]);
+    const touched = await appTx(
+      { storeId: ids.storeA },
+      tx => tx.$executeRaw`UPDATE public.stores SET name = 'hacked' WHERE id = ${ids.storeB}`
+    );
+    expect(touched).toBe(0);
+    expect((await owner.store.findUnique({ where: { id: ids.storeB } }))?.name).toBe('RLS B');
+  });
+
+  it("a user sees the stores they own or staff, nobody else's; an active super_admin sees all", async () => {
+    const as = (userId: string) =>
+      appTx(
+        { userId },
+        tx =>
+          tx.$queryRaw<
+            Array<{ id: string }>
+          >`SELECT id FROM public.stores WHERE slug LIKE ${PREFIX + '%'}`
+      ).then(r => r.map(x => x.id).sort());
+    expect(await as(ids.ownerA)).toEqual([ids.storeA]);
+    expect(await as(ids.staffA)).toEqual([ids.storeA]);
+    expect(await as(ids.customerB)).toEqual([]);
+    expect(await as(ids.superAdmin)).toEqual([ids.storeA, ids.storeB].sort());
+  });
+
+  it('a store is inserted only by its owner (or a super_admin)', async () => {
+    await expect(
+      appTx(
+        { userId: ids.ownerA },
+        tx =>
+          tx.$executeRaw`INSERT INTO public.stores (id, name, slug, owner_id, updated_at) VALUES (${uid()}, 'x', ${PREFIX + 'ins-' + uid().slice(0, 8)}, ${ids.ownerB}, now())`
+      )
+    ).rejects.toThrow(/row-level security/i);
+  });
+
+  it('a user reads only their own refresh tokens', async () => {
+    const mk = (userId: string) =>
+      owner.refreshToken.create({
+        data: { token: `${PREFIX}rt-${uid()}`, userId, expiresAt: new Date(Date.now() + 60_000) },
+      });
+    await mk(ids.ownerA);
+    await mk(ids.customerB);
+    const mine = await appTx(
+      { userId: ids.ownerA },
+      tx =>
+        tx.$queryRaw<
+          Array<{ user_id: string }>
+        >`SELECT user_id FROM public.refresh_tokens WHERE token LIKE ${PREFIX + 'rt-%'}`
+    );
+    expect(new Set(mine.map(r => r.user_id))).toEqual(new Set([ids.ownerA]));
+    await owner.refreshToken.deleteMany({ where: { token: { startsWith: `${PREFIX}rt-` } } });
   });
 });
