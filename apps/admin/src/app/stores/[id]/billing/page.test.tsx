@@ -149,14 +149,42 @@ describe('merchant billing page', () => {
   });
 
   it('a plan with no price cannot be subscribed to (disabled, never "0")', async () => {
-    mockApi(billing({ availablePlans: [paidPlan({ priceMonthlyMinor: null })] }));
+    mockApi(
+      billing({
+        availablePlans: [paidPlan({ priceMonthlyMinor: null })],
+        billing: billingFixture({ trialCardMode: 'card_on_file' }),
+      })
+    );
     render(<StoreBillingPage />);
     const cta = (await screen.findByRole('button', { name: 'priceUnset' })) as HTMLButtonElement;
     expect(cta.disabled).toBe(true);
   });
 
+  it('InstaPay-only (default): no card subscribe buttons, InstaPay copy instead', async () => {
+    mockApi(
+      billing({
+        availablePlans: [paidPlan()],
+        billing: billingFixture({
+          trialCardMode: 'pay_at_trial_end',
+          hasPaymentMethod: false,
+          card: null,
+        }),
+      })
+    );
+    render(<StoreBillingPage />);
+    expect(await screen.findByText('subscribeBodyInstapay')).toBeTruthy();
+    expect(screen.queryByText('subscribeBody')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'subscribe' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'pay.addCard' })).toBeNull();
+  });
+
   it('subscribing posts the checkout and redirects to the hosted payment page', async () => {
-    mockApi(billing({ availablePlans: [paidPlan()] }));
+    mockApi(
+      billing({
+        availablePlans: [paidPlan()],
+        billing: billingFixture({ trialCardMode: 'card_on_file' }),
+      })
+    );
     apiPost.mockResolvedValue({ data: { redirectUrl: 'https://pay.test/s/1' }, error: null });
     const loc = { href: '' };
     vi.stubGlobal('location', loc);

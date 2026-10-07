@@ -8586,7 +8586,8 @@
       "working": "Publishing…",
       "failed": "We could not publish the store. Please try again.",
       "done": "Your store is live"
-    }
+    },
+    "subscribeBodyInstapay": "Prices in EGP. You pay by InstaPay transfer; your plan is activated as soon as we confirm the payment."
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
@@ -8817,7 +8818,7 @@
         "redirecting": "Redirecting to the secure page…",
         "cardFailed": "We could not start the card setup. Please try again.",
         "instapayTitle": "InstaPay",
-        "instapayBody": "Pay by InstaPay transfer instead of a card.",
+        "instapayBody": "Pay by InstaPay bank transfer.",
         "instapayCta": "Pay by InstaPay",
         "instapayHandle": "InstaPay address",
         "instapayAmount": "Exact amount",

@@ -105,17 +105,20 @@ export function assertBillingConfigAtBoot(env: Env = process.env): void {
 export type TrialCardMode = 'card_on_file' | 'pay_at_trial_end';
 
 export function resolveTrialCardMode(
-  provider: Pick<BillingProvider, 'name' | 'capabilities'> = getBillingProvider(),
+  provider?: Pick<BillingProvider, 'name' | 'capabilities'>,
   env: Env = process.env
 ): TrialCardMode {
   const raw = (env.BILLING_TRIAL_CARD_MODE ?? '').trim().toLowerCase();
-  const capable = provider.capabilities.cardSetupWithoutCharge;
-  if (raw === '') return capable ? 'card_on_file' : 'pay_at_trial_end';
-  if (raw === 'pay_at_trial_end') return 'pay_at_trial_end';
+  // InstaPay-only by default (Ahmad, 2026-10-07: no card gateway account yet):
+  // the card option exists only when explicitly turned on (Ruling EBDA-FUNNEL-17).
+  if (raw === '' || raw === 'pay_at_trial_end') return 'pay_at_trial_end';
   if (raw === 'card_on_file') {
+    // Resolved only when card mode is requested: InstaPay-only never needs a gateway.
+    const p = provider ?? getBillingProvider();
+    const capable = p.capabilities.cardSetupWithoutCharge;
     if (!capable) {
       throw new Error(
-        `BILLING_TRIAL_CARD_MODE=card_on_file but provider "${provider.name}" cannot save a card without a charge`
+        `BILLING_TRIAL_CARD_MODE=card_on_file but provider "${p.name}" cannot save a card without a charge`
       );
     }
     return 'card_on_file';

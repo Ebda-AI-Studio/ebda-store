@@ -65,7 +65,7 @@ interface BillingData {
   availablePlans: PlanSummary[];
   billing?: BillingInfo;
   storeStatus?: 'active' | 'inactive' | 'suspended';
-  provider?: 'kashier' | 'stub';
+  provider?: 'kashier' | 'stub' | null;
 }
 
 interface Charge {
@@ -439,6 +439,8 @@ export default function StoreBillingPage() {
   const instapayChosen = info?.billingMethod === 'instapay';
   const showCardControls =
     !cardUnavailable && (info?.trialCardMode === 'card_on_file' || !!info?.hasPaymentMethod);
+  // Card payments exist only when the card mode is on or a card is already saved.
+  const cardPayments = info?.trialCardMode === 'card_on_file' || !!info?.hasPaymentMethod;
   const showPaymentMethod =
     !!info &&
     (showCardControls ||
@@ -564,17 +566,18 @@ export default function StoreBillingPage() {
             </div>
           )}
 
-          {data.subscription.status === 'past_due' && (
-            <div
-              role="alert"
-              className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive-ink"
-            >
-              <p className="font-semibold">{t('pastDueTitle')}</p>
-              <p className="mt-1">
-                {t('pastDueBody', { date: fmtDate(data.billing?.nextRetryAt ?? null) ?? '' })}
-              </p>
-            </div>
-          )}
+          {data.subscription.status === 'past_due' &&
+            data.billing?.billingMethod !== 'instapay' && (
+              <div
+                role="alert"
+                className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive-ink"
+              >
+                <p className="font-semibold">{t('pastDueTitle')}</p>
+                <p className="mt-1">
+                  {t('pastDueBody', { date: fmtDate(data.billing?.nextRetryAt ?? null) ?? '' })}
+                </p>
+              </div>
+            )}
 
           {data.subscription.status === 'canceled' && (
             <div role="status" className="rounded-xl border bg-card p-4 text-sm">
@@ -891,8 +894,12 @@ export default function StoreBillingPage() {
           </section>
 
           <section id="plans" className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+            {/* InstaPay-only (no card gateway): plans are shown for reference; the
+                plan is paid by transfer and activated by a super-admin. */}
             <h2 className="mb-1 text-base font-semibold">{t('subscribeTitle')}</h2>
-            <p className="mb-3 text-sm text-muted-foreground">{t('subscribeBody')}</p>
+            <p className="mb-3 text-sm text-muted-foreground">
+              {cardPayments ? t('subscribeBody') : t('subscribeBodyInstapay')}
+            </p>
             <div className="mb-3 inline-flex rounded-full bg-muted p-1 text-sm" role="group">
               {(['monthly', 'yearly'] as const).map(k => (
                 <button
@@ -928,20 +935,23 @@ export default function StoreBillingPage() {
                       )}
                     </p>
                     {isCurrent && <Badge variant="info">{t('currentBadge')}</Badge>}
-                    {!isCurrent && paid && data.subscription.status !== 'comped' && (
-                      <Button
-                        size="sm"
-                        className="max-md:min-h-11"
-                        disabled={price === null || busy !== null}
-                        onClick={() => (hasCard ? switchPlan(p.code) : subscribe(p.code))}
-                      >
-                        {price === null
-                          ? t('priceUnset')
-                          : hasCard
-                            ? t('switchTo')
-                            : t('subscribe')}
-                      </Button>
-                    )}
+                    {!isCurrent &&
+                      paid &&
+                      data.subscription.status !== 'comped' &&
+                      (cardPayments || hasCard) && (
+                        <Button
+                          size="sm"
+                          className="max-md:min-h-11"
+                          disabled={price === null || busy !== null}
+                          onClick={() => (hasCard ? switchPlan(p.code) : subscribe(p.code))}
+                        >
+                          {price === null
+                            ? t('priceUnset')
+                            : hasCard
+                              ? t('switchTo')
+                              : t('subscribe')}
+                        </Button>
+                      )}
                   </div>
                 );
               })}

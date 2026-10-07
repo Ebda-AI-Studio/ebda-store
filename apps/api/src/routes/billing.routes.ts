@@ -76,7 +76,13 @@ router.get(
             : null,
           availablePlans,
           billing: await getSubscriptionBillingState(storeId),
-          provider: getBillingProvider().name,
+          provider: (() => {
+            try {
+              return getBillingProvider().name;
+            } catch {
+              return null; // InstaPay-only: no card gateway configured
+            }
+          })(),
           /** `inactive` until the go-live gate passes (onboarding / this page). */
           storeStatus:
             (await prisma.store.findUnique({ where: { id: storeId }, select: { status: true } }))

@@ -592,6 +592,14 @@ export async function startCheckout(args: {
   returnUrl?: string;
 }): Promise<{ redirectUrl: string; billingEventId: string }> {
   const interval = args.interval ?? 'monthly';
+  // Hosted card checkout exists only in card mode (Ruling EBDA-FUNNEL-17).
+  if (resolveTrialCardMode(args.provider) !== 'card_on_file') {
+    throw new AppError(
+      409,
+      'CARD_PAYMENTS_DISABLED',
+      'Card payments are not available; pay by InstaPay from this page'
+    );
+  }
   const provider = args.provider ?? getBillingProvider();
   const { plan, price } = await loadPayablePlan(args.planCode, interval);
 
@@ -776,7 +784,7 @@ export type RenewalResult =
 export async function renewSubscription(
   subscriptionId: string,
   now: Date = new Date(),
-  provider: BillingProvider = getBillingProvider()
+  providerArg?: BillingProvider
 ): Promise<RenewalResult> {
   const subStoreId = await getEntityStoreId('store_subscription', subscriptionId);
   const sub = subStoreId
@@ -841,6 +849,9 @@ export async function renewSubscription(
     return { action: 'skipped', reason: 'price_not_set' };
   }
 
+  // Resolved only when a card is actually charged: an InstaPay-only deployment
+  // (no BILLING_PROVIDER) never needs a gateway for reminders/overdue/suspension.
+  const provider = providerArg ?? getBillingProvider();
   const key = trialEnd
     ? `sub:${sub.id}:trial-end:${periodEnd.toISOString()}`
     : renewalKey(sub.id, periodEnd, attempt);
@@ -1002,7 +1013,7 @@ export async function expireStaleCheckouts(now: Date): Promise<number> {
 /** One pass of the daily cycle. Idempotent: running it twice charges once. */
 export async function runBillingCycle(
   now: Date = new Date(),
-  provider: BillingProvider = getBillingProvider(),
+  provider?: BillingProvider,
   /** Restrict the pass to specific subscriptions (operator re-run for one store). */
   only?: { subscriptionIds?: string[] }
 ): Promise<CycleSummary> {

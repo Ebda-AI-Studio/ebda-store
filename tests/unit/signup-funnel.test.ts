@@ -84,7 +84,7 @@ describe('goLiveVerdict', () => {
   });
 });
 
-describe('resolveTrialCardMode', () => {
+describe('resolveTrialCardMode (InstaPay-only by default, Ruling EBDA-FUNNEL-17)', () => {
   const stub = new StubBillingProvider();
   const kashier = new KashierBillingProvider({
     baseUrl: '',
@@ -92,19 +92,20 @@ describe('resolveTrialCardMode', () => {
     secretKey: 's',
     apiKey: 'a',
   });
-  it('unset follows the provider capability', () => {
-    expect(resolveTrialCardMode(stub, {})).toBe('card_on_file');
+  it('unset = pay_at_trial_end on every provider (card hidden)', () => {
+    expect(resolveTrialCardMode(stub, {})).toBe('pay_at_trial_end');
     expect(resolveTrialCardMode(kashier, {})).toBe('pay_at_trial_end');
   });
-  it('card_on_file on Kashier is refused (it cannot save a card without a charge)', () => {
+  it('production with NO billing provider configured still resolves (no gateway needed)', () => {
+    expect(resolveTrialCardMode(undefined, { NODE_ENV: 'production' })).toBe('pay_at_trial_end');
+  });
+  it('card only when explicitly on AND the provider can save without a charge', () => {
+    expect(resolveTrialCardMode(stub, { BILLING_TRIAL_CARD_MODE: 'card_on_file' })).toBe(
+      'card_on_file'
+    );
     expect(() =>
       resolveTrialCardMode(kashier, { BILLING_TRIAL_CARD_MODE: 'card_on_file' })
     ).toThrow(/cannot save a card/);
-  });
-  it('explicit pay_at_trial_end is honoured; garbage is refused', () => {
-    expect(resolveTrialCardMode(stub, { BILLING_TRIAL_CARD_MODE: 'pay_at_trial_end' })).toBe(
-      'pay_at_trial_end'
-    );
     expect(() => resolveTrialCardMode(stub, { BILLING_TRIAL_CARD_MODE: 'free' })).toThrow();
   });
 });

@@ -37,6 +37,8 @@ import {
 } from '@api/services/platform-mailer';
 import { hasDb } from '../helpers/bundle-fixtures';
 
+// Card paths are exercised explicitly; the product default is InstaPay-only.
+process.env.BILLING_TRIAL_CARD_MODE = 'card_on_file';
 const run = crypto.randomUUID().slice(0, 8);
 const PASSWORD = 'Str0ng!Passw0rd';
 const emails: string[] = [];

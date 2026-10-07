@@ -70,6 +70,8 @@ import { config } from '@api/config';
 import adminRoutes from '@api/routes/admin.routes';
 import { hasDb } from '../helpers/bundle-fixtures';
 
+// Card paths are exercised explicitly; the product default is InstaPay-only.
+process.env.BILLING_TRIAL_CARD_MODE = 'card_on_file';
 const run = crypto.randomUUID().slice(0, 8);
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 function appUrl(): string {
@@ -737,6 +739,31 @@ describe.skipIf(!hasDb)('signup funnel', () => {
           })
         )
       ).rejects.toMatchObject({ code: 'REFERENCE_USED_ELSEWHERE' });
+    });
+  });
+
+  describe('InstaPay-only default (BILLING_TRIAL_CARD_MODE unset)', () => {
+    it('refuses card setup and card checkout; the InstaPay path still goes live', async () => {
+      const prev = process.env.BILLING_TRIAL_CARD_MODE;
+      delete process.env.BILLING_TRIAL_CARD_MODE;
+      try {
+        const { storeId } = await trialStore('instaonly');
+        await expect(startCardSetup({ storeId, provider: stub })).rejects.toMatchObject({
+          code: 'CARD_SETUP_UNAVAILABLE',
+        });
+        await expect(
+          startCheckout({ storeId, planCode: 'growth', provider: stub })
+        ).rejects.toMatchObject({ code: 'CARD_PAYMENTS_DISABLED' });
+        expect((await getSubscriptionBillingState(storeId)).trialCardMode).toBe('pay_at_trial_end');
+        await chooseInstapay(storeId);
+        await expect(assertStoreMayGoLive(storeId)).resolves.toMatchObject({
+          reason: 'trial_instapay',
+        });
+        expect(stub.cardSetupCalls).toHaveLength(0);
+        expect(stub.checkoutCalls).toHaveLength(0);
+      } finally {
+        process.env.BILLING_TRIAL_CARD_MODE = prev;
+      }
     });
   });
 

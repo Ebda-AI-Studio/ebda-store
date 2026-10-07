@@ -71,7 +71,37 @@ function mockState(state: unknown) {
   });
 }
 
+// CI's jsdom has a working localStorage and some local origins have none: give
+// every run the same Map-backed storage so both behave like CI.
+if (
+  !(() => {
+    try {
+      return !!window.localStorage;
+    } catch {
+      return false;
+    }
+  })()
+) {
+  const mem = new Map<string, string>();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (k: string) => mem.get(k) ?? null,
+      setItem: (k: string, v: string) => void mem.set(k, String(v)),
+      removeItem: (k: string) => void mem.delete(k),
+      clear: () => mem.clear(),
+    },
+  });
+}
+
 beforeEach(() => {
+  // The plan step persists the choice (ebda.signup.plan); a jsdom with a real
+  // localStorage (CI) would otherwise carry one test's plan into the next.
+  try {
+    window.localStorage?.removeItem('ebda.signup.plan');
+  } catch {
+    /* no storage in this environment */
+  }
   apiPost.mockResolvedValue({ data: {}, error: null });
   apiPut.mockResolvedValue({ data: {}, error: null });
 });
