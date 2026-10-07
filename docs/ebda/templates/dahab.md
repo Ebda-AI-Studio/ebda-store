@@ -49,13 +49,15 @@ DATABASE_URL=<owner-role URL of the local container> OWNER_PASSWORD=… \
 
 Isolated from production on every axis; production Workers, routes, Hyperdrive, queues, KV, R2 and the Neon `main` branch are untouched.
 
-| Piece      | Preview                                                                                                                                                                                                                                         | Production (untouched)       |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| Database   | Neon branch `preview` (`br-blue-sky-b29b0j6o`), fresh database `ebda_preview` migrated from this branch; the copied `neondb` was dropped on the branch, so no production row exists in preview                                                  | `main` / `neondb`            |
-| API        | Worker `ebda-api-preview` → `api-preview.ebda.app`, Hyperdrive `ebda-preview` (caching off, role `ebda_app`), KV `ebda-preview-cache`, queues `ebda-preview-{email,sms}[-dlq]`, rate-limit namespace 1101, no crons, own JWT/ENCRYPTION secrets | `ebda-api`                   |
-| Storefront | Worker `ebda-web-preview` → `dahab-preview.ebda.app` (OPENNEXT_CACHE=false: no ISR bucket)                                                                                                                                                      | `ebda-web` on `*.ebda.app/*` |
-| Admin      | Worker `ebda-admin-preview` → `admin-preview.ebda.app`                                                                                                                                                                                          | `ebda-admin`                 |
-| Media      | R2 `ebda-preview-media` (public r2.dev URL)                                                                                                                                                                                                     | `ebda-media`                 |
+| Piece      | Preview                                                                                                                                                                                                                                            | Production (untouched)                              |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Database   | Neon branch `preview` (`br-blue-sky-b29b0j6o`), fresh database `ebda_preview` migrated from this branch; the copied `neondb` was dropped on the branch, so no production row exists in preview                                                     | `main` / `neondb`                                   |
+| API        | Worker `ebda-api-preview` → `api-preview.ebda.app`, Hyperdrive `ebda-preview` (caching off, role `ebda_app`), KV `ebda-preview-cache`, queues `ebda-preview-{email,sms}[-dlq]`, rate-limit namespace 1101, no crons, own JWT/ENCRYPTION secrets    | `ebda-api`                                          |
+| Storefront | Worker `ebda-web-preview` → `dahab-preview.ebda.app`, its own data cache (R2 `ebda-preview-isr-cache` + DO tag cache; edits appear within the fetch windows, ≤ 60 s for products/layout, 300 s for reviews — the preview has no revalidate secret) | `ebda-web` on `*.ebda.app/*` (`ebda-web-isr-cache`) |
+| Admin      | Worker `ebda-admin-preview` → `admin-preview.ebda.app`                                                                                                                                                                                             | `ebda-admin`                                        |
+| Media      | R2 `ebda-preview-media` (public r2.dev URL)                                                                                                                                                                                                        | `ebda-media`                                        |
+
+Smart placement was tried on `ebda-api-preview` and reverted: with it, about half of the requests waited the full 20 s for a pooled database client and answered 503 `OVERLOADED`; without it 28/28 probes answered 200.
 
 Each preview Worker is a custom domain **plus** a host-specific zone route (`<host>/*`): zone routes run before custom domains, so without it the production `*.ebda.app/*` route answered `api-preview.ebda.app` on the first deploy. Every preview response carries `X-Robots-Tag: noindex, nofollow` (`preview-worker` entries). No Resend / Inngest / Sentry / OneSignal / payment keys exist on preview: it cannot email, text or charge anyone. Secrets live in the macOS keychain (account `whisky11`): `ebda-preview-JWT_SECRET`, `ebda-preview-ENCRYPTION_KEY`, `ebda-preview-OWNER_DATABASE_URL`, `ebda-preview-APP_DATABASE_URL`, `ebda-preview-admin-login` (demo admin, `email password`).
 
@@ -65,13 +67,13 @@ Deploy (from a checkout of this branch, `CLOUDFLARE_ACCOUNT_ID=69188202efc4df480
 PREVIEW_HYPERDRIVE_ID=9f87e8fb4ce549bc901a8d84c8827464 PREVIEW_KV_ID=060d12930dd84f3081a2b49feca405df \
   node scripts/preview/preview-config.mjs api
 (cd apps/api && npx wrangler deploy --config .wrangler.preview.jsonc --secrets-file <json from keychain> --var BUILD_COMMIT_SHA:$(git rev-parse HEAD))
-OPENNEXT_CACHE=false CF_SETUP_SKIP_DEPS=1 bash scripts/cf-setup-local.sh web admin
+OPENNEXT_CACHE=true CF_SETUP_SKIP_DEPS=1 bash scripts/cf-setup-local.sh web && CF_SETUP_SKIP_DEPS=1 bash scripts/cf-setup-local.sh admin
 STOREFRONT_FRAME_ANCESTORS=https://admin-preview.ebda.app NEXT_PUBLIC_API_URL=https://api-preview.ebda.app/api/v1 bash scripts/cf-build.sh web
 NEXT_PUBLIC_API_URL=https://api-preview.ebda.app bash scripts/cf-build.sh admin
 node scripts/preview/preview-config.mjs web && node scripts/preview/preview-config.mjs admin
 (cd apps/web && npx wrangler deploy --config .wrangler.preview.jsonc)
 (cd apps/admin && npx wrangler deploy --config .wrangler.preview.jsonc)
-git checkout apps/web/wrangler.jsonc apps/web/open-next.config.ts apps/admin/wrangler.jsonc   # generated files
+git checkout apps/web/wrangler.jsonc apps/web/open-next.config.ts apps/admin/wrangler.jsonc && rm -f apps/web/cache-worker-entry.ts   # generated files
 ```
 
 Teardown (all preview-only names; nothing here touches production):
@@ -84,6 +86,7 @@ npx wrangler delete --name ebda-api-preview
 npx wrangler hyperdrive delete 9f87e8fb4ce549bc901a8d84c8827464
 npx wrangler kv namespace delete --namespace-id 060d12930dd84f3081a2b49feca405df
 for q in ebda-preview-email ebda-preview-sms ebda-preview-email-dlq ebda-preview-sms-dlq; do npx wrangler queues delete $q; done
+npx wrangler r2 bucket delete ebda-preview-isr-cache   # empty it first if it holds cache objects
 npx wrangler r2 bucket dev-url disable ebda-preview-media && npx wrangler r2 object delete … && npx wrangler r2 bucket delete ebda-preview-media
 # Neon: delete ONLY the branch named `preview`
 curl -X DELETE -H "Authorization: Bearer $(security find-generic-password -a whisky11 -s neon-api-key-whisky11 -w)" \
