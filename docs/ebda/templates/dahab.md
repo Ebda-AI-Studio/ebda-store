@@ -45,6 +45,10 @@ DATABASE_URL=<owner-role URL of the local container> OWNER_PASSWORD=… \
   npx tsx scripts/dahab-demo/seed-dahab.mjs            # loopback only unless --allow-remote
 ```
 
+## Editor end to end (real stack)
+
+`npm run test:editor-live` (with `EDITOR_E2E_PG=<local superuser postgres URL>`) drives the visual builder against the real admin, the real storefront in the canvas and the real API in workerd, over a fresh database seeded by this demo seed: edit a hero heading → live canvas, add + reorder a section, hide a section, publish → public storefront. Local only (Ruling EDITOR-LIVE-3).
+
 ## Preview stack
 
 Isolated from production on every axis; production Workers, routes, Hyperdrive, queues, KV, R2 and the Neon `main` branch are untouched.
@@ -57,7 +61,7 @@ Isolated from production on every axis; production Workers, routes, Hyperdrive, 
 | Admin      | Worker `ebda-admin-preview` → `admin-preview.ebda.app`                                                                                                                                                                                             | `ebda-admin`                                        |
 | Media      | R2 `ebda-preview-media` (public r2.dev URL)                                                                                                                                                                                                        | `ebda-media`                                        |
 
-Smart placement was tried on `ebda-api-preview` and reverted: with it, about half of the requests waited the full 20 s for a pooled database client and answered 503 `OVERLOADED`; without it 28/28 probes answered 200.
+Smart placement was tried on `ebda-api-preview` and reverted: with it, about half of the requests waited the full 20 s for a pooled database client and answered 503 `OVERLOADED`; without it 28/28 probes answered 200. (2026-10-07: the same 20 s `OVERLOADED` came back without smart placement, from isolates whose database clients were all held by cancelled requests; fixed in `ClientPool`, see `docs/ebda/design/stage2-workers-db.md`, "Cancelled requests". The smart-placement result may have been the same leak.)
 
 Each preview Worker is a custom domain **plus** a host-specific zone route (`<host>/*`): zone routes run before custom domains, so without it the production `*.ebda.app/*` route answered `api-preview.ebda.app` on the first deploy. Every preview response carries `X-Robots-Tag: noindex, nofollow` (`preview-worker` entries). No Resend / Inngest / Sentry / OneSignal / payment keys exist on preview: it cannot email, text or charge anyone. Secrets live in the macOS keychain (account `whisky11`): `ebda-preview-JWT_SECRET`, `ebda-preview-ENCRYPTION_KEY`, `ebda-preview-OWNER_DATABASE_URL`, `ebda-preview-APP_DATABASE_URL`, `ebda-preview-admin-login` (demo admin, `email password`).
 
