@@ -1,0 +1,101 @@
+/**
+ * Shapes of `GET /stores/:id/billing` -> `billing` (also embedded in
+ * `GET /onboarding/state`). One definition so the onboarding steps, the
+ * merchant billing page and the store-wide banner cannot drift.
+ */
+
+export type BillingInterval = 'monthly' | 'yearly';
+export type TrialPlanCode = 'basic' | 'growth' | 'business';
+
+export interface PlanSelection {
+  planCode: TrialPlanCode;
+  interval: BillingInterval;
+}
+
+export interface BillingCard {
+  last4: string | null;
+  brand: string | null;
+  savedAt: string | null;
+}
+
+export interface BillingInfo {
+  billingInterval: BillingInterval;
+  /** Plan chosen at signup; billed when the trial ends. */
+  pendingPlanCode: string | null;
+  nextRetryAt: string | null;
+  dunningAttempts: number;
+  hasPaymentMethod: boolean;
+  billedByPlatform: boolean;
+  card: BillingCard | null;
+  trialEndsAt: string | null;
+  nextCharge: { at: string; planCode: string; amountMinor: number | null } | null;
+  /** The card option is offered only when 'card_on_file'. */
+  trialCardMode: 'card_on_file' | 'pay_at_trial_end' | null;
+  billingMethod: 'card' | 'instapay' | null;
+  instapay: {
+    available: boolean;
+    handle: string | null;
+    reference: string | null;
+    amountMinor: number | null;
+    pendingClaims: number;
+  };
+  dueSoon: { dueAt: string; daysLeft: number } | null;
+  overdue: boolean;
+  /** InstaPay: the store pauses at this time if unpaid. */
+  suspendAt: string | null;
+  /** wa.me link, or null when support WhatsApp is not configured. */
+  supportWhatsappUrl: string | null;
+  suspension: { reason: 'unpaid' | 'over_store_limit'; at: string } | null;
+}
+
+export interface PaymentClaim {
+  id: string;
+  planCode: string;
+  billingInterval: BillingInterval;
+  amountMinor: number;
+  method: string;
+  paymentReference: string | null;
+  payerReference: string;
+  status: 'pending' | 'confirmed' | 'rejected';
+  reviewNote: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
+/** Minimal plan row needed to show a price card. */
+export interface PlanOption {
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  priceMonthlyMinor: number | null;
+  priceYearlyMinor: number | null;
+}
+
+export const SIGNUP_PLAN_KEY = 'ebda.signup.plan';
+
+export function isTrialPlanCode(v: unknown): v is TrialPlanCode {
+  return v === 'basic' || v === 'growth' || v === 'business';
+}
+
+/** The plan chosen on the marketing site / signup page, if one was persisted. */
+export function readStoredPlan(): PlanSelection | null {
+  try {
+    const raw = window.localStorage.getItem(SIGNUP_PLAN_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as Partial<PlanSelection>;
+    if (isTrialPlanCode(v.planCode) && (v.interval === 'monthly' || v.interval === 'yearly')) {
+      return { planCode: v.planCode, interval: v.interval };
+    }
+  } catch {
+    // Storage can be blocked or hold junk; the plan step then just preselects the default.
+  }
+  return null;
+}
+
+export function storePlan(selection: PlanSelection): void {
+  try {
+    window.localStorage.setItem(SIGNUP_PLAN_KEY, JSON.stringify(selection));
+  } catch {
+    // Storage unavailable (private window): the choice still travels in component state.
+  }
+}

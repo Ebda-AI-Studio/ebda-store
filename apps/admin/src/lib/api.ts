@@ -701,28 +701,40 @@ export async function apiRequest<T = unknown>(
     }
 
     if (!response.ok) {
+      // Two envelopes exist: `{ error: { code, message, details } }` and the
+      // legacy `{ error: 'string', code }`.
+      const rawError: unknown = data.error;
+      const errObj =
+        rawError && typeof rawError === 'object'
+          ? (rawError as { code?: string; message?: string; details?: Record<string, unknown> })
+          : undefined;
+      const errCode: string | undefined =
+        errObj?.code ?? (data as unknown as { code?: string }).code;
+      const errMessage = errObj?.message ?? (typeof rawError === 'string' ? rawError : undefined);
       // A super-admin who hasn't enrolled in 2FA gets 403 MFA_SETUP_REQUIRED on
       // every protected route. Send them straight to the enrollment page instead
       // of surfacing a dead "failed to load" error. The /account/security page
       // only calls non-gated routes (/auth/me, /auth/mfa/*) so this can't loop.
       if (
         typeof window !== 'undefined' &&
-        data.error?.code === 'MFA_SETUP_REQUIRED' &&
+        errCode === 'MFA_SETUP_REQUIRED' &&
         window.location.pathname !== '/account/security'
       ) {
         window.location.assign('/account/security');
       }
+      const message = localizedApiMessage(
+        errCode,
+        errMessage || `Request failed with status ${response.status}`,
+        errObj?.details
+      );
+      if (response.status === 402) dispatchUpsell(errCode, message, errObj?.details);
       return {
         data: null,
         error: {
-          code: data.error?.code || 'SERVER_ERROR',
-          message: localizedApiMessage(
-            data.error?.code,
-            data.error?.message || `Request failed with status ${response.status}`,
-            data.error?.details
-          ),
+          code: errCode || 'SERVER_ERROR',
+          message,
           status: response.status,
-          details: data.error?.details,
+          details: errObj?.details,
         },
       };
     }
@@ -919,14 +931,42 @@ export async function apiPatch<T = unknown>(endpoint: string, body?: unknown) {
  * is RTL — platform-level, no per-page handling.
  */
 function localizedApiMessage(
-  code: string | undefined,
+  _code: string | undefined,
   message: string,
   details: Record<string, unknown> | undefined
 ): string {
-  if (code !== 'PLAN_LIMIT_REACHED') return message;
+  // Any code whose details carry both-language text is localized (plan limits,
+  // subscription gates, go-live gates, ...).
   const isArabic = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
   const text = isArabic ? details?.messageAr : details?.messageEn;
   return typeof text === 'string' && text ? text : message;
+}
+
+export interface UpsellEventDetail {
+  code: string;
+  message: string;
+  upgradeTo: { code: string; nameEn: string; nameAr: string } | string | null;
+  limitKey: string | null;
+}
+
+/** Tell the shell a 402 happened so it can offer an upgrade (UpsellDialog). */
+function dispatchUpsell(
+  code: string | undefined,
+  message: string,
+  details: Record<string, unknown> | undefined
+): void {
+  if (typeof window === 'undefined') return;
+  const upgradeTo = details?.upgradeTo as UpsellEventDetail['upgradeTo'] | undefined;
+  window.dispatchEvent(
+    new CustomEvent<UpsellEventDetail>('ebda:upsell', {
+      detail: {
+        code: code ?? 'SERVER_ERROR',
+        message,
+        upgradeTo: upgradeTo ?? null,
+        limitKey: typeof details?.limitKey === 'string' ? details.limitKey : null,
+      },
+    })
+  );
 }
 
 /**

@@ -24,9 +24,45 @@ vi.mock('../../i18n/useT', () => {
 vi.mock('@force/ui', () => ({
   Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
   Button: (p: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...p} />,
+  Input: ({
+    label,
+    error,
+    ...p
+  }: { label?: string; error?: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
+    <div>
+      <label htmlFor={p.id}>{label}</label>
+      <input {...p} />
+      {error && <p>{error}</p>}
+    </div>
+  ),
+  Select: ({
+    label,
+    options,
+    ...p
+  }: {
+    label?: string;
+    options: { value: string; label: string }[];
+  } & React.SelectHTMLAttributes<HTMLSelectElement>) => (
+    <label>
+      {label}
+      <select {...p}>
+        {options.map(o => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  ),
+  Modal: ({ children, title }: { children: React.ReactNode; title?: string }) => (
+    <div role="dialog" aria-label={title}>
+      {children}
+    </div>
+  ),
 }));
 
 import BillingEventsPage from './page';
+import { addPeriod } from './_components/ManualPaymentForm';
 
 const row = (over: Record<string, unknown> = {}) => ({
   id: 'e1',
@@ -50,6 +86,7 @@ const row = (over: Record<string, unknown> = {}) => ({
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
 describe('super-admin billing ledger page', () => {
@@ -95,5 +132,201 @@ describe('super-admin billing ledger page', () => {
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toBe('failedToLoad');
     expect(screen.queryByText('empty')).toBeNull();
+  });
+});
+
+const sub = (over: Record<string, unknown> = {}) => ({
+  storeId: 's9',
+  storeName: 'Nile Textiles',
+  storeSlug: 'nile',
+  storeStatus: 'active',
+  planCode: 'growth',
+  chosenPlanCode: 'business',
+  billingInterval: 'yearly',
+  status: 'trialing',
+  trialEndsAt: '2026-11-20T00:00:00.000Z',
+  card: null,
+  provider: 'kashier',
+  billingMethod: 'instapay',
+  paymentReference: 'EBD-7K2Q',
+  suspendedReason: null,
+  dunningAttempts: 0,
+  nextRetryAt: null,
+  currentPeriodEnd: null,
+  nextCharge: { at: '2026-11-20T00:00:00.000Z', planCode: 'business', amountMinor: 8991000 },
+  ...over,
+});
+
+/** apiGet by URL for the three tabs. */
+function mockTabs(subs: unknown[] = [sub()], claims: unknown[] = []) {
+  apiGet.mockImplementation(async (url: string) => {
+    if (url.includes('/billing/subscriptions'))
+      return { data: { subscriptions: subs }, error: null };
+    if (url.includes('/billing/claims')) return { data: { claims }, error: null };
+    return { data: { events: [] }, error: null };
+  });
+}
+const openTab = (name: string) => fireEvent.click(screen.getByRole('tab', { name }));
+
+describe('billing ledger: signup-funnel additions', () => {
+  it('the type filter offers card_setup and manual_payment and sends them as the API filter', async () => {
+    apiGet.mockResolvedValue({ data: { events: [] }, error: null });
+    render(<BillingEventsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'types.card_setup' }));
+    await waitFor(() =>
+      expect(apiGet.mock.calls.some(c => String(c[0]).includes('type=card_setup'))).toBe(true)
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'types.manual_payment' }));
+    await waitFor(() =>
+      expect(apiGet.mock.calls.some(c => String(c[0]).includes('type=manual_payment'))).toBe(true)
+    );
+  });
+
+  it('Subscriptions tab lists stores and filters by view (due / overdue / suspended)', async () => {
+    mockTabs();
+    render(<BillingEventsPage />);
+    openTab('tabs.subscriptions');
+    expect((await screen.findAllByText('Nile Textiles')).length).toBeGreaterThan(0);
+    expect(apiGet).toHaveBeenCalledWith('/api/v1/admin/billing/subscriptions');
+    fireEvent.click(screen.getByRole('button', { name: 'views.overdue' }));
+    await waitFor(() =>
+      expect(apiGet).toHaveBeenCalledWith('/api/v1/admin/billing/subscriptions?view=overdue')
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'views.due' }));
+    await waitFor(() =>
+      expect(apiGet).toHaveBeenCalledWith('/api/v1/admin/billing/subscriptions?view=due')
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'views.suspended' }));
+    await waitFor(() =>
+      expect(apiGet).toHaveBeenCalledWith('/api/v1/admin/billing/subscriptions?view=suspended')
+    );
+  });
+
+  it('Subscriptions: an outage is a failure state, not "no subscriptions"', async () => {
+    apiGet.mockResolvedValue({
+      data: null,
+      error: { code: 'SERVER_ERROR', message: 'x', status: 500 },
+    });
+    render(<BillingEventsPage />);
+    openTab('tabs.subscriptions');
+    expect((await screen.findByRole('alert')).textContent).toBe('failedToLoad');
+  });
+
+  it('manual payment: amount is converted to piastres by string parsing, never float math', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-05T10:00:00.000Z'));
+    mockTabs();
+    apiPost.mockResolvedValue({ data: { duplicate: false, billingEventId: 'b1' }, error: null });
+    render(<BillingEventsPage />);
+    openTab('tabs.subscriptions');
+    fireEvent.click((await screen.findAllByRole('button', { name: 'record' }))[0]);
+    // Prefilled from the row: chosen plan, interval, next-charge amount, InstaPay.
+    expect((screen.getByLabelText('amount') as HTMLInputElement).value).toBe('89910.00');
+    expect((screen.getByLabelText('plan') as HTMLSelectElement).value).toBe('business');
+    expect((screen.getByLabelText('interval') as HTMLSelectElement).value).toBe('yearly');
+    expect((screen.getByLabelText('periodEnd') as HTMLInputElement).value).toBe('2027-11-05');
+
+    const amount = screen.getByLabelText('amount');
+    fireEvent.change(screen.getByLabelText('reference'), { target: { value: 'IPN-1' } });
+    fireEvent.change(amount, { target: { value: '1.999' } });
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }));
+    expect(await screen.findByText('amountInvalid')).toBeTruthy();
+    expect(apiPost).not.toHaveBeenCalled();
+
+    // 0.29 * 100 is 28.999999999999996 in floats; the API must get exactly 29.
+    fireEvent.change(amount, { target: { value: '0.29' } });
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }));
+    await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
+    expect(apiPost).toHaveBeenCalledWith('/api/v1/admin/stores/s9/manual-payment', {
+      planCode: 'business',
+      interval: 'yearly',
+      amountMinor: 29,
+      method: 'instapay',
+      reference: 'IPN-1',
+      paidAt: '2026-11-05T00:00:00.000Z',
+      periodStart: '2026-11-05T00:00:00.000Z',
+      periodEnd: '2027-11-05T00:00:00.000Z',
+    });
+    expect(await screen.findByText('manual.recorded')).toBeTruthy();
+  });
+
+  it('manual payment: a repeated reference reports "duplicate" instead of success', async () => {
+    mockTabs();
+    apiPost.mockResolvedValue({ data: { duplicate: true, billingEventId: 'b1' }, error: null });
+    render(<BillingEventsPage />);
+    openTab('tabs.subscriptions');
+    fireEvent.click((await screen.findAllByRole('button', { name: 'record' }))[0]);
+    fireEvent.change(screen.getByLabelText('reference'), { target: { value: 'IPN-1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }));
+    expect(await screen.findByText('manual.duplicate')).toBeTruthy();
+    expect(screen.queryByText('manual.recorded')).toBeNull();
+  });
+
+  const claim = {
+    id: 'cl1',
+    storeId: 's9',
+    storeName: 'Nile Textiles',
+    storeSlug: 'nile',
+    storeStatus: 'suspended',
+    planCode: 'growth',
+    billingInterval: 'monthly',
+    amountMinor: 349000,
+    method: 'instapay',
+    paymentReference: 'EBD-7K2Q',
+    payerReference: 'IPN-99887766',
+    proofUrl: null,
+    status: 'pending',
+    createdAt: '2026-11-04T00:00:00.000Z',
+  };
+
+  it('Payment claims: Confirm & activate opens the form prefilled from the claim (incl. claimId)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-31T10:00:00.000Z'));
+    mockTabs([], [claim]);
+    apiPost.mockResolvedValue({ data: { duplicate: false }, error: null });
+    render(<BillingEventsPage />);
+    openTab('tabs.claims');
+    expect(apiGet).toHaveBeenCalledWith('/api/v1/admin/billing/claims?status=pending');
+    fireEvent.click((await screen.findAllByRole('button', { name: 'confirm' }))[0]);
+    expect((screen.getByLabelText('reference') as HTMLInputElement).value).toBe('IPN-99887766');
+    expect((screen.getByLabelText('amount') as HTMLInputElement).value).toBe('3490.00');
+    // Jan 31 + 1 month clamps to the end of February, not March 3.
+    expect((screen.getByLabelText('periodEnd') as HTMLInputElement).value).toBe('2026-02-28');
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }));
+    await waitFor(() => expect(apiPost).toHaveBeenCalled());
+    expect(apiPost.mock.calls[0][1]).toMatchObject({
+      claimId: 'cl1',
+      method: 'instapay',
+      amountMinor: 349000,
+      reference: 'IPN-99887766',
+      planCode: 'growth',
+      interval: 'monthly',
+    });
+  });
+
+  it('Payment claims: Reject needs a note, then posts store + note', async () => {
+    mockTabs([], [claim]);
+    apiPost.mockResolvedValue({ data: {}, error: null });
+    render(<BillingEventsPage />);
+    openTab('tabs.claims');
+    fireEvent.click((await screen.findAllByRole('button', { name: 'reject' }))[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'rejectSubmit' }));
+    expect(await screen.findByText('noteRequired')).toBeTruthy();
+    expect(apiPost).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('note'), { target: { value: 'Amount does not match' } });
+    fireEvent.click(screen.getByRole('button', { name: 'rejectSubmit' }));
+    await waitFor(() =>
+      expect(apiPost).toHaveBeenCalledWith('/api/v1/admin/billing/claims/cl1/reject', {
+        storeId: 's9',
+        note: 'Amount does not match',
+      })
+    );
+  });
+
+  it('addPeriod clamps month ends and handles years', () => {
+    expect(addPeriod('2026-01-31', 'monthly')).toBe('2026-02-28');
+    expect(addPeriod('2028-01-31', 'monthly')).toBe('2028-02-29');
+    expect(addPeriod('2026-12-15', 'monthly')).toBe('2027-01-15');
+    expect(addPeriod('2028-02-29', 'yearly')).toBe('2029-02-28');
   });
 });

@@ -10,6 +10,9 @@
  * plan picker here (e.g. to comp a store), backed by
  * PUT /admin/stores/:id/subscription.
  *
+ * Signup funnel additions: trial/plan summary, payment method (card on file or
+ * InstaPay with a "I paid" confirmation), billing notices, and "Go live".
+ *
  * Orders never block checkout: past the monthly cap the store is flagged and
  * this page shows a banner instead (see PlanLimitService.noteOrderCreated).
  */
@@ -17,12 +20,21 @@
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button, Select, useToast } from '@force/ui';
+import { Badge, Button, Input, Select, useToast } from '@force/ui';
 import { formatMoney, type PlanLimits } from '@force/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
 import { useT } from '../../../../i18n/useT';
+import { CopyRow } from '../../../../components/billing/CopyRow';
+import {
+  cardLabel,
+  fmtDate as fmtBillingDate,
+  planLabel,
+} from '../../../../components/billing/format';
+import { billingNotice, noticeText } from '../../../../components/billing/notice';
+import { startCardSetup, useCardReturn } from '../../../../components/billing/useCardReturn';
+import type { BillingInfo, PaymentClaim } from '../../../../components/billing/types';
 
 interface PlanSummary {
   code: string;
@@ -51,20 +63,14 @@ interface BillingData {
   };
   ordersOverLimitMonth: string | null;
   availablePlans: PlanSummary[];
-  billing?: {
-    billingInterval: 'monthly' | 'yearly';
-    pendingPlanCode: string | null;
-    nextRetryAt: string | null;
-    dunningAttempts: number;
-    hasPaymentMethod: boolean;
-    billedByPlatform: boolean;
-  };
+  billing?: BillingInfo;
+  storeStatus?: 'active' | 'inactive' | 'suspended';
   provider?: 'kashier' | 'stub';
 }
 
 interface Charge {
   id: string;
-  type: 'checkout' | 'renewal' | 'upgrade' | 'refund';
+  type: 'checkout' | 'renewal' | 'upgrade' | 'refund' | 'card_setup' | 'manual_payment';
   planCode: string | null;
   amountMinor: number;
   status: 'pending' | 'succeeded' | 'failed' | 'refunded';
@@ -124,6 +130,7 @@ export default function StoreBillingPage() {
   const t = useT('billing');
   const tCommon = useT('common');
   const tLimits = useT('plans.limits');
+  const tNotice = useT('billing.notice');
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const { user } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
@@ -139,6 +146,12 @@ export default function StoreBillingPage() {
   const [returnState, setReturnState] = useState<'idle' | 'pending' | 'ok' | 'failed' | 'later'>(
     'idle'
   );
+  const [claims, setClaims] = useState<PaymentClaim[]>([]);
+  const [payerReference, setPayerReference] = useState('');
+  const [claimError, setClaimError] = useState('');
+  const [cardUnavailable, setCardUnavailable] = useState(false);
+  const [goLiveError, setGoLiveError] = useState('');
+  const [highlightPlan, setHighlightPlan] = useState<string | null>(null);
   const isSuperAdmin = user?.role === 'super_admin';
 
   const load = useCallback(async () => {
@@ -159,12 +172,36 @@ export default function StoreBillingPage() {
     if (d) setCharges(d.charges ?? []);
   }, [storeId]);
 
+  const loadClaims = useCallback(async () => {
+    const { data: d } = await apiGet<{ claims?: PaymentClaim[] }>(
+      `/api/v1/stores/${storeId}/billing/payment-claims`
+    );
+    setClaims(d?.claims ?? []);
+  }, [storeId]);
+
   useEffect(() => {
     if (storeId) {
       load();
       loadCharges();
+      loadClaims();
     }
-  }, [load, loadCharges, storeId]);
+  }, [load, loadCharges, loadClaims, storeId]);
+
+  // `?plan=<code>` comes from the upsell dialog: mark that plan below.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setHighlightPlan(new URLSearchParams(window.location.search).get('plan'));
+  }, []);
+
+  // Back from the hosted card-save page (`?card=return`). Nothing was charged;
+  // the signed webhook flips `hasPaymentMethod`, so poll for that.
+  const cardReturn = useCardReturn(storeId, async () => {
+    const { data: d } = await apiGet<BillingData>(`/api/v1/stores/${storeId}/billing`);
+    if (d) setData(d);
+    if (!d?.billing?.hasPaymentMethod) return false;
+    void loadCharges();
+    return true;
+  });
 
   // Back from the hosted card page: the browser's word is only a hint, so ask
   // the API for the ledger status (updated by the signed webhook) and poll briefly.
@@ -303,6 +340,80 @@ export default function StoreBillingPage() {
     await Promise.all([load(), loadCharges()]);
   }
 
+  async function addCard() {
+    setBusy('card');
+    const failed = await startCardSetup(storeId, 'billing');
+    if (failed) {
+      setBusy(null);
+      if (failed.code === 'CARD_SETUP_UNAVAILABLE') setCardUnavailable(true);
+      else toastError(t('pay.cardFailed'));
+    }
+  }
+
+  async function chooseInstapay() {
+    setBusy('instapay');
+    try {
+      const { error: e } = await apiPost(`/api/v1/stores/${storeId}/billing/payment-method`, {
+        method: 'instapay',
+      });
+      if (e) {
+        toastError(
+          e.code === 'INSTAPAY_NOT_CONFIGURED'
+            ? t('pay.instapayUnavailable')
+            : t('pay.instapayFailed')
+        );
+        return;
+      }
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function sendClaim(e: React.FormEvent) {
+    e.preventDefault();
+    const ref = payerReference.trim();
+    if (ref.length < 4 || ref.length > 64) {
+      setClaimError(t('pay.payerRefInvalid'));
+      return;
+    }
+    setClaimError('');
+    setBusy('claim');
+    try {
+      // No screenshot field on purpose: the only admin upload helper (ImageUpload)
+      // writes to the PUBLIC media bucket, which is the wrong home for a payment proof.
+      const { error: err } = await apiPost(`/api/v1/stores/${storeId}/billing/payment-claims`, {
+        payerReference: ref,
+      });
+      if (err) {
+        setClaimError(t('pay.claimFailed'));
+        return;
+      }
+      setPayerReference('');
+      toastSuccess(t('pay.claimSent'));
+      await Promise.all([loadClaims(), load()]);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function goLive() {
+    setGoLiveError('');
+    setBusy('golive');
+    try {
+      const { error: err } = await apiPost(`/api/v1/onboarding/stores/${storeId}/go-live`);
+      if (err) {
+        // 402s carry a localized message (payment method required, trial over, ...).
+        setGoLiveError(err.status === 402 && err.message ? err.message : t('goLive.failed'));
+        return;
+      }
+      toastSuccess(t('goLive.done'));
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const planName = (p: { nameEn: string; nameAr: string }) =>
     locale === 'ar' ? p.nameAr : p.nameEn;
   const fmtDate = (iso: string | null) =>
@@ -317,6 +428,24 @@ export default function StoreBillingPage() {
     minor === null ? t('priceTbd') : formatMoney(minor, locale);
   const planPrice = (p: PlanSummary) =>
     interval === 'yearly' ? p.priceYearlyMinor : p.priceMonthlyMinor;
+
+  const info = data?.billing;
+  const notice = billingNotice(info);
+  const noticeCopy = info && notice ? noticeText(notice, info, tNotice, locale) : null;
+  const noticeUrgent = notice === 'unpaid' || notice === 'overdue' || notice === 'overStoreLimit';
+  const chosenPlan = data?.availablePlans.find(p => p.code === info?.pendingPlanCode);
+  const chargePlan = data?.availablePlans.find(p => p.code === info?.nextCharge?.planCode);
+  const instapay = info?.instapay;
+  const instapayChosen = info?.billingMethod === 'instapay';
+  const showCardControls =
+    !cardUnavailable && (info?.trialCardMode === 'card_on_file' || !!info?.hasPaymentMethod);
+  const showPaymentMethod =
+    !!info &&
+    (showCardControls ||
+      !!instapay?.available ||
+      instapayChosen ||
+      claims.length > 0 ||
+      !!info.card);
 
   const currentMonth = new Date().toISOString().slice(0, 7);
   const overOrders = data?.ordersOverLimitMonth?.startsWith(currentMonth) ?? false;
@@ -338,6 +467,80 @@ export default function StoreBillingPage() {
       {!error && !data && <p className="text-sm text-muted-foreground">{t('loading')}</p>}
       {data && (
         <div className="space-y-4">
+          {noticeCopy && (
+            <div
+              role={noticeUrgent ? 'alert' : 'status'}
+              className={`rounded-xl border p-4 text-sm ${
+                noticeUrgent
+                  ? 'border-destructive/40 bg-destructive/10 text-destructive-ink'
+                  : 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200'
+              }`}
+            >
+              <p className="font-semibold">{noticeCopy.title}</p>
+              {noticeCopy.body && <p className="mt-1">{noticeCopy.body}</p>}
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                {notice === 'overStoreLimit' && (
+                  <a href="#plans" className="font-medium underline">
+                    {tNotice('seePlans')}
+                  </a>
+                )}
+                {info?.supportWhatsappUrl && (
+                  <a
+                    href={info.supportWhatsappUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium underline"
+                  >
+                    {tNotice('whatsapp')}
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
+          {cardReturn.state !== 'idle' && (
+            <div role="status" className="rounded-xl border bg-card p-4 text-sm">
+              {cardReturn.state === 'pending' && t('pay.returnPending')}
+              {cardReturn.state === 'ok' && t('pay.returnOk')}
+              {cardReturn.state === 'failed' && t('pay.returnFailed')}
+              {cardReturn.state === 'later' && t('pay.returnLater')}
+              {cardReturn.stubOrderId && cardReturn.state === 'pending' && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    disabled={cardReturn.busy}
+                    onClick={() => cardReturn.simulate('success')}
+                  >
+                    {t('pay.stubSaved')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={cardReturn.busy}
+                    onClick={() => cardReturn.simulate('failure')}
+                  >
+                    {t('pay.stubDecline')}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {data.storeStatus === 'inactive' && (
+            <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+              <h2 className="mb-1 text-base font-semibold">{t('goLive.title')}</h2>
+              <p className="mb-3 text-sm text-muted-foreground">{t('goLive.body')}</p>
+              {goLiveError && (
+                <p role="alert" className="mb-3 text-sm text-destructive-ink">
+                  {goLiveError}
+                </p>
+              )}
+              <Button className="max-md:min-h-11" disabled={busy !== null} onClick={goLive}>
+                {busy === 'golive' ? t('goLive.working') : t('goLive.cta')}
+              </Button>
+            </section>
+          )}
+
           {overOrders && (
             <div
               role="alert"
@@ -446,6 +649,200 @@ export default function StoreBillingPage() {
             </dl>
           </section>
 
+          {info && (
+            <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <h2 className="text-base font-semibold">{t('trial.title')}</h2>
+                <Badge
+                  variant={
+                    data.subscription.status === 'past_due'
+                      ? 'destructive'
+                      : data.subscription.status === 'trialing' ||
+                          data.subscription.status === 'comped'
+                        ? 'info'
+                        : data.subscription.status === 'active'
+                          ? 'success'
+                          : 'secondary'
+                  }
+                >
+                  {t(`status.${data.subscription.status}`)}
+                </Badge>
+              </div>
+              <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+                {(info.trialEndsAt ?? data.subscription.trialEndsAt) && (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-muted-foreground">{t('trialEnds')}</dt>
+                    <dd>{fmtDate(info.trialEndsAt ?? data.subscription.trialEndsAt)}</dd>
+                  </div>
+                )}
+                {info.pendingPlanCode && (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-muted-foreground">{t('trial.chosenPlan')}</dt>
+                    <dd>
+                      {planLabel(chosenPlan, info.pendingPlanCode, locale)} ·{' '}
+                      {t(info.billingInterval === 'yearly' ? 'intervalYearly' : 'intervalMonthly')}
+                    </dd>
+                  </div>
+                )}
+                {info.nextCharge && (
+                  <div className="flex justify-between gap-2 sm:col-span-2">
+                    <dt className="text-muted-foreground">{t('trial.nextCharge')}</dt>
+                    <dd className="text-end tabular-nums">
+                      {info.nextCharge.amountMinor !== null
+                        ? t('trial.nextChargeLine', {
+                            amount: formatMoney(info.nextCharge.amountMinor, locale),
+                            plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
+                            date: fmtBillingDate(info.nextCharge.at, locale),
+                          })
+                        : t('trial.nextChargeNoAmount', {
+                            plan: planLabel(chargePlan, info.nextCharge.planCode, locale),
+                            date: fmtBillingDate(info.nextCharge.at, locale),
+                          })}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </section>
+          )}
+
+          {showPaymentMethod && info && (
+            <section className="space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+              <h2 className="text-base font-semibold">{t('pay.title')}</h2>
+
+              {(showCardControls || info.card) && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium">{t('pay.card')}</h3>
+                  {info.hasPaymentMethod && info.card ? (
+                    <p className="text-sm">
+                      <span dir="ltr" className="font-medium">
+                        {cardLabel(info.card)}
+                      </span>
+                      {info.card.savedAt && (
+                        <span className="text-muted-foreground">
+                          {' · '}
+                          {t('pay.cardSavedOn', {
+                            date: fmtBillingDate(info.card.savedAt, locale),
+                          })}
+                        </span>
+                      )}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{t('pay.noCard')}</p>
+                  )}
+                  {showCardControls && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="max-md:min-h-11"
+                        disabled={busy !== null}
+                        onClick={addCard}
+                      >
+                        {busy === 'card'
+                          ? t('pay.redirecting')
+                          : info.hasPaymentMethod
+                            ? t('pay.replaceCard')
+                            : t('pay.addCard')}
+                      </Button>
+                      <p className="text-xs text-muted-foreground">{t('pay.cardNote')}</p>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {(instapay?.available || instapayChosen) && instapay && (
+                <div className="space-y-3 border-t pt-4">
+                  <h3 className="text-sm font-medium">{t('pay.instapay')}</h3>
+                  {!instapayChosen ? (
+                    <Button
+                      variant="outline"
+                      className="max-md:min-h-11"
+                      disabled={busy !== null}
+                      onClick={chooseInstapay}
+                    >
+                      {t('pay.useInstapay')}
+                    </Button>
+                  ) : (
+                    <>
+                      <div className="space-y-3 text-sm">
+                        {(
+                          [
+                            [t('pay.handle'), instapay.handle],
+                            [
+                              t('pay.amount'),
+                              instapay.amountMinor !== null
+                                ? formatMoney(instapay.amountMinor, locale)
+                                : null,
+                            ],
+                            [t('pay.reference'), instapay.reference],
+                          ] as const
+                        ).map(([label, value]) =>
+                          value ? (
+                            <CopyRow
+                              key={label}
+                              label={label}
+                              value={value}
+                              copyLabel={t('pay.copy')}
+                              copiedLabel={t('pay.copied')}
+                            />
+                          ) : null
+                        )}
+                      </div>
+                      <form onSubmit={sendClaim} className="space-y-2" noValidate>
+                        <h4 className="text-sm font-medium">{t('pay.paidTitle')}</h4>
+                        <p className="text-xs text-muted-foreground">{t('pay.paidHelp')}</p>
+                        <Input
+                          id="payer-reference"
+                          dir="ltr"
+                          label={t('pay.payerRef')}
+                          value={payerReference}
+                          maxLength={64}
+                          onChange={e => setPayerReference(e.target.value)}
+                          error={claimError || undefined}
+                        />
+                        <Button type="submit" className="max-md:min-h-11" disabled={busy !== null}>
+                          {busy === 'claim' ? t('pay.sending') : t('pay.send')}
+                        </Button>
+                      </form>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {claims.length > 0 && (
+                <div className="space-y-2 border-t pt-4">
+                  <h3 className="text-sm font-medium">{t('claims.title')}</h3>
+                  <ul className="space-y-2">
+                    {claims.map(c => (
+                      <li key={c.id} className="rounded-lg border p-3 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span dir="ltr" className="font-medium">
+                            {c.payerReference}
+                          </span>
+                          <Badge
+                            variant={
+                              c.status === 'confirmed'
+                                ? 'success'
+                                : c.status === 'rejected'
+                                  ? 'destructive'
+                                  : 'warning'
+                            }
+                          >
+                            {t(`claims.status.${c.status}`)}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatMoney(c.amountMinor, locale)} ·{' '}
+                          {fmtBillingDate(c.createdAt, locale)}
+                        </p>
+                        {c.reviewNote && <p className="mt-1">{c.reviewNote}</p>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
+          )}
+
           <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="mb-4 text-base font-semibold">{t('usageTitle')}</h2>
             <div className="space-y-4">
@@ -493,7 +890,7 @@ export default function StoreBillingPage() {
             </ul>
           </section>
 
-          <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+          <section id="plans" className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="mb-1 text-base font-semibold">{t('subscribeTitle')}</h2>
             <p className="mb-3 text-sm text-muted-foreground">{t('subscribeBody')}</p>
             <div className="mb-3 inline-flex rounded-full bg-muted p-1 text-sm" role="group">
@@ -519,7 +916,9 @@ export default function StoreBillingPage() {
                 return (
                   <div
                     key={p.code}
-                    className={`rounded-lg border p-3 text-sm ${isCurrent ? 'border-primary' : ''}`}
+                    className={`rounded-lg border p-3 text-sm ${
+                      isCurrent || p.code === highlightPlan ? 'border-primary' : ''
+                    }`}
                   >
                     <p className="font-medium">{planName(p)}</p>
                     <p className="mb-2 tabular-nums text-muted-foreground">

@@ -152,6 +152,24 @@ export function Home({ locale }: { locale: Locale }) {
                   <li key={f}>{f}</li>
                 ))}
               </ul>
+              <p>
+                <a
+                  href={`${SIGNUP_URL}?plan=${p.id}&interval=month`}
+                  className="btn btn-primary"
+                  data-plan-cta={p.id}
+                >
+                  {c.pricing.planCta.replace('{plan}', p.name[locale])}
+                </a>
+              </p>
+              <p>
+                <a
+                  href={`${SIGNUP_URL}?plan=${p.id}&interval=year`}
+                  className="muted"
+                  data-plan-cta-annual={p.id}
+                >
+                  {c.pricing.planCtaAnnual}
+                </a>
+              </p>
             </li>
           ))}
         </ul>

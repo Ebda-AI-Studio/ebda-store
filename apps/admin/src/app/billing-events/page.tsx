@@ -10,6 +10,10 @@
  * flagged so an operator can reconcile it with the gateway; a succeeded charge
  * can be refunded (full or partial) from here.
  *
+ * Two more tabs live here: "Subscriptions" (who is on trial / due / overdue /
+ * paused, with a manual-payment action) and "Payment claims" (the InstaPay
+ * "I paid" queue, confirmed or rejected by hand).
+ *
  * Route guard: super_admin only (RequireSuperAdmin + the API's requireRole).
  */
 
@@ -23,12 +27,15 @@ import { DataTable, type DataTableColumn } from '../../components/mobile/DataTab
 import { apiGet, apiPost } from '../../lib/api';
 import { useT } from '../../i18n/useT';
 import { useLatestRequest } from '../../hooks/useLatestRequest';
+import { ClaimsPanel } from './_components/ClaimsPanel';
+import { ManualPaymentForm, type ManualPaymentPrefill } from './_components/ManualPaymentForm';
+import { SubscriptionsPanel } from './_components/SubscriptionsPanel';
 
 interface LedgerRow {
   id: string;
   storeId: string;
   storeName: string;
-  type: 'checkout' | 'renewal' | 'upgrade' | 'refund';
+  type: 'checkout' | 'renewal' | 'upgrade' | 'refund' | 'card_setup' | 'manual_payment';
   planCode: string | null;
   billingInterval: string | null;
   amountMinor: number;
@@ -43,7 +50,16 @@ interface LedgerRow {
 }
 
 const STATUS_FILTERS = ['', 'pending', 'succeeded', 'failed', 'refunded'] as const;
-const TYPE_FILTERS = ['', 'checkout', 'renewal', 'upgrade', 'refund'] as const;
+const TYPE_FILTERS = [
+  '',
+  'checkout',
+  'renewal',
+  'upgrade',
+  'refund',
+  'card_setup',
+  'manual_payment',
+] as const;
+const TABS = ['ledger', 'subscriptions', 'claims'] as const;
 
 function statusVariant(s: string): 'success' | 'warning' | 'destructive' | 'default' {
   if (s === 'succeeded') return 'success';
@@ -52,7 +68,7 @@ function statusVariant(s: string): 'success' | 'warning' | 'destructive' | 'defa
   return 'default';
 }
 
-function BillingEventsInner() {
+function LedgerPanel({ refreshSignal }: { refreshSignal: number }) {
   const t = useT('billingEvents');
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const [rows, setRows] = useState<LedgerRow[]>([]);
@@ -82,7 +98,7 @@ function BillingEventsInner() {
 
   useEffect(() => {
     fetchRows();
-  }, [fetchRows, refreshKey]);
+  }, [fetchRows, refreshKey, refreshSignal]);
 
   async function refund(row: LedgerRow) {
     if (!window.confirm(t('confirmRefund', { amount: formatMoney(row.amountMinor, locale) }))) {
@@ -193,66 +209,131 @@ function BillingEventsInner() {
   ];
 
   return (
+    <div>
+      <div className="mb-4 flex items-center justify-end">
+        <Button variant="outline" size="sm" onClick={() => setRefreshKey(k => k + 1)}>
+          {t('refresh')}
+        </Button>
+      </div>
+
+      {(
+        [
+          ['statusFilter', STATUS_FILTERS, status, setStatus, 'statuses'],
+          ['typeFilter', TYPE_FILTERS, type, setType, 'types'],
+        ] as const
+      ).map(([label, options, current, set, ns]) => (
+        <div key={label} className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">{t(label)}</span>
+          {options.map(o => (
+            <button
+              key={o || 'all'}
+              onClick={() => set(o)}
+              className={`rounded-full px-3 py-1 text-sm ${
+                current === o ? 'bg-foreground text-background' : 'bg-muted text-foreground'
+              }`}
+            >
+              {o ? t(`${ns}.${o}`) : t('all')}
+            </button>
+          ))}
+        </div>
+      ))}
+
+      {message && (
+        <div className="mb-3 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary-ink">
+          {message}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="rounded-lg border border-border px-3 py-6 text-center text-muted-foreground">
+          {t('loading')}
+        </div>
+      ) : (
+        <DataTable<LedgerRow>
+          ariaLabel={t('title')}
+          columns={columns}
+          rows={rows}
+          rowKey={r => r.id}
+          emptyState={
+            loadError ? (
+              <div
+                role="alert"
+                className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-6 text-center text-destructive-ink"
+              >
+                {t('failedToLoad')}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border px-3 py-6 text-center text-muted-foreground">
+                {t('empty')}
+              </div>
+            )
+          }
+        />
+      )}
+    </div>
+  );
+}
+
+function BillingEventsInner() {
+  const t = useT('billingEvents');
+  const [tab, setTab] = useState<(typeof TABS)[number]>('ledger');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [form, setForm] = useState<ManualPaymentPrefill | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       <div className="p-4 sm:p-6">
-        <div className="mb-4 flex items-center justify-end">
-          <Button variant="outline" size="sm" onClick={() => setRefreshKey(k => k + 1)}>
-            {t('refresh')}
-          </Button>
+        <div role="tablist" aria-label={t('title')} className="mb-4 flex flex-wrap gap-2">
+          {TABS.map(k => (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={tab === k}
+              onClick={() => setTab(k)}
+              className={`rounded-full px-4 py-1.5 text-sm max-md:min-h-11 ${
+                tab === k ? 'bg-foreground text-background' : 'bg-muted text-foreground'
+              }`}
+            >
+              {t(`tabs.${k}`)}
+            </button>
+          ))}
         </div>
 
-        {(
-          [
-            ['statusFilter', STATUS_FILTERS, status, setStatus, 'statuses'],
-            ['typeFilter', TYPE_FILTERS, type, setType, 'types'],
-          ] as const
-        ).map(([label, options, current, set, ns]) => (
-          <div key={label} className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">{t(label)}</span>
-            {options.map(o => (
-              <button
-                key={o || 'all'}
-                onClick={() => set(o)}
-                className={`rounded-full px-3 py-1 text-sm ${
-                  current === o ? 'bg-foreground text-background' : 'bg-muted text-foreground'
-                }`}
-              >
-                {o ? t(`${ns}.${o}`) : t('all')}
-              </button>
-            ))}
-          </div>
-        ))}
-
         {message && (
-          <div className="mb-3 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary-ink">
+          <div
+            role="status"
+            className="mb-3 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary-ink"
+          >
             {message}
           </div>
         )}
 
-        {loading ? (
-          <div className="rounded-lg border border-border px-3 py-6 text-center text-muted-foreground">
-            {t('loading')}
-          </div>
-        ) : (
-          <DataTable<LedgerRow>
-            ariaLabel={t('title')}
-            columns={columns}
-            rows={rows}
-            rowKey={r => r.id}
-            emptyState={
-              loadError ? (
-                <div
-                  role="alert"
-                  className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-6 text-center text-destructive-ink"
-                >
-                  {t('failedToLoad')}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-border px-3 py-6 text-center text-muted-foreground">
-                  {t('empty')}
-                </div>
-              )
-            }
+        {tab === 'ledger' && <LedgerPanel refreshSignal={refreshKey} />}
+        {tab === 'subscriptions' && (
+          <SubscriptionsPanel refreshKey={refreshKey} onRecordPayment={setForm} />
+        )}
+        {tab === 'claims' && (
+          <ClaimsPanel
+            refreshKey={refreshKey}
+            onConfirm={setForm}
+            onChanged={m => {
+              setMessage(m);
+              setRefreshKey(k => k + 1);
+            }}
+          />
+        )}
+
+        {form && (
+          <ManualPaymentForm
+            prefill={form}
+            onClose={() => setForm(null)}
+            onDone={outcome => {
+              setForm(null);
+              setMessage(t(outcome === 'duplicate' ? 'manual.duplicate' : 'manual.recorded'));
+              setRefreshKey(k => k + 1);
+            }}
           />
         )}
       </div>

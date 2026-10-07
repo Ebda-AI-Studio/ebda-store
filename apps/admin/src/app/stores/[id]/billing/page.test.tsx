@@ -28,10 +28,22 @@ vi.mock('@force/ui', () => ({
   Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
   Button: (p: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...p} />,
   Select: ({ label }: { label: string }) => <select aria-label={label} />,
+  Input: ({
+    label,
+    error,
+    ...p
+  }: { label?: string; error?: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
+    <div>
+      <label htmlFor={p.id}>{label}</label>
+      <input {...p} />
+      {error && <p>{error}</p>}
+    </div>
+  ),
   useToast: () => ({ success: vi.fn(), error: vi.fn() }),
 }));
 
 import StoreBillingPage from './page';
+import { billingFixture } from '../../../../components/billing/fixtures';
 
 const limits = {
   maxProducts: 50,
@@ -83,9 +95,10 @@ function billing(over: Partial<Record<string, unknown>> = {}) {
 }
 
 /** apiGet by URL: the billing summary, the charges list, anything else empty. */
-function mockApi(summary: unknown, charges: unknown[] = []) {
+function mockApi(summary: unknown, charges: unknown[] = [], claims: unknown[] = []) {
   apiGet.mockImplementation(async (url: string) => {
     if (url.endsWith('/invoices')) return { data: { charges }, error: null };
+    if (url.endsWith('/payment-claims')) return { data: { claims }, error: null };
     return { data: summary, error: null };
   });
 }
@@ -93,6 +106,8 @@ function mockApi(summary: unknown, charges: unknown[] = []) {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
+  window.history.replaceState(null, '', '/');
   role.current = 'store_admin';
 });
 
@@ -235,5 +250,265 @@ describe('merchant billing page', () => {
     });
     render(<StoreBillingPage />);
     expect(await screen.findByText('loadError')).toBeTruthy();
+  });
+});
+
+describe('signup funnel: plan, payment method, notices, go live', () => {
+  const instapayChosen = billingFixture({
+    trialCardMode: 'pay_at_trial_end',
+    billingMethod: 'instapay',
+    billingInterval: 'yearly',
+    instapay: {
+      available: true,
+      handle: 'ebda@instapay',
+      reference: 'EBD-7K2Q',
+      amountMinor: 3141000,
+      pendingClaims: 0,
+    },
+  });
+  const plans = [
+    {
+      code: 'growth',
+      nameEn: 'Growth',
+      nameAr: 'النمو',
+      priceMonthlyMinor: 349000,
+      priceYearlyMinor: 3141000,
+      limits,
+    },
+  ];
+  const trialing = {
+    status: 'trialing',
+    currentPeriodEnd: null,
+    trialEndsAt: '2026-11-20T00:00:00.000Z',
+    cancelAtPeriodEnd: false,
+  };
+
+  it('Plan & trial: trial end, chosen plan + interval, next charge with amount and plan', async () => {
+    mockApi(
+      billing({
+        subscription: trialing,
+        availablePlans: plans,
+        billing: {
+          ...instapayChosen,
+          nextCharge: { at: '2026-11-20T00:00:00.000Z', planCode: 'growth', amountMinor: 3141000 },
+        },
+      })
+    );
+    render(<StoreBillingPage />);
+    expect(await screen.findByText('trial.title')).toBeTruthy();
+    expect(screen.getByText('Growth · intervalYearly')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'trial.nextChargeLine:{"amount":"EGP 31,410.00","plan":"Growth","date":"20 November 2026"}'
+      )
+    ).toBeTruthy();
+    expect(screen.getAllByText('status.trialing').length).toBeGreaterThan(0);
+  });
+
+  it('card on file: shows •••• 4242 and Replace card starts a billing-origin card setup', async () => {
+    mockApi(
+      billing({
+        subscription: trialing,
+        billing: billingFixture({
+          hasPaymentMethod: true,
+          billingMethod: 'card',
+          card: { last4: '4242', brand: 'visa', savedAt: '2026-11-05T00:00:00.000Z' },
+        }),
+      })
+    );
+    apiPost.mockResolvedValue({ data: { redirectUrl: 'https://pay.test/card/9' }, error: null });
+    const loc = { href: '', search: '' };
+    vi.stubGlobal('location', loc);
+    render(<StoreBillingPage />);
+    expect(await screen.findByText('•••• 4242 visa')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'pay.replaceCard' }));
+    await waitFor(() => expect(loc.href).toBe('https://pay.test/card/9'));
+    expect(apiPost).toHaveBeenCalledWith('/api/v1/stores/store-1/billing/card-setup', {
+      from: 'billing',
+    });
+  });
+
+  it('InstaPay: shows the reference, validates the payer reference, and says nothing is activated by it', async () => {
+    mockApi(
+      billing({ subscription: trialing, billing: instapayChosen }),
+      [],
+      [
+        {
+          id: 'cl1',
+          planCode: 'growth',
+          billingInterval: 'yearly',
+          amountMinor: 3141000,
+          method: 'instapay',
+          paymentReference: 'EBD-7K2Q',
+          payerReference: 'IPN-99887766',
+          status: 'pending',
+          reviewNote: null,
+          createdAt: '2026-11-06T00:00:00.000Z',
+          reviewedAt: null,
+        },
+      ]
+    );
+    apiPost.mockResolvedValue({ data: {}, error: null });
+    render(<StoreBillingPage />);
+    expect(await screen.findByText('EBD-7K2Q')).toBeTruthy();
+    expect(screen.getByText('IPN-99887766')).toBeTruthy();
+    expect(screen.getByText('claims.status.pending')).toBeTruthy();
+
+    const input = screen.getByLabelText('pay.payerRef');
+    fireEvent.change(input, { target: { value: 'ab' } });
+    fireEvent.click(screen.getByRole('button', { name: 'pay.send' }));
+    expect(await screen.findByText('pay.payerRefInvalid')).toBeTruthy();
+    expect(apiPost).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: 'IPN-12345678' } });
+    fireEvent.click(screen.getByRole('button', { name: 'pay.send' }));
+    await waitFor(() =>
+      expect(apiPost).toHaveBeenCalledWith('/api/v1/stores/store-1/billing/payment-claims', {
+        payerReference: 'IPN-12345678',
+      })
+    );
+  });
+
+  it('unpaid suspension: an alert with the pay instructions and the support WhatsApp link', async () => {
+    mockApi(
+      billing({
+        storeStatus: 'suspended',
+        billing: billingFixture({
+          suspension: { reason: 'unpaid', at: '2026-11-20T00:00:00.000Z' },
+          supportWhatsappUrl: 'https://wa.me/201000000000',
+        }),
+      })
+    );
+    render(<StoreBillingPage />);
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('unpaidTitle');
+    expect(alert.textContent).toContain('unpaidBody');
+    expect(screen.getByRole('link', { name: 'whatsapp' }).getAttribute('href')).toBe(
+      'https://wa.me/201000000000'
+    );
+  });
+
+  it('over-store-limit suspension is a read-only notice that points to the plans', async () => {
+    mockApi(
+      billing({
+        billing: billingFixture({
+          suspension: { reason: 'over_store_limit', at: '2026-11-20T00:00:00.000Z' },
+        }),
+      })
+    );
+    render(<StoreBillingPage />);
+    expect((await screen.findByRole('alert')).textContent).toContain('overLimitTitle');
+    expect(screen.getByRole('link', { name: 'seePlans' })).toBeTruthy();
+  });
+
+  it('due soon with a card on file names the card and the date, calmly (not an alert)', async () => {
+    mockApi(
+      billing({
+        billing: billingFixture({
+          hasPaymentMethod: true,
+          billingMethod: 'card',
+          card: { last4: '4242', brand: 'visa', savedAt: null },
+          dueSoon: { dueAt: '2026-11-20T00:00:00.000Z', daysLeft: 3 },
+        }),
+      })
+    );
+    render(<StoreBillingPage />);
+    const note = await screen.findByRole('status');
+    expect(note.textContent).toContain(
+      'chargeSoon:{"card":"•••• 4242 visa","date":"20 November 2026"}'
+    );
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('Go live: shown only for an inactive store; a 402 shows its localized message', async () => {
+    mockApi(billing({ storeStatus: 'inactive', billing: billingFixture() }));
+    apiPost.mockResolvedValue({
+      data: null,
+      error: {
+        code: 'PAYMENT_METHOD_REQUIRED',
+        message: 'Add a payment method first',
+        status: 402,
+      },
+    });
+    render(<StoreBillingPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'goLive.cta' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Add a payment method first');
+    expect(apiPost).toHaveBeenCalledWith('/api/v1/onboarding/stores/store-1/go-live');
+    cleanup();
+
+    mockApi(billing({ storeStatus: 'active', billing: billingFixture() }));
+    render(<StoreBillingPage />);
+    await screen.findByText('trial.title');
+    expect(screen.queryByRole('button', { name: 'goLive.cta' })).toBeNull();
+  });
+
+  it('charges list labels card_setup ("nothing charged") and manual_payment', async () => {
+    mockApi(billing(), [
+      {
+        id: 'c1',
+        type: 'card_setup',
+        planCode: null,
+        amountMinor: 0,
+        status: 'succeeded',
+        failureReason: null,
+        attempt: 0,
+        createdAt: '2026-11-03T04:00:00.000Z',
+      },
+      {
+        id: 'c2',
+        type: 'manual_payment',
+        planCode: 'growth',
+        amountMinor: 349000,
+        status: 'succeeded',
+        failureReason: null,
+        attempt: 0,
+        createdAt: '2026-11-04T04:00:00.000Z',
+      },
+    ]);
+    render(<StoreBillingPage />);
+    expect(await screen.findByText('invoiceTypes.card_setup')).toBeTruthy();
+    expect(screen.getByText(/invoiceTypes\.manual_payment/)).toBeTruthy();
+  });
+
+  it('back from the card page (stub): needs the simulate button, then polls until the card is saved', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/stores/store-1/billing?card=return&stub=1&merchantOrderId=22222222-2222-2222-2222-222222222222'
+    );
+    let saved = false;
+    apiGet.mockImplementation(async (url: string) => {
+      if (url.endsWith('/invoices')) return { data: { charges: [] }, error: null };
+      if (url.endsWith('/payment-claims')) return { data: { claims: [] }, error: null };
+      return {
+        data: billing({
+          subscription: trialing,
+          billing: billingFixture(
+            saved
+              ? {
+                  hasPaymentMethod: true,
+                  billingMethod: 'card',
+                  card: { last4: '4242', brand: 'visa', savedAt: null },
+                }
+              : {}
+          ),
+        }),
+        error: null,
+      };
+    });
+    apiPost.mockImplementation(async () => {
+      saved = true;
+      return { data: {}, error: null };
+    });
+    render(<StoreBillingPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'pay.stubSaved' }));
+    await waitFor(() =>
+      expect(apiPost).toHaveBeenCalledWith('/api/v1/stores/store-1/billing/checkout/stub-confirm', {
+        merchantOrderId: '22222222-2222-2222-2222-222222222222',
+        outcome: 'success',
+      })
+    );
+    expect(await screen.findByText('pay.returnOk')).toBeTruthy();
+    expect(await screen.findByText('•••• 4242 visa')).toBeTruthy();
   });
 });

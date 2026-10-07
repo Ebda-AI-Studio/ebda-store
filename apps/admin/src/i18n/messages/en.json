@@ -8501,7 +8501,9 @@
       "checkout": "Subscription payment",
       "renewal": "Renewal",
       "upgrade": "Upgrade",
-      "refund": "Refund"
+      "refund": "Refund",
+      "card_setup": "Card saved — nothing charged",
+      "manual_payment": "Manual payment"
     },
     "invoiceStatuses": {
       "pending": "Pending",
@@ -8513,7 +8515,78 @@
     "stubTitle": "Local test gateway",
     "stubBody": "The stub provider is active. Simulate the gateway's answer for the pending checkout:",
     "stubPay": "Simulate success",
-    "stubDecline": "Simulate decline"
+    "stubDecline": "Simulate decline",
+    "trial": {
+      "title": "Plan & trial",
+      "chosenPlan": "Chosen plan",
+      "nextCharge": "Next charge",
+      "nextChargeLine": "{amount} for {plan} on {date}",
+      "nextChargeNoAmount": "{plan} on {date}"
+    },
+    "pay": {
+      "title": "Payment method",
+      "card": "Card",
+      "cardSavedOn": "saved {date}",
+      "noCard": "No card on file.",
+      "addCard": "Add a card",
+      "replaceCard": "Replace card",
+      "cardNote": "Nothing is charged when you save a card.",
+      "redirecting": "Redirecting…",
+      "cardFailed": "We could not start the card setup",
+      "returnPending": "Confirming your card…",
+      "returnOk": "Card saved. Nothing was charged.",
+      "returnFailed": "The card was not saved. Nothing was charged.",
+      "returnLater": "We have not received the confirmation yet. This page will update shortly.",
+      "stubSaved": "Simulate card saved",
+      "stubDecline": "Simulate decline",
+      "instapay": "InstaPay",
+      "useInstapay": "Pay by InstaPay",
+      "handle": "InstaPay address",
+      "amount": "Exact amount",
+      "reference": "Your reference",
+      "copy": "Copy",
+      "copied": "Copied",
+      "paidTitle": "I paid by InstaPay",
+      "paidHelp": "After you transfer, send us the InstaPay transaction reference. We will confirm it and activate your plan shortly.",
+      "payerRef": "InstaPay transaction reference",
+      "payerRefInvalid": "Enter between 4 and 64 characters.",
+      "send": "Send",
+      "sending": "Sending…",
+      "claimSent": "Thanks. We will confirm your payment and activate your plan shortly.",
+      "claimFailed": "We could not send this. Please try again.",
+      "instapayUnavailable": "InstaPay is not available right now",
+      "instapayFailed": "We could not set up InstaPay"
+    },
+    "claims": {
+      "title": "Payment confirmations",
+      "status": {
+        "pending": "Waiting for us",
+        "confirmed": "Confirmed",
+        "rejected": "Rejected"
+      }
+    },
+    "notice": {
+      "unpaidTitle": "Your store is paused for shoppers until payment is recorded",
+      "unpaidBody": "Pay by InstaPay with your reference, then send us the transaction reference below. Your store comes back as soon as we confirm it.",
+      "overLimitTitle": "Read-only: your plan covers fewer stores",
+      "overLimitBody": "Your plan includes fewer stores than you have. Upgrade to Business to edit all of them again.",
+      "overdueTitle": "Your payment is overdue",
+      "overdueBody": "We will pause your store on {date} if payment is not recorded.",
+      "overdueBodyNoDate": "Your store will be paused if payment is not recorded soon.",
+      "dueSoonTitle": "Payment due in {n} days",
+      "chargeSoon": "We'll charge your card {card} on {date}",
+      "whatsapp": "Message us on WhatsApp",
+      "seePlans": "See plans",
+      "view": "View billing"
+    },
+    "goLive": {
+      "title": "Go live",
+      "body": "Your store is not public yet. Publish it when you are ready.",
+      "cta": "Go live",
+      "working": "Publishing…",
+      "failed": "We could not publish the store. Please try again.",
+      "done": "Your store is live"
+    }
   },
   "planLimit": {
     "maxProducts": "Your plan allows up to {limit} products. Upgrade to add more.",
@@ -8531,7 +8604,7 @@
   "onboarding": {
     "signup": {
       "title": "Create your store",
-      "subtitle": "Start selling online in minutes. No card needed.",
+      "subtitle": "Start selling online in minutes. 14-day free trial — nothing is charged today.",
       "name": "Your name",
       "namePlaceholder": "Mona Hassan",
       "email": "Email address",
@@ -8567,7 +8640,12 @@
         "backToLogin": "Back to sign in"
       },
       "noAccount": "New to Ebda?",
-      "createStore": "Create your store"
+      "createStore": "Create your store",
+      "plan": {
+        "chip": "Selected plan: {plan} · {interval} — 14-day Growth trial",
+        "monthly": "monthly",
+        "yearly": "annual"
+      }
     },
     "verify": {
       "verifying": "Verifying your email…",
@@ -8594,7 +8672,9 @@
         "template": "Look",
         "product": "Product",
         "payment": "Payment",
-        "live": "Launch"
+        "live": "Launch",
+        "plan": "Plan",
+        "billing": "Billing"
       },
       "back": "Back",
       "next": "Continue",
@@ -8702,9 +8782,53 @@
         "copy": "Copy link",
         "copied": "Copied",
         "whatsapp": "Share on WhatsApp",
-        "dashboard": "Go to dashboard"
+        "dashboard": "Go to dashboard",
+        "addPayment": "Add a payment method"
       },
-      "retry": "Try again"
+      "retry": "Try again",
+      "plan": {
+        "title": "Choose your plan",
+        "trialNote": "Every plan starts with a 14-day Growth trial. On day 15 you're charged for the plan you pick.",
+        "monthly": "Monthly",
+        "yearly": "Annual",
+        "saveBadge": "Save 25%",
+        "perMonth": "/ month",
+        "perYear": "/ year",
+        "priceTbd": "Price to be announced",
+        "saving": "Saving…",
+        "saveFailed": "We could not save your plan. Please try again.",
+        "notTrialing": "Your trial has ended, so the plan can no longer be changed here. Open Billing to change it."
+      },
+      "billing": {
+        "title": "How will you pay?",
+        "subtitle": "Nothing is charged today. Your trial runs for 14 days; pick how you'll pay when it ends.",
+        "returnPending": "Confirming your card…",
+        "returnOk": "Card saved. Nothing was charged.",
+        "returnFailed": "The card was not saved. Nothing was charged. You can try again.",
+        "returnLater": "We have not received the confirmation yet. Refresh in a moment.",
+        "stubSaved": "Simulate card saved",
+        "stubDecline": "Simulate decline",
+        "noOption": "No payment method can be set up right now. You can continue and add one from Billing before you launch.",
+        "cardTitle": "Card",
+        "cardSaved": "Card saved:",
+        "cardBody": "Save a card. Nothing is charged now; we charge {amount} for {plan} on {date}.",
+        "cardBodyNoAmount": "Save a card. Nothing is charged now; we charge the plan you chose on {date}.",
+        "cardCta": "Save a card",
+        "redirecting": "Redirecting to the secure page…",
+        "cardFailed": "We could not start the card setup. Please try again.",
+        "instapayTitle": "InstaPay",
+        "instapayBody": "Pay by InstaPay transfer instead of a card.",
+        "instapayCta": "Pay by InstaPay",
+        "instapayHandle": "InstaPay address",
+        "instapayAmount": "Exact amount",
+        "instapayReference": "Your reference",
+        "instapayHow": "Transfer before {date} with this exact amount and reference. Then send us the InstaPay transaction reference from Billing. We confirm it and your plan continues.",
+        "copy": "Copy",
+        "copied": "Copied",
+        "instapayUnavailable": "InstaPay is not available right now.",
+        "instapayFailed": "We could not set up InstaPay. Please try again.",
+        "continueAnyway": "Continue without payment for now"
+      }
     },
     "setupGuide": {
       "title": "Setup guide",
@@ -8797,7 +8921,9 @@
       "checkout": "Checkout",
       "renewal": "Renewal",
       "upgrade": "Upgrade",
-      "refund": "Refund"
+      "refund": "Refund",
+      "card_setup": "Card saved",
+      "manual_payment": "Manual payment"
     },
     "statuses": {
       "pending": "Pending",
@@ -8808,6 +8934,123 @@
     "interval": {
       "monthly": "monthly",
       "yearly": "yearly"
+    },
+    "tabs": {
+      "ledger": "Ledger",
+      "subscriptions": "Subscriptions",
+      "claims": "Payment claims"
+    },
+    "plans": {
+      "basic": "Basic",
+      "growth": "Growth",
+      "business": "Business"
+    },
+    "manual": {
+      "title": "Record manual payment for {store}",
+      "plan": "Plan",
+      "interval": "Billing period",
+      "monthly": "Monthly",
+      "yearly": "Annual",
+      "amount": "Amount (EGP)",
+      "method": "Method",
+      "methods": {
+        "instapay": "InstaPay",
+        "bank": "Bank transfer",
+        "cash": "Cash"
+      },
+      "reference": "Payment reference",
+      "paidAt": "Paid on",
+      "periodStart": "Period start",
+      "periodEnd": "Period end",
+      "amountInvalid": "Enter a positive amount with at most 2 decimals.",
+      "referenceRequired": "A payment reference is required.",
+      "dateRequired": "Pick a date.",
+      "periodInvalid": "The period must end after it starts.",
+      "failed": "We could not record this payment. Please try again.",
+      "saving": "Saving…",
+      "submit": "Record payment & activate",
+      "recorded": "Payment recorded and plan activated.",
+      "duplicate": "This reference was already recorded. Nothing changed."
+    },
+    "subscriptions": {
+      "title": "Subscriptions",
+      "loading": "Loading subscriptions…",
+      "failedToLoad": "Failed to load subscriptions.",
+      "empty": "No subscriptions match.",
+      "viewFilter": "Show",
+      "views": {
+        "all": "All",
+        "due": "Due ≤7 days",
+        "overdue": "Overdue",
+        "suspended": "Suspended"
+      },
+      "columns": {
+        "store": "Store",
+        "plan": "Plan",
+        "chosenPlan": "Chosen plan",
+        "method": "Method",
+        "status": "Status",
+        "trialEnds": "Trial ends",
+        "card": "Card",
+        "nextCharge": "Next charge",
+        "action": "Action"
+      },
+      "interval": {
+        "monthly": "monthly",
+        "yearly": "annual"
+      },
+      "methods": {
+        "card": "Card",
+        "instapay": "InstaPay"
+      },
+      "statuses": {
+        "trialing": "Trial",
+        "active": "Active",
+        "past_due": "Overdue",
+        "canceled": "Canceled",
+        "comped": "Complimentary",
+        "none": "None"
+      },
+      "suspended": {
+        "unpaid": "Paused: unpaid",
+        "over_store_limit": "Over store limit"
+      },
+      "record": "Record manual payment"
+    },
+    "claims": {
+      "title": "Payment claims",
+      "loading": "Loading claims…",
+      "failedToLoad": "Failed to load payment claims.",
+      "empty": "No claims here.",
+      "statusFilter": "Status",
+      "statuses": {
+        "pending": "Pending",
+        "confirmed": "Confirmed",
+        "rejected": "Rejected"
+      },
+      "columns": {
+        "date": "Date",
+        "store": "Store",
+        "plan": "Plan",
+        "amount": "Amount",
+        "payerReference": "Payer reference",
+        "reference": "Our reference",
+        "status": "Status",
+        "action": "Action"
+      },
+      "interval": {
+        "monthly": "monthly",
+        "yearly": "annual"
+      },
+      "proof": "Proof",
+      "confirm": "Confirm & activate",
+      "reject": "Reject",
+      "rejectTitle": "Reject the claim from {store}",
+      "note": "Reason (shown to the merchant)",
+      "noteRequired": "A reason is required.",
+      "rejectFailed": "We could not reject this claim.",
+      "rejectSubmit": "Reject claim",
+      "rejected": "Claim rejected."
     }
   },
   "codReconciliation": {
@@ -8867,5 +9110,11 @@
     "next": "Next",
     "unmatchedTitle": "Lines matching no shipment",
     "unmatchedHelp": "These statement lines name a tracking number that is not one of your shipments. They match automatically if that shipment appears."
+  },
+  "upsell": {
+    "title": "Upgrade to continue",
+    "upgradeTo": "Upgrade to {plan}",
+    "seePlans": "See plans",
+    "dismiss": "Not now"
   }
 }
