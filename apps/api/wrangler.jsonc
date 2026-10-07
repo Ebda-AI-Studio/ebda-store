@@ -117,5 +117,7 @@
     "API_URL": "https://api.ebda.app",
     "TRUST_PROXY_HOPS": "1",
     "INNGEST_SERVE_HOST": "https://api.ebda.app",
+    // Public image (not a secret): Ebda's InstaPay QR on the merchant pay screen.
+    "EBDA_INSTAPAY_QR_URL": "https://media.ebda.app/platform/instapay-qr.jpg",
   },
 }

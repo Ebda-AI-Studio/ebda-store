@@ -21,8 +21,8 @@ import {
   isInterval,
   priceFor,
 } from './period';
-import { instapayHandle, supportWhatsappUrl } from './manual-config';
-import { subscriptionChargeAmount } from './charge-amount';
+import { instapayHandle, supportContact } from './manual-config';
+import { chargeFor, ledgerVat } from './charge-amount';
 
 const DAY = 86_400_000;
 export type ReminderKind = 'd7' | 'd3' | 'd1' | 'd0';
@@ -127,6 +127,8 @@ export async function sendDueReminder(
     createdAt: new Date(),
   });
   if (store?.owner?.email) {
+    const charge = await chargeFor((plan && priceFor(plan, interval)) || 0);
+    const support = supportContact(store.name);
     await EmailService.sendSubscriptionBillingNotice(
       storeId,
       {
@@ -134,7 +136,8 @@ export async function sendDueReminder(
         to: store.owner.email,
         storeName: store.name,
         planName: plan ? (lang === 'ar' ? plan.nameAr : plan.nameEn) : '',
-        amountMinor: subscriptionChargeAmount((plan && priceFor(plan, interval)) || 0).totalMinor,
+        amountMinor: charge.totalMinor,
+        vat: ledgerVat(charge).vat,
         billingUrl: `${config.adminUrl ?? ''}${url}`,
         dueOn,
         daysLeft,
@@ -142,7 +145,8 @@ export async function sendDueReminder(
         cardLast4: sub.paymentMethodLast4,
         instapayHandle: method === 'instapay' ? instapayHandle() : null,
         paymentReference: sub.paymentReference,
-        whatsappUrl: supportWhatsappUrl(store.name),
+        whatsappUrl: support.whatsappUrl,
+        supportEmail: support.email,
       },
       lang
     ).catch(err => logger.warn({ err, storeId }, '[billing] reminder email failed'));
