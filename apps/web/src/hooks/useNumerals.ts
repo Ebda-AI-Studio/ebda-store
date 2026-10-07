@@ -1,36 +1,44 @@
 import { useCallback } from 'react';
-import { toArabicDigits } from '@force/shared';
+import {
+  effectiveNumerals,
+  formatMoney,
+  localizeDigits,
+  storeNumerals,
+  type Numerals,
+} from '@force/shared';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStore } from '../contexts/StoreContext';
 
 /**
- * Single choke point for numeral localization on the storefront.
- *
- * By default every number renders in Western digits (0-9), in both
- * languages. A merchant can opt in (`StoreTheme.arabicNumerals`) so that
- * numeric displays render Eastern Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) — but
- * ONLY while the visitor is browsing the Arabic locale. The English
- * storefront always stays Western digits regardless of the flag.
- *
- * Wrap displayed numeric strings (prices, counts, quantities, page numbers,
- * loyalty points) with `localize(...)`. Do NOT apply it to identifiers
- * (order numbers, SKUs, phone numbers, tracking numbers) — those must stay
- * Western digits always.
+ * The digit system for THIS render (Ruling NUMERALS-1): Western (0-9) unless
+ * the merchant opted into Arabic-Indic (`StoreTheme.arabicNumerals`, admin:
+ * "شكل الأرقام في المتجر") AND the shopper is reading Arabic. Pass it to
+ * `formatPrice` / `intlLocale` / `<Price numerals>`.
  */
-export function useNumerals() {
+export function useStoreNumerals(): Numerals {
   const { language } = useLanguage();
   const { store } = useStore();
-  const arabicNumerals = store?.theme?.arabicNumerals === true;
+  return effectiveNumerals(language, storeNumerals(store?.theme));
+}
 
+/**
+ * Single choke point for numeral localization of pre-formatted strings on the
+ * storefront. Wrap displayed numeric strings (counts, quantities, page
+ * numbers, loyalty points) with `localize(...)`. Do NOT apply it to
+ * identifiers (order numbers, SKUs, phone numbers, tracking numbers) — those
+ * stay Western digits always. Prices go through `useLocalePrice`.
+ */
+export function useNumerals() {
+  const numerals = useStoreNumerals();
   const localize = useCallback(
-    (value: string | number): string => {
-      if (language === 'ar' && arabicNumerals) {
-        return toArabicDigits(value);
-      }
-      return String(value);
-    },
-    [language, arabicNumerals]
+    (value: string | number): string => localizeDigits(value, numerals),
+    [numerals]
   );
-
-  return { localize };
+  /** A MINOR-unit amount without its currency (`1,299.50`, `450`) in the
+   *  render's digits — for layouts that place the symbol themselves. */
+  const money = useCallback(
+    (minor: number): string => formatMoney(minor, 'ar', { hideSymbol: true, numerals }),
+    [numerals]
+  );
+  return { localize, money, numerals };
 }

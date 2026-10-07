@@ -2463,8 +2463,10 @@
         "hint": "Customers can add a product to cart with one tap directly from the homepage carousels — no need to open the product page first. When on, the bottom \"Add to cart\" button on each carousel card is hidden (the + replaces it)."
       },
       "arabicNumerals": {
-        "title": "Arabic numerals (٠١٢٣)",
-        "hint": "Show Eastern Arabic-Indic digits on the Arabic storefront. Off = Western digits (0-9) everywhere."
+        "title": "Store numerals: 123 / ١٢٣",
+        "hint": "How numbers look on your Arabic storefront (prices, quantities, dates). 123 (Western) is the default; ١٢٣ shows Arabic-Indic digits to Arabic-reading customers only. English pages, order numbers and this dashboard always use 123.",
+        "western": "Western digits (123) — default",
+        "arabic": "Arabic-Indic digits (١٢٣)"
       },
       "socialIconColors": {
         "title": "Social icon colors",
@@ -2586,11 +2588,11 @@
       "phone": "Phone",
       "phoneAr": "Phone (Arabic Display)",
       "phonePlaceholder": "+20 1XX XXX XXXX",
-      "phoneArPlaceholder": "٩٦٥ XXXX XXXX+",
+      "phoneArPlaceholder": "965 XXXX XXXX+",
       "address": "Address",
       "addressAr": "Address (Arabic)",
       "addressPlaceholder": "123 Street, City, Egypt",
-      "addressArPlaceholder": "١٢٣ شارع، المدينة، مصر",
+      "addressArPlaceholder": "123 شارع، المدينة، مصر",
       "addressUrl": "Map link",
       "addressUrlPlaceholder": "https://maps.app.goo.gl/...",
       "addressUrlHint": "Paste a Google or Apple Maps link to your storefront's pin. The footer address will become clickable and open this URL in a new tab.",
@@ -2746,7 +2748,7 @@
       "nameLabel": "Name *",
       "namePlaceholder": "Summer Sale 20% Off",
       "nameArLabel": "Name (Arabic)",
-      "nameArPlaceholder": "خصم الصيف ٢٠٪",
+      "nameArPlaceholder": "خصم الصيف 20٪",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Get 20% off on all summer items",
       "descriptionArLabel": "Description (Arabic)",
@@ -4931,7 +4933,7 @@
       "textEnglish": "Announcement Text (English)",
       "textEnglishPlaceholder": "Free shipping on orders over 10 EGP!",
       "textArabic": "Announcement Text (Arabic)",
-      "textArabicPlaceholder": "شحن مجاني للطلبات فوق ١٠ ج.م!",
+      "textArabicPlaceholder": "شحن مجاني للطلبات فوق 10 ج.م!",
       "linkUrl": "Link URL (optional)",
       "linkUrlPlaceholder": "https://example.com/sale",
       "linkUrlHint": "The entire bar will link to this URL when clicked",

@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { apiGet } from '../../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { withNumerals } from '@force/shared';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -189,7 +190,7 @@ export function AiSweepResultsPanels({ storeId }: { storeId: string }) {
       </div>
       {lastFetched && (
         <p className="mb-3 text-xs text-muted-foreground">
-          {t('lastFetched', { time: lastFetched.toLocaleTimeString() })}
+          {t('lastFetched', { time: lastFetched.toLocaleTimeString(undefined, withNumerals()) })}
         </p>
       )}
 

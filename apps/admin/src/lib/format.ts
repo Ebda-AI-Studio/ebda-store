@@ -1,15 +1,17 @@
 import { formatPrice as sharedFormatPrice, minorToDecimalString, tryToMinor } from '@force/shared';
 
 /**
- * The admin renders Latin digits in both locales (issue 1971) — the same
- * policy as its ICU messages (`i18n/formats.ts`). An Arabic-locale price keeps
- * its Arabic currency symbol (`1,500.00 ج.م`) but not Arabic-Indic digits.
+ * The admin renders Latin digits in both locales (issue 1971, Ruling
+ * NUMERALS-1) — the same policy as its ICU messages (`i18n/formats.ts`). An
+ * Arabic-locale price keeps its Arabic currency symbol (`1,500.00 ج.م`) but
+ * not Arabic-Indic digits. The admin is an accounting surface, so it keeps
+ * every decimal (`EGP 450.00`); the storefront trims a zero fraction.
  */
 export function formatPrice(
   amount: number,
   options?: Parameters<typeof sharedFormatPrice>[1]
 ): string {
-  return sharedFormatPrice(amount, { ...options, latinDigits: true });
+  return sharedFormatPrice(amount, { ...options, numerals: 'latn', fixedDecimals: true });
 }
 
 export function formatDate(date: string | null | undefined): string {

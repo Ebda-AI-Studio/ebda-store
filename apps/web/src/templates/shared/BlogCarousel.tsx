@@ -1,5 +1,7 @@
 'use client';
 
+import { useStoreNumerals } from '../../hooks/useNumerals';
+import { intlLocale } from '@force/shared';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -36,6 +38,7 @@ interface BlogCarouselProps {
  */
 export function BlogCarousel({ posts, spacingSettings }: BlogCarouselProps) {
   const { isRtl } = useLanguage();
+  const numerals = useStoreNumerals();
   const storeUrl = useStoreUrl();
   if (!posts || posts.length === 0) return null;
 
@@ -95,11 +98,14 @@ export function BlogCarousel({ posts, spacingSettings }: BlogCarouselProps) {
                   <div className="p-4">
                     {date && (
                       <p className="text-xs text-foreground/55">
-                        {new Date(date).toLocaleDateString(isRtl ? 'ar-EG' : 'en-EG', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
+                        {new Date(date).toLocaleDateString(
+                          intlLocale(isRtl ? 'ar' : 'en', numerals),
+                          {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          }
+                        )}
                       </p>
                     )}
                     <h3 className="mt-1 text-base font-bold text-foreground line-clamp-2">

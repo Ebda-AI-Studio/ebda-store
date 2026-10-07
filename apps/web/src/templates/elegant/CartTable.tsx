@@ -7,7 +7,7 @@ import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 
-import { minorToDecimalString, REGION } from '@force/shared';
+import { REGION } from '@force/shared';
 /**
  * Elegant template — cart rendered with thin hairline dividers, generous
  * whitespace, and serif-friendly tracking to match Elegant's fashion-
@@ -23,9 +23,9 @@ export default function ElegantCartTable({
   typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
-  const { localize } = useNumerals();
+  const { localize, money } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const format = (price: number) => `${localize(minorToDecimalString(price))} ${currency}`;
+  const format = (price: number) => `${money(price)} ${currency}`;
 
   return (
     <div className="divide-y divide-border/50" dir={isRtl ? 'rtl' : 'ltr'}>

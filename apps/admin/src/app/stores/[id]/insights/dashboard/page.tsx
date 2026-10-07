@@ -10,7 +10,7 @@ import { apiGet } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { isUntrackedForGuests } from '@/lib/guest-checkout';
 
-import { minorToDecimalString } from '@force/shared';
+import { minorToDecimalString, withNumerals } from '@force/shared';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TopSku {
@@ -288,7 +288,8 @@ export default function InsightsDashboardPage() {
                   funnel insights panels. */}
               {data.velocityAsOf && (
                 <span className="text-xs text-muted-foreground whitespace-nowrap">
-                  {t('asOf')}: {new Date(data.velocityAsOf).toLocaleString()}
+                  {t('asOf')}:{' '}
+                  {new Date(data.velocityAsOf).toLocaleString(undefined, withNumerals())}
                 </span>
               )}
             </div>

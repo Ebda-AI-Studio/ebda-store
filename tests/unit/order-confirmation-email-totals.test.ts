@@ -52,7 +52,7 @@ describe('order confirmation email totals', () => {
   it('inclusive tax is a caption after Total (en + ar)', () => {
     const d = data({ tax: 238, taxIncludedInPrice: true });
     const en = text(orderConfirmationTemplate.en(d, 'S'));
-    expect(en).toBe('Subtotal 50.00 EGP Shipping 5.00 EGP Total 55.00 EGP Incl. VAT 2.38 EGP');
+    expect(en).toBe('Subtotal 50 EGP Shipping 5 EGP Total 55 EGP Incl. VAT 2.38 EGP');
     const ar = text(orderConfirmationTemplate.ar(d, 'S'));
     expect(ar.indexOf('شامل ضريبة القيمة المضافة 2.38 ج.م')).toBeGreaterThan(
       ar.indexOf('الإجمالي')
@@ -81,8 +81,8 @@ describe('order confirmation email totals', () => {
         'S'
       )
     );
-    expect(t).toContain('Coupon (SAVE) -5.00 EGP');
-    expect(t).toContain('Loyalty points (200) -10.00 EGP');
+    expect(t).toContain('Coupon (SAVE) -5 EGP');
+    expect(t).toContain('Loyalty points (200) -10 EGP');
   });
 
   it('renders a USD order in USD, not "100.00 EGP"', () => {
@@ -92,7 +92,7 @@ describe('order confirmation email totals', () => {
         'S'
       )
     );
-    expect(t).toContain('Total USD 100.00');
+    expect(t).toContain('Total USD 100');
     expect(t).not.toContain('EGP');
   });
 });

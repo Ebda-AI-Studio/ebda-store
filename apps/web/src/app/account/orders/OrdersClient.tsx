@@ -8,7 +8,7 @@ import { api, type Order } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatDate as formatStoreDate } from '@/lib/format-date';
-import { groupOrderLinesForDisplay } from '@force/shared';
+import { groupOrderLinesForDisplay, storeNumerals } from '@force/shared';
 
 export default function OrdersClient() {
   const storeUrl = useStoreUrl();
@@ -54,6 +54,7 @@ export default function OrdersClient() {
     return formatStoreDate(date, {
       timezone: store.timezone,
       language,
+      numerals: storeNumerals(store?.theme),
       style: 'long',
     });
   }

@@ -2,6 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import { TIER_COLORS, type LoyaltyStats } from './types';
+import { withNumerals } from '@force/shared';
 
 interface LoyaltyStatsCardsProps {
   stats: LoyaltyStats;
@@ -24,19 +25,19 @@ export function LoyaltyStatsCards({ stats }: LoyaltyStatsCardsProps) {
       <div className="bg-card rounded-xl border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('pointsIssued')}</p>
         <p className="text-2xl font-bold text-success-ink">
-          {stats.totalPointsIssued.toLocaleString()}
+          {stats.totalPointsIssued.toLocaleString(undefined, withNumerals())}
         </p>
       </div>
       <div className="bg-card rounded-xl border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('pointsRedeemed')}</p>
         <p className="text-2xl font-bold text-primary">
-          {stats.totalPointsRedeemed.toLocaleString()}
+          {stats.totalPointsRedeemed.toLocaleString(undefined, withNumerals())}
         </p>
       </div>
       <div className="bg-card rounded-xl border border-border p-4">
         <p className="text-sm text-muted-foreground">{t('outstanding')}</p>
         <p className="text-2xl font-bold text-info-ink">
-          {stats.outstandingPoints.toLocaleString()}
+          {stats.outstandingPoints.toLocaleString(undefined, withNumerals())}
         </p>
       </div>
       <div className="bg-card rounded-xl border border-border p-4">

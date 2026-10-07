@@ -16,6 +16,7 @@ import { GscNotConnected } from './_components/GscNotConnected';
 import { GscTotalsCards } from './_components/GscTotalsCards';
 import { GscTrendChart } from './_components/GscTrendChart';
 import { GscTopQueriesList } from './_components/GscTopQueriesList';
+import { withNumerals } from '@force/shared';
 
 /**
  * Merchant-facing answer-engine (AEO/GEO citation) dashboard (Task 7).
@@ -60,7 +61,9 @@ export default function AnswerEnginePage() {
         <div className="space-y-6">
           {summary.lastRunAt && (
             <p className="text-xs text-muted-foreground">
-              {t('lastRunAt', { date: new Date(summary.lastRunAt).toLocaleDateString() })}
+              {t('lastRunAt', {
+                date: new Date(summary.lastRunAt).toLocaleDateString(undefined, withNumerals()),
+              })}
             </p>
           )}
 

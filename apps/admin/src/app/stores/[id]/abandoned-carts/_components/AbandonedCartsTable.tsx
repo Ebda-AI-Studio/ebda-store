@@ -9,6 +9,7 @@ import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { ABANDONED_CART_COLORS, CART_STATUS_KEYS } from './types';
 import type { AbandonedCartRecord, ListMeta } from './types';
+import { withNumerals } from '@force/shared';
 
 const formatMajor = minorToMajor;
 
@@ -81,7 +82,7 @@ export function AbandonedCartsTable({
       header: t('columns.date'),
       cell: record => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {new Date(record.createdAt).toLocaleDateString()}
+          {new Date(record.createdAt).toLocaleDateString(undefined, withNumerals())}
         </span>
       ),
     },

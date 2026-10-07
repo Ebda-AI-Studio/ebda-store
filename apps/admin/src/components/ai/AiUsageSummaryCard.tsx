@@ -26,6 +26,7 @@ import Link from 'next/link';
 import { apiGet } from '../../lib/api';
 import { useT } from '@/i18n/useT';
 import { formatSpend } from '@/lib/ai-spend';
+import { withNumerals } from '@force/shared';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ function SpendFigure({
       </p>
       {unpriced > 0 && (
         <p className="text-[11px] text-amber-600 dark:text-amber-500">
-          {t('spendUnpriced', { count: unpriced.toLocaleString() })}
+          {t('spendUnpriced', { count: unpriced.toLocaleString(undefined, withNumerals()) })}
         </p>
       )}
     </>
@@ -150,7 +151,8 @@ function QuotaBar({
     <div>
       <div className="mb-1 flex items-center justify-between text-xs">
         <span className="font-medium text-foreground">
-          {label} — {current.toLocaleString()} / {cap.toLocaleString()} ({pct}%)
+          {label} — {current.toLocaleString(undefined, withNumerals())} /{' '}
+          {cap.toLocaleString(undefined, withNumerals())} ({pct}%)
         </span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -294,7 +296,7 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
               <span
                 className={`font-bold tabular-nums ${remainingWarn ? 'text-destructive-ink' : 'text-foreground'}`}
               >
-                {remaining.toLocaleString()}
+                {remaining.toLocaleString(undefined, withNumerals())}
               </span>
             </div>
             <div className="flex items-start justify-between gap-2 text-xs">
@@ -359,19 +361,19 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
         <div className="rounded-lg bg-muted/40 px-3 py-2">
           <p className="text-xs text-muted-foreground">{t('statToday')}</p>
           <p className="text-lg font-bold tabular-nums text-primary">
-            {summary.today.toLocaleString()}
+            {summary.today.toLocaleString(undefined, withNumerals())}
           </p>
         </div>
         <div className="rounded-lg bg-muted/40 px-3 py-2">
           <p className="text-xs text-muted-foreground">{t('statThisMonth')}</p>
           <p className="text-lg font-bold tabular-nums text-foreground">
-            {summary.thisMonth.toLocaleString()}
+            {summary.thisMonth.toLocaleString(undefined, withNumerals())}
           </p>
         </div>
         <div className="rounded-lg bg-muted/40 px-3 py-2">
           <p className="text-xs text-muted-foreground">{t('statDailyCap')}</p>
           <p className="text-lg font-bold tabular-nums text-foreground">
-            {summary.dailyCap.toLocaleString()}
+            {summary.dailyCap.toLocaleString(undefined, withNumerals())}
           </p>
         </div>
         <div className="rounded-lg bg-muted/40 px-3 py-2">
@@ -379,7 +381,7 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
           <p
             className={`text-lg font-bold tabular-nums ${remainingWarn ? 'text-destructive-ink' : 'text-foreground'}`}
           >
-            {remaining.toLocaleString()}
+            {remaining.toLocaleString(undefined, withNumerals())}
           </p>
         </div>
       </div>

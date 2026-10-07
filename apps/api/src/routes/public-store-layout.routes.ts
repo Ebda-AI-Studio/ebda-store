@@ -92,7 +92,7 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
     // layout_settings, else the layout-derived document — plus its rev for
     // provenance. `layout` is unchanged so a storefront/admin deploy that
     // predates the builder keeps working across the deploy gap.
-    const { definition, rev } = await getPublishedDefinition(storeId, layout);
+    const { definition, rev } = await getPublishedDefinition(storeId, layout, templateId);
     // Cache lightly at the edge — layout settings change rarely
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120');
     res.json({ success: true, data: { layout, definition, rev } });

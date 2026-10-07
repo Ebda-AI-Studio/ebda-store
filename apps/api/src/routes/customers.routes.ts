@@ -220,13 +220,13 @@ router.get(
       // silently believing it's the complete customer history.
       if (ordersTruncated) {
         const noticeRow = sheet.addRow({
-          storeName: `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString()} orders were aggregated. Contact support for a full export of larger stores.`,
+          storeName: `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString('en-US')} orders were aggregated. Contact support for a full export of larger stores.`,
         });
         noticeRow.font = { bold: true, color: { argb: 'FFB91C1C' } };
       }
       if (zeroOrderTruncated) {
         const noticeRow = sheet.addRow({
-          storeName: `NOTE: export truncated — only the newest ${MAX_ZERO_ORDER_CUSTOMERS.toLocaleString()} registered customers who have not ordered yet are included.`,
+          storeName: `NOTE: export truncated — only the newest ${MAX_ZERO_ORDER_CUSTOMERS.toLocaleString('en-US')} registered customers who have not ordered yet are included.`,
         });
         noticeRow.font = { bold: true, color: { argb: 'FFB91C1C' } };
       }
@@ -329,7 +329,7 @@ router.get(
 
       if (ordersTruncated) {
         const noticeRow = purchasesSheet.addRow({
-          storeName: `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString()} orders were included.`,
+          storeName: `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString('en-US')} orders were included.`,
         });
         noticeRow.font = { bold: true, color: { argb: 'FFB91C1C' } };
       }
@@ -465,8 +465,8 @@ router.get(
         summarySheet.addRow([]);
         const noticeRow = summarySheet.addRow([
           ordersTruncated
-            ? `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString()} orders were included.`
-            : `NOTE: export truncated — only the newest ${MAX_ZERO_ORDER_CUSTOMERS.toLocaleString()} registered customers who have not ordered yet are included.`,
+            ? `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString('en-US')} orders were included.`
+            : `NOTE: export truncated — only the newest ${MAX_ZERO_ORDER_CUSTOMERS.toLocaleString('en-US')} registered customers who have not ordered yet are included.`,
         ]);
         noticeRow.getCell(1).font = { bold: true, color: { argb: 'FFB91C1C' } };
       }

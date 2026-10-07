@@ -1,4 +1,4 @@
-import { formatPrice, minorToDecimalString, REGION } from '@force/shared';
+import { formatMoney, formatPrice, REGION } from '@force/shared';
 
 /**
  * HTML escape for safe interpolation of user-controlled strings in email templates.
@@ -18,11 +18,10 @@ export function escapeHtml(value: unknown): string {
 }
 
 /**
- * Money in an email, in the ORDER's currency (issue 1705). The templates used
- * `minorToDecimalString(x)` with a hardcoded "EGP" / "ج.م" suffix, which prints
- * a non-EGP order (e.g. USD stored in cents) with the wrong suffix. EGP keeps its exact existing
- * rendering, so every EGP email is unchanged; any other currency goes through
- * the shared `formatPrice` the storefront and admin use.
+ * Money in an email, in the ORDER's currency (issue 1705). EGP keeps its
+ * number-then-symbol layout (`450 ج.م` / `450 EGP`) with Western digits and no
+ * zero fraction (`1,299.50` keeps its piastres) — Ruling NUMERALS-1; any other
+ * currency goes through the shared `formatPrice` the storefront and admin use.
  */
 export function emailMoney(
   minor: number,
@@ -31,7 +30,7 @@ export function emailMoney(
 ): string {
   const code = currency || REGION.currency;
   if (code === REGION.currency) {
-    return `${minorToDecimalString(minor)} ${REGION.currencySymbol[locale]}`;
+    return `${formatMoney(minor, locale, { hideSymbol: true })} ${REGION.currencySymbol[locale]}`;
   }
   return formatPrice(minor, { currency: code });
 }

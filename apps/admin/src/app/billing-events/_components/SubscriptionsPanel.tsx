@@ -146,7 +146,7 @@ export function SubscriptionsPanel({
           <span className="tabular-nums">
             {fmtDate(r.nextCharge.at, locale)}
             {r.nextCharge.amountMinor !== null
-              ? ` · ${formatMoney(r.nextCharge.amountMinor, locale)}`
+              ? ` · ${formatMoney(r.nextCharge.amountMinor, locale, { fixedDecimals: true })}`
               : ''}
           </span>
         ) : (

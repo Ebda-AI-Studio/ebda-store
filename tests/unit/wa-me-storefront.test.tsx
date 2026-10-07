@@ -61,7 +61,7 @@ describe('storefront wa.me buttons', () => {
     const out = html(<WaMeProductButton product={product} priceMinor={49900} />);
     expect(out).toContain('data-testid="wa-me-product"');
     expect(out).toContain('href="https://wa.me/201012345678?text=');
-    expect(hrefOf(out)).toContain('Linen Shirt — EGP 499.00');
+    expect(hrefOf(out)).toContain('Linen Shirt — EGP 499');
     expect(hrefOf(out)).toContain('https://nile.ebda.app/products/linen-shirt');
     expect(out).toContain('Ask or share on WhatsApp');
   });

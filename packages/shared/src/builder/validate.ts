@@ -87,7 +87,7 @@ function scanValue(value: unknown, path: string, key: string, errors: BuilderIss
   if (typeof value === 'string') {
     if (byteLength(value) > BUILDER_LIMITS.maxStringBytes)
       errors.push(
-        issue('STRING_TOO_LONG', path, 'Text is longer than 2 KB.', 'النص أطول من ٢ كيلوبايت.')
+        issue('STRING_TOO_LONG', path, 'Text is longer than 2 KB.', 'النص أطول من 2 كيلوبايت.')
       );
     if ((IMAGE_KEY_RE.test(key) || URL_KEY_RE.test(key)) && value !== '') {
       const scheme = /^\s*([a-z][a-z0-9+.-]*):/i.exec(value)?.[1]?.toLowerCase();
@@ -247,7 +247,7 @@ export function validateDefinitionSync(input: unknown): ValidationResult {
         'DOC_TOO_LARGE',
         '',
         'The page is larger than 256 KB.',
-        'حجم الصفحة أكبر من ٢٥٦ كيلوبايت.'
+        'حجم الصفحة أكبر من 256 كيلوبايت.'
       )
     );
 

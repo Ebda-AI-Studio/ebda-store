@@ -14,7 +14,6 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useNumerals } from '../hooks/useNumerals';
 import { api, type SearchSuggestion } from '../lib/api';
 
-import { minorToDecimalString } from '@force/shared';
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface SearchAutocompleteProps {
@@ -52,7 +51,7 @@ function cacheSet(key: string, value: SearchSuggestion[]) {
 export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps) {
   const storeUrl = useStoreUrl();
   const { language, t } = useLanguage();
-  const { localize } = useNumerals();
+  const { money } = useNumerals();
   const isAr = language === 'ar';
 
   const [suggestions, setSuggestions] = useState<SearchSuggestion[] | null>(null);
@@ -236,7 +235,7 @@ export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps)
             const isActive = activeIndex === idx;
             const displayName = isAr && product.nameAr ? product.nameAr : product.name;
             // Prices stored in piastres — divide by 1000 for EGP.
-            const priceMajor = localize(minorToDecimalString(product.price));
+            const priceMajor = money(product.price);
 
             return (
               <Link

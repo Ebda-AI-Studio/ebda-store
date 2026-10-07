@@ -9,6 +9,7 @@ import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { apiDelete, apiGet, apiPost, getApiUrl } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { withNumerals } from '@force/shared';
 
 /**
  * Merchant screen for the MCP merchant-admin keys — issue, review, revoke.
@@ -182,7 +183,8 @@ export default function MerchantKeysPage() {
     setScopes(prev => (prev.includes(scope) ? prev.filter(s => s !== scope) : [...prev, scope]));
   }, []);
 
-  const fmt = (v: string | null) => (v ? new Date(v).toLocaleString() : t('table.never'));
+  const fmt = (v: string | null) =>
+    v ? new Date(v).toLocaleString(undefined, withNumerals()) : t('table.never');
 
   const keyColumns: DataTableColumn<KeyRow>[] = [
     {

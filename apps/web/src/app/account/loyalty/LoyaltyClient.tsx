@@ -1,5 +1,6 @@
 'use client';
 
+import { storeNumerals } from '@force/shared';
 import { useState, useEffect } from 'react';
 import { useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -46,6 +47,7 @@ export default function LoyaltyClient() {
     formatStoreDate(dateStr, {
       timezone: store.timezone,
       language,
+      numerals: storeNumerals(store?.theme),
       style: 'long',
     });
 
@@ -437,7 +439,7 @@ export default function LoyaltyClient() {
                   )}
                 </p>
                 <p className="mt-1 text-5xl font-bold text-primary">
-                  {localize(loyaltyPoints.points.toLocaleString())}
+                  {localize(loyaltyPoints.points.toLocaleString('en-US'))}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {t('points', '\u0646\u0642\u0627\u0637')}
@@ -550,7 +552,7 @@ export default function LoyaltyClient() {
                         }`}
                       >
                         {isPositive ? '+' : ''}
-                        {localize(txn.points.toLocaleString())}
+                        {localize(txn.points.toLocaleString('en-US'))}
                       </td>
                     </tr>
                   );

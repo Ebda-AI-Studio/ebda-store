@@ -31,7 +31,6 @@
  * the storefront Next data cache via the `layout:<storeId>` tag, and the
  * store's slug/host/domain resolve keys. Draft saves touch no public cache.
  */
-import { isDeepStrictEqual } from 'node:util';
 import { prisma } from '@force/database';
 import {
   BUILDER_LIMITS,
@@ -39,6 +38,7 @@ import {
   definitionToLayout,
   layoutToDefinition,
   mergeDocumentOnlySections,
+  publishedDocumentAgrees,
   resolveLayoutSettings,
   validateDefinition,
   type BuilderIssue,
@@ -168,10 +168,16 @@ export async function getPageState(storeId: string, pageKey: string): Promise<Pa
  * under packages/database/prisma) changing `layout_settings` behind a
  * published document: the storefront then follows `layout_settings`, which
  * is what every other reader sees, and the drift is logged.
+ *
+ * `layout` is the row resolved against `templateId` (what the route serves),
+ * so the document side must be resolved the same way (`publishedDocumentAgrees`)
+ * — comparing the template-less projection made every template family and
+ * every removed section look like drift (Ruling BUILDER-PUBLISH-1).
  */
 export async function getPublishedDefinition(
   storeId: string,
   layout: StoreLayoutSettings,
+  templateId: TemplateId | null,
   pageKey = HOME_PAGE_KEY
 ): Promise<{ definition: PageDefinition; rev: number | null }> {
   // The public route may run with no tenant context (a storefront fetch by
@@ -186,12 +192,7 @@ export async function getPublishedDefinition(
   if (published) {
     const doc = published.document as unknown as PageDefinition;
     try {
-      if (
-        isDeepStrictEqual(
-          JSON.parse(JSON.stringify(definitionToLayout(doc))),
-          JSON.parse(JSON.stringify(layout))
-        )
-      )
+      if (publishedDocumentAgrees(doc, layout, templateId ?? undefined))
         return { definition: doc, rev: published.rev };
     } catch {
       // fall through: an unreadable document renders from layout_settings

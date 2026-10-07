@@ -34,7 +34,7 @@ import { BrandPill } from './BrandPill';
 import { getDiscountBadgeColor } from './discount-badge';
 import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
 
-import { fromMinor, minorToDecimalString } from '@force/shared';
+import { fromMinor } from '@force/shared';
 import { REGION } from '@force/shared';
 interface PecannbeeProductCardProps extends ProductCardProps {
   pack?: TemplateId;
@@ -97,7 +97,7 @@ function PecannbeeProductCardImpl({
 }: PecannbeeProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
-  const { localize } = useNumerals();
+  const { money, numerals } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const styles = getPackStyles(pack);
   const textSizes = getProductCardTextSizes(cardSize);
@@ -137,7 +137,7 @@ function PecannbeeProductCardImpl({
   const orderable = inStock || product.acceptsBackorder === true;
   const onSale = isOnSale(product);
   // BUG 1 fix: use getDiscountBadgeText so fixed-EGP discounts render correctly.
-  const discountBadgeText = getDiscountBadgeText(product, isRtl);
+  const discountBadgeText = getDiscountBadgeText(product, isRtl, undefined, undefined, numerals);
 
   const name = isRtl && product.nameAr ? product.nameAr : product.name;
   const href = `${urlPrefix}/products/${product.slug}`;
@@ -500,12 +500,12 @@ function PecannbeeProductCardImpl({
                     }}
                   >
                     {pricing.mode === 'fromMin' ? `${isRtl ? 'من ' : 'From '}` : ''}
-                    {localize(minorToDecimalString(pricing.displayPrice))} {currency}
+                    {money(pricing.displayPrice)} {currency}
                   </span>
                 </span>
                 {pricing.displayCompare && (
                   <span className="text-sm text-muted-foreground line-through">
-                    {localize(minorToDecimalString(pricing.displayCompare))}
+                    {money(pricing.displayCompare)}
                   </span>
                 )}
               </div>

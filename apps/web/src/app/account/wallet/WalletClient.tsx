@@ -1,5 +1,6 @@
 'use client';
 
+import { storeNumerals } from '@force/shared';
 import { useEffect, useState } from 'react';
 import { useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -39,7 +40,12 @@ export default function WalletClient() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   const formatDate = (iso: string) =>
-    formatStoreDate(iso, { timezone: store.timezone, language, style: 'long' });
+    formatStoreDate(iso, {
+      timezone: store.timezone,
+      language,
+      numerals: storeNumerals(store?.theme),
+      style: 'long',
+    });
 
   useEffect(() => {
     if (!wallet || !storeId) {
