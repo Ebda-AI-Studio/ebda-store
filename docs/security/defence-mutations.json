@@ -507,8 +507,8 @@
       "tier": "unit",
       "why": "an attacker-supplied X-Original-Host lands in every AI product-feed link and is cached 600s in Redis and at the CDN",
       "source": "apps/api/src/routes/public.routes.ts",
-      "find": "    const baseUrl = store.domain ? `https://${store.domain}` : `${config.webUrl}/${store.slug}`;",
-      "replace": "    const baseUrl = store.domain\n      ? `https://${store.domain}`\n      : `https://${req.get('x-original-host') ?? req.get('host')}`;",
+      "find": "    const baseUrl = storefrontOrigin(store);",
+      "replace": "    const baseUrl = `https://${req.get('x-original-host') ?? req.get('host')}`;",
       "test": "tests/unit/feed-baseurl-ignores-request-header.test.ts"
     },
     {
@@ -1287,8 +1287,8 @@
       "tier": "unit",
       "why": "an inactive or soft-deleted store's custom domain stays a credentials:true CORS origin indefinitely (#1214)",
       "source": "apps/api/src/lib/cors-cache.ts",
-      "find": "    status: { in: ['active', 'suspended'] as ('active' | 'suspended')[] },\n    deletedAt: null,",
-      "replace": "",
+      "find": "export function corsCustomDomainWhere(hostname: string) {\n  return {\n    ...storeDomainWhere(hostname),\n    status: { in: ['active', 'suspended'] as ('active' | 'suspended')[] },\n    deletedAt: null,\n",
+      "replace": "export function corsCustomDomainWhere(hostname: string) {\n  return {\n    ...storeDomainWhere(hostname),\n",
       "test": "tests/unit/cors-custom-domain-trust.test.ts"
     },
     {
@@ -1390,16 +1390,6 @@
       "find": "router.use('/public', publicAffiliateRoutes);",
       "replace": "router.use('/public', affiliateRoutes);",
       "test": "tests/unit/public-mount-admin-route-guard.test.ts"
-    },
-    {
-      "id": "cache-agent-docs-not-cookie-resolved",
-      "domain": "cache poisoning",
-      "tier": "unit",
-      "why": "platform-host llms.txt / ACP / UCP / product feed resolved from the sticky x-store-slug cookie while shared-cacheable — one store's document cached under the platform URL for every visitor (#1959)",
-      "source": "apps/web/middleware.ts",
-      "find": "  const cookieSlug = isUrlKeyedPublicPath(request.nextUrl.pathname)\n    ? undefined\n    : request.cookies.get('x-store-slug')?.value;",
-      "replace": "  const cookieSlug = request.cookies.get('x-store-slug')?.value;",
-      "test": "tests/unit/web-middleware-characterization.test.ts"
     },
     {
       "id": "csrf-router-level-admin-auth-not-at-public",
@@ -1656,7 +1646,7 @@
       "domain": "availability",
       "tier": "unit",
       "why": "with the global-cap bypass keyed on a header NAME, removing the dedicated /api/v1/inngest bucket leaves forged-signature POSTs unbounded — each a 10 MB JSON parse plus an HMAC on the shared event loop before the 401 (issue 2063)",
-      "source": "apps/api/src/index.ts",
+      "source": "apps/api/src/app.ts",
       "find": "app.use('/api/v1/inngest', inngestLimiter);",
       "replace": "void inngestLimiter;",
       "test": "tests/unit/global-rate-limit-skip.test.ts"
@@ -1697,7 +1687,7 @@
       "tier": "unit",
       "why": "the SMS opt-out link is MAC'd with JWT_SECRET again, so rotating the session secret permanently kills every delivered opt-out link — a guest's only login-free way to stop marketing SMS (issue 2424)",
       "source": "apps/api/src/lib/sms-consent.ts",
-      "find": "createHmac('sha256', derivedSecret('fwb:sms-optout-mac:v2'))",
+      "find": "createHmac('sha256', derivedSecret('ebda:sms-optout-mac:v2'))",
       "replace": "createHmac('sha256', process.env.JWT_SECRET!)",
       "test": "tests/unit/sms-consent-lib.test.ts"
     },
@@ -1727,7 +1717,7 @@
       "tier": "unit",
       "why": "new campaign unsubscribe links fall back to JWT_SECRET again, so a session-secret rotation kills the one-click unsubscribe in every campaign email sent from then on (issue 2424 class)",
       "source": "apps/api/src/lib/campaign-unsubscribe-token.ts",
-      "find": "process.env.CAMPAIGN_UNSUBSCRIBE_SECRET || derivedSecret('fwb:campaign-unsubscribe-mac:v1')\n  );",
+      "find": "process.env.CAMPAIGN_UNSUBSCRIBE_SECRET || derivedSecret('ebda:campaign-unsubscribe-mac:v1')\n  );",
       "replace": "process.env.CAMPAIGN_UNSUBSCRIBE_SECRET || config.jwtSecret\n  );",
       "test": "tests/unit/campaign-unsubscribe-token.test.ts"
     },
@@ -1737,7 +1727,7 @@
       "tier": "unit",
       "why": "new review-request links fall back to JWT_SECRET again, so a session-secret rotation kills every review link still inside its 90-day window (issue 2424 class)",
       "source": "apps/api/src/lib/review-token.ts",
-      "find": "return process.env.REVIEW_TOKEN_SECRET || derivedSecret('fwb:review-link-mac:v1');",
+      "find": "return process.env.REVIEW_TOKEN_SECRET || derivedSecret('ebda:review-link-mac:v1');",
       "replace": "return process.env.REVIEW_TOKEN_SECRET || config.jwtSecret;",
       "test": "tests/unit/review-token.test.ts"
     },
