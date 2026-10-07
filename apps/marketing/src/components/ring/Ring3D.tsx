@@ -50,6 +50,7 @@ export function Ring3D({ l }: { l: RingLabels }) {
     let dragging = false;
     let lastX = 0;
     let velocity = 0;
+    let ro: ResizeObserver | null = null;
 
     const progress = () => {
       const r = el.getBoundingClientRect();
@@ -97,7 +98,8 @@ export function Ring3D({ l }: { l: RingLabels }) {
       s.setStone(stone);
       const size = () => s.resize(cv.clientWidth, cv.clientHeight);
       size();
-      new ResizeObserver(size).observe(cv);
+      ro = new ResizeObserver(size);
+      ro.observe(cv);
       s.setYaw(progress() * Math.PI * 2.2);
       s.render();
       setLive(true);
@@ -127,6 +129,11 @@ export function Ring3D({ l }: { l: RingLabels }) {
       disposed = true;
       near.disconnect();
       seen.disconnect();
+      ro?.disconnect();
+      cv.removeEventListener('pointerdown', onDown);
+      cv.removeEventListener('pointermove', onMove);
+      cv.removeEventListener('pointerup', onUp);
+      cv.removeEventListener('pointercancel', onUp);
       if (raf) cancelAnimationFrame(raf);
       sceneRef.current?.dispose();
       sceneRef.current = null;
