@@ -14,7 +14,16 @@ import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
 import { auditLog } from '../middleware/security';
 import { syncSubscriptionFromLegacyPlan } from '../services/plan-sync';
-import { listLedger, refundCharge } from '../services/billing/subscription-billing.service';
+import {
+  listLedger,
+  listSubscriptionsForAdmin,
+  refundCharge,
+} from '../services/billing/subscription-billing.service';
+import {
+  listClaimsForAdmin,
+  recordManualPayment,
+  rejectClaim,
+} from '../services/billing/account.service';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { inngest } from '../lib/inngest/client';
@@ -345,12 +354,132 @@ router.get(
         .object({
           storeId: z.string().uuid().optional(),
           status: z.enum(['pending', 'succeeded', 'failed', 'refunded']).optional(),
-          type: z.enum(['checkout', 'renewal', 'upgrade', 'refund']).optional(),
+          type: z
+            .enum(['checkout', 'renewal', 'upgrade', 'refund', 'card_setup', 'manual_payment'])
+            .optional(),
           limit: z.coerce.number().int().min(1).max(200).optional(),
           before: z.coerce.date().optional(),
         })
         .parse(req.query);
       res.json({ success: true, data: { events: await listLedger(q) } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** Every store's plan, trial end, card (last4/brand) and next charge (signup funnel). */
+router.get(
+  '/billing/subscriptions',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const q = z
+        .object({
+          status: z.enum(['trialing', 'active', 'past_due', 'canceled', 'comped']).optional(),
+          view: z.enum(['due', 'overdue', 'suspended']).optional(),
+          limit: z.coerce.number().int().min(1).max(500).optional(),
+        })
+        .parse(req.query);
+      res.json({ success: true, data: { subscriptions: await listSubscriptionsForAdmin(q) } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** Super-admin queue of merchants' "I paid by InstaPay" claims. */
+router.get(
+  '/billing/claims',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { status } = z
+        .object({ status: z.enum(['pending', 'confirmed', 'rejected']).default('pending') })
+        .parse(req.query);
+      res.json({ success: true, data: { claims: await listClaimsForAdmin(status) } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/billing/claims/:id/reject',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, note } = z
+        .object({ storeId: z.string().uuid(), note: z.string().trim().min(1).max(500) })
+        .parse(req.body);
+      await rejectClaim({ storeId, claimId: req.params.id, note, actorId: req.user!.userId });
+      await auditLog({
+        action: 'billing.claim_rejected',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'manual_payment_claim',
+        resourceId: req.params.id,
+        details: { note },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /admin/stores/:id/manual-payment — "Record manual payment & activate"
+ * (InstaPay / bank / cash). Super-admin only; idempotent on (method, reference):
+ * a repeat returns the first ledger row and changes nothing.
+ */
+router.post(
+  '/stores/:id/manual-payment',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const input = z
+        .object({
+          planCode: z.string().min(1).max(64),
+          interval: z.enum(['monthly', 'yearly']),
+          amountMinor: z.number().int().positive().max(100_000_000),
+          method: z.enum(['instapay', 'bank', 'cash']),
+          reference: z.string().trim().min(3).max(100),
+          paidAt: z.coerce.date(),
+          periodStart: z.coerce.date(),
+          periodEnd: z.coerce.date(),
+          claimId: z.string().uuid().optional(),
+        })
+        .strict()
+        .parse(req.body);
+      const out = await recordManualPayment({
+        storeId: req.params.id,
+        ...input,
+        actorId: req.user!.userId,
+      });
+      await auditLog({
+        action: out.duplicate
+          ? 'billing.manual_payment_replayed'
+          : 'billing.manual_payment_recorded',
+        userId: req.user!.userId,
+        storeId: req.params.id,
+        resourceType: 'billing_event',
+        resourceId: out.billingEventId,
+        details: {
+          planCode: input.planCode,
+          interval: input.interval,
+          amountMinor: input.amountMinor,
+          method: input.method,
+          reference: input.reference,
+          periodStart: input.periodStart.toISOString(),
+          periodEnd: input.periodEnd.toISOString(),
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.status(out.duplicate ? 200 : 201).json({ success: true, data: out });
     } catch (error) {
       next(error);
     }

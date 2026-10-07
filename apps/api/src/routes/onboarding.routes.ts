@@ -7,6 +7,7 @@ import { tenantContext } from '../middleware/tenant-context';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { OnboardingService, SELF_SERVE_TEMPLATES } from '../services/onboarding.service';
 import { applyOnboardingInstapay } from '../services/onboarding-instapay';
+import { SIGNUP_PLAN_CODES } from '../services/billing/trial';
 
 /**
  * Self-serve onboarding, mounted at `/onboarding`.
@@ -57,9 +58,17 @@ const createStoreSchema = z.object({
   slug: z.string().trim().min(1).max(60),
   template: z.enum(SELF_SERVE_TEMPLATES).optional(),
   language: z.enum(['ar', 'en']).optional(),
+  /** Plan chosen at signup (marketing deep link / plan step); billed at trial end. */
+  plan: z
+    .object({
+      planCode: z.enum(SIGNUP_PLAN_CODES),
+      interval: z.enum(['monthly', 'yearly']),
+    })
+    .strict()
+    .optional(),
 });
 
-// POST /onboarding/store - create the (inactive, free-plan) store. Verified email only.
+// POST /onboarding/store - create the (inactive) store on the Growth trial. Verified email only.
 router.post(
   '/store',
   ...merchantOnly,

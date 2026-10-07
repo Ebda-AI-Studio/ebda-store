@@ -182,10 +182,10 @@ enum VerificationTokenType {
 // ==========================================
 
 model Store {
-  id                    String      @id @default(uuid())
-  name                  String
-  nameAr                String?     @map("name_ar")
-  slug                  String      @unique
+  id                     String      @id @default(uuid())
+  name                   String
+  nameAr                 String?     @map("name_ar")
+  slug                   String      @unique
   // The VERIFIED custom domain: the only column host resolution, CORS and
   // storefrontOrigin read. A claim that is not yet verified lives in
   // `pendingDomain` (never served), so a squatter's unproven claim can never
@@ -193,51 +193,55 @@ model Store {
   // the state of the latest claim ('pending' | 'active' | 'failed', CHECK-
   // constrained in SQL): pending -> active (provider verified) or failed; a
   // pending/failed claim is released after DOMAIN_CLAIM_TTL_HOURS.
-  domain                String?     @unique
-  domainStatus          String?     @map("domain_status")
-  pendingDomain         String?     @map("pending_domain")
-  domainClaimedAt       DateTime?   @map("domain_claimed_at")
-  domainVerifiedAt      DateTime?   @map("domain_verified_at")
+  domain                 String?     @unique
+  domainStatus           String?     @map("domain_status")
+  pendingDomain          String?     @map("pending_domain")
+  domainClaimedAt        DateTime?   @map("domain_claimed_at")
+  domainVerifiedAt       DateTime?   @map("domain_verified_at")
   // Legacy frontend-hosting-provider column. Cloudflare-for-SaaS is the only
   // provider now (Vercel cancelled 2026-07) — kept as-is, no migration needed.
-  domainProvider        String?     @map("domain_provider")
+  domainProvider         String?     @map("domain_provider")
   // Resend email-sender state (platform-managed under a single Resend account)
-  emailSenderLocalPart  String      @default("noreply") @map("email_sender_local_part")
-  emailDomainId         String?     @map("email_domain_id")
-  emailDomainStatus     String?     @map("email_domain_status")
-  emailDomainVerifiedAt DateTime?   @map("email_domain_verified_at")
-  ownerId               String      @map("owner_id")
-  status                StoreStatus @default(active)
-  plan                  StorePlan   @default(starter)
-  logo                  String?
-  logoAr                String?     @map("logo_ar")
-  favicon               String?
+  emailSenderLocalPart   String      @default("noreply") @map("email_sender_local_part")
+  emailDomainId          String?     @map("email_domain_id")
+  emailDomainStatus      String?     @map("email_domain_status")
+  emailDomainVerifiedAt  DateTime?   @map("email_domain_verified_at")
+  ownerId                String      @map("owner_id")
+  status                 StoreStatus @default(active)
+  /// Why billing suspended the store (unpaid | over_store_limit); NULL = not a
+  /// billing suspension. Only these are lifted automatically (EBDA-FUNNEL-10).
+  billingSuspendedReason String?     @map("billing_suspended_reason")
+  billingSuspendedAt     DateTime?   @map("billing_suspended_at")
+  plan                   StorePlan   @default(starter)
+  logo                   String?
+  logoAr                 String?     @map("logo_ar")
+  favicon                String?
   // Hero customization
-  heroTitle             String?     @map("hero_title")
-  heroTitleAr           String?     @map("hero_title_ar")
-  heroSubtitle          String?     @map("hero_subtitle")
-  heroSubtitleAr        String?     @map("hero_subtitle_ar")
-  heroCtaText           String?     @map("hero_cta_text")
-  heroCtaTextAr         String?     @map("hero_cta_text_ar")
-  heroCtaLink           String?     @map("hero_cta_link")
-  heroImage             String?     @map("hero_image")
+  heroTitle              String?     @map("hero_title")
+  heroTitleAr            String?     @map("hero_title_ar")
+  heroSubtitle           String?     @map("hero_subtitle")
+  heroSubtitleAr         String?     @map("hero_subtitle_ar")
+  heroCtaText            String?     @map("hero_cta_text")
+  heroCtaTextAr          String?     @map("hero_cta_text_ar")
+  heroCtaLink            String?     @map("hero_cta_link")
+  heroImage              String?     @map("hero_image")
   // Cover image shown on the storefront's Best Sellers virtual
   // category tile. Optional — when null the storefront falls back to
   // the text-only treatment.
-  bestSellersImage      String?     @map("best_sellers_image")
+  bestSellersImage       String?     @map("best_sellers_image")
   // Per-store typography overrides — see TypographySettings type in
   // @force/shared. JSON because the shape will keep evolving (more
   // zones, line-height/letter-spacing, etc.) and we don't want a
   // column-add migration each time.
-  typography            Json?       @map("typography")
-  description           String?
-  descriptionAr         String?     @map("description_ar")
-  currency              String      @default("EGP")
-  timezone              String      @default("Africa/Cairo")
-  settings              Json        @default("{}")
-  createdAt             DateTime    @default(now()) @map("created_at")
-  updatedAt             DateTime    @updatedAt @map("updated_at")
-  deletedAt             DateTime?   @map("deleted_at") // Soft delete support
+  typography             Json?       @map("typography")
+  description            String?
+  descriptionAr          String?     @map("description_ar")
+  currency               String      @default("EGP")
+  timezone               String      @default("Africa/Cairo")
+  settings               Json        @default("{}")
+  createdAt              DateTime    @default(now()) @map("created_at")
+  updatedAt              DateTime    @updatedAt @map("updated_at")
+  deletedAt              DateTime?   @map("deleted_at") // Soft delete support
 
   // Template & Theme
   template       StoreTemplate @default(modern)
@@ -512,6 +516,8 @@ model Store {
   usageSnapshots           StoreUsageSnapshot[]
   subscription             StoreSubscription?
   billingEvents            BillingEvent[]
+  manualPaymentClaims      ManualPaymentClaim[]
+  billingReminders         BillingReminder[]
 
   @@index([ownerId])
   @@index([status])
@@ -4524,10 +4530,18 @@ model StoreSubscription {
   cancelAtPeriodEnd  Boolean            @default(false) @map("cancel_at_period_end")
 
   // Provider fields — nullable until task 3 (Kashier/Paymob adapter) fills them.
-  provider                 String? @map("provider")
-  providerCustomerId       String? @map("provider_customer_id")
-  providerSubscriptionId   String? @map("provider_subscription_id")
-  providerPaymentMethodRef String? @map("provider_payment_method_ref")
+  provider                 String?   @map("provider")
+  providerCustomerId       String?   @map("provider_customer_id")
+  providerSubscriptionId   String?   @map("provider_subscription_id")
+  providerPaymentMethodRef String?   @map("provider_payment_method_ref")
+  /// Card display details (signup funnel, migration 20261007120000). Never the token.
+  paymentMethodLast4       String?   @map("payment_method_last4")
+  paymentMethodBrand       String?   @map("payment_method_brand")
+  paymentMethodSavedAt     DateTime? @map("payment_method_saved_at")
+  /// card | instapay (null = not chosen). See Rulings EBDA-FUNNEL-8/9.
+  billingMethod            String?   @map("billing_method")
+  /// Unique code the merchant writes on an InstaPay transfer.
+  paymentReference         String?   @unique @map("payment_reference")
 
   /// First day (Cairo) of the month in which this store went OVER its monthly
   /// order cap. Orders are never blocked at checkout (see PlanLimitService);
@@ -4573,7 +4587,7 @@ model BillingEvent {
   id              String    @id @default(uuid())
   storeId         String    @map("store_id")
   subscriptionId  String?   @map("subscription_id")
-  /// checkout | renewal | upgrade | refund
+  /// checkout | renewal | upgrade | refund | card_setup (amount 0, nothing charged)
   type            String
   planCode        String?   @map("plan_code")
   billingInterval String?   @map("billing_interval")
@@ -4601,6 +4615,58 @@ model BillingEvent {
   @@index([status, createdAt])
   @@index([provider, providerRef])
   @@map("billing_events")
+}
+
+/// A merchant's "I paid by InstaPay" claim (signup funnel). Never activates
+/// anything by itself; a super-admin confirms it with the manual-payment action.
+/// RLS: strict store policy (migration 20261007120000).
+model ManualPaymentClaim {
+  id               String    @id @default(uuid())
+  storeId          String    @map("store_id")
+  subscriptionId   String?   @map("subscription_id")
+  planCode         String    @map("plan_code")
+  billingInterval  String    @map("billing_interval")
+  amountMinor      Int       @map("amount_minor")
+  /// instapay | bank | cash
+  method           String    @default("instapay")
+  /// Our reference (store_subscriptions.payment_reference) at claim time.
+  paymentReference String    @map("payment_reference")
+  /// The payer's transaction reference (InstaPay txn id); unique per method.
+  payerReference   String    @map("payer_reference")
+  proofUrl         String?   @map("proof_url")
+  /// pending | confirmed | rejected
+  status           String    @default("pending")
+  reviewNote       String?   @map("review_note")
+  reviewedBy       String?   @map("reviewed_by")
+  reviewedAt       DateTime? @map("reviewed_at")
+  billingEventId   String?   @map("billing_event_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([method, payerReference])
+  @@index([storeId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("manual_payment_claims")
+}
+
+/// One reminder per (subscription, due date, kind): the daily job's idempotency
+/// handle (signup funnel). RLS: strict store policy.
+model BillingReminder {
+  id             String   @id @default(uuid())
+  storeId        String   @map("store_id")
+  subscriptionId String   @map("subscription_id")
+  dueAt          DateTime @map("due_at")
+  /// d7 | d3 | d1 | d0 | suspended
+  kind           String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, dueAt, kind])
+  @@index([storeId])
+  @@map("billing_reminders")
 }
 
 /// Provider webhook inbox (SP5 task 3): UNIQUE (provider, eventId) makes a

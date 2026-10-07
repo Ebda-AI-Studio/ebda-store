@@ -48,6 +48,8 @@ import { socketService } from '../../apps/api/src/services/socket.service';
 import { errorHandler } from '../../apps/api/src/middleware/error-handler';
 import billingWebhookRoutes from '../../apps/api/src/routes/billing-webhook.routes';
 
+// Card paths are exercised explicitly; the product default is InstaPay-only.
+process.env.BILLING_TRIAL_CARD_MODE = 'card_on_file';
 const hasDb =
   !!process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost:5432/test_db');
 

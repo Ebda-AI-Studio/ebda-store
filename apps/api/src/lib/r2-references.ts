@@ -383,6 +383,15 @@ export const R2_REFERENCE_COLUMNS: readonly R2ReferenceColumn[] = [
     kind: 'json',
     why: 'platform settings; may carry platform branding images',
   },
+  // ── Billing: InstaPay payment proof (signup funnel) ────────────────────────
+  {
+    model: 'ManualPaymentClaim',
+    field: 'proofUrl',
+    table: 'manual_payment_claims',
+    column: 'proof_url',
+    kind: 'url',
+    why: 'optional InstaPay transfer screenshot uploaded by the merchant',
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

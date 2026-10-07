@@ -19,28 +19,36 @@ export function LiveStep({
   store,
   productCount,
   onBack,
+  onGoToBilling,
 }: {
   store: OnboardingStore;
   productCount: number;
   onBack: () => void;
+  onGoToBilling: () => void;
 }) {
   const t = useT('onboarding.flow.live');
   const tFlow = useT('onboarding.flow');
   const tTemplates = useT('onboarding.flow.template');
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState('');
   const [live, setLive] = useState<LiveResult | null>(null);
   const [copied, setCopied] = useState(false);
 
   async function handlePublish() {
     setError('');
+    setErrorCode('');
     setPublishing(true);
     const { data, error: apiError } = await apiPost<{ store: LiveResult }>(
       `/api/v1/onboarding/stores/${store.id}/go-live`
     );
     setPublishing(false);
     if (apiError || !data) {
-      setError(t('publishFailed'));
+      // 402s carry a localized message (payment method required, trial over, ...).
+      setError(
+        apiError?.status === 402 && apiError.message ? apiError.message : t('publishFailed')
+      );
+      setErrorCode(apiError?.code ?? '');
       return;
     }
     setLive(data.store);
@@ -115,7 +123,16 @@ export function LiveStep({
       </div>
       {error && (
         <div role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink">
-          {error}
+          <p>{error}</p>
+          {errorCode === 'PAYMENT_METHOD_REQUIRED' && (
+            <button
+              type="button"
+              onClick={onGoToBilling}
+              className="mt-2 font-medium text-primary-ink underline"
+            >
+              {t('addPayment')}
+            </button>
+          )}
         </div>
       )}
       <dl className="divide-y divide-border rounded-lg border border-border text-sm">
