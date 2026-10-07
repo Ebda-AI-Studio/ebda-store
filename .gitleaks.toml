@@ -24,6 +24,7 @@ regexes = [
   '''egy_csk_test_94042f793419c5a0f14a4cadfda9d626''',
   '''eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9\.eyJ1c2VyX2lkIjo0Mzk5NTYs''',
   '''ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SjFjMlZ5WDJsa0lqb3pNREk0TlRJ''',
+  '''ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SjFjMlZ5WDJsa0lqbzBNems1TlRZ''',
   # Fake provider-key fixtures (provider-connect / fawry contract tests) — CI-only.
   '''wrong-key-123456''',
   '''pak_live_0123456789abcdef''',
