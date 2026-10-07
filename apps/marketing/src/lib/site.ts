@@ -8,6 +8,9 @@ export const LOGIN_URL = `${BRAND_ADMIN_URL}/login`;
 export const SIGNUP_URL = `${BRAND_ADMIN_URL}/signup`;
 export const SECURITY_EMAIL = `security@${BRAND.domains.marketing}`;
 
+/** Every public marketing page (same set in both locales). The sitemap is generated from this. */
+export const SITE_PAGES = ['', 'legal', 'privacy', 'terms'] as const;
+
 /** Home path per locale. Arabic is the default and lives at the root. */
 export const HOME: Record<Locale, string> = { ar: '/', en: '/en' };
 
