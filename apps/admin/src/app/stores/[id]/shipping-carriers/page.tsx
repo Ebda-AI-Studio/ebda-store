@@ -2,55 +2,22 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, apiPut, apiPost } from '../../../../lib/api';
+import { apiGet } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { useT } from '@/i18n/useT';
+import { BRAND, providerRequestMailto, providersOfKind } from '@force/shared';
+import { useAuth } from '../../../../lib/auth';
 import { ShippingCarriersEmptyState } from './_components/ShippingCarriersEmptyState';
-import { ICarryCarrierCard } from './_components/ICarryCarrierCard';
-import { AramexCarrierCard } from './_components/AramexCarrierCard';
-import { BostaCarrierCard } from './_components/BostaCarrierCard';
+import { CarrierConnectCard } from './_components/CarrierConnectCard';
 import { ManualCarrierCard } from './_components/ManualCarrierCard';
 import { ShipmentsTable } from './_components/ShipmentsTable';
-import { type PickupAddress } from './_components/PickupAddressForm';
-import {
-  DEFAULT_CONFIGS,
-  type AramexConfig,
-  type BostaConfig,
-  type CarrierConfigApiRow,
-  type CarrierConfigs,
-  type CarrierKey,
-  type ICarryConfig,
-  type Shipment,
-  type ShipmentsData,
-  type TestStatus,
-} from './_components/types';
+import type { CarrierConfigRow, Shipment, ShipmentsData } from './_components/types';
 
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
-const CARRIER_NAME_KEYS: Record<CarrierKey, string> = {
-  icarry: 'carrierNames.icarry',
-  aramex: 'carrierNames.aramex',
-  bosta: 'carrierNames.bosta',
-};
 
-// The pickup address is stored in the carrier's non-secret `settings` (same keys for every carrier).
-const pickupFromSettings = (
-  settings: Record<string, string | boolean | undefined> | undefined
-) => ({
-  name: String(settings?.pickupName ?? ''),
-  phone: String(settings?.pickupPhone ?? ''),
-  line1: String(settings?.pickupLine1 ?? ''),
-  city: String(settings?.pickupCity ?? 'Cairo'),
-  area: String(settings?.pickupArea ?? ''),
-});
-const pickupToSettings = (p: PickupAddress) => ({
-  pickupName: p.name,
-  pickupPhone: p.phone,
-  pickupLine1: p.line1,
-  pickupCity: p.city,
-  pickupArea: p.area,
-});
+// Carriers are schema-driven from the provider catalog; manual delivery keeps its info card.
+const CARRIERS = providersOfKind('shipping').filter(p => !p.manual);
 
 export default function ShippingCarriersPage() {
   const { gate } = useRequireFeature('shipping_carriers');
@@ -58,27 +25,16 @@ export default function ShippingCarriersPage() {
   const params = useParams();
   const storeId = params.id as string;
   const { isEnabled } = useFeatures();
-  const { success: toastSuccess, error: showError } = useToast();
   const tPage = useT('shipping.carriers.page');
-  const tShipments = useT('shipping.carriers.shipments');
-  const tToast = useT('shipping.carriers.toast');
+  const tConnect = useT('shipping.carriers.connect');
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
 
   const featureEnabled = isEnabled('shipping_carriers');
 
   // Carrier configs state
   const [loading, setLoading] = useState(true);
-  const [configs, setConfigs] = useState<CarrierConfigs>(DEFAULT_CONFIGS);
-
-  // Save/test state
-  const [savingCarrier, setSavingCarrier] = useState<CarrierKey | null>(null);
-  const [testingCarrier, setTestingCarrier] = useState<CarrierKey | null>(null);
-  const [settingDefault, setSettingDefault] = useState<CarrierKey | null>(null);
-  const [rotating, setRotating] = useState(false);
-  const [testStatus, setTestStatus] = useState<Record<CarrierKey, TestStatus>>({
-    icarry: 'idle',
-    aramex: 'idle',
-    bosta: 'idle',
-  });
+  const [configs, setConfigs] = useState<CarrierConfigRow[]>([]);
 
   // Shipments state
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -91,47 +47,10 @@ export default function ShippingCarriersPage() {
   // ─── Data Fetching ──────────────────────────────────────────────────────────
 
   const fetchConfigs = useCallback(async () => {
-    const { data } = await apiGet<{ configs: CarrierConfigApiRow[] }>(
+    const { data } = await apiGet<{ configs: CarrierConfigRow[] }>(
       `/api/v1/stores/${storeId}/shipping-carriers/configs`
     );
-    if (data?.configs) {
-      const merged: CarrierConfigs = { ...DEFAULT_CONFIGS };
-      for (const cfg of data.configs) {
-        const code = cfg.carrier as CarrierKey;
-        const base = { enabled: cfg.enabled ?? false, isDefault: cfg.isDefault ?? false };
-        const pickup = pickupFromSettings(cfg.settings);
-        if (code === 'icarry') {
-          merged.icarry = {
-            ...base,
-            apiKey: cfg.credentials?.apiKey ?? '',
-            merchantId: cfg.credentials?.merchantId ?? '',
-            pickup,
-          };
-        } else if (code === 'bosta') {
-          merged.bosta = {
-            ...base,
-            apiKey: cfg.credentials?.apiKey ?? '',
-            businessLocationId: cfg.credentials?.businessLocationId ?? '',
-            sandbox: cfg.settings?.sandbox === true,
-            pickup,
-          };
-        } else if (code === 'aramex') {
-          merged.aramex = {
-            ...base,
-            sandbox: cfg.settings?.sandbox === true,
-            codEgpConfirmed: cfg.settings?.codEgpConfirmed === true,
-            accountNumber: cfg.credentials?.accountNumber ?? '',
-            accountPin: cfg.credentials?.accountPin ?? '',
-            accountEntity: cfg.credentials?.accountEntity ?? '',
-            accountCountryCode: cfg.credentials?.accountCountryCode ?? 'EG',
-            username: cfg.credentials?.username ?? '',
-            password: cfg.credentials?.password ?? '',
-            pickup,
-          };
-        }
-      }
-      setConfigs(merged);
-    }
+    if (data?.configs) setConfigs(data.configs);
   }, [storeId]);
 
   const fetchShipments = useCallback(async () => {
@@ -170,183 +89,6 @@ export default function ShippingCarriersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shipmentsPage, carrierFilter, statusFilter]);
 
-  // ─── Helpers ────────────────────────────────────────────────────────────────
-
-  const carrierLabel = useCallback(
-    (carrier: CarrierKey): string => tShipments(CARRIER_NAME_KEYS[carrier]),
-    [tShipments]
-  );
-
-  // ─── Save Carrier Config ────────────────────────────────────────────────────
-
-  const handleSaveCarrier = async (carrier: CarrierKey) => {
-    setSavingCarrier(carrier);
-    try {
-      const cfg = configs[carrier];
-      const settings = pickupToSettings(cfg.pickup);
-      const body =
-        carrier === 'icarry'
-          ? {
-              enabled: cfg.enabled,
-              credentials: {
-                apiKey: (cfg as ICarryConfig).apiKey,
-                merchantId: (cfg as ICarryConfig).merchantId,
-              },
-              settings,
-            }
-          : carrier === 'bosta'
-            ? {
-                enabled: cfg.enabled,
-                credentials: {
-                  apiKey: (cfg as BostaConfig).apiKey,
-                  businessLocationId: (cfg as BostaConfig).businessLocationId,
-                },
-                settings: { ...settings, sandbox: (cfg as BostaConfig).sandbox },
-              }
-            : {
-                enabled: cfg.enabled,
-                credentials: {
-                  accountNumber: (cfg as AramexConfig).accountNumber,
-                  accountPin: (cfg as AramexConfig).accountPin,
-                  accountEntity: (cfg as AramexConfig).accountEntity,
-                  accountCountryCode: (cfg as AramexConfig).accountCountryCode,
-                  username: (cfg as AramexConfig).username,
-                  password: (cfg as AramexConfig).password,
-                },
-                settings: {
-                  ...settings,
-                  sandbox: (cfg as AramexConfig).sandbox,
-                  codEgpConfirmed: (cfg as AramexConfig).codEgpConfirmed,
-                },
-              };
-
-      const { error } = await apiPut(
-        `/api/v1/stores/${storeId}/shipping-carriers/configs/${carrier}`,
-        body
-      );
-      if (!error) {
-        toastSuccess(
-          tToast('savedTitle'),
-          tToast('savedDescription', { carrier: carrierLabel(carrier) })
-        );
-      } else {
-        showError(tToast('errorTitle'), error.message || tToast('saveFailed'));
-      }
-    } catch (err) {
-      console.error('Failed to save carrier config:', err);
-      showError(tToast('errorTitle'), tToast('saveFailedRetry'));
-    } finally {
-      setSavingCarrier(null);
-    }
-  };
-
-  // ─── Test Connection ────────────────────────────────────────────────────────
-
-  const handleTestConnection = async (carrier: CarrierKey) => {
-    setTestingCarrier(carrier);
-    setTestStatus(prev => ({ ...prev, [carrier]: 'testing' }));
-    try {
-      const { error } = await apiPost(
-        `/api/v1/stores/${storeId}/shipping-carriers/test/${carrier}`
-      );
-      if (!error) {
-        setTestStatus(prev => ({ ...prev, [carrier]: 'success' }));
-        toastSuccess(
-          tToast('connectionOkTitle'),
-          tToast('connectionOkDescription', { carrier: carrierLabel(carrier) })
-        );
-      } else {
-        setTestStatus(prev => ({ ...prev, [carrier]: 'error' }));
-        showError(tToast('connectionFailedTitle'), error.message || tToast('testFailed'));
-      }
-    } catch (err) {
-      console.error('Test connection error:', err);
-      setTestStatus(prev => ({ ...prev, [carrier]: 'error' }));
-      showError(tToast('errorTitle'), tToast('testFailedRetry'));
-    } finally {
-      setTestingCarrier(null);
-    }
-  };
-
-  // ─── Set Default ────────────────────────────────────────────────────────────
-
-  const handleSetDefault = async (carrier: CarrierKey) => {
-    setSettingDefault(carrier);
-    try {
-      const { error } = await apiPost(
-        `/api/v1/stores/${storeId}/shipping-carriers/default/${carrier}`
-      );
-      if (!error) {
-        setConfigs(prev => ({
-          icarry: { ...prev.icarry, isDefault: carrier === 'icarry' },
-          aramex: { ...prev.aramex, isDefault: carrier === 'aramex' },
-          bosta: { ...prev.bosta, isDefault: carrier === 'bosta' },
-        }));
-        toastSuccess(
-          tToast('defaultSetTitle'),
-          tToast('defaultSetDescription', { carrier: carrierLabel(carrier) })
-        );
-      } else {
-        showError(tToast('errorTitle'), error.message || tToast('defaultSetFailed'));
-      }
-    } catch (err) {
-      console.error('Set default error:', err);
-      showError(tToast('errorTitle'), tToast('defaultSetFailed'));
-    } finally {
-      setSettingDefault(null);
-    }
-  };
-
-  // ─── Config Patchers ────────────────────────────────────────────────────────
-
-  function updateICarry(patch: Partial<ICarryConfig>) {
-    setConfigs(prev => ({ ...prev, icarry: { ...prev.icarry, ...patch } }));
-  }
-
-  function updateAramex(patch: Partial<AramexConfig>) {
-    setConfigs(prev => ({ ...prev, aramex: { ...prev.aramex, ...patch } }));
-  }
-
-  function updateBosta(patch: Partial<BostaConfig>) {
-    setConfigs(prev => ({ ...prev, bosta: { ...prev.bosta, ...patch } }));
-  }
-
-  function updateBostaPickup(patch: Partial<PickupAddress>) {
-    setConfigs(prev => ({
-      ...prev,
-      bosta: { ...prev.bosta, pickup: { ...prev.bosta.pickup, ...patch } },
-    }));
-  }
-
-  const handleRotateSecret = async () => {
-    setRotating(true);
-    try {
-      const { error } = await apiPost(
-        `/api/v1/stores/${storeId}/shipping-carriers/webhook-secret/bosta/rotate`
-      );
-      if (!error) toastSuccess(tToast('rotatedTitle'), tToast('rotatedDescription'));
-      else showError(tToast('errorTitle'), error.message || tToast('rotateFailed'));
-    } catch {
-      showError(tToast('errorTitle'), tToast('rotateFailed'));
-    } finally {
-      setRotating(false);
-    }
-  };
-
-  function updateICarryPickup(patch: Partial<PickupAddress>) {
-    setConfigs(prev => ({
-      ...prev,
-      icarry: { ...prev.icarry, pickup: { ...prev.icarry.pickup, ...patch } },
-    }));
-  }
-
-  function updateAramexPickup(patch: Partial<PickupAddress>) {
-    setConfigs(prev => ({
-      ...prev,
-      aramex: { ...prev.aramex, pickup: { ...prev.aramex.pickup, ...patch } },
-    }));
-  }
-
   const shipmentsPages = Math.max(1, Math.ceil(shipmentsTotal / shipmentsLimit));
 
   // ─── Render ─────────────────────────────────────────────────────────────────
@@ -363,48 +105,31 @@ export default function ShippingCarriersPage() {
         <ShippingCarriersEmptyState />
       ) : (
         <div className="space-y-6">
-          <BostaCarrierCard
-            config={configs.bosta}
-            saving={savingCarrier === 'bosta'}
-            testing={testingCarrier === 'bosta'}
-            settingDefault={settingDefault === 'bosta'}
-            rotating={rotating}
-            testStatus={testStatus.bosta}
-            onConfigChange={updateBosta}
-            onPickupChange={updateBostaPickup}
-            onSave={() => handleSaveCarrier('bosta')}
-            onTest={() => handleTestConnection('bosta')}
-            onSetDefault={() => handleSetDefault('bosta')}
-            onRotateSecret={handleRotateSecret}
-          />
+          <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+            {tPage('intro')}
+          </div>
 
-          <ICarryCarrierCard
-            config={configs.icarry}
-            saving={savingCarrier === 'icarry'}
-            testing={testingCarrier === 'icarry'}
-            settingDefault={settingDefault === 'icarry'}
-            testStatus={testStatus.icarry}
-            onConfigChange={updateICarry}
-            onPickupChange={updateICarryPickup}
-            onSave={() => handleSaveCarrier('icarry')}
-            onTest={() => handleTestConnection('icarry')}
-            onSetDefault={() => handleSetDefault('icarry')}
-          />
-
-          <AramexCarrierCard
-            config={configs.aramex}
-            saving={savingCarrier === 'aramex'}
-            testing={testingCarrier === 'aramex'}
-            settingDefault={settingDefault === 'aramex'}
-            testStatus={testStatus.aramex}
-            onConfigChange={updateAramex}
-            onPickupChange={updateAramexPickup}
-            onSave={() => handleSaveCarrier('aramex')}
-            onTest={() => handleTestConnection('aramex')}
-            onSetDefault={() => handleSetDefault('aramex')}
-          />
+          {CARRIERS.map(entry => (
+            <CarrierConnectCard
+              key={entry.code}
+              entry={entry}
+              config={configs.find(c => c.carrier === entry.code)}
+              storeId={storeId}
+              isSuperAdmin={isSuperAdmin}
+              onChanged={fetchConfigs}
+            />
+          ))}
 
           <ManualCarrierCard storeId={storeId} />
+
+          <p className="text-sm text-muted-foreground">
+            <a
+              href={providerRequestMailto(BRAND.supportEmail, 'shipping')}
+              className="text-primary underline"
+            >
+              {tConnect('requestCarrier')}
+            </a>
+          </p>
 
           <ShipmentsTable
             shipments={shipments}
