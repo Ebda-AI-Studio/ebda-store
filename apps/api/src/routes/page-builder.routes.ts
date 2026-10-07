@@ -52,12 +52,10 @@ const guard = [authenticate, authorize('store_admin', 'super_admin'), requireSto
 function pageKeyOr404(req: Request, res: Response): string | null {
   const { pageKey } = req.params;
   if (!SUPPORTED_PAGES.has(pageKey)) {
-    res
-      .status(404)
-      .json({
-        success: false,
-        error: { code: 'PAGE_NOT_FOUND', message: `Unknown page "${pageKey}"` },
-      });
+    res.status(404).json({
+      success: false,
+      error: { code: 'PAGE_NOT_FOUND', message: `Unknown page "${pageKey}"` },
+    });
     return null;
   }
   return pageKey;
