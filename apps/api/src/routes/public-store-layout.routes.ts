@@ -10,6 +10,7 @@ import { prisma } from '@force/database';
 import { resolveLayoutSettings } from '@force/shared';
 import type { TemplateId } from '@force/shared';
 import { redis } from '../services/redis.service';
+import { getPublishedDefinition } from '../services/page-builder.service';
 
 const router = Router();
 
@@ -82,9 +83,15 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
     }
 
     const layout = resolveLayoutSettings(store.layoutSettings, templateId);
+    // Visual builder (additive): the page document the storefront renders —
+    // the PUBLISHED revision (never a draft) when it agrees with
+    // layout_settings, else the layout-derived document — plus its rev for
+    // provenance. `layout` is unchanged so a storefront/admin deploy that
+    // predates the builder keeps working across the deploy gap.
+    const { definition, rev } = await getPublishedDefinition(storeId, layout);
     // Cache lightly at the edge — layout settings change rarely
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120');
-    res.json({ success: true, data: { layout } });
+    res.json({ success: true, data: { layout, definition, rev } });
   } catch (error) {
     next(error);
   }

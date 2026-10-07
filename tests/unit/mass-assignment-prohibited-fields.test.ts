@@ -607,10 +607,11 @@ describe('route inventory coverage — every store/product/order write route is 
 describe('repo-wide mass-assignment shape gate', () => {
   // file -> reason. A passthrough here is on a nested JSON config blob stored
   // in a Json column, never on an object whose keys become Prisma columns.
-  const PASSTHROUGH_ALLOWED: Record<string, string> = {
-    'store-layout.routes.ts':
-      'section entries inside the page-layout JSON column (forward-compat for new section keys); not mapped onto Store columns',
-  };
+  // (The page-layout schema's `extraCarousels` passthrough moved out of
+  // `store-layout.routes.ts` into `packages/shared/src/builder/layout-schema.ts`
+  // with the visual builder registry — still a nested entry of the
+  // `layout_settings` JSON column, never mapped onto Store columns.)
+  const PASSTHROUGH_ALLOWED: Record<string, string> = {};
 
   const routeFiles = readdirSync(ROUTES_DIR).filter(f => f.endsWith('.routes.ts'));
   const stripComments = (src: string) =>

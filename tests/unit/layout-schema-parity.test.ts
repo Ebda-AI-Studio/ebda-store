@@ -47,7 +47,7 @@ describe('layout PUT schema parity — StoreLayoutSettings vs layoutSchema', () 
         'LAYOUT SCHEMA PARITY FAILURE',
         '─────────────────────────────────────────────────────────',
         'The following StoreLayoutSettings keys are NOT listed in the',
-        'layoutSchema inside apps/api/src/routes/store-layout.routes.ts:',
+        'layoutSchema (packages/shared/src/builder/layout-schema.ts, re-exported by store-layout.routes.ts):',
         '',
         missingKeys.map(k => `  • "${k}"`).join('\n'),
         '',
@@ -56,7 +56,7 @@ describe('layout PUT schema parity — StoreLayoutSettings vs layoutSchema', () 
         'PUT /admin/stores/:id/layout. The admin save returns HTTP 200',
         "but the merchant's change is quietly lost.",
         '',
-        'Fix: add the missing key(s) to layoutSchema in store-layout.routes.ts.',
+        'Fix: add the missing key(s) to the layout schema in packages/shared/src/builder/layout-schema.ts.',
         '─────────────────────────────────────────────────────────',
       ].join('\n')
     ).toEqual([]);

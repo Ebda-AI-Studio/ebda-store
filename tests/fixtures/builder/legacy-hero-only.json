@@ -1,0 +1,4 @@
+{
+  "hero": { "enabled": true, "mode": "slider", "autoplayMs": 5000, "slides": [] },
+  "testimonials": { "enabled": true, "minRating": 4, "verifiedOnly": false }
+}

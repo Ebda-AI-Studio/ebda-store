@@ -1,6 +1,6 @@
 # Ebda visual builder — file-by-file plan, phases 1–5
 
-Date: 2026-10-07. Input: `2026-10-07-builder-phase0-gap-matrix.md` (gap numbers `#n` refer to it). Plan only: no implementation code. Each phase still needs its own task-level plan (failing test first) before execution, per the program plan. Constraints held throughout: Cloudflare Workers + Neon (no D1), Arabic/RTL first, EGP, no paid services, no new runtime dependency unless named below, Plasmic/Webstudio = concepts only (AGPL), Next.js Commerce (MIT) = the only code candidate, existing stores keep their current rendering.
+Date: 2026-10-07. Input: `2026-10-07-builder-phase0-gap-matrix.md` (gap numbers `#n` refer to it). Plan only: no implementation code. Each phase still needs its own task-level plan (failing test first) before execution, per the program plan. Constraints held throughout: Cloudflare Workers + Neon (no D1), Arabic/RTL first, EGP, no paid services, no new runtime dependency unless named below, Webstudio and Plasmic `platform/` = concepts only (AGPL); Plasmic outside `platform/` (MIT) and Next.js Commerce (MIT) may be reused with notices (Ruling BUILDER-LICENSE-1, superseding the earlier "concepts only" line), existing stores keep their current rendering.
 
 ## Principles that shape every phase
 

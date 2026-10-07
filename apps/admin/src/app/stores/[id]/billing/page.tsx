@@ -26,7 +26,8 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
 import { useT } from '../../../../i18n/useT';
-import { CopyRow } from '../../../../components/billing/CopyRow';
+import { InstapayPanel } from '../../../../components/billing/InstapayPanel';
+import { SupportLink } from '../../../../components/billing/SupportLink';
 import {
   cardLabel,
   fmtDate as fmtBillingDate,
@@ -34,7 +35,11 @@ import {
 } from '../../../../components/billing/format';
 import { billingNotice, noticeText } from '../../../../components/billing/notice';
 import { startCardSetup, useCardReturn } from '../../../../components/billing/useCardReturn';
-import type { BillingInfo, PaymentClaim } from '../../../../components/billing/types';
+import type {
+  BillingInfo,
+  PaymentClaim,
+  PlatformVatLine,
+} from '../../../../components/billing/types';
 
 interface PlanSummary {
   code: string;
@@ -77,6 +82,9 @@ interface Charge {
   failureReason: string | null;
   attempt: number;
   createdAt: string;
+  /** Ebda VAT inside amountMinor (0 / absent = no VAT line). */
+  vatMinor?: number;
+  vat?: PlatformVatLine | null;
 }
 
 const BAR_KEYS = ['maxProducts', 'maxStaff', 'maxOrdersPerMonth'] as const;
@@ -486,16 +494,7 @@ export default function StoreBillingPage() {
                     {tNotice('seePlans')}
                   </a>
                 )}
-                {info?.supportWhatsappUrl && (
-                  <a
-                    href={info.supportWhatsappUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-medium underline"
-                  >
-                    {tNotice('whatsapp')}
-                  </a>
-                )}
+                <SupportLink whatsappUrl={info?.supportWhatsappUrl} email={info?.supportEmail} />
               </div>
             </div>
           )}
@@ -766,30 +765,7 @@ export default function StoreBillingPage() {
                     </Button>
                   ) : (
                     <>
-                      <div className="space-y-3 text-sm">
-                        {(
-                          [
-                            [t('pay.handle'), instapay.handle],
-                            [
-                              t('pay.amount'),
-                              instapay.amountMinor !== null
-                                ? formatMoney(instapay.amountMinor, locale)
-                                : null,
-                            ],
-                            [t('pay.reference'), instapay.reference],
-                          ] as const
-                        ).map(([label, value]) =>
-                          value ? (
-                            <CopyRow
-                              key={label}
-                              label={label}
-                              value={value}
-                              copyLabel={t('pay.copy')}
-                              copiedLabel={t('pay.copied')}
-                            />
-                          ) : null
-                        )}
-                      </div>
+                      <InstapayPanel instapay={instapay} locale={locale} />
                       <form onSubmit={sendClaim} className="space-y-2" noValidate>
                         <h4 className="text-sm font-medium">{t('pay.paidTitle')}</h4>
                         <p className="text-xs text-muted-foreground">{t('pay.paidHelp')}</p>
@@ -1025,6 +1001,18 @@ export default function StoreBillingPage() {
 
           <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="mb-3 text-base font-semibold">{t('invoicesTitle')}</h2>
+            {(() => {
+              // Tax-invoice wording only once Ebda actually charged VAT (never while it is OFF).
+              const taxed = charges.find(c => c.vat && (c.vatMinor ?? 0) > 0)?.vat;
+              return taxed ? (
+                <p className="mb-3 text-xs text-muted-foreground" data-testid="tax-invoice-seller">
+                  {t('taxInvoiceSeller', {
+                    name: taxed.legalName ?? '',
+                    trn: taxed.trn ?? '',
+                  })}
+                </p>
+              ) : null;
+            })()}
             {charges.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('invoicesEmpty')}</p>
             ) : (
@@ -1061,6 +1049,15 @@ export default function StoreBillingPage() {
                         <td className="py-2 pe-3 tabular-nums">
                           {c.type === 'refund' ? '−' : ''}
                           {formatMoney(c.amountMinor, locale)}
+                          {c.vat && (c.vatMinor ?? 0) > 0 && (
+                            <span className="block text-xs text-muted-foreground">
+                              {t('invoiceVat', {
+                                rate: c.vat.rateBps / 100,
+                                vat: formatMoney(c.vatMinor ?? 0, locale),
+                              })}
+                              {c.vat.trn ? ` · ${t('invoiceTrn', { trn: c.vat.trn })}` : ''}
+                            </span>
+                          )}
                         </td>
                         <td className="py-2 pe-3">
                           <Badge

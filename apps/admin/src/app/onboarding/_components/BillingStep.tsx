@@ -7,7 +7,7 @@ import { formatMoney } from '@force/shared';
 import { apiGet, apiPost } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { cardLabel, fmtDate, planLabel } from '../../../components/billing/format';
-import { CopyRow } from '../../../components/billing/CopyRow';
+import { InstapayPanel } from '../../../components/billing/InstapayPanel';
 import { startCardSetup, useCardReturn } from '../../../components/billing/useCardReturn';
 import type { BillingInfo, PlanOption } from '../../../components/billing/types';
 import type { OnboardingState } from './types';
@@ -187,26 +187,7 @@ export function BillingStep({
             </>
           ) : (
             <div className="space-y-3 text-sm">
-              {(
-                [
-                  [t('instapayHandle'), ip.handle],
-                  [
-                    t('instapayAmount'),
-                    ip.amountMinor !== null ? formatMoney(ip.amountMinor, locale) : null,
-                  ],
-                  [t('instapayReference'), ip.reference],
-                ] as const
-              ).map(([label, value]) =>
-                value ? (
-                  <CopyRow
-                    key={label}
-                    label={label}
-                    value={value}
-                    copyLabel={t('copy')}
-                    copiedLabel={t('copied')}
-                  />
-                ) : null
-              )}
+              <InstapayPanel instapay={ip} locale={locale} />
               <p className="rounded-lg bg-muted/50 p-3 text-muted-foreground">
                 {t('instapayHow', { date: chargeDate })}
               </p>
