@@ -38,7 +38,11 @@ export const absoluteUrl = (p: string) =>
  *  order from docs/ebda/plans/domains-and-marketing-site.md with this shorter one. */
 export const SECTION_ORDER = [
   'story',
+  'how',
   'templates',
+  'scenes',
+  'breakout',
+  'dahab',
   'features',
   'payments',
   'pricing',
@@ -50,7 +54,7 @@ export type SectionId = (typeof SECTION_ORDER)[number];
 /** Top-nav items other than the wordmark and the two account actions. */
 export const NAV_ANCHORS = [
   { key: 'features', target: 'features' },
-  { key: 'solutions', target: 'story' },
+  { key: 'solutions', target: 'how' },
   { key: 'pricing', target: 'pricing' },
   { key: 'resources', target: 'faq' },
 ] as const satisfies readonly { key: string; target: SectionId }[];

@@ -27,7 +27,7 @@ describe('marketing nav', () => {
     const nav = en.match(/<nav aria-label="Main navigation".*?<\/nav>/s)![0];
     const labels = [...nav.matchAll(/<a href="([^"]+)">([^<]+)<\/a>/g)].slice(0, 4);
     expect(labels.map(m => m[2])).toEqual(['Features', 'How it works', 'Pricing', 'FAQ']);
-    expect(labels.map(m => m[1])).toEqual(['#features', '#story', '#pricing', '#faq']);
+    expect(labels.map(m => m[1])).toEqual(['#features', '#how', '#pricing', '#faq']);
   });
   it('Log in -> app login, Start now -> app signup, in both locales', () => {
     expect(LOGIN_URL).toBe('https://admin.ebda.app/login');
@@ -54,12 +54,24 @@ describe('marketing hero and structure', () => {
     expect(ar).not.toContain('Your business, your store');
   });
   it('renders sections in the exact required order', () => {
-    const expected = ['story', 'templates', 'features', 'payments', 'pricing', 'faq', 'start'];
+    const expected = [
+      'story',
+      'how',
+      'templates',
+      'scenes',
+      'breakout',
+      'dahab',
+      'features',
+      'payments',
+      'pricing',
+      'faq',
+      'start',
+    ];
     expect([...SECTION_ORDER]).toEqual(expected);
     for (const html of [ar, en]) {
-      const ids = [...html.matchAll(/<section id="([a-z]+)" class="(?:section|story)[" ]/g)].map(
-        m => m[1]
-      );
+      const ids = [
+        ...html.matchAll(/<section id="([a-z]+)" class="(?:section|story|breakout)[" ]/g),
+      ].map(m => m[1]);
       expect(ids).toEqual(expected);
     }
   });
@@ -153,6 +165,26 @@ describe('marketing honesty', () => {
       expect(s).toContain(label);
     expect(s).toContain('EGP 13,410');
     expect(s).toContain('EGP 89,910');
+  });
+  it('the new motion sections ship their real assets and accessible controls', () => {
+    for (const html of [ar, en]) {
+      // four numbered steps, a real sequence
+      expect(html.match(/class="step4"/g)).toHaveLength(4);
+      expect(html).toContain('>01<');
+      // composited room scenes, one per template family, with alt text
+      for (const id of ['souq', 'lamma', 'dahab', 'qamar', 'jasmine'])
+        expect(html).toContain(`/scenes/${id}-1200.webp`);
+      // 3D ring: poster first, swatches are real buttons with pressed state
+      expect(html).toContain('/ring/ring-gold-diamond.webp');
+      expect(html.match(/class="swatch"/g)).toHaveLength(6);
+      expect(html).toMatch(
+        /aria-pressed="true"[^>]*data-metal="gold"|data-metal="gold"[^>]*aria-pressed="true"/
+      );
+      // notification stream: four toasts
+      expect(html.match(/class="story-toast"/g)).toHaveLength(4);
+    }
+    expect(ar).toContain('بوسطة استلمت الشحنة');
+    expect(ar).toContain('وصلك دفع إنستا باي');
   });
   it('the five template families show real storefront captures', () => {
     for (const id of ['souq', 'dahab', 'qamar', 'lamma', 'jasmine'])

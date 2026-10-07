@@ -40,6 +40,10 @@ Ruling R-EBDA-COPY-8 — what is inside the device frames on ebda.app is the REA
 
 Ruling R-EBDA-COPY-9 — provider marks are shown transparent, in one cream ink, with brand colours on hover, and no tiles; the FawryPay mark is the official badge with its yellow ground removed (blue ink only). Supersedes the plates in R-EBDA-COPY-7. Evidence: Ahmad 2026-10-07. Cost if wrong: Fawry asks for the badge form and the file is swapped back.
 
+Ruling R-EBDA-COPY-10 — the Dahab 3D ring is built from three.js primitives (lathe band, prongs, faceted brilliant) with physically based metal and the procedural `RoomEnvironment`, not a downloaded glTF. Evidence: no third-party model to license or credit; the lazy chunk is ~550 KB raw (three.js), loaded only within ~900px of the section and never under reduced motion, and the posters (`public/ring/`, 9 metal x stone stills from `scripts/ring/make-posters.mjs`) cover first paint and reduced motion. Cost if wrong: a reviewer wants a more detailed jeweller's model; swap `ring-scene.ts` for a GLTFLoader + Draco model of the same API.
+
+Ruling R-EBDA-COPY-11 — the room scenes are composited OFFLINE (`scripts/scenes/compose.mjs`: Chromium renders the capture onto a real laptop screen with a matrix3d homography, or a CSS phone with 3D rotation, shadow and screen light, onto CC0 room photos) and shipped as flat AVIF/WebP, instead of transforming live DOM over a photo at runtime. Evidence: identical look, zero runtime layout/3D cost, works without JS. Cost if wrong: re-run the script whenever the captures change (run it after `capture:stores`).
+
 ## 2026-10-07 — Locked pricing (R-EBDA-PRICING-\*)
 
 Source: `docs/plans/2026-10-05-pricing-decisions.md`. Branch `feat/locked-pricing`.

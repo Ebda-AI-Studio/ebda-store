@@ -28,7 +28,7 @@ Hero (now), per locale, over the Nile-at-night canvas (static inline poster firs
 
 > **ابدأ متجرك أونلاين في دقايق.** / **Open your online store in minutes.**
 
-Sections (now, R-EBDA-COPY-5), in order (`SECTION_ORDER` in `apps/marketing/src/lib/site.ts`): Story (pinned scroll: the real Lamma storefront scrolls inside a phone, flips through the other templates, receives an order) · Templates (real captures of the five families on laptop, tablet and phone, live switcher; R-EBDA-COPY-8) · Features · Payments and shipping (provider logos) · Pricing (cards + full comparison table from the shared plan catalogue) · FAQ (max 8) · Closing call to action. Footer: contact (hello@, security@) and "Ebda by Whisky 11" linked to whisky11.com.
+Sections (now, R-EBDA-COPY-5/8/10/11), in order (`SECTION_ORDER` in `apps/marketing/src/lib/site.ts`): Story (pinned scroll: the real Lamma storefront scrolls inside a phone, flips through the other templates, then a stream of four notifications) · How it works (four numbered cards, a gold line draws each in) · Templates (real captures of the five families on laptop, tablet and phone, live switcher) · Scenes (the captures composited into five real rooms) · Break-out (pinned: the Dahab ring leaves the phone while gold wipes up and giant outlined «ابدأ / متجرك / دلوقتي» drift) · Dahab (live three.js ring, drag + scroll, metal and stone swatches) · Features · Payments and shipping (provider marks) · Pricing (cards + full comparison table from the shared plan catalogue) · FAQ · Closing call to action. Footer: contact (ahlan@, security@) and "Ebda by Whisky 11" linked to whisky11.com.
 
 Original brief (2026-10-03, superseded):
 

@@ -25,14 +25,12 @@ const STRIP_MAX_PCT =
 export function StoryScroll({
   title,
   steps,
-  orderTitle,
-  orderBody,
+  toasts,
   phoneLabel,
 }: {
   title: string;
   steps: string[];
-  orderTitle: string;
-  orderBody: string;
+  toasts: { t: string; d: string }[];
   phoneLabel: string;
 }) {
   const ref = useRef<HTMLElement>(null);
@@ -144,13 +142,17 @@ export function StoryScroll({
                   </div>
                 ))}
               </div>
-              <div className="story-toast" aria-hidden="true">
-                <span className="toast-mark" />
-                <span>
-                  <strong>{orderTitle}</strong>
-                  <span>{orderBody}</span>
-                </span>
-              </div>
+              <ol className="story-toasts" aria-hidden="true">
+                {toasts.map((n, i) => (
+                  <li key={n.t} className="story-toast" style={{ '--i': i } as React.CSSProperties}>
+                    <span className="toast-mark" />
+                    <span>
+                      <strong>{n.t}</strong>
+                      <span>{n.d}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
             </Phone>
           </div>
         </div>
@@ -213,6 +215,8 @@ export function Reveal({ children, className = '' }: { children: ReactNode; clas
   useEffect(() => {
     const el = ref.current;
     if (!el || reducedMotion() || typeof IntersectionObserver === 'undefined') return;
+    // `armed` hides only what the reveal will draw in; without JS everything stays drawn.
+    el.classList.add('armed');
     const io = new IntersectionObserver(
       ([e]) => {
         if (e.isIntersecting) {

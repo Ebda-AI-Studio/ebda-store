@@ -16,7 +16,10 @@ import {
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { JsonLd } from './JsonLd';
+import { Breakout } from './Breakout';
 import { Reveal, StoryScroll, TemplateShowcase } from './Motion';
+import { Ring3D } from './ring/Ring3D';
+import { Scenes } from './Scenes';
 import { NileNight } from './NileNight';
 
 function ProviderIcon({ kind }: { kind: 'cash' | 'truck' }) {
@@ -72,10 +75,39 @@ export function Home({ locale }: { locale: Locale }) {
       <StoryScroll
         title={c.story.title}
         steps={c.story.steps}
-        orderTitle={c.story.orderTitle}
-        orderBody={c.story.orderBody}
+        toasts={c.story.toasts}
         phoneLabel={c.story.phoneLabel}
       />
+    ),
+    how: () => (
+      <Section id="how" title={c.how.title} className="how">
+        <Reveal className="steps-wrap">
+          <ol className="steps4">
+            {c.how.steps.map((st, i) => (
+              <li key={st.t} className="step4" style={{ '--i': i } as React.CSSProperties}>
+                <span className="step4-n" aria-hidden="true">
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <h3>{st.t}</h3>
+                <p>{st.d}</p>
+              </li>
+            ))}
+          </ol>
+        </Reveal>
+      </Section>
+    ),
+    scenes: () => (
+      <Section id="scenes" title={c.scenes.title} className="scenes-section">
+        <p className="lead">{c.scenes.lead}</p>
+        <Scenes items={c.scenes.items} />
+      </Section>
+    ),
+    breakout: () => <Breakout title={c.breakout.title} words={c.breakout.words} />,
+    dahab: () => (
+      <Section id="dahab" title={c.dahab.title} className="dahab">
+        <p className="lead">{c.dahab.lead}</p>
+        <Ring3D l={c.dahab.ring} />
+      </Section>
     ),
     templates: () => (
       <Section id="templates" title={c.templates.title} className="templates">
