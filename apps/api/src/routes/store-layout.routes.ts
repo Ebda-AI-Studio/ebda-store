@@ -19,6 +19,7 @@ import { getAuthUser } from '../utils/store-helpers';
 import { cleanupRemovedJsonUrls } from '../services/r2-cleanup.service';
 import { redis } from '../services/redis.service';
 import { bustStoreCaches } from '../services/store.service';
+import { publishLegacyLayout } from '../services/page-builder.service';
 import logger from '../lib/logger';
 import { randomBytes } from 'node:crypto';
 
@@ -89,6 +90,26 @@ router.put(
         },
         currentTemplate
       );
+
+      // One writer for page documents (visual builder): this legacy save
+      // becomes a published revision too, so the revision history and
+      // `layout_settings` never diverge. Losing a race to a concurrent
+      // publish answers 409 instead of overwriting it.
+      const outcome = await publishLegacyLayout({
+        storeId,
+        layout: merged,
+        userId: getAuthUser(req).userId,
+      });
+      if (outcome === 'conflict') {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'REV_CONFLICT',
+            message: 'The page was published by another editor at the same time; reload and retry.',
+          },
+        });
+        return;
+      }
 
       await prisma.store.update({
         where: { id: storeId },

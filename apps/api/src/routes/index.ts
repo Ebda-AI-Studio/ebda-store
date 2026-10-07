@@ -52,6 +52,7 @@ import {
 } from './sms-consent.routes';
 import onesignalRoutes from './onesignal.routes';
 import storeLayoutRoutes from './store-layout.routes';
+import pageBuilderRoutes from './page-builder.routes';
 import publicStoreLayoutRoutes from './public-store-layout.routes';
 import pagesRoutes from './pages.routes';
 import typographyRoutes from './typography.routes';
@@ -224,6 +225,8 @@ router.use('/stores/:storeId/campaigns', campaignAiDraftRouter);
 
 // Store-scoped routes — tenantContext wraps all downstream handlers in an RLS transaction
 router.use('/admin/stores/:storeId/layout', tenantContext, storeLayoutRoutes);
+// Visual builder page documents (draft / publish / revisions / rollback).
+router.use('/admin/stores/:storeId/builder', tenantContext, pageBuilderRoutes);
 router.use('/stores/:storeId/products', tenantContext, productRoutes);
 router.use('/stores/:storeId/categories', tenantContext, categoryRoutes);
 // Context chosen PER REQUEST, not per router (FORCE-API-2G): the WRITES here

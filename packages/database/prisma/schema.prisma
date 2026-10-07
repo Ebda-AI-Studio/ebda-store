@@ -459,6 +459,7 @@ model Store {
   shippingCarrierConfigs   ShippingCarrierConfig[]
   shipments                Shipment[]
   codRemittances           CodRemittance[]
+  pageRevisions            StorePageRevision[]
   affiliates               Affiliate[]
   affiliateReferrals       AffiliateReferral[]
   affiliatePayouts         AffiliatePayout[]
@@ -4604,4 +4605,41 @@ model BillingWebhookEvent {
 
   @@unique([provider, eventId])
   @@map("billing_webhook_events")
+}
+
+// ==========================================
+// Visual builder: page documents (draft / published / archived revisions)
+// ==========================================
+
+// One row per saved revision of a store page's PageDefinition
+// (packages/shared/src/builder). `rev` is monotonic per (store, page) and is
+// the optimistic-concurrency token: a write names the rev it was based on and
+// gets 409 when the page moved. At most one `draft` and one `published` row
+// per page (partial unique indexes in the migration). Publishing back-writes
+// stores.layout_settings through the adapter so every legacy reader keeps
+// working. Strict RLS (R-EBDA-001) in the same migration.
+model StorePageRevision {
+  id            String    @id @default(uuid())
+  storeId       String    @map("store_id")
+  pageKey       String    @map("page_key")
+  rev           Int
+  // draft | published | archived (CHECK constraint in the migration)
+  status        String
+  schemaVersion Int       @map("schema_version")
+  document      Json
+  docBytes      Int       @map("doc_bytes")
+  baseRev       Int?      @map("base_rev")
+  note          String?
+  // User id of the editor. No FK: users are identity-keyed under RLS and an
+  // erased user must not take a store's page history with them.
+  createdBy     String?   @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  publishedAt   DateTime? @map("published_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, pageKey, rev])
+  @@index([storeId, pageKey, createdAt(sort: Desc)])
+  @@map("store_page_revisions")
 }
