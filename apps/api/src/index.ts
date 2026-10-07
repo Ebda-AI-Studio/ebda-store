@@ -19,6 +19,8 @@ import { sendAlert, awaitInFlightAlerts, ALERT_SEND_DEADLINE_MS } from './servic
 import { withLeaderLock } from './lib/leader-election';
 import { awaitDeferredWork } from './lib/after-tenant-commit';
 import logger from './lib/logger';
+import { listenAfterDatabaseRoleGuard, type DatabaseRoleRow } from './lib/database-role-guard';
+import { retryTransientRead } from './lib/db-retry';
 
 // The Node server shell (Railway, Docker, `npm run dev`). The Express app itself
 // lives in app.ts and is shared with the Cloudflare Worker shell (worker.ts);
@@ -59,68 +61,38 @@ socketService.initialize(httpServer);
   );
 })();
 
-// Start server
-const server = httpServer.listen(config.port, () => {
+// Start server — only AFTER the DB role guard has run (FIX-003). The guard used
+// to be a fire-and-forget IIFE inside this callback, so the API was already
+// serving when it ran, and a failed role query was logged and skipped (fail
+// open). Now it is awaited first; in production an unsafe OR unverifiable role
+// exits non-zero before a single request is accepted. ALLOW_BYPASSRLS_ROLE=true
+// is still honoured (loudly). See lib/database-role-guard.ts; the Workers shell
+// has its own guard (cf/database-role-guard.ts).
+const server = httpServer;
+void listenAfterDatabaseRoleGuard(
+  {
+    queryRole: () =>
+      retryTransientRead(
+        () => prisma.$queryRaw<DatabaseRoleRow[]>`
+          SELECT current_user::text AS "currentUser", rolbypassrls, rolsuper
+          FROM pg_roles WHERE rolname = current_user
+        `,
+        { label: 'database-role-guard' }
+      ),
+    nodeEnv: config.nodeEnv,
+    allowBypassRls: process.env.ALLOW_BYPASSRLS_ROLE === 'true',
+    log: logger,
+    exit: code => process.exit(code),
+  },
+  () => server.listen(config.port, onListening)
+);
+
+function onListening(): void {
   logger.info({ host: config.host, port: config.port, env: config.nodeEnv }, 'API server started');
   logger.info(
     { docs: `http://${config.host}:${config.port}/docs` },
     'WebSocket enabled, API docs available'
   );
-
-  // Finding #5 (MED): BYPASSRLS guard.
-  // If DATABASE_URL ever connects as a BYPASSRLS role (e.g. neondb_owner),
-  // all RLS tenant isolation is silently off — every store can read every
-  // other store's data. Refuse to serve traffic in production; warn in dev.
-  // Wrapped in try/catch so a transient query failure doesn't kill the boot.
-  (async () => {
-    try {
-      const rows = await prisma.$queryRaw<Array<{ currentUser: string; rolbypassrls: boolean }>>`
-        SELECT current_user::text AS "currentUser", (rolbypassrls OR rolsuper) AS rolbypassrls FROM pg_roles WHERE rolname = current_user
-      `;
-      const bypassRls = rows[0]?.rolbypassrls === true;
-      // Positive, always-on record of the role the API actually connected as
-      // (#1940). CI greps this exact line after /health is up and fails the
-      // integration job unless it reads `current_user=ebda_app
-      // rolbypassrls=false` — a liveness probe alone passes identically as a
-      // superuser, so a silent relapse to a bypass role would stay green.
-      // Values are in the message (not only the object) so the grep works
-      // under pino-pretty too. A role name is not a secret.
-      logger.info(
-        { currentUser: rows[0]?.currentUser, rolbypassrls: bypassRls },
-        `[SECURITY] DB role check: current_user=${rows[0]?.currentUser ?? 'unknown'} rolbypassrls=${bypassRls}`
-      );
-      if (bypassRls) {
-        // Explicit escape hatch. Production currently connects as `neondb_owner`
-        // (a BYPASSRLS role); cutting DATABASE_URL over to the non-owner
-        // `ebda_app` role is a tracked RLS-cutover follow-up, NOT a P0 change.
-        // Until then, ALLOW_BYPASSRLS_ROLE=true keeps the API serving (loud
-        // warning, not exit) so a routine redeploy can't take the whole platform
-        // down. Verified 2026-06-27: this guard `process.exit(1)` crash-looped
-        // prod the moment a redeploy first built it. Remove the env once
-        // ebda_app is live and DATABASE_URL no longer uses a bypass role.
-        const allowBypassRls = process.env.ALLOW_BYPASSRLS_ROLE === 'true';
-        if (config.nodeEnv === 'production' && !allowBypassRls) {
-          logger.fatal(
-            { currentUser: 'see pg_roles', rolbypassrls: true },
-            '[SECURITY FATAL] DATABASE_URL connects as a BYPASSRLS role — ' +
-              'all RLS tenant isolation is disabled. ' +
-              'Switch DATABASE_URL to the non-owner role (ebda_app) and redeploy, ' +
-              'or set ALLOW_BYPASSRLS_ROLE=true to explicitly accept this.'
-          );
-          process.exit(1);
-        } else {
-          logger.warn(
-            { rolbypassrls: true },
-            '[SECURITY WARN] DB role has BYPASSRLS — RLS is not enforced in this environment. ' +
-              'Use the ebda_app role in production.'
-          );
-        }
-      }
-    } catch (err) {
-      // Query failure must not crash boot — log and continue.
-      logger.warn({ err }, '[SECURITY] BYPASSRLS guard query failed — skipping check');
-    }
-  })();
 
   // Surface auth-token TTLs at boot. A stale `JWT_EXPIRES_IN="3h"` env
   // var on Railway once silently broke the iOS PWA — the cookie's
@@ -208,7 +180,7 @@ const server = httpServer.listen(config.port, () => {
         );
       });
   }, 3000);
-});
+}
 
 // Graceful shutdown handler
 async function gracefulShutdown(signal: string) {

@@ -10,7 +10,7 @@ Source of the problem: `docs/audits/2026-07-02-tenancy-rls-auth.md` (F1/F2/F3) +
 
 ## Current state (verified from migrations + code)
 
-- **Role:** prod connects as `neondb_owner` (`rolbypassrls = true`). Boot guard `apps/api/src/index.ts:438-480` keeps serving with a loud warning while `ALLOW_BYPASSRLS_ROLE=true`. → RLS is **inert in prod today**.
+- **Role:** prod connects as `neondb_owner` (`rolbypassrls = true`). Boot guard `apps/api/src/lib/database-role-guard.ts` (awaited before `listen()`, FIX-003) keeps serving with a loud warning while `ALLOW_BYPASSRLS_ROLE=true`. → RLS is **inert in prod today**.
 - **`force_app` role** already exists and is granted DML + sequence usage + default privileges (`.../20260404000000_add_rls_policies/migration.sql:16-29`). Policies are written `FOR ALL TO force_app`.
 - **Policy predicate is "allow-contextless" / hybrid** (`.../20260609000000_complete_force_rls_coverage/migration.sql:16-34`):
   `current_store_id() IS NULL OR app.bypass_rls='true' OR store_id = current_store_id()`.

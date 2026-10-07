@@ -25,6 +25,10 @@ const { mockPrisma, redisMock } = vi.hoisted(() => ({
     set: vi.fn(async () => {}),
     delete: vi.fn(async () => {}),
     deleteByPattern: vi.fn(async () => 0),
+    // FIX-001/002: healthy Redis with generations that never move.
+    isAvailable: vi.fn(() => true),
+    getCacheGenerations: vi.fn(async (names: string[]) => names.map(() => null)),
+    bumpCacheGeneration: vi.fn(async () => {}),
   },
 }));
 
