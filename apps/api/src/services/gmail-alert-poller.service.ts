@@ -160,7 +160,7 @@ function resolveSource(fromAddress: string): string {
 const PROJECT_MARKERS: Array<{ tag: string; patterns: RegExp[] }> = [
   // Ebda sub-projects — most specific first
   { tag: 'Ebda-API', patterns: [/ebda.*\bapi\b/i, /api\.ebda\.app/i] },
-  { tag: 'Ebda-Admin', patterns: [/ebda.admin/i, /\badmin\.ebda\.app/i] },
+  { tag: 'Ebda-Admin', patterns: [/ebda.admin/i, /\bstore\.ebda\.app/i] },
   { tag: 'Ebda-Web', patterns: [/ebda.web/i, /\bebda\.app/i] },
   { tag: 'Ebda', patterns: [/\bebda\b/i] },
 ];

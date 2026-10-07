@@ -19,6 +19,7 @@
  */
 import { z } from 'zod';
 import { storeLayoutSchema } from './layout-schema';
+import { imageTextSchema, newsletterSchema } from './sections-document-only';
 import { DEFAULT_LAYOUT_SETTINGS } from '../types/store-layout';
 import type { LegacyHomeSectionKey } from './section-keys';
 import { VIEWPORTS, type Viewport } from './viewports';
@@ -27,6 +28,7 @@ import {
   cardSettings,
   headingSettings,
   settingFactories as s,
+  spacingSettings,
   styleSettings,
   type SettingDefinition,
 } from './settings-schema';
@@ -58,8 +60,12 @@ export interface SectionDefinition {
   type: string;
   labelEn: string;
   labelAr: string;
-  /** Key in the legacy layout. Product carousels use `'extraCarousels'`. */
-  legacyKey: LegacyLayoutKey | 'extraCarousels';
+  /**
+   * Key in the legacy layout. Product carousels use `'extraCarousels'`.
+   * `null` = a DOCUMENT-ONLY type (Phase 2: image-text, newsletter): never
+   * projected into `layout_settings`, rendered from the published document.
+   */
+  legacyKey: LegacyLayoutKey | 'extraCarousels' | null;
   /** Storefront renderer the web app maps this type onto. */
   rendererKey: string;
   group: SectionGroup;
@@ -94,10 +100,25 @@ function def(
     'propsSchema' | 'maxCount' | 'cardinality' | 'blocks' | 'responsive' | 'presets'
   > &
     Partial<
-      Pick<SectionDefinition, 'cardinality' | 'maxCount' | 'blocks' | 'responsive' | 'presets'>
+      Pick<
+        SectionDefinition,
+        'cardinality' | 'maxCount' | 'blocks' | 'responsive' | 'presets' | 'propsSchema'
+      >
     >
 ): SectionDefinition {
   const key = d.legacyKey;
+  if (key === null) {
+    if (!d.propsSchema) throw new Error(`document-only section ${d.type} needs a propsSchema`);
+    return {
+      cardinality: 'many',
+      maxCount: 8,
+      blocks: [],
+      responsive: { hidden: ALL, settings: {} },
+      presets: [{ nameEn: d.labelEn, nameAr: d.labelAr, settings: {} }],
+      ...d,
+      propsSchema: d.propsSchema,
+    };
+  }
   return {
     cardinality: 'one',
     maxCount: 1,
@@ -226,14 +247,14 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         }
       ),
       s.select('desktopColumns', 'Columns (desktop)', 'الأعمدة (سطح المكتب)', [
-        opt(2, '2', '٢'),
-        opt(3, '3', '٣'),
-        opt(4, '4', '٤'),
+        opt(2, '2', '2'),
+        opt(3, '3', '3'),
+        opt(4, '4', '4'),
       ]),
       s.select('mobileColumns', 'Columns (mobile)', 'الأعمدة (الجوال)', [
-        opt(1, '1', '١'),
-        opt(2, '2', '٢'),
-        opt(3, '3', '٣'),
+        opt(1, '1', '1'),
+        opt(2, '2', '2'),
+        opt(3, '3', '3'),
       ]),
       ...cardSettings(),
       ...styleSettings(),
@@ -382,6 +403,87 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     ],
   }),
   def({
+    type: 'image-text',
+    labelEn: 'Image with text',
+    labelAr: 'صورة مع نص',
+    legacyKey: null,
+    rendererKey: 'section.imageText',
+    group: 'template',
+    propsSchema: imageTextSchema,
+    presets: [
+      {
+        nameEn: 'Image with text',
+        nameAr: 'صورة مع نص',
+        settings: {
+          heading: 'Our story',
+          headingAr: 'حكايتنا',
+          body: 'Tell customers what makes your products special.',
+          bodyAr: 'احكِ لعملائك ما يميز منتجاتك.',
+          imagePosition: 'start',
+          imageAspect: 'square',
+        },
+      },
+      {
+        nameEn: 'Text first',
+        nameAr: 'النص أولاً',
+        settings: {
+          heading: 'Made by hand',
+          headingAr: 'شغل يدوي',
+          imagePosition: 'end',
+          imageAspect: 'portrait',
+        },
+      },
+    ],
+    settings: [
+      s.image('image', 'Image', 'الصورة', { localized: true }),
+      s.text('alt', 'Image description', 'وصف الصورة', { localized: true }),
+      s.text('heading', 'Heading', 'العنوان', { localized: true }),
+      s.textarea('body', 'Text', 'النص', { localized: true }),
+      s.text('buttonText', 'Button text', 'نص الزر', { localized: true }),
+      s.url('buttonLink', 'Button link', 'رابط الزر'),
+      s.select('imagePosition', 'Image side', 'جهة الصورة', [
+        opt('start', 'Start (right in Arabic)', 'البداية (يمين في العربية)'),
+        opt('end', 'End (left in Arabic)', 'النهاية (يسار في العربية)'),
+      ]),
+      s.select('imageAspect', 'Image shape', 'شكل الصورة', [
+        opt('square', 'Square', 'مربع'),
+        opt('portrait', 'Portrait', 'طولي'),
+        opt('landscape', 'Landscape', 'عرضي'),
+      ]),
+      s.color('bgColor', 'Background', 'الخلفية'),
+      ...spacingSettings(),
+    ],
+  }),
+  def({
+    type: 'newsletter',
+    labelEn: 'Newsletter signup',
+    labelAr: 'الاشتراك في النشرة',
+    legacyKey: null,
+    rendererKey: 'section.newsletter',
+    group: 'template',
+    propsSchema: newsletterSchema,
+    maxCount: 2,
+    presets: [
+      {
+        nameEn: 'Newsletter signup',
+        nameAr: 'الاشتراك في النشرة',
+        settings: {
+          heading: 'Get our offers first',
+          headingAr: 'اعرف عروضنا الأول',
+          body: 'New arrivals and discounts, straight to your inbox.',
+          bodyAr: 'الجديد والخصومات توصلك على الإيميل.',
+        },
+      },
+    ],
+    settings: [
+      s.text('heading', 'Heading', 'العنوان', { localized: true }),
+      s.textarea('body', 'Text', 'النص', { localized: true }),
+      s.text('buttonText', 'Button text', 'نص الزر', { localized: true }),
+      s.color('bgColor', 'Background', 'الخلفية'),
+      ...spacingSettings(),
+    ],
+  }),
+  def({
     type: 'footer',
     labelEn: 'Footer',
     labelAr: 'التذييل',
@@ -393,7 +495,9 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
 ];
 
 const BY_TYPE = new Map(SECTION_REGISTRY.map(d => [d.type, d]));
-const BY_LEGACY_KEY = new Map(SECTION_REGISTRY.map(d => [d.legacyKey, d]));
+const BY_LEGACY_KEY = new Map(
+  SECTION_REGISTRY.filter(d => d.legacyKey !== null).map(d => [d.legacyKey, d])
+);
 
 export function getSectionDefinition(type: string): SectionDefinition | undefined {
   return BY_TYPE.get(type);

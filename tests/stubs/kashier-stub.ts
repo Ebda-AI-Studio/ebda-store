@@ -1,9 +1,13 @@
 /**
- * A local Kashier stub: payment sessions, order retrieval, refunds, and the
- * HMAC-SHA256 `x-kashier-signature` webhook, with DECIMAL string amounts ("123.45") like
- * the real API. It mirrors what the adapter ASSUMES; the unconfirmed parts are
- * `UNVERIFIED:` in the adapter and are checked in 6c.
+ * A local Kashier stub shaped by Kashier's OFFICIAL docs (developers.kashier.io): payment
+ * sessions (POST /v3/payment/sessions, 201), order search (GET /v3/payment/orders?search=),
+ * validate-credentials (POST /v2/merchants/validate-credentials), refund (PUT
+ * /v3/orders/:kashierOrderId) and the HMAC-SHA256 `x-kashier-signature` webhook whose
+ * `data.signatureKeys` are the documented ten. One base URL serves both the dashboard host and
+ * the FEP host (the adapter picks the path). Order search carries the amounts only while
+ * `emitAmounts` is true: the documented projection has none (UNVERIFIED in the adapter).
  */
+import crypto from 'node:crypto';
 import { toMinor, minorToDecimalString } from '@force/shared';
 import {
   kashierSignature,
@@ -28,10 +32,38 @@ interface Session {
   transactionId: string | null;
 }
 
+/** The Kashier order id (a uuid) of a session, derived so a test can predict it. */
+export function kashierOrderIdOf(order: string): string {
+  const h = crypto.createHash('sha1').update(order).digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+
+/** The ten keys of the documented webhook example. */
+export const KASHIER_DOCUMENTED_SIGNATURE_KEYS = [
+  'amount',
+  'channel',
+  'currency',
+  'kashierOrderId',
+  'merchantOrderId',
+  'method',
+  'orderReference',
+  'status',
+  'transactionId',
+  'transactionResponseCode',
+];
+
 export class KashierStub {
   readonly sessions = new Map<string, Session>();
-  readonly requests: Array<{ method: string; path: string; body: Record<string, unknown> }> = [];
+  readonly requests: Array<{
+    method: string;
+    path: string;
+    search: string;
+    body: Record<string, unknown>;
+    headers: Record<string, string>;
+  }> = [];
   readonly faults = new FaultGate();
+  /** Order search carries `amount` / `capturedAmount` / `refundedAmount` (UNVERIFIED: not documented). */
+  emitAmounts = true;
   private seq = 0;
 
   get createdCount(): number {
@@ -39,32 +71,76 @@ export class KashierStub {
   }
 
   fetch = async (url: string, init?: RequestInit): Promise<Response> => {
-    const path = new URL(url).pathname;
+    const u = new URL(url);
+    const path = u.pathname;
     const method = (init?.method ?? 'GET').toUpperCase();
     const body = await readJson(init);
+    const headers: Record<string, string> = {};
+    for (const [k, v] of Object.entries((init?.headers ?? {}) as Record<string, string>)) {
+      headers[k.toLowerCase()] = v;
+    }
     // Recorded BEFORE the fault gate: a call the gateway "never answers" still reached it.
-    this.requests.push({ method, path, body });
+    this.requests.push({ method, path, search: u.search, body, headers });
     const early = await this.faults.enter();
     if (early) return early;
     if (headerOf(init, 'authorization') !== KASHIER_STUB.secretKey) {
-      return json(401, { message: 'unauthorized' });
+      return json(401, { error: 'Authorization error', message: 'Invalid secret key' });
     }
     if (method === 'POST' && path === '/v3/payment/sessions') return this.createSession(body, init);
+    if (method === 'POST' && path === '/v2/merchants/validate-credentials') {
+      return this.validateCredentials(body);
+    }
+    if (method === 'GET' && path === '/v3/payment/orders') {
+      return this.searchOrders(u.searchParams.get('search'));
+    }
     const m = path.match(/^\/v3\/orders\/([^/]+)$/);
-    if (m && method === 'GET') return this.getOrder(decodeURIComponent(m[1]));
     if (m && method === 'PUT') return this.refund(decodeURIComponent(m[1]), body);
     return json(404, { message: 'not found' });
   };
 
+  private validateCredentials(b: Record<string, unknown>): Response {
+    const sk = b.secretKeys as Array<{ mode: string; key: string }> | undefined;
+    const ak = b.apiKeys as Array<{ mode: string; key: string }> | undefined;
+    const ok =
+      sk?.[0]?.mode === 'test' &&
+      sk[0].key === KASHIER_STUB.secretKey &&
+      ak?.[0]?.mode === 'test' &&
+      ak[0].key === KASHIER_STUB.apiKey;
+    // UNVERIFIED shape: Kashier publishes no 200 body; a wrong api key is modelled as 401 here.
+    return ok ? json(200, {}) : json(401, { message: 'Invalid credentials' });
+  }
+
   private createSession(b: Record<string, unknown>, init?: RequestInit): Response {
     if (headerOf(init, 'api-key') !== KASHIER_STUB.apiKey)
       return json(401, { message: 'bad api key' });
+    // Required by the schema: expireAt, maxFailureAttempts, amount, currency, order, merchantId,
+    // merchantRedirect, type, display, customer.
+    for (const f of [
+      'expireAt',
+      'maxFailureAttempts',
+      'amount',
+      'currency',
+      'order',
+      'merchantId',
+      'merchantRedirect',
+      'type',
+      'display',
+      'customer',
+    ]) {
+      if (b[f] === undefined) return json(400, { message: `${f} is required` });
+    }
+    if (typeof b.expireAt !== 'string' || !(new Date(b.expireAt).getTime() > Date.now())) {
+      return json(400, { message: 'expireAt must be a future ISO date' });
+    }
     if (b.merchantId !== KASHIER_STUB.merchantId) return json(400, { message: 'unknown merchant' });
     if (typeof b.amount !== 'string' || !/^\d+\.\d{2}$/.test(b.amount) || Number(b.amount) <= 0) {
       return json(400, { message: 'amount must be a positive decimal with 2 places' });
     }
     if (b.currency !== 'EGP') return json(400, { message: 'unsupported currency' });
     if (typeof b.order !== 'string' || !b.order) return json(400, { message: 'order required' });
+    if (this.sessions.has(b.order)) {
+      return json(400, { code: 'ERR_ORD_02', message: 'Duplicate order.' });
+    }
     const s: Session = {
       id: `ks_${++this.seq}`,
       order: b.order,
@@ -75,60 +151,133 @@ export class KashierStub {
     };
     this.sessions.set(s.order, s);
     return json(201, {
+      status: 'CREATED',
+      failureAttempts: 0,
+      capturedAmount: 0,
+      refundedAmount: 0,
       _id: s.id,
-      sessionUrl: `https://payments.kashier.stub/session/${s.id}`,
-      amount: s.amount,
+      merchantId: b.merchantId,
+      expireAt: b.expireAt,
+      maxFailureAttempts: b.maxFailureAttempts,
+      paymentParams: { ...b, hash: 'stub' },
+      history: [{ status: 'CREATED', date: new Date().toISOString() }],
+      sessionUrl: `https://payments.kashier.stub/session/${s.id}?mode=test`,
     });
   }
 
-  private order(s: Session): Record<string, unknown> {
-    const refunded = s.refunds.reduce((n, a) => n + toMinor(a), 0);
+  private refundedMinor(s: Session): number {
+    return s.refunds.reduce((n, a) => n + toMinor(a), 0);
+  }
+
+  private orderEntry(s: Session): Record<string, unknown> {
+    const status = { PENDING: 'INITIATED', PAID: 'CAPTURED', FAILED: 'FAILED', EXPIRED: 'EXPIRED' }[
+      s.state
+    ];
     return {
       merchantOrderId: s.order,
-      status: s.state,
-      amount: s.amount,
-      currency: 'EGP',
-      capturedAmount: s.state === 'PAID' ? s.amount : '0.00',
-      refundedAmount: minorToDecimalString(refunded),
-      method: 'card',
+      orderId: kashierOrderIdOf(s.order),
+      status,
+      interChangeRate: 'ON_US',
+      transactions:
+        s.state === 'PAID'
+          ? [{ operation: 'pay', status: 'SUCCESS', transactionResponseCode: 'APPROVED' }]
+          : [],
+      ...(this.emitAmounts
+        ? {
+            amount: s.amount,
+            capturedAmount: s.state === 'PAID' ? s.amount : '0.00',
+            refundedAmount: minorToDecimalString(this.refundedMinor(s)),
+            method: 'card',
+          }
+        : {}),
     };
   }
 
-  private getOrder(id: string): Response {
-    const s = this.sessions.get(id);
-    return s
-      ? json(200, { status: 'SUCCESS', response: this.order(s) })
-      : json(404, { message: 'order not found' });
+  /** `search` is a partial, case-insensitive match on merchantOrderId (look-alikes are returned too). */
+  private searchOrders(search: string | null): Response {
+    if (!search) return json(400, { message: 'search is required' });
+    const data = [...this.sessions.values()]
+      .filter(s => s.order.toLowerCase().includes(search.toLowerCase()))
+      .map(s => this.orderEntry(s));
+    return json(200, {
+      status: 'SUCCESS',
+      message: 'Orders retrieved successfully',
+      data,
+      pagination: { total: data.length, page: 1, limit: 20, pages: 1 },
+    });
   }
 
-  private refund(id: string, b: Record<string, unknown>): Response {
-    const s = this.sessions.get(id);
+  private refund(kashierOrderId: string, b: Record<string, unknown>): Response {
+    const s = [...this.sessions.values()].find(x => kashierOrderIdOf(x.order) === kashierOrderId);
     if (!s) return json(404, { message: 'order not found' });
-    if (s.state !== 'PAID') return json(400, { message: 'order is not paid' });
-    const tx = b.transaction as { amount?: string } | undefined;
-    if (
-      b.apiOperation !== 'REFUND' ||
-      typeof tx?.amount !== 'string' ||
-      !/^\d+\.\d{2}$/.test(tx.amount)
-    ) {
-      return json(400, { message: 'invalid refund request' });
+    if (s.state !== 'PAID') {
+      return json(400, { error: { cause: 'order is not paid' }, status: 'FAILURE' });
     }
-    const refunded = s.refunds.reduce((n, a) => n + toMinor(a), 0);
-    if (toMinor(tx.amount) <= 0 || toMinor(tx.amount) > toMinor(s.amount) - refunded) {
-      return json(400, { message: 'refund exceeds the refundable balance' });
+    const tx = b.transaction as { amount?: unknown } | undefined;
+    if (b.apiOperation !== 'REFUND') return json(400, { message: 'invalid refund request' });
+    // `transaction.amount` is a JSON NUMBER; omitted = the whole remaining balance.
+    if (tx?.amount !== undefined && (typeof tx.amount !== 'number' || tx.amount <= 0)) {
+      return json(400, { message: 'transaction.amount must be a positive number' });
     }
-    s.refunds.push(tx.amount);
-    return json(200, { status: 'SUCCESS', response: { transactionId: `ktx_r${++this.seq}` } });
+    const refunded = this.refundedMinor(s);
+    const remaining = toMinor(s.amount) - refunded;
+    let amount: string;
+    if (tx?.amount === undefined) {
+      amount = minorToDecimalString(remaining);
+    } else {
+      try {
+        amount = minorToDecimalString(toMinor(String(tx.amount)));
+      } catch {
+        return json(400, { message: 'invalid refund amount' });
+      }
+    }
+    if (toMinor(amount) <= 0 || toMinor(amount) > remaining) {
+      return json(200, {
+        response: { status: 'FAILURE', gatewayMessage: 'refund exceeds the refundable balance' },
+        status: 'FAILURE',
+      });
+    }
+    s.refunds.push(amount);
+    const totalRefunded = this.refundedMinor(s);
+    const full = totalRefunded >= toMinor(s.amount);
+    return json(200, {
+      response: {
+        status: 'SUCCESS',
+        gatewayCode: 'APPROVED',
+        transactionId: `TX-r${++this.seq}`,
+        amount: Number(amount),
+        currency: 'EGP',
+        operation: 'refund',
+        payload: {
+          order: {
+            amount: Number(s.amount),
+            currency: 'EGP',
+            id: kashierOrderId,
+            reference: s.order,
+            status: full ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
+            totalRefundedAmount: Number(minorToDecimalString(totalRefunded)),
+          },
+          result: 'SUCCESS',
+          transaction: { amount: Number(amount), currency: 'EGP', type: 'REFUND' },
+        },
+      },
+      messages: { en: 'Congratulations! Your refund was successful' },
+      status: 'SUCCESS',
+    });
   }
 
   capture(order: string): void {
     const s = this.sessions.get(order);
     if (!s) throw new Error(`no stub kashier order ${order}`);
     s.state = 'PAID';
-    s.transactionId = `ktx_${++this.seq}`;
+    s.transactionId = `TX-${++this.seq}`;
   }
 
-  /** What Kashier POSTs to `serverWebhook`, signed with the Payment API key. */
+  /**
+   * What Kashier POSTs to `serverWebhook`, signed with the Payment API key. `data.amount` is a
+   * decimal NUMBER (documented), `data.status` is SUCCESS | FAILURE | PENDING, and the default
+   * `signatureKeys` are the documented ten (plus none else: `transactionId` is among them).
+   */
   webhookFor(
     order: string,
     o: {
@@ -141,21 +290,18 @@ export class KashierStub {
   ): SignedWebhook {
     const data: Record<string, unknown> = {
       merchantOrderId: order,
-      kashierOrderId: `ko_${order}`,
+      kashierOrderId: kashierOrderIdOf(order),
+      orderReference: `TEST-ORD-${order.length}`,
       transactionId: o.transactionId,
-      amount: o.amount,
-      currency: 'EGP',
       status: o.status,
       method: 'card',
-      signatureKeys: o.signatureKeys ?? [
-        'amount',
-        'currency',
-        'kashierOrderId',
-        'merchantOrderId',
-        'method',
-        'status',
-        'transactionId',
-      ],
+      creationDate: '2026-10-07T10:00:00.000Z',
+      amount: Number(o.amount),
+      currency: 'EGP',
+      transactionResponseCode: '00',
+      channel: 'online | e-commerce',
+      signatureKeys: o.signatureKeys ?? KASHIER_DOCUMENTED_SIGNATURE_KEYS,
+      platform: {},
     };
     const signature = kashierSignature(data, data.signatureKeys as string[], KASHIER_STUB.apiKey);
     return {
@@ -177,7 +323,7 @@ export function createKashierControl(stub: KashierStub): ContractControl {
     paymentWebhook: (providerRef, opts = {}) => {
       const s = stub.sessions.get(providerRef)!;
       const state = opts.state ?? (s.state === 'PAID' ? 'paid' : 'pending');
-      const status = { paid: 'SUCCESS', pending: 'PENDING', failed: 'FAILED', expired: 'EXPIRED' }[
+      const status = { paid: 'SUCCESS', pending: 'PENDING', failed: 'FAILURE', expired: 'FAILURE' }[
         state
       ];
       return stub.webhookFor(providerRef, {
@@ -186,12 +332,13 @@ export function createKashierControl(stub: KashierStub): ContractControl {
         transactionId: opts.eventId ?? s.transactionId ?? `ktx_pending_${++n}`,
       });
     },
-    webhookStates: ['pending', 'failed', 'expired'],
+    // A webhook's `data.status` is SUCCESS | FAILURE | PENDING: there is no expired delivery.
+    webhookStates: ['pending', 'failed'],
     badSignature: w => ({ ...w, headers: { [KASHIER_SIGNATURE_HEADER]: 'deadbeef' } }),
     noSignature: w => ({ ...w, headers: {} }),
     tamperAmount: (w, amountMinor) =>
-      edit(w, d => void (d.amount = minorToDecimalString(amountMinor))),
-    tamperStatus: w => edit(w, d => void (d.status = 'FAILED')),
+      edit(w, d => void (d.amount = Number(minorToDecimalString(amountMinor)))),
+    tamperStatus: w => edit(w, d => void (d.status = 'FAILURE')),
     injectNextCall: (fault: StubFault) => stub.faults.injectNextCall(fault),
     providerPaymentCount: () => stub.createdCount,
   };

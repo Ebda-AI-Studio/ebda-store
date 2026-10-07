@@ -423,7 +423,7 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
         billing: billingFixture({
           suspension: { reason: 'unpaid', at: '2026-11-20T00:00:00.000Z' },
           supportWhatsappUrl: null,
-          supportEmail: 'hello@ebda.app',
+          supportEmail: 'ahlan@ebda.app',
         }),
       })
     );
@@ -431,8 +431,8 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     await screen.findByRole('alert');
     expect(screen.queryByRole('link', { name: 'whatsapp' })).toBeNull();
     expect(
-      screen.getByRole('link', { name: 'email:{"email":"hello@ebda.app"}' }).getAttribute('href')
-    ).toBe('mailto:hello@ebda.app');
+      screen.getByRole('link', { name: 'email:{"email":"ahlan@ebda.app"}' }).getAttribute('href')
+    ).toBe('mailto:ahlan@ebda.app');
     expect(document.querySelector('a[href*="wa.me"]')).toBeNull();
   });
 
@@ -450,7 +450,7 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
           rateBps: 1400,
           mode: 'exclusive',
           trn: '123456789',
-          legalName: 'Whisky 11',
+          legalName: 'Ebda AI Studio',
         },
         status: 'succeeded',
         failureReason: null,

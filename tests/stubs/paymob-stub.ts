@@ -1,10 +1,11 @@
 /**
- * A local Paymob (Accept, Intention API) stub: it speaks the shapes the adapter
- * documents (cents == piastres integers, `Authorization: Token <secret>`, the HMAC-SHA512
- * transaction callback, refund / void) so the adapter and the shared contract suite can
- * run without a real account. It mirrors what the adapter ASSUMES about Paymob; every
- * assumption not confirmed from Paymob's own docs is `UNVERIFIED:` in the adapter, and 6c
- * checks them against a real sandbox.
+ * A local Paymob (Accept, Intention API) stub speaking the shapes in Paymob's official docs
+ * (developers.paymob.com): cents == piastres integers, `Authorization: Token <secret key>` on
+ * intention / refund / void, `POST /api/auth/tokens {api_key}` -> `{profile, token}`, order
+ * inquiry as `POST /api/ecommerce/orders/transaction_inquiry {auth_token, order_id}` (no
+ * Authorization header), the HMAC-SHA512 transaction callback and the unified checkout host.
+ * Anything the docs do not state is `UNVERIFIED:` in the adapter, and 6c checks it against a
+ * real sandbox.
  */
 import crypto from 'node:crypto';
 import { paymobHmac, PAYMOB_HMAC_HEADER } from '@api/services/payment-providers/paymob.provider';
@@ -12,11 +13,16 @@ import type { ContractControl, SignedWebhook } from '../contract/payment-provide
 import { FaultGate, headerOf, json, readJson, type StubFault } from './stub-common';
 
 export const PAYMOB_STUB = {
+  /** Paymob SECRET key (creds.apiKey): `Authorization: Token <this>`. */
   secretKey: 'sk_test_paymob_stub',
+  /** Paymob API KEY (creds.secretKey): only for POST /api/auth/tokens. */
+  apiKey: 'paymob_stub_api_key',
   publicKey: 'pk_test_paymob_stub',
   hmacSecret: 'paymob-stub-hmac-secret',
-  integrationIds: { card: 11, meeza: 22, wallet: 33, valu: 44 },
+  integrationIds: { card: 11, wallet: 22, valu: 33, kiosk: 44, applepay: 55 },
   baseUrl: 'https://paymob.stub.test',
+  checkoutUrl: 'https://checkout.paymob.stub.test',
+  authToken: 'stub_auth_token',
 } as const;
 
 interface Order {
@@ -38,6 +44,7 @@ interface Txn {
   parent: number | null;
   integration_id: number;
   created_at: string;
+  source_type: string;
 }
 
 export class PaymobStub {
@@ -60,15 +67,24 @@ export class PaymobStub {
     this.requests.push({ path, body });
     const early = await this.faults.enter();
     if (early) return early;
+    // Docs: auth token request and order inquiry carry their credential in the BODY.
+    if (path === '/api/auth/tokens') return this.authTokens(body);
+    if (path === '/api/ecommerce/orders/transaction_inquiry') return this.inquiry(body);
     if (headerOf(init, 'authorization') !== `Token ${PAYMOB_STUB.secretKey}`) {
       return json(401, { detail: 'Authentication credentials were not provided.' });
     }
     if (path === '/v1/intention/') return this.intention(body);
-    if (path === '/api/ecommerce/orders/transaction_inquiry') return this.inquiry(body);
     if (path === '/api/acceptance/void_refund/refund') return this.refund(body);
     if (path === '/api/acceptance/void_refund/void') return this.void(body);
     return json(404, { detail: 'Not found.' });
   };
+
+  private authTokens(b: Record<string, unknown>): Response {
+    if (b.api_key !== PAYMOB_STUB.apiKey) {
+      return json(401, { detail: 'Invalid api_key.' });
+    }
+    return json(200, { profile: { id: 106 }, token: PAYMOB_STUB.authToken });
+  }
 
   private intention(b: Record<string, unknown>): Response {
     const amount = b.amount;
@@ -103,10 +119,16 @@ export class PaymobStub {
     };
     this.orders.set(order.id, order);
     return json(201, {
-      id: `pi_stub_${order.id}`,
-      client_secret: `stub_csk_${order.id}`,
+      payment_keys: [
+        { integration: order.methods[0], key: 'stub_payment_key', order_id: order.id },
+      ],
+      id: `pi_test_stub${order.id}`,
+      client_secret: `egy_csk_test_stub${order.id}`,
       intention_order_id: order.id,
       intention_detail: { amount: order.amount },
+      special_reference: order.merchantRef,
+      status: 'intended',
+      object: 'paymentintention',
     });
   }
 
@@ -125,14 +147,19 @@ export class PaymobStub {
         order: { id: o.id, amount_cents: o.amount, merchant_order_id: o.merchantRef },
       };
     }
+    const { source_type, ...rest } = t;
     return {
-      ...t,
+      ...rest,
       currency: 'EGP',
+      source_data: { type: source_type, pan: '2346', sub_type: 'MasterCard' },
       order: { id: o.id, amount_cents: o.amount, merchant_order_id: o.merchantRef },
     };
   }
 
   private inquiry(b: Record<string, unknown>): Response {
+    if (b.auth_token !== PAYMOB_STUB.authToken) {
+      return json(401, { detail: 'Invalid auth_token.' });
+    }
     const o = this.orders.get(Number(b.order_id));
     return o ? json(200, this.txnView(o)) : json(404, { detail: 'order not found' });
   }
@@ -144,10 +171,17 @@ export class PaymobStub {
     if (!Number.isInteger(amount) || (amount as number) <= 0)
       return json(400, { amount_cents: ['invalid'] });
     if (t.is_voided || (amount as number) > t.amount_cents - t.refunded_amount_cents) {
-      return json(400, { detail: 'refund amount exceeds the refundable balance' });
+      // Docs: the 400 message of an over-refund.
+      return json(400, {
+        message:
+          'Requested Refund Amount is greater than the maximum refund amount permissible. Maximum Refund Amount is EGP 100.0',
+      });
     }
     t.refunded_amount_cents += amount as number;
     t.is_refunded = t.refunded_amount_cents >= t.amount_cents;
+    if (t.source_type === 'aggregator') {
+      return json(400, { message: 'Kiosk payments cannot be refunded' });
+    }
     const r: Txn = {
       id: ++this.seq,
       orderId: t.orderId,
@@ -160,14 +194,21 @@ export class PaymobStub {
       parent: t.id,
       integration_id: t.integration_id,
       created_at: new Date().toISOString(),
+      source_type: t.source_type,
     };
     this.txns.set(r.id, r);
-    return json(200, { ...r, parent_transaction: t.id });
+    return json(200, {
+      ...r,
+      is_refund: !r.is_voided,
+      is_void: r.is_voided,
+      parent_transaction: t.id,
+    });
   }
 
   private void(b: Record<string, unknown>): Response {
     const t = this.txns.get(Number(b.transaction_id));
     if (!t || !t.success) return json(400, { detail: 'transaction not found or not captured' });
+    if (t.source_type !== 'card') return json(400, { message: 'Only card payments can be voided' });
     if (!this.voidWindowOpen || t.refunded_amount_cents > 0 || t.is_voided) {
       return json(400, { detail: 'transaction can no longer be voided' });
     }
@@ -185,13 +226,19 @@ export class PaymobStub {
       parent: t.id,
       integration_id: t.integration_id,
       created_at: new Date().toISOString(),
+      source_type: t.source_type,
     };
     this.txns.set(r.id, r);
-    return json(200, { ...r, parent_transaction: t.id });
+    return json(200, {
+      ...r,
+      is_refund: !r.is_voided,
+      is_void: r.is_voided,
+      parent_transaction: t.id,
+    });
   }
 
   /** The customer pays: a successful transaction on the order. */
-  capture(orderId: number): Txn {
+  capture(orderId: number, sourceType = 'card'): Txn {
     const o = this.orders.get(orderId);
     if (!o) throw new Error(`no stub order ${orderId}`);
     const t: Txn = {
@@ -206,6 +253,7 @@ export class PaymobStub {
       parent: null,
       integration_id: o.methods[0],
       created_at: new Date().toISOString(),
+      source_type: sourceType,
     };
     this.txns.set(t.id, t);
     o.txnId = t.id;
@@ -225,7 +273,7 @@ export class PaymobStub {
       | 'is_refunded'
       | 'integration_id'
       | 'created_at'
-    > & { parent?: number | null },
+    > & { parent?: number | null; source_type?: string },
     secret = PAYMOB_STUB.hmacSecret
   ): { body: Record<string, unknown>; hmac: string } {
     const obj = {
@@ -247,7 +295,7 @@ export class PaymobStub {
       currency: 'EGP',
       created_at: t.created_at,
       order: { id: t.orderId, merchant_order_id: this.orders.get(t.orderId)?.merchantRef },
-      source_data: { pan: '2346', sub_type: 'MasterCard', type: 'card' },
+      source_data: { pan: '2346', sub_type: 'MasterCard', type: t.source_type ?? 'card' },
     };
     return { body: { type: 'TRANSACTION', obj }, hmac: paymobHmac(obj, secret) };
   }

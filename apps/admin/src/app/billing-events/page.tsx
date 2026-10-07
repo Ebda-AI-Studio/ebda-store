@@ -20,7 +20,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge, Button } from '@force/ui';
-import { formatMoney } from '@force/shared';
+import { formatMoney, withNumerals } from '@force/shared';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { DataTable, type DataTableColumn } from '../../components/mobile/DataTable';
@@ -104,7 +104,13 @@ function LedgerPanel({ refreshSignal }: { refreshSignal: number }) {
   }, [fetchRows, refreshKey, refreshSignal]);
 
   async function refund(row: LedgerRow) {
-    if (!window.confirm(t('confirmRefund', { amount: formatMoney(row.amountMinor, locale) }))) {
+    if (
+      !window.confirm(
+        t('confirmRefund', {
+          amount: formatMoney(row.amountMinor, locale, { fixedDecimals: true }),
+        })
+      )
+    ) {
       return;
     }
     setBusy(row.id);
@@ -123,7 +129,9 @@ function LedgerPanel({ refreshSignal }: { refreshSignal: number }) {
     {
       header: t('columns.date'),
       cell: r => (
-        <span className="text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</span>
+        <span className="text-muted-foreground">
+          {new Date(r.createdAt).toLocaleString(undefined, withNumerals())}
+        </span>
       ),
     },
     {
@@ -155,12 +163,12 @@ function LedgerPanel({ refreshSignal }: { refreshSignal: number }) {
       cell: r => (
         <span className="tabular-nums">
           {r.type === 'refund' ? '−' : ''}
-          {formatMoney(r.amountMinor, locale)}
+          {formatMoney(r.amountMinor, locale, { fixedDecimals: true })}
           {r.vat && (r.vatMinor ?? 0) > 0 && (
             <span className="block text-xs text-muted-foreground">
               {t('vatLine', {
                 rate: r.vat.rateBps / 100,
-                vat: formatMoney(r.vatMinor ?? 0, locale),
+                vat: formatMoney(r.vatMinor ?? 0, locale, { fixedDecimals: true }),
                 trn: r.vat.trn ?? '',
               })}
             </span>

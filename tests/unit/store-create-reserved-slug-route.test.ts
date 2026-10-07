@@ -13,7 +13,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { RESERVED_SLUGS } from '@force/shared';
+import { RESERVED_SLUGS, STORE_SLUG_MIN_LENGTH } from '@force/shared';
+
+// `id` is reserved as a hostname but is already below the slug minimum (SLUG_TOO_SHORT).
+const RESERVED_CREATABLE = RESERVED_SLUGS.filter(s => s.length >= STORE_SLUG_MIN_LENGTH);
 
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {
@@ -120,7 +123,7 @@ beforeEach(async () => {
 });
 
 describe('POST /stores — slug rules', () => {
-  it.each([...RESERVED_SLUGS])(
+  it.each([...RESERVED_CREATABLE])(
     'rejects the reserved slug %j with SLUG_RESERVED (400)',
     async slug => {
       const res = await request(app).post('/stores').send({ name: 'My Shop', slug });
@@ -175,12 +178,15 @@ describe('POST /stores — slug rules', () => {
 });
 
 describe('PUT /stores/:id — slug rules', () => {
-  it.each([...RESERVED_SLUGS])('rejects renaming a store to the reserved slug %j', async slug => {
-    const res = await request(app).put(`/stores/${STORE_ID}`).send({ slug });
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('SLUG_RESERVED');
-    expect(update).not.toHaveBeenCalled();
-  });
+  it.each([...RESERVED_CREATABLE])(
+    'rejects renaming a store to the reserved slug %j',
+    async slug => {
+      const res = await request(app).put(`/stores/${STORE_ID}`).send({ slug });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('SLUG_RESERVED');
+      expect(update).not.toHaveBeenCalled();
+    }
+  );
 
   it('accepts a valid new slug', async () => {
     const res = await request(app).put(`/stores/${STORE_ID}`).send({ slug: 'new-address' });

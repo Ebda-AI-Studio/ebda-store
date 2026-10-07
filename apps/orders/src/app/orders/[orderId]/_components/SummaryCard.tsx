@@ -1,6 +1,6 @@
 'use client';
 
-import { orderTaxPlacement } from '@force/shared';
+import { orderTaxPlacement, withNumerals } from '@force/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMoney } from '@/lib/format';
 import type { OrderDetail } from '@/lib/orders';
@@ -65,7 +65,7 @@ export function SummaryCard({ order }: SummaryCardProps) {
     ...(loyaltyPortion > 0
       ? [
           {
-            label: `${t.detail.loyaltyPoints}${order.loyaltyPointsRedeemed ? ` (${order.loyaltyPointsRedeemed.toLocaleString(locale)})` : ''}`,
+            label: `${t.detail.loyaltyPoints}${order.loyaltyPointsRedeemed ? ` (${order.loyaltyPointsRedeemed.toLocaleString(locale, withNumerals())})` : ''}`,
             value: formatMoney(loyaltyPortion, order.currency),
           },
         ]

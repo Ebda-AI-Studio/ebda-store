@@ -30,6 +30,11 @@ const str = (v: unknown): string | null =>
 const obj = (v: unknown): Record<string, unknown> =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 
+/**
+ * The gateways whose webhooks this route accepts. Every one must also have a case in the
+ * extractors below; tests/unit/provider-catalog.test.ts asserts the list equals the catalog's
+ * non-manual payment providers, so a catalog entry cannot ship without its webhook wiring.
+ */
 export const GATEWAY_WEBHOOK_PROVIDERS = ['paymob', 'kashier', 'fawry'] as const;
 export type GatewayWebhookProvider = (typeof GATEWAY_WEBHOOK_PROVIDERS)[number];
 

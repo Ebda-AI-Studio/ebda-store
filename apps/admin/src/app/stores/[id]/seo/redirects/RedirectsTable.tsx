@@ -1,6 +1,7 @@
 'use client';
 
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { withNumerals } from '@force/shared';
 
 // Split out of page.tsx as a pure function of its props (#903) so it is
 // testable without AdminLayout's context tree (auth/store/features/router) —
@@ -44,7 +45,7 @@ export function RedirectsTable({ rows, deletingId, onDelete, t, ariaLabel }: Red
       className: 'w-32',
       cell: row => (
         <span className="text-xs text-muted-foreground">
-          {new Date(row.createdAt).toLocaleDateString()}
+          {new Date(row.createdAt).toLocaleDateString(undefined, withNumerals())}
         </span>
       ),
     },

@@ -131,7 +131,7 @@ function isStorefrontConfigured(): boolean {
 }
 
 /** Admin app — used by `notifyAdminsOfOrder` (new-order pings to store
- *  owners). Origin: https://admin.ebda.app. Distinct from the
+ *  owners). Origin: https://store.ebda.app. Distinct from the
  *  storefront app because OneSignal locks each app to a single origin. */
 function isAdminConfigured(): boolean {
   return !!(config.onesignalAdminAppId && config.onesignalAdminRestApiKey);
@@ -174,7 +174,7 @@ export class OneSignalService {
    */
   static async notifyAdminsOfOrder(input: NotifyOrderInput): Promise<void> {
     // Admin pushes go through the admin OneSignal app (origin
-    // admin.ebda.app), NOT the storefront app. OneSignal locks each
+    // store.ebda.app), NOT the storefront app. OneSignal locks each
     // app to a single chrome_web_origin so we can't reuse the storefront
     // app for admin devices — they'd fail subscription with an origin
     // mismatch error.
@@ -315,7 +315,7 @@ export class OneSignalService {
   /**
    * Push a "New order" notification to the staff running the Orders PWA
    * (orders.ebda.app) for THIS store. Distinct from
-   * `notifyAdminsOfOrder` (admin PWA, admin.ebda.app) — a different
+   * `notifyAdminsOfOrder` (admin PWA, store.ebda.app) — a different
    * device set + a different OneSignal app, so the two never double-send.
    *
    * Targeting is TAG-BASED: the Orders app tags each subscribed device with

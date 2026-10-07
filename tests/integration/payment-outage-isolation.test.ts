@@ -259,7 +259,8 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
     const o = await mkOrder(s);
     const res = await create(o.id, 'paymob');
     expect(res.status).toBe(200);
-    expect(res.body.data.paymentUrl).toContain('/unifiedcheckout/?publicKey=');
+    // Paymob's documented Egypt unified checkout host (developers.paymob.com, unified-checkout-redirection).
+    expect(res.body.data.paymentUrl).toMatch(/^https:\/\/eg\.checkout\.paymob\.com\/\?publicKey=/);
     // The gateway was called once, and when it was, no ebda_app session was holding a transaction
     // open (the request's own would show up as `idle in transaction` while it waited).
     expect(paymob.requests.filter(r => r.path === '/v1/intention/')).toHaveLength(1);

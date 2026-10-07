@@ -11,6 +11,7 @@ import { minorToMajor } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
+import { withNumerals } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -319,7 +320,7 @@ export default function ExpensesPage() {
             <>
               {meta && (
                 <p className="mb-2 text-sm text-muted-foreground" data-testid="expenses-total">
-                  {t('totalCount', { total: meta.total.toLocaleString() })}
+                  {t('totalCount', { total: meta.total.toLocaleString(undefined, withNumerals()) })}
                 </p>
               )}
               <DataTable<ExpenseRow>

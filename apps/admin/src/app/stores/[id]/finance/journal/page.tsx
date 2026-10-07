@@ -15,6 +15,7 @@ import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useNotifications, useUiRefresh } from '@/contexts/NotificationContext';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
+import { withNumerals } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -158,7 +159,7 @@ export default function JournalListPage() {
             <>
               {meta && (
                 <p className="text-sm text-muted-foreground" data-testid="journal-total">
-                  {t('totalCount', { total: meta.total.toLocaleString() })}
+                  {t('totalCount', { total: meta.total.toLocaleString(undefined, withNumerals()) })}
                 </p>
               )}
               {/* Journal entries list — genuine accounting ledger (columns are
@@ -205,7 +206,7 @@ export default function JournalListPage() {
                             {entry.entryNumber}
                           </td>
                           <td className="px-3 py-2 text-muted-foreground">
-                            {new Date(entry.postedAt).toLocaleDateString()}
+                            {new Date(entry.postedAt).toLocaleDateString(undefined, withNumerals())}
                           </td>
                           <td className="px-3 py-2 text-muted-foreground capitalize">
                             {entry.source.replace(/_/g, ' ')}

@@ -145,7 +145,23 @@ SMTP_FROM_EMAIL=noreply@yourdomain.com
 
 > ⚠️ **NOTE (updated 2026-07-05):** Production storefront, admin, and orders PWA run on **Cloudflare Workers** (OpenNext), NOT Vercel. Worker names: `ebda-admin` (`admin.force-ai.co`), `ebda-web` (`store.force-ai.co` + per-tenant custom domains), `ebda-orders` (`orders.force-ai.co`). The Vercel projects that previously hosted these apps are decommissioned.
 
-**Ebda status:** the Cloudflare API Worker deploys through the GitHub Actions workflow `.github/workflows/cf-api-deploy.yml` (manual `workflow_dispatch`, `main` only, `ubuntu-latest`). This repo has no `cf-deploy.yml` and does not use Cloudflare's Workers Builds Git integration; web/admin/orders CI deploy is not wired yet. The paragraph below is inherited from FWB (where `cf-deploy.yml` auto-deploys on push to `main`) and describes that pipeline: All three apps deploy via GitHub Actions on push to `main` touching their respective `apps/*/**` path (`.github/workflows/cf-deploy.yml`, runs on the self-hosted runner). The per-app filter diffs against the **last successful `cf-deploy` run on `main`**, not `HEAD~1`, so a run cancelled by a newer merge never strands its changes; if that lookup fails, all three deploy (details: `docs/migration/cloudflare-ci-deploy.md`). No manual per-push steps needed — the workflow builds each app with OpenNext and runs `wrangler deploy`. Per-tenant custom domain provisioning is handled by the API via Cloudflare-for-SaaS (see `apps/api/src/services/cloudflare-domain.service.ts` / `docs/migration/cloudflare-cutover-runbook.md`). Setup details: `docs/migration/cloudflare-ci-deploy.md`.
+**Ebda status (2026-10-07):** all four Workers deploy from GitHub Actions on `ubuntu-latest`, `environment: production`, `main` only. `cf-api-deploy.yml` (manual `workflow_dispatch`) deploys `ebda-api`; `cf-admin-deploy.yml`, `cf-web-deploy.yml` and `cf-orders-deploy.yml` deploy `ebda-admin` (`store.ebda.app`), `ebda-web` (every `<slug>.ebda.app` store) and `ebda-orders` (`orders.ebda.app`) on a push to `main` touching their app (or `packages/shared`, `packages/ui`, the lockfile, the CF scripts), or by `workflow_dispatch`. Each one: `npm ci` → route tests → `scripts/cf-setup-local.sh <app>` (routes from BRAND via `scripts/cf-routes.cjs`; web with `OPENNEXT_CACHE=true` on R2 bucket `ebda-web-isr-cache` + DO tag cache) → `scripts/cf-build.sh <app>` with the `NEXT_PUBLIC_*` build env → required Worker secrets check (web: `REVALIDATE_SECRET`) → `wrangler deploy` → POLL until `/_next/static/<BUILD_ID>/_buildManifest.js` (exists only in this build) is 200 and the probe page answers (admin `/signup` 200, orders `/login` 200, web an unknown store host 404). The first deploy of all three was run locally from the same build on 2026-10-07. The FWB `cf-deploy.yml` described below does not exist in this repo.
+
+### Storefront wildcard and the ebda.app route table
+
+Zone routes run BEFORE Workers custom domains, so the storefront's `*.ebda.app/*` route would catch every subdomain that has no more-specific route. Current table (verify with `GET /zones/<zone>/workers/routes` + `GET /accounts/<acct>/workers/domains`):
+
+| Host                                 | Served by                    | How                                                                                                               |
+| ------------------------------------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `ebda.app` (apex)                    | `ebda-marketing`             | custom domain; `*.ebda.app/*` does not match the bare apex                                                        |
+| `api.ebda.app`                       | `ebda-api`                   | `api.ebda.app/*` route + custom domain                                                                            |
+| `store.ebda.app` / `orders.ebda.app` | `ebda-admin` / `ebda-orders` | custom domain + `<host>/*` route (the route beats the wildcard)                                                   |
+| `admin.ebda.app` (retired)           | nothing (`ebda-web` 404)     | HOST-STORE-1: no custom domain, no route; the wildcard reaches `ebda-web`, `admin` is a reserved slug → plain 404 |
+| `preview.ebda.app`                   | `ebda-marketing-preview`     | custom domain + a **Worker-less** `preview.ebda.app/*` route (exclusion)                                          |
+| `media.ebda.app`                     | R2 `ebda-media`              | R2 custom domain + a **Worker-less** `media.ebda.app/*` route (exclusion)                                         |
+| `<slug>.ebda.app`                    | `ebda-web`                   | `*.ebda.app/*` route + a proxied wildcard DNS record `*`                                                          |
+
+Any NEW subdomain served by something other than the storefront needs either its own Worker route or a Worker-less exclusion route (`POST /zones/<zone>/workers/routes {"pattern":"<host>/*"}` with no `script`) — otherwise the storefront answers it with store-not-found. Wildcard DNS: `A * 192.0.2.0 proxied` (originless; explicit records still win). The Cloudflare-for-SaaS `*/*` fallback route inherited from FWB is deliberately NOT used — it would also capture the marketing apex; merchant custom domains need it (or a dedicated fallback-origin host) when that feature ships (Ruling EBDA-DEPLOY-1).
 
 ---
 
@@ -208,7 +224,7 @@ Add these records to your domain:
 
 | Type  | Name   | Value                   | Notes                                                                                                                                                                                                                                                      |
 | ----- | ------ | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| —     | store  | (Worker route)          | Cloudflare Worker `ebda-web` custom domain                                                                                                                                                                                                                 |
+| A     | \*     | 192.0.2.0 (proxied)     | Storefront wildcard → `ebda-web` via the `*.ebda.app/*` route                                                                                                                                                                                              |
 | —     | admin  | (Worker route)          | Cloudflare Worker `ebda-admin` custom domain                                                                                                                                                                                                               |
 | —     | orders | (Worker route)          | Cloudflare Worker `ebda-orders` custom domain                                                                                                                                                                                                              |
 | CNAME | api    | your-app.up.railway.app | Railway API — Cloudflare-PROXIED (verified live 2026-09-02: responses carry `server: cloudflare` + `cf-ray`; `cf-cache-status: DYNAMIC`, i.e. CF forwards but does not cache JSON without an explicit cache rule). The old "no proxy" note here was stale. |
@@ -260,8 +276,9 @@ git push origin main
 ### Deploy Web/Admin/Orders (Cloudflare Workers)
 
 ```bash
-# cf-deploy.yml auto-deploys each app changed since the last successful deploy
+# cf-{web,admin,orders}-deploy.yml deploy each app on a push to main touching it
 git push origin main
+# or: gh workflow run cf-admin-deploy.yml --ref main
 ```
 
 ### Manual Database Migration
@@ -296,7 +313,7 @@ and cannot be renamed.
 
 ### Cloudflare Workers (Web, Admin & Orders)
 
-1. `bash scripts/rollback.sh` (git revert + push) re-triggers `cf-deploy.yml`, redeploying the reverted build to `ebda-web` / `ebda-admin` / `ebda-orders`.
+1. `bash scripts/rollback.sh` (git revert + push) re-triggers `cf-{web,admin,orders}-deploy.yml`, redeploying the reverted build to `ebda-web` / `ebda-admin` / `ebda-orders`.
 2. To roll back a single Worker without a code revert: `wrangler deployments list` (per app dir) then `wrangler rollback <deployment-id>`.
 
 See `docs/ROLLBACK.md` §A for the full fast-path procedure.

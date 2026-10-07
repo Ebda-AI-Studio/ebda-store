@@ -14,7 +14,7 @@
  * gracefully (skips the model layer, keeps the deterministic result) when
  * no API key is configured or the judge response fails to parse.
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GeminiFailoverClient } from '../gemini-keys';
 import { config } from '../../../config';
 import logger from '../../logger';
 import { parseAiJson } from '../parse-ai-json';
@@ -138,7 +138,7 @@ export async function judgeOutput<TInput, TOutput>(params: {
   }
 
   try {
-    const genai = new GoogleGenerativeAI(apiKey);
+    const genai = new GeminiFailoverClient(apiKey);
     const model = genai.getGenerativeModel({
       model: modelName,
       generationConfig: { responseMimeType: 'application/json' },

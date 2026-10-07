@@ -7,6 +7,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { useRequireFeature } from '@/hooks/useRequireFeature';
+import { withNumerals } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -98,7 +99,7 @@ function AnomalyRow({
             <span className="text-xs text-muted-foreground capitalize">{item.scope}</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            {new Date(item.detectedAt).toLocaleDateString()}
+            {new Date(item.detectedAt).toLocaleDateString(undefined, withNumerals())}
           </p>
         </div>
         <div className="flex items-center gap-2">

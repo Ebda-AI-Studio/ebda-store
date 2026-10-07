@@ -7,7 +7,7 @@ import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 
-import { minorToDecimalString, REGION } from '@force/shared';
+import { REGION } from '@force/shared';
 /**
  * Minimal template — cart rendered with ultra-spare typography-first
  * layout. No borders, no backgrounds, just rows separated by
@@ -23,9 +23,9 @@ export default function MinimalCartTable({
   typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
-  const { localize } = useNumerals();
+  const { localize, money } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const format = (price: number) => `${localize(minorToDecimalString(price))} ${currency}`;
+  const format = (price: number) => `${money(price)} ${currency}`;
 
   return (
     <div className="space-y-10" dir={isRtl ? 'rtl' : 'ltr'}>

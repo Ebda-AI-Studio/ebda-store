@@ -10,7 +10,7 @@
  *
  * OneSignal locks each app to a single `chrome_web_origin`, so the Orders PWA
  * (orders.ebda.app) uses its OWN OneSignal app, distinct from the admin
- * (admin.ebda.app) and storefront (ebda.app) ones. The app
+ * (store.ebda.app) and storefront (ebda.app) ones. The app
  * id comes from NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID (Vercel env).
  *
  * SDK init runs once (idempotent) in OneSignalInit; this module owns the

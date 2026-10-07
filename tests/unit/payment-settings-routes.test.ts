@@ -93,6 +93,7 @@ vi.mock('@api/middleware/store-access', () => ({
 
 vi.mock('@api/middleware/tenant-context', () => ({
   tenantContext: (_req: any, _res: any, next: any) => next(),
+  paymentSettingsRouteContext: (_req: any, _res: any, next: any) => next(),
 }));
 
 vi.mock('@api/middleware/security', () => ({
@@ -256,11 +257,11 @@ describe('POST /payment-settings/store/:storeId — isDefault is exclusive per s
   it('unsets every other default of the store before creating the new one', async () => {
     mockPrisma.paymentConfig.findFirst.mockResolvedValue(null);
     mockPrisma.paymentConfig.create.mockResolvedValue(
-      baseConfig({ storeId: STORE_ID, isDefault: true })
+      baseConfig({ provider: 'cod', storeId: STORE_ID, isDefault: true })
     );
 
     const res = await request(app).post(`${BASE}/store/${STORE_ID}`).send({
-      provider: 'paymob',
+      provider: 'cod',
       isEnabled: false,
       isDefault: true,
       apiKey: 'sk_new_key',
@@ -297,14 +298,14 @@ describe('PUT /payment-settings/store/:storeId/:provider — a masked placeholde
 
   it('drops apiKey/secretKey from the update when the client echoes the mask back', async () => {
     mockPrisma.paymentConfig.findFirst.mockResolvedValue(
-      baseConfig({ id: 'cfg-1', storeId: STORE_ID })
+      baseConfig({ id: 'cfg-1', provider: 'cod', storeId: STORE_ID, isEnabled: false })
     );
     mockPrisma.paymentConfig.update.mockResolvedValue(
-      baseConfig({ id: 'cfg-1', storeId: STORE_ID })
+      baseConfig({ id: 'cfg-1', provider: 'cod', storeId: STORE_ID, isEnabled: false })
     );
 
     await request(app)
-      .put(`${BASE}/store/${STORE_ID}/paymob`)
+      .put(`${BASE}/store/${STORE_ID}/cod`)
       .send({ apiKey: 'sk_l****_key', secretKey: '****', isEnabled: false });
 
     const updateCall = mockPrisma.paymentConfig.update.mock.calls[0][0];
@@ -315,15 +316,13 @@ describe('PUT /payment-settings/store/:storeId/:provider — a masked placeholde
 
   it('encrypts a genuinely new secretKey that does not contain the mask marker', async () => {
     mockPrisma.paymentConfig.findFirst.mockResolvedValue(
-      baseConfig({ id: 'cfg-1', storeId: STORE_ID })
+      baseConfig({ id: 'cfg-1', provider: 'cod', storeId: STORE_ID, isEnabled: false })
     );
     mockPrisma.paymentConfig.update.mockResolvedValue(
-      baseConfig({ id: 'cfg-1', storeId: STORE_ID })
+      baseConfig({ id: 'cfg-1', provider: 'cod', storeId: STORE_ID, isEnabled: false })
     );
 
-    await request(app)
-      .put(`${BASE}/store/${STORE_ID}/paymob`)
-      .send({ secretKey: 'brand_new_secret' });
+    await request(app).put(`${BASE}/store/${STORE_ID}/cod`).send({ secretKey: 'brand_new_secret' });
 
     const updateCall = mockPrisma.paymentConfig.update.mock.calls[0][0];
     expect(updateCall.data.secretKey).toBe('CIPHERTEXT(brand_new_secret)');
@@ -332,9 +331,7 @@ describe('PUT /payment-settings/store/:storeId/:provider — a masked placeholde
   it('404s updating a provider with no existing configuration for the store', async () => {
     mockPrisma.paymentConfig.findFirst.mockResolvedValue(null);
 
-    const res = await request(app)
-      .put(`${BASE}/store/${STORE_ID}/paymob`)
-      .send({ isEnabled: true });
+    const res = await request(app).put(`${BASE}/store/${STORE_ID}/cod`).send({ isEnabled: true });
 
     expect(res.status).toBe(404);
     expect(mockPrisma.paymentConfig.update).not.toHaveBeenCalled();
@@ -466,10 +463,12 @@ describe('#2010 — credential display fingerprint', () => {
   it('stores the fingerprint next to the ciphertext on create', async () => {
     mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'admin-1' });
     mockPrisma.paymentConfig.findFirst.mockResolvedValue(null);
-    mockPrisma.paymentConfig.create.mockResolvedValue(baseConfig({ storeId: STORE_ID }));
+    mockPrisma.paymentConfig.create.mockResolvedValue(
+      baseConfig({ provider: 'cod', storeId: STORE_ID })
+    );
 
     await request(app).post(`${BASE}/store/${STORE_ID}`).send({
-      provider: 'paymob',
+      provider: 'cod',
       isEnabled: false,
       apiKey: 'sk_new_key_WXYZ',
       merchantId: 'merchant_987',
@@ -488,23 +487,36 @@ describe('#2010 — credential display fingerprint', () => {
   });
 
   it('updates the fingerprint when a store key is re-saved, and leaves it alone on a masked echo', async () => {
-    currentUser.role = 'store_admin';
-    currentUser.userId = 'owner-1';
-    mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'owner-1' });
-    mockPrisma.paymentConfig.findFirst.mockResolvedValue(
-      baseConfig({ id: 'cfg-1', storeId: STORE_ID })
-    );
-    mockPrisma.paymentConfig.update.mockResolvedValue(baseConfig({ id: 'cfg-1' }));
+    mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'admin-1' });
+    const cod = baseConfig({ id: 'cfg-1', provider: 'cod', storeId: STORE_ID, isEnabled: false });
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(cod);
+    mockPrisma.paymentConfig.update.mockResolvedValue(cod);
 
-    await request(app).put(`${BASE}/store/${STORE_ID}/tap`).send({ apiKey: 'sk_rotated_ABCD' });
+    await request(app).put(`${BASE}/store/${STORE_ID}/cod`).send({ apiKey: 'sk_rotated_ABCD' });
     const saved = mockPrisma.paymentConfig.update.mock.calls[0][0].data;
     expect(saved.apiKey).toBe('CIPHERTEXT(sk_rotated_ABCD)');
     expect(saved.apiKeyLast4).toBe('ABCD');
 
     mockPrisma.paymentConfig.update.mockClear();
-    await request(app).put(`${BASE}/store/${STORE_ID}/tap`).send({ apiKey: '****ABCD' });
+    await request(app).put(`${BASE}/store/${STORE_ID}/cod`).send({ apiKey: '****ABCD' });
     const echoed = mockPrisma.paymentConfig.update.mock.calls[0][0].data;
     expect(echoed.apiKey).toBeUndefined();
     expect(echoed.apiKeyLast4).toBeUndefined();
+  });
+
+  it('refuses gateway keys on the generic STORE update: the credentials endpoint is the single writer', async () => {
+    currentUser.role = 'store_admin';
+    currentUser.userId = 'owner-1';
+    mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'owner-1' });
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(
+      baseConfig({ id: 'cfg-1', storeId: STORE_ID, isEnabled: false })
+    );
+
+    const res = await request(app)
+      .put(`${BASE}/store/${STORE_ID}/paymob`)
+      .send({ apiKey: 'sk_rotated_ABCD' });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('USE_CREDENTIALS_ENDPOINT');
+    expect(mockPrisma.paymentConfig.update).not.toHaveBeenCalled();
   });
 });

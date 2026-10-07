@@ -153,7 +153,7 @@ describe('formatMoney', () => {
   it('en: "EGP 1,299.50"', () => {
     expect(formatMoney(129_950, 'en')).toBe('EGP 1,299.50');
     expect(formatMoney(5, 'en')).toBe('EGP 0.05');
-    expect(formatMoney(0, 'en')).toBe('EGP 0.00');
+    expect(formatMoney(0, 'en')).toBe('EGP 0');
     expect(formatMoney(-129_950, 'en')).toBe('EGP -1,299.50');
   });
 
@@ -170,18 +170,35 @@ describe('formatMoney', () => {
     expect(formatMoney(129_950, 'en', { easternArabicDigits: true })).toBe('EGP 1,299.50');
   });
 
-  it('always shows exactly the currency exponent in decimals; foreign codes keep their own', () => {
-    expect(formatMoney(100, 'en')).toBe('EGP 1.00');
+  it('a whole amount drops its zero fraction; piastres keep every decimal (Ruling NUMERALS-1)', () => {
+    expect(formatMoney(45_000, 'ar')).toBe('450 ج.م');
+    expect(formatMoney(45_000, 'en')).toBe('EGP 450');
+    expect(formatMoney(45_050, 'ar')).toBe('450.50 ج.م');
+    expect(formatMoney(45_005, 'ar')).toBe('450.05 ج.م');
+    expect(formatMoney(100, 'en')).toBe('EGP 1');
+    expect(formatMoney(100, 'en', { fixedDecimals: true })).toBe('EGP 1.00');
     expect(formatMoney(1500, 'en', { currency: 'BHD' })).toBe('BHD 1.500');
-    expect(formatMoney(1500, 'en', { currency: 'USD' })).toBe('USD 15.00');
+    expect(formatMoney(1000, 'en', { currency: 'BHD' })).toBe('BHD 1');
+    expect(formatMoney(1500, 'en', { currency: 'USD' })).toBe('USD 15');
     expect(formatMoney(129_950, 'ar', { hideSymbol: true })).toBe('1,299.50');
+    expect(formatMoney(-45_000, 'ar')).toBe('-450 ج.م');
+    expect(formatMoney(-0.4, 'ar')).toBe('0 ج.م');
   });
 
-  it('formatPrice (the legacy shared entry point) delegates to the same formatter', () => {
+  it("numerals: 'arab' is the only way to Arabic-Indic digits, and only in Arabic", () => {
+    expect(formatMoney(45_000, 'ar', { numerals: 'arab' })).toBe('٤٥٠ ج.م');
+    expect(formatMoney(129_950, 'ar', { numerals: 'arab' })).toBe('١٬٢٩٩٫٥٠ ج.م');
+    expect(formatMoney(45_000, 'en', { numerals: 'arab' })).toBe('EGP 450');
+    expect(formatMoney(45_000, 'ar', { numerals: 'latn' })).toBe('450 ج.م');
+  });
+
+  it('formatPrice defaults to WESTERN digits in Arabic (Ruling NUMERALS-1)', () => {
     expect(formatPrice(129_950)).toBe('EGP 1,299.50');
-    expect(formatPrice(129_950, { locale: 'ar', latinDigits: true })).toBe('1,299.50 ج.م');
-    expect(formatPrice(129_950, { locale: 'ar' })).toBe('١٬٢٩٩٫٥٠ ج.م');
+    expect(formatPrice(45_000, { locale: 'ar' })).toBe('450 ج.م');
+    expect(formatPrice(129_950, { locale: 'ar' })).toBe('1,299.50 ج.م');
+    expect(formatPrice(129_950, { locale: 'ar', numerals: 'arab' })).toBe('١٬٢٩٩٫٥٠ ج.م');
     expect(formatPrice(1299.5, { unit: 'major' })).toBe('EGP 1,299.50');
+    expect(formatPrice(450, { unit: 'major', locale: 'ar' })).toBe('450 ج.م');
   });
 });
 

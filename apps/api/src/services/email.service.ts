@@ -396,7 +396,7 @@ export class EmailService {
     opts?: { queue?: boolean }
   ): Promise<void> {
     const html = renderBrandedShell(args.content, {
-      name: BRAND.name,
+      name: BRAND.product.nameEn,
       nameAr: null,
       logo: BRAND_EMAIL_LOGO_URL,
       theme: null,
@@ -1070,7 +1070,7 @@ export class EmailService {
       content,
       text: this.htmlToText(
         renderBrandedShell(content, {
-          name: BRAND.name,
+          name: BRAND.product.nameEn,
           nameAr: null,
           logo: BRAND_EMAIL_LOGO_URL,
           theme: null,

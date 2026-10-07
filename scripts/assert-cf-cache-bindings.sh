@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Assert the worker config scripts/cf-setup-local.sh just GENERATED matches the
-# OPENNEXT_CACHE mode. ONE copy, run by both .github/workflows/cf-deploy.yml
+# OPENNEXT_CACHE mode. ONE copy, run by both .github/workflows/cf-{web,admin,orders}-deploy.yml
 # (before every storefront deploy) and ci.yml's worker-dry-run (on every PR
 # that can move the Worker bundle) — issues 2089/2152/2154: CI used to build
 # the committed config, which the generator overwrites, so it never exercised

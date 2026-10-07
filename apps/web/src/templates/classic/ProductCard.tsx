@@ -17,7 +17,13 @@ import {
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor, getProductCardTextSizes, fromMinor, REGION } from '@force/shared';
+import {
+  resolveColor,
+  getProductCardTextSizes,
+  fromMinor,
+  REGION,
+  storeNumerals,
+} from '@force/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
@@ -71,6 +77,8 @@ function ClassicProductCard({
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
+  // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
+  const numerals = storeNumerals(store?.theme);
   const isRtl = isRtlProp ?? ctxIsRtl;
   const handleAddToCart = async (productId: string) => {
     await onAddToCart?.(productId);
@@ -102,7 +110,7 @@ function ClassicProductCard({
   const pricing = getProductPricing(product, undefined, 'card');
   const hasSale = !!pricing.displayCompare || pricing.hasVariantDiscount;
   // BUG 1 fix: use helper for correct EGP/pct badge text.
-  const discountBadgeText = getDiscountBadgeText(product, isRtl);
+  const discountBadgeText = getDiscountBadgeText(product, isRtl, undefined, undefined, numerals);
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
   const orderable = product.inStock !== false || product.acceptsBackorder === true;
 
@@ -381,6 +389,7 @@ function ClassicProductCard({
                 fromPrefix={pricing.mode === 'fromMin'}
                 currency={currency}
                 isRtl={isRtl}
+                numerals={numerals}
                 size="sm"
                 showDiscount={false}
                 className={`justify-center font-serif text-muted-foreground tabular-nums ${textSizes.price}`}

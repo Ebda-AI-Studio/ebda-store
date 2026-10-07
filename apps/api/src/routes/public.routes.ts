@@ -792,7 +792,7 @@ router.post(
       // Customer-leak guard: only treat req.user as the order owner when
       // the role is `customer`. The API cookie is shared between admin
       // and storefront origins (api.ebda.app host), so a merchant
-      // signed into admin.ebda.app sends the SAME cookie to
+      // signed into store.ebda.app sends the SAME cookie to
       // /public/orders on ebda.app. Without this guard
       // we'd attach the merchant's super_admin/store_admin userId as
       // `Order.customerId` — downstream loyalty / abandoned-cart /
@@ -854,7 +854,7 @@ router.get('/orders', authenticate, async (req: Request, res: Response, next: Ne
 //     /payments/create — see the comment there for the rationale.
 //
 // We use optionalAuthenticate so a stale admin cookie bleeding through
-// from admin.ebda.app doesn't reject a guest's success page; the
+// from store.ebda.app doesn't reject a guest's success page; the
 // role-guard below handles that case.
 router.get(
   '/orders/:id',
@@ -1808,7 +1808,8 @@ router.post(
       const subscribeSchema = z.object({
         email: z.string().email('Invalid email address').max(254),
         language: z.enum(['en', 'ar']).optional(),
-        source: z.enum(['footer', 'popup', 'manual']).optional(),
+        // `section`: the visual builder's newsletter section (Phase 2).
+        source: z.enum(['footer', 'popup', 'manual', 'section']).optional(),
       });
 
       const data = subscribeSchema.parse(req.body);

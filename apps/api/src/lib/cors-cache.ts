@@ -223,7 +223,7 @@ export function isPlatformOrigin(
   // (`<slug>.ebda.app`) and custom domains are validated separately.
   // (The post-launch WhatsApp platform host is NOT listed here.)
   if (origin === brandUrl(BRAND.domains.marketing)) return true;
-  if (origin === brandUrl(BRAND.domains.admin)) return true;
+  if (origin === brandUrl(BRAND.domains.storeApp)) return true;
   if (origin === brandUrl(BRAND.domains.orders)) return true;
 
   // Cloudflare Workers preview deploys for the project (OpenNext migration).

@@ -52,6 +52,7 @@ import {
   REFUND_STATUS_BY_ID_KEY,
 } from '../services/payment-providers/refund-settlement';
 import { rangeOrLegacyDays } from '../lib/report-range';
+import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
 
 const router = Router({ mergeParams: true });
 
@@ -371,7 +372,7 @@ router.get(
       // Append truncation notice row on the Orders sheet when cap was hit
       if (truncated) {
         const noteRow = ordersSheet.addRow({
-          storeName: `NOTE: export truncated — only the most recent ${orders.length.toLocaleString()} orders were exported. Contact support for a full export of larger stores.`,
+          storeName: `NOTE: export truncated — only the most recent ${orders.length.toLocaleString('en-US')} orders were exported. Contact support for a full export of larger stores.`,
         });
         noteRow.font = { bold: true, color: { argb: 'FFB91C1C' } };
       }
@@ -1843,7 +1844,7 @@ router.post(
           items: buildPaymentLineItems(order.items),
           callbackUrl: `${storefrontBaseUrl}/checkout/success`,
           errorUrl: `${storefrontBaseUrl}/checkout/error`,
-          webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${providerName}`,
+          webhookUrl: paymentWebhookUrl(providerName, storeId),
           notifyVia,
           ...(method ? { metadata: { method } } : {}),
         },

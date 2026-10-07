@@ -29,7 +29,7 @@ const ON = (mode: 'exclusive' | 'inclusive'): PlatformVat => ({
   rate: 14,
   mode,
   trn: '123456789',
-  legalName: 'Whisky 11 LLC',
+  legalName: 'Ebda AI Studio',
 });
 
 beforeEach(() => h.getPlatformVat.mockReset());
@@ -58,7 +58,7 @@ describe('Ebda VAT on subscription charges (one seam, read per charge)', () => {
         rateBps: 1400,
         mode: 'exclusive',
         trn: '123456789',
-        legalName: 'Whisky 11 LLC',
+        legalName: 'Ebda AI Studio',
       },
     });
   });
@@ -102,24 +102,24 @@ describe('InstaPay QR config', () => {
 
 describe('support contact (no WhatsApp number yet)', () => {
   it('BRAND support email is the address that actually receives mail', () => {
-    expect(BRAND.supportEmail).toBe('hello@ebda.app');
+    expect(BRAND.supportEmail).toBe('ahlan@ebda.app');
   });
   it('EBDA_SUPPORT_EMAIL overrides; unset or malformed falls back to BRAND', () => {
-    expect(supportEmail({})).toBe('hello@ebda.app');
-    expect(supportEmail({ EBDA_SUPPORT_EMAIL: 'nope' })).toBe('hello@ebda.app');
+    expect(supportEmail({})).toBe('ahlan@ebda.app');
+    expect(supportEmail({ EBDA_SUPPORT_EMAIL: 'nope' })).toBe('ahlan@ebda.app');
     expect(supportEmail({ EBDA_SUPPORT_EMAIL: ' billing@ebda.app ' })).toBe('billing@ebda.app');
   });
   it('WhatsApp unset: no wa.me link, a mailto instead', () => {
     expect(supportContact('Shop', {})).toEqual({
       whatsappUrl: null,
-      email: 'hello@ebda.app',
-      mailto: 'mailto:hello@ebda.app?subject=Shop',
+      email: 'ahlan@ebda.app',
+      mailto: 'mailto:ahlan@ebda.app?subject=Shop',
     });
   });
   it('WhatsApp set: the wa.me link, and the email is still there', () => {
     const c = supportContact(undefined, { EBDA_SUPPORT_WHATSAPP: '01012345678' });
     expect(c.whatsappUrl).toBe('https://wa.me/201012345678');
-    expect(c.email).toBe('hello@ebda.app');
+    expect(c.email).toBe('ahlan@ebda.app');
   });
 });
 
@@ -128,7 +128,7 @@ describe('billing notice email', () => {
     storeName: 'Amelia',
     planName: 'Growth',
     amountMinor: 349000,
-    billingUrl: 'https://admin.ebda.app/stores/s1/billing',
+    billingUrl: 'https://store.ebda.app/stores/s1/billing',
     dueOn: '2026-11-20',
     daysLeft: 3,
     method: 'instapay' as const,
@@ -142,9 +142,9 @@ describe('billing notice email', () => {
           ...base,
           kind,
           whatsappUrl: null,
-          supportEmail: 'hello@ebda.app',
+          supportEmail: 'ahlan@ebda.app',
         });
-        expect(html).toContain('mailto:hello@ebda.app');
+        expect(html).toContain('mailto:ahlan@ebda.app');
         expect(html).not.toContain('wa.me');
       });
     }
@@ -160,12 +160,12 @@ describe('billing notice email', () => {
           vatMinor: 48860,
           rateBps: 1400,
           trn: '123456789',
-          legalName: 'Whisky 11',
+          legalName: 'Ebda AI Studio',
         },
       });
       expect(on).toMatch(lang === 'en' ? /includes VAT 14%/ : /ضريبة القيمة المضافة 14%/);
       expect(on).toContain('123456789');
-      expect(on).toContain('Whisky 11');
+      expect(on).toContain('Ebda AI Studio');
     });
   }
 });

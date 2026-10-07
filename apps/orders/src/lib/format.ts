@@ -1,6 +1,6 @@
 import type { AddressJson } from './orders';
 
-import { REGION, minorToDecimalString } from '@force/shared';
+import { REGION, minorToDecimalString, withNumerals } from '@force/shared';
 /**
  * Order money is stored in minor units (EGP: 1 EGP = 100 piastres) — same convention as the
  * admin's order formatMoney. The decimals/scale come from `currencyExponent(currency)`.
@@ -11,13 +11,16 @@ export function formatMoney(minor: number, currency = REGION.currency): string {
 
 export function formatDateTime(iso: string | null | undefined, locale: string): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString(locale, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  return new Date(iso).toLocaleString(
+    locale,
+    withNumerals({
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  );
 }
 
 /**

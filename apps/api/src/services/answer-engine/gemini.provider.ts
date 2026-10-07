@@ -59,6 +59,7 @@ import { AppError } from '../../middleware/error-handler';
 import { assertAiQuota } from '../../lib/ai-quota';
 import { recordUsage } from '../ai.service';
 import logger from '../../lib/logger';
+import { isGeminiQuotaError, withGeminiFailover } from '../../lib/ai/gemini-keys';
 import type { AnswerEngineProvider, EngineAnswer } from './provider';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -192,17 +193,37 @@ export class GeminiAnswerEngineProvider implements AnswerEngineProvider {
     prompt: string,
     tools: Record<string, unknown>[]
   ): Promise<GeminiCallResult> {
-    const res = await fetch(`${GEMINI_API_BASE}/${MODEL}:generateContent`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': config.googleAiKey,
-      },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        ...(tools.length ? { tools } : {}),
-      }),
-    });
+    // Key failover (RULINGS GEMINI-FAILOVER-1): a 429 on one key retries with the next.
+    let res: Response;
+    try {
+      res = await withGeminiFailover(async apiKey => {
+        const r = await fetch(`${GEMINI_API_BASE}/${MODEL}:generateContent`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            ...(tools.length ? { tools } : {}),
+          }),
+        });
+        if (r.status === 429) {
+          const ra = Number(r.headers.get('retry-after'));
+          throw Object.assign(new Error('RESOURCE_EXHAUSTED'), {
+            status: 429,
+            retryAfterSeconds: Number.isFinite(ra) && ra > 0 ? ra : undefined,
+            response: r,
+          });
+        }
+        return r;
+      }, config.googleAiKey);
+    } catch (err) {
+      if (!isGeminiQuotaError(err)) throw err;
+      const r = (err as { response?: Response }).response;
+      if (!r) return { ok: false, status: 429, errorMessage: 'all Gemini keys rate limited' };
+      res = r;
+    }
 
     const json = (await res.json().catch(() => ({}))) as GeminiRestResponse;
 

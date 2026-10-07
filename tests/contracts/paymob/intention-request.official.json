@@ -1,0 +1,33 @@
+{
+  "amount": 2000,
+  "currency": "EGP",
+  "payment_methods": [158],
+  "items": [
+    {
+      "name": "Item name",
+      "amount": 2000,
+      "description": "Item description",
+      "quantity": 1
+    }
+  ],
+  "billing_data": {
+    "apartment": "dumy",
+    "first_name": "ala",
+    "last_name": "zain",
+    "street": "dumy",
+    "building": "dumy",
+    "phone_number": "+92345xxxxxxxx",
+    "city": "dumy",
+    "country": "dumy",
+    "email": "customer@example.com",
+    "floor": "dumy",
+    "state": "dumy"
+  },
+  "extras": {
+    "ee": 22
+  },
+  "special_reference": "phe4sjw11q-1xxxxxxxxx",
+  "expiration": 3600,
+  "notification_url": "https://webhook.site/dabe4968-5xxxxxxxxxxxxxxxxxxxxxx",
+  "redirection_url": "https://www.google.com/"
+}

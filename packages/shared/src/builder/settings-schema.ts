@@ -77,6 +77,19 @@ export const settingFactories = {
     group: 'content',
     ...extra,
   }),
+  textarea: (
+    id: string,
+    labelEn: string,
+    labelAr: string,
+    extra: Partial<SettingDefinition> = {}
+  ): SettingDefinition => ({
+    id,
+    type: 'textarea',
+    labelEn,
+    labelAr,
+    group: 'content',
+    ...extra,
+  }),
   image: (
     id: string,
     labelEn: string,
@@ -320,8 +333,9 @@ export const THEME_SETTINGS_SCHEMA: readonly ThemeSettingsGroup[] = [
       {
         id: 'arabicNumerals',
         type: 'checkbox',
-        labelEn: 'Arabic numerals in Arabic',
-        labelAr: 'أرقام عربية في الواجهة العربية',
+        // Ruling NUMERALS-1: unchecked = Western 123 (default, both languages).
+        labelEn: 'Store numerals: ١٢٣ on Arabic pages (default 123)',
+        labelAr: 'شكل الأرقام في المتجر: ١٢٣ في الصفحات العربية (الافتراضي 123)',
       },
     ],
   },

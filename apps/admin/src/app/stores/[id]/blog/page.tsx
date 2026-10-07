@@ -7,6 +7,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { SearchInput } from '../../../../components/SearchInput';
 import { apiGet, apiDelete } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { withNumerals } from '@force/shared';
 
 interface BlogPost {
   id: string;
@@ -268,7 +269,10 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
                         )}
                         <p className="mt-1 text-[11px] text-muted-foreground">
                           /{post.slug} ·{' '}
-                          {new Date(post.publishedAt ?? post.createdAt).toLocaleDateString()}
+                          {new Date(post.publishedAt ?? post.createdAt).toLocaleDateString(
+                            undefined,
+                            withNumerals()
+                          )}
                         </p>
                       </div>
                     </Link>

@@ -1,0 +1,7 @@
+{
+  "_source": "https://developer.fawrystaging.com/docs/server-apis/refund-issue-api (sample request, verbatim minus its signature)",
+  "merchantCode": "dJWmdV+lPIE=",
+  "referenceNumber": "946787894",
+  "refundAmount": 10,
+  "reason": "Item not as described"
+}

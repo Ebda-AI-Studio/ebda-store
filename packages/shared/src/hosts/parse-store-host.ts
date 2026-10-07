@@ -5,7 +5,7 @@ import { validateStoreSlugFormat } from './slug';
 /** Platform surfaces (never a store) that live on, or in front of, a host. */
 export type PlatformApp =
   | 'marketing'
-  | 'admin'
+  | 'storeApp'
   | 'api'
   | 'orders'
   | 'docs'
@@ -54,7 +54,7 @@ export const PREVIEW_HOST_SUFFIXES = [
 
 /** Reserved labels that front a real platform surface under `.ebda.app`. */
 const PLATFORM_LABELS: Readonly<Record<string, PlatformApp>> = {
-  admin: 'admin',
+  store: 'storeApp',
   api: 'api',
   orders: 'orders',
   docs: 'docs',

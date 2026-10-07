@@ -335,7 +335,7 @@ describe('orderConfirmationTemplate', () => {
     const d = { ...orderData, discount: 300, couponCode: 'SAVE10' };
     const html = orderConfirmationTemplate.en(d, STORE);
     expect(html).toContain('Discount (SAVE10)');
-    expect(html).toContain('3.00');
+    expect(html).toMatch(/\b3 EGP/); // whole amount: no zero fraction (Ruling NUMERALS-1)
   });
 
   it('discount row names the promotion when no coupon code is set (en)', () => {

@@ -75,7 +75,7 @@ export type TaxReviewDecision = z.infer<typeof taxReviewDecisionSchema>;
 export const TAX_NOT_VERIFIED_CODE = 'TAX_NOT_VERIFIED';
 
 // ── Ebda's OWN VAT on subscriptions (platform setting, ruling TAX-6) ─────────
-// Ebda (Whisky 11) is not VAT-registered yet, so this defaults OFF. It is a
+// Ebda AI Studio is not VAT-registered yet, so this defaults OFF. It is a
 // super-admin setting (system_settings key `ebda.vat`), not an env flag.
 
 export const PLATFORM_VAT_SETTING_KEY = 'ebda.vat';

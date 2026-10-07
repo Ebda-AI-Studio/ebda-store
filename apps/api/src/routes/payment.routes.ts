@@ -32,6 +32,7 @@ import { computeCodCharge, codProvider } from '../services/payment-providers/cod
 import { isProviderAvailable } from '../services/payment-providers/provider-health';
 import { enabledMethods, METHOD_LABELS } from '../services/payment-providers/provider-methods';
 import { PaymentProviderError } from '../services/payment-providers/types';
+import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
 const router = Router();
 
 // ==========================================
@@ -725,7 +726,7 @@ router.post(
               ? `${storefrontBaseUrl}${data.errorUrl}`
               : data.errorUrl
             : `${storefrontBaseUrl}/checkout/error`,
-          webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${providerName}`,
+          webhookUrl: paymentWebhookUrl(providerName, order.storeId),
           ...(data.method ? { metadata: { method: data.method } } : {}),
         };
 

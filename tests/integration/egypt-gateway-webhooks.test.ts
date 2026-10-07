@@ -199,12 +199,14 @@ describe.skipIf(!hasDb)('Egyptian gateway webhooks: route, inbox, definer, handl
   }
 
   /** POST a delivery the way each gateway does (Paymob: signature in the query string). */
-  const send = (gateway: Gateway, w: SignedWebhook, extraQuery = '') => {
+  const send = (gateway: Gateway, w: SignedWebhook, extraQuery = '', urlStoreId?: string) => {
     const hmac = w.headers[PAYMOB_HMAC_HEADER];
+    // The per-store URL the settings page shows (`/s/<storeId>`), or the legacy per-provider one.
+    const route = `/api/v1/webhooks/payment/${gateway}${urlStoreId ? `/s/${urlStoreId}` : ''}`;
     const path =
       gateway === 'paymob' && typeof hmac === 'string'
-        ? `/api/v1/webhooks/payment/paymob?hmac=${hmac}${extraQuery}`
-        : `/api/v1/webhooks/payment/${gateway}`;
+        ? `${route}?hmac=${hmac}${extraQuery}`
+        : route;
     let req = client().post(path).set('Content-Type', 'application/json');
     for (const [k, v] of Object.entries(w.headers)) {
       if (k !== PAYMOB_HMAC_HEADER && typeof v === 'string') req = req.set(k, v);
@@ -290,6 +292,25 @@ describe.skipIf(!hasDb)('Egyptian gateway webhooks: route, inbox, definer, handl
   });
 
   describe.each(['paymob', 'kashier', 'fawry'] as const)('%s', gateway => {
+    it('the per-store webhook URL pays its own store and ignores a payment of another store', async () => {
+      const s = await mkStore(`url-${gateway}`);
+      const other = await mkStore(`url-other-${gateway}`);
+      const { order, payment } = await startPayment(s, gateway);
+      const w = deliveryFor(gateway, payment.transactionId!);
+
+      // A valid delivery posted to ANOTHER store's URL moves nothing.
+      const wrong = await send(gateway, w, '', other.id);
+      expect(wrong.status).toBe(200);
+      expect(wrong.body.data.status).toBe('ignored');
+      expect((await state(order.id)).payment.status).toBe('pending');
+
+      const right = await send(gateway, w, '', s.id);
+      expect(right.status).toBe(200);
+      const after = await state(order.id);
+      expect(after.payment.status).toBe('completed');
+      expect(after.order.paymentStatus).toBe('paid');
+    });
+
     it('a correctly signed delivery pays the order; its REPLAY is a no-op', async () => {
       const s = await mkStore(`pay-${gateway}`);
       const { order, payment } = await startPayment(s, gateway);

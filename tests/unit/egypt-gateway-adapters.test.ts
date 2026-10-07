@@ -38,6 +38,7 @@ import { baseRequest } from '../contract/payment-provider.contract';
 const paymobCreds: ProviderCredentials = {
   mode: 'sandbox',
   apiKey: PAYMOB_STUB.secretKey,
+  secretKey: PAYMOB_STUB.apiKey,
   webhookSecret: PAYMOB_STUB.hmacSecret,
   settings: { publicKey: PAYMOB_STUB.publicKey, integrationIds: PAYMOB_STUB.integrationIds },
 };
@@ -209,10 +210,11 @@ describe('amount conversion at the gateway edge', () => {
       { providerRef: b.providerRef, idempotencyKey: 'b', amountMinor: 1_029 },
       kashierCreds
     );
+    // Kashier's refund `transaction.amount` is a JSON NUMBER (documented), built from the exact decimal.
     expect(
-      (ks.stub.requests.find(r => r.method === 'PUT')!.body.transaction as { amount: string })
+      (ks.stub.requests.find(r => r.method === 'PUT')!.body.transaction as { amount: number })
         .amount
-    ).toBe('10.29');
+    ).toBe(10.29);
 
     const fw = fawry();
     const c = await fw.provider.createPayment(baseRequest({ amountMinor: 5_029 }), fawryCreds);
@@ -390,7 +392,7 @@ describe('Paymob', () => {
 
   it('method selection: only the named integration is offered; a method the merchant did not enable is refused', async () => {
     const { stub, provider } = paymob();
-    await provider.createPayment(baseRequest({ metadata: { method: 'meeza' } }), paymobCreds);
+    await provider.createPayment(baseRequest({ metadata: { method: 'wallet' } }), paymobCreds);
     expect(stub.requests.find(r => r.path === '/v1/intention/')!.body.payment_methods).toEqual([
       22,
     ]);
@@ -405,7 +407,7 @@ describe('Paymob', () => {
     // no method named: every enabled integration, once
     const all = paymob();
     await all.provider.createPayment(baseRequest(), paymobCreds);
-    expect(all.stub.requests[0].body.payment_methods).toEqual([11, 22, 33, 44]);
+    expect(all.stub.requests[0].body.payment_methods).toEqual([11, 22, 33, 44, 55]);
   });
 
   it('items are sent only when they add up to the amount; otherwise one line carries it', async () => {
@@ -549,7 +551,7 @@ describe('Kashier', () => {
     );
   });
 
-  it.each(['merchantOrderId', 'amount', 'currency', 'status'])(
+  it.each(['merchantOrderId', 'amount', 'currency', 'status', 'transactionId'])(
     'signatureKeys must cover %s',
     key => {
       const { provider } = kashier();
@@ -593,13 +595,27 @@ describe('Kashier', () => {
     );
   });
 
-  it('a refund is told from the SIGNED status, not from the unsigned `event` field', () => {
+  it('`event` is unsigned: a relabelled delivery keeps the SAME event id, so the inbox drops it as a replay', () => {
     const { provider } = kashier();
     const good = delivery({ status: 'SUCCESS' });
+    const original = provider.verifyWebhook(good.rawBody, good.headers, kashierCreds);
     const body = JSON.parse(good.rawBody);
     body.event = 'refund'; // an attacker relabels a genuine PAYMENT delivery (outside the signature)
-    const ev = provider.verifyWebhook(JSON.stringify(body), good.headers, kashierCreds);
-    expect(ev.kind).toBe('payment'); // still a payment: it never becomes a refund event
+    const relabelled = provider.verifyWebhook(JSON.stringify(body), good.headers, kashierCreds);
+    expect(relabelled.kind).toBe('refund');
+    expect(relabelled.eventId).toBe(original.eventId);
+  });
+
+  it('an `idempotency` replay marker or an unknown event is refused, never guessed into a payment', () => {
+    const { provider } = kashier();
+    const good = delivery();
+    for (const event of ['idempotency', 'mystery']) {
+      const body = JSON.parse(good.rawBody);
+      body.event = event;
+      expect(
+        sync(() => provider.verifyWebhook(JSON.stringify(body), good.headers, kashierCreds))
+      ).toBe('WEBHOOK_MALFORMED');
+    }
   });
 
   it('the webhook key is the webhook secret when set, else the Payment API key', () => {

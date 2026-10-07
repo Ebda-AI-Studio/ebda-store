@@ -1616,7 +1616,8 @@
         "stopPreviewHint": "Stop previewing unsaved changes — show the saved version instead.",
         "previewUnsavedChanges": "Preview is showing unsaved changes (click to reset)",
         "expandAll": "Expand all",
-        "collapseAll": "Collapse all"
+        "collapseAll": "Collapse all",
+        "tryNewBuilder": "Try the new visual builder"
       },
       "pageCards": {
         "productsListTitle": "Products list page",
@@ -2462,8 +2463,10 @@
         "hint": "Customers can add a product to cart with one tap directly from the homepage carousels — no need to open the product page first. When on, the bottom \"Add to cart\" button on each carousel card is hidden (the + replaces it)."
       },
       "arabicNumerals": {
-        "title": "Arabic numerals (٠١٢٣)",
-        "hint": "Show Eastern Arabic-Indic digits on the Arabic storefront. Off = Western digits (0-9) everywhere."
+        "title": "Store numerals: 123 / ١٢٣",
+        "hint": "How numbers look on your Arabic storefront (prices, quantities, dates). 123 (Western) is the default; ١٢٣ shows Arabic-Indic digits to Arabic-reading customers only. English pages, order numbers and this dashboard always use 123.",
+        "western": "Western digits (123) — default",
+        "arabic": "Arabic-Indic digits (١٢٣)"
       },
       "socialIconColors": {
         "title": "Social icon colors",
@@ -2585,11 +2588,11 @@
       "phone": "Phone",
       "phoneAr": "Phone (Arabic Display)",
       "phonePlaceholder": "+20 1XX XXX XXXX",
-      "phoneArPlaceholder": "٩٦٥ XXXX XXXX+",
+      "phoneArPlaceholder": "965 XXXX XXXX+",
       "address": "Address",
       "addressAr": "Address (Arabic)",
       "addressPlaceholder": "123 Street, City, Egypt",
-      "addressArPlaceholder": "١٢٣ شارع، المدينة، مصر",
+      "addressArPlaceholder": "123 شارع، المدينة، مصر",
       "addressUrl": "Map link",
       "addressUrlPlaceholder": "https://maps.app.goo.gl/...",
       "addressUrlHint": "Paste a Google or Apple Maps link to your storefront's pin. The footer address will become clickable and open this URL in a new tab.",
@@ -2745,7 +2748,7 @@
       "nameLabel": "Name *",
       "namePlaceholder": "Summer Sale 20% Off",
       "nameArLabel": "Name (Arabic)",
-      "nameArPlaceholder": "خصم الصيف ٢٠٪",
+      "nameArPlaceholder": "خصم الصيف 20٪",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Get 20% off on all summer items",
       "descriptionArLabel": "Description (Arabic)",
@@ -3399,11 +3402,11 @@
   },
   "pwa": {
     "installHint": {
-      "title": "Install Ebda Admin to receive push notifications",
+      "title": "Install Ebda Store Admin to receive push notifications",
       "description": "iPhone needs the app added to your home screen before push notifications can work.",
       "step1": "Tap the Share icon in Safari",
       "step2": "Choose Add to Home Screen",
-      "step3": "Open Ebda Admin from the home screen and allow notifications",
+      "step3": "Open Ebda Store Admin from the home screen and allow notifications",
       "dismiss": "Dismiss"
     },
     "page": {
@@ -4759,30 +4762,6 @@
       "percentLabel": "Percentage surcharge (%)",
       "percentHelp": "Optional: a percentage of the order total added to the fixed fee, rounded to the piastre."
     },
-    "gateway": {
-      "apiKeyLabel": "API Key",
-      "apiKeyPlaceholder": "Enter API key",
-      "secretKeyLabel": "Secret Key",
-      "secretKeyPlaceholder": "Enter secret key",
-      "webhookSecretLabel": "Webhook Secret",
-      "webhookSecretPlaceholder": "Enter webhook secret",
-      "webhookUrlLabel": "Webhook URL (paste in provider dashboard)",
-      "webhookUrlDescription": {
-        "paymob": "In the Paymob dashboard, paste this URL as the \"Transaction processed callback\" of your integrations. Paymob appends its signature to it; we verify it with your HMAC secret (above).",
-        "kashier": "Kashier is told this URL with every payment, so there is nothing to paste. It is shown for reference: payment events are verified with your Payment API key (above).",
-        "fawry": "In the Fawry merchant portal, set this URL as the server notification URL. We verify every notification with your secure key (above)."
-      },
-      "webhookUrlCopy": "Copy",
-      "webhookUrlCopied": "Copied!",
-      "merchantIdLabel": "Merchant ID",
-      "merchantIdPlaceholder": "Enter merchant ID (if applicable)",
-      "testModeOn": "Test Mode On",
-      "testModeOff": "Test Mode Off",
-      "testModeDescriptionOn": "Using test credentials — no real payments processed",
-      "testModeDescriptionOff": "Live mode — real payments will be processed",
-      "savedValue": "Saved: {value}",
-      "savedResaveToShow": "Saved: **** — re-save the key to show its last 4 characters."
-    },
     "messages": {
       "savedSuccess": "Saved successfully",
       "failedToSave": "Failed to save",
@@ -4810,61 +4789,94 @@
       "unknown": "Not checked yet",
       "note": "When a provider times out or is unreachable, only that method is hidden from checkout for a minute or two. Cash on delivery and your other methods keep working."
     },
-    "paymob": {
-      "secretKeyLabel": "Secret key",
-      "secretKeyHelp": "Paymob dashboard > Settings > Account Info. Used for every server call.",
-      "secretKeyPlaceholder": "Paste the secret key",
-      "hmacLabel": "HMAC secret",
-      "hmacHelp": "Paymob dashboard > Settings > Account Info > HMAC. Verifies Paymob's callbacks.",
-      "hmacPlaceholder": "Paste the HMAC secret",
-      "publicKeyLabel": "Public key",
-      "publicKeyHelp": "Shown in the checkout link; not a secret.",
-      "publicKeyPlaceholder": "Paste the public key",
-      "integrationsTitle": "Payment methods",
-      "integrationsHelp": "Paste the integration ID of each method you want to offer (Paymob dashboard > Developers > Payment Integrations). Leave a method empty to hide it.",
-      "integrationPlaceholder": "Integration ID",
-      "methods": {
-        "card": "Card",
-        "meeza": "Meeza",
-        "wallet": "Mobile wallet (Vodafone Cash, Orange, e&)",
-        "valu": "valU installments"
-      }
-    },
-    "kashier": {
-      "merchantIdLabel": "Merchant ID (MID)",
-      "merchantIdHelp": "Kashier dashboard > Integrations. Looks like MID-1234-56.",
-      "merchantIdPlaceholder": "MID-...",
-      "apiKeyLabel": "Payment API key",
-      "apiKeyHelp": "Kashier dashboard > Integrations. Also verifies Kashier's webhooks.",
-      "apiKeyPlaceholder": "Paste the Payment API key",
-      "secretKeyLabel": "Secret key",
-      "secretKeyHelp": "Kashier dashboard > Integrations. Used for every server call.",
-      "secretKeyPlaceholder": "Paste the secret key",
-      "displayLabel": "Payment page language",
-      "display": {
-        "ar": "Arabic",
-        "en": "English"
+    "connect": {
+      "configure": "Connect",
+      "status": {
+        "enabled": "Enabled",
+        "connected": "Connected",
+        "notConnected": "Not connected",
+        "comingSoon": "Coming soon"
       },
-      "methodsTitle": "Methods on the payment page",
+      "comingSoonLine": "Coming soon: we are still testing this provider against the company's test account. It will appear here for you to connect as soon as it is ready.",
+      "superAdminNote": "Not verified yet (coming soon for merchants). As a super admin you can save credentials and test the connection, but it cannot be enabled until it is verified.",
+      "modes": {
+        "label": "Credentials mode",
+        "sandbox": "Sandbox",
+        "live": "Live",
+        "active": "Active",
+        "notActive": "The active mode is {mode}. These credentials are not used yet.",
+        "useThis": "Use this mode"
+      },
+      "secretSaved": "Saved",
+      "secretSavedLast4": "Saved ••••{last4}",
+      "secretPlaceholder": "Paste the value",
+      "whereToFind": "Where do I find this?",
+      "docsCredentials": "Provider guide to these keys",
+      "docsDashboard": "Open the provider dashboard",
+      "validation": {
+        "required": "is required",
+        "controlChars": "contains invalid characters",
+        "tooLong": "is too long",
+        "wholeNumber": "must be a whole number",
+        "wrongFormat": "has the wrong format",
+        "generic": "is not valid"
+      },
+      "actions": {
+        "save": "Save credentials",
+        "saving": "Saving...",
+        "test": "Test connection ({mode})",
+        "testing": "Testing..."
+      },
+      "testDisabled": "Save all required fields for the active mode ({mode}) to test the connection.",
+      "test": {
+        "ok": "Connected: the provider accepted your credentials.",
+        "bad_credentials": "The provider rejected these credentials. Check them and save again.",
+        "wrong_mode": "These look like credentials for the other mode (sandbox vs live). Check the mode.",
+        "incomplete": "Some required fields are missing. Fill them in and save.",
+        "unreachable": "Could not reach the provider. Try again in a minute.",
+        "unknown": "The test did not give a clear answer. Try again, or contact support.",
+        "latency": "{ms} ms"
+      },
+      "messages": {
+        "saved": "Saved",
+        "savedDisabled": "Saved. The active credentials changed, so the provider was turned off until you test the connection again.",
+        "modeActivated": "Now using {mode} mode. Test the connection before enabling.",
+        "nothingToSave": "Nothing to save: type a value first.",
+        "failed": "Something went wrong. Please try again."
+      },
+      "enable": {
+        "label": "Accept payments with this provider",
+        "notVerified": "Cannot be enabled yet: this provider is not verified.",
+        "saveFirst": "Save the credentials first.",
+        "testFirst": "Run Test connection successfully on the saved credentials first."
+      },
+      "webhook": {
+        "label": "Webhook URL",
+        "automatic": "Automatic",
+        "pasteIt": "Paste it in the company's dashboard",
+        "copy": "Copy",
+        "copied": "Copied!"
+      },
+      "options": {
+        "title": "Options",
+        "methods": "Methods to offer",
+        "display": "Payment page language",
+        "displayAr": "Arabic",
+        "displayEn": "English",
+        "expiryHours": "Reference code valid for (hours, 1-720)",
+        "expiryInvalid": "Enter a whole number of hours between 1 and 720.",
+        "save": "Save options"
+      },
       "methods": {
         "card": "Card",
-        "wallet": "Mobile wallet"
-      }
-    },
-    "fawry": {
-      "merchantCodeLabel": "Merchant code",
-      "merchantCodeHelp": "Given by Fawry when your account is opened.",
-      "merchantCodePlaceholder": "Paste the merchant code",
-      "secureKeyLabel": "Secure key",
-      "secureKeyHelp": "Signs every request and verifies every Fawry notification.",
-      "secureKeyPlaceholder": "Paste the secure key",
-      "expiryLabel": "Reference code valid for (hours)",
-      "expiryHelp": "How long the customer has to pay the code at an outlet. Default 72.",
-      "methodsTitle": "Methods",
-      "methods": {
-        "payatfawry": "Pay at Fawry (reference code)",
-        "card": "Card"
-      }
+        "wallet": "Mobile wallet",
+        "valu": "valU",
+        "kiosk": "Kiosk",
+        "applepay": "Apple Pay",
+        "bnpl": "Installments (BNPL)",
+        "payatfawry": "Pay at Fawry"
+      },
+      "requestProvider": "Need another payment or shipping provider? Tell us"
     }
   },
   "hero": {
@@ -4921,7 +4933,7 @@
       "textEnglish": "Announcement Text (English)",
       "textEnglishPlaceholder": "Free shipping on orders over 10 EGP!",
       "textArabic": "Announcement Text (Arabic)",
-      "textArabicPlaceholder": "شحن مجاني للطلبات فوق ١٠ ج.م!",
+      "textArabicPlaceholder": "شحن مجاني للطلبات فوق 10 ج.م!",
       "linkUrl": "Link URL (optional)",
       "linkUrlPlaceholder": "https://example.com/sale",
       "linkUrlHint": "The entire bar will link to this URL when clicked",
@@ -5472,7 +5484,7 @@
   "auth": {
     "login": {
       "title": "Admin Login",
-      "subtitle": "Sign in to access the Ebda Platform",
+      "subtitle": "Sign in to access Ebda Store",
       "email": "Email address",
       "emailPlaceholder": "you@example.com",
       "password": "Password",
@@ -5480,8 +5492,8 @@
       "signIn": "Sign in",
       "signingIn": "Signing in…",
       "loginFailed": "Login failed",
-      "footer": "Ebda Platform Admin Panel",
-      "brandTitle": "Ebda",
+      "footer": "Ebda Store Admin Panel",
+      "brandTitle": "Ebda Store",
       "brandSubtitle": "Manage your e-commerce stores, users, and platform settings from one powerful dashboard.",
       "statActiveStores": "Active Stores",
       "statProducts": "Products",
@@ -5734,7 +5746,8 @@
         "paymentAbandonments": "Payment Abandonments",
         "locations": "Locations",
         "customerGroups": "Customer groups",
-        "wallet": "Wallet"
+        "wallet": "Wallet",
+        "visualBuilder": "Visual builder"
       },
       "superAdmin": "Super Admin",
       "superAdminHint": "Full platform access",
@@ -8666,7 +8679,7 @@
         "resent": "If the address is eligible, a new link is on its way.",
         "backToLogin": "Back to sign in"
       },
-      "noAccount": "New to Ebda?",
+      "noAccount": "New to Ebda Store?",
       "createStore": "Create your store",
       "plan": {
         "chip": "Selected plan: {plan} · {interval} — 14-day Growth trial",
@@ -9294,6 +9307,139 @@
       "stateOn": "ON",
       "stateOff": "OFF",
       "saveFailed": "Could not save: {message}"
+    }
+  },
+  "builder": {
+    "loading": "Opening the builder…",
+    "loadError": "The page could not be loaded.",
+    "retry": "Try again",
+    "back": "Back to the dashboard",
+    "undo": "Undo",
+    "redo": "Redo",
+    "publish": "Publish",
+    "publishing": "Publishing…",
+    "published": "Published — your store shows the new page.",
+    "publishFailed": "Publish failed. Your draft is saved; try again.",
+    "restored": "Restored and published.",
+    "status": {
+      "loading": "Loading…",
+      "saved": "Draft saved",
+      "dirty": "Unsaved changes",
+      "saving": "Saving…",
+      "error": "Not saved — fix the highlighted fields",
+      "conflict": "Changed elsewhere"
+    },
+    "rejected": {
+      "cardinality": "This page already has the maximum number of these sections.",
+      "group": "This section belongs in another part of the page.",
+      "block": "This section does not accept that block.",
+      "notFound": "That item no longer exists.",
+      "unknown": "Unknown section type."
+    },
+    "families": {
+      "label": "Templates",
+      "confirm": "Apply this template as a draft? Your products, slides and copy are kept; nothing goes live until you publish.",
+      "applied": "Template applied to your draft."
+    },
+    "panes": {
+      "start": "Structure",
+      "end": "Settings"
+    },
+    "tabs": {
+      "sections": "Sections",
+      "theme": "Theme",
+      "history": "History"
+    },
+    "viewport": {
+      "label": "Preview size",
+      "desktop": "Desktop",
+      "tablet": "Tablet",
+      "mobile": "Mobile"
+    },
+    "conflict": {
+      "message": "This page was changed in another tab or by another editor. Choose which version to keep.",
+      "takeTheirs": "Load their version",
+      "keepMine": "Keep mine"
+    },
+    "canvas": {
+      "title": "Store preview",
+      "loading": "Loading preview…"
+    },
+    "tree": {
+      "label": "Page structure",
+      "header": "Header",
+      "template": "Page",
+      "footer": "Footer",
+      "addSection": "Add section",
+      "addBlock": "Add {name}",
+      "drag": "Drag to reorder {name}",
+      "moveUp": "Move {name} up",
+      "moveDown": "Move {name} down",
+      "show": "Show {name}",
+      "hide": "Hide {name}",
+      "duplicate": "Duplicate {name}",
+      "remove": "Remove {name}"
+    },
+    "addSection": {
+      "title": "Add a section",
+      "close": "Close",
+      "limitReached": "Limit reached ({max})"
+    },
+    "media": {
+      "title": "Media",
+      "upload": "Upload image",
+      "uploading": "Uploading…",
+      "close": "Close",
+      "loadError": "Images could not be loaded.",
+      "empty": "No images yet — upload one.",
+      "more": "Load more",
+      "loading": "Loading…"
+    },
+    "settings": {
+      "empty": "Select a section in the page or the list to edit it.",
+      "unknownType": "This section was made by a newer editor and cannot be edited here.",
+      "modeLabel": "Editing mode",
+      "content": "Content",
+      "design": "Design",
+      "visibility": "Show on",
+      "viewport": {
+        "desktop": "Desktop",
+        "tablet": "Tablet",
+        "mobile": "Mobile"
+      },
+      "resetViewport": "Reset {viewport}",
+      "arabic": "Arabic",
+      "english": "English",
+      "unsafeUrl": "Use a link that starts with / or https://",
+      "default": "Default",
+      "editInClassic": "Edit in the classic page builder",
+      "changeImage": "Change",
+      "chooseImage": "Choose image",
+      "removeImage": "Remove",
+      "pickCategory": "Choose a category",
+      "removeProduct": "Remove product",
+      "searchProducts": "Search products"
+    },
+    "theme": {
+      "classicOnly": "edit in the classic page builder",
+      "saved": "Theme saved",
+      "error": "Theme not saved — try again",
+      "saving": "Saving…",
+      "save": "Save theme"
+    },
+    "revisions": {
+      "error": "History could not be loaded.",
+      "empty": "No saved versions yet.",
+      "rev": "Version {rev}",
+      "status": {
+        "draft": "draft",
+        "published": "live",
+        "archived": "earlier"
+      },
+      "restore": "Restore",
+      "restoring": "Restoring…",
+      "confirmRestore": "Publish version {rev} again? Your current draft is replaced.",
+      "more": "Load more"
     }
   }
 }
