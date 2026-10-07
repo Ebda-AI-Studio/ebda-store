@@ -98,6 +98,23 @@ if (app === 'api') {
     assets: { directory: '.open-next/assets', binding: 'ASSETS' },
     services: [{ binding: 'WORKER_SELF_REFERENCE', service: `ebda-${app}-preview` }],
     routes: customDomains(app === 'web' ? STORE_HOSTS : [ADMIN_HOST]),
+    // Storefront data cache (OpenNext R2 incremental cache + DO tag cache), on
+    // the PREVIEW's own bucket: build web with OPENNEXT_CACHE=true. Without it
+    // every render refetched every API call (5-10 s pages on the preview).
+    ...(app === 'web'
+      ? {
+          r2_buckets: [
+            { binding: 'NEXT_INC_CACHE_R2_BUCKET', bucket_name: 'ebda-preview-isr-cache' },
+          ],
+          durable_objects: {
+            bindings: [
+              { name: 'NEXT_TAG_CACHE_DO_SHARDED', class_name: 'DOShardedTagCache' },
+              { name: 'NEXT_CACHE_DO_QUEUE', class_name: 'DOQueueHandler' },
+            ],
+          },
+          migrations: [{ tag: 'v1', new_sqlite_classes: ['DOShardedTagCache', 'DOQueueHandler'] }],
+        }
+      : {}),
     vars: {
       CF_ENV_NAME: 'preview',
       // The builder canvas: the preview admin may frame the preview storefront

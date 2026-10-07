@@ -197,3 +197,41 @@ describe('Dahab family, theme and baseline', () => {
     expect(getTemplateTheme('dahab').dividers?.enabled).toBe(false);
   });
 });
+
+describe('builder section product resolution (featured collection / spotlight)', async () => {
+  const { resolveSectionProducts } =
+    await import('../../apps/web/src/builder/sections/section-products');
+  const p = (id: string, slug?: string) =>
+    ({ id, slug: id, categories: slug ? [{ category: { slug } }] : [] }) as never;
+  const pools = {
+    newArrivals: [p('n1'), p('n2')],
+    bestSellers: [p('b1')],
+    featured: [p('f1')],
+    // What HomePageBody fetched for the section's category / hand-picked ids.
+    extra: [p('x1', 'necklaces'), p('x2', 'necklaces'), p('x3', 'rings')],
+  };
+  it('a category source reads the products fetched for that category', () => {
+    const got = resolveSectionProducts(
+      { productSource: 'category', categorySlug: 'Necklaces' },
+      pools,
+      8
+    );
+    expect(got.map((x: { id: string }) => x.id)).toEqual(['x1', 'x2']);
+  });
+  it('hand-picked keeps the merchant order and drops unknown ids', () => {
+    const got = resolveSectionProducts(
+      { productSource: 'manual', manualProductIds: ['x3', 'gone', 'b1'] },
+      pools,
+      8
+    );
+    expect(got.map((x: { id: string }) => x.id)).toEqual(['x3', 'b1']);
+  });
+  it('an empty match falls back to the newest products, and the limit applies', () => {
+    const got = resolveSectionProducts(
+      { productSource: 'category', categorySlug: 'none', limit: 1 },
+      pools,
+      8
+    );
+    expect(got.map((x: { id: string }) => x.id)).toEqual(['n1']);
+  });
+});

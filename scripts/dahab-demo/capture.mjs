@@ -39,20 +39,39 @@ for (const lang of ['ar', 'en']) {
       hasTouch: vp.mobile,
       locale: lang === 'ar' ? 'ar-EG' : 'en-US',
     });
-    await ctx.addCookies([{ name: 'force-language', value: lang, url: BASE }]);
+    await ctx.addCookies([
+      { name: 'force-language', value: lang, url: BASE },
+      // Consent already given, so the banner does not cover the pages under review.
+      {
+        name: 'force-cookie-consent',
+        value: encodeURIComponent(
+          JSON.stringify({ marketing: false, v: 1, ts: '2026-10-07T00:00:00Z' })
+        ),
+        url: BASE,
+      },
+    ]);
     const page = await ctx.newPage();
     for (const pg of PAGES) {
       if (ONLY && !ONLY.includes(pg.name)) continue;
       if (pg.addFirst) {
-        await page.goto(BASE + pg.addFirst, { waitUntil: 'networkidle' });
-        const add = page
-          .getByRole('button', { name: lang === 'ar' ? 'إضافة للسلة' : 'Add to bag' })
-          .first();
-        await add.click();
-        await page.waitForTimeout(1500);
-        await page.keyboard.press('Escape');
+        // The preview can be cold (scale-to-zero database): retry the product page.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          await page.goto(BASE + pg.addFirst, { waitUntil: 'load', timeout: 90_000 });
+          const add = page
+            .getByRole('button', {
+              name: lang === 'ar' ? 'إضافة للسلة' : 'Add to bag',
+              exact: true,
+            })
+            .first();
+          if (await add.isVisible({ timeout: 20_000 }).catch(() => false)) {
+            await add.click();
+            await page.waitForTimeout(1500);
+            await page.keyboard.press('Escape');
+            break;
+          }
+        }
       }
-      await page.goto(BASE + pg.path, { waitUntil: 'networkidle' });
+      await page.goto(BASE + pg.path, { waitUntil: 'load', timeout: 90_000 });
       // Walk the page so lazy images load, then return to the top.
       await page.evaluate(async () => {
         for (let y = 0; y < document.body.scrollHeight; y += 500) {
@@ -61,7 +80,7 @@ for (const lang of ['ar', 'en']) {
         }
         window.scrollTo(0, 0);
       });
-      await page.waitForTimeout(1200);
+      await page.waitForTimeout(2500);
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - window.innerWidth
       );
