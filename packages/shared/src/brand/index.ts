@@ -12,7 +12,14 @@
 export const BRAND = {
   name: 'Ebda',
   nameAr: 'ابدأ',
-  company: 'Whisky 11',
+  /** The company behind Ebda (single source for every operator mention; ruling OPERATOR-1). */
+  company: {
+    legalNameAr: 'ابدأ ستوديو للذكاء الاصطناعي والبرمجيات والتسويق الرقمي',
+    legalNameEn: 'Ebda AI Studio for Artificial Intelligence, Software and Digital Marketing',
+    shortNameAr: 'ابدأ ستوديو',
+    shortNameEn: 'Ebda AI Studio',
+    url: 'https://ebda.app',
+  },
   tagline: 'Your store, live today.',
   taglineAr: 'متجرك أونلاين النهاردة.',
   colors: {

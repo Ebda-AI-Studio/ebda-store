@@ -53,7 +53,7 @@ describe('getPlatformVat — default OFF, fail closed', () => {
       rate: 14,
       mode: 'inclusive',
       trn: '987654321',
-      legalName: 'Whisky 11 LLC',
+      legalName: 'Ebda AI Studio',
     };
     findUnique.mockResolvedValue({ value: v });
     expect(await getPlatformVat()).toEqual(v);

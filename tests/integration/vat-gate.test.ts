@@ -337,7 +337,13 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
 
     const saved = await asApp(() =>
       updatePlatformVat(
-        { enabled: false, rate: 14, mode: 'inclusive', trn: '987654321', legalName: 'Whisky 11' },
+        {
+          enabled: false,
+          rate: 14,
+          mode: 'inclusive',
+          trn: '987654321',
+          legalName: 'Ebda AI Studio',
+        },
         { userId: superAdminId }
       )
     );
@@ -394,7 +400,7 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
     it(`Ebda VAT ON (${mode}): the checkout charges ${total} and the ledger row records the VAT split + TRN`, async () => {
       await asApp(() =>
         updatePlatformVat(
-          { enabled: true, rate: 14, mode, trn: '987654321', legalName: 'Whisky 11' },
+          { enabled: true, rate: 14, mode, trn: '987654321', legalName: 'Ebda AI Studio' },
           { userId: superAdminId }
         )
       );
@@ -420,7 +426,7 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
           rateBps: 1400,
           mode,
           trn: '987654321',
-          legalName: 'Whisky 11',
+          legalName: 'Ebda AI Studio',
         });
       } finally {
         await owner.systemSetting.deleteMany({ where: { key: 'ebda.vat' } });
@@ -452,7 +458,13 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
 
     await asApp(() =>
       updatePlatformVat(
-        { enabled: true, rate: 14, mode: 'exclusive', trn: '987654321', legalName: 'Whisky 11' },
+        {
+          enabled: true,
+          rate: 14,
+          mode: 'exclusive',
+          trn: '987654321',
+          legalName: 'Ebda AI Studio',
+        },
         { userId: superAdminId }
       )
     );

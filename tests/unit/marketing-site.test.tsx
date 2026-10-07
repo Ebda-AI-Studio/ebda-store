@@ -8,6 +8,8 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { Home } from '../../apps/marketing/src/components/Home';
 import { LegalPage } from '../../apps/marketing/src/components/LegalPage';
+import { AboutPage } from '../../apps/marketing/src/components/AboutPage';
+import sitemap from '../../apps/marketing/src/app/sitemap';
 import { pageMetadata, jsonLd } from '../../apps/marketing/src/lib/seo';
 import { PLANS, PRICING_PUBLISHED } from '../../apps/marketing/src/lib/plans';
 import {
@@ -171,11 +173,9 @@ describe('marketing honesty', () => {
     expect(ar).toContain('ابدأ — بابك لبدء مشروعك.');
     expect(en).toContain('Ebda — Your doorway to business.');
     expect(en).toContain(
-      'Ebda is a product of <a href="https://whisky11.com" target="_blank" rel="noopener noreferrer">Whisky 11</a>. © 2026 Whisky 11. All rights reserved.'
+      'Ebda is a product of Ebda AI Studio. © 2026 Ebda AI Studio. All rights reserved.'
     );
-    expect(ar).toContain(
-      'ابدأ منتج من <a href="https://whisky11.com" target="_blank" rel="noopener noreferrer">Whisky 11</a>. © 2026 Whisky 11. جميع الحقوق محفوظة.'
-    );
+    expect(ar).toContain('ابدأ منتج من ابدأ ستوديو. © 2026 ابدأ ستوديو. جميع الحقوق محفوظة.');
     // no Arabic-Indic digits anywhere on either home page or any legal page
     expect(ar).not.toMatch(/[٠-٩]/);
     expect(en).not.toMatch(/[٠-٩]/);
@@ -188,9 +188,9 @@ describe('marketing honesty', () => {
   });
   it('the legal notice and terms name the operator without a personal name', () => {
     const ln = renderToStaticMarkup(<LegalPage locale="en" page="legal" />);
-    expect(ln).toContain('Ebda is a technology platform owned and operated by');
+    expect(ln).toContain('Ebda is a technology platform owned and operated by Ebda AI Studio');
     const lar = renderToStaticMarkup(<LegalPage locale="ar" page="terms" />);
-    expect(lar).toContain('ابدأ منصة تقنية مملوكة لـ');
+    expect(lar).toContain('ابدأ منصة تقنية مملوكة لابدأ ستوديو');
     for (const l of ['ar', 'en'] as const)
       for (const page of LEGAL_SLUGS) {
         const h = renderToStaticMarkup(<LegalPage locale={l} page={page} />);
@@ -231,14 +231,33 @@ describe('marketing honesty', () => {
     expect(s).toContain('1,490 ج.م');
     expect(s).not.toMatch(/[٠-٩]/);
   });
-  it('every Whisky 11 mention in the footer links to whisky11.com in a new tab', () => {
-    for (const html of [ar, en]) {
+  it('no customer-facing surface names the old operator or links whisky11.com; JSON-LD names Ebda AI Studio', () => {
+    const pages = LEGAL_SLUGS.flatMap(page =>
+      (['ar', 'en'] as const).map(l => renderToStaticMarkup(<LegalPage locale={l} page={page} />))
+    );
+    for (const html of [ar, en, ...pages]) expect(html).not.toMatch(/whisky/i);
+    const org = jsonLd('en')['@graph'][0] as Record<string, unknown>;
+    expect(org.name).toBe('Ebda AI Studio');
+    expect(org.alternateName).toBe('ابدأ ستوديو');
+    expect(org.url).toBe('https://ebda.app');
+    expect(org).not.toHaveProperty('parentOrganization');
+    expect(JSON.stringify(org)).not.toMatch(/whisky/i);
+  });
+  it('the about page carries the company line, the story and both contact addresses', () => {
+    for (const l of ['ar', 'en'] as const) {
+      const html = renderToStaticMarkup(<AboutPage locale={l} />);
       expect(html).toContain(
-        '<a href="https://whisky11.com" target="_blank" rel="noopener noreferrer">Whisky 11</a>'
+        l === 'en' ? 'owned and operated by Ebda AI Studio' : 'مملوكة لابدأ ستوديو'
       );
+      expect(html).toContain('ahlan@ebda.app');
+      expect(html).toContain('security@ebda.app');
+      expect(html).not.toMatch(/whisky/i);
     }
-    const org = jsonLd('en')['@graph'][0] as { parentOrganization: { url: string } };
-    expect(org.parentOrganization.url).toBe('https://whisky11.com');
+  });
+  it('the about page is in the sitemap for both locales', () => {
+    const urls = sitemap().map(e => e.url);
+    expect(urls).toContain('https://ebda.app/about/');
+    expect(urls).toContain('https://ebda.app/en/about/');
   });
   it('first-merchant block carries no invented quote', () => {
     expect(en).toContain('data-testid="first-merchant"');

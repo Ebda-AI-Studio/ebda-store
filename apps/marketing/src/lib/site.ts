@@ -19,10 +19,10 @@ export const LEGAL_SLUGS = [
   'acceptable-use',
 ] as const;
 export type LegalSlug = (typeof LEGAL_SLUGS)[number];
-export type PageSlug = '' | LegalSlug;
+export type PageSlug = '' | 'about' | LegalSlug;
 
 /** Every public marketing page (same set in both locales). The sitemap is generated from this. */
-export const SITE_PAGES = ['', ...LEGAL_SLUGS] as const;
+export const SITE_PAGES = ['', 'about', ...LEGAL_SLUGS] as const;
 
 /** Page path (no trailing slash except root) for a locale, e.g. pagePath('en','privacy') -> /en/privacy */
 export function pagePath(locale: Locale, page: PageSlug): string {
@@ -59,9 +59,6 @@ export const NAV_ANCHORS = [
   { key: 'pricing', target: 'pricing' },
   { key: 'resources', target: 'faq' },
 ] as const satisfies readonly { key: string; target: SectionId }[];
-
-/** Company behind Ebda; every mention links here. */
-export const COMPANY_URL = 'https://whisky11.com';
 
 /**
  * Customer-stories placeholder. Amelia Aurum is merchant #1; no quotes are

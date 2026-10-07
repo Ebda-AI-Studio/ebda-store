@@ -1,7 +1,10 @@
+import { BRAND } from '@force/shared/brand';
 import { LEGAL_AR } from './legal-ar';
 import { LEGAL_EN } from './legal-en';
 import type { LegalPages } from './legal-types';
 import type { Locale } from './site';
+
+const CO = BRAND.company;
 
 /** A payment or shipping provider; `logo` is a file in public/logos/ (none = our own icon). */
 export interface Provider {
@@ -45,6 +48,8 @@ export interface Copy {
     secondary: string;
     slugLabel: string;
   };
+  /** The /about page: company line, story heading, contact heading. */
+  aboutPage: { title: string; company: string; storyH: string; contactH: string; desc: string };
   /** «حكاية ابدأ»: why the name and the open-door mark. */
   about: { title: string; paras: string[]; close: string; markLabel: string };
   /** The pinned scroll story: a store assembling inside a phone. */
@@ -89,7 +94,7 @@ export interface Copy {
     planCtaAnnual: string;
   };
   faq: { title: string; items: { q: string; a: string }[] };
-  /** Footer contact block; `company` precedes the linked company name ("Ebda by Whisky 11"). */
+  /** Footer contact block. */
   contact: { title: string; hello: string; security: string };
   start: {
     title: string;
@@ -108,8 +113,9 @@ export interface Copy {
     acceptableUse: string;
     contact: string;
     legalVersion: string;
-    /** Ownership line around the linked company name: `${before}Whisky 11${after}`. */
-    ownership: { before: string; after: string };
+    about: string;
+    /** Ownership + copyright line (company names come from BRAND.company). */
+    ownership: string;
   };
   legalPages: LegalPages;
 }
@@ -278,6 +284,13 @@ export const COPY: Record<Locale, Copy> = {
         },
       ],
     },
+    aboutPage: {
+      title: 'عن ابدأ',
+      desc: 'ابدأ منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، من ابدأ ستوديو.',
+      company: `ابدأ منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، مملوكة ل${CO.shortNameAr} وتديرها.`,
+      storyH: 'حكاية ابدأ',
+      contactH: 'تواصل معنا',
+    },
     about: {
       title: 'حكاية ابدأ',
       paras: [
@@ -301,7 +314,7 @@ export const COPY: Record<Locale, Copy> = {
       login: 'عندك متجر؟ ادخل',
     },
     footer: {
-      product: 'ابدأ — منتج من Whisky 11',
+      product: `ابدأ — منتج من ${CO.shortNameAr}`,
       legalNav: 'روابط قانونية',
       legal: 'الإشعار القانوني',
       privacy: 'الخصوصية',
@@ -310,7 +323,8 @@ export const COPY: Record<Locale, Copy> = {
       acceptableUse: 'الاستخدام المقبول',
       contact: 'تواصل: ahlan@ebda.app',
       legalVersion: 'الإصدار 1.0 من الوثائق القانونية · 2026-10-07.',
-      ownership: { before: 'ابدأ منتج من ', after: '. © 2026 Whisky 11. جميع الحقوق محفوظة.' },
+      about: 'عن ابدأ',
+      ownership: `ابدأ منتج من ${CO.shortNameAr}. © 2026 ${CO.shortNameAr}. جميع الحقوق محفوظة.`,
     },
     legalPages: LEGAL_AR,
   },
@@ -498,6 +512,13 @@ export const COPY: Record<Locale, Copy> = {
         },
       ],
     },
+    aboutPage: {
+      title: 'About Ebda',
+      desc: 'Ebda is an online store builder for merchants in Egypt, a product of Ebda AI Studio.',
+      company: `Ebda is an online store builder for merchants in Egypt, a technology platform owned and operated by ${CO.shortNameEn}.`,
+      storyH: 'The Ebda story',
+      contactH: 'Contact',
+    },
     about: {
       title: 'The Ebda story',
       paras: [
@@ -521,7 +542,7 @@ export const COPY: Record<Locale, Copy> = {
       login: 'Have a store? Log in',
     },
     footer: {
-      product: 'Ebda — a Whisky 11 product',
+      product: `Ebda — a product of ${CO.shortNameEn}`,
       legalNav: 'Legal links',
       legal: 'Legal notice',
       privacy: 'Privacy',
@@ -530,10 +551,8 @@ export const COPY: Record<Locale, Copy> = {
       acceptableUse: 'Acceptable use',
       contact: 'Contact: ahlan@ebda.app',
       legalVersion: 'Legal documents version 1.0 · 2026-10-07.',
-      ownership: {
-        before: 'Ebda is a product of ',
-        after: '. © 2026 Whisky 11. All rights reserved.',
-      },
+      about: 'About Ebda',
+      ownership: `Ebda is a product of ${CO.shortNameEn}. © 2026 ${CO.shortNameEn}. All rights reserved.`,
     },
     legalPages: LEGAL_EN,
   },

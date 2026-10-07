@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { COPY } from '../lib/content';
-import { COMPANY_URL, HOME, type LegalSlug, type Locale } from '../lib/site';
+import { HOME, type LegalSlug, type Locale } from '../lib/site';
 import type { LegalPages } from '../lib/legal-types';
 import { Footer } from './Footer';
 import { Header } from './Header';
@@ -15,23 +15,6 @@ const DOC_KEY: Record<
   'merchant-agreement': 'merchant',
   'acceptable-use': 'acceptableUse',
 };
-
-const COMPANY = 'Whisky 11';
-
-/** Legal text with every "Whisky 11" mention linked to the company site (new tab). */
-function withCompanyLinks(text: string) {
-  const parts = text.split(COMPANY);
-  return parts.flatMap((part, i) =>
-    i === 0
-      ? [part]
-      : [
-          <a key={i} href={COMPANY_URL} target="_blank" rel="noopener noreferrer">
-            {COMPANY}
-          </a>,
-          part,
-        ]
-  );
-}
 
 export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug }) {
   const c = COPY[locale].legalPages;
@@ -71,7 +54,7 @@ export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug })
                   {s.h}
                 </h2>
                 {s.p.map(t => (
-                  <p key={t}>{withCompanyLinks(t)}</p>
+                  <p key={t}>{t}</p>
                 ))}
               </section>
             ))}

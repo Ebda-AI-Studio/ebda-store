@@ -14,7 +14,13 @@ describe('BRAND', () => {
   it('carries the Ebda identity from the brief', () => {
     expect(BRAND.name).toBe('Ebda');
     expect(BRAND.nameAr).toBe('ابدأ');
-    expect(BRAND.company).toBe('Whisky 11');
+    expect(BRAND.company).toEqual({
+      legalNameAr: 'ابدأ ستوديو للذكاء الاصطناعي والبرمجيات والتسويق الرقمي',
+      legalNameEn: 'Ebda AI Studio for Artificial Intelligence, Software and Digital Marketing',
+      shortNameAr: 'ابدأ ستوديو',
+      shortNameEn: 'Ebda AI Studio',
+      url: 'https://ebda.app',
+    });
     expect(BRAND.colors).toEqual({ night: '#0A0B0C', gold: '#B08D57', lift: '#CBA873' });
     expect(BRAND.fonts.sans).toBe('Geist');
     expect(BRAND.fonts.arabic).toBe('IBM Plex Sans Arabic');

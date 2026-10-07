@@ -3,7 +3,6 @@ import { BRAND } from '@force/shared/brand';
 import { COPY } from './content';
 import { PLANS, PRICING_PUBLISHED } from './plans';
 import {
-  COMPANY_URL,
   HOME,
   SIGNUP_URL,
   SITE_URL,
@@ -76,13 +75,13 @@ export function jsonLd(locale: Locale) {
       {
         '@type': 'Organization',
         '@id': org,
-        name: BRAND.name,
-        alternateName: BRAND.nameAr,
+        name: BRAND.company.shortNameEn,
+        alternateName: BRAND.company.shortNameAr,
+        legalName: BRAND.company.legalNameEn,
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         email: BRAND.supportEmail,
         sameAs: [] as string[],
-        parentOrganization: { '@type': 'Organization', name: BRAND.company, url: COMPANY_URL },
       },
       {
         '@type': 'WebSite',
