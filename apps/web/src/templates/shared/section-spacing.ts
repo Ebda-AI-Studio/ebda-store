@@ -40,7 +40,24 @@ const PADDING_BOTTOM_CLASSES: Record<
  *
  * Returns '' when neither flag is set (no change from default).
  */
+/**
+ * Three-viewport visibility (visual builder, BUILDER-PREVIEW-1). Only used
+ * when `hideOnTablet` is set; otherwise the legacy two-way classes below are
+ * emitted unchanged, so no existing store's markup moves.
+ * mobile < 768 · tablet 768–1023 · desktop >= 1024.
+ */
+function threeWayVisibilityClass(s: SectionPaddingMaxWidthVisibility): string {
+  return [
+    s.hideOnMobile ? 'max-md:hidden' : '',
+    s.hideOnTablet ? 'md:max-lg:hidden' : '',
+    s.hideOnDesktop ? 'lg:hidden' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
 function visibilityClass(s: SectionPaddingMaxWidthVisibility): string {
+  if (s.hideOnTablet !== undefined) return threeWayVisibilityClass(s);
   if (s.hideOnMobile && s.hideOnDesktop) return 'hidden';
   if (s.hideOnMobile) return 'hidden md:block';
   if (s.hideOnDesktop) return 'md:hidden';
@@ -123,6 +140,7 @@ export function sectionVisibilityClass(
   s: SectionPaddingMaxWidthVisibility | undefined
 ): string | undefined {
   if (!s) return undefined;
+  if (s.hideOnTablet !== undefined) return threeWayVisibilityClass(s) || undefined;
   if (s.hideOnMobile && s.hideOnDesktop) return 'hidden';
   if (s.hideOnMobile) return 'hidden md:block';
   if (s.hideOnDesktop) return 'md:hidden';

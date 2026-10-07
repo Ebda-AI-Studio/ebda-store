@@ -1325,6 +1325,7 @@
       "saveError": "Failed to save layout",
       "saveErrorLayoutOnly": "Layout saved, but typography failed. Retry the save.",
       "saveErrorTypographyOnly": "Typography saved, but layout failed. Retry the save.",
+      "saveConflict": "This page was changed in another tab or by another editor. Reload the page, then re-apply your change.",
       "loadError": "Failed to load layout",
       "preview": {
         "mobile": "Mobile",
