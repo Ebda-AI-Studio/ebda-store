@@ -26,7 +26,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStub } from './lib/stub.mjs';
-import { PM_SECRET_KEY } from './lib/fixture.mjs';
+import { PM_API_KEY, PM_SECRET_KEY } from './lib/fixture.mjs';
 import { paymentEndpointProblems } from './lib/guards.mjs';
 import { buildFixture } from './lib/fixture.mjs';
 import { snapshotDb, psqlExec, psqlJson } from './lib/snapshot.mjs';
@@ -735,7 +735,7 @@ async function main() {
   log(`base ${baseSide.id}  head ${headSide.id}  → ${outDir}`);
 
   const infra = refSides.length ? await ensureInfra(args) : null;
-  const stub = createStub({ secretKey: PM_SECRET_KEY });
+  const stub = createStub({ secretKey: PM_SECRET_KEY, apiKey: PM_API_KEY });
   await stub.listen(args.stubPort);
   const built = new Map();
   const results = {};

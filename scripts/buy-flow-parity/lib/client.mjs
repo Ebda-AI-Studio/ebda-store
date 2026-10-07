@@ -20,6 +20,10 @@ export const HARNESS_ENV = {
   LOAD_TEST_BYPASS_TOKEN: LOAD_TEST_TOKEN,
   PAYMENT_ATTEMPTS_PER_IP_10M: '10000',
   PAYMENT_ATTEMPTS_PER_STORE_10M: '10000',
+  // The harness drives Paymob against its local stub; Paymob is not yet sandbox-verified in the
+  // provider catalog (PROVIDERS-2), so the gate would hide it. Honoured only outside production
+  // (the harness runs the API with NODE_ENV=development).
+  PAYMENT_PROVIDERS_ALLOW_UNVERIFIED: '1',
 };
 export const LOAD_TEST_HEADER = { 'x-load-test-token': LOAD_TEST_TOKEN };
 

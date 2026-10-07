@@ -1,0 +1,23 @@
+{
+  "_source": "https://developer.fawrystaging.com/docs/server-apis/create-payment-refno-apis (sample request, verbatim; the page publishes no expected hash, so none is stored here)",
+  "merchantCode": "1tSa6uxz2nTwlaAmt38enA==",
+  "customerName": "example",
+  "customerMobile": "01234567891",
+  "customerEmail": "customer@example.com",
+  "customerProfileId": "777777",
+  "merchantRefNum": "2312465464",
+  "amount": "580.55",
+  "paymentExpiry": "1631138400000",
+  "currencyCode": "EGP",
+  "language": "en-gb",
+  "chargeItems": [
+    {
+      "itemId": "897fa8e81be26df25db592e81c31c",
+      "description": "Item Descriptoin",
+      "price": "580.55",
+      "quantity": "1"
+    }
+  ],
+  "paymentMethod": "PayAtFawry",
+  "description": "Example Description"
+}

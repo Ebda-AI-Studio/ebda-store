@@ -1,0 +1,31 @@
+{
+  "response": {
+    "status": "SUCCESS",
+    "gatewayCode": "APPROVED",
+    "gatewayMessage": "Payment accepted",
+    "transactionResponseCode": "00",
+    "transactionId": "TX-69827599",
+    "transactionDate": "2022-04-13T10:44:46.724Z",
+    "amount": 10,
+    "currency": "EGP",
+    "operation": "refund",
+    "payload": {
+      "order": {
+        "amount": 14,
+        "currency": "EGP",
+        "id": "93c799ea-ae6c-485c-bf36-a385acbb8c13",
+        "reference": "6228c89970bbfb001898c9fc",
+        "status": "PARTIALLY_REFUNDED",
+        "totalAuthorizedAmount": 14,
+        "totalCapturedAmount": 14,
+        "totalRefundedAmount": 10
+      },
+      "result": "SUCCESS",
+      "transaction": { "amount": 10, "currency": "EGP", "id": "TX-69827599", "type": "REFUND" }
+    },
+    "cardOrderId": "93c799ea-ae6c-485c-bf36-a385acbb8c13",
+    "orderReference": "TEST-ORD-37089"
+  },
+  "messages": { "en": "Congratulations! Your refund was successful" },
+  "status": "SUCCESS"
+}
