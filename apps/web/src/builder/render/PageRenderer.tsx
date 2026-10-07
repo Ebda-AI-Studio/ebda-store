@@ -39,7 +39,7 @@ import { resolveSectionZone } from '../../templates/shared/section-typography';
  *   2. ORDER comes from `definition.sections` instead of
  *      `layout.sectionOrder` + "extras last".
  * Unknown section types (a document from a newer editor) are skipped, never
- * thrown. Chrome sections (announcement/header/footer) are rendered by
+ * thrown. The header and footer section groups are rendered by
  * `ShopChrome` around this component, not here.
  *
  * Output equivalence with the pre-builder renderer is pinned by
@@ -934,7 +934,7 @@ export function PageRenderer({
         const body: React.ReactNode[] = [];
         for (const section of renderableSections(definition).sections) {
           const def = getSectionDefinition(section.type);
-          if (!def || def.placement !== 'body') continue;
+          if (!def || def.group !== 'template') continue;
           if (def.legacyKey === 'extraCarousels') {
             body.push(extraJSX[extraIdx++]);
             continue;

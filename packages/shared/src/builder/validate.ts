@@ -15,7 +15,7 @@
 import type { z } from 'zod';
 import { isSafeUrl } from '../utils/safe-url';
 import { storeLayoutSchema } from './layout-schema';
-import { sectionToLegacy } from './adapter';
+import { allSections, sectionToLegacy } from './adapter';
 import { getSectionDefinition, VIEWPORTS } from './registry';
 import {
   BUILDER_LIMITS,
@@ -23,6 +23,7 @@ import {
   type PageDefinition,
   type SectionNode,
 } from './schema';
+import type { SectionGroup } from './registry';
 
 export interface BuilderIssue {
   code:
@@ -36,7 +37,8 @@ export interface BuilderIssue {
     | 'UNSAFE_URL'
     | 'PHYSICAL_ALIGNMENT'
     | 'RESPONSIVE_NOT_SUPPORTED'
-    | 'SLOT_NOT_SUPPORTED'
+    | 'BLOCK_NOT_SUPPORTED'
+    | 'GROUP_MISMATCH'
     | 'PROPS_INVALID'
     | 'REF_NOT_FOUND';
   path: string;
@@ -129,9 +131,8 @@ function zodIssues(err: z.ZodError, base: string): BuilderIssue[] {
 function validateSection(
   node: SectionNode,
   path: string,
-  depth: number,
-  errors: BuilderIssue[],
-  warnings: BuilderIssue[]
+  group: SectionGroup,
+  errors: BuilderIssue[]
 ): void {
   const d = getSectionDefinition(node.type);
   if (!d) {
@@ -145,17 +146,52 @@ function validateSection(
     );
     return;
   }
-  if (node.children && node.children.length > 0) {
-    if (d.slots.length === 0 || depth >= BUILDER_LIMITS.maxDepth)
+  if (d.group !== group)
+    errors.push(
+      issue(
+        'GROUP_MISMATCH',
+        path,
+        `"${d.labelEn}" belongs in the ${d.group} group.`,
+        `مكان "${d.labelAr}" هو مجموعة ${d.group}.`
+      )
+    );
+  const blockIds = new Set<string>();
+  const blockCounts = new Map<string, number>();
+  (node.blocks ?? []).forEach((b, j) => {
+    const bd = d.blocks.find(x => x.type === b.type);
+    if (!bd) {
       errors.push(
         issue(
-          'SLOT_NOT_SUPPORTED',
-          `${path}/children`,
-          `"${d.labelEn}" cannot contain other sections.`,
-          `لا يمكن أن يحتوي "${d.labelAr}" على أقسام أخرى.`
+          'BLOCK_NOT_SUPPORTED',
+          `${path}/blocks/${j}/type`,
+          `"${d.labelEn}" does not accept "${b.type}" blocks.`,
+          `لا يقبل "${d.labelAr}" عناصر من نوع "${b.type}".`
         )
       );
-  }
+      return;
+    }
+    if (blockIds.has(b.id))
+      errors.push(
+        issue(
+          'DUPLICATE_ID',
+          `${path}/blocks/${j}/id`,
+          `Duplicate block id "${b.id}".`,
+          `معرّف عنصر مكرر "${b.id}".`
+        )
+      );
+    blockIds.add(b.id);
+    blockCounts.set(b.type, (blockCounts.get(b.type) ?? 0) + 1);
+  });
+  for (const bd of d.blocks)
+    if ((blockCounts.get(bd.type) ?? 0) > bd.maxCount)
+      errors.push(
+        issue(
+          'CARDINALITY',
+          `${path}/blocks`,
+          `At most ${bd.maxCount} "${bd.labelEn}" blocks.`,
+          `الحد الأقصى ${bd.maxCount} من "${bd.labelAr}".`
+        )
+      );
   for (const v of VIEWPORTS) {
     const o = node.responsive?.[v];
     if (!o) continue;
@@ -168,23 +204,25 @@ function validateSection(
           'غير مدعوم.'
         )
       );
-    for (const prop of Object.keys(o.props ?? {})) {
-      if (!(d.responsive.props[v] ?? []).includes(prop))
+    for (const key of Object.keys(o.settings ?? {})) {
+      if (!(d.responsive.settings[v] ?? []).includes(key))
         errors.push(
           issue(
             'RESPONSIVE_NOT_SUPPORTED',
-            `${path}/responsive/${v}/props/${prop}`,
-            `"${prop}" cannot be set per ${v} for this section.`,
-            `لا يمكن ضبط "${prop}" لكل جهاز في هذا القسم.`
+            `${path}/responsive/${v}/settings/${key}`,
+            `"${key}" cannot be set per ${v} for this section.`,
+            `لا يمكن ضبط "${key}" لكل جهاز في هذا القسم.`
           )
         );
     }
   }
-  scanValue(node.props, `${path}/props`, '', errors);
+  scanValue(node.settings, `${path}/settings`, '', errors);
+  (node.blocks ?? []).forEach((b, j) =>
+    scanValue(b.settings, `${path}/blocks/${j}/settings`, '', errors)
+  );
   if (node.responsive) scanValue(node.responsive, `${path}/responsive`, '', errors);
   const parsed = d.propsSchema.safeParse(sectionToLegacy(node, d.legacyKey));
-  if (!parsed.success) errors.push(...zodIssues(parsed.error, `${path}/props`));
-  void warnings;
+  if (!parsed.success) errors.push(...zodIssues(parsed.error, `${path}/settings`));
 }
 
 /** Synchronous checks (no catalogue lookups). */
@@ -215,7 +253,7 @@ export function validateDefinitionSync(input: unknown): ValidationResult {
 
   const ids = new Set<string>();
   const counts = new Map<string, number>();
-  const visit = (nodes: SectionNode[], base: string, depth: number) => {
+  const visit = (nodes: SectionNode[], base: string, group: SectionGroup) => {
     nodes.forEach((n, i) => {
       const path = `${base}/${i}`;
       if (ids.has(n.id))
@@ -229,20 +267,12 @@ export function validateDefinitionSync(input: unknown): ValidationResult {
         );
       ids.add(n.id);
       counts.set(n.type, (counts.get(n.type) ?? 0) + 1);
-      validateSection(n, path, depth, errors, warnings);
-      if (n.children) visit(n.children, `${path}/children`, depth + 1);
+      validateSection(n, path, group, errors);
     });
   };
-  visit(def.sections, '/sections', 1);
-  if (ids.size > BUILDER_LIMITS.maxSections)
-    errors.push(
-      issue(
-        'TOO_MANY_SECTIONS',
-        '/sections',
-        'A page holds at most 40 sections.',
-        'الحد الأقصى ٤٠ قسماً.'
-      )
-    );
+  visit(def.sectionGroups.header, '/sectionGroups/header', 'header');
+  visit(def.sections, '/sections', 'template');
+  visit(def.sectionGroups.footer, '/sectionGroups/footer', 'footer');
   for (const [type, n] of counts) {
     const d = getSectionDefinition(type);
     if (d && n > d.maxCount)
@@ -279,10 +309,10 @@ export function collectRefs(def: PageDefinition): {
   const productIds = new Set<string>();
   for (const n of def.sections) {
     if (n.type !== 'product-carousel') continue;
-    if (typeof n.props.categorySlug === 'string' && n.props.categorySlug)
-      categorySlugs.add(n.props.categorySlug);
-    if (Array.isArray(n.props.manualProductIds))
-      for (const id of n.props.manualProductIds) if (typeof id === 'string') productIds.add(id);
+    if (typeof n.settings.categorySlug === 'string' && n.settings.categorySlug)
+      categorySlugs.add(n.settings.categorySlug);
+    if (Array.isArray(n.settings.manualProductIds))
+      for (const id of n.settings.manualProductIds) if (typeof id === 'string') productIds.add(id);
   }
   return { categorySlugs: [...categorySlugs], productIds: [...productIds] };
 }
@@ -298,23 +328,23 @@ export async function validateDefinition(
   const found = await opts.resolveRefs(refs);
   res.definition.sections.forEach((n, i) => {
     if (n.type !== 'product-carousel') return;
-    const slug = n.props.categorySlug;
+    const slug = n.settings.categorySlug;
     if (typeof slug === 'string' && slug && !found.categorySlugs.has(slug))
       res.warnings.push(
         issue(
           'REF_NOT_FOUND',
-          `/sections/${i}/props/categorySlug`,
+          `/sections/${i}/settings/categorySlug`,
           `Category "${slug}" is not in this store; the carousel falls back to newest products.`,
           `الفئة "${slug}" غير موجودة في هذا المتجر؛ سيعرض الشريط أحدث المنتجات.`
         )
       );
-    const ids = Array.isArray(n.props.manualProductIds) ? n.props.manualProductIds : [];
+    const ids = Array.isArray(n.settings.manualProductIds) ? n.settings.manualProductIds : [];
     ids.forEach((id, j) => {
       if (typeof id === 'string' && !found.productIds.has(id))
         res.warnings.push(
           issue(
             'REF_NOT_FOUND',
-            `/sections/${i}/props/manualProductIds/${j}`,
+            `/sections/${i}/settings/manualProductIds/${j}`,
             `Product "${id}" is not in this store and will not show.`,
             `المنتج "${id}" غير موجود في هذا المتجر ولن يظهر.`
           )
@@ -329,12 +359,13 @@ export async function validateDefinition(
  * types (a document written by a newer editor) instead of throwing.
  */
 export function renderableSections(def: PageDefinition): {
+  /** Known sections, in render order (header group, template, footer group). */
   sections: SectionNode[];
   skipped: Array<{ id: string; type: string }>;
 } {
   const sections: SectionNode[] = [];
   const skipped: Array<{ id: string; type: string }> = [];
-  for (const n of def.sections) {
+  for (const n of allSections(def)) {
     if (getSectionDefinition(n.type)) sections.push(n);
     else skipped.push({ id: n.id, type: n.type });
   }

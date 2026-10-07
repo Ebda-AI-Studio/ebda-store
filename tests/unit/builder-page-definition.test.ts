@@ -19,6 +19,10 @@ import {
   LEGACY_HOME_SECTION_KEYS,
   LAYOUT_TOP_LEVEL_KEYS,
   BUILDER_LIMITS,
+  HERO_SLIDE_BLOCK,
+  sectionFromPreset,
+  THEME_SETTINGS_SCHEMA,
+  heroSlideSchema,
   type PageDefinition,
   type StoreLayoutSettings,
   type TemplateId,
@@ -220,7 +224,7 @@ describe('adapter round trip', () => {
     const D = layoutToDefinition(L);
     const extras = D.sections.filter(s => s.type === 'product-carousel');
     expect(extras.map(s => s.id)).toEqual(['extra-extra-feat', 'extra-extra-feat-2']);
-    expect(extras.map(s => s.props.id)).toEqual(['Extra_Feat', 'extra feat']);
+    expect(extras.map(s => s.settings.id)).toEqual(['Extra_Feat', 'extra feat']);
   });
 });
 
@@ -234,13 +238,94 @@ describe('registry', () => {
     for (const k of keys) expect(LAYOUT_TOP_LEVEL_KEYS as readonly string[]).toContain(k);
   });
 
-  it('chrome sections are placed top/bottom, cardinality one; product carousels many (max 8)', () => {
+  it('header/footer are section groups, cardinality one; product carousels many (max 8)', () => {
     const byType = Object.fromEntries(SECTION_REGISTRY.map(d => [d.type, d]));
-    expect(byType.header.placement).toBe('chrome-top');
-    expect(byType.footer.placement).toBe('chrome-bottom');
+    expect(byType.header.group).toBe('header');
+    expect(byType.announcement.group).toBe('header');
+    expect(byType.footer.group).toBe('footer');
     expect(byType.header.cardinality).toBe('one');
     expect(byType['product-carousel']).toMatchObject({ cardinality: 'many', maxCount: 8 });
-    for (const d of SECTION_REGISTRY) expect(d.slots).toEqual([]);
+    expect(byType.hero.blocks.map(b => b.type)).toEqual(['slide']);
+  });
+});
+
+describe('settings schemas (drive the Phase 2 auto-generated panel)', () => {
+  const VISIBILITY_AND_STRUCTURE = new Set([
+    'enabled', // -> hidden
+    'hideOnMobile', // -> responsive.mobile.hidden
+    'hideOnDesktop', // -> responsive.desktop/tablet.hidden
+    'hideOnTablet', // -> responsive.tablet.hidden
+    'layoutMobile', // -> responsive.mobile.settings.layout
+    'captionPositionMobile', // -> responsive.mobile.settings.captionPosition
+    'slides', // -> blocks
+    'id', // product carousel's internal id (kept in settings, not editable)
+  ]);
+  const shapeKeys = (schema: unknown): string[] =>
+    Object.keys((schema as { shape: Record<string, unknown> }).shape);
+  const settingIds = (defs: ReadonlyArray<{ id: string; localized?: boolean }>) =>
+    new Set(defs.flatMap(d => (d.localized ? [d.id, `${d.id}Ar`] : [d.id])));
+
+  it('every field the API stores for a section has a settings descriptor, and no descriptor is phantom', () => {
+    for (const d of SECTION_REGISTRY) {
+      const stored = shapeKeys(d.propsSchema).filter(k => !VISIBILITY_AND_STRUCTURE.has(k));
+      const declared = settingIds(d.settings);
+      expect(
+        stored.filter(k => !declared.has(k)),
+        `${d.type}: stored but no descriptor`
+      ).toEqual([]);
+      expect(
+        [...declared].filter(k => !stored.includes(k)),
+        `${d.type}: descriptor for nothing`
+      ).toEqual([]);
+    }
+  });
+
+  it('hero slide block descriptors cover every slide field', () => {
+    const stored = shapeKeys(heroSlideSchema);
+    const declared = settingIds(HERO_SLIDE_BLOCK.settings);
+    expect(stored.filter(k => !declared.has(k))).toEqual([]);
+    expect([...declared].filter(k => !stored.includes(k))).toEqual([]);
+  });
+
+  it('select options and responsive settings are consistent with the registry', () => {
+    for (const d of SECTION_REGISTRY) {
+      for (const st of d.settings) {
+        if (st.type === 'select')
+          expect(st.options?.length, `${d.type}.${st.id}`).toBeGreaterThan(1);
+        for (const v of st.responsive ?? [])
+          expect(d.responsive.settings[v] ?? [], `${d.type}.${st.id}`).toContain(st.id);
+        expect(st.labelAr.length, `${d.type}.${st.id} needs an Arabic label`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('every preset inserts a valid section (add-section picker)', () => {
+    for (const d of SECTION_REGISTRY) {
+      d.presets.forEach((p, i) => {
+        const doc = baseDef();
+        const node = sectionFromPreset(d.type, i, `preset-${d.type}`);
+        expect(node.hidden).toBe(false);
+        const list = d.group === 'template' ? doc.sections : doc.sectionGroups[d.group];
+        // replace an existing singleton so cardinality is not what is tested here
+        const at = list.findIndex(n => n.type === d.type);
+        if (at >= 0 && d.cardinality === 'one') list.splice(at, 1, node);
+        else list.push(node);
+        expect(validateDefinitionSync(doc).errors, `${d.type} / ${p.nameEn}`).toEqual([]);
+      });
+    }
+  });
+
+  it('global theme settings are typed against StoreTheme and bilingual', () => {
+    const ids = THEME_SETTINGS_SCHEMA.flatMap(g => g.settings.map(st => st.id));
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(THEME_SETTINGS_SCHEMA.map(g => g.id)).toEqual([
+      'colors',
+      'typography',
+      'buttons',
+      'spacing',
+    ]);
+    for (const g of THEME_SETTINGS_SCHEMA)
+      for (const st of g.settings) expect(st.labelAr).not.toBe('');
   });
 });
 
@@ -275,7 +360,7 @@ describe('validation', () => {
     expect(codes(D)).toContain('CARDINALITY');
     const many = baseDef();
     for (let i = 0; i < 41; i++)
-      many.sections.push({ id: `x-${i}`, type: 'brand-story', props: {} });
+      many.sections.push({ id: `x-${i}`, type: 'brand-story', settings: {} });
     expect(codes(many)).toContain('SCHEMA'); // envelope max(40)
   });
 
@@ -285,26 +370,27 @@ describe('validation', () => {
       D.sections.push({
         id: `extra-n${i}`,
         type: 'product-carousel',
-        props: { id: `n${i}`, productSource: 'featured' },
+        settings: { id: `n${i}`, productSource: 'featured' },
       });
     expect(codes(D)).toContain('CARDINALITY');
   });
 
   it('rejects a document over 256 KB and a string over 2 KB', () => {
     const big = baseDef();
-    const slide = { image: 'https://pub-test.r2.dev/x.jpg', alt: 'a'.repeat(2000) };
-    const hero = big.sections.find(s => s.type === 'hero')!;
-    hero.props.slides = Array.from({ length: 10 }, () => slide);
     for (let i = 0; i < 25; i++)
       big.sections.push({
         id: `bs-${i}`,
         type: 'brand-story',
-        props: { typography: { body: { fontFamily: 'f'.repeat(100) } }, pad: 'x'.repeat(2000) },
+        settings: { typography: { body: { fontFamily: 'f'.repeat(100) } }, pad: 'x'.repeat(2000) },
       });
     expect(BUILDER_LIMITS.maxDocBytes).toBe(262144);
     const long = baseDef();
-    long.sections.find(s => s.type === 'hero')!.props.slides = [
-      { image: 'https://pub-test.r2.dev/x.jpg', alt: 'é'.repeat(1100) },
+    long.sections.find(s => s.type === 'hero')!.blocks = [
+      {
+        id: 'slide-1',
+        type: 'slide',
+        settings: { image: 'https://pub-test.r2.dev/x.jpg', alt: 'é'.repeat(1100) },
+      },
     ];
     expect(codes(long)).toContain('STRING_TOO_LONG');
     const huge = baseDef();
@@ -320,16 +406,14 @@ describe('validation', () => {
     href => {
       const D = baseDef();
       const hero = D.sections.find(s => s.type === 'hero')!;
-      (hero.props.slides as Array<Record<string, unknown>>)[0].ctaHref = href;
+      hero.blocks![0].settings.ctaHref = href;
       expect(codes(D)).toContain('UNSAFE_URL');
     }
   );
 
   it('rejects data:/javascript: image URLs but accepts https and relative', () => {
     const D = baseDef();
-    const slides = D.sections.find(s => s.type === 'hero')!.props.slides as Array<
-      Record<string, unknown>
-    >;
+    const slides = D.sections.find(s => s.type === 'hero')!.blocks!.map(b => b.settings);
     slides[0].image = 'data:image/png;base64,AAAA';
     expect(codes(D)).toContain('UNSAFE_URL');
     slides[0].image = '/uploads/a.jpg';
@@ -338,7 +422,7 @@ describe('validation', () => {
 
   it('rejects physical left/right alignment (RTL must mirror)', () => {
     const D = baseDef();
-    D.sections.find(s => s.type === 'category-grid')!.props.typography = {
+    D.sections.find(s => s.type === 'category-grid')!.settings.typography = {
       heading: { textAlign: 'left' },
     };
     expect(codes(D)).toContain('PHYSICAL_ALIGNMENT');
@@ -346,31 +430,72 @@ describe('validation', () => {
 
   it('rejects responsive props a section does not support, accepts the declared ones', () => {
     const D = baseDef();
-    D.sections.find(s => s.type === 'hero')!.responsive = { mobile: { props: { mode: 'single' } } };
+    D.sections.find(s => s.type === 'hero')!.responsive = {
+      mobile: { settings: { mode: 'single' } },
+    };
     expect(codes(D)).toContain('RESPONSIVE_NOT_SUPPORTED');
     const ok = baseDef();
     ok.sections.find(s => s.type === 'category-grid')!.responsive = {
       tablet: { hidden: true },
-      mobile: { props: { layout: 'grid' } },
+      mobile: { settings: { layout: 'grid' } },
     };
     expect(validateDefinitionSync(ok).errors).toEqual([]);
   });
 
-  it('rejects children (no v1 section declares a slot)', () => {
+  it('blocks: hero slides are ordered slide blocks; foreign block types, duplicates and >10 are rejected', () => {
     const D = baseDef();
-    D.sections[0].children = [{ id: 'kid', type: 'brand-story', props: {} }];
-    expect(codes(D)).toContain('SLOT_NOT_SUPPORTED');
+    const hero = D.sections.find(s => s.type === 'hero')!;
+    expect(hero.blocks!.map(b => [b.id, b.type])).toEqual([
+      ['slide-1', 'slide'],
+      ['slide-2', 'slide'],
+    ]);
+    expect(hero.settings.slides).toBeUndefined();
+    // reorder blocks -> slides reorder in the projection
+    hero.blocks!.reverse();
+    expect(definitionToLayout(D).hero.slides[0].image).toBe('https://pub-test.r2.dev/hero/b.jpg');
+    // a hidden block is not rendered
+    hero.blocks![0].hidden = true;
+    expect(definitionToLayout(D).hero.slides).toHaveLength(1);
+    const bad = baseDef();
+    bad.sections.find(s => s.type === 'category-grid')!.blocks = [
+      { id: 'b', type: 'slide', settings: {} },
+    ];
+    expect(codes(bad)).toContain('BLOCK_NOT_SUPPORTED');
+    const dup = baseDef();
+    const h = dup.sections.find(s => s.type === 'hero')!;
+    h.blocks![1].id = h.blocks![0].id;
+    expect(codes(dup)).toContain('DUPLICATE_ID');
+    const many = baseDef();
+    many.sections.find(s => s.type === 'hero')!.blocks = Array.from({ length: 11 }, (_, i) => ({
+      id: `slide-${i + 1}`,
+      type: 'slide',
+      settings: { image: 'https://pub-test.r2.dev/x.jpg' },
+    }));
+    expect(codes(many)).toContain('CARDINALITY');
+  });
+
+  it('section groups: header/footer types live in their groups only', () => {
+    const D = layoutToDefinition(asStorefront(loadLayoutFixture('fully-customised'), 'modern'));
+    expect(D.sectionGroups.header.map(s => s.type)).toEqual(['announcement', 'header']);
+    expect(D.sectionGroups.footer.map(s => s.type)).toEqual(['footer']);
+    expect(validateDefinitionSync(D).errors).toEqual([]);
+    const moved = clone(D);
+    moved.sections.push(moved.sectionGroups.footer.pop()!);
+    expect(codes(moved)).toContain('GROUP_MISMATCH');
+    const wrong = clone(D);
+    wrong.sectionGroups.header.push(wrong.sections.shift()!);
+    expect(codes(wrong)).toContain('GROUP_MISMATCH');
   });
 
   it('runs the per-type props through the layout schema (bad enum -> PROPS_INVALID)', () => {
     const D = baseDef();
-    D.sections.find(s => s.type === 'category-grid')!.props.desktopColumns = 9;
+    D.sections.find(s => s.type === 'category-grid')!.settings.desktopColumns = 9;
     expect(codes(D)).toContain('PROPS_INVALID');
   });
 
   it('unknown section type: an ERROR on write, SKIPPED (never thrown) on render', () => {
     const D = baseDef();
-    D.sections.splice(1, 0, { id: 'future', type: 'image-text', props: {} });
+    D.sections.splice(1, 0, { id: 'future', type: 'image-text', settings: {} });
     expect(codes(D)).toContain('UNKNOWN_TYPE');
     const { sections, skipped } = renderableSections(D);
     expect(skipped).toEqual([{ id: 'future', type: 'image-text' }]);
@@ -383,7 +508,7 @@ describe('validation', () => {
     D.sections.push({
       id: 'extra-m',
       type: 'product-carousel',
-      props: { id: 'm', productSource: 'manual', manualProductIds: ['mine', 'theirs'] },
+      settings: { id: 'm', productSource: 'manual', manualProductIds: ['mine', 'theirs'] },
     });
     const res = await validateDefinition(D, {
       resolveRefs: async () => ({
@@ -393,7 +518,7 @@ describe('validation', () => {
     });
     expect(res.ok).toBe(true);
     expect(res.warnings.map(w => w.path)).toEqual([
-      `/sections/${D.sections.length - 1}/props/manualProductIds/1`,
+      `/sections/${D.sections.length - 1}/settings/manualProductIds/1`,
     ]);
   });
 });

@@ -1,98 +1,133 @@
 /**
- * Section registry (visual builder Phase 1).
+ * Section + block registry (visual builder Phase 1, Shopify-theme-editor model).
  *
- * One entry per section TYPE a `PageDefinition` may contain. Phase 1 covers
- * exactly the sections the storefront already renders — no new renderers —
- * so every entry maps onto a key of the legacy `StoreLayoutSettings`
- * (`legacyKey`), and its props are validated by the SAME Zod schema the
- * layout PUT uses (`storeLayoutSchema.shape[legacyKey]`). Adding a section
- * type is a registry entry, not three hand-kept key lists.
+ * One entry per section TYPE a `PageDefinition` may contain. Each declares:
+ *   - `settings`  : the settings schema that drives the editor panel
+ *                   (`settings-schema.ts`);
+ *   - `blocks`    : the block types it accepts, each with its own settings
+ *                   schema and a max count (hero -> `slide`);
+ *   - `presets`   : what "Add section" inserts (name + starting settings);
+ *   - `group`     : `header` / `footer` section group, or the page `template`;
+ *   - `responsive`: which viewports may hide it, which settings vary per viewport;
+ *   - `propsSchema`: the Zod VALIDATOR — the same schema the layout PUT uses
+ *                   (`storeLayoutSchema.shape[legacyKey]`), applied to the
+ *                   reconstructed legacy object.
  *
- * Concepts (typed component registration, slots, content-vs-design props)
- * follow the Phase 0 comparison in docs/plans/2026-10-07-builder-phase0-gap-matrix.md.
- * No third-party code is used here.
+ * Phase 1 covers exactly the sections the storefront already renders (no new
+ * renderers), so every entry maps onto a legacy layout key (`legacyKey`).
+ * Adding a section type is a registry entry, not three hand-kept key lists.
  */
 import { z } from 'zod';
 import { storeLayoutSchema } from './layout-schema';
+import { DEFAULT_LAYOUT_SETTINGS } from '../types/store-layout';
 import type { LegacyHomeSectionKey } from './section-keys';
+import { VIEWPORTS, type Viewport } from './viewports';
+import {
+  SETTING_OPTIONS,
+  cardSettings,
+  headingSettings,
+  settingFactories as s,
+  styleSettings,
+  type SettingDefinition,
+} from './settings-schema';
 
-export type SectionPlacement = 'chrome-top' | 'body' | 'chrome-bottom';
-export type Viewport = 'desktop' | 'tablet' | 'mobile';
-export const VIEWPORTS: readonly Viewport[] = ['desktop', 'tablet', 'mobile'];
+export { VIEWPORTS, VIEWPORT_RANGES, type Viewport } from './viewports';
 
-/**
- * Viewport ranges the renderer maps responsive overrides onto (Tailwind
- * defaults; `md` = 768 is the storefront's existing mobile/desktop line).
- * BUILDER-PREVIEW-1: the editor previews all three.
- */
-export const VIEWPORT_RANGES: Record<Viewport, { minPx: number; maxPx: number | null }> = {
-  mobile: { minPx: 0, maxPx: 767 },
-  tablet: { minPx: 768, maxPx: 1023 },
-  desktop: { minPx: 1024, maxPx: null },
-};
+/** Where a section lives: a shared section group, or the page template. */
+export type SectionGroup = 'header' | 'template' | 'footer';
 
 /** Layout keys a registry entry can project onto. */
 export type LegacyLayoutKey = LegacyHomeSectionKey | 'announcement' | 'header' | 'footer';
+
+export interface BlockDefinition {
+  type: string;
+  labelEn: string;
+  labelAr: string;
+  maxCount: number;
+  settings: readonly SettingDefinition[];
+}
+
+export interface SectionPreset {
+  nameEn: string;
+  nameAr: string;
+  settings: Record<string, unknown>;
+  blocks?: Array<{ type: string; settings: Record<string, unknown> }>;
+}
 
 export interface SectionDefinition {
   type: string;
   labelEn: string;
   labelAr: string;
-  /** Key in the legacy layout. `extraCarousels` entries use `'extraCarousels'`. */
+  /** Key in the legacy layout. Product carousels use `'extraCarousels'`. */
   legacyKey: LegacyLayoutKey | 'extraCarousels';
   /** Storefront renderer the web app maps this type onto. */
   rendererKey: string;
+  group: SectionGroup;
   cardinality: 'one' | 'many';
   maxCount: number;
-  placement: SectionPlacement;
-  /** Nested slots. Empty in v1: no section accepts children. */
-  slots: readonly string[];
-  /**
-   * Responsive capability: which viewports may hide the section, and which
-   * props may be overridden per viewport (v1: only what the storefront
-   * already renders per breakpoint).
-   */
+  settings: readonly SettingDefinition[];
+  blocks: readonly BlockDefinition[];
+  presets: readonly SectionPreset[];
   responsive: {
     hidden: readonly Viewport[];
-    props: Partial<Record<Viewport, readonly string[]>>;
+    settings: Partial<Record<Viewport, readonly string[]>>;
   };
-  /** Bilingual text pairs [en, ar]. Direction is never stored; the visitor's locale picks. */
-  localizedProps: ReadonlyArray<readonly [string, string]>;
-  /**
-   * Whether the legacy object carries a required `enabled` flag (the five
-   * original sections) or an optional one that falls back to a store flag.
-   */
-  enabledRequired: boolean;
   /** Validates the reconstructed legacy section object. */
   propsSchema: z.ZodTypeAny;
 }
 
 const shape = storeLayoutSchema.shape;
-const unwrap = (s: z.ZodTypeAny): z.ZodTypeAny =>
-  s instanceof z.ZodOptional ? unwrap(s.unwrap()) : s;
+const unwrap = (x: z.ZodTypeAny): z.ZodTypeAny =>
+  x instanceof z.ZodOptional ? unwrap(x.unwrap()) : x;
 const extraCarouselSchema = (unwrap(shape.extraCarousels) as z.ZodArray<z.ZodTypeAny>).element;
+const { opt } = SETTING_OPTIONS;
+const PACKAGED = DEFAULT_LAYOUT_SETTINGS as unknown as Record<
+  string,
+  Record<string, unknown> | undefined
+>;
 
-const TITLE_PAIRS = [
-  ['title', 'titleAr'],
-  ['kicker', 'kickerAr'],
-  ['subtitle', 'subtitleAr'],
-] as const;
-
-const ALL_VIEWPORTS: readonly Viewport[] = VIEWPORTS;
+const ALL: readonly Viewport[] = VIEWPORTS;
 
 function def(
-  d: Omit<SectionDefinition, 'propsSchema' | 'slots' | 'maxCount' | 'cardinality'> &
-    Partial<Pick<SectionDefinition, 'cardinality' | 'maxCount'>>
+  d: Omit<
+    SectionDefinition,
+    'propsSchema' | 'maxCount' | 'cardinality' | 'blocks' | 'responsive' | 'presets'
+  > &
+    Partial<
+      Pick<SectionDefinition, 'cardinality' | 'maxCount' | 'blocks' | 'responsive' | 'presets'>
+    >
 ): SectionDefinition {
   const key = d.legacyKey;
   return {
     cardinality: 'one',
     maxCount: 1,
-    slots: [],
+    blocks: [],
+    responsive: { hidden: ALL, settings: {} },
+    // Default preset = the packaged defaults for the section (DEFAULT_LAYOUT_SETTINGS).
+    presets: [{ nameEn: d.labelEn, nameAr: d.labelAr, settings: { ...(PACKAGED[key] ?? {}) } }],
     ...d,
     propsSchema: key === 'extraCarousels' ? extraCarouselSchema : unwrap(shape[key]),
   };
 }
+
+export const HERO_SLIDE_BLOCK: BlockDefinition = {
+  type: 'slide',
+  labelEn: 'Slide',
+  labelAr: 'شريحة',
+  // Same cap as the layout schema (`hero.slides.max(10)`).
+  maxCount: 10,
+  settings: [
+    s.image('image', 'Image', 'الصورة', { localized: true }),
+    s.image('imageMobile', 'Mobile image', 'صورة الجوال', { localized: true }),
+    s.text('alt', 'Image description', 'وصف الصورة'),
+    s.text('headline', 'Headline', 'العنوان', { localized: true }),
+    s.text('ctaText', 'Button text', 'نص الزر', { localized: true }),
+    s.url('ctaHref', 'Button link', 'رابط الزر'),
+    s.url('link', 'Whole-slide link', 'رابط الشريحة'),
+  ],
+};
+
+const carouselLimit = (max: number) => s.range('limit', 'Products to show', 'عدد المنتجات', 1, max);
 
 export const SECTION_REGISTRY: readonly SectionDefinition[] = [
   def({
@@ -101,10 +136,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     labelAr: 'شريط الإعلانات',
     legacyKey: 'announcement',
     rendererKey: 'chrome.announcement',
-    placement: 'chrome-top',
-    responsive: { hidden: ALL_VIEWPORTS, props: {} },
-    localizedProps: [],
-    enabledRequired: false,
+    group: 'header',
+    settings: styleSettings(),
   }),
   def({
     type: 'header',
@@ -112,10 +145,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     labelAr: 'الترويسة',
     legacyKey: 'header',
     rendererKey: 'chrome.header',
-    placement: 'chrome-top',
-    responsive: { hidden: ALL_VIEWPORTS, props: {} },
-    localizedProps: [],
-    enabledRequired: false,
+    group: 'header',
+    settings: [s.check('sticky', 'Sticky header', 'ترويسة ثابتة'), ...styleSettings()],
   }),
   def({
     type: 'hero',
@@ -123,14 +154,47 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     labelAr: 'البانر الرئيسي',
     legacyKey: 'hero',
     rendererKey: 'home.hero',
-    placement: 'body',
-    responsive: { hidden: ALL_VIEWPORTS, props: {} },
-    localizedProps: [
-      ['headline', 'headlineAr'],
-      ['ctaText', 'ctaTextAr'],
-      ['image', 'imageAr'],
+    group: 'template',
+    blocks: [HERO_SLIDE_BLOCK],
+    presets: [
+      {
+        nameEn: 'Slideshow',
+        nameAr: 'عرض شرائح',
+        settings: { mode: 'slider', autoplayMs: 5000 },
+        blocks: [],
+      },
+      {
+        nameEn: 'Single banner',
+        nameAr: 'بانر واحد',
+        settings: { mode: 'single', autoplayMs: 5000 },
+        blocks: [],
+      },
     ],
-    enabledRequired: true,
+    settings: [
+      s.select(
+        'mode',
+        'Layout',
+        'التخطيط',
+        [opt('single', 'Single banner', 'بانر واحد'), opt('slider', 'Slideshow', 'عرض شرائح')],
+        {
+          group: 'content',
+        }
+      ),
+      s.range(
+        'autoplayMs',
+        'Slide duration (ms)',
+        'مدة الشريحة (ملي ثانية)',
+        1000,
+        30000,
+        500,
+        'design'
+      ),
+      s.select('presentation', 'Presentation', 'طريقة العرض', [
+        opt('full-bleed', 'Full bleed', 'بعرض الشاشة'),
+        opt('framed', 'Framed', 'داخل إطار'),
+      ]),
+      ...styleSettings(),
+    ],
   }),
   def({
     type: 'category-grid',
@@ -138,14 +202,42 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     labelAr: 'الفئات',
     legacyKey: 'categories',
     rendererKey: 'home.categories',
-    placement: 'body',
-    responsive: {
-      hidden: ALL_VIEWPORTS,
-      // The storefront already renders a separate mobile layout + caption.
-      props: { mobile: ['layout', 'captionPosition'] },
-    },
-    localizedProps: TITLE_PAIRS,
-    enabledRequired: true,
+    group: 'template',
+    // The storefront already renders a separate mobile layout + caption.
+    responsive: { hidden: ALL, settings: { mobile: ['layout', 'captionPosition'] } },
+    settings: [
+      ...headingSettings(),
+      s.select(
+        'layout',
+        'Layout',
+        'التخطيط',
+        [opt('grid', 'Grid', 'شبكة'), opt('horizontal', 'Scrolling row', 'صف متحرك')],
+        {
+          responsive: ['mobile'],
+        }
+      ),
+      s.select(
+        'captionPosition',
+        'Name position',
+        'موضع الاسم',
+        [opt('below', 'Below', 'أسفل'), opt('overlay', 'On image', 'على الصورة')],
+        {
+          responsive: ['mobile'],
+        }
+      ),
+      s.select('desktopColumns', 'Columns (desktop)', 'الأعمدة (سطح المكتب)', [
+        opt(2, '2', '٢'),
+        opt(3, '3', '٣'),
+        opt(4, '4', '٤'),
+      ]),
+      s.select('mobileColumns', 'Columns (mobile)', 'الأعمدة (الجوال)', [
+        opt(1, '1', '١'),
+        opt(2, '2', '٢'),
+        opt(3, '3', '٣'),
+      ]),
+      ...cardSettings(),
+      ...styleSettings(),
+    ],
   }),
   def({
     type: 'new-arrivals',
@@ -153,10 +245,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     labelAr: 'أحدث المنتجات',
     legacyKey: 'newArrivals',
     rendererKey: 'home.newArrivals',
-    placement: 'body',
-    responsive: { hidden: ALL_VIEWPORTS, props: {} },
-    localizedProps: TITLE_PAIRS,
-    enabledRequired: true,
+    group: 'template',
+    settings: [...headingSettings(), carouselLimit(48), ...cardSettings(), ...styleSettings()],
   }),
   def({
     type: 'best-sellers',
@@ -164,10 +254,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     labelAr: 'الأكثر مبيعاً',
     legacyKey: 'bestSellers',
     rendererKey: 'home.bestSellers',
-    placement: 'body',
-    responsive: { hidden: ALL_VIEWPORTS, props: {} },
-    localizedProps: TITLE_PAIRS,
-    enabledRequired: true,
+    group: 'template',
+    settings: [...headingSettings(), carouselLimit(48), ...cardSettings(), ...styleSettings()],
   }),
   def({
     type: 'brand-story',
@@ -175,10 +263,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     labelAr: 'قصة العلامة',
     legacyKey: 'brandStory',
     rendererKey: 'home.brandStory',
-    placement: 'body',
-    responsive: { hidden: ALL_VIEWPORTS, props: {} },
-    localizedProps: [],
-    enabledRequired: false,
+    group: 'template',
+    settings: styleSettings(),
   }),
   def({
     type: 'blog-carousel',
@@ -186,10 +272,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     labelAr: 'المدونة',
     legacyKey: 'blogCarousel',
     rendererKey: 'home.blogCarousel',
-    placement: 'body',
-    responsive: { hidden: ALL_VIEWPORTS, props: {} },
-    localizedProps: [],
-    enabledRequired: false,
+    group: 'template',
+    settings: [s.range('limit', 'Posts to show', 'عدد المقالات', 1, 20), ...styleSettings()],
   }),
   def({
     type: 'trust-strip',
@@ -197,10 +281,22 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     labelAr: 'شريط الثقة',
     legacyKey: 'trustStrip',
     rendererKey: 'home.trustStrip',
-    placement: 'body',
-    responsive: { hidden: ALL_VIEWPORTS, props: {} },
-    localizedProps: [],
-    enabledRequired: false,
+    group: 'template',
+    settings: [
+      s.select('layout', 'Layout', 'التخطيط', [
+        opt('horizontal', 'Row', 'صف'),
+        opt('vertical', 'Stacked', 'عمودي'),
+      ]),
+      s.select('size', 'Size', 'الحجم', [
+        opt('sm', 'Small', 'صغير'),
+        opt('md', 'Medium', 'متوسط'),
+        opt('lg', 'Large', 'كبير'),
+      ]),
+      s.color('iconColor', 'Icon colour', 'لون الأيقونة'),
+      s.color('iconBgColor', 'Icon background', 'خلفية الأيقونة'),
+      s.color('textColor', 'Text colour', 'لون النص'),
+      ...styleSettings(),
+    ],
   }),
   def({
     type: 'testimonials',
@@ -208,10 +304,13 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     labelAr: 'آراء العملاء',
     legacyKey: 'testimonials',
     rendererKey: 'home.testimonials',
-    placement: 'body',
-    responsive: { hidden: ALL_VIEWPORTS, props: {} },
-    localizedProps: [['title', 'titleAr']],
-    enabledRequired: true,
+    group: 'template',
+    settings: [
+      ...headingSettings(false),
+      s.range('minRating', 'Minimum rating', 'أقل تقييم', 1, 5),
+      s.check('verifiedOnly', 'Verified purchases only', 'مشتريات موثقة فقط', 'content'),
+      ...styleSettings(),
+    ],
   }),
   def({
     type: 'product-carousel',
@@ -219,13 +318,68 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     labelAr: 'شريط منتجات',
     legacyKey: 'extraCarousels',
     rendererKey: 'home.productCarousel',
-    placement: 'body',
+    group: 'template',
     cardinality: 'many',
     // Same cap as the layout schema (`extraCarousels.max(8)`).
     maxCount: 8,
-    responsive: { hidden: ALL_VIEWPORTS, props: {} },
-    localizedProps: TITLE_PAIRS,
-    enabledRequired: false,
+    presets: [
+      {
+        nameEn: 'Newest products',
+        nameAr: 'أحدث المنتجات',
+        settings: { productSource: 'newest', limit: 12 },
+      },
+      {
+        nameEn: 'From a category',
+        nameAr: 'من فئة',
+        settings: { productSource: 'category', limit: 12 },
+      },
+      {
+        nameEn: 'Hand-picked products',
+        nameAr: 'منتجات مختارة',
+        settings: { productSource: 'manual', limit: 12 },
+      },
+    ],
+    settings: [
+      s.select(
+        'productSource',
+        'Products',
+        'المنتجات',
+        [
+          opt('newest', 'Newest', 'الأحدث'),
+          opt('best_seller', 'Best sellers', 'الأكثر مبيعاً'),
+          opt('featured', 'Featured', 'المميزة'),
+          opt('category', 'From a category', 'من فئة'),
+          opt('manual', 'Hand-picked', 'مختارة يدوياً'),
+        ],
+        { group: 'content' }
+      ),
+      {
+        id: 'categorySlug',
+        type: 'category',
+        labelEn: 'Category',
+        labelAr: 'الفئة',
+        group: 'content',
+      },
+      s.range(
+        'categoryFetchLimit',
+        'Products to load from the category',
+        'عدد منتجات الفئة',
+        1,
+        200
+      ),
+      {
+        id: 'manualProductIds',
+        type: 'product_list',
+        labelEn: 'Products',
+        labelAr: 'المنتجات',
+        group: 'content',
+        max: 50,
+      },
+      ...headingSettings(),
+      carouselLimit(50),
+      ...cardSettings(),
+      ...styleSettings(),
+    ],
   }),
   def({
     type: 'footer',
@@ -233,10 +387,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     labelAr: 'التذييل',
     legacyKey: 'footer',
     rendererKey: 'chrome.footer',
-    placement: 'chrome-bottom',
-    responsive: { hidden: ALL_VIEWPORTS, props: {} },
-    localizedProps: [],
-    enabledRequired: false,
+    group: 'footer',
+    settings: styleSettings(),
   }),
 ];
 

@@ -179,7 +179,7 @@ describe('PageRenderer: the published-document path renders the same page', () =
 
   it('skips an unknown section type instead of throwing', () => {
     const def = layoutToDefinition(asStorefront('default', 'modern'));
-    def.sections.splice(2, 0, { id: 'future', type: 'image-text', props: { x: 1 } });
+    def.sections.splice(2, 0, { id: 'future', type: 'image-text', settings: { x: 1 } });
     expect(renderHome('default', 'A', 'modern', 'en', { definition: def })).toBe(
       renderHome('default', 'A', 'modern', 'en')
     );

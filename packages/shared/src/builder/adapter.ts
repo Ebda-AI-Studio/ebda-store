@@ -13,7 +13,7 @@
  *   2. layoutToDefinition(definitionToLayout(D)) deep-equals D for any D the
  *      adapter produced.
  *
- * Mapping per section: the legacy section object becomes `props`, minus
+ * Mapping per section: the legacy section object becomes `settings`, minus
  *   - `enabled`           -> `hidden` (`enabled:false` <-> `hidden:true`; an
  *                            unset optional `enabled` stays unset, so the
  *                            store-flag fallback keeps working),
@@ -22,9 +22,13 @@
  *                            legacy two-way mode applies),
  *   - `hideOnTablet`      -> `responsive.tablet.hidden`,
  *   - categories `layoutMobile` / `captionPositionMobile`
- *                         -> `responsive.mobile.props.layout` / `.captionPosition`.
+ *                         -> `responsive.mobile.settings.layout` / `.captionPosition`,
+ *   - hero `slides`       -> ordered `blocks` of type `slide` (ids `slide-1`…).
  * Everything else (including keys the adapter does not know) stays in
- * `props` untouched, which is what makes the round trip lossless.
+ * `settings` untouched, which is what makes the round trip lossless.
+ * Announcement + header land in the `header` section group, footer in the
+ * `footer` group; the eight body sections and product carousels are the
+ * page template (`sections`).
  *
  * Known non-round-trips (documented, Ruling BUILDER-ADAPTER-1): a legacy
  * `hideOnTablet` explicitly equal to `hideOnDesktop` normalises away (it is
@@ -51,6 +55,7 @@ import {
 import {
   PAGE_DEFINITION_SCHEMA_VERSION,
   type PageDefinition,
+  type BlockNode,
   type SectionNode,
   type ViewportOverride,
 } from './schema';
@@ -62,8 +67,8 @@ const MOBILE_PROP_LEGACY_NAME: Record<string, Record<string, string>> = {
   categories: { layout: 'layoutMobile', captionPosition: 'captionPositionMobile' },
 };
 
-const CHROME_TOP: LegacyLayoutKey[] = ['announcement', 'header'];
-const CHROME_BOTTOM: LegacyLayoutKey[] = ['footer'];
+const HEADER_GROUP: LegacyLayoutKey[] = ['announcement', 'header'];
+const FOOTER_GROUP: LegacyLayoutKey[] = ['footer'];
 const OPTIONAL_KEYS = new Set<string>([
   'brandStory',
   'blogCarousel',
@@ -88,17 +93,33 @@ export const SITE_SETTING_KEYS = [
   'bottomBar',
 ] as const satisfies ReadonlyArray<keyof StoreLayoutSettings>;
 
+/** Legacy keys whose array entries become blocks: `<layoutKey>.<field>` -> block type. */
+const BLOCK_FIELDS: Record<string, { field: string; blockType: string; idPrefix: string }> = {
+  hero: { field: 'slides', blockType: 'slide', idPrefix: 'slide' },
+};
+
 function legacyToSection(
   id: string,
   type: string,
   legacyKey: string,
   src: LegacyObject
 ): SectionNode {
-  const props: LegacyObject = { ...src };
-  const node: SectionNode = { id, type, props };
-  if ('enabled' in props) {
-    if (props.enabled !== undefined) node.hidden = props.enabled === false;
-    delete props.enabled;
+  const settings: LegacyObject = { ...src };
+  const node: SectionNode = { id, type, settings };
+  const blockField = BLOCK_FIELDS[legacyKey];
+  if (blockField && Array.isArray(settings[blockField.field])) {
+    node.blocks = (settings[blockField.field] as unknown[]).map(
+      (b, i): BlockNode => ({
+        id: `${blockField.idPrefix}-${i + 1}`,
+        type: blockField.blockType,
+        settings: { ...(b as LegacyObject) },
+      })
+    );
+    delete settings[blockField.field];
+  }
+  if ('enabled' in settings) {
+    if (settings.enabled !== undefined) node.hidden = settings.enabled === false;
+    delete settings.enabled;
   }
   const responsive: {
     desktop?: ViewportOverride;
@@ -106,28 +127,29 @@ function legacyToSection(
     mobile?: ViewportOverride;
   } = {};
   const vp = (v: 'desktop' | 'tablet' | 'mobile'): ViewportOverride => (responsive[v] ??= {});
-  if ('hideOnMobile' in props) {
-    if (props.hideOnMobile !== undefined) vp('mobile').hidden = props.hideOnMobile as boolean;
-    delete props.hideOnMobile;
+  if ('hideOnMobile' in settings) {
+    if (settings.hideOnMobile !== undefined) vp('mobile').hidden = settings.hideOnMobile as boolean;
+    delete settings.hideOnMobile;
   }
-  const hasTablet = 'hideOnTablet' in props && props.hideOnTablet !== undefined;
-  if ('hideOnDesktop' in props) {
-    if (props.hideOnDesktop !== undefined) {
-      vp('desktop').hidden = props.hideOnDesktop as boolean;
-      if (!hasTablet) vp('tablet').hidden = props.hideOnDesktop as boolean;
+  const hasTablet = 'hideOnTablet' in settings && settings.hideOnTablet !== undefined;
+  if ('hideOnDesktop' in settings) {
+    if (settings.hideOnDesktop !== undefined) {
+      vp('desktop').hidden = settings.hideOnDesktop as boolean;
+      if (!hasTablet) vp('tablet').hidden = settings.hideOnDesktop as boolean;
     }
-    delete props.hideOnDesktop;
+    delete settings.hideOnDesktop;
   }
-  if ('hideOnTablet' in props) {
-    if (hasTablet) vp('tablet').hidden = props.hideOnTablet as boolean;
-    delete props.hideOnTablet;
+  if ('hideOnTablet' in settings) {
+    if (hasTablet) vp('tablet').hidden = settings.hideOnTablet as boolean;
+    delete settings.hideOnTablet;
   }
   const mobileNames = MOBILE_PROP_LEGACY_NAME[legacyKey];
   if (mobileNames) {
-    for (const [prop, legacyName] of Object.entries(mobileNames)) {
-      if (legacyName in props) {
-        if (props[legacyName] !== undefined) (vp('mobile').props ??= {})[prop] = props[legacyName];
-        delete props[legacyName];
+    for (const [name, legacyName] of Object.entries(mobileNames)) {
+      if (legacyName in settings) {
+        if (settings[legacyName] !== undefined)
+          (vp('mobile').settings ??= {})[name] = settings[legacyName];
+        delete settings[legacyName];
       }
     }
   }
@@ -137,7 +159,14 @@ function legacyToSection(
 
 /** Rebuild the legacy section object a section node stands for. */
 export function sectionToLegacy(node: SectionNode, legacyKey: string): LegacyObject {
-  const out: LegacyObject = { ...node.props };
+  const out: LegacyObject = { ...node.settings };
+  const blockField = BLOCK_FIELDS[legacyKey];
+  if (blockField && node.blocks) {
+    // A hidden block is not rendered: the legacy shape has no per-slide flag.
+    out[blockField.field] = node.blocks
+      .filter(b => b.type === blockField.blockType && b.hidden !== true)
+      .map(b => ({ ...b.settings }));
+  }
   if (node.hidden !== undefined) out.enabled = !node.hidden;
   const r = node.responsive;
   if (r?.mobile?.hidden !== undefined) out.hideOnMobile = r.mobile.hidden;
@@ -150,9 +179,9 @@ export function sectionToLegacy(node: SectionNode, legacyKey: string): LegacyObj
     if (d !== undefined) out.hideOnDesktop = d;
   }
   const mobileNames = MOBILE_PROP_LEGACY_NAME[legacyKey];
-  if (mobileNames && r?.mobile?.props) {
-    for (const [prop, legacyName] of Object.entries(mobileNames)) {
-      if (r.mobile.props[prop] !== undefined) out[legacyName] = r.mobile.props[prop];
+  if (mobileNames && r?.mobile?.settings) {
+    for (const [name, legacyName] of Object.entries(mobileNames)) {
+      if (r.mobile.settings[name] !== undefined) out[legacyName] = r.mobile.settings[name];
     }
   }
   return out;
@@ -177,19 +206,23 @@ export function layoutToDefinition(layout: StoreLayoutSettings, pageKey = 'home'
   const absent: string[] = [];
   const taken = new Set<string>();
   const sections: SectionNode[] = [];
+  const header: SectionNode[] = [];
+  const footer: SectionNode[] = [];
 
-  const pushFixed = (key: LegacyLayoutKey) => {
+  const fixed = (key: LegacyLayoutKey): SectionNode => {
     const d = sectionDefinitionForLegacyKey(key);
     const src = L[key];
     if (src === undefined) absent.push(key);
     const id = legacySectionId(key);
     taken.add(id);
-    sections.push(legacyToSection(id, d.type, key, (src ?? {}) as LegacyObject));
+    return legacyToSection(id, d.type, key, (src ?? {}) as LegacyObject);
   };
 
-  for (const key of CHROME_TOP) if (L[key] !== undefined) pushFixed(key);
-  for (const key of CHROME_TOP) if (L[key] === undefined) absent.push(key);
-  for (const key of resolveLegacySectionOrder(layout.sectionOrder)) pushFixed(key);
+  for (const key of HEADER_GROUP) {
+    if (L[key] !== undefined) header.push(fixed(key));
+    else absent.push(key);
+  }
+  for (const key of resolveLegacySectionOrder(layout.sectionOrder)) sections.push(fixed(key));
   const extras = layout.extraCarousels;
   if (extras === undefined) absent.push('extraCarousels');
   for (const extra of extras ?? []) {
@@ -198,8 +231,8 @@ export function layoutToDefinition(layout: StoreLayoutSettings, pageKey = 'home'
       legacyToSection(extraSectionId(src.id, taken), 'product-carousel', 'extraCarousels', src)
     );
   }
-  for (const key of CHROME_BOTTOM) {
-    if (L[key] !== undefined) pushFixed(key);
+  for (const key of FOOTER_GROUP) {
+    if (L[key] !== undefined) footer.push(fixed(key));
     else absent.push(key);
   }
 
@@ -213,6 +246,7 @@ export function layoutToDefinition(layout: StoreLayoutSettings, pageKey = 'home'
   return {
     schemaVersion: PAGE_DEFINITION_SCHEMA_VERSION,
     pageKey,
+    sectionGroups: { header, footer },
     sections,
     siteSettings,
     ...(Object.keys(legacy).length > 0 ? { legacy } : {}),
@@ -220,7 +254,17 @@ export function layoutToDefinition(layout: StoreLayoutSettings, pageKey = 'home'
 }
 
 function isEmptyNode(n: SectionNode): boolean {
-  return Object.keys(n.props).length === 0 && n.hidden === undefined && !n.responsive;
+  return (
+    Object.keys(n.settings).length === 0 &&
+    n.hidden === undefined &&
+    !n.responsive &&
+    n.blocks === undefined
+  );
+}
+
+/** Every section of a document: header group, template, footer group (render order). */
+export function allSections(def: PageDefinition): SectionNode[] {
+  return [...def.sectionGroups.header, ...def.sections, ...def.sectionGroups.footer];
 }
 
 export function definitionToLayout(def: PageDefinition): StoreLayoutSettings {
@@ -230,7 +274,7 @@ export function definitionToLayout(def: PageDefinition): StoreLayoutSettings {
   const extras: LegacyObject[] = [];
   const seen = new Set<string>();
 
-  for (const node of def.sections) {
+  for (const node of allSections(def)) {
     const d = getSectionDefinition(node.type);
     if (!d) continue; // unknown type: nothing to project (renderers skip it too)
     if (d.legacyKey === 'extraCarousels') {
@@ -267,4 +311,24 @@ export function definitionToLayout(def: PageDefinition): StoreLayoutSettings {
 
   for (const [k, v] of Object.entries(def.siteSettings)) out[k] = v;
   return resolveLayoutSettings(out);
+}
+
+/**
+ * A new, visible section built from a registry preset (the "Add section"
+ * picker). `id` must be unique in the document; validate before saving.
+ */
+export function sectionFromPreset(type: string, presetIndex: number, id: string): SectionNode {
+  const d = getSectionDefinition(type);
+  const preset = d?.presets[presetIndex];
+  if (!d || !preset) throw new Error(`no preset ${presetIndex} for section type ${type}`);
+  const node = legacyToSection(id, type, d.legacyKey, { ...preset.settings });
+  node.hidden = false;
+  if (d.blocks.length > 0 || preset.blocks)
+    node.blocks = (preset.blocks ?? []).map((b, i) => ({
+      id: `${b.type}-${i + 1}`,
+      type: b.type,
+      settings: { ...b.settings },
+    }));
+  if (d.legacyKey === 'extraCarousels' && node.settings.id === undefined) node.settings.id = id;
+  return node;
 }
