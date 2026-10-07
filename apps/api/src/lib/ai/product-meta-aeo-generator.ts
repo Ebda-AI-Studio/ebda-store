@@ -16,7 +16,7 @@
  * (store + category branches keep calling `buildMetaAeoPrompt` directly
  * since they persist/skip differently per-kind).
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GeminiFailoverClient } from './gemini-keys';
 import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
 import { recordUsage } from '../../services/ai.service';
@@ -104,7 +104,7 @@ export async function generateProductMetaAeo(
   apiKey: string,
   modelName: string
 ): Promise<GeneratedMetaAeo> {
-  const genai = new GoogleGenerativeAI(apiKey);
+  const genai = new GeminiFailoverClient(apiKey);
   const model = genai.getGenerativeModel({
     model: modelName,
     generationConfig: { responseMimeType: 'application/json' },
