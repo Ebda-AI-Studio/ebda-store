@@ -25,6 +25,7 @@ import {
   type BillingProvider,
   type BillingWebhookEvent,
   type BillingWebhookKind,
+  type CardSetupRequest,
   type ChargeRequest,
   type ChargeResult,
   type CheckoutRequest,
@@ -117,6 +118,15 @@ export function kashierSignaturePayload(
 
 export class KashierBillingProvider implements BillingProvider {
   readonly name = 'kashier' as const;
+  /**
+   * Kashier's recurring guide (https://developers.kashier.io/docs/accept-payments/recurring,
+   * read 2026-10-07) delivers the card token to `serverWebhook` only "once the
+   * customer completes payment"; no zero-amount / verify-only save is documented.
+   * So Kashier cannot save a card with nothing charged (Ruling EBDA-FUNNEL-2): the
+   * funnel runs in `pay_at_trial_end` mode on Kashier until Kashier confirms in
+   * writing a no-charge (or authorize-then-void) tokenization.
+   */
+  readonly capabilities = { cardSetupWithoutCharge: false };
   private readonly cfg: Required<Omit<KashierConfig, 'fetchImpl'>> & { fetchImpl: typeof fetch };
 
   constructor(cfg: KashierConfig) {
@@ -175,6 +185,14 @@ export class KashierBillingProvider implements BillingProvider {
     return { status: res.status, json };
   }
 
+  async createCardSetupSession(_req: CardSetupRequest): Promise<CheckoutResult> {
+    // Refused BEFORE any network call: nothing can have been charged.
+    throw new BillingProviderError(
+      'Kashier has no documented card tokenization without a payment (Ruling EBDA-FUNNEL-2)',
+      true
+    );
+  }
+
   async createCheckoutForSubscription(req: CheckoutRequest): Promise<CheckoutResult> {
     const { status, json } = await this.call('POST', SESSIONS_PATH, {
       merchantId: this.cfg.merchantId,
@@ -185,7 +203,8 @@ export class KashierBillingProvider implements BillingProvider {
       type: 'one-time',
       allowedMethods: 'card',
       // Save the card so Ebda can charge it on renewal (needs account enablement).
-      saveCard: 'required',
+      // Documented values are "optional" | "forced" (payment-sessions page, 2026-10-07).
+      saveCard: 'forced',
       display: req.locale ?? 'ar',
       description: req.description,
       merchantRedirect: req.returnUrl,

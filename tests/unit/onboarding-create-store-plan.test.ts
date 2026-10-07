@@ -38,6 +38,15 @@ vi.mock('@api/services/store.service', () => ({ bustStoreCaches: vi.fn() }));
 vi.mock('@api/services/setup-guide.service', () => ({ SetupGuideService: {} }));
 vi.mock('@api/lib/store-scoped-read', () => ({ readInStoreContext: vi.fn() }));
 vi.mock('@api/services/plan-limit.service', () => ({ assertOwnerMayCreateStore: m.gate }));
+// Signup funnel: the chosen plan is validated (payable + public) before anything is created.
+vi.mock('@api/services/billing/subscription-billing.service', () => ({
+  loadPayablePlan: vi.fn(async (code: string) => ({
+    plan: { code, isPublic: true },
+    price: 349000,
+  })),
+  getSubscriptionBillingState: vi.fn(),
+}));
+vi.mock('@api/services/billing/go-live-gate', () => ({ assertStoreMayGoLive: vi.fn() }));
 vi.mock('@api/services/store-creation-limit', () => ({
   assertStoreCreationBudget: m.budget,
   withStoreCreationLock: (_o: string, fn: () => unknown) => {
@@ -63,7 +72,12 @@ describe('OnboardingService.createStore — locked pricing', () => {
     await OnboardingService.createStore({ userId: 'u1' }, input);
     expect(m.gate).toHaveBeenCalledWith('u1');
     expect(m.provision).toHaveBeenCalledWith(
-      expect.objectContaining({ plan: 'professional', growthTrial: true, status: 'inactive' })
+      expect.objectContaining({
+        plan: 'professional',
+        growthTrial: true,
+        status: 'inactive',
+        trialChoice: { planCode: 'growth', interval: 'monthly' },
+      })
     );
   });
 

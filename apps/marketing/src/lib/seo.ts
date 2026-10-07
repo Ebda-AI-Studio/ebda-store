@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { BRAND } from '@force/shared/brand';
 import { COPY } from './content';
+import { PLANS, PRICING_PUBLISHED } from './plans';
 import {
   HOME,
   SIGNUP_URL,
@@ -63,7 +64,7 @@ export function pageMetadata(
   };
 }
 
-/** JSON-LD graph: Organization + WebSite + SoftwareApplication. No ratings or offers (add Offer nodes from PLANS if wanted). */
+/** JSON-LD graph: Organization + WebSite + SoftwareApplication (offers from PLANS) + FAQPage (home). No ratings. */
 export function jsonLd(locale: Locale) {
   const c = COPY[locale];
   const org = `${SITE_URL}/#organization`;
@@ -79,6 +80,7 @@ export function jsonLd(locale: Locale) {
         url: SITE_URL,
         logo: `${SITE_URL}/icon-512.png`,
         email: BRAND.supportEmail,
+        sameAs: [] as string[],
         parentOrganization: { '@type': 'Organization', name: BRAND.company },
       },
       {
@@ -100,7 +102,37 @@ export function jsonLd(locale: Locale) {
         installUrl: SIGNUP_URL,
         publisher: { '@id': org },
         inLanguage: ['ar', 'en'],
+        ...(PRICING_PUBLISHED && {
+          offers: PLANS.filter(p => p.price).map(p => ({
+            '@type': 'Offer',
+            name: p.name[locale],
+            price: (p.price!.amountMinor / 100).toFixed(2),
+            priceCurrency: 'EGP',
+            priceSpecification: {
+              '@type': 'UnitPriceSpecification',
+              price: (p.price!.amountMinor / 100).toFixed(2),
+              priceCurrency: 'EGP',
+              billingDuration: 'P1M',
+              unitCode: 'MON',
+            },
+            url: SIGNUP_URL,
+            availability: 'https://schema.org/PreOrder',
+          })),
+        }),
       },
+      ...(c.faq.items.length
+        ? [
+            {
+              '@type': 'FAQPage',
+              inLanguage: locale,
+              mainEntity: c.faq.items.map(i => ({
+                '@type': 'Question',
+                name: i.q,
+                acceptedAnswer: { '@type': 'Answer', text: i.a },
+              })),
+            },
+          ]
+        : []),
     ],
   };
 }

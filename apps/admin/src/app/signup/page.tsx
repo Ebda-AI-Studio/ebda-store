@@ -3,17 +3,22 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { Button, Input } from '@force/ui';
 import { PublicShell } from '../../components/onboarding/PublicShell';
 import { apiGet, apiPost } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { validateSignup, type SignupFields } from '../../lib/onboarding-validation';
 import { useT } from '@/i18n/useT';
+import { STATIC_PLANS } from '../../components/billing/plans';
+import { isTrialPlanCode, storePlan, type PlanSelection } from '../../components/billing/types';
 
 export default function SignupPage() {
   const t = useT('onboarding.signup');
   const tSent = useT('onboarding.signup.sent');
   const tErr = useT('onboarding.signup.errors');
+  const tPlan = useT('onboarding.signup.plan');
+  const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [fields, setFields] = useState<SignupFields>({
@@ -32,6 +37,24 @@ export default function SignupPage() {
   // too fast is refused) and a honeypot input real people never see or fill.
   const [formToken, setFormToken] = useState('');
   const [honeypot, setHoneypot] = useState('');
+
+  // The plan picked on the marketing site arrives as ?plan=<id>&interval=month|year.
+  // Validate it, keep it for the onboarding plan step, and show it back.
+  const [selectedPlan, setSelectedPlan] = useState<PlanSelection | null>(null);
+  useEffect(() => {
+    const qs = new URLSearchParams(window.location.search);
+    const planCode = qs.get('plan');
+    if (!isTrialPlanCode(planCode)) return;
+    const selection: PlanSelection = {
+      planCode,
+      interval: qs.get('interval') === 'year' ? 'yearly' : 'monthly',
+    };
+    storePlan(selection);
+    setSelectedPlan(selection);
+  }, []);
+  const selectedPlanOption = selectedPlan
+    ? STATIC_PLANS.find(p => p.code === selectedPlan.planCode)
+    : undefined;
 
   async function loadFormToken() {
     const { data } = await apiGet<{ token: string }>('/api/v1/auth/merchant/signup-token');
@@ -140,6 +163,17 @@ export default function SignupPage() {
 
   return (
     <PublicShell title={t('title')} subtitle={t('subtitle')}>
+      {selectedPlan && selectedPlanOption && (
+        <p
+          data-testid="selected-plan"
+          className="mb-4 rounded-lg bg-muted px-3 py-2 text-center text-sm text-foreground"
+        >
+          {tPlan('chip', {
+            plan: locale === 'ar' ? selectedPlanOption.nameAr : selectedPlanOption.nameEn,
+            interval: tPlan(selectedPlan.interval),
+          })}
+        </p>
+      )}
       <form className="space-y-4" onSubmit={handleSubmit} noValidate>
         {formError && (
           <div
