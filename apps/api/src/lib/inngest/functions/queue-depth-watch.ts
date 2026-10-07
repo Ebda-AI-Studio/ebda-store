@@ -91,10 +91,10 @@ const queueDepthWatchFn = inngest.createFunction(
     // Inngest workers, so plain prisma reads return 0 rows. Each store is read
     // in its own scope and the per-store partials are merged to the same
     // global 20-row ceilings.
-    const perStore = await acrossStores(() =>
+    const perStore = await acrossStores(storeId =>
       Promise.all([
         prisma.bulkAiJob.findMany({
-          where: { status: 'queued', createdAt: { lt: queuedThreshold } },
+          where: { storeId, status: 'queued', createdAt: { lt: queuedThreshold } },
           select: {
             id: true,
             storeId: true,
@@ -106,7 +106,7 @@ const queueDepthWatchFn = inngest.createFunction(
           take: 20,
         }),
         prisma.bulkAiJob.findMany({
-          where: { status: 'running', startedAt: { lt: runningThreshold } },
+          where: { storeId, status: 'running', startedAt: { lt: runningThreshold } },
           select: {
             id: true,
             storeId: true,
@@ -183,7 +183,7 @@ const queueDepthWatchFn = inngest.createFunction(
         try {
           await withStore(job.storeId, tx =>
             tx.bulkAiJob.update({
-              where: { id: job.id },
+              where: { id: job.id, storeId: job.storeId },
               data: { status: 'queued', autoResumeCount: { increment: 1 } },
             })
           );
@@ -246,7 +246,7 @@ const queueDepthWatchFn = inngest.createFunction(
       try {
         await withStore(job.storeId, tx =>
           tx.bulkAiJob.update({
-            where: { id: job.id },
+            where: { id: job.id, storeId: job.storeId },
             data: {
               status: 'failed',
               errorMessage: `auto-reaped by queue-depth-watch: stuck running ${ageMin}m at progress ${progress} (${reason}). likely cause: worker died mid-execution (deploy window / crash / inngest disconnect). retry from UI.`,

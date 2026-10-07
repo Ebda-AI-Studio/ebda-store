@@ -27,6 +27,7 @@ import {
 } from './card-size';
 import { getProductPricing, getDiscountBadgeText, isOnSale } from '../../lib/product-pricing';
 import { productCardPropsEqual } from './product-card-memo';
+import DahabProductCard from '../dahab/ProductCard';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
 import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
@@ -592,4 +593,17 @@ function PecannbeeProductCardImpl({
   );
 }
 
-export const PecannbeeProductCard = memo(PecannbeeProductCardImpl, productCardPropsEqual);
+/**
+ * Pack hand-over: the Dahab skin has its own card (templates/dahab/ProductCard)
+ * and every surface that renders this platform card reaches it through here,
+ * so the card call sites stay single. Other packs render the card above.
+ */
+function PecannbeeProductCardSwitch(props: PecannbeeProductCardProps) {
+  return props.pack === 'dahab' ? (
+    <DahabProductCard {...props} />
+  ) : (
+    <PecannbeeProductCardImpl {...props} />
+  );
+}
+
+export const PecannbeeProductCard = memo(PecannbeeProductCardSwitch, productCardPropsEqual);

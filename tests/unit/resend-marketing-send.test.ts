@@ -21,7 +21,10 @@ vi.mock('resend', () => ({
     batch = { send: batchSend };
   },
 }));
-vi.mock('@force/database', () => ({ prisma: { store: { findUnique } } }));
+vi.mock('@force/database', () => {
+  const prisma = { store: { findUnique } };
+  return { prisma, withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(prisma) };
+});
 vi.mock('@api/config', () => ({ config: { resendApiKey: 're_test' } }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },

@@ -112,6 +112,7 @@ vi.mock('@force/database', () => ({
   // tenant-transaction branch is covered against a real DB + RLS in
   // tests/integration/customer-privacy-cross-tenant.test.ts.
   hasTenantContext: () => false,
+  currentStoreId: () => 'store-1',
   // Delegates to the mocked $transaction, invoking the callback with the
   // same mock prisma object (tx.* === prisma.* here, which is fine — the
   // real distinction only matters for RLS/isolation, not this test).
@@ -130,6 +131,14 @@ vi.mock('@force/database', () => ({
 // `auditLog.create` stay the fakes the assertions below read.
 vi.mock('@api/lib/definer', () => ({
   deleteUserAddresses: (userId: string) => mockPrisma.address.deleteMany({ where: { userId } }),
+  // `ebda_user_tokens_delete` clears the user's push subscriptions + refresh + verification tokens
+  // in one guarded call.
+  deleteUserTokens: async (userId: string) => {
+    await mockPrisma.oneSignalSubscription.deleteMany({ where: { userId } });
+    await mockPrisma.refreshToken.deleteMany({ where: { userId } });
+    await mockPrisma.verificationToken.deleteMany({ where: { userId } });
+    return 0;
+  },
   insertAuditLog: (e: { action: string; storeId?: string | null; details?: unknown }) =>
     mockPrisma.auditLog.create({
       data: { action: e.action, storeId: e.storeId ?? null, details: e.details },
@@ -207,7 +216,7 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
 
     // The primary anonymization transaction still ran to completion.
     expect(mockPrisma.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: CUSTOMER.id } })
+      expect.objectContaining({ where: { id: CUSTOMER.id, storeId: CUSTOMER.storeId } })
     );
   });
 
@@ -330,7 +339,7 @@ describe('AuthService.eraseAccount — the CRM scrub refuses an ambiguous identi
     await AuthService.eraseAccount(CUSTOMER.id);
 
     expect(mockPrisma.customer.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'crm-only' } })
+      expect.objectContaining({ where: { id: 'crm-only', storeId: CUSTOMER.storeId } })
     );
     expect(mockPrisma.customerAddress.deleteMany).toHaveBeenCalledWith({
       where: { customerId: { in: ['crm-only'] } },
@@ -369,7 +378,7 @@ describe('AuthService.eraseAccount — revokes live access tokens (#1871)', () =
 
     expect(mockPrisma.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: CUSTOMER.id },
+        where: { id: CUSTOMER.id, storeId: CUSTOMER.storeId },
         data: expect.objectContaining({ tokenVersion: { increment: 1 } }),
       })
     );

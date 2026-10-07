@@ -589,7 +589,7 @@ router.put(
       }
 
       await prisma.bundle.update({
-        where: { id },
+        where: { id, storeId },
         data: {
           ...(data.name !== undefined && { name: data.name }),
           ...(data.nameAr !== undefined && { nameAr: data.nameAr }),
@@ -682,7 +682,7 @@ router.delete(
         throw new AppError(404, 'NOT_FOUND', 'Bundle not found for this store');
       }
 
-      await prisma.bundle.update({ where: { id }, data: { isActive: false } });
+      await prisma.bundle.update({ where: { id, storeId }, data: { isActive: false } });
       // See the POST handler above — the same feed-cache invalidation gap;
       // a deactivated bundle must stop being purchasable there too, not just
       // in `resolveBundle`'s live-read callers.

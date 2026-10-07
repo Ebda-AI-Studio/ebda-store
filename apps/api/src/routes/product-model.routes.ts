@@ -302,7 +302,7 @@ router.put(
       }
       const current = await getModelRow(storeId, productId);
       const model = await prisma.productModel.update({
-        where: { id: current.id },
+        where: { id: current.id, storeId },
         data: {
           ...(body.altText !== undefined ? { altText: body.altText || null } : {}),
           ...(body.altTextAr !== undefined ? { altTextAr: body.altTextAr || null } : {}),
@@ -364,7 +364,7 @@ router.delete(
     try {
       const { storeId, productId } = req.params;
       const current = await getModelRow(storeId, productId);
-      await prisma.productModel.delete({ where: { id: current.id } });
+      await prisma.productModel.delete({ where: { id: current.id, storeId } });
       await auditLog({
         action: 'product.model3d.deleted',
         userId: req.user!.userId,

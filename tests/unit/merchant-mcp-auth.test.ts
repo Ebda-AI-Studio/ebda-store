@@ -146,7 +146,7 @@ describe('verifyMerchantKey', () => {
     findUnique.mockResolvedValue(validRow(plaintext));
     await verifyMerchantKey(reqWithKey(plaintext), STORE);
     expect(findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { keyHash: hashMerchantKey(plaintext) } })
+      expect.objectContaining({ where: { keyHash: hashMerchantKey(plaintext), storeId: STORE.id } })
     );
   });
 

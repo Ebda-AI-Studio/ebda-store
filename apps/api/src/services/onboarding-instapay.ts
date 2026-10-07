@@ -35,7 +35,10 @@ export async function applyOnboardingInstapay(
 
   if (!input.enabled) {
     if (existing) {
-      await prisma.paymentConfig.update({ where: { id: existing.id }, data: { isEnabled: false } });
+      await prisma.paymentConfig.update({
+        where: { id: existing.id, storeId },
+        data: { isEnabled: false },
+      });
       PaymentService.clearCache(storeId);
     }
     return { instapay: false, configId: existing?.id ?? null };
@@ -64,7 +67,7 @@ export async function applyOnboardingInstapay(
 
   const config = existing
     ? await prisma.paymentConfig.update({
-        where: { id: existing.id },
+        where: { id: existing.id, storeId },
         data: { isEnabled: true, settings },
         select: { id: true },
       })

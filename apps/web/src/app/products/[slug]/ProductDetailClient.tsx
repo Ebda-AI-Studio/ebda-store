@@ -46,6 +46,7 @@ import {
 import { fromMinor, model3dSwatchColor } from '@force/shared';
 import { Model3dToggle, ProductModel3dPanel } from '../../../components/ProductModel3d';
 import { captureEvent } from '../../../components/PostHogProvider';
+import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
 import { REGION } from '@force/shared';
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
@@ -225,6 +226,10 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // useTemplateComponents is kept for its loading state — used to gate the
   // related-products render so cards don't flash before hydration.
   const { isLoading: templateLoading } = useTemplateComponents();
+  // Related strip size: the platform card row shows 3; Dahab's row is a
+  // 4-up carousel, so it asks for a fuller row (same endpoint, same rules).
+  const relatedCount = templateId === 'dahab' ? 8 : 3;
+  const relatedFetchLimit = templateId === 'dahab' ? '9' : '3';
   const { isEnabled } = useFeatures();
   const { language, t } = useLanguage();
   const { localize, numerals } = useNumerals();
@@ -303,10 +308,12 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
       if (categories && categories.length > 0) {
         const catId = categories[0].category?.id;
         if (catId) {
-          api.getProducts({ category: catId, limit: '3' }).then(relResponse => {
+          api.getProducts({ category: catId, limit: relatedFetchLimit }).then(relResponse => {
             if (relResponse.success && relResponse.data) {
               setRelatedProducts(
-                relResponse.data.products.filter((p: Product) => p.id !== product.id).slice(0, 3)
+                relResponse.data.products
+                  .filter((p: Product) => p.id !== product.id)
+                  .slice(0, relatedCount)
               );
             }
           });
@@ -346,9 +353,14 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
           // than nesting: no category means nothing to relate to.
           const catId = firstCategoryId(response.data.product.categories);
           if (catId) {
-            const relResponse = await api.getProducts({ category: catId, limit: '3' });
+            const relResponse = await api.getProducts({
+              category: catId,
+              limit: relatedFetchLimit,
+            });
             if (relResponse.success && relResponse.data) {
-              setRelatedProducts(pickRelated(relResponse.data.products, loadedProduct.id));
+              setRelatedProducts(
+                pickRelated(relResponse.data.products, loadedProduct.id, relatedCount)
+              );
             }
           }
         } else {
@@ -571,6 +583,153 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     resolvedLayout?.productCardDefaults?.customBadge?.color,
     store.theme
   );
+
+  // Below-the-fold blocks shared by every skin (FAQ, reviews, upsell, related).
+  const belowFold = (
+    <>
+      {product?.faqs && product.faqs.length > 0 && (
+        <ProductFAQSection faqs={product.faqs} language={language} t={t} />
+      )}
+      {isEnabled('reviews') &&
+        layout?.reviewSection?.enabled &&
+        product &&
+        store.id &&
+        store.id !== 'demo' && (
+          <SectionErrorBoundary section="reviews">
+            <ReviewSection storeId={store.id} productId={product.id} />
+          </SectionErrorBoundary>
+        )}
+      {isEnabled('upsell_crosssell') && product && store.id && store.id !== 'demo' && (
+        <>
+          <SectionErrorBoundary section="frequently-bought-together">
+            <FrequentlyBoughtTogether storeId={store.id} productId={product.id} />
+          </SectionErrorBoundary>
+          <SectionErrorBoundary section="you-might-also-like">
+            <YouMightAlsoLike storeId={store.id} productId={product.id} />
+          </SectionErrorBoundary>
+        </>
+      )}
+    </>
+  );
+
+  // Dahab skin: same data and handlers, Dahab presentation (templates/dahab/ProductDetail).
+  if (templateId === 'dahab') {
+    const maxQty =
+      effectiveInventory != null && effectiveInventory > 0 ? Math.min(effectiveInventory, 10) : 10;
+    const badges = [pdpCustomBadgeText, discountBadgeText].filter((b): b is string => !!b);
+    return (
+      <ShopChrome layout={resolvedLayout}>
+        <div className="flex-1" style={pdpBgStyle}>
+          <DahabProductDetail
+            images={images}
+            name={displayName}
+            categoryName={categoryName ?? undefined}
+            categoryHref={
+              cat0?.category?.slug
+                ? storeUrl(`/products?category=${cat0.category.slug}`)
+                : undefined
+            }
+            homeHref={storeUrl('/')}
+            productsHref={storeUrl('/products')}
+            shippingHref={storeUrl('/shipping')}
+            returnsHref={storeUrl('/returns')}
+            excerpt={displayExcerpt}
+            description={displayDescription}
+            priceText={
+              pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
+                ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
+                : formatPrice(displayPrice)
+            }
+            compareText={
+              pricing.mode === 'single' && displayCompare && displayCompare > displayPrice
+                ? formatPrice(displayCompare)
+                : null
+            }
+            badges={badges}
+            variants={productVariants}
+            options={productOptions}
+            onVariantSelect={setSelectedVariant}
+            onShopperSelect={() => setShopperPickedVariant(true)}
+            quantity={quantity}
+            setQuantity={setQuantity}
+            maxQuantity={maxQty}
+            stockText={
+              outOfStock && !canBackorder
+                ? t('Out of stock', 'غير متوفر حالياً')
+                : canBackorder
+                  ? t('Made to order — ships when ready', 'بيتعمل مخصوص — يتشحن أول ما يجهز')
+                  : null
+            }
+            onAddToCart={handleAddToCart}
+            isAdding={isAdding}
+            addDisabled={(outOfStock && !canBackorder) || variantRequired}
+            addLabel={
+              variantRequired
+                ? t('Choose options', 'اختيار المقاس')
+                : canBackorder
+                  ? t('Pre-order', 'طلب مسبق')
+                  : outOfStock
+                    ? t('Out of stock', 'غير متوفر')
+                    : t('Add to bag', 'إضافة للسلة')
+            }
+            isWishlisted={isWishlisted}
+            onToggleWishlist={handleToggleWishlist}
+            sku={product.sku}
+            specs={
+              (product as { specifications?: unknown }).specifications ? (
+                <SpecTable
+                  specifications={
+                    (product as { specifications?: unknown }).specifications as
+                      | Record<string, string>
+                      | undefined
+                  }
+                />
+              ) : undefined
+            }
+            extras={
+              <>
+                <WaMeProductButton product={product} priceMinor={displayPrice} className="w-full" />
+                <ShareProductRow
+                  productName={displayName}
+                  url={typeof window !== 'undefined' ? window.location.href : ''}
+                />
+              </>
+            }
+            selectedImage={selectedImage}
+            onSelectImage={setSelectedImage}
+          />
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">{belowFold}</div>
+          {relatedProducts.length > 0 && !templateLoading && (
+            <section className="py-12 sm:py-16">
+              <ProductCarousel
+                products={relatedProducts.map(toTemplateProduct)}
+                title="You may also like"
+                titleAr="قطع قد تعجبك"
+                isRtl={language === 'ar'}
+                currency={store.currency}
+                pack={templateId}
+                urlPrefix={storeUrl('')}
+                showCardPrice={store.theme?.showPriceOnCards === false ? false : undefined}
+                onAddToCart={async productId => {
+                  const found = relatedProducts.find(x => x.id === productId);
+                  if (found)
+                    addItem({
+                      id: found.id,
+                      name: found.name,
+                      nameAr: found.nameAr ?? undefined,
+                      price: found.price,
+                      slug: found.slug,
+                      image: found.images?.[0]?.url,
+                      category: found.categories?.[0]?.category?.name,
+                    });
+                }}
+              />
+            </section>
+          )}
+        </div>
+      </ShopChrome>
+    );
+  }
 
   return (
     <ShopChrome layout={resolvedLayout}>

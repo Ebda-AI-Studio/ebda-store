@@ -95,6 +95,11 @@ export interface CarrierShipmentResponse {
   trackingUrl?: string;
   labelUrl?: string;
   estimatedDelivery?: Date;
+  /**
+   * The parcel IS booked but a follow-up the carrier needs failed (ShipBlu's pickup request).
+   * Short, English, secret-free; the service shows it on the shipment next to the tracking number.
+   */
+  warning?: string;
 }
 
 export interface TrackingHistoryEntry {
@@ -172,6 +177,14 @@ export interface ShippingCarrierProvider {
   capabilities: CarrierCapabilities;
 
   /**
+   * Carriers whose callbacks echo a header we chose (Bosta: `webhookCustomHeaders`): the service
+   * requires that header IN ADDITION to the secret URL token, so a leaked URL alone is not enough.
+   * `valueFor(secret)` derives the header value from the store's webhook secret (never the secret
+   * itself, so the URL token and the header value cannot be swapped for each other).
+   */
+  webhookHeader?: { name: string; valueFor(secret: string): string };
+
+  /**
    * Create a new shipment with the carrier. MUST be idempotent on `data.merchantReference`:
    * a repeat call for the same reference returns the same shipment, never a second parcel.
    */
@@ -192,7 +205,6 @@ export interface ShippingCarrierProvider {
 
   /**
    * Cancel a shipment by carrier shipment ID. `not_cancellable` once the carrier has it.
-   * (The legacy iCarry adapter still answers a boolean; `normalizeCancel` reads both.)
    */
   cancelShipment(
     credentials: any,
@@ -229,10 +241,17 @@ export interface ShippingCarrierProvider {
   /**
    * Test carrier credentials by making a lightweight API call
    */
-  testConnection(
-    credentials: any,
-    ctx?: CarrierCallContext
-  ): Promise<{ success: boolean; error?: string }>;
+  testConnection(credentials: any, ctx?: CarrierCallContext): Promise<CarrierTestResult>;
+}
+
+/**
+ * What Test connection answers. `error` is a short English reason, never a secret or a raw
+ * carrier body; `code` lets the admin say "wrong key" apart from "carrier unreachable".
+ */
+export interface CarrierTestResult {
+  success: boolean;
+  error?: string;
+  code?: 'bad_credentials' | 'unreachable' | 'unknown';
 }
 
 export function normalizeCancel(r: CarrierCancelResult | boolean): CarrierCancelResult {
@@ -263,5 +282,5 @@ export class CarrierError extends Error {
   }
 }
 
-export const CARRIER_CODES = ['icarry', 'aramex', 'bosta', 'manual'] as const;
+export const CARRIER_CODES = ['bosta', 'shipblu', 'mylerz', 'aramex', 'manual'] as const;
 export type CarrierCode = (typeof CARRIER_CODES)[number];

@@ -986,10 +986,10 @@ export class CartService {
     // where a unique index does not exist.
     if (!userCart) {
       await prisma.cart.update({
-        where: { id: guestCart.id },
+        where: { id: guestCart.id, storeId },
         data: { customerId },
       });
-      return this.loadMergedCart(guestCart.id);
+      return this.loadMergedCart(storeId, guestCart.id);
     }
 
     const targetCart = userCart;
@@ -1048,9 +1048,9 @@ export class CartService {
     }
 
     // Delete guest cart (cascades to its own CartItem/CartBundle rows).
-    await prisma.cart.delete({ where: { id: guestCart.id } });
+    await prisma.cart.delete({ where: { id: guestCart.id, storeId } });
 
-    return this.loadMergedCart(targetCart.id);
+    return this.loadMergedCart(storeId, targetCart.id);
   }
 
   /**
@@ -1060,9 +1060,9 @@ export class CartService {
    * return two different shapes — a duplicated include is exactly how that
    * drifts.
    */
-  private static loadMergedCart(cartId: string) {
+  private static loadMergedCart(storeId: string, cartId: string) {
     return prisma.cart.findUnique({
-      where: { id: cartId },
+      where: { id: cartId, storeId },
       include: {
         items: {
           include: {

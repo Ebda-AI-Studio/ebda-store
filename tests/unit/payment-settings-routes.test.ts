@@ -1,6 +1,6 @@
 /**
- * Route-level tests for `payment-settings.routes.ts` — the super-admin
- * (global, `storeId: null`) and store-admin (per-store override) CRUD over
+ * Route-level tests for `payment-settings.routes.ts` — the per-store CRUD over
+ * (the global `storeId: null` routes are retired and answer 410, R-EBDA-007)
  * `PaymentConfig`, which holds encrypted provider secrets (Paymob/Kashier/
  * Fawry API keys, webhook secrets). No test file imported this
  * router before this one (GitHub #1547) — a revenue-critical surface with
@@ -60,7 +60,7 @@ const { mockPrisma, mockClearCache, mockAuditLog, currentUser, decryptSpy } = vi
   mockAuditLog: vi.fn(),
   // Mutable — tests flip `.role`/`.userId` to exercise RBAC + the route's
   // own inline ownership check under the REAL `requirePermission`.
-  currentUser: { userId: 'admin-1', role: 'super_admin' as string },
+  currentUser: { userId: 'admin-1', role: 'super_admin' as string, anonymous: false },
 }));
 
 vi.mock('@force/database', () => ({
@@ -72,8 +72,12 @@ vi.mock('@force/database', () => ({
 }));
 
 vi.mock('@api/middleware/auth', () => ({
-  authenticate: (req: any, _res: any, next: any) => {
-    req.user = { ...currentUser };
+  authenticate: (req: any, res: any, next: any) => {
+    if (currentUser.anonymous) {
+      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'x' } });
+      return;
+    }
+    req.user = { userId: currentUser.userId, role: currentUser.role };
     next();
   },
   authorize:
@@ -169,55 +173,64 @@ beforeEach(() => {
   vi.clearAllMocks();
   currentUser.userId = 'admin-1';
   currentUser.role = 'super_admin';
+  currentUser.anonymous = false;
   mockClearCache.mockReset();
 });
 
-// ─── GET — never the secrets, in any form ──────────────────────────────────
+// ─── Retired global (platform-level) routes — 410, behind auth (R-EBDA-007) ──
 
-describe('GET /payment-settings — never the stored secret, in any form', () => {
-  it('masks apiKey/merchantId and blanks secretKey/webhookSecret on the list', async () => {
-    mockPrisma.paymentConfig.findMany.mockResolvedValue([baseConfig()]);
+describe('Global payment-settings routes are retired (R-EBDA-007)', () => {
+  const GLOBAL_ROUTES: Array<[string, string]> = [
+    ['get', ''],
+    ['get', '/paymob'],
+    ['post', ''],
+    ['put', '/paymob'],
+    ['delete', '/paymob'],
+    ['post', '/paymob/toggle'],
+    ['post', '/paymob/set-default'],
+    ['post', '/paymob/test'],
+    ['get', '/health/all'],
+  ];
 
+  it.each(GLOBAL_ROUTES)(
+    '%s /payment-settings%s answers 410 GLOBAL_PAYMENT_CONFIG_UNSUPPORTED to a super_admin and never touches the DB',
+    async (method, path) => {
+      const res = await (request(app) as any)[method](`${BASE}${path}`).send({});
+
+      expect(res.status).toBe(410);
+      expect(res.body.error.code).toBe('GLOBAL_PAYMENT_CONFIG_UNSUPPORTED');
+      for (const fn of Object.values(mockPrisma.paymentConfig)) {
+        expect(fn).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it.each(GLOBAL_ROUTES)(
+    '%s /payment-settings%s is 401 when unauthenticated',
+    async (method, path) => {
+      currentUser.anonymous = true;
+      const res = await (request(app) as any)[method](`${BASE}${path}`).send({});
+
+      expect(res.status).toBe(401);
+      expect(res.body.error?.code).not.toBe('GLOBAL_PAYMENT_CONFIG_UNSUPPORTED');
+    }
+  );
+
+  it('is 403 (not 410) for a role without settings:read', async () => {
+    currentUser.role = 'customer';
     const res = await request(app).get(BASE);
 
-    expect(res.status).toBe(200);
-    const config = res.body.data.configs[0];
-    // Never the raw ciphertext or anything resembling the real secret.
-    const raw = JSON.stringify(res.body);
-    expect(raw).not.toContain('CIPHERTEXT');
-    expect(raw).not.toContain('sk_live_the_real_paymob_key');
-    expect(raw).not.toContain('secret_value');
-    expect(raw).not.toContain('whsec_abcdef');
-    // secretKey/webhookSecret are fully blanked, never a partial reveal.
-    expect(config.secretKey).toBe('****');
-    expect(config.webhookSecret).toBe('****');
-  });
-
-  it('masks a single provider config on the detail route the same way', async () => {
-    mockPrisma.paymentConfig.findFirst.mockResolvedValue(baseConfig());
-
-    const res = await request(app).get(`${BASE}/paymob`);
-
-    expect(res.status).toBe(200);
-    expect(JSON.stringify(res.body)).not.toContain('CIPHERTEXT');
-    expect(res.body.data.config.secretKey).toBe('****');
-  });
-
-  it('404s a provider that has no global configuration', async () => {
-    mockPrisma.paymentConfig.findFirst.mockResolvedValue(null);
-
-    const res = await request(app).get(`${BASE}/paymob`);
-
-    expect(res.status).toBe(404);
-    expect(res.body.error.code).toBe('NOT_FOUND');
+    expect(res.status).toBe(403);
   });
 });
 
-// ─── POST — validation + isDefault exclusivity ─────────────────────────────
+// ─── Store-scoped — masking, validation, isDefault exclusivity, masked echo ──
 
-describe('POST /payment-settings — validation failure renders as a readable 400', () => {
+describe('POST /payment-settings/store/:storeId — validation failure renders as a readable 400', () => {
   it('rejects an unknown provider enum with VALIDATION_ERROR, not a 500', async () => {
-    const res = await request(app).post(BASE).send({ provider: 'not-a-real-provider' });
+    const res = await request(app)
+      .post(`${BASE}/store/${STORE_ID}`)
+      .send({ provider: 'not-a-real-provider' });
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -225,58 +238,74 @@ describe('POST /payment-settings — validation failure renders as a readable 40
     expect(mockPrisma.paymentConfig.create).not.toHaveBeenCalled();
   });
 
-  it('409s creating a provider that is already configured globally', async () => {
-    mockPrisma.paymentConfig.findFirst.mockResolvedValue(baseConfig());
+  it('409s creating a provider that is already configured for the store', async () => {
+    mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'admin-1' });
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(baseConfig({ storeId: STORE_ID }));
 
-    const res = await request(app).post(BASE).send({ provider: 'paymob' });
+    const res = await request(app).post(`${BASE}/store/${STORE_ID}`).send({ provider: 'paymob' });
 
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('ALREADY_EXISTS');
   });
 });
 
-describe('POST /payment-settings — isDefault is exclusive per scope', () => {
-  it('unsets every other global default before creating the new one', async () => {
-    mockPrisma.paymentConfig.findFirst.mockResolvedValue(null);
-    mockPrisma.paymentConfig.create.mockResolvedValue(baseConfig({ isDefault: true }));
+describe('POST /payment-settings/store/:storeId — isDefault is exclusive per store', () => {
+  beforeEach(() => {
+    mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'admin-1' });
+  });
 
-    const res = await request(app)
-      .post(BASE)
-      .send({ provider: 'paymob', isDefault: true, apiKey: 'sk_new_key' });
+  it('unsets every other default of the store before creating the new one', async () => {
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(null);
+    mockPrisma.paymentConfig.create.mockResolvedValue(
+      baseConfig({ provider: 'cod', storeId: STORE_ID, isDefault: true })
+    );
+
+    const res = await request(app).post(`${BASE}/store/${STORE_ID}`).send({
+      provider: 'cod',
+      isEnabled: false,
+      isDefault: true,
+      apiKey: 'sk_new_key',
+    });
 
     expect(res.status).toBe(201);
     expect(mockPrisma.paymentConfig.updateMany).toHaveBeenCalledWith({
-      where: { storeId: null, isDefault: true },
+      where: { storeId: STORE_ID, isDefault: true },
       data: { isDefault: false },
     });
     // The new secret was actually encrypted before being persisted.
     expect(mockPrisma.paymentConfig.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ apiKey: 'CIPHERTEXT(sk_new_key)' }),
+        data: expect.objectContaining({ storeId: STORE_ID, apiKey: 'CIPHERTEXT(sk_new_key)' }),
       })
     );
-    expect(mockClearCache).toHaveBeenCalledWith();
+    expect(mockClearCache).toHaveBeenCalledWith(STORE_ID);
   });
 
   it('does not touch other defaults when isDefault is not set', async () => {
     mockPrisma.paymentConfig.findFirst.mockResolvedValue(null);
-    mockPrisma.paymentConfig.create.mockResolvedValue(baseConfig());
+    mockPrisma.paymentConfig.create.mockResolvedValue(baseConfig({ storeId: STORE_ID }));
 
-    await request(app).post(BASE).send({ provider: 'cod' });
+    await request(app).post(`${BASE}/store/${STORE_ID}`).send({ provider: 'cod' });
 
     expect(mockPrisma.paymentConfig.updateMany).not.toHaveBeenCalled();
   });
 });
 
-// ─── PUT — masked placeholders never get re-encrypted ──────────────────────
+describe('PUT /payment-settings/store/:storeId/:provider — a masked placeholder is not re-stored as a secret', () => {
+  beforeEach(() => {
+    mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'admin-1' });
+  });
 
-describe('PUT /payment-settings/:provider — a masked placeholder is not re-stored as a secret', () => {
   it('drops apiKey/secretKey from the update when the client echoes the mask back', async () => {
-    mockPrisma.paymentConfig.findFirst.mockResolvedValue(baseConfig({ id: 'cfg-1' }));
-    mockPrisma.paymentConfig.update.mockResolvedValue(baseConfig({ id: 'cfg-1' }));
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(
+      baseConfig({ id: 'cfg-1', provider: 'cod', storeId: STORE_ID, isEnabled: false })
+    );
+    mockPrisma.paymentConfig.update.mockResolvedValue(
+      baseConfig({ id: 'cfg-1', provider: 'cod', storeId: STORE_ID, isEnabled: false })
+    );
 
     await request(app)
-      .put(`${BASE}/paymob`)
+      .put(`${BASE}/store/${STORE_ID}/cod`)
       .send({ apiKey: 'sk_l****_key', secretKey: '****', isEnabled: false });
 
     const updateCall = mockPrisma.paymentConfig.update.mock.calls[0][0];
@@ -286,19 +315,23 @@ describe('PUT /payment-settings/:provider — a masked placeholder is not re-sto
   });
 
   it('encrypts a genuinely new secretKey that does not contain the mask marker', async () => {
-    mockPrisma.paymentConfig.findFirst.mockResolvedValue(baseConfig({ id: 'cfg-1' }));
-    mockPrisma.paymentConfig.update.mockResolvedValue(baseConfig({ id: 'cfg-1' }));
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(
+      baseConfig({ id: 'cfg-1', provider: 'cod', storeId: STORE_ID, isEnabled: false })
+    );
+    mockPrisma.paymentConfig.update.mockResolvedValue(
+      baseConfig({ id: 'cfg-1', provider: 'cod', storeId: STORE_ID, isEnabled: false })
+    );
 
-    await request(app).put(`${BASE}/paymob`).send({ secretKey: 'brand_new_secret' });
+    await request(app).put(`${BASE}/store/${STORE_ID}/cod`).send({ secretKey: 'brand_new_secret' });
 
     const updateCall = mockPrisma.paymentConfig.update.mock.calls[0][0];
     expect(updateCall.data.secretKey).toBe('CIPHERTEXT(brand_new_secret)');
   });
 
-  it('404s updating a provider with no existing global configuration', async () => {
+  it('404s updating a provider with no existing configuration for the store', async () => {
     mockPrisma.paymentConfig.findFirst.mockResolvedValue(null);
 
-    const res = await request(app).put(`${BASE}/paymob`).send({ isEnabled: true });
+    const res = await request(app).put(`${BASE}/store/${STORE_ID}/cod`).send({ isEnabled: true });
 
     expect(res.status).toBe(404);
     expect(mockPrisma.paymentConfig.update).not.toHaveBeenCalled();
@@ -332,9 +365,7 @@ describe('Store-scoped payment settings — ownership + not-found', () => {
     currentUser.role = 'store_admin';
     currentUser.userId = 'owner-1';
     mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'owner-1' });
-    mockPrisma.paymentConfig.findMany
-      .mockResolvedValueOnce([baseConfig({ storeId: STORE_ID })]) // storeConfigs
-      .mockResolvedValueOnce([]); // globalConfigs
+    mockPrisma.paymentConfig.findMany.mockResolvedValueOnce([baseConfig({ storeId: STORE_ID })]); // storeConfigs
 
     const res = await request(app).get(`${BASE}/store/${STORE_ID}`);
 
@@ -345,64 +376,47 @@ describe('Store-scoped payment settings — ownership + not-found', () => {
 });
 
 // ─── /:provider/toggle and /:provider/set-default — the enable/default logic ──
+// ─── /store/:storeId/:provider/toggle — the enable logic ──
 
-describe('POST /payment-settings/:provider/toggle', () => {
+describe('POST /payment-settings/store/:storeId/:provider/toggle', () => {
   it('flips isEnabled and audits the action with the acting user', async () => {
-    mockPrisma.paymentConfig.findFirst.mockResolvedValue(baseConfig({ isEnabled: true }));
-    mockPrisma.paymentConfig.update.mockResolvedValue(baseConfig({ isEnabled: false }));
+    mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'admin-1' });
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(
+      baseConfig({ id: 'cfg-1', storeId: STORE_ID, isEnabled: true })
+    );
+    mockPrisma.paymentConfig.update.mockResolvedValue(
+      baseConfig({ storeId: STORE_ID, isEnabled: false })
+    );
 
-    const res = await request(app).post(`${BASE}/paymob/toggle`).send({ enabled: false });
+    const res = await request(app)
+      .post(`${BASE}/store/${STORE_ID}/paymob/toggle`)
+      .send({ enabled: false });
 
     expect(res.status).toBe(200);
     expect(mockPrisma.paymentConfig.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ isEnabled: false }) })
+      expect.objectContaining({
+        where: { id: 'cfg-1', storeId: STORE_ID },
+        data: expect.objectContaining({ isEnabled: false }),
+      })
     );
     expect(mockAuditLog).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'payment_config.disabled', userId: 'admin-1' })
+      expect.objectContaining({ action: 'store_payment_config.disabled', userId: 'admin-1' })
     );
-    expect(mockClearCache).toHaveBeenCalledWith();
+    expect(mockClearCache).toHaveBeenCalledWith(STORE_ID);
   });
 });
-
-describe('POST /payment-settings/:provider/set-default', () => {
-  it('unsets every other default then sets this provider as the sole default', async () => {
-    mockPrisma.paymentConfig.findFirst.mockResolvedValue(baseConfig({ isDefault: false }));
-    mockPrisma.paymentConfig.update.mockResolvedValue(baseConfig({ isDefault: true }));
-
-    const res = await request(app).post(`${BASE}/paymob/set-default`);
-
-    expect(res.status).toBe(200);
-    expect(mockPrisma.paymentConfig.updateMany).toHaveBeenCalledWith({
-      where: { storeId: null, isDefault: true },
-      data: { isDefault: false },
-    });
-    expect(mockPrisma.paymentConfig.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ isDefault: true }) })
-    );
-  });
-
-  it('404s setting a non-configured provider as default', async () => {
-    mockPrisma.paymentConfig.findFirst.mockResolvedValue(null);
-
-    const res = await request(app).post(`${BASE}/paymob/set-default`);
-
-    expect(res.status).toBe(404);
-    expect(mockPrisma.paymentConfig.updateMany).not.toHaveBeenCalled();
-  });
-});
-
-// ─── #2010 — which key is saved, without decrypting ────────────────────────
 
 describe('#2010 — credential display fingerprint', () => {
   it('shows ****<last4 of the plaintext> from the stored fingerprint, never the ciphertext, and never decrypts', async () => {
-    mockPrisma.paymentConfig.findMany.mockResolvedValue([
-      baseConfig({ apiKeyLast4: '_key', merchantIdLast4: '3456' }),
+    mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'admin-1' });
+    mockPrisma.paymentConfig.findMany.mockResolvedValueOnce([
+      baseConfig({ storeId: STORE_ID, apiKeyLast4: '_key', merchantIdLast4: '3456' }),
     ]);
 
-    const res = await request(app).get(BASE);
+    const res = await request(app).get(`${BASE}/store/${STORE_ID}`);
 
     expect(res.status).toBe(200);
-    const config = res.body.data.configs[0];
+    const config = res.body.data.storeConfigs[0];
     expect(config.apiKey).toBe('****_key');
     expect(config.merchantId).toBe('****3456');
     expect(config.apiKeyFingerprintMissing).toBe(false);
@@ -419,9 +433,9 @@ describe('#2010 — credential display fingerprint', () => {
     currentUser.role = 'store_admin';
     currentUser.userId = 'owner-1';
     mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'owner-1' });
-    mockPrisma.paymentConfig.findMany
-      .mockResolvedValueOnce([baseConfig({ storeId: STORE_ID, apiKeyLast4: null })])
-      .mockResolvedValueOnce([]);
+    mockPrisma.paymentConfig.findMany.mockResolvedValueOnce([
+      baseConfig({ storeId: STORE_ID, apiKeyLast4: null }),
+    ]);
 
     const res = await request(app).get(`${BASE}/store/${STORE_ID}`);
 
@@ -435,23 +449,30 @@ describe('#2010 — credential display fingerprint', () => {
   });
 
   it('a row with no key at all returns null and no re-save flag', async () => {
-    mockPrisma.paymentConfig.findFirst.mockResolvedValue(
-      baseConfig({ apiKey: null, merchantId: null })
-    );
+    mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'admin-1' });
+    mockPrisma.paymentConfig.findMany.mockResolvedValueOnce([
+      baseConfig({ storeId: STORE_ID, apiKey: null, merchantId: null }),
+    ]);
 
-    const res = await request(app).get(`${BASE}/paymob`);
+    const res = await request(app).get(`${BASE}/store/${STORE_ID}`);
 
-    expect(res.body.data.config.apiKey).toBeNull();
-    expect(res.body.data.config.apiKeyFingerprintMissing).toBe(false);
+    expect(res.body.data.storeConfigs[0].apiKey).toBeNull();
+    expect(res.body.data.storeConfigs[0].apiKeyFingerprintMissing).toBe(false);
   });
 
   it('stores the fingerprint next to the ciphertext on create', async () => {
+    mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'admin-1' });
     mockPrisma.paymentConfig.findFirst.mockResolvedValue(null);
-    mockPrisma.paymentConfig.create.mockResolvedValue(baseConfig());
+    mockPrisma.paymentConfig.create.mockResolvedValue(
+      baseConfig({ provider: 'cod', storeId: STORE_ID })
+    );
 
-    await request(app)
-      .post(BASE)
-      .send({ provider: 'paymob', apiKey: 'sk_new_key_WXYZ', merchantId: 'merchant_987' });
+    await request(app).post(`${BASE}/store/${STORE_ID}`).send({
+      provider: 'cod',
+      isEnabled: false,
+      apiKey: 'sk_new_key_WXYZ',
+      merchantId: 'merchant_987',
+    });
 
     expect(mockPrisma.paymentConfig.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -465,17 +486,19 @@ describe('#2010 — credential display fingerprint', () => {
     );
   });
 
-  it('updates the fingerprint when a global key is re-saved, and leaves it alone on a masked echo', async () => {
-    mockPrisma.paymentConfig.findFirst.mockResolvedValue(baseConfig({ id: 'cfg-1' }));
-    mockPrisma.paymentConfig.update.mockResolvedValue(baseConfig({ id: 'cfg-1' }));
+  it('updates the fingerprint when a store key is re-saved, and leaves it alone on a masked echo', async () => {
+    mockPrisma.store.findUnique.mockResolvedValue({ id: STORE_ID, ownerId: 'admin-1' });
+    const cod = baseConfig({ id: 'cfg-1', provider: 'cod', storeId: STORE_ID, isEnabled: false });
+    mockPrisma.paymentConfig.findFirst.mockResolvedValue(cod);
+    mockPrisma.paymentConfig.update.mockResolvedValue(cod);
 
-    await request(app).put(`${BASE}/paymob`).send({ apiKey: 'sk_rotated_ABCD' });
+    await request(app).put(`${BASE}/store/${STORE_ID}/cod`).send({ apiKey: 'sk_rotated_ABCD' });
     const saved = mockPrisma.paymentConfig.update.mock.calls[0][0].data;
     expect(saved.apiKey).toBe('CIPHERTEXT(sk_rotated_ABCD)');
     expect(saved.apiKeyLast4).toBe('ABCD');
 
     mockPrisma.paymentConfig.update.mockClear();
-    await request(app).put(`${BASE}/paymob`).send({ apiKey: '****ABCD' });
+    await request(app).put(`${BASE}/store/${STORE_ID}/cod`).send({ apiKey: '****ABCD' });
     const echoed = mockPrisma.paymentConfig.update.mock.calls[0][0].data;
     expect(echoed.apiKey).toBeUndefined();
     expect(echoed.apiKeyLast4).toBeUndefined();

@@ -17,7 +17,7 @@ import { AppError } from '../middleware/error-handler';
 import { inngest } from '../lib/inngest/client';
 import { generateProductFaqs } from '../lib/ai/product-faq-generator';
 import { generateProductMetaAeo } from '../lib/ai/product-meta-aeo-generator';
-import { prisma } from '@force/database';
+import { currentStoreId, prisma } from '@force/database';
 import { AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
 import {
   fillProductFields,
@@ -376,7 +376,7 @@ async function markJobFailedIfEnqueueFailed(jobId: string, err: unknown): Promis
     // swallowed failure must not abort it (issue 2215's class).
     await withSavepoint(() =>
       prisma.bulkAiJob.update({
-        where: { id: jobId },
+        where: { id: jobId, storeId: currentStoreId() },
         data: { status: 'failed', errorMessage: message, completedAt: new Date() },
       })
     );

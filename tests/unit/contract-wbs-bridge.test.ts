@@ -14,7 +14,7 @@
  *    consumption code (wa-bridge-client, botCatalogService, wa-ordering)
  *
  * Auth: `x-wbs-api-key` header. The middleware decrypts the stored key and
- * compares — we short-circuit by mocking the prisma.store.findMany response
+ * compares — we short-circuit by mocking the definer's wbsBridgeKeys response
  * so the decrypt path returns a predictable match.
  *
  * Run: npm run test:contract
@@ -176,7 +176,7 @@ const MOCK_STORE = {
   currency: 'EGP',
   wbsEnabled: true,
   wbsClientId: 'client-uuid-123',
-  wbsApiKey: 'encrypted:' + TEST_WBS_API_KEY, // encryption mock returns the suffix
+  credentials: { wbsApiKey: 'encrypted:' + TEST_WBS_API_KEY }, // encryption mock returns the suffix
   settings: { locale: 'ar' },
   botCopy: { greeting_new: 'Hello!' },
 };
@@ -206,9 +206,18 @@ const MOCK_PRODUCT = {
   variants: [],
 };
 
+// waBridgeAuth reads the bridge-enabled stores' key ciphertexts through the
+// SECURITY DEFINER wrapper (no store scope exists yet), then loads the matched
+// store via withStore. Default: one store whose key decrypts to TEST_WBS_API_KEY.
+vi.mock('../../apps/api/src/lib/definer', () => ({
+  wbsBridgeKeys: vi.fn(async () => [
+    { storeId: MOCK_STORE.id, wbsApiKey: MOCK_STORE.credentials.wbsApiKey },
+  ]),
+}));
+
 // Mock @force/database before importing the route
-vi.mock('@force/database', () => ({
-  prisma: {
+vi.mock('@force/database', () => {
+  const prisma = {
     store: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
@@ -235,8 +244,12 @@ vi.mock('@force/database', () => ({
     bundleItem: {
       findMany: vi.fn(),
     },
-  },
-}));
+  };
+  return {
+    prisma,
+    withStore: (_storeId: string, fn: (tx: typeof prisma) => unknown) => fn(prisma),
+  };
+});
 
 // Task 10: /store-catalog now checks the `bundles` feature. Mocked directly
 // (rather than mocking @force/database's withRlsBypass/storeFeature that
@@ -321,9 +334,9 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
   });
 
   it('401 — wrong api key', async () => {
-    const { prisma } = await import('@force/database');
     // Return no matching store (wrong key)
-    (prisma.store.findMany as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    const { wbsBridgeKeys } = await import('../../apps/api/src/lib/definer');
+    (wbsBridgeKeys as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
     const res = await request(app)
       .get('/api/v1/wa-bridge/store-catalog')
       .set('x-wbs-api-key', 'completely-wrong-key');
@@ -451,8 +464,10 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
 
   it('404 — store not found after auth', async () => {
     const { prisma } = await import('@force/database');
-    // Auth passes (findMany returns the store) but findUnique returns null
-    (prisma.store.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    // Auth passes (first findUnique returns the store) but the route's own findUnique returns null
+    (prisma.store.findUnique as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(MOCK_STORE)
+      .mockResolvedValueOnce(null);
 
     const res = await request(app)
       .get('/api/v1/wa-bridge/store-catalog')

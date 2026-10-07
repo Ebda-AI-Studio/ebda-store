@@ -40,6 +40,9 @@ import { StubBillingProvider } from '@api/services/billing';
 import { startCheckout } from '@api/services/billing/subscription-billing.service';
 import { recordManualPayment } from '@api/services/billing/account.service';
 
+// The card checkout path is exercised explicitly; the product default is InstaPay-only.
+process.env.BILLING_TRIAL_CARD_MODE = 'card_on_file';
+
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw';
 const hasDb = !!OWNER_URL && !OWNER_URL.includes('localhost:5432/test_db');
@@ -163,7 +166,7 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
     );
 
   beforeAll(async () => {
-    owner = createPrismaClient({ connectionString: OWNER_URL, max: 3 });
+    owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
     superAdminId = await mkUser('super_admin', 'root');
   });
 
@@ -305,14 +308,31 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
         a.storeId,
         async () => {
           const { prisma } = await import('@force/database');
-          return {
-            profiles: await prisma.storeTaxProfile.findMany({ where: { storeId: b.storeId } }),
-            docs: await prisma.storeTaxDocument.findMany({ where: { storeId: b.storeId } }),
-          };
+          // Layer 1 (code guard): a typed query naming ANOTHER store is refused
+          // before it reaches SQL.
+          const guardRefusals = await Promise.all(
+            [
+              () => prisma.storeTaxProfile.findMany({ where: { storeId: b.storeId } }),
+              () => prisma.storeTaxDocument.findMany({ where: { storeId: b.storeId } }),
+            ].map(q =>
+              q().then(
+                () => 'not-refused',
+                (e: Error) => e.name
+              )
+            )
+          );
+          // Layer 2 (RLS): raw SQL is not guard-checked inside a scope, so it
+          // proves the database itself hides the other store's rows.
+          const profiles = await prisma.$queryRaw<{ id: string }[]>`
+            SELECT id FROM store_tax_profiles WHERE store_id = ${b.storeId}`;
+          const docs = await prisma.$queryRaw<{ id: string }[]>`
+            SELECT id FROM store_tax_documents WHERE store_id = ${b.storeId}`;
+          return { guardRefusals, profiles, docs };
         },
         a.userId
       )
     );
+    expect(seen.guardRefusals).toEqual(['TenantScopeViolation', 'TenantScopeViolation']);
     expect(seen.profiles).toHaveLength(0);
     expect(seen.docs).toHaveLength(0);
     const view = await asApp(() =>

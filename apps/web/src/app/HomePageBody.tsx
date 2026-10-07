@@ -80,6 +80,37 @@ function fetchHomeCategories(
     .catch(() => null);
 }
 
+/** Refs of the document-only product sections (category slug → fetch cap, product ids). */
+function documentSectionRefs(def: PageDefinition | undefined): {
+  categories: Array<[string, number]>;
+  productIds: string[];
+  newest: number;
+  bestSellers: number;
+} {
+  const categories: Array<[string, number]> = [];
+  const productIds: string[] = [];
+  let newest = 0;
+  let bestSellers = 0;
+  for (const n of def?.sections ?? []) {
+    if (n.hidden === true) continue;
+    if (n.type !== 'featured-collection' && n.type !== 'product-spotlight') continue;
+    const s = n.settings as {
+      productSource?: string;
+      categorySlug?: unknown;
+      manualProductIds?: unknown;
+    };
+    if (s.productSource === 'category' && typeof s.categorySlug === 'string' && s.categorySlug)
+      categories.push([s.categorySlug, 24]);
+    if (s.productSource === 'manual' && Array.isArray(s.manualProductIds))
+      for (const id of s.manualProductIds) if (typeof id === 'string') productIds.push(id);
+    const limit = Math.min(24, Number((n.settings as { limit?: unknown }).limit) || 8);
+    // newest is also every section's empty-match fallback, so it is always loaded.
+    newest = Math.max(newest, limit);
+    if (s.productSource === 'best_seller') bestSellers = Math.max(bestSellers, limit);
+  }
+  return { categories, productIds, newest, bestSellers };
+}
+
 async function fetchHomepageData(
   store: { id: string; domain?: string },
   layout: StoreLayoutSettings,
@@ -89,6 +120,20 @@ async function fetchHomepageData(
   prefetched?: {
     featured?: Promise<ProductsApiResult | null>;
     categories?: Promise<CategoriesApiResult | null>;
+  },
+  /** Catalogue refs held by document-only product sections
+   *  (featured-collection / product-spotlight), fetched alongside the
+   *  extra-carousel refs so a hand-picked or category grid has its products. */
+  docRefs: {
+    categories: Array<[string, number]>;
+    productIds: string[];
+    newest: number;
+    bestSellers: number;
+  } = {
+    categories: [],
+    productIds: [],
+    newest: 0,
+    bestSellers: 0,
   }
 ): Promise<{
   featuredProducts: Product[];
@@ -119,8 +164,14 @@ async function fetchHomepageData(
     };
   }
 
-  const newArrivalsLimit = layout.newArrivals.enabled ? layout.newArrivals.limit : 0;
-  const bestSellersLimit = layout.bestSellers.enabled ? layout.bestSellers.limit : 0;
+  const newArrivalsLimit = Math.max(
+    layout.newArrivals.enabled ? layout.newArrivals.limit : 0,
+    docRefs.newest
+  );
+  const bestSellersLimit = Math.max(
+    layout.bestSellers.enabled ? layout.bestSellers.limit : 0,
+    docRefs.bestSellers
+  );
 
   const testimonialsQuery = layout.testimonials.enabled
     ? `?minRating=${layout.testimonials.minRating}&verifiedOnly=${layout.testimonials.verifiedOnly}&limit=6`
@@ -147,13 +198,17 @@ async function fetchHomepageData(
     const existing = categoryFetchMap.get(e.categorySlug) ?? 0;
     if (cap > existing) categoryFetchMap.set(e.categorySlug, cap);
   }
+  for (const [slug, cap] of docRefs.categories) {
+    if (cap > (categoryFetchMap.get(slug) ?? 0)) categoryFetchMap.set(slug, cap);
+  }
   const categoryFetches = Array.from(categoryFetchMap.entries());
   const manualIds = Array.from(
-    new Set(
-      extras
+    new Set([
+      ...extras
         .filter(e => e.enabled !== false && e.productSource === 'manual')
-        .flatMap(e => e.manualProductIds ?? [])
-    )
+        .flatMap(e => e.manualProductIds ?? []),
+      ...docRefs.productIds,
+    ])
   );
 
   const [
@@ -375,10 +430,15 @@ export async function HomePageBody({
       ? emitZoneCss(draftBundle.typography as Parameters<typeof emitZoneCss>[0], store.theme)
       : '';
   const { featuredProducts, newArrivals, bestSellers, categories, testimonials, extraProducts } =
-    await fetchHomepageData(store, layout, {
-      featured: featuredPromise,
-      categories: categoriesPromise,
-    });
+    await fetchHomepageData(
+      store,
+      layout,
+      {
+        featured: featuredPromise,
+        categories: categoriesPromise,
+      },
+      documentSectionRefs(builderDefinition ?? draftBundle.definition)
+    );
 
   const siteUrl = storeAbsoluteUrl(store, '');
   const socialUrls = store.socialLinks

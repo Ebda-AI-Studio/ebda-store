@@ -209,7 +209,7 @@ export async function approveExpense(
   const nextStatus = selfApproval ? 'pending' : 'approved';
 
   return prisma.expense.update({
-    where: { id },
+    where: { id, storeId },
     data: {
       status: nextStatus,
       approvedBy: nextStatus === 'approved' ? (userId ?? null) : null,
@@ -236,7 +236,7 @@ export async function postExpense(storeId: string, id: string): Promise<ExpenseW
   }
 
   const updated = await prisma.expense.update({
-    where: { id },
+    where: { id, storeId },
     data: { status: 'posted', postedAt: new Date() },
     include: {
       supplier: { select: { id: true, name: true, nameAr: true } },
@@ -270,7 +270,7 @@ export async function rejectExpense(storeId: string, id: string): Promise<Expens
   }
 
   return prisma.expense.update({
-    where: { id },
+    where: { id, storeId },
     data: { status: 'rejected' },
     include: {
       supplier: { select: { id: true, name: true, nameAr: true } },

@@ -38,6 +38,12 @@ import ElegantHero from '../templates/elegant/Hero';
 import ElegantProductGrid from '../templates/elegant/ProductGrid';
 import ElegantCategoryGrid from '../templates/elegant/CategoryGrid';
 
+import DahabHero, { DahabHeroBanner, DahabHeroSlider } from '../templates/dahab/Hero';
+import DahabProductGrid from '../templates/dahab/ProductGrid';
+import DahabCategoryGrid, { DahabCategoryStrip } from '../templates/dahab/CategoryGrid';
+import { DahabProductCarousel } from '../templates/dahab/ProductCarousel';
+import { DahabTestimonialRow } from '../templates/dahab/TestimonialRow';
+
 // Pecannbee-flow shared sections — same component for all 5 packs because
 // they're styled with theme tokens. Per-pack overrides can replace these
 // later by exporting a same-named component from the pack's index.ts.
@@ -102,6 +108,17 @@ const homepageTemplates: Record<TemplateId, HomepageTemplateComponents> = {
     ProductGrid: ElegantProductGrid,
     CategoryGrid: ElegantCategoryGrid,
     ...shared,
+  },
+  // Dahab owns every homepage section (builder Phase 3 pilot).
+  dahab: {
+    Hero: DahabHero,
+    HeroBanner: DahabHeroBanner,
+    HeroSlider: DahabHeroSlider,
+    ProductGrid: DahabProductGrid,
+    ProductCarousel: DahabProductCarousel,
+    CategoryGrid: DahabCategoryGrid,
+    CategoryStrip: DahabCategoryStrip,
+    TestimonialRow: DahabTestimonialRow,
   },
 };
 

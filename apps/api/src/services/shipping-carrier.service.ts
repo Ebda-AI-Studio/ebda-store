@@ -4,7 +4,15 @@
 // ==========================================
 
 import crypto from 'node:crypto';
-import { prisma, Prisma, runInTenantContext, runInStoreScope, withMoneyTx } from '@force/database';
+import {
+  currentStoreId,
+  prisma,
+  Prisma,
+  runInTenantContext,
+  runInStoreScope,
+  withMoneyTx,
+  withStore,
+} from '@force/database';
 import { getShipmentStoreIdByTracking } from '../lib/definer';
 import { config as appConfig } from '../config';
 import {
@@ -13,16 +21,28 @@ import {
   verifyWebhookToken,
 } from '../lib/shipment-tracking';
 import { sweepAcrossStores } from '../lib/cross-store';
+import { safeEqual } from '../lib/carrier-http';
 import { redis } from './redis.service';
-import { encryption } from './encryption.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
 
-import { iCarryCarrier } from './carriers/icarry.carrier';
-import { aramexCarrier } from './carriers/aramex.carrier';
-import { bostaCarrier } from './carriers/bosta.carrier';
-import { manualCarrier } from './carriers/manual.carrier';
+import { CARRIER_REGISTRY } from './carriers/registry';
+import {
+  activeCredentials,
+  decryptCarrierBlob,
+  encryptCarrierBlob,
+} from './carriers/carrier-credentials';
+import {
+  applyCarrierCredentialUpdate,
+  assertCarrierEnableAllowed,
+  carrierEntry,
+  publicCarrierConfig,
+  rotateBlobWebhookSecret,
+  runCarrierConnectionTest,
+  type CarrierCredentialUpdate,
+} from './carriers/carrier-connection.service';
+import { isProviderUsable } from './payment-providers/provider-gate';
 import {
   ShippingCarrierProvider,
   CarrierCode,
@@ -39,13 +59,6 @@ import type { OrderStatus } from '@prisma/client';
 import { AppError } from '../middleware/error-handler';
 import { assertValidTransition, VALID_ORDER_TRANSITIONS } from './order-status-machine';
 import { assertOrderFulfillable } from '../lib/order-fulfilment-guard';
-
-const CARRIER_REGISTRY: Record<CarrierCode, ShippingCarrierProvider> = {
-  icarry: iCarryCarrier,
-  aramex: aramexCarrier,
-  bosta: bostaCarrier,
-  manual: manualCarrier,
-};
 
 export function getCarrierProvider(code: string): ShippingCarrierProvider | undefined {
   return (CARRIER_REGISTRY as Record<string, ShippingCarrierProvider>)[code];
@@ -76,26 +89,14 @@ export function carrierCallbackUrl(carrier: string, storeId: string, secret: str
 
 // Cache TTL for carrier configs (5 minutes)
 const CARRIER_CONFIG_CACHE_TTL = 300;
-// `:v2:` is load-bearing, not cosmetic. Before 2026-09-23 this key cached the
-// DECRYPTED rows, so `credentials` was a plain object; it now caches the
-// still-encrypted Prisma rows. Redis outlives the deploy, so reusing the old
-// key would feed a pre-fix object to decryptCredentials for the full 300s TTL
-// (longer under a rolling restart, where old instances keep writing the old
-// shape). That returned {} — indistinguishable from "no credentials" — and
-// preserveMaskedCredentials would then drop the merchant's masked fields and
-// persist the truncated set, permanently erasing an Aramex/iCarry secret.
-// Bump this suffix on ANY change to the cached value's shape.
-const CARRIER_CONFIG_CACHE_PREFIX = 'shipping:carrier-configs:v2:';
+// The version suffix is load-bearing, not cosmetic: Redis outlives a deploy, and a cached row
+// of an older shape (v1: decrypted credentials; v2: before the catalog blob + test_mode) fed to
+// the readers below would read as "no credentials". Bump it on ANY change to the cached value's
+// shape.
+const CARRIER_CONFIG_CACHE_PREFIX = 'shipping:carrier-configs:v3:';
 
 // Redis lock for tracking cron
 const TRACKING_CRON_LOCK = 'shipping:tracking-cron';
-
-interface CarrierConfigData {
-  enabled: boolean;
-  isDefault?: boolean;
-  credentials: Record<string, string>;
-  settings?: Record<string, unknown>;
-}
 
 interface ListShipmentsOptions {
   page?: number;
@@ -112,32 +113,20 @@ class ShippingCarrierService {
   // ==========================================
 
   /**
-   * Get all carrier configs for a store (Redis-cached, credentials decrypted).
-   *
-   * S2-1 (2026-09-22 security audit): the Redis cache stores the row AS
-   * FETCHED FROM PRISMA — `credentials` still AES-256-GCM-encrypted, same as
-   * at rest in Postgres. Decryption happens AFTER every read (cache hit or
-   * miss), never before the write to Redis. Before this fix the cache stored
-   * the DECRYPTED blob for the full 300s TTL — Aramex/iCarry API keys sat in
-   * Redis in plaintext, the same tier that was publicly reachable without
-   * auth until 2026-09-04.
+   * The raw (still ENCRYPTED) config rows of a store, Redis-cached. S2-1 (2026-09-22 security
+   * audit): the cache holds the row as Prisma returned it, `credentials` ciphertext included,
+   * never a decrypted secret; decryption happens after every read and is never itself cached.
    */
-  async getCarrierConfigs(storeId: string) {
+  private async getConfigRows(storeId: string) {
     const cacheKey = `${CARRIER_CONFIG_CACHE_PREFIX}${storeId}`;
-
-    // Try cache first — encrypted, same shape Prisma returns.
-    let configs = await redis.get<any[]>(cacheKey, true);
-
-    if (configs === null) {
-      // Fetch from DB
-      configs = await prisma.shippingCarrierConfig.findMany({
+    let rows = await redis.get<any[]>(cacheKey, true);
+    if (rows === null) {
+      rows = await prisma.shippingCarrierConfig.findMany({
         where: { storeId },
         orderBy: { createdAt: 'asc' },
       });
-
-      // Cache the still-ENCRYPTED rows (best-effort).
       try {
-        await redis.set(cacheKey, configs, CARRIER_CONFIG_CACHE_TTL);
+        await redis.set(cacheKey, rows, CARRIER_CONFIG_CACHE_TTL);
       } catch (err) {
         logger.warn(
           { err, storeId },
@@ -145,161 +134,170 @@ class ShippingCarrierService {
         );
       }
     }
-
-    // Decrypt after every read — this result is never itself cached.
-    return configs.map(cfg => ({
-      ...cfg,
-      credentials: cfg.credentials ? this.decryptCredentials(cfg.credentials) : {},
-    }));
+    return rows;
   }
 
   /**
-   * Get a single carrier config for a store
+   * Config rows for the SERVER (adapter calls): `credentials` is the ACTIVE mode's flat field map
+   * plus the webhook secret. Never hand this to a browser: use `getPublicCarrierConfigs`.
    */
+  async getCarrierConfigs(storeId: string) {
+    const rows = await this.getConfigRows(storeId);
+    return rows.map(cfg => ({ ...cfg, credentials: this.readActiveCredentials(cfg) }));
+  }
+
+  /** Config rows for the ADMIN: write-only credentials (hints), no ciphertext, no secret. */
+  async getPublicCarrierConfigs(storeId: string) {
+    const rows = await this.getConfigRows(storeId);
+    return rows.map(cfg => publicCarrierConfig(cfg));
+  }
+
   async getCarrierConfig(storeId: string, carrier: CarrierCode) {
     const configs = await this.getCarrierConfigs(storeId);
     return configs.find((c: any) => c.carrier === carrier) ?? null;
   }
 
   /**
-   * Upsert a carrier config (encrypts credentials, invalidates cache)
+   * Create or update one carrier's configuration (the catalog connect flow).
+   *
+   *  - `fields` are credentials of `mode`, validated against the catalog; '' / masked / undefined
+   *    keep the stored value, null clears it (write-only: nothing is ever read back).
+   *  - `activate` makes `mode` the active one; changing the active mode's credentials (or the
+   *    mode) of an ENABLED carrier disables it: the new keys have not been tested.
+   *  - enabling (or making default) passes the enable gate: PROVIDERS-2 + a current Test connection.
    */
-  async upsertCarrierConfig(storeId: string, carrier: CarrierCode, data: CarrierConfigData) {
-    // Masked-secret resubmit guard: the route GET returns credentials masked
-    // (e.g. `abcd******`, or `****`). If the merchant saves a carrier without
-    // editing a credential, that masked value comes back on the PUT —
-    // persisting it would overwrite the real encrypted secret (ICarry apiKey,
-    // Aramex password) with mask text. Treat any value still carrying a `*`
-    // as "unchanged" and keep the stored credential instead.
-    // `webhookSecret` is server-managed (it authenticates the carrier's callbacks): whatever
-    // the client sent is dropped, and it is re-attached below from the stored value.
-    const { webhookSecret: _ignored, ...clientCredentials } = data.credentials;
-    const mergedCredentials = await this.preserveMaskedCredentials(
-      storeId,
-      carrier,
-      clientCredentials
-    );
-    if (getCarrierProvider(carrier)?.capabilities.webhooks && carrier !== 'icarry') {
-      mergedCredentials.webhookSecret = await this.webhookSecretFor(storeId, carrier, false);
-    }
-    const encryptedCredentials = encryption.encrypt(JSON.stringify(mergedCredentials));
-
-    const result = await prisma.shippingCarrierConfig.upsert({
-      where: { storeId_carrier: { storeId, carrier } },
-      create: {
-        storeId,
-        carrier,
-        credentials: encryptedCredentials,
-        enabled: data.enabled ?? false,
-        isDefault: data.isDefault ?? false,
-        settings: (data.settings ?? {}) as any,
-      },
-      update: {
-        credentials: encryptedCredentials,
-        enabled: data.enabled ?? false,
-        settings: (data.settings ?? {}) as any,
-        updatedAt: new Date(),
-      },
-    });
-
-    await this.invalidateCarrierConfigCache(storeId);
-    return result;
-  }
-
-  /**
-   * Merge incoming carrier credentials over the currently-stored (decrypted)
-   * values, preserving any field whose incoming value is still a mask. The
-   * route's `maskCredentials` always emits AT LEAST 4 consecutive asterisks
-   * (`<prefix>****` for a value longer than 4 chars, bare `****` otherwise —
-   * see `shipping-carrier.routes.ts`'s `maskCredentials`), so the sentinel
-   * check requires that exact shape (`****`), not a bare `includes('*')`.
-   * #1866: a real credential legitimately containing a single `*` (a
-   * password with a special char) used to match the old bare check, throw
-   * CARRIER_CREDENTIALS_UNRESOLVED, and block the save with no stored
-   * fallback — mirrors notification-config.service.ts's identical fix for
-   * the same class of bug.
-   */
-  private async preserveMaskedCredentials(
+  async upsertCarrierConfig(
     storeId: string,
     carrier: CarrierCode,
-    incoming: Record<string, string>
-  ): Promise<Record<string, string>> {
-    let stored: Record<string, string> | null = null;
-    const out: Record<string, string> = {};
+    input: {
+      credentials?: CarrierCredentialUpdate;
+      activate?: boolean;
+      enabled?: boolean;
+      isDefault?: boolean;
+      settings?: Record<string, unknown>;
+    }
+  ) {
+    const entry = carrierEntry(carrier);
+    const out = await prisma.$transaction(async tx => {
+      // Serialize concurrent saves of this carrier: two PUTs (sandbox keys + live keys, or settings
+      // + a rotation) would otherwise each merge over the SAME snapshot and the later write would
+      // silently revert the earlier one. (Nothing to lock on first creation: the unique key does it.)
+      await tx.$queryRaw`SELECT 1 FROM shipping_carrier_configs WHERE store_id = ${storeId} AND carrier = ${carrier} FOR UPDATE`;
+      // Straight from Prisma, never the cache: this read is the merge base for a secret.
+      const existing = await tx.shippingCarrierConfig.findUnique({
+        where: { storeId_carrier: { storeId, carrier } },
+      });
 
-    for (const [key, value] of Object.entries(incoming)) {
-      if (typeof value === 'string' && value.includes('****')) {
-        if (stored === null) {
-          // Straight from Prisma, NEVER through getCarrierConfig's 300s cache.
-          // This read is the merge base for a secret we are about to
-          // overwrite, so it has to be the current truth: a cached base is
-          // stale by up to the TTL, which silently reverts a credential the
-          // merchant changed moments ago on another replica — and a cache
-          // holding an unexpected shape reads as "no credentials" and erases
-          // the secret outright.
-          const current = await prisma.shippingCarrierConfig.findUnique({
-            where: { storeId_carrier: { storeId, carrier } },
-            select: { credentials: true },
-          });
-          stored = current?.credentials ? this.decryptCredentials(current.credentials) : {};
-        }
-        const storedVal = stored[key];
-        // Keep the real stored secret. If we cannot resolve one, REFUSE the
-        // save: dropping the field here persists a truncated credential set
-        // over a working one, which is silent, permanent data loss the
-        // merchant never sees. Failing the write is recoverable; erasing
-        // their carrier password is not.
-        if (typeof storedVal === 'string' && storedVal.length > 0) {
-          out[key] = storedVal;
-        } else {
+      let cipher = existing?.credentials ?? '';
+      let hints: unknown = existing?.credentialHints ?? {};
+      let activeModeChanged = false;
+      let changed: string[] = [];
+      if (input.credentials) {
+        let u;
+        try {
+          u = applyCarrierCredentialUpdate(entry, existing, input.credentials);
+        } catch (err) {
+          if (err instanceof AppError) throw err;
+          // The stored blob cannot be read (a rotated ENCRYPTION_KEY, a corrupt row). Merging over
+          // it would persist a truncated set over a working secret: refuse, writing nothing.
           throw new AppError(
             400,
             'CARRIER_CREDENTIALS_UNRESOLVED',
-            `Re-enter the ${carrier} credentials: the saved value for "${key}" could not be read, and saving now would erase it.`
+            `Re-enter the ${carrier} credentials: the saved ones could not be read, and saving now would erase them.`
           );
         }
-      } else {
-        out[key] = value;
+        cipher = u.cipher;
+        hints = u.hints;
+        changed = u.changed;
+        activeModeChanged = u.activeModeChanged;
+      } else if (
+        existing?.credentials &&
+        existing.settings &&
+        typeof existing.settings === 'object' &&
+        'sandbox' in existing.settings
+      ) {
+        // A legacy flat blob is read as live, or as sandbox only BECAUSE `settings.sandbox` says so.
+        // This save strips that key (the mode is `testMode` now), so the blob is re-shaped in the
+        // same write: otherwise its sandbox keys would silently become the LIVE set.
+        try {
+          cipher = encryptCarrierBlob(decryptCarrierBlob(existing.credentials, existing.settings));
+        } catch {
+          /* unreadable: leave it untouched, a settings-only save must not need the secrets */
+        }
       }
-    }
+      const nextTestMode = input.activate
+        ? input.credentials?.mode === 'sandbox'
+        : (existing?.testMode ?? true);
+      const modeSwitched = existing ? existing.testMode !== nextTestMode : false;
+      const mustDisable = Boolean(existing?.enabled) && (activeModeChanged || modeSwitched);
+      const nextEnabled = input.enabled ?? (Boolean(existing?.enabled) && !mustDisable);
+      const nextDefault = input.isDefault ?? (nextEnabled ? Boolean(existing?.isDefault) : false);
+      if (nextDefault && !nextEnabled) {
+        throw new AppError(409, 'NOT_ENABLED', 'Only an enabled carrier can be the default');
+      }
+      const settings: Record<string, unknown> = { ...(input.settings ?? {}) };
+      delete settings.sandbox; // the mode is the row's testMode, never a stored setting
+      const nextSettings = input.settings ? settings : ((existing?.settings as object) ?? {});
 
-    return out;
+      if (nextEnabled) {
+        assertCarrierEnableAllowed({
+          carrier,
+          enabled: true,
+          testMode: nextTestMode,
+          credentials: cipher,
+          settings: nextSettings,
+          credentialHints: hints,
+          connectionTest: existing?.connectionTest ?? null,
+        });
+      }
+
+      const data = {
+        credentials: cipher,
+        credentialHints: hints as Prisma.InputJsonValue,
+        testMode: nextTestMode,
+        enabled: nextEnabled,
+        isDefault: nextDefault,
+        settings: nextSettings as Prisma.InputJsonValue,
+      };
+      if (nextDefault) {
+        await tx.shippingCarrierConfig.updateMany({
+          where: { storeId, isDefault: true, NOT: { carrier } },
+          data: { isDefault: false },
+        });
+      }
+      const row = await tx.shippingCarrierConfig.upsert({
+        where: { storeId_carrier: { storeId, carrier } },
+        create: { storeId, carrier, ...data },
+        update: data,
+      });
+      return { row, changed, mustDisable };
+    });
+    await this.invalidateCarrierConfigCache(storeId);
+    return {
+      config: publicCarrierConfig(out.row),
+      changed: out.changed,
+      disabledUntilRetested: out.mustDisable,
+    };
   }
 
   /**
    * The per-store secret that authenticates a carrier's webhook callbacks (it rides in the URL
-   * path, because carriers like Bosta sign nothing). Kept inside the encrypted credentials,
-   * generated once, replaced only on `rotate`.
+   * path and, for carriers that echo a header, in that header). Kept inside the encrypted
+   * credentials, generated once, replaced only on `rotate`.
    */
-  private async webhookSecretFor(
-    storeId: string,
-    carrier: CarrierCode,
-    rotate: boolean
-  ): Promise<string> {
-    if (!rotate) {
-      // Straight from Prisma: the merge base must be the current truth, not the 300 s cache.
-      const current = await prisma.shippingCarrierConfig.findUnique({
-        where: { storeId_carrier: { storeId, carrier } },
-        select: { credentials: true },
-      });
-      const stored = current?.credentials ? this.decryptCredentials(current.credentials) : {};
-      if (stored.webhookSecret) return stored.webhookSecret;
-    }
-    return crypto.randomBytes(24).toString('hex');
-  }
-
-  /** Replace the webhook secret (the old callback URL stops working at once). */
   async rotateWebhookSecret(storeId: string, carrier: CarrierCode) {
-    const current = await prisma.shippingCarrierConfig.findUnique({
-      where: { storeId_carrier: { storeId, carrier } },
-      select: { credentials: true },
-    });
-    if (!current) throw new AppError(404, 'NOT_FOUND', 'Carrier is not configured');
-    const stored = current.credentials ? this.decryptCredentials(current.credentials) : {};
-    stored.webhookSecret = await this.webhookSecretFor(storeId, carrier, true);
-    await prisma.shippingCarrierConfig.update({
-      where: { storeId_carrier: { storeId, carrier } },
-      data: { credentials: encryption.encrypt(JSON.stringify(stored)) },
+    await prisma.$transaction(async tx => {
+      // same lock as upsertCarrierConfig: a rotation must not be reverted by a concurrent save
+      await tx.$queryRaw`SELECT 1 FROM shipping_carrier_configs WHERE store_id = ${storeId} AND carrier = ${carrier} FOR UPDATE`;
+      const current = await tx.shippingCarrierConfig.findUnique({
+        where: { storeId_carrier: { storeId, carrier } },
+        select: { credentials: true, settings: true },
+      });
+      if (!current) throw new AppError(404, 'NOT_FOUND', 'Carrier is not configured');
+      await tx.shippingCarrierConfig.update({
+        where: { storeId_carrier: { storeId, carrier } },
+        data: { credentials: rotateBlobWebhookSecret(current.credentials, current.settings) },
+      });
     });
     await this.invalidateCarrierConfigCache(storeId);
   }
@@ -315,9 +313,17 @@ class ShippingCarrierService {
   }
 
   /**
-   * Set the default carrier for a store (unsets others first)
+   * Set the default carrier for a store (unsets others first). The carrier must already be
+   * enabled: this never enables one (that is the connect flow's gate).
    */
   async setDefaultCarrier(storeId: string, carrier: CarrierCode) {
+    const row = await prisma.shippingCarrierConfig.findUnique({
+      where: { storeId_carrier: { storeId, carrier } },
+      select: { enabled: true },
+    });
+    if (!row?.enabled) {
+      throw new AppError(409, 'NOT_ENABLED', 'Enable the carrier before making it the default');
+    }
     await prisma.$transaction([
       prisma.shippingCarrierConfig.updateMany({
         where: { storeId, isDefault: true },
@@ -325,7 +331,7 @@ class ShippingCarrierService {
       }),
       prisma.shippingCarrierConfig.updateMany({
         where: { storeId, carrier },
-        data: { isDefault: true, enabled: true },
+        data: { isDefault: true },
       }),
     ]);
 
@@ -333,36 +339,57 @@ class ShippingCarrierService {
   }
 
   /**
-   * Test carrier credentials by making a lightweight API call
+   * Test connection: the adapter's ONE harmless authenticated call with the ACTIVE mode's stored
+   * credentials. Records `{ok, code, mode, at, fingerprint}` on the row: the enable gate.
    */
   async testConnection(storeId: string, carrier: CarrierCode) {
-    const config = await this.getCarrierConfig(storeId, carrier);
-    if (!config) {
-      return { success: false, error: 'Carrier not configured for this store' };
+    const row = await prisma.shippingCarrierConfig.findUnique({
+      where: { storeId_carrier: { storeId, carrier } },
+    });
+    if (!row) {
+      throw new AppError(404, 'NOT_FOUND', 'Save the credentials before testing the connection');
     }
-
-    const carrierImpl = CARRIER_REGISTRY[carrier];
-    return carrierImpl.testConnection(config.credentials, this.callContext(config));
+    const startedAt = Date.now();
+    const { result, stored } = await runCarrierConnectionTest(
+      row,
+      this.callContext({ storeId, carrier, settings: row.settings, testMode: row.testMode })
+    );
+    const latency = Date.now() - startedAt;
+    await prisma.shippingCarrierConfig.update({
+      where: { id: row.id, storeId },
+      data: { connectionTest: stored as unknown as Prisma.InputJsonValue },
+    });
+    await this.invalidateCarrierConfigCache(storeId);
+    return {
+      carrier,
+      mode: stored.mode,
+      test: { ok: result.ok, code: result.code, message: result.message, latency },
+    };
   }
 
   // ==========================================
   // Shipment Lifecycle
   // ==========================================
 
-  /** What an adapter is handed next to the decrypted credentials. */
+  /**
+   * What an adapter is handed next to the decrypted credentials. `settings.sandbox` is derived
+   * from the row's mode, never from stored settings: it picks the carrier's sandbox host.
+   */
   callContext(cfg?: {
     storeId?: string;
     carrier?: string;
     settings?: unknown;
     credentials?: Record<string, string>;
+    testMode?: boolean;
   }): CarrierCallContext {
-    const settings = (cfg?.settings as Record<string, unknown> | undefined) ?? {};
+    const stored = (cfg?.settings as Record<string, unknown> | undefined) ?? {};
+    const settings = { ...stored, sandbox: cfg?.testMode === true };
     const secret = cfg?.credentials?.webhookSecret;
     const impl = cfg?.carrier ? getCarrierProvider(cfg.carrier) : undefined;
     return {
       settings,
       callbackUrl:
-        impl?.capabilities.webhooks && cfg?.storeId && secret && cfg.carrier !== 'icarry'
+        impl?.capabilities.webhooks && cfg?.storeId && secret
           ? carrierCallbackUrl(cfg.carrier!, cfg.storeId, secret)
           : undefined,
     };
@@ -435,6 +462,15 @@ class ShippingCarrierService {
         409,
         'CARRIER_NOT_ENABLED',
         `Carrier ${resolvedCarrierCode} is not enabled for this store`
+      );
+    }
+    // PROVIDERS-2 at the point of use (belt and braces next to the enable gate): a carrier the
+    // catalog does not list as verified never books a parcel, whatever a stored row says.
+    if (resolvedCarrierCode !== 'manual' && !isProviderUsable(resolvedCarrierCode)) {
+      throw new AppError(
+        409,
+        'CARRIER_NOT_ENABLED',
+        `Carrier ${resolvedCarrierCode} is coming soon and cannot book shipments yet`
       );
     }
 
@@ -524,10 +560,10 @@ class ShippingCarrierService {
     // ---- record it (own short transaction) and move the order along
     const shipment = await runInTenantContext(storeId, () =>
       prisma.shipment.update({
-        where: { id: claimedId },
+        where: { id: claimedId, storeId },
         data: {
           status: 'created',
-          error: null,
+          error: response.warning ?? null,
           trackingNumber: response.trackingNumber,
           trackingUrl: response.trackingUrl,
           labelUrl: response.labelUrl,
@@ -567,7 +603,7 @@ class ShippingCarrierService {
       );
       await runInTenantContext(storeId, () =>
         prisma.shipment.update({
-          where: { id: claimedId },
+          where: { id: claimedId, storeId },
           data: { error: 'Booked, but the order status could not be set to shipped' },
         })
       ).catch(() => undefined);
@@ -575,8 +611,9 @@ class ShippingCarrierService {
 
     // Shipment notification fully fire-and-forget (called from the admin route and from the
     // Inngest job; neither may wait on the notification provider).
-    void prisma.store
-      .findUnique({ where: { id: storeId }, select: { name: true } })
+    void withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { name: true } })
+    )
       .catch(() => null)
       .then(store =>
         notificationDispatcher
@@ -659,7 +696,7 @@ class ShippingCarrierService {
     try {
       await runInTenantContext(storeId, () =>
         prisma.shipment.update({
-          where: { id: shipmentId },
+          where: { id: shipmentId, storeId },
           data: { status: CREATION_FAILED, error: message },
         })
       );
@@ -677,7 +714,7 @@ class ShippingCarrierService {
    */
   async cancelShipment(shipmentId: string, opts: { force?: boolean } = {}) {
     const shipment = await prisma.shipment.findUnique({
-      where: { id: shipmentId },
+      where: { id: shipmentId, storeId: currentStoreId() },
       include: { order: { select: { storeId: true, id: true } } },
     });
 
@@ -746,7 +783,7 @@ class ShippingCarrierService {
 
     const history = Array.isArray(shipment.statusHistory) ? (shipment.statusHistory as any[]) : [];
     const updatedShipment = await prisma.shipment.update({
-      where: { id: shipmentId },
+      where: { id: shipmentId, storeId: currentStoreId() },
       data: {
         status: 'cancelled',
         error: null,
@@ -785,7 +822,9 @@ class ShippingCarrierService {
 
   /** The label for a shipment: the stored URL, else the carrier's (PDF bytes or a URL). */
   async getLabel(shipmentId: string): Promise<CarrierLabel> {
-    const shipment = await prisma.shipment.findUnique({ where: { id: shipmentId } });
+    const shipment = await prisma.shipment.findUnique({
+      where: { id: shipmentId, storeId: currentStoreId() },
+    });
     if (!shipment || !shipment.carrierShipmentId || !shipment.trackingNumber) {
       throw new AppError(404, 'NOT_FOUND', 'No booked shipment to print a label for');
     }
@@ -806,7 +845,10 @@ class ShippingCarrierService {
       this.callContext({ ...carrierConfig, storeId: shipment.storeId })
     );
     if (label.url && label.url !== shipment.labelUrl) {
-      await prisma.shipment.update({ where: { id: shipmentId }, data: { labelUrl: label.url } });
+      await prisma.shipment.update({
+        where: { id: shipmentId, storeId: currentStoreId() },
+        data: { labelUrl: label.url },
+      });
     }
     return label;
   }
@@ -847,7 +889,9 @@ class ShippingCarrierService {
 
   /** Manual carrier: the merchant moves the shipment along (picked up, delivered, ...). */
   async manualUpdateStatus(shipmentId: string, status: ShipmentStatus) {
-    const shipment = await prisma.shipment.findUnique({ where: { id: shipmentId } });
+    const shipment = await prisma.shipment.findUnique({
+      where: { id: shipmentId, storeId: currentStoreId() },
+    });
     if (!shipment) throw new AppError(404, 'NOT_FOUND', 'Shipment not found');
     if (shipment.carrier !== 'manual') {
       throw new AppError(400, 'NOT_MANUAL', 'Only manual shipments are updated by hand');
@@ -880,7 +924,7 @@ class ShippingCarrierService {
     extra: { estimatedDelivery?: Date } = {}
   ) {
     const shipment = await prisma.shipment.findUnique({
-      where: { id: shipmentId },
+      where: { id: shipmentId, storeId: currentStoreId() },
       include: {
         order: {
           include: { customer: { select: { email: true, firstName: true, lastName: true } } },
@@ -896,7 +940,7 @@ class ShippingCarrierService {
       const touched =
         source === 'carrier_poll'
           ? await prisma.shipment.update({
-              where: { id: shipmentId },
+              where: { id: shipmentId, storeId: currentStoreId() },
               data: { lastPolledAt: new Date() },
             })
           : shipment;
@@ -906,7 +950,7 @@ class ShippingCarrierService {
 
     const prevStatus = shipment.status;
     const updated = await prisma.shipment.update({
-      where: { id: shipmentId },
+      where: { id: shipmentId, storeId: currentStoreId() },
       data: {
         status: nextStatus,
         statusHistory: merged.history as unknown as Prisma.InputJsonValue,
@@ -933,9 +977,9 @@ class ShippingCarrierService {
 
     if (nextStatus === 'delivered' && prevStatus !== 'delivered') {
       await setOrderStatusGuarded(prisma, shipment.storeId, shipment.orderId, 'delivered');
-      const store = await prisma.store
-        .findUnique({ where: { id: shipment.storeId }, select: { name: true } })
-        .catch(() => null);
+      const store = await withStore(shipment.storeId, tx =>
+        tx.store.findUnique({ where: { id: shipment.storeId }, select: { name: true } })
+      ).catch(() => null);
       const order = shipment.order;
       const shippingAddr = order.shippingAddress as { phone?: string } | null;
       notificationDispatcher
@@ -963,7 +1007,9 @@ class ShippingCarrierService {
    * per shipment) and from the admin "refresh" button.
    */
   async updateShipmentStatus(shipmentId: string) {
-    const shipment = await prisma.shipment.findUnique({ where: { id: shipmentId } });
+    const shipment = await prisma.shipment.findUnique({
+      where: { id: shipmentId, storeId: currentStoreId() },
+    });
     if (!shipment) {
       throw new AppError(404, 'NOT_FOUND', `Shipment ${shipmentId} not found`);
     }
@@ -1006,37 +1052,8 @@ class ShippingCarrierService {
   }
 
   /**
-   * Legacy path (iCarry, one global bearer secret): the carrier names the parcel by tracking
-   * number only, so the owning store is resolved by a definer first.
-   */
-  async processWebhook(carrier: string, body: unknown, headers: Record<string, string>) {
-    const impl = getCarrierProvider(carrier);
-    if (!impl) {
-      logger.warn({ carrier }, '[ShippingCarrierService] Unknown carrier webhook received');
-      return null;
-    }
-    const result = impl.processWebhook(body, headers);
-    if (!result) {
-      logger.warn(
-        { carrier },
-        '[ShippingCarrierService] Carrier returned null from processWebhook'
-      );
-      return null;
-    }
-    const webhookStoreId = await getShipmentStoreIdByTracking(result.trackingNumber);
-    if (!webhookStoreId) {
-      logger.warn(
-        { trackingNumber: result.trackingNumber, carrier },
-        '[ShippingCarrierService] No shipment found for webhook tracking number'
-      );
-      return null;
-    }
-    return runInTenantContext(webhookStoreId, async () => this.applyWebhookResult(carrier, result));
-  }
-
-  /**
    * A webhook for a carrier that signs nothing (Bosta): the callback URL carries the store id
-   * and that store's secret token. The token is compared (constant time) against the secret in
+   * and that store's secret token, and the carrier echoes a header we chose. The token is compared (constant time) against the secret in
    * the store's encrypted carrier credentials; a wrong token, an unknown store and a store
    * without that carrier are the same `unauthorized`, so the answer is no oracle.
    */
@@ -1048,17 +1065,25 @@ class ShippingCarrierService {
     headers: Record<string, string>
   ): Promise<'unauthorized' | 'ignored' | 'unknown_shipment' | 'duplicate' | 'applied'> {
     const impl = getCarrierProvider(carrier);
-    if (!impl || !impl.capabilities.webhooks || carrier === 'icarry') return 'unauthorized';
+    if (!impl || !impl.capabilities.webhooks) return 'unauthorized';
     if (!/^[0-9a-f-]{36}$/i.test(storeId)) return 'unauthorized';
 
     return runInTenantContext(storeId, async () => {
       // Straight from Prisma (not the 300 s cache): a rotated secret must stop working at once.
       const row = await prisma.shippingCarrierConfig.findUnique({
         where: { storeId_carrier: { storeId, carrier } },
-        select: { credentials: true },
+        select: { credentials: true, settings: true },
       });
-      const secret = row?.credentials ? this.decryptCredentials(row.credentials).webhookSecret : '';
+      const secret = this.readWebhookSecret(row);
       if (!verifyWebhookToken(secret, token)) return 'unauthorized' as const;
+      // Carriers that echo a header we set (Bosta) must present it too: a leaked URL alone is
+      // not enough. Missing, wrong or empty are the same `unauthorized` (no oracle).
+      if (impl.webhookHeader) {
+        const presented = headers[impl.webhookHeader.name.toLowerCase()] ?? '';
+        if (!presented || !safeEqual(presented, impl.webhookHeader.valueFor(secret))) {
+          return 'unauthorized' as const;
+        }
+      }
 
       const result = impl.processWebhook(body, headers);
       if (!result) return 'ignored' as const;
@@ -1071,7 +1096,7 @@ class ShippingCarrierService {
     result: CarrierWebhookResult
   ): Promise<'unknown_shipment' | 'duplicate' | 'applied'> {
     const shipment = await prisma.shipment.findFirst({
-      where: { trackingNumber: result.trackingNumber, carrier },
+      where: { storeId: currentStoreId(), trackingNumber: result.trackingNumber, carrier },
       select: { id: true },
     });
     if (!shipment) {
@@ -1194,9 +1219,10 @@ class ShippingCarrierService {
     // Strict RLS: one tenant transaction per store finds the due shipments; each is then
     // polled in its own store scope (the carrier call holds no transaction).
     const active = await sweepAcrossStores({
-      fetch: () =>
+      fetch: storeId =>
         prisma.shipment.findMany({
           where: {
+            storeId,
             status: { notIn: [...TERMINAL_SHIPMENT_STATUSES, CREATION_FAILED, 'creating'] },
             trackingNumber: { not: null },
             carrier: { in: polled },
@@ -1266,25 +1292,46 @@ class ShippingCarrierService {
     };
   }
 
-  private decryptCredentials(encryptedCredentials: string): Record<string, string> {
-    if (!encryptedCredentials) return {};
-    // Outside the try ON PURPOSE. A non-string here means the caller handed us
-    // an ALREADY-DECRYPTED object — the pre-v2 cache shape. Letting that fall
-    // into the catch below returns {}, which every caller reads as "this
-    // merchant has no credentials configured": carrier auth fails on live
-    // orders, and the masked-resubmit merge erases the real secret. A wrong
-    // shape is a bug, not a missing credential, so it fails loudly.
-    if (typeof encryptedCredentials !== 'string') {
+  /**
+   * The active mode's flat credentials of a stored row. An unreadable blob (a rotated
+   * ENCRYPTION_KEY) is logged and read as empty HERE (a carrier call then fails as
+   * misconfigured); saving never goes through this path (it re-reads and throws), so an
+   * unreadable secret is never overwritten by a truncated one.
+   */
+  private readActiveCredentials(row: {
+    carrier: string;
+    testMode: boolean;
+    credentials?: string | null;
+    settings?: unknown;
+  }): Record<string, string> {
+    // Outside the try ON PURPOSE. A non-string here means the caller handed us an ALREADY-DECRYPTED
+    // object (a surviving pre-v3 cache entry). Letting that fall into the catch returns {}, which
+    // every caller reads as "this merchant has no credentials": carrier auth fails on live
+    // orders. A wrong shape is a bug, not a missing credential, so it fails loudly.
+    if (row.credentials && typeof row.credentials !== 'string') {
       throw new Error(
-        '[ShippingCarrierService] credentials are not an encrypted string — refusing to read them as empty'
+        '[ShippingCarrierService] credentials are not an encrypted string: refusing to read them as empty'
       );
     }
     try {
-      const decrypted = encryption.decrypt(encryptedCredentials);
-      return JSON.parse(decrypted);
+      return activeCredentials(row);
     } catch (err) {
-      logger.error({ err }, '[ShippingCarrierService] Failed to decrypt credentials');
+      logger.error(
+        { err, carrier: row.carrier },
+        '[ShippingCarrierService] Failed to decrypt credentials'
+      );
       return {};
+    }
+  }
+
+  private readWebhookSecret(
+    row: { credentials?: string | null; settings?: unknown } | null | undefined
+  ): string {
+    if (!row?.credentials) return '';
+    try {
+      return decryptCarrierBlob(row.credentials, row.settings).webhookSecret ?? '';
+    } catch {
+      return '';
     }
   }
 
@@ -1320,7 +1367,7 @@ async function setOrderStatusGuarded(
   if (!current) throw new AppError(404, 'NOT_FOUND', 'Order not found for this store');
   if (current.status === to) return;
   assertValidTransition(current.status, to);
-  await client.order.update({ where: { id: orderId }, data: { status: to } });
+  await client.order.update({ where: { id: orderId, storeId }, data: { status: to } });
 }
 
 export const shippingCarrierService = new ShippingCarrierService();

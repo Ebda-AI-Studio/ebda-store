@@ -17,10 +17,12 @@ const m = vi.hoisted(() => ({
 }));
 
 vi.mock('@force/database', () => ({
-  prisma: { store: { count: m.count, findUnique: m.findUnique } },
+  prisma: {},
   Prisma: { PrismaClientKnownRequestError: class extends Error {} },
   withUser: async (_id: string, fn: (tx: unknown) => unknown) =>
     fn({
+      // `stores` is under RLS: the owner's store count is read as that owner.
+      store: { count: m.count },
       user: {
         findUnique: async () => ({
           email: 'o@x.com',
@@ -31,6 +33,8 @@ vi.mock('@force/database', () => ({
       },
     }),
 }));
+// The slug probe is the `ebda_store_id_by_slug` definer (m.findUnique: null = slug is free).
+vi.mock('@api/lib/definer', () => ({ storeIdBySlug: m.findUnique }));
 vi.mock('@api/services/provisioning.service', () => ({
   ProvisioningService: { provisionStore: m.provision },
 }));

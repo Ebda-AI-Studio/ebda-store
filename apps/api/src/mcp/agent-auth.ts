@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Request } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
-import { prisma, runInTenantContext, runInStoreScope } from '@force/database';
+import { prisma, runInTenantContext, runInStoreScope, withStore } from '@force/database';
 import { insertAuditLog } from '../lib/definer';
 import type { McpStore } from './resolve-store';
 import { encryption } from '../services/encryption.service';
@@ -218,10 +218,13 @@ export async function resolveAgentAuth(req: Request, store: McpStore): Promise<A
   const presented = (req.header(AGENT_KEY_HEADER) ?? '').toString().trim();
   if (presented) {
     try {
-      const row = await prisma.store.findUnique({
-        where: { id: store.id },
-        select: { agentApiKey: true },
-      });
+      // `store_credentials` is store-scoped (RLS + tenant guard): read in the store's scope.
+      const row = await withStore(store.id, tx =>
+        tx.storeCredential.findUnique({
+          where: { storeId: store.id },
+          select: { agentApiKey: true },
+        })
+      );
       if (!row?.agentApiKey) {
         context.credential = 'unconfigured';
       } else {
@@ -690,7 +693,7 @@ async function flushCount(
     // One short store-scoped statement (strict RLS: an unscoped UPDATE matches no row).
     await runInStoreScope(store.id, () =>
       prisma.auditLog.update({
-        where: { id: rowId },
+        where: { id: rowId, storeId: store.id },
         data: { details: JSON.parse(JSON.stringify({ ...baseDetails, count })) },
       })
     );

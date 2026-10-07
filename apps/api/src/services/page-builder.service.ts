@@ -31,7 +31,7 @@
  * the storefront Next data cache via the `layout:<storeId>` tag, and the
  * store's slug/host/domain resolve keys. Draft saves touch no public cache.
  */
-import { prisma } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import {
   BUILDER_LIMITS,
   PAGE_DEFINITION_SCHEMA_VERSION,
@@ -113,10 +113,12 @@ const META_SELECT = {
 const docBytes = (d: unknown) => Buffer.byteLength(JSON.stringify(d), 'utf8');
 
 async function loadStore(storeId: string) {
-  return prisma.store.findUnique({
-    where: { id: storeId },
-    select: { layoutSettings: true, template: true, slug: true, domain: true },
-  });
+  return withStore(storeId, tx =>
+    tx.store.findUnique({
+      where: { id: storeId },
+      select: { layoutSettings: true, template: true, slug: true, domain: true },
+    })
+  );
 }
 
 async function loadRows(storeId: string, pageKey: string) {
@@ -342,10 +344,12 @@ async function applyPublishedLayout(
   definition: PageDefinition
 ): Promise<StoreLayoutSettings> {
   const layout = definitionToLayout(definition);
-  await prisma.store.update({
-    where: { id: storeId },
-    data: { layoutSettings: layout as unknown as object },
-  });
+  await withStore(storeId, tx =>
+    tx.store.update({
+      where: { id: storeId },
+      data: { layoutSettings: layout as unknown as object },
+    })
+  );
   void cleanupRemovedJsonUrls(store.layoutSettings ?? {}, layout).catch(err =>
     logger.warn({ err, storeId }, '[page-builder] r2 cleanup failed')
   );

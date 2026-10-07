@@ -42,9 +42,10 @@ export const bulkImportOrphanCleanup: InngestFunction.Any = inngest.createFuncti
 
     // `bulk_import_jobs` is store-scoped: sweep it store by store, each in its
     // own scope, and mark that store's orphans failed there.
-    const swept = await acrossStores(async () => {
+    const swept = await acrossStores(async storeId => {
       const found = await prisma.bulkImportJob.findMany({
         where: {
+          storeId,
           status: 'running',
           startedAt: { lt: orphanCutoff },
         },
@@ -52,7 +53,7 @@ export const bulkImportOrphanCleanup: InngestFunction.Any = inngest.createFuncti
       });
       if (found.length > 0) {
         await prisma.bulkImportJob.updateMany({
-          where: { id: { in: found.map(o => o.id) } },
+          where: { id: { in: found.map(o => o.id) }, storeId },
           data: {
             status: 'failed',
             errorMessage:

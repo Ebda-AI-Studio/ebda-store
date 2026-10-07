@@ -24,6 +24,8 @@ Moved verbatim from `CLAUDE.md` (2026-07-11). Canonical reference for StoreTheme
 
 ## Theme flags
 
+> Skin defaults: `TEMPLATE_THEMES` seeds the colours per skin. The Dahab skin (`docs/ebda/templates/dahab.md`) ships a full night/gold/ivory palette, `bgPage`/`bgSectionAlt` night tokens and `dividers.enabled: false`; its layout baseline keeps every section on the page token.
+
 All flags ride the `StoreTheme` JSON column except `blogEnabled` (own `Store` column — gates API routes).
 
 | Flag                              | Default                                                                                                                                 | Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |

@@ -35,9 +35,13 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@force/database', async importOriginal => {
   const actual = await importOriginal<typeof import('@force/database')>();
+  const prisma = { user: { findUnique: h.userFindUnique }, store: { findUnique: vi.fn() } };
   return {
     ...actual,
-    prisma: { user: { findUnique: h.userFindUnique }, store: { findUnique: vi.fn() } },
+    prisma,
+    // requireStoreAccess reads the store inside its own scope (`withStore`, strict RLS);
+    // here the scoped client is the same fake, so the owner/customer fixtures below still decide.
+    withStore: async (_storeId: string, fn: (tx: typeof prisma) => unknown) => fn(prisma),
   };
 });
 

@@ -352,11 +352,13 @@ const OPT_OUT_BASE_TTL_MS = 120_000;
 const optOutBaseCache = new BoundedMap<string, { base: Promise<string>; expiresAt: number }>(2000);
 
 async function readStorefrontBase(storeId: string): Promise<{ base: string; found: boolean }> {
-  // `stores` carries no RLS: a plain read.
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: { domain: true, slug: true },
-  });
+  // `stores` is under RLS (R-EBDA-005): read in the store's own scope.
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({
+      where: { id: storeId },
+      select: { domain: true, slug: true },
+    })
+  );
   const base = store ? storefrontOrigin(store) : config.webUrl;
   return { base, found: !!store };
 }

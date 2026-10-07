@@ -62,26 +62,31 @@ const txClient = {
   },
 };
 
-vi.mock('@force/database', () => ({
-  prisma: {
-    loyaltyTransaction: {
-      findFirst: (...a: unknown[]) => outerTxFindFirst(...a),
-      // The pre-fix code built its batch from these; they must look like the
-      // in-transaction writes so a reverted fix is judged on its VALUES.
-      create: (...a: unknown[]) => inTxCreate(...a),
+vi.mock('@force/database', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod: Record<string, any> = {
+    prisma: {
+      loyaltyTransaction: {
+        findFirst: (...a: unknown[]) => outerTxFindFirst(...a),
+        // The pre-fix code built its batch from these; they must look like the
+        // in-transaction writes so a reverted fix is judged on its VALUES.
+        create: (...a: unknown[]) => inTxCreate(...a),
+      },
+      loyaltyPoints: {
+        findUnique: (...a: unknown[]) => outerPointsFindUnique(...a),
+        update: (...a: unknown[]) => inTxPointsUpdate(...a),
+      },
+      store: { findUnique: vi.fn(() => Promise.resolve({ loyaltySettings: {} })) },
+      // Pre-fix array batch: run the already-created promises.
+      $transaction: (arg: unknown) =>
+        Array.isArray(arg) ? Promise.all(arg) : (arg as (tx: unknown) => unknown)(txClient),
     },
-    loyaltyPoints: {
-      findUnique: (...a: unknown[]) => outerPointsFindUnique(...a),
-      update: (...a: unknown[]) => inTxPointsUpdate(...a),
-    },
-    store: { findUnique: vi.fn(() => Promise.resolve({ loyaltySettings: {} })) },
-    // Pre-fix array batch: run the already-created promises.
-    $transaction: (arg: unknown) =>
-      Array.isArray(arg) ? Promise.all(arg) : (arg as (tx: unknown) => unknown)(txClient),
-  },
-  withMoneyTx: (_client: unknown, fn: (tx: unknown) => unknown) => fn(txClient),
-  Prisma: { PrismaClientKnownRequestError },
-}));
+    withMoneyTx: (_client: unknown, fn: (tx: unknown) => unknown) => fn(txClient),
+    Prisma: { PrismaClientKnownRequestError },
+  };
+  mod.withStore = (_id: string, fn: (tx: unknown) => unknown) => fn(mod.prisma);
+  return mod;
+});
 
 vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: () => Promise.resolve(true) },

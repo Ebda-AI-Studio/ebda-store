@@ -21,8 +21,12 @@ const h = vi.hoisted(() => ({
 vi.mock('@force/database', () => ({
   runInTenantContext: async (_s: string, fn: () => Promise<unknown>) => fn(),
   runInStoreScope: async (_s: string, fn: () => Promise<unknown>) => fn(),
+  // The cron lists stores through the directory definer; the filter is applied in code.
+  storeDirectory: async (filter?: (s: Record<string, unknown>) => boolean) =>
+    ['s1', 's2']
+      .map(id => ({ id, status: 'active', aiFeaturesEnabled: true, plan: 'professional' }))
+      .filter(s => (filter ? filter(s) : true)),
   prisma: {
-    store: { findMany: async () => [{ id: 's1' }, { id: 's2' }] },
     // run-started-at reads the DATABASE clock (issue 2076).
     $queryRaw: async () => [{ now: new Date() }],
   },
@@ -40,7 +44,6 @@ vi.mock('@api/services/answer-engine/gemini.provider', () => ({
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: h.sendAlert }));
 vi.mock('@api/lib/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock('@api/lib/ai-plan-eligibility', () => ({
-  aiEligiblePlanFilter: {},
   isAiEligiblePlan: () => true,
 }));
 

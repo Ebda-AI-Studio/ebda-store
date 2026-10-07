@@ -14,6 +14,10 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import crypto from 'node:crypto';
+import pg from 'pg';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { TextFallbackClient } from '../../packages/database/src/client';
 import {
   createPrismaClient,
   runWithRequestDb,
@@ -54,7 +58,31 @@ function appUrl(): string {
 const makeApp = () => createPrismaClient({ connectionString: appUrl(), max: 2 });
 const inStore = <T>(storeId: string, fn: () => Promise<T>) =>
   runWithRequestDb(makeApp, () => runInTenantContext(storeId, fn));
-const contextless = <T>(fn: () => Promise<T>) => runWithRequestDb(makeApp, fn);
+
+/**
+ * The RLS proof below must run UNGUARDED: the code-level tenant guard (R-EBDA-003) would refuse
+ * the deliberately unscoped queries before Postgres saw them, so the policy would go unproved.
+ * Same shape as tests/integration/rls-ebda-app.test.ts: a plain ebda_app client, GUC set by hand.
+ */
+async function rawApp<T>(
+  storeId: string | undefined,
+  fn: (tx: PrismaClient) => Promise<T>
+): Promise<T> {
+  const client = new PrismaClient({
+    adapter: new PrismaPg(
+      new pg.Pool({ connectionString: appUrl(), max: 1, Client: TextFallbackClient }),
+      { disposeExternalPool: true }
+    ),
+  });
+  try {
+    return await client.$transaction(async tx => {
+      if (storeId) await tx.$queryRaw`SELECT set_config('app.current_store_id', ${storeId}, true)`;
+      return fn(tx as unknown as PrismaClient);
+    });
+  } finally {
+    await client.$disconnect();
+  }
+}
 
 const MODEL = (name: string, materials = ['Band', 'Stone']) => ({
   modelUrl: `https://media.test/stores/x/models/${name}.glb`,
@@ -114,7 +142,7 @@ async function productWithOptions(storeId: string, tag: string) {
 }
 
 beforeAll(async () => {
-  owner = createPrismaClient({ connectionString: OWNER_URL, max: 3 });
+  owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
   await owner.$executeRawUnsafe(`ALTER ROLE ebda_app WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
   ids.storeA = await freshStore('a');
   ids.storeB = await freshStore('b');
@@ -253,14 +281,14 @@ describe('concurrent first uploads for one product', { retry: 0 }, () => {
 
 describe('strict RLS on product_models / product_model_bindings', { retry: 0 }, () => {
   it('store B sees none of store A rows and cannot write into store A', async () => {
-    const seen = await inStore(ids.storeB, async () => ({
-      models: await prisma.productModel.count(),
-      bindings: await prisma.productModelBinding.count(),
+    const seen = await rawApp(ids.storeB, async tx => ({
+      models: await tx.productModel.count(),
+      bindings: await tx.productModelBinding.count(),
     }));
     expect(seen).toEqual({ models: 0, bindings: 0 });
     await expect(
-      inStore(ids.storeB, () =>
-        prisma.productModel.create({
+      rawApp(ids.storeB, tx =>
+        tx.productModel.create({
           data: {
             storeId: ids.storeA,
             productId: ids.productB,
@@ -276,11 +304,11 @@ describe('strict RLS on product_models / product_model_bindings', { retry: 0 }, 
   });
 
   it('a context-less ebda_app read sees nothing and a write is rejected', async () => {
-    expect(await contextless(() => prisma.productModel.count())).toBe(0);
-    expect(await contextless(() => prisma.productModelBinding.count())).toBe(0);
+    expect(await rawApp(undefined, tx => tx.productModel.count())).toBe(0);
+    expect(await rawApp(undefined, tx => tx.productModelBinding.count())).toBe(0);
     await expect(
-      contextless(() =>
-        prisma.productModel.create({
+      rawApp(undefined, tx =>
+        tx.productModel.create({
           data: {
             storeId: ids.storeB,
             productId: ids.productB,

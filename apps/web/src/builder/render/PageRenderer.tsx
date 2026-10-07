@@ -22,6 +22,20 @@ import {
 } from '@force/shared';
 import { ImageTextSection, type ImageTextSettings } from '../sections/ImageTextSection';
 import { NewsletterSection, type NewsletterSettings } from '../sections/NewsletterSection';
+import {
+  FeaturedCollectionSection,
+  type FeaturedCollectionSettings,
+} from '../sections/FeaturedCollectionSection';
+import {
+  CollectionListSection,
+  type CollectionListSettings,
+} from '../sections/CollectionListSection';
+import {
+  ProductSpotlightSection,
+  type ProductSpotlightSettings,
+} from '../sections/ProductSpotlightSection';
+import { TrustBadgesSection, type TrustBadgesSettings } from '../sections/TrustBadgesSection';
+import { resolveSectionProducts } from '../sections/section-products';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import {
   sectionSpacingClasses,
@@ -101,6 +115,16 @@ export function PageRenderer({
 
   const isRtl = language === 'ar';
   const T = getHomepageTemplate(templateId);
+  // The "Featured products" fallback exists so a page never ends without
+  // products; a document that already shows products in a builder product
+  // section (or a carousel) does not need it.
+  const documentShowsProducts = definition.sections.some(
+    n =>
+      n.hidden !== true &&
+      (n.type === 'featured-collection' ||
+        n.type === 'product-spotlight' ||
+        n.type === 'product-carousel')
+  );
 
   // Effective card-price visibility: the store-level master toggle
   // (theme.showPriceOnCards) composes with the per-card default
@@ -958,8 +982,48 @@ export function PageRenderer({
             // Document-only sections render straight from the document.
             if (section.hidden === true) continue;
             const settings = sectionToLegacy(section, '') as Record<string, unknown>;
+            const pools = {
+              newArrivals,
+              bestSellers,
+              featured: featuredProducts,
+              extra: extraProducts ?? [],
+            };
             const node =
-              def.type === 'image-text' ? (
+              def.type === 'featured-collection' ? (
+                <FeaturedCollectionSection
+                  settings={settings as FeaturedCollectionSettings}
+                  products={resolveSectionProducts(
+                    settings as FeaturedCollectionSettings,
+                    pools,
+                    8
+                  ).map(toTemplateProduct)}
+                  pack={templateId}
+                  onAddToCart={handleAddToCart}
+                  editorMode={editorMode}
+                />
+              ) : def.type === 'collection-list' ? (
+                <CollectionListSection
+                  settings={settings as CollectionListSettings}
+                  blocks={section.blocks ?? []}
+                  categories={categories}
+                  editorMode={editorMode}
+                />
+              ) : def.type === 'product-spotlight' ? (
+                <ProductSpotlightSection
+                  settings={settings as ProductSpotlightSettings}
+                  products={resolveSectionProducts(
+                    settings as ProductSpotlightSettings,
+                    pools,
+                    3
+                  ).map(toTemplateProduct)}
+                  editorMode={editorMode}
+                />
+              ) : def.type === 'trust-badges' ? (
+                <TrustBadgesSection
+                  settings={settings as TrustBadgesSettings}
+                  blocks={section.blocks ?? []}
+                />
+              ) : def.type === 'image-text' ? (
                 <ImageTextSection
                   settings={settings as ImageTextSettings}
                   editorMode={editorMode}
@@ -999,6 +1063,7 @@ export function PageRenderer({
           Sprint 1: was `bg-muted/30`; now uses the section-alt token. */}
       {!layout.newArrivals.enabled &&
         !layout.bestSellers.enabled &&
+        !documentShowsProducts &&
         templateProducts.length > 0 && (
           <section className="bg-[hsl(var(--bg-section-alt))] py-12 sm:py-16 lg:py-20">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

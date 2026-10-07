@@ -192,11 +192,14 @@ const { mockPrisma, capturedOrderCreate } = vi.hoisted(() => {
 });
 
 vi.mock('@force/database', () => ({
-  setTenantGucs: async () => undefined,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  scopeTransaction: (tx: any, _g: unknown, fn: any) => fn(tx),
   prisma: mockPrisma,
   Prisma: {},
   OrderStatus: {},
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  withStore: (_storeId: string, fn: any) => fn(mockPrisma),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   withMoneyTx: (client: any, fn: any) =>
     client?.$transaction ? client.$transaction(fn) : fn(client),

@@ -228,7 +228,7 @@ describe('order-refunded fanout — restore-inventory step', () => {
     // (see docs/superpowers/plans/2026-08-30-variant-stock-drift.md).
     expect(h.productUpdate).toHaveBeenCalledTimes(1);
     expect(h.productUpdate).toHaveBeenCalledWith({
-      where: { id: 'p1' },
+      where: { id: 'p1', storeId: 's1' },
       data: { inventory: { increment: 2 } },
     });
     expect(h.productUpdate).not.toHaveBeenCalledWith(
@@ -295,7 +295,7 @@ describe('order-refunded fanout — restore-inventory step', () => {
 
     expect(h.productUpdate).toHaveBeenCalledTimes(1);
     expect(h.productUpdate).toHaveBeenCalledWith({
-      where: { id: 'p1' },
+      where: { id: 'p1', storeId: 's1' },
       data: { inventory: { increment: 2 } },
     });
     expect(h.inventoryHistoryCreate).toHaveBeenCalledTimes(1);
@@ -455,7 +455,7 @@ describe('order-refunded fanout — affiliate/loyalty/backorder reversal steps',
     await handleOrderRefunded('o1', 's1', true, true, stepStub);
 
     expect(h.backorderLineUpdateMany).toHaveBeenCalledWith({
-      where: { orderItem: { orderId: 'o1' }, fulfilledAt: null, cancelledAt: null },
+      where: { storeId: 's1', orderItem: { orderId: 'o1' }, fulfilledAt: null, cancelledAt: null },
       data: expect.objectContaining({ cancelledReason: 'Order refunded' }),
     });
   });
@@ -680,7 +680,7 @@ describe('order-refunded fanout — two-tier failure policy (Task 4)', () => {
     // nothing else. The claim row is never deleted.
     expect(h.orderEventDeleteMany).not.toHaveBeenCalled();
     expect(h.orderEventUpdate).toHaveBeenCalledWith({
-      where: { id: 'claim-1' },
+      where: { id: 'claim-1', storeId: 's1' },
       data: { metadata: { released: ['email'] } },
     });
     expect(order.indexOf('release-refund-notification-claim')).toBeGreaterThan(
@@ -704,7 +704,7 @@ describe('order-refunded fanout — two-tier failure policy (Task 4)', () => {
     expect(h.notifyAdminsOfRefund).not.toHaveBeenCalled();
     // …and the released channel is re-claimed.
     expect(h.orderEventUpdate).toHaveBeenCalledWith({
-      where: { id: 'claim-1' },
+      where: { id: 'claim-1', storeId: 's1' },
       data: { metadata: { released: [] } },
     });
   });

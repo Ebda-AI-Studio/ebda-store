@@ -59,7 +59,7 @@ vi.mock('@api/services/wallet.service', () => ({
   storeCustomerWhere: (storeId: string, customerId: string) => ({
     id: customerId,
     role: 'customer',
-    OR: [{ storeId }, { storeId: null, orders: { some: { storeId } } }],
+    storeId,
   }),
   WalletService: {
     listWallets: h.listWallets,

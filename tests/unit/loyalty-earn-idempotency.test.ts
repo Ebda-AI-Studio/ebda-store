@@ -41,13 +41,15 @@ vi.mock('@force/database', () => {
     }
   }
 
+  const prisma = {
+    store: { findUnique: h.storeFindUnique },
+    loyaltyPoints: { findUnique: h.lpFindUnique, create: h.lpCreate, update: vi.fn() },
+    loyaltyTransaction: { findFirst: h.ltFindFirst, create: h.ltCreate },
+    $transaction: h.transaction,
+  };
   return {
-    prisma: {
-      store: { findUnique: h.storeFindUnique },
-      loyaltyPoints: { findUnique: h.lpFindUnique, create: h.lpCreate, update: vi.fn() },
-      loyaltyTransaction: { findFirst: h.ltFindFirst, create: h.ltCreate },
-      $transaction: h.transaction,
-    },
+    prisma,
+    withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(prisma),
     Prisma: { PrismaClientKnownRequestError },
   };
 });

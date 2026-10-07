@@ -1,11 +1,17 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import { seedCoaForStore } from '../../../apps/api/src/services/accounting/account.service';
-import { postOrderPaymentJournal } from '../../../apps/api/src/services/accounting/posting/order-posting';
-import { postRefundJournal } from '../../../apps/api/src/services/accounting/posting/refund-posting';
+import { postOrderPaymentJournal as postOrderPaymentJournalRaw } from '../../../apps/api/src/services/accounting/posting/order-posting';
+import { postRefundJournal as postRefundJournalRaw } from '../../../apps/api/src/services/accounting/posting/refund-posting';
 
 const OWNER = '00000000-0000-0000-0000-0000000000aa';
 let storeId: string;
+// Production runs these inside runInTenantContext(storeId); the tenant guard
+// needs the same ambient store here.
+const postOrderPaymentJournal = (a: Parameters<typeof postOrderPaymentJournalRaw>[0]) =>
+  runInTenantContext(storeId, () => postOrderPaymentJournalRaw(a));
+const postRefundJournal = (a: Parameters<typeof postRefundJournalRaw>[0]) =>
+  runInTenantContext(storeId, () => postRefundJournalRaw(a));
 let productId: string;
 
 beforeAll(async () => {

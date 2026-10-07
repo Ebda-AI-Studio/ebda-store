@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
 import { cookies, headers } from 'next/headers';
-import { Plus_Jakarta_Sans, IBM_Plex_Sans_Arabic } from 'next/font/google';
+import { Plus_Jakarta_Sans, IBM_Plex_Sans_Arabic, Amiri, Marcellus } from 'next/font/google';
 import { ToastProvider } from '@force/ui';
 import { LanguageProvider } from '../contexts/LanguageContext';
 import { StoreProvider } from '../contexts/StoreContext';
@@ -44,6 +44,27 @@ const ibmPlexArabic = IBM_Plex_Sans_Arabic({
   variable: '--font-arabic',
   display: 'swap',
   weight: ['400', '500', '600', '700'],
+});
+
+// Dahab template display faces (builder Phase 3 pilot). `preload: false`:
+// the @font-face rules exist for every store, but a browser only downloads a
+// face that some element actually uses — i.e. only on Dahab storefronts.
+const dahabArabic = Amiri({
+  // Display only, and only the bold cut: Arabic headings are set in Amiri 700
+  // (globals.css); Latin headings use Marcellus. One file on Arabic pages.
+  subsets: ['arabic'],
+  variable: '--font-dahab-ar',
+  display: 'swap',
+  weight: '700',
+  preload: false,
+});
+
+const dahabLatin = Marcellus({
+  subsets: ['latin'],
+  variable: '--font-dahab-latin',
+  display: 'swap',
+  weight: '400',
+  preload: false,
 });
 
 export const viewport: Viewport = {
@@ -516,7 +537,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         // sibling. ShopChrome carries its own pb-32 for content inside it;
         // body-level reserve is the only way to also protect siblings
         // rendered after ShopChrome by the providers. Ahmad 2026-05-17 evening.
-        className={`${plusJakarta.variable} ${ibmPlexArabic.variable} font-sans antialiased bg-background text-foreground overflow-x-hidden pb-32 md:pb-0`}
+        className={`${plusJakarta.variable} ${ibmPlexArabic.variable} ${dahabArabic.variable} ${dahabLatin.variable} font-sans antialiased bg-background text-foreground overflow-x-hidden pb-32 md:pb-0`}
+        // Skin hook for pack-level CSS (Dahab's display face, globals.css), on the
+        // server-rendered body so the first paint already has it (the chrome
+        // itself loads on the client). Only Dahab sets it: other stores' markup
+        // is unchanged.
+        data-pack={store.template === 'dahab' ? 'dahab' : undefined}
       >
         {/* Reset scroll to top on every route change — the body is the scroll
             container (overflow-x-hidden), so Next's window-targeted scroll

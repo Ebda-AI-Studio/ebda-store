@@ -152,18 +152,16 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
     }));
   }
 
-  // Check if COD is enabled for this store (or globally)
+  // Check if COD is enabled for this store. There is no platform-level (storeId NULL) COD
+  // row for the app role: strict RLS hides it and the tenant guard refuses an unscoped read
+  // (R-EBDA-007), so only the store's own row counts.
   let codConfig: { fixedFee: number; displayName: string; displayNameAr: string | null } | null =
     null;
-  const codRecord = await prisma.paymentConfig.findFirst({
-    where: {
-      OR: [
-        ...(storeId ? [{ storeId, provider: 'cod' as const, isEnabled: true }] : []),
-        { storeId: null, provider: 'cod' as const, isEnabled: true },
-      ],
-    },
-    orderBy: { storeId: 'desc' },
-  });
+  const codRecord = storeId
+    ? await prisma.paymentConfig.findFirst({
+        where: { storeId, provider: 'cod' as const, isEnabled: true },
+      })
+    : null;
   if (codRecord) {
     codConfig = {
       fixedFee: codRecord.fixedFee ? Number(codRecord.fixedFee) : 0,
@@ -295,8 +293,8 @@ router.post(
         ? await withStore(orderStoreId, () =>
             prisma.order.findFirst({
               where: isCustomer
-                ? { id: data.orderId, customerId: req.user!.userId }
-                : { id: data.orderId, customerId: null },
+                ? { id: data.orderId, storeId: orderStoreId, customerId: req.user!.userId }
+                : { id: data.orderId, storeId: orderStoreId, customerId: null },
               include: {
                 items: { include: { product: true } },
                 customer: true,
@@ -503,14 +501,9 @@ router.post(
           // COD (Cash on Delivery) — skip payment gateway
           // ==========================================
           // Look up COD config for fee
+          // The store's own COD row only (no platform-level row exists for the app role, R-EBDA-007).
           const codConfig = await prisma.paymentConfig.findFirst({
-            where: {
-              OR: [
-                { storeId: order.storeId, provider: 'cod', isEnabled: true },
-                { storeId: null, provider: 'cod', isEnabled: true },
-              ],
-            },
-            orderBy: { storeId: 'desc' }, // Store-specific first, then global
+            where: { storeId: order.storeId, provider: 'cod', isEnabled: true },
           });
 
           if (!codConfig) {
@@ -566,7 +559,7 @@ router.post(
           });
           if (applyFee) {
             await prisma.order.update({
-              where: { id: order.id },
+              where: { id: order.id, storeId: order.storeId },
               data: { total: chargedTotal },
             });
           }
@@ -950,6 +943,7 @@ router.get(
           // Store admin must own the store the order belongs to
           return !!(await prisma.order.findFirst({
             where: {
+              storeId: statusStoreId,
               payments: { some: { transactionId } },
               store: { ownerId: user.userId },
             },
@@ -958,7 +952,11 @@ router.get(
         }
         // Customer: must own the order
         return !!(await prisma.order.findFirst({
-          where: { customerId: user.userId, payments: { some: { transactionId } } },
+          where: {
+            storeId: statusStoreId,
+            customerId: user.userId,
+            payments: { some: { transactionId } },
+          },
           select: { id: true },
         }));
       });
@@ -1159,16 +1157,18 @@ router.get(
       const order = orderStoreId
         ? await withStore(orderStoreId, () => {
             if (user.role === 'super_admin') {
-              return prisma.order.findUnique({ where: { id: orderId } });
+              return prisma.order.findUnique({ where: { id: orderId, storeId: orderStoreId } });
             }
             if (user.role === 'store_admin') {
               // Store admin can only see orders from stores they own
               return prisma.order.findFirst({
-                where: { id: orderId, store: { ownerId: user.userId } },
+                where: { id: orderId, storeId: orderStoreId, store: { ownerId: user.userId } },
               });
             }
             // Customer: can only see their own orders
-            return prisma.order.findFirst({ where: { id: orderId, customerId: user.userId } });
+            return prisma.order.findFirst({
+              where: { id: orderId, storeId: orderStoreId, customerId: user.userId },
+            });
           })
         : null;
 
@@ -1227,7 +1227,7 @@ router.get('/:id/events', authenticate, async (req: Request, res: Response, next
 
     const events = await withStore(owner.storeId, () =>
       prisma.paymentEvent.findMany({
-        where: { paymentId: owner.paymentId },
+        where: { storeId: owner.storeId, paymentId: owner.paymentId },
         orderBy: { occurredAt: 'desc' },
         select: {
           id: true,
@@ -1278,7 +1278,7 @@ router.get(
       const event = owner
         ? await withStore(owner.storeId, () =>
             prisma.paymentEvent.findUnique({
-              where: { id: eventId },
+              where: { id: eventId, storeId: owner.storeId },
               select: {
                 id: true,
                 paymentId: true,

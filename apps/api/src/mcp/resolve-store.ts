@@ -1,4 +1,5 @@
-import { prisma } from '@force/database';
+import { withStore } from '@force/database';
+import { lookupStore } from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
 
 export interface McpStore {
@@ -24,10 +25,17 @@ export interface McpStore {
  * off/unentitled" (capability leak). Do not give this a distinct code.
  */
 export async function resolveStoreBySlug(slug: string): Promise<McpStore> {
-  const store = await prisma.store.findFirst({
-    where: { slug, status: 'active', deletedAt: null },
-    select: { id: true, name: true, slug: true, currency: true, domain: true },
-  });
+  // `stores` is under RLS (R-EBDA-005): the slug resolves through the definer (active,
+  // not deleted), then the row is read inside that store's own scope.
+  const hit = await lookupStore({ slug }, ['active']);
+  const store = hit
+    ? await withStore(hit.id, tx =>
+        tx.store.findUnique({
+          where: { id: hit.id },
+          select: { id: true, name: true, slug: true, currency: true, domain: true },
+        })
+      )
+    : null;
 
   if (!store) {
     throw new AppError(404, 'NOT_FOUND', 'Not found');

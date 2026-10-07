@@ -545,7 +545,7 @@ export class AnalyticsService {
     // Fetch product details for the top productIds in a single query
     const productIds = grouped.map(g => g.productId);
     const products = await prisma.product.findMany({
-      where: { id: { in: productIds } },
+      where: { id: { in: productIds }, storeId },
       select: {
         id: true,
         name: true,
@@ -690,6 +690,7 @@ export class AnalyticsService {
       // Customers with at least one order in the period who had no earlier orders
       prisma.user.count({
         where: {
+          storeId,
           orders: {
             some: { storeId, createdAt: { gte: startDate, lte: endDate } },
           },
@@ -704,6 +705,7 @@ export class AnalyticsService {
       // Customers with more than one order in this store (returning buyers)
       prisma.user.count({
         where: {
+          storeId,
           orders: {
             some: { storeId },
           },
@@ -737,7 +739,7 @@ export class AnalyticsService {
       .map(g => g.customerId)
       .filter((id): id is string => id != null);
     const customerDetails = await prisma.user.findMany({
-      where: { id: { in: topCustomerIds } },
+      where: { id: { in: topCustomerIds }, storeId },
       select: { id: true, email: true, firstName: true, lastName: true },
     });
 

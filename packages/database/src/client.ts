@@ -16,6 +16,7 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import type { SqlDriverAdapterFactory } from '@prisma/driver-adapter-utils';
+import { tenantGuardExtension } from './tenant-guard';
 
 // Options are extracted so the client's TYPE can be derived from them. A global
 // `omit` narrows PrismaClient's generic, so a plain `PrismaClient` annotation
@@ -43,13 +44,17 @@ const prismaOptions = {
   // off a query that didn't select it is a TYPE ERROR, and every reader now
   // names the field in its `select`. PaymentConfig.{apiKey,secretKey,
   // webhookSecret} still needs the same pass.
+  //
+  // 2026-10-07 (R-EBDA-005): the three store credentials moved out of `stores`
+  // into `store_credentials` (strict store RLS); the omit moved with them, so a
+  // reader still names each one in a `select`.
   omit: {
     user: {
       passwordHash: true,
       mfaSecret: true,
       mfaBackupCodes: true,
     },
-    store: {
+    storeCredential: {
       wbsApiKey: true,
       metaAccessToken: true,
       agentApiKey: true,
@@ -88,6 +93,18 @@ export interface CreatePrismaClientOptions {
    * passes ['error', 'warn']: a console line per query is CPU, log volume and heap there.
    */
   log?: Array<'query' | 'info' | 'warn' | 'error'>;
+  /**
+   * 'app' (default): the client every runtime uses. It carries the code-level tenant
+   * guard (`tenant-guard.ts`, R-EBDA-003): a query on a tenant model must be scoped to
+   * the ambient store or it is refused before it is sent.
+   *
+   * 'owner': migrations, seeds, ops scripts and integration-test FIXTURES only. No
+   * tenant guard, and it REFUSES to run unless its connection role bypasses RLS by
+   * itself (superuser / BYPASSRLS): on `ebda_app` its first query throws. It is the
+   * client form of `withOwnerTx` (hatch 'owner-role-tx'), and
+   * `tests/unit/no-rls-bypass-in-runtime.test.ts` keeps it out of `apps/api/src`.
+   */
+  role?: 'app' | 'owner';
 }
 
 /**
@@ -234,6 +251,7 @@ export function createPrismaClient(opts: CreatePrismaClientOptions): AppPrismaCl
         console.error(`[database] idle pool client error: ${err.message}`);
       }),
   });
+  if (opts.role === 'owner') return createOwnerClient(adapter, opts.log);
   return createPrismaClientWithAdapter(adapter, opts.log);
 }
 
@@ -245,9 +263,51 @@ export function createPrismaClientWithAdapter(
   adapter: PrismaPg | SqlDriverAdapterFactory,
   log?: CreatePrismaClientOptions['log']
 ): AppPrismaClient {
+  // The tenant guard is a QUERY extension: it changes no types, so the client keeps
+  // the omit-narrowed `AppPrismaClient` shape. Interactive transactions opened on it
+  // carry the extension too.
   return new PrismaClient({
     ...prismaOptions,
     ...(log ? { log } : {}),
     adapter,
+  }).$extends(tenantGuardExtension) as unknown as AppPrismaClient;
+}
+
+/**
+ * The owner-role client (`role: 'owner'`): no tenant guard, and every operation first
+ * proves (once per client) that the connection's role bypasses RLS by itself. On the
+ * strict-RLS app role it throws instead of silently reading zero rows.
+ */
+function createOwnerClient(
+  adapter: PrismaPg,
+  log?: CreatePrismaClientOptions['log']
+): AppPrismaClient {
+  const base = new PrismaClient({ ...prismaOptions, ...(log ? { log } : {}), adapter });
+  let verified: Promise<void> | undefined;
+  const verify = (): Promise<void> =>
+    (verified ??= base
+      .$queryRawUnsafe<Array<{ ok: boolean; who: string }>>(
+        'SELECT (rolsuper OR rolbypassrls) AS ok, current_user::text AS who FROM pg_roles WHERE rolname = current_user'
+      )
+      .then(rows => {
+        if (rows[0]?.ok !== true) {
+          throw new Error(
+            `owner-role client: connection role ${rows[0]?.who ?? '?'} does not bypass RLS. ` +
+              'It is for migrations, scripts and test fixtures on an owner connection only.'
+          );
+        }
+      })
+      .catch(err => {
+        verified = undefined;
+        throw err;
+      }));
+  return base.$extends({
+    name: 'ebda-owner-role-check',
+    query: {
+      $allOperations: async ({ args, query }) => {
+        await verify();
+        return query(args);
+      },
+    },
   }) as unknown as AppPrismaClient;
 }

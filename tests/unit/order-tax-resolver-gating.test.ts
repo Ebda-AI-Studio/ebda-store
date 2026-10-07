@@ -21,13 +21,17 @@ const taxRateFindMany = vi.fn();
 const profileFindUnique = vi.fn();
 const isFeatureEnabled = vi.fn();
 
-vi.mock('@force/database', () => ({
-  prisma: {
+vi.mock('@force/database', () => {
+  const client = {
     store: { findUnique: (...args: unknown[]) => storeFindUnique(...args) },
     taxRate: { findMany: (...args: unknown[]) => taxRateFindMany(...args) },
     storeTaxProfile: { findUnique: (...args: unknown[]) => profileFindUnique(...args) },
-  },
-}));
+  };
+  return {
+    prisma: client,
+    withStore: (_storeId: string, fn: (tx: typeof client) => unknown) => fn(client),
+  };
+});
 
 vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: (...args: unknown[]) => isFeatureEnabled(...args) },

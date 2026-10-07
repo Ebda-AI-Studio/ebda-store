@@ -12,6 +12,9 @@ const { mockCreate } = vi.hoisted(() => ({ mockCreate: vi.fn(async () => ({ id: 
 
 vi.mock('@force/database', () => ({
   prisma: { refreshToken: { create: mockCreate } },
+  // The session row is written as the user it belongs to: run the callback on the same fake.
+  withUser: async (_userId: string, fn: (tx: unknown) => unknown) =>
+    fn({ refreshToken: { create: mockCreate } }),
   Prisma: {},
 }));
 vi.mock('@api/services/redis.service', () => ({

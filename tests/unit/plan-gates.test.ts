@@ -26,6 +26,9 @@ vi.mock('@force/database', () => ({
   prisma: { store: { findMany: m.storeFindMany } },
   Prisma: {},
   withMoneyTx: vi.fn(),
+  // `stores` is under RLS: the owner's stores are listed as that owner.
+  withUser: async (_id: string, fn: (tx: unknown) => unknown) =>
+    fn({ store: { findMany: m.storeFindMany } }),
   withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
     fn({
       store: { findUnique: m.storeFindUnique },

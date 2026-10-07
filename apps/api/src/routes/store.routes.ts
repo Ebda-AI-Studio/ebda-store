@@ -2,9 +2,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
-import { tenantContext } from '../middleware/tenant-context';
+import { storeScopeContext, tenantContext } from '../middleware/tenant-context';
 import { requireStoreAccess } from '../middleware/store-access';
-import { Prisma, prisma, StoreStatus, withUser } from '@force/database';
+import { Prisma, prisma, StoreStatus, withUser, asPlatformOperator } from '@force/database';
 import { StoreService } from '../services/store.service';
 import { resolveDomainService } from '../services/domain-provider';
 import { DomainClaimService, normalizeDomain } from '../services/domain-claim.service';
@@ -32,6 +32,13 @@ import {
 } from '../lib/marketing-pixels-secrets';
 
 const router = Router();
+
+// Every `/:id` route acts on THAT store, and `/stores` is mounted with no request
+// transaction (index.ts: the domain handlers make slow third-party calls). Scope each
+// one to its store with `storeScopeContext` (runInStoreScope: every query is its own
+// short store transaction), so the code-level tenant guard (R-EBDA-003) and RLS on
+// `stores` (R-EBDA-005) see the store; authorization is still `requireStoreAccess`.
+router.param('id', (req, res, next) => storeScopeContext(req, res, next));
 
 /**
  * Parse a store create/update body. A rejected slug is raised as its own stable
@@ -447,7 +454,12 @@ router.get(
 
       // The store payload names its owner (`users`, identity-scoped under strict RLS): read
       // as the acting user, who is either a super_admin (sees every owner) or the owner.
-      const result = await withUser(req.user!.userId, () =>
+      // A super_admin's list is the platform directory: the 'platform-operator' hatch.
+      const asActor = <T>(fn: () => Promise<T>) =>
+        req.user!.role === 'super_admin'
+          ? asPlatformOperator(req.user!.userId, fn)
+          : withUser(req.user!.userId, fn);
+      const result = await asActor(() =>
         StoreService.list({
           page: page ? parseInt(page as string) : undefined,
           limit: limit ? parseInt(limit as string) : undefined,
@@ -1511,7 +1523,9 @@ router.put(
       if (faq.count === 0) {
         throw new AppError(404, 'NOT_FOUND', 'FAQ not found');
       }
-      const updated = await prisma.storeFaq.findUnique({ where: { id: req.params.faqId } });
+      const updated = await prisma.storeFaq.findUnique({
+        where: { id: req.params.faqId, storeId: req.params.id },
+      });
       res.json({ success: true, data: updated });
     } catch (error) {
       next(error);
@@ -1651,7 +1665,7 @@ router.put(
       if (body.orderIndex !== undefined) updateData.orderIndex = body.orderIndex;
       if (body.isActive !== undefined) updateData.isActive = body.isActive;
       const updated = await prisma.storeHowto.update({
-        where: { id: req.params.howtoId },
+        where: { id: req.params.howtoId, storeId: req.params.id },
         data: updateData,
       });
       res.json({ success: true, data: updated });

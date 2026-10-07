@@ -12,6 +12,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the database module before importing the service
 vi.mock('@force/database', () => ({
+  // tests/setup-e2e.ts builds the owner-role fixture client from this export;
+  // these suites never touch a database, so a stub is enough.
+  createPrismaClient: vi.fn(),
   prisma: {
     customerAddress: {
       findMany: vi.fn(),

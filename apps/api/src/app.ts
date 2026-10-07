@@ -33,6 +33,7 @@ import alertWebhookRoutes from './routes/alert-webhooks.routes';
 import waBridgeRoutes from './routes/wa-bridge.routes';
 import { setupSwagger } from './docs/swagger';
 import { prisma } from '@force/database';
+import { lookupStore } from './lib/definer';
 import { redis } from './services/redis.service';
 import { circuitBreaker } from './services/circuit-breaker.service';
 import { emailQueue } from './services/email-queue.service';
@@ -255,8 +256,8 @@ app.use(
 
         // Async DB lookup — only allow if a LIVE store (active/suspended, not
         // deleted) owns this host (slug subdomain or custom domain). See corsStoreOriginWhere (#1214).
-        prisma.store
-          .findFirst({ where: storeOriginWhere.where, select: { id: true } })
+        // `stores` is under RLS (R-EBDA-005): the host resolves through the lookup definer.
+        lookupStore(storeOriginWhere.match, storeOriginWhere.statuses)
           .then(store => {
             const allowed = store !== null;
             corsDomainCache.set(hostname, corsEntryAfterLookup(allowed, Date.now()));

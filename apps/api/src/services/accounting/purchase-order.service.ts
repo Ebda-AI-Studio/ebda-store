@@ -192,7 +192,7 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
 
   const po = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
     const po = await tx.purchaseOrder.findUnique({
-      where: { id: input.poId },
+      where: { id: input.poId, storeId: input.storeId },
       include: { items: true },
     });
     if (!po || po.storeId !== input.storeId)
@@ -256,7 +256,7 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
         const isFullyFulfilled = newQtyFulfilled === bo.qty;
 
         await tx.backorderLine.update({
-          where: { id: bo.id },
+          where: { id: bo.id, storeId: input.storeId },
           data: {
             qtyFulfilled: newQtyFulfilled,
             ...(isFullyFulfilled ? { fulfilledAt: new Date(), fulfilledByPoItemId: item.id } : {}),
@@ -436,7 +436,7 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
     const newStatus = allComplete ? 'received' : anyReceived ? 'partial' : po.status;
 
     return tx.purchaseOrder.update({
-      where: { id: input.poId },
+      where: { id: input.poId, storeId: input.storeId },
       data: {
         status: newStatus,
         receivedAt: allComplete ? new Date() : po.receivedAt,
@@ -518,7 +518,7 @@ export async function cancelPurchaseOrder(storeId: string, id: string) {
       'PO_ALREADY_RECEIVED',
       'A fully-received purchase order cannot be cancelled.'
     );
-  return prisma.purchaseOrder.update({ where: { id }, data: { status: 'cancelled' } });
+  return prisma.purchaseOrder.update({ where: { id, storeId }, data: { status: 'cancelled' } });
 }
 
 /**
@@ -594,7 +594,7 @@ export async function createPoFromSuggestion(
   });
 
   await prisma.reorderSuggestion.update({
-    where: { id: suggestionId },
+    where: { id: suggestionId, storeId },
     data: { status: 'accepted', poId: po.id },
   });
 

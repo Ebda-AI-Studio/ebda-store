@@ -29,6 +29,7 @@ import { useNumerals } from '../../hooks/useNumerals';
 import { getProductCardTextSizes, resolveColor, REGION } from '@force/shared';
 import { cn } from '@force/ui';
 import type { ProductCarouselProps } from '../types';
+import { DahabProductCarousel } from '../dahab/ProductCarousel';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { getDiscountBadgeText, isOnSale } from '../../lib/product-pricing';
 import { getDiscountBadgeColor } from './discount-badge';
@@ -49,7 +50,7 @@ import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from 
  * strip every 4s, pauses on hover/touch, respects prefers-reduced-motion,
  * and loops back to the start when it reaches the end.
  */
-export function ProductCarousel({
+function SharedProductCarousel({
   products,
   title,
   titleAr,
@@ -788,5 +789,18 @@ export function ProductCarousel({
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Pack hand-over: Dahab renders its own product row (templates/dahab/
+ * ProductCarousel); every other pack renders the shared carousel above. The
+ * product page's related strip and the homepage both call this export.
+ */
+export function ProductCarousel(props: ProductCarouselProps) {
+  return props.pack === 'dahab' ? (
+    <DahabProductCarousel {...props} />
+  ) : (
+    <SharedProductCarousel {...props} />
   );
 }

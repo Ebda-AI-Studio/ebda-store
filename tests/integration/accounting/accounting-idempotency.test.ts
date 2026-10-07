@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import { seedCoaForStore } from '../../../apps/api/src/services/accounting/account.service';
 import { postOrderPaymentJournal } from '../../../apps/api/src/services/accounting/posting/order-posting';
 
@@ -83,7 +83,10 @@ describe('webhook / inngest re-fire does not double-post', () => {
       // Fire 5 times in parallel — simulating webhook retries + concurrent
       // refresh-payment safety net + Inngest at-least-once delivery
       const results = await Promise.allSettled(
-        Array.from({ length: 5 }, () => postOrderPaymentJournal({ orderId: order.id }))
+        Array.from({ length: 5 }, () =>
+          // Production calls this inside runInTenantContext(storeId).
+          runInTenantContext(store.id, () => postOrderPaymentJournal({ orderId: order.id }))
+        )
       );
 
       const entries = await prisma.journalEntry.findMany({

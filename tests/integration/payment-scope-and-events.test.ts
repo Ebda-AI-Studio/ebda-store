@@ -91,8 +91,10 @@ describe.skipIf(!hasDb)('payment scope: link/retry outside a tx, events definer'
         ownerId: admin.id,
         status: 'active',
         wbsEnabled: true,
-        wbsApiKey: encryption.encrypt('wbs-test-key'),
       },
+    });
+    await owner.storeCredential.create({
+      data: { storeId: store.id, wbsApiKey: encryption.encrypt('wbs-test-key') },
     });
     storeIds.push(store.id);
     await planService.assignPlan(store.id, { planCode: 'comped' });
@@ -193,7 +195,7 @@ describe.skipIf(!hasDb)('payment scope: link/retry outside a tx, events definer'
   };
 
   beforeAll(async () => {
-    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4 });
+    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4, role: 'owner' });
     paymobServer = await serveStub(paymob.fetch, async () => {
       idleTxAtGatewayCall.push(await idleAppTransactions());
     });

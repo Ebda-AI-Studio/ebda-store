@@ -180,7 +180,7 @@ export async function upsertModel(
       return upsertModel(storeId, productId, input);
     }
   }
-  await prisma.productModel.update({ where: { id: existing.id }, data });
+  await prisma.productModel.update({ where: { id: existing.id, storeId }, data });
   const materialNames = input.materials.map(m => m.name);
   const dropped = await prisma.productModelBinding.deleteMany({
     where: {
@@ -206,7 +206,10 @@ export async function setUsdz(
     select: { id: true, usdzUrl: true },
   });
   if (!existing) throw new AppError(404, 'NO_MODEL', 'Upload the .glb model first');
-  await prisma.productModel.update({ where: { id: existing.id }, data: { usdzUrl, usdzBytes } });
+  await prisma.productModel.update({
+    where: { id: existing.id, storeId },
+    data: { usdzUrl, usdzBytes },
+  });
   return { previousUsdzUrl: existing.usdzUrl };
 }
 

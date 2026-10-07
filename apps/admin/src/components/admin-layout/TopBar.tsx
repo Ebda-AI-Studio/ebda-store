@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { Button } from '@force/ui';
 import { NotificationBell } from '../NotificationBell';
+import AdminLanguageSwitcher from '../AdminLanguageSwitcher';
+import { DocumentTitle } from '../DocumentTitle';
 import { useT } from '@/i18n/useT';
 
 interface TopBarProps {
@@ -30,6 +32,7 @@ export function TopBar({
 
   return (
     <header className="sticky top-0 z-20 border-b border-border/50 bg-card/80 backdrop-blur-md">
+      <DocumentTitle title={title} />
       {/* Primary row — title + bell. Actions live below this on mobile
           (see the mobile-only second row) and inline on desktop. The
           header is no longer fixed-height: it absorbs whatever the
@@ -87,6 +90,7 @@ export function TopBar({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 lg:gap-3">
+          <AdminLanguageSwitcher />
           <NotificationBell />
 
           {viewStoreUrl && (

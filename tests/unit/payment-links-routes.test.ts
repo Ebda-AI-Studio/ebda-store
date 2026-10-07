@@ -77,7 +77,7 @@ const STORE = {
   slug: 'shop',
   currency: 'EGP',
   wbsEnabled: true,
-  wbsApiKey: 'enc-key',
+  credentials: { wbsApiKey: 'enc-key' },
 };
 const PRODUCT = {
   id: PRODUCT_ID,
@@ -194,7 +194,7 @@ describe('POST /stores/:id/payment-links', () => {
   });
 
   it('WBS_NOT_CONFIGURED when the store has no WBS key', async () => {
-    mockPrisma.store.findUnique.mockResolvedValue({ ...STORE, wbsApiKey: null });
+    mockPrisma.store.findUnique.mockResolvedValue({ ...STORE, credentials: null });
     expectEnvelope(await request(app).post(URL).send(BODY), 400, 'WBS_NOT_CONFIGURED');
   });
 
@@ -224,7 +224,9 @@ describe('POST /stores/:id/payment-links', () => {
   it('PAYMENT_NOT_CONFIGURED deletes the draft order it already created', async () => {
     mockPaymentService.getDefaultProvider.mockResolvedValue(null);
     expectEnvelope(await request(app).post(URL).send(BODY), 400, 'PAYMENT_NOT_CONFIGURED');
-    expect(mockPrisma.order.delete).toHaveBeenCalledWith({ where: { id: 'order-1' } });
+    expect(mockPrisma.order.delete).toHaveBeenCalledWith({
+      where: { id: 'order-1', storeId: STORE_ID },
+    });
   });
 
   it('WBS_SEND_FAILED deletes the draft order and keeps the bridge code as a detail', async () => {
@@ -237,14 +239,18 @@ describe('POST /stores/:id/payment-links', () => {
     expectEnvelope(res, 502, 'WBS_SEND_FAILED');
     expect(res.body.error.message).toBe('Blocked');
     expect(res.body.error.details).toEqual({ wbsError: 'RECIPIENT_BLOCKED' });
-    expect(mockPrisma.order.delete).toHaveBeenCalledWith({ where: { id: 'order-1' } });
+    expect(mockPrisma.order.delete).toHaveBeenCalledWith({
+      where: { id: 'order-1', storeId: STORE_ID },
+    });
   });
 
   it('a throw from the payment provider deletes the draft order and reaches the error handler', async () => {
     mockPaymentService.createPayment.mockRejectedValue(new Error('gateway down'));
     const res = await request(app).post(URL).send(BODY);
     expect(res.status).toBe(500);
-    expect(mockPrisma.order.delete).toHaveBeenCalledWith({ where: { id: 'order-1' } });
+    expect(mockPrisma.order.delete).toHaveBeenCalledWith({
+      where: { id: 'order-1', storeId: STORE_ID },
+    });
   });
 });
 

@@ -1,4 +1,5 @@
-import { acrossStores, acrossStoresFlat, prisma } from '@force/database';
+import { acrossStores, acrossStoresFlat, withUser } from '@force/database';
+import { ownedStoreIds as definerOwnedStoreIds } from './definer';
 
 /**
  * Merge helpers for reads that span stores (super-admin dashboards, platform
@@ -65,11 +66,9 @@ export async function pageAcrossStores<T>(args: {
 /** The ids of the stores a store admin owns (all stores for `undefined`). */
 export async function ownedStoreIds(ownerId: string | undefined): Promise<string[] | undefined> {
   if (!ownerId) return undefined;
-  const stores = await prisma.store.findMany({
-    where: { ownerId, deletedAt: null },
-    select: { id: true },
-  });
-  return stores.map(s => s.id);
+  // `stores` is under RLS (R-EBDA-005): read the owner's store ids AS that owner, through the
+  // guarded definer (the acting user must be `ownerId` or a super_admin).
+  return withUser(ownerId, () => definerOwnedStoreIds(ownerId));
 }
 
 /**
@@ -80,7 +79,8 @@ export async function ownedStoreIds(ownerId: string | undefined): Promise<string
  * the same global `take` the single query used to have.
  */
 export async function sweepAcrossStores<T>(args: {
-  fetch: () => Promise<T[]>;
+  /** One store's rows, inside that store's scope; `storeId` is the store being scanned. */
+  fetch: (storeId: string) => Promise<T[]>;
   orderKey: (row: T) => Date | number;
   take: number;
   /** Newest first. Default: oldest first. */

@@ -838,7 +838,7 @@ router.post(
           data: { status: 'completed', paidAt: new Date() },
         }),
         prisma.order.update({
-          where: { id: orderId },
+          where: { id: orderId, storeId },
           data: {
             paymentStatus: 'paid',
             ...(order.status === 'pending' ? { status: 'confirmed' } : {}),
@@ -988,7 +988,7 @@ router.post(
           data: { status: 'completed', paidAt: new Date() },
         }),
         prisma.order.update({
-          where: { id: order.id },
+          where: { id: order.id, storeId },
           data: {
             paymentStatus: 'paid',
             ...(order.status === 'pending' ? { status: 'confirmed' } : {}),
@@ -1423,7 +1423,7 @@ router.post(
           assertValidTransition(currentOrder.status, 'refunded');
           await OrderService.applyRefundEffects(storeId, orderId);
           await prisma.order.update({
-            where: { id: orderId },
+            where: { id: orderId, storeId },
             data: { status: 'refunded', paymentStatus: 'refunded' },
           });
         }

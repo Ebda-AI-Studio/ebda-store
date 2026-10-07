@@ -1,6 +1,9 @@
 import { createPrismaClient } from '@force/database';
 
-const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
+const prisma = createPrismaClient({
+  connectionString: process.env.DATABASE_URL ?? '',
+  role: 'owner',
+});
 
 async function migrate() {
   const stores = await prisma.store.findMany({

@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, currentStoreId } from '@force/database';
 import type { Prisma } from '@prisma/client';
 import { getSystemAccountIdByCode } from '../account.service';
 import { postEntry } from '../journal.service';
@@ -56,7 +56,7 @@ export async function postOrderPaymentJournal(args: {
   const client: Prisma.TransactionClient | typeof prisma = tx ?? prisma;
 
   const order = await client.order.findUnique({
-    where: { id: orderId },
+    where: { id: orderId, storeId: currentStoreId() },
     include: {
       items: true,
       payments: { where: { status: 'completed' } },

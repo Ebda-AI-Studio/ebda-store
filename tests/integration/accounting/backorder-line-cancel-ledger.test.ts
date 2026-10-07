@@ -19,9 +19,9 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import { prisma, runInTenantContext } from '@force/database';
 import { seedCoaForStore } from '../../../apps/api/src/services/accounting/account.service';
-import { postOrderPaymentJournal } from '../../../apps/api/src/services/accounting/posting/order-posting';
-import { postRefundJournal } from '../../../apps/api/src/services/accounting/posting/refund-posting';
-import { postPartialReturnJournal } from '../../../apps/api/src/services/accounting/posting/partial-return-posting';
+import { postOrderPaymentJournal as postOrderPaymentJournalRaw } from '../../../apps/api/src/services/accounting/posting/order-posting';
+import { postRefundJournal as postRefundJournalRaw } from '../../../apps/api/src/services/accounting/posting/refund-posting';
+import { postPartialReturnJournal as postPartialReturnJournalRaw } from '../../../apps/api/src/services/accounting/posting/partial-return-posting';
 import { cancelBackorder } from '../../../apps/api/src/services/accounting/backorder.service';
 import { OrderService } from '../../../apps/api/src/services/order.service';
 import { handleOrderRefunded } from '../../../apps/api/src/lib/inngest/functions/order-refunded';
@@ -31,6 +31,14 @@ const hasDb =
 
 const OWNER = '00000000-0000-0000-0000-0000000000bd';
 let storeId: string;
+// Production runs these inside runInTenantContext(storeId); the tenant guard
+// needs the same ambient store here.
+const postOrderPaymentJournal = (a: Parameters<typeof postOrderPaymentJournalRaw>[0]) =>
+  runInTenantContext(storeId, () => postOrderPaymentJournalRaw(a));
+const postRefundJournal = (a: Parameters<typeof postRefundJournalRaw>[0]) =>
+  runInTenantContext(storeId, () => postRefundJournalRaw(a));
+const postPartialReturnJournal = (a: Parameters<typeof postPartialReturnJournalRaw>[0]) =>
+  runInTenantContext(storeId, () => postPartialReturnJournalRaw(a));
 const productIds: string[] = [];
 let acct: Record<'cash' | 'taxPayable' | 'revenue' | 'shipping' | 'cogs' | 'inventory', string>;
 

@@ -188,6 +188,20 @@ export interface ClientPoolOptions {
   connectionsPerRequest?: number;
   /** How long a request waits for a client before `ClientPoolTimeout`. Default 20 000 ms. */
   maxWaitMs?: number;
+  /**
+   * A lease held longer than this is presumed to belong to a CANCELLED request and stops counting
+   * against `max` when a client is needed. Default 30 000 ms (the request transaction's own limit).
+   *
+   * Why: workerd cancels a request whose client disconnects, and a cancelled request's pending
+   * promises never settle, so the `finally` that releases its lease never runs. Measured on the
+   * preview API (2026-10-07): probes cut off by the client left `leased: 3` with nothing in flight;
+   * once every client was held by a dead request, the isolate answered ALL requests 503 OVERLOADED
+   * after `maxWaitMs`, for the life of the isolate. A stale lease is abandoned, never revoked: its
+   * client is not reused (a slow but live request may still be on it) and a late release drops it.
+   */
+  staleLeaseMs?: number;
+  /** Clock, for tests. */
+  now?: () => number;
   log?: CreatePrismaClientOptions['log'];
   onPoolError?: (err: Error) => void;
 }
@@ -195,18 +209,27 @@ export interface ClientPoolOptions {
 export class ClientPool {
   readonly max: number;
   readonly maxWaitMs: number;
+  readonly staleLeaseMs: number;
+  private readonly now: () => number;
   private readonly idle: Slot[] = [];
-  private readonly waiters: Array<(slot: Slot) => void> = [];
+  private readonly waiters: Array<{ resolve: (slot: Slot) => void; since: number }> = [];
+  /** Every client handed out (to a lease or to a waiter), with when: what a stale check reads. */
+  private readonly out = new Map<Slot, number>();
   private created = 0;
-  private leased = 0;
   private discarded = 0;
+  private abandoned = 0;
 
   constructor(private readonly opts: ClientPoolOptions) {
     this.max = Math.max(1, opts.max ?? 4);
     this.maxWaitMs = opts.maxWaitMs ?? 20_000;
+    this.staleLeaseMs = opts.staleLeaseMs ?? 30_000;
+    this.now = opts.now ?? Date.now;
   }
 
-  /** Clients built so far (never exceeds `max`), leased now, and requests waiting. */
+  /**
+   * Clients built so far and not abandoned (never exceeds `max`), held now, idle, requests waiting,
+   * clients dropped for a lost dispatch, and leases abandoned as stale (cancelled requests).
+   */
   stats(): {
     created: number;
     leased: number;
@@ -214,11 +237,13 @@ export class ClientPool {
     waiting: number;
     max: number;
     discarded: number;
+    abandoned: number;
   } {
     return {
       discarded: this.discarded,
+      abandoned: this.abandoned,
       created: this.created,
-      leased: this.leased,
+      leased: this.out.size,
       idle: this.idle.length,
       waiting: this.waiters.length,
       max: this.max,
@@ -236,27 +261,71 @@ export class ClientPool {
     return { adapter, client: createPrismaClientWithAdapter(factory, this.opts.log) };
   }
 
-  async acquire(): Promise<ClientLease> {
+  /** Stop counting leases older than `staleLeaseMs` (see the option). */
+  private reclaimStale(): void {
+    const cutoff = this.now() - this.staleLeaseMs;
+    for (const [slot, since] of this.out) {
+      if (since > cutoff) continue;
+      this.out.delete(slot);
+      this.created--;
+      this.abandoned++;
+    }
+  }
+
+  /** An idle client, a new one under `max`, or (at capacity) one freed by reclaiming stale leases. */
+  private take(): Slot | undefined {
     let slot = this.idle.pop();
+    if (!slot && this.created >= this.max) this.reclaimStale();
     if (!slot && this.created < this.max) slot = this.build();
+    if (slot) this.out.set(slot, this.now());
+    return slot;
+  }
+
+  /**
+   * Give a client (or, with none, the capacity to build one) to the oldest LIVE waiter, else idle
+   * it. A waiter older than `maxWaitMs` is dead: a live one has already timed out and left the
+   * queue, so one still here belongs to a cancelled request whose timer will never fire.
+   */
+  private handBack(back: Slot | undefined): void {
+    const cutoff = this.now() - this.maxWaitMs;
+    while (this.waiters.length > 0) {
+      const w = this.waiters[0];
+      if (w.since < cutoff) {
+        this.waiters.shift();
+        continue;
+      }
+      const slot = back ?? (this.created < this.max ? this.build() : undefined);
+      if (!slot) return;
+      this.waiters.shift();
+      this.out.set(slot, this.now());
+      w.resolve(slot);
+      return;
+    }
+    if (back) this.idle.push(back);
+  }
+
+  async acquire(): Promise<ClientLease> {
+    let slot = this.take();
     if (!slot) {
       let timer: ReturnType<typeof setTimeout> | undefined;
-      let waiter: ((s: Slot) => void) | undefined;
+      let waiter: { resolve: (s: Slot) => void; since: number } | undefined;
       try {
         slot = await new Promise<Slot>((resolve, reject) => {
-          waiter = resolve;
-          this.waiters.push(resolve);
-          timer = setTimeout(() => reject(new ClientPoolTimeout(this.maxWaitMs)), this.maxWaitMs);
+          waiter = { resolve, since: this.now() };
+          this.waiters.push(waiter);
+          timer = setTimeout(() => {
+            const i = waiter ? this.waiters.indexOf(waiter) : -1;
+            if (i >= 0) this.waiters.splice(i, 1);
+            // The lease we waited on may have gone stale meanwhile (a cancelled request).
+            const late = this.take();
+            if (late) resolve(late);
+            else reject(new ClientPoolTimeout(this.maxWaitMs));
+          }, this.maxWaitMs);
         });
-      } catch (err) {
-        const i = waiter ? this.waiters.indexOf(waiter) : -1;
-        if (i >= 0) this.waiters.splice(i, 1);
-        throw err;
       } finally {
         clearTimeout(timer);
       }
     }
-    this.leased++;
     const scope = new ConnectionScope(
       this.opts.connectionString,
       this.opts.onPoolError ?? (() => undefined),
@@ -277,19 +346,21 @@ export class ClientPool {
         // Unbind first: from here no query can reach the connection that is about to close.
         held.adapter.scope = undefined;
         await scope.close();
-        this.leased--;
+        if (!this.out.delete(held)) {
+          // Abandoned as stale while this (slow, not dead) request still held it: the pool has
+          // already replaced it, so it is not handed out again.
+          void held.client.$disconnect().catch(() => undefined);
+          return;
+        }
         let back: Slot | undefined = held;
         if (hasStuckDispatch(held.client)) {
           // Never hand a client with a lost dispatch to the next request.
           this.discarded++;
           this.created--;
           void held.client.$disconnect().catch(() => undefined);
-          back = this.waiters.length > 0 ? this.build() : undefined;
+          back = undefined;
         }
-        if (!back) return;
-        const next = this.waiters.shift();
-        if (next) next(back);
-        else this.idle.push(back);
+        this.handBack(back);
       },
     };
   }

@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { withStore } from '@force/database';
 
 /**
  * `computeOrderTax` now lives in `@force/shared` so the storefront checkout
@@ -42,20 +42,25 @@ export interface ActiveTaxRate {
 }
 
 export async function resolveActiveTaxRate(storeId: string): Promise<ActiveTaxRate> {
-  const [store, rates, profile] = await Promise.all([
-    prisma.store.findUnique({
-      where: { id: storeId },
-      select: { taxEnabled: true, taxIncludedInPrice: true },
-    }),
-    prisma.taxRate.findMany({
-      where: { storeId, isActive: true },
-      select: { rate: true },
-    }),
-    prisma.storeTaxProfile.findUnique({
-      where: { storeId },
-      select: { status: true, taxRegistrationNumber: true, legalName: true },
-    }),
-  ]);
+  // The public storefront payloads call this before any store scope exists;
+  // order creation calls it inside one. withStore serves both (and reuses an
+  // existing scope for the same store).
+  const [store, rates, profile] = await withStore(storeId, tx =>
+    Promise.all([
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { taxEnabled: true, taxIncludedInPrice: true },
+      }),
+      tx.taxRate.findMany({
+        where: { storeId, isActive: true },
+        select: { rate: true },
+      }),
+      tx.storeTaxProfile.findUnique({
+        where: { storeId },
+        select: { status: true, taxRegistrationNumber: true, legalName: true },
+      }),
+    ])
+  );
 
   // Rates are Decimal(5,2)-shaped percentages; sum in hundredths so 0.1 + 0.2
   // is exactly 0.3, never 0.30000000000000004.

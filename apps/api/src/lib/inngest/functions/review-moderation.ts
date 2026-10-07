@@ -55,7 +55,7 @@ export const reviewModeration: InngestFunction.Any = inngest.createFunction(
     await step.run('persist-spam-result', () =>
       runInTenantContext(storeId, () =>
         prisma.review.update({
-          where: { id: reviewId },
+          where: { id: reviewId, storeId },
           data: {
             spamScore: spam.spamScore,
             spamReasons: spam.reasons,

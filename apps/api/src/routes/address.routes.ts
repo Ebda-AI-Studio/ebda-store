@@ -146,7 +146,7 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const { id } = req.params;
 
     // Verify ownership
-    const existing = await prisma.address.findUnique({ where: { id } });
+    const existing = await prisma.address.findUnique({ where: { id, userId } });
     if (!existing) {
       res.status(404).json({
         success: false,
@@ -188,7 +188,7 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const address = await prisma.address.update({
-      where: { id },
+      where: { id, userId },
       data: {
         ...(data.firstName !== undefined && { firstName: data.firstName }),
         ...(data.lastName !== undefined && { lastName: data.lastName }),
@@ -227,7 +227,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     const { id } = req.params;
 
     // Verify ownership
-    const existing = await prisma.address.findUnique({ where: { id } });
+    const existing = await prisma.address.findUnique({ where: { id, userId } });
     if (!existing) {
       res.status(404).json({
         success: false,
@@ -244,7 +244,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
       return;
     }
 
-    await prisma.address.delete({ where: { id } });
+    await prisma.address.delete({ where: { id, userId } });
 
     // If the deleted address was default, promote the most recently created address
     if (existing.isDefault) {
@@ -253,7 +253,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
         orderBy: { createdAt: 'desc' },
       });
       if (next) {
-        await prisma.address.update({ where: { id: next.id }, data: { isDefault: true } });
+        await prisma.address.update({ where: { id: next.id, userId }, data: { isDefault: true } });
       }
     }
 

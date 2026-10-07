@@ -6,7 +6,7 @@
  *
  * `super_admin` provisioning is operator-controlled and never goes through here.
  */
-import { prisma } from '@force/database';
+import { withUser } from '@force/database';
 import { abuseConfig } from '../lib/abuse-config';
 import { AppError } from '../middleware/error-handler';
 import { redis } from './redis.service';
@@ -18,9 +18,11 @@ export async function assertStoreCreationBudget(
   now: Date = new Date()
 ): Promise<void> {
   const cap = abuseConfig.storesPerAccountPerDay();
-  const recent = await prisma.store.count({
-    where: { ownerId, createdAt: { gte: new Date(now.getTime() - DAY_MS) } },
-  });
+  const recent = await withUser(ownerId, tx =>
+    tx.store.count({
+      where: { ownerId, createdAt: { gte: new Date(now.getTime() - DAY_MS) } },
+    })
+  );
   if (recent >= cap) {
     throw new AppError(
       429,

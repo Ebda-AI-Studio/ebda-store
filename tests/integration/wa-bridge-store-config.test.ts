@@ -19,10 +19,13 @@ const mockStore = {
   },
   metaCatalogId: 'cat-123',
   metaBusinessId: 'biz-123',
-  metaAccessToken: 'encrypted-token-xyz',
+  credentials: { metaAccessToken: 'encrypted-token-xyz' },
 };
 
 vi.mock('@force/database', () => ({
+  // tests/setup-e2e.ts builds the owner-role fixture client from this export;
+  // these suites never touch a database, so a stub is enough.
+  createPrismaClient: vi.fn(),
   prisma: {
     store: {
       findUnique: vi.fn(),
@@ -141,7 +144,12 @@ describe('POST /wa-bridge/store/meta-catalog-config', () => {
     expect(prisma.store.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          metaAccessToken: 'enc:my-token',
+          credentials: {
+            upsert: {
+              create: { metaAccessToken: 'enc:my-token' },
+              update: { metaAccessToken: 'enc:my-token' },
+            },
+          },
         }),
       })
     );

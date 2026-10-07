@@ -6,10 +6,12 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { prisma } from '@force/database';
+import { prisma, withStore } from '@force/database';
+import { lookupStore } from '../lib/definer';
 import { resolveLayoutSettings } from '@force/shared';
 import type { TemplateId } from '@force/shared';
 import { redis } from '../services/redis.service';
+import { readInStoreContext } from '../lib/store-scoped-read';
 import {
   getPublishedDefinition,
   getPreviewDefinition,
@@ -25,10 +27,17 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
     // Load store once (template + layoutSettings) so both the draft and
     // committed paths resolve against the store's template baseline without
     // a second round-trip.
-    const store = await prisma.store.findFirst({
-      where: { id: storeId, status: 'active' },
-      select: { layoutSettings: true, template: true },
-    });
+    // `stores` is under RLS (R-EBDA-005): an ACTIVE store with this id through the lookup
+    // definer, then its row inside its own scope.
+    const hit = await lookupStore({ id: storeId }, ['active']);
+    const store = hit
+      ? await withStore(hit.id, tx =>
+          tx.store.findUnique({
+            where: { id: hit.id },
+            select: { layoutSettings: true, template: true },
+          })
+        )
+      : null;
     if (!store) {
       res.status(404).json({
         success: false,
@@ -163,21 +172,27 @@ router.get(
       const verifiedOnly = req.query.verifiedOnly === 'true';
       const limit = Math.max(1, Math.min(20, parseInt((req.query.limit as string) || '6', 10)));
 
-      const reviews = await prisma.review.findMany({
-        where: {
-          storeId,
-          status: 'published',
-          rating: { gte: minRating },
-          ...(verifiedOnly ? { verifiedPurchase: true } : {}),
-        },
-        include: {
-          customer: {
-            select: { firstName: true, lastName: true },
+      // Strict RLS (R-EBDA-001): `reviews` and `users` are store-scoped, and a
+      // public request carries no tenant context, so this read must enter the
+      // store's scope or it returns [] — which hid the testimonials section on
+      // every store (found by the Dahab pilot, 2026-10-07).
+      const reviews = await readInStoreContext(storeId, () =>
+        prisma.review.findMany({
+          where: {
+            storeId,
+            status: 'published',
+            rating: { gte: minRating },
+            ...(verifiedOnly ? { verifiedPurchase: true } : {}),
           },
-        },
-        orderBy: [{ rating: 'desc' }, { createdAt: 'desc' }],
-        take: limit,
-      });
+          include: {
+            customer: {
+              select: { firstName: true, lastName: true },
+            },
+          },
+          orderBy: [{ rating: 'desc' }, { createdAt: 'desc' }],
+          take: limit,
+        })
+      );
 
       const testimonials = reviews.map(r => ({
         id: r.id,
