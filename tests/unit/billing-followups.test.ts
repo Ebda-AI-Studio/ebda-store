@@ -102,24 +102,24 @@ describe('InstaPay QR config', () => {
 
 describe('support contact (no WhatsApp number yet)', () => {
   it('BRAND support email is the address that actually receives mail', () => {
-    expect(BRAND.supportEmail).toBe('hello@ebda.app');
+    expect(BRAND.supportEmail).toBe('ahlan@ebda.app');
   });
   it('EBDA_SUPPORT_EMAIL overrides; unset or malformed falls back to BRAND', () => {
-    expect(supportEmail({})).toBe('hello@ebda.app');
-    expect(supportEmail({ EBDA_SUPPORT_EMAIL: 'nope' })).toBe('hello@ebda.app');
+    expect(supportEmail({})).toBe('ahlan@ebda.app');
+    expect(supportEmail({ EBDA_SUPPORT_EMAIL: 'nope' })).toBe('ahlan@ebda.app');
     expect(supportEmail({ EBDA_SUPPORT_EMAIL: ' billing@ebda.app ' })).toBe('billing@ebda.app');
   });
   it('WhatsApp unset: no wa.me link, a mailto instead', () => {
     expect(supportContact('Shop', {})).toEqual({
       whatsappUrl: null,
-      email: 'hello@ebda.app',
-      mailto: 'mailto:hello@ebda.app?subject=Shop',
+      email: 'ahlan@ebda.app',
+      mailto: 'mailto:ahlan@ebda.app?subject=Shop',
     });
   });
   it('WhatsApp set: the wa.me link, and the email is still there', () => {
     const c = supportContact(undefined, { EBDA_SUPPORT_WHATSAPP: '01012345678' });
     expect(c.whatsappUrl).toBe('https://wa.me/201012345678');
-    expect(c.email).toBe('hello@ebda.app');
+    expect(c.email).toBe('ahlan@ebda.app');
   });
 });
 
@@ -142,9 +142,9 @@ describe('billing notice email', () => {
           ...base,
           kind,
           whatsappUrl: null,
-          supportEmail: 'hello@ebda.app',
+          supportEmail: 'ahlan@ebda.app',
         });
-        expect(html).toContain('mailto:hello@ebda.app');
+        expect(html).toContain('mailto:ahlan@ebda.app');
         expect(html).not.toContain('wa.me');
       });
     }

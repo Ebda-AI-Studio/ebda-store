@@ -25,9 +25,11 @@ interface Pt {
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
 
-function build(W: number, H: number): Pt[] {
+function build(W: number, H: number, mirror: boolean): Pt[] {
   const pts: Pt[] = [];
-  const cx = W * (W > 700 ? 0.7 : 0.62);
+  // The river sits on the side away from the headline: right in LTR, left in RTL.
+  const f = W > 700 ? 0.7 : 0.62;
+  const cx = W * (mirror ? 1 - f : f);
   const top = H * 0.05;
   const deltaY = H * 0.4;
   const bottom = H * 1.05;
@@ -62,7 +64,7 @@ function build(W: number, H: number): Pt[] {
   // Cairo and Alexandria glow
   pts.push({ x: cx, y: deltaY + 4, s: 0, a: 0, p: 0, g: 0, city: 28 });
   pts.push({
-    x: cx - (deltaY - top) * 0.72,
+    x: cx + (mirror ? 1 : -1) * (deltaY - top) * 0.72,
     y: top + (deltaY - top) * 0.12,
     s: 0,
     a: 0,
@@ -126,7 +128,7 @@ function draw(
   x.fillRect(0, 0, W, H);
 }
 
-export function NileNight({ className }: { className?: string }) {
+export function NileNight({ className, mirror = false }: { className?: string; mirror?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -134,7 +136,7 @@ export function NileNight({ className }: { className?: string }) {
     let cleanup: (() => void) | undefined;
     const timer = window.setTimeout(() => {
       cleanup = setup();
-    }, 1500);
+    }, 1200);
     const setup = (): (() => void) | undefined => {
       const c = ref.current;
       const x = c?.getContext('2d');
@@ -170,8 +172,11 @@ export function NileNight({ className }: { className?: string }) {
         c.width = Math.round(W * dpr);
         c.height = Math.round(H * dpr);
         x.setTransform(dpr, 0, 0, dpr, 0, 0);
-        pts = build(W, H);
+        pts = build(W, H, mirror);
         if (reduce) staticFrame();
+        else draw(x, W, H, pts, 0, false);
+        // The static poster under the canvas shows until the first frame is painted.
+        c.dataset.live = '1';
       };
 
       resize();
@@ -196,7 +201,7 @@ export function NileNight({ className }: { className?: string }) {
       window.clearTimeout(timer);
       cleanup?.();
     };
-  }, []);
+  }, [mirror]);
 
   return <canvas ref={ref} aria-hidden="true" className={className} />;
 }

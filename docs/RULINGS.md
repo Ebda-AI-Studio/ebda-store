@@ -18,6 +18,18 @@ Ruling R-EBDA-001: the backend runs FWB's Express API on Cloudflare Workers (`no
 
 ---
 
+## 2026-10-07 — Marketing copy and design (R-EBDA-COPY-\*)
+
+Branch `copy/egyptian-arabic`.
+
+Ruling R-EBDA-COPY-1 — the marketing home drops the 12-section order, the nav labels and the mandated hero line ("ابدأ بيع أونلاين." over an English sub on both locales) from `docs/ebda/plans/domains-and-marketing-site.md`, for six sections, a per-locale hero and Egyptian colloquial Arabic. Evidence: Ahmad 2026-10-07, "the Arabic sucks, use Egyptian Arabic, and there's a lot of talking"; visible words AR 842 → 407, EN 1007 → 474 (built HTML). Cost if wrong: the original brief's order is restored from the history kept in that doc and the old `SECTION_ORDER`.
+
+Ruling R-EBDA-COPY-2 — shipping (Bosta, Aramex) and cards/wallets stay "قريب / Coming soon" on the site although the brief for this change listed them as product features. Evidence: `docs/ebda/plans/STATUS.md` SP6/SP7 "done against stubs; sandboxes wait on keys". Cost if wrong: the site under-sells two features for the days between their sandbox proof and this copy changing.
+
+Ruling R-EBDA-COPY-3 — the hero poster is an inline SVG (`src/lib/hero-poster.ts`), not a CSS background image. Evidence: as a `url()` background it became the LCP element (4.6s on the uncompressed local server); inline SVG shapes are not LCP candidates, so the headline text is. Cost if wrong: ~24 KB (~4 KB brotli) more HTML per home page.
+
+Ruling R-EBDA-COPY-4 — the legal pages' "Whisky 11" operator line is NOT linked in this change; the footer (on every page, legal included) and the JSON-LD `parentOrganization.url` are. Evidence: a parallel PR (docs/legal-pages) owns the legal page content. Cost if wrong: one unlinked mention on the legal notice until that PR adds it.
+
 ## 2026-10-07 — Locked pricing (R-EBDA-PRICING-\*)
 
 Source: `docs/plans/2026-10-05-pricing-decisions.md`. Branch `feat/locked-pricing`.
@@ -5638,6 +5650,14 @@ Ruling BUILDER2-E2E-1 — the editor E2E runs against an in-memory API with the 
 Ruling BUILDER2-PREVIEW-DATA-1 — inside the canvas the DRAFT drives the page's data fetches and chrome (`definitionToLayout(draft)`), so a carousel added in the editor loads its own products; the editor reloads the canvas after an autosave that changed a data-bearing setting (product source, category, manual products, limits, review filters). Cost if wrong: one autosave interval (1.2 s) of stale product tiles after such an edit.
 
 Ruling BUILDER2-CHROME-1 — `/stores/:id/builder` is exempt from the "every store page reaches `<AdminLayout>`" guard (`apps/admin/src/app/__tests__/admin-chrome-early-return.test.ts`, `FULL_SCREEN_EDITORS`, with a rot check). Evidence: the brief asks for a Shopify-theme-editor-style editor, which is full-screen by design; it carries its own top bar with the open-door mark linking back to the store dashboard. The guard's purpose (chrome vanishing mid-load on normal pages) still applies to every other page. Cost if wrong: a merchant inside the builder has one click back instead of the sidebar.
+
+## 2026-10-07 — Legal pages v1.0 (branch `docs/legal-pages`)
+
+Ruling LEGAL-1 — Legal documents (terms, privacy, merchant agreement, acceptable use, legal notice) were drafted from competitor patterns and published WITHOUT counsel review, by Ahmad's decision (2026-10-07). Liability cap = fees paid in the 3 months before the event; fraud/gross-fault carve-out kept; 30 days' notice for fee changes. Cost if wrong: an unenforceable clause, or a regulator or merchant challenge, that counsel would have caught.
+
+Ruling LEGAL-2 — TODO, no automatic job exists: a suspended or unpaid store is NOT deleted by any cron (billing-renewal only suspends after `INSTAPAY_GRACE_DAYS` = 3). The Merchant Agreement and Privacy Policy therefore promise only "kept until the merchant asks for deletion or the account is closed, then deleted within 90 days". That 90-day deletion is a manual/ops process today; build a job or keep it manual. Cost if wrong: a deletion request past 90 days is a broken promise in the published text.
+
+Ruling LEGAL-3 — The privacy policy lists the providers in use in production (Ahmad, 2026-10-07): Cloudflare Workers/KV/Queues/R2, Neon (EU), Resend, Sentry (EU), Inngest, Google Gemini, PostHog (EU cloud), OneSignal (US). Railway and Redis are not used and not listed. Adding any new provider needs the policy updated BEFORE its key is set. Cost if wrong: an undisclosed sub-processor.
 
 Ruling EBDA-BILLFU-1 — InstaPay QR: `EBDA_INSTAPAY_QR_URL` (https only, else null) is returned with the InstaPay details (`billing.instapay.qrUrl`, `instapayDetails().qrUrl`) and rendered by ONE shared component (`apps/admin/src/components/billing/InstapayPanel.tsx`) on both the onboarding billing step and the billing page, next to the handle, exact amount and reference (each with a copy button). Unset = no `<img>` at all; a URL that fails to load hides itself (`onError`). On phones (`md:hidden`) the panel leads with three "open the InstaPay app, Send money, paste the address, amount and reference" steps, because a QR cannot be scanned from the same screen. There is NO "open InstaPay" deep link: InstaPay publishes no app URL scheme, and its payment links (ipn.eg) are generated per user in the app, so one cannot be derived from the handle; guidance text + copy buttons instead. Admin CSP already allows `img-src https:`, so media.ebda.app needed no CSP change. The production URL is a public `vars` entry in `apps/api/wrangler.jsonc` (live 200 image/jpeg, checked 2026-10-07). Cost if wrong: a merchant on a phone types the handle instead of tapping a link.
 
