@@ -6,9 +6,14 @@ const { prismaStoreFindUnique } = vi.hoisted(() => ({
   prismaStoreFindUnique: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
-  prisma: { store: { findUnique: prismaStoreFindUnique } },
-}));
+vi.mock('@force/database', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod: Record<string, any> = {
+    prisma: { store: { findUnique: prismaStoreFindUnique } },
+  };
+  mod.withStore = (_id: string, fn: (tx: unknown) => unknown) => fn(mod.prisma);
+  return mod;
+});
 
 // ResendService is called by sendForStore — mock it out so no real HTTP.
 vi.mock('@api/services/resend.service', () => ({

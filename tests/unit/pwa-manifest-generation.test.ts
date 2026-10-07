@@ -13,10 +13,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const findUniqueMock = vi.fn();
 const isFeatureEnabledMock = vi.fn();
 
-vi.mock('@force/database', () => ({
-  prisma: { store: { findUnique: findUniqueMock, update: vi.fn() } },
-  Prisma: {},
-}));
+vi.mock('@force/database', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod: Record<string, any> = {
+    prisma: { store: { findUnique: findUniqueMock, update: vi.fn() } },
+    Prisma: {},
+  };
+  mod.withStore = (_id: string, fn: (tx: unknown) => unknown) => fn(mod.prisma);
+  return mod;
+});
 vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: isFeatureEnabledMock },
 }));

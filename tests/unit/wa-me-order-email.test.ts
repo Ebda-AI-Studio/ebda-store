@@ -5,7 +5,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { prismaStoreFindUnique } = vi.hoisted(() => ({ prismaStoreFindUnique: vi.fn() }));
-vi.mock('@force/database', () => ({ prisma: { store: { findUnique: prismaStoreFindUnique } } }));
+vi.mock('@force/database', () => {
+  const prisma = { store: { findUnique: prismaStoreFindUnique } };
+  return { prisma, withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(prisma) };
+});
 vi.mock('@api/services/resend.service', () => ({
   ResendService: { sendBrandedEmail: vi.fn().mockResolvedValue({ id: 'em_test' }) },
 }));

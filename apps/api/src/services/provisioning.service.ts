@@ -456,10 +456,12 @@ export class ProvisioningService {
    * Update store status
    */
   static async updateStoreStatus(storeId: string, status: 'active' | 'inactive' | 'suspended') {
-    const store = await prisma.store.update({
-      where: { id: storeId },
-      data: { status },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { status },
+      })
+    );
     // Account status is NEVER-stale (adversarial audit P1-7) — bust the
     // public resolve/slug/id caches + fire the storefront revalidate purge
     // on EVERY status writer, or a suspended store keeps serving the cached

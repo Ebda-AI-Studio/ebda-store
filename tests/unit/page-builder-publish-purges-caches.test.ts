@@ -66,14 +66,16 @@ vi.mock('@api/middleware/security', () => ({
 }));
 vi.mock('@force/database', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
+  const prisma = {
+    store: m.store,
+    storePageRevision: m.rev,
+    category: { findMany: vi.fn().mockResolvedValue([]) },
+    product: { findMany: vi.fn().mockResolvedValue([]) },
+  };
   return {
     ...actual,
-    prisma: {
-      store: m.store,
-      storePageRevision: m.rev,
-      category: { findMany: vi.fn().mockResolvedValue([]) },
-      product: { findMany: vi.fn().mockResolvedValue([]) },
-    },
+    prisma,
+    withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(prisma),
   };
 });
 

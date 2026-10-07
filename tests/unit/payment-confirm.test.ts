@@ -25,20 +25,25 @@ const orderFindUnique = vi.fn().mockResolvedValue({ status: 'pending' });
 // The amount-mismatch alert path resolves the store name for the Telegram
 // header — mock a store row so the alert-building code has something to read.
 const storeFindUnique = vi.fn().mockResolvedValue({ name: 'Test Store' });
-vi.mock('@force/database', () => ({
-  prisma: {
-    payment: { update: (...a: unknown[]) => paymentUpdate(...a) },
-    order: {
-      update: (...a: unknown[]) => orderUpdate(...a),
-      findUnique: (...a: unknown[]) => orderFindUnique(...a),
+vi.mock('@force/database', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod: Record<string, any> = {
+    prisma: {
+      payment: { update: (...a: unknown[]) => paymentUpdate(...a) },
+      order: {
+        update: (...a: unknown[]) => orderUpdate(...a),
+        findUnique: (...a: unknown[]) => orderFindUnique(...a),
+      },
+      store: { findUnique: (...a: unknown[]) => storeFindUnique(...a) },
+      $transaction: (...a: unknown[]) => txn(...a),
     },
-    store: { findUnique: (...a: unknown[]) => storeFindUnique(...a) },
-    $transaction: (...a: unknown[]) => txn(...a),
-  },
-  // The "Payment received" merchant push wraps a lookup in runInTenantContext;
-  // mock it as a pass-through that just runs the callback.
-  runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
-}));
+    // The "Payment received" merchant push wraps a lookup in runInTenantContext;
+    // mock it as a pass-through that just runs the callback.
+    runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
+  };
+  mod.withStore = (_id: string, fn: (tx: unknown) => unknown) => fn(mod.prisma);
+  return mod;
+});
 
 // Mock the append-only event log — assert it's written, don't hit a DB.
 const recordEvent = vi.fn().mockResolvedValue(undefined);

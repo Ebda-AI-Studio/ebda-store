@@ -9,7 +9,7 @@
  * seed rows a super-admin-provisioned one does (VAT rate, default category,
  * COD payment config, subscription).
  */
-import { prisma, Prisma, withUser } from '@force/database';
+import { prisma, Prisma, withUser, withStore } from '@force/database';
 import {
   storeHost,
   storefrontOrigin,
@@ -284,10 +284,12 @@ export class OnboardingService {
 
   /** inactive -> active. Idempotent for an already-live store; a suspended store stays suspended. */
   static async goLive(storeId: string) {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { id: true, slug: true, domain: true, status: true, name: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { id: true, slug: true, domain: true, status: true, name: true },
+      })
+    );
     if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
     if (store.status === 'suspended') {
       throw new AppError(403, 'STORE_SUSPENDED', 'This store is suspended');
@@ -300,7 +302,9 @@ export class OnboardingService {
       if (methods === 0) {
         throw new AppError(400, 'NO_PAYMENT_METHOD', 'Enable a payment method before going live');
       }
-      await prisma.store.update({ where: { id: storeId }, data: { status: 'active' } });
+      await withStore(storeId, tx =>
+        tx.store.update({ where: { id: storeId }, data: { status: 'active' } })
+      );
       await bustStoreCaches(store.id, store.slug, store.domain);
     }
     return {

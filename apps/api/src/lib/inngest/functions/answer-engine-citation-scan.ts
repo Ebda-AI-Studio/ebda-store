@@ -21,7 +21,7 @@
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
 import type { InngestFunction } from 'inngest';
-import { prisma, runInStoreScope, storeDirectory } from '@force/database';
+import { prisma, runInStoreScope, storeDirectory, withStore } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { chunk, BULK_AI_BATCH_SIZE } from '../batch-utils';
@@ -280,7 +280,9 @@ export const answerEngineScanOnDemand: InngestFunction.Any = inngest.createFunct
     // excludes those via `isAiEligiblePlan` when enumerating stores, so
     // this on-demand twin must apply the same exclusion (mirrors
     // `stock-reorder-scan.ts`'s on-demand plan gate).
-    const store = await prisma.store.findUnique({ where: { id: storeId }, select: { plan: true } });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+    );
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },

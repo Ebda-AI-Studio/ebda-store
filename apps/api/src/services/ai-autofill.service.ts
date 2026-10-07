@@ -1,5 +1,5 @@
 import { AI_AUTOFILL_FIELD_NAMES, fieldsNeedingRefresh, type AiFieldSources } from '@force/shared';
-import { prisma } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import { AIService } from './ai.service';
 import { isAiQuotaCapError } from '../lib/ai-quota';
 import { containsArabic } from '../lib/ai/description-richness';
@@ -102,10 +102,12 @@ export async function fillProductFields(
     return { filled: 0, skipped: true };
   }
 
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: { name: true, nameAr: true },
-  });
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({
+      where: { id: storeId },
+      select: { name: true, nameAr: true },
+    })
+  );
 
   const writes: Record<string, string> = {};
   const stampedSources: AiFieldSources = { ...sources };
@@ -277,10 +279,12 @@ export async function fillProductFields(
 
 /** Read the per-store aiAutopilot toggle (default ON when unset). */
 export async function isAutopilotEnabled(storeId: string): Promise<boolean> {
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: { theme: true },
-  });
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({
+      where: { id: storeId },
+      select: { theme: true },
+    })
+  );
   const theme = (store?.theme as Record<string, unknown>) ?? {};
   return theme.aiAutopilot !== false; // default ON
 }

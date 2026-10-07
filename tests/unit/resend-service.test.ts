@@ -29,11 +29,16 @@ vi.mock('resend', () => ({
   }),
 }));
 
-vi.mock('@force/database', () => ({
-  prisma: {
-    store: { update: prismaUpdateMock, findUnique: prismaFindUniqueMock },
-  },
-}));
+vi.mock('@force/database', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod: Record<string, any> = {
+    prisma: {
+      store: { update: prismaUpdateMock, findUnique: prismaFindUniqueMock },
+    },
+  };
+  mod.withStore = (_id: string, fn: (tx: unknown) => unknown) => fn(mod.prisma);
+  return mod;
+});
 
 vi.mock('@api/config', () => ({
   config: { resendApiKey: 're_test_key' },

@@ -33,7 +33,7 @@
  * idempotency) is only enqueued on the first transition into `paid`.
  */
 
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext, withStore } from '@force/database';
 import type { PaymentStatus } from '@force/database';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
@@ -199,9 +199,9 @@ export async function confirmPaymentFromProviderStatus(
         },
       });
 
-      const alertStore = await prisma.store
-        .findUnique({ where: { id: order.storeId }, select: { name: true } })
-        .catch(() => null);
+      const alertStore = await withStore(order.storeId, tx =>
+        tx.store.findUnique({ where: { id: order.storeId }, select: { name: true } })
+      ).catch(() => null);
       void sendAlert({
         level: 'p0',
         scope: 'store',

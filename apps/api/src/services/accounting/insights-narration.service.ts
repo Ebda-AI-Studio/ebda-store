@@ -15,7 +15,7 @@
  * keeps Gemini call counts low.
  */
 
-import { prisma, runInStoreScope } from '@force/database';
+import { prisma, runInStoreScope, withStore } from '@force/database';
 import { callGemini } from './gemini-ai.service';
 import logger from '../../lib/logger';
 
@@ -60,10 +60,12 @@ async function narrate(storeId: string, scope: NarrationScope): Promise<Narratio
   // Check store-level opt-in
   let store: { aiNarrationEnabled: boolean; name: string } | null = null;
   try {
-    store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { aiNarrationEnabled: true, name: true },
-    });
+    store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { aiNarrationEnabled: true, name: true },
+      })
+    );
   } catch (err) {
     logger.warn({ err, storeId, scope }, 'insights-narration: failed to load store');
     return null;

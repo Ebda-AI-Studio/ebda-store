@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, storeDirectory } from '@force/database';
+import { prisma, storeDirectory, withStore } from '@force/database';
 import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';
@@ -101,10 +101,12 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
           await step.run(`send-email-${store.id}`, async () => {
             // Load the store name for the email subject/body.
             // withRlsBypass is needed here too because we're outside HTTP context.
-            const storeRow = await prisma.store.findUnique({
-              where: { id: store.id },
-              select: { name: true },
-            });
+            const storeRow = await withStore(store.id, tx =>
+              tx.store.findUnique({
+                where: { id: store.id },
+                select: { name: true },
+              })
+            );
 
             await EmailService.sendLowStockAlert(store.id, {
               to: scan.recipientEmail!,
@@ -189,10 +191,12 @@ export const stockLowStockAlertOnDemand: InngestFunction.Any = inngest.createFun
     let emailed = false;
     if (scanResult.alertedProducts.length > 0 && scanResult.recipientEmail) {
       await step.run('send-email', async () => {
-        const storeRow = await prisma.store.findUnique({
-          where: { id: storeId },
-          select: { name: true },
-        });
+        const storeRow = await withStore(storeId, tx =>
+          tx.store.findUnique({
+            where: { id: storeId },
+            select: { name: true },
+          })
+        );
 
         await EmailService.sendLowStockAlert(storeId, {
           to: scanResult.recipientEmail!,

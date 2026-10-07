@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInStoreScope } from '@force/database';
+import { prisma, runInStoreScope, withStore } from '@force/database';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -131,10 +131,12 @@ async function ensureFooterSupportLinkEnabled(
   defaultNameAr: string
 ): Promise<void> {
   try {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { settings: true },
+      })
+    );
     if (!store) return;
 
     const settings = (store.settings ?? {}) as Record<string, unknown>;
@@ -176,10 +178,12 @@ async function ensureFooterSupportLinkEnabled(
       footerLinks: { ...footerLinks, support },
     };
 
-    await prisma.store.update({
-      where: { id: storeId },
-      data: { settings: nextSettings },
-    });
+    await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { settings: nextSettings },
+      })
+    );
 
     logger.info(
       { storeId, href, defaultName },

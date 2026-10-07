@@ -622,7 +622,9 @@ export class InstapayService {
       where: { id: orderId, storeId },
       select: { orderNumber: true, total: true, currency: true },
     });
-    const store = await prisma.store.findUnique({ where: { id: storeId }, select: { name: true } });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { name: true } })
+    );
     if (!order) return;
     await OneSignalService.notifyAdminsOfInstapay({
       orderId,

@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, storeDirectory } from '@force/database';
+import { prisma, storeDirectory, withStore } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runReorderScan } from '../../../services/accounting/reorder-scan.service';
@@ -105,7 +105,9 @@ export const stockReorderScanOnDemand: InngestFunction.Any = inngest.createFunct
 
     // Plan gate — inventory.basic is in the `free` baseline so a lapsed
     // merchant can still see their stock; it must not buy them AI spend.
-    const store = await prisma.store.findUnique({ where: { id: storeId }, select: { plan: true } });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+    );
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },
