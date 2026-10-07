@@ -9,7 +9,7 @@ Self-serve, Shopify-style store builder for Egypt, by **Ebda AI Studio**. Sign u
 | Host                                                      | What                                                       |
 | --------------------------------------------------------- | ---------------------------------------------------------- |
 | `ebda.app`                                                | Marketing site                                             |
-| `admin.ebda.app`                                          | Merchant dashboard (`apps/admin`)                          |
+| `store.ebda.app`                                          | Merchant dashboard (`apps/admin`)                          |
 | `<slug>.ebda.app` + custom domains                        | Storefronts (`apps/web`)                                   |
 | `orders.ebda.app`                                         | Orders PWA for fulfilment staff (`apps/orders`)            |
 | `api.ebda.app`                                            | API (`apps/api`)                                           |

@@ -32,11 +32,11 @@ describe('marketing nav', () => {
     expect(labels.map(m => m[1])).toEqual(['#features', '#how', '#pricing', '#faq']);
   });
   it('Log in -> app login, Start now -> app signup, in both locales', () => {
-    expect(LOGIN_URL).toBe('https://admin.ebda.app/login');
-    expect(SIGNUP_URL).toBe('https://admin.ebda.app/signup');
+    expect(LOGIN_URL).toBe('https://store.ebda.app/login');
+    expect(SIGNUP_URL).toBe('https://store.ebda.app/signup');
     for (const html of [ar, en]) {
-      expect(html).toContain('<a href="https://admin.ebda.app/login" class="link-login">');
-      expect(html).toMatch(/<a href="https:\/\/admin\.ebda\.app\/signup" class="btn btn-primary">/);
+      expect(html).toContain('<a href="https://store.ebda.app/login" class="link-login">');
+      expect(html).toMatch(/<a href="https:\/\/store\.ebda\.app\/signup" class="btn btn-primary">/);
     }
     expect(en).toContain('>Log in<');
     expect(en).toContain('>Start now<');

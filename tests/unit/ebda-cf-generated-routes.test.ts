@@ -24,7 +24,7 @@ describe('Ebda generated Cloudflare routes', () => {
       });
       for (const [app, host] of Object.entries({
         web: BRAND.domains.marketing,
-        admin: BRAND.domains.admin,
+        admin: BRAND.domains.storeApp,
         orders: BRAND.domains.orders,
       })) {
         const config = JSON.parse(readFileSync(join(root, 'apps', app, 'wrangler.jsonc'), 'utf8'));

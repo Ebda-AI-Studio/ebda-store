@@ -1,10 +1,10 @@
 // Static build for help.ebda.app: in-repo MDX articles, Arabic-first (/) + English (/en/),
 // with a build-time MiniSearch index searched client-side. Every article may link back to
-// admin.ebda.app via `appPath` frontmatter.
+// store.ebda.app via `appPath` frontmatter.
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRAND, BRAND_ADMIN_URL, BRAND_MARKETING_URL } from '@force/shared/brand';
+import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL } from '@force/shared/brand';
 import { renderMdx } from '@force/site-kit/build/mdx';
 import {
   esc,
@@ -41,7 +41,7 @@ const L = {
     switch: { label: 'English', lang: 'en' },
     nav: [
       { href: BRAND_MARKETING_URL, label: BRAND.nameAr },
-      { href: BRAND_ADMIN_URL, label: 'لوحة التحكم' },
+      { href: BRAND_STORE_APP_URL, label: 'لوحة التحكم' },
       { href: `https://${BRAND.domains.status}`, label: 'حالة الخدمة' },
     ],
     footer: `© ${new Date().getUTCFullYear()} ${BRAND.company}. تحتاج مساعدة إضافية؟ راسلنا.`,
@@ -74,7 +74,7 @@ const L = {
     switch: { label: 'العربية', lang: 'ar' },
     nav: [
       { href: BRAND_MARKETING_URL + '/en/', label: BRAND.name },
-      { href: BRAND_ADMIN_URL, label: 'Dashboard' },
+      { href: BRAND_STORE_APP_URL, label: 'Dashboard' },
       { href: `https://${BRAND.domains.status}/en`, label: 'Status' },
     ],
     footer: `© ${new Date().getUTCFullYear()} ${BRAND.company}. Need more help? Email us.`,
@@ -172,7 +172,7 @@ for (const lang of ['ar', 'en']) {
         `<li><a href="${articleUrl(lang, a.slug)}">${esc(a.data.title)}</a>${a.data.status === 'soon' ? ` <span class="badge">${esc(c.soon)}</span>` : ''}<p class="muted">${esc(a.data.description)}</p></li>`
     )
     .join('');
-  const homeMain = `<div class="prose"><h1>${esc(c.homeTitle)}</h1><p>${esc(c.homeIntro)}</p><p><a class="btn" href="${BRAND_ADMIN_URL}/signup">${esc(c.homeCta)}</a></p><h2 id="topics">${esc(c.cardsTitle)}</h2><ul class="cards">${cards}</ul></div>`;
+  const homeMain = `<div class="prose"><h1>${esc(c.homeTitle)}</h1><p>${esc(c.homeIntro)}</p><p><a class="btn" href="${BRAND_STORE_APP_URL}/signup">${esc(c.homeCta)}</a></p><h2 id="topics">${esc(c.cardsTitle)}</h2><ul class="cards">${cards}</ul></div>`;
   writePage(
     out,
     homeUrl(lang),
@@ -193,7 +193,7 @@ for (const lang of ['ar', 'en']) {
     const { html, headings } = await renderMdx(a.body, { tableLabel: a.data.title });
     const soon = a.data.status === 'soon' ? `<p><span class="badge">${esc(c.soon)}</span></p>` : '';
     const appLink = a.data.appPath
-      ? `<p><a class="btn btn-ghost" href="${esc(BRAND_ADMIN_URL + a.data.appPath)}">${esc(c.openApp)}</a></p>`
+      ? `<p><a class="btn btn-ghost" href="${esc(BRAND_STORE_APP_URL + a.data.appPath)}">${esc(c.openApp)}</a></p>`
       : '';
     const main = `<article class="prose"><h1>${esc(a.data.title)}</h1>${soon}${renderToc(headings, c.tocLabel)}${html}${appLink}</article>`;
     writePage(

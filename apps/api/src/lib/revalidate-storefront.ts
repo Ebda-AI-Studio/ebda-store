@@ -1,5 +1,6 @@
 import { storeHost } from '@force/shared';
 import logger from './logger';
+import { cfBindings } from '../cf/bindings';
 
 /**
  * Fire-and-forget storefront cache purge. After a store mutation (theme,
@@ -13,7 +14,11 @@ import logger from './logger';
  * custom domain.
  *
  * Config — this is a TWO-SIDED contract and both sides must agree:
- *  - STOREFRONT_REVALIDATE_URL (API): storefront base, e.g. https://ebda.app
+ *  - On Workers: the `STOREFRONT` Service Binding to `ebda-web` (apps/api/wrangler.jsonc).
+ *    It wins over the URL — the storefront is reached Worker-to-Worker, never via a
+ *    public host (Ruling HOST-STORE-1: `store.ebda.app`, the old purge host, is now
+ *    the merchant app, so a hostname here can silently start hitting the wrong Worker).
+ *  - STOREFRONT_REVALIDATE_URL (API, Node only): storefront base, e.g. https://<slug>.ebda.app
  *  - REVALIDATE_SECRET (API **and** the storefront Worker): shared secret.
  *
  * If the secret is missing on the STOREFRONT, this endpoint answers 503 and
@@ -31,6 +36,9 @@ import logger from './logger';
  * NEVER throws and NEVER awaits in the request path — a revalidation hiccup
  * must not affect the save that already committed.
  */
+/** Placeholder origin for Service Binding requests (the binding routes by binding, not host). */
+export const SERVICE_BINDING_BASE = 'https://ebda-web.service-binding';
+
 export function revalidateStorefront(opts: RevalidateOptions): void {
   void revalidateStorefrontNow(opts);
 }
@@ -59,7 +67,9 @@ export type RevalidateOutcome =
  * path keeps using `revalidateStorefront`, which does not await this.
  */
 export async function revalidateStorefrontNow(opts: RevalidateOptions): Promise<RevalidateOutcome> {
-  const base = process.env.STOREFRONT_REVALIDATE_URL;
+  const binding = cfBindings()?.STOREFRONT;
+  // The binding ignores the hostname; this one only labels logs.
+  const base = binding ? SERVICE_BINDING_BASE : process.env.STOREFRONT_REVALIDATE_URL;
   const secret = process.env.REVALIDATE_SECRET;
   if (!base || !secret) return 'not-configured';
 
@@ -78,7 +88,8 @@ export async function revalidateStorefrontNow(opts: RevalidateOptions): Promise<
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 4000);
 
-  return fetch(url, {
+  const send = binding ? binding.fetch.bind(binding) : fetch;
+  return send(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ secret, tags }),

@@ -153,9 +153,9 @@ describe('draft preview token API', () => {
 describe('canvas origins', () => {
   it('match the storefront frame-ancestors (same env var, same defaults)', () => {
     const cfg = readFileSync(join(__dirname, '../../apps/web/next.config.js'), 'utf8');
-    expect(cfg).toContain("'https://admin.ebda.app'");
-    expect(cfg).toContain("'https://admin.ebda.app http://localhost:3001 http://localhost:3000'");
-    expect(allowedParentOrigins({ NODE_ENV: 'production' })).toEqual(['https://admin.ebda.app']);
+    expect(cfg).toContain("'https://store.ebda.app'");
+    expect(cfg).toContain("'https://store.ebda.app http://localhost:3001 http://localhost:3000'");
+    expect(allowedParentOrigins({ NODE_ENV: 'production' })).toEqual(['https://store.ebda.app']);
     expect(allowedParentOrigins({ NODE_ENV: 'development' })).toContain('http://localhost:3001');
     expect(
       allowedParentOrigins({

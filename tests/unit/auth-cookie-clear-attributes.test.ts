@@ -10,7 +10,7 @@
  * for: the shopper on demo-store.example whose /auth/refresh just 401'd keeps
  * the dead `token`/`refresh_token` cookies, the cookieless guest branch in
  * csrfProtection never fires, and POST /payments/create 403s permanently. It
- * only ever worked for same-site callers (admin.ebda.app), who were never
+ * only ever worked for same-site callers (store.ebda.app), who were never
  * stuck.
  *
  * The opposite trap is maxAge: these cookies carry a 365-day maxAge, and

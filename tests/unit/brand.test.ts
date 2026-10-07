@@ -28,8 +28,10 @@ describe('BRAND', () => {
     expect(BRAND.noReplyEmail).toBe('no-reply@ebda.app');
   });
 
-  it('has no store.ebda.app host (stores live on <slug>.ebda.app)', () => {
-    expect(Object.values(BRAND.domains)).not.toContain('store.ebda.app');
+  it('store.ebda.app is the merchant app; admin.ebda.app is retired (HOST-STORE-1)', () => {
+    expect(BRAND.domains.storeApp).toBe('store.ebda.app');
+    expect(Object.values(BRAND.domains)).not.toContain('admin.ebda.app');
+    // Stores still live on <slug>.ebda.app; `store` is a reserved slug, never a store.
     expect(BRAND.domains.storeSuffix).toBe('.ebda.app');
   });
 });
@@ -54,6 +56,6 @@ describe('brand helpers', () => {
     expect(brandFrom()).toBe('Ebda <no-reply@ebda.app>');
     expect(poweredByBrand()).toBe('Powered by Ebda');
     expect(poweredByBrand('ar')).toBe('مدعوم من ابدأ');
-    expect(brandUrl(BRAND.domains.admin)).toBe('https://admin.ebda.app');
+    expect(brandUrl(BRAND.domains.storeApp)).toBe('https://store.ebda.app');
   });
 });
