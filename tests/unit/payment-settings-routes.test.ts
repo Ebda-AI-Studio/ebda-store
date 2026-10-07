@@ -468,14 +468,12 @@ describe('#2010 — credential display fingerprint', () => {
     mockPrisma.paymentConfig.findFirst.mockResolvedValue(null);
     mockPrisma.paymentConfig.create.mockResolvedValue(baseConfig({ storeId: STORE_ID }));
 
-    await request(app)
-      .post(`${BASE}/store/${STORE_ID}`)
-      .send({
-        provider: 'paymob',
-        isEnabled: false,
-        apiKey: 'sk_new_key_WXYZ',
-        merchantId: 'merchant_987',
-      });
+    await request(app).post(`${BASE}/store/${STORE_ID}`).send({
+      provider: 'paymob',
+      isEnabled: false,
+      apiKey: 'sk_new_key_WXYZ',
+      merchantId: 'merchant_987',
+    });
 
     expect(mockPrisma.paymentConfig.create).toHaveBeenCalledWith(
       expect.objectContaining({
