@@ -41,6 +41,12 @@ describe('RESERVED_SLUGS — the single source of truth', () => {
         'billing',
         'support',
         'blog',
+        // suite products + identity (PRODUCT-NAME-1, 2026-10-07)
+        'crm',
+        'erp',
+        'hub',
+        'id',
+        'accounts',
       ].sort()
     );
   });
@@ -106,9 +112,11 @@ describe('store slug validation', () => {
     for (const slug of RESERVED_SLUGS) {
       const result = validateStoreSlug(slug);
       expect(result.ok).toBe(false);
-      // `app`/`api` are 3 chars; the 2-char labels would hit TOO_SHORT first, but
-      // none of the reserved labels is shorter than 3.
-      if (!result.ok) expect(result.code).toBe('SLUG_RESERVED');
+      // 2-char reserved labels (e.g. `id`) hit SLUG_TOO_SHORT first — still refused.
+      if (!result.ok)
+        expect(slug.length < 3 ? ['SLUG_TOO_SHORT', 'SLUG_RESERVED'] : ['SLUG_RESERVED']).toContain(
+          result.code
+        );
     }
   });
 
