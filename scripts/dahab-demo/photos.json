@@ -1,6 +1,6 @@
 [
   {
-    "key": "ring-solitaire-1",
+    "asset": "ring-solitaire-1",
     "kind": "p",
     "unsplashId": "UktGGAIwQyQ",
     "slug": "a-close-up-of-a-black-fabric-with-a-ring-on-it-UktGGAIwQyQ",
@@ -10,7 +10,7 @@
     "raw": "https://images.unsplash.com/photo-1716511956048-e0532bd9746e"
   },
   {
-    "key": "ring-solitaire-2",
+    "asset": "ring-solitaire-2",
     "kind": "p",
     "unsplashId": "EsjkVKMdN_I",
     "slug": "a-womans-hand-displays-a-large-rectangular-diamond-ring-EsjkVKMdN_I",
@@ -20,7 +20,7 @@
     "raw": "https://images.unsplash.com/photo-1780250784120-c83d1bbbebe8"
   },
   {
-    "key": "ring-braided-1",
+    "asset": "ring-braided-1",
     "kind": "p",
     "unsplashId": "MGlSslCP2LY",
     "slug": "gold-earrings-with-small-diamonds-on-satin-fabric-MGlSslCP2LY",
@@ -30,7 +30,7 @@
     "raw": "https://images.unsplash.com/photo-1771173652661-8245a9d94095"
   },
   {
-    "key": "ring-braided-2",
+    "asset": "ring-braided-2",
     "kind": "p",
     "unsplashId": "ltQW6B3rgvA",
     "slug": "a-woman-with-a-ring-on-her-finger-ltQW6B3rgvA",
@@ -40,7 +40,7 @@
     "raw": "https://images.unsplash.com/photo-1698259947512-a6ac66f961f2"
   },
   {
-    "key": "ring-emerald-1",
+    "asset": "ring-emerald-1",
     "kind": "p",
     "unsplashId": "41PGxdWN0xo",
     "slug": "a-persons-hand-holding-a-ring-with-a-green-stone-41PGxdWN0xo",
@@ -50,7 +50,7 @@
     "raw": "https://images.unsplash.com/photo-1685970732254-d2d1f43ddc7c"
   },
   {
-    "key": "ring-emerald-2",
+    "asset": "ring-emerald-2",
     "kind": "p",
     "unsplashId": "NTvXpPuSJrE",
     "slug": "a-green-ring-sitting-on-top-of-a-black-stand-NTvXpPuSJrE",
@@ -60,7 +60,7 @@
     "raw": "https://images.unsplash.com/photo-1685970730959-eb22c7b2bcd9"
   },
   {
-    "key": "ring-bands-1",
+    "asset": "ring-bands-1",
     "kind": "p",
     "unsplashId": "ZYet8yoepik",
     "slug": "gold-wedding-bands-on-fabric-ZYet8yoepik",
@@ -70,7 +70,7 @@
     "raw": "https://images.unsplash.com/photo-1622398925373-3f91b1e275f5"
   },
   {
-    "key": "ring-bands-2",
+    "asset": "ring-bands-2",
     "kind": "p",
     "unsplashId": "4U0i-ZlpyCk",
     "slug": "gold-ring-on-black-surface-4U0i-ZlpyCk",
@@ -80,7 +80,7 @@
     "raw": "https://images.unsplash.com/photo-1624634240157-8413a485be50"
   },
   {
-    "key": "ring-bold-1",
+    "asset": "ring-bold-1",
     "kind": "p",
     "unsplashId": "PYklI-sQ0ig",
     "slug": "a-close-up-of-a-person-holding-a-handbag-PYklI-sQ0ig",
@@ -90,7 +90,7 @@
     "raw": "https://images.unsplash.com/photo-1724261366524-657929c7e0b2"
   },
   {
-    "key": "ring-bold-2",
+    "asset": "ring-bold-2",
     "kind": "p",
     "unsplashId": "51FssjDQCPY",
     "slug": "woman-wearing-gold-ring-and-gold-ring-51FssjDQCPY",
@@ -100,7 +100,7 @@
     "raw": "https://images.unsplash.com/photo-1599481805056-1c61a8975797"
   },
   {
-    "key": "necklace-teardrop-1",
+    "asset": "necklace-teardrop-1",
     "kind": "p",
     "unsplashId": "TmOPo7TpLzw",
     "slug": "a-necklace-on-a-mannequin-with-flowers-in-the-background-TmOPo7TpLzw",
@@ -110,7 +110,7 @@
     "raw": "https://images.unsplash.com/photo-1705326452390-3ecf6070595f"
   },
   {
-    "key": "necklace-teardrop-2",
+    "asset": "necklace-teardrop-2",
     "kind": "p",
     "unsplashId": "QkZgJ7jWzIs",
     "slug": "a-white-mannequin-with-a-gold-necklace-on-it-QkZgJ7jWzIs",
@@ -120,7 +120,7 @@
     "raw": "https://images.unsplash.com/photo-1705326454924-f6777522b030"
   },
   {
-    "key": "necklace-cuban-1",
+    "asset": "necklace-cuban-1",
     "kind": "p",
     "unsplashId": "Z3GHeY0NXGg",
     "slug": "a-pair-of-gold-chain-bracelets-sitting-on-top-of-a-white-box-Z3GHeY0NXGg",
@@ -130,7 +130,7 @@
     "raw": "https://images.unsplash.com/photo-1708220040856-131e4f86a1aa"
   },
   {
-    "key": "necklace-cuban-2",
+    "asset": "necklace-cuban-2",
     "kind": "p",
     "unsplashId": "FV4STFfvcnw",
     "slug": "a-woman-wearing-a-white-dress-and-gold-jewelry-FV4STFfvcnw",
@@ -140,7 +140,7 @@
     "raw": "https://images.unsplash.com/photo-1721206624465-7d7691ebe50f"
   },
   {
-    "key": "necklace-crown-1",
+    "asset": "necklace-crown-1",
     "kind": "p",
     "unsplashId": "_Ycmc96ZxWM",
     "slug": "a-gold-necklace-with-a-crown-on-it-_Ycmc96ZxWM",
@@ -150,7 +150,7 @@
     "raw": "https://images.unsplash.com/photo-1685970731194-e27b477e87ba"
   },
   {
-    "key": "necklace-crown-2",
+    "asset": "necklace-crown-2",
     "kind": "p",
     "unsplashId": "QwRwbZe6dWc",
     "slug": "a-close-up-of-a-necklace-QwRwbZe6dWc",
@@ -160,7 +160,7 @@
     "raw": "https://images.unsplash.com/photo-1659708701940-e60893ef03d0"
   },
   {
-    "key": "necklace-flower-1",
+    "asset": "necklace-flower-1",
     "kind": "p",
     "unsplashId": "rvF5EglUXWg",
     "slug": "a-necklace-with-white-flowers-on-a-gold-chain-rvF5EglUXWg",
@@ -170,7 +170,7 @@
     "raw": "https://images.unsplash.com/photo-1685970731571-72ede0cb26ea"
   },
   {
-    "key": "necklace-flower-2",
+    "asset": "necklace-flower-2",
     "kind": "p",
     "unsplashId": "XYa9DKDBbPs",
     "slug": "a-close-up-of-a-person-wearing-a-necklace-XYa9DKDBbPs",
@@ -180,7 +180,7 @@
     "raw": "https://images.unsplash.com/photo-1727252586975-578c9122ec95"
   },
   {
-    "key": "necklace-coin-1",
+    "asset": "necklace-coin-1",
     "kind": "p",
     "unsplashId": "7uQQHORcTpc",
     "slug": "a-necklace-hanging-on-a-metal-chain-7uQQHORcTpc",
@@ -190,7 +190,7 @@
     "raw": "https://images.unsplash.com/photo-1635767798638-3e25273a8236"
   },
   {
-    "key": "necklace-coin-2",
+    "asset": "necklace-coin-2",
     "kind": "p",
     "unsplashId": "EnvGlhMhFrc",
     "slug": "woman-in-white-tank-top-wearing-silver-necklace-EnvGlhMhFrc",
@@ -200,7 +200,7 @@
     "raw": "https://images.unsplash.com/photo-1599459182681-c938b7f65af0"
   },
   {
-    "key": "necklace-classic-1",
+    "asset": "necklace-classic-1",
     "kind": "p",
     "unsplashId": "eVqKdSJKW9Q",
     "slug": "a-black-mannequin-with-a-gold-necklace-on-it-eVqKdSJKW9Q",
@@ -210,7 +210,7 @@
     "raw": "https://images.unsplash.com/photo-1688406264720-e2f9389c9ed1"
   },
   {
-    "key": "necklace-classic-2",
+    "asset": "necklace-classic-2",
     "kind": "p",
     "unsplashId": "n2-AYPfb-Ug",
     "slug": "woman-wearing-gold-jewelry-with-pearl-accents-n2-AYPfb-Ug",
@@ -220,7 +220,7 @@
     "raw": "https://images.unsplash.com/photo-1770721478216-3e5dbbe8dcc2"
   },
   {
-    "key": "bracelet-eye-1",
+    "asset": "bracelet-eye-1",
     "kind": "p",
     "unsplashId": "W49Oxm_WnmI",
     "slug": "a-woman-wearing-a-bracelet-with-a-evil-eye-on-it-W49Oxm_WnmI",
@@ -230,7 +230,7 @@
     "raw": "https://images.unsplash.com/photo-1721206624492-3d05631471ea"
   },
   {
-    "key": "bracelet-eye-2",
+    "asset": "bracelet-eye-2",
     "kind": "p",
     "unsplashId": "fP7s7YTfKx4",
     "slug": "a-woman-sitting-on-a-bed-with-her-hands-on-her-chest-fP7s7YTfKx4",
@@ -240,7 +240,7 @@
     "raw": "https://images.unsplash.com/photo-1721103428133-a2635d9e62eb"
   },
   {
-    "key": "bracelet-cuff-1",
+    "asset": "bracelet-cuff-1",
     "kind": "p",
     "unsplashId": "O7YCeE_65TE",
     "slug": "a-close-up-of-a-gold-ring-on-a-table-O7YCeE_65TE",
@@ -250,7 +250,7 @@
     "raw": "https://images.unsplash.com/photo-1689367436629-1d288f1e23b6"
   },
   {
-    "key": "bracelet-cuff-2",
+    "asset": "bracelet-cuff-2",
     "kind": "p",
     "unsplashId": "WDsohK10HAw",
     "slug": "a-close-up-of-a-gold-ring-on-a-table-WDsohK10HAw",
@@ -260,7 +260,7 @@
     "raw": "https://images.unsplash.com/photo-1689367436442-76c859315008"
   },
   {
-    "key": "bracelet-gourmet-1",
+    "asset": "bracelet-gourmet-1",
     "kind": "p",
     "unsplashId": "oO0JAOJhquk",
     "slug": "a-gold-chain-bracelet-sitting-on-top-of-a-magazine-oO0JAOJhquk",
@@ -270,7 +270,7 @@
     "raw": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a"
   },
   {
-    "key": "bracelet-gourmet-2",
+    "asset": "bracelet-gourmet-2",
     "kind": "p",
     "unsplashId": "h_ssRPj8UZo",
     "slug": "a-close-up-of-a-person-wearing-a-bracelet-h_ssRPj8UZo",
@@ -280,7 +280,7 @@
     "raw": "https://images.unsplash.com/photo-1633810543462-77c4a3b13f07"
   },
   {
-    "key": "bracelet-bangles-1",
+    "asset": "bracelet-bangles-1",
     "kind": "p",
     "unsplashId": "AoZrJQ80KCc",
     "slug": "a-couple-of-bracelets-sitting-on-top-of-a-table-AoZrJQ80KCc",
@@ -290,7 +290,7 @@
     "raw": "https://images.unsplash.com/photo-1679156271456-d6068c543ee7"
   },
   {
-    "key": "bracelet-bangles-2",
+    "asset": "bracelet-bangles-2",
     "kind": "p",
     "unsplashId": "aldDZePniqg",
     "slug": "gold-chain-necklace-on-white-surface-aldDZePniqg",
@@ -300,7 +300,7 @@
     "raw": "https://images.unsplash.com/photo-1611107683227-e9060eccd846"
   },
   {
-    "key": "bracelet-fine-1",
+    "asset": "bracelet-fine-1",
     "kind": "p",
     "unsplashId": "Jno26Xf1-WI",
     "slug": "a-delicate-gold-bracelet-with-an-id-tag-Jno26Xf1-WI",
@@ -310,7 +310,7 @@
     "raw": "https://images.unsplash.com/photo-1777999802051-f6f0296e76af"
   },
   {
-    "key": "bracelet-fine-2",
+    "asset": "bracelet-fine-2",
     "kind": "p",
     "unsplashId": "GtOo17K-vTg",
     "slug": "a-woman-wearing-a-gold-chain-bracelet-GtOo17K-vTg",
@@ -320,7 +320,7 @@
     "raw": "https://images.unsplash.com/photo-1633810542706-90e5ff7557be"
   },
   {
-    "key": "earring-drop-1",
+    "asset": "earring-drop-1",
     "kind": "p",
     "unsplashId": "q4uRpPcvF88",
     "slug": "a-pair-of-gold-earrings-sitting-on-top-of-a-white-sheet-q4uRpPcvF88",
@@ -330,7 +330,7 @@
     "raw": "https://images.unsplash.com/photo-1727990864588-757416bf8062"
   },
   {
-    "key": "earring-drop-2",
+    "asset": "earring-drop-2",
     "kind": "p",
     "unsplashId": "5S0IV03f0i8",
     "slug": "a-pair-of-gold-earrings-sitting-on-top-of-a-white-sheet-5S0IV03f0i8",
@@ -340,7 +340,7 @@
     "raw": "https://images.unsplash.com/photo-1727990865600-91f8cb8b0168"
   },
   {
-    "key": "earring-hoop-1",
+    "asset": "earring-hoop-1",
     "kind": "p",
     "unsplashId": "77vl4dH6KKQ",
     "slug": "a-pair-of-gold-hoop-earrings-on-a-white-stand-77vl4dH6KKQ",
@@ -350,7 +350,7 @@
     "raw": "https://images.unsplash.com/photo-1708220040824-b273dd0a17cc"
   },
   {
-    "key": "earring-hoop-2",
+    "asset": "earring-hoop-2",
     "kind": "p",
     "unsplashId": "s9idT2PQUt4",
     "slug": "a-close-up-of-a-person-wearing-a-pair-of-earrings-s9idT2PQUt4",
@@ -360,7 +360,7 @@
     "raw": "https://images.unsplash.com/photo-1671644730555-916aa8d8157f"
   },
   {
-    "key": "earring-twist-1",
+    "asset": "earring-twist-1",
     "kind": "p",
     "unsplashId": "Ki7TPcA9204",
     "slug": "gold-ring-on-white-textile-Ki7TPcA9204",
@@ -370,7 +370,7 @@
     "raw": "https://images.unsplash.com/photo-1617038260897-41a1f14a8ca0"
   },
   {
-    "key": "earring-twist-2",
+    "asset": "earring-twist-2",
     "kind": "p",
     "unsplashId": "FEIoXyYIPik",
     "slug": "a-woman-wearing-a-pair-of-gold-rings-FEIoXyYIPik",
@@ -380,7 +380,7 @@
     "raw": "https://images.unsplash.com/photo-1698259947669-82602bc3a702"
   },
   {
-    "key": "earring-huggie-1",
+    "asset": "earring-huggie-1",
     "kind": "p",
     "unsplashId": "jqcmEaerPjU",
     "slug": "two-textured-and-smooth-gold-hoop-earrings-on-white-jqcmEaerPjU",
@@ -390,7 +390,7 @@
     "raw": "https://images.unsplash.com/photo-1781901726815-29af905d0b46"
   },
   {
-    "key": "earring-huggie-2",
+    "asset": "earring-huggie-2",
     "kind": "p",
     "unsplashId": "6OHCS0XIKAQ",
     "slug": "two-gold-hoop-earrings-one-ribbed-on-white-background-6OHCS0XIKAQ",
@@ -400,7 +400,7 @@
     "raw": "https://images.unsplash.com/photo-1784322662679-1823caf49e86"
   },
   {
-    "key": "earring-wave-1",
+    "asset": "earring-wave-1",
     "kind": "p",
     "unsplashId": "pQYSjhWz4cQ",
     "slug": "a-pair-of-gold-earrings-on-a-white-surface-pQYSjhWz4cQ",
@@ -410,7 +410,7 @@
     "raw": "https://images.unsplash.com/photo-1708220040828-9ab1673681d3"
   },
   {
-    "key": "earring-wave-2",
+    "asset": "earring-wave-2",
     "kind": "p",
     "unsplashId": "n2-AYPfb-Ug",
     "slug": "woman-wearing-gold-jewelry-with-pearl-accents-n2-AYPfb-Ug",
@@ -420,7 +420,7 @@
     "raw": "https://images.unsplash.com/photo-1770721478216-3e5dbbe8dcc2"
   },
   {
-    "key": "earring-link-1",
+    "asset": "earring-link-1",
     "kind": "p",
     "unsplashId": "GaWRVzfRfbY",
     "slug": "gold-chain-link-hoop-earrings-on-a-reflective-surface-GaWRVzfRfbY",
@@ -430,7 +430,7 @@
     "raw": "https://images.unsplash.com/photo-1786052337799-983e1667dff8"
   },
   {
-    "key": "earring-link-2",
+    "asset": "earring-link-2",
     "kind": "p",
     "unsplashId": "I4GVWQXXIXQ",
     "slug": "a-pair-of-gold-chain-link-hoop-earrings-on-a-mirror-I4GVWQXXIXQ",
@@ -440,7 +440,7 @@
     "raw": "https://images.unsplash.com/photo-1786052337390-567bce745609"
   },
   {
-    "key": "hero-1",
+    "asset": "hero-1",
     "kind": "h",
     "unsplashId": "sNRL7DRavPw",
     "slug": "woman-with-curly-hair-and-jewelry-sNRL7DRavPw",
@@ -450,7 +450,7 @@
     "raw": "https://images.unsplash.com/photo-1788562767053-6d185dad6e2e"
   },
   {
-    "key": "hero-2",
+    "asset": "hero-2",
     "kind": "h",
     "unsplashId": "mrljCG3nCR4",
     "slug": "woman-with-long-brown-hair-looking-away-mrljCG3nCR4",
@@ -460,7 +460,7 @@
     "raw": "https://images.unsplash.com/photo-1768845431923-0146cf14804d"
   },
   {
-    "key": "collection-rings",
+    "asset": "collection-rings",
     "kind": "s",
     "unsplashId": "ltQW6B3rgvA",
     "slug": "a-woman-with-a-ring-on-her-finger-ltQW6B3rgvA",
@@ -470,7 +470,7 @@
     "raw": "https://images.unsplash.com/photo-1698259947512-a6ac66f961f2"
   },
   {
-    "key": "collection-necklaces",
+    "asset": "collection-necklaces",
     "kind": "s",
     "unsplashId": "FV4STFfvcnw",
     "slug": "a-woman-wearing-a-white-dress-and-gold-jewelry-FV4STFfvcnw",
@@ -480,7 +480,7 @@
     "raw": "https://images.unsplash.com/photo-1721206624465-7d7691ebe50f"
   },
   {
-    "key": "collection-bracelets",
+    "asset": "collection-bracelets",
     "kind": "s",
     "unsplashId": "fP7s7YTfKx4",
     "slug": "a-woman-sitting-on-a-bed-with-her-hands-on-her-chest-fP7s7YTfKx4",
@@ -490,7 +490,7 @@
     "raw": "https://images.unsplash.com/photo-1721103428133-a2635d9e62eb"
   },
   {
-    "key": "collection-earrings",
+    "asset": "collection-earrings",
     "kind": "s",
     "unsplashId": "FEIoXyYIPik",
     "slug": "a-woman-wearing-a-pair-of-gold-rings-FEIoXyYIPik",
@@ -500,7 +500,7 @@
     "raw": "https://images.unsplash.com/photo-1698259947669-82602bc3a702"
   },
   {
-    "key": "story-craft",
+    "asset": "story-craft",
     "kind": "s",
     "unsplashId": "muMwgeSo31A",
     "slug": "person-holding-stone-muMwgeSo31A",
@@ -510,7 +510,7 @@
     "raw": "https://images.unsplash.com/photo-1526907279934-3c9d2e53170f"
   },
   {
-    "key": "gift-tray",
+    "asset": "gift-tray",
     "kind": "s",
     "unsplashId": "moRYg6k5-Kg",
     "slug": "a-silver-tray-topped-with-lots-of-gold-jewelry-moRYg6k5-Kg",

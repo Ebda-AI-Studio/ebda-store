@@ -25,7 +25,7 @@ mkdirSync(join(out, 'dahab'), { recursive: true });
 let n = 0;
 for (const ph of photos) {
   for (const [suffix, w, h] of SIZES[ph.kind]) {
-    const file = join(out, 'dahab', `${ph.key}${suffix}.webp`);
+    const file = join(out, 'dahab', `${ph.asset}${suffix}.webp`);
     if (existsSync(file)) continue;
     const crop = ph.kind === 'h' ? 'faces,entropy' : 'entropy';
     // Byte budget per file (mobile Lighthouse): step the quality down until it fits.
@@ -42,7 +42,7 @@ for (const ph of photos) {
           if (res.ok) break;
           throw new Error(`HTTP ${res.status}`);
         } catch (err) {
-          if (attempt >= 4) throw new Error(`${ph.key}: ${err.message}`);
+          if (attempt >= 4) throw new Error(`${ph.asset}: ${err.message}`);
           await new Promise(r => setTimeout(r, 2000 * attempt));
         }
       }
