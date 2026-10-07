@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { firstCategoryId, pickRelated } from '../../../lib/related-products';
 import { useLocalePrice } from '../../../hooks/useLocalePrice';
 import { useParams } from 'next/navigation';
@@ -43,7 +43,9 @@ import {
   resolveCardBadges,
 } from '../../../templates/shared/custom-badge';
 
-import { fromMinor } from '@force/shared';
+import { fromMinor, model3dSwatchColor } from '@force/shared';
+import { Model3dToggle, ProductModel3dPanel } from '../../../components/ProductModel3d';
+import { captureEvent } from '../../../components/PostHogProvider';
 import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
 import { REGION } from '@force/shared';
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
@@ -177,6 +179,11 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // rule is that auto-selection changes nothing visible except the pill state
   // and the Add to Cart button — a tap still swaps it exactly as before.
   const [shopperPickedVariant, setShopperPickedVariant] = useState(false);
+  // 3D viewer (docs/plans/2026-10-07-product-3d-viewer.md): opened by an
+  // explicit tap only — nothing 3D downloads before it. `pickedOptions` is the
+  // shopper's PARTIAL pick map, so "Metal: Gold" recolours before a size.
+  const [show3d, setShow3d] = useState(false);
+  const [pickedOptions, setPickedOptions] = useState<Record<string, string>>({});
   const galleryVariant = shopperPickedVariant ? selectedVariant : null;
 
   // Reset the gallery to the first image whenever the variant image changes —
@@ -229,6 +236,16 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const formatPrice = useLocalePrice();
   // Prop layout wins (server-side fetch); ctx layout is the lazy-fetched fallback.
   const resolvedLayout = layout ?? ctxLayout ?? undefined;
+  // The API already drops `model3d` when `product_3d` is off; the flag check
+  // here is the second gate (a super-admin override takes effect client-side
+  // on the next store payload too).
+  const model3d = product?.model3d && isEnabled('product_3d') ? product.model3d : null;
+  const model3dBindings = model3d?.bindings;
+  const swatchColor = useCallback(
+    (optionName: string, value: string) =>
+      model3dBindings ? model3dSwatchColor(model3dBindings, optionName, value) : undefined,
+    [model3dBindings]
+  );
   // Issue 2: pass productCardDefaults to all card surfaces on this page.
   const productCardDefaults = resolvedLayout?.productCardDefaults;
 
@@ -777,7 +794,34 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               <div
                 className={`relative ${pdpAspectClass} mx-auto max-w-[280px] sm:max-w-[400px] lg:max-w-[600px] overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10`}
               >
-                {images.length > 0 ? (
+                {model3d && (
+                  <Model3dToggle
+                    active={show3d}
+                    t={t}
+                    onToggle={() => {
+                      if (!show3d) {
+                        captureEvent('product_3d_opened', {
+                          storeId: store?.id,
+                          productId: product.id,
+                        });
+                      }
+                      setShow3d(v => !v);
+                    }}
+                  />
+                )}
+                {model3d && show3d ? (
+                  <ProductModel3dPanel
+                    model={model3d}
+                    storeId={store?.id ?? ''}
+                    productId={product.id}
+                    productName={displayName}
+                    fallbackPoster={productImages[0]?.url}
+                    selected={pickedOptions}
+                    optionOrder={productOptions.map(o => o.name)}
+                    isRtl={language === 'ar'}
+                    t={t}
+                  />
+                ) : images.length > 0 ? (
                   // Swipeable scroll-snap track — one image per page. Touch users
                   // swipe left/right; desktop scrolls/drag. handleGalleryScroll
                   // keeps selectedImage (dots + thumbnails) in sync.
@@ -835,11 +879,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     so the PDP matches the listing. orderable honors backorder:
                     a backorder-able OOS product is still orderable so no label.
                     Sits OVER the swipe track so it stays put while images scroll. */}
-                <OosImageDim
-                  orderable={!outOfStock || canBackorder}
-                  oosDimColor={productCardDefaults?.oosDimColor}
-                  theme={store?.theme}
-                />
+                {!show3d && (
+                  <OosImageDim
+                    orderable={!outOfStock || canBackorder}
+                    oosDimColor={productCardDefaults?.oosDimColor}
+                    theme={store?.theme}
+                  />
+                )}
                 <OutOfStockRibbon
                   inStock={!outOfStock || canBackorder}
                   isRtl={language === 'ar'}
@@ -853,7 +899,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   theme={store?.theme}
                 />
                 {/* Dot indicators — current image of total. */}
-                {images.length > 1 && (
+                {images.length > 1 && !show3d && (
                   <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
                     {images.map((_, i) => (
                       <span
@@ -952,6 +998,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   options={productOptions}
                   onVariantSelect={setSelectedVariant}
                   onShopperSelect={() => setShopperPickedVariant(true)}
+                  onSelectionChange={setPickedOptions}
+                  swatchColor={model3d ? swatchColor : undefined}
                 />
               )}
 

@@ -220,6 +220,10 @@ Expand step of rulings PROVIDERS-9/10. `shipping_carrier_configs` gained `test_m
 
 Adds `dahab` to the `"StoreTemplate"` enum (builder Phase 3 pilot). Postgres cannot drop an enum value, so a rollback is: revert the code, move any store on the new value back (`UPDATE stores SET template = 'elegant' WHERE template = 'dahab';` — re-check RLS policy state after, per the note above), and leave the value unused. Delete the row from `_prisma_migrations` only if you also restore from a pre-migration branch.
 
+## Product 3D models (`20261008000020_product_3d_models`)
+
+Two additive tables (`product_models`, `product_model_bindings`); every FK into them CASCADEs and nothing else references them. Feature-only rollback without a deploy: a super-admin `StoreFeature` override `product_3d = false` hides the viewer for that store (the public payload drops `model3d`). Code rollback: revert (path B); the PDP then renders photos only. To also drop the data: `DROP TABLE product_model_bindings, product_models;` and delete the row from `_prisma_migrations`; the `.glb`/`.usdz` objects under `stores/<id>/models/` become orphans for the weekly R2 sweep. Re-check RLS state after any restore (`tests/integration/rls-ebda-app.test.ts`).
+
 ## Trace: what migrated when
 
 ```bash

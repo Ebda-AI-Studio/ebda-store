@@ -14,6 +14,11 @@ interface VariantSelectorProps {
   /** Fires when the shopper taps a pill (never for the auto-selected single
    *  variant), so the page can tell a real pick from the pre-selection. */
   onShopperSelect?: () => void;
+  /** Fires with the (possibly PARTIAL) pick map on every change — the 3D
+   *  viewer recolours on "Metal: Gold" before a size is chosen. */
+  onSelectionChange?: (selected: Record<string, string>) => void;
+  /** Colour dot for a pill (a 3D colour/metal binding), or undefined. */
+  swatchColor?: (optionName: string, value: string) => string | undefined;
   /**
    * `pill` (default, every existing store): filled primary pill when picked.
    * `swatch` (Dahab): outlined chips with a metal-colour dot for gold
@@ -36,6 +41,8 @@ export function VariantSelector({
   options,
   onVariantSelect,
   onShopperSelect,
+  onSelectionChange,
+  swatchColor,
   appearance = 'pill',
 }: VariantSelectorProps) {
   const swatch = appearance === 'swatch';
@@ -48,6 +55,10 @@ export function VariantSelector({
       options.map(o => o.name)
     )
   );
+
+  useEffect(() => {
+    onSelectionChange?.(selected);
+  }, [selected, onSelectionChange]);
 
   // Derive the matching variant whenever selections change
   useEffect(() => {
@@ -157,6 +168,7 @@ export function VariantSelector({
                 const isSelected = selected[option.name] === value;
                 const available = isValueAvailable(option.name, value);
                 const thumbnail = getThumbnailForValue(option.name, value);
+                const dotColor = thumbnail ? undefined : swatchColor?.(option.name, value);
                 // Pill text: merchant Arabic wins; else unit tokens are
                 // localised ("185 Gram" → "185 جرام"); else English.
                 const pillLabel = localizeOptionValue(value, valueAr, isRtl);
@@ -180,7 +192,7 @@ export function VariantSelector({
                           ].join(' ')
                         : [
                             'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition-all',
-                            thumbnail ? 'inline-flex items-center gap-2' : '',
+                            thumbnail || dotColor ? 'inline-flex items-center gap-2' : '',
                             isSelected
                               ? 'border-primary bg-primary text-white shadow-md shadow-primary/25'
                               : available
@@ -211,6 +223,13 @@ export function VariantSelector({
                           className="h-full w-full object-cover"
                         />
                       </span>
+                    )}
+                    {dotColor && (
+                      <span
+                        aria-hidden="true"
+                        className="inline-block h-4 w-4 shrink-0 rounded-full border border-foreground/20"
+                        style={{ backgroundColor: dotColor }}
+                      />
                     )}
                     {pillLabel}
                     {/* Strikethrough diagonal line for unavailable values */}

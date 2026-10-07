@@ -9,6 +9,7 @@ import { AdminLayout } from '../../../../../components/AdminLayout';
 import { useAuth } from '../../../../../lib/auth';
 import { apiGet, apiDelete } from '../../../../../lib/api';
 import { ProductInfoSections, ProductSidebar } from './_components/ProductInfoSections';
+import { Product3dModelCard } from './_components/Product3dModelCard';
 
 interface Product {
   id: string;
@@ -241,6 +242,7 @@ export default function ProductDetailPage() {
             statusBadge={getStatusBadge(product.status)}
             fallbackSku={t('fallbackSku')}
           />
+          <Product3dModelCard storeId={storeId} productId={product.id} />
         </div>
 
         <div className="space-y-6">

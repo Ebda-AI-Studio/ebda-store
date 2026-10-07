@@ -333,6 +333,31 @@ export const R2_REFERENCE_COLUMNS: readonly R2ReferenceColumn[] = [
     kind: 'url',
     why: 'per-variant image upload',
   },
+  // ── Product 3D models (docs/plans/2026-10-07-product-3d-viewer.md) ─────────
+  {
+    model: 'ProductModel',
+    field: 'modelUrl',
+    table: 'product_models',
+    column: 'model_url',
+    kind: 'url',
+    why: 'product 3D model (.glb) upload, stores/<id>/models/',
+  },
+  {
+    model: 'ProductModel',
+    field: 'usdzUrl',
+    table: 'product_models',
+    column: 'usdz_url',
+    kind: 'url',
+    why: 'optional iOS Quick Look .usdz upload, stores/<id>/models/',
+  },
+  {
+    model: 'ProductModel',
+    field: 'posterUrl',
+    table: 'product_models',
+    column: 'poster_url',
+    kind: 'url',
+    why: '3D viewer poster (captured from the preview or uploaded), products/ folder',
+  },
   {
     model: 'Bundle',
     field: 'image',

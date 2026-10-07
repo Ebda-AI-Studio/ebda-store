@@ -132,6 +132,9 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'BankStatement.fileName': 'original upload filename only; the statement is parsed, not stored',
   'AnswerEngineCheck.citedUrls': 'third-party URLs an AI answer engine cited',
   'AnswerEngineCheck.competitorUrls': 'third-party competitor URLs',
+  'ProductModel.materials': 'material names + indexes extracted from the GLB, no URLs',
+  'ProductModel.gltfVariants': 'KHR_materials_variants names, no URLs',
+  'ProductModel.stats': 'vertex/mesh/texture counts and extension names, no URLs',
 };
 
 const FLAGGED = SCHEMA.filter(c => c.type === 'Json' || URL_SHAPED.test(c.field));

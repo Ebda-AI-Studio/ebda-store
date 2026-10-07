@@ -330,10 +330,21 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
             : ProductService.getPublicBySlug(storeId, slugOrId)
         );
 
+    // `product_3d` (every plan; a super-admin override can switch it off per
+    // store) is checked AFTER the Redis read, so the cached product never
+    // decides an entitlement — FeatureService's own cache is busted on every
+    // override write. Residual: the edge cache below, same as every field.
+    const payload =
+      product && (product as { model3d?: unknown }).model3d
+        ? (await featureService.isFeatureEnabled(storeId, 'product_3d'))
+          ? product
+          : { ...product, model3d: null }
+        : product;
+
     setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({
       success: true,
-      data: { product },
+      data: { product: payload },
     });
   } catch (error) {
     next(error);

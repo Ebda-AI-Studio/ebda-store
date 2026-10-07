@@ -451,6 +451,9 @@ describe('every table with a store_id column is under STRICT, FORCED RLS (auto-e
   it('includes the tables added after the enumeration was written (visual builder revisions)', async () => {
     const tables = (await tenantTables()).map(t => t.table);
     expect(tables).toContain('store_page_revisions');
+    // Product 3D models (2026-10-07) — both tables carry store_id, so the
+    // forced/strict/contextless assertions below cover them automatically.
+    expect(tables).toEqual(expect.arrayContaining(['product_models', 'product_model_bindings']));
     const [{ n }] = await owner.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(*) AS n FROM public.store_page_revisions`;
     expect(Number(n)).toBeGreaterThanOrEqual(2); // not vacuously empty for the 0-row assertion below

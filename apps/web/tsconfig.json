@@ -12,7 +12,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@force/shared": ["../../packages/shared/src"],
-      "@force/ui": ["../../packages/ui/src"]
+      "@force/ui": ["../../packages/ui/src"],
+      "@force/ui/model3d": ["../../packages/ui/src/model3d"]
     },
     "plugins": [
       {

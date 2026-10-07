@@ -113,6 +113,8 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       shipments: 'Shipment',
       codRemittances: 'CodRemittance',
       pageRevisions: 'StorePageRevision',
+      productModels: 'ProductModel',
+      productModelBindings: 'ProductModelBinding',
       affiliates: 'Affiliate',
       affiliateReferrals: 'AffiliateReferral',
       affiliatePayouts: 'AffiliatePayout',
@@ -287,6 +289,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       countLines: 'CountLine',
       dailyViews: 'ProductDailyView',
       bundleItems: 'BundleItem',
+      model3d: 'ProductModel',
     },
   },
   {
@@ -349,6 +352,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     relations: {
       option: 'ProductOption',
       variants: 'ProductVariantOption',
+      model3dBindings: 'ProductModelBinding',
     },
   },
   {
@@ -369,6 +373,26 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       warehouseStock: 'WarehouseStock',
       countLines: 'CountLine',
       bundleItems: 'BundleItem',
+    },
+  },
+  {
+    name: 'ProductModel',
+    table: 'product_models',
+    storeId: true,
+    relations: {
+      store: 'Store',
+      product: 'Product',
+      bindings: 'ProductModelBinding',
+    },
+  },
+  {
+    name: 'ProductModelBinding',
+    table: 'product_model_bindings',
+    storeId: true,
+    relations: {
+      store: 'Store',
+      model: 'ProductModel',
+      optionValue: 'ProductOptionValue',
     },
   },
   {
