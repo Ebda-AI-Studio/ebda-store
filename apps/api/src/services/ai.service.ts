@@ -16,7 +16,7 @@
  * Every call writes an `AiUsage` row so `cached_hit=true` and token
  * usage can be aggregated for billing/audit later.
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GeminiFailoverClient } from '../lib/ai/gemini-keys';
 import { z } from 'zod';
 import { createHash } from 'crypto';
 import sharp from 'sharp';
@@ -135,12 +135,12 @@ const CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 const META_TITLE_MAX = 60;
 const META_DESCRIPTION_MAX = 160;
 
-let cachedClient: GoogleGenerativeAI | null = null;
-function getClient(): GoogleGenerativeAI {
+let cachedClient: GeminiFailoverClient | null = null;
+function getClient(): GeminiFailoverClient {
   if (!config.googleAiKey) {
     throw new AppError(503, 'AI_NOT_CONFIGURED', 'AI features are not configured on this server.');
   }
-  if (!cachedClient) cachedClient = new GoogleGenerativeAI(config.googleAiKey);
+  if (!cachedClient) cachedClient = new GeminiFailoverClient();
   return cachedClient;
 }
 
