@@ -15,7 +15,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: 'Who we are',
         p: [
-          'Ebda (ابدأ), available at ebda.app, is an online store builder for merchants in Egypt. It is operated by Ahmad Sharaf, trading as "Whisky 11" ("Ebda", "we", "us"). Whisky 11 is not yet a registered company; this notice will be updated when that changes.',
+          'Ebda (ابدأ), available at ebda.app, is an online store builder for merchants in Egypt. It is a product of Whisky 11 ("Ebda", "we", "us").',
         ],
       },
       {
@@ -312,7 +312,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '1. Who this covers',
         p: [
-          "This policy explains how Ebda (operated by Ahmad Sharaf trading as Whisky 11) handles personal data under Egypt's Personal Data Protection Law No. 151 of 2020. It covers: merchants and their staff who use Ebda; visitors to ebda.app; and shoppers who buy from a merchant's store. Contact: hello@ebda.app.",
+          "This policy explains how Ebda (a product of Whisky 11) handles personal data under Egypt's Personal Data Protection Law No. 151 of 2020. It covers: merchants and their staff who use Ebda; visitors to ebda.app; and shoppers who buy from a merchant's store. Contact: hello@ebda.app.",
         ],
       },
       {
