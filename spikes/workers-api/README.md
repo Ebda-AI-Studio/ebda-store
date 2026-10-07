@@ -2,7 +2,7 @@
 
 **Question:** can FWB's "one interactive transaction per request, `set_config` the tenant GUCs first, commit before responding" model run on workerd with Prisma 6 + `@prisma/adapter-pg`, through a transaction-mode pooler (what Hyperdrive does), with no cross-tenant leak?
 
-**Answer: yes, locally.** 17/17 tests pass on workerd, 0 leaks in 300 interleaved requests over a pool of 2 server connections, and a mutation check proves the isolation tests fail when the GUC handling is broken. What this does *not* prove is Cloudflare's real Hyperdrive pooler (see Gaps).
+**Answer: yes, locally.** 17/17 tests pass on workerd, 0 leaks in 300 interleaved requests over a pool of 2 server connections, and a mutation check proves the isolation tests fail when the GUC handling is broken. What this does _not_ prove is Cloudflare's real Hyperdrive pooler (see Gaps).
 
 ## Layout
 
@@ -42,58 +42,58 @@ Tests run **on workerd via `@cloudflare/vitest-pool-workers`** (not a script aga
 
 `npx vitest run` (exit 0): `Test Files 3 passed, Tests 17 passed` (`results/green-run.txt`).
 
-| Required test | Result |
-|---|---|
+| Required test                                                                                                                                                | Result                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
 | 300 interleaved concurrent requests (alternating amelia/rival hosts, plus every 5th op a no-GUC probe transaction); every response only that host's products | PASS, leaks=0, non-200=0; 2 distinct backend PIDs, both PIDs served both tenants (reuse proven) |
-| Request with GUC unset returns zero rows (reads), write rejected, `stores` not even granted | PASS |
-| Role is `ebda_app`, not superuser, not BYPASSRLS; all 5 tables ENABLE+FORCE RLS | PASS |
-| After an amelia tx, a reused pooled connection cannot see the GUC (40 pairs, same backend PID in 15-35 of 40) | PASS, leaks=0 |
-| NEGATIVE CONTROL: session-level `set_config(...,false)` leaks through pgbouncer | PASS (it leaked 13/20 to 20/20 times, so the harness can fail) |
-| Cart add twice -> quantity 2, both 200, no 25P02 | PASS |
-| 12 concurrent adds to one cart -> quantity 12, all 200 (Prisma upsert+increment race) | PASS |
-| Other tenant's product id on this host -> 404, nothing written; same session id on two hosts -> two carts | PASS |
-| Webhook: bad/missing/non-hex/other-body signature -> 401; unknown provider -> 404; nothing stored | PASS |
-| Webhook good -> 200 + cart paid; replay -> 200 `duplicate:true`, one row; 5 simultaneous replays -> one row, all 200 | PASS |
-| Webhook delivered on rival's host cannot mark amelia's cart paid | PASS |
-| Unknown host / apex / `a.b.ebda.app` / foreign domain / invalid labels -> 404; custom domain + case/port normalised -> amelia | PASS |
-| Each of the 8 reserved slugs (`app api docs help status whatsapp www admin`) -> 404 | PASS |
-| `wrangler dev` smoke: 240 requests @24 concurrency, leaks=0, unknown host 404, reserved host 404 | PASS (`results/smoke-dev.txt`) |
+| Request with GUC unset returns zero rows (reads), write rejected, `stores` not even granted                                                                  | PASS                                                                                            |
+| Role is `ebda_app`, not superuser, not BYPASSRLS; all 5 tables ENABLE+FORCE RLS                                                                              | PASS                                                                                            |
+| After an amelia tx, a reused pooled connection cannot see the GUC (40 pairs, same backend PID in 15-35 of 40)                                                | PASS, leaks=0                                                                                   |
+| NEGATIVE CONTROL: session-level `set_config(...,false)` leaks through pgbouncer                                                                              | PASS (it leaked 13/20 to 20/20 times, so the harness can fail)                                  |
+| Cart add twice -> quantity 2, both 200, no 25P02                                                                                                             | PASS                                                                                            |
+| 12 concurrent adds to one cart -> quantity 12, all 200 (Prisma upsert+increment race)                                                                        | PASS                                                                                            |
+| Other tenant's product id on this host -> 404, nothing written; same session id on two hosts -> two carts                                                    | PASS                                                                                            |
+| Webhook: bad/missing/non-hex/other-body signature -> 401; unknown provider -> 404; nothing stored                                                            | PASS                                                                                            |
+| Webhook good -> 200 + cart paid; replay -> 200 `duplicate:true`, one row; 5 simultaneous replays -> one row, all 200                                         | PASS                                                                                            |
+| Webhook delivered on rival's host cannot mark amelia's cart paid                                                                                             | PASS                                                                                            |
+| Unknown host / apex / `a.b.ebda.app` / foreign domain / invalid labels -> 404; custom domain + case/port normalised -> amelia                                | PASS                                                                                            |
+| Each of the 8 reserved slugs (`app api docs help status whatsapp www admin`) -> 404                                                                          | PASS                                                                                            |
+| `wrangler dev` smoke: 240 requests @24 concurrency, leaks=0, unknown host 404, reserved host 404                                                             | PASS (`results/smoke-dev.txt`)                                                                  |
 
 ### Mutation check (`bash scripts/mutation-check.sh`, output in `results/mutation-check.txt`)
 
-| Step | vitest exit | Outcome |
-|---|---|---|
-| baseline | 0 | 16/16 (isolation + routes) green |
-| Mutation 1: `set_config(..., true)` -> `false` (session-level, both GUCs) | **1** | RED: 3 failed: the 300-request load test (no-GUC probes saw a previous tenant's GUC/rows), "GUC not set returns zero rows", "transaction-local ... does not leak". All route tests stayed green: each request overwrites the GUC before reading, so **only the unscoped probes can detect this mutation**. That is why the load test contains them. |
-| Mutation 2: store-id `set_config` call deleted | **1** | RED: 8 failed (load test, reuse test, every cart/webhook test: strict RLS gives 0 rows / rejects inserts). "GUC not set" correctly stays green here. |
-| restored (`diff` identical) | 0 | 16/16 green |
+| Step                                                                      | vitest exit | Outcome                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| baseline                                                                  | 0           | 16/16 (isolation + routes) green                                                                                                                                                                                                                                                                                                                    |
+| Mutation 1: `set_config(..., true)` -> `false` (session-level, both GUCs) | **1**       | RED: 3 failed: the 300-request load test (no-GUC probes saw a previous tenant's GUC/rows), "GUC not set returns zero rows", "transaction-local ... does not leak". All route tests stayed green: each request overwrites the GUC before reading, so **only the unscoped probes can detect this mutation**. That is why the load test contains them. |
+| Mutation 2: store-id `set_config` call deleted                            | **1**       | RED: 8 failed (load test, reuse test, every cart/webhook test: strict RLS gives 0 rows / rejects inserts). "GUC not set" correctly stays green here.                                                                                                                                                                                                |
+| restored (`diff` identical)                                               | 0           | 16/16 green                                                                                                                                                                                                                                                                                                                                         |
 
 The pooler is restarted between runs because mutation 1 leaves session-level state on server connections.
 
 ### Versions
 
-| | |
-|---|---|
-| Node | 22.22.0 |
-| wrangler | 4.147.0 (`wrangler dev` workerd 1.20261001.1) |
+|                                   |                                                                                                |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Node                              | 22.22.0                                                                                        |
+| wrangler                          | 4.147.0 (`wrangler dev` workerd 1.20261001.1)                                                  |
 | `@cloudflare/vitest-pool-workers` | 0.22.0 (miniflare 5.20260815.0-alpha, **workerd 1.20260815.1**, newest compat date 2026-08-22) |
-| vitest | 4.1.11 |
-| prisma / @prisma/client | 6.19.3 (`engineType = "client"`, query compiler + wasm, no native engine) |
-| @prisma/adapter-pg | 6.19.3 |
-| pg / pg-cloudflare / pg-pool | 8.23.1 / 1.4.1 / 3.14.0 |
-| hono | 4.13.12 |
-| PostgreSQL / pgbouncer | 16.14 / 1.22.0 |
+| vitest                            | 4.1.11                                                                                         |
+| prisma / @prisma/client           | 6.19.3 (`engineType = "client"`, query compiler + wasm, no native engine)                      |
+| @prisma/adapter-pg                | 6.19.3                                                                                         |
+| pg / pg-cloudflare / pg-pool      | 8.23.1 / 1.4.1 / 3.14.0                                                                        |
+| hono                              | 4.13.12                                                                                        |
+| PostgreSQL / pgbouncer            | 16.14 / 1.22.0                                                                                 |
 
 ### Timings (localhost, Miniflare Hyperdrive proxy -> pgbouncer -> pg; `results/timing.txt`)
 
 Sequential, uncontended, 40 samples after warmup. Every request opens a fresh pg connection (SCRAM handshake via pgbouncer) and a new Prisma client. workerd timer resolution is ~1 ms.
 
-| Route | end-to-end p50 / p95 | in-handler transaction (connect + BEGIN..COMMIT) p50 / p95 |
-|---|---|---|
-| first request in an isolate (wasm init + cold connect) | 757-869 ms | n/a |
-| GET /products | 14 / 22 ms | 11 / 17 ms |
-| POST /cart/items | 21 / 28 ms | 17 / 23 ms |
-| POST /webhooks/payments/fakepay | 19 / 26 ms | 12 / 15 ms |
+| Route                                                  | end-to-end p50 / p95 | in-handler transaction (connect + BEGIN..COMMIT) p50 / p95 |
+| ------------------------------------------------------ | -------------------- | ---------------------------------------------------------- |
+| first request in an isolate (wasm init + cold connect) | 757-869 ms           | n/a                                                        |
+| GET /products                                          | 14 / 22 ms           | 11 / 17 ms                                                 |
+| POST /cart/items                                       | 21 / 28 ms           | 17 / 23 ms                                                 |
+| POST /webhooks/payments/fakepay                        | 19 / 26 ms           | 12 / 15 ms                                                 |
 
 Under load (300 requests, concurrency 30, pool_size 2): p50 ~430-490 ms, p95 ~1.3-1.6 s, total ~5.5 s. That is queueing for 2 server connections, not slowness: in transaction mode a request pins a server connection for its whole interactive transaction (about 5-8 round trips), so throughput is roughly `pool_size / tx_duration`.
 
@@ -109,7 +109,7 @@ Under load (300 requests, concurrency 30, pool_size 2): p50 ~430-490 ms, p95 ~1.
 
 ## Findings (what worked / broke / workarounds)
 
-1. **FWB's policies are allow-contextless, so the "GUC unset returns zero rows" property does not hold for FWB as written.** Every FWB policy is `current_store_id() IS NULL OR store_id = current_store_id()`, so a request that forgets the GUC (or, on a pooler, lands on a connection with no GUC) sees *all tenants*. For Ebda the spike uses strict policies (`store_id = current_store_id()`, NULL -> no rows, inserts rejected) and tests that. Super-admin/cross-tenant paths then need an explicit mechanism (a bypass role or `SECURITY DEFINER` functions); that is a design decision to make, not a free port.
+1. **FWB's policies are allow-contextless, so the "GUC unset returns zero rows" property does not hold for FWB as written.** Every FWB policy is `current_store_id() IS NULL OR store_id = current_store_id()`, so a request that forgets the GUC (or, on a pooler, lands on a connection with no GUC) sees _all tenants_. For Ebda the spike uses strict policies (`store_id = current_store_id()`, NULL -> no rows, inserts rejected) and tests that. Super-admin/cross-tenant paths then need an explicit mechanism (a bypass role or `SECURITY DEFINER` functions); that is a design decision to make, not a free port.
 2. **Transaction-local `set_config(..., true)` is safe through a transaction-mode pooler; session-level is not.** 0 leaks in 300 interleaved requests plus targeted reuse probes on a 2-connection pool, and the negative control leaks 13-20/20 times. The mutation check shows the load test only catches the `true->false` regression because of its unscoped probes; plain per-tenant requests re-set the GUC and hide it. Keep that probe pattern in any real test suite.
 3. **Prisma 6.19 runs on workerd only with the query compiler (`engineType = "client"`) and the explicit `generated/prisma/wasm.js` entry.** The Rust-engine wasm path was not used. Quirk: `$queryRaw` cannot deserialize Postgres `name` columns (`current_user`, `pg_class.relname`); cast to `::text`. adapter-pg sends no named prepared statements, so pgbouncer 1.22 transaction mode needed no `max_prepared_statements`. Interactive transactions, `upsert` with `{ increment }`, and `createMany({skipDuplicates})` all worked; 12 concurrent increments produced exactly 12 with no P2002/25P02.
 4. **Test-tooling friction (workarounds are in the repo):**

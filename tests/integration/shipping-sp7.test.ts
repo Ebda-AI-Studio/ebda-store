@@ -530,7 +530,9 @@ describe.skipIf(!hasDb)('SP7 shipping (ebda_app, strict RLS)', () => {
 
     it('the right token moves the shipment; a replay is a no-op; an old event does not move it back', async () => {
       const { s, o, sh, secret } = await booked('wh');
-      const at = (sec: number) => new Date(Date.UTC(2026, 9, 6, 12, 0, sec));
+      // Ahead of the booking's own `created` entry (stamped now), or the event is stale and ignored.
+      const base = Date.now() + 6 * 3_600_000;
+      const at = (sec: number) => new Date(base + sec * 1000);
       const body = (status: any, ts: Date) => bosta.webhookBody(sh.trackingNumber!, status, ts);
 
       expect((await post(s.id, secret, body('out_for_delivery', at(30)))).status).toBe(200);

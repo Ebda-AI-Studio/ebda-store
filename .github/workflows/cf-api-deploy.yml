@@ -38,6 +38,17 @@ jobs:
         run: |
           npx wrangler secret list --config .wrangler.deploy.jsonc > /tmp/ebda-secret-names.json
           node -e 'const names = new Set(require("/tmp/ebda-secret-names.json").map(x => x.name)); for (const name of ["JWT_SECRET", "ENCRYPTION_KEY", "RESEND_API_KEY"]) { if (!names.has(name)) throw new Error(`Missing Worker secret: ${name}`); }'
+      - name: Apply database migrations
+        # Schema first, Worker second: a failed migrate fails the job, so no deploy runs
+        # against a schema the new code does not match. The URL stays in step env (masked
+        # by GitHub) and is never echoed. Owner role, direct host: DDL cannot go through
+        # Hyperdrive/the pooler.
+        env:
+          DATABASE_URL: ${{ secrets.EBDA_MIGRATE_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.EBDA_MIGRATE_DATABASE_URL }}
+        run: |
+          test -n "$DATABASE_URL" || { echo "::error::EBDA_MIGRATE_DATABASE_URL is not set in the production environment"; exit 1; }
+          npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
       - name: Deploy reviewed API
         working-directory: apps/api
         run: npx wrangler deploy --config .wrangler.deploy.jsonc --var BUILD_COMMIT_SHA:$GITHUB_SHA

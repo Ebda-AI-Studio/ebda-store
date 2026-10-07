@@ -49,16 +49,16 @@ primary source in this pass. Anything marked UNVERIFIED must be settled before i
 
 ### 2.1 VAT law: threshold, rates, who registers, penalties
 
-| Fact | Source |
-|---|---|
-| Standard rate 14% (13% FY2016/17, 14% from FY2017/18); machinery/equipment used in production 5%; exports zero-rated per Executive Regulations. Law 67/2016 Art. 3. | [P] ETA English translation of Law 67/2016 (updated 15 Jan 2023): https://www.eta.gov.eg/sites/default/files/2024-02/Law-english-no.67-2016.pdf.pdf |
-| Registration: anyone selling taxable goods/services whose total taxable + exempt sales over the preceding 12 months reach or exceed **EGP 500,000** must apply within 30 days. The threshold "may be amended by a Ministerial decree". Art. 16. | same [P] |
-| Voluntary registration below the threshold is allowed (Art. 18). | same [P] |
-| Natural persons who sell no goods/services need not register. Importers, exporters and distribution agents register regardless of turnover. Art. 16. | same [P] |
-| **Issuing an invoice charged with VAT by a non-registrant is tax evasion** (Art. 68, item 8); failing to register on time is also evasion (Art. 68, item 1). Penalty Art. 67: 3 to 5 years imprisonment and a fine of EGP 5,000 to 50,000, or either; doubled on repeat within 3 years. | same [P] |
-| Registrants must issue invoices on taxable sales (Art. 68 item 6 makes failure evasion). | same [P] |
-| Law 67/2016 has been amended by Laws 66/2017, 208/2017, 329/2017, 13/2020, 3/2022, 24/2023, 177/2023, 157/2025. Law 157/2025 (in force from 18 Jul 2025) changed schedule rates and the scope of taxable items; ministerial decrees 417/418 of 2025 followed (effective 24 Oct 2025). | [S] https://quaderno.io/guides/egypt-vat-guide/ , search summary of EY: https://taxnews.ey.com/news/2025-2316-egypt-introduces-significant-updates-to-vat-provisions (EY page lists no threshold change) |
-| Exempt goods/services and Table Tax rates live in the law's attached schedules (not extracted in this pass). Table Tax is charged on top of VAT on listed items and, for some items, on the inclusive end-consumer price. | [P] law text, Art. 36 onward and the Table notes |
+| Fact                                                                                                                                                                                                                                                                                    | Source                                                                                                                                                                                                   |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Standard rate 14% (13% FY2016/17, 14% from FY2017/18); machinery/equipment used in production 5%; exports zero-rated per Executive Regulations. Law 67/2016 Art. 3.                                                                                                                     | [P] ETA English translation of Law 67/2016 (updated 15 Jan 2023): https://www.eta.gov.eg/sites/default/files/2024-02/Law-english-no.67-2016.pdf.pdf                                                      |
+| Registration: anyone selling taxable goods/services whose total taxable + exempt sales over the preceding 12 months reach or exceed **EGP 500,000** must apply within 30 days. The threshold "may be amended by a Ministerial decree". Art. 16.                                         | same [P]                                                                                                                                                                                                 |
+| Voluntary registration below the threshold is allowed (Art. 18).                                                                                                                                                                                                                        | same [P]                                                                                                                                                                                                 |
+| Natural persons who sell no goods/services need not register. Importers, exporters and distribution agents register regardless of turnover. Art. 16.                                                                                                                                    | same [P]                                                                                                                                                                                                 |
+| **Issuing an invoice charged with VAT by a non-registrant is tax evasion** (Art. 68, item 8); failing to register on time is also evasion (Art. 68, item 1). Penalty Art. 67: 3 to 5 years imprisonment and a fine of EGP 5,000 to 50,000, or either; doubled on repeat within 3 years. | same [P]                                                                                                                                                                                                 |
+| Registrants must issue invoices on taxable sales (Art. 68 item 6 makes failure evasion).                                                                                                                                                                                                | same [P]                                                                                                                                                                                                 |
+| Law 67/2016 has been amended by Laws 66/2017, 208/2017, 329/2017, 13/2020, 3/2022, 24/2023, 177/2023, 157/2025. Law 157/2025 (in force from 18 Jul 2025) changed schedule rates and the scope of taxable items; ministerial decrees 417/418 of 2025 followed (effective 24 Oct 2025).   | [S] https://quaderno.io/guides/egypt-vat-guide/ , search summary of EY: https://taxnews.ey.com/news/2025-2316-egypt-introduces-significant-updates-to-vat-provisions (EY page lists no threshold change) |
+| Exempt goods/services and Table Tax rates live in the law's attached schedules (not extracted in this pass). Table Tax is charged on top of VAT on listed items and, for some items, on the inclusive end-consumer price.                                                               | [P] law text, Art. 36 onward and the Table notes                                                                                                                                                         |
 
 **Threshold conflict, UNVERIFIED.** The law text we could read says EGP 500,000. Several 2025-26
 vendor articles (vatupdate, Wafeq, ohmyfin) say "Resolution No. 281 of 2025 reduced the mandatory VAT
@@ -108,12 +108,12 @@ obligation lookup (UNVERIFIED API; the check is a web page).
 
 Environments [P] (SDK FAQ https://sdk.invoicing.eta.gov.eg/faq/):
 
-| | PreProd | Production |
-|---|---|---|
-| Registration portal | https://profile.preprod.eta.gov.eg | https://profile.eta.gov.eg |
-| Invoicing portal | https://preprod.invoicing.eta.gov.eg | https://invoicing.eta.gov.eg |
-| System API | https://api.preprod.invoicing.eta.gov.eg | https://api.invoicing.eta.gov.eg |
-| Identity | https://id.preprod.eta.gov.eg | https://id.eta.gov.eg |
+|                     | PreProd                                  | Production                       |
+| ------------------- | ---------------------------------------- | -------------------------------- |
+| Registration portal | https://profile.preprod.eta.gov.eg       | https://profile.eta.gov.eg       |
+| Invoicing portal    | https://preprod.invoicing.eta.gov.eg     | https://invoicing.eta.gov.eg     |
+| System API          | https://api.preprod.invoicing.eta.gov.eg | https://api.invoicing.eta.gov.eg |
+| Identity            | https://id.preprod.eta.gov.eg            | https://id.eta.gov.eg            |
 
 PreProd needs the ETA root CA installed (FAQ) and a Postman collection is provided: a real sandbox
 exists. Sandbox onboarding still needs an ETA PreProd taxpayer profile; UNVERIFIED how fast ETA
@@ -124,6 +124,7 @@ invites representatives, **registers one or more ERP/POS systems and gets API cr
 and secret)**, and for e-invoice an eSeal X.509 certificate for signing.
 
 **Authentication** [P]:
+
 - E-receipt: `POST {identity}/connect/token`, `grant_type=client_credentials`, `client_id`,
   `client_secret`, headers `posserial`, `pososversion`, `posmodelframework`, `presharedkey`. Token
   lasts 3600 s. Only taxpayers with the **B2C tag** can submit receipts.
@@ -134,6 +135,7 @@ and secret)**, and for e-invoice an eSeal X.509 certificate for signing.
   https://sdk.invoicing.eta.gov.eg/api/01-login-as-taxpayer-system/
 
 **Can Ebda submit on behalf of many merchants? Yes with conditions.**
+
 1. E-invoice: documented intermediary login (`onbehalfof`), one Ebda credential plus a per-merchant
    grant in the merchant's ETA profile. [P]
 2. E-receipt: the SDK states "the issuer Id must be the same in the token (submitter of the document
@@ -146,6 +148,7 @@ and secret)**, and for e-invoice an eSeal X.509 certificate for signing.
    "taxpayers can register one or more solution providers"); matches the start page.
 
 **Signing** [P] https://sdk.invoicing.eta.gov.eg/signature-creation/ :
+
 - E-invoice documents: canonicalise, SHA-256, **CAdES-BES signature with an X.509 eSeal certificate**
   embedded as Base64. The private key is issued on a **USB crypto-token/HSM** held by the taxpayer
   (vendor write-ups on cloud signing servers exist, e.g. SAP community post), so a multi-tenant
@@ -237,30 +240,30 @@ ETA handling. What we could confirm:
 
 ### 3.1 Tax fields, settings, calculations
 
-| What | Where |
-|---|---|
-| Store switches: `taxEnabled` (default false), `taxIncludedInPrice` (default false), legacy `defaultTaxRate` (not read by the charge) | `packages/database/prisma/schema.prisma:290-292` |
-| Accounting default `defaultTaxRateBps` (default 0), unrelated to the storefront charge | `schema.prisma:381` |
-| `TaxRate` model (name, rate Decimal(5,2), country/state/priority/isCompound ignored by the charge, isActive) | `schema.prisma:2701` |
-| Per-order frozen convention `Order.taxIncludedInPrice` | `schema.prisma:1333` (migration `20260927130000_order_tax_included_in_price`) |
-| Order money field `orders.tax` | initial migration `...20241227000000_initial_schema/migration.sql:177` |
-| Expense and PO tax (input VAT, merchant purchases) | `schema.prisma:3599` (PurchaseOrder.taxAmount), `3766` (Expense.taxAmount), migration `20260519210000_accounting_batch_2` |
-| **The single charge resolver**: `resolveActiveTaxRate(storeId)` returns the SUM of active rates when `Store.taxEnabled`, else 0 | `apps/api/src/lib/order-tax.ts:42-61` |
-| Formula (VAT after discount; inclusive extraction `base*bps/(10000+bps)`) | `packages/shared/src/region/index.ts:163-171`, wrapper `packages/shared/src/order-tax.ts:25-36`, `REGION.defaultVatBps = 1400` at `region/index.ts:99` |
-| Rulings | `docs/RULINGS.md` M3-3, M3-6..M3-9, TAX-1 (line 4615), TAX-1a. TAX-1 states "VAT collection is a legal obligation, not a billing feature" and charges on `taxEnabled` alone; prod had 0 `tax_rates` rows and `taxEnabled: false` on every live store at the time (re-check before migrating) |
+| What                                                                                                                                 | Where                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Store switches: `taxEnabled` (default false), `taxIncludedInPrice` (default false), legacy `defaultTaxRate` (not read by the charge) | `packages/database/prisma/schema.prisma:290-292`                                                                                                                                                                                                                                             |
+| Accounting default `defaultTaxRateBps` (default 0), unrelated to the storefront charge                                               | `schema.prisma:381`                                                                                                                                                                                                                                                                          |
+| `TaxRate` model (name, rate Decimal(5,2), country/state/priority/isCompound ignored by the charge, isActive)                         | `schema.prisma:2701`                                                                                                                                                                                                                                                                         |
+| Per-order frozen convention `Order.taxIncludedInPrice`                                                                               | `schema.prisma:1333` (migration `20260927130000_order_tax_included_in_price`)                                                                                                                                                                                                                |
+| Order money field `orders.tax`                                                                                                       | initial migration `...20241227000000_initial_schema/migration.sql:177`                                                                                                                                                                                                                       |
+| Expense and PO tax (input VAT, merchant purchases)                                                                                   | `schema.prisma:3599` (PurchaseOrder.taxAmount), `3766` (Expense.taxAmount), migration `20260519210000_accounting_batch_2`                                                                                                                                                                    |
+| **The single charge resolver**: `resolveActiveTaxRate(storeId)` returns the SUM of active rates when `Store.taxEnabled`, else 0      | `apps/api/src/lib/order-tax.ts:42-61`                                                                                                                                                                                                                                                        |
+| Formula (VAT after discount; inclusive extraction `base*bps/(10000+bps)`)                                                            | `packages/shared/src/region/index.ts:163-171`, wrapper `packages/shared/src/order-tax.ts:25-36`, `REGION.defaultVatBps = 1400` at `region/index.ts:99`                                                                                                                                       |
+| Rulings                                                                                                                              | `docs/RULINGS.md` M3-3, M3-6..M3-9, TAX-1 (line 4615), TAX-1a. TAX-1 states "VAT collection is a legal obligation, not a billing feature" and charges on `taxEnabled` alone; prod had 0 `tax_rates` rows and `taxEnabled: false` on every live store at the time (re-check before migrating) |
 
 ### 3.2 Every place a tax line can be PRODUCED
 
-| Path | File:line | Uses resolver? |
-|---|---|---|
-| Public checkout order creation | `apps/api/src/services/order.service.ts:810` (resolve), `:1001` (`computeOrderTax`), `:1386` (freezes `taxIncludedInPrice`) | yes |
-| Admin-created order | `order.service.ts:2525` (resolve), `:2655` (compute), `:2763` (freeze) in `createAdminOrder` (`:2408`) | yes |
-| Storefront payload for cart/checkout (display) | `apps/api/src/routes/public.routes.ts:1571` and `:1743` (`taxRatePercent`) ; the web side recomputes with the same formula at `apps/web/src/app/checkout/CheckoutClient.tsx:1076-1078`, `apps/web/src/app/cart/CartClient.tsx:368-370`, label in `apps/web/src/lib/tax-display.ts` | yes (display) |
-| Payment links draft order | `apps/api/src/routes/payment-links.routes.ts:288` hard-codes `tax: 0` | n/a, no tax |
-| Refunds/returns re-use the frozen order values | `return.service.ts:1206-1234`, `:1475-1486`; GL `accounting/posting/order-posting.ts:126-182` (Tax Payable 2100), `partial-return-allocation.ts` | consume `order.tax` |
-| Tax report (VAT per period from the ledger) | `apps/api/src/services/accounting/tax-report.service.ts`; admin `apps/admin/src/app/stores/[id]/finance/reports/page.tsx` | derived |
-| Removed second resolver (`POST /public/:storeId/tax/calculate`) | `tax.routes.ts:236-243` comment, issues 2211/2167 | gone |
-| Store/agent surfaces (MCP) | grep of `apps/api/src/mcp` shows read-only `tax` echo (`mcp/tools/admin-read.tools.ts:364`) and no tax-settings writer | n/a |
+| Path                                                            | File:line                                                                                                                                                                                                                                                                          | Uses resolver?      |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| Public checkout order creation                                  | `apps/api/src/services/order.service.ts:810` (resolve), `:1001` (`computeOrderTax`), `:1386` (freezes `taxIncludedInPrice`)                                                                                                                                                        | yes                 |
+| Admin-created order                                             | `order.service.ts:2525` (resolve), `:2655` (compute), `:2763` (freeze) in `createAdminOrder` (`:2408`)                                                                                                                                                                             | yes                 |
+| Storefront payload for cart/checkout (display)                  | `apps/api/src/routes/public.routes.ts:1571` and `:1743` (`taxRatePercent`) ; the web side recomputes with the same formula at `apps/web/src/app/checkout/CheckoutClient.tsx:1076-1078`, `apps/web/src/app/cart/CartClient.tsx:368-370`, label in `apps/web/src/lib/tax-display.ts` | yes (display)       |
+| Payment links draft order                                       | `apps/api/src/routes/payment-links.routes.ts:288` hard-codes `tax: 0`                                                                                                                                                                                                              | n/a, no tax         |
+| Refunds/returns re-use the frozen order values                  | `return.service.ts:1206-1234`, `:1475-1486`; GL `accounting/posting/order-posting.ts:126-182` (Tax Payable 2100), `partial-return-allocation.ts`                                                                                                                                   | consume `order.tax` |
+| Tax report (VAT per period from the ledger)                     | `apps/api/src/services/accounting/tax-report.service.ts`; admin `apps/admin/src/app/stores/[id]/finance/reports/page.tsx`                                                                                                                                                          | derived             |
+| Removed second resolver (`POST /public/:storeId/tax/calculate`) | `tax.routes.ts:236-243` comment, issues 2211/2167                                                                                                                                                                                                                                  | gone                |
+| Store/agent surfaces (MCP)                                      | grep of `apps/api/src/mcp` shows read-only `tax` echo (`mcp/tools/admin-read.tools.ts:364`) and no tax-settings writer                                                                                                                                                             | n/a                 |
 
 ### 3.3 Who can turn VAT on (the gap)
 
@@ -440,12 +443,12 @@ collisions force a manual flag.
 
 ### 5.5 Automatic validation tiers
 
-| Tier | Method | Status |
-|---|---|---|
-| T0 | Format check on TRN shape, uniqueness per store, document presence | always on |
-| T1 | e-finance/ETA "Validate Taxpayer Registration Number" API with OTP to the taxpayer | UNVERIFIED eligibility; request access (Q2); gives TIN details + proof of control |
-| T2 | Reviewer opens the ETA "registered" web page manually (https://eta.gov.eg/ar/registered) | manual, function UNVERIFIED |
-| T3 | Document review by super-admin | baseline, mandatory until T1 is proven |
+| Tier | Method                                                                                   | Status                                                                            |
+| ---- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| T0   | Format check on TRN shape, uniqueness per store, document presence                       | always on                                                                         |
+| T1   | e-finance/ETA "Validate Taxpayer Registration Number" API with OTP to the taxpayer       | UNVERIFIED eligibility; request access (Q2); gives TIN details + proof of control |
+| T2   | Reviewer opens the ETA "registered" web page manually (https://eta.gov.eg/ar/registered) | manual, function UNVERIFIED                                                       |
+| T3   | Document review by super-admin                                                           | baseline, mandatory until T1 is proven                                            |
 
 Policy: T1 passing does not auto-approve at first; it pre-fills the review and raises priority. After
 a trial period (e.g. 50 clean reviews) consider auto-approve when T1 returns "registered and active"
@@ -488,7 +491,7 @@ refund/return -> Return Receipt v1.2 referencing the original uuid (new seq)
   `marketing-pixels-secrets.ts`, never returned to the browser, redacted in logs and Sentry.
   Decrypt only inside the worker; `safe-decrypt-json.ts` pattern.
 - **Intermediary option (e-invoice, maybe receipts)**: one Ebda credential plus `onbehalfof=<merchant
-  RIN>` after the merchant grants permission. Test on PreProd; adopt only if receipts accept it,
+RIN>` after the merchant grants permission. Test on PreProd; adopt only if receipts accept it,
   because it removes the copy-paste of secrets and gives one rotation point.
 - **Signing seam**: `ReceiptSigner` interface with a `NoopSigner` (current enforcement) and a
   `CadesBesSigner` that calls a merchant-authorised remote signing service. Do not hold merchants'
@@ -525,13 +528,13 @@ refund/return -> Return Receipt v1.2 referencing the original uuid (new seq)
 
 ## 6. Phased plan
 
-| Phase | Scope | Exit evidence |
-|---|---|---|
-| P0 Gate (about 1 week) | Schema + RLS, profile/document/event services, resolver gate, write gate, backfill + prod read-only check, merchant tax page states, super-admin review queue, EN/AR emails, TAX-2 ruling, tests incl. mutation negative control, merchant docs | Prod SELECT shows 0 stores collecting without verified profile; e2e unverified store charges 0 on every producer; reviewer can approve/reject |
-| P1 Platform flag + validation | `PlatformSetting`, billing flag + test, e-finance TIN OTP access request and, if granted, T1 integration; invoice seller block (registration number, tax invoice heading) | Billing amount equals plan price; T1 works on e-finance test env |
-| P2 ETA PreProd e-receipt | Per-store connection (encrypted), mapper, queue, QR renderer, reconcile, noop signer, PreProd account + test merchants | 100 PreProd receipts accepted incl. return receipts; 429/503 chaos test; QR resolves on PreProd portal |
-| P3 Production rollout | Per-merchant opt-in with `mode`, runbook, alerts, docs, 24 h SLA watch; pilot with 1-2 real registered merchants | Live receipts visible in ETA portal; zero late submissions over 2 weeks |
-| P4 B2B e-invoice (on demand) | Invoice document type, intermediary or BYO signing connector, buyer TIN capture, Get Document Printout | Only after a registered merchant with B2B sales commits |
+| Phase                         | Scope                                                                                                                                                                                                                                           | Exit evidence                                                                                                                                 |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0 Gate (about 1 week)        | Schema + RLS, profile/document/event services, resolver gate, write gate, backfill + prod read-only check, merchant tax page states, super-admin review queue, EN/AR emails, TAX-2 ruling, tests incl. mutation negative control, merchant docs | Prod SELECT shows 0 stores collecting without verified profile; e2e unverified store charges 0 on every producer; reviewer can approve/reject |
+| P1 Platform flag + validation | `PlatformSetting`, billing flag + test, e-finance TIN OTP access request and, if granted, T1 integration; invoice seller block (registration number, tax invoice heading)                                                                       | Billing amount equals plan price; T1 works on e-finance test env                                                                              |
+| P2 ETA PreProd e-receipt      | Per-store connection (encrypted), mapper, queue, QR renderer, reconcile, noop signer, PreProd account + test merchants                                                                                                                          | 100 PreProd receipts accepted incl. return receipts; 429/503 chaos test; QR resolves on PreProd portal                                        |
+| P3 Production rollout         | Per-merchant opt-in with `mode`, runbook, alerts, docs, 24 h SLA watch; pilot with 1-2 real registered merchants                                                                                                                                | Live receipts visible in ETA portal; zero late submissions over 2 weeks                                                                       |
+| P4 B2B e-invoice (on demand)  | Invoice document type, intermediary or BYO signing connector, buyer TIN capture, Get Document Printout                                                                                                                                          | Only after a registered merchant with B2B sales commits                                                                                       |
 
 Each phase ships docs and memory/rulings in the same PR set (documentation parity). Production
 verification after each deploy follows the verify-against-production rule (health commit, live
@@ -578,16 +581,16 @@ checkout on a guest cart; completing a real purchase needs Ahmad's go-ahead).
 
 ## 9. Costs
 
-| Item | Amount | Who pays | Source |
-|---|---|---|---|
-| ETA e-invoice/e-receipt API usage | no fee documented | n/a | SDK has no pricing page; absence only, UNVERIFIED |
-| Digital signature certificate (personal) | about EGP 700-1,000 per year | merchant | [S] https://edariba.com/en/electronic-seal-price-2025-required-documents-egypt/ |
-| eSeal (company) certificate | EGP 950-3,600 depending on CA and term (Egypt Trust 1y 950, MCDR 1y 1,800) | merchant (B2B only) | same [S] |
-| USB crypto-token | EGP 250-800 one-off, 500 re-issue | merchant (B2B only) | same [S] |
-| E-finance TIN validation service | unknown | Ebda | UNVERIFIED (Q2) |
-| Engineering | P0 about 1 week; P1 about 0.5-1 week; P2 about 2-3 weeks; P3 about 1 week | Ebda | estimate |
-| Cloud | one Inngest function family, small R2 volume, negligible | Ebda | estimate |
-| Accountant/legal review of gating copy and Art. 67/68 exposure | one-off consult | Ebda | recommended |
+| Item                                                           | Amount                                                                     | Who pays            | Source                                                                          |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------- |
+| ETA e-invoice/e-receipt API usage                              | no fee documented                                                          | n/a                 | SDK has no pricing page; absence only, UNVERIFIED                               |
+| Digital signature certificate (personal)                       | about EGP 700-1,000 per year                                               | merchant            | [S] https://edariba.com/en/electronic-seal-price-2025-required-documents-egypt/ |
+| eSeal (company) certificate                                    | EGP 950-3,600 depending on CA and term (Egypt Trust 1y 950, MCDR 1y 1,800) | merchant (B2B only) | same [S]                                                                        |
+| USB crypto-token                                               | EGP 250-800 one-off, 500 re-issue                                          | merchant (B2B only) | same [S]                                                                        |
+| E-finance TIN validation service                               | unknown                                                                    | Ebda                | UNVERIFIED (Q2)                                                                 |
+| Engineering                                                    | P0 about 1 week; P1 about 0.5-1 week; P2 about 2-3 weeks; P3 about 1 week  | Ebda                | estimate                                                                        |
+| Cloud                                                          | one Inngest function family, small R2 volume, negligible                   | Ebda                | estimate                                                                        |
+| Accountant/legal review of gating copy and Art. 67/68 exposure | one-off consult                                                            | Ebda                | recommended                                                                     |
 
 E-receipts need no hardware by the SDK as read today (signing disabled, UNVERIFIED for future
 enforcement); that is the main reason to ship B2C first.

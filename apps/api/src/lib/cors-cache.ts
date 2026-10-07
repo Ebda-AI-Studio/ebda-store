@@ -223,9 +223,7 @@ export function isPlatformOrigin(
   // SCOPED to OUR account subdomain + our worker names — NOT any *.workers.dev,
   // which (with credentials: true) would let an attacker's worker make
   // credentialed requests to the API.
-  if (
-    /^https:\/\/force-(web|admin|orders)-cf-preview\.ahmed0montaser\.workers\.dev$/.test(origin)
-  ) {
+  if (/^https:\/\/ebda-(web|admin|orders)\.ahmed0montaser\.workers\.dev$/.test(origin)) {
     return true;
   }
 

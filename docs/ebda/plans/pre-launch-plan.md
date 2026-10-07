@@ -25,13 +25,13 @@ a check, a skill, or a standard doc). A lesson only in chat is lost.
 
 ### Skills to create (candidates)
 
-| Skill | What it packages | Source this session |
-|---|---|---|
-| `merge-lane` | single-lane merge train: head-only CI, cancel non-head runs, BEHIND update, audit gate, auto-resolve of append-only files (RULINGS union, defence-record regen, i18n JSON 3-way deep merge, workflow path lists), post-merge verify-deploy, worktree cleanup | `/tmp/claude-501/lane.sh`, `auto-resolve.sh`, `json-merge.py`, `union-hunks.py`, `verify-deploy.sh`, `clean-merged-wt.sh` |
-| `pr-refresh` | refresh a stale PR onto main safely: keep both sides, money-conflict stop rule, migration re-ordering, regenerate generated files, run BOTH tests/unit and colocated app tests, parity for money code | `/tmp/claude-501/refresh-prompt.md` |
-| `buy-flow-parity` | when/how to run the harness, read `result.json` not the exit code or a `| tail`, compare vs origin/main not only vs the old baseline | FWB `scripts/buy-flow-parity/` |
-| `umbra-ci-recovery` | post-reboot / post-rebuild checklist for fwb-ci6 (runners per repo, docker run, hosts pin, kernel, doctor) and what NOT to conclude from symptoms | this session's CI incidents |
-| `prod-readonly-check` | read-only prod SQL through the Railway DATABASE_URL with positive controls (psql `-c` prints only the LAST statement; check key length; one statement per call) | this session's prod checks |
+| Skill                 | What it packages                                                                                                                                                                                                                                             | Source this session                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `merge-lane`          | single-lane merge train: head-only CI, cancel non-head runs, BEHIND update, audit gate, auto-resolve of append-only files (RULINGS union, defence-record regen, i18n JSON 3-way deep merge, workflow path lists), post-merge verify-deploy, worktree cleanup | `/tmp/claude-501/lane.sh`, `auto-resolve.sh`, `json-merge.py`, `union-hunks.py`, `verify-deploy.sh`, `clean-merged-wt.sh` |
+| `pr-refresh`          | refresh a stale PR onto main safely: keep both sides, money-conflict stop rule, migration re-ordering, regenerate generated files, run BOTH tests/unit and colocated app tests, parity for money code                                                        | `/tmp/claude-501/refresh-prompt.md`                                                                                       |
+| `buy-flow-parity`     | when/how to run the harness, read `result.json` not the exit code or a `                                                                                                                                                                                     | tail`, compare vs origin/main not only vs the old baseline                                                                | FWB `scripts/buy-flow-parity/` |
+| `umbra-ci-recovery`   | post-reboot / post-rebuild checklist for fwb-ci6 (runners per repo, docker run, hosts pin, kernel, doctor) and what NOT to conclude from symptoms                                                                                                            | this session's CI incidents                                                                                               |
+| `prod-readonly-check` | read-only prod SQL through the Railway DATABASE_URL with positive controls (psql `-c` prints only the LAST statement; check key length; one statement per call)                                                                                              | this session's prod checks                                                                                                |
 
 ### Where the skills live (owner decision 2026-09-27: part of the AI OS)
 
@@ -78,6 +78,7 @@ known-good fixture passes, and has been invoked once on a real case.
 ### Global CLAUDE.md
 
 Rewrite for clarity, not length. Planned changes:
+
 - One short "hard rules" block at the top (money, prod, secrets, destructive
   actions, identity), each one line with the enforcing file named.
 - Move long explanations into memory files; CLAUDE.md keeps the rule + a link.
@@ -88,15 +89,15 @@ Rewrite for clarity, not length. Planned changes:
 
 ## Phase 2 — Umbra stability (close the gaps found this session)
 
-| Gap | Fix | Proof |
-|---|---|---|
-| doctor `guest-binaries-missing` false positive (Permission denied) | umbra PR #56 (done locally) | merge #56; doctor healthy on a fresh guest |
-| ci-runner-guard auto-rebuilds on one signal with no negative control | require the signal to reproduce under `sudo` / a second probe before rebuilding; alert instead of rebuild on a fresh guest | unit test with a fresh-guest fixture |
-| Rebuild loses host pins (R2 populate `188.114.97.6`) | carry extra `/etc/hosts` entries in the machine seed / cloud-init; and ensure it in `cf-deploy.yml` on self-hosted runners | rebuild, then a storefront deploy passes first try |
-| `umbra runner restore` partial; second run fails "already configured" | make restore idempotent (skip configured units, re-register orphans) | rebuild twice; every repo online |
-| Installing the CLI by `cp` over the binary → Killed: 9 | install via rm + cp + codesign in the Makefile's install target | `make install` then `umbra list` |
-| Host memory pressure (16 GiB, heavy swap) freezes the guest | cap parallel agents; keep the guest at 4 GiB; alert on host swap > 75% | swap stays under the line during a CI burst |
-| Unknown restarts were misdiagnosed (kernel, disk) | record every guard action in one log with the reason, surfaced in the daily brief | next incident is explained from the log alone |
+| Gap                                                                   | Fix                                                                                                                        | Proof                                              |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| doctor `guest-binaries-missing` false positive (Permission denied)    | umbra PR #56 (done locally)                                                                                                | merge #56; doctor healthy on a fresh guest         |
+| ci-runner-guard auto-rebuilds on one signal with no negative control  | require the signal to reproduce under `sudo` / a second probe before rebuilding; alert instead of rebuild on a fresh guest | unit test with a fresh-guest fixture               |
+| Rebuild loses host pins (R2 populate `188.114.97.6`)                  | carry extra `/etc/hosts` entries in the machine seed / cloud-init; and ensure it in `cf-deploy.yml` on self-hosted runners | rebuild, then a storefront deploy passes first try |
+| `umbra runner restore` partial; second run fails "already configured" | make restore idempotent (skip configured units, re-register orphans)                                                       | rebuild twice; every repo online                   |
+| Installing the CLI by `cp` over the binary → Killed: 9                | install via rm + cp + codesign in the Makefile's install target                                                            | `make install` then `umbra list`                   |
+| Host memory pressure (16 GiB, heavy swap) freezes the guest           | cap parallel agents; keep the guest at 4 GiB; alert on host swap > 75%                                                     | swap stays under the line during a CI burst        |
+| Unknown restarts were misdiagnosed (kernel, disk)                     | record every guard action in one log with the reason, surfaced in the daily brief                                          | next incident is explained from the log alone      |
 
 ## Phase 3 — Ebda on Cloudflare (design first, then build)
 
@@ -124,9 +125,9 @@ Owner decision (2026-09-26): Ebda's backend runs on Cloudflare, not Railway.
 
 ## Order and evidence
 
-| Phase | Done when |
-|---|---|
-| 0 | FWB open issues 0 (or owner list), every PR merged + verified live |
-| 1 | each lesson has a memory file with the sentinel AND an enforcing artefact; each skill lives in force-ai-foundation (skills/ + standard/ + install.sh) AND ships a probe + known-bad fixture in mypovonai-learn/fleet; invoked once on a real case; CLAUDE.md rewritten and reviewed by Ahmad |
-| 2 | two consecutive rebuilds of fwb-ci6 come back fully working with no manual step; doctor healthy on a fresh guest |
-| 3 | design doc approved by Ahmad; spike passes parity; then the clone |
+| Phase | Done when                                                                                                                                                                                                                                                                                    |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | FWB open issues 0 (or owner list), every PR merged + verified live                                                                                                                                                                                                                           |
+| 1     | each lesson has a memory file with the sentinel AND an enforcing artefact; each skill lives in force-ai-foundation (skills/ + standard/ + install.sh) AND ships a probe + known-bad fixture in mypovonai-learn/fleet; invoked once on a real case; CLAUDE.md rewritten and reviewed by Ahmad |
+| 2     | two consecutive rebuilds of fwb-ci6 come back fully working with no manual step; doctor healthy on a fresh guest                                                                                                                                                                             |
+| 3     | design doc approved by Ahmad; spike passes parity; then the clone                                                                                                                                                                                                                            |

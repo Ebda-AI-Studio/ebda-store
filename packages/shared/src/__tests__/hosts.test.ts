@@ -143,7 +143,7 @@ describe('parseStoreHost', () => {
     ['help', 'help.ebda.app', platform('help')],
     ['status', 'status.ebda.app', platform('status')],
     ['whatsapp (reserved)', 'whatsapp.ebda.app', platform('whatsapp')],
-    ['workers.dev preview', 'force-web-cf-preview.acct.workers.dev', platform('preview')],
+    ['workers.dev preview', 'ebda-web.acct.workers.dev', platform('preview')],
     // ── reserved labels with no platform surface are never a store ────────
     ['store.ebda.app does not exist', 'store.ebda.app', INVALID],
     ['retired app label (never live; reserved, no surface)', 'app.ebda.app', INVALID],

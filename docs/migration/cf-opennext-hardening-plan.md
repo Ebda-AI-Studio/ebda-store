@@ -53,7 +53,7 @@ export default defineCloudflareConfig({
 // add to the generated web wrangler.jsonc:
 "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
 "services": [
-  { "binding": "WORKER_SELF_REFERENCE", "service": "force-web-cf-preview" }
+  { "binding": "WORKER_SELF_REFERENCE", "service": "ebda-web" }
 ],
 "r2_buckets": [
   { "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "force-web-opennext-cache" }
@@ -69,7 +69,7 @@ export default defineCloudflareConfig({
 ]
 ```
 
-The DO classes are exported by OpenNext's generated worker — no app code needed. The `WORKER_SELF_REFERENCE` service name MUST equal the worker `name` (`force-web-cf-preview`).
+The DO classes are exported by OpenNext's generated worker — no app code needed. The `WORKER_SELF_REFERENCE` service name MUST equal the worker `name` (`ebda-web`).
 
 ### 1d. Verify (preview deploy, BEFORE merge)
 

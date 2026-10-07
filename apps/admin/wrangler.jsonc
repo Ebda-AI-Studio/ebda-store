@@ -1,5 +1,5 @@
 {
-  "name": "force-admin-cf-preview",
+  "name": "ebda-admin",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-03-25",
   "compatibility_flags": ["nodejs_compat"],
