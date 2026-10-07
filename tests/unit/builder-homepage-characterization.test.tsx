@@ -22,7 +22,7 @@ import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import path from 'node:path';
-import { resolveLayoutSettings, type TemplateId } from '@force/shared';
+import { resolveLayoutSettings, layoutToDefinition, type TemplateId } from '@force/shared';
 import {
   LAYOUT_FIXTURES,
   TEMPLATES,
@@ -139,4 +139,70 @@ describe('storefront homepage body: characterization (pins pre-builder output)',
       );
     });
   }
+});
+
+describe('PageRenderer: the published-document path renders the same page', () => {
+  const asStorefront = (fixture: (typeof LAYOUT_FIXTURES)[number], t: TemplateId) =>
+    resolveLayoutSettings(
+      JSON.parse(JSON.stringify(resolveLayoutSettings(loadLayoutFixture(fixture), t)))
+    );
+
+  it('a definition passed in (as the API returns it, through JSON) == the layout-derived render', () => {
+    for (const fixture of LAYOUT_FIXTURES) {
+      for (const template of TEMPLATES) {
+        const def = JSON.parse(JSON.stringify(layoutToDefinition(asStorefront(fixture, template))));
+        for (const language of ['en', 'ar'] as const) {
+          expect(renderHome(fixture, 'A', template, language, { definition: def })).toBe(
+            renderHome(fixture, 'A', template, language)
+          );
+        }
+      }
+    }
+  });
+
+  it('honours document order, including a carousel placed between fixed sections', () => {
+    const def = layoutToDefinition(asStorefront('pecannbee-flow', 'modern'));
+    const extra = def.sections.findIndex(s => s.type === 'product-carousel');
+    const [carousel] = def.sections.splice(extra, 1);
+    def.sections.unshift(carousel);
+    const html = renderHome('pecannbee-flow', 'A', 'modern', 'en', { definition: def });
+    expect(html.indexOf('data-section="extra:')).toBeLessThan(html.indexOf('data-section="hero"'));
+  });
+
+  it('tablet-only visibility emits the three-way classes; untouched sections keep legacy classes', () => {
+    const def = layoutToDefinition(asStorefront('default', 'modern'));
+    def.sections.find(s => s.type === 'hero')!.responsive = { tablet: { hidden: true } };
+    const html = renderHome('default', 'A', 'modern', 'en', { definition: def });
+    expect(html).toMatch(/data-section="hero"[^>]*class="md:max-lg:hidden"/);
+    expect(html).not.toContain('max-md:hidden');
+  });
+
+  it('skips an unknown section type instead of throwing', () => {
+    const def = layoutToDefinition(asStorefront('default', 'modern'));
+    def.sections.splice(2, 0, { id: 'future', type: 'image-text', props: { x: 1 } });
+    expect(renderHome('default', 'A', 'modern', 'en', { definition: def })).toBe(
+      renderHome('default', 'A', 'modern', 'en')
+    );
+  });
+
+  it('a hidden section does not render its body', () => {
+    const def = layoutToDefinition(asStorefront('default', 'modern'));
+    def.sections.find(s => s.type === 'new-arrivals')!.hidden = true;
+    const html = renderHome('default', 'A', 'modern', 'en', { definition: def });
+    expect(html).not.toContain('data-section="newArrivals"');
+    expect(renderHome('default', 'A', 'modern', 'en')).toContain('data-section="newArrivals"');
+  });
+});
+
+describe('builder render path stays out of the editor bundle', () => {
+  it('nothing under apps/web/src/builder imports dnd-kit or the admin app', async () => {
+    const fs = await import('node:fs');
+    const dir = path.join(__dirname, '../../apps/web/src/builder');
+    const files = fs.readdirSync(dir, { recursive: true }) as string[];
+    const offenders = files
+      .filter(f => /\.(ts|tsx)$/.test(f))
+      .filter(f => /@dnd-kit|apps\/admin/.test(fs.readFileSync(path.join(dir, f), 'utf8')));
+    expect(files.some(f => f.endsWith('PageRenderer.tsx'))).toBe(true);
+    expect(offenders).toEqual([]);
+  });
 });
