@@ -22,6 +22,7 @@ import {
   HERO_SLIDE_BLOCK,
   sectionFromPreset,
   THEME_SETTINGS_SCHEMA,
+  TEMPLATE_FAMILIES,
   heroSlideSchema,
   type PageDefinition,
   type StoreLayoutSettings,
@@ -520,5 +521,31 @@ describe('validation', () => {
     expect(res.warnings.map(w => w.path)).toEqual([
       `/sections/${D.sections.length - 1}/settings/manualProductIds/1`,
     ]);
+  });
+});
+
+describe('template families (final names, Ahmad 2026-10-07)', () => {
+  it('declares Souq, Dahab, Qamar, Lamma, Jasmine with Arabic labels', () => {
+    expect(TEMPLATE_FAMILIES.map(f => [f.id, f.labelEn, f.labelAr])).toEqual([
+      ['souq', 'Souq', 'سوق'],
+      ['dahab', 'Dahab', 'دهب'],
+      ['qamar', 'Qamar', 'قمر'],
+      ['lamma', 'Lamma', 'لمّة'],
+      ['jasmine', 'Jasmine', 'ياسمين'],
+    ]);
+  });
+
+  it('composes only registered sections; pending ones are not registered yet', () => {
+    const types = new Set(SECTION_REGISTRY.map(d => d.type));
+    for (const f of TEMPLATE_FAMILIES) {
+      expect(
+        f.sectionTypes.filter(t => !types.has(t)),
+        f.id
+      ).toEqual([]);
+      expect(
+        f.pendingSectionTypes.filter(t => types.has(t)),
+        f.id
+      ).toEqual([]);
+    }
   });
 });

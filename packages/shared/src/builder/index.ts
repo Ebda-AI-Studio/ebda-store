@@ -10,3 +10,4 @@ export * from './registry';
 export * from './adapter';
 export * from './validate';
 export { storeLayoutSchema, heroSlideSchema } from './layout-schema';
+export * from './template-families';

@@ -204,6 +204,10 @@ railway run --service api -- npx tsx ../../scripts/r2-orphan-audit.ts --apply  #
 bash scripts/rollback.sh
 ```
 
+## Visual builder revisions (`20261007120000_store_page_revisions`)
+
+Additive table; nothing else references it. To roll the feature back: revert the code (path B) — the storefront and admin then read `stores.layout_settings` exactly as before, which every publish already back-wrote, so no data step is needed. To also drop the data: `DROP TABLE store_page_revisions;` and delete the row from `_prisma_migrations`. Re-check RLS state after any restore (`tests/integration/rls-ebda-app.test.ts`).
+
 ## Trace: what migrated when
 
 ```bash
