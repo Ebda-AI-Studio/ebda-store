@@ -340,3 +340,14 @@ describe('raw SQL (R-EBDA-004)', () => {
     expect(new Set(rows.map(r => r.store_id))).toEqual(new Set([ids.storeA]));
   });
 });
+
+describe('pre-scope store definers', () => {
+  it('the public store page past the end is empty, with the total (no NULL id leaks out)', async () => {
+    const { publicStorePage } = await import('../../apps/api/src/lib/definer');
+    const first = await asApp(() => publicStorePage(0, 100));
+    expect(first.total).toBeGreaterThan(0);
+    expect(first.ids.every(id => typeof id === 'string')).toBe(true);
+    const past = await asApp(() => publicStorePage(first.total + 50, 10));
+    expect(past).toEqual({ ids: [], total: first.total });
+  });
+});

@@ -810,9 +810,13 @@ export async function publicStorePage(
   skip: number,
   take: number
 ): Promise<{ ids: string[]; total: number }> {
-  const rows = await prisma.$queryRaw<Array<{ id: string; total: bigint }>>`
+  const rows = await prisma.$queryRaw<Array<{ id: string | null; total: bigint }>>`
     SELECT id, total FROM public.ebda_public_store_page(${skip}::int, ${take}::int)`;
-  return { ids: rows.map(r => r.id), total: rows.length ? Number(rows[0].total) : 0 };
+  // An empty page still returns one row carrying the total, with id NULL.
+  return {
+    ids: rows.flatMap(r => (r.id ? [r.id] : [])),
+    total: rows.length ? Number(rows[0].total) : 0,
+  };
 }
 
 // ---------------------------------------------------------------------------
