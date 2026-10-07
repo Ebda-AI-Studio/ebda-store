@@ -709,18 +709,19 @@ jobs:
         # superuser (BYPASSRLS) or as ebda_app, so a relapse of the API's
         # DATABASE_URL to a bypass role would leave every integration test
         # green while proving nothing under enforced RLS (#1940). The API logs
-        # the role it actually connected as at boot (apps/api/src/index.ts,
-        # BYPASSRLS guard); this step fails the job unless that line says
-        # ebda_app without BYPASSRLS. Fails closed: a missing line (guard
-        # query failed, or never ran) is a failure, not a pass.
+        # the role it actually connected as at boot (apps/api/src/lib/
+        # database-role-guard.ts, awaited before listen); this step fails the
+        # job unless that line says ebda_app without BYPASSRLS or SUPERUSER.
+        # Fails closed: a missing line (guard query failed, or never ran) is a
+        # failure, not a pass.
         run: |
           for i in $(seq 1 30); do
             if grep -q 'DB role check: current_user=' /tmp/api-server.log; then break; fi
             sleep 1
           done
           grep 'DB role check: current_user=' /tmp/api-server.log || { echo "::error::API never logged its DB role"; tail -50 /tmp/api-server.log; exit 1; }
-          if ! grep -q 'DB role check: current_user=ebda_app rolbypassrls=false' /tmp/api-server.log; then
-            echo "::error::API is not connected as ebda_app without BYPASSRLS — integration results would not prove RLS"
+          if ! grep -q 'DB role check: current_user=ebda_app rolbypassrls=false rolsuper=false' /tmp/api-server.log; then
+            echo "::error::API is not connected as ebda_app without BYPASSRLS/SUPERUSER — integration results would not prove RLS"
             exit 1
           fi
 

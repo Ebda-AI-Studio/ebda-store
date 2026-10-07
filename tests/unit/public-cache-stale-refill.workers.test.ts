@@ -1,0 +1,128 @@
+/**
+ * FIX-001 on the Workers shell: the real `redis.service` builds the real
+ * `CfRedis`, payloads land in (fake) KV and the generation counters in the
+ * AuthState Durable Object engine over node:sqlite — the same harness as
+ * tests/unit/cf-redis.test.ts. KV has no in-process L1 here (FIX-002 was
+ * already fixed by design on Workers), so the race is purely KV-vs-fill.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AuthStateStore, type Op } from '@api/cf/auth-state-core';
+import { createSqlite } from '../helpers/sqlite-sql';
+
+vi.mock('@api/lib/runtime', () => ({ isWorkers: true }));
+vi.mock('@api/lib/db-retry', () => ({
+  retryTransientRead: (fn: () => Promise<unknown>) => fn(),
+}));
+vi.mock('@api/lib/revalidate-storefront', () => ({ revalidateStorefront: vi.fn() }));
+
+class FakeAuthStateNamespace {
+  readonly stores = new Map<string, AuthStateStore>();
+  idFromName(name: string) {
+    return name;
+  }
+  get(id: unknown) {
+    const name = String(id);
+    if (!this.stores.has(name)) this.stores.set(name, new AuthStateStore(createSqlite()));
+    const store = this.stores.get(name)!;
+    return {
+      apply: async (ops: Op[]) => ops.map(op => store.run(op, Date.now())),
+    } as never;
+  }
+}
+
+class FakeKv {
+  readonly data = new Map<string, string>();
+  async get(k: string) {
+    return this.data.get(k) ?? null;
+  }
+  async put(k: string, v: string) {
+    this.data.set(k, v);
+  }
+  async delete(k: string) {
+    this.data.delete(k);
+  }
+  async list(o?: { prefix?: string }) {
+    const keys = [...this.data.keys()]
+      .filter(k => k.startsWith(o?.prefix ?? ''))
+      .map(name => ({ name }));
+    return { keys, list_complete: true };
+  }
+}
+
+let ns: FakeAuthStateNamespace;
+let kv: FakeKv;
+
+/** A fresh isolate: new module graph over the SAME bindings (KV + DO). */
+async function isolate() {
+  vi.resetModules();
+  const bindings = await import('@api/cf/bindings');
+  bindings.setCfBindings({
+    HYPERDRIVE: { connectionString: '' },
+    AUTH_STATE: ns,
+    KV_CACHE: kv,
+  } as unknown as Parameters<typeof bindings.setCfBindings>[0]);
+  const { redis } = await import('@api/services/redis.service');
+  await redis.connect();
+  const cache = await import('@api/lib/public-cache');
+  return { redis, cache };
+}
+
+beforeEach(() => {
+  ns = new FakeAuthStateNamespace();
+  kv = new FakeKv();
+});
+afterEach(async () => {
+  (await import('@api/cf/bindings')).clearCfBindings();
+});
+
+async function heldFill(cache: Awaited<ReturnType<typeof isolate>>['cache'], key: string) {
+  let release!: (v: { price: number }) => void;
+  let announce!: () => void;
+  const started = new Promise<void>(r => (announce = r));
+  const pending = cache.getCached(key, 120, async () => {
+    announce();
+    return new Promise<{ price: number }>(r => (release = r));
+  });
+  await started;
+  return { release, pending };
+}
+
+describe('Workers (KV + AuthState DO): a pre-write fill cannot republish', () => {
+  it('generation counters live on the Durable Object, never in KV', async () => {
+    const { cache } = await isolate();
+    await cache.invalidateStoreProductCaches('s1');
+    expect([...kv.data.keys()].some(k => k.includes('cachegen'))).toBe(false);
+    expect(ns.stores.size).toBeGreaterThan(0);
+  });
+
+  it('same isolate: the order-path invalidator beats a held fill', async () => {
+    const { cache } = await isolate();
+    const fill = await heldFill(cache, 'public:product:s1:sku-1');
+    await cache.invalidateStoreProductCachesAfterOrder('s1');
+    fill.release({ price: 100 });
+    await fill.pending;
+    expect(kv.data.has('cache:public:product:s1:sku-1')).toBe(false);
+    const fresh = await cache.getCached('public:product:s1:sku-1', 120, async () => ({
+      price: 200,
+    }));
+    expect(fresh.price).toBe(200);
+  });
+
+  it('another isolate invalidating mid-fill is seen through the DO generation', async () => {
+    const a = await isolate();
+    const fill = await heldFill(a.cache, 'public:products:s1:list');
+    const b = await isolate();
+    await b.cache.invalidateCachedPrefix('public:products:s1:');
+    fill.release({ price: 100 });
+    await fill.pending;
+    expect(kv.data.has('cache:public:products:s1:list')).toBe(false);
+  });
+
+  it('an untouched key still fills KV (no false suppression)', async () => {
+    const { cache } = await isolate();
+    await cache.getCached('public:products:s2:list', 120, async () => ({ price: 7 }));
+    expect(JSON.parse(kv.data.get('cache:public:products:s2:list') ?? 'null')).toEqual({
+      price: 7,
+    });
+  });
+});

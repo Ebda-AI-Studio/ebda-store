@@ -15,8 +15,9 @@ import { isWorkers } from './runtime';
  *     bounded to 1000 entries with LRU-style eviction so a stream of
  *     unique keys (e.g. bot scans) can't OOM the API
  *
- * Read path (`getCached`) tries Redis first, falls back to memory,
- * and on miss invokes the fetcher and writes through to both. Write
+ * Read path (`getCached`) tries Redis first, reads memory ONLY while
+ * Redis is down, and on miss invokes the fetcher and writes to Redis (or,
+ * when Redis is down, to memory), guarded by generation counters. Write
  * paths in the rest of the codebase MUST call `invalidateCached` after
  * mutations or the storefront serves stale data for up to the TTL.
  *
@@ -35,11 +36,89 @@ const memoryCache = new BoundedMap<string, { data: unknown; expiresAt: number }>
  */
 const inFlight = new Map<string, Promise<unknown>>();
 
+/**
+ * GENERATION COUNTERS (FIX-001). STALENESS CLASS: price/stock are NEVER-stale.
+ *
+ * A fill that read the DB BEFORE a write committed used to `redis.set` its
+ * pre-write value AFTER that write's invalidation had already run, so the old
+ * price/stock was republished for the whole TTL. Every invalidator now bumps a
+ * generation (in Redis, shared by every replica, and locally) BEFORE deleting;
+ * a fill captures the generations covering its key before `fetchFn`, skips its
+ * write if any moved, and re-checks after writing (deleting its own entry if a
+ * bump landed between check and write). A prefix bump is cut back to a `:`
+ * boundary at most {@link GEN_MAX_DEPTH} segments deep, so a fill only has to
+ * read `''`, its first {@link GEN_MAX_DEPTH} `seg:` prefixes and its own key.
+ */
+const GEN_MAX_DEPTH = 3;
+/** Refreshed on every bump; outlives any fill by orders of magnitude. */
+const GEN_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+/** The generations a fill of `key` must watch: root, `seg:` prefixes (≤ depth), the key. */
+export function generationNamesFor(key: string): string[] {
+  const names = [''];
+  let idx = -1;
+  for (let depth = 0; depth < GEN_MAX_DEPTH; depth++) {
+    idx = key.indexOf(':', idx + 1);
+    if (idx === -1) break;
+    names.push(key.slice(0, idx + 1));
+  }
+  names.push(key);
+  return names;
+}
+
+/** The generation a prefix bust bumps: the prefix cut back to a covering `:` boundary. */
+export function generationNameForPrefix(prefix: string): string {
+  let cut = 0;
+  let idx = -1;
+  for (let depth = 0; depth < GEN_MAX_DEPTH; depth++) {
+    idx = prefix.indexOf(':', idx + 1);
+    if (idx === -1) break;
+    cut = idx + 1;
+  }
+  return prefix.slice(0, cut);
+}
+
+/**
+ * Local generations guard the in-memory fallback (written only while Redis is
+ * down). Values come from one monotonic sequence, so an evicted-then-rebumped
+ * name can never repeat a value a fill captured earlier.
+ */
+let localGenSeq = 0;
+const localGens = new BoundedMap<string, number>(10_000);
+
+function readLocalGens(names: string[]): string {
+  return names.map(n => localGens.get(n) ?? 0).join(',');
+}
+
+/** Shared generations as one comparable string, or null when Redis can't vouch for them. */
+async function readSharedGens(names: string[]): Promise<string | null> {
+  try {
+    return (await redis.getCacheGenerations(names)).map(v => v ?? '0').join(',');
+  } catch {
+    return null;
+  }
+}
+
+async function bumpGeneration(name: string): Promise<void> {
+  localGens.set(name, ++localGenSeq);
+  try {
+    await redis.bumpCacheGeneration(name, GEN_TTL_SECONDS);
+  } catch {
+    // Redis unavailable: no replica can write the shared layer either, and the
+    // delete below fails the same way — the pre-existing outage residual.
+  }
+}
+
 export async function getCached<T>(
   key: string,
   ttlSeconds: number,
   fetchFn: () => Promise<T>
 ): Promise<T> {
+  // FIX-002: the in-memory layer is a fallback for a DOWN Redis only. While
+  // Redis is healthy another replica's invalidation clears Redis but can never
+  // reach this process's memory, so reading memory on a healthy miss served the
+  // pre-write price/stock for the whole TTL.
+  let redisHealthy = redis.isAvailable();
   try {
     const cached = await redis.get<string>(key);
     if (cached) {
@@ -47,13 +126,17 @@ export async function getCached<T>(
     }
   } catch {
     // Redis unavailable, fall through.
+    redisHealthy = false;
   }
 
-  // Workers: no in-process L1. An isolate cannot see another isolate's invalidation, so a
-  // write would stay invisible here for the whole TTL; KV is the one shared cache.
-  const memEntry = isWorkers ? undefined : memoryCache.get(key);
-  if (memEntry && memEntry.expiresAt > Date.now()) {
-    return memEntry.data as T;
+  // Workers: no in-process L1 at all. An isolate cannot see another isolate's
+  // invalidation, so a write would stay invisible here for the whole TTL; KV is
+  // the one shared cache.
+  if (!redisHealthy && !isWorkers) {
+    const memEntry = memoryCache.get(key);
+    if (memEntry && memEntry.expiresAt > Date.now()) {
+      return memEntry.data as T;
+    }
   }
 
   // Miss on both layers: single-flight the fetch so concurrent callers for this
@@ -63,18 +146,34 @@ export async function getCached<T>(
   if (existing) return existing;
 
   const pending = (async () => {
+    const genNames = generationNamesFor(key);
+    const localBefore = readLocalGens(genNames);
+    const sharedBefore = await readSharedGens(genNames);
     // A cache fill is a read by construction, so a dropped pooler connection
     // (Neon idling a socket — FORCE-API-2D/2E/2F) is re-run a bounded number of
     // times instead of 500ing the storefront. `fetchFn` MUST stay a pure read.
     const data = await retryTransientRead(fetchFn, {
       label: `getCached:${key.split(':')[1] ?? key}`,
     });
-    try {
-      await redis.set(key, JSON.stringify(data), ttlSeconds);
-    } catch {
-      // Redis unavailable, memory cache below is the fallback.
+
+    if (sharedBefore !== null && (await readSharedGens(genNames)) === sharedBefore) {
+      try {
+        await redis.set(key, JSON.stringify(data), ttlSeconds);
+        // An invalidation that bumped between the check above and this write
+        // has already run (or is running) its delete; take our entry back out.
+        if ((await readSharedGens(genNames)) !== sharedBefore) {
+          await redis.delete(key);
+        }
+      } catch {
+        // Redis failed mid-fill: nothing is cached this time (memory is only
+        // written when Redis was already down at the start of the fill).
+      }
     }
-    if (!isWorkers) memoryCache.set(key, { data, expiresAt: Date.now() + ttlSeconds * 1000 });
+    // Memory only when the shared layer is down (FIX-002), and never with a
+    // value a local invalidation has superseded since the fetch began.
+    if (!isWorkers && sharedBefore === null && readLocalGens(genNames) === localBefore) {
+      memoryCache.set(key, { data, expiresAt: Date.now() + ttlSeconds * 1000 });
+    }
     return data;
   })();
 
@@ -82,7 +181,8 @@ export async function getCached<T>(
   try {
     return await pending;
   } finally {
-    inFlight.delete(key);
+    // An invalidation may have dropped this entry and a newer fill taken its slot.
+    if (inFlight.get(key) === pending) inFlight.delete(key);
   }
 }
 
@@ -91,9 +191,13 @@ export async function getCached<T>(
  * Without this, a write on the admin side leaves the storefront
  * serving stale rows until the TTL expires (60s for store, 120s for
  * categories, 30s for product lists). Call from every write path that
- * mutates the underlying data.
+ * mutates the underlying data. Bumps the key's generation FIRST, so a fill
+ * already in flight cannot republish its pre-write value afterwards.
  */
 export async function invalidateCached(key: string): Promise<void> {
+  await bumpGeneration(key);
+  // A caller arriving after the write must not join a pre-write fetch.
+  inFlight.delete(key);
   try {
     await redis.delete(key);
   } catch {
@@ -109,9 +213,14 @@ export async function invalidateCached(key: string): Promise<void> {
  * a price/stock correction stayed live on OTHER API replicas (and the same pod
  * after a restart) for up to the TTL — the Redis copy outlived the bust. Now
  * both layers clear immediately. Best-effort on the Redis side: an outage is
- * swallowed and the in-memory sweep still runs.
+ * swallowed and the in-memory sweep still runs. Bumps the covering generation
+ * FIRST (FIX-001), so a fill already in flight cannot republish afterwards.
  */
 export async function invalidateCachedPrefix(prefix: string): Promise<void> {
+  await bumpGeneration(generationNameForPrefix(prefix));
+  for (const key of inFlight.keys()) {
+    if (key.startsWith(prefix)) inFlight.delete(key);
+  }
   for (const key of memoryCache.keys()) {
     if (key.startsWith(prefix)) memoryCache.delete(key);
   }
