@@ -301,7 +301,9 @@ describe('DELETE / and GET / stay available when the feature is off', () => {
     expect((await request(app()).get(url())).status).toBe(200);
     const del = await request(app()).delete(url());
     expect(del.status).toBe(200);
-    expect(m.del).toHaveBeenCalledWith({ where: { id: 'model-1' } });
+    expect(m.del).toHaveBeenCalledWith({
+      where: { id: 'model-1', storeId: expect.any(String) },
+    });
     expect(m.orphan).toHaveBeenCalledWith('https://media.test/old.glb');
     expect(m.orphan).toHaveBeenCalledWith('https://media.test/old-poster.webp');
   });
