@@ -37,6 +37,7 @@ Ruling R-EBDA-3D-6 — accepted residual: `https://media.ebda.app` sends no CORS
 Ruling R-EBDA-3D-7 — accepted residual: Android Scene Viewer shows the file's default materials, not the shopper's picked finish (it fetches the raw GLB from our bucket). iOS AR carries the finish when it is generated on device from the live scene; an uploaded USDZ shows whatever the merchant exported. Cost if wrong: an Android shopper who picked Rose gold sees the file's default metal in AR.
 
 Ruling R-EBDA-3D-8 — "all templates' product pages + quick view": there is ONE PDP render path (`ProductDetailClient`, both routing trees, all 5 templates; the builder has no product-detail section) and NO quick view exists in `apps/web`. The viewer ships in that one path; quick view is Phase 2 and starts by building quick view. The "3D" chip on product cards (8 card render paths) is also Phase 2. Evidence: `grep -ri quickview apps/web/src` is empty; templates own no product page. Cost if wrong: none for templates; a later quick view must embed the viewer itself.
+
 ## 2026-10-07 — Tenant defence: code-level guard + RLS on everything (R-EBDA-003..008)
 
 Source: Ahmad, 2026-10-07: "I want code-level tenant filtering AND RLS on from the beginning." Branch `feat/tenant-defence` (expand) and its stacked contract PR.
