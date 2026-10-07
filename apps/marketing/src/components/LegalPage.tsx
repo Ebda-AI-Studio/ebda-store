@@ -1,18 +1,24 @@
 import Link from 'next/link';
 import { COPY } from '../lib/content';
-import { HOME, type Locale } from '../lib/site';
+import { HOME, type LegalSlug, type Locale } from '../lib/site';
+import type { LegalPages } from '../lib/legal-types';
 import { Footer } from './Footer';
 import { Header } from './Header';
 
-export function LegalPage({
-  locale,
-  page,
-}: {
-  locale: Locale;
-  page: 'legal' | 'privacy' | 'terms';
-}) {
+const DOC_KEY: Record<
+  LegalSlug,
+  keyof Pick<LegalPages, 'legal' | 'privacy' | 'terms' | 'merchant' | 'acceptableUse'>
+> = {
+  legal: 'legal',
+  privacy: 'privacy',
+  terms: 'terms',
+  'merchant-agreement': 'merchant',
+  'acceptable-use': 'acceptableUse',
+};
+
+export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug }) {
   const c = COPY[locale].legalPages;
-  const doc = c[page];
+  const doc = c[DOC_KEY[page]];
   return (
     <>
       <Header locale={locale} page={page} />
@@ -25,7 +31,9 @@ export function LegalPage({
         {doc.sections.map(s => (
           <section key={s.h}>
             <h2>{s.h}</h2>
-            <p>{s.p}</p>
+            {s.p.map(t => (
+              <p key={t}>{t}</p>
+            ))}
           </section>
         ))}
         <p>

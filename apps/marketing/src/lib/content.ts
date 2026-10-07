@@ -1,3 +1,6 @@
+import { LEGAL_AR } from './legal-ar';
+import { LEGAL_EN } from './legal-en';
+import type { LegalPages } from './legal-types';
 import type { Locale } from './site';
 
 export type Status = 'launch' | 'coming';
@@ -79,18 +82,13 @@ export interface Copy {
     legal: string;
     privacy: string;
     terms: string;
+    merchant: string;
+    acceptableUse: string;
     contact: string;
     by: string;
     draftNote: string;
   };
-  legalPages: {
-    draftBadge: string;
-    draftBody: string;
-    back: string;
-    legal: { title: string; sections: { h: string; p: string }[] };
-    privacy: { title: string; sections: { h: string; p: string }[] };
-    terms: { title: string; sections: { h: string; p: string }[] };
-  };
+  legalPages: LegalPages;
 }
 
 export const COPY: Record<Locale, Copy> = {
@@ -260,7 +258,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           q: 'ماذا عن بياناتي؟',
-          a: 'منتجاتك وطلباتك وعملاؤك بياناتك. تفاصيل المعالجة في صفحة الخصوصية (مسودة قيد المراجعة القانونية)، وأدوات التصدير على خارطة الطريق.',
+          a: 'منتجاتك وطلباتك وعملاؤك بياناتك. تفاصيل المعالجة في صفحة الخصوصية، وأدوات التصدير على خارطة الطريق.',
         },
       ],
     },
@@ -277,66 +275,13 @@ export const COPY: Record<Locale, Copy> = {
       legal: 'الإشعار القانوني',
       privacy: 'الخصوصية',
       terms: 'الشروط',
+      merchant: 'اتفاقية التاجر',
+      acceptableUse: 'الاستخدام المقبول',
       contact: 'تواصل: support@ebda.app',
       by: 'منتج من Whisky 11',
-      draftNote: 'الصفحات القانونية مسودات قيد المراجعة.',
+      draftNote: 'الإصدار 1.0 من الوثائق القانونية · 2026-10-07.',
     },
-    legalPages: {
-      draftBadge: 'مسودة',
-      draftBody:
-        'هذه الصفحة مسودة مبدئية لحين مراجعتها من مستشار قانوني (في إطار القانون المصري). لا تُعد نصًا قانونيًا نهائيًا ولا يُعتمد عليها.',
-      back: 'العودة إلى الرئيسية',
-      legal: {
-        title: 'الإشعار القانوني',
-        sections: [
-          {
-            h: 'مقدّم الخدمة',
-            p: 'ابدأ منتج تقدمه Whisky 11. [بيانات الشركة وبيانات التسجيل التجاري تُضاف بعد المراجعة القانونية.]',
-          },
-          { h: 'التواصل', p: 'للدعم: support@ebda.app. للإبلاغ عن ثغرة أمنية: security@ebda.app.' },
-          {
-            h: 'الاختصاص',
-            p: '[يحدد المستشار القانوني القانون الواجب التطبيق والاختصاص القضائي بما يتوافق مع القوانين المصرية.]',
-          },
-        ],
-      },
-      privacy: {
-        title: 'سياسة الخصوصية',
-        sections: [
-          {
-            h: 'البيانات التي نعالجها',
-            p: '[قائمة مبدئية: بيانات حساب التاجر، بيانات المتجر، وبيانات عملاء المتجر التي يعالجها التاجر عبر المنصة. يحدد المستشار التفاصيل.]',
-          },
-          {
-            h: 'الأساس القانوني والحقوق',
-            p: '[يُراجع في ضوء قانون حماية البيانات الشخصية المصري رقم ١٥١ لسنة ٢٠٢٠ ولائحته التنفيذية، ويشمل حقوق الاطلاع والتصحيح والمحو.]',
-          },
-          {
-            h: 'الاحتفاظ والمعالجون',
-            p: '[مدد الاحتفاظ ومزوّدو الخدمة المعالجون للبيانات تُستكمل قبل الإطلاق.]',
-          },
-          { h: 'التواصل', p: 'support@ebda.app' },
-        ],
-      },
-      terms: {
-        title: 'شروط الخدمة',
-        sections: [
-          {
-            h: 'قبول الشروط',
-            p: '[نص مبدئي: باستخدامك ابدأ فإنك توافق على هذه الشروط بعد اعتمادها.]',
-          },
-          {
-            h: 'الحساب والمتجر',
-            p: '[مسؤوليات التاجر عن محتوى متجره ومنتجاته والتزامه بالقوانين المصرية للتجارة الإلكترونية وحماية المستهلك.]',
-          },
-          {
-            h: 'الخطط والرسوم',
-            p: '[الأسعار معلنة في قسم الأسعار (أساسية ١٬٤٩٠ / نمو ٣٬٤٩٠ / أعمال ٩٬٩٩٠ ج.م شهريًا، دون عمولة على الطلبات). شروط الاسترداد تُضاف بعد اعتمادها.]',
-          },
-          { h: 'إنهاء الخدمة والمسؤولية', p: '[يحددها المستشار القانوني.]' },
-        ],
-      },
-    },
+    legalPages: LEGAL_AR,
   },
   en: {
     meta: {
@@ -517,7 +462,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           q: 'What about my data?',
-          a: 'Your products, orders and customers are yours. How data is handled is described on the Privacy page (a draft awaiting legal review); export tools are on the roadmap.',
+          a: 'Your products, orders and customers are yours. How data is handled is described on the Privacy page; export tools are on the roadmap.',
         },
       ],
     },
@@ -534,65 +479,12 @@ export const COPY: Record<Locale, Copy> = {
       legal: 'Legal notice',
       privacy: 'Privacy',
       terms: 'Terms',
+      merchant: 'Merchant agreement',
+      acceptableUse: 'Acceptable use',
       contact: 'Contact: support@ebda.app',
       by: 'A Whisky 11 product',
-      draftNote: 'Legal pages are drafts pending review.',
+      draftNote: 'Legal documents version 1.0 · 2026-10-07.',
     },
-    legalPages: {
-      draftBadge: 'DRAFT',
-      draftBody:
-        'This page is a placeholder draft pending review by legal counsel (Egyptian law context). It is not final legal text and must not be relied on.',
-      back: 'Back to home',
-      legal: {
-        title: 'Legal notice',
-        sections: [
-          {
-            h: 'Service provider',
-            p: 'Ebda is a product of Whisky 11. [Company details and commercial registration information to be added after legal review.]',
-          },
-          { h: 'Contact', p: 'Support: support@ebda.app. Security reports: security@ebda.app.' },
-          {
-            h: 'Governing law',
-            p: '[Governing law and jurisdiction to be set by counsel in line with Egyptian law.]',
-          },
-        ],
-      },
-      privacy: {
-        title: 'Privacy policy',
-        sections: [
-          {
-            h: 'Data we process',
-            p: '[Initial list: merchant account data, store data, and store-customer data merchants process through the platform. Counsel to finalise.]',
-          },
-          {
-            h: 'Legal basis and rights',
-            p: '[To be reviewed against Egypt’s Personal Data Protection Law No. 151 of 2020 and its executive regulations, including rights of access, correction and erasure.]',
-          },
-          {
-            h: 'Retention and processors',
-            p: '[Retention periods and service providers acting as processors to be completed before launch.]',
-          },
-          { h: 'Contact', p: 'support@ebda.app' },
-        ],
-      },
-      terms: {
-        title: 'Terms of service',
-        sections: [
-          {
-            h: 'Acceptance',
-            p: '[Placeholder: by using Ebda you agree to these terms once adopted.]',
-          },
-          {
-            h: 'Account and store',
-            p: '[Merchant responsibility for store content and products, and compliance with Egyptian e-commerce and consumer-protection law.]',
-          },
-          {
-            h: 'Plans and fees',
-            p: '[Prices are published in the Pricing section (Basic EGP 1,490 / Growth 3,490 / Business 9,990 a month, no commission on orders). Refund terms to be added once adopted.]',
-          },
-          { h: 'Termination and liability', p: '[To be set by counsel.]' },
-        ],
-      },
-    },
+    legalPages: LEGAL_EN,
   },
 };

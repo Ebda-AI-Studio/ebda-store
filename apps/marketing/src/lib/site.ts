@@ -8,14 +8,24 @@ export const LOGIN_URL = `${BRAND_ADMIN_URL}/login`;
 export const SIGNUP_URL = `${BRAND_ADMIN_URL}/signup`;
 export const SECURITY_EMAIL = `security@${BRAND.domains.marketing}`;
 
-/** Every public marketing page (same set in both locales). The sitemap is generated from this. */
-export const SITE_PAGES = ['', 'legal', 'privacy', 'terms'] as const;
-
 /** Home path per locale. Arabic is the default and lives at the root. */
 export const HOME: Record<Locale, string> = { ar: '/', en: '/en' };
 
+export const LEGAL_SLUGS = [
+  'legal',
+  'privacy',
+  'terms',
+  'merchant-agreement',
+  'acceptable-use',
+] as const;
+export type LegalSlug = (typeof LEGAL_SLUGS)[number];
+export type PageSlug = '' | LegalSlug;
+
+/** Every public marketing page (same set in both locales). The sitemap is generated from this. */
+export const SITE_PAGES = ['', ...LEGAL_SLUGS] as const;
+
 /** Page path (no trailing slash except root) for a locale, e.g. pagePath('en','privacy') -> /en/privacy */
-export function pagePath(locale: Locale, page: '' | 'legal' | 'privacy' | 'terms'): string {
+export function pagePath(locale: Locale, page: PageSlug): string {
   const base = locale === 'ar' ? '' : '/en';
   const p = page ? `${base}/${page}` : base;
   return p === '' ? '/' : p;
