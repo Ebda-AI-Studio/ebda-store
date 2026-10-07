@@ -721,3 +721,69 @@ export async function taxProfilesForReview(status: string | null): Promise<TaxRe
     duplicateTrnStores: Number(r.duplicate_trn_stores),
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Pre-scope reads of `stores` (R-EBDA-005, migration 20261008000000_tenant_defence_expand).
+// `stores` is under RLS, so a lookup that runs BEFORE a store or user scope exists goes
+// through one of these; the full row is then read inside `withStore(id)`.
+// ---------------------------------------------------------------------------
+
+export type StoreStatusName = 'active' | 'inactive' | 'suspended';
+
+/**
+ * One store by id, slug or VERIFIED custom domain (precedence in that order), among
+ * `statuses`, not soft-deleted. Returns `{ id, status }` or null. Never defaults to
+ * another store.
+ */
+export async function lookupStore(
+  match: { id?: string | null; slug?: string | null; domain?: string | null },
+  statuses: readonly StoreStatusName[] = ['active']
+): Promise<{ id: string; status: string } | null> {
+  if (!match.id && !match.slug && !match.domain) return null;
+  const rows = await prisma.$queryRaw<Array<{ id: string; status: string }>>`
+    SELECT id, status FROM public.ebda_store_lookup(
+      ${match.id ?? null}, ${match.slug ?? null}, ${match.domain ?? null}, ${[...statuses]}::text[])`;
+  return rows[0] ?? null;
+}
+
+/** The id of the store holding `slug` (any status, deleted included: the unique index does). */
+export async function storeIdBySlug(slug: string): Promise<string | null> {
+  const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
+    SELECT public.ebda_store_id_by_slug(${slug}) AS id`;
+  return rows[0]?.id ?? null;
+}
+
+/** The id of the store whose VERIFIED domain is `domain` (any status). */
+export async function storeIdByDomain(domain: string): Promise<string | null> {
+  const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
+    SELECT public.ebda_store_id_by_domain(${domain}) AS id`;
+  return rows[0]?.id ?? null;
+}
+
+/** The ids of every store with a PENDING claim on `domain`. */
+export async function storeIdsClaimingDomain(domain: string): Promise<string[]> {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT ebda_store_ids_claiming_domain AS id FROM public.ebda_store_ids_claiming_domain(${domain})`;
+  return rows.map(r => r.id);
+}
+
+/**
+ * The live stores `ownerId` owns. Guarded in SQL: the acting user (app.current_user_id)
+ * must BE `ownerId`, or an active super_admin; wrap the call in `withUser(ownerId, ...)`.
+ */
+export async function ownedStoreIds(ownerId: string): Promise<string[]> {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT ebda_owned_store_ids AS id FROM public.ebda_owned_store_ids(${ownerId})`;
+  return rows.map(r => r.id);
+}
+
+/**
+ * The WhatsApp bridge's pre-scope key check: the CIPHERTEXT of every bridge-enabled
+ * store's WBS key, for constant-time comparison after decryption in the API. Nothing
+ * else may call this.
+ */
+export async function wbsBridgeKeys(): Promise<Array<{ storeId: string; wbsApiKey: string }>> {
+  const rows = await prisma.$queryRaw<Array<{ store_id: string; wbs_api_key: string }>>`
+    SELECT store_id, wbs_api_key FROM public.ebda_wbs_bridge_keys()`;
+  return rows.map(r => ({ storeId: r.store_id, wbsApiKey: r.wbs_api_key }));
+}
