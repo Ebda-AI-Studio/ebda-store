@@ -14,10 +14,8 @@ export function Header({ locale, page = '' }: { locale: Locale; page?: Page }) {
     <header className="site-header">
       <div className="wrap header-row">
         <Link href={home} className="wordmark" aria-label={`${BRAND.name} ${BRAND.nameAr}`}>
-          <span className="wm-latin">EBDA</span>
-          <span className="wm-ar" lang="ar">
-            {BRAND.nameAr}
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/lockup-dark.svg" alt="" className="wm-lockup" width={84} height={28} />
         </Link>
         <nav aria-label={c.nav.label} className="nav">
           <ul className="nav-links">

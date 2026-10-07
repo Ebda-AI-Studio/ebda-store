@@ -13,7 +13,7 @@
  * The outbox is process-local on purpose: it is not a queue and is never
  * exposed over HTTP.
  */
-import { BRAND, resolveDefaultLanguage } from '@force/shared';
+import { BRAND, BRAND_EMAIL_LOGO_URL, resolveDefaultLanguage } from '@force/shared';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
@@ -98,7 +98,7 @@ export async function sendMerchantVerificationEmail(
   const html = renderBrandedShell(content, {
     name: BRAND.name,
     nameAr: null,
-    logo: null,
+    logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,
     phone: null,
@@ -131,7 +131,7 @@ export async function sendMerchantDuplicateSignupNotice(
   const html = renderBrandedShell(content, {
     name: BRAND.name,
     nameAr: null,
-    logo: null,
+    logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,
     phone: null,

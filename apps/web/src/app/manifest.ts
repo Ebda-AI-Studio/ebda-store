@@ -85,6 +85,8 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const store = await getStore();
   const primaryColor = store.theme?.primaryColor || BRAND.colors.gold;
   const fallbackThemeColor = hslToHex(primaryColor);
+  // `DEFAULT_STORE` sentinel (store-resolver.ts): no merchant resolved → platform.
+  const isPlatformDefault = store.id === 'demo' && !store.favicon;
   const storeDefaultLanguage = (store.settings as Record<string, unknown> | undefined)
     ?.defaultLanguage as string | undefined;
   const locale = await resolveStorefrontLocale(storeDefaultLanguage);
@@ -144,8 +146,11 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     description: pickMetaDescription(store, locale) || localizedStoreDescriptionFallback,
     start_url: '/',
     display: 'standalone',
-    background_color: '#ffffff',
-    theme_color: fallbackThemeColor,
+    // The platform-default store (no real merchant resolved) is Ebda itself:
+    // night chrome + the open-door icons incl. maskable. Real merchants keep
+    // their own colours and icons.
+    background_color: isPlatformDefault ? BRAND.colors.night : '#ffffff',
+    theme_color: isPlatformDefault ? BRAND.colors.night : fallbackThemeColor,
     icons: [
       ...(store.favicon
         ? [
@@ -155,6 +160,22 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
         : [
             { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
             { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+            ...(isPlatformDefault
+              ? [
+                  {
+                    src: '/icon-maskable-192.png',
+                    sizes: '192x192',
+                    type: 'image/png',
+                    purpose: 'maskable' as const,
+                  },
+                  {
+                    src: '/icon-maskable-512.png',
+                    sizes: '512x512',
+                    type: 'image/png',
+                    purpose: 'maskable' as const,
+                  },
+                ]
+              : []),
           ]),
     ],
   };

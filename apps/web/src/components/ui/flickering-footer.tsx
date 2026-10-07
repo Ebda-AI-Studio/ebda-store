@@ -318,11 +318,16 @@ export function FlickeringFooter() {
       {/* ------------------------------------------------------------------ */}
       <div className="relative z-10 border-t border-border/30 px-6 py-16">
         <div className="max-w-6xl mx-auto flex flex-col gap-12 md:gap-0 md:flex-row md:justify-between">
-          {/* Brand lockup — real Ebda logo (public/logo.svg, orange mark). */}
+          {/* Brand lockup — approved Ebda open-door mark (public/logo.svg, gold). */}
           <div className="flex flex-col gap-4 max-w-xs">
             <div className="flex items-center gap-2.5">
-              <img src="/logo.svg" alt={BRAND.name} className="h-9 w-auto" />
-              <span className="text-white font-bold text-lg tracking-tight">{BRAND.name}</span>
+              <img
+                src="/lockup-dark.svg"
+                alt={BRAND.name}
+                className="h-10 w-auto"
+                width={120}
+                height={40}
+              />
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
               {t(

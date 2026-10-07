@@ -48,7 +48,7 @@ import {
   subscriptionBillingTemplate,
   type SubscriptionBillingNoticeData,
 } from './email-templates/subscription-billing';
-import { BRAND, brandFrom, poweredByBrand } from '@force/shared';
+import { BRAND, BRAND_EMAIL_LOGO_URL, brandFrom, poweredByBrand } from '@force/shared';
 
 import { resolveDefaultLanguage } from '@force/shared';
 // ==========================================
@@ -370,7 +370,7 @@ export class EmailService {
     const html = renderBrandedShell(args.content, {
       name: BRAND.name,
       nameAr: null,
-      logo: null,
+      logo: BRAND_EMAIL_LOGO_URL,
       theme: null,
       email: null,
       phone: null,
@@ -1014,7 +1014,7 @@ export class EmailService {
         renderBrandedShell(content, {
           name: BRAND.name,
           nameAr: null,
-          logo: null,
+          logo: BRAND_EMAIL_LOGO_URL,
           theme: null,
           email: null,
           phone: null,
