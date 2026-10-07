@@ -58,7 +58,7 @@ All flags ride the `StoreTheme` JSON column except `blogEnabled` (own `Store` co
 
 Invariants:
 
-- Class helpers live in `apps/web/src/templates/shared/card-size.ts` (`ctaShapeClass`/`ctaSizeClass`/`labelShapeClass`/`oosPlacementClass`); Zod-validated in `store-layout.routes.ts` `productCardDefaults` (silent-strip trap — every key must be listed).
+- Class helpers live in `apps/web/src/templates/shared/card-size.ts` (`ctaShapeClass`/`ctaSizeClass`/`labelShapeClass`/`oosPlacementClass`); Zod-validated in `packages/shared/src/builder/layout-schema.ts` `productCardDefaults` (re-exported by `store-layout.routes.ts`) (silent-strip trap — every key must be listed).
 - Cards read via `useStore().layout?.productCardDefaults` with prop fallback (the #380 "T.ProductGrid threads zero props" lesson).
 - **`ctaShape`/`ctaSize` MUST merge via `cn()` (tailwind-merge), NOT string concat** — base buttons hardcode `rounded-2xl`/`rounded-xl` + padding/`min-h`, and Tailwind's fixed source order makes those win over later-in-string classes; plain concat silently dropped every shape except `pill`. Fixed across all 8 paths.
 - **The PDP carries the OOS system too** — `ProductDetailClient.tsx` mounts `OosImageDim` + `OutOfStockRibbon` on the main image from the same `productCardDefaults`, honoring backorder (`orderable = !outOfStock || canBackorder`).

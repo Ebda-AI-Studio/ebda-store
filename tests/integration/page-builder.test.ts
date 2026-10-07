@@ -11,6 +11,12 @@
  * nothing lost); tenant isolation; catalogue refs from another store are
  * warnings; the legacy layout PUT path writes a revision; an out-of-band
  * layout write wins over a stale published document; store delete cascades.
+ *
+ * RETRY: every describe pins `retry: 0`. The flow block is an ordered state
+ * machine on one store (rev 1, 2, 3…), so a CI `--retry=1` re-run would fail
+ * on attempt 2's artefacts and hide attempt 1's real error (CLAUDE.md,
+ * "Integration tests must be RETRY-SAFE"); the race blocks each take a fresh
+ * store, but a race assertion that passes only on retry is a finding.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import crypto from 'node:crypto';
@@ -114,7 +120,7 @@ afterAll(async () => {
   await owner.$disconnect();
 });
 
-describe('draft -> publish -> revisions -> rollback (one store, in order)', () => {
+describe('draft -> publish -> revisions -> rollback (one store, in order)', { retry: 0 }, () => {
   let storeId = '';
   beforeAll(async () => {
     storeId = await freshStore('flow');
@@ -251,7 +257,7 @@ describe('draft -> publish -> revisions -> rollback (one store, in order)', () =
   });
 });
 
-describe('optimistic concurrency under real parallel transactions', () => {
+describe('optimistic concurrency under real parallel transactions', { retry: 0 }, () => {
   it('5 editors save on the same baseRev: exactly one wins, four get 409, no lost or duplicated rows', async () => {
     const storeId = await freshStore('race-save');
     const results = await Promise.all(
@@ -335,7 +341,7 @@ describe('optimistic concurrency under real parallel transactions', () => {
   });
 });
 
-describe('tenant isolation (strict RLS on store_page_revisions)', () => {
+describe('tenant isolation (strict RLS on store_page_revisions)', { retry: 0 }, () => {
   it("store B's scope sees none of store A's revisions and cannot write one for A", async () => {
     const { storeA, storeB } = ids;
     await inStore(storeA, () =>
@@ -394,7 +400,7 @@ describe('tenant isolation (strict RLS on store_page_revisions)', () => {
   });
 });
 
-describe('integrity guards', () => {
+describe('integrity guards', { retry: 0 }, () => {
   it('an out-of-band layout_settings write wins over a stale published document', async () => {
     const storeId = await freshStore('drift');
     await inStore(storeId, () =>

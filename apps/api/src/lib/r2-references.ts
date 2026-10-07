@@ -129,6 +129,17 @@ export const R2_REFERENCE_COLUMNS: readonly R2ReferenceColumn[] = [
     why: 'page-builder hero slides and section images',
   },
   {
+    model: 'StorePageRevision',
+    field: 'document',
+    table: 'store_page_revisions',
+    column: 'document',
+    kind: 'json',
+    // Every revision (draft, published AND archived) keeps its images live:
+    // rollback republishes an archived document, so an image that only an
+    // old revision still names must not be swept as an orphan.
+    why: 'visual-builder page revisions (draft / published / archived; rollback restores them)',
+  },
+  {
     model: 'Store',
     field: 'theme',
     table: 'stores',

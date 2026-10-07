@@ -131,7 +131,9 @@ describe('custom badge — the data hops it must survive', () => {
     // The recurring silent-strip trap called out in store-layout.ts: a key
     // absent from this schema is dropped on every PUT, so the merchant's
     // corner/colour save "succeeds" and changes nothing.
-    expect(read('apps/api/src/routes/store-layout.routes.ts')).toContain('customBadge: z');
+    // The layout Zod schema moved to shared with the visual builder registry
+    // (the API route re-exports it).
+    expect(read('packages/shared/src/builder/layout-schema.ts')).toContain('customBadge: z');
   });
 
   it('the admin exposes both inputs (every column with meaning gets a UI)', () => {
