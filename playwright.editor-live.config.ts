@@ -57,7 +57,11 @@ export default defineConfig({
   projects: [
     {
       name: 'ar-1280',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 860 }, locale: 'ar-EG' },
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 860 },
+        locale: 'ar-EG',
+      },
     },
   ],
   webServer: [

@@ -15,7 +15,10 @@
 import { test, expect, type Page, type BrowserContext, type Frame } from '@playwright/test';
 
 const STORE_ORIGIN = 'https://dahab-preview.ebda.app'; // the seeded store's real origin
-const OWNER = { email: 'dahab-demo@ebda.app', password: process.env.EDITOR_E2E_OWNER_PW || 'Editor-e2e#2026' };
+const OWNER = {
+  email: 'dahab-demo@ebda.app',
+  password: process.env.EDITOR_E2E_OWNER_PW || 'Editor-e2e#2026',
+};
 const HEADLINE = `عنوان تجريبي ${Date.now() % 100000}`;
 
 /** Serve the store's real https origin from the local storefront (Host header kept). */
@@ -33,7 +36,9 @@ async function routeStorefront(context: BrowserContext) {
 }
 
 async function login(page: Page) {
-  await page.context().addCookies([{ name: 'admin-lang', value: 'ar', url: test.info().project.use.baseURL! }]);
+  await page
+    .context()
+    .addCookies([{ name: 'admin-lang', value: 'ar', url: test.info().project.use.baseURL! }]);
   await page.goto('/login');
   // the form re-mounts once the auth state resolves: retry until the login navigates away
   await expect(async () => {
@@ -65,7 +70,10 @@ async function openBuilder(page: Page): Promise<Frame> {
   await page.goto(`/stores/${id}/builder`);
   await expect(page.getByTestId('builder')).toBeVisible({ timeout: 60_000 });
   const iframe = page.getByTestId('builder-canvas');
-  await expect(iframe).toHaveAttribute('src', new RegExp(`^${STORE_ORIGIN}/\\?_preview=\\d+&_builder=`));
+  await expect(iframe).toHaveAttribute(
+    'src',
+    new RegExp(`^${STORE_ORIGIN}/\\?_preview=\\d+&_builder=`)
+  );
   // `ready` arrived from the real storefront origin: the editor drops its loading notice
   await expect(page.locator('[role="status"]', { hasText: /تحميل|Loading/ })).toHaveCount(0, {
     timeout: 90_000,
@@ -90,10 +98,14 @@ const templateIds = (page: Page) =>
     .locator('[data-testid^="tree-row-"]')
     .evaluateAll(els => els.map(e => e.getAttribute('data-testid')!.replace('tree-row-', '')));
 const waitSaved = (page: Page) =>
-  expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'saved', { timeout: 30_000 });
+  expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'saved', {
+    timeout: 30_000,
+  });
 
 test.describe.serial('visual builder on the real stack', () => {
-  test('editing a hero heading updates the live canvas without a reload, and autosaves', async ({ page }) => {
+  test('editing a hero heading updates the live canvas without a reload, and autosaves', async ({
+    page,
+  }) => {
     const frame = await openBuilder(page);
     await frame.evaluate(() => ((window as unknown as { __sameDoc: number }).__sameDoc = 1));
     const firstSlide = page.locator('[data-testid^="tree-block-hero-"]').first();
@@ -101,14 +113,18 @@ test.describe.serial('visual builder on the real stack', () => {
     await page.getByTestId('field-headlineAr').fill(HEADLINE);
     await expect(frame.locator('[data-builder-id="hero"]')).toContainText(HEADLINE);
     // same document: the edit arrived over postMessage, not by reloading the iframe
-    expect(await frame.evaluate(() => (window as unknown as { __sameDoc?: number }).__sameDoc)).toBe(1);
+    expect(
+      await frame.evaluate(() => (window as unknown as { __sameDoc?: number }).__sameDoc)
+    ).toBe(1);
     await waitSaved(page);
     // the draft really persisted: a fresh editor session renders it in a fresh canvas
     const again = await openBuilder(page);
     await expect(again.locator('[data-builder-id="hero"]')).toContainText(HEADLINE);
   });
 
-  test('adding and reordering a section renders in the canvas in the new order', async ({ page }) => {
+  test('adding and reordering a section renders in the canvas in the new order', async ({
+    page,
+  }) => {
     const frame = await openBuilder(page);
     const before = await templateIds(page);
     await page.getByTestId('add-section-template').click();
@@ -150,7 +166,9 @@ test.describe.serial('visual builder on the real stack', () => {
   test('publish: the public storefront serves the published page', async ({ page, context }) => {
     await openBuilder(page);
     await page.getByTestId('publish').click();
-    await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'saved', { timeout: 30_000 });
+    await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'saved', {
+      timeout: 30_000,
+    });
     const shop = await context.newPage();
     // the storefront's committed-layout fetch is cached for 60 s (purged on publish where the
     // revalidate binding exists); poll past that window

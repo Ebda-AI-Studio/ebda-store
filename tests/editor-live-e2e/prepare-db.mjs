@@ -20,7 +20,8 @@ if (!['localhost', '127.0.0.1', '::1'].includes(u.hostname) && !/^192\.168\./.te
   throw new Error(`refusing non-local postgres host ${u.hostname}`);
 if (!/^[a-z0-9_]+$/.test(db)) throw new Error('EDITOR_E2E_DB must be [a-z0-9_]');
 
-const psql = (url, sql) => execFileSync('psql', [url, '-v', 'ON_ERROR_STOP=1', '-qAtc', sql], { stdio: 'pipe' });
+const psql = (url, sql) =>
+  execFileSync('psql', [url, '-v', 'ON_ERROR_STOP=1', '-qAtc', sql], { stdio: 'pipe' });
 psql(server, `DROP DATABASE IF EXISTS ${db} WITH (FORCE)`);
 psql(server, `CREATE DATABASE ${db}`);
 const url = new URL(server);
@@ -29,7 +30,11 @@ const env = { ...process.env, DATABASE_URL: url.href, DIRECT_URL: url.href };
 for (const pkg of ['database', 'shared'])
   if (!existsSync(resolve(root, `packages/${pkg}/dist`)))
     execFileSync('npm', ['run', 'build', '-w', `packages/${pkg}`], { cwd: root, stdio: 'inherit' });
-execFileSync('npx', ['prisma', 'migrate', 'deploy'], { cwd: resolve(root, 'packages/database'), env, stdio: 'inherit' });
+execFileSync('npx', ['prisma', 'migrate', 'deploy'], {
+  cwd: resolve(root, 'packages/database'),
+  env,
+  stdio: 'inherit',
+});
 psql(url.href, `ALTER ROLE ebda_app LOGIN PASSWORD '${appPw}'`);
 execFileSync('npx', ['tsx', 'scripts/dahab-demo/seed-dahab.mjs'], {
   cwd: root,

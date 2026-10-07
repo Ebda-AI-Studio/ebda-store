@@ -100,7 +100,13 @@ describe('leases and waiters of requests that were cancelled', () => {
 
   it('a lease never released (its request was cancelled) is reclaimed once stale: the pool serves again', async () => {
     const c = clock();
-    const pool = new ClientPool({ connectionString: URL, max: 1, staleLeaseMs: 50, maxWaitMs: 20, now: c.now });
+    const pool = new ClientPool({
+      connectionString: URL,
+      max: 1,
+      staleLeaseMs: 50,
+      maxWaitMs: 20,
+      now: c.now,
+    });
     const dead = await pool.acquire(); // its request is cancelled: release() is never called
     await expect(pool.acquire()).rejects.toBeInstanceOf(ClientPoolTimeout); // still young: busy
     c.advance(60);
@@ -125,7 +131,13 @@ describe('leases and waiters of requests that were cancelled', () => {
 
   it('a live lease is never reclaimed while it is younger than staleLeaseMs', async () => {
     const c = clock();
-    const pool = new ClientPool({ connectionString: URL, max: 1, staleLeaseMs: 50, maxWaitMs: 20, now: c.now });
+    const pool = new ClientPool({
+      connectionString: URL,
+      max: 1,
+      staleLeaseMs: 50,
+      maxWaitMs: 20,
+      now: c.now,
+    });
     const a = await pool.acquire();
     c.advance(40);
     await expect(pool.acquire()).rejects.toBeInstanceOf(ClientPoolTimeout);
