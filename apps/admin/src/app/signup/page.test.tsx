@@ -185,3 +185,52 @@ it('reports a failed resend without a success message', async () => {
   );
   expect(screen.queryByText('onboarding.signup.sent.resent')).toBeNull();
 });
+
+describe('signup plan hand-off from the marketing site', () => {
+  const store = new Map<string, string>();
+  beforeEach(() => {
+    store.clear();
+    // This jsdom origin has no localStorage; a Map-backed stand-in.
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => void store.set(k, v),
+      },
+    });
+  });
+  afterEach(() => {
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('keeps a valid ?plan&interval for onboarding and shows it back', async () => {
+    window.history.replaceState(null, '', '/signup?plan=business&interval=year');
+    render(<SignupPage />);
+    const chip = await screen.findByTestId('selected-plan');
+    expect(chip.textContent).toBe(
+      'onboarding.signup.plan.chip:{"plan":"Business","interval":"onboarding.signup.plan.yearly"}'
+    );
+    expect(JSON.parse(window.localStorage.getItem('ebda.signup.plan')!)).toEqual({
+      planCode: 'business',
+      interval: 'yearly',
+    });
+  });
+
+  it('defaults a missing interval to monthly', async () => {
+    window.history.replaceState(null, '', '/signup?plan=basic');
+    render(<SignupPage />);
+    await screen.findByTestId('selected-plan');
+    expect(JSON.parse(window.localStorage.getItem('ebda.signup.plan')!)).toEqual({
+      planCode: 'basic',
+      interval: 'monthly',
+    });
+  });
+
+  it('ignores an unknown plan: no chip, nothing stored', async () => {
+    window.history.replaceState(null, '', '/signup?plan=enterprise&interval=year');
+    render(<SignupPage />);
+    await act(async () => {});
+    expect(screen.queryByTestId('selected-plan')).toBeNull();
+    expect(window.localStorage.getItem('ebda.signup.plan')).toBeNull();
+  });
+});

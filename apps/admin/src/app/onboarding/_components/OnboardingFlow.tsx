@@ -6,17 +6,27 @@ import { useRouter } from 'next/navigation';
 import { apiGet } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { StepIndicator } from './StepIndicator';
+import { PlanStep } from './PlanStep';
+import { DEFAULT_SELECTION, STATIC_PLANS } from '../../../components/billing/plans';
 import { StoreStep } from './StoreStep';
+import { BillingStep } from './BillingStep';
 import { TemplateStep } from './TemplateStep';
 import { ProductStep } from './ProductStep';
 import { PaymentStep } from './PaymentStep';
 import { LiveStep } from './LiveStep';
 import { VerifyGate } from './VerifyGate';
+import {
+  isTrialPlanCode,
+  readStoredPlan,
+  type BillingInfo,
+  type PlanOption,
+  type PlanSelection,
+} from '../../../components/billing/types';
 import { STEP_ORDER, type OnboardingState, type OnboardingStore, type StepKey } from './types';
 
 /**
- * Self-serve stepper: name + address -> template -> first product -> payment
- * -> go live. State lives on the server (`GET /onboarding/state`), so a
+ * Self-serve stepper: plan -> name + address -> how you will pay -> template
+ * -> first product -> payment -> go live. State lives on the server (`GET /onboarding/state`), so a
  * refresh or a return visit resumes at the first unfinished point; an already
  * live store goes straight to its dashboard.
  */
@@ -29,9 +39,11 @@ export function OnboardingFlow() {
   routerRef.current = router;
   const [state, setState] = useState<OnboardingState | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [step, setStep] = useState<StepKey>('store');
+  const [step, setStep] = useState<StepKey>('plan');
   const [store, setStore] = useState<OnboardingStore | null>(null);
   const [productCount, setProductCount] = useState(0);
+  const [plan, setPlan] = useState<PlanSelection>(DEFAULT_SELECTION);
+  const [plans, setPlans] = useState<PlanOption[]>(STATIC_PLANS);
 
   const load = useCallback(async () => {
     setLoadFailed(false);
@@ -43,18 +55,58 @@ export function OnboardingFlow() {
     setState(data);
     setStore(data.store);
     setProductCount(data.productCount);
+    // Preselect: the plan already recorded on the trial, else the one picked
+    // before signup (marketing site / signup page), else Growth monthly.
+    const stored = readStoredPlan();
+    const recorded = data.billing?.pendingPlanCode;
+    if (data.store && recorded && ['basic', 'growth', 'business'].includes(recorded)) {
+      setPlan({
+        planCode: recorded as PlanSelection['planCode'],
+        interval: data.billing?.billingInterval ?? 'monthly',
+      });
+    } else if (stored) {
+      setPlan(stored);
+    }
     if (data.store) {
       if (data.store.status === 'active') {
         routerRef.current.replace(`/stores/${data.store.id}`);
         return;
       }
-      setStep(prev => (prev === 'store' ? 'template' : prev));
+      // Resume: no way to pay on file yet -> billing; otherwise the template.
+      const paid =
+        !data.billing || data.billing.hasPaymentMethod || data.billing.billingMethod === 'instapay';
+      setStep(prev => (prev === 'plan' ? (paid ? 'template' : 'billing') : prev));
     }
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const updateBilling = useCallback((billing: BillingInfo | null) => {
+    setState(prev => (prev ? { ...prev, billing } : prev));
+  }, []);
+
+  const fetchBilling = useCallback(async (): Promise<BillingInfo | null> => {
+    const { data } = await apiGet<OnboardingState>('/api/v1/onboarding/state');
+    return data?.billing ?? null;
+  }, []);
+
+  // With a store, the API's own plan list (live prices) replaces the static catalog.
+  const storeId = store?.id;
+  useEffect(() => {
+    if (!storeId) return;
+    let cancelled = false;
+    void apiGet<{ availablePlans: PlanOption[] }>(`/api/v1/stores/${storeId}/billing`).then(
+      ({ data }) => {
+        const live = data?.availablePlans?.filter(p => isTrialPlanCode(p.code));
+        if (!cancelled && live && live.length > 0) setPlans(live);
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId]);
 
   const go = (delta: 1 | -1) =>
     setStep(
@@ -88,29 +140,60 @@ export function OnboardingFlow() {
   return (
     <div>
       <StepIndicator current={step} />
-      {step === 'store' && store ? (
+      {step === 'plan' ? (
+        <PlanStep
+          plans={plans}
+          initial={plan}
+          storeId={store?.id}
+          onDone={selection => {
+            setPlan(selection);
+            // The next charge (plan, amount, date) changed with the plan.
+            if (store) void fetchBilling().then(b => updateBilling(b));
+            setStep('store');
+          }}
+        />
+      ) : !store ? (
+        <StoreStep
+          plan={plan}
+          onBack={() => setStep('plan')}
+          onCreated={async created => {
+            const createdBilling = await fetchBilling();
+            setStore(created);
+            setState(prev =>
+              prev ? { ...prev, store: created, codEnabled: true, billing: createdBilling } : prev
+            );
+            setStep('billing');
+          }}
+        />
+      ) : step === 'store' ? (
         <div className="space-y-4">
           <p className="font-medium text-foreground">{store.name}</p>
           <p dir="ltr" className="text-sm text-muted-foreground">
             {store.host}
           </p>
-          <Button type="button" onClick={() => setStep('template')}>
-            {t('next')}
-          </Button>
+          <div className="flex gap-3">
+            <Button type="button" variant="outline" onClick={() => setStep('plan')}>
+              {t('back')}
+            </Button>
+            <Button type="button" onClick={() => setStep('billing')}>
+              {t('next')}
+            </Button>
+          </div>
         </div>
-      ) : !store ? (
-        <StoreStep
-          onCreated={created => {
-            setStore(created);
-            setState(prev => (prev ? { ...prev, store: created, codEnabled: true } : prev));
-            setStep('template');
-          }}
+      ) : step === 'billing' ? (
+        <BillingStep
+          storeId={store.id}
+          billing={state.billing ?? null}
+          plans={plans}
+          onBillingChange={updateBilling}
+          onBack={() => setStep('store')}
+          onDone={() => setStep('template')}
         />
       ) : step === 'template' ? (
         <TemplateStep
           storeId={store.id}
           initial={store.template}
-          onBack={() => setStep('store')}
+          onBack={() => setStep('billing')}
           onDone={template => {
             setStore({ ...store, template });
             go(1);
@@ -132,7 +215,12 @@ export function OnboardingFlow() {
           onDone={() => go(1)}
         />
       ) : (
-        <LiveStep store={store} productCount={productCount} onBack={() => go(-1)} />
+        <LiveStep
+          store={store}
+          productCount={productCount}
+          onBack={() => go(-1)}
+          onGoToBilling={() => setStep('billing')}
+        />
       )}
     </div>
   );

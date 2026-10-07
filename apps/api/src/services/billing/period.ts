@@ -4,9 +4,23 @@ export type BillingInterval = 'monthly' | 'yearly';
 
 export const FREE_PLAN_CODE = 'free';
 export const COMPED_PLAN_CODE = 'comped';
-/** Admin-granted plans: never purchasable, never charged, always status `comped` (Amelia's founding deal). */
+/**
+ * Admin-granted plans: never purchasable, never charged, always status `comped`.
+ * `founding_free` stays defined but assigned to nobody (Ruling EBDA-FUNNEL-15).
+ */
 export const GRANTED_PLAN_CODES: readonly string[] = [COMPED_PLAN_CODE, 'founding_free'];
 export const isGrantedPlan = (code: string): boolean => GRANTED_PLAN_CODES.includes(code);
+/** Signup trial (locked pricing): 14 days on Growth whatever plan was chosen. */
+export const TRIAL_DAYS = 14;
+export const TRIAL_PLAN_CODE = 'growth';
+/**
+ * InstaPay (manual) subscriptions: days after the due date before an unpaid
+ * store is suspended (Ruling EBDA-FUNNEL-11). A config constant by Ahmad's
+ * decision; change it here, not per store.
+ */
+export const INSTAPAY_GRACE_DAYS = 3;
+/** Reminder offsets in days before the due date (7, 3, 1 and the due day). */
+export const REMINDER_OFFSETS = [7, 3, 1, 0] as const;
 /** Dunning retry offsets in days after the missed period end: day 3, then day 7. */
 export const DUNNING_RETRY_DAYS = [3, 7] as const;
 /** Failed charges for one period before the store is downgraded (day 0 + 2 retries). */

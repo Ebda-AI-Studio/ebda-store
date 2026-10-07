@@ -5,26 +5,36 @@ import {
   findDueSubscriptionIds,
   renewSubscription,
 } from '../../../services/billing/subscription-billing.service';
+import {
+  findReminderCandidates,
+  sendDueReminder,
+} from '../../../services/billing/reminders.service';
 
 /**
- * Daily subscription billing cycle (SP5 task 3) — 04:00 UTC (06:00/07:00 Cairo).
+ * Daily subscription billing cycle (SP5 task 3 + signup funnel) — 04:00 UTC
+ * (06:00/07:00 Cairo).
  *
- * Covers renewals, dunning retries (day 3 / day 7) and cancel-at-period-end
- * finalisation: `findDueSubscriptionIds` returns whatever needs attention and
- * `renewSubscription` does one subscription. Each subscription is its own
- * `step.run`, so one merchant's failure never blocks the rest and Inngest
- * retries only that step.
+ * 1. Reminders (7/3/1 days before and on the due day) — one `billing_reminders`
+ *    row per (subscription, due date, kind), so a re-run sends nothing twice.
+ * 2. Renewals: card subscriptions are charged on the due day (dunning on
+ *    failure); InstaPay subscriptions go past_due on the due day and the store is
+ *    suspended after the grace period (INSTAPAY_GRACE_DAYS); cancel-at-period-end
+ *    is finalised. `findDueSubscriptionIds` returns whatever needs attention and
+ *    `renewSubscription` does one subscription. Each subscription is its own
+ *    `step.run`, so one merchant's failure never blocks the rest and Inngest
+ *    retries only that step.
  *
  * Safe to re-run at any time (manual backfill, Inngest retry, double
  * delivery): the charge's idempotency key `sub:<id>:<periodEnd ISO>` (retries
- * `…:retry<n>`) is claimed in `billing_events` BEFORE the gateway is called, so
- * a second run finds the key taken and skips. The provider call happens inside
- * the step but outside any DB transaction.
+ * `…:retry<n>`, trial end `…:trial-end:…`) is claimed in `billing_events` BEFORE
+ * the gateway is called, so a second run finds the key taken and skips; the
+ * no-money transitions (overdue, suspension) are compare-and-set. The provider
+ * call happens inside the step but outside any DB transaction.
  */
 export const billingRenewalDaily: InngestFunction.Any = inngest.createFunction(
   {
     id: 'billing-renewal-daily',
-    name: 'Daily subscription renewals + dunning',
+    name: 'Daily subscription reminders, renewals + dunning',
     retries: 2,
     concurrency: { limit: 1 },
     triggers: [{ cron: '0 4 * * *' }],
@@ -34,6 +44,14 @@ export const billingRenewalDaily: InngestFunction.Any = inngest.createFunction(
     const expired = await step.run('expire-stale-checkouts', () =>
       expireStaleCheckouts(new Date(nowIso))
     );
+    const reminderIds = await step.run('find-reminders', () =>
+      findReminderCandidates(new Date(nowIso))
+    );
+    let reminders = 0;
+    for (const id of reminderIds) {
+      const r = await step.run(`remind-${id}`, () => sendDueReminder(id, new Date(nowIso)));
+      if (r.sent) reminders++;
+    }
     const ids = await step.run('find-due', () => findDueSubscriptionIds(new Date(nowIso)));
     const results: Array<{ id: string; action: string }> = [];
     for (const id of ids) {
@@ -43,6 +61,6 @@ export const billingRenewalDaily: InngestFunction.Any = inngest.createFunction(
       });
       results.push(r);
     }
-    return { examined: ids.length, expiredCheckouts: expired, results };
+    return { examined: ids.length, expiredCheckouts: expired, reminders, results };
   }
 );

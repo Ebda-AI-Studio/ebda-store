@@ -10,9 +10,16 @@ import { EmailService } from '../email.service';
 import { socketService } from '../socket.service';
 import { featureService } from '../feature.service';
 import { bustStoreCaches } from '../store.service';
+import { reconcileStoreAccess } from './account.service';
+import { instapayDetails } from './account.service';
+import { supportWhatsappUrl } from './manual-config';
 
 export type BillingEffect =
   | { kind: 'plan_changed'; storeId: string }
+  /** Money was recorded: lift an `unpaid` suspension, re-apply the store allowance. */
+  | { kind: 'payment_recorded'; storeId: string }
+  /** The daily job suspended an unpaid InstaPay store (`applied` = this run did it). */
+  | { kind: 'store_suspended'; storeId: string; applied: boolean }
   | {
       kind: 'payment_failed';
       storeId: string;
@@ -67,7 +74,16 @@ async function runOne(effect: BillingEffect): Promise<void> {
     await featureService.invalidateCache(effect.storeId);
     await bustStoreCaches(effect.storeId, store.slug, store.domain);
   }
-  if (effect.kind === 'plan_changed') return;
+  // Any plan or payment change can move the owner's store allowance (a Business
+  // lapse suspends the extra stores; a payment lifts an unpaid suspension).
+  if (
+    effect.kind === 'plan_changed' ||
+    effect.kind === 'downgraded' ||
+    effect.kind === 'payment_recorded'
+  ) {
+    await reconcileStoreAccess(effect.storeId);
+  }
+  if (effect.kind === 'plan_changed' || effect.kind === 'payment_recorded') return;
 
   const lang: 'en' | 'ar' =
     (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar' ? 'ar' : 'en';
@@ -76,6 +92,40 @@ async function runOne(effect: BillingEffect): Promise<void> {
     p => p.code === (effect.kind === 'payment_failed' ? effect.planCode : ctx.planCode)
   );
   const planName = planRow ? (lang === 'ar' ? planRow.nameAr : planRow.nameEn) : '';
+
+  if (effect.kind === 'store_suspended') {
+    if (!effect.applied) return;
+    socketService.notifyStore(effect.storeId, {
+      type: 'billing_store_suspended',
+      title: lang === 'ar' ? 'تم إيقاف متجرك مؤقتًا' : 'Your store is paused',
+      message:
+        lang === 'ar'
+          ? 'لم نستلم الدفعة. ادفع لإعادة المتجر فورًا.'
+          : 'We have not received the payment. Pay to bring the store back at once.',
+      data: { storeId: effect.storeId, url },
+      createdAt: new Date(),
+    });
+    if (store.owner?.email) {
+      const ip = await instapayDetails(effect.storeId);
+      await EmailService.sendSubscriptionBillingNotice(
+        effect.storeId,
+        {
+          kind: 'store_suspended',
+          to: store.owner.email,
+          storeName: store.name,
+          planName,
+          amountMinor: ip?.amountMinor ?? 0,
+          billingUrl: `${config.adminUrl ?? ''}${url}`,
+          method: 'instapay',
+          instapayHandle: ip?.handle ?? null,
+          paymentReference: ip?.reference ?? null,
+          whatsappUrl: supportWhatsappUrl(store.name),
+        },
+        lang
+      );
+    }
+    return;
+  }
 
   if (effect.kind === 'payment_failed') {
     const retryOn = effect.nextRetryAt.toISOString().slice(0, 10);

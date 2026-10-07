@@ -260,7 +260,7 @@ describe('Kashier requests', () => {
     });
     expect(out.redirectUrl).toBe('https://checkout.kashier.test/s/1');
     expect(f.calls[0].body.amount).toBe('499.00');
-    expect(f.calls[0].body.saveCard).toBe('required');
+    expect(f.calls[0].body.saveCard).toBe('forced');
   });
 
   it('parseReturn is a hint only', () => {
