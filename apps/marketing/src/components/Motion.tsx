@@ -1,17 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { DEMO_STORES, TEMPLATE_IDS, type TemplateId } from '../lib/demo-stores';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { DEVICE_SHOTS, STORY_STRIP } from '../lib/device-shots';
-import type { Locale } from '../lib/site';
 import { Laptop, Phone, Screen, Tablet } from './Devices';
 
 const reducedMotion = () =>
   typeof window.matchMedia === 'function' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/** Templates the story phone flips through on step 3 ("restyle it in one tap"). */
-const STORY_SWAPS: TemplateId[] = ['jasmine', 'dahab', 'qamar', 'souq', 'lamma'];
 
 /** How far the full-page strip can scroll inside the phone, as % of the strip's height. */
 const PHONE_VIEWPORT = { w: 390, h: 844 };
@@ -34,13 +29,11 @@ export function StoryScroll({
   phoneLabel: string;
 }) {
   const ref = useRef<HTMLElement>(null);
-  const [swap, setSwap] = useState<TemplateId | null>(null);
 
   useEffect(() => {
     const el = ref.current;
     if (!el || reducedMotion()) return;
     let raf = 0;
-    let lastSwap: TemplateId | null = null;
     const update = () => {
       raf = 0;
       const r = el.getBoundingClientRect();
@@ -50,17 +43,11 @@ export function StoryScroll({
       el.style.setProperty('--p', p.toFixed(4));
       el.style.setProperty('--in', Math.min(1, p / 0.12).toFixed(4));
       el.dataset.step = String(step);
-      // Steps 1-2: the real Lamma storefront scrolls inside the phone down to its products.
+      // Steps 1-3: the real store scrolls inside the phone, from the hero down to its products.
       el.style.setProperty(
         '--scroll',
-        (Math.min(1, Math.max(0, (p - 0.12) / 0.33)) * 0.62).toFixed(4)
+        (Math.min(1, Math.max(0, (p - 0.12) / 0.62)) * 0.66).toFixed(4)
       );
-      // Step 3: the same phone flips through the other real templates.
-      const next = step === 3 ? STORY_SWAPS[Math.min(4, Math.floor(((p - 0.5) / 0.28) * 5))] : null;
-      if (next !== lastSwap) {
-        lastSwap = next;
-        setSwap(next === 'lamma' ? null : next);
-      }
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update);
@@ -111,9 +98,9 @@ export function StoryScroll({
                 style={{ '--strip-max': `${STRIP_MAX_PCT.toFixed(3)}%` } as React.CSSProperties}
               >
                 <picture className="story-strip">
-                  <source type="image/avif" srcSet="/devices/lamma-story-600.avif" />
+                  <source type="image/avif" srcSet="/devices/dahab-story-900.avif" />
                   <img
-                    src="/devices/lamma-story-600.webp"
+                    src="/devices/dahab-story-900.webp"
                     width={STORY_STRIP.w}
                     height={STORY_STRIP.h}
                     alt=""
@@ -121,14 +108,14 @@ export function StoryScroll({
                     decoding="async"
                   />
                 </picture>
-                {'bar' in DEVICE_SHOTS.lamma && (
+                {'bar' in DEVICE_SHOTS.dahab && (
                   <picture className="story-bar">
-                    <source type="image/avif" srcSet="/devices/lamma-bar-600.avif" />
+                    <source type="image/avif" srcSet="/devices/dahab-bar-900.avif" />
                     <img
-                      src="/devices/lamma-bar-600.webp"
-                      width={600}
+                      src="/devices/dahab-bar-900.webp"
+                      width={900}
                       height={Math.round(
-                        (600 * DEVICE_SHOTS.lamma.bar.h) / DEVICE_SHOTS.lamma.bar.w
+                        (900 * DEVICE_SHOTS.dahab.bar.h) / DEVICE_SHOTS.dahab.bar.w
                       )}
                       alt=""
                       loading="lazy"
@@ -136,11 +123,6 @@ export function StoryScroll({
                     />
                   </picture>
                 )}
-                {STORY_SWAPS.filter(t => t !== 'lamma').map(t => (
-                  <div key={t} className="story-swap" data-on={swap === t ? '1' : undefined}>
-                    <Screen tpl={t} device="phone" sizes="300px" />
-                  </div>
-                ))}
               </div>
               <ol className="story-toasts" aria-hidden="true">
                 {toasts.map((n, i) => (
@@ -161,48 +143,22 @@ export function StoryScroll({
   );
 }
 
-/** Template switcher: tap a family, all three devices restyle and swap products live. */
-export function TemplateShowcase({
-  locale,
-  groupLabel,
-  devicesLabel,
-}: {
-  locale: Locale;
-  groupLabel: string;
-  devicesLabel: string;
-}) {
-  const [tpl, setTpl] = useState<TemplateId>('souq');
+/**
+ * One store on every screen: the same real storefront captured at true phone, tablet and
+ * laptop viewports. A single store until the designed templates exist (builder Phase 3).
+ */
+export function DevicesShowcase({ devicesLabel }: { devicesLabel: string }) {
   return (
     <div className="showcase">
-      <div className="tpl-tabs" role="group" aria-label={groupLabel}>
-        {TEMPLATE_IDS.map(id => (
-          <button
-            key={id}
-            type="button"
-            className="tpl-tab"
-            data-pal={id}
-            aria-pressed={tpl === id}
-            onClick={() => setTpl(id)}
-          >
-            <span className="tpl-swatch" aria-hidden="true" />
-            <span className="tpl-name">{DEMO_STORES[id].template[locale]}</span>
-            <span className="tpl-kind">{DEMO_STORES[id].kind[locale]}</span>
-          </button>
-        ))}
-      </div>
-      <div
-        className="devices"
-        role="img"
-        aria-label={`${devicesLabel}: ${DEMO_STORES[tpl].template[locale]}`}
-      >
+      <div className="devices" role="img" aria-label={devicesLabel}>
         <Laptop className="devices-laptop">
-          <Screen tpl={tpl} device="laptop" sizes="(min-width: 700px) 620px, 92vw" />
+          <Screen tpl="dahab" device="laptop" sizes="(min-width: 700px) 620px, 92vw" />
         </Laptop>
         <Tablet className="devices-tablet">
-          <Screen tpl={tpl} device="tablet" sizes="200px" />
+          <Screen tpl="dahab" device="tablet" sizes="210px" />
         </Tablet>
         <Phone className="devices-phone">
-          <Screen tpl={tpl} device="phone" sizes="140px" />
+          <Screen tpl="dahab" device="phone" sizes="140px" />
         </Phone>
       </div>
     </div>

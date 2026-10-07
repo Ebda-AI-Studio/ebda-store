@@ -60,7 +60,6 @@ describe('marketing hero and structure', () => {
       'story',
       'how',
       'templates',
-      'scenes',
       'breakout',
       'dahab',
       'features',
@@ -202,9 +201,6 @@ describe('marketing honesty', () => {
       // four numbered steps, a real sequence
       expect(html.match(/class="step4"/g)).toHaveLength(4);
       expect(html).toContain('>01<');
-      // composited room scenes, one per template family, with alt text
-      for (const id of ['souq', 'lamma', 'dahab', 'qamar', 'jasmine'])
-        expect(html).toContain(`/scenes/${id}-1200.webp`);
       // 3D ring: poster first, swatches are real buttons with pressed state
       expect(html).toContain('/ring/ring-gold-diamond.webp');
       expect(html.match(/class="swatch"/g)).toHaveLength(6);
@@ -217,13 +213,18 @@ describe('marketing honesty', () => {
     expect(ar).toContain('بوسطة استلمت الشحنة');
     expect(ar).toContain('وصلك دفع إنستا باي');
   });
-  it('the five template families show real storefront captures', () => {
-    for (const id of ['souq', 'dahab', 'qamar', 'lamma', 'jasmine'])
-      expect(en).toContain(`data-pal="${id}"`);
+  it('shows ONE real store (Dahab) on every device, high-res, and no food anywhere', () => {
     // Real storefront captures (apps/web) at true device sizes, never a hand-made mock.
-    for (const d of ['phone-600', 'tablet-840', 'laptop-1280'])
-      expect(en).toContain(`/devices/souq-${d}.webp`);
-    expect(en).toContain('/devices/lamma-story-600.webp');
+    for (const d of ['phone-600', 'phone-900', 'tablet-840', 'laptop-1280', 'laptop-1920'])
+      expect(en).toContain(`/devices/dahab-${d}.webp`);
+    expect(en).toContain('/devices/dahab-story-900.webp');
+    for (const html of [ar, en]) {
+      expect(html).not.toMatch(/souq-|qamar-|lamma-|jasmine-|data-pal=/);
+      // no template switcher promising looks that are not shown
+      expect(html).not.toMatch(/tpl-tab|Five templates|خمس قوالب/);
+    }
+    expect(ar).not.toMatch(/كيكة|أكل بيتي|طبيخ|محشي|ورق عنب/);
+    expect(en).not.toMatch(/cake|home-food|home food|kitchen/i);
     expect(en).not.toMatch(/lorem|placeholder/i);
   });
   it('prices use Western digits and ج.م on the Arabic page', () => {

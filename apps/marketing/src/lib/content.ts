@@ -13,8 +13,6 @@ export interface Provider {
   icon?: 'cash' | 'truck';
 }
 
-export type SceneId = 'lamma' | 'dahab' | 'souq' | 'qamar' | 'jasmine';
-
 export interface RingCopy {
   label: string;
   hint: string;
@@ -61,13 +59,11 @@ export interface Copy {
     phoneLabel: string;
   };
   how: { title: string; steps: { t: string; d: string }[] };
-  scenes: { title: string; lead: string; items: Record<SceneId, { place: string; alt: string }> };
   breakout: { title: string; words: [string, string, string] };
   dahab: { title: string; lead: string; ring: RingCopy };
   templates: {
     title: string;
     lead: string;
-    groupLabel: string;
     devicesLabel: string;
   };
   features: { title: string; items: { t: string; d: string }[] };
@@ -150,40 +146,23 @@ export const COPY: Record<Locale, Copy> = {
     },
     story: {
       title: 'متجرك بيتبني قدامك.',
-      steps: ['اختار اسم ولوجو.', 'نزّل منتجاتك.', 'غيّر الشكل بضغطة.', 'وأول طلب يوصلك.'],
+      steps: ['اختار اسم ولوجو.', 'نزّل منتجاتك.', 'ظبّط ألوانك وصورك.', 'وأول طلب يوصلك.'],
       toasts: [
-        { t: 'طلب جديد · 450 ج.م', d: 'كيكة شوكولاتة · الدفع عند الاستلام' },
+        { t: 'طلب جديد · 9,750 ج.م', d: 'سلسلة دهب · الدفع عند الاستلام' },
         { t: 'بوسطة استلمت الشحنة', d: 'الطلب رقم 1043 في الطريق للعميل' },
-        { t: 'وصلك دفع إنستا باي', d: '760 ج.م من سارة م.' },
+        { t: 'وصلك دفع إنستا باي', d: '18,500 ج.م من سارة م.' },
         { t: 'عميل جديد اشترك في النشرة', d: 'نهى اشتركت في عروض الأسبوع' },
       ],
-      phoneLabel: 'متجر أكل بيتي بيتبني على الموبايل، وبعدين توصله الطلبات والإشعارات.',
+      phoneLabel: 'متجر مجوهرات بيتبني على الموبايل، وبعدين توصله الطلبات والإشعارات.',
     },
     how: {
       title: '4 خطوات وتبدأ تبيع.',
       steps: [
         { t: 'سجّل وسمّي متجرك', d: 'إيميل وباسورد، واختار اللينك بتاعك.' },
         { t: 'نزّل منتجاتك', d: 'بالصور والأسعار والمقاسات، أو من ملف CSV.' },
-        { t: 'اختار قالب وظبّطه', d: 'خمس قوالب، وكل حاجة فيهم تتعدّل.' },
+        { t: 'اختار شكل متجرك', d: 'ألوانك وصورك، وكل حاجة فيه تتعدّل.' },
         { t: 'استقبل الطلبات', d: 'وتابع الدفع والشحن من موبايلك.' },
       ],
-    },
-    scenes: {
-      title: 'متجرك، في كل مكان بتشتغل فيه.',
-      lead: 'نفس المتجر، شغّال من المطبخ للمحل.',
-      items: {
-        lamma: {
-          place: 'مطبخ البيت',
-          alt: 'موبايل على رخامة مطبخ جنب براد شاي بيعرض متجر أكل بيتي',
-        },
-        dahab: {
-          place: 'ترابيزة الدهب',
-          alt: 'موبايل على ترابيزة خشب جنب سلسلة بيعرض متجر مجوهرات',
-        },
-        souq: { place: 'المكتب بالليل', alt: 'لابتوب على مكتب بالليل بيعرض متجر إلكترونيات' },
-        qamar: { place: 'البوتيك', alt: 'موبايل على كاونتر بوتيك قدام رف هدوم بيعرض متجر أزياء' },
-        jasmine: { place: 'التسريحة', alt: 'موبايل وسط فرش المكياج بيعرض متجر تجميل' },
-      },
     },
     breakout: { title: 'منتجك هو البطل.', words: ['ابدأ', 'متجرك', 'دلوقتي'] },
     dahab: {
@@ -199,10 +178,9 @@ export const COPY: Record<Locale, Copy> = {
       },
     },
     templates: {
-      title: 'خمس قوالب. اختار اللي على ذوقك.',
+      title: 'متجر واحد، على كل الشاشات.',
       lead: 'نفس المتجر على الموبايل والتابلت واللابتوب.',
-      groupLabel: 'اختار قالب',
-      devicesLabel: 'المتجر بالقالب المختار على لابتوب وتابلت وموبايل',
+      devicesLabel: 'متجر مجوهرات حقيقي على ابدأ، على لابتوب وتابلت وموبايل',
     },
     features: {
       title: 'كل اللي محتاجه عشان تبيع.',
@@ -360,52 +338,26 @@ export const COPY: Record<Locale, Copy> = {
       steps: [
         'Pick a name and logo.',
         'Add your products.',
-        'Restyle it in one tap.',
+        'Tune your colours and photos.',
         'And the first order arrives.',
       ],
       toasts: [
-        { t: 'New order · EGP 450', d: 'Chocolate cake · cash on delivery' },
+        { t: 'New order · EGP 9,750', d: 'Gold chain · cash on delivery' },
         { t: 'Bosta picked up the parcel', d: 'Order 1043 is on its way' },
-        { t: 'InstaPay payment received', d: 'EGP 760 from Sara M.' },
+        { t: 'InstaPay payment received', d: 'EGP 18,500 from Sara M.' },
         { t: 'New newsletter subscriber', d: 'Noha joined this week’s offers' },
       ],
       phoneLabel:
-        'A home-food store being built on a phone, then receiving orders and notifications.',
+        'A jewellery store being built on a phone, then receiving orders and notifications.',
     },
     how: {
       title: 'Four steps and you’re selling.',
       steps: [
         { t: 'Sign up and name your store', d: 'Email and password, then pick your link.' },
         { t: 'Add your products', d: 'Photos, prices and sizes, or a CSV file.' },
-        { t: 'Pick a template and tune it', d: 'Five templates, everything editable.' },
+        { t: 'Pick your store’s look', d: 'Your colours and photos, everything editable.' },
         { t: 'Take orders', d: 'And follow payment and shipping from your phone.' },
       ],
-    },
-    scenes: {
-      title: 'Your store, wherever you work.',
-      lead: 'The same store, from the kitchen to the shop floor.',
-      items: {
-        lamma: {
-          place: 'The home kitchen',
-          alt: 'A phone on a kitchen counter showing a home-food store',
-        },
-        dahab: {
-          place: 'The jewellery table',
-          alt: 'A phone on a wooden table beside a necklace, showing a jewellery store',
-        },
-        souq: {
-          place: 'The desk at night',
-          alt: 'A laptop on a desk at night showing an electronics store',
-        },
-        qamar: {
-          place: 'The boutique',
-          alt: 'A phone on a boutique counter in front of a clothing rail, showing a fashion store',
-        },
-        jasmine: {
-          place: 'The vanity',
-          alt: 'A phone among makeup brushes, showing a beauty store',
-        },
-      },
     },
     breakout: { title: 'Your product is the star.', words: ['ابدأ', 'متجرك', 'دلوقتي'] },
     dahab: {
@@ -421,10 +373,9 @@ export const COPY: Record<Locale, Copy> = {
       },
     },
     templates: {
-      title: 'Five templates. Pick your style.',
+      title: 'One store, on every screen.',
       lead: 'The same store on phone, tablet and laptop.',
-      groupLabel: 'Choose a template',
-      devicesLabel: 'The store in the chosen template on a laptop, tablet and phone',
+      devicesLabel: 'A real jewellery store on Ebda, on a laptop, tablet and phone',
     },
     features: {
       title: 'Everything you need to sell.',

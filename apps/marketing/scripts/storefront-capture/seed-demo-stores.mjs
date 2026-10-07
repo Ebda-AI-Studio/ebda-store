@@ -47,6 +47,7 @@ const LOOK = {
     radius: 'md',
   },
   dahab: {
+    dark: true,
     template: 'elegant',
     primary: '38 48% 58%',
     bg: '40 12% 6%',
@@ -157,6 +158,9 @@ function theme(id) {
     borderRadius: l.radius,
     // Western digits on the Arabic storefront too (the template preset opts into Eastern ones).
     arabicNumerals: false,
+    // Section rhythm on the store's own surfaces (page + alternate), not the white default.
+    bgPage: l.bg,
+    bgSectionAlt: dark ? '40 10% 9%' : l.muted,
   };
 }
 
@@ -271,6 +275,14 @@ async function main() {
               },
             ],
           },
+          ...(LOOK[id].dark && {
+            bottomBar: {
+              bgColor: 'token:card',
+              activeColor: 'token:primary',
+              inactiveColor: '#9C9486',
+            },
+            footer: { bgColor: 'token:card' },
+          }),
           categories: {
             enabled: true,
             layout: 'grid',
@@ -285,6 +297,21 @@ async function main() {
       )
     );
     let doc = shared.applyTemplateFamily(base, id);
+    // One continuous surface for the dark stores: every section, the header, the footer and
+    // the bottom tab bar on the store's own background (merchant config, set per section the
+    // way the builder's background picker does), so no white or gold blocks break the page.
+    if (LOOK[id].dark) {
+      const onBg = n =>
+        n.type === 'hero' ? n : { ...n, settings: { ...n.settings, bgColor: 'token:card' } };
+      doc = {
+        ...doc,
+        sections: doc.sections.map(onBg),
+        sectionGroups: {
+          header: doc.sectionGroups.header.map(onBg),
+          footer: doc.sectionGroups.footer.map(onBg),
+        },
+      };
+    }
     // Fill the copy of sections the family adds from a preset (image-text, newsletter).
     doc = {
       ...doc,
