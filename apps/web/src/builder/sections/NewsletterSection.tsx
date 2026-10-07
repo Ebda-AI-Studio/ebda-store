@@ -129,12 +129,12 @@ export function NewsletterSection({
           </form>
         )}
         {state === 'invalid' && (
-          <p role="alert" className="mt-2 text-sm text-destructive">
+          <p role="alert" className="mt-2 text-sm text-destructive-ink">
             {tr('Please enter a valid email.')}
           </p>
         )}
         {state === 'error' && (
-          <p role="alert" className="mt-2 text-sm text-destructive">
+          <p role="alert" className="mt-2 text-sm text-destructive-ink">
             {tr('Something went wrong. Please try again later.')}
           </p>
         )}

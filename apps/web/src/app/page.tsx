@@ -13,7 +13,7 @@ export async function generateMetadata({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}): Promise<Metadata> {
+} = {}): Promise<Metadata> {
   // The builder canvas (admin preview iframe) is never indexable.
   const params = (await searchParams) ?? {};
   if ('_builder' in params) return { robots: { index: false, follow: false } };

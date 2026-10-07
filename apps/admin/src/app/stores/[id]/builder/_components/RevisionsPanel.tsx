@@ -63,7 +63,7 @@ export function RevisionsPanel({
   return (
     <div className="h-full overflow-y-auto p-4" data-testid="revisions-panel">
       {error && (
-        <p role="alert" className="mb-2 text-sm text-destructive">
+        <p role="alert" className="mb-2 text-sm text-destructive-ink">
           {t('error')}
         </p>
       )}

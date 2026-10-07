@@ -178,7 +178,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
     return (
       <div className="grid h-screen place-items-center bg-background p-6 text-center">
         <div>
-          <p className="text-sm text-destructive">{t('loadError')}</p>
+          <p className="text-sm text-destructive-ink">{t('loadError')}</p>
           <button
             type="button"
             onClick={() => void b.reload()}

@@ -97,12 +97,12 @@ export function MediaPicker({
         </div>
       </div>
       {uploadError && (
-        <p role="alert" className="px-5 pt-3 text-sm text-destructive">
+        <p role="alert" className="px-5 pt-3 text-sm text-destructive-ink">
           {uploadError}
         </p>
       )}
       <div className="max-h-[60vh] overflow-y-auto p-5">
-        {state === 'error' && <p className="text-sm text-destructive">{t('loadError')}</p>}
+        {state === 'error' && <p className="text-sm text-destructive-ink">{t('loadError')}</p>}
         {state !== 'error' && items.length === 0 && state === 'ready' && (
           <p className="text-sm text-muted-foreground">{t('empty')}</p>
         )}

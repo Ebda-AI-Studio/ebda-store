@@ -135,7 +135,7 @@ export function SettingsPanel({
         {sectionErrors.length > 0 && (
           <ul
             role="alert"
-            className="space-y-1 rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+            className="space-y-1 rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive-ink"
           >
             {sectionErrors.map(e => (
               <li key={e.path}>{locale === 'ar' ? e.messageAr : e.messageEn}</li>
@@ -292,7 +292,9 @@ function Field({
             placeholder={PATH_EXAMPLE}
             className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-base sm:text-sm"
           />
-          {bad && <span className="mt-1 block text-[11px] text-destructive">{t('unsafeUrl')}</span>}
+          {bad && (
+            <span className="mt-1 block text-[11px] text-destructive-ink">{t('unsafeUrl')}</span>
+          )}
         </label>
       );
     }
