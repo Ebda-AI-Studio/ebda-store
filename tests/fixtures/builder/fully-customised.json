@@ -1,0 +1,141 @@
+{
+  "hero": {
+    "enabled": true,
+    "mode": "single",
+    "autoplayMs": 4000,
+    "hideOnMobile": false,
+    "hideOnDesktop": false,
+    "slides": [
+      {
+        "image": "https://pub-test.r2.dev/hero/single.jpg",
+        "alt": "Banner",
+        "headline": "Ramadan offers",
+        "headlineAr": "عروض رمضان",
+        "ctaText": "See offers",
+        "ctaTextAr": "شاهد العروض",
+        "ctaHref": "/products?sort=newest"
+      }
+    ]
+  },
+  "categories": {
+    "enabled": true,
+    "layout": "grid",
+    "layoutMobile": "horizontal",
+    "captionPosition": "below",
+    "captionPositionMobile": "overlay",
+    "desktopColumns": 3,
+    "mobileColumns": 3,
+    "paddingTop": "tight",
+    "paddingBottom": "xloose",
+    "maxWidth": "full",
+    "hideOnDesktop": true,
+    "subtitle": "Pick a category",
+    "subtitleAr": "اختر فئة",
+    "showSubtitleLines": true,
+    "cardAspect": "portrait",
+    "cardGap": "loose",
+    "showLabel": true,
+    "showHover": false,
+    "showCardFrame": true,
+    "cardFrameStyle": "outline",
+    "cardFrameWidth": "thick",
+    "cardFrameSize": "comfortable",
+    "cardFrameColor": "#222222",
+    "typography": {
+      "heading": { "fontSize": "2xl", "textTransform": "uppercase", "textAlign": "center" },
+      "kicker": { "letterSpacing": "0.2em" },
+      "categoryLabel": { "fontWeight": "600" },
+      "seeAll": { "textDecoration": "underline" }
+    }
+  },
+  "newArrivals": {
+    "enabled": true,
+    "limit": 12,
+    "hideOnMobile": true,
+    "cardSize": "lg",
+    "cardAspect": "square",
+    "cardShape": "soft",
+    "cardGap": "tight",
+    "showLabel": false,
+    "showHover": true,
+    "subtitle": "Just landed",
+    "subtitleAr": "وصل حديثاً",
+    "typography": {
+      "productName": { "fontWeight": "500" },
+      "productPrice": { "color": "#aa0000" }
+    },
+    "dividers": { "above": { "enabled": true, "style": "dotted" }, "title": { "enabled": true } }
+  },
+  "bestSellers": {
+    "enabled": true,
+    "limit": 4,
+    "paddingTop": "none",
+    "maxWidth": "contained",
+    "cardFrameWidth": "thin",
+    "typography": { "productCta": { "textTransform": "uppercase" } }
+  },
+  "testimonials": {
+    "enabled": true,
+    "minRating": 5,
+    "verifiedOnly": false,
+    "title": "What buyers say",
+    "titleAr": "آراء المشترين",
+    "typography": { "heading": { "fontFamily": "Cairo" } }
+  },
+  "brandStory": {
+    "enabled": true,
+    "bgColor": "#101010",
+    "hideOnMobile": true,
+    "typography": { "body": { "lineHeight": "1.8" } }
+  },
+  "trustStrip": {
+    "enabled": true,
+    "layout": "vertical",
+    "size": "lg",
+    "textColor": "#ffffff",
+    "bgColor": "#333333"
+  },
+  "blogCarousel": { "enabled": true, "limit": 3 },
+  "announcement": { "enabled": true, "bgColor": "token:primary" },
+  "header": { "enabled": true, "sticky": true },
+  "footer": { "enabled": true, "paddingTop": "loose" },
+  "bottomBar": { "bgColor": "#000000", "activeColor": "token:accent" },
+  "productsPage": { "density": "compact", "bgColor": "#fafafa" },
+  "productDetailPage": { "imageAspect": "portrait" },
+  "cartPage": { "textScale": "lg" },
+  "checkoutPage": { "colorScheme": "light" },
+  "locationsPage": { "density": "spacious" },
+  "categoriesPage": { "bgColor": "#eeeeee" },
+  "filterSidebar": { "enabled": false, "defaultOpen": false },
+  "reviewSection": { "enabled": true },
+  "sizing": { "heroAspect": "16:9", "productImageAspect": "3:4", "categoryImageAspect": "2:3" },
+  "sectionOrder": ["testimonials", "hero", "categories"],
+  "extraCarousels": [
+    {
+      "id": "extra-1716200000000",
+      "enabled": true,
+      "limit": 3,
+      "productSource": "manual",
+      "manualProductIds": ["p3", "p1", "missing"],
+      "title": "Hand picked",
+      "titleAr": "مختارات"
+    },
+    { "id": "extra-off", "enabled": false, "limit": 4, "productSource": "featured" },
+    {
+      "id": "Extra_Feat",
+      "limit": 2,
+      "productSource": "featured",
+      "bgColor": "#123456",
+      "cardSize": "xs"
+    }
+  ],
+  "productCardDefaults": {
+    "showCardName": true,
+    "showCardPrice": false,
+    "cardFrameWidth": "normal",
+    "cardFrameSize": "compact",
+    "cardFrameColor": "#cccccc",
+    "ctaMode": "viewOnly",
+    "oosLabel": true
+  }
+}
