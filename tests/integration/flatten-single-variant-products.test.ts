@@ -2,7 +2,7 @@
  * scripts/flatten-single-variant-products-2026-09-30.ts against a real
  * database, with the cart asserted through the real API route.
  *
- * The seeded product mirrors pecannbee's shape: ONE active variant
+ * The seeded product mirrors demo-store's shape: ONE active variant
  * ("Size: 380 Gram") holding the stock, the parent's inventory column at 0,
  * an order line and a cart line pointing at the variant, a warehouse shadow
  * row for the variant plus a stale product-level one.

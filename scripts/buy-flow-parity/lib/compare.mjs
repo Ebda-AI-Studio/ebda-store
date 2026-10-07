@@ -20,7 +20,7 @@ const JWT_RE = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 const REF_HASH_RE = /(<orderNo:\d+>)-[0-9a-f]{10}\b/g;
 // Each API instance listens on its own loopback port, and the callback URLs it sends name it.
 const LOOPBACK_PORT_RE = /(https?:\/\/127\.0\.0\.1):\d+/g;
-const WORKTREE_RE = /[^\s"'`]*fwb-buy-flow-parity\/wt-[0-9a-f]+/g;
+const WORKTREE_RE = /[^\s"'`]*ebda-buy-flow-parity\/wt-[0-9a-f]+/g;
 const SECRET_KEYS = new Set([
   'csrfToken',
   'accessToken',

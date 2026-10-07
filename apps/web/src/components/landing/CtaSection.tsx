@@ -44,14 +44,6 @@ export default function CtaSection() {
 
         <div className="flex flex-wrap items-center justify-center gap-4">
           <a
-            href="https://wa.me/96541169141"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-7 py-4 text-base font-semibold text-[#160b03] shadow-[0_10px_34px_rgba(255,106,26,0.38)] transition-transform hover:-translate-y-0.5"
-          >
-            {t('Talk on WhatsApp', 'تواصل عبر واتساب')}
-          </a>
-          <a
             href={`mailto:${BRAND.supportEmail}`}
             className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.02] px-7 py-4 text-base font-semibold text-white transition-colors hover:border-primary"
           >
@@ -61,8 +53,8 @@ export default function CtaSection() {
 
         <p className="text-sm text-white/40">
           {t(
-            'Managed setup · Kuwait payments built in · Live in days',
-            'إعداد مُدار · مدفوعات الكويت مدمجة · انطلق في أيام'
+            'Managed setup · Egyptian payments built in · Live in days',
+            'إعداد مُدار · مدفوعات مصرية مدمجة · انطلق في أيام'
           )}
         </p>
       </div>

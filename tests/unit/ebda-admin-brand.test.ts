@@ -6,7 +6,7 @@ const css = readFileSync('apps/admin/src/styles/globals.css', 'utf8');
 const layout = readFileSync('apps/admin/src/app/layout.tsx', 'utf8');
 const shell = readFileSync('apps/admin/src/components/onboarding/PublicShell.tsx', 'utf8');
 
-// Pin identity where inherited FWB defaults previously survived rebranding.
+// Pin identity where inherited Ebda defaults previously survived rebranding.
 describe('Ebda merchant identity', () => {
   it('uses the approved gold hue and dark button ink in both themes', () => {
     const expected = '36.4 36.03% 51.57%'; // BRAND gold converted to HSL, <0.01 channel rounding.

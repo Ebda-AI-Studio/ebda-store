@@ -780,7 +780,7 @@ export default function ProductsClient({
                 </div>
               )}
 
-              {/* Grid View — Pecannbee-spec PLP card (sold-out ribbon, wishlist
+              {/* Grid View — Demo Store-spec PLP card (sold-out ribbon, wishlist
                 top-START, full-width pill CTA). 6 cols desktop / 3 tablet /
                 2 mobile per spec § 4.4. The per-pack visual treatment comes
                 from the `pack` prop (see templates/shared/pack-styles.ts). */}

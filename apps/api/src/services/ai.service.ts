@@ -610,8 +610,8 @@ export class AIService {
       '<ul>, <li> and <a href="https://..."> tags — no <html>/<head>/<body>, no styles, no ' +
       'images, no scripts. Do not invent prices, discounts, codes, dates or URLs that the ' +
       'brief does not give; if the brief gives none, write copy that needs none. Do not add ' +
-      'an unsubscribe line (the platform adds one). The Arabic version is natural Gulf-' +
-      'friendly Modern Standard Arabic, not a literal translation. Match how Egyptian shoppers ' +
+      'an unsubscribe line (the platform adds one). The Arabic version is natural, ' +
+      'Egypt-friendly Modern Standard Arabic, not a literal translation. Match how Egyptian shoppers ' +
       'actually talk: warm, professional, no fake hype.';
 
     const detailLines = [

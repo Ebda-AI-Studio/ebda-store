@@ -23,19 +23,19 @@ export const STORE_CONTENT_GOLDEN: GoldenCase[] = [
       entityDescription: 'A handmade ceramic mug, dishwasher safe, holds 350ml.',
     },
     output: {
-      title: 'Handmade Ceramic Mug | Wady Aljuz',
+      title: 'Handmade Ceramic Mug | Demo Shop',
       titleAr: 'كوب سيراميك يدوي الصنع | وادي الجوز',
       description:
         'Shop our handmade 350ml ceramic mug, dishwasher safe and perfect for everyday use in Egypt.',
       descriptionAr:
         'تسوق كوب السيراميك يدوي الصنع بسعة 350 مل، آمن لغسالة الصحون ومثالي للاستخدام اليومي في مصر.',
-      keywords: ['ceramic mug kuwait', 'handmade mug', 'كوب سيراميك', 'kitchenware kuwait'],
+      keywords: ['ceramic mug egypt', 'handmade mug', 'كوب سيراميك', 'kitchenware egypt'],
     },
   },
   {
     id: 'section-copy-new-arrivals',
     type: 'section-copy',
-    input: { section: 'newArrivals', storeName: 'Wady Aljuz', existingTitle: 'New Arrivals' },
+    input: { section: 'newArrivals', storeName: 'Demo Shop', existingTitle: 'New Arrivals' },
     output: {
       kicker: 'JUST IN',
       kickerAr: 'وصل حديثاً',

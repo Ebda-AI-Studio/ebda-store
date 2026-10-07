@@ -238,7 +238,7 @@ for (const r of results) {
 }
 
 const lines = [];
-lines.push(`# Defence mutation record — FWB`);
+lines.push(`# Defence mutation record — Ebda`);
 lines.push('');
 // Deliberately NO timestamp. CI regenerates this file and asserts byte
 // equality against the committed copy, so any non-deterministic content turns

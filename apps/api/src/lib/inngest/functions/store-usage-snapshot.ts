@@ -23,8 +23,8 @@ import { sendAlert } from '../../../services/alerts.service';
  *
  * TRAFFIC IS SPLIT ON PURPOSE. A cart row is created per storefront session, so
  * carts with no items approximate unique visitors on a normal browsing store.
- * But the ratio is wildly store-dependent: measured 2026-08, pecannbee had 2687
- * empty / 135 with-items (classic browsing) while wady-aljuz had 93 / 1111
+ * But the ratio is wildly store-dependent: measured 2026-08, demo-store had 2687
+ * empty / 135 with-items (classic browsing) while demo-shop had 93 / 1111
  * (carts arrive pre-filled through a different flow). A single "carts" number
  * would silently mean two different things, so both are stored and the reader
  * decides.
@@ -128,7 +128,7 @@ export const storeUsageSnapshot: InngestFunction.Any = inngest.createFunction(
               WHERE o.store_id = s.id AND o.created_at >= ${start} AND o.created_at < ${end}) AS orders,
             -- NET revenue: money collected AND kept. payment_status = 'paid'
             -- alone is not enough — production contains paid+refunded and
-            -- paid+cancelled orders (pecannbee 3, wady-aljuz 2 as of 2026-08),
+            -- paid+cancelled orders (demo-store 3, demo-shop 2 as of 2026-08),
             -- and counting those would inflate revenue for exactly the stores
             -- with the most reversals. Delivered-but-still-unpaid orders are
             -- excluded too; they are a bookkeeping gap, not revenue.

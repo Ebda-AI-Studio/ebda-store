@@ -143,11 +143,11 @@ describe('ci.yml lanes', () => {
     expect(ci.jobs.changes.if).toBe("github.event_name == 'pull_request'");
   });
 
-  it('the always-on guards run the no-FWB-branding test, the pin check and the migration gate', () => {
+  it('the always-on guards run the no-inherited-branding test, the pin check and the migration gate', () => {
     const g = ci.jobs.guards;
     expect(g.needs).toBeUndefined();
     expect(g.if).toBeUndefined();
-    expect(JSON.stringify(g.steps)).toMatch(/no-fwb-branding\.test\.ts/);
+    expect(JSON.stringify(g.steps)).toMatch(/no-force-branding\.test\.ts/);
     expect(JSON.stringify(g.steps)).toMatch(/check-action-pins\.sh/);
     expect(JSON.stringify(g.steps)).toMatch(/check-migration-order\.mjs/);
   });

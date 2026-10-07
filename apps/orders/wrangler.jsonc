@@ -6,7 +6,7 @@
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "routes": [
     { "pattern": "orders.ebda.app", "custom_domain": true },
-    { "pattern": "orders.ebda.app/*", "zone_name": "ebda.app" }
+    { "pattern": "orders.ebda.app/*", "zone_name": "ebda.app" },
   ],
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
 }

@@ -6,7 +6,7 @@
  *
  * Pure data + pure helpers: no runtime imports, safe in Workers, middleware,
  * Next.js client bundles and Node alike. Do not re-hardcode these values
- * elsewhere; `tests/unit/no-fwb-branding.test.ts` guards the old FWB strings.
+ * elsewhere; `tests/unit/no-force-branding.test.ts` guards against inherited third-party brand strings.
  */
 
 export const BRAND = {

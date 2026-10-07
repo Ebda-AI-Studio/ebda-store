@@ -6,7 +6,7 @@ module.exports = {
   // used it (issue 2380 moved Label to `text-foreground`). Nothing in apps/web
   // renders Label, but merchant-authored HTML could carry the class, so it is
   // kept: the storefront stylesheet may only GROW from a shared-package change,
-  // never lose a rule (pecannbee must not change; Ruling YWA-TXT-1).
+  // never lose a rule (demo-store must not change; Ruling YWA-TXT-1).
   safelist: ['text-gray-700'],
   theme: {
     extend: {

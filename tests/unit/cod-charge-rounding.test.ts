@@ -15,7 +15,7 @@ const charge = (over: Partial<Parameters<typeof computeCodCharge>[0]> = {}) =>
   });
 
 describe('computeCodCharge', () => {
-  it('fixed fee only: the courier collects total + fee (parity with FWB)', () => {
+  it('fixed fee only: the courier collects total + fee (parity with Ebda)', () => {
     expect(charge()).toEqual({
       feeMinor: 500,
       chargedTotalMinor: 10_500,

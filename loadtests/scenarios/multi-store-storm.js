@@ -23,7 +23,7 @@ const productListLatency = new Trend('ms_product_list', true);
 const categoryListLatency = new Trend('ms_category_list', true);
 const productDetailLatency = new Trend('ms_product_detail', true);
 
-const BASE = __ENV.BASE_URL || 'https://api-production-c058.up.railway.app/api/v1';
+const BASE = __ENV.BASE_URL || 'https://api.ebda.app/api/v1';
 
 // STORE_IDS is required — parse once at startup (module level) so each VU
 // shares the same array without re-parsing on every iteration.

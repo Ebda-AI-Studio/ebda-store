@@ -9,7 +9,7 @@ export interface DbEnv {
   BASE_DOMAIN: string;
 }
 
-export const GUC_STORE = 'app.current_store_id'; // same names as FWB
+export const GUC_STORE = 'app.current_store_id'; // same names as Ebda
 export const GUC_USER = 'app.current_user_id';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -101,7 +101,7 @@ export async function runRequest(
           r.headers = { ...r.headers, 'x-ebda-backend-pid': String(scope.backendPid) };
         return r;
       },
-      { maxWait: 5000, timeout: 10000 } // FWB uses maxWait 10s / timeout 30s; tighter here, edge requests are short
+      { maxWait: 5000, timeout: 10000 } // Ebda uses maxWait 10s / timeout 30s; tighter here, edge requests are short
     );
     // A handler that returns a 5xx should roll back; we throw inside handlers for that, so commit happened here.
     return { reply, deferred, txMs: performance.now() - t0 };

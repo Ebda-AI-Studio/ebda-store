@@ -95,8 +95,8 @@ module.exports = {
       user: 'deploy',
       host: ['server1.example.com'],
       ref: 'origin/main',
-      repo: 'git@github.com:Ebda-KW/force-website-builder.git',
-      path: '/var/www/force-website-builder',
+      repo: 'git@github.com:Whisky-11/ebda.git',
+      path: '/var/www/ebda',
       'pre-deploy-local': '',
       'post-deploy':
         'npm install && npm run build && pm2 reload ecosystem.config.js --env production',
@@ -109,8 +109,8 @@ module.exports = {
       user: 'deploy',
       host: ['staging.example.com'],
       ref: 'origin/develop',
-      repo: 'git@github.com:Ebda-KW/force-website-builder.git',
-      path: '/var/www/force-website-builder-staging',
+      repo: 'git@github.com:Whisky-11/ebda.git',
+      path: '/var/www/ebda-staging',
       'post-deploy': 'npm install && npm run build && pm2 reload ecosystem.config.js --env staging',
       env: {
         NODE_ENV: 'staging',

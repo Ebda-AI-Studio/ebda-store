@@ -140,9 +140,7 @@ describe('audit inputs use the merge-base (three-dot) range (issues 2338, 2352)'
 
   it('blast-radius.yml passes a three-dot range', () => {
     const yml = readFileSync(join(root, '.github/workflows/blast-radius.yml'), 'utf8');
-    expect(yml).toMatch(
-      /blast-radius\.sh force-website-builder "\$\{BASE_SHA:-HEAD~1\}\.\.\.\$\{HEAD_SHA:-HEAD\}"/
-    );
+    expect(yml).toMatch(/blast-radius\.sh ebda "\$\{BASE_SHA:-HEAD~1\}\.\.\.\$\{HEAD_SHA:-HEAD\}"/);
   });
 
   it('blast-radius.sh keeps three-dot semantics (reports only the branch-side file)', () => {

@@ -42,7 +42,7 @@ A page is a **template** of ordered **sections**; each section holds ordered **b
 | Limits                | ≤ 40 sections, ≤ 50 blocks per section, ≤ 256 KB per document (also a DB CHECK), ≤ 2 KB per string; link schemes per `isSafeUrl`; images http(s) or relative.                                                     |
 | Unknown types         | an error on write (draft/publish); skipped, never thrown, on render (`renderableSections`).                                                                                                                       |
 
-## Code map (all Ebda-only paths, see `docs/TWIN-PATHS.md`)
+## Code map (Ebda-only paths, self-contained so they can be ported to FWB later)
 
 | File                                                                             | Owns                                                                                                                                                                                                                                                                                        |
 | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

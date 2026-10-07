@@ -5,7 +5,7 @@
  * by calling the external API endpoint on the WBS backend.
  *
  * Architecture:
- *  - FWB (this service) calls WBS POST /api/v1/external/send-template
+ *  - Ebda (this service) calls WBS POST /api/v1/external/send-template
  *  - Auth: x-wbs-api-key header (per-store API key, AES-GCM encrypted at rest)
  *  - Variables are positional strings mapped from the order payload
  *
@@ -224,7 +224,7 @@ export class WbsBridgeService {
   /**
    * Fetch client metadata from WBS using the provided (plaintext) API key.
    *
-   * Used during the "connect by key" UX: FWB calls this to verify the key and
+   * Used during the "connect by key" UX: Ebda calls this to verify the key and
    * auto-populate `wbsClientId`, `businessName`, and available templates.
    *
    * The caller is responsible for decrypting the key before passing it here.
@@ -290,7 +290,7 @@ export class WbsBridgeService {
   /**
    * Fetch abandoned WhatsApp DM carts from WBS for a given store's API key.
    *
-   * Used by FWB's abandoned-cart sweep to merge WBS DM carts with website carts.
+   * Used by Ebda's abandoned-cart sweep to merge WBS DM carts with website carts.
    * wa_carts remains the single source of truth in WBS — no duplication.
    *
    * Degraded-mode contract: returns [] on any error (401, 5xx, network) so the
@@ -364,7 +364,7 @@ export class WbsBridgeService {
    * Sync the per-store WA customer-DM ordering flag to WBS.
    *
    * Called when a merchant toggles "Customer ordering via WhatsApp DM" in the
-   * FWB Connection tab. WBS uses `wa_ordering_enabled` on the client row to
+   * Ebda Connection tab. WBS uses `wa_ordering_enabled` on the client row to
    * decide whether to activate the ordering state machine for inbound DMs.
    *
    * Throws:

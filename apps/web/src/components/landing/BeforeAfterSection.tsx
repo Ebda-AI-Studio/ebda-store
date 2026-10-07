@@ -6,9 +6,8 @@ import { SectionHeader } from '@/components/landing/SectionHeader';
 import { Aurora } from '@/components/landing/Reveal';
 
 /**
- * Before → After: a blank starter store (CSS wireframe) transforms into a real,
- * fully-branded storefront (an actual screenshot of a live merchant, Pecannbee).
- * The "after" is genuine — proof, not a mockup.
+ * Before → After: a blank starter store (CSS wireframe) transforms into a
+ * branded storefront (an illustrative CSS wireframe — not a real merchant).
  */
 
 /** A grey wireframe standing in for an empty / unbranded starting store. */
@@ -33,6 +32,34 @@ function BlankStoreWireframe() {
             <div className="aspect-square w-full rounded-lg bg-neutral-800" />
             <div className="h-2.5 w-3/4 rounded bg-neutral-700" />
             <div className="h-2.5 w-1/2 rounded bg-neutral-700" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** An illustrative branded storefront wireframe (brand-coloured accents). */
+export function BrandedStoreWireframe() {
+  return (
+    <div className="h-full w-full bg-[#14110d] p-4">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="h-4 w-24 rounded bg-primary" />
+        <div className="flex gap-2">
+          <div className="h-4 w-10 rounded bg-white/20" />
+          <div className="h-4 w-10 rounded bg-white/20" />
+          <div className="h-4 w-4 rounded-full bg-primary/70" />
+        </div>
+      </div>
+      <div className="mb-4 flex h-28 w-full items-end rounded-lg bg-gradient-to-br from-primary/40 to-primary/10 p-4">
+        <div className="h-3 w-1/3 rounded bg-white/70" />
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="space-y-2">
+            <div className="aspect-square w-full rounded-lg bg-white/10" />
+            <div className="h-2.5 w-3/4 rounded bg-white/30" />
+            <div className="h-2.5 w-1/3 rounded bg-primary/80" />
           </div>
         ))}
       </div>
@@ -93,20 +120,14 @@ export function BeforeAfterSection() {
             </span>
           </div>
 
-          {/* After — a real live store */}
+          {/* After — a branded store */}
           <div className="flex-1">
             <p className="mb-3 text-center text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              {t('After · a live store', 'بعد · متجر حقيقي')}
+              {t('After · your store', 'بعد · متجرك')}
             </p>
             <BrowserFrame>
               <div className="aspect-[4/3] w-full overflow-hidden">
-                <img
-                  src="/landing/after-store.jpg"
-                  alt={t('A live branded storefront', 'متجر حقيقي بهوية كاملة')}
-                  className="h-full w-full object-cover object-top"
-                  loading="lazy"
-                  decoding="async"
-                />
+                <BrandedStoreWireframe />
               </div>
             </BrowserFrame>
           </div>

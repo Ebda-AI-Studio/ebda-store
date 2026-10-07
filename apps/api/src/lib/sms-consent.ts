@@ -40,7 +40,7 @@ export function smsConsentPhoneKey(phone: string | null | undefined): string | n
  *   to 128 bits (22 chars), and the store id is NOT in the token: the consent
  *   row carries it. 128 bits is far beyond guessing range.
  * - Keyed on a purpose-bound key derived from ENCRYPTION_KEY
- *   (`derivedSecret('fwb:sms-optout-mac:v2')`), NOT JWT_SECRET (issue 2424):
+ *   (`derivedSecret('ebda:sms-optout-mac:v2')`), NOT JWT_SECRET (issue 2424):
  *   rotating the session secret signs everyone out, and must not also kill the
  *   only login-free way a guest has to stop marketing SMS. The message is
  *   still domain-separated, so a MAC here means nothing anywhere else.
@@ -61,7 +61,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export const SMS_OPT_OUT_TOKEN_LENGTH = 45;
 
 function mac(consentId: string): Buffer {
-  return createHmac('sha256', derivedSecret('fwb:sms-optout-mac:v2'))
+  return createHmac('sha256', derivedSecret('ebda:sms-optout-mac:v2'))
     .update(`sms-optout:v2:${consentId}`)
     .digest()
     .subarray(0, 16);

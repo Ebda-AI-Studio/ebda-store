@@ -33,7 +33,7 @@ function colorWithOpacity(
 export const siteConfig = {
   name: BRAND.name,
   hero: {
-    description: 'The AI-powered commerce platform built for Gulf businesses.',
+    description: 'The AI-powered commerce platform built for Egyptian businesses.',
   },
   footerLinks: {
     Company: [
@@ -298,13 +298,11 @@ export function FlickeringFooter() {
       links: [
         { label: t('What we do', 'ماذا نقدم'), href: '#features' },
         { label: t('The AI edge', 'ميزة الذكاء الاصطناعي'), href: '#aeo-geo' },
-        { label: t('Our merchants', 'متاجرنا'), href: '#merchants' },
       ],
     },
     {
       title: t('Get in touch', 'تواصل معنا'),
       links: [
-        { label: t('WhatsApp', 'واتساب'), href: 'https://wa.me/96541169141' },
         { label: t('Email', 'البريد'), href: `mailto:${BRAND.supportEmail}` },
         { label: t('Ebda', 'ابدأ'), href: BRAND_MARKETING_URL },
       ],
@@ -332,18 +330,10 @@ export function FlickeringFooter() {
             <p className="text-sm text-muted-foreground leading-relaxed">
               {t(
                 siteConfig.hero.description,
-                'منصة التجارة الإلكترونية المدعومة بالذكاء الاصطناعي للأعمال الخليجية.'
+                'منصة التجارة الإلكترونية المدعومة بالذكاء الاصطناعي للأعمال المصرية.'
               )}
             </p>
             <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
-              <a
-                href="https://wa.me/96541169141"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-primary transition-colors"
-              >
-                WhatsApp · +965 6674 0311
-              </a>
               <a
                 href={`mailto:${BRAND.supportEmail}`}
                 className="hover:text-primary transition-colors"

@@ -151,7 +151,7 @@ const layoutSchemaInternal = z
       slides: z.array(heroSlideSchema).max(10),
       // 2026-05-18: framed vs full-bleed presentation. Without this listed
       // Zod silently strips the field on PUT — same trap as
-      // feedback-fwb-zod-silent-strip-trap.md. Keep in sync with HeroSettings.
+      // the zod silent-strip trap (layout-schema-parity.test.ts). Keep in sync with HeroSettings.
       presentation: z.enum(['full-bleed', 'framed']).optional(),
       // 2026-05-18 Sprint 3: per-section bg color. Must be listed or Zod
       // silently strips it on every PUT — same trap class as imageMobile.
@@ -241,7 +241,7 @@ const layoutSchemaInternal = z
     // size / aspect / named shape / spacing / labels / hover the same
     // way they tune category cards. Without listing the new fields here
     // Zod silently strips them on save (the trap documented in
-    // feedback-fwb-zod-silent-strip-trap.md).
+    // the zod silent-strip trap (layout-schema-parity.test.ts)).
     newArrivals: z.object({
       enabled: z.boolean(),
       limit: z.number().int().min(1).max(48),

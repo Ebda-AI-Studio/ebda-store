@@ -47,7 +47,7 @@ const ROWS = [
     firstName: 'Ahmed',
     lastName: 'S',
     email: 'a@x.test',
-    phone: '+96599001234',
+    phone: '+201001234567',
     totalOrders: 3,
     totalSpent: 30000,
     avgOrderValue: 10000,

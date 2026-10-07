@@ -274,7 +274,7 @@ router.post(
       const parsedOptions = importOptionsSchema.parse(options || {});
       const userId = req.user!.userId;
 
-      // One CSV entry point for both layouts: FWB's own template passes
+      // One CSV entry point for both layouts: Ebda's own template passes
       // through (BOM stripped); a Shopify product export is grouped by Handle
       // and converted (EGP -> piastres, strict 2 decimals) into the same
       // platform CSV. Either way the single BulkService importer does the work.

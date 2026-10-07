@@ -241,7 +241,7 @@ router.get(
       // checkout — `customerKeyOf` (lowercased email, else phone), the ONE key the
       // Customers page and RFM rollup use. Filtering on
       // `customerId: { not: null }` read 0% on every guest-checkout store (all
-      // of pecannbee's orders are guest). `null` = unknown (no identifiable
+      // of demo-store's orders are guest). `null` = unknown (no identifiable
       // buyer in the window), which the page renders as "—", never as 0%.
       //
       // Aggregated IN POSTGRES (issue 2260): loading every paid order of the

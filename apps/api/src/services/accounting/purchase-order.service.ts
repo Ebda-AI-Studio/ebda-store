@@ -407,7 +407,7 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
         }
         const newStock = onHandBefore + remainingToProcess;
 
-        // InventoryHistory row (existing FWB pattern)
+        // InventoryHistory row (existing Ebda pattern)
         await tx.inventoryHistory.create({
           data: {
             productId: item.productId,

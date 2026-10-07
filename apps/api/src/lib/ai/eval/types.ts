@@ -1,7 +1,7 @@
 /**
  * AI-output evaluation harness — shared types.
  *
- * Every distinct AI generation path in FWB (product FAQs, excerpts, alt
+ * Every distinct AI generation path in Ebda (product FAQs, excerpts, alt
  * text, category/tag suggestions, translation, SEO meta, section copy,
  * description balancing, logo palette extraction, AEO/GEO content sweeps,
  * product recommendations, and review tools) gets an entry in

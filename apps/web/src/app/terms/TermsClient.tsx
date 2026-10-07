@@ -7,7 +7,7 @@ import { formatDate } from '../../lib/format-date';
 
 // This fallback copy's content last materially changed in commit 9364a5c3
 // ("fix: remediate builder reality audit findings ... legal", 2026-07-09,
-// PR #523 §Lens D) — the Kuwait governing-law/jurisdiction/as-is-warranty
+// PR #523 §Lens D) — the governing-law/jurisdiction/as-is-warranty
 // section below. `formatDate(new Date(), ...)` rendered "today" on every
 // page load regardless, a false attestation that the terms are currently
 // under review (C1-2 in the 2026-09-22 AEO audit). Update this constant in
@@ -269,8 +269,8 @@ function TermsFallback() {
             </h2>
             <p className="mt-2 text-muted-foreground">
               {t(
-                'These Terms are governed by and construed in accordance with the laws of the State of Kuwait. Any dispute arising out of or relating to these Terms or your use of the service shall be subject to the exclusive jurisdiction of the competent courts of Kuwait.',
-                'تخضع هذه الشروط وتُفسَّر وفقاً لقوانين دولة الكويت. يخضع أي نزاع ينشأ عن هذه الشروط أو يتعلق بها أو باستخدامك للخدمة للاختصاص القضائي الحصري للمحاكم المختصة في دولة الكويت.'
+                'These Terms are governed by and construed in accordance with the laws of the Arab Republic of Egypt. Any dispute arising out of or relating to these Terms or your use of the service shall be subject to the exclusive jurisdiction of the competent courts of Egypt.',
+                'تخضع هذه الشروط وتُفسَّر وفقاً لقوانين جمهورية مصر العربية. يخضع أي نزاع ينشأ عن هذه الشروط أو يتعلق بها أو باستخدامك للخدمة للاختصاص القضائي الحصري للمحاكم المختصة في جمهورية مصر العربية.'
               )}
             </p>
           </section>
@@ -287,8 +287,6 @@ function TermsFallback() {
             </p>
             <p className="mt-2 text-muted-foreground">
               {t('Email:', 'البريد الإلكتروني:')} {legalEmail}
-              <br />
-              {t('Address: Kuwait City, Kuwait', 'العنوان: مدينة الكويت، الكويت')}
             </p>
           </section>
         </div>

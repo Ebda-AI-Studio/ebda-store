@@ -16,9 +16,9 @@ const ARABIC_RANGE = /[؀-ۿ]/;
 function makeStore(overrides: Partial<ResolvedStore> = {}): ResolvedStore {
   return {
     id: 'store-1',
-    name: 'Pecannbee',
-    slug: 'pecannbee',
-    domain: 'pecannbee.com.kw',
+    name: 'Demo Store',
+    slug: 'demo-store',
+    domain: 'demo-store.example',
     status: 'active',
     currency: 'EGP',
     timezone: 'Africa/Cairo',
@@ -122,7 +122,7 @@ describe('organizationJsonLd', () => {
     const node = organizationJsonLd(makeStore(), 'en');
     expect(node['@context']).toBe('https://schema.org');
     expect(node['@type']).toBe('Organization');
-    expect(node.name).toBe('Pecannbee');
+    expect(node.name).toBe('Demo Store');
     expect(typeof node.url).toBe('string');
   });
 });

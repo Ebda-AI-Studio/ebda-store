@@ -13,10 +13,10 @@ describe('isSafeUrl', () => {
   });
 
   it('accepts allowlisted absolute schemes', () => {
-    expect(isSafeUrl('https://wadyaljuz.com')).toBe(true);
+    expect(isSafeUrl('https://demo-shop.example')).toBe(true);
     expect(isSafeUrl('http://example.com/x')).toBe(true);
     expect(isSafeUrl('mailto:hello@store.com')).toBe(true);
-    expect(isSafeUrl('tel:+96512345678')).toBe(true);
+    expect(isSafeUrl('tel:+201001234567')).toBe(true);
     expect(isSafeUrl('HTTPS://EXAMPLE.COM')).toBe(true); // case-insensitive
   });
 

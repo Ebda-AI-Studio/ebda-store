@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { buildProductFeed, type FeedBundleInput } from '@api/lib/product-feed';
 
-const store = { id: 's1', name: 'Wady Aljuz', slug: 'wady-aljuz', currency: 'EGP' };
+const store = { id: 's1', name: 'Demo Shop', slug: 'demo-shop', currency: 'EGP' };
 const product = {
   id: 'p1',
   name: 'Olive Oil 1L',
@@ -20,17 +20,17 @@ const product = {
 
 describe('buildProductFeed', () => {
   it('maps a product to OpenAI-convention feed fields', () => {
-    const feed = buildProductFeed(store, [product], 'https://wadyaljuz.com');
+    const feed = buildProductFeed(store, [product], 'https://demo-shop.example');
     expect(feed.store).toEqual({
-      name: 'Wady Aljuz',
-      url: 'https://wadyaljuz.com',
+      name: 'Demo Shop',
+      url: 'https://demo-shop.example',
       currency: 'EGP',
     });
     const item = feed.products[0];
     expect(item.item_id).toBe('p1');
     expect(item.title).toBe('Olive Oil 1L');
     expect(item.title_ar).toBe('زيت زيتون ١ لتر');
-    expect(item.link).toBe('https://wadyaljuz.com/products/olive-oil-1l');
+    expect(item.link).toBe('https://demo-shop.example/products/olive-oil-1l');
     expect(item.image_link).toBe('https://cdn.example/img1.jpg');
     expect(item.price).toBe('150.00 EGP'); // compareAtPrice is the base price
     expect(item.sale_price).toBe('125.00 EGP'); // price is what the customer pays
@@ -58,8 +58,13 @@ describe('buildProductFeed', () => {
     let withoutBundlesArg: ReturnType<typeof buildProductFeed>;
     let withExplicitEmptyBundles: ReturnType<typeof buildProductFeed>;
     try {
-      withoutBundlesArg = buildProductFeed(store, [product], 'https://wadyaljuz.com');
-      withExplicitEmptyBundles = buildProductFeed(store, [product], 'https://wadyaljuz.com', []);
+      withoutBundlesArg = buildProductFeed(store, [product], 'https://demo-shop.example');
+      withExplicitEmptyBundles = buildProductFeed(
+        store,
+        [product],
+        'https://demo-shop.example',
+        []
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -84,7 +89,7 @@ describe('buildProductFeed', () => {
     };
 
     it('appears as a sibling product entry with is_bundle:true, correct sale pricing, and nameAr', () => {
-      const feed = buildProductFeed(store, [product], 'https://wadyaljuz.com', [bundle]);
+      const feed = buildProductFeed(store, [product], 'https://demo-shop.example', [bundle]);
       expect(feed.product_count).toBe(2);
       const item = feed.products.find(p => p.item_id === 'b1')!;
       expect(item.title).toBe('Ramadan Box');
@@ -100,7 +105,7 @@ describe('buildProductFeed', () => {
       // P2-4 (final review): `/bundles/<slug>` shipped later in this branch —
       // it is in the sitemap and carries JSON-LD — so an agent reading the
       // feed must be able to link a shopper straight to the bundle.
-      expect(item.link).toBe('https://wadyaljuz.com/bundles/ramadan-box');
+      expect(item.link).toBe('https://demo-shop.example/bundles/ramadan-box');
       expect(item.updated_at).toBe('2026-08-01T00:00:00.000Z');
       // A real product entry must stay completely unaffected by a bundle
       // being present elsewhere in the same feed.
@@ -109,7 +114,7 @@ describe('buildProductFeed', () => {
     });
 
     it('links every entry — products to /products/<slug>, bundles to /bundles/<slug>', () => {
-      const feed = buildProductFeed(store, [product], 'https://wadyaljuz.com', [bundle]);
+      const feed = buildProductFeed(store, [product], 'https://demo-shop.example', [bundle]);
       expect(feed.products.every(p => typeof p.link === 'string' && p.link.length > 0)).toBe(true);
       expect(feed.products.find(p => p.item_id === 'p1')!.link).toContain('/products/');
       expect(feed.products.find(p => p.item_id === 'b1')!.link).toContain('/bundles/');

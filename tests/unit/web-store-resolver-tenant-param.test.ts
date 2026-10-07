@@ -29,21 +29,23 @@ describe('getStoreByTenantParam', () => {
         // not the URL, to distinguish a known vs. unknown domain.
         if (url.includes('/public/store/resolve')) {
           const requestedDomain = init?.headers?.['x-store-domain'];
-          if (requestedDomain === 'palora.ebda.app') {
+          if (requestedDomain === 'demo-boutique.ebda.app') {
             return {
               ok: true,
               json: async () => ({
                 success: true,
-                data: { store: { id: 'store-slug-1', slug: 'palora', name: 'Palora' } },
+                data: {
+                  store: { id: 'store-slug-1', slug: 'demo-boutique', name: 'Demo Boutique' },
+                },
               }),
             } as Response;
           }
-          if (requestedDomain === 'wadyaljuz.com') {
+          if (requestedDomain === 'demo-shop.example') {
             return {
               ok: true,
               json: async () => ({
                 success: true,
-                data: { store: { id: 'store-domain-1', slug: 'wadyaljuz', name: 'Wady Aljuz' } },
+                data: { store: { id: 'store-domain-1', slug: 'demo-shop', name: 'Demo Shop' } },
               }),
             } as Response;
           }
@@ -68,12 +70,12 @@ describe('getStoreByTenantParam', () => {
             }),
           } as Response;
         }
-        if (url.includes('/public/stores/palora')) {
+        if (url.includes('/public/stores/demo-boutique')) {
           return {
             ok: true,
             json: async () => ({
               success: true,
-              data: { store: { id: 'store-slug-1', slug: 'palora', name: 'Palora' } },
+              data: { store: { id: 'store-slug-1', slug: 'demo-boutique', name: 'Demo Boutique' } },
             }),
           } as Response;
         }
@@ -93,16 +95,16 @@ describe('getStoreByTenantParam', () => {
 
   it('resolves a bare tenant string as a custom domain', async () => {
     const { getStoreByTenantParam } = await import('@web/lib/store-resolver');
-    const store = await getStoreByTenantParam('wadyaljuz.com');
+    const store = await getStoreByTenantParam('demo-shop.example');
     expect(store.id).toBe('store-domain-1');
-    expect(store.slug).toBe('wadyaljuz');
+    expect(store.slug).toBe('demo-shop');
   });
 
   it('resolves a `<slug>.ebda.app` tenant (the request host) as that store', async () => {
     const { getStoreByTenantParam } = await import('@web/lib/store-resolver');
-    const store = await getStoreByTenantParam('palora.ebda.app');
+    const store = await getStoreByTenantParam('demo-boutique.ebda.app');
     expect(store.id).toBe('store-slug-1');
-    expect(store.slug).toBe('palora');
+    expect(store.slug).toBe('demo-boutique');
   });
 
   it('triggers notFound() when the custom domain does not resolve', async () => {
@@ -118,7 +120,7 @@ describe('getStoreByTenantParam', () => {
   // The tenant key is re-classified as a HOST: a hand-built key that is not a
   // store host can never resolve a store (and never reaches the API).
   it.each([
-    'slug:palora', // the retired path-slug tenant encoding
+    'slug:demo-boutique', // the retired path-slug tenant encoding
     'ebda.app',
     'admin.ebda.app',
     'www.ebda.app',

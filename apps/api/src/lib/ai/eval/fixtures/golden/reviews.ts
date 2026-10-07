@@ -36,9 +36,9 @@ export const REVIEWS_GOLDEN: GoldenCase[] = [
   {
     id: 'review-owner-response-positive',
     type: 'review-owner-response',
-    input: { storeName: 'Wady Aljuz', rating: 5, body: 'Love this mug, beautiful glaze!' },
+    input: { storeName: 'Demo Shop', rating: 5, body: 'Love this mug, beautiful glaze!' },
     output: {
-      en: "Thank you so much for the kind words — we're thrilled you love the mug! — Wady Aljuz",
+      en: "Thank you so much for the kind words — we're thrilled you love the mug! — Demo Shop",
       ar: 'شكرًا جزيلاً على كلماتك اللطيفة — يسعدنا أنك أعجبت بالكوب! — وادي الجوز',
     },
   },

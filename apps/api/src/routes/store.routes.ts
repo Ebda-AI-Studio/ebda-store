@@ -1164,14 +1164,14 @@ router.get(
       // `priority` (MX-only, Resend's AWS SES feedback MX defaults to 10)
       // and `ttl` (string, e.g. "Auto" or seconds) are preserved through
       // the merge. Without them merchants hit registrar fields they don't
-      // know how to fill — caught on wadyaljuz.com 2026-05-13.
+      // know how to fill — caught on demo-shop.example 2026-05-13.
       // Refresh Resend status live and capture the fresh status + records.
       // The critical fix: the response MUST use the live `refreshed.status`
       // returned from this call, NOT the pre-refresh `storeRow.emailDomainStatus`.
       // storeRow was fetched BEFORE refreshDomainStatus writes the updated value
       // to the DB, so returning storeRow.emailDomainStatus would return a stale
       // snapshot and show "Verified" even after Resend has deleted/revoked the
-      // domain. (Exact failure mode: wadyaljuz had emailDomainStatus='verified' in
+      // domain. (Exact failure mode: demo-shop had emailDomainStatus='verified' in
       // DB but Resend had already deleted the domain; storeRow carried the stale
       // 'verified'; refreshDomainStatus threw 404, was swallowed in catch, so the
       // response returned the stale 'verified' badge — Fix 2 2026-06-29.)
@@ -1402,7 +1402,7 @@ router.post(
 // POST /stores/:id/email-sender/verify — kick off Resend verification AND
 // refresh the local state. Previously called refreshDomainStatus which only
 // does a GET; without the POST-to-/verify the domain stays in `not_started`
-// forever. Caught on wadyaljuz.com 2026-05-13.
+// forever. Caught on demo-shop.example 2026-05-13.
 router.post(
   '/:id/email-sender/verify',
   authenticate,

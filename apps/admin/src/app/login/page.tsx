@@ -232,7 +232,7 @@ export default function LoginPage() {
             <div className="flex justify-center">
               <Image
                 src="/lockup-light.svg"
-                alt={tb('forceMediaAlt')}
+                alt={tb('brandAlt')}
                 width={180}
                 height={60}
                 className="dark:hidden"
@@ -240,7 +240,7 @@ export default function LoginPage() {
               />
               <Image
                 src="/lockup-dark.svg"
-                alt={tb('forceMediaAlt')}
+                alt={tb('brandAlt')}
                 width={180}
                 height={60}
                 className="hidden dark:block"

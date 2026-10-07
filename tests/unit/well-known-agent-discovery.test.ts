@@ -18,7 +18,7 @@
  *     An open store still accepts a keyless write; the documents just never
  *     confirm the posture either way (scoped-audit P2 on PR #1942).
  *  3. **Custom-domain merchants get their OWN URLs.** A platform-rooted link
- *     served on `wadyaljuz.com` sends the agent to a redirect at best. This is
+ *     served on `demo-shop.example` sends the agent to a redirect at best. This is
  *     the bug `/llms.txt` actually shipped with once.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -157,13 +157,13 @@ describe('acp.json', () => {
 
   it('roots URLs at the merchant OWN domain when they have one', async () => {
     headerBag.slug = null;
-    headerBag.domain = 'wadyaljuz.com';
-    headerBag.host = 'wadyaljuz.com';
-    mockStore({ slug: 'wadyaljuz', domain: 'wadyaljuz.com' });
+    headerBag.domain = 'demo-shop.example';
+    headerBag.host = 'demo-shop.example';
+    mockStore({ slug: 'demo-shop', domain: 'demo-shop.example' });
     const b = await body(await acpGet());
-    expect(b.merchant.url).toBe('https://wadyaljuz.com');
-    expect(b.endpoints.product_feed).toBe('https://wadyaljuz.com/feeds/products.json');
-    expect(b.endpoints.llms_txt).toBe('https://wadyaljuz.com/llms.txt');
+    expect(b.merchant.url).toBe('https://demo-shop.example');
+    expect(b.endpoints.product_feed).toBe('https://demo-shop.example/feeds/products.json');
+    expect(b.endpoints.llms_txt).toBe('https://demo-shop.example/llms.txt');
   });
 
   it('roots URLs at <slug>.ebda.app for a store with no custom domain (never a path on the apex)', async () => {
@@ -195,9 +195,9 @@ describe('acp.json', () => {
 
   it('stays shared-cacheable on a custom domain (the 3 live stores) — same as a store subdomain', async () => {
     headerBag.slug = null;
-    headerBag.domain = 'wadyaljuz.com';
-    headerBag.host = 'wadyaljuz.com';
-    mockStore({ slug: 'wadyaljuz', domain: 'wadyaljuz.com' });
+    headerBag.domain = 'demo-shop.example';
+    headerBag.host = 'demo-shop.example';
+    mockStore({ slug: 'demo-shop', domain: 'demo-shop.example' });
     const res = await acpGet();
     expect(res.headers.get('cache-control')).toBe('public, max-age=300, s-maxage=300');
     expect(res.headers.get('vary')).toBe('Cookie');
@@ -254,7 +254,7 @@ describe('ucp', () => {
   });
 
   it('declares 1000 minor units for a three-decimal currency — the 10x trap', async () => {
-    mockStore({ currency: 'KWD' });
+    mockStore({ currency: 'BHD' });
     const b = await body(await ucpGet());
     expect(b.pricing.minor_units_per_major).toBe(1000);
   });
@@ -266,11 +266,11 @@ describe('ucp', () => {
 
   it('cross-links to acp.json on the right host', async () => {
     headerBag.slug = null;
-    headerBag.domain = 'wadyaljuz.com';
-    headerBag.host = 'wadyaljuz.com';
-    mockStore({ slug: 'wadyaljuz', domain: 'wadyaljuz.com' });
+    headerBag.domain = 'demo-shop.example';
+    headerBag.host = 'demo-shop.example';
+    mockStore({ slug: 'demo-shop', domain: 'demo-shop.example' });
     const b = await body(await ucpGet());
-    expect(b.documents.acp).toBe('https://wadyaljuz.com/.well-known/acp.json');
+    expect(b.documents.acp).toBe('https://demo-shop.example/.well-known/acp.json');
   });
 
   it('is shared-cacheable when resolved from the Host, same as acp.json', async () => {
@@ -282,9 +282,9 @@ describe('ucp', () => {
 
   it('stays shared-cacheable on a custom domain (the 3 live stores)', async () => {
     headerBag.slug = null;
-    headerBag.domain = 'wadyaljuz.com';
-    headerBag.host = 'wadyaljuz.com';
-    mockStore({ slug: 'wadyaljuz', domain: 'wadyaljuz.com' });
+    headerBag.domain = 'demo-shop.example';
+    headerBag.host = 'demo-shop.example';
+    mockStore({ slug: 'demo-shop', domain: 'demo-shop.example' });
     const res = await ucpGet();
     expect(res.headers.get('cache-control')).toBe('public, max-age=300, s-maxage=300');
     expect(res.headers.get('vary')).toBe('Cookie');

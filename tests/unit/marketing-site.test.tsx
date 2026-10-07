@@ -162,7 +162,7 @@ describe('marketing SEO and trust surface', () => {
       }
     }
   });
-  it('no Force / FWB branding in any rendered page or public file', () => {
+  it('no inherited third-party branding in any rendered page or public file', () => {
     const bad = /Force AI|ForceAI|Force Website Builder|force-ai|\bFWB\b|\bForce\b/i;
     const all = [ar, en, pub('llms.txt'), pub('.well-known/security.txt'), pub('og.svg')];
     for (const p of ['legal', 'privacy', 'terms'] as const)

@@ -32,7 +32,7 @@ describe('classifyOrphans — the R2 delete guard', () => {
 
   it('SKIPS a freshly-uploaded unreferenced key — the data-loss guard', () => {
     // A file PUT to R2 whose DB row has not landed yet. Deleting it is the
-    // failure mode that may have produced Palora's missing covers.
+    // failure mode that may have produced Demo Boutique's missing covers.
     const r = classifyOrphans([obj('fresh', 10, 1 * HOUR)], new Set(), 24 * HOUR, NOW);
     expect(r.orphans).toEqual([]);
     expect(r.skippedRecent).toBe(1);

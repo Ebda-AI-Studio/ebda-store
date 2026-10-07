@@ -146,8 +146,8 @@ type TrackALocale = 'en' | 'ar';
  * rejected like any other unparseable value, so the list can only ever name
  * stores one by one.
  *
- * A token may carry the store's default language after a colon, `palora:ar`
- * or `wadyaljuz.com:ar`; a bare token means `en`. Middleware is synchronous and
+ * A token may carry the store's default language after a colon, `demo-boutique:ar`
+ * or `demo-shop.example:ar`; a bare token means `en`. Middleware is synchronous and
  * cannot read `settings.defaultLanguage`, but a cookie-less visitor to an
  * Arabic-default store must get Arabic in the route/cache key (issue 2419,
  * Ruling TRC-7). The suffix must be `en` or `ar`; anything else, or a second
@@ -184,7 +184,7 @@ function parseTenantRoutingStores(raw: string | undefined): Map<string, TrackALo
  * carries (`buildStoreTreeUrl`'s `tenantKey`): the path/cookie slug on a
  * platform host, or the normalized custom-domain hostname. Middleware is
  * synchronous and cannot look a custom domain up to find its slug, so a custom
- * domain is allowlisted by its HOSTNAME (`pecannbee.com.kw`); a bare slug
+ * domain is allowlisted by its HOSTNAME (`demo-store.example`); a bare slug
  * token never matches a custom domain. Read INSIDE the request handler.
  */
 function tenantRoutingStoreAllowed(storeKey: string): boolean {
@@ -248,7 +248,7 @@ function buildStoreTreeUrl(
  * a real storefront visitor who previewed in the same browser (2026-05-28).
  *
  * SameSite=None + Secure so it survives the cross-site iframe context
- * (admin.ebda.app framing wadyaljuz.com). TTL 1h matches Redis.
+ * (admin.ebda.app framing demo-shop.example). TTL 1h matches Redis.
  */
 function applyDraftCookie(
   request: NextRequest,
@@ -536,7 +536,7 @@ export const config = {
      * skipped any dotted first segment, so that reason is gone). Excluded, it
      * never received `x-store-domain` / `x-store-slug`, so `app/manifest.ts`'s
      * `getStore()` resolved NO store and every custom-domain merchant served
-     * the platform's "Force" manifest — verified live on pecannbee.com.kw
+     * the platform's "Force" manifest — verified live on demo-store.example
      * 2026-10-01. It must see the same store context every page gets.
      *
      * favicon.ico is intentionally NOT excluded here (removed 2026-07-02) so

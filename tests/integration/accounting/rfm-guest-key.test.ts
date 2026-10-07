@@ -4,7 +4,7 @@
  *
  * The rollup used to key a guest as `GUEST:sha256("<email>:<phone>")` while
  * the Customers list keyed the same guest by plain email/phone, so no segment
- * could ever resolve to a list row — and on a guest-only store (pecannbee:
+ * could ever resolve to a list row — and on a guest-only store (demo-store:
  * 81 snapshots, all guests) the segment drill-down was empty by construction.
  *
  * Asserts, on a real Postgres:

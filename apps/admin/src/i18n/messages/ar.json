@@ -2654,8 +2654,8 @@
       "phNameAr": "مثال: الفرع الرئيسي",
       "phCountry": "مثال: مصر",
       "phCountryAr": "مثال: مصر",
-      "phAddress": "مثال: قطعة 5، شارع سالم المبارك، السالمية",
-      "phAddressAr": "مثال: قطعة 5، شارع سالم المبارك، السالمية",
+      "phAddress": "مثال: 12 شارع التحرير، الدقي، الجيزة",
+      "phAddressAr": "مثال: 12 شارع التحرير، الدقي، الجيزة",
       "phPhone": "مثال: +20 2 2222 2222",
       "phWhatsapp": "مثال: +201012345678",
       "phHours": "مثال: السبت–الخميس 9ص–10م",
@@ -3118,10 +3118,10 @@
       "zoneNameArLabel": "اسم المنطقة (بالعربية)",
       "zoneNameArPlaceholder": "مثال: منطقة العاصمة",
       "areasLabel": "المناطق",
-      "areasPlaceholder": "افصل بين المناطق بفواصل: العاصمة، حولي، الفروانية",
+      "areasPlaceholder": "افصل بين المناطق بفواصل: القاهرة، الجيزة، الإسكندرية",
       "addAllEgyptGovernorates": "+ إضافة جميع محافظات مصر",
       "areasArLabel": "المناطق (بالعربية)",
-      "areasArPlaceholder": "العاصمة، حولي، الفروانية",
+      "areasArPlaceholder": "القاهرة، الجيزة، الإسكندرية",
       "deliveryFeeLabel": "رسوم التوصيل (ج.م)",
       "deliveryFeePlaceholder": "1.000",
       "freeShippingLabel": "شحن مجاني فوق (ج.م)",
@@ -5104,7 +5104,7 @@
       "aeoTitle": "تحسين نتائج محركات البحث الذكية",
       "aeoHint": "تم تعبئة البيانات تلقائياً بواسطة نظام البحث الذكي، تقدر تعدل عليها حسب كل جهة.",
       "aeoLabelEn": "وصف الميتا الخاص بـ AEO (إنجليزي)",
-      "aeoPlaceholderEn": "Conversational answer-engine copy. e.g. «Wady Aljuz is an Egypt-based online grocery store specializing in…»",
+      "aeoPlaceholderEn": "Conversational answer-engine copy. e.g. «Demo Shop is an Egypt-based online grocery store specializing in…»",
       "aeoHintText": "اترك الحقل فارغاً ليقوم نظام AEO بتعبئته تلقائياً. أسلوب إجابة مباشر، 130–160 حرف.",
       "aeoLabelAr": "وصف ميتا لـ AEO (عربي)",
       "aeoPlaceholderAr": "نسخة عربية لمحركات الإجابة — مثال: «وادي الجوز متجر إلكتروني مصري متخصص في…»",
@@ -5781,7 +5781,8 @@
       "ariaLabel": "اللغة"
     },
     "brand": {
-      "forceMediaAlt": "Ebda"
+      "forceMediaAlt": "Ebda",
+      "brandAlt": "ابدأ"
     },
     "aiUsageSummaryCard": {
       "loading": "جاري تحميل رصيد الذكاء الاصطناعي...",

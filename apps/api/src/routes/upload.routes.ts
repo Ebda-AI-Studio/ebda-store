@@ -205,7 +205,7 @@ router.post(
         // Unconditional ceiling AFTER the optional aspect crop. resizeToAspect
         // is opt-in via ?aspect= and no product-image surface sends it, so
         // without this a 26 MP camera original is stored and served as-is —
-        // which is exactly how palora ended up shipping a 28 MB PNG to mobile
+        // which is exactly how demo-boutique ended up shipping a 28 MB PNG to mobile
         // customers for three months.
         const resizedBuffer = await enforceMaxDimensions(aspectResized);
 

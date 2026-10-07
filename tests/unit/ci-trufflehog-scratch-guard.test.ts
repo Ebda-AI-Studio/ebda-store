@@ -2,7 +2,7 @@
  * No job uses a local `./` action before `actions/checkout`.
  *
  * A `uses: ./.github/actions/...` step cannot resolve until checkout has put
- * the repo on disk. (This file used to also pin the FWB-era pre-checkout
+ * the repo on disk. (This file used to also pin the Ebda-era pre-checkout
  * trufflehog-scratch guard for self-hosted jobs; Ebda runs on ephemeral
  * GitHub-hosted runners only, so that guard, and its assertions, are gone.
  * tests/unit/workflow-hosted-runners-only.test.ts keeps it that way.)

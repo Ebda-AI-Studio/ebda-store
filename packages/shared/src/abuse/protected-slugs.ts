@@ -30,8 +30,6 @@ export const PROTECTED_BRAND_NAMES: readonly string[] = [
   'whisky-11',
   'whisky',
   'whiskyeleven',
-  'forcemedia',
-  'forcewebsitebuilder',
   // Payments, wallets, fintech
   'paymob',
   'accept-paymob',
@@ -53,9 +51,6 @@ export const PROTECTED_BRAND_NAMES: readonly string[] = [
   'halan',
   'tamara',
   'tabby',
-  'myfatoorah',
-  'hesabe',
-  'upayments',
   'paypal',
   'stripe',
   'visa',

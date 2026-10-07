@@ -1,6 +1,6 @@
 /**
  * The ledger must follow the ORDER's committed state (audit 2026-09-30,
- * finding 4 — two wady-aljuz orders).
+ * finding 4 — two demo-shop orders).
  *
  * 1. ORD-1781512189610-9972A710 is delivered + paid, but its sale entry was
  *    reversed "refund applied". On 2026-07-09 a delivered→refunded status

@@ -37,8 +37,8 @@ afterEach(cleanup);
 
 const baseStore: StoreData = {
   id: 'store123',
-  name: 'Wady Al Juz',
-  slug: 'wadyaljuz',
+  name: 'Demo Shop',
+  slug: 'demo-shop',
   status: 'active',
   currency: 'EGP',
   timezone: 'Africa/Cairo',

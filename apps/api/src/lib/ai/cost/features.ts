@@ -22,9 +22,9 @@ import { buildMetaAeoPrompt } from '../product-meta-aeo-generator';
 import type { FeatureCostInput } from './cost';
 
 const MODEL = 'gemini-flash-lite-latest';
-const STORE = { storeId: 'rep-store', storeName: 'Pecannbee' };
+const STORE = { storeId: 'rep-store', storeName: 'Demo Store' };
 
-/** A typical bilingual FWB product with a variant option — representative prompt size. */
+/** A typical bilingual Ebda product with a variant option — representative prompt size. */
 const REP_PRODUCT = {
   name: 'Organic Medjool Dates 400g',
   nameAr: 'تمر مجدول عضوي ٤٠٠ جرام',

@@ -10,7 +10,7 @@ import { check, sleep, group } from 'k6';
 // disposable dev store) — set STORE_ID to a test store seeded with
 // at least one purchasable product.
 
-const BASE = __ENV.BASE_URL || 'https://api-production-c058.up.railway.app/api/v1';
+const BASE = __ENV.BASE_URL || 'https://api.ebda.app/api/v1';
 const STORE_ID = __ENV.STORE_ID;
 const PRODUCT_SLUG = __ENV.PRODUCT_SLUG;
 
@@ -73,9 +73,9 @@ export default function () {
         firstName: 'LoadTest',
         lastName: 'Buyer',
         email: `lt-${__VU}-${__ITER}@example.com`,
-        phone: '+96599999999',
+        phone: '+201000000000',
         address1: '1 Block Street',
-        city: 'Kuwait City',
+        city: 'Cairo',
         state: 'Capital',
         postalCode: '00000',
         country: 'KW',

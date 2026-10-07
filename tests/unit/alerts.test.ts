@@ -103,7 +103,7 @@ describe('sendAlert — configured', () => {
       level: 'p0',
       title: 'payment.webhook.hmac_fail',
       body: 'tap provider HMAC fail',
-      context: { store: 'wady-aljuz', attempts: 3 },
+      context: { store: 'demo-shop', attempts: 3 },
     });
 
     expect(result).toBe('sent');
@@ -117,7 +117,7 @@ describe('sendAlert — configured', () => {
     expect(body.text).toContain('[P0 PLATFORM]'); // default scope when omitted
     expect(body.text).toContain('payment.webhook.hmac_fail');
     expect(body.text).toContain('tap provider HMAC fail');
-    expect(body.text).toContain('"store": "wady-aljuz"');
+    expect(body.text).toContain('"store": "demo-shop"');
     expect(body.disable_web_page_preview).toBe(true);
   });
 
@@ -226,16 +226,16 @@ describe('sendAlert — configured', () => {
     await sendAlert({
       level: 'p1',
       scope: 'store',
-      store: { id: 'dfc1c208-1c30-4eba-9821-6f3be15e3506', name: 'Wady Aljuz', slug: 'wady-aljuz' },
+      store: { id: '00000000-0000-4000-8000-000000000001', name: 'Demo Shop', slug: 'demo-shop' },
       source: 'payment.webhook.hmac_fail',
       title: 'hmac fail',
     });
 
     const body = JSON.parse(mockState.fetchMock.mock.calls[0][1].body as string);
     expect(body.text).toContain('[P1 STORE]');
-    expect(body.text).toContain('store=Wady Aljuz');
-    expect(body.text).toContain('wady-aljuz');
-    expect(body.text).toContain('dfc1c208'); // truncated id suffix
+    expect(body.text).toContain('store=Demo Shop');
+    expect(body.text).toContain('demo-shop');
+    expect(body.text).toContain('00000000'); // truncated id suffix
     expect(body.text).toContain('source=payment.webhook.hmac_fail');
   });
 

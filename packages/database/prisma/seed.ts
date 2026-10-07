@@ -26,11 +26,11 @@ function generateSlug(name: string): string {
     .replace(/(^-|-$)/g, '');
 }
 
-// Demo prices below were authored in KWD; Ebda seeds EGP, so scale them up
-// (rough 1 KWD ≈ 100 EGP — demo data only, not a conversion rate).
+// Demo prices below were authored in a 3-decimal currency; Ebda seeds EGP, so scale them up
+// (rough 1 unit ≈ 100 EGP — demo data only, not a conversion rate).
 const DEMO_PRICE_FACTOR = 100;
 
-/** Demo major-unit price (KWD-era numbers) → integer EGP piastres. */
+/** Demo major-unit price (legacy numbers) → integer EGP piastres. */
 function priceInFils(major: number): number {
   return roundToMinor(major * DEMO_PRICE_FACTOR);
 }

@@ -5,7 +5,7 @@ import { productJsonLd, shippingDetailsJsonLd } from '../structured-data';
  * Agent-readable commerce fields on Product JSON-LD.
  *
  * An AI shopping agent filters on delivery cost, delivery time and return
- * window before it looks at anything else. FWB had the underlying data
+ * window before it looks at anything else. Ebda had the underlying data
  * (ShippingZone rows, store identity) but no machine-readable surface for it.
  *
  * The governing rule in every test below: a field is emitted ONLY when real
@@ -16,8 +16,8 @@ import { productJsonLd, shippingDetailsJsonLd } from '../structured-data';
 
 const store = {
   id: 's1',
-  name: 'Pecannbee',
-  slug: 'pecannbee',
+  name: 'Demo Store',
+  slug: 'demo-store',
   currency: 'EGP',
   status: 'active',
   timezone: 'Africa/Cairo',
@@ -31,7 +31,7 @@ const product = { name: 'Pecan Mix', slug: 'pecan-mix', price: 5000, inventory: 
 describe('productJsonLd — agent-readable fields', () => {
   it('emits brand from the store name', () => {
     const ld = productJsonLd(product, store) as unknown as Record<string, unknown>;
-    expect(ld.brand).toEqual({ '@type': 'Brand', name: 'Pecannbee' });
+    expect(ld.brand).toEqual({ '@type': 'Brand', name: 'Demo Store' });
   });
 });
 

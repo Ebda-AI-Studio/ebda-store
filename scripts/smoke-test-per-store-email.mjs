@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // One-off smoke test for the per-store branded email rollout.
-// Loads apps/api/.env, finds Wady Aljuz, sends a real branded order
+// Loads apps/api/.env, finds Demo Shop, sends a real branded order
 // confirmation to ahmed0montaser@gmail.com via the new ResendService
 // pipeline (resolveSender -> renderBrandedShell -> resend SDK).
 //
@@ -8,7 +8,7 @@
 //   RESEND_API_KEY=re_xxx node scripts/smoke-test-per-store-email.mjs
 //
 // Or set RESEND_API_KEY in apps/api/.env and the script reads it from
-// there. The platform fallback path (force-ai.co, already verified
+// there. The platform fallback path (ebda.app, already verified
 // on Resend) is the one this exercises — no custom domain required.
 
 import { config as loadEnv } from 'dotenv';
@@ -19,7 +19,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: resolve(__dirname, '../apps/api/.env') });
 
 const RECIPIENT = process.env.SMOKE_RECIPIENT || 'ahmed0montaser@gmail.com';
-const STORE_SLUG = process.env.SMOKE_STORE_SLUG || 'wady-aljuz';
+const STORE_SLUG = process.env.SMOKE_STORE_SLUG || 'demo-shop';
 
 if (!process.env.RESEND_API_KEY) {
   console.error(
@@ -65,7 +65,7 @@ try {
       ? store.emailSenderLocalPart.trim()
       : 'noreply';
   const useCustomDomain = store.emailDomainStatus === 'verified' && !!store.domain;
-  const host = useCustomDomain ? store.domain : 'force-ai.co';
+  const host = useCustomDomain ? store.domain : 'ebda.app';
   const fromLine = `${sanitizeDisplayName(store.name)} <${localPart}@${host}>`;
 
   console.log('✓ Computed sender:', fromLine);
@@ -93,7 +93,7 @@ try {
       <p style="margin-top:24px;color:#666;font-size:13px;">Generated at ${new Date().toISOString()}</p>
     </div>
     <div style="background:#f5f5f5;padding:16px;text-align:center;font-size:12px;color:#666;">
-      Powered by Force AI
+      Powered by Ebda
     </div>
   </div>
 </body>

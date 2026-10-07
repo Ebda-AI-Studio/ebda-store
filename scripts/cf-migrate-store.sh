@@ -7,7 +7,7 @@
 # is no longer an available rollback target).
 #
 # Usage:
-#   CF_API_TOKEN=... CF_ZONE_ID=... CF_FALLBACK_ORIGIN=cf.forcemediakw.com \
+#   CF_API_TOKEN=... CF_ZONE_ID=... CF_FALLBACK_ORIGIN=cf.ebda.app \
 #   DATABASE_URL=... bash scripts/cf-migrate-store.sh <store-slug> [--rollback]
 set -euo pipefail
 SLUG="${1:?usage: cf-migrate-store.sh <slug> [--rollback]}"
@@ -46,6 +46,6 @@ db -c "UPDATE stores SET domain_provider='cloudflare' WHERE slug='$SLUG';" >/dev
 echo "✓ $SLUG ($DOMAIN) provider → cloudflare"
 echo
 echo "MERCHANT DNS — set this ONE record, then watch SSL go active (minutes):"
-echo "  CNAME  $DOMAIN  →  ${CF_FALLBACK_ORIGIN:-cf.forcemediakw.com}"
+echo "  CNAME  $DOMAIN  →  ${CF_FALLBACK_ORIGIN:-cf.ebda.app}"
 echo "Verify: admin → store → Domain (status flips to verified once SSL is active)."
 echo "Rollback: bash scripts/cf-migrate-store.sh $SLUG --rollback"

@@ -196,7 +196,7 @@ describe.skipIf(!hasDb)('merchant-admin MCP surface', () => {
     const [unknown, off, badKey] = await Promise.all([
       rpc(`no-such-store-${uid()}`, initialize, A.readKey),
       rpc(gated.slug, initialize, gated.readKey),
-      rpc(A.slug, initialize, 'fwbm_not-a-real-key-at-all-nope'),
+      rpc(A.slug, initialize, 'ebdam_not-a-real-key-at-all-nope'),
     ]);
     expect(unknown.status).toBe(404);
     expect(off.status).toBe(404);

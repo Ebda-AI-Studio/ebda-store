@@ -54,7 +54,6 @@ interface StatItem {
 
 const STATS: StatItem[] = [
   { value: 200, suffix: '+', labelEn: 'products imported', labelAr: 'منتج مستورد' },
-  { value: 3, suffix: '', labelEn: 'live Kuwaiti stores', labelAr: 'متجر كويتي مباشر' },
   { value: 2, suffix: '', labelEn: 'languages, AR + EN', labelAr: 'لغتان، عربي + إنجليزي' },
   { value: 7, suffix: '', labelEn: 'days to launch', labelAr: 'أيام للإطلاق' },
 ];

@@ -18,7 +18,7 @@ const HEADER =
 const convert = (...lines: string[]) => importCsvToPlatformCsv([HEADER, ...lines].join('\n'));
 
 describe('importCsvToPlatformCsv — layout detection', () => {
-  it("passes FWB's own template through untouched (piastres), BOM stripped", () => {
+  it("passes Ebda's own template through untouched (piastres), BOM stripped", () => {
     const csv = '﻿name,price,sku\nRing,485000,R1';
     const out = importCsvToPlatformCsv(csv);
     expect(out.format).toBe('platform');

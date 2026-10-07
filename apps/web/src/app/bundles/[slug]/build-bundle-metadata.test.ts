@@ -9,7 +9,7 @@ import type { PublicBundleDetail } from '../../../lib/api';
  * it is what selects `descriptionAr` over `description`.
  */
 
-const STORE = { name: 'Wady Aljuz', slug: 'wady-aljuz', domain: 'wadyaljuz.com' };
+const STORE = { name: 'Demo Shop', slug: 'demo-shop', domain: 'demo-shop.example' };
 
 const ARABIC_RANGE = /[؀-ۿ]/;
 
@@ -89,10 +89,10 @@ describe('Arabic fallback description names (#1857)', () => {
  */
 describe('buildBundleMetadata — Arabic name/store fallback (#1857)', () => {
   const STORE_AR = {
-    name: 'Wady Aljuz',
+    name: 'Demo Shop',
     nameAr: 'وادي الجوز',
-    slug: 'wady-aljuz',
-    domain: 'wadyaljuz.com',
+    slug: 'demo-shop',
+    domain: 'demo-shop.example',
   };
 
   it('ar locale, no descriptionAr at all: title, description, openGraph and twitter titles use the Arabic bundle + store names, never the English ones', () => {
@@ -105,7 +105,7 @@ describe('buildBundleMetadata — Arabic name/store fallback (#1857)', () => {
     expect(meta.description).toContain('صندوق الإفطار');
     expect(meta.description).toContain('وادي الجوز');
     expect(meta.description).not.toContain('Breakfast Box');
-    expect(meta.description).not.toContain('Wady Aljuz');
+    expect(meta.description).not.toContain('Demo Shop');
     expect(meta.openGraph?.title).toBe('صندوق الإفطار | وادي الجوز');
     const twitterTitle = meta.twitter && 'title' in meta.twitter ? meta.twitter.title : undefined;
     expect(twitterTitle).toBe('صندوق الإفطار | وادي الجوز');
@@ -113,13 +113,13 @@ describe('buildBundleMetadata — Arabic name/store fallback (#1857)', () => {
 
   it('ar locale, bundle/store have no Arabic name set: falls back to the English name rather than going blank', () => {
     const bundle = makeBundle({ nameAr: null, description: null, descriptionAr: null });
-    const storeNoAr = { name: 'Wady Aljuz', slug: 'wady-aljuz', domain: 'wadyaljuz.com' };
+    const storeNoAr = { name: 'Demo Shop', slug: 'demo-shop', domain: 'demo-shop.example' };
 
     const meta = buildBundleMetadata(bundle, storeNoAr, 'ar');
 
     expect(meta.title).toBe('Breakfast Box');
     expect(meta.description).toContain('Breakfast Box');
-    expect(meta.description).toContain('Wady Aljuz');
+    expect(meta.description).toContain('Demo Shop');
   });
 
   it('en locale (same bundle/store data): title, description and titles stay English even though nameAr is set', () => {
@@ -129,8 +129,8 @@ describe('buildBundleMetadata — Arabic name/store fallback (#1857)', () => {
 
     expect(meta.title).toBe('Breakfast Box');
     expect(meta.description).toContain('Breakfast Box');
-    expect(meta.description).toContain('Wady Aljuz');
+    expect(meta.description).toContain('Demo Shop');
     expect(meta.description).not.toContain('صندوق الإفطار');
-    expect(meta.openGraph?.title).toBe('Breakfast Box | Wady Aljuz');
+    expect(meta.openGraph?.title).toBe('Breakfast Box | Demo Shop');
   });
 });

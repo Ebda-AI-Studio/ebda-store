@@ -187,7 +187,7 @@ const bulkAiLlmsTxtFn = inngest.createFunction(
           // which the model then echoed verbatim into the stored llms.txt text,
           // producing links that 404 for every category on every store that
           // ran this sweep (A4-2, 2026-09-22 AEO audit — verified live: 18/18
-          // category links across pecannbee.com.kw + wadyaljuz.com 404'd).
+          // category links across demo-store.example + demo-shop.example 404'd).
           // `apps/web/src/app/llms.txt/route.ts`'s `fixCategoryLinks` also
           // rewrites/drops any dead link at serve time as a second layer of
           // defense, but the prompt should stop generating them in the first

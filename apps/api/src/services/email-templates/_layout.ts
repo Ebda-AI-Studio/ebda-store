@@ -1,7 +1,7 @@
 /**
  * Email-client-safe layout primitives shared by EVERY transactional email.
  *
- * Why this exists (2026-09-30, Pecannbee invoice on the Gmail Android app):
+ * Why this exists (2026-09-30, Demo Store invoice on the Gmail Android app):
  * Gmail, Outlook and most webmail clients drop or partially drop `<style>`
  * blocks — Gmail discards any rule it cannot parse (CSS custom properties,
  * `color-mix()`, space-separated `hsl()`), and a `<style>` nested in the body

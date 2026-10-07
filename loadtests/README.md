@@ -88,7 +88,7 @@ npm run seed:loadtest:cleanup --workspace @force/database
 ```
 
 This deletes all `loadtest-store-*` stores (and their products/categories) and
-the `loadtest+stores@forcemediakw.com` user. Safe to run multiple times.
+the `loadtest+stores@ebda.app` user. Safe to run multiple times.
 
 #### Env knobs
 
@@ -130,7 +130,7 @@ paths in roughly real-shopper proportions:
 2m → 300 VUs (ramp to peak), hold 3m at 300 VUs (this is where headroom is
 actually measured), 1m ramp-down. At the default 80 seeded stores, 300 VUs
 is ~3.75 concurrent VUs per store at peak — comparable to several dozen
-small-to-mid Kuwait/GCC storefronts each seeing a handful of concurrent
+small-to-mid Egyptian storefronts each seeing a handful of concurrent
 shoppers simultaneously. That's deliberately a step below a single-store
 flash-sale spike (`api-bursts.js` already covers that extreme at 200 req/s
 constant-arrival) and a step above `multi-store-storm.js`'s default
