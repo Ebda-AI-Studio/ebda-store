@@ -68,7 +68,7 @@ export interface ValidationResult {
 }
 
 const IMAGE_KEY_RE = /^(image|imageAr|imageMobile|imageMobileAr)$/;
-const URL_KEY_RE = /^(link|ctaHref|href)$/;
+const URL_KEY_RE = /^(link|ctaHref|href|buttonLink)$/;
 const ALIGN_KEY_RE = /align$/i;
 
 function issue(
@@ -221,7 +221,7 @@ function validateSection(
     scanValue(b.settings, `${path}/blocks/${j}/settings`, '', errors)
   );
   if (node.responsive) scanValue(node.responsive, `${path}/responsive`, '', errors);
-  const parsed = d.propsSchema.safeParse(sectionToLegacy(node, d.legacyKey));
+  const parsed = d.propsSchema.safeParse(sectionToLegacy(node, d.legacyKey ?? ''));
   if (!parsed.success) errors.push(...zodIssues(parsed.error, `${path}/settings`));
 }
 

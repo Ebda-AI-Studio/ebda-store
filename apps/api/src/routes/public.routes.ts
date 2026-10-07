@@ -1789,7 +1789,8 @@ router.post(
       const subscribeSchema = z.object({
         email: z.string().email('Invalid email address').max(254),
         language: z.enum(['en', 'ar']).optional(),
-        source: z.enum(['footer', 'popup', 'manual']).optional(),
+        // `section`: the visual builder's newsletter section (Phase 2).
+        source: z.enum(['footer', 'popup', 'manual', 'section']).optional(),
       });
 
       const data = subscribeSchema.parse(req.body);

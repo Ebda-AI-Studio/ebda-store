@@ -1,0 +1,28 @@
+{
+  "status": "CREATED",
+  "failureAttempts": 0,
+  "capturedAmount": 0,
+  "refundedAmount": 0,
+  "_id": "67adc07584f10c00121f6739",
+  "merchantId": "MID-XXXX-XXXX",
+  "expireAt": "2025-01-28T17:27:32.359Z",
+  "maxFailureAttempts": 3,
+  "paymentParams": {
+    "display": "en",
+    "paymentType": "credit",
+    "amount": "100.00",
+    "currency": "EGP",
+    "order": "as8f64a5",
+    "merchantRedirect": "https://your-website.com/redirect",
+    "type": "one-time",
+    "allowedMethods": "card,wallet",
+    "failureRedirect": false,
+    "customer": { "email": "john@example.com", "reference": "894321" },
+    "serverWebhook": "https://your_webhook_url",
+    "storeName": "Demo",
+    "store": "Demo"
+  },
+  "history": [{ "status": "CREATED", "date": "2025-02-13T09:50:45.360Z" }],
+  "webhookNotifications": [],
+  "sessionUrl": "https://payments.kashier.io/session/67adc07584f10c00121f6739?mode=test"
+}

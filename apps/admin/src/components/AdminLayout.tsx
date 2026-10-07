@@ -124,6 +124,7 @@ export function AdminLayout({
     // Catalog tabs
     products: t('hubTabs.products'),
     pageBuilder: t('hubTabs.pageBuilder'),
+    visualBuilder: t('hubTabs.visualBuilder'),
     content: t('hubTabs.content'),
     blog: t('hubTabs.blog'),
     floatingWidget: t('hubTabs.floatingWidget'),

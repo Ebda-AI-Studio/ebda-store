@@ -57,6 +57,8 @@ const ALLOWED_TENANT_FOLDERS = new Set<string>([
   'pages',
   'branding',
   'hero',
+  // Visual builder media picker uploads: stores/<storeId>/builder/...
+  'builder',
   'misc',
   // Per-store custom fonts uploaded via the typography admin page.
   // Uses the same key shape as everything else: stores/<storeId>/fonts/...
@@ -446,6 +448,47 @@ export class StorageService {
       uploadUrl,
       key,
       publicUrl: this.getPublicUrl(key),
+    };
+  }
+
+  /**
+   * One page of a store's uploaded images, newest first within the page
+   * (visual builder media picker). `prefix` MUST be a tenant prefix
+   * (`stores/<storeId>/...`): the caller derives it from a store id that
+   * passed the ownership check, never from user input.
+   */
+  static async listByPrefix(
+    prefix: string,
+    opts: { cursor?: string; limit?: number } = {}
+  ): Promise<{
+    items: Array<{ key: string; url: string; size: number; lastModified: string | null }>;
+    nextCursor: string | null;
+  }> {
+    if (!/^stores\/[0-9a-f-]{36}\//i.test(prefix)) {
+      throw new AppError(400, 'INVALID_PREFIX', 'listByPrefix requires a store-scoped prefix');
+    }
+    const client = await this.getClient();
+    const listed = await client.send(
+      new (await loadS3()).ListObjectsV2Command({
+        Bucket: config.storageBucket,
+        Prefix: prefix,
+        ContinuationToken: opts.cursor,
+        MaxKeys: Math.min(Math.max(opts.limit ?? 50, 1), 200),
+      })
+    );
+    const items = (listed.Contents ?? [])
+      .filter((o): o is typeof o & { Key: string } => Boolean(o.Key))
+      .filter(o => /\.(jpe?g|png|gif|webp|svg|avif)$/i.test(o.Key))
+      .map(o => ({
+        key: o.Key,
+        url: this.getPublicUrl(o.Key),
+        size: o.Size ?? 0,
+        lastModified: o.LastModified ? new Date(o.LastModified).toISOString() : null,
+      }))
+      .sort((a, b) => (b.lastModified ?? '').localeCompare(a.lastModified ?? ''));
+    return {
+      items,
+      nextCursor: listed.IsTruncated ? (listed.NextContinuationToken ?? null) : null,
     };
   }
 

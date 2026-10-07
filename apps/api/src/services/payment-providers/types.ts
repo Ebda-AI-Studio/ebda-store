@@ -3,7 +3,13 @@
 // Common interfaces for all payment gateways
 // ==========================================
 
-export type PaymentProvider = 'cod' | 'instapay' | 'paymob' | 'kashier' | 'fawry';
+/**
+ * A payment provider CODE from the catalog (`PROVIDER_CATALOG` in @force/shared, kind
+ * 'payments'). It used to be a closed union mirrored by a Postgres enum; since 2026-10-07
+ * (ruling PROVIDERS-1) the column is TEXT and the catalog is the list, so adding a gateway is a
+ * catalog entry + an adapter, never a type edit or a migration.
+ */
+export type PaymentProvider = string;
 
 /** Customer-facing methods of the Egyptian gateways (a gateway adapter's `capabilities.methods`). */
 export type PaymentMethod =
@@ -466,9 +472,41 @@ export class PaymentProviderError extends Error {
   }
 }
 
+/** Outcome of `testConnection`: what the merchant sees next to the Test connection button. */
+export type ConnectionTestCode =
+  /** The provider accepted the credentials. */
+  | 'ok'
+  /** The provider refused them (wrong key, wrong merchant id, wrong signature key). */
+  | 'bad_credentials'
+  /** A sandbox key in live mode or the reverse. */
+  | 'wrong_mode'
+  /** Required fields are missing or malformed: nothing was sent. */
+  | 'incomplete'
+  /** Timeout / 5xx / network: try again later. Says nothing about the credentials. */
+  | 'unreachable'
+  /** The provider answered something the adapter does not recognise. */
+  | 'unknown';
+
+export interface ConnectionTestResult {
+  ok: boolean;
+  code: ConnectionTestCode;
+  /** Short English reason for logs / the admin; NEVER a secret or a raw provider body. */
+  message: string;
+  /** Non-secret facts learned (merchant name, entitled methods), shown back to the merchant. */
+  details?: Record<string, string | number | boolean>;
+}
+
 export interface PaymentProviderV2 {
   readonly name: PaymentProvider;
   readonly capabilities: ProviderCapabilities;
+
+  /**
+   * ONE harmless authenticated call proving the credentials of `creds.mode` are accepted
+   * (auth token, account info, a status lookup of a reference that cannot exist). It must not
+   * create, move or reserve anything at the provider. Never throws: every failure is a code.
+   * Gateways implement it; manual providers (COD, InstaPay) have nothing to test.
+   */
+  testConnection?(creds: ProviderCredentials): Promise<ConnectionTestResult>;
 
   /**
    * Start a payment. Idempotent on `idempotencyKey`. Rejects with

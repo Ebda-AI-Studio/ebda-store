@@ -435,3 +435,39 @@ describe('integrity guards', { retry: 0 }, () => {
     expect(await owner.storePageRevision.count({ where: { storeId } })).toBe(0);
   });
 });
+
+describe('document-only sections survive the legacy save paths', { retry: 0 }, () => {
+  it('a legacy layout PUT keeps an image-text section the new builder added', async () => {
+    const { reduceDocument } = await import('@force/shared');
+    const storeId = await freshStore('doconly');
+    const withImage = reduceDocument(docFor({}), {
+      type: 'addSection',
+      list: 'template',
+      sectionType: 'image-text',
+      presetIndex: 0,
+      index: 1,
+    }).doc;
+    await inStore(storeId, () =>
+      saveDraft({ storeId, pageKey: HOME, baseRev: 0, definition: withImage, userId: null })
+    );
+    await inStore(storeId, () => publishDraft({ storeId, pageKey: HOME, baseRev: 1 }));
+    const legacy = resolveLayoutSettings({ bestSellers: { enabled: false, limit: 2 } }, 'modern');
+    expect(
+      await inStore(storeId, () => publishLegacyLayout({ storeId, layout: legacy, userId: null }))
+    ).toBe('ok');
+    // the legacy PUT route writes layout_settings right after (store-layout.routes.ts)
+    await owner.store.update({
+      where: { id: storeId },
+      data: { layoutSettings: legacy as unknown as object },
+    });
+    const pub = await owner.storePageRevision.findFirst({
+      where: { storeId, status: 'published' },
+    });
+    const ids = (pub!.document as unknown as PageDefinition).sections.map(s => s.id);
+    expect(ids[1]).toBe('image-text-1');
+    // and the public read serves it (projection still agrees with layout_settings)
+    const layout = resolveLayoutSettings(await layoutOf(storeId), 'modern');
+    const served = await getPublishedDefinition(storeId, layout);
+    expect(served.definition.sections.some(s => s.type === 'image-text')).toBe(true);
+  });
+});

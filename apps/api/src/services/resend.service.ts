@@ -381,17 +381,26 @@ export class ResendService {
   }
 
   /**
-   * The same branded email to several addresses as SEPARATE messages — one
-   * address per email, up to 100 per Resend batch call. Used by the legacy
-   * newsletter broadcast, which previously passed a 50-address chunk as one
-   * `to:` array so every subscriber received the other 49 addresses.
+   * Branded emails to several addresses as SEPARATE messages — one address per
+   * email, up to 100 per Resend batch call. Used by the legacy newsletter
+   * broadcast, which previously passed a 50-address chunk as one `to:` array so
+   * every subscriber received the other 49 addresses. Each message carries its
+   * OWN html (per-subscriber unsubscribe link) and optional RFC 8058 headers.
    */
   static async sendBrandedBatch(
     storeId: string,
-    opts: { to: string[]; subject: string; html: string; text?: string }
+    opts: {
+      subject: string;
+      messages: Array<{
+        to: string;
+        html: string;
+        text?: string;
+        headers?: Record<string, string>;
+      }>;
+    }
   ): Promise<{ ids: string[] }> {
-    if (opts.to.length === 0) return { ids: [] };
-    if (opts.to.length > 100) throw new Error('Resend batch accepts at most 100 emails');
+    if (opts.messages.length === 0) return { ids: [] };
+    if (opts.messages.length > 100) throw new Error('Resend batch accepts at most 100 emails');
     const store = await prisma.store.findUnique({
       where: { id: storeId },
       select: {
@@ -408,12 +417,13 @@ export class ResendService {
     const sender = resolveSender(store);
     const client = ensureClient();
     type BatchPayload = Parameters<typeof client.batch.send>[0];
-    const payload: BatchPayload = opts.to.map(address => ({
+    const payload: BatchPayload = opts.messages.map(m => ({
       from: sender.from,
-      to: [address],
+      to: [m.to],
       subject: opts.subject,
-      html: opts.html,
-      ...(opts.text ? { text: opts.text } : {}),
+      html: m.html,
+      ...(m.text ? { text: m.text } : {}),
+      ...(m.headers ? { headers: m.headers } : {}),
       ...(sender.replyTo ? { replyTo: sender.replyTo } : {}),
     }));
     const { data, error } = await client.batch.send(payload);

@@ -18,7 +18,10 @@ import {
   definitionToLayout,
   getSectionDefinition,
   renderableSections,
+  sectionToLegacy,
 } from '@force/shared';
+import { ImageTextSection, type ImageTextSettings } from '../sections/ImageTextSection';
+import { NewsletterSection, type NewsletterSettings } from '../sections/NewsletterSection';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import {
   sectionSpacingClasses,
@@ -68,10 +71,18 @@ export interface PageRendererProps {
    *  (category-slug and manual-ids sources). Merged into the union the
    *  storefront filters against. */
   extraProducts?: Product[];
+  /**
+   * Editor canvas only (token-gated preview): wrap each section in a
+   * `display: contents` marker carrying its id so the overlay can select it,
+   * and mark inline-editable text. Never set on a public render, so public
+   * markup is unchanged (characterization snapshots).
+   */
+  editorMode?: boolean;
 }
 
 export function PageRenderer({
   definition,
+  editorMode = false,
   templateId,
   featuredProducts,
   newArrivals,
@@ -932,17 +943,53 @@ export function PageRenderer({
         const rendered = new Set<string>();
         let extraIdx = 0;
         const body: React.ReactNode[] = [];
+        const mark = (id: string, node: React.ReactNode) =>
+          editorMode ? (
+            <div key={`builder:${id}`} data-builder-id={id} style={{ display: 'contents' }}>
+              {node}
+            </div>
+          ) : (
+            node
+          );
         for (const section of renderableSections(definition).sections) {
           const def = getSectionDefinition(section.type);
           if (!def || def.group !== 'template') continue;
+          if (def.legacyKey === null) {
+            // Document-only sections render straight from the document.
+            if (section.hidden === true) continue;
+            const settings = sectionToLegacy(section, '') as Record<string, unknown>;
+            const node =
+              def.type === 'image-text' ? (
+                <ImageTextSection
+                  settings={settings as ImageTextSettings}
+                  editorMode={editorMode}
+                />
+              ) : def.type === 'newsletter' ? (
+                <NewsletterSection
+                  settings={settings as NewsletterSettings}
+                  editorMode={editorMode}
+                />
+              ) : null;
+            if (node)
+              body.push(
+                <SectionErrorBoundary key={section.id} section={section.id}>
+                  {mark(section.id, node)}
+                </SectionErrorBoundary>
+              );
+            continue;
+          }
           if (def.legacyKey === 'extraCarousels') {
-            body.push(extraJSX[extraIdx++]);
+            body.push(mark(section.id, extraJSX[extraIdx++]));
             continue;
           }
           if (rendered.has(def.legacyKey)) continue;
           rendered.add(def.legacyKey);
           body.push(
-            <React.Fragment key={def.legacyKey}>{sectionMap[def.legacyKey]}</React.Fragment>
+            editorMode ? (
+              mark(section.id, sectionMap[def.legacyKey])
+            ) : (
+              <React.Fragment key={def.legacyKey}>{sectionMap[def.legacyKey]}</React.Fragment>
+            )
           );
         }
         return <>{body}</>;

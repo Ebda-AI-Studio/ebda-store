@@ -4,47 +4,40 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@force/ui';
+import { BRAND, PROVIDER_CATALOG, providerRequestMailto } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
+import { useAuth } from '../../../../lib/auth';
 import {
   ProviderCard,
   type ProviderDef,
   type ProviderSaveMessage,
   type StorePaymentConfig,
 } from './_components/ProviderCard';
+import { GatewayConnectCard, type GatewayConfig } from './_components/GatewayConnectCard';
 
-const PROVIDERS: ProviderDef[] = [
-  { id: 'paymob', name: 'Paymob', nameAr: 'باي موب', color: '#0B5FFF', kind: 'paymob' },
-  { id: 'kashier', name: 'Kashier', nameAr: 'كاشير', color: '#00A19A', kind: 'kashier' },
-  { id: 'fawry', name: 'Fawry', nameAr: 'فوري', color: '#F2B705', kind: 'fawry' },
-  {
-    id: 'instapay',
-    name: 'InstaPay',
-    nameAr: 'إنستاباي',
-    color: '#6B3FA0',
-    kind: 'instapay',
-  },
-  {
-    id: 'cod',
-    name: 'Cash on Delivery',
-    nameAr: 'الدفع عند الاستلام',
-    color: '#64748B',
-    kind: 'cod',
-  },
-];
+// Gateways (Paymob, Kashier, Fawry...) are schema-driven from the catalog; only the manual
+// methods (COD, InstaPay) keep the hand-built card.
+const GATEWAYS = PROVIDER_CATALOG.filter(p => p.kind === 'payments' && !p.manual);
+const PROVIDERS: ProviderDef[] = PROVIDER_CATALOG.filter(
+  p => p.kind === 'payments' && p.manual && (p.code === 'cod' || p.code === 'instapay')
+).map(p => ({
+  id: p.code,
+  name: p.name.en,
+  nameAr: p.name.ar,
+  color: p.logo.color,
+  kind: p.code as ProviderDef['kind'],
+}));
+
+type AnyConfig = StorePaymentConfig & GatewayConfig;
 
 const emptyConfig = (provider: string): StorePaymentConfig => ({
   provider,
   isEnabled: false,
-  apiKey: '',
-  secretKey: '',
-  webhookSecret: '',
-  merchantId: '',
-  testMode: provider === 'cod' || provider === 'instapay' ? false : true,
-  displayName: provider === 'cod' ? 'Cash on Delivery' : provider === 'instapay' ? 'InstaPay' : '',
-  displayNameAr:
-    provider === 'cod' ? 'الدفع عند الاستلام' : provider === 'instapay' ? 'إنستاباي' : '',
+  testMode: false,
+  displayName: provider === 'cod' ? 'Cash on Delivery' : 'InstaPay',
+  displayNameAr: provider === 'cod' ? 'الدفع عند الاستلام' : 'إنستاباي',
   fixedFee: 0,
   settings: {},
 });
@@ -53,8 +46,10 @@ export default function StorePaymentSettingsPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('paymentSettings');
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
 
-  const [configs, setConfigs] = useState<StorePaymentConfig[]>([]);
+  const [configs, setConfigs] = useState<AnyConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,12 +61,11 @@ export default function StorePaymentSettingsPage() {
 
   const fetchConfigs = useCallback(async () => {
     if (!storeId) return;
-    setIsLoading(true);
+    // No skeleton on refetch: it would unmount the cards (and their notices) after every save.
     setError(null);
     try {
       const { data, error: apiError } = await apiGet<
-        | { storeConfigs?: StorePaymentConfig[]; configs?: StorePaymentConfig[] }
-        | StorePaymentConfig[]
+        { storeConfigs?: AnyConfig[]; configs?: AnyConfig[] } | AnyConfig[]
       >(`/api/v1/payment-settings/store/${storeId}`);
 
       if (apiError) {
@@ -79,12 +73,10 @@ export default function StorePaymentSettingsPage() {
         return;
       }
 
-      const loaded: StorePaymentConfig[] = Array.isArray(data)
+      const loaded: AnyConfig[] = Array.isArray(data)
         ? data
-        : (data as { storeConfigs?: StorePaymentConfig[]; configs?: StorePaymentConfig[] })
-            ?.storeConfigs ||
-          (data as { storeConfigs?: StorePaymentConfig[]; configs?: StorePaymentConfig[] })
-            ?.configs ||
+        : (data as { storeConfigs?: AnyConfig[]; configs?: AnyConfig[] })?.storeConfigs ||
+          (data as { storeConfigs?: AnyConfig[]; configs?: AnyConfig[] })?.configs ||
           [];
       setConfigs(loaded);
 
@@ -144,7 +136,6 @@ export default function StorePaymentSettingsPage() {
     const isNew = !existingConfig?.id;
 
     const isCod = provider === 'cod';
-    const isInstapay = provider === 'instapay';
 
     try {
       const body: Record<string, unknown> = isCod
@@ -157,33 +148,18 @@ export default function StorePaymentSettingsPage() {
             testMode: false,
             settings: { percentBps: Number(formData.settings?.percentBps) || 0 },
           }
-        : isInstapay
-          ? {
-              provider,
-              isEnabled: formData.isEnabled,
-              displayName: formData.displayName || 'InstaPay',
-              displayNameAr: formData.displayNameAr || 'إنستاباي',
-              testMode: false,
-              settings: Object.fromEntries(
-                Object.entries(formData.settings ?? {}).filter(
-                  ([, v]) => v !== '' && v !== null && v !== undefined
-                )
-              ),
-            }
-          : {
-              provider: formData.provider,
-              isEnabled: formData.isEnabled,
-              testMode: formData.testMode,
-              // A credential left as the saved, masked value (`****abcd`) is ignored by the API
-              // (it keeps the stored one); only a newly typed key replaces it.
-              ...(formData.apiKey ? { apiKey: formData.apiKey } : {}),
-              ...(formData.secretKey ? { secretKey: formData.secretKey } : {}),
-              ...(formData.webhookSecret ? { webhookSecret: formData.webhookSecret } : {}),
-              ...(formData.merchantId ? { merchantId: formData.merchantId } : {}),
-              // The NON-secret part: Paymob's public key and integration ids, the methods a
-              // Kashier / Fawry page offers, Fawry's code lifetime.
-              settings: formData.settings ?? {},
-            };
+        : {
+            provider,
+            isEnabled: formData.isEnabled,
+            displayName: formData.displayName || 'InstaPay',
+            displayNameAr: formData.displayNameAr || 'إنستاباي',
+            testMode: false,
+            settings: Object.fromEntries(
+              Object.entries(formData.settings ?? {}).filter(
+                ([, v]) => v !== '' && v !== null && v !== undefined
+              )
+            ),
+          };
 
       const endpoint = isNew
         ? `/api/v1/payment-settings/store/${storeId}`
@@ -262,6 +238,16 @@ export default function StorePaymentSettingsPage() {
       </div>
 
       <div className="space-y-4">
+        {GATEWAYS.map(entry => (
+          <GatewayConnectCard
+            key={entry.code}
+            entry={entry}
+            config={configs.find(c => c.provider === entry.code)}
+            storeId={storeId}
+            isSuperAdmin={isSuperAdmin}
+            onChanged={fetchConfigs}
+          />
+        ))}
         {PROVIDERS.map(provider => {
           const form = forms[provider.id] ?? emptyConfig(provider.id);
           const isExpanded = expanded[provider.id] ?? false;
@@ -286,6 +272,15 @@ export default function StorePaymentSettingsPage() {
           );
         })}
       </div>
+
+      <p className="mt-6 text-sm text-muted-foreground">
+        <a
+          href={providerRequestMailto(BRAND.supportEmail, 'payments')}
+          className="text-primary underline"
+        >
+          {t('connect.requestProvider')}
+        </a>
+      </p>
     </AdminLayout>
   );
 }

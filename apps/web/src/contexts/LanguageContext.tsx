@@ -282,6 +282,17 @@ export const translations = {
     'ربما انتقل المتجر الذي تبحث عنه، أو قد يكون الرابط غير صحيح.',
   'Go to Ebda': `الانتقال إلى ${BRAND.nameAr}`,
 
+  // Visual builder newsletter section (Phase 2). The consent line is platform
+  // copy, not merchant-editable, so every signup form carries it.
+  'Your email': 'بريدك الإلكتروني',
+  Subscribe: 'اشترك',
+  'Subscribing…': 'جارٍ الاشتراك…',
+  'Thanks — you are subscribed.': 'شكراً — تم اشتراكك.',
+  'Please enter a valid email.': 'من فضلك أدخل بريداً إلكترونياً صحيحاً.',
+  'By subscribing you agree to receive marketing emails from this store.':
+    'بالاشتراك توافق على استلام رسائل تسويقية من هذا المتجر.',
+  'Privacy policy': 'سياسة الخصوصية',
+
   // Route error fallback — Try Again while the refresh is in flight.
   'Retrying…': 'جارٍ إعادة المحاولة…',
 } as const;

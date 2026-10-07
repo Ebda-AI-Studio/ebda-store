@@ -11,7 +11,7 @@
  * (formal MSA). The Arabic fields are optional in the parsed shape only so a
  * malformed Gemini row degrades gracefully rather than throwing.
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GeminiFailoverClient } from './gemini-keys';
 import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
 import { validateFaqGrounding } from './faq-grounding-validator';
@@ -131,7 +131,7 @@ export async function generateProductFaqs(
   apiKey: string,
   modelName: string
 ): Promise<GeneratedProductFaq[]> {
-  const genai = new GoogleGenerativeAI(apiKey);
+  const genai = new GeminiFailoverClient(apiKey);
   const model = genai.getGenerativeModel({ model: modelName });
 
   const prompt = buildProductFaqPrompt(input);

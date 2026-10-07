@@ -6,7 +6,7 @@
  * proposing a new one. Never returns duplicates or empty strings. Used by
  * the `bulk-ai-tags` catalogue sweep.
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GeminiFailoverClient } from './gemini-keys';
 import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
 import { recordUsage } from '../../services/ai.service';
@@ -57,7 +57,7 @@ export async function suggestProductTags(
   apiKey: string,
   modelName: string
 ): Promise<string[]> {
-  const genai = new GoogleGenerativeAI(apiKey);
+  const genai = new GeminiFailoverClient(apiKey);
   const model = genai.getGenerativeModel({ model: modelName });
 
   const prompt = buildTagsPrompt(input);

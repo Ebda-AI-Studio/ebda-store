@@ -76,6 +76,8 @@ const ALLOWED_FOLDERS = new Set([
   'pages',
   'branding',
   'hero',
+  // Visual builder media (section images picked in the editor).
+  'builder',
   'misc',
   // Custom fonts (woff2/woff/ttf/otf) uploaded by the typography
   // admin. The /uploads/font endpoint enforces the file-type filter
@@ -162,6 +164,44 @@ export async function resolveFolderAndStore(
   }
   return { ok: true, folder, storeId };
 }
+
+/**
+ * GET /uploads/list?storeId=<id>&folder=<folder>&cursor=<token>
+ * The visual builder's media picker: one page of the store's own uploaded
+ * images (R2 prefix `stores/<storeId>/<folder>/`, or every folder when
+ * `folder` is omitted). Same tenant check as the upload routes
+ * (`resolveFolderAndStore`: ownership verified, super_admin may cross), and a
+ * store id is REQUIRED — there is no un-scoped listing.
+ */
+router.get(
+  '/list',
+  authenticate,
+  requirePermission('products:write'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const folderGiven = typeof req.query.folder === 'string' && req.query.folder !== '';
+      const resolved = await resolveFolderAndStore(req);
+      if (!resolved.ok) {
+        res.status(resolved.status).json({ success: false, error: resolved.error });
+        return;
+      }
+      if (!resolved.storeId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_TENANT', message: 'storeId is required' },
+        });
+        return;
+      }
+      const prefix = `stores/${resolved.storeId}/${folderGiven ? `${resolved.folder}/` : ''}`;
+      const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+      const page = await StorageService.listByPrefix(prefix, { cursor, limit: 60 });
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json({ success: true, data: page });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 /**
  * POST /uploads/image
