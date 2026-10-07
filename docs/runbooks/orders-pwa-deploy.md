@@ -1,7 +1,7 @@
 # Orders PWA — Deploy + Domain Runbook
 
 > **SUPERSEDED (2026-07).** The Orders PWA now deploys as the Cloudflare Worker
-> `force-orders-cf-preview` (`orders.force-ai.co`) via `cf-deploy.yml` — the same
+> `ebda-orders` (`orders.force-ai.co`) via `cf-deploy.yml` — the same
 > GitHub Actions pipeline that builds `apps/web` and `apps/admin` (see
 > `docs/DEPLOYMENT.md` and `docs/migration/cloudflare-ci-deploy.md`). The Vercel
 > project this runbook describes creating is decommissioned; the steps below are

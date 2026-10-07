@@ -51,7 +51,10 @@ export class AramexStub {
   quoteCurrency = 'EGP';
   quoteValue = '62.50';
   rejectAuth = false;
-  private clock = Date.parse('2026-10-05T08:00:00Z');
+  // Carrier events must be NEWER than the shipment's own `created` history entry (stamped at
+  // booking, i.e. now) or mergeTracking ignores them as stale. A fixed past date here was a time
+  // bomb: it passed until the wall clock moved past it. Start ahead of "now" instead.
+  private clock = Date.now() + 6 * 3_600_000;
 
   fetch = async (url: string, init?: RequestInit): Promise<Response> => {
     const path = new URL(url).pathname.replace('/ShippingAPI.V2', '');

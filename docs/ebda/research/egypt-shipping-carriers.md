@@ -10,21 +10,22 @@ Start with **Bosta** (public REST API, API-key auth, staging environment, COD, A
 
 ## Decision table
 
-| Carrier | API + docs | Sandbox | Auth | COD | Label | Tracking webhook | Public pricing | Evidence quality |
-|---|---|---|---|---|---|---|---|---|
-| Bosta | REST v2, https://docs.bosta.co | Yes: `stg-app.bosta.co` | API key | Yes | AWB print endpoint | Yes, `webhookUrl` on create; no HMAC | Partial, see detail | Medium (SDK + snippets) |
-| Aramex | Shipping Services, Rate Calculator, Tracking APIs | Yes (test account, **unverified** how) | Account credentials in request body | Yes, amount in USD only (one source) | Yes (PrintLabel) | No webhook found; poll Tracking | No (account-specific) | Medium (official manual PDF listed) |
-| J&T Express Egypt | JMS open platform https://open.jtjms-eg.com | **unverified** | apiAccount + timestamp + MD5 digest | Yes (COD paid scan status) | Yes (base64 PDF) | Yes (form push, digest-verified) | No | Medium (third-party code) |
-| Mylerz | REST https://integration.mylerz.net | **unverified** | Bearer token via `/token` | Yes: `COD`, `CC`, `PP` | **unverified** | **unverified** | No | Low-medium |
-| ShipBlu | REST + Swagger https://docs.shipblu.com | Yes, on request (tech@shipblu.com) | API key | **unverified** (likely) | **unverified** | **unverified** | No | Low (docs blocked) |
-| R2S | Via ClickPost; direct docs **unverified** | **unverified** | **unverified** | **unverified** | **unverified** | **unverified** | No | Low |
-| Sprint | No public API found | n/a | n/a | n/a | n/a | n/a | No | Low |
-| Turbo | Nothing found | n/a | n/a | n/a | n/a | n/a | No | None |
-| Egypt Post | No public merchant API found; tracking via aggregators | n/a | n/a | n/a | n/a | via third-party trackers only | No | Low |
+| Carrier           | API + docs                                             | Sandbox                                | Auth                                | COD                                  | Label              | Tracking webhook                     | Public pricing        | Evidence quality                    |
+| ----------------- | ------------------------------------------------------ | -------------------------------------- | ----------------------------------- | ------------------------------------ | ------------------ | ------------------------------------ | --------------------- | ----------------------------------- |
+| Bosta             | REST v2, https://docs.bosta.co                         | Yes: `stg-app.bosta.co`                | API key                             | Yes                                  | AWB print endpoint | Yes, `webhookUrl` on create; no HMAC | Partial, see detail   | Medium (SDK + snippets)             |
+| Aramex            | Shipping Services, Rate Calculator, Tracking APIs      | Yes (test account, **unverified** how) | Account credentials in request body | Yes, amount in USD only (one source) | Yes (PrintLabel)   | No webhook found; poll Tracking      | No (account-specific) | Medium (official manual PDF listed) |
+| J&T Express Egypt | JMS open platform https://open.jtjms-eg.com            | **unverified**                         | apiAccount + timestamp + MD5 digest | Yes (COD paid scan status)           | Yes (base64 PDF)   | Yes (form push, digest-verified)     | No                    | Medium (third-party code)           |
+| Mylerz            | REST https://integration.mylerz.net                    | **unverified**                         | Bearer token via `/token`           | Yes: `COD`, `CC`, `PP`               | **unverified**     | **unverified**                       | No                    | Low-medium                          |
+| ShipBlu           | REST + Swagger https://docs.shipblu.com                | Yes, on request (tech@shipblu.com)     | API key                             | **unverified** (likely)              | **unverified**     | **unverified**                       | No                    | Low (docs blocked)                  |
+| R2S               | Via ClickPost; direct docs **unverified**              | **unverified**                         | **unverified**                      | **unverified**                       | **unverified**     | **unverified**                       | No                    | Low                                 |
+| Sprint            | No public API found                                    | n/a                                    | n/a                                 | n/a                                  | n/a                | n/a                                  | No                    | Low                                 |
+| Turbo             | Nothing found                                          | n/a                                    | n/a                                 | n/a                                  | n/a                | n/a                                  | No                    | None                                |
+| Egypt Post        | No public merchant API found; tracking via aggregators | n/a                                    | n/a                                 | n/a                                  | n/a                | via third-party trackers only        | No                    | Low                                 |
 
 ## Carrier detail
 
 ### Bosta
+
 - **Docs:** https://docs.bosta.co (base `https://app.bosta.co/api/v2/`, search snippet); SDKs https://github.com/bostaapp/bosta-nodejs and https://github.com/bostaapp/bosta-ruby; Postman-style mirror https://3mwf7w72fh.apidog.io/welcome-1726329m0.
 - **Sandbox:** staging at `https://stg-app.bosta.co` / `https://stg-business.bosta.co` (bosta-nodejs README). Registration: https://business.bosta.co/signup; API key comes from the business dashboard.
 - **Endpoints (SDK):** create / update / list / get-by-tracking delivery, track, print AWB, terminate delivery; pickups CRUD; reference data for cities, zones, delivery states and types.
@@ -38,6 +39,7 @@ Start with **Bosta** (public REST API, API-key auth, staging environment, COD, A
 - **Extra:** valU-Bosta installment-on-delivery partnership (https://www.arabfinance.com/en/News/newdetails/11201, search).
 
 ### Aramex Egypt
+
 - **Docs:** https://www.aramex.com/us/en/developers-solution-center/aramex-apis ; Shipping Services manual https://www.aramex.com/docs/default-source/resourses/resourcesdata/shipping-services-api-manual.pdf ; Shipment Preparation manual https://www.aramex.com/content/uploads/109/232/42024/shipments-preparation-api-manual.pdf (not read in full).
 - **APIs:** Shipping Services (create shipments, print labels, pickups, attachments), Rate Calculator, Shipment Tracking, Location Services (search summary of the developer center, 2026-10-03). Open-source SDK reference: https://github.com/Bilinx-solutions/Laravel-Aramex-SDK.
 - **Sandbox/keys:** test environment exists per Aramex developer docs; how to obtain an account number + PIN for Egypt: **unverified**. Production requires an Aramex customer account (sales contact).
@@ -47,6 +49,7 @@ Start with **Bosta** (public REST API, API-key auth, staging environment, COD, A
 - **Pricing:** account-specific via Rate Calculator API; no public rate card.
 
 ### J&T Express Egypt
+
 - **Docs:** https://open.jtjms-eg.com/#/apiDoc/index (per https://github.com/mohammedam33n/jt-express-laravel; not read directly). API host `https://openapi.jtjms-eg.com/webopenplatformapi/api`.
 - **Endpoints (from open-source adapter, https://github.com/NUMU-IO/NUMU-api/pull/605):** `order/addOrder`, `order/cancelOrder` (by transaction id, not waybill), `order/printOrder` (base64 PDF), `logistics/trace`, `location/getLocation`.
 - **Auth:** form-posted `bizContent`; headers `apiAccount`, `timestamp`, `digest = base64(md5(bizContent + privateKey))`; order ops add a business digest involving customerCode, password hash and a fixed salt (see PR for the exact formula; do not copy a salt into our docs without reading the official doc).
@@ -56,26 +59,31 @@ Start with **Bosta** (public REST API, API-key auth, staging environment, COD, A
 - **COD fee/settlement/pricing/sandbox:** **unverified**.
 
 ### Mylerz
+
 - **Docs:** API v1.3.1 PDF mirror https://www.slideshare.net/slideshow/mylerz-api-v131-1pdf/259928573 (13 methods: add orders, statuses, details, tracking; search); integration host `https://integration.mylerz.net` for Egypt (https://github.com/mohamedhekal/shipbridge-mylerz/blob/main/docs/GUIDE_AR.md). WordPress plugin https://wordpress.org/plugins/mylerz/.
 - **Auth:** `POST /token` with username, password, `grant_type=password`; Bearer token afterwards.
 - **COD:** `Payment_Type` of `PP` (prepaid), `COD`, or `CC` (credit-card-on-delivery) with `COD_Value`. Required fields: customer mobile, neighborhood, and a pre-registered warehouse name (search/GitHub).
 - **Sandbox, label, webhooks, cancel, pricing, settlement:** **unverified**.
 
 ### ShipBlu
+
 - **Docs:** https://docs.shipblu.com (Quick Start, Tutorial, API Reference, JS client; source https://github.com/ShipBlu/shipblu.github.io). Swagger at https://api.staging.shipblu.com/docs/.
 - **Sandbox:** request by emailing tech@shipblu.com with business account name (docs landing, search snippet). **API key** generated from the merchant account.
 - COD, labels, webhooks, pricing, governorates, returns: docs blocked; **unverified**.
 
 ### R2S, Sprint, Turbo, Egypt Post
+
 - **R2S:** third-party integrations exist (ClickPost https://www.clickpost.ai/carrier-integration/r2s, Odoo https://apps.odoo.com/apps/modules/13.0/r2s_delivery), implying an API with tracking and NDR; direct docs, auth and sandbox **unverified**.
 - **Sprint:** https://sprint.xyz/ advertises e-commerce platform integrations and tracking SMS; no public API doc found. **Unverified.**
 - **Turbo:** nothing usable found. **Unverified.**
 - **Egypt Post:** only tracking via aggregators (TrackingMore, Track123); merchant booking API: none found. COD refusal 12-18% and return-to-origin 15-30% are market figures from https://www.udjatagency.com/ecommerce-in-egypt/ (search, undated marketing blog, **unverified**).
 
 ### Aggregators (alternative route)
+
 - ClickPost lists Egyptian carriers (J&T, R2S) with order creation, labels, tracking, NDR (https://www.clickpost.ai/carrier-integration/jtexpress). Not evaluated for cost; likely overkill for Ebda but a way to cover R2S quickly. **Unverified.**
 
 ## What the common `ShippingCarrier` interface must accommodate
+
 1. **Quote is optional.** Bosta and Aramex may offer rate endpoints; others are contract rates. Interface: `quote()` returns `{amount_piastres, source: 'api'|'merchant_table'}`, with a merchant-configured flat/zone rate table as fallback.
 2. **Multiple ids per shipment:** carrier shipment id, waybill/tracking number, merchant reference (Ebda order id), and carrier "transaction id" (J&T cancels by it). Store all.
 3. **Address model:** carriers want their own city/zone/neighborhood ids (Bosta zones, Mylerz neighborhood, J&T Arabic location tree). Keep a per-carrier location map and a "needs mapping" failure state rather than guessing.
@@ -89,9 +97,11 @@ Start with **Bosta** (public REST API, API-key auth, staging environment, COD, A
 11. **Rate limits / retries:** unknown; queue createShipment with idempotency by merchant reference since no idempotency header was found.
 
 ## Recommendation
+
 Adapter order: **Bosta -> Aramex -> J&T Express -> Mylerz -> ShipBlu -> R2S (via direct docs or ClickPost) -> Sprint/Turbo/Egypt Post only on merchant demand, plus a "manual carrier" adapter (merchant enters tracking number) shipped on day one.** Rationale: Bosta and J&T have the best-evidenced documented flows; Mylerz and ShipBlu have public docs but thinner evidence; the rest have no verified public API. Aramex stays second because of merchant demand but needs a COD-currency test early.
 
 ## Open questions for Ahmad
+
 1. Do we hold master accounts or does each merchant bring carrier credentials? (Affects negotiating rates and COD reconciliation.)
 2. Can Whisky 11 open a test Bosta, Aramex, J&T and ShipBlu account now so we can read the real docs behind logins?
 3. Is a manual-carrier adapter acceptable for launch for carriers without APIs?
@@ -100,7 +110,9 @@ Adapter order: **Bosta -> Aramex -> J&T Express -> Mylerz -> ShipBlu -> R2S (via
 6. Should COD refusal/RTO analytics be in v1?
 
 ## Sources
+
 All accessed 2026-10-03. "(search)" = search snippet only because the page was blocked.
+
 - Bosta: https://docs.bosta.co (search), https://github.com/bostaapp/bosta-nodejs , https://github.com/bostaapp/bosta-ruby , https://3mwf7w72fh.apidog.io/welcome-1726329m0 (search), https://www.bosta.com/delivery-costs-and-transit-times (search), https://businessmodelcanvastemplate.com/blogs/how-it-works/bosta-how-it-works (search, third-party), https://www.arabfinance.com/en/News/newdetails/11201 (search)
 - Aramex: https://www.aramex.com/us/en/developers-solution-center/aramex-apis , https://www.aramex.com/docs/default-source/resourses/resourcesdata/shipping-services-api-manual.pdf (search), https://www.aramex.com/content/uploads/109/232/42024/shipments-preparation-api-manual.pdf (search), https://support.shiptheory.com/support/solutions/articles/24000049808-how-to-send-a-cash-on-delivery-shipment-with-aramex (search), https://easysellapp.com/blogs/wiki/egypt-ecommerce-cod-market-entry-shopify-2026 (search, third-party), https://github.com/Bilinx-solutions/Laravel-Aramex-SDK (search)
 - J&T Egypt: https://github.com/NUMU-IO/NUMU-api/pull/605 , https://github.com/mohammedam33n/jt-express-laravel (search), https://github.com/ahmed5330/kunonline/issues/25 (search), https://www.weship.com/en/carriers/j-t-express-eg (search), https://www.clickpost.ai/carrier-integration/jtexpress (search)

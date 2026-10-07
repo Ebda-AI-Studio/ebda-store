@@ -129,12 +129,12 @@ EOF
     fi
     cat > "$dir/wrangler.jsonc" <<EOF
 {
-  "name": "force-$app-cf-preview",
+  "name": "ebda-$app",
   "main": "${MAIN_ENTRY}",
   "compatibility_date": "${COMPAT_DATE}",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
-  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "force-$app-cf-preview" }],
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "ebda-$app" }],
   "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "force-web-opennext-cache" }],
   "durable_objects": { "bindings": [
     { "name": "NEXT_TAG_CACHE_DO_SHARDED", "class_name": "DOShardedTagCache" },
@@ -152,7 +152,7 @@ export default defineCloudflareConfig({});
 EOF
     cat > "$dir/wrangler.jsonc" <<EOF
 {
-  "name": "force-$app-cf-preview",
+  "name": "ebda-$app",
   "main": "${MAIN_ENTRY}",
   "compatibility_date": "${COMPAT_DATE}",
   "compatibility_flags": ["nodejs_compat"],

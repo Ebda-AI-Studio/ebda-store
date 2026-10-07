@@ -2,7 +2,7 @@
 
 > **2026-05-22 update:** prior versions of this doc described a Cloudflare Pages + Supabase topology that was never the production state. The canonical production stack is below. The old doc misled incident responders during the 2026-05-22 audit (P1-7).
 >
-> **2026-07-05 update:** `apps/web`, `apps/admin`, and `apps/orders` have since fully MIGRATED off Vercel to **Cloudflare Workers** (OpenNext, deployed by GitHub Actions via `wrangler deploy` (Ebda: only the API workflow `.github/workflows/cf-api-deploy.yml` exists, manual `workflow_dispatch` on `main`; there is no `cf-deploy.yml` for web/admin/orders yet) — `force-web-cf-preview` / `force-admin-cf-preview` / `force-orders-cf-preview`, serving `store.force-ai.co` / `admin.force-ai.co` / `orders.force-ai.co`). The old Vercel projects (`force-admin`, `force-web`, `force-orders`) are decommissioned. Steps below that reference Vercel setup/rollback are kept for history where useful but no longer reflect where to actually deploy — see `docs/migration/cloudflare-ci-deploy.md` and `docs/migration/cloudflare-cutover-runbook.md` for the current procedure.
+> **2026-07-05 update:** `apps/web`, `apps/admin`, and `apps/orders` have since fully MIGRATED off Vercel to **Cloudflare Workers** (OpenNext, deployed by GitHub Actions via `wrangler deploy` (Ebda: only the API workflow `.github/workflows/cf-api-deploy.yml` exists, manual `workflow_dispatch` on `main`; there is no `cf-deploy.yml` for web/admin/orders yet) — `ebda-web` / `ebda-admin` / `ebda-orders`, serving `store.force-ai.co` / `admin.force-ai.co` / `orders.force-ai.co`). The old Vercel projects (`force-admin`, `force-web`, `force-orders`) are decommissioned. Steps below that reference Vercel setup/rollback are kept for history where useful but no longer reflect where to actually deploy — see `docs/migration/cloudflare-ci-deploy.md` and `docs/migration/cloudflare-cutover-runbook.md` for the current procedure.
 
 ## CI gate
 
@@ -28,12 +28,12 @@ To run the full gate manually: `bash scripts/safe-deploy.sh`
 ┌──────────────────────────────────────────────────────────────────┐
 │              CLOUDFLARE WORKERS (GitHub Actions, wrangler deploy)│
 │  ┌──────────────────────────┐  ┌──────────────────────────┐      │
-│  │ force-admin-cf-preview   │  │ force-web-cf-preview     │      │
+│  │ ebda-admin   │  │ ebda-web     │      │
 │  │  admin.force-ai.co       │  │  store.force-ai.co       │      │
 │  │                          │  │  + per-tenant domains    │      │
 │  └──────────────────────────┘  │  (wadyaljuz.com, ...)    │      │
 │  ┌──────────────────────────┐  └──────────────────────────┘      │
-│  │ force-orders-cf-preview  │                                    │
+│  │ ebda-orders  │                                    │
 │  │  orders.force-ai.co      │                                    │
 │  └──────────────────────────┘                                    │
 └──────────────────────────────────────────────────────────────────┘
@@ -143,7 +143,7 @@ SMTP_FROM_EMAIL=noreply@yourdomain.com
 
 ## Step 2: Cloudflare Workers Setup (Web, Admin & Orders)
 
-> ⚠️ **NOTE (updated 2026-07-05):** Production storefront, admin, and orders PWA run on **Cloudflare Workers** (OpenNext), NOT Vercel. Worker names: `force-admin-cf-preview` (`admin.force-ai.co`), `force-web-cf-preview` (`store.force-ai.co` + per-tenant custom domains), `force-orders-cf-preview` (`orders.force-ai.co`). The Vercel projects that previously hosted these apps are decommissioned.
+> ⚠️ **NOTE (updated 2026-07-05):** Production storefront, admin, and orders PWA run on **Cloudflare Workers** (OpenNext), NOT Vercel. Worker names: `ebda-admin` (`admin.force-ai.co`), `ebda-web` (`store.force-ai.co` + per-tenant custom domains), `ebda-orders` (`orders.force-ai.co`). The Vercel projects that previously hosted these apps are decommissioned.
 
 **Ebda status:** the Cloudflare API Worker deploys through the GitHub Actions workflow `.github/workflows/cf-api-deploy.yml` (manual `workflow_dispatch`, `main` only, `ubuntu-latest`). This repo has no `cf-deploy.yml` and does not use Cloudflare's Workers Builds Git integration; web/admin/orders CI deploy is not wired yet. The paragraph below is inherited from FWB (where `cf-deploy.yml` auto-deploys on push to `main`) and describes that pipeline: All three apps deploy via GitHub Actions on push to `main` touching their respective `apps/*/**` path (`.github/workflows/cf-deploy.yml`, runs on the self-hosted runner). The per-app filter diffs against the **last successful `cf-deploy` run on `main`**, not `HEAD~1`, so a run cancelled by a newer merge never strands its changes; if that lookup fails, all three deploy (details: `docs/migration/cloudflare-ci-deploy.md`). No manual per-push steps needed — the workflow builds each app with OpenNext and runs `wrangler deploy`. Per-tenant custom domain provisioning is handled by the API via Cloudflare-for-SaaS (see `apps/api/src/services/cloudflare-domain.service.ts` / `docs/migration/cloudflare-cutover-runbook.md`). Setup details: `docs/migration/cloudflare-ci-deploy.md`.
 
@@ -208,9 +208,9 @@ Add these records to your domain:
 
 | Type  | Name   | Value                   | Notes                                                                                                                                                                                                                                                      |
 | ----- | ------ | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| —     | store  | (Worker route)          | Cloudflare Worker `force-web-cf-preview` custom domain                                                                                                                                                                                                     |
-| —     | admin  | (Worker route)          | Cloudflare Worker `force-admin-cf-preview` custom domain                                                                                                                                                                                                   |
-| —     | orders | (Worker route)          | Cloudflare Worker `force-orders-cf-preview` custom domain                                                                                                                                                                                                  |
+| —     | store  | (Worker route)          | Cloudflare Worker `ebda-web` custom domain                                                                                                                                                                                                                 |
+| —     | admin  | (Worker route)          | Cloudflare Worker `ebda-admin` custom domain                                                                                                                                                                                                               |
+| —     | orders | (Worker route)          | Cloudflare Worker `ebda-orders` custom domain                                                                                                                                                                                                              |
 | CNAME | api    | your-app.up.railway.app | Railway API — Cloudflare-PROXIED (verified live 2026-09-02: responses carry `server: cloudflare` + `cf-ray`; `cf-cache-status: DYNAMIC`, i.e. CF forwards but does not cache JSON without an explicit cache rule). The old "no proxy" note here was stale. |
 | CNAME | cdn    | pub-xxx.r2.dev          | Cloudflare R2 public bucket (`*.r2.dev`)                                                                                                                                                                                                                   |
 
@@ -296,7 +296,7 @@ and cannot be renamed.
 
 ### Cloudflare Workers (Web, Admin & Orders)
 
-1. `bash scripts/rollback.sh` (git revert + push) re-triggers `cf-deploy.yml`, redeploying the reverted build to `force-web-cf-preview` / `force-admin-cf-preview` / `force-orders-cf-preview`.
+1. `bash scripts/rollback.sh` (git revert + push) re-triggers `cf-deploy.yml`, redeploying the reverted build to `ebda-web` / `ebda-admin` / `ebda-orders`.
 2. To roll back a single Worker without a code revert: `wrangler deployments list` (per app dir) then `wrangler rollback <deployment-id>`.
 
 See `docs/ROLLBACK.md` §A for the full fast-path procedure.
@@ -503,17 +503,17 @@ Renewal verification: re-check these in the per-provider dashboard quarterly —
 
 ### Account ownership
 
-| Service                | Account email          | Project / org                                                                                                              |
-| ---------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Cloudflare             | forceai.0ps1@gmail.com | Workers hosting (deployed by GitHub Actions) `force-web`/`force-admin`/`force-orders-cf-preview` (replaced Vercel 2026-07) |
-| Railway                | forceai.0ps1@gmail.com | project `force-website-builder`                                                                                            |
-| Neon                   | forceai.0ps1@gmail.com | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1)                                                                      |
-| Sentry                 | forceai.0ps1@gmail.com | one org with four projects: `api`, `web`, `admin`, `orders`                                                                |
-| PostHog                | forceai.0ps1@gmail.com | EU region, single project covering web + admin                                                                             |
-| UptimeRobot            | forceai.0ps1@gmail.com | free tier, 2 monitors currently                                                                                            |
-| Axiom                  | (Ahmad's account)      | free tier (500GB/30d) — dataset `force-api-railway`                                                                        |
-| Resend                 | platform-wide          | one account; per-merchant domains added under it                                                                           |
-| @ForceAI1_bot Telegram | personal DM to Ahmad   | chat_id `1943728711`                                                                                                       |
+| Service                | Account email          | Project / org                                                                                                  |
+| ---------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Cloudflare             | forceai.0ps1@gmail.com | Workers hosting (deployed by GitHub Actions) `force-web`/`force-admin`/`ebda-orders` (replaced Vercel 2026-07) |
+| Railway                | forceai.0ps1@gmail.com | project `force-website-builder`                                                                                |
+| Neon                   | forceai.0ps1@gmail.com | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1)                                                          |
+| Sentry                 | forceai.0ps1@gmail.com | one org with four projects: `api`, `web`, `admin`, `orders`                                                    |
+| PostHog                | forceai.0ps1@gmail.com | EU region, single project covering web + admin                                                                 |
+| UptimeRobot            | forceai.0ps1@gmail.com | free tier, 2 monitors currently                                                                                |
+| Axiom                  | (Ahmad's account)      | free tier (500GB/30d) — dataset `force-api-railway`                                                            |
+| Resend                 | platform-wide          | one account; per-merchant domains added under it                                                               |
+| @ForceAI1_bot Telegram | personal DM to Ahmad   | chat_id `1943728711`                                                                                           |
 
 ---
 

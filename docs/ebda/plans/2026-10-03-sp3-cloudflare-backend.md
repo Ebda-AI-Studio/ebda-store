@@ -5,6 +5,7 @@
 **Budget:** $35. Opus: design doc + Ruling. Sonnet: dependency inventory, spike code, harness wiring.
 
 **Inputs already known (from FWB `docs/migration/backend-cf-migration-plan.md`, 2026-06-26):**
+
 - Frontends (admin/web/orders) already run on Workers via OpenNext; only the API is on Railway.
 - Blockers on Workers: ioredis (TCP; single wrapper `services/redis.service.ts`), Socket.io (2 files), sharp (5), imapflow (1), `@sentry/node`/OpenTelemetry node SDK, multer (5), Express itself.
 - HARD-STOP: RLS relies on `SET LOCAL` GUCs inside ONE per-request interactive transaction (`middleware/tenant-context.ts`, `request-transaction.ts`). Must prove Hyperdrive keeps the tx on one connection and that no session-level `SET` leaks across tenants.
@@ -18,4 +19,5 @@
 5. **Ruling** in `docs/RULINGS.md` (created in SP4's `main`; drafted here as `docs/design/ruling-draft-sp3.md`).
 
 ## Done when
+
 Design + spike committed to PR, spike tests green on workerd (mutation-checked), parity `result.json` read, Ruling drafted. Ahmad told the gate decision taken under his "do not stop" instruction, for after-the-fact review.
