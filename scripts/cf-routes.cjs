@@ -4,7 +4,7 @@ const { BRAND } = require('../packages/shared/dist/brand/index.js');
 const app = process.argv[2];
 const host = {
   web: BRAND.domains.marketing,
-  admin: BRAND.domains.app,
+  admin: BRAND.domains.admin,
   orders: BRAND.domains.orders,
 }[app];
 if (!host) throw new Error(`Unsupported Cloudflare app: ${app}`);

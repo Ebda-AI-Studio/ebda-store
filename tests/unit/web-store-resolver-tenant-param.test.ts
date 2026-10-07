@@ -120,7 +120,7 @@ describe('getStoreByTenantParam', () => {
   it.each([
     'slug:palora', // the retired path-slug tenant encoding
     'ebda.app',
-    'app.ebda.app',
+    'admin.ebda.app',
     'www.ebda.app',
     'x.y.ebda.app',
     'localhost',

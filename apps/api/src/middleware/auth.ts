@@ -277,7 +277,7 @@ export function authorize(...roles: string[]) {
 
 /**
  * "Is this request a real customer?" guard. The api host's auth cookie is
- * shared between admin (app.ebda.app) and storefront
+ * shared between admin (admin.ebda.app) and storefront
  * (ebda.app) origins, so a merchant signed into admin sends
  * the SAME cookie to public/customer-facing endpoints — and naively reading
  * `req.user?.userId` as a customerId attaches the merchant's user record to

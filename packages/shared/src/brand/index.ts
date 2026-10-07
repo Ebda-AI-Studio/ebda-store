@@ -34,7 +34,7 @@ export const BRAND = {
   },
   domains: {
     marketing: 'ebda.app',
-    app: 'app.ebda.app',
+    admin: 'admin.ebda.app',
     api: 'api.ebda.app',
     orders: 'orders.ebda.app',
     storeSuffix: '.ebda.app',
@@ -67,8 +67,8 @@ export function brandUrl(host: string): string {
 
 /** Marketing site origin, e.g. `https://ebda.app`. */
 export const BRAND_MARKETING_URL = brandUrl(BRAND.domains.marketing);
-/** Merchant dashboard origin, e.g. `https://app.ebda.app`. */
-export const BRAND_APP_URL = brandUrl(BRAND.domains.app);
+/** Merchant dashboard origin, e.g. `https://admin.ebda.app`. */
+export const BRAND_ADMIN_URL = brandUrl(BRAND.domains.admin);
 /** API origin, e.g. `https://api.ebda.app`. */
 export const BRAND_API_URL = brandUrl(BRAND.domains.api);
 

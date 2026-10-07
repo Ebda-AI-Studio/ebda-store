@@ -30,7 +30,7 @@
 
 ## 1. Global Constraints
 
-- Domains: `ebda.app` marketing; `app.ebda.app` merchant dashboard; **every store at `<slug>.ebda.app`** (free), merchant **custom domains** on top; `api.`, `docs.`, `help.`, `status.`; `whatsapp.` reserved for later. **No `store.ebda.app`.** `.app` is HTTPS-only (HSTS preload).
+- Domains: `ebda.app` marketing; `admin.ebda.app` merchant dashboard; **every store at `<slug>.ebda.app`** (free), merchant **custom domains** on top; `api.`, `docs.`, `help.`, `status.`; `whatsapp.` reserved for later. **No `store.ebda.app`.** `.app` is HTTPS-only (HSTS preload).
 - Reserved slugs, enforced in validation from the first commit: `app api docs help status whatsapp www admin orders mail cdn assets static store dashboard billing support blog`.
 - **Self-serve like Shopify**: signup → live store with no human from Whisky 11.
 - **Arabic-first (RTL default) + English**, like FWB.
@@ -103,7 +103,7 @@ Briefs in `docs/research/`, sources cited, decision-ready:
 - Config-driven brand (`packages/shared/brand`): name, colours, logo, fonts; zero FWB / Force AI strings visible (CI grep test).
 - EGP minor units end to end; Egypt VAT config; Arabic-first default.
 - Reserved-slug validation; host resolver for `<slug>.ebda.app` + custom domains (throws on unknown host; tests per Review Focus 1).
-- Nile login animation on `app.ebda.app/login` (respect `prefers-reduced-motion`).
+- Nile login animation on `admin.ebda.app/login` (respect `prefers-reduced-motion`).
 - Backend per SP3 decision.
 **Done when:** Amelia Aurum's catalogue (CSV import) runs on a staging `amelia.ebda.app` (or local equivalent if no CF token yet) with parity green and the no-FWB-branding test passing.
 

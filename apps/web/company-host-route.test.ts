@@ -34,7 +34,7 @@ describe('companyHostRoute', () => {
       'wadyaljuz.com',
       'www.wadyaljuz.com',
       // Platform subdomains and store subdomains.
-      'app.ebda.app',
+      'admin.ebda.app',
       'orders.ebda.app',
       'api.ebda.app',
       'demo.ebda.app',
