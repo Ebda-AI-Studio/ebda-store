@@ -23,8 +23,9 @@ import {
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
-import { sendMerchantVerificationEmail } from './platform-mailer';
+import { sendMerchantPasswordResetEmail, sendMerchantVerificationEmail } from './platform-mailer';
 import { accountLockout } from './account-lockout.service';
+import { BRAND_STORE_APP_URL, PASSWORD_RESET_TTL_MINUTES } from '@force/shared';
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
@@ -69,6 +70,19 @@ export const GENERIC_RESEND_VERIFICATION_RESULT = {
   success: true,
   message: 'If an account exists with this email, a verification link has been sent.',
 } as const;
+
+/** Password-reset link lifetime (minutes): the shared constant, see @force/shared auth-policy. */
+export const RESET_TOKEN_TTL_MINUTES = PASSWORD_RESET_TTL_MINUTES;
+
+/**
+ * Origin of the Ebda Store merchant app for links in platform mail. Production
+ * pins it to the BRAND host, so a mis-set ADMIN_URL can never point a reset
+ * link (a bearer credential) at another host; elsewhere ADMIN_URL so local and
+ * CI runs get a followable localhost link.
+ */
+export function storeAppOrigin(): string {
+  return config.nodeEnv === 'production' ? BRAND_STORE_APP_URL : config.adminUrl;
+}
 
 function authScope(email: string, storeId: string | null) {
   // P1-1 — defence in depth at the SINK. `email` lands at the top level of a
@@ -1543,7 +1557,20 @@ export class AuthService {
     );
   }
 
-  static async requestPasswordReset(email: string, storeId: string | null = null): Promise<void> {
+  /**
+   * Issue a password-reset link. Returns the account id when one was found (for
+   * the caller's audit row only; the HTTP answer never depends on it).
+   *
+   * The mail is handed to `cfWaitUntil` instead of being awaited: the found and
+   * not-found branches then answer in roughly the same time, so response latency
+   * does not reveal whether an account exists (a Resend round trip is ~100s of
+   * ms; the remaining gap is one indexed insert). A failed send is logged, never
+   * surfaced, exactly as before when the route swallowed it.
+   */
+  static async requestPasswordReset(
+    email: string,
+    storeId: string | null = null
+  ): Promise<{ userId: string } | null> {
     // Tenant-scoped lookup so a Store A reset request doesn't leak the
     // existence of an account on Store B with the same email.
     const user = await findUserInScope(
@@ -1564,16 +1591,13 @@ export class AuthService {
 
     if (!user) {
       // Silently return to prevent email enumeration
-      return;
+      return null;
     }
 
-    // Generate reset token
+    // Generate reset token. Only its SHA-256 is stored; the plaintext exists
+    // in the mail alone.
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
-    // 15 minutes (S5-2, 2026-09-22 security audit — was 1 hour). A reset
-    // link outstanding for an hour is an hour-long window for a forwarded
-    // or intercepted email to take over the account.
-    const RESET_TOKEN_TTL_MINUTES = 15;
     const resetExpires = new Date(Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000);
 
     // Store reset token as a special refresh token
@@ -1587,27 +1611,56 @@ export class AuthService {
       })
     );
 
-    // Send reset email
-    const resetUrl = `${config.webUrl}/auth/reset-password?token=${resetToken}`;
+    const name = `${user.firstName} ${user.lastName}`.trim() || user.email;
+    const language = (user.language as 'en' | 'ar' | undefined) ?? undefined;
     if (user.storeId) {
-      await EmailService.sendPasswordReset(
-        user.storeId,
-        {
-          email: user.email,
-          name: `${user.firstName} ${user.lastName}`.trim() || user.email,
-          resetUrl,
-          expiresInMinutes: RESET_TOKEN_TTL_MINUTES,
-        },
-        (user.language as 'en' | 'ar' | undefined) ?? undefined
+      // Storefront customer: the store's branded sender, storefront page.
+      cfWaitUntil(
+        EmailService.sendPasswordReset(
+          user.storeId,
+          {
+            email: user.email,
+            name,
+            resetUrl: `${config.webUrl}/auth/reset-password?token=${resetToken}`,
+            expiresInMinutes: RESET_TOKEN_TTL_MINUTES,
+          },
+          language
+        ).catch(err => logger.error({ err, userId: user.id }, 'password-reset mail failed'))
       );
     } else {
-      // Admin password-reset: no store context, skip branded email.
-      logger.info({ userId: user.id }, 'Skipping branded password-reset email — admin account');
+      // Admin namespace (merchant / staff / operator on Ebda Store): no store
+      // context, so the platform sender. Until 2026-10-07 this branch sent
+      // NOTHING — a merchant who forgot their password had no way back in.
+      cfWaitUntil(
+        sendMerchantPasswordResetEmail(
+          {
+            email: user.email,
+            name,
+            resetUrl: `${storeAppOrigin()}/reset-password?token=${resetToken}`,
+            expiresInMinutes: RESET_TOKEN_TTL_MINUTES,
+          },
+          language
+        ).catch(err =>
+          logger.error({ err, userId: user.id }, 'merchant password-reset mail failed')
+        )
+      );
     }
+    return { userId: user.id };
   }
 
-  static async resetPassword(token: string, newPassword: string): Promise<void> {
-    // Hash the provided token
+  /**
+   * Redeem a reset token: set the new password, burn the token, end every
+   * session. Returns the account id for the caller's audit row.
+   *
+   * What this deliberately does NOT touch: MFA. `mfaEnabled` / `mfaSecret`
+   * survive a reset, so the next login still stops at the MFA challenge — a
+   * reset proves control of the inbox, not of the second factor.
+   */
+  static async resetPassword(token: string, newPassword: string): Promise<{ userId: string }> {
+    // Hash the provided token. The lookup below is an equality match on this
+    // SHA-256 digest, never on the plaintext: a timing difference in the
+    // index walk can only leak bits of a hash of 256 random bits, which says
+    // nothing about any live token (Ruling EBDA-PWRESET-3).
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
     // Find the reset token. `revokedAt: null` mirrors the check the refresh
@@ -1634,21 +1687,35 @@ export class AuthService {
       throw new AppError(400, 'TOKEN_INVALID', 'Invalid or expired reset token');
     }
 
-    // Hash new password
+    // Hash new password (slow) BEFORE claiming the token, so the claim and the
+    // password write sit as close together as possible.
     const passwordHash = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
 
+    // Claim the token atomically: single-use is decided by this DELETE's row
+    // count, not by the read above. Two concurrent redemptions of one link both
+    // pass the findFirst; only one can delete the row, and the loser stops here
+    // before writing a password. (It used to be read -> write password ->
+    // delete, so both requests set a password and the later one won.)
+    const claimed = await withUser(storedToken.userId, tx =>
+      tx.refreshToken.deleteMany({
+        where: {
+          id: storedToken.id,
+          userId: storedToken.userId,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+      })
+    );
+    if (claimed.count !== 1) {
+      throw new AppError(400, 'TOKEN_INVALID', 'Invalid or expired reset token');
+    }
+
     // Update user password (as that user: `users` is RLS-scoped to app.current_user_id)
-    await withUser(storedToken.userId, tx =>
+    const updated = await withUser(storedToken.userId, tx =>
       tx.user.update({
         where: { id: storedToken.userId },
         data: { passwordHash },
-      })
-    );
-
-    // Delete the reset token (single-use, no reuse-detection value).
-    await withUser(storedToken.userId, tx =>
-      tx.refreshToken.delete({
-        where: { id: storedToken.id, userId: storedToken.userId },
+        select: { email: true, storeId: true },
       })
     );
 
@@ -1665,6 +1732,20 @@ export class AuthService {
     // performs precisely because they believe someone else is holding their
     // credentials.
     await AuthService.revokeAllSessions(storedToken.userId, 'password_reset');
+
+    // A merchant who reset because they were locked out after too many wrong
+    // passwords must be able to use the new one at once. The lockout exists to
+    // stop password guessing; whoever holds a valid reset link no longer needs
+    // to guess. Same key shape as login (`<storeId>:<email>` or `<email>`).
+    // Best-effort: Redis being down must not fail a reset that already landed.
+    const lockoutEmail = updated.email.trim().toLowerCase();
+    await accountLockout
+      .unlockAccount(updated.storeId ? `${updated.storeId}:${lockoutEmail}` : lockoutEmail)
+      .catch(err =>
+        logger.warn({ err, userId: storedToken.userId }, 'lockout clear after reset failed')
+      );
+
+    return { userId: storedToken.userId };
   }
 
   /**

@@ -117,8 +117,8 @@
       "tier": "unit",
       "why": "login limiter's Redis failure posture flips to fail-closed, 500ing the write surface on a blip",
       "source": "apps/api/src/middleware/security.ts",
-      "find": "  // the cache layer deliberately fails open. Unlimited-but-up beats down.\n  passOnStoreError: true,\n  skip: skipForLoadTestOrTests,\n  keyGenerator: req => {\n    // Use IP + email for more granular limiting. ipKeyGenerator() normalizes",
-      "replace": "  // the cache layer deliberately fails open. Unlimited-but-up beats down.\n  passOnStoreError: false,\n  skip: skipForLoadTestOrTests,\n  keyGenerator: req => {\n    // Use IP + email for more granular limiting. ipKeyGenerator() normalizes",
+      "find": "    // the cache layer deliberately fails open. Unlimited-but-up beats down.\n    passOnStoreError: true,\n    skip: opts?.skip ?? skipForLoadTestOrTests,\n    keyGenerator: authLimiterKey,",
+      "replace": "    // the cache layer deliberately fails open. Unlimited-but-up beats down.\n    passOnStoreError: false,\n    skip: opts?.skip ?? skipForLoadTestOrTests,\n    keyGenerator: authLimiterKey,",
       "test": "tests/unit/rate-limit-fail-open.test.ts"
     },
     {
@@ -1960,6 +1960,26 @@
       "find": "  return TENANT_GUARD_SCHEMA.filter(m => m.storeId).map(m => m.name);",
       "replace": "  return [];",
       "test": "tests/unit/tenant-guard-models.test.ts"
+    },
+    {
+      "id": "password-reset-token-single-use-claim",
+      "domain": "authn / session",
+      "tier": "integration",
+      "why": "two concurrent redemptions of one reset link both set a password (read -> write -> delete): whoever lands second silently owns the account the owner just recovered",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "    const claimed = await withUser(storedToken.userId, tx =>\n      tx.refreshToken.deleteMany({\n        where: {\n          id: storedToken.id,\n          userId: storedToken.userId,\n          revokedAt: null,\n          expiresAt: { gt: new Date() },\n        },\n      })\n    );",
+      "replace": "    const claimed = { count: 1 };",
+      "test": "tests/integration/merchant-password-reset.test.ts"
+    },
+    {
+      "id": "forgot-password-same-answer-found-or-not",
+      "domain": "enumeration",
+      "tier": "integration",
+      "why": "forgot-password answers a registered address differently from an unknown one, so the reset form becomes an account-existence oracle for every merchant and shopper",
+      "source": "apps/api/src/routes/auth.routes.ts",
+      "find": "            details: { email: maskEmail(parsed.data.email) },\n            ip: req.ip,\n            userAgent: req.headers['user-agent'],\n          });\n        }",
+      "replace": "            details: { email: maskEmail(parsed.data.email) },\n            ip: req.ip,\n            userAgent: req.headers['user-agent'],\n          });\n          res.json({ success: true, data: { message: 'Reset link sent.' } });\n          return;\n        }",
+      "test": "tests/integration/merchant-password-reset.test.ts"
     }
   ]
 }

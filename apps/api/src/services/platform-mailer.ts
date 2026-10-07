@@ -20,6 +20,7 @@ import { maskEmail } from '../lib/pii-mask';
 import { ResendService } from './resend.service';
 import { EmailService, renderBrandedShell } from './email.service';
 import { emailVerificationTemplate } from './email-templates/email-verification';
+import { passwordResetTemplate } from './email-templates/password-reset';
 import { escapeHtml } from './email-templates/_util';
 
 export interface CapturedMail {
@@ -28,6 +29,7 @@ export interface CapturedMail {
   html: string;
   /** First absolute http(s) link in the body, for tests that follow it. */
   link: string | null;
+  replyTo?: string;
   at: Date;
 }
 
@@ -65,9 +67,34 @@ function shouldReallySend(): boolean {
   return config.nodeEnv === 'production' && ResendService.isConfigured();
 }
 
-async function deliver(msg: { to: string; subject: string; html: string }): Promise<void> {
+/**
+ * The captured link with its `token` query param masked, for the dev log line.
+ * A password-reset token is a bearer credential for the whole account, so it
+ * never reaches a log sink, even in development (the outbox keeps the real
+ * link for tests).
+ */
+function redactTokenParam(link: string | null): string | null {
+  if (!link) return link;
+  try {
+    const u = new URL(link);
+    if (u.searchParams.has('token')) u.searchParams.set('token', '[redacted]');
+    return u.toString();
+  } catch {
+    return '[unparseable link]';
+  }
+}
+
+async function deliver(
+  msg: { to: string; subject: string; html: string; replyTo?: string },
+  opts: { redactLinkInLog?: boolean } = {}
+): Promise<void> {
   if (shouldReallySend()) {
-    await EmailService.sendPlatformRaw({ to: msg.to, subject: msg.subject, html: msg.html });
+    await EmailService.sendPlatformRaw({
+      to: msg.to,
+      subject: msg.subject,
+      html: msg.html,
+      ...(msg.replyTo ? { replyTo: msg.replyTo } : {}),
+    });
     return;
   }
   const link = /href="(https?:\/\/[^"]+)"/.exec(msg.html)?.[1]?.replace(/&amp;/g, '&') ?? null;
@@ -81,7 +108,11 @@ async function deliver(msg: { to: string; subject: string; html: string }): Prom
     );
   } else {
     logger.info(
-      { to: maskEmail(msg.to), subject: msg.subject, link },
+      {
+        to: maskEmail(msg.to),
+        subject: msg.subject,
+        link: opts.redactLinkInLog ? redactTokenParam(link) : link,
+      },
       '[PLATFORM-MAIL] captured (not sent outside production)'
     );
   }
@@ -143,4 +174,38 @@ export async function sendMerchantDuplicateSignupNotice(
     subject: lang === 'ar' ? 'لديك حساب مسبقاً' : 'You already have an account',
     html,
   });
+}
+
+/**
+ * Password reset for an account in the admin namespace (`users.store_id`
+ * NULL): a merchant on Ebda Store. The per-store branded sender needs a store,
+ * so this goes out from the platform sender (`Ebda Store <no-reply@ebda.app>`)
+ * with replies routed to the support inbox. Same template, same TTL copy as
+ * the storefront customer reset.
+ */
+export async function sendMerchantPasswordResetEmail(
+  data: { email: string; name: string; resetUrl: string; expiresInMinutes: number },
+  language?: Lang
+): Promise<void> {
+  const lang: Lang = language ?? resolveDefaultLanguage(undefined);
+  const content = passwordResetTemplate[lang](data, BRAND.product.nameEn);
+  const html = renderBrandedShell(content, {
+    name: BRAND.product.nameEn,
+    nameAr: null,
+    logo: BRAND_EMAIL_LOGO_URL,
+    theme: null,
+    email: null,
+    phone: null,
+    address: null,
+    defaultLanguage: lang,
+  });
+  await deliver(
+    {
+      to: data.email,
+      subject: passwordResetTemplate.subject[lang](data, ''),
+      html,
+      replyTo: BRAND.supportEmail,
+    },
+    { redactLinkInLog: true }
+  );
 }

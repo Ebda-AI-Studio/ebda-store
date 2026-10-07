@@ -30,6 +30,9 @@ export default function VerifyEmailPage() {
     if (started.current) return;
     started.current = true;
     const token = new URLSearchParams(window.location.search).get('token');
+    // The token is a credential: take it out of the address bar before
+    // analytics, error reporting or the history can record the full URL.
+    window.history.replaceState(null, '', window.location.pathname);
     if (!token) {
       setPhase({ kind: 'error', reason: 'missing' });
       return;
