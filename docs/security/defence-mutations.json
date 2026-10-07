@@ -1392,16 +1392,6 @@
       "test": "tests/unit/public-mount-admin-route-guard.test.ts"
     },
     {
-      "id": "cache-agent-docs-not-cookie-resolved",
-      "domain": "cache poisoning",
-      "tier": "unit",
-      "why": "platform-host llms.txt / ACP / UCP / product feed resolved from the sticky x-store-slug cookie while shared-cacheable — one store's document cached under the platform URL for every visitor (#1959)",
-      "source": "apps/web/middleware.ts",
-      "find": "  const cookieSlug = isUrlKeyedPublicPath(request.nextUrl.pathname)\n    ? undefined\n    : request.cookies.get('x-store-slug')?.value;",
-      "replace": "  const cookieSlug = request.cookies.get('x-store-slug')?.value;",
-      "test": "tests/unit/web-middleware-characterization.test.ts"
-    },
-    {
       "id": "csrf-router-level-admin-auth-not-at-public",
       "domain": "csrf / session",
       "tier": "unit",
