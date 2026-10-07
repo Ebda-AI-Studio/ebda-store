@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * WA-token cart hydrator (Phase 6 / Option C, FWB storefront).
+ * WA-token cart hydrator (Phase 6 / Option C, Ebda storefront).
  *
  * When the checkout URL carries ?waToken=<jwt>, redeem it via the
  * /api/v1/wa-bridge/cart/redeem endpoint to recover the cart payload
@@ -51,7 +51,7 @@ import {
   urlWithoutToken,
 } from './wa-token';
 
-const SESSION_KEY = 'fwb.wa-cart-redeemed';
+const SESSION_KEY = 'ebda.wa-cart-redeemed';
 
 export default function WaTokenHydrator() {
   const router = useRouter();
@@ -137,7 +137,7 @@ export default function WaTokenHydrator() {
 
         // Stash customer phone for the shipping-step pre-fill.
         if (data.customerPhone) {
-          sessionSet('fwb.wa-customer-phone', data.customerPhone);
+          sessionSet('ebda.wa-customer-phone', data.customerPhone);
         }
 
         // Strip the token from the URL so a refresh doesn't re-redeem.

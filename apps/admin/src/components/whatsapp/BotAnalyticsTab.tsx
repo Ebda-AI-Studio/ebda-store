@@ -12,8 +12,8 @@
  *   - Language breakdown (EN / AR)
  *   - LLM stats footer card
  *
- * Data: proxied through FWB GET /stores/:id/bot-analytics?from=&to=
- * (FWB decrypts the wbsApiKey and forwards to WBS /external/bot-analytics)
+ * Data: proxied through Ebda GET /stores/:id/bot-analytics?from=&to=
+ * (Ebda decrypts the wbsApiKey and forwards to WBS /external/bot-analytics)
  *
  * Privacy: dashboard shows ONLY aggregates. No phone numbers or
  * individual customer events are ever included in the response.

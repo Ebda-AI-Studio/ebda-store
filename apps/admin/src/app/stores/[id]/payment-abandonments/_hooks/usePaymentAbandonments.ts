@@ -78,7 +78,7 @@ export function usePaymentAbandonments({ storeId, enabled }: UsePaymentAbandonme
   const fetchStats = useCallback(async () => {
     // apiGet already unwraps the { success, data } envelope, so `data` IS the
     // stats payload — do not unwrap a second time (the double-unwrap silently
-    // dropped real rows; see fwb-apiget-double-unwrap).
+    // dropped real rows; the apiGet double-unwrap trap).
     const { data, error: apiError } = await apiGet<AbandonmentStats>(
       `/api/v1/stores/${storeId}/payment-abandonments/stats`
     );

@@ -1,7 +1,7 @@
 /**
  * verify-merchant-feature-parity.mjs
  *
- * Verifies that the resolved feature flags for Wady Aljuz and Palora
+ * Verifies that the resolved feature flags for Demo Shop and Demo Boutique
  * (the two real merchants) are identical before and after the
  * 4-layer feature enforcement PR.
  *
@@ -22,7 +22,7 @@ import { prisma } from '@force/database';
 import { PLAN_BASELINE, FEATURE_KEYS_ARRAY } from '@force/shared';
 
 // The two real merchants (slugs are stable across environments).
-const TARGET_SLUGS = ['wadyaljuz', 'palora'];
+const TARGET_SLUGS = ['demo-shop', 'demo-boutique'];
 
 /**
  * Replicates featureService.rowsToMap() without importing the full service
@@ -88,7 +88,9 @@ async function main() {
     for (const key of FEATURE_KEYS_ARRAY) {
       const enabled = resolved[key];
       const override = store.storeFeatures.find(r => r.featureKey === key);
-      const source = override ? `[override: ${override.enabled ? 'ON' : 'OFF'}]` : '[plan baseline]';
+      const source = override
+        ? `[override: ${override.enabled ? 'ON' : 'OFF'}]`
+        : '[plan baseline]';
       const status = enabled ? '✅ ON ' : '❌ OFF';
       console.log(`${key.padEnd(colW)} ${status}  ${source}`);
     }
@@ -96,7 +98,9 @@ async function main() {
     // Check for overrides that might need attention post-merge
     const activeOverrides = store.storeFeatures.filter(r => r.enabled === false);
     if (activeOverrides.length > 0) {
-      console.log(`\n⚠️  ATTENTION: ${store.name} has ${activeOverrides.length} feature(s) explicitly DISABLED via override:`);
+      console.log(
+        `\n⚠️  ATTENTION: ${store.name} has ${activeOverrides.length} feature(s) explicitly DISABLED via override:`
+      );
       for (const o of activeOverrides) {
         console.log(`   - ${o.featureKey}: forced OFF (overrides plan baseline)`);
       }
@@ -106,7 +110,9 @@ async function main() {
 
     const enabledOverrides = store.storeFeatures.filter(r => r.enabled === true);
     if (enabledOverrides.length > 0) {
-      console.log(`\nℹ️  ${store.name} has ${enabledOverrides.length} feature(s) explicitly ENABLED via override:`);
+      console.log(
+        `\nℹ️  ${store.name} has ${enabledOverrides.length} feature(s) explicitly ENABLED via override:`
+      );
       for (const o of enabledOverrides) {
         console.log(`   - ${o.featureKey}: forced ON (may exceed plan tier)`);
       }
@@ -121,7 +127,9 @@ async function main() {
   }
 
   console.log(`\n${'='.repeat(70)}`);
-  console.log(`PARITY CHECK: ${anyDrift ? '❌ DRIFT DETECTED — see above' : '✅ No drift detected'}`);
+  console.log(
+    `PARITY CHECK: ${anyDrift ? '❌ DRIFT DETECTED — see above' : '✅ No drift detected'}`
+  );
   console.log(`This PR adds enforcement gates only. It does NOT change PLAN_BASELINE`);
   console.log(`or StoreFeature rows. Resolved flags are identical pre- and post-merge.`);
   console.log(`${'='.repeat(70)}\n`);

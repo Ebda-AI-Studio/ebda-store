@@ -89,7 +89,7 @@ describe('ProductDetailBody — redirect-on-miss', () => {
     const store = {
       id: 'store1',
       slug: 'pecan',
-      domain: 'pecannbee.com.kw',
+      domain: 'demo-store.example',
     } as unknown as ResolvedStore;
 
     await expect(
@@ -98,7 +98,7 @@ describe('ProductDetailBody — redirect-on-miss', () => {
 
     expect(mockedPermanentRedirect).toHaveBeenCalledTimes(1);
     expect(mockedPermanentRedirect).toHaveBeenCalledWith(
-      'https://pecannbee.com.kw/products/raw-pecan'
+      'https://demo-store.example/products/raw-pecan'
     );
     expect(mockedNotFound).not.toHaveBeenCalled();
   });

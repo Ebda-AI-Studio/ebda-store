@@ -247,7 +247,7 @@
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     font-feature-settings: 'cv11', 'ss01';
     /* Storefront base body size — 16px on mobile / 17px on desktop. The
-       Pecannbee spec's "body weight, centered" for captions reads ~16px;
+       Demo Store spec's "body weight, centered" for captions reads ~16px;
        with a 17px ground we keep card names + descriptions comfortable
        without forcing every utility class to bump from text-sm to text-base. */
     font-size: 16px;

@@ -45,7 +45,7 @@ describe('checkMinimumOrder', () => {
     expect(result.shortfallFils).toBe(0);
   });
 
-  it('computes the exact Pecannbee scenario (5 EGP minimum, 2 EGP short)', () => {
+  it('computes the exact Demo Store scenario (5 EGP minimum, 2 EGP short)', () => {
     // 5 EGP = 5000 piastres minimum, cart at 3 EGP = 3000 piastres.
     const result = checkMinimumOrder(3000, 5000);
     expect(result.met).toBe(false);

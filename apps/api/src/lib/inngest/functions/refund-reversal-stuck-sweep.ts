@@ -323,7 +323,7 @@ export const refundReversalStuckSweep: InngestFunction.Any = inngest.createFunct
     //
     // Neon suspends a compute after 5 minutes idle. Anything polling the database
     // every 5 minutes therefore resets the idle timer just before it fires, and the
-    // compute NEVER sleeps. Measured: fwb-eu ran 195 active hours out of 195 and
+    // compute NEVER sleeps. Measured: a previous project ran 195 active hours out of 195 and
     // burned 193 CU-h/month — 76% of the whole account allowance — while the menu
     // projects, which idle normally, used 7-17.
     //

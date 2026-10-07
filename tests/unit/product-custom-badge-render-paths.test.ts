@@ -2,7 +2,7 @@
  * Render-path coverage gate for the custom product badge.
  *
  * CLAUDE.md, "Platform-level fixes": product-card UX lands on ALL render
- * paths — the shared Pecannbee card, the five theme cards, the carousel and
+ * paths — the shared Demo Store card, the five theme cards, the carousel and
  * the list item — plus the PDP, "or it isn't shipped". That rule is stated in
  * a markdown file, which makes it a preference; this file makes it a gate.
  *

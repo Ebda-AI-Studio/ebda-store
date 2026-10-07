@@ -42,7 +42,7 @@ vi.mock('@force/database', () => {
         delete: vi.fn(),
       },
       $executeRawUnsafe: vi.fn(async (sql: string) => {
-        log.push(sql.replace(/"fwb_sp_\d+"/, 'sp'));
+        log.push(sql.replace(/"ebda_sp_\d+"/, 'sp'));
         return 0;
       }),
     },

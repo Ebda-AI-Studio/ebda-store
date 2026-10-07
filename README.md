@@ -2,8 +2,6 @@
 
 Self-serve, Shopify-style store builder for Egypt, by **Whisky 11**. Sign up, get a live store at `<slug>.ebda.app` with no human in the loop, then bring your own domain when you are ready. Arabic-first (RTL) with English, EGP pricing, and Egyptian payments and shipping behind pluggable interfaces.
 
-Ebda is a fork of FWB (Force Website Builder, a GCC product of Force AI). FWB is the read-only `upstream` remote and is never pushed to; shared core paths are synced deliberately, see [docs/TWIN-PATHS.md](./docs/TWIN-PATHS.md).
-
 > **Proprietary commercial software.** All rights reserved. See [LICENSE](./LICENSE).
 
 ## Where things live
@@ -17,7 +15,7 @@ Ebda is a fork of FWB (Force Website Builder, a GCC product of Force AI). FWB is
 | `api.ebda.app`                                            | API (`apps/api`)                                           |
 | `docs.` / `help.` / `status.` / `whatsapp.` (`.ebda.app`) | Developer docs, help centre, status page, WhatsApp (later) |
 
-Brand identity (name, colours, fonts, domains, sender addresses, legal URLs) is a single source of truth: `BRAND` in `packages/shared/src/brand/index.ts`, imported from `@force/shared`. Do not re-hardcode those values; `tests/unit/no-fwb-branding.test.ts` fails on any surviving FWB/Force AI string in shipped sources.
+Brand identity (name, colours, fonts, domains, sender addresses, legal URLs) is a single source of truth: `BRAND` in `packages/shared/src/brand/index.ts`, imported from `@force/shared`. Do not re-hardcode those values; `tests/unit/no-force-branding.test.ts` fails on any inherited third-party brand string in shipped sources.
 
 ## Repository layout
 
@@ -33,7 +31,7 @@ packages/
   ui/       Shared React components
 docs/
   ebda/     Ebda plans, research, design, brand brief  (Ebda-only)
-  ...       Inherited FWB docs (read-only reference)
+  ...       Inherited Ebda docs (read-only reference)
 ```
 
 The `@force/*` package scope and `FORCE_*` environment variable names are inherited internal identifiers and are intentionally unchanged for now.

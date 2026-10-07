@@ -98,8 +98,8 @@ export default function FeaturesSection() {
           kicker={t('AI-NATIVE COMMERCE', 'تجارة ذكاء اصطناعي أصيلة')}
           title={t('Your store, run by AI', 'متجرك، يُديره الذكاء الاصطناعي')}
           subtitle={t(
-            'Writing, search visibility, accounting, payments, and WhatsApp — everything a Kuwaiti merchant needs, in one place.',
-            'الكتابة والظهور في البحث والمحاسبة والمدفوعات وواتساب — كل ما يحتاجه التاجر الكويتي في مكان واحد.'
+            'Writing, search visibility, accounting, payments, and WhatsApp — everything an Egyptian merchant needs, in one place.',
+            'الكتابة والظهور في البحث والمحاسبة والمدفوعات وواتساب — كل ما يحتاجه التاجر المصري في مكان واحد.'
           )}
         />
 

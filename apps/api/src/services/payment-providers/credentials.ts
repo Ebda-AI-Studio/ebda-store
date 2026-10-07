@@ -2,7 +2,7 @@
  * Per-merchant provider credentials (SP6a).
  *
  * Secrets live ONLY in the encrypted `payment_configs` columns (AES-256-GCM
- * through `encryption.service`, keyed by `ENCRYPTION_KEY`, the same mechanism FWB
+ * through `encryption.service`, keyed by `ENCRYPTION_KEY`, the same mechanism Ebda
  * used). They are decrypted here, at the moment of a provider call, into a
  * `ProviderCredentials` that is handed to the adapter and dropped. They are never
  * logged (`describeForLog` is the only thing that may be logged about a config),

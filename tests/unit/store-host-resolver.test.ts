@@ -41,8 +41,8 @@ const STORE_A: StoreRow = {
 };
 const STORE_B: StoreRow = {
   id: 'store-b',
-  slug: 'palora',
-  name: 'Palora',
+  slug: 'demo-boutique',
+  name: 'Demo Boutique',
   domain: null,
   domainStatus: null,
   status: 'active',
@@ -209,7 +209,7 @@ describe('GET /public/store/resolve — host → store', () => {
     ['amelia.ebda.app', 'store-a'],
     ['AMELIA.EBDA.APP:443', 'store-a'],
     ['amelia.ebda.app.', 'store-a'],
-    ['palora.ebda.app', 'store-b'],
+    ['demo-boutique.ebda.app', 'store-b'],
     ['ameliaaurum.com', 'store-a'], // custom domain
     ['www.ameliaaurum.com', 'store-a'], // www canonicalises to the apex row
   ])('%s → %s', async (host, id) => {
@@ -298,9 +298,9 @@ describe('GET /public/store/resolve — host → store', () => {
 describe('cache isolation (Review Focus 1)', () => {
   it('store A then store B on the same endpoint: each host gets its own store, repeatedly', async () => {
     const first = await resolve('amelia.ebda.app'); // A is now cached
-    const b = await resolve('palora.ebda.app');
+    const b = await resolve('demo-boutique.ebda.app');
     const again = await resolve('amelia.ebda.app'); // served from A's cache
-    const bAgain = await resolve('palora.ebda.app');
+    const bAgain = await resolve('demo-boutique.ebda.app');
     expect(first.body.data.store.id).toBe('store-a');
     expect(b.body.data.store.id).toBe('store-b');
     expect(again.body.data.store.id).toBe('store-a');
@@ -340,12 +340,12 @@ describe('cache isolation (Review Focus 1)', () => {
 
   it('every cache key written is scoped to the host (or store id) — none is store-agnostic', async () => {
     await resolve('amelia.ebda.app');
-    await resolve('palora.ebda.app');
+    await resolve('demo-boutique.ebda.app');
     await resolve('ameliaaurum.com');
     const keys = [...redisData.keys()];
     expect(keys.length).toBeGreaterThanOrEqual(3);
     for (const key of keys) {
-      expect(key).toMatch(/amelia\.ebda\.app|palora\.ebda\.app|ameliaaurum\.com|store-[ab]/);
+      expect(key).toMatch(/amelia\.ebda\.app|demo-boutique\.ebda\.app|ameliaaurum\.com|store-[ab]/);
     }
     expect(keys.some(k => k.endsWith(':default'))).toBe(false);
   });
@@ -354,9 +354,9 @@ describe('cache isolation (Review Focus 1)', () => {
     const get = (host: string) => request(app).get('/public/products').set('x-store-domain', host);
 
     const a1 = await get('amelia.ebda.app'); // fills A's cache
-    const b1 = await get('palora.ebda.app');
+    const b1 = await get('demo-boutique.ebda.app');
     const a2 = await get('amelia.ebda.app'); // served from A's cache
-    const b2 = await get('palora.ebda.app');
+    const b2 = await get('demo-boutique.ebda.app');
     const custom = await get('ameliaaurum.com'); // A's custom domain: A's data again
 
     expect(a1.body.data.products[0].id).toBe('store-a-p1');

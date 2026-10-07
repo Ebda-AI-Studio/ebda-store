@@ -35,7 +35,7 @@ import type { LowStockAlertItem } from '../email-templates/low-stock-alert';
 // ---------------------------------------------------------------------------
 
 // Sentinel key prefix. Full key: `low-stock-alerted:{storeId}:{productId}`
-// ioredis transparently applies REDIS_KEY_PREFIX (e.g. `fwb-staging:`) so
+// ioredis transparently applies REDIS_KEY_PREFIX (e.g. `ebda-staging:`) so
 // we don't need to embed the env prefix here.
 export const SENTINEL_KEY_PREFIX = 'low-stock-alerted';
 

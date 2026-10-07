@@ -5,7 +5,7 @@
  * carts are only recorded when the cart has a customer contact, so on a store
  * that takes guest orders every metric built on `abandoned_carts` —
  * abandoned-cart stats, the funnel's "checkouts started" and "abandoned" —
- * reads 0 whatever shoppers do (live: pecannbee 0 checkouts started against 55
+ * reads 0 whatever shoppers do (live: demo-store 0 checkouts started against 55
  * completed orders in 30 days). The API now reports `guestCheckout` (the store
  * took a guest order in the window) and the admin shows those zeros as
  * "not tracked for guest checkout" (en + ar). A non-zero count on such a store

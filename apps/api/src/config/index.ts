@@ -68,8 +68,8 @@ export const config = {
   // Optional keyspace prefix applied to EVERY Redis command via the
   // ioredis `keyPrefix` constructor option. Prod leaves this unset so
   // existing cache/session/csrf keys keep their bare shape (no migration).
-  // Staging sets REDIS_KEY_PREFIX=fwb-staging: so its keys live under
-  // `fwb-staging:cache:*`, `fwb-staging:csrf:*` etc., fully isolated
+  // Staging sets REDIS_KEY_PREFIX=ebda-staging: so its keys live under
+  // `ebda-staging:cache:*`, `ebda-staging:csrf:*` etc., fully isolated
   // from prod traffic on the shared Railway Redis instance.
   redisKeyPrefix: process.env.REDIS_KEY_PREFIX || '',
 
@@ -263,7 +263,7 @@ export const config = {
 
 // Additional production validations (core secrets already validated above)
 if (config.nodeEnv === 'production') {
-  // Payment-provider warning removed 2026-05-20 — FWB uses per-store
+  // Payment-provider warning removed 2026-05-20 — Ebda uses per-store
   // PaymentConfig table rows (encrypted via ENCRYPTION_KEY) for every real
   // checkout. There are no platform-level gateway env vars at all (SP6b):
   // Paymob, Kashier and Fawry keys exist only as encrypted per-store rows.

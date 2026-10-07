@@ -106,7 +106,7 @@ describe('storeJsonLd', () => {
   });
 
   it('emits PostalAddress with Egypt default', () => {
-    const r = storeJsonLd({ name: 'Wady', url: 'https://x', address: 'Hawalli' }) as any;
+    const r = storeJsonLd({ name: 'Demo Shop', url: 'https://x', address: 'Hawalli' }) as any;
     expect(r.address['@type']).toBe('PostalAddress');
     expect(r.address.streetAddress).toBe('Hawalli');
     expect(r.address.addressCountry).toBe('EG');

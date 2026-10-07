@@ -115,7 +115,7 @@ export class ResendService {
       }
 
       // The stored id 404s when the domain was deleted on Resend's side (DB
-      // and Resend drifted — verified 2026-06-27: wadyaljuz.com had
+      // and Resend drifted — verified 2026-06-27: demo-shop.example had
       // emailDomainStatus='verified' locally but Resend returned 404, so the
       // merchant could never re-add it). Clear the stale id and create fresh
       // instead of hard-erroring on every retry.
@@ -142,7 +142,7 @@ export class ResendService {
    * Resend endpoints exist: GET /domains/:id returns current state,
    * POST /domains/:id/verify tells Resend to START verifying. Calling
    * only GET leaves a freshly-provisioned domain at `not_started`
-   * forever — which is exactly what bit wadyaljuz.com 2026-05-13.
+   * forever — which is exactly what bit demo-shop.example 2026-05-13.
    *
    * Now the admin's "Verify" button trigger:
    *   1. POST /domains/:id/verify (the kick-off — ignored if already verified)
@@ -232,7 +232,7 @@ export class ResendService {
       // Clear our dangling reference instead of throwing, so the admin badge
       // stops showing a false 'verified', resolveSender falls back to the
       // verified platform domain, and the merchant can re-provision cleanly.
-      // (wadyaljuz hit this: emailDomainStatus='verified' in DB but the Resend
+      // (demo-shop hit this: emailDomainStatus='verified' in DB but the Resend
       // domain was gone → get 404 → previously threw → stale badge. 2026-06-29.)
       if (error?.name === 'not_found') {
         await prisma.store.update({

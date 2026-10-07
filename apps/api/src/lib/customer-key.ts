@@ -73,7 +73,7 @@ export const GUEST_RFM_KEY_PREFIX = 'GUEST:';
 let rfmKeySecret: Buffer | undefined;
 function guestKeySecret(): Buffer {
   rfmKeySecret ??= createHmac('sha256', config.encryptionKey)
-    .update('fwb:customer-rfm-key:v1', 'utf8')
+    .update('ebda:customer-rfm-key:v1', 'utf8')
     .digest();
   return rfmKeySecret;
 }

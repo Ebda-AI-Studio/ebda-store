@@ -42,9 +42,9 @@ SMOKE_ADMIN_URL=https://staging-admin.example.com \
 
 Defaults:
 
-- Storefront: `https://wadyaljuz.com` — in CI the `smoke-test` job reads the
+- Storefront: `https://demo-shop.example` — in CI the `smoke-test` job reads the
   `SMOKE_STOREFRONT_URL` repo Actions **variable** first (falling back to
-  wadyaljuz.com), so the reference merchant can change without a code change.
+  demo-shop.example), so the reference merchant can change without a code change.
   The platform host (`ebda.app`) serves the landing page with no
   product links, so it cannot satisfy the PDP test — the target must be a
   live merchant storefront with at least one published product.

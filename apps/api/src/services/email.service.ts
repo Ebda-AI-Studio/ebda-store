@@ -125,7 +125,7 @@ export async function storeHidesPoweredBy(storeId: string): Promise<boolean> {
 /**
  * The branded wrapper every customer/merchant email ships in.
  *
- * Email-client-safe by construction (Pecannbee invoice on the Gmail Android
+ * Email-client-safe by construction (Demo Store invoice on the Gmail Android
  * app, 2026-09-30): NO `<style>` block — Gmail and Outlook drop or partially
  * drop them, and the old shell's `var()`/`color-mix()` rules were discarded
  * wholesale, so every class-sized element rendered at its natural size. The

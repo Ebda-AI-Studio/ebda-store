@@ -552,7 +552,7 @@ export class InvoiceService {
             order.store.logo
               ? // Logo is the brand mark — when present we don't also render
                 // the store-name text below it; otherwise the name shows up
-                // twice (e.g. logo of "Wady Aljuz" + text "Wady Aljuz").
+                // twice (e.g. logo of "Demo Shop" + text "Demo Shop").
                 `<img src="${escapeHtml(order.store.logo)}" alt="${escapeHtml(order.store.name)}" class="store-logo" />`
               : `<div class="store-name">${escapeHtml(order.store.name)}</div>`
           }
@@ -706,7 +706,7 @@ export class InvoiceService {
    * the Gmail Android app every class-sized element fell back to its natural
    * size: the logo rendered twice at full resolution (shell + page header),
    * the product photo ran several screens tall, and the 80px diagonal "PAID"
-   * watermark lost its positioning (Pecannbee, ORD-TM67JC-2Q6XK, 2026-09-30).
+   * watermark lost its positioning (Demo Store, ORD-TM67JC-2Q6XK, 2026-09-30).
    * This renderer is inline-styled tables only: no logo (the shell has it),
    * 64px thumbnails, and the status as a small badge.
    */

@@ -20,10 +20,10 @@ const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAG
  * where the real protection lives.
  *
  * This used to be a hand-maintained list of merchant domains, which is why
- * `https://wadyaljuz.com` was sitting in it: one tenant was onboarded, someone
+ * `https://demo-shop.example` was sitting in it: one tenant was onboarded, someone
  * added their domain, and every merchant onboarded afterwards silently lost
- * their preview. Pecannbee's page-builder showed Chrome's "This content is
- * blocked" for exactly that reason — `pecannbee.com.kw` was never added.
+ * their preview. Demo Store's page-builder showed Chrome's "This content is
+ * blocked" for exactly that reason — `demo-store.example` was never added.
  *
  * `ADMIN_DEFAULT_FRAME_SRC` (env var; was `ADMIN_PREVIEW_FRAME_SRC` — renamed
  * 2026-09-25, #1675) was supposed to be the relief valve ("without a

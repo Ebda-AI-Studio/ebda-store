@@ -154,7 +154,7 @@ function onListening(): void {
   // Railway redeploy the new container's function definitions stay
   // unregistered until Inngest cloud happens to ping us — which can take
   // 30+ min. Verified 2026-05-27: 3 bulk-ai jobs queued for 30 min on
-  // Wady Aljuz after a redeploy because functions hadn't synced.
+  // Demo Shop after a redeploy because functions hadn't synced.
   // With serveHost set (config.inngestServeHost), this PUT still registers
   // the correct public origin even though it originates from 127.0.0.1.
   //

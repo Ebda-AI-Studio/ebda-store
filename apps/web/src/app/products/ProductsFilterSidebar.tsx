@@ -221,7 +221,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  // Mobile renders a slide-up bottom-sheet with backdrop (Pecannbee spec § 4.4).
+  // Mobile renders a slide-up bottom-sheet with backdrop (Demo Store spec § 4.4).
   // Desktop renders inline as a sticky sidebar — merchant can set
   // filterSidebar.defaultOpen to start it collapsed.
   const [isOpen, setIsOpen] = useState(false);

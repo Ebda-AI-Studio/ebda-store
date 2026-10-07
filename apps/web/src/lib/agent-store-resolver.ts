@@ -10,7 +10,7 @@ import { storefrontOrigin } from '@force/shared';
  * `llms.txt/route.ts` first:
  *
  *   <slug>.ebda.app/…   → middleware sets `x-store-domain` to the host
- *   wadyaljuz.com/…     → middleware sets `x-store-domain` to the host
+ *   demo-shop.example/…     → middleware sets `x-store-domain` to the host
  *   ebda.app/…          → neither: the platform itself, no store
  *
  * Extracted so a new discovery document cannot re-derive it slightly

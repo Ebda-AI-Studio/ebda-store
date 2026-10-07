@@ -110,7 +110,7 @@ function isConfigured(): boolean {
  *   env=production · source=process.uncaughtException
  *
  *   🔴 [P0 STORE] payment.webhook.hmac_fail
- *   store=Wady Aljuz (wady-aljuz · dfc1c208…)
+ *   store=Demo Shop (demo-shop · 00000000…)
  *   env=production · source=payment.webhook.hmac_fail
  *
  * The scope-prefixed tag (`PLATFORM` or `STORE`) makes "is this everyone

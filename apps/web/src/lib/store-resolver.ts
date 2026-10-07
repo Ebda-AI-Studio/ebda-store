@@ -781,7 +781,7 @@ export async function getStoreOrNotFound(): Promise<ResolvedStore> {
  *
  * `tenant` is the middleware-encoded tenant key — the request HOST:
  *  - `<slug>.ebda.app` (e.g. `"amelia.ebda.app"`), OR
- *  - a normalized custom domain (e.g. `"wadyaljuz.com"`).
+ *  - a normalized custom domain (e.g. `"demo-shop.example"`).
  *
  * Triggers Next's `notFound()` when the tenant doesn't resolve to an active
  * store — mirrors `getStoreOrNotFound()`'s behavior for unknown

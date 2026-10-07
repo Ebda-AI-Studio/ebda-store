@@ -200,8 +200,8 @@ export function DataTable<T>({
                           paragraph direction — without it, a neutral-character
                           string (phone number, email, SKU, money) embedded in
                           an RTL row gets its characters reordered by the
-                          bidi algorithm (e.g. "+965 2222 3333" rendering as
-                          "3333 2222 965+"). */}
+                          bidi algorithm (e.g. "+20 100 123 4567" rendering as
+                          "4567 123 100 20+"). */}
                       <bdi>{c.cell(row, i)}</bdi>
                     </td>
                   ))}

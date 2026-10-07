@@ -35,9 +35,9 @@ Judge from `status` and `paymentStatus` together — neither alone is enough:
 
 ## Money is in integer minor units
 
-`total` is an integer in the currency's **minor** units. KWD has three decimal
-places: `30000` is **30.000 KWD**. Divide by 1000 for KWD, 100 for a
-two-decimal currency, and say which you used.
+`total` is an integer in the currency's **minor** units. EGP has two decimal
+places: `30000` is **300.00 EGP**. Divide by 100 for a two-decimal currency
+(1000 for a three-decimal one such as BHD), and say which you used.
 
 ## Report
 

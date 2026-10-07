@@ -3,7 +3,7 @@
  * `<style>` (Gmail app, Outlook): sizing lives in HTML attributes + inline
  * styles, never in a class a `<style>` block would have sized.
  *
- * Regression: Pecannbee's invoice email (ORD-TM67JC-2Q6XK, 2026-09-30) on the
+ * Regression: Demo Store's invoice email (ORD-TM67JC-2Q6XK, 2026-09-30) on the
  * Gmail Android app rendered the logo at 1600px (twice), the product photo at
  * 1200×1600 and the print page's "PAID" watermark as a loose block — the
  * emailed invoice was the printable web page, class-sized, nested in the shell.
@@ -62,10 +62,10 @@ import { subscriptionBillingTemplate } from '@api/services/email-templates/subsc
 type Locale = 'en' | 'ar';
 
 const STORE = (locale: Locale): EmailStoreContext => ({
-  name: 'Pecannbee',
+  name: 'Demo Store',
   logo: 'https://pub.r2.dev/logo-1600x420.png',
   theme: { primaryColor: '28 55% 30%' },
-  email: 'hello@pecannbee.test',
+  email: 'hello@demo-store.test',
   phone: '+965 5555 1234',
   address: 'Cairo',
   defaultLanguage: locale,
@@ -104,7 +104,7 @@ const any = {
   trackingNumber: 'TRK1',
   trackingUrl: 'https://t.test',
   carrier: 'Aramex',
-  storeName: 'Pecannbee',
+  storeName: 'Demo Store',
   returnNumber: 'RET-1',
   type: 'refund',
   status: 'approved',
@@ -202,7 +202,7 @@ function renderAll(): Array<{ name: string; locale: Locale; html: string }> {
     for (const [name, tpl] of Object.entries(TEMPLATES)) {
       const content = (tpl[locale] as (...a: unknown[]) => string)(
         any,
-        'Pecannbee',
+        'Demo Store',
         'https://s.test'
       );
       out.push({ name, locale, html: renderBrandedShell(content, STORE(locale)) });
@@ -339,7 +339,7 @@ describe('invoice email', () => {
 });
 
 describe('logo scales down whole — never cropped', () => {
-  // A wordmark (pecannbee-style, ~4:1) and a square mark. The shell cannot know
+  // A wordmark (demo-store-style, ~4:1) and a square mark. The shell cannot know
   // the shape, so the guard is structural: a proportional image with a fixed
   // width and height:auto, and nothing that can clip it (object-fit, a fixed
   // height/max-height, or a fixed-height container with overflow:hidden).

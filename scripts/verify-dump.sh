@@ -49,7 +49,7 @@
 
 set -uo pipefail
 
-# Decompressed floor. A real FWB dump is ~1.4MB gzipped / tens of MB plain, and
+# Decompressed floor. A real Ebda dump is ~1.4MB gzipped / tens of MB plain, and
 # even a bare schema is tens of KB, so 1KB sits far below anything legitimate and
 # far above the failures it must catch (0 bytes, a truncated first block, a short
 # error string). It is deliberately NOT tuned close to the real dump size: the row

@@ -220,11 +220,17 @@ export function isPlatformOrigin(
   if (origin === brandUrl(BRAND.domains.orders)) return true;
 
   // Cloudflare Workers preview deploys for the project (OpenNext migration).
-  // SCOPED to OUR account subdomain + our worker names — NOT any *.workers.dev,
-  // which (with credentials: true) would let an attacker's worker make
-  // credentialed requests to the API.
+  // SCOPED to OUR account subdomain (CF_WORKERS_DEV_SUBDOMAIN) + our worker
+  // names — NOT any *.workers.dev, which (with credentials: true) would let an
+  // attacker's worker make credentialed requests to the API. Unset = no preview
+  // origin is trusted.
+  const workersDevSubdomain = process.env.CF_WORKERS_DEV_SUBDOMAIN;
   if (
-    /^https:\/\/force-(web|admin|orders)-cf-preview\.ahmed0montaser\.workers\.dev$/.test(origin)
+    workersDevSubdomain &&
+    /^[a-z0-9-]+$/.test(workersDevSubdomain) &&
+    new RegExp(`^https://ebda-(web|admin|orders)\\.${workersDevSubdomain}\\.workers\\.dev$`).test(
+      origin
+    )
   ) {
     return true;
   }

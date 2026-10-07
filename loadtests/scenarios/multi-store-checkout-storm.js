@@ -23,7 +23,7 @@ import { Trend } from 'k6/metrics';
 const orderLatency = new Trend('ms_place_order', true);
 const addToCartLatency = new Trend('ms_add_to_cart', true);
 
-const BASE = __ENV.BASE_URL || 'https://api-production-c058.up.railway.app/api/v1';
+const BASE = __ENV.BASE_URL || 'https://api.ebda.app/api/v1';
 
 if (!__ENV.STORE_IDS) {
   throw new Error('STORE_IDS env var is required (comma-separated seeded store UUIDs).');
@@ -107,9 +107,9 @@ export default function () {
         firstName: 'LoadTest',
         lastName: 'Buyer',
         email: `lt-${__VU}-${__ITER}@example.com`,
-        phone: '+96599999999',
+        phone: '+201000000000',
         address1: '1 Block Street',
-        city: 'Kuwait City',
+        city: 'Cairo',
         state: 'Capital',
         postalCode: '00000',
         country: 'KW',

@@ -2,11 +2,11 @@
   "ci": {
     "collect": {
       "url": [
-        "https://wadyaljuz.com/",
-        "https://wadyaljuz.com/products",
-        "https://wadyaljuz.com/products/fine-turkish-yellow-bulgur",
-        "https://wadyaljuz.com/cart",
-        "https://wadyaljuz.com/checkout"
+        "https://demo-shop.example/",
+        "https://demo-shop.example/products",
+        "https://demo-shop.example/products/fine-turkish-yellow-bulgur",
+        "https://demo-shop.example/cart",
+        "https://demo-shop.example/checkout"
       ],
       "numberOfRuns": 3,
       "settings": {

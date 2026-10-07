@@ -7,7 +7,7 @@
 //
 // Why this exists: merchants sometimes upload raw photos at 4K-8K width
 // without realizing the storefront will only ever render at ~1920px max.
-// Wady Aljuz's hero is currently 7986×3327 / 10 MB — Next/Image still
+// Demo Shop's hero is currently 7986×3327 / 10 MB — Next/Image still
 // downsamples on serve, but the 10 MB original sits in R2 forever and
 // every WebP-conversion pass loads the full file into memory. Downscaling
 // at the source keeps R2 lean + speeds up the AVIF/WebP pipeline.

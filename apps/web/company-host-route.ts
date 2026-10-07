@@ -3,7 +3,7 @@
  *
  * This Worker owns the WHOLE `ebda.app` zone (SaaS wildcard route), so it
  * sees EVERY host: the company apex, `store/admin/orders.ebda.app`, and every
- * merchant custom domain (pecannbee.com, wadyaljuz.com, …). This helper decides
+ * merchant custom domain (demo-store.example, demo-shop.example, …). This helper decides
  * what to do based ONLY on the hostname, with no side effects, so the routing
  * contract is unit-testable in isolation from the (heavy) Next handler.
  *

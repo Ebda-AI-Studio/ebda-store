@@ -163,7 +163,7 @@ function unsafeInterpolating(): { file: string; args: string[] }[] {
  * parameterised form.
  */
 const UNSAFE_INTERPOLATION_ALLOWED: Record<string, string> = {
-  'apps/api/src/lib/savepoint.ts': 'name is `fwb_sp_${counter}`, generated here',
+  'apps/api/src/lib/savepoint.ts': 'name is `ebda_sp_${counter}`, generated here',
   'apps/api/src/services/accounting/journal.service.ts': 'sp is `je_idem_${Date.now()}`',
   'apps/api/src/lib/inngest/functions/audit-log-archive.ts': 'a module constant',
   'packages/database/src/index.ts': 'SET LOCAL cannot bind; UUID-validated then quote-escaped',

@@ -176,7 +176,7 @@ interface PostHogPersonSearchResult {
  * data survived indefinitely while every log line said the erasure
  * succeeded):
  *
- *   1. FWB's storefront PostHog init (`PostHogProvider.tsx`) only ever
+ *   1. Ebda's storefront PostHog init (`PostHogProvider.tsx`) only ever
  *      holds the PUBLIC project key (`NEXT_PUBLIC_POSTHOG_KEY`) client-side.
  *      Deleting a person requires a PERSONAL API key with person-level
  *      write scope — that key must never reach the browser, and no

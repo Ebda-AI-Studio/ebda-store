@@ -70,7 +70,7 @@ if (STORE_ID_LIST.length === 0) {
 // Medium-traffic profile: ramp to 300 VUs (override via LENS_N_MAX_VUS) spread
 // randomly across the ~80 seeded stores. At the default 80 stores that's
 // ~3.75 concurrent VUs per store at peak — comparable to several dozen
-// small-to-mid Kuwait/GCC storefronts each seeing a handful of concurrent
+// small-to-mid Egyptian storefronts each seeing a handful of concurrent
 // shoppers at once, well short of a single-store flash-sale spike
 // (api-bursts.js covers that extreme separately). Sustained hold is where
 // the headroom measurement comes from — thresholds below assert the ceiling

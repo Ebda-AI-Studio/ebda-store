@@ -32,7 +32,7 @@ function platformRequest(path: string) {
   return new NextRequest(`https://ebda.app${path}`, {
     headers: {
       host: 'ebda.app',
-      cookie: 'x-store-slug=palora',
+      cookie: 'x-store-slug=demo-boutique',
       // A client cannot forge the signal either.
       'x-store-slug-source': 'cookie',
     },
@@ -48,17 +48,27 @@ function stubApi() {
         return new Response(
           JSON.stringify({
             data: {
-              store: { id: 'store_p', slug: 'palora', name: 'Palora', status: 'active' },
+              store: {
+                id: 'store_p',
+                slug: 'demo-boutique',
+                name: 'Demo Boutique',
+                status: 'active',
+              },
               enabledFeatures: ['agent_checkout', 'agent_feed'],
             },
           })
         );
       }
-      if (u.includes('/public/stores/palora')) {
+      if (u.includes('/public/stores/demo-boutique')) {
         return new Response(
           JSON.stringify({
             data: {
-              store: { id: 'store_p', slug: 'palora', name: 'Palora', status: 'active' },
+              store: {
+                id: 'store_p',
+                slug: 'demo-boutique',
+                name: 'Demo Boutique',
+                status: 'active',
+              },
               enabledFeatures: ['agent_checkout', 'agent_feed'],
             },
           })
@@ -102,7 +112,7 @@ describe('agent-discovery documents on the real middleware path (#2174)', () => 
     const { GET } = await import('../../apps/web/src/app/llms.txt/route');
     const res = await GET();
     const body = await res.text();
-    expect(body).not.toContain('Palora');
+    expect(body).not.toContain('Demo Boutique');
     expect(body).toContain('# Ebda');
     expect(res.headers.get('cache-control')).toMatch(/^public, s-maxage=/);
   });
@@ -123,15 +133,15 @@ describe('agent-discovery documents on the real middleware path (#2174)', () => 
   it('control: <slug>.ebda.app/llms.txt DOES answer as that store, from the Host', async () => {
     captureForwarded(
       middleware(
-        new NextRequest('https://palora.ebda.app/llms.txt', {
-          headers: { host: 'palora.ebda.app' },
+        new NextRequest('https://demo-boutique.ebda.app/llms.txt', {
+          headers: { host: 'demo-boutique.ebda.app' },
         })
       )
     );
-    expect(forwarded.get('x-store-domain')).toBe('palora.ebda.app');
+    expect(forwarded.get('x-store-domain')).toBe('demo-boutique.ebda.app');
     const { GET } = await import('../../apps/web/src/app/llms.txt/route');
     const res = await GET();
     expect(res.status).toBe(200);
-    expect(await res.text()).toContain('Palora');
+    expect(await res.text()).toContain('Demo Boutique');
   });
 });

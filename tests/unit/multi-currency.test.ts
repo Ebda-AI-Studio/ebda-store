@@ -55,10 +55,10 @@ describe('convertToBase — basic multiplication with half-up rounding', () => {
     expect(convertToBase(1, 0.5)).toBe(1);
   });
 
-  it('is exponent-aware: a 3-decimal currency (KWD fils) → EGP piastres divides by 10', () => {
-    // 1.000 KWD = 1000 fils @ 165 EGP/KWD = 165.00 EGP = 16500 piastres
-    expect(convertToBase(1000, 165, 'KWD')).toBe(16_500);
-    // and the same amount treated as piastres (the old FWB bug) would be 165000
+  it('is exponent-aware: a 3-decimal currency (BHD fils) → EGP piastres divides by 10', () => {
+    // 1.000 BHD = 1000 fils @ 165 EGP/BHD = 165.00 EGP = 16500 piastres
+    expect(convertToBase(1000, 165, 'BHD')).toBe(16_500);
+    // and the same amount treated as piastres (the old Ebda bug) would be 165000
     expect(convertMinor(1000, 165, 'EGP', 'EGP')).toBe(165_000);
   });
 });
@@ -126,8 +126,8 @@ describe('requiresFxRate', () => {
     expect(requiresFxRate('egp')).toBe(false);
   });
 
-  it('returns true for KWD (no longer the base)', () => {
-    expect(requiresFxRate('KWD')).toBe(true);
+  it('returns true for BHD (no longer the base)', () => {
+    expect(requiresFxRate('BHD')).toBe(true);
   });
 
   it('returns true for USD', () => {

@@ -48,7 +48,7 @@ import logger from '../lib/logger';
 export const MERCHANT_KEY_HEADER = 'x-merchant-key';
 
 /** Human-readable prefix, so a leaked key is greppable and self-identifying. */
-export const MERCHANT_KEY_PREFIX = 'fwbm_';
+export const MERCHANT_KEY_PREFIX = 'ebdam_';
 
 /**
  * Scope tiers. A key minted for reporting must not be able to delete a
@@ -91,7 +91,7 @@ export function generateMerchantKey(): { plaintext: string; hash: string; prefix
   return {
     plaintext,
     hash: hashMerchantKey(plaintext),
-    prefix: plaintext.slice(0, 13), // `fwbm_` + 8 chars
+    prefix: plaintext.slice(0, MERCHANT_KEY_PREFIX.length + 8), // `ebdam_` + 8 chars
   };
 }
 

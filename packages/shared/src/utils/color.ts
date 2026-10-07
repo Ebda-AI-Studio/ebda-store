@@ -168,7 +168,7 @@ export function resolveColor(value: ColorValue | undefined, theme: StoreTheme): 
     // --accent for every store, so the merchant's token choice still
     // resolves to a real color instead of silently dropping.
     //
-    // Verified FWB 2026-05-20 — wadyaljuz picked `token:card` for the
+    // Verified Ebda 2026-05-20 — demo-shop picked `token:card` for the
     // footer color zone but had no `cardColor` on the theme row; old code
     // returned undefined here, callers fell back to default → merchant
     // intent was silently lost across 14 cardFrameColor sites + the
@@ -294,7 +294,7 @@ export function pickReadableForeground(bg: string | undefined): '#ffffff' | '#00
   const lum = relativeLuminance(rgb);
   // 0.179 is the WCAG-correct flip point — the luminance value where contrast
   // against black and white is mathematically balanced (solving 20L²+2L-1=0).
-  // For #FF6E00 (FWB brand orange, L≈0.324) this returns BLACK because black
+  // For #FF6E00 (legacy orange, L≈0.324) this returns BLACK because black
   // gives 7.48:1 contrast (passes AA easily) while white gives 2.81:1 (fails AA).
   //
   // An earlier draft used 0.35 to make the helper return white-on-orange
@@ -541,14 +541,14 @@ export function deriveCoreBrandTokens(seeds: {
   if (isNewMode) {
     // ── New mode: seed from primary + secondary ──────────────────────────
     //
-    // Recipe reverse-engineered from wadyaljuz's hand-tuned palette (the one
+    // Recipe reverse-engineered from demo-shop's hand-tuned palette (the one
     // Ahmad chose by hand in the page builder) + the OSOSS reference set
-    // (pecannbee). The governing principle in BOTH: every neutral is a tint of
+    // (demo-store). The governing principle in BOTH: every neutral is a tint of
     // the PRIMARY hue at low saturation, laid out on a lightness ladder —
     // NOT generic Tailwind greys, and NOT a hardcoded blue-black foreground.
     // That single rule is what makes a palette read as cohesive / designed.
     //
-    // wadyaljuz ground truth (primary 348 68% 25%):
+    // demo-shop ground truth (primary 348 68% 25%):
     //   foreground/cardFg  348 30% 12%   ← darkest, body text
     //   secondaryFg        348 60% 18%   ← emphasis text
     //   mutedFg            348 12% 38%   ← supporting text / counts
@@ -575,7 +575,7 @@ export function deriveCoreBrandTokens(seeds: {
     const borderTriplet = tinted(12, 88); // hairlines / card strokes
 
     // Card + page background stay essentially white so product images read
-    // cleanly (wadyaljuz + pecannbee both float cards on near-white).
+    // cleanly (demo-shop + demo-store both float cards on near-white).
     const cardTriplet = '0 0% 100%';
     const backgroundTriplet = '0 0% 100%';
 
@@ -591,7 +591,7 @@ export function deriveCoreBrandTokens(seeds: {
     const accentSat = Math.round(Math.min(60, Math.max(25, secIsChromatic ? sParts!.s : Sp)));
     const accentTriplet = `${accentHue} ${accentSat}% 92%`;
 
-    // Secondary foreground: wadyaljuz pairs a DARK brand tint on its LIGHT
+    // Secondary foreground: demo-shop pairs a DARK brand tint on its LIGHT
     // secondary surface. When the merchant's secondary is itself dark/saturated,
     // flip to an auto-contrast foreground instead.
     const secondaryFg =

@@ -85,7 +85,7 @@ describe('WbsBridgeService.fetchMetadata', () => {
 
   const GOOD_METADATA: WbsMetadataResponse = {
     clientId: 'client-uuid-123',
-    businessName: 'Wady Aljuz',
+    businessName: 'Demo Shop',
     phoneNumber: '+96550012345',
     wabaId: 'waba-456',
     templates: [
@@ -116,7 +116,7 @@ describe('WbsBridgeService.fetchMetadata', () => {
     const result = await service.fetchMetadata(TEST_KEY);
 
     expect(result.clientId).toBe('client-uuid-123');
-    expect(result.businessName).toBe('Wady Aljuz');
+    expect(result.businessName).toBe('Demo Shop');
     expect(result.templates).toHaveLength(1);
     expect(result.templates[0].variableCount).toBe(3);
   });

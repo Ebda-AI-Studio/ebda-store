@@ -1,4 +1,4 @@
-// The Gmail alert poller is FWB ops plumbing (R-EBDA-001 §5: dropped). Ebda's alerts
+// The Gmail alert poller is Ebda ops plumbing (R-EBDA-001 §5: dropped). Ebda's alerts
 // come from Sentry and the status page.
 import { unavailable } from './_unavailable';
 

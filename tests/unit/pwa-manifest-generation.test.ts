@@ -168,7 +168,7 @@ describe('PWAService.generateManifest — Arabic identity members', () => {
 
   it('emits the merchant-authored appNameAr / shortNameAr / descriptionAr', async () => {
     findUniqueMock.mockResolvedValue({
-      name: 'Wady Aljuz',
+      name: 'Demo Shop',
       nameAr: 'وادي الجوز',
       pwaSettings: { appNameAr: 'تطبيق وادي', shortNameAr: 'وادي', descriptionAr: 'تسوق الآن' },
     });
@@ -177,11 +177,11 @@ describe('PWAService.generateManifest — Arabic identity members', () => {
     expect(m.name_ar).toBe('تطبيق وادي');
     expect(m.short_name_ar).toBe('وادي');
     expect(m.description_ar).toBe('تسوق الآن');
-    expect(m.name).toBe('Wady Aljuz'); // standard member unchanged
+    expect(m.name).toBe('Demo Shop'); // standard member unchanged
   });
 
   it('falls back to the store Arabic name when the PWA tab left the Arabic fields blank', async () => {
-    findUniqueMock.mockResolvedValue({ name: 'Wady Aljuz', nameAr: 'وادي الجوز', pwaSettings: {} });
+    findUniqueMock.mockResolvedValue({ name: 'Demo Shop', nameAr: 'وادي الجوز', pwaSettings: {} });
     const { PWAService } = await import('@api/services/pwa.service');
     const m = (await PWAService.generateManifest(STORE_ID)) as M;
     expect(m.name_ar).toBe('وادي الجوز');

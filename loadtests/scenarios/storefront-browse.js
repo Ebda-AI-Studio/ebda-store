@@ -14,7 +14,7 @@ const productListLatency = new Trend('product_list_latency', true);
 const categoryListLatency = new Trend('category_list_latency', true);
 const productDetailLatency = new Trend('product_detail_latency', true);
 
-const BASE = __ENV.BASE_URL || 'https://api-production-c058.up.railway.app/api/v1';
+const BASE = __ENV.BASE_URL || 'https://api.ebda.app/api/v1';
 const STORE_ID = __ENV.STORE_ID; // required
 
 if (!STORE_ID) {

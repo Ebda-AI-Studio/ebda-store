@@ -10,7 +10,7 @@
 // To change what actually deploys, edit scripts/cf-setup-local.sh.
 
 {
-  "name": "force-web-cf-preview",
+  "name": "ebda-web",
   // Custom worker entry (NOT the raw OpenNext output) — wraps the generated
   // fetch handler with @sentry/cloudflare so SSR/RSC errors are captured on
   // this target. See apps/web/sentry-worker-entry.ts for the why + sources.
@@ -21,7 +21,7 @@
   "compatibility_date": "2025-08-16",
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
-  "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "force-web-isr-cache" }],
+  "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "ebda-web-isr-cache" }],
   "routes": [
     { "pattern": "ebda.app", "custom_domain": true },
     { "pattern": "cf.ebda.app", "custom_domain": true },

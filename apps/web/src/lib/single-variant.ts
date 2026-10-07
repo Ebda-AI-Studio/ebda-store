@@ -1,5 +1,5 @@
 /**
- * Owner report 2026-09-30 (pecannbee): a product with exactly ONE variant
+ * Owner report 2026-09-30 (demo-store): a product with exactly ONE variant
  * (e.g. "Size: 380 Gram") showed a one-option picker and a disabled
  * "Select Options" / "اختر الخيارات" button until the shopper tapped the only
  * option. When there is nothing to choose, the PDP now starts with that option

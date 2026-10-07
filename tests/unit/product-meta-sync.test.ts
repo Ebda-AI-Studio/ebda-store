@@ -82,9 +82,9 @@ describe('productMetaSync', () => {
         findUnique: vi.fn().mockResolvedValue({
           metaCatalogId: 'cat123',
           settings: { wbsBaseUrl: 'http://wbs:3001' },
-          name: 'Wady Aljuz',
-          slug: 'wady-aljuz',
-          domain: 'wadyaljuz.com',
+          name: 'Demo Shop',
+          slug: 'demo-shop',
+          domain: 'demo-shop.example',
           currency: 'EGP',
         }),
       },
@@ -114,8 +114,8 @@ describe('productMetaSync', () => {
     // payload enriched with the Meta feed fields WBS can't derive
     const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(sent.product).toMatchObject({
-      link: 'https://wadyaljuz.com/products/test-product',
-      brand: 'Wady Aljuz',
+      link: 'https://demo-shop.example/products/test-product',
+      brand: 'Demo Shop',
       currency: 'EGP',
     });
   });
@@ -164,8 +164,8 @@ describe('productMetaSync', () => {
         findUnique: vi.fn().mockResolvedValue({
           metaCatalogId: 'cat123',
           settings: { wbsBaseUrl: 'http://wbs:3001' },
-          name: 'Palora',
-          slug: 'palora',
+          name: 'Demo Boutique',
+          slug: 'demo-boutique',
           domain: null,
           currency: 'EGP',
         }),
@@ -205,8 +205,8 @@ describe('productMetaSync', () => {
         findUnique: vi.fn().mockResolvedValue({
           metaCatalogId: 'cat123',
           settings: { wbsBaseUrl: 'http://wbs:3001' },
-          name: 'Palora',
-          slug: 'palora',
+          name: 'Demo Boutique',
+          slug: 'demo-boutique',
           domain: null,
           currency: 'EGP',
         }),
@@ -245,8 +245,8 @@ describe('productMetaSync', () => {
         findUnique: vi.fn().mockResolvedValue({
           metaCatalogId: 'cat123',
           settings: { wbsBaseUrl: 'http://wbs:3001' },
-          name: 'Palora',
-          slug: 'palora',
+          name: 'Demo Boutique',
+          slug: 'demo-boutique',
           domain: null,
           currency: 'EGP',
         }),
@@ -285,8 +285,8 @@ describe('productMetaSync', () => {
         findUnique: vi.fn().mockResolvedValue({
           metaCatalogId: 'cat123',
           settings: { wbsBaseUrl: 'http://wbs:3001' },
-          name: 'Palora',
-          slug: 'palora',
+          name: 'Demo Boutique',
+          slug: 'demo-boutique',
           domain: null,
           currency: 'EGP',
         }),

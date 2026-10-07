@@ -4,7 +4,7 @@ import { prisma, withSystemJob, type Prisma } from '@force/database';
 /**
  * Typed wrappers for the SECURITY DEFINER functions of the strict-RLS migration
  * (`20261004000000_ebda_strict_rls`). They are the ONLY way the API reaches data
- * before a store or user is known, or across stores. FWB did the same with an
+ * before a store or user is known, or across stores. Ebda did the same with an
  * `app.bypass_rls` GUC that the policies honoured; under `ebda_app` there is no
  * such flag, only these narrow, named functions (fixed search_path, exact-key
  * lookups, no dynamic SQL).

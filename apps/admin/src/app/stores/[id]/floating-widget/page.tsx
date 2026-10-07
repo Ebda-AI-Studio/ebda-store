@@ -411,7 +411,7 @@ export default function FloatingWidgetPage() {
                               placeholder={
                                 store?.whatsapp
                                   ? t('usingStoreWhatsapp', { value: store.whatsapp })
-                                  : '96522668490'
+                                  : '201001234567'
                               }
                               className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                             />
@@ -444,7 +444,7 @@ export default function FloatingWidgetPage() {
                             placeholder={
                               store?.socialLinks?.instagram
                                 ? t('usingStoreInstagram', { value: store.socialLinks.instagram })
-                                : 'wadyaljuz'
+                                : 'demo-shop'
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
@@ -462,7 +462,7 @@ export default function FloatingWidgetPage() {
                             placeholder={
                               store?.phone
                                 ? t('usingStorePhone', { value: store.phone })
-                                : '+96522668490'
+                                : '+201001234567'
                             }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />

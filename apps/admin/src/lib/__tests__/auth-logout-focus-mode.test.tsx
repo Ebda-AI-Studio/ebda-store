@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Regression for #174: FocusModeContext restores `fwb_focus_mode` from
+ * Regression for #174: FocusModeContext restores `ebda_focus_mode` from
  * localStorage on mount with NO per-user validation, and logout() only ever
  * cleared accessToken/refreshToken/csrfToken. A second admin signing into
  * the same device inherited whichever store the PREVIOUS admin last

@@ -63,7 +63,6 @@ const GCC_COUNTRY_AR: Record<string, string> = {
   Qatar: 'قطر',
   Bahrain: 'البحرين',
   Oman: 'عُمان',
-  Kuwait: 'الكويت',
 };
 
 interface LocationsClientProps {

@@ -6,7 +6,7 @@ import { check } from 'k6';
 // Targets the same edge-cached read endpoints as storefront-browse
 // but with much heavier concurrency and no think-time.
 
-const BASE = __ENV.BASE_URL || 'https://api-production-c058.up.railway.app/api/v1';
+const BASE = __ENV.BASE_URL || 'https://api.ebda.app/api/v1';
 const STORE_ID = __ENV.STORE_ID;
 
 if (!STORE_ID) {

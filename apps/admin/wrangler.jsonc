@@ -1,5 +1,5 @@
 {
-  "name": "force-admin-cf-preview",
+  "name": "ebda-admin",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-03-25",
   "compatibility_flags": ["nodejs_compat"],
@@ -7,12 +7,12 @@
   "routes": [
     {
       "pattern": "admin.ebda.app",
-      "custom_domain": true
+      "custom_domain": true,
     },
     {
       "pattern": "admin.ebda.app/*",
-      "zone_name": "ebda.app"
-    }
+      "zone_name": "ebda.app",
+    },
   ],
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
 }

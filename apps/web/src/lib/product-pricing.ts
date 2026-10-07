@@ -5,7 +5,7 @@ import { formatMoney } from '@force/shared';
  * The Product row carries its own `price` + `compareAtPrice` even when
  * the product has variants — but those parent-level values are usually
  * stale defaults from before the merchant configured variants (see the
- * Wady Aljuz olive-oil consolidation: parent retained a pre-fold
+ * Demo Shop olive-oil consolidation: parent retained a pre-fold
  * compareAtPrice of 20 EGP that no variant inherited, producing a
  * fake "20% OFF" badge on the storefront card).
  *

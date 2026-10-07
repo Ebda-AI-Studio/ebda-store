@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate the Cloudflare/OpenNext worker config for the FWB Next apps so
+# Generate the Cloudflare/OpenNext worker config for the Ebda Next apps so
 # `bash scripts/cf-build.sh <app>` then `wrangler deploy` works.
 #
 # apps/<app>/open-next.config.ts and wrangler.jsonc ARE committed (.gitignore
@@ -33,32 +33,32 @@ done
 
 # 2. per-app open-next.config.ts + wrangler.jsonc
 #
-# ROUTES — the `force-ai.co` production hostnames each worker owns. These MUST be
+# ROUTES — the `ebda.app` production hostnames each worker owns. These MUST be
 # emitted here so a CI `wrangler deploy` (.github/workflows/cf-deploy.yml) binds
 # the correct domains; a route-less worker deploys to *.workers.dev only and the
 # live custom hostnames stop resolving.
 #
 # web carries an extra `*/*` zone route: it is the Cloudflare-for-SaaS FALLBACK
-# ORIGIN, so every merchant Custom Hostname (wadyaljuz.com, …) proxies through
+# ORIGIN, so every merchant Custom Hostname (demo-shop.example, …) proxies through
 # the storefront worker. A bare fallback-origin custom domain alone returns HTTP
 # 522 — the `*/*` zone route is what makes the worker actually answer those
 # proxied requests (GOTCHA 4 in the cutover runbook).
 #
 # CRITICAL (GOTCHA 5, 2026-06-25): that `*/*` route OVERRIDES the admin/orders
 # custom domains in the SAME zone — Cloudflare does NOT let a custom domain win
-# over a `*/*` zone route, so admin/orders.force-ai.co would just serve the
+# over a `*/*` zone route, so admin/orders.ebda.app would just serve the
 # storefront. The fix: give admin/orders a MORE-SPECIFIC zone route
-# (`admin.force-ai.co/*`) which DOES beat `*/*`. So each carries BOTH its
+# (`admin.ebda.app/*`) which DOES beat `*/*`. So each carries BOTH its
 # custom_domain (for DNS + edge cert) AND the specific zone route (to win routing
 # priority). wrangler accepts both for the same host. Verified live 2026-06-25.
 for app in "${APPS[@]}"; do
   dir="$ROOT/apps/$app"
   [ -d "$dir" ] || { echo "skip config: no apps/$app"; continue; }
-  # Brand authority, not inherited FWB hostnames. CI builds shared first.
+  # Brand authority, not inherited Ebda hostnames. CI builds shared first.
   ROUTES_JSON="$(node "$ROOT/scripts/cf-routes.cjs" "$app")"
   # apps/web deploys a CUSTOM Worker entry (sentry-worker-entry.ts) that wraps the
   # OpenNext handler with @sentry/cloudflare (SSR error capture) AND reverse-proxies
-  # the force-ai.co / www company apex to Cloudflare Pages. Other apps deploy the raw
+  # the ebda.app / www company apex to Cloudflare Pages. Other apps deploy the raw
   # OpenNext worker. Keep this in sync with the committed apps/web/wrangler.jsonc —
   # this generator OVERWRITES that file, so `main` MUST be set here too (else the
   # custom entry is silently dropped and Sentry SSR + the apex proxy never deploy).
@@ -76,7 +76,7 @@ for app in "${APPS[@]}"; do
   # ACROSS isolates — a merchant theme/brand-color save then applies in ~1s
   # instead of up to ~15s (each isolate's memory cache was independent).
   #
-  # PRE-REQS before enabling: the R2 bucket `force-web-opennext-cache` must exist
+  # PRE-REQS before enabling: the R2 bucket `ebda-web-opennext-cache` must exist
   # (cf-deploy.yml creates it idempotently), and the change MUST be verified on a
   # CF PREVIEW deploy first — the DO binding class names below are the documented
   # OpenNext names and must match `.open-next/worker.js`'s exports for that
@@ -129,13 +129,13 @@ EOF
     fi
     cat > "$dir/wrangler.jsonc" <<EOF
 {
-  "name": "force-$app-cf-preview",
+  "name": "ebda-$app",
   "main": "${MAIN_ENTRY}",
   "compatibility_date": "${COMPAT_DATE}",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
-  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "force-$app-cf-preview" }],
-  "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "force-web-opennext-cache" }],
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "ebda-$app" }],
+  "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "ebda-web-opennext-cache" }],
   "durable_objects": { "bindings": [
     { "name": "NEXT_TAG_CACHE_DO_SHARDED", "class_name": "DOShardedTagCache" },
     { "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" }
@@ -152,7 +152,7 @@ export default defineCloudflareConfig({});
 EOF
     cat > "$dir/wrangler.jsonc" <<EOF
 {
-  "name": "force-$app-cf-preview",
+  "name": "ebda-$app",
   "main": "${MAIN_ENTRY}",
   "compatibility_date": "${COMPAT_DATE}",
   "compatibility_flags": ["nodejs_compat"],

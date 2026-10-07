@@ -96,7 +96,7 @@ export interface CallGeminiBatchOpts<TItem> {
   storeId: string;
   /**
    * Milliseconds to wait between calls. Defaults to 2500 (Gemini free-tier
-   * ~30 RPM = 2s min gap; 2.5s is the established FWB default).
+   * ~30 RPM = 2s min gap; 2.5s is the established Ebda default).
    * Pass `Store.aiBulkThrottleMs` here for per-store tuning.
    */
   throttleMs?: number;

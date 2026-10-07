@@ -7,7 +7,7 @@
  * palettes built to break a naive derivation — on every surface the text sits
  * on, bare and under every tint up to 30%, at WCAG AA (4.5:1).
  *
- * A store whose theme sets `legacyBannerContrast: true` (pecannbee, pinned by
+ * A store whose theme sets `legacyBannerContrast: true` (demo-store, pinned by
  * data — Ruling BC-1) gets `--<role>-ink: var(--<role>)`, i.e. the ink IS the
  * role colour and the text renders exactly as before. That pass-through must
  * survive every emitter: the shared themeToCssVars, the SSR style tag
@@ -195,7 +195,7 @@ describe('per-store inks read at >= 4.5:1 (default, issue 2349)', () => {
   });
 });
 
-describe('legacyBannerContrast: the ink is the role colour (pecannbee, Ruling BC-1)', () => {
+describe('legacyBannerContrast: the ink is the role colour (demo-store, Ruling BC-1)', () => {
   const legacy = { ...DEFAULT_THEME, legacyBannerContrast: true } as StoreTheme;
 
   it('themeToCssVars emits var(--<role>) for every ink', () => {
@@ -298,7 +298,7 @@ describe('page surface wrapper (merchant page colour on cart / checkout / PDP / 
   );
 });
 
-describe('no slug branching (Ruling BC-1: pecannbee is pinned by data)', () => {
+describe('no slug branching (Ruling BC-1: demo-store is pinned by data)', () => {
   it.each([
     'packages/shared/src/utils/status-ink.ts',
     'apps/web/src/lib/page-surface.ts',
@@ -306,7 +306,7 @@ describe('no slug branching (Ruling BC-1: pecannbee is pinned by data)', () => {
     'apps/web/src/contexts/StoreContext.tsx',
   ])('%s never branches on a store', file => {
     const src = readFileSync(join(REPO, file), 'utf8');
-    expect(src).not.toMatch(/['"`](pecannbee|wadyaljuz|palora)['"`]/i);
+    expect(src).not.toMatch(/['"`](demo-store|demo-shop|demo-boutique)['"`]/i);
     expect(src).not.toMatch(/\.slug\s*[!=]==/);
   });
 });

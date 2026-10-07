@@ -1,7 +1,7 @@
 /**
- * No workflow may use a sparse checkout (inherited from FWB, 2026-09-30).
+ * No workflow may use a sparse checkout (inherited from Ebda, 2026-09-30).
  *
- * FWB's persistent workspace once kept `core.sparseCheckout` on after a sparse
+ * Ebda's persistent workspace once kept `core.sparseCheckout` on after a sparse
  * probe job, and the next plain checkout reused it (a tree of only `scripts/`,
  * so `npm ci` found no package-lock.json). Ebda's hosted runners are
  * ephemeral, so the leak cannot recur there, and the guard that undid it is

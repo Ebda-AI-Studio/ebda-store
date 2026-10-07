@@ -9,7 +9,7 @@ export interface DbEnv {
   BASE_DOMAIN: string;
 }
 
-export const GUC_STORE = 'app.current_store_id'; // same names as FWB
+export const GUC_STORE = 'app.current_store_id'; // same names as Ebda
 export const GUC_USER = 'app.current_user_id';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -29,7 +29,10 @@ export function makePrisma(env: DbEnv): PrismaClient {
 
 /** Transaction-LOCAL GUCs. `true` = is_local: reverts at COMMIT/ROLLBACK, so a pooler
  *  that hands this server connection to another tenant next can never see it. */
-export async function setTenantGucs(tx: Tx, g: { storeId?: string; userId?: string }): Promise<void> {
+export async function setTenantGucs(
+  tx: Tx,
+  g: { storeId?: string; userId?: string }
+): Promise<void> {
   if (g.storeId !== undefined) {
     if (!UUID_RE.test(g.storeId)) throw new Error('Invalid store ID format');
     await tx.$queryRaw`SELECT set_config('app.current_store_id', ${g.storeId}, true)`;
@@ -40,10 +43,24 @@ export async function setTenantGucs(tx: Tx, g: { storeId?: string; userId?: stri
   }
 }
 
-export interface Reply { status: number; body: unknown; headers?: Record<string, string> }
-export interface Scope { storeId: string; userId?: string; defer(fn: () => Promise<void>): void; backendPid?: number }
+export interface Reply {
+  status: number;
+  body: unknown;
+  headers?: Record<string, string>;
+}
+export interface Scope {
+  storeId: string;
+  userId?: string;
+  defer(fn: () => Promise<void>): void;
+  backendPid?: number;
+}
 
-export interface RequestResult { reply: Reply; deferred: Array<() => Promise<void>>; txMs: number; pid?: number }
+export interface RequestResult {
+  reply: Reply;
+  deferred: Array<() => Promise<void>>;
+  txMs: number;
+  pid?: number;
+}
 
 /**
  * ONE interactive transaction per request:
@@ -60,27 +77,31 @@ export async function runRequest(
   opts: { wantPid?: boolean } = {}
 ): Promise<RequestResult> {
   const key: HostKey | null = parseHost(host, env.BASE_DOMAIN);
-  if (!key) return { reply: { status: 404, body: { error: 'unknown_host' } }, deferred: [], txMs: 0 };
+  if (!key)
+    return { reply: { status: 404, body: { error: 'unknown_host' } }, deferred: [], txMs: 0 };
   const prisma = makePrisma(env);
   const deferred: Array<() => Promise<void>> = [];
   const t0 = performance.now();
   try {
     const reply = await prisma.$transaction(
-      async (tx) => {
-        const rows = await tx.$queryRaw<{ id: string | null }[]>`SELECT resolve_store_id(${key.slug}, ${key.domain}) AS id`;
+      async tx => {
+        const rows = await tx.$queryRaw<
+          { id: string | null }[]
+        >`SELECT resolve_store_id(${key.slug}, ${key.domain}) AS id`;
         const storeId = rows[0]?.id;
         if (!storeId) return { status: 404, body: { error: 'unknown_host' } } as Reply;
         await setTenantGucs(tx, { storeId, userId });
-        const scope: Scope = { storeId, userId, defer: (fn) => void deferred.push(fn) };
+        const scope: Scope = { storeId, userId, defer: fn => void deferred.push(fn) };
         if (opts.wantPid) {
           const p = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
           scope.backendPid = p[0]?.pid;
         }
         const r = await handler(tx, scope);
-        if (scope.backendPid) r.headers = { ...r.headers, 'x-ebda-backend-pid': String(scope.backendPid) };
+        if (scope.backendPid)
+          r.headers = { ...r.headers, 'x-ebda-backend-pid': String(scope.backendPid) };
         return r;
       },
-      { maxWait: 5000, timeout: 10000 } // FWB uses maxWait 10s / timeout 30s; tighter here, edge requests are short
+      { maxWait: 5000, timeout: 10000 } // Ebda uses maxWait 10s / timeout 30s; tighter here, edge requests are short
     );
     // A handler that returns a 5xx should roll back; we throw inside handlers for that, so commit happened here.
     return { reply, deferred, txMs: performance.now() - t0 };

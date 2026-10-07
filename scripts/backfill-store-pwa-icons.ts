@@ -5,8 +5,8 @@
  * pre-B5 three-field form, but hasn't run the new generator yet.
  *
  * docs/superpowers/plans/2026-05-04-storefront-per-store-pwa-full-sizes.md,
- * task 7. As of 2026-09-25 there are 3 live stores (pecannbee, palora,
- * wady-aljuz) — this is small and one-off, not a recurring job.
+ * task 7. As of 2026-09-25 there are 3 live stores (demo-store, demo-boutique,
+ * demo-shop) — this is small and one-off, not a recurring job.
  *
  * DEVIATION FROM THE 2026-05-04 PLAN: written as `.ts` (not `.mjs`) so it can
  * import `generatePwaIconSet`/`PWAService` directly from
@@ -41,7 +41,7 @@
  *   railway run --service api -- npx tsx ../../scripts/backfill-store-pwa-icons.ts
  *
  *   # Scope to one store while testing:
- *   railway run --service api -- npx tsx ../../scripts/backfill-store-pwa-icons.ts --store palora
+ *   railway run --service api -- npx tsx ../../scripts/backfill-store-pwa-icons.ts --store demo-boutique
  *
  *   # Apply for real, once the dry-run output looks right:
  *   railway run --service api -- npx tsx ../../scripts/backfill-store-pwa-icons.ts --apply

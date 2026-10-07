@@ -42,7 +42,7 @@ describe('middleware — internal rewrite target is not externally addressable',
   // the routing flag is on or off, because the route tree exists either way.
   it('404s /tenant-store/* with the flag off', () => {
     const res = middleware(
-      req('https://wadyaljuz.com/tenant-store/x/en/products', 'wadyaljuz.com')
+      req('https://demo-shop.example/tenant-store/x/en/products', 'demo-shop.example')
     );
     expect(res.status).toBe(404);
   });
@@ -50,7 +50,7 @@ describe('middleware — internal rewrite target is not externally addressable',
   it('404s /tenant-store/* with the flag on', () => {
     process.env.STOREFRONT_TENANT_ROUTING = 'true';
     const res = middleware(
-      req('https://wadyaljuz.com/tenant-store/x/en/products', 'wadyaljuz.com')
+      req('https://demo-shop.example/tenant-store/x/en/products', 'demo-shop.example')
     );
     expect(res.status).toBe(404);
   });
@@ -63,10 +63,12 @@ describe('middleware — internal rewrite target is not externally addressable',
 
 describe('middleware — www→apex canonicalisation', () => {
   it('301s a www custom domain to its apex, preserving path and query', () => {
-    const res = middleware(req('https://www.wadyaljuz.com/products?page=2', 'www.wadyaljuz.com'));
+    const res = middleware(
+      req('https://www.demo-shop.example/products?page=2', 'www.demo-shop.example')
+    );
     expect(res.status).toBe(301);
     const loc = new URL(res.headers.get('location') as string);
-    expect(loc.host).toBe('wadyaljuz.com');
+    expect(loc.host).toBe('demo-shop.example');
     expect(loc.pathname).toBe('/products');
     expect(loc.search).toBe('?page=2');
   });
@@ -80,17 +82,17 @@ describe('middleware — www→apex canonicalisation', () => {
 
 describe('middleware — custom domain store binding', () => {
   it('binds the store via x-store-domain on the response', () => {
-    const res = middleware(req('https://wadyaljuz.com/products', 'wadyaljuz.com'));
-    expect(res.headers.get('x-store-domain')).toBe('wadyaljuz.com');
+    const res = middleware(req('https://demo-shop.example/products', 'demo-shop.example'));
+    expect(res.headers.get('x-store-domain')).toBe('demo-shop.example');
   });
 
   it('rewrites /favicon.ico to the per-store favicon route', () => {
-    const res = middleware(req('https://wadyaljuz.com/favicon.ico', 'wadyaljuz.com'));
+    const res = middleware(req('https://demo-shop.example/favicon.ico', 'demo-shop.example'));
     expect(rewriteOf(res)).toContain('/api/store-favicon');
   });
 
   it('does NOT re-rewrite the favicon once the sf marker is present (loop guard)', () => {
-    const res = middleware(req('https://wadyaljuz.com/favicon.ico?sf=1', 'wadyaljuz.com'));
+    const res = middleware(req('https://demo-shop.example/favicon.ico?sf=1', 'demo-shop.example'));
     expect(rewriteOf(res) ?? '').not.toContain('/api/store-favicon');
   });
 
@@ -104,7 +106,7 @@ describe('middleware — a platform host never resolves a store (no path, no coo
   const ctx = (res: Response, name: string) => res.headers.get(`x-middleware-request-${name}`);
 
   it('does NOT treat the first path segment as a store slug (no rewrite, no store context)', () => {
-    const res = middleware(req('https://ebda.app/palora/products', 'ebda.app'));
+    const res = middleware(req('https://ebda.app/demo-boutique/products', 'ebda.app'));
     expect(rewriteOf(res)).toBeNull();
     expect(ctx(res, 'x-store-domain')).toBeNull();
     expect(ctx(res, 'x-store-slug')).toBeNull();
@@ -112,13 +114,13 @@ describe('middleware — a platform host never resolves a store (no path, no coo
   });
 
   it('does NOT set a sticky store cookie', () => {
-    const res = middleware(req('https://ebda.app/palora/products', 'ebda.app'));
+    const res = middleware(req('https://ebda.app/demo-boutique/products', 'ebda.app'));
     expect(res.headers.get('set-cookie') ?? '').not.toContain('x-store-slug');
   });
 
   it('ignores a legacy x-store-slug cookie: it neither names a store nor is forwarded', () => {
     const res = middleware(
-      req('https://ebda.app/products', 'ebda.app', { cookie: 'x-store-slug=palora' })
+      req('https://ebda.app/products', 'ebda.app', { cookie: 'x-store-slug=demo-boutique' })
     );
     expect(ctx(res, 'x-store-slug')).toBeNull();
     expect(ctx(res, 'x-store-domain')).toBeNull();
@@ -131,14 +133,16 @@ describe('middleware — preview draft isolation', () => {
   // browser for previewing.
   it('sets the draft cookie inside the admin preview iframe', () => {
     const res = middleware(
-      req('https://wadyaljuz.com/?_layoutDraft=tok123&_preview=9', 'wadyaljuz.com')
+      req('https://demo-shop.example/?_layoutDraft=tok123&_preview=9', 'demo-shop.example')
     );
     expect(res.headers.get('set-cookie') ?? '').toContain('force-preview-draft=tok123');
   });
 
   it('clears a stale draft cookie for a normal visitor (no _preview)', () => {
     const res = middleware(
-      req('https://wadyaljuz.com/', 'wadyaljuz.com', { cookie: 'force-preview-draft=tok123' })
+      req('https://demo-shop.example/', 'demo-shop.example', {
+        cookie: 'force-preview-draft=tok123',
+      })
     );
     const setCookie = res.headers.get('set-cookie') ?? '';
     expect(setCookie).toContain('force-preview-draft=');
@@ -147,7 +151,9 @@ describe('middleware — preview draft isolation', () => {
 
   it('does not set a draft cookie when _layoutDraft is present without _preview', () => {
     // A token in the URL alone is not proof of an admin iframe.
-    const res = middleware(req('https://wadyaljuz.com/?_layoutDraft=tok123', 'wadyaljuz.com'));
+    const res = middleware(
+      req('https://demo-shop.example/?_layoutDraft=tok123', 'demo-shop.example')
+    );
     expect(res.headers.get('set-cookie') ?? '').not.toContain('force-preview-draft=tok123');
   });
 });
@@ -165,7 +171,7 @@ describe('middleware — agent/feed documents resolve the store from the Host al
     '/feeds/products.json',
   ])('apex %s with a legacy x-store-slug cookie carries NO store context', p => {
     const res = middleware(
-      req(`https://ebda.app${p}`, 'ebda.app', { cookie: 'x-store-slug=palora' })
+      req(`https://ebda.app${p}`, 'ebda.app', { cookie: 'x-store-slug=demo-boutique' })
     );
     expect(forwardedDomain(res)).toBeNull();
     expect(res.headers.get('x-middleware-request-x-store-slug')).toBeNull();
@@ -175,18 +181,18 @@ describe('middleware — agent/feed documents resolve the store from the Host al
   it.each(['/llms.txt', '/.well-known/acp.json', '/feeds/products.json'])(
     '<slug>.ebda.app%s carries that host as the store',
     p => {
-      const res = middleware(req(`https://palora.ebda.app${p}`, 'palora.ebda.app'));
-      expect(forwardedDomain(res)).toBe('palora.ebda.app');
+      const res = middleware(req(`https://demo-boutique.ebda.app${p}`, 'demo-boutique.ebda.app'));
+      expect(forwardedDomain(res)).toBe('demo-boutique.ebda.app');
     }
   );
 
   it('a store host ignores a cookie naming another store', () => {
     const res = middleware(
-      req('https://palora.ebda.app/products', 'palora.ebda.app', {
-        cookie: 'x-store-slug=pecannbee',
+      req('https://demo-boutique.ebda.app/products', 'demo-boutique.ebda.app', {
+        cookie: 'x-store-slug=demo-store',
       })
     );
-    expect(forwardedDomain(res)).toBe('palora.ebda.app');
+    expect(forwardedDomain(res)).toBe('demo-boutique.ebda.app');
     expect(res.headers.get('x-middleware-request-x-store-slug')).toBeNull();
   });
 });
@@ -209,7 +215,7 @@ describe('middleware — client-supplied store-context headers never reach the r
   };
 
   it('custom domain: a spoofed x-is-platform / slug / draft is stripped', () => {
-    const res = middleware(req('https://wadyaljuz.com/products', 'wadyaljuz.com', SPOOF));
+    const res = middleware(req('https://demo-shop.example/products', 'demo-shop.example', SPOOF));
     // Re-asserted as 'false' (never absent) so layout.tsx can tell a custom
     // domain apart from "middleware did not run" (#2091).
     expect(forwarded(res, 'x-is-platform')).toBe('false');
@@ -217,9 +223,9 @@ describe('middleware — client-supplied store-context headers never reach the r
     expect(forwarded(res, 'x-store-slug-source')).toBeNull();
     expect(forwarded(res, 'x-preview-draft')).toBeNull();
     // The authentic values are re-asserted from the Host.
-    expect(forwarded(res, 'x-store-domain')).toBe('wadyaljuz.com');
-    expect(forwarded(res, 'x-store-identifier')).toBe('wadyaljuz.com');
-    expect(forwarded(res, 'x-original-host')).toBe('wadyaljuz.com');
+    expect(forwarded(res, 'x-store-domain')).toBe('demo-shop.example');
+    expect(forwarded(res, 'x-store-identifier')).toBe('demo-shop.example');
+    expect(forwarded(res, 'x-original-host')).toBe('demo-shop.example');
   });
 
   it('platform host: a spoofed x-store-domain cannot make /llms.txt answer as another store', () => {
@@ -233,11 +239,11 @@ describe('middleware — client-supplied store-context headers never reach the r
 
   it('a draft header outside the preview iframe is dropped, inside it is re-derived', () => {
     const outside = middleware(
-      req('https://wadyaljuz.com/', 'wadyaljuz.com', { 'x-preview-draft': 'forged' })
+      req('https://demo-shop.example/', 'demo-shop.example', { 'x-preview-draft': 'forged' })
     );
     expect(forwarded(outside, 'x-preview-draft')).toBeNull();
     const inside = middleware(
-      req('https://wadyaljuz.com/?_preview=1&_layoutDraft=real', 'wadyaljuz.com', {
+      req('https://demo-shop.example/?_preview=1&_layoutDraft=real', 'demo-shop.example', {
         'x-preview-draft': 'forged',
       })
     );
@@ -263,16 +269,16 @@ describe('middleware — /manifest.webmanifest gets the same store context as a 
 
   it('custom domain: the manifest request carries x-store-domain', () => {
     const res = middleware(
-      req('https://pecannbee.com.kw/manifest.webmanifest', 'pecannbee.com.kw')
+      req('https://demo-store.example/manifest.webmanifest', 'demo-store.example')
     );
-    expect(res.headers.get('x-middleware-request-x-store-domain')).toBe('pecannbee.com.kw');
+    expect(res.headers.get('x-middleware-request-x-store-domain')).toBe('demo-store.example');
     expect(rewriteOf(res)).toBeNull();
   });
 
   it('platform host: the manifest carries no store context, even with a legacy cookie', () => {
     const res = middleware(
       req('https://ebda.app/manifest.webmanifest', 'ebda.app', {
-        cookie: 'x-store-slug=palora',
+        cookie: 'x-store-slug=demo-boutique',
       })
     );
     expect(rewriteOf(res)).toBeNull();
@@ -281,7 +287,9 @@ describe('middleware — /manifest.webmanifest gets the same store context as a 
   });
 
   it('<slug>.ebda.app: the manifest request carries the host as the store', () => {
-    const res = middleware(req('https://palora.ebda.app/manifest.webmanifest', 'palora.ebda.app'));
-    expect(res.headers.get('x-middleware-request-x-store-domain')).toBe('palora.ebda.app');
+    const res = middleware(
+      req('https://demo-boutique.ebda.app/manifest.webmanifest', 'demo-boutique.ebda.app')
+    );
+    expect(res.headers.get('x-middleware-request-x-store-domain')).toBe('demo-boutique.ebda.app');
   });
 });

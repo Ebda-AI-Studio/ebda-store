@@ -81,7 +81,7 @@ export async function withSavepoint<T>(fn: () => Promise<T>): Promise<T> {
 export async function withSavepointOn<T>(client: RawExecutor, fn: () => Promise<T>): Promise<T> {
   // Name is generated here, never caller-supplied — no interpolation of
   // untrusted input into the raw statement.
-  const name = `fwb_sp_${++savepointSeq}`;
+  const name = `ebda_sp_${++savepointSeq}`;
 
   await client.$executeRawUnsafe(`SAVEPOINT "${name}"`);
   try {

@@ -50,9 +50,7 @@ else
   else
     # Search well-known project roots
     for _p in \
-      "$HOME/Desktop/projects/force-website-builder" \
-      "$HOME/Desktop/projects/whatsapp-broadcaster" \
-      "$HOME/Desktop/projects/Force-Media-CRM"; do
+      "$HOME/Desktop/projects/Whisky-11/business/ebda/ebda"; do
       if [[ "$_p" == *"$REPO_SLUG"* ]] && [ -f "$_p/graphify-out/graph.json" ]; then
         GRAPH_JSON="$_p/graphify-out/graph.json"
         break
@@ -77,7 +75,7 @@ _is_pr_number() { [[ "$1" =~ ^[0-9]+$ ]]; }
 CHANGED_FILES=()
 if _is_pr_number "$PR_REF"; then
   command -v gh >/dev/null || { echo "scoped-audit: gh CLI missing (needed for PR lookup)" >&2; exit 1; }
-  GH_USER="${GH_USER:-ForceAI-KW}"
+  GH_USER="${GH_USER:-Whisky-11}"
   _read_lines_into_array CHANGED_FILES \
     gh pr diff --repo "$GH_USER/$REPO_SLUG" "$PR_REF" --name-only
 else
@@ -394,7 +392,7 @@ sys.stdout.buffer.write(d if i < 0 else d[:i+1])
 " 2>/dev/null)
 elif _is_pr_number "$PR_REF"; then
   command -v gh >/dev/null && \
-    DIFF_CONTENT=$(gh pr diff "$PR_REF" --repo "${GH_USER:-ForceAI-KW}/$REPO_SLUG" 2>/dev/null \
+    DIFF_CONTENT=$(gh pr diff "$PR_REF" --repo "${GH_USER:-Whisky-11}/$REPO_SLUG" 2>/dev/null \
     | python3 -c "
 import sys
 d = sys.stdin.buffer.read(153600)

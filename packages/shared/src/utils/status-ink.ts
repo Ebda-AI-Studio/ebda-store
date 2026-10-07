@@ -7,7 +7,7 @@
 // STORE, from the store's own role colour and surfaces, so a merchant palette
 // can never undo it. A store whose theme sets `legacyBannerContrast: true`
 // gets `--<role>-ink: var(--<role>)` instead — the ink IS the role colour, so
-// it renders exactly as before (pecannbee, pinned through data, never a slug).
+// it renders exactly as before (demo-store, pinned through data, never a slug).
 
 import { parseColorToRgb, relativeLuminance, rgbToHslTriplet, type Rgb } from './color';
 

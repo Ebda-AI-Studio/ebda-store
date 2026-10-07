@@ -32,7 +32,7 @@ export interface LoyaltySettings {
 
 export const DEFAULT_LOYALTY_SETTINGS: LoyaltySettings = {
   // 1 point per 1 EGP spent; with pointsValue 1 piastre/point that is a 1% accrual
-  // (FWB: 10 points per 1 KWD at 1 fil/point = the same 1%). Name kept for API compat.
+  // (10 points per 1 major unit at 1 minor unit/point = the same 1%). Name kept for API compat.
   pointsPerMajorUnit: 1,
   signupBonus: 100,
   referralBonus: 200,

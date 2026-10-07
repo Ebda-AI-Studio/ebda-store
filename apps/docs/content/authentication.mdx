@@ -38,7 +38,7 @@ If neither resolves to an active store the API answers `400 STORE_NOT_RESOLVED`.
 
 A merchant API key authenticates **one store's admin MCP endpoint**, `POST /api/v1/mcp/admin/:storeSlug`. It is a device credential: one per laptop, CI job or teammate, so that revoking one never signs out the others.
 
-- Send it in the `x-merchant-key` header. Keys look like `fwbm_` followed by 43 URL-safe characters.
+- Send it in the `x-merchant-key` header. Keys look like `ebdam_` followed by 43 URL-safe characters.
 - It is shown **once**, when minted. Only a SHA-256 hash is stored, so a lost key is rotated, never recovered.
 - Keys carry scopes. The default is read only.
 

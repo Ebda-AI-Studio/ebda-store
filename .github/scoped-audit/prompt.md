@@ -52,7 +52,7 @@ The input that follows this prompt contains four sections:
    features must change in lockstep with the proposed fix. "Fix line X" is
    incomplete; "fix line X AND update the dependent in Y:Z" is complete.
 
-## FWB standing rules to enforce (the bug-classes most likely to appear)
+## Ebda standing rules to enforce (the bug-classes most likely to appear)
 
 - **RLS via `runInTenantContext`:** every write to a tenant table (anything
   scoped to a store) from HTTP routes, webhooks, workers, Inngest functions,

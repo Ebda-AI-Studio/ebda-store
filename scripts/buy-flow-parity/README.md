@@ -6,7 +6,7 @@ and diffs the outcome field by field. Identical output means the change does not
 influence ordering or payment. Any difference is printed as a field path with the
 base and head values.
 
-There is no default baseline (the old FWB Kuwait commit `96814545` is irrelevant for
+There is no default baseline (the old Ebda Kuwait commit `96814545` is irrelevant for
 Ebda): in ref mode `--base <ref>` is required (use `origin/main` for "current
 main"); `--head` defaults to `HEAD`. See the **Ebda** section below for Linux usage
 and the runtime (api-url) mode.
@@ -35,7 +35,7 @@ behaviour, and the owner has to approve that change explicitly (see `--allow`).
 
 ## What a run does
 
-For each ref: `git worktree add --detach` into `$TMPDIR/fwb-buy-flow-parity/`
+For each ref: `git worktree add --detach` into `$TMPDIR/ebda-buy-flow-parity/`
 (child git runs with every `GIT_*` variable stripped; `core.bare` is checked before
 and after), `npm ci` via npm@10 with `HUSKY=0`, `prisma generate`, then a build
 of `packages/database`, `packages/shared` and `apps/api`. `prisma migrate deploy`
@@ -43,8 +43,8 @@ runs on a **fresh local database per ref**. The fixture is seeded as plain SQL (
 it is identical for both refs), and the built API starts **as the `ebda_app` RLS (override: `PARITY_APP_ROLE`)
 role**, the same way production and CI run it. The scenarios then run over HTTP.
 
-- **Postgres 16 + Redis 7** run as Apple `container`s `fwb-buyflow-pg`
-  (127.0.0.1:55432) and `fwb-buyflow-redis` (127.0.0.1:56379). They are started if
+- **Postgres 16 + Redis 7** run as Apple `container`s `ebda-buyflow-pg`
+  (127.0.0.1:55432) and `ebda-buyflow-redis` (127.0.0.1:56379). They are started if
   missing and reused otherwise. To use existing servers instead, pass
   `--pg-url`/`--redis-url`. Both must be loopback addresses, and the harness
   refuses anything else.

@@ -23,7 +23,7 @@
  * bulk-ai-geo (citation-copy + brand-facts), bulk-ai-recommendations,
  * services/ai.service.ts).
  *
- * Reference: Palestinian zatar citation-copy product on Wady Aljuz
+ * Reference: Palestinian zatar citation-copy product on Demo Shop
  * triggered "Bad control character in string literal in JSON at
  * position 147" on 2026-05-28. The Gemini body had real newlines
  * between the bullet points the prompt asks for.

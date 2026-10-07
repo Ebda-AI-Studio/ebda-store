@@ -34,7 +34,7 @@
  * 2026-09-30) gets (1)-(3) for the four STATUS roles — `primary` is the
  * merchant's brand colour (Ruling YWA-TXT-1) — measured from the no-theme
  * fallback in its globals.css; a store's own inks are derived from its palette
- * and gated in tests/unit/storefront-status-ink.test.ts, and pecannbee keeps
+ * and gated in tests/unit/storefront-status-ink.test.ts, and demo-store keeps
  * the old colours through `theme.legacyBannerContrast` (data, Ruling BC-1).
  * (4) and (5) are not applied to the storefront (Ruling BC-1).
  */

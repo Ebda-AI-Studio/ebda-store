@@ -83,7 +83,7 @@ const wbsIntegrationSchema = z.object({
   /** Phase 7 opt-in for store-logo HEADER images on templates. */
   wbsTemplateUseLogoHeader: z.boolean().optional(),
   /**
-   * Customer-DM ordering via WhatsApp — when set, FWB stores the value and
+   * Customer-DM ordering via WhatsApp — when set, Ebda stores the value and
    * syncs it to WBS via PUT /api/v1/external/wa-ordering.
    * Default OFF (false) — merchant opts in explicitly from the Connection tab.
    */
@@ -219,13 +219,13 @@ router.get(
         }
       }
 
-      // Augment with FWB's OWN approved templates. WBS metadata reflects
+      // Augment with Ebda's OWN approved templates. WBS metadata reflects
       // its templates table which can lag (Meta callbacks missed,
-      // templates approved via Meta UI directly, etc.). FWB's
+      // templates approved via Meta UI directly, etc.). Ebda's
       // WhatsAppTemplate rows are the more authoritative "approved for
       // THIS store" set because the bridge updates them via
       // /wa-bridge/templates/status webhooks. Union + dedupe by
-      // name+language. If FWB has own-approved rows we also clear the
+      // name+language. If Ebda has own-approved rows we also clear the
       // wbs_unavailable error since the connection is functionally
       // healthy (the merchant still has approved templates to choose.
       //
@@ -505,7 +505,7 @@ router.put(
           level: 'info',
           scope: 'store',
           store: { id: storeId, name: prevStore.name, slug: prevStore.slug },
-          source: 'fwb.wbs-integration.botMode',
+          source: 'ebda.wbs-integration.botMode',
           title: `Store flipped to ${input.botMode}`,
           body: `Bot mode changed from ${prevStore.botMode ?? 'unset'} to ${input.botMode}. Verify Meta Commerce catalog is approved + access token still valid.`,
           context: { prevBotMode: prevStore.botMode, newBotMode: input.botMode },
@@ -515,7 +515,7 @@ router.put(
       }
 
       // ── Sync waCustomerOrderingEnabled to WBS ─────────────────────────────
-      // Non-blocking: any error here MUST NOT fail the save — the FWB Store
+      // Non-blocking: any error here MUST NOT fail the save — the Ebda Store
       // record is the source of truth; WBS sync is best-effort and can be
       // retried by the next save. Log the error for observability.
       if (input.waCustomerOrderingEnabled !== undefined && updated.wbsApiKey) {
@@ -835,7 +835,7 @@ router.post(
       sendAlert({
         level: 'info',
         scope: 'store',
-        source: 'fwb.wbs-integration.provisionMetaCatalog',
+        source: 'ebda.wbs-integration.provisionMetaCatalog',
         store: { id: storeId, name: updated.name, slug: updated.slug },
         title: 'Meta Commerce catalog auto-provisioned',
         body:

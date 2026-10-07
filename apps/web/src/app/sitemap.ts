@@ -44,7 +44,7 @@ class SitemapSourceUnavailableError extends Error {
   }
 }
 /**
- * Resolve a custom-domain host (e.g. `wadyaljuz.com`) to its owning
+ * Resolve a custom-domain host (e.g. `demo-shop.example`) to its owning
  * store via the dedicated /public/store/resolve endpoint. Returns null
  * when the host isn't a known custom domain (e.g. platform path,
  * preview deploy host, direct IP hit).
@@ -77,7 +77,7 @@ async function resolveStoreByHost(host: string): Promise<StoreListEntry | null> 
  * `limit` at 100 (`ProductService.listPublic`: `Math.min(100, ...)`) — the
  * old single `?limit=1000` request silently got page 1 of 100, so any
  * catalog past 100 products was absent from the sitemap (audit-followup
- * #1147/#1163; live-verified: pecannbee returned 100 of 160). Loop pages at
+ * #1147/#1163; live-verified: demo-store returned 100 of 160). Loop pages at
  * the real clamp until `meta.totalPages` is exhausted, bounded by
  * `maxPages` so the master branch's fan-out can't blow the Worker's
  * 1000-subrequest ceiling. Truncation past the bound is logged, never
@@ -236,7 +236,7 @@ async function buildTenantSitemap(
  * Every store has its own host, and `/sitemap.xml` on that host lists ONLY that
  * store's URLs, rooted at that host:
  *
- *   - `amelia.ebda.app` / `wadyaljuz.com` (a store host)
+ *   - `amelia.ebda.app` / `demo-shop.example` (a store host)
  *     → ONLY that store's URLs, submitted to that merchant's GSC property
  *   - `ebda.app` and other platform hosts
  *     → no store, nothing to list: an empty sitemap (the marketing site owns
