@@ -1,0 +1,5 @@
+{
+  "_note": "Key `11111` (Payment API key of the docs' worked example); signature = the docs' expected HMAC-SHA256 hex, re-computed with openssl.",
+  "key": "11111",
+  "x-kashier-signature": "9610477b2255b2a8ef84fd89adfaa5f1305ff9c20324205851890f1ea03109f4"
+}

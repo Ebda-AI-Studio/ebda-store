@@ -1,5 +1,6 @@
 import { prisma } from '@force/database';
 import { countAiUsage } from './definer';
+import { geminiKeyCount } from './ai/gemini-keys';
 import { AppError } from '../middleware/error-handler';
 
 export const AI_QUOTA_DAILY_CODE = 'AI_QUOTA_DAILY_EXCEEDED';
@@ -123,8 +124,13 @@ export async function assertAiQuota(
       : Promise.resolve(0),
   ]);
 
+  // The default daily cap models ONE Google project's free ceiling. Each extra
+  // Gemini key is a separate project with its own quota (GEMINI-FAILOVER-1), so
+  // the DEFAULT scales with the key count; an explicit AI_DAILY_REQUEST_CAP is
+  // taken as the operator's total and is never scaled.
   const dailyCap = parseInt(
-    process.env.AI_DAILY_REQUEST_CAP ?? String(DEFAULT_DAILY_REQUEST_CAP),
+    process.env.AI_DAILY_REQUEST_CAP ??
+      String(DEFAULT_DAILY_REQUEST_CAP * Math.max(1, geminiKeyCount())),
     10
   );
   const monthlyCap = parseInt(

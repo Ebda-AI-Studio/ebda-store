@@ -7,7 +7,7 @@
  * shape as `product-faq-generator.ts` so every bulk-AI generator reads the
  * same way.
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GeminiFailoverClient } from './gemini-keys';
 import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
 import { recordUsage } from '../../services/ai.service';
@@ -58,7 +58,7 @@ export async function generateProductExcerpt(
   apiKey: string,
   modelName: string
 ): Promise<GeneratedProductExcerpt> {
-  const genai = new GoogleGenerativeAI(apiKey);
+  const genai = new GeminiFailoverClient(apiKey);
   const model = genai.getGenerativeModel({ model: modelName });
 
   const prompt = buildExcerptPrompt(input);

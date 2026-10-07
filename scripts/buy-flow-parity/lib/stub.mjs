@@ -16,9 +16,16 @@
 import http from 'node:http';
 
 /** Integration id per method the fixture enables (settings.integrationIds). */
-export const PAYMOB_INTEGRATIONS = { card: 11, meeza: 22, wallet: 33, valu: 44 };
+export const PAYMOB_INTEGRATIONS = { card: 11, wallet: 22, valu: 33, kiosk: 44, applepay: 55 };
 
-export function createStub({ secretKey }) {
+/** The auth token POST /api/auth/tokens hands out (docs: `{profile, token}`). */
+const PAYMOB_AUTH_TOKEN = 'bfp-parity-paymob-auth-token';
+
+/**
+ * `secretKey` = Paymob Secret key (`Authorization: Token`); `apiKey` = Paymob API key for
+ * /api/auth/tokens (when omitted, any non-empty api_key is accepted).
+ */
+export function createStub({ secretKey, apiKey }) {
   const state = {
     requests: [],
     orders: new Map(), // orderId -> { amount, merchantRef, txnId, status }
@@ -66,10 +73,34 @@ export function createStub({ secretKey }) {
         order: orderRef,
       };
     }
-    return { ...t, currency: 'EGP', order: orderRef };
+    return {
+      ...t,
+      currency: 'EGP',
+      source_data: { type: 'card', pan: '2346', sub_type: 'MasterCard' },
+      order: orderRef,
+    };
   }
 
   function handlePaymob(path, body, headers, res) {
+    // Docs: the auth-token request and the order inquiry carry their credential in the BODY.
+    if (path === '/api/auth/tokens') {
+      if (!body?.api_key || (apiKey && body.api_key !== apiKey)) {
+        return json(res, 401, { detail: 'Invalid api_key.' });
+      }
+      return json(res, 200, { profile: { id: 106 }, token: PAYMOB_AUTH_TOKEN });
+    }
+    if (path === '/api/ecommerce/orders/transaction_inquiry') {
+      // The documented shape is `auth_token` in the body. A BASE ref built before the adapter
+      // followed the docs (2026-10-07) sends `Authorization: Token <secret>` instead; accept that
+      // too so the harness can still run the base side of a comparison.
+      const legacyBase = headers.authorization === `Token ${secretKey}`;
+      if (body?.auth_token !== PAYMOB_AUTH_TOKEN && !legacyBase) {
+        return json(res, 401, { detail: 'Invalid auth_token.' });
+      }
+      const order = state.orders.get(String(body?.order_id));
+      if (!order) return json(res, 404, { detail: 'order not found' });
+      return json(res, 200, txnView(order));
+    }
     if (headers.authorization !== `Token ${secretKey}`) {
       return json(res, 401, { detail: 'Authentication credentials were not provided.' });
     }
@@ -92,16 +123,11 @@ export function createStub({ secretKey }) {
           status: 'Pending',
         });
         return json(res, 201, {
-          id: `pi_stub_${id}`,
-          client_secret: `stub_csk_${id}`,
+          id: `pi_test_stub${id}`,
+          client_secret: `egy_csk_test_stub${id}`,
           intention_order_id: id,
           intention_detail: { amount: body.amount },
         });
-      }
-      case '/api/ecommerce/orders/transaction_inquiry': {
-        const order = state.orders.get(String(body?.order_id));
-        if (!order) return json(res, 404, { detail: 'order not found' });
-        return json(res, 200, txnView(order));
       }
       case '/api/acceptance/void_refund/void':
       case '/api/acceptance/void_refund/refund': {

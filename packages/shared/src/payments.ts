@@ -120,7 +120,9 @@ export type CodSettings = z.infer<typeof codSettingsSchema>;
 // ---------------------------------------------------------------------------
 
 /** Customer-facing methods a Paymob integration id can enable. */
-export const PAYMOB_METHODS = ['card', 'meeza', 'wallet', 'valu'] as const;
+// Meeza cards ride the card integration; kiosk cannot be refunded; Apple Pay has live ids only
+// (developers.paymob.com payment-methods pages, 2026-10-07).
+export const PAYMOB_METHODS = ['card', 'wallet', 'valu', 'kiosk', 'applepay'] as const;
 export type PaymobMethod = (typeof PAYMOB_METHODS)[number];
 
 const integrationId = z.number().int().positive().max(2_147_483_647);
@@ -132,9 +134,10 @@ export const paymobSettingsBaseSchema = z.object({
   integrationIds: z
     .object({
       card: integrationId.optional(),
-      meeza: integrationId.optional(),
       wallet: integrationId.optional(),
       valu: integrationId.optional(),
+      kiosk: integrationId.optional(),
+      applepay: integrationId.optional(),
     })
     .default({}),
 });
@@ -144,13 +147,12 @@ export const paymobSettingsSchema = paymobSettingsBaseSchema.refine(
 );
 export type PaymobSettings = z.infer<typeof paymobSettingsBaseSchema>;
 
-export const KASHIER_METHODS = ['card', 'wallet'] as const;
+// `allowedMethods` tokens of a Kashier payment session (developers.kashier.io). Meeza is a card;
+// test mode only ever offers card and wallet.
+export const KASHIER_METHODS = ['card', 'wallet', 'bnpl'] as const;
 export const kashierSettingsSchema = z.object({
   /** Which methods the hosted page offers; default both. */
-  methods: z
-    .array(z.enum(KASHIER_METHODS))
-    .min(1)
-    .default([...KASHIER_METHODS]),
+  methods: z.array(z.enum(KASHIER_METHODS)).min(1).default(['card', 'wallet']),
   /** Language of the hosted payment page. */
   display: z.enum(['en', 'ar']).default('ar'),
 });

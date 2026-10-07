@@ -1,0 +1,30 @@
+{
+  "status": "SUCCESS",
+  "message": "Orders retrieved successfully",
+  "data": [
+    {
+      "merchantOrderId": "ORDER-12345",
+      "orderId": "00916dc7-7a3a-4875-af44-118bc678378b",
+      "status": "CAPTURED",
+      "interChangeRate": "ON_US",
+      "transactions": [
+        {
+          "operation": "3dsecure_verify",
+          "status": "SUCCESS",
+          "transactionResponseCode": "AUTHENTICATION_IN_PROGRESS",
+          "reconcilation": "NA",
+          "merchantWebhookReconciliation": "NA"
+        },
+        {
+          "operation": "pay",
+          "status": "SUCCESS",
+          "transactionResponseCode": "APPROVED",
+          "reconcilation": "OK",
+          "merchantWebhookReconciliation": "OK",
+          "isSettled": true
+        }
+      ]
+    }
+  ],
+  "pagination": { "total": 1, "page": 1, "limit": 20, "pages": 1 }
+}

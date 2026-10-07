@@ -1,0 +1,42 @@
+{
+  "event": "pay",
+  "data": {
+    "merchantOrderId": "1653481557813",
+    "kashierOrderId": "9ad06b17-755b-4e21-9774-aff3e2726ac9",
+    "orderReference": "TEST-ORD-38855",
+    "transactionId": "TX-249893963",
+    "status": "SUCCESS",
+    "method": "card",
+    "creationDate": "2022-01-23T10:50:54.261Z",
+    "amount": 1,
+    "currency": "EGP",
+    "card": {
+      "cardInfo": {
+        "cardHolderName": "John Doe",
+        "cardBrand": "Mastercard",
+        "maskedCard": "511111******1118"
+      },
+      "merchant": { "merchantRedirectURL": "http://localhost:9000/callback" },
+      "amount": 1,
+      "currency": "EGP"
+    },
+    "metaData": { "time": "2022-01-23T10:50:52.562Z" },
+    "transactionResponseCode": "00",
+    "transactionResponseMessage": { "en": "Approved", "ar": "تمت الموافقة" },
+    "channel": "online | e-commerce",
+    "merchantDetails": { "businessEmail": "billing@example.com" },
+    "signatureKeys": [
+      "amount",
+      "channel",
+      "currency",
+      "kashierOrderId",
+      "merchantOrderId",
+      "method",
+      "orderReference",
+      "status",
+      "transactionId",
+      "transactionResponseCode"
+    ],
+    "platform": {}
+  }
+}

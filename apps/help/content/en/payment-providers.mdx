@@ -1,22 +1,69 @@
 ---
 title: Payment providers
-description: Cards and wallets are coming soon. Cash on delivery is the available payment method today.
+description: How to connect Paymob, Kashier or FawryPay to your store. Online payments open per provider once it is verified.
 section: Selling
 order: 5
 status: soon
-keywords: cards wallets provider paymob fawry kashier
+keywords: cards wallets provider paymob fawry fawrypay kashier connect api keys webhook sandbox test connection
 ---
 
 <Callout type="soon" title="Coming soon">
-  Online card and wallet payments are not live yet.
+  Paymob, Kashier and FawryPay show as "Coming soon" until we finish testing each one against its
+  own test environment. You can read how connecting works below; the steps will not change.
 </Callout>
 
 ## What works today
 
-[Cash on delivery](/en/orders-and-cod/) and [InstaPay](/en/instapay/) (confirmed by hand) are available for customers. The setup flow shows "Cards and wallets" as "Coming soon".
+[Cash on delivery](/en/orders-and-cod/) and [InstaPay](/en/instapay/) (confirmed by hand) are available for customers.
 
-## What is coming
+## How connecting works
 
-We are integrating Egyptian payment providers so customers can pay by card or mobile wallet. When a provider is ready you will connect your own account from the dashboard. If one provider is down, only that payment method is affected; checkout keeps working with the others.
+You use your OWN account with the payment company: the money goes to you, not to Ebda. Connecting is
+only a credentials step in **Settings > Payments**:
 
-We do not list provider names or fees here until they are confirmed.
+1. Open the provider's card and pick **Sandbox** (test) or **Live**. Each mode keeps its own keys, so
+   test keys never reach the live system.
+2. Paste each value. Every field has a **Where do I find this?** link that opens the exact page in the
+   provider's dashboard. Secret keys are saved encrypted and are never shown again: the page only
+   shows "Saved ••••" and the last 4 characters.
+3. Press **Test connection**. Ebda makes one harmless call to the provider with your keys; nothing is
+   charged.
+4. Once the test passes, switch the provider **on**. Changing a key later turns it off until you test
+   again.
+5. Copy the **webhook URL** shown on the card where the card asks you to (see below). That is how the
+   provider tells your store a payment succeeded.
+
+## Paymob
+
+- **Secret key, Public key, API key:** Paymob dashboard > Settings > API Keys (under Developers) >
+  View. Test keys start with `sk_test_` / `pk_test_`, live keys with `sk_live_` / `pk_live_`. The API
+  key is the same in both modes.
+- **HMAC secret:** shown next to your API keys in Paymob's settings. If you cannot see it, ask your
+  Paymob account manager.
+- **Integration IDs:** Settings > Payment Integrations, the "Integration ID" column. Enter one per
+  payment method you want (cards, wallets, valU, kiosk, Apple Pay). Test and live integrations have
+  different IDs. Apple Pay has live IDs only.
+- **Webhook:** paste the webhook URL into the **Webhook URL** of every integration you entered
+  (Payment Integrations > the integration > Edit > Save Changes).
+- Kiosk payments cannot be refunded through Paymob.
+
+## Kashier
+
+- **Merchant ID (MID):** under your user name in the top bar of the Kashier dashboard (looks like
+  `MID-1234-567`).
+- **Payment API key** and **Secret key:** Kashier dashboard > Integrations. Switch "It's live data" on
+  to see the live keys; test keys only work in Sandbox.
+- The Kashier user who created the secret key needs the refund permission for refunds to work.
+- **Webhook:** nothing to paste. Ebda sends the URL with every payment.
+
+## FawryPay
+
+- **Merchant code** and **Secure key:** the FawryPay team sends them by email when your account is set
+  up (staging and production values differ). For a test account, register at FawryPay's staging
+  site; FawryPay contacts you to activate it.
+- **Webhook:** send the webhook URL to the FawryPay team as your notification (callback) URL.
+
+## Need another provider?
+
+Ebda supports Paymob, Kashier and FawryPay, plus cash on delivery and InstaPay. If you need another
+payment or shipping company, use the **Tell us** link at the bottom of the Payments page.

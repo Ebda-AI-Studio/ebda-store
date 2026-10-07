@@ -1,6 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { Prisma, prisma, withMoneyTx, runInStoreScope } from '@force/database';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GeminiFailoverClient } from '../../ai/gemini-keys';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
@@ -66,11 +66,11 @@ const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-function getGenAI(): GoogleGenerativeAI {
+function getGenAI(): GeminiFailoverClient {
   if (!config.googleAiKey) {
     throw new Error('AI_NOT_CONFIGURED: GOOGLE_GENERATIVE_AI_KEY missing');
   }
-  return new GoogleGenerativeAI(config.googleAiKey);
+  return new GeminiFailoverClient();
 }
 
 // How many of the strongest co-purchase pairs to load per product as a

@@ -53,6 +53,7 @@ runPaymentProviderContract('paymob (Intention API stub)', () => {
     creds: {
       mode: 'sandbox',
       apiKey: PAYMOB_STUB.secretKey,
+      secretKey: PAYMOB_STUB.apiKey,
       webhookSecret: PAYMOB_STUB.hmacSecret,
       settings: { publicKey: PAYMOB_STUB.publicKey, integrationIds: PAYMOB_STUB.integrationIds },
     },

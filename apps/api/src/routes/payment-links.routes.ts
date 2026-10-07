@@ -44,6 +44,7 @@ import logger from '../lib/logger';
 import type { Currency } from '../services/payment-providers/types';
 
 import { minorToDecimalString, REGION } from '@force/shared';
+import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
 const router = Router({ mergeParams: true });
 
 const bodySchema = z
@@ -372,7 +373,7 @@ router.post(
           })),
           callbackUrl: `${storefrontBaseUrl}/checkout/success`,
           errorUrl: `${storefrontBaseUrl}/checkout/error`,
-          webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${providerName}`,
+          webhookUrl: paymentWebhookUrl(providerName, storeId),
           notifyVia: 'link',
         },
         providerName,
