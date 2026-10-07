@@ -1,7 +1,7 @@
 // Generates public/og.svg + public/og.png (1200x630): the Nile-at-night lights
 // (each light is a store) in Antique Gold on night. Deterministic (seeded).
-// Arabic tagline uses a system Arabic face (Geeza Pro on macOS); the PNG is committed,
-// so re-run on a machine with an Arabic font. Re-run with `npm run og -w apps/marketing`.
+// All text is pre-outlined (brand/logo/ebda-lockup-dark.svg + ebda-og-text.svg, IBM Plex Sans Arabic /
+// Readex Pro shaped with HarfBuzz), so the output is identical on any machine. Re-run with `npm run og -w apps/marketing`.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -50,6 +50,8 @@ const lockupSvg = readFileSync(
 );
 const lockupInner = lockupSvg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
 // viewBox is "18 16 288.496 96": scale 2.6 -> ~750x250 box, left-aligned at x=76.
+const ogText = readFileSync(path.join(dir, '..', '..', '..', 'brand', 'logo', 'ebda-og-text.svg'), 'utf8');
+const pathOf = (role) => ogText.match(new RegExp(`data-role="${role}" d="([^"]+)"`))[1];
 const lockup = `<g transform="translate(76 70) scale(2.6) translate(-18 -16)">${lockupInner}</g>`;
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
@@ -59,9 +61,9 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" 
 <rect width="${W}" height="${H}" fill="${NIGHT}"/>${dots}
 <rect width="${W}" height="${H}" fill="url(#f)"/><rect width="760" height="${H}" fill="url(#l)"/>
 ${lockup}
-<text x="76" y="400" font-family="Geeza Pro, Arial, sans-serif" font-size="76" font-weight="700" fill="${LIFT}">ابدأ متجرك</text>
+<path d="${pathOf('tagline')}" fill="${LIFT}"/>
 <rect x="76" y="438" width="96" height="4" fill="${GOLD}"/>
-<text x="76" y="556" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="26" fill="#A9B1AF">ebda.app</text>
+<path d="${pathOf('url')}" fill="#A9B1AF"/>
 </svg>
 `;
 writeFileSync(path.join(dir, 'og.svg'), svg);
