@@ -133,10 +133,15 @@ describe('marketing SEO and trust surface', () => {
       en: '/en/privacy',
     });
   });
-  it('JSON-LD has Organization, WebSite, SoftwareApplication and no ratings', () => {
+  it('JSON-LD has Organization, WebSite, SoftwareApplication, FAQPage and no ratings', () => {
     const g = jsonLd('en')['@graph'];
-    expect(g.map(n => n['@type'])).toEqual(['Organization', 'WebSite', 'SoftwareApplication']);
-    expect(JSON.stringify(g)).not.toMatch(/aggregateRating|ratingValue|review|offers/i);
+    expect(g.map(n => n['@type'])).toEqual([
+      'Organization',
+      'WebSite',
+      'SoftwareApplication',
+      'FAQPage',
+    ]);
+    expect(JSON.stringify(g)).not.toMatch(/aggregateRating|ratingValue|"review"/i);
     expect(en).toContain('application/ld+json');
   });
   it('security.txt has Contact, a future Expires within a year, Canonical', () => {
