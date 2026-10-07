@@ -1616,7 +1616,8 @@
         "stopPreviewHint": "Stop previewing unsaved changes — show the saved version instead.",
         "previewUnsavedChanges": "Preview is showing unsaved changes (click to reset)",
         "expandAll": "Expand all",
-        "collapseAll": "Collapse all"
+        "collapseAll": "Collapse all",
+        "tryNewBuilder": "Try the new visual builder"
       },
       "pageCards": {
         "productsListTitle": "Products list page",
@@ -5743,7 +5744,8 @@
         "paymentAbandonments": "Payment Abandonments",
         "locations": "Locations",
         "customerGroups": "Customer groups",
-        "wallet": "Wallet"
+        "wallet": "Wallet",
+        "visualBuilder": "Visual builder"
       },
       "superAdmin": "Super Admin",
       "superAdminHint": "Full platform access",
@@ -9303,6 +9305,139 @@
       "stateOn": "ON",
       "stateOff": "OFF",
       "saveFailed": "Could not save: {message}"
+    }
+  },
+  "builder": {
+    "loading": "Opening the builder…",
+    "loadError": "The page could not be loaded.",
+    "retry": "Try again",
+    "back": "Back to the dashboard",
+    "undo": "Undo",
+    "redo": "Redo",
+    "publish": "Publish",
+    "publishing": "Publishing…",
+    "published": "Published — your store shows the new page.",
+    "publishFailed": "Publish failed. Your draft is saved; try again.",
+    "restored": "Restored and published.",
+    "status": {
+      "loading": "Loading…",
+      "saved": "Draft saved",
+      "dirty": "Unsaved changes",
+      "saving": "Saving…",
+      "error": "Not saved — fix the highlighted fields",
+      "conflict": "Changed elsewhere"
+    },
+    "rejected": {
+      "cardinality": "This page already has the maximum number of these sections.",
+      "group": "This section belongs in another part of the page.",
+      "block": "This section does not accept that block.",
+      "notFound": "That item no longer exists.",
+      "unknown": "Unknown section type."
+    },
+    "families": {
+      "label": "Templates",
+      "confirm": "Apply this template as a draft? Your products, slides and copy are kept; nothing goes live until you publish.",
+      "applied": "Template applied to your draft."
+    },
+    "panes": {
+      "start": "Structure",
+      "end": "Settings"
+    },
+    "tabs": {
+      "sections": "Sections",
+      "theme": "Theme",
+      "history": "History"
+    },
+    "viewport": {
+      "label": "Preview size",
+      "desktop": "Desktop",
+      "tablet": "Tablet",
+      "mobile": "Mobile"
+    },
+    "conflict": {
+      "message": "This page was changed in another tab or by another editor. Choose which version to keep.",
+      "takeTheirs": "Load their version",
+      "keepMine": "Keep mine"
+    },
+    "canvas": {
+      "title": "Store preview",
+      "loading": "Loading preview…"
+    },
+    "tree": {
+      "label": "Page structure",
+      "header": "Header",
+      "template": "Page",
+      "footer": "Footer",
+      "addSection": "Add section",
+      "addBlock": "Add {name}",
+      "drag": "Drag to reorder {name}",
+      "moveUp": "Move {name} up",
+      "moveDown": "Move {name} down",
+      "show": "Show {name}",
+      "hide": "Hide {name}",
+      "duplicate": "Duplicate {name}",
+      "remove": "Remove {name}"
+    },
+    "addSection": {
+      "title": "Add a section",
+      "close": "Close",
+      "limitReached": "Limit reached ({max})"
+    },
+    "media": {
+      "title": "Media",
+      "upload": "Upload image",
+      "uploading": "Uploading…",
+      "close": "Close",
+      "loadError": "Images could not be loaded.",
+      "empty": "No images yet — upload one.",
+      "more": "Load more",
+      "loading": "Loading…"
+    },
+    "settings": {
+      "empty": "Select a section in the page or the list to edit it.",
+      "unknownType": "This section was made by a newer editor and cannot be edited here.",
+      "modeLabel": "Editing mode",
+      "content": "Content",
+      "design": "Design",
+      "visibility": "Show on",
+      "viewport": {
+        "desktop": "Desktop",
+        "tablet": "Tablet",
+        "mobile": "Mobile"
+      },
+      "resetViewport": "Reset {viewport}",
+      "arabic": "Arabic",
+      "english": "English",
+      "unsafeUrl": "Use a link that starts with / or https://",
+      "default": "Default",
+      "editInClassic": "Edit in the classic page builder",
+      "changeImage": "Change",
+      "chooseImage": "Choose image",
+      "removeImage": "Remove",
+      "pickCategory": "Choose a category",
+      "removeProduct": "Remove product",
+      "searchProducts": "Search products"
+    },
+    "theme": {
+      "classicOnly": "edit in the classic page builder",
+      "saved": "Theme saved",
+      "error": "Theme not saved — try again",
+      "saving": "Saving…",
+      "save": "Save theme"
+    },
+    "revisions": {
+      "error": "History could not be loaded.",
+      "empty": "No saved versions yet.",
+      "rev": "Version {rev}",
+      "status": {
+        "draft": "draft",
+        "published": "live",
+        "archived": "earlier"
+      },
+      "restore": "Restore",
+      "restoring": "Restoring…",
+      "confirmRestore": "Publish version {rev} again? Your current draft is replaced.",
+      "more": "Load more"
     }
   }
 }

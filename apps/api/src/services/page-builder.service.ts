@@ -38,6 +38,7 @@ import {
   PAGE_DEFINITION_SCHEMA_VERSION,
   definitionToLayout,
   layoutToDefinition,
+  mergeDocumentOnlySections,
   resolveLayoutSettings,
   validateDefinition,
   type BuilderIssue,
@@ -514,8 +515,12 @@ export async function publishLegacyLayout(args: {
   userId: string | null;
 }): Promise<'ok' | 'conflict'> {
   const { storeId, layout } = args;
-  const definition = layoutToDefinition(layout, HOME_PAGE_KEY);
-  const { head } = await loadRows(storeId, HOME_PAGE_KEY);
+  const { head, draft, published } = await loadRows(storeId, HOME_PAGE_KEY);
+  // The layout knows nothing about document-only sections (image-text,
+  // newsletter): carry them over from the latest document or this save
+  // would delete them.
+  const previous = (draft ?? published)?.document as PageDefinition | undefined;
+  const definition = mergeDocumentOnlySections(layoutToDefinition(layout, HOME_PAGE_KEY), previous);
   return publishNewRevision({
     storeId,
     pageKey: HOME_PAGE_KEY,
@@ -552,3 +557,23 @@ export async function listRevisions(args: {
 }
 
 export { BUILDER_LIMITS };
+
+// ── Draft preview tokens (Phase 2 editor canvas) ────────────────────────────
+
+/** Redis TTL for a builder preview token (the Redis TTL floor is 120s). */
+export const PREVIEW_TOKEN_TTL_SECONDS = 3600;
+export const previewTokenKey = (storeId: string, token: string) =>
+  `builder-preview:${storeId}:${token}`;
+
+/**
+ * The document the editor canvas renders for a preview token: the working
+ * draft, else published, else the layout-derived document — read fresh on
+ * every request, so one token follows the draft as it autosaves.
+ */
+export async function getPreviewDefinition(
+  storeId: string,
+  pageKey: string
+): Promise<{ definition: PageDefinition; rev: number } | null> {
+  const state = await readInStoreContext(storeId, () => getPageState(storeId, pageKey));
+  return state ? { definition: state.definition, rev: state.rev } : null;
+}

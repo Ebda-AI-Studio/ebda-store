@@ -282,6 +282,40 @@ jobs:
         if: needs.changes.outputs.status_tests == 'true'
         run: npm run test:status
 
+  # Visual builder editor E2E (Phase 2): the admin builder in a real Chromium,
+  # Arabic (RTL) and English at 390 / 820 / 1280, against the in-memory API
+  # (tests/builder-e2e/mock-api.mjs) and a contract fake of the storefront
+  # canvas. No database, no network beyond localhost. Main lane (nightly /
+  # dispatch, like test-e2e): PRs stay lint + typecheck + affected unit
+  # (docs/ebda/ci.md budget); run it locally before a PR with
+  # `npx playwright test -c playwright.builder.config.ts`.
+  builder-e2e:
+    name: Builder E2E (ar/en x 390/820/1280)
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma Client
+        run: npm run db:generate
+      - name: Build database package
+        run: npm run build -w packages/database
+      - name: Build shared package
+        run: npm run build -w packages/shared
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run builder E2E
+        run: npx playwright test -c playwright.builder.config.ts
+        env:
+          CI: 'true'
+
   # `wrangler deploy --dry-run` for each changed Worker app, on the Node the
   # deploy uses (a plain build never starts wrangler, so it passed while real
   # deploys died on the Node floor, 2026-10-03). `changes` only lists apps that
@@ -1143,6 +1177,7 @@ jobs:
         test-rls-ebda-app,
         test-rls-payload-parity,
         test-e2e,
+        builder-e2e,
         mutation,
       ]
     if: always() && failure() && github.event_name != 'pull_request'

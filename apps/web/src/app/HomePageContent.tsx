@@ -45,6 +45,8 @@ interface HomePageContentProps {
   /** Published page document from `GET /public/stores/:id/layout`, already
    *  validated by the caller. Absent → derived from `layout`. */
   definition?: PageDefinition;
+  /** Builder canvas only (token-gated preview): see PageRenderer `editorMode`. */
+  editorMode?: boolean;
 }
 
 export function HomePageContent({
@@ -57,6 +59,7 @@ export function HomePageContent({
   extraProducts,
   layout,
   definition,
+  editorMode,
 }: HomePageContentProps) {
   const doc = definition ?? layoutToDefinition(layout);
   return (
@@ -70,6 +73,7 @@ export function HomePageContent({
         categories={categories}
         testimonials={testimonials}
         extraProducts={extraProducts}
+        editorMode={editorMode}
       />
     </ShopChrome>
   );

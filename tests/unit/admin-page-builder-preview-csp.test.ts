@@ -37,6 +37,9 @@ const ADMIN_CATCHALL_SOURCE = readStringConst('ADMIN_CATCHALL_SOURCE');
 /** Representative admin paths, including the exact edge cases that matter. */
 const ADMIN_PATHS = [
   '/stores/abc123/page-builder',
+  // the visual builder (Phase 2) frames the storefront the same way
+  '/stores/abc123/builder',
+  '/stores/abc123/builder/extra',
   '/stores/store-with-dashes/page-builder',
   '/stores/abc123/page-builder/',
   '/stores/abc123/page-builder/extra',
@@ -64,6 +67,7 @@ describe('admin headers() route patterns match the real paths they claim to', ()
     expect(matched.sort()).toEqual(
       [
         '/stores/abc123/page-builder',
+        '/stores/abc123/builder',
         '/stores/store-with-dashes/page-builder',
         TRAILING_SLASH_OVERLAP,
       ].sort()
@@ -76,6 +80,7 @@ describe('admin headers() route patterns match the real paths they claim to', ()
     expect(matched.sort()).toEqual(
       [
         '/stores/abc123/page-builder/extra',
+        '/stores/abc123/builder/extra',
         '/stores/abc123/products',
         '/stores/abc123/dashboard',
         '/dashboard',
@@ -205,6 +210,8 @@ describe('page-builder preview CSP', () => {
 
     const cases: Array<{ url: string; matchesPageBuilder: boolean }> = [
       { url: '/stores/abc123/page-builder', matchesPageBuilder: true },
+      { url: '/stores/abc123/builder', matchesPageBuilder: true },
+      { url: '/stores/abc123/builder-x', matchesPageBuilder: false },
       { url: '/stores/abc123/orders', matchesPageBuilder: false },
       { url: '/dashboard', matchesPageBuilder: false },
       { url: '/', matchesPageBuilder: false },
@@ -316,11 +323,13 @@ describe('admin security headers as SERVED — Next manifest regex + OpenNext ro
         /\s+/
       );
     expect(fsOf('/stores/abc123/page-builder')).toContain('https:');
+    expect(fsOf('/stores/abc123/builder')).toContain('https:');
     for (const p of [
       '/',
       '/login',
       '/stores/abc123/products',
       '/stores/abc123/page-builder/extra',
+      '/stores/abc123/builder/extra',
       // Next compiles header sources with `strict: true`: the trailing-slash
       // form is NOT the preview route when served (unlike the default-options
       // overlap documented at the top of this file).

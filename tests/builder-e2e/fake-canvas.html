@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>fake canvas</title>
+    <style>
+      body { font-family: sans-serif; margin: 0; }
+      [data-builder-id] { display: block; padding: 12px; border-bottom: 1px solid #ddd; }
+    </style>
+  </head>
+  <body>
+    <!--
+      Contract fake of the storefront canvas for the admin E2E: speaks
+      ebda-builder:v1 exactly like apps/web/src/builder/preview/EditorOverlay.tsx
+      (ready / select / hover / patch-text out; render / select in), and
+      records what it received so the test can assert on it. The real overlay
+      is covered by tests/unit/builder-preview-canvas.test.tsx.
+    -->
+    <main id="root"></main>
+    <script>
+      const P = 'ebda-builder:v1';
+      const parentOrigin = new URL(document.referrer).origin;
+      window.__received = [];
+      window.__doc = null;
+      const send = m => window.parent.postMessage({ protocol: P, ...m }, parentOrigin);
+      function render(doc) {
+        window.__doc = doc;
+        const root = document.getElementById('root');
+        root.innerHTML = '';
+        for (const s of doc.sections) {
+          if (s.hidden) continue;
+          const el = document.createElement('section');
+          el.dataset.builderId = s.id;
+          const h = document.createElement('h2');
+          h.textContent = s.settings.heading || s.settings.title || s.type;
+          el.appendChild(h);
+          root.appendChild(el);
+        }
+      }
+      window.addEventListener('message', e => {
+        if (e.origin !== parentOrigin || e.source !== window.parent) return;
+        if (!e.data || e.data.protocol !== P) return;
+        window.__received.push(e.data.type);
+        if (e.data.type === 'render') render(e.data.definition);
+        if (e.data.type === 'select') window.__selected = e.data.sectionId;
+      });
+      document.addEventListener('click', e => {
+        const id = e.target.closest('[data-builder-id]')?.dataset.builderId;
+        if (id) send({ type: 'select', sectionId: id });
+      });
+      window.__patch = (sectionId, key, value) => send({ type: 'patch-text', sectionId, key, value });
+      send({ type: 'ready' });
+    </script>
+  </body>
+</html>

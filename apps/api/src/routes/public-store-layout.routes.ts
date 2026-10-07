@@ -10,7 +10,11 @@ import { prisma } from '@force/database';
 import { resolveLayoutSettings } from '@force/shared';
 import type { TemplateId } from '@force/shared';
 import { redis } from '../services/redis.service';
-import { getPublishedDefinition } from '../services/page-builder.service';
+import {
+  getPublishedDefinition,
+  getPreviewDefinition,
+  previewTokenKey,
+} from '../services/page-builder.service';
 
 const router = Router();
 
@@ -96,6 +100,47 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
     next(error);
   }
 });
+
+/**
+ * GET /public/stores/:storeId/builder-preview?token=<t>
+ * The visual builder canvas: the working DRAFT document for a valid,
+ * store-scoped preview token (minted by the authenticated
+ * `POST /admin/stores/:storeId/builder/pages/:pageKey/preview-token`).
+ * Unknown/expired token -> 404, and never cacheable anywhere.
+ */
+router.get(
+  '/stores/:storeId/builder-preview',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.setHeader('Cache-Control', 'private, no-store');
+      const { storeId } = req.params;
+      const token = typeof req.query.token === 'string' ? req.query.token : '';
+      if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) {
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Preview not found' } });
+        return;
+      }
+      const entry = await redis.get<{ pageKey?: string }>(previewTokenKey(storeId, token), true);
+      if (!entry || typeof entry.pageKey !== 'string') {
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Preview not found' } });
+        return;
+      }
+      const doc = await getPreviewDefinition(storeId, entry.pageKey);
+      if (!doc) {
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Store not found' } });
+        return;
+      }
+      res.json({ success: true, data: doc });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 /**
  * GET /public/stores/:storeId/testimonials

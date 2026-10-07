@@ -77,6 +77,19 @@ export const settingFactories = {
     group: 'content',
     ...extra,
   }),
+  textarea: (
+    id: string,
+    labelEn: string,
+    labelAr: string,
+    extra: Partial<SettingDefinition> = {}
+  ): SettingDefinition => ({
+    id,
+    type: 'textarea',
+    labelEn,
+    labelAr,
+    group: 'content',
+    ...extra,
+  }),
   image: (
     id: string,
     labelEn: string,
