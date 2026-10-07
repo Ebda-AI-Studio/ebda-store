@@ -31,7 +31,7 @@ Left: parent/child billing for extra stores (R-EBDA-PRICING-6); upsell UI for 40
 
 ## Signup funnel (branch `feat/signup-funnel`, stacks on #10; PR to main, not merged, not deployed)
 Goal: plan choice, then card on file (nothing charged) OR InstaPay, then a 14-day Growth trial; daily reminders, charge or overdue, suspension; super-admin manual payments; store allowance; upsell UI. Plan: docs/plans/2026-10-07-signup-funnel.md. Rulings: EBDA-FUNNEL-1..15 in docs/RULINGS.md.
-State: API, migration `20261007120000_signup_funnel`, admin + marketing UI, and the unit + integration tests are done locally (local PG container `ebda-funnel-pg` :55441, redis `ebda-funnel-redis` :56391, both Apple `container`; remove when finished).
+State: API, migration `20261007160000_signup_funnel`, admin + marketing UI, and the unit + integration tests are done locally (local PG container `ebda-funnel-pg` :55441, redis `ebda-funnel-redis` :56391, both Apple `container`; remove when finished).
 Left: Kashier has no documented no-charge tokenization, so card-on-file needs Kashier's written enablement (Ruling 2). Kashier MIT charge path is unverified against the docs (fep host / CONTAUTH / agreement id). Production steps: set EBDA_INSTAPAY_HANDLE + EBDA_SUPPORT_WHATSAPP; move Amelia off `comped` by recording her InstaPay payment in super-admin. Not live-verified: no deploy.
 
 ## Egypt VAT gate phase 1 (branch `feat/vat-gate`, PR to main, not merged, not deployed)
