@@ -183,8 +183,19 @@ export default function SignupPage() {
             {formError}
           </div>
         )}
-        {/* Honeypot: off-screen, not focusable, not announced. A bot fills it; a person never does. */}
-        <div aria-hidden="true" style={{ position: 'absolute', left: '-10000px', top: 'auto' }}>
+        {/* Honeypot: clipped to 1px, not focusable, not announced. A bot fills it; a person never does.
+            Clipped, not `left:-10000px`: in this RTL page that offset made the document 10,390px wide. */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            overflow: 'hidden',
+            clip: 'rect(0 0 0 0)',
+            whiteSpace: 'nowrap',
+          }}
+        >
           <label htmlFor="signup-company-site">Company website</label>
           <input
             id="signup-company-site"

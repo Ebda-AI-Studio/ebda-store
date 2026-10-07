@@ -1,6 +1,6 @@
 // ⚠️  REGENERATED AT DEPLOY TIME — EDITING THIS FILE CHANGES NOTHING IN PROD.
 //
-// `.github/workflows/cf-deploy.yml` runs `scripts/cf-setup-local.sh web` BEFORE
+// `.github/workflows/cf-web-deploy.yml` runs `scripts/cf-setup-local.sh web` BEFORE
 // the build and it OVERWRITES this file unconditionally, so any binding added
 // here alone never reaches the worker. The live bindings (confirmed against the
 // Cloudflare API on 2026-09-02) are NEXT_TAG_CACHE_DO_SHARDED,
@@ -23,8 +23,7 @@
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "ebda-web-isr-cache" }],
   "routes": [
-    { "pattern": "ebda.app", "custom_domain": true },
-    { "pattern": "cf.ebda.app", "custom_domain": true },
-    { "pattern": "*/*", "zone_name": "ebda.app" },
+    // Store subdomains only — the apex belongs to ebda-marketing (scripts/cf-routes.cjs).
+    { "pattern": "*.ebda.app/*", "zone_name": "ebda.app" },
   ],
 }
