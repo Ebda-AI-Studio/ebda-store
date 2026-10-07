@@ -73,6 +73,10 @@ export const FEATURE_KEYS_ARRAY = [
   // PLAN (`brandingRemoval` limit: Growth + Business) via FeatureService's plan
   // layer — in NO PLAN_BASELINE; a super-admin StoreFeature override still wins.
   'remove_branding',
+  // Product 3D models + AR on the PDP (2026-10-07). Included in EVERY plan's
+  // baseline (Ahmad 2026-10-07, Ruling R-EBDA-3D-2 — no plan gate). A key at all
+  // only so a super-admin StoreFeature override can switch it off per store.
+  'product_3d',
   // Accounting sub-features (2026-05-27)
   'accounting.basic',
   'accounting.expenses',
@@ -622,6 +626,20 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'ويُمنح لمتجر بعينه عبر تجاوز من المشرف العام.',
     category: 'storefront',
     tier: 'addon',
+  },
+  product_3d: {
+    key: 'product_3d',
+    name: '3D product models + AR',
+    nameAr: 'موديلات ثلاثية الأبعاد + الواقع المعزز',
+    description:
+      'Upload a 3D model (.glb) of a product: shoppers rotate and zoom it on the product page, ' +
+      'see it change with the chosen colour or metal, and place it in their room on iPhone and ' +
+      'Android. Included in every plan.',
+    descriptionAr:
+      'ارفع موديل ثلاثي الأبعاد (‎.glb‎) للمنتج: العميل يلفّه ويقرّبه في صفحة المنتج، ويشوفه ' +
+      'بيتغيّر مع اللون أو المعدن اللي اختاره، ويحطه في أوضته على آيفون وأندرويد. متاح في كل الباقات.',
+    category: 'storefront',
+    tier: 'core',
   },
   bundles: {
     key: 'bundles',

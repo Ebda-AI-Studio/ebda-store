@@ -77,10 +77,17 @@ export function postLoginDestination(): string {
 
 /**
  * Pages reachable with no session. `/login` plus the self-serve funnel
- * (`/signup`, `/verify-email`): a visitor must be able to create an account
- * and open the emailed link before any session exists.
+ * (`/signup`, `/verify-email`) and password recovery (`/forgot-password`,
+ * `/reset-password`): a visitor must be able to create an account, recover
+ * one, and open the emailed links before any session exists.
  */
-export const PUBLIC_PATHS: readonly string[] = ['/login', '/signup', '/verify-email'];
+export const PUBLIC_PATHS: readonly string[] = [
+  '/login',
+  '/signup',
+  '/verify-email',
+  '/forgot-password',
+  '/reset-password',
+];
 
 export function isPublicPath(pathname: string | null | undefined): boolean {
   return !!pathname && PUBLIC_PATHS.includes(pathname.replace(/\/+$/, '') || '/');

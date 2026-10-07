@@ -105,7 +105,7 @@ describe('Aramex COD is EGP or refused, never KWD', () => {
     const r = await carrier.createShipment(
       ARAMEX_STUB.credentials,
       shipmentRequest({ codAmount: 12_345 }),
-      { settings: { codEgpConfirmed: true } }
+      { settings: { codEgpConfirmed: true, productType: 'CDS' } }
     );
     const p = stub.parcels.get(r.trackingNumber)!;
     expect(p.codCurrency).toBe('EGP');
@@ -125,7 +125,7 @@ describe('Aramex COD is EGP or refused, never KWD', () => {
     // "true" as a string is not a confirmation: only the explicit boolean
     await expect(
       carrier.createShipment(ARAMEX_STUB.credentials, shipmentRequest({ codAmount: 5_000 }), {
-        settings: { codEgpConfirmed: 'true' },
+        settings: { codEgpConfirmed: 'true', productType: 'CDS' },
       })
     ).rejects.toMatchObject({ code: 'COD_NOT_SUPPORTED' });
   });

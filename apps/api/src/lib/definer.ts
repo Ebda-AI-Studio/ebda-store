@@ -723,7 +723,7 @@ export async function taxProfilesForReview(status: string | null): Promise<TaxRe
 }
 
 // ---------------------------------------------------------------------------
-// Pre-scope reads of `stores` (R-EBDA-005, migration 20261008000000_tenant_defence_expand).
+// Pre-scope reads of `stores` (R-EBDA-005, migration 20261008000010_tenant_defence_expand).
 // `stores` is under RLS, so a lookup that runs BEFORE a store or user scope exists goes
 // through one of these; the full row is then read inside `withStore(id)`.
 // ---------------------------------------------------------------------------

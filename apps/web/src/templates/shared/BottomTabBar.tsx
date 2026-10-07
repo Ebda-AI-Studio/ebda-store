@@ -301,6 +301,9 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
         menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
       }`}
       aria-hidden={!menuOpen}
+      // Closed sheet: invisible AND out of the tab order (axe aria-hidden-focus;
+      // its links were still reachable by keyboard while hidden).
+      inert={!menuOpen ? true : undefined}
     >
       <button
         type="button"

@@ -77,6 +77,9 @@ const STARTER_CORE: FeatureKey[] = [
   'answer_engine_insights',
   'upsell_crosssell',
   'accounting.profit_anomaly',
+  // 3D product models + AR (2026-10-07): every plan, Basic included — Ahmad's
+  // decision, Ruling R-EBDA-3D-2. Restrict one store via a StoreFeature override.
+  'product_3d',
 ];
 
 const PROFESSIONAL_ADDITIONS: FeatureKey[] = [
@@ -145,6 +148,9 @@ export const PLAN_BASELINE: Record<StorePlan, readonly FeatureKey[]> = {
     'inventory.basic',
     // WhatsApp admin access is universal (managed-agency default — see STARTER_CORE).
     'whatsapp',
+    // 3D product models are on every plan (Ruling R-EBDA-3D-2), the fallback
+    // `free` tier included, so a lapsed store's PDP does not lose its models.
+    'product_3d',
   ],
   starter: STARTER_CORE,
   professional: [...STARTER_CORE, ...PROFESSIONAL_ADDITIONS],

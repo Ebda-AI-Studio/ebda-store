@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { BRAND, BRAND_MARKETING_URL } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import AdminLanguageSwitcher from '../AdminLanguageSwitcher';
+import { DocumentTitle } from '../DocumentTitle';
 
 /** Shared signed-out and setup surface; logical spacing mirrors under RTL. */
 export function PublicShell({
@@ -22,6 +23,7 @@ export function PublicShell({
   const t = useT('onboarding.shell');
   return (
     <main id="admin-main-content" className="min-h-dvh bg-background px-4 py-5 sm:px-6">
+      <DocumentTitle title={title} />
       <div className="mx-auto flex min-h-[calc(100dvh-2.5rem)] max-w-6xl flex-col">
         <header className="flex items-center justify-between gap-4 border-b border-border pb-4">
           <a href={BRAND_MARKETING_URL} aria-label={t('back')} className="flex items-center gap-3">

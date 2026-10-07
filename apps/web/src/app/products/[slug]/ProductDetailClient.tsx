@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { firstCategoryId, pickRelated } from '../../../lib/related-products';
 import { useLocalePrice } from '../../../hooks/useLocalePrice';
 import { useParams } from 'next/navigation';
@@ -43,7 +43,10 @@ import {
   resolveCardBadges,
 } from '../../../templates/shared/custom-badge';
 
-import { fromMinor } from '@force/shared';
+import { fromMinor, model3dSwatchColor } from '@force/shared';
+import { Model3dToggle, ProductModel3dPanel } from '../../../components/ProductModel3d';
+import { captureEvent } from '../../../components/PostHogProvider';
+import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
 import { REGION } from '@force/shared';
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
@@ -176,6 +179,11 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // rule is that auto-selection changes nothing visible except the pill state
   // and the Add to Cart button — a tap still swaps it exactly as before.
   const [shopperPickedVariant, setShopperPickedVariant] = useState(false);
+  // 3D viewer (docs/plans/2026-10-07-product-3d-viewer.md): opened by an
+  // explicit tap only — nothing 3D downloads before it. `pickedOptions` is the
+  // shopper's PARTIAL pick map, so "Metal: Gold" recolours before a size.
+  const [show3d, setShow3d] = useState(false);
+  const [pickedOptions, setPickedOptions] = useState<Record<string, string>>({});
   const galleryVariant = shopperPickedVariant ? selectedVariant : null;
 
   // Reset the gallery to the first image whenever the variant image changes —
@@ -218,12 +226,26 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // useTemplateComponents is kept for its loading state — used to gate the
   // related-products render so cards don't flash before hydration.
   const { isLoading: templateLoading } = useTemplateComponents();
+  // Related strip size: the platform card row shows 3; Dahab's row is a
+  // 4-up carousel, so it asks for a fuller row (same endpoint, same rules).
+  const relatedCount = templateId === 'dahab' ? 8 : 3;
+  const relatedFetchLimit = templateId === 'dahab' ? '9' : '3';
   const { isEnabled } = useFeatures();
   const { language, t } = useLanguage();
   const { localize, numerals } = useNumerals();
   const formatPrice = useLocalePrice();
   // Prop layout wins (server-side fetch); ctx layout is the lazy-fetched fallback.
   const resolvedLayout = layout ?? ctxLayout ?? undefined;
+  // The API already drops `model3d` when `product_3d` is off; the flag check
+  // here is the second gate (a super-admin override takes effect client-side
+  // on the next store payload too).
+  const model3d = product?.model3d && isEnabled('product_3d') ? product.model3d : null;
+  const model3dBindings = model3d?.bindings;
+  const swatchColor = useCallback(
+    (optionName: string, value: string) =>
+      model3dBindings ? model3dSwatchColor(model3dBindings, optionName, value) : undefined,
+    [model3dBindings]
+  );
   // Issue 2: pass productCardDefaults to all card surfaces on this page.
   const productCardDefaults = resolvedLayout?.productCardDefaults;
 
@@ -286,10 +308,12 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
       if (categories && categories.length > 0) {
         const catId = categories[0].category?.id;
         if (catId) {
-          api.getProducts({ category: catId, limit: '3' }).then(relResponse => {
+          api.getProducts({ category: catId, limit: relatedFetchLimit }).then(relResponse => {
             if (relResponse.success && relResponse.data) {
               setRelatedProducts(
-                relResponse.data.products.filter((p: Product) => p.id !== product.id).slice(0, 3)
+                relResponse.data.products
+                  .filter((p: Product) => p.id !== product.id)
+                  .slice(0, relatedCount)
               );
             }
           });
@@ -329,9 +353,14 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
           // than nesting: no category means nothing to relate to.
           const catId = firstCategoryId(response.data.product.categories);
           if (catId) {
-            const relResponse = await api.getProducts({ category: catId, limit: '3' });
+            const relResponse = await api.getProducts({
+              category: catId,
+              limit: relatedFetchLimit,
+            });
             if (relResponse.success && relResponse.data) {
-              setRelatedProducts(pickRelated(relResponse.data.products, loadedProduct.id));
+              setRelatedProducts(
+                pickRelated(relResponse.data.products, loadedProduct.id, relatedCount)
+              );
             }
           }
         } else {
@@ -555,6 +584,153 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     store.theme
   );
 
+  // Below-the-fold blocks shared by every skin (FAQ, reviews, upsell, related).
+  const belowFold = (
+    <>
+      {product?.faqs && product.faqs.length > 0 && (
+        <ProductFAQSection faqs={product.faqs} language={language} t={t} />
+      )}
+      {isEnabled('reviews') &&
+        layout?.reviewSection?.enabled &&
+        product &&
+        store.id &&
+        store.id !== 'demo' && (
+          <SectionErrorBoundary section="reviews">
+            <ReviewSection storeId={store.id} productId={product.id} />
+          </SectionErrorBoundary>
+        )}
+      {isEnabled('upsell_crosssell') && product && store.id && store.id !== 'demo' && (
+        <>
+          <SectionErrorBoundary section="frequently-bought-together">
+            <FrequentlyBoughtTogether storeId={store.id} productId={product.id} />
+          </SectionErrorBoundary>
+          <SectionErrorBoundary section="you-might-also-like">
+            <YouMightAlsoLike storeId={store.id} productId={product.id} />
+          </SectionErrorBoundary>
+        </>
+      )}
+    </>
+  );
+
+  // Dahab skin: same data and handlers, Dahab presentation (templates/dahab/ProductDetail).
+  if (templateId === 'dahab') {
+    const maxQty =
+      effectiveInventory != null && effectiveInventory > 0 ? Math.min(effectiveInventory, 10) : 10;
+    const badges = [pdpCustomBadgeText, discountBadgeText].filter((b): b is string => !!b);
+    return (
+      <ShopChrome layout={resolvedLayout}>
+        <div className="flex-1" style={pdpBgStyle}>
+          <DahabProductDetail
+            images={images}
+            name={displayName}
+            categoryName={categoryName ?? undefined}
+            categoryHref={
+              cat0?.category?.slug
+                ? storeUrl(`/products?category=${cat0.category.slug}`)
+                : undefined
+            }
+            homeHref={storeUrl('/')}
+            productsHref={storeUrl('/products')}
+            shippingHref={storeUrl('/shipping')}
+            returnsHref={storeUrl('/returns')}
+            excerpt={displayExcerpt}
+            description={displayDescription}
+            priceText={
+              pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
+                ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
+                : formatPrice(displayPrice)
+            }
+            compareText={
+              pricing.mode === 'single' && displayCompare && displayCompare > displayPrice
+                ? formatPrice(displayCompare)
+                : null
+            }
+            badges={badges}
+            variants={productVariants}
+            options={productOptions}
+            onVariantSelect={setSelectedVariant}
+            onShopperSelect={() => setShopperPickedVariant(true)}
+            quantity={quantity}
+            setQuantity={setQuantity}
+            maxQuantity={maxQty}
+            stockText={
+              outOfStock && !canBackorder
+                ? t('Out of stock', 'غير متوفر حالياً')
+                : canBackorder
+                  ? t('Made to order — ships when ready', 'بيتعمل مخصوص — يتشحن أول ما يجهز')
+                  : null
+            }
+            onAddToCart={handleAddToCart}
+            isAdding={isAdding}
+            addDisabled={(outOfStock && !canBackorder) || variantRequired}
+            addLabel={
+              variantRequired
+                ? t('Choose options', 'اختيار المقاس')
+                : canBackorder
+                  ? t('Pre-order', 'طلب مسبق')
+                  : outOfStock
+                    ? t('Out of stock', 'غير متوفر')
+                    : t('Add to bag', 'إضافة للسلة')
+            }
+            isWishlisted={isWishlisted}
+            onToggleWishlist={handleToggleWishlist}
+            sku={product.sku}
+            specs={
+              (product as { specifications?: unknown }).specifications ? (
+                <SpecTable
+                  specifications={
+                    (product as { specifications?: unknown }).specifications as
+                      | Record<string, string>
+                      | undefined
+                  }
+                />
+              ) : undefined
+            }
+            extras={
+              <>
+                <WaMeProductButton product={product} priceMinor={displayPrice} className="w-full" />
+                <ShareProductRow
+                  productName={displayName}
+                  url={typeof window !== 'undefined' ? window.location.href : ''}
+                />
+              </>
+            }
+            selectedImage={selectedImage}
+            onSelectImage={setSelectedImage}
+          />
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">{belowFold}</div>
+          {relatedProducts.length > 0 && !templateLoading && (
+            <section className="py-12 sm:py-16">
+              <ProductCarousel
+                products={relatedProducts.map(toTemplateProduct)}
+                title="You may also like"
+                titleAr="قطع قد تعجبك"
+                isRtl={language === 'ar'}
+                currency={store.currency}
+                pack={templateId}
+                urlPrefix={storeUrl('')}
+                showCardPrice={store.theme?.showPriceOnCards === false ? false : undefined}
+                onAddToCart={async productId => {
+                  const found = relatedProducts.find(x => x.id === productId);
+                  if (found)
+                    addItem({
+                      id: found.id,
+                      name: found.name,
+                      nameAr: found.nameAr ?? undefined,
+                      price: found.price,
+                      slug: found.slug,
+                      image: found.images?.[0]?.url,
+                      category: found.categories?.[0]?.category?.name,
+                    });
+                }}
+              />
+            </section>
+          )}
+        </div>
+      </ShopChrome>
+    );
+  }
+
   return (
     <ShopChrome layout={resolvedLayout}>
       {/* Whole product detail page — gallery + info + variants +
@@ -618,7 +794,34 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               <div
                 className={`relative ${pdpAspectClass} mx-auto max-w-[280px] sm:max-w-[400px] lg:max-w-[600px] overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10`}
               >
-                {images.length > 0 ? (
+                {model3d && (
+                  <Model3dToggle
+                    active={show3d}
+                    t={t}
+                    onToggle={() => {
+                      if (!show3d) {
+                        captureEvent('product_3d_opened', {
+                          storeId: store?.id,
+                          productId: product.id,
+                        });
+                      }
+                      setShow3d(v => !v);
+                    }}
+                  />
+                )}
+                {model3d && show3d ? (
+                  <ProductModel3dPanel
+                    model={model3d}
+                    storeId={store?.id ?? ''}
+                    productId={product.id}
+                    productName={displayName}
+                    fallbackPoster={productImages[0]?.url}
+                    selected={pickedOptions}
+                    optionOrder={productOptions.map(o => o.name)}
+                    isRtl={language === 'ar'}
+                    t={t}
+                  />
+                ) : images.length > 0 ? (
                   // Swipeable scroll-snap track — one image per page. Touch users
                   // swipe left/right; desktop scrolls/drag. handleGalleryScroll
                   // keeps selectedImage (dots + thumbnails) in sync.
@@ -676,11 +879,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     so the PDP matches the listing. orderable honors backorder:
                     a backorder-able OOS product is still orderable so no label.
                     Sits OVER the swipe track so it stays put while images scroll. */}
-                <OosImageDim
-                  orderable={!outOfStock || canBackorder}
-                  oosDimColor={productCardDefaults?.oosDimColor}
-                  theme={store?.theme}
-                />
+                {!show3d && (
+                  <OosImageDim
+                    orderable={!outOfStock || canBackorder}
+                    oosDimColor={productCardDefaults?.oosDimColor}
+                    theme={store?.theme}
+                  />
+                )}
                 <OutOfStockRibbon
                   inStock={!outOfStock || canBackorder}
                   isRtl={language === 'ar'}
@@ -694,7 +899,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   theme={store?.theme}
                 />
                 {/* Dot indicators — current image of total. */}
-                {images.length > 1 && (
+                {images.length > 1 && !show3d && (
                   <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
                     {images.map((_, i) => (
                       <span
@@ -793,6 +998,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   options={productOptions}
                   onVariantSelect={setSelectedVariant}
                   onShopperSelect={() => setShopperPickedVariant(true)}
+                  onSelectionChange={setPickedOptions}
+                  swatchColor={model3d ? swatchColor : undefined}
                 />
               )}
 

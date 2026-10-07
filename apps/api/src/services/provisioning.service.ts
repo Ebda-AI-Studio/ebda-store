@@ -53,7 +53,7 @@ export interface ProvisionStoreInput {
   /** Self-serve only: the plan + interval chosen at signup, billed at trial end. */
   trialChoice?: TrialChoice;
   /** Initial storefront template; defaults to the schema default. */
-  template?: 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
+  template?: 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' | 'dahab';
   storeNameAr?: string;
 
   // Owner details

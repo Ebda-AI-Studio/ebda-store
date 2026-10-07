@@ -2,6 +2,7 @@
 // Exports types, utilities, and constants used across all apps
 
 export * from './brand';
+export * from './auth-policy';
 export * from './hosts';
 export * from './abuse';
 export * from './types';
@@ -32,3 +33,4 @@ export * from './whatsapp';
 export * from './builder';
 export * from './providers/catalog';
 export * from './providers/credential-fields';
+export * from './model3d';

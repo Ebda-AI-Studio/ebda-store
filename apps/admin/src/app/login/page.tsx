@@ -8,6 +8,8 @@ import { Button, Input } from '@force/ui';
 import { useAuth, postLoginDestination, type MfaChallenge } from '../../lib/auth';
 import { useT } from '@/i18n/useT';
 import { NileNight } from './_components/NileNight';
+import AdminLanguageSwitcher from '@/components/AdminLanguageSwitcher';
+import { DocumentTitle } from '@/components/DocumentTitle';
 
 const REMEMBER_EMAIL_KEY = 'force-admin-remember-email';
 
@@ -111,6 +113,10 @@ export default function LoginPage() {
         </div>
         <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
           <div className="mx-auto w-full max-w-sm lg:w-96">
+            <div className="mb-6 flex justify-end">
+              <AdminLanguageSwitcher />
+            </div>
+            <DocumentTitle title={t('title')} />
             <div className="text-center">
               <div className="flex justify-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
@@ -228,6 +234,10 @@ export default function LoginPage() {
       </div>
       <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
         <div className="mx-auto w-full max-w-sm lg:w-96">
+          <div className="mb-6 flex justify-end">
+            <AdminLanguageSwitcher />
+          </div>
+          <DocumentTitle title={t('title')} />
           <div className="text-center">
             <div className="flex justify-center">
               <Image
@@ -290,6 +300,11 @@ export default function LoginPage() {
                 className="mt-1"
                 placeholder={t('passwordPlaceholder')}
               />
+              <div className="mt-2 text-end">
+                <Link href="/forgot-password" className="text-sm text-primary-ink hover:underline">
+                  {t('forgotPassword')}
+                </Link>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">

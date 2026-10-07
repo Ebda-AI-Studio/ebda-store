@@ -73,7 +73,7 @@ interface ImportResult {
   rejected: Array<{ line: number; reason: string }>;
 }
 
-const CARRIERS = ['bosta', 'aramex', 'manual', 'icarry'];
+const CARRIERS = ['bosta', 'shipblu', 'mylerz', 'aramex', 'manual'];
 const STATUS_COLORS = {
   awaiting: { className: 'bg-muted text-foreground' },
   partial: { className: 'bg-warning/10 text-warning-ink' },

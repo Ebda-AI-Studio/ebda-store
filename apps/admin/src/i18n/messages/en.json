@@ -20,12 +20,12 @@
       "notFound": {
         "code": "404",
         "title": "Page not found",
-        "message": "The admin page you are looking for does not exist or has been moved.",
+        "message": "The page you are looking for does not exist or has been moved.",
         "goHome": "Go to Dashboard"
       },
       "boundary": {
         "title": "Something went wrong",
-        "message": "An unexpected error occurred in the admin panel.",
+        "message": "An unexpected error occurred in Ebda Store.",
         "errorId": "Error ID: {id}",
         "unknown": "Unknown error",
         "generic": "An unexpected error occurred.",
@@ -33,8 +33,8 @@
         "goHome": "Go to Dashboard"
       },
       "global": {
-        "title": "Admin Error",
-        "message": "A critical error occurred in the admin application."
+        "title": "Ebda Store error",
+        "message": "A critical error occurred in Ebda Store."
       },
       "somethingWrong": "Something went wrong"
     },
@@ -961,6 +961,63 @@
       "handBackTitle": "Hand this field back to the AI",
       "retryLabel": "⚠ Retry",
       "switchToAiLabel": "✨ Switch to AI"
+    },
+    "model3d": {
+      "title": "3D model",
+      "intro": "Let shoppers rotate the product, see it in each colour or metal, and place it in their room (AR). One self-contained .glb file, up to {mb} MB.",
+      "disabled": "3D models are switched off for this store. Contact support to turn them on. You can still remove an existing model.",
+      "chooseGlb": "Upload .glb model",
+      "formatHint": "Binary glTF (.glb) with textures embedded. Draco/KTX2 compression is not supported yet: use meshopt + WebP.",
+      "replace": "Replace model",
+      "remove": "Remove 3D model",
+      "removeConfirm": "Remove this product's 3D model? Shoppers will see photos only.",
+      "removed": "3D model removed",
+      "uploaded": "Uploaded",
+      "uploadFailed": "Upload failed",
+      "uploading": "Uploading… {pct}%",
+      "saveFailed": "Could not save",
+      "saved": "Saved",
+      "loading": "Loading 3D…",
+      "previewError": "Preview could not load the model.",
+      "hint": "Drag to rotate · scroll to zoom · arrow keys",
+      "ar": "View in your space",
+      "stats": "{mb} MB · {vertices} vertices · {materials} materials",
+      "warnLarge": "This file is large; it will load slowly on mobile data. Optimise it (see the help article).",
+      "warnVertices": "This model is very detailed; older phones may struggle. Simplify it if you can.",
+      "droppedBindings": "{count} colour/metal mappings were removed because the new model does not have their material.",
+      "capturePoster": "Use current view as poster",
+      "posterSaved": "Poster saved",
+      "poster": "Poster (shown while the 3D model loads)",
+      "altText": "Description for screen readers (English)",
+      "altTextAr": "Description for screen readers (Arabic)",
+      "arEnabled": "Show \"View in your space\" (AR) on phones",
+      "usdzTitle": "iPhone AR file (optional)",
+      "usdzSet": "Your .usdz file is used ({mb} MB).",
+      "usdzGenerated": "Not uploaded: the iPhone creates one from the .glb when the shopper taps AR.",
+      "chooseUsdz": "Upload .usdz",
+      "removeUsdz": "Remove .usdz",
+      "save": "Save",
+      "mappingTitle": "Colours and metals",
+      "mappingIntro": "Pick which part of the model changes when a shopper chooses an option, and how it looks.",
+      "noOptions": "This product has no options. Add options (for example Metal or Colour) on the variants page to map them.",
+      "noMaterials": "This model has no named materials to change.",
+      "target": "Part of the model",
+      "noBinding": "No change",
+      "materials": "Materials",
+      "gltfVariants": "Variants in the file",
+      "finish": "Finish",
+      "colour": "Colour",
+      "preview": "Preview",
+      "saveMapping": "Save mapping",
+      "mappingSaved": "Mapping saved",
+      "presets": {
+        "gold": "Gold",
+        "white_gold": "White gold",
+        "rose_gold": "Rose gold",
+        "silver": "Silver",
+        "platinum": "Platinum",
+        "custom": "Custom colour"
+      }
     }
   },
   "orders": {
@@ -2268,7 +2325,7 @@
       },
       "shippingCarriers": {
         "title": "Shipping Carriers",
-        "description": "iCarry and Aramex delivery integration"
+        "description": "Bosta, ShipBlu, Mylerz and Aramex delivery integration"
       },
       "newsletter": {
         "title": "Newsletter Subscribers",
@@ -2918,54 +2975,12 @@
     "carriers": {
       "page": {
         "title": "Shipping Carriers",
-        "subtitle": "Connect Bosta or Aramex, or ship with any courier by hand"
+        "subtitle": "Connect Bosta, ShipBlu, Mylerz or Aramex, or ship with any courier by hand",
+        "intro": "Save your carrier keys, run Test connection, then switch the carrier on. Test with the sandbox first when the carrier offers one."
       },
       "empty": {
         "title": "Shipping Carriers not enabled",
-        "description": "Enable the Shipping Carriers feature in your store features to configure Bosta, Aramex and manual delivery."
-      },
-      "shared": {
-        "enabled": "Enabled",
-        "disabled": "Disabled",
-        "save": "Save",
-        "testConnection": "Test Connection",
-        "setAsDefault": "Set as Default",
-        "defaultBadge": "Default"
-      },
-      "icarry": {
-        "title": "iCarry",
-        "subtitle": "Egypt delivery via iCarry",
-        "fields": {
-          "apiKey": "API Key",
-          "merchantId": "Merchant ID"
-        },
-        "placeholders": {
-          "apiKey": "iCarry API key",
-          "merchantId": "e.g. MERCH-001"
-        }
-      },
-      "aramex": {
-        "title": "Aramex",
-        "subtitle": "Delivery via Aramex (tracking is checked automatically)",
-        "fields": {
-          "accountNumber": "Account Number",
-          "accountPin": "PIN",
-          "accountEntity": "Entity",
-          "accountCountryCode": "Country Code",
-          "username": "Username",
-          "password": "Password",
-          "sandbox": "Use the Aramex test environment",
-          "codEgpConfirmed": "COD in EGP confirmed by Aramex"
-        },
-        "placeholders": {
-          "accountNumber": "Aramex account number",
-          "accountPin": "Account PIN",
-          "accountEntity": "e.g. CAI",
-          "accountCountryCode": "e.g. EG",
-          "username": "Aramex account username",
-          "password": "Aramex account password"
-        },
-        "codNotice": "Aramex may only accept cash-on-delivery amounts in US dollars. Until Aramex confirms in writing that your account collects COD in EGP and you switch this on, cash-on-delivery orders cannot be shipped with Aramex (prepaid orders are not affected)."
+        "description": "Enable the Shipping Carriers feature in your store features to configure Bosta, ShipBlu, Mylerz, Aramex and manual delivery."
       },
       "pickup": {
         "title": "Pickup Address",
@@ -2995,9 +3010,10 @@
           "allStatuses": "All statuses"
         },
         "carrierNames": {
-          "icarry": "iCarry",
           "aramex": "Aramex",
           "bosta": "Bosta",
+          "shipblu": "ShipBlu",
+          "mylerz": "Mylerz",
           "manual": "Manual"
         },
         "statuses": {
@@ -3027,48 +3043,116 @@
           "next": "Next"
         }
       },
-      "connectionStatus": {
-        "testing": "Testing…",
-        "connected": "Connected",
-        "failed": "Failed"
-      },
-      "toast": {
-        "savedTitle": "Saved",
-        "savedDescription": "{carrier} settings saved.",
-        "errorTitle": "Error",
-        "saveFailed": "Failed to save settings.",
-        "saveFailedRetry": "Failed to save settings. Please try again.",
-        "connectionOkTitle": "Connection OK",
-        "connectionOkDescription": "{carrier} connection test passed.",
-        "connectionFailedTitle": "Connection Failed",
-        "testFailed": "Test failed.",
-        "testFailedRetry": "Test connection failed.",
-        "defaultSetTitle": "Default Set",
-        "defaultSetDescription": "{carrier} is now the default carrier.",
-        "defaultSetFailed": "Failed to set default carrier.",
-        "rotatedTitle": "Secret rotated",
-        "rotatedDescription": "The old callback address no longer works; new deliveries use the new one.",
-        "rotateFailed": "Could not rotate the secret. Save the Bosta settings first."
-      },
-      "bosta": {
-        "title": "Bosta",
-        "subtitle": "Delivery and cash on delivery via Bosta",
-        "fields": {
-          "apiKey": "API key",
-          "businessLocationId": "Pickup location ID",
-          "sandbox": "Use the Bosta test environment"
-        },
-        "placeholders": {
-          "apiKey": "Bosta API key",
-          "businessLocationId": "Your Bosta pickup location ID"
-        },
-        "webhookNotice": "Tracking updates reach us automatically: every delivery is booked with a private callback address for your store. Rotate the secret below if you think it has leaked.",
-        "rotateSecret": "Rotate webhook secret"
-      },
       "manual": {
-        "title": "Manual carrier",
-        "description": "Always available on the order page for a courier without an integration: type the courier name and the tracking number it gave you, then move the shipment along yourself. Cash on delivery is tracked the same way.",
+        "title": "Manual delivery",
+        "description": "Manual delivery: type the courier name and tracking number on each order; nothing to connect.",
         "codLink": "Open COD reconciliation"
+      },
+      "connect": {
+        "configure": "Connect",
+        "status": {
+          "enabled": "Enabled",
+          "connected": "Connected",
+          "notConnected": "Not connected",
+          "comingSoon": "Coming soon"
+        },
+        "comingSoonLine": "Coming soon: we are still testing this carrier against the company's test account. It will appear here for you to connect as soon as it is ready.",
+        "superAdminNote": "Not verified yet (coming soon for merchants). As a super admin you can save credentials and test the connection, but it cannot be enabled until it is verified.",
+        "modes": {
+          "label": "Credentials mode",
+          "sandbox": "Sandbox",
+          "live": "Live",
+          "active": "Active",
+          "notActive": "The active mode is {mode}. These credentials are not used yet.",
+          "useThis": "Use this mode"
+        },
+        "secretSaved": "Saved",
+        "secretSavedLast4": "Saved ••••{last4}",
+        "secretPlaceholder": "Paste the value",
+        "whereToFind": "Where do I find this?",
+        "docsCredentials": "Carrier guide to these keys",
+        "docsDashboard": "Open the carrier dashboard",
+        "validation": {
+          "required": "is required",
+          "controlChars": "contains invalid characters",
+          "tooLong": "is too long",
+          "wholeNumber": "must be a whole number",
+          "wrongFormat": "has the wrong format",
+          "generic": "is not valid"
+        },
+        "actions": {
+          "save": "Save credentials",
+          "saving": "Saving...",
+          "test": "Test connection ({mode})",
+          "testing": "Testing..."
+        },
+        "testDisabled": "Save all required fields for the active mode ({mode}) to test the connection.",
+        "test": {
+          "ok": "Connected: the carrier accepted your credentials.",
+          "bad_credentials": "The carrier rejected these credentials. Check them and save again.",
+          "wrong_mode": "These look like credentials for the other mode (sandbox vs live). Check the mode.",
+          "incomplete": "Some required fields are missing. Fill them in and save.",
+          "unreachable": "Could not reach the carrier. Try again in a minute.",
+          "unknown": "The test did not give a clear answer. Try again, or contact support.",
+          "latency": "{ms} ms"
+        },
+        "messages": {
+          "saved": "Saved",
+          "savedDisabled": "Saved. The active credentials changed, so the carrier was turned off until you test the connection again.",
+          "modeActivated": "Now using {mode} mode. Test the connection before enabling.",
+          "nothingToSave": "Nothing to save: type a value first.",
+          "failed": "Something went wrong. Please try again.",
+          "settingsSaved": "Settings saved.",
+          "defaultSet": "This is now your default carrier.",
+          "secretRotated": "The old callback address no longer works; new deliveries use the new one.",
+          "rotateFailed": "Could not rotate the secret. Save and test the Bosta credentials first."
+        },
+        "enable": {
+          "label": "Ship orders with this carrier",
+          "notVerified": "Cannot be enabled yet: this carrier is not verified.",
+          "saveFirst": "Save the credentials first.",
+          "testFirst": "Run Test connection successfully on the saved credentials first."
+        },
+        "capabilities": {
+          "cod": "Cash on delivery",
+          "label": "Labels",
+          "quote": "Rate quote",
+          "pickup": "Pickup",
+          "cancel": "Cancel",
+          "tracking-webhook": "Live tracking"
+        },
+        "webhook": {
+          "label": "Tracking updates",
+          "automatic": "Automatic",
+          "pasteIt": "Send the address to the carrier's team"
+        },
+        "rotateSecret": "Rotate webhook secret",
+        "default": {
+          "badge": "Default",
+          "set": "Set as default"
+        },
+        "settings": {
+          "title": "Shipping settings",
+          "defaultWeight": "Default parcel weight (kg)",
+          "defaultWeightHelp": "Used when a product has no weight.",
+          "defaultWeightInvalid": "Enter a weight greater than 0.",
+          "packageSize": "Default package size",
+          "sizes": {
+            "1": "Small",
+            "2": "Medium",
+            "3": "Large",
+            "4": "Extra large",
+            "SMALL": "Small",
+            "MEDIUM": "Medium",
+            "LARGE": "Large"
+          },
+          "productType": "Aramex product type",
+          "productTypeHelp": "Ask Aramex which domestic product your account uses.",
+          "codEgpConfirmed": "Aramex confirmed in writing that it collects cash on delivery in EGP",
+          "codNotice": "Until Aramex confirms this in writing and you tick the box, cash-on-delivery orders cannot be shipped with Aramex (prepaid orders are not affected).",
+          "save": "Save settings"
+        },
+        "requestCarrier": "Need another shipping carrier? Tell us"
       }
     },
     "page": {
@@ -3076,7 +3160,7 @@
       "subtitle": "Set per-area delivery fees for every Egypt district",
       "intro": "A shipping zone is a group of areas you charge a single rate to deliver to. Define a zone for each region you ship to so checkout can quote the right delivery fee.",
       "carriersBannerTitle": "Shipping Carriers enabled",
-      "carriersBannerHint": "Configure iCarry & Aramex credentials, test connections, and view shipments.",
+      "carriersBannerHint": "Configure Bosta, ShipBlu, Mylerz and Aramex credentials, test connections, and view shipments.",
       "carriersBannerLink": "Manage carriers →"
     },
     "toolbar": {
@@ -3401,12 +3485,15 @@
     }
   },
   "pwa": {
+    "appManifest": {
+      "description": "Ebda Store merchant dashboard"
+    },
     "installHint": {
-      "title": "Install Ebda Store Admin to receive push notifications",
+      "title": "Install Ebda Store to receive push notifications",
       "description": "iPhone needs the app added to your home screen before push notifications can work.",
       "step1": "Tap the Share icon in Safari",
       "step2": "Choose Add to Home Screen",
-      "step3": "Open Ebda Store Admin from the home screen and allow notifications",
+      "step3": "Open Ebda Store from the home screen and allow notifications",
       "dismiss": "Dismiss"
     },
     "page": {
@@ -5483,7 +5570,7 @@
   },
   "auth": {
     "login": {
-      "title": "Admin Login",
+      "title": "Sign in",
       "subtitle": "Sign in to access Ebda Store",
       "email": "Email address",
       "emailPlaceholder": "you@example.com",
@@ -5492,7 +5579,7 @@
       "signIn": "Sign in",
       "signingIn": "Signing in…",
       "loginFailed": "Login failed",
-      "footer": "Ebda Store Admin Panel",
+      "footer": "Ebda Store",
       "brandTitle": "Ebda Store",
       "brandSubtitle": "Manage your e-commerce stores, users, and platform settings from one powerful dashboard.",
       "statActiveStores": "Active Stores",
@@ -5511,7 +5598,46 @@
       "rememberMe": "Remember my email",
       "serverError": "Server returned an invalid response. Please try again.",
       "accessDenied": "Access denied. Admin or staff privileges required.",
-      "mfaVerifyFailed": "Verification failed"
+      "mfaVerifyFailed": "Verification failed",
+      "forgotPassword": "Forgot password?"
+    },
+    "forgot": {
+      "title": "Reset your password",
+      "subtitle": "Enter the email you use for Ebda Store. We will send you a link to choose a new password.",
+      "email": "Email address",
+      "emailPlaceholder": "you@example.com",
+      "submit": "Send reset link",
+      "submitting": "Sending…",
+      "emailInvalid": "Enter a valid email address",
+      "sentTitle": "Check your email",
+      "sentBody": "If an Ebda Store account exists for {email}, we sent a link to reset your password. The link works once and expires in {minutes} minutes.",
+      "sentHint": "No email? Check spam, or try again in a few minutes.",
+      "tryAgain": "Use a different email",
+      "rateLimited": "Too many requests. Please try again in a little while.",
+      "generic": "Something went wrong. Please try again.",
+      "backToLogin": "Back to sign in"
+    },
+    "reset": {
+      "title": "Choose a new password",
+      "subtitle": "After you save it, every device signed in to your account is signed out.",
+      "password": "New password",
+      "passwordPlaceholder": "Create a password",
+      "passwordHelp": "At least 8 characters with upper and lower case letters, a number and a symbol.",
+      "confirm": "Confirm new password",
+      "confirmPlaceholder": "Type it again",
+      "submit": "Save new password",
+      "submitting": "Saving…",
+      "passwordWeak": "Password needs 8+ characters, upper and lower case, a number and a symbol",
+      "mismatch": "The two passwords do not match",
+      "invalidTitle": "This link does not work",
+      "invalidBody": "Reset links work once and expire after {minutes} minutes. Request a new one and use the latest email.",
+      "requestNew": "Request a new link",
+      "successTitle": "Password updated",
+      "successBody": "Your password was changed and you were signed out everywhere. Sign in with your new password.",
+      "signIn": "Sign in",
+      "rateLimited": "Too many attempts. Please try again in a little while.",
+      "generic": "We could not update your password. Please try again.",
+      "backToLogin": "Back to sign in"
     }
   },
   "users": {
@@ -5765,7 +5891,7 @@
       "goBack": "Go back",
       "viewStore": "View Store",
       "forcePlatformBrand": "Platform",
-      "forceAdminBrand": "Admin",
+      "forceAdminBrand": "Store",
       "forceBrandPrefix": "Ebda",
       "languageLabel": "Language",
       "focusMode": {
@@ -5791,7 +5917,9 @@
       "loadFailed": "Could not load this data. Please try again."
     },
     "languageSwitcher": {
-      "ariaLabel": "Language"
+      "ariaLabel": "Language",
+      "nativeEn": "English",
+      "nativeAr": "العربية"
     },
     "brand": {
       "forceMediaAlt": "Ebda",

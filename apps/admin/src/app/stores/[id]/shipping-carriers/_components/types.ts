@@ -4,48 +4,52 @@
  * module, avoiding duplicate type declarations.
  */
 
-import { DEFAULT_PICKUP, type PickupAddress } from './PickupAddressForm';
+import type { CredentialMode } from '@force/shared';
+import type { PickupAddress } from './PickupAddressForm';
 
-export type CarrierKey = 'icarry' | 'aramex' | 'bosta';
+export type CarrierKey = 'bosta' | 'shipblu' | 'mylerz' | 'aramex' | 'manual';
 
-export interface ICarryConfig {
+/** One saved-credential hint: secrets only say they are set (+ last 4), non-secrets echo the value. */
+export type CredentialHint = { set: true; last4?: string; value?: string };
+
+/** The carrier's non-secret settings (pickup address, weight, size, Aramex product). */
+export type CarrierSettings = Record<string, string | number | boolean | undefined>;
+
+/**
+ * A row of `GET /stores/:id/shipping-carriers/configs`. Credentials are never returned
+ * (write-only): only `credentialHints` say which are saved.
+ */
+export interface CarrierConfigRow {
+  id?: string;
+  carrier: string;
   enabled: boolean;
   isDefault: boolean;
-  apiKey: string;
-  merchantId: string;
-  pickup: PickupAddress;
+  /** true = the sandbox credentials are the active ones. */
+  testMode?: boolean;
+  /** The active credential mode. */
+  mode?: CredentialMode;
+  settings?: CarrierSettings | null;
+  credentialHints?: Partial<Record<CredentialMode, Record<string, CredentialHint>>> | null;
+  connectionTest?: { ok: boolean; code: string; mode: CredentialMode; at: string } | null;
+  connectionTestCurrent?: boolean;
 }
 
-export interface BostaConfig {
-  enabled: boolean;
-  isDefault: boolean;
-  apiKey: string;
-  businessLocationId: string;
-  sandbox: boolean;
-  pickup: PickupAddress;
-}
+// The pickup address is stored in the carrier's non-secret `settings` (same keys for every carrier).
+export const pickupFromSettings = (settings: CarrierSettings | undefined): PickupAddress => ({
+  name: String(settings?.pickupName ?? ''),
+  phone: String(settings?.pickupPhone ?? ''),
+  line1: String(settings?.pickupLine1 ?? ''),
+  city: String(settings?.pickupCity ?? 'Cairo'),
+  area: String(settings?.pickupArea ?? ''),
+});
 
-export interface AramexConfig {
-  enabled: boolean;
-  isDefault: boolean;
-  /** Use Aramex's test environment. */
-  sandbox: boolean;
-  /** The merchant has Aramex's written confirmation that COD is collected in EGP. */
-  codEgpConfirmed: boolean;
-  accountNumber: string;
-  accountPin: string;
-  accountEntity: string;
-  accountCountryCode: string;
-  username: string;
-  password: string;
-  pickup: PickupAddress;
-}
-
-export interface CarrierConfigs {
-  icarry: ICarryConfig;
-  aramex: AramexConfig;
-  bosta: BostaConfig;
-}
+export const pickupToSettings = (p: PickupAddress) => ({
+  pickupName: p.name,
+  pickupPhone: p.phone,
+  pickupLine1: p.line1,
+  pickupCity: p.city,
+  pickupArea: p.area,
+});
 
 export interface Shipment {
   id: string;
@@ -69,21 +73,6 @@ export interface ShipmentApiRow {
 export interface ShipmentsData {
   shipments: ShipmentApiRow[];
   meta?: { total: number; page: number; limit: number; totalPages: number };
-}
-
-export type TestStatus = 'idle' | 'testing' | 'success' | 'error';
-
-/**
- * Raw carrier-config row as returned by the API. Credentials and settings
- * are free-form JSON blobs whose exact shape differs per carrier, so we
- * narrow them at the page level when merging into DEFAULT_CONFIGS.
- */
-export interface CarrierConfigApiRow {
-  carrier: string;
-  enabled?: boolean;
-  isDefault?: boolean;
-  credentials?: Record<string, string | undefined>;
-  settings?: Record<string, string | boolean | undefined>;
 }
 
 /**
@@ -114,34 +103,3 @@ export const SHIPMENT_COLORS = {
       'bg-destructive/10 text-destructive-ink dark:bg-destructive/30 dark:text-destructive-ink',
   },
 } as const;
-
-export const DEFAULT_CONFIGS: CarrierConfigs = {
-  icarry: {
-    enabled: false,
-    isDefault: false,
-    apiKey: '',
-    merchantId: '',
-    pickup: { ...DEFAULT_PICKUP },
-  },
-  bosta: {
-    enabled: false,
-    isDefault: false,
-    apiKey: '',
-    businessLocationId: '',
-    sandbox: false,
-    pickup: { ...DEFAULT_PICKUP },
-  },
-  aramex: {
-    enabled: false,
-    isDefault: false,
-    sandbox: false,
-    codEgpConfirmed: false,
-    accountNumber: '',
-    accountPin: '',
-    accountEntity: '',
-    accountCountryCode: 'EG',
-    username: '',
-    password: '',
-    pickup: { ...DEFAULT_PICKUP },
-  },
-};

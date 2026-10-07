@@ -48,10 +48,17 @@ describe('onboarding validation', () => {
   });
 
   it('the funnel pages are reachable without a session, the dashboard is not', () => {
-    for (const p of ['/login', '/signup', '/verify-email', '/signup/']) {
+    for (const p of [
+      '/login',
+      '/signup',
+      '/verify-email',
+      '/signup/',
+      '/forgot-password',
+      '/reset-password',
+    ]) {
       expect(isPublicPath(p), p).toBe(true);
     }
-    for (const p of ['/', '/onboarding', '/stores/x', '/signup-evil', null]) {
+    for (const p of ['/', '/onboarding', '/stores/x', '/signup-evil', '/reset-password/x', null]) {
       expect(isPublicPath(p), String(p)).toBe(false);
     }
   });

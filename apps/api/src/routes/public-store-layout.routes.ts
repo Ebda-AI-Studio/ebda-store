@@ -11,6 +11,7 @@ import { lookupStore } from '../lib/definer';
 import { resolveLayoutSettings } from '@force/shared';
 import type { TemplateId } from '@force/shared';
 import { redis } from '../services/redis.service';
+import { readInStoreContext } from '../lib/store-scoped-read';
 import {
   getPublishedDefinition,
   getPreviewDefinition,
@@ -171,21 +172,27 @@ router.get(
       const verifiedOnly = req.query.verifiedOnly === 'true';
       const limit = Math.max(1, Math.min(20, parseInt((req.query.limit as string) || '6', 10)));
 
-      const reviews = await prisma.review.findMany({
-        where: {
-          storeId,
-          status: 'published',
-          rating: { gte: minRating },
-          ...(verifiedOnly ? { verifiedPurchase: true } : {}),
-        },
-        include: {
-          customer: {
-            select: { firstName: true, lastName: true },
+      // Strict RLS (R-EBDA-001): `reviews` and `users` are store-scoped, and a
+      // public request carries no tenant context, so this read must enter the
+      // store's scope or it returns [] — which hid the testimonials section on
+      // every store (found by the Dahab pilot, 2026-10-07).
+      const reviews = await readInStoreContext(storeId, () =>
+        prisma.review.findMany({
+          where: {
+            storeId,
+            status: 'published',
+            rating: { gte: minRating },
+            ...(verifiedOnly ? { verifiedPurchase: true } : {}),
           },
-        },
-        orderBy: [{ rating: 'desc' }, { createdAt: 'desc' }],
-        take: limit,
-      });
+          include: {
+            customer: {
+              select: { firstName: true, lastName: true },
+            },
+          },
+          orderBy: [{ rating: 'desc' }, { createdAt: 'desc' }],
+          take: limit,
+        })
+      );
 
       const testimonials = reviews.map(r => ({
         id: r.id,

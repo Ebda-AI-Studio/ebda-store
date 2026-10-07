@@ -23,6 +23,8 @@ import {
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { redis } from '../services/redis.service';
 import { AppError } from '../middleware/error-handler';
+import { maskEmail } from '../lib/pii-mask';
+import { passwordSchema } from '../services/merchant-signup.service';
 
 const router = Router();
 
@@ -985,10 +987,24 @@ router.post(
       const parsed = emailLookupSchema.safeParse({ email });
       if (parsed.success) {
         // Always return success to prevent email enumeration
-        await AuthService.requestPasswordReset(
-          parsed.data.email,
-          typeof storeId === 'string' ? storeId : null
-        );
+        const scope = typeof storeId === 'string' ? storeId : null;
+        const found = await AuthService.requestPasswordReset(parsed.data.email, scope);
+        // Audit only when a link was actually issued: the row is internal (the
+        // response below is identical either way), and logging every probe for
+        // an unknown address would turn the audit trail into a spray log. The
+        // address is masked; the user id is what an investigation joins on.
+        if (found) {
+          await auditLog({
+            action: 'auth.password_reset.requested',
+            userId: found.userId,
+            resourceType: 'user',
+            resourceId: found.userId,
+            ...(scope ? { storeId: scope } : {}),
+            details: { email: maskEmail(parsed.data.email) },
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+          });
+        }
       }
 
       res.json({
@@ -1011,7 +1027,7 @@ router.post(
   authLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { token, password } = req.body;
+      const { token, password } = req.body ?? {};
 
       if (!token || !password) {
         res.status(400).json({
@@ -1021,13 +1037,10 @@ router.post(
         return;
       }
 
-      if (
-        password.length < 8 ||
-        !/[A-Z]/.test(password) ||
-        !/[a-z]/.test(password) ||
-        !/[0-9]/.test(password) ||
-        !/[^A-Za-z0-9]/.test(password)
-      ) {
+      // Same password policy as signup (merchant-signup.service passwordSchema:
+      // 8-128 chars, upper, lower, digit, symbol), so a reset can never set a
+      // password the signup form would have refused.
+      if (typeof password !== 'string' || !passwordSchema.safeParse(password).success) {
         res.status(400).json({
           success: false,
           error: {
@@ -1039,7 +1052,24 @@ router.post(
         return;
       }
 
-      await AuthService.resetPassword(token, password);
+      // A reset token is 32 random bytes as 64 lowercase hex chars. Anything else
+      // (an object, an array, a truncated paste) is answered exactly like an
+      // unknown token, never as a distinct error and never as a 500.
+      if (typeof token !== 'string' || !/^[0-9a-f]{64}$/.test(token)) {
+        throw new AppError(400, 'TOKEN_INVALID', 'Invalid or expired reset token');
+      }
+
+      const { userId } = await AuthService.resetPassword(token, password);
+
+      await auditLog({
+        action: 'auth.password_reset.completed',
+        userId,
+        resourceType: 'user',
+        resourceId: userId,
+        details: { sessionsRevoked: true },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
       res.json({
         success: true,

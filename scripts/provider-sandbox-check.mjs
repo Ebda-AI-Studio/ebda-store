@@ -33,11 +33,16 @@
  * evidence to flip `verified: true` and set `verification.sandboxVerifiedAt` in the catalog.
  *
  * Needs the built API and shared packages: `npm run build -w packages/shared -w apps/api`.
+ *
+ * SHIPPING CARRIERS (bosta | shipblu | mylerz | aramex): same command, a different flow (read-only
+ * steps by default, `--create` books ONE sandbox parcel after a prompt). See
+ * scripts/lib/carrier-sandbox-check.mjs for the env variables and the steps.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { CARRIER_ADAPTERS, runCarrierCheck } from './lib/carrier-sandbox-check.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const provider = process.argv[2];
@@ -54,8 +59,15 @@ function die(msg) {
   process.exit(2);
 }
 
-if (!ADAPTERS[provider])
-  die('usage: provider-sandbox-check.mjs <paymob|kashier|fawry> [--webhook file.json]');
+if (CARRIER_ADAPTERS[provider]) {
+  await runCarrierCheck({ ROOT, carrier: provider, die, argv: process.argv });
+  process.exit(0);
+}
+if (!ADAPTERS[provider]) {
+  die(
+    'usage: provider-sandbox-check.mjs <paymob|kashier|fawry|bosta|shipblu|mylerz|aramex> [--create] [--webhook file.json]'
+  );
+}
 if (process.env[`${provider.toUpperCase()}_BASE_URL`]) {
   die(
     `${provider.toUpperCase()}_BASE_URL is set: this script talks to the real sandbox only; unset it.`

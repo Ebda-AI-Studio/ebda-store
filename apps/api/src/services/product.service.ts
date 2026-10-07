@@ -14,6 +14,7 @@ import { redis } from './redis.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { cleanupRemovedImages } from './r2-cleanup.service';
+import { PUBLIC_MODEL3D_SELECT, toPublicModel3d } from './product-model.service';
 import { inngest } from '../lib/inngest/client';
 import { stampHumanEdits, enqueueRecommendationsSweepForNewProduct } from './ai-autofill.service';
 import { recordSlugRedirect } from './slug-redirect.service';
@@ -1701,6 +1702,10 @@ export class ProductService {
         customer: { select: { firstName: true, lastName: true } },
       },
     },
+    // Product 3D model (docs/plans/2026-10-07-product-3d-viewer.md). Reshaped
+    // into `PublicModel3d` by `toPublicModel3d`; the public route strips it
+    // when `product_3d` is off for the store.
+    model3d: { select: PUBLIC_MODEL3D_SELECT },
   } as const satisfies Prisma.ProductSelect;
 
   /**
@@ -1853,7 +1858,11 @@ export class ProductService {
       ratingCount: ratingAggregate._count.rating,
     };
 
-    return { ...this.publicDetailWithStock(product), ratingStats };
+    return {
+      ...this.publicDetailWithStock(product),
+      model3d: toPublicModel3d(product.model3d),
+      ratingStats,
+    };
   }
 
   static async getPublicById(storeId: string, productId: string) {
@@ -1879,7 +1888,11 @@ export class ProductService {
       ratingCount: ratingAggregate._count.rating,
     };
 
-    return { ...this.publicDetailWithStock(product), ratingStats };
+    return {
+      ...this.publicDetailWithStock(product),
+      model3d: toPublicModel3d(product.model3d),
+      ratingStats,
+    };
   }
 
   static async getCategories(storeId: string) {

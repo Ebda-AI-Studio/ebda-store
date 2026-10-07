@@ -39,6 +39,9 @@ const arFlat = flatten(ar as Messages);
 
 // Reviewed exceptions where en === ar is correct, not a missed translation.
 const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
+  // Language toggle names each language in its own script, same in both locales.
+  'components.languageSwitcher.nativeEn',
+  'components.languageSwitcher.nativeAr',
   // Digits-only example: the admin shows Western digits in both languages (Ruling NUMERALS-1).
   'taxVerification.form.trnPlaceholder',
   // Self-serve onboarding: LTR example values (email address, Egyptian mobile
@@ -136,13 +139,11 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
   'coupons.form.usageLimitPerUserPlaceholder',
   'coupons.targeting.minQuantityPlaceholder',
   'promotions.page.valuePercentage',
-  'shipping.carriers.icarry.title',
-  'shipping.carriers.aramex.title',
-  // SP7: Bosta is a brand name; the phone example is a local-format number, LTR in both locales.
-  'shipping.carriers.bosta.title',
+  // Carrier brand names (Bosta, ShipBlu, Mylerz, Aramex); the phone example is a local-format number, LTR in both locales.
   'shipping.carriers.shipments.carrierNames.bosta',
+  'shipping.carriers.shipments.carrierNames.shipblu',
+  'shipping.carriers.shipments.carrierNames.mylerz',
   'shipping.carriers.pickup.placeholders.phone',
-  'shipping.carriers.shipments.carrierNames.icarry',
   'shipping.carriers.shipments.carrierNames.aramex',
   'shipping.table.dashPlaceholder',
   'shipping.modal.areasArPlaceholder',
@@ -240,6 +241,7 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
   'categories.form.descriptionArabicPlaceholder',
   'categories.form.required',
   'auth.login.emailPlaceholder',
+  'auth.forgot.emailPlaceholder',
   'auth.login.mfaCodePlaceholder',
   'components.imageUpload.uploadingPercent',
   'components.adminLayout.forcePlatformBrand',

@@ -70,8 +70,9 @@ describe('Feature Registry', () => {
     // 2026-09-25: 44 keys (added `customer_wallet_checkout` — spending the
     //   wallet at checkout, a second toggle in NO plan baseline).
     // 2026-10-07: 45 keys (added `remove_branding` — decided by the plan layer, in NO baseline).
-    it('has exactly 45 entries', () => {
-      expect(FEATURE_KEYS_ARRAY).toHaveLength(45);
+    // 2026-10-07: 46 keys (added `product_3d` — every plan's baseline, Ruling R-EBDA-3D-2).
+    it('has exactly 46 entries', () => {
+      expect(FEATURE_KEYS_ARRAY).toHaveLength(46);
     });
   });
 

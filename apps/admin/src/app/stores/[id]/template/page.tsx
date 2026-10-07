@@ -9,7 +9,7 @@ import { apiGet, apiPut } from '../../../../lib/api';
 import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 
-type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
+type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' | 'dahab';
 
 interface Template {
   id: TemplateId;
@@ -78,6 +78,19 @@ const templates: Template[] = [
     tags: ['Fashion', 'Jewelry', 'Beauty'],
     bestFor: 'Fashion, jewelry, and beauty brands',
     previewColor: 'from-rose-500 to-rose-600',
+  },
+  {
+    // Builder Phase 3 pilot. Switching the skin does not rewrite the store's
+    // colours (Ruling DAHAB-3): the gold-on-night palette comes with the
+    // Dahab family preset, not with this switch.
+    id: 'dahab',
+    name: 'Dahab',
+    nameAr: 'دهب',
+    description: 'Gold on night. Made for jewellery, handmade pieces and premium gifts.',
+    descriptionAr: 'دهب على ليل. معمول للمجوهرات والمشغولات اليدوية والهدايا الراقية.',
+    tags: ['Jewellery', 'Handmade', 'Gifts'],
+    bestFor: 'Jewellery, handmade and premium gifts',
+    previewColor: 'from-[#0E1119] to-[#C9A35E]',
   },
 ];
 

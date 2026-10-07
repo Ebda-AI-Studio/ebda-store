@@ -20,8 +20,8 @@ import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';
 import { AuthService } from './auth.service';
 import { sendMerchantDuplicateSignupNotice } from './platform-mailer';
 
-/** Same password policy as `/auth/register`. */
-const passwordSchema = z
+/** Same password policy as `/auth/register` (also used by `/auth/reset-password`). */
+export const passwordSchema = z
   .string()
   .min(8, 'Password must be at least 8 characters')
   .max(128)
