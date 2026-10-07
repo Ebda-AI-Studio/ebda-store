@@ -114,8 +114,8 @@ function git(args, opts = {}) {
 const coreBare = () => git(['config', '--default', '', '--get', 'core.bare']);
 
 // ---------------------------------------------------------------- infra
-const CONTAINER_PG = 'fwb-buyflow-pg';
-const CONTAINER_REDIS = 'fwb-buyflow-redis';
+const CONTAINER_PG = 'ebda-buyflow-pg';
+const CONTAINER_REDIS = 'ebda-buyflow-redis';
 
 function sh(cmd, args, opts = {}) {
   return execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts });
@@ -265,7 +265,7 @@ function run(cmd, args, cwd, env, logFile) {
 }
 
 function prepareRef(sha, logDir) {
-  const root = path.join(os.tmpdir(), 'fwb-buy-flow-parity');
+  const root = path.join(os.tmpdir(), 'ebda-buy-flow-parity');
   fs.mkdirSync(root, { recursive: true });
   const dir = path.join(root, `wt-${sha.slice(0, 12)}`);
   const marker = path.join(dir, '.bfp-ready');

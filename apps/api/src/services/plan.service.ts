@@ -15,6 +15,7 @@ import { featureService } from './feature.service';
 import { bustStoreCaches } from './store.service';
 import { parseLimits } from './plan-entitlements';
 import { isGrantedPlan } from './billing/period';
+import { reconcileStoreAccess } from './billing/account.service';
 import logger from '../lib/logger';
 import { planSubscriberCounts, storeIdsOnPlan } from '../lib/definer';
 
@@ -165,6 +166,9 @@ export const planService = {
     await featureService.invalidateCache(storeId);
     await bustStoreCaches(storeId, store.slug, store.domain);
     logger.info({ storeId, planCode: plan.code, status }, '[plan] store plan assigned');
+    // A plan change can grow or shrink the owner's store allowance (Business ->
+    // Growth suspends the extra stores; back to Business restores them).
+    await reconcileStoreAccess(storeId);
     return { planCode: plan.code, status };
   },
 };

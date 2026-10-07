@@ -85,7 +85,7 @@ describe('pickReadableForeground', () => {
     expect(pickReadableForeground('#1a1a1a')).toBe('#ffffff');
   });
 
-  it('returns black for the FWB brand orange (L≈0.324; black=7.5:1 passes AA, white=2.8:1 fails)', () => {
+  it('returns black for the legacy orange (L≈0.324; black=7.5:1 passes AA, white=2.8:1 fails)', () => {
     // #FF6E00 has luminance ~0.324. WCAG flip point is 0.179 so this is
     // above the threshold → black wins. Verified mathematically:
     //   contrast(orange, black) = (0.324 + 0.05) / 0.05 = 7.48 ✓ AA
@@ -113,9 +113,9 @@ describe('contrastRatio', () => {
     expect(contrastRatio('#FF6E00', '#FF6E00')).toBeCloseTo(1, 1);
   });
 
-  it('passes WCAG AA for the FWB orange + white text', () => {
+  it('passes WCAG AA for the legacy orange + white text', () => {
     const ratio = contrastRatio('#FF6E00', '#FFFFFF');
-    // FWB orange + white is ~3.0:1 — passes AA large text (3.0) but fails AA normal text (4.5).
+    // legacy orange + white is ~3.0:1 — passes AA large text (3.0) but fails AA normal text (4.5).
     expect(ratio).toBeGreaterThan(2.5);
     expect(ratio).toBeLessThan(4.5);
   });
@@ -402,7 +402,7 @@ describe('deriveCoreBrandTokens — brand-tinted neutral recipe', () => {
   });
 
   it('a near-neutral secondary falls back to the primary hue for the accent', () => {
-    // wadyaljuz-shaped case (secondary is a near-grey surface): accent must
+    // demo-shop-shaped case (secondary is a near-grey surface): accent must
     // still harmonise by borrowing the PRIMARY hue rather than going chromatic.
     const t = deriveCoreBrandTokens({ primary: toHex(PRIMARY), secondary: '0 8% 95%' });
     expect(Math.abs(parse(t.accentColor).h - Hp)).toBeLessThanOrEqual(2);

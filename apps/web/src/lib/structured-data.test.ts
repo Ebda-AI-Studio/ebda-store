@@ -82,19 +82,19 @@ describe('getSiteUrl / storeAbsoluteUrl with NEXT_PUBLIC_SITE_URL SET (productio
 
   const storeWithDomain = {
     id: 'store-1',
-    slug: 'pecannbee',
-    domain: 'pecannbee.com.kw',
+    slug: 'demo-store',
+    domain: 'demo-store.example',
   } as unknown as ResolvedStore;
 
   const platformPathStore = {
     id: 'store-2',
-    slug: 'palora',
+    slug: 'demo-boutique',
     domain: undefined,
   } as unknown as ResolvedStore;
 
   it("a merchant's custom domain WINS over the platform env var", () => {
     process.env.NEXT_PUBLIC_SITE_URL = PLATFORM;
-    expect(getSiteUrl(storeWithDomain)).toBe('https://pecannbee.com.kw');
+    expect(getSiteUrl(storeWithDomain)).toBe('https://demo-store.example');
   });
 
   it('custom-domain canonical stays on the merchant domain (the shipped bug)', () => {
@@ -102,15 +102,15 @@ describe('getSiteUrl / storeAbsoluteUrl with NEXT_PUBLIC_SITE_URL SET (productio
     // Regression: this returned https://ebda.app/products/widget —
     // a platform URL with no /<slug> prefix, which resolves to the DEMO store.
     expect(storeAbsoluteUrl(storeWithDomain, '/products/widget')).toBe(
-      'https://pecannbee.com.kw/products/widget'
+      'https://demo-store.example/products/widget'
     );
   });
 
   it('a store with no custom domain gets its own <slug>.ebda.app origin — the env var never wins, no path prefix', () => {
     process.env.NEXT_PUBLIC_SITE_URL = PLATFORM;
-    expect(getSiteUrl(platformPathStore)).toBe('https://palora.ebda.app');
+    expect(getSiteUrl(platformPathStore)).toBe('https://demo-boutique.ebda.app');
     expect(storeAbsoluteUrl(platformPathStore, '/products/widget')).toBe(
-      'https://palora.ebda.app/products/widget'
+      'https://demo-boutique.ebda.app/products/widget'
     );
   });
 
@@ -122,8 +122,8 @@ describe('getSiteUrl / storeAbsoluteUrl with NEXT_PUBLIC_SITE_URL SET (productio
   it('trims whitespace and a trailing slash on both branches', () => {
     process.env.NEXT_PUBLIC_SITE_URL = `${PLATFORM}/\n`;
     expect(getSiteUrl()).toBe(PLATFORM);
-    expect(getSiteUrl({ domain: ' pecannbee.com.kw ' } as ResolvedStore)).toBe(
-      'https://pecannbee.com.kw'
+    expect(getSiteUrl({ domain: ' demo-store.example ' } as ResolvedStore)).toBe(
+      'https://demo-store.example'
     );
   });
 });

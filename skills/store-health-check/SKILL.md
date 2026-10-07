@@ -28,9 +28,9 @@ the finding.
 
 ## Money is in integer minor units
 
-Every amount is an integer in the currency's **minor** units. KWD has three
-decimal places: `12500` is **12.500 KWD**, not 125.00. Divide by 1000 for KWD,
-100 for a two-decimal currency, and say which you used. Getting this wrong by
+Every amount is an integer in the currency's **minor** units. EGP has two
+decimal places: `12500` is **125.00 EGP**, not 12,500. Divide by 100 for a
+two-decimal currency (1000 for a three-decimal one such as BHD), and say which you used. Getting this wrong by
 a factor of ten is the single most likely way this skill misleads someone.
 
 ## Report

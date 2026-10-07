@@ -591,7 +591,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // calls, which do match the `/public/` early return above. But POST
   // /payments/create is NOT a `/public/` path, so it fell through to the token
   // verifier below, and a guest can never satisfy it: `generateCsrfToken` is
-  // reachable only from login and refresh. That sentence cost pecannbee.com.kw
+  // reachable only from login and refresh. That sentence cost demo-store.example
   // 17 unpaid orders over two days (2026-09-03 to 09-05).
   //
   // Non-`/public/` guest writes are carried by the cookieless branch further

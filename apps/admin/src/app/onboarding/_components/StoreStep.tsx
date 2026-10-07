@@ -6,6 +6,7 @@ import { validateStoreSlug } from '@force/shared';
 import { apiGet, apiPost } from '../../../lib/api';
 import { suggestSlug } from '../../../lib/onboarding-validation';
 import { useT } from '@/i18n/useT';
+import type { PlanSelection } from '../../../components/billing/types';
 import type { OnboardingStore, SlugCheck } from './types';
 
 type SlugUi =
@@ -29,7 +30,17 @@ const REASON_KEY = {
 
 const DEBOUNCE_MS = 400;
 
-export function StoreStep({ onCreated }: { onCreated: (store: OnboardingStore) => void }) {
+export function StoreStep({
+  plan,
+  onBack,
+  onCreated,
+}: {
+  /** The plan chosen in the plan step; sent so the trial is billed for it on day 15. */
+  plan?: PlanSelection;
+  onBack?: () => void;
+  onCreated: (store: OnboardingStore) => void;
+}) {
+  const tFlow = useT('onboarding.flow');
   const t = useT('onboarding.flow.store');
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -95,6 +106,7 @@ export function StoreStep({ onCreated }: { onCreated: (store: OnboardingStore) =
       name: name.trim(),
       slug,
       language: document.documentElement.dir === 'rtl' ? 'ar' : 'en',
+      ...(plan ? { plan: { planCode: plan.planCode, interval: plan.interval } } : {}),
     });
     setCreating(false);
     if (error || !data) {
@@ -156,9 +168,16 @@ export function StoreStep({ onCreated }: { onCreated: (store: OnboardingStore) =
         </p>
         <p className="text-xs text-muted-foreground">{t('slugHelp')}</p>
       </div>
-      <Button type="submit" className="w-full" disabled={creating || slugUi.kind !== 'available'}>
-        {creating ? t('creating') : t('create')}
-      </Button>
+      <div className="flex gap-3">
+        {onBack && (
+          <Button type="button" variant="outline" onClick={onBack}>
+            {tFlow('back')}
+          </Button>
+        )}
+        <Button type="submit" className="flex-1" disabled={creating || slugUi.kind !== 'available'}>
+          {creating ? t('creating') : t('create')}
+        </Button>
+      </div>
     </form>
   );
 }

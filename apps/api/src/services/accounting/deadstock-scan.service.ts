@@ -15,7 +15,7 @@
  *      newly listed product is not "90 days dead" on day one.
  *      A product without a cost price used to be skipped entirely, which made
  *      the scan blind on every store that never entered costs (2026-09-30
- *      audit: pecannbee 0/210, palora 0/22) while the page said "No dead stock".
+ *      audit: demo-store 0/210, demo-boutique 0/22) while the page said "No dead stock".
  *   5. Batch-call Gemini for bilingual clearance copy (max 20/call).
  *   6. Refresh the product's existing OPEN flag, or create one. Keyed on the
  *      open flag, not on scannedAt: keying on the per-run timestamp inserted a
@@ -78,7 +78,7 @@ const GEMINI_CHUNK_SIZE = 20;
 const GEMINI_THROTTLE_MS = 2500;
 const EXPIRE_AFTER_DAYS = 30;
 const DEADSTOCK_DAYS_THRESHOLD = 90;
-// 5,000 EGP in piastres (1 EGP = 100 piastres). Re-based from FWB's 50 KWD; product to confirm.
+// 5,000 EGP in piastres (1 EGP = 100 piastres). Egypt-scale default; product to confirm.
 const DEADSTOCK_VALUE_FILS_THRESHOLD = 500_000;
 
 // ---------------------------------------------------------------------------

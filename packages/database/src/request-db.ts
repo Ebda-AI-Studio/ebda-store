@@ -7,7 +7,7 @@
 //   - Otherwise a lazily created PROCESS SINGLETON (Node: the Express API, the
 //     Inngest functions, vitest, scripts). Same behaviour as before this file.
 //
-// This is deliberately separate from FWB's tenant-context AsyncLocalStorage in
+// This is deliberately separate from Ebda's tenant-context AsyncLocalStorage in
 // `index.ts` (`tenantStorage`, `storeScope`): that one carries an open
 // TRANSACTION client for the request's RLS scope; this one carries the CLIENT
 // the transaction is opened on. The two nest: the request transaction is begun

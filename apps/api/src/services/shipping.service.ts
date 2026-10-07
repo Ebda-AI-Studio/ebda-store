@@ -54,7 +54,7 @@ export function resolveShippingFee(
     if (!areaMatch) return false;
     // Governorate disambiguation: when caller supplies a non-empty governorate,
     // require it to match so same-named areas in different governorates resolve
-    // to the correct rate (e.g. "Rumaithiya" exists in both Hawalli and Ahmadi).
+    // to the correct rate (the same area name can exist in two governorates).
     if (governorate && governorate.trim() !== '') {
       return r.governorate.toLowerCase() === governorate.toLowerCase();
     }

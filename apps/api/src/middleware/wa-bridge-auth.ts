@@ -1,10 +1,10 @@
 /**
- * WBS→FWB bridge inbound auth (Phase 6 / Option C).
+ * WBS→Ebda bridge inbound auth (Phase 6 / Option C).
  *
- * WBS calls into FWB to look up products + create carts. Auth is the
- * SAME `wbsApiKey` that FWB issues when a merchant connects WBS through
+ * WBS calls into Ebda to look up products + create carts. Auth is the
+ * SAME `wbsApiKey` that Ebda issues when a merchant connects WBS through
  * the existing wbs-integration routes — but used in the reverse direction
- * (WBS sends it as `X-WBS-API-KEY` header; FWB looks up the matching
+ * (WBS sends it as `X-WBS-API-KEY` header; Ebda looks up the matching
  * store).
  *
  * On success, attaches `req.bridgeStore` with the store row (only safe

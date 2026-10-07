@@ -218,7 +218,7 @@ function parseArgs() {
  * DATA-LOSS guard, not a tuning knob. It protects the race where a file has been
  * PUT to R2 but the DB row carrying its URL has not been written yet — without
  * it, a cleanup running mid-upload wipes a freshly-uploaded image, which is the
- * failure mode that may have produced Palora's missing covers. A guard that
+ * failure mode that may have produced Demo Boutique's missing covers. A guard that
  * cannot be tested is a guard nobody can trust.
  *
  * An object with NO lastModified is treated as infinitely old, matching the

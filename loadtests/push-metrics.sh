@@ -73,7 +73,7 @@ for f in "${summaries[@]}"; do
   fi
 
   ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  record="{\"_time\":\"$ts\",\"level\":\"info\",\"message\":\"k6 load test results\",\"scenario\":\"$scenario\",\"p95_ms\":$p95,\"rps\":$rps,\"error_rate\":$error_rate,\"project\":\"force-website-builder\"}"
+  record="{\"_time\":\"$ts\",\"level\":\"info\",\"message\":\"k6 load test results\",\"scenario\":\"$scenario\",\"p95_ms\":$p95,\"rps\":$rps,\"error_rate\":$error_rate,\"project\":\"ebda\"}"
   payload="${payload}${record}"$'\n'
   echo "[push-metrics] queued: scenario=$scenario p95_ms=$p95 rps=$rps error_rate=$error_rate"
 done

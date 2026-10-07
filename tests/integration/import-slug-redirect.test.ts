@@ -1,7 +1,7 @@
 /**
  * Bulk Import Slug Redirect — Integration Tests
  *
- * Reproduces the real-world pecannbee case: a merchant re-exports their
+ * Reproduces the real-world demo-store case: a merchant re-exports their
  * catalog from a source system with a different (usually longer,
  * auto-numbered) handle for a SKU that already exists in the store. Bulk
  * import matches the row by SKU and, in Phase 4, writes the NEW incoming

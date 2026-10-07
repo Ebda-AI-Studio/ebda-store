@@ -68,7 +68,7 @@ const MAX_LONGEST_SIDE = 2000;
  * for product images. So a 26-megapixel camera original uploaded straight from
  * a phone was stored, and served, at full size.
  *
- * That is not hypothetical. On 2026-05-01 the palora catalog went up as 19
+ * That is not hypothetical. On 2026-05-01 the demo-boutique catalog went up as 19
  * images averaging 8 MB — including a 4160x6240 PNG at 28 MB — and those pages
  * shipped exactly that to every mobile customer until 2026-08-09. 178 MB of
  * originals reduced to 7 MB (96%) with no visible quality change, which is the

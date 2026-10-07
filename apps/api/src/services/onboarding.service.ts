@@ -23,6 +23,12 @@ import { SetupGuideService } from './setup-guide.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { assertOwnerMayCreateStore } from './plan-limit.service';
 import { assertStoreCreationBudget, withStoreCreationLock } from './store-creation-limit';
+import { assertStoreMayGoLive } from './billing/go-live-gate';
+import {
+  getSubscriptionBillingState,
+  loadPayablePlan,
+} from './billing/subscription-billing.service';
+import { DEFAULT_TRIAL_CHOICE, type TrialChoice } from './billing/trial';
 
 /** A self-serve owner may hold this many stores (abuse bound; raise with plans). */
 export const MAX_SELF_SERVE_STORES_PER_OWNER = 3;
@@ -136,6 +142,7 @@ export class OnboardingService {
         : null,
       productCount,
       codEnabled,
+      billing: store ? await getSubscriptionBillingState(store.id) : null,
     };
   }
 
@@ -147,6 +154,8 @@ export class OnboardingService {
       slug: string;
       template?: SelfServeTemplate;
       language?: 'ar' | 'en';
+      /** Plan chosen at signup (billed at trial end); defaults to Growth monthly. */
+      plan?: TrialChoice;
     }
   ) {
     const user = await withUser(owner.userId, tx =>
@@ -162,6 +171,13 @@ export class OnboardingService {
     const owned = await prisma.store.count({ where: { ownerId: owner.userId, deletedAt: null } });
     if (owned >= MAX_SELF_SERVE_STORES_PER_OWNER) {
       throw new AppError(409, 'STORE_LIMIT_REACHED', 'Store limit reached for this account');
+    }
+
+    // The chosen plan must be payable (public, priced) BEFORE anything is created.
+    const trialChoice = input.plan ?? DEFAULT_TRIAL_CHOICE;
+    const { plan: chosen } = await loadPayablePlan(trialChoice.planCode, trialChoice.interval);
+    if (!chosen.isPublic) {
+      throw new AppError(400, 'PLAN_NOT_PURCHASABLE', 'This plan cannot be purchased');
     }
 
     const availability = await this.checkSlug(input.slug, {
@@ -195,6 +211,7 @@ export class OnboardingService {
           // Business plan and starts on it, with no second trial.
           plan: ownedNow > 0 ? 'enterprise' : 'professional',
           growthTrial: ownedNow === 0,
+          trialChoice,
           status: 'inactive',
           template: input.template,
           ownerEmail: user.email,
@@ -269,6 +286,9 @@ export class OnboardingService {
       throw new AppError(403, 'STORE_SUSPENDED', 'This store is suspended');
     }
     if (store.status !== 'active') {
+      // Billing first (Ruling EBDA-FUNNEL-5): an active trial with a saved card,
+      // a pay-at-trial-end trial, a paid plan, or an admin-granted plan.
+      await assertStoreMayGoLive(storeId);
       const methods = await prisma.paymentConfig.count({ where: { storeId, isEnabled: true } });
       if (methods === 0) {
         throw new AppError(400, 'NO_PAYMENT_METHOD', 'Enable a payment method before going live');

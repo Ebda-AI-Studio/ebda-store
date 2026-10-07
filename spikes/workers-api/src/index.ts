@@ -10,7 +10,7 @@ const app = new Hono<{ Bindings: Env }>();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const hostOf = (req: Request) => req.headers.get('host') ?? new URL(req.url).host;
-// Spike stand-in for auth: FWB derives userId from the verified JWT.
+// Spike stand-in for auth: Ebda derives userId from the verified JWT.
 const userIdOf = (req: Request) => {
   const u = req.headers.get('x-ebda-user-id');
   return u && UUID_RE.test(u) ? u : undefined;
@@ -31,11 +31,11 @@ const run = (c: any, handler: Parameters<typeof runRequest>[3]) =>
     wantPid: c.env.DEBUG_HEADERS === '1',
   });
 
-// Public catalogue read (mirrors FWB public storefront product list; no pricing engine).
+// Public catalogue read (mirrors Ebda public storefront product list; no pricing engine).
 app.get('/products', async c => {
   const r = await run(c, async (tx, { storeId }) => {
     const products = await tx.product.findMany({
-      where: { storeId, active: true }, // defense-in-depth, like FWB's explicit storeId filters
+      where: { storeId, active: true }, // defense-in-depth, like Ebda's explicit storeId filters
       orderBy: { name: 'asc' },
       select: { id: true, storeId: true, name: true, pricePiastres: true },
     });

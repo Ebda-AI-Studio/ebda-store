@@ -54,7 +54,15 @@ export interface Copy {
     laterTitle: string;
   };
   analytics: FeatureCopy;
-  pricing: { eyebrow: string; title: string; lead: string; note: string; cta: string };
+  pricing: {
+    eyebrow: string;
+    title: string;
+    lead: string;
+    note: string;
+    cta: string;
+    planCta: string;
+    planCtaAnnual: string;
+  };
   stories: {
     eyebrow: string;
     title: string;
@@ -211,6 +219,8 @@ export const COPY: Record<Locale, Copy> = {
       lead: 'جرّب باقة النمو لمدة ١٤ يومًا. لا توجد باقة مجانية أو عمولة على الطلبات.',
       note: 'وفر ٢٥٪ بالدفع السنوي. رسوم بوابة الدفع منفصلة. بعد تجاوز حد الطلبات، لديك مهلة ٧ أيام للترقية.',
       cta: 'ابدأ البيع',
+      planCta: 'ابدأ بباقة {plan}',
+      planCtaAnnual: 'أو اشترك سنويًا ووفّر ٢٥٪',
     },
     stories: {
       eyebrow: '10 · قصص التجار',
@@ -465,6 +475,8 @@ export const COPY: Record<Locale, Copy> = {
       lead: 'Try Growth for 14 days. No free plan and no platform commission on orders.',
       note: 'Save 25% with annual billing. Gateway fees are separate. After exceeding the order cap, you have 7 days to upgrade.',
       cta: 'Start selling',
+      planCta: 'Start with {plan}',
+      planCtaAnnual: 'Or pay annually and save 25%',
     },
     stories: {
       eyebrow: '10 · Customer stories',

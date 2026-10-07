@@ -3,7 +3,7 @@
 // import a catalogue CSV through the SAME code the admin "Bulk import" uses
 // (csv-import.ts converter -> BulkService.importProducts -> product-cache bust).
 //
-//   DATABASE_URL=postgresql://test:test@localhost:5432/ebda_amelia \
+//   DATABASE_URL=<loopback postgres url, e.g. a local container> \
 //     npx tsx scripts/ebda-seed-amelia.mjs [--csv <file>] [--owner-email <email>] [--allow-remote]
 //
 // Run it with `tsx` (not bare node): it imports the API's TypeScript services.
@@ -100,12 +100,12 @@ try {
     },
   });
 
-  // Merchant #1 is on the admin-granted `comped` plan: every limit unlimited,
-  // no platform fee, every feature on. Done BEFORE the import so the product
-  // ceiling never applies to the catalogue load. Do not copy this to other
-  // merchants (use scripts/ebda-comp-store.mjs deliberately).
+  // Amelia is a REGULAR paying client (Ruling EBDA-FUNNEL-15): no comped /
+  // founding_free plan. The seed puts the store on Growth so the catalogue load
+  // runs under real limits; in production Ahmad activates her paid period from
+  // super-admin -> Billing -> "Record manual payment & activate" (InstaPay).
   const { planService } = await import('../apps/api/src/services/plan.service.ts');
-  await planService.assignPlan(store.id, { planCode: 'comped' });
+  await planService.assignPlan(store.id, { planCode: 'growth' });
   store = await prisma.store.findUniqueOrThrow({ where: { id: store.id } });
 
   // ---- import (same path as the admin Bulk import) ---------------------------

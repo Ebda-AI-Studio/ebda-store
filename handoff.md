@@ -1,7 +1,7 @@
 # Ebda UI handoff
 
 ## Goal
-Assess launch readiness, remove exposed FWB naming, improve UI and fix wiring/errors; prove backend operation in Cloudflare workerd. Mobile is mandatory end-to-end.
+Assess launch readiness, remove exposed Ebda naming, improve UI and fix wiring/errors; prove backend operation in Cloudflare workerd. Mobile is mandatory end-to-end.
 
 ## Current state
 Branch `codex/ebda-ui-ux`, worktree `/private/tmp/ebda-ui-20261005`, baseline `89461087`. Root `plan` and unrelated `.handoff/` preserved. PR #3: https://github.com/Whisky-11/ebda/pull/3. Initial UI commits `9d047026`/`0a91f0ce`; expanded launch fixes `23acd07b` committed for PR #3. PR #3 merged the earlier UI head only. PR #4 carries subsequent backend fixes; authorized merge in progress, no deploy. Local built Worker preview: http://localhost:8788/signup.
@@ -28,6 +28,11 @@ Ruling MERGE-2 — allowlist only the two exact synthetic shipping fixture value
 Basic / Growth / Business = EGP 1,490 / 3,490 / 9,990 (annual 25% off), 0 fee, no free plan, 14-day Growth trial. Source: docs/plans/2026-10-05-pricing-decisions.md; implementation map and rulings R-EBDA-PRICING-1..10 in docs/plans/2026-10-05-pricing-implementation.md and docs/RULINGS.md.
 Done: catalog migration `20261007000000_locked_pricing` (DB == `DEFAULT_PLAN_SEEDS`, hidden free/pro/comped kept, `founding_free` added unassigned); gates at the server write path for stores 1/1/3, branding removal (Growth+Business), API access (Business), analytics tiers, order cap incl. payment-links; marketing + help (ar/en) show real prices.
 Left: parent/child billing for extra stores (R-EBDA-PRICING-6); upsell UI for 402 on gated analytics pages; Amelia still on `comped`; first store created by `POST /stores` is Basic-active with no checkout; live billing/UAT/deploy not exercised. Local PG container `ebda-pricing-pg` (Apple `container`) can be removed.
+
+## Signup funnel (branch `feat/signup-funnel`, stacks on #10; PR to main, not merged, not deployed)
+Goal: plan choice, then card on file (nothing charged) OR InstaPay, then a 14-day Growth trial; daily reminders, charge or overdue, suspension; super-admin manual payments; store allowance; upsell UI. Plan: docs/plans/2026-10-07-signup-funnel.md. Rulings: EBDA-FUNNEL-1..15 in docs/RULINGS.md.
+State: API, migration `20261007160000_signup_funnel`, admin + marketing UI, and the unit + integration tests are done locally (local PG container `ebda-funnel-pg` :55441, redis `ebda-funnel-redis` :56391, both Apple `container`; remove when finished).
+Left: Kashier has no documented no-charge tokenization, so card-on-file needs Kashier's written enablement (Ruling 2). Kashier MIT charge path is unverified against the docs (fep host / CONTAUTH / agreement id). Production steps: set EBDA_INSTAPAY_HANDLE + EBDA_SUPPORT_WHATSAPP; move Amelia off `comped` by recording her InstaPay payment in super-admin. Not live-verified: no deploy.
 
 ## Egypt VAT gate phase 1 (branch `feat/vat-gate`, PR to main, not merged, not deployed)
 Goal: no VAT unless the merchant's VAT registration is VERIFIED by a super-admin; Ebda's own subscription VAT a super-admin setting, default OFF. Rulings TAX-2..TAX-9 in docs/RULINGS.md (TAX-2 supersedes TAX-1's "taxEnabled alone").

@@ -182,7 +182,7 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
   // Threshold history:
   //   v1 (2026-05-25): skip only when current==0 && baseline<10 — too tight.
   //   v2 (2026-05-27): skip only when current==0 && baseline<50 — still missed
-  //                    the LOW-but-nonzero current case (Wady Aljuz: current=12,
+  //                    the LOW-but-nonzero current case (Demo Shop: current=12,
   //                    baseline=0.33 → 3500% P0 false positive, 2026-06-17).
   //   v3 (2026-06-17): absolute floor in EITHER window (direction-agnostic).
   const COST_SPIKE_MIN_UNITS = 50;
@@ -208,7 +208,7 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
   // meaningful absolute revenue in EITHER window makes the percentage a
   // signal — a real drop off a real baseline still fires, including the
   // −100% of a store whose revenue stopped.
-  //   v1 (2026-10-01): 50 KWD / week floor in either window; re-based for Ebda
+  //   v1 (2026-10-01): EGP-scaled weekly floor in either window
   //   to 5,000 EGP / week (500_000 piastres) — product to confirm.
   const REVENUE_DROP_MIN_FILS = 500_000;
   const includeRevenue =

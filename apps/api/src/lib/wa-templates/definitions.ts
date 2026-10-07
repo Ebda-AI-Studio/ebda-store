@@ -86,7 +86,7 @@ export const TEMPLATES: TemplateDefinition[] = [
         type: 'BODY',
         text: 'Hi {{1}}, your order {{2}} for {{3}} from {{4}} has been received. Thank you!',
         example: {
-          body_text: [['Ahmad', 'ORD-1042', '55.00 EGP', 'Wady Aljuz']],
+          body_text: [['Ahmad', 'ORD-1042', '55.00 EGP', 'Demo Shop']],
         },
       },
       {
@@ -146,7 +146,7 @@ export const TEMPLATES: TemplateDefinition[] = [
         // {{5}} and uses a TRK- prefixed example.
         text: 'Hi {{1}}, your order {{2}} for {{3}} from {{4}} is on the way. Track it with reference {{5}} — we will message you when it arrives.',
         example: {
-          body_text: [['Ahmad', 'ORD-1042', '55.00 EGP', 'Wady Aljuz', 'TRK-12345']],
+          body_text: [['Ahmad', 'ORD-1042', '55.00 EGP', 'Demo Shop', 'TRK-12345']],
         },
       },
     ],
@@ -189,7 +189,7 @@ export const TEMPLATES: TemplateDefinition[] = [
         // earlier and ends with substantive thanks text.
         text: 'Hi {{1}}, your order {{2}} for {{3}} from {{4}} has been delivered. Thanks for shopping with us, we hope you love it.',
         example: {
-          body_text: [['Ahmad', 'ORD-1042', '55.00 EGP', 'Wady Aljuz']],
+          body_text: [['Ahmad', 'ORD-1042', '55.00 EGP', 'Demo Shop']],
         },
       },
       {
@@ -237,7 +237,7 @@ export const TEMPLATES: TemplateDefinition[] = [
         type: 'BODY',
         text: 'Welcome back, {{1}}! New arrivals just landed at {{2}}. Reply "menu" to browse the latest collection.',
         example: {
-          body_text: [['Ahmad', 'Wady Aljuz']],
+          body_text: [['Ahmad', 'Demo Shop']],
         },
       },
     ],
@@ -277,7 +277,7 @@ export const TEMPLATES: TemplateDefinition[] = [
         type: 'BODY',
         text: 'Hi {{1}}, you left {{2}} worth of items in your cart at {{3}}. Reply "checkout" to complete your order.',
         example: {
-          body_text: [['Ahmad', '55.00 EGP', 'Wady Aljuz']],
+          body_text: [['Ahmad', '55.00 EGP', 'Demo Shop']],
         },
       },
     ],
@@ -322,8 +322,8 @@ export const TEMPLATES: TemplateDefinition[] = [
               'Ahmad',
               '55.00',
               'EGP',
-              'Wady Aljuz',
-              'https://wadyaljuz.com/checkout?waToken=abc123',
+              'Demo Shop',
+              'https://demo-shop.example/checkout?waToken=abc123',
             ],
           ],
         },
@@ -349,7 +349,13 @@ export const TEMPLATES: TemplateDefinition[] = [
         text: 'مرحبًا {{1}}، هذا رابط الدفع من {{4}} بقيمة {{2}} {{3}}: {{5}}. الرابط صالح لمدة 30 دقيقة.',
         example: {
           body_text: [
-            ['أحمد', '55.00', 'ج.م', 'وادي الجوز', 'https://wadyaljuz.com/checkout?waToken=abc123'],
+            [
+              'أحمد',
+              '55.00',
+              'ج.م',
+              'وادي الجوز',
+              'https://demo-shop.example/checkout?waToken=abc123',
+            ],
           ],
         },
       },

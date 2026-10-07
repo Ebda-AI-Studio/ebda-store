@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# safe-deploy.sh - local gate + push for FWB
+# safe-deploy.sh - local gate + push for Ebda
 # Usage: bash scripts/safe-deploy.sh
 set -euo pipefail
 

@@ -216,7 +216,7 @@ const allInngestFunctions: InngestFunction.Any[] = [
 ];
 
 /**
- * Served functions. On Workers the Gmail alert poller is left out: it is FWB ops plumbing over IMAP
+ * Served functions. On Workers the Gmail alert poller is left out: it is Ebda ops plumbing over IMAP
  * (TCP + TLS to Gmail), dropped from the Ebda API (R-EBDA-001 section 5); Ebda alerts come from
  * Sentry and the status page.
  */

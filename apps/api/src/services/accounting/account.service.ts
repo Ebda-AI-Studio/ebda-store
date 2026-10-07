@@ -85,7 +85,7 @@ async function postOpeningBalanceIfNeeded(
 
   // Variants contribute their own inventory × costPrice. Per-variant costPrice
   // is used when set; falls back to the parent product's costPrice otherwise
-  // (FWB Batch 1 — per-variant cost not always populated).
+  // (Ebda Batch 1 — per-variant cost not always populated).
   const variantRows = await tx.productVariant.findMany({
     where: {
       product: { storeId, deletedAt: null, status: { not: 'archived' }, trackInventory: true },

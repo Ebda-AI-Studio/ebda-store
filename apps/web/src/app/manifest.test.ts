@@ -31,9 +31,9 @@ const { default: manifest } = await import('./manifest');
 function makeStore(overrides: Record<string, unknown> = {}) {
   return {
     id: 'store-1',
-    name: 'Wady Aljuz',
+    name: 'Demo Shop',
     nameAr: 'وادي الجوز',
-    slug: 'wady-aljuz',
+    slug: 'demo-shop',
     domain: undefined,
     favicon: undefined,
     theme: {},
@@ -63,7 +63,7 @@ describe('manifest — localized store name in the description fallback (#1857)'
     const result = await manifest();
 
     expect(result.description).toContain('وادي الجوز');
-    expect(result.description).not.toContain('Wady Aljuz');
+    expect(result.description).not.toContain('Demo Shop');
   });
 
   it('en locale (same store data): description stays English', async () => {
@@ -73,7 +73,7 @@ describe('manifest — localized store name in the description fallback (#1857)'
 
     const result = await manifest();
 
-    expect(result.description).toContain('Wady Aljuz');
+    expect(result.description).toContain('Demo Shop');
   });
 
   it('ar locale, no nameAr set: falls back to the English name rather than going blank', async () => {
@@ -83,7 +83,7 @@ describe('manifest — localized store name in the description fallback (#1857)'
 
     const result = await manifest();
 
-    expect(result.description).toContain('Wady Aljuz');
+    expect(result.description).toContain('Demo Shop');
   });
 });
 
@@ -102,7 +102,7 @@ describe('manifest — localized name/short_name (#2195)', () => {
     storeRef.current = makeStore();
     cookieRef.lang = 'en';
     global.fetch = vi.fn(async () => ({ ok: false })) as unknown as typeof fetch;
-    expect((await manifest()).name).toBe('Wady Aljuz');
+    expect((await manifest()).name).toBe('Demo Shop');
   });
 });
 
@@ -110,9 +110,9 @@ describe('manifest — localized name/short_name (#2195)', () => {
 // who configured an Arabic app name actually hit.
 describe('manifest — API manifest branch picks the Arabic members under ar (#2194)', () => {
   const apiManifest = {
-    name: 'Wady Aljuz App',
-    short_name: 'Wady',
-    description: 'Shop at Wady Aljuz',
+    name: 'Demo Shop App',
+    short_name: 'Demo Shop',
+    description: 'Shop at Demo Shop',
     name_ar: 'تطبيق وادي الجوز',
     short_name_ar: 'وادي',
     description_ar: 'تسوق من وادي الجوز',
@@ -135,14 +135,14 @@ describe('manifest — API manifest branch picks the Arabic members under ar (#2
     cookieRef.lang = 'en';
     global.fetch = okFetch(apiManifest);
     const result = await manifest();
-    expect(result.name).toBe('Wady Aljuz App');
-    expect(result.description).toBe('Shop at Wady Aljuz');
+    expect(result.name).toBe('Demo Shop App');
+    expect(result.description).toBe('Shop at Demo Shop');
   });
 
   it('ar against an API that predates the *_ar members: never the English description', async () => {
     storeRef.current = makeStore();
     cookieRef.lang = 'ar';
-    global.fetch = okFetch({ name: 'Wady Aljuz App', description: 'Shop at Wady Aljuz' });
+    global.fetch = okFetch({ name: 'Demo Shop App', description: 'Shop at Demo Shop' });
     const result = await manifest();
     expect(result.description).toContain('وادي الجوز');
     expect(result.description).not.toContain('Shop at');

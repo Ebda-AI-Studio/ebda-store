@@ -103,10 +103,6 @@ const REVIEWED_SPREADS: Record<string, string> = {
     'OrphanedProviderInvoice → storeId, orderId, orderNumber, provider, transactionId, amount, currency, source',
   'apps/api/src/services/payment-providers/unbooked-refund-alert.ts|a.context':
     'Record<string, unknown>; the four callers in payment.factory.ts pass payment / order / claim / refund ids and piastres amounts only',
-  'packages/database/prisma/clone-demo-stores.ts|e':
-    'bare first arg: `.catch(e => console.error(e))` — the Error from a local dev CLI, never deployed',
-  'packages/database/prisma/flip-card-frame-primary.ts|e':
-    'bare first arg: `.catch(e => console.error(e))` — the Error from a local dev CLI, never deployed',
   'packages/database/prisma/seed.ts|e':
     'bare first arg: `.catch(e => console.error(e))` — the Error from a local dev CLI, never deployed',
 };

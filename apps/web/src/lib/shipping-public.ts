@@ -4,12 +4,12 @@ import type { PublicShippingZone } from './structured-data';
 /**
  * Shipping rates for the storefront's JSON-LD shipping block.
  *
- * TWO SOURCES, and both are required. FWB has two shipping models:
+ * TWO SOURCES, and both are required. Ebda has two shipping models:
  *   - `ShippingZone`     — named zones, carry a delivery-day estimate
  *   - `ShippingAreaRate` — per-governorate/area rates, no day estimate
  *
  * Real merchants overwhelmingly use AREA RATES: that is what the admin's
- * `AreaRateEditor` writes, and Pecannbee (the reference store) has a full
+ * `AreaRateEditor` writes, and Demo Store (the reference store) has a full
  * Egypt area list with ZERO zones. Reading zones alone shipped a block that
  * was silently dead for every such store — the fetch succeeded, returned an
  * empty list, and the block was correctly-but-uselessly omitted forever.

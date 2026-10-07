@@ -722,7 +722,7 @@ export function HomePageContent({
                   // preceding section (default order) is brandStory or
                   // bestSellers — checking only blogCarousel's own bgColor let a
                   // white divider band show over the white page bg between two
-                  // brown sections (pecannbee). Mirrors the bestSellers/brandStory
+                  // brown sections (demo-store). Mirrors the bestSellers/brandStory
                   // dividers which already check both sides.
                   hideForExplicitBg={
                     !!(
@@ -752,7 +752,7 @@ export function HomePageContent({
                   // strip's preceding section (default order) is blogCarousel /
                   // brandStory / bestSellers — checking only the trust strip's own
                   // bgColor left a white divider band between the brown
-                  // best-sellers and the trust strip (pecannbee, 2026-06-20).
+                  // best-sellers and the trust strip (demo-store, 2026-06-20).
                   hideForExplicitBg={
                     !!(
                       layout.bestSellers.bgColor ||

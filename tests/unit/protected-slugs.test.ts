@@ -47,7 +47,7 @@ describe('protected slug matching', () => {
 
   it.each([
     'amelia',
-    'wady-aljuz',
+    'demo-shop',
     'pineapple', // contains "apple" but is a different word
     'pineapple-shop',
     'coolshop',

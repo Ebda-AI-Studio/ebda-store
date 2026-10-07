@@ -9,6 +9,7 @@ import { NotificationProvider } from '../contexts/NotificationContext';
 import { FocusModeProvider } from '../contexts/FocusModeContext';
 import { PwaInstallHint } from '../components/PwaInstallHint';
 import { PostHogProvider } from '../components/PostHogProvider';
+import { UpsellDialog } from '../components/billing/UpsellDialog';
 // OneSignalInit is a render-null leaf that only runs post-auth — keep the heavy
 // react-onesignal lib out of the first-load bundle (irrelevant on the login page).
 const OneSignalInit = dynamic(
@@ -33,6 +34,7 @@ function AuthenticatedProviders({ children }: { children: ReactNode }) {
             <ToastProvider>
               <OneSignalInit />
               <PwaInstallHint />
+              <UpsellDialog />
               {children}
             </ToastProvider>
           </FocusModeProvider>

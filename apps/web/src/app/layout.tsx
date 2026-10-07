@@ -89,7 +89,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   // Bare platform host (no custom domain, no slug) resolves to DEFAULT_STORE,
   // whose name is "Force" — which produced the merchant-shaped title
-  // "Force - Online Shopping in Kuwait" for a store that does not exist. The
+  // a generic platform title for a store that does not exist. The
   // root now redirects to ebda.app, so the ONLY page that renders under this
   // sentinel is the platform 404; title it as one and keep it out of the index.
   // Without this the tab still reads like the old marketing page even though

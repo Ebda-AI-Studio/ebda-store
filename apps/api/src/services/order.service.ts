@@ -2288,7 +2288,7 @@ export class OrderService {
     // Sending it inline, before COMMIT, let a status change that then rolled
     // back still reverse the ledger and restore stock: production has a
     // delivered + paid order whose sale entry was reversed "refund applied"
-    // while the order itself never left `delivered` (wady-aljuz, order
+    // while the order itself never left `delivered` (demo-shop, order
     // ORD-1781512189610-9972A710, 2026-07-09 — the 30s request transaction
     // timed out, the status flip rolled back, the reversal had already
     // committed and the event had already been sent). The `order/refunded`

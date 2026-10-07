@@ -36,7 +36,9 @@ describe('resolveBannerLink — HeroBannerLink render decision', () => {
   });
 
   it('returns the safe link for an absolute https URL — renders an anchor', () => {
-    expect(resolveBannerLink('https://wadyaljuz.com/sale')).toBe('https://wadyaljuz.com/sale');
+    expect(resolveBannerLink('https://demo-shop.example/sale')).toBe(
+      'https://demo-shop.example/sale'
+    );
   });
 
   it('returns null for a javascript: URL (neutralized, defense-in-depth) — renders Fragment/no anchor', () => {

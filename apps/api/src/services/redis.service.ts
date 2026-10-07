@@ -27,7 +27,7 @@ class RedisService {
               return Math.min(times * 500, 30000);
             },
             lazyConnect: true,
-            // When REDIS_KEY_PREFIX is set (e.g. `fwb-staging:` on staging),
+            // When REDIS_KEY_PREFIX is set (e.g. `ebda-staging:` on staging),
             // ioredis transparently prefixes every command's keys. All
             // consumers (cache.set/get, csrf, session, ratelimit, lock,
             // email-queue) get the prefix for free — no per-call changes

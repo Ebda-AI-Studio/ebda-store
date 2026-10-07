@@ -26,17 +26,7 @@ export type PaymentStatus =
   | 'expired'
   | 'cod_pending';
 
-export type Currency =
-  | 'EGP'
-  | 'KWD'
-  | 'USD'
-  | 'EUR'
-  | 'GBP'
-  | 'AED'
-  | 'SAR'
-  | 'BHD'
-  | 'OMR'
-  | 'QAR';
+export type Currency = 'EGP' | 'USD' | 'EUR' | 'GBP' | 'AED' | 'SAR' | 'BHD' | 'OMR' | 'QAR';
 
 export interface CustomerInfo {
   id?: string;
@@ -278,7 +268,7 @@ export interface IPaymentProvider {
 // `PaymentProviderV2` is the successor of `IPaymentProvider` above. It is the
 // same system evolved, not a second one: it reuses `Currency`, `CustomerInfo`,
 // `PaymentStatus` and the factory (`registerProviderV2`), and 6b moves the Egypt
-// gateway adapters (Paymob, Kashier, Fawry) onto it and deletes the Kuwait ones
+// gateway adapters (Paymob, Kashier, Fawry) onto it and deletes the legacy ones
 // and `IPaymentProvider`.
 //
 // Differences that matter for money:

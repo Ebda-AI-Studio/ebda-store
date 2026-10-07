@@ -3,7 +3,7 @@
 // Store Theme & Template Types
 export * from './store-theme';
 
-// Store Layout Settings (Pecannbee-style flow toggles)
+// Store Layout Settings (Demo Store-style flow toggles)
 export * from './store-layout';
 
 // Per-template branded layout baselines (Brand Engine Phase 2)

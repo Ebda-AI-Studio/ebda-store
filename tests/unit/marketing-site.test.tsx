@@ -95,10 +95,10 @@ describe('marketing hero and structure', () => {
 });
 
 describe('marketing honesty', () => {
+  const section = (h: string) => h.match(/<section id="pricing".*?<\/section>/s)![0];
   it('pricing shows the locked EGP prices in both languages, driven by one config', () => {
     expect(PRICING_PUBLISHED).toBe(true);
     expect(PLANS.map(p => p.price?.amountMinor)).toEqual([149000, 349000, 999000]);
-    const section = (h: string) => h.match(/<section id="pricing".*?<\/section>/s)![0];
     for (const html of [en, ar]) {
       const s = section(html).replace(/[\s\u00a0\u202f,٬،.]/g, '');
       // Latin or Arabic-Indic digits: 1,490 / 3,490 / 9,990 per month
@@ -108,6 +108,17 @@ describe('marketing honesty', () => {
     }
     expect(section(en)).not.toContain('Pricing coming soon');
     expect(section(ar)).not.toContain('السعر قريبًا');
+  });
+  it('each plan card links to signup with its plan and both intervals', () => {
+    for (const html of [en, ar]) {
+      const s = section(html);
+      for (const id of ['basic', 'growth', 'business']) {
+        expect(s).toContain(`href="${SIGNUP_URL}?plan=${id}&amp;interval=month"`);
+        expect(s).toContain(`href="${SIGNUP_URL}?plan=${id}&amp;interval=year"`);
+      }
+    }
+    expect(section(en)).toContain('Start with Growth');
+    expect(section(ar)).toContain('ابدأ بباقة النمو');
   });
   it('payments mark unbuilt methods as coming and WhatsApp does not promise automation', () => {
     const pay = en.match(/<section id="payments".*?<\/section>/s)![0];
@@ -133,10 +144,15 @@ describe('marketing SEO and trust surface', () => {
       en: '/en/privacy',
     });
   });
-  it('JSON-LD has Organization, WebSite, SoftwareApplication and no ratings', () => {
+  it('JSON-LD has Organization, WebSite, SoftwareApplication, FAQPage and no ratings', () => {
     const g = jsonLd('en')['@graph'];
-    expect(g.map(n => n['@type'])).toEqual(['Organization', 'WebSite', 'SoftwareApplication']);
-    expect(JSON.stringify(g)).not.toMatch(/aggregateRating|ratingValue|review|offers/i);
+    expect(g.map(n => n['@type'])).toEqual([
+      'Organization',
+      'WebSite',
+      'SoftwareApplication',
+      'FAQPage',
+    ]);
+    expect(JSON.stringify(g)).not.toMatch(/aggregateRating|ratingValue|"review"/i);
     expect(en).toContain('application/ld+json');
   });
   it('security.txt has Contact, a future Expires within a year, Canonical', () => {
@@ -162,7 +178,7 @@ describe('marketing SEO and trust surface', () => {
       }
     }
   });
-  it('no Force / FWB branding in any rendered page or public file', () => {
+  it('no inherited third-party branding in any rendered page or public file', () => {
     const bad = /Force AI|ForceAI|Force Website Builder|force-ai|\bFWB\b|\bForce\b/i;
     const all = [ar, en, pub('llms.txt'), pub('.well-known/security.txt'), pub('og.svg')];
     for (const p of ['legal', 'privacy', 'terms'] as const)

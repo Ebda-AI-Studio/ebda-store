@@ -1,6 +1,16 @@
-export type StepKey = 'store' | 'template' | 'product' | 'payment' | 'live';
+import type { BillingInfo } from '../../../components/billing/types';
 
-export const STEP_ORDER: readonly StepKey[] = ['store', 'template', 'product', 'payment', 'live'];
+export type StepKey = 'plan' | 'store' | 'billing' | 'template' | 'product' | 'payment' | 'live';
+
+export const STEP_ORDER: readonly StepKey[] = [
+  'plan',
+  'store',
+  'billing',
+  'template',
+  'product',
+  'payment',
+  'live',
+];
 
 export type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
 
@@ -28,6 +38,7 @@ export interface OnboardingState {
   store: OnboardingStore | null;
   productCount: number;
   codEnabled: boolean;
+  billing: BillingInfo | null;
 }
 
 export type SlugCheck =

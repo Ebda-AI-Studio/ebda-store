@@ -5,7 +5,7 @@ import type { StoreTheme } from '../../types/store-theme';
 // Minimal theme factory — only the fields deriveBrandRoles reads.
 const theme = (over: Partial<StoreTheme> = {}): StoreTheme =>
   ({
-    primaryColor: '348 68% 25%', // wadyaljuz maroon (dark)
+    primaryColor: '348 68% 25%', // demo-shop maroon (dark)
     primaryForeground: '0 0% 100%',
     secondaryColor: '220 14% 96%',
     secondaryForeground: '220 9% 20%',
@@ -21,7 +21,7 @@ const theme = (over: Partial<StoreTheme> = {}): StoreTheme =>
   }) as StoreTheme;
 
 describe('deriveBrandRoles', () => {
-  it('preserves a stored foreground verbatim (wadyaljuz-immutability)', () => {
+  it('preserves a stored foreground verbatim (demo-shop-immutability)', () => {
     const vars = deriveBrandRoles(theme());
     expect(vars['--primary']).toBe('348 68% 25%');
     expect(vars['--primary-foreground']).toBe('0 0% 100%'); // stored value, untouched
@@ -52,19 +52,19 @@ describe('deriveBrandRoles', () => {
     expect(vars['--primary-foreground']).toBe('0 0% 100%');
   });
 
-  it('CALIBRATION: a fully-configured theme is returned unchanged (wadyaljuz gate)', () => {
+  it('CALIBRATION: a fully-configured theme is returned unchanged (demo-shop gate)', () => {
     // Spec §7: a fully-configured theme (all foregrounds stored + readable)
-    // must come out byte-identical. This is the hard constraint — wadyaljuz
+    // must come out byte-identical. This is the hard constraint — demo-shop
     // does not move. If this fails, the engine is over-correcting.
-    const wady = theme(); // all *Color + readable *Foreground set
-    const vars = deriveBrandRoles(wady);
-    expect(vars['--primary']).toBe(wady.primaryColor);
-    expect(vars['--primary-foreground']).toBe(wady.primaryForeground);
-    expect(vars['--secondary']).toBe(wady.secondaryColor);
-    expect(vars['--secondary-foreground']).toBe(wady.secondaryForeground);
-    expect(vars['--accent']).toBe(wady.accentColor);
-    expect(vars['--accent-foreground']).toBe(wady.accentForeground);
-    expect(vars['--card']).toBe(wady.cardColor);
-    expect(vars['--card-foreground']).toBe(wady.cardForeground);
+    const demoTheme = theme(); // all *Color + readable *Foreground set
+    const vars = deriveBrandRoles(demoTheme);
+    expect(vars['--primary']).toBe(demoTheme.primaryColor);
+    expect(vars['--primary-foreground']).toBe(demoTheme.primaryForeground);
+    expect(vars['--secondary']).toBe(demoTheme.secondaryColor);
+    expect(vars['--secondary-foreground']).toBe(demoTheme.secondaryForeground);
+    expect(vars['--accent']).toBe(demoTheme.accentColor);
+    expect(vars['--accent-foreground']).toBe(demoTheme.accentForeground);
+    expect(vars['--card']).toBe(demoTheme.cardColor);
+    expect(vars['--card-foreground']).toBe(demoTheme.cardForeground);
   });
 });

@@ -18,7 +18,7 @@ export const seoMetaTooLongAndPriceClaim: KnownFailureCase = {
       'Shop this handmade ceramic mug now for only 3.5 EGP, dishwasher safe and perfect for daily use.',
     descriptionAr:
       'تسوق كوب السيراميك اليدوي الآن مقابل 3.5 جنيه مصري فقط، آمن لغسالة الصحون ومثالي للاستخدام اليومي.',
-    keywords: ['ceramic mug kuwait', 'handmade mug', 'كوب سيراميك'],
+    keywords: ['ceramic mug egypt', 'handmade mug', 'كوب سيراميك'],
   },
   expectedFailedChecks: ['title-within-60-chars', 'no-price-or-stock-claims'],
 };

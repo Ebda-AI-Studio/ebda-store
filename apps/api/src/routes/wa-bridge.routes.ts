@@ -1,5 +1,5 @@
 /**
- * WBS→FWB Bridge Routes — WhatsApp Customer-DM Ordering (Phase 6 / Option C)
+ * WBS→Ebda Bridge Routes — WhatsApp Customer-DM Ordering (Phase 6 / Option C)
  *
  * Endpoints WBS calls into during the customer-DM-to-order flow. All
  * routes auth via `X-WBS-API-KEY` header (mapped to a Store by the
@@ -65,7 +65,7 @@ const router = Router();
 // a customer-DM ordering flow has natural rhythm (browse → choose → cart),
 // so even an aggressive customer can't reasonably exceed 120/min. Real
 // purpose: contain a buggy WBS state-machine retry loop from overwhelming
-// FWB. Falls back to IP when the key is missing (still gets the same cap).
+// Ebda. Falls back to IP when the key is missing (still gets the same cap).
 const bridgeRateLimit = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
@@ -317,10 +317,10 @@ router.get('/products/by-category', waBridgeAuth, async (req: Request, res: Resp
 // ─── GET /store-catalog (Phase 8 — bot intent classifier) ───────────────────
 // Returns all active categories + products in a single response sized for
 // the Gemini intent-classification prompt. WBS caches this at 5-min TTL;
-// FWB adds a 30-day Cache-Control so CDN/Varnish can edge-cache if needed.
+// Ebda adds a 30-day Cache-Control so CDN/Varnish can edge-cache if needed.
 //
 // Product cap: 1000. Stores with >1000 products will see a warning in the
-// response; pagination in Phase 8.2. For Wady Aljuz today (~235 products)
+// response; pagination in Phase 8.2. For Demo Shop today (~235 products)
 // the cap is never hit.
 //
 // Phase 4 extension: optional ?phone=<E164> query param. When provided, the
@@ -677,7 +677,7 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
       );
     }
 
-    // Task 10: bundles appear in the catalogue FWB offers WBS, as siblings
+    // Task 10: bundles appear in the catalogue Ebda offers WBS, as siblings
     // of a product entry — `bundles` is in NO plan baseline, so a store
     // without the super-admin override must see this response completely
     // unchanged (no bundle rows queried at all, not just filtered out).
@@ -818,7 +818,7 @@ export const cartFromWaSchema = z.object({
     .max(20),
   customerPhone: z.string().min(8).max(20).optional(),
   waId: z.string().min(8).max(20).optional(), // native catalog alias for customerPhone
-  customerId: z.string().min(1).optional(), // FWB customer ID (native catalog flow)
+  customerId: z.string().min(1).optional(), // Ebda customer ID (native catalog flow)
   customerName: z.string().min(1).max(120).optional(),
   locale: z.enum(['ar', 'en']).optional(),
   waConversationId: z.string().min(1).max(120).optional(),
@@ -1096,7 +1096,7 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
 });
 
 // ─── POST /cart/redeem ───────────────────────────────────────────────────────
-// Called by the FWB storefront when the customer opens the checkout URL.
+// Called by the Ebda storefront when the customer opens the checkout URL.
 // Decodes the token + returns the cart payload to seed the checkout form.
 // Single-use semantics: the token itself is sufficient (short TTL) — we
 // don't persist a "redeemed" flag in v1. If single-use is later needed,
@@ -1150,9 +1150,9 @@ router.post('/cart/redeem', async (req: Request, res: Response) => {
 });
 
 // ─── POST /templates/status ──────────────────────────────────────────────────
-// Phase 7 FWB-driven template sync: WBS calls back here when Meta's
+// Phase 7 store-driven template sync: WBS calls back here when Meta's
 // message_template_status_update webhook arrives for a template that
-// originated from an FWB-driven submission. Idempotent — same status
+// originated from an store-driven submission. Idempotent — same status
 // arriving twice (Meta sometimes redelivers) just refreshes the row.
 
 const templateStatusSchema = z.object({
@@ -1220,7 +1220,7 @@ router.post('/templates/status', waBridgeAuth, async (req: Request, res: Respons
     if (!existing) {
       // Status arrived for a template we don't have a local row for — log
       // and continue. Could be a template submitted directly via the WBS
-      // admin (not FWB-driven) or a stale callback from a deleted store.
+      // admin (not store-driven) or a stale callback from a deleted store.
       logger.info(
         { fwbStoreId, sourceKey, language, status },
         '[wa-bridge] templates/status: no matching local row — ignored'
@@ -1314,7 +1314,7 @@ router.get('/store/meta-catalog-config', waBridgeAuth, async (req: Request, res:
 
 // ─── POST /store/meta-catalog-config ────────────────────────────────────────
 // Saves catalog ID + business ID + encrypted access token.
-// Called from FWB admin (Bot Config tab) when merchant saves the Meta IDs.
+// Called from Ebda admin (Bot Config tab) when merchant saves the Meta IDs.
 const metaCatalogConfigSchema = z.object({
   storeId: z.string().min(1),
   catalogId: z.string().min(1).optional(),

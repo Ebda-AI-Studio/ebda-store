@@ -1,3 +1,4 @@
+import { upgradePlanFor } from '@force/shared';
 import { Request, Response, NextFunction } from 'express';
 import { prisma, withStore } from '@force/database';
 import { AppError } from './error-handler';
@@ -39,11 +40,32 @@ export async function requireStoreAccess(
     // Validate store exists
     const store = await prisma.store.findUnique({
       where: { id: storeId },
-      select: { id: true, ownerId: true, name: true, status: true },
+      select: { id: true, ownerId: true, name: true, status: true, billingSuspendedReason: true },
     });
 
     if (!store) {
       throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+    }
+
+    // A store beyond the owner's plan allowance is READ-ONLY for the merchant
+    // (Ruling EBDA-FUNNEL-10): every write but billing (where they upgrade) is
+    // refused with an upsell. Super-admins are not bound (operator override).
+    if (
+      user.role !== 'super_admin' &&
+      store.billingSuspendedReason === 'over_store_limit' &&
+      !['GET', 'HEAD', 'OPTIONS'].includes(req.method) &&
+      !/\/billing(\/|$)/.test(`${req.baseUrl}${req.path}`)
+    ) {
+      const messageEn =
+        'This store is read-only: your plan covers fewer stores. Upgrade to Business to edit it again.';
+      const messageAr =
+        'هذا المتجر للقراءة فقط: باقتك تشمل عددًا أقل من المتاجر. قم بالترقية إلى باقة الأعمال لتعديله من جديد.';
+      throw new AppError(402, 'STORE_OVER_PLAN_LIMIT', messageEn, {
+        limitKey: 'maxStores',
+        upgradeTo: upgradePlanFor('maxStores', 2),
+        messageEn,
+        messageAr,
+      });
     }
 
     // Super admin can access any store; log only WRITES, not reads.

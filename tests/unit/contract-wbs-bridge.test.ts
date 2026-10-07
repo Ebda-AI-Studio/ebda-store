@@ -1,8 +1,8 @@
 /**
- * Contract Test — FWB ↔ WBS Bridge (FWB side)
+ * Contract Test — Ebda ↔ WBS Bridge (Ebda side)
  *
- * Asserts the JSON shapes emitted by FWB's /wa-bridge/* endpoints match
- * exactly what WBS's bot code expects to receive. If FWB's response drifts
+ * Asserts the JSON shapes emitted by Ebda's /wa-bridge/* endpoints match
+ * exactly what WBS's bot code expects to receive. If Ebda's response drifts
  * (field renamed, type changed, field removed) this test fails loud before
  * the change reaches production.
  *
@@ -301,7 +301,7 @@ async function buildApp(): Promise<Express> {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-describe('contract: GET /wa-bridge/store-catalog (FWB → WBS consumer)', () => {
+describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () => {
   beforeAll(async () => {
     app = await buildApp();
 

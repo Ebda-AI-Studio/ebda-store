@@ -156,7 +156,7 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
             {t('accessToken')}
           </label>
           {hasToken && !accessToken && (
-            // Neutral, not green: a token string is stored, but FWB does not
+            // Neutral, not green: a token string is stored, but Ebda does not
             // validate it live against Meta (it may be expired/revoked or have
             // lost the catalog_management scope). Don't imply "verified".
             <div className="mb-2 flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2">

@@ -23,11 +23,11 @@ import { config } from '../config';
  * instead of signing with a value anyone can reproduce.
  */
 export type DerivedSecretLabel =
-  | 'fwb:sms-optout-mac:v2'
-  | 'fwb:campaign-unsubscribe-mac:v1'
-  | 'fwb:review-link-mac:v1';
+  | 'ebda:sms-optout-mac:v2'
+  | 'ebda:campaign-unsubscribe-mac:v1'
+  | 'ebda:review-link-mac:v1';
 
-const SALT = 'fwb:derived-secret';
+const SALT = 'ebda:derived-secret';
 
 export function derivedSecret(label: DerivedSecretLabel): Buffer {
   if (!config.encryptionKey) {

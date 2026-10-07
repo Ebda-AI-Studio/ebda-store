@@ -63,7 +63,7 @@ export type ConfirmSource = 'admin_refresh' | 'guest_verify' | 'auto_cancel_swee
  *  `parseWebhook`/`getPaymentStatus`, which convert to piastres via
  *  `Math.round(x * 100)` for a 2-decimal currency). 5 piastres (0.05 EGP)
  *  absorbs float/rounding noise without masking a real underpayment — the same
- *  5-minor-unit noise bound FWB used, deliberately NOT re-tuned in the EGP
+ *  5-minor-unit noise bound Ebda used, deliberately NOT re-tuned in the EGP
  *  conversion (it is a rounding allowance, not a money value). */
 const AMOUNT_TOLERANCE_FILS = 5;
 

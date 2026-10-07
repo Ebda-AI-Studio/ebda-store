@@ -18,9 +18,9 @@ const TENANT_DIR = join(WEB, 'app/tenant-store/[tenant]/[locale]');
 
 const STORE = {
   id: 'store-1',
-  name: 'Wady Al Juz',
-  slug: 'wadyaljuz',
-  domain: 'wadyaljuz.com',
+  name: 'Demo Shop',
+  slug: 'demo-shop',
+  domain: 'demo-shop.example',
   status: 'active',
   description: 'Nuts and dates',
   theme: {},
@@ -31,7 +31,7 @@ const STORE = {
 
 vi.mock('next/headers', () => ({
   cookies: async () => ({ get: () => undefined }),
-  headers: async () => new Headers({ host: 'wadyaljuz.com', 'x-is-platform': '0' }),
+  headers: async () => new Headers({ host: 'demo-shop.example', 'x-is-platform': '0' }),
 }));
 vi.mock('next/navigation', () => ({
   notFound: () => {
@@ -82,7 +82,7 @@ describe('tenant-tree page metadata equals its legacy twin', () => {
       const legacy = (await import(`${WEB}/app/${route}/page`)) as PageModule;
       const tenant = (await import(`${TENANT_DIR}/${route}/page`)) as PageModule;
       const off = await resolveMetadata(legacy, {});
-      const on = await resolveMetadata(tenant, { tenant: 'wadyaljuz.com', locale: 'en' });
+      const on = await resolveMetadata(tenant, { tenant: 'demo-shop.example', locale: 'en' });
       expect(on).toEqual(off);
     });
   }
@@ -91,7 +91,7 @@ describe('tenant-tree page metadata equals its legacy twin', () => {
     const legacy = (await import(`${WEB}/app/page`)) as PageModule;
     const tenant = (await import(`${TENANT_DIR}/page`)) as PageModule;
     const off = (await resolveMetadata(legacy, {})) as { alternates?: unknown } | undefined;
-    const on = (await resolveMetadata(tenant, { tenant: 'wadyaljuz.com', locale: 'en' })) as
+    const on = (await resolveMetadata(tenant, { tenant: 'demo-shop.example', locale: 'en' })) as
       | { alternates?: unknown }
       | undefined;
     expect(on?.alternates).toEqual(off?.alternates);

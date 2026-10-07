@@ -94,7 +94,7 @@ describe('generateMerchantKey', () => {
     const { plaintext, hash, prefix } = generateMerchantKey();
     expect(plaintext.startsWith(MERCHANT_KEY_PREFIX)).toBe(true);
     expect(hash).toBe(hashMerchantKey(plaintext));
-    expect(prefix).toBe(plaintext.slice(0, 13));
+    expect(prefix).toBe(plaintext.slice(0, MERCHANT_KEY_PREFIX.length + 8));
     // 32 random bytes base64url ≈ 43 chars, plus the prefix.
     expect(plaintext.length).toBeGreaterThan(40);
   });
@@ -200,7 +200,7 @@ describe('verifyMerchantKey', () => {
   });
 
   it('refuses a too-short header without touching the database', async () => {
-    await expect(verifyMerchantKey(reqWithKey('fwbm_'), STORE)).rejects.toMatchObject({
+    await expect(verifyMerchantKey(reqWithKey('ebdam_'), STORE)).rejects.toMatchObject({
       statusCode: 404,
     });
     expect(findUnique).not.toHaveBeenCalled();

@@ -9,7 +9,7 @@ import logger from '../../../lib/logger';
  * be debited when that provider's payment is received. Multi-method / instant
  * gateways (Paymob: cards, Meeza, wallets, valU; Fawry: reference codes) = 1000
  * 'Cash Online', the card-first hosted gateway (Kashier) = 1010 'Cash Card', COD = 1020.
- * The split is inherited from the Kuwait gateways it replaced (aggregator -> 1000,
+ * The split is inherited from the gateways it replaced (aggregator -> 1000,
  * card gateway -> 1010) and is an accounting choice the owner has not re-confirmed
  * for Egypt: it only decides WHICH asset account the receipt is booked to, never an amount.
  */
@@ -84,7 +84,7 @@ export async function postOrderPaymentJournal(args: {
   // it, and books revenue for money that was handed back. Production had one:
   // an order refunded by status in May (paymentStatus left at 'paid') was
   // re-swept by the 2026-07-09 order-created stuck sweep, whose fanout posted
-  // its sale — revenue with no reversal (wady-aljuz, JE-2026-000018). A
+  // its sale — revenue with no reversal (demo-shop, JE-2026-000018). A
   // cancelled order that captured money is refunded on cancel the same way,
   // so both statuses mean "no sale to book".
   if (order.status === 'cancelled' || order.status === 'refunded') {

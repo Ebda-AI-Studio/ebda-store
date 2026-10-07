@@ -101,7 +101,7 @@ function assertLocal(url, name) {
 
 const FIXTURES = [
   { slug: 'parity-pecan', domain: 'parity-pecan.test', name: 'Parity Pecan', faqs: 6, howtos: 3 },
-  { slug: 'parity-wady', domain: 'parity-wady.test', name: 'Parity Wady', faqs: 4, howtos: 2 },
+  { slug: 'parity-shop', domain: 'parity-shop.test', name: 'Parity Shop', faqs: 4, howtos: 2 },
 ];
 
 async function seedFixtures(db) {

@@ -23,7 +23,7 @@ export interface ModelPrice {
 
 /** Pinned price table. Update when Google changes Gemini pricing. */
 export const MODEL_PRICES: Record<string, ModelPrice> = {
-  // Gemini Flash Lite — FWB's default AI model (gemini-flash-lite-latest).
+  // Gemini Flash Lite — Ebda's default AI model (gemini-flash-lite-latest).
   'gemini-flash-lite-latest': { inPerM: 0.1, outPerM: 0.4 },
 };
 

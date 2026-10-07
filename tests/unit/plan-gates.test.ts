@@ -111,9 +111,14 @@ describe('maxStores 1 / 1 / 3 — assertOwnerMayCreateStore', () => {
     await expect(assertOwnerMayCreateStore('o1')).resolves.toBeUndefined();
   });
 
-  it('the best plan across the owner stores decides (Basic + Business -> room up to 3)', async () => {
+  it('the OLDEST store (billing parent) decides, not the best plan (Ruling EBDA-FUNNEL-13)', async () => {
+    // A child store's own Business row must not keep granting stores once the
+    // parent is on Basic (or lapsed): that was the over-limit loophole.
     owns('s1', 's2');
     onPlans({ s1: { code: 'basic' }, s2: { code: 'business' } });
+    await expect(assertOwnerMayCreateStore('o1')).rejects.toMatchObject({ statusCode: 402 });
+    owns('s1', 's2');
+    onPlans({ s1: { code: 'business' }, s2: { code: 'basic' } });
     await expect(assertOwnerMayCreateStore('o1')).resolves.toBeUndefined();
   });
 });

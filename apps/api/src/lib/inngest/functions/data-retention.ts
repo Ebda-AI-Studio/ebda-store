@@ -188,7 +188,7 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
  *
  * Candidate: order.createdAt < now - 5y AND shippingAddress NOT already
  * `{anonymized:true}` (idempotent — re-runs skip already-scrubbed rows).
- * No-op until the first orders age into the 5y window (earliest FWB
+ * No-op until the first orders age into the 5y window (earliest Ebda
  * order is 2026-04-26 → first run with candidates lands ~2031-04-26).
  *
  * Schedule: monthly, 1st of month 03:30 UTC (offset from the user

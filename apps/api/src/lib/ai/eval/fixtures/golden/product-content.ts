@@ -7,7 +7,7 @@ export const PRODUCT_CONTENT_GOLDEN: GoldenCase[] = [
     type: 'product-faq',
     input: {
       storeId: 'store-1',
-      storeName: 'Wady Aljuz',
+      storeName: 'Demo Shop',
       product: {
         name: 'Handmade Ceramic Mug',
         nameAr: 'كوب سيراميك يدوي الصنع',
@@ -45,7 +45,7 @@ export const PRODUCT_CONTENT_GOLDEN: GoldenCase[] = [
     type: 'product-excerpt',
     input: {
       storeId: 'store-1',
-      storeName: 'Wady Aljuz',
+      storeName: 'Demo Shop',
       product: {
         name: 'Handmade Ceramic Mug',
         nameAr: 'كوب سيراميك يدوي الصنع',
@@ -74,7 +74,7 @@ export const PRODUCT_CONTENT_GOLDEN: GoldenCase[] = [
     type: 'product-category-suggestion',
     input: {
       storeId: 'store-1',
-      storeName: 'Wady Aljuz',
+      storeName: 'Demo Shop',
       product: {
         name: 'Handmade Ceramic Mug',
         description: 'A handmade ceramic mug, dishwasher safe.',
@@ -91,7 +91,7 @@ export const PRODUCT_CONTENT_GOLDEN: GoldenCase[] = [
     type: 'product-tags',
     input: {
       storeId: 'store-1',
-      storeName: 'Wady Aljuz',
+      storeName: 'Demo Shop',
       product: {
         name: 'Handmade Ceramic Mug',
         description: 'A handmade ceramic mug, dishwasher safe.',

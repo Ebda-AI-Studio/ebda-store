@@ -962,7 +962,7 @@ export async function isOwnerRole(): Promise<boolean> {
  * ITSELF (a superuser or BYPASSRLS owner: the `DIRECT_URL` role that runs
  * migrations, an ops script, the integration tests' fixture connection).
  *
- * It sets NO GUC. FWB's `withRlsBypass` flipped `app.bypass_rls`; Ebda's
+ * It sets NO GUC. Ebda's `withRlsBypass` flipped `app.bypass_rls`; Ebda's
  * policies no longer read it. And it REFUSES to run on the strict-RLS app role:
  * every API/Worker query goes through `withStore` / `withUser` / `acrossStores`
  * / a SECURITY DEFINER function instead, and a call that reaches this on
@@ -985,5 +985,5 @@ export async function withOwnerTx<T>(fn: (tx: TenantTx) => Promise<T>): Promise<
   );
 }
 
-/** @deprecated FWB's name. Same as `withOwnerTx`: no GUC, owner role only. */
+/** @deprecated Ebda's name. Same as `withOwnerTx`: no GUC, owner role only. */
 export const withRlsBypass = withOwnerTx;

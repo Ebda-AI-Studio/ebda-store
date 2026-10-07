@@ -384,7 +384,7 @@ router.post('/payment/:provider', async (req: Request, res: Response, next: Next
     // storeId is resolved upfront so handleWebhook can load the right
     // per-store webhook secret for signature verification — without this,
     // signature checks against platform-level env vars (always empty in
-    // FWB prod) would reject every per-tenant webhook.
+    // Ebda prod) would reject every per-tenant webhook.
     //
     // FORCE RLS: resolveStoreIdFromWebhookPayload runs in withRlsBypass
     // (cross-tenant). Once storeId is known, handleWebhook + markWebhookProcessed

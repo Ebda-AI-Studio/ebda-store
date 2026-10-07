@@ -14,7 +14,7 @@ export interface TemplateSeeds {
 /**
  * Per-template recommended Smart Palette seeds. Pre-fills modal inputs
  * when merchant opens it for the first time (or clicks "Reset to template
- * defaults"). Aesthetic matches the template's identity per the FWB
+ * defaults"). Aesthetic matches the template's identity per the Ebda
  * theme-identity audit (2026-05-20).
  */
 export const TEMPLATE_PRESETS: Record<string, TemplateSeeds> = {

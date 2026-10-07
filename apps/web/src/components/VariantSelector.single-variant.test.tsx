@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Owner report 2026-09-30 (pecannbee): a product with exactly ONE variant
+ * Owner report 2026-09-30 (demo-store): a product with exactly ONE variant
  * ("Size: 380 Gram") made the shopper tap the only option before Add to Cart
  * worked. The picker now starts with that option picked — and nothing else
  * about it changes (owner: no visual changes): same pills, same labels, the

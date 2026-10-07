@@ -31,7 +31,7 @@ describe('decodeRouteParam', () => {
   });
 
   it('decodes the `slug:` tenant key the middleware percent-encodes', () => {
-    expect(decodeRouteParam('slug%3Apecannbee')).toBe('slug:pecannbee');
-    expect(decodeRouteParam('slug:pecannbee')).toBe('slug:pecannbee');
+    expect(decodeRouteParam('slug%3Ademo-store')).toBe('slug:demo-store');
+    expect(decodeRouteParam('slug:demo-store')).toBe('slug:demo-store');
   });
 });

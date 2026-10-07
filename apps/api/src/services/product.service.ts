@@ -1736,7 +1736,7 @@ export class ProductService {
     // Arabic `valueAr` (when set) so the storefront can render the
     // size/color/etc picker in the merchant's chosen language. Without
     // valueAr the picker always shows the English label even on the
-    // Arabic storefront — the issue Wady Aljuz hit on its olive-oil
+    // Arabic storefront — the issue Demo Shop hit on its olive-oil
     // page where size pills read "2-liter / 4-liter / 16-liter" in
     // Arabic mode.
     const reshapedOptions = (product.options ?? []).map(o => ({

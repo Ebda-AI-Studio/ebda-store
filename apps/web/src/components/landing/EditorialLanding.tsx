@@ -4,17 +4,15 @@ import { StatsStrip } from '@/components/landing/StatsStrip';
 import FeaturesSection from '@/components/landing/FeaturesSection';
 import { BeforeAfterSection } from '@/components/landing/BeforeAfterSection';
 import { AeoGeoSection } from '@/components/landing/AeoGeoSection';
-import { MerchantsSection } from '@/components/landing/MerchantsSection';
 import CtaSection from '@/components/landing/CtaSection';
 import { FooterSection } from '@/components/landing/FooterSection';
-import { FloatingWhatsApp } from '@/components/landing/FloatingWhatsApp';
 import { LandingNotFoundBanner } from '@/components/landing/LandingNotFoundBanner';
 import { Reveal } from '@/components/landing/Reveal';
 
 /**
  * The Ebda platform landing (ebda.app) — editorial dark system:
- * warm near-black + grain, orange as accent/glow only, and a real Ebda
- * client store (Pecannbee) as the hero. Rendered at the bare platform root
+ * warm near-black + grain, orange as accent/glow only, and an illustrative
+ * storefront as the hero. Rendered at the bare platform root
  * (`page.tsx`), on the 404 (`not-found.tsx`, with `notFoundBanner`), and at
  * `/landing-preview`. Replaces the old light `PlatformLanding.tsx`.
  */
@@ -35,13 +33,9 @@ export function EditorialLanding({ notFoundBanner = false }: { notFoundBanner?: 
         <AeoGeoSection />
       </Reveal>
       <Reveal>
-        <MerchantsSection />
-      </Reveal>
-      <Reveal>
         <CtaSection />
       </Reveal>
       <FooterSection />
-      <FloatingWhatsApp />
     </main>
   );
 }

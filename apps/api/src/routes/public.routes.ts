@@ -1381,7 +1381,7 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
  * app.current_store_id OR app.bypass_rls` — with no allowance for a query that
  * sets no context. These public routes run outside `tenantContext`, so under
  * the non-bypass `ebda_app` role a nested `store.faqs` select silently
- * returned `[]` for every store. That is what emptied pecannbee's 24 FAQs and
+ * returned `[]` for every store. That is what emptied demo-store's 24 FAQs and
  * 9 how-tos during the 2026-09-25 cutover attempt, with no error anywhere.
  *
  * The store has already been resolved from the unscoped `stores` table, so
@@ -1419,7 +1419,7 @@ async function fetchStoreFaqsAndHowtos(storeId: string) {
  * column (B3, 2026-09-25). Gated on BOTH `locationsEnabled` (the existing
  * Locations feature) AND `theme.showBranchesInFooter` (the new footer
  * opt-in), so a store with Locations enabled for its /locations page but no
- * footer opt-in — e.g. pecannbee's 8 locations — pays no extra query and its
+ * footer opt-in — e.g. demo-store's 8 locations — pays no extra query and its
  * footer is unaffected until it explicitly turns this on. Narrower select
  * than `LocationsService.listPublished` (drops country/whatsapp/hours/
  * mapsEmbedUrl) since this rides EVERY page's store-resolve payload — the

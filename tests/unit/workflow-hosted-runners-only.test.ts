@@ -1,12 +1,12 @@
 /**
  * Ebda's CI runs on GitHub-hosted runners only (SP4 task 9, Ahmad's decision):
- * "it needs no Umbra". Umbra is FWB's self-hosted runner fleet; nothing in
+ * "it needs no Umbra". Umbra is Ebda's self-hosted runner fleet; nothing in
  * Ebda may depend on it, because Ebda's workflows must keep working when no
  * such runner exists (GitHub QUEUES a job whose labels match no online runner
  * for up to ~24h instead of failing it, so a leftover label silently hangs
  * the workflow).
  *
- * This replaces the FWB-era runner-selector test, which pinned the
+ * This replaces the Ebda-era runner-selector test, which pinned the
  * `vars.USE_SELF_HOSTED` / `vars.SCHEDULED_ON_CLOUD` switch forms. Those
  * switches are gone: every `runs-on` is the literal `ubuntu-latest`.
  */

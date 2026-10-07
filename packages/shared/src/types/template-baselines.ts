@@ -13,7 +13,7 @@ import { DEFAULT_LAYOUT_SETTINGS } from './store-layout';
 import type { TemplateId } from './store-theme';
 
 /**
- * The shared structural baseline — wadyaljuz's real (already-tokenized) layout
+ * The shared structural baseline — demo-shop's real (already-tokenized) layout
  * with CONTENT stripped (hero images, marketing copy) and content-gating flags
  * reset to the safe new-store defaults (testimonials/reviews OFF — KW Law
  * 39/2014 fake-reviews posture). This IS the `elegant` baseline; the other four
@@ -95,7 +95,7 @@ export const BASE_BRANDED_LAYOUT: StoreLayoutSettings = {
   },
   filterSidebar: { enabled: true, defaultOpen: true },
   testimonials: {
-    enabled: false, // reset from wadyaljuz's `true` — new stores start off
+    enabled: false, // reset from demo-shop's `true` — new stores start off
     minRating: 4,
     verifiedOnly: true,
     bgColor: 'token:primary',

@@ -16,6 +16,7 @@ const { apiGet, apiPost, apiPut, replace } = vi.hoisted(() => ({
 }));
 vi.mock('../../../lib/api', () => ({ apiGet, apiPost, apiPut }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace, push: vi.fn() }) }));
+vi.mock('next-intl', () => ({ useLocale: () => 'en' }));
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
     <a href={href}>{children}</a>
@@ -35,6 +36,7 @@ vi.mock('@/i18n/useT', () => {
 });
 
 import { OnboardingFlow } from './OnboardingFlow';
+import { billingFixture } from '../../../components/billing/fixtures';
 
 const verifiedNoStore = {
   user: { email: 'mona@x.com', name: 'Mona', emailVerified: true },
@@ -69,7 +71,37 @@ function mockState(state: unknown) {
   });
 }
 
+// CI's jsdom has a working localStorage and some local origins have none: give
+// every run the same Map-backed storage so both behave like CI.
+if (
+  !(() => {
+    try {
+      return !!window.localStorage;
+    } catch {
+      return false;
+    }
+  })()
+) {
+  const mem = new Map<string, string>();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (k: string) => mem.get(k) ?? null,
+      setItem: (k: string, v: string) => void mem.set(k, String(v)),
+      removeItem: (k: string) => void mem.delete(k),
+      clear: () => mem.clear(),
+    },
+  });
+}
+
 beforeEach(() => {
+  // The plan step persists the choice (ebda.signup.plan); a jsdom with a real
+  // localStorage (CI) would otherwise carry one test's plan into the next.
+  try {
+    window.localStorage?.removeItem('ebda.signup.plan');
+  } catch {
+    /* no storage in this environment */
+  }
   apiPost.mockResolvedValue({ data: {}, error: null });
   apiPut.mockResolvedValue({ data: {}, error: null });
 });
@@ -78,6 +110,13 @@ afterEach(() => {
   vi.clearAllMocks();
   vi.useRealTimers();
 });
+
+/** Plan step -> Next -> the store step (a visitor with no store always starts at the plan). */
+async function toStoreStep() {
+  await screen.findByText('onboarding.flow.plan.title');
+  fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
+  return screen.findByLabelText('onboarding.flow.store.name');
+}
 
 const slugChecks = () =>
   apiGet.mock.calls.filter(c => String(c[0]).startsWith('/api/v1/onboarding/slug-check'));
@@ -102,10 +141,62 @@ describe('onboarding stepper', () => {
     expect(await screen.findByText('onboarding.flow.template.title')).toBeTruthy();
   });
 
+  it('resumes at billing when the store has no way to pay yet, at the template once it has one', async () => {
+    mockState({ ...verifiedNoStore, store: inactiveStore, billing: billingFixture() });
+    render(<OnboardingFlow />);
+    expect(await screen.findByText('onboarding.flow.billing.title')).toBeTruthy();
+    cleanup();
+
+    mockState({
+      ...verifiedNoStore,
+      store: inactiveStore,
+      billing: billingFixture({ hasPaymentMethod: true, billingMethod: 'card' }),
+    });
+    render(<OnboardingFlow />);
+    expect(await screen.findByText('onboarding.flow.template.title')).toBeTruthy();
+    cleanup();
+
+    mockState({
+      ...verifiedNoStore,
+      store: inactiveStore,
+      billing: billingFixture({ billingMethod: 'instapay' }),
+    });
+    render(<OnboardingFlow />);
+    expect(await screen.findByText('onboarding.flow.template.title')).toBeTruthy();
+  });
+
+  it('starts a visitor with no store at the plan step, and sends the chosen plan with the store', async () => {
+    mockState(verifiedNoStore);
+    apiPost.mockResolvedValueOnce({ data: { store: inactiveStore }, error: null });
+    render(<OnboardingFlow />);
+    await screen.findByText('onboarding.flow.plan.title');
+    fireEvent.click(screen.getByRole('radio', { name: /Business/ }));
+    fireEvent.click(screen.getByRole('button', { name: /onboarding\.flow\.plan\.yearly/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
+    fireEvent.change(await screen.findByLabelText('onboarding.flow.store.name'), {
+      target: { value: 'My Shop' },
+    });
+    const create = await screen.findByRole('button', { name: 'onboarding.flow.store.create' });
+    await waitFor(() => expect((create as HTMLButtonElement).disabled).toBe(false), {
+      timeout: 2000,
+    });
+    fireEvent.click(create);
+    await waitFor(() =>
+      expect(apiPost).toHaveBeenCalledWith('/api/v1/onboarding/store', {
+        name: 'My Shop',
+        slug: 'my-shop',
+        language: 'en',
+        plan: { planCode: 'business', interval: 'yearly' },
+      })
+    );
+    // Created -> how will you pay (billing is re-read from the state).
+    expect(await screen.findByText('onboarding.flow.billing.title')).toBeTruthy();
+  });
+
   it('suggests an address from the name, checks availability live, and shows <slug>.ebda.app', async () => {
     mockState(verifiedNoStore);
     render(<OnboardingFlow />);
-    const name = await screen.findByLabelText('onboarding.flow.store.name');
+    const name = await toStoreStep();
     fireEvent.change(name, { target: { value: 'My Shop' } });
     expect((screen.getByLabelText('onboarding.flow.store.slug') as HTMLInputElement).value).toBe(
       'my-shop'
@@ -129,7 +220,7 @@ describe('onboarding stepper', () => {
   it('refuses a reserved address locally, without calling the API, and blocks create', async () => {
     mockState(verifiedNoStore);
     render(<OnboardingFlow />);
-    fireEvent.change(await screen.findByLabelText('onboarding.flow.store.name'), {
+    fireEvent.change(await toStoreStep(), {
       target: { value: 'Anything' },
     });
     fireEvent.change(screen.getByLabelText('onboarding.flow.store.slug'), {
@@ -147,7 +238,7 @@ describe('onboarding stepper', () => {
   it('shows "taken" from the live check and does not create', async () => {
     mockState(verifiedNoStore);
     render(<OnboardingFlow />);
-    fireEvent.change(await screen.findByLabelText('onboarding.flow.store.name'), {
+    fireEvent.change(await toStoreStep(), {
       target: { value: 'Taken One' },
     });
     expect(
@@ -156,12 +247,12 @@ describe('onboarding stepper', () => {
     expect(apiPost).not.toHaveBeenCalled();
   });
 
-  it('creates the store (Arabic-first language from dir) and advances to the template step', async () => {
+  it('creates the store (Arabic-first language from dir) and advances to billing, then the template', async () => {
     mockState(verifiedNoStore);
     apiPost.mockResolvedValueOnce({ data: { store: inactiveStore }, error: null });
     document.documentElement.dir = 'rtl';
     render(<OnboardingFlow />);
-    fireEvent.change(await screen.findByLabelText('onboarding.flow.store.name'), {
+    fireEvent.change(await toStoreStep(), {
       target: { value: 'My Shop' },
     });
     const create = await screen.findByRole('button', { name: 'onboarding.flow.store.create' });
@@ -174,8 +265,12 @@ describe('onboarding stepper', () => {
         name: 'My Shop',
         slug: 'my-shop',
         language: 'ar',
+        plan: { planCode: 'growth', interval: 'monthly' },
       })
     );
+    // Created -> billing step (no payment option offered by this state) -> template.
+    expect(await screen.findByText('onboarding.flow.billing.title')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.billing.continueAnyway' }));
     expect(await screen.findByText('onboarding.flow.template.title')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
     await screen.findByText('onboarding.flow.product.title');
@@ -320,6 +415,35 @@ describe('onboarding stepper', () => {
     );
   });
 
+  it('shows the localized go-live refusal and links back to the billing step', async () => {
+    mockState({ ...verifiedNoStore, store: inactiveStore, codEnabled: true });
+    apiPost.mockImplementation(async (url: string) =>
+      url.endsWith('/go-live')
+        ? {
+            data: null,
+            error: {
+              code: 'PAYMENT_METHOD_REQUIRED',
+              message: 'Add a payment method first',
+              status: 402,
+            },
+          }
+        : { data: {}, error: null }
+    );
+    render(<OnboardingFlow />);
+    await screen.findByText('onboarding.flow.template.title');
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'onboarding.flow.skip' }));
+    await screen.findByText('onboarding.flow.payment.title');
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
+    await screen.findByText('onboarding.flow.live.title');
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.live.publish' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Add a payment method first');
+    expect(alert.textContent).not.toContain('publishFailed');
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.live.addPayment' }));
+    expect(await screen.findByText('onboarding.flow.billing.title')).toBeTruthy();
+  });
+
   it('rejects a non-positive price before calling the API', async () => {
     mockState({ ...verifiedNoStore, store: inactiveStore });
     render(<OnboardingFlow />);
@@ -344,11 +468,13 @@ describe('onboarding error and navigation regressions', () => {
     render(<OnboardingFlow />);
     await screen.findByText('onboarding.flow.template.title');
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.back' }));
+    await screen.findByText('onboarding.flow.billing.title');
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.back' }));
     expect(await screen.findByText('My shop')).toBeTruthy();
     expect(screen.queryByLabelText('onboarding.flow.store.name')).toBeNull();
     expect(apiPost).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
-    expect(await screen.findByText('onboarding.flow.template.title')).toBeTruthy();
+    expect(await screen.findByText('onboarding.flow.billing.title')).toBeTruthy();
   });
   it('does not claim a failed verification resend succeeded', async () => {
     mockState({ ...verifiedNoStore, user: { ...verifiedNoStore.user, emailVerified: false } });

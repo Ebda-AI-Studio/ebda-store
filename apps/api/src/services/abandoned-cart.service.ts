@@ -353,7 +353,7 @@ class AbandonedCartService {
    * WhatsApp template for each one.
    *
    * Architecture decision: we do NOT create AbandonedCart records for WA-origin
-   * carts (the model requires a foreign-key to a FWB Cart row which doesn't
+   * carts (the model requires a foreign-key to a Ebda Cart row which doesn't
    * exist for DM carts). Instead we send a single step-1 WhatsApp reminder
    * directly via the WBS bridge and use a Redis sentinel key for dedup across
    * sweep cycles.

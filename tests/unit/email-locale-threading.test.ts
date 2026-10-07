@@ -119,7 +119,7 @@ async function runOrderCreatedHandler(
 
   (prisma.order.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce(order);
   (prisma.store.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-    name: 'Wady Aljuz',
+    name: 'Demo Shop',
   });
 
   // Re-implement the handler's core logic (mirrors order-created.ts exactly)

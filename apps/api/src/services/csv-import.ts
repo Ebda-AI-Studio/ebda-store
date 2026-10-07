@@ -5,7 +5,7 @@ import { AppError } from '../middleware/error-handler';
  * CSV → platform import CSV.
  *
  * The bulk-import pipeline has ONE importer (`BulkService.importProducts`), fed
- * a "platform CSV" (FWB's own template: prices in integer piastres, variant
+ * a "platform CSV" (Ebda's own template: prices in integer piastres, variant
  * rows linked by `parentSku`). `xlsx-import.ts` converts spreadsheets into that
  * format; this module does the same for CSV files, so a merchant who uploads a
  * `.csv` goes through exactly the same importer, job row, cache busting and
@@ -13,7 +13,7 @@ import { AppError } from '../middleware/error-handler';
  *
  * Two layouts are accepted:
  *
- *  - FWB's own template (`name,price,...`): passed through untouched except for
+ *  - Ebda's own template (`name,price,...`): passed through untouched except for
  *    a leading UTF-8 BOM being stripped. Prices there are INTEGER PIASTRES.
  *  - The Shopify product export (`Handle,Title,Body (HTML),...`): one row per
  *    variant/image, grouped by `Handle`. Prices there are MAJOR EGP ("4,850.00"
@@ -171,7 +171,7 @@ const blankRow = (): PlatformRow =>
 
 /**
  * Entry point used by the import route. Strips a BOM, detects the layout and
- * converts Shopify exports; FWB-template CSVs pass through.
+ * converts Shopify exports; Ebda-template CSVs pass through.
  */
 export function importCsvToPlatformCsv(text: string): CsvConversion {
   const records = parseCsvRecords(text);

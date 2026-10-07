@@ -6,7 +6,7 @@ import { getSiteUrl } from '../lib/structured-data';
  * Host-aware robots.txt. The `sitemap:` directive must point at the
  * sitemap rooted in the SAME host the visitor is currently on:
  *
- *   - on `wadyaljuz.com` → https://wadyaljuz.com/sitemap.xml
+ *   - on `demo-shop.example` → https://demo-shop.example/sitemap.xml
  *   - on `ebda.app` → https://ebda.app/sitemap.xml
  *
  * Without this, robots.txt on the custom domain would advertise

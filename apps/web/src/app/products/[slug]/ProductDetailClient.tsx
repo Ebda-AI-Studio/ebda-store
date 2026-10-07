@@ -521,7 +521,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // out-of-stock item stays orderable — the cart + order API already honor
   // allowBackorder (product.service.ts enrichStockFlags → acceptsBackorder).
   // The storefront previously hard-disabled Add-to-Cart at 0 inventory,
-  // silently blocking the backorder feature merchants paid for (FWB audit
+  // silently blocking the backorder feature merchants paid for (Ebda audit
   // 2026-06-14).
   const canBackorder =
     outOfStock &&

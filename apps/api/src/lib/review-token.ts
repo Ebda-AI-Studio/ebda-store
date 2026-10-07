@@ -21,12 +21,12 @@ import { derivedSecret } from './derived-secret';
  * JWT_SECRET, for links signed before issue 2424 (they age out within 90 days).
  */
 function signingKey(): string | Buffer {
-  return process.env.REVIEW_TOKEN_SECRET || derivedSecret('fwb:review-link-mac:v1');
+  return process.env.REVIEW_TOKEN_SECRET || derivedSecret('ebda:review-link-mac:v1');
 }
 
 function verifyKeys(): Array<string | Buffer> {
   const dedicated = process.env.REVIEW_TOKEN_SECRET;
-  return dedicated ? [dedicated] : [derivedSecret('fwb:review-link-mac:v1'), config.jwtSecret];
+  return dedicated ? [dedicated] : [derivedSecret('ebda:review-link-mac:v1'), config.jwtSecret];
 }
 
 function macHex(key: string | Buffer, orderId: string, productId: string): string {

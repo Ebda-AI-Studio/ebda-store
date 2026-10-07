@@ -29,10 +29,10 @@ describe('companyHostRoute', () => {
   describe('everything else falls through to Next (merchants unaffected)', () => {
     const passthroughHosts = [
       // Real merchant custom domains — MUST keep working exactly as before.
-      'pecannbee.com',
-      'www.pecannbee.com',
-      'wadyaljuz.com',
-      'www.wadyaljuz.com',
+      'demo-store.example',
+      'www.demo-store.example',
+      'demo-shop.example',
+      'www.demo-shop.example',
       // Platform subdomains and store subdomains.
       'admin.ebda.app',
       'orders.ebda.app',
@@ -50,7 +50,7 @@ describe('companyHostRoute', () => {
     });
 
     it('a merchant path on a store subdomain is untouched', () => {
-      expect(companyHostRoute('pecannbee.ebda.app', '/products', '')).toEqual({
+      expect(companyHostRoute('demo-store.ebda.app', '/products', '')).toEqual({
         kind: 'next',
       });
     });

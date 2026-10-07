@@ -68,7 +68,7 @@ function themeToCssVars(theme: StoreTheme): Record<string, string> {
     // Brand engine (2026-06-05) — contrast-safe overrides for the 4 brand
     // color/foreground pairs. MUST match the shared themeToCssVars so this
     // client mirror agrees with the SSR-emitted vars (no flash). Stored
-    // readable foregrounds (wadyaljuz) pass through verbatim.
+    // readable foregrounds (demo-shop) pass through verbatim.
     ...deriveBrandRoles(theme),
   };
 

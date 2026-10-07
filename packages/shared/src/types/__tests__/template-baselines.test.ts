@@ -28,7 +28,7 @@ describe('BASE_BRANDED_LAYOUT', () => {
     for (const c of colors) expect(c.startsWith('token:')).toBe(true);
   });
 
-  it('carries no wadyaljuz content (empty hero slides, no marketing copy)', () => {
+  it('carries no demo-shop content (empty hero slides, no marketing copy)', () => {
     expect(BASE_BRANDED_LAYOUT.hero.slides).toEqual([]);
     expect(BASE_BRANDED_LAYOUT.categories.title).toBeUndefined();
     expect(BASE_BRANDED_LAYOUT.categories.subtitle).toBeUndefined();

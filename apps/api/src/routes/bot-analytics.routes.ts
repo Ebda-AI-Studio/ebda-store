@@ -1,8 +1,8 @@
 /**
  * Bot Analytics Proxy Routes — Ebda ↔ WBS Bridge
  *
- * Proxies the bot conversion funnel analytics from WBS to the FWB admin.
- * The admin frontend calls FWB (same-origin JWT auth), FWB decrypts the
+ * Proxies the bot conversion funnel analytics from WBS to the Ebda admin.
+ * The admin frontend calls Ebda (same-origin JWT auth), Ebda decrypts the
  * store's wbsApiKey and forwards the request to WBS.
  *
  * Why proxy rather than calling WBS directly from the browser:

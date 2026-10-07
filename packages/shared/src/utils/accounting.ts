@@ -44,7 +44,6 @@ export const ALLOWED_CURRENCIES = [
   'SAR', // Saudi Riyal   (1 SAR = 100 halalas)
   'AED', // UAE Dirham    (1 AED = 100 fils)
   'QAR', // Qatari Riyal  (1 QAR = 100 dirhams)
-  'KWD', // Kuwaiti Dinar (1 KWD = 1000 fils)
   'BHD', // Bahraini Dinar (1 BHD = 1000 fils)
   'OMR', // Omani Rial    (1 OMR = 1000 baisa)
   'TRY', // Turkish Lira  (1 TRY = 100 kuruş)
@@ -59,7 +58,7 @@ export type AllowedCurrency = (typeof ALLOWED_CURRENCIES)[number];
  * BASE currency's minor units (`REGION.currency`, EGP piastres).
  *
  * Rounding rule: HALF-UP to the nearest integer minor unit. Exponent-aware
- * (USD cents → EGP piastres is ×rate; EGP → KWD would shift by one decimal).
+ * (USD cents → EGP piastres is ×rate; EGP → BHD would shift by one decimal).
  *
  * @param originalAmount  Amount in the original currency's minor units
  *                        (e.g. cents for USD, halalas for SAR).
