@@ -290,7 +290,7 @@ beforeAll(async () => {
   ids.faqB = (
     await owner.storeFaq.create({ data: { storeId: storeB.id, question: 'q', answer: 'a' } })
   ).id;
-  // Visual builder revisions (migration 20261007120000_store_page_revisions):
+  // Visual builder revisions (migration 20261007150000_store_page_revisions):
   // real rows in both stores so the isolation assertions are not vacuous.
   for (const storeId of [storeA.id, storeB.id])
     await owner.storePageRevision.create({

@@ -64,7 +64,7 @@ The adapter is lossless both ways for every resolved layout (golden fixtures × 
 
 ## Storage, publishing and caches
 
-`store_page_revisions` (migration `20261007120000_store_page_revisions`): one row per revision; `rev` monotonic per (store, page) and the optimistic-concurrency token; at most one `draft` and one `published` row per page (partial unique indexes); strict RLS (R-EBDA-001), FK cascade on store delete; no FK on `created_by` (identity rows are user-keyed under RLS and erasure must not take page history).
+`store_page_revisions` (migration `20261007150000_store_page_revisions`): one row per revision; `rev` monotonic per (store, page) and the optimistic-concurrency token; at most one `draft` and one `published` row per page (partial unique indexes); strict RLS (R-EBDA-001), FK cascade on store delete; no FK on `created_by` (identity rows are user-keyed under RLS and erasure must not take page history).
 
 | Call                                            | Behaviour                                                                                                                                                                                                                                                                                 |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
