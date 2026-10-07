@@ -1963,7 +1963,7 @@ model PaymentConfig {
   @@map("payment_configs")
 }
 
-/// UNUSED since 20261007180000_payment_provider_codes (payment_configs.provider is TEXT now). Kept
+/// UNUSED since 20261007210000_payment_provider_codes (payment_configs.provider is TEXT now). Kept
 /// until the contract migration so a rollback can cast the column back; do not reference it.
 enum PaymentProvider {
   cod

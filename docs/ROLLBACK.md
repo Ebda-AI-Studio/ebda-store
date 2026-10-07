@@ -208,7 +208,7 @@ bash scripts/rollback.sh
 
 Additive table; nothing else references it. To roll the feature back: revert the code (path B) — the storefront and admin then read `stores.layout_settings` exactly as before, which every publish already back-wrote, so no data step is needed. To also drop the data: `DROP TABLE store_page_revisions;` and delete the row from `_prisma_migrations`. Re-check RLS state after any restore (`tests/integration/rls-ebda-app.test.ts`).
 
-## Provider codes + credential blob (`20261007180000_payment_provider_codes`)
+## Provider codes + credential blob (`20261007210000_payment_provider_codes`)
 
 Expand step of rulings PROVIDERS-1/2. `payment_configs.provider` became TEXT (+ CHECK on a lowercase code) and three columns were added (`credentials` encrypted blob, `credential_hints`, `connection_test`); the legacy credential columns and the `"PaymentProvider"` enum type are still there. Rollback: revert the code, then `ALTER TABLE payment_configs DROP CONSTRAINT payment_configs_provider_code_check; ALTER TABLE payment_configs DROP COLUMN credentials, DROP COLUMN credential_hints, DROP COLUMN connection_test; ALTER TABLE payment_configs ALTER COLUMN provider TYPE "PaymentProvider" USING (provider::"PaymentProvider");` — the cast fails loudly if a row carries a code outside the enum. Rows saved through the new connect form keep their keys ONLY in `credentials`, so dropping it loses them: the merchant re-enters them (PROVIDERS-1 records 0 merchants in production on 2026-10-07; not re-read from production in this change). Delete the row from `_prisma_migrations` after reverting by hand.
 
