@@ -23,6 +23,7 @@ vi.mock('@force/database', () => {
   return {
     prisma: client,
     Prisma: {},
+    currentStoreId: () => '11111111-1111-4111-8111-111111111111',
     withMoneyTx: (fn: (c: unknown) => unknown) => Promise.resolve(fn(client)),
     runInTenantContext: (_id: string, fn: () => unknown) => fn(),
     runInStoreScope: (_id: string, fn: () => unknown) => fn(),
