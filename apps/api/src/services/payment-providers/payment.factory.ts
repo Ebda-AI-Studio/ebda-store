@@ -1421,10 +1421,12 @@ export class PaymentService {
                       id: storeId,
                       name:
                         (
-                          await prisma.store.findUnique({
-                            where: { id: storeId },
-                            select: { name: true },
-                          })
+                          await withStore(storeId, tx =>
+                            tx.store.findUnique({
+                              where: { id: storeId },
+                              select: { name: true },
+                            })
+                          )
                         )?.name ?? storeId,
                     },
                   }

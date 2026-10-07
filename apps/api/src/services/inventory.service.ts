@@ -1,4 +1,4 @@
-import { prisma, Prisma, InventoryChangeType } from '@force/database';
+import { prisma, Prisma, InventoryChangeType, withStore } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { WarehouseService } from './warehouse.service';
@@ -888,10 +888,12 @@ export class InventoryService {
   ): Promise<void> {
     try {
       // Find the store for name and slug
-      const store = await prisma.store.findUnique({
-        where: { id: storeId },
-        select: { name: true, slug: true, domain: true },
-      });
+      const store = await withStore(storeId, tx =>
+        tx.store.findUnique({
+          where: { id: storeId },
+          select: { name: true, slug: true, domain: true },
+        })
+      );
 
       if (!store) return;
 

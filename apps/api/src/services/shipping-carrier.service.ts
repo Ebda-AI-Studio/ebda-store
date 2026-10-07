@@ -11,6 +11,7 @@ import {
   runInTenantContext,
   runInStoreScope,
   withMoneyTx,
+  withStore,
 } from '@force/database';
 import { getShipmentStoreIdByTracking } from '../lib/definer';
 import { config as appConfig } from '../config';
@@ -582,8 +583,9 @@ class ShippingCarrierService {
 
     // Shipment notification fully fire-and-forget (called from the admin route and from the
     // Inngest job; neither may wait on the notification provider).
-    void prisma.store
-      .findUnique({ where: { id: storeId }, select: { name: true } })
+    void withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { name: true } })
+    )
       .catch(() => null)
       .then(store =>
         notificationDispatcher
@@ -947,9 +949,9 @@ class ShippingCarrierService {
 
     if (nextStatus === 'delivered' && prevStatus !== 'delivered') {
       await setOrderStatusGuarded(prisma, shipment.storeId, shipment.orderId, 'delivered');
-      const store = await prisma.store
-        .findUnique({ where: { id: shipment.storeId }, select: { name: true } })
-        .catch(() => null);
+      const store = await withStore(shipment.storeId, tx =>
+        tx.store.findUnique({ where: { id: shipment.storeId }, select: { name: true } })
+      ).catch(() => null);
       const order = shipment.order;
       const shippingAddr = order.shippingAddress as { phone?: string } | null;
       notificationDispatcher

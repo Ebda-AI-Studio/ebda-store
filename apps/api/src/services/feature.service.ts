@@ -434,10 +434,12 @@ class FeatureService {
     plan: StorePlan,
     userId: string
   ): Promise<Record<FeatureKey, boolean>> {
-    await prisma.store.update({
-      where: { id: storeId },
-      data: { plan, updatedAt: new Date() },
-    });
+    await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { plan, updatedAt: new Date() },
+      })
+    );
     // Keep the subscription (limits) on the plan the enum now names (SP5).
     await withStore(storeId, tx => syncSubscriptionFromLegacyPlan(tx, storeId, plan));
     await this.invalidateCache(storeId);

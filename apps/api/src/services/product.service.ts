@@ -5,6 +5,7 @@ import {
   OrderStatus,
   withMoneyTx,
   SlugEntityType,
+  withStore,
 } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { activeVariants, effectiveInventory } from '../lib/effective-inventory';
@@ -1944,18 +1945,18 @@ export class ProductService {
       // serving the categories list. Without this guard a fresh deploy
       // ahead of the migration takes the whole endpoint down with a
       // 500.
-      prisma.store
-        .findUnique({
+      withStore(storeId, tx =>
+        tx.store.findUnique({
           where: { id: storeId },
           select: { bestSellersImage: true },
         })
-        .catch(err => {
-          logger.warn(
-            { err, storeId },
-            '[getCategories] bestSellersImage read failed — column missing?'
-          );
-          return null;
-        }),
+      ).catch(err => {
+        logger.warn(
+          { err, storeId },
+          '[getCategories] bestSellersImage read failed — column missing?'
+        );
+        return null;
+      }),
     ]);
 
     const realCategories = categories.map(c => ({

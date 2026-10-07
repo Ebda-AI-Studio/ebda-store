@@ -1,5 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { prisma, Prisma, OrderStatus, withMoneyTx, scopeTransaction } from '@force/database';
+import {
+  prisma,
+  Prisma,
+  OrderStatus,
+  withMoneyTx,
+  scopeTransaction,
+  withStore,
+} from '@force/database';
 import {
   checkMinimumOrder,
   allocateBundlePrice,
@@ -793,10 +800,12 @@ export class OrderService {
     // checkout path; the storefront cart/checkout mirror it for UX only.
     // Deliberately NOT applied to OrderService.createAdminOrder — merchants
     // must be able to override the minimum for phone/manual orders.
-    const storeForMinOrder = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { settings: true },
-    });
+    const storeForMinOrder = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { settings: true },
+      })
+    );
     const minimumOrderFilsRaw = (storeForMinOrder?.settings as Record<string, unknown> | null)?.[
       'minimumOrderFils'
     ];

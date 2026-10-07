@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import { parseReportRange, resolveStoreTimeZone, type ReportRange } from '@force/shared';
 
 export type RangeOrLegacyResult =
@@ -41,9 +41,11 @@ export type { ReportRange };
  * it opens an extra interactive Postgres transaction per request (issue 2410).
  */
 export async function storeTimeZone(storeId: string): Promise<string> {
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: { timezone: true },
-  });
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({
+      where: { id: storeId },
+      select: { timezone: true },
+    })
+  );
   return resolveStoreTimeZone(store?.timezone);
 }

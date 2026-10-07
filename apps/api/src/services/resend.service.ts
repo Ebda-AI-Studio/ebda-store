@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { prisma } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { resolveSender, type StoreSenderShape } from './email-sender';
@@ -76,10 +76,12 @@ export class ResendService {
    * Idempotent — safe to call repeatedly.
    */
   static async provisionStoreDomain(storeId: string): Promise<DomainDnsRecord[]> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { id: true, domain: true, emailDomainId: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { id: true, domain: true, emailDomainId: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     if (!store.domain) throw new Error('Store has no custom domain to provision');
 
@@ -92,13 +94,15 @@ export class ResendService {
       if (error || !data) {
         throw new Error(`Resend create-domain failed: ${error?.message ?? 'unknown'}`);
       }
-      await prisma.store.update({
-        where: { id: storeId },
-        data: {
-          emailDomainId: (data as { id: string }).id,
-          emailDomainStatus: (data as { status?: string }).status ?? 'pending',
-        },
-      });
+      await withStore(storeId, tx =>
+        tx.store.update({
+          where: { id: storeId },
+          data: {
+            emailDomainId: (data as { id: string }).id,
+            emailDomainStatus: (data as { status?: string }).status ?? 'pending',
+          },
+        })
+      );
       return ((data as { records?: unknown[] }).records ?? []).map(toDnsRecord);
     };
 
@@ -107,10 +111,12 @@ export class ResendService {
       const { data, error } = await client.domains.get(store.emailDomainId);
 
       if (data) {
-        await prisma.store.update({
-          where: { id: storeId },
-          data: { emailDomainStatus: (data as { status?: string }).status ?? 'pending' },
-        });
+        await withStore(storeId, tx =>
+          tx.store.update({
+            where: { id: storeId },
+            data: { emailDomainStatus: (data as { status?: string }).status ?? 'pending' },
+          })
+        );
         return ((data as { records?: unknown[] }).records ?? []).map(toDnsRecord);
       }
 
@@ -124,10 +130,12 @@ export class ResendService {
           { storeId, staleDomainId: store.emailDomainId },
           'Resend domain id no longer exists — clearing stale id and recreating'
         );
-        await prisma.store.update({
-          where: { id: storeId },
-          data: { emailDomainId: null, emailDomainStatus: null, emailDomainVerifiedAt: null },
-        });
+        await withStore(storeId, tx =>
+          tx.store.update({
+            where: { id: storeId },
+            data: { emailDomainId: null, emailDomainStatus: null, emailDomainVerifiedAt: null },
+          })
+        );
         return createFresh();
       }
 
@@ -157,10 +165,12 @@ export class ResendService {
     status: string;
     records: DomainDnsRecord[];
   }> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { id: true, emailDomainId: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { id: true, emailDomainId: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     if (!store.emailDomainId) {
       throw new Error('Store email sender not provisioned yet — call provisionStoreDomain first');
@@ -203,10 +213,12 @@ export class ResendService {
     status: string;
     records: DomainDnsRecord[];
   }> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { id: true, emailDomainId: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { id: true, emailDomainId: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     if (!store.emailDomainId) {
       throw new Error('Store email sender not provisioned yet — call provisionStoreDomain first');
@@ -235,10 +247,12 @@ export class ResendService {
       // (demo-shop hit this: emailDomainStatus='verified' in DB but the Resend
       // domain was gone → get 404 → previously threw → stale badge. 2026-06-29.)
       if (error?.name === 'not_found') {
-        await prisma.store.update({
-          where: { id: storeId },
-          data: { emailDomainId: null, emailDomainStatus: null, emailDomainVerifiedAt: null },
-        });
+        await withStore(storeId, tx =>
+          tx.store.update({
+            where: { id: storeId },
+            data: { emailDomainId: null, emailDomainStatus: null, emailDomainVerifiedAt: null },
+          })
+        );
         return { status: 'unverified', records: [] };
       }
       throw new Error(`Resend get-domain failed: ${error?.message ?? 'unknown'}`);
@@ -251,7 +265,7 @@ export class ResendService {
     if (status === 'verified') {
       updateData.emailDomainVerifiedAt = new Date();
     }
-    await prisma.store.update({ where: { id: storeId }, data: updateData });
+    await withStore(storeId, tx => tx.store.update({ where: { id: storeId }, data: updateData }));
 
     return {
       status,
@@ -266,10 +280,12 @@ export class ResendService {
    * carry a dangling reference.
    */
   static async removeStoreDomain(storeId: string): Promise<void> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { id: true, emailDomainId: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { id: true, emailDomainId: true },
+      })
+    );
     if (!store) return;
     if (!store.emailDomainId) return;
 
@@ -287,10 +303,12 @@ export class ResendService {
       }
     }
 
-    await prisma.store.update({
-      where: { id: storeId },
-      data: { emailDomainId: null, emailDomainStatus: null, emailDomainVerifiedAt: null },
-    });
+    await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { emailDomainId: null, emailDomainStatus: null, emailDomainVerifiedAt: null },
+      })
+    );
   }
 
   /**
@@ -302,17 +320,19 @@ export class ResendService {
     storeId: string,
     opts: { to: string | string[]; subject: string; html: string; text?: string }
   ): Promise<{ id: string }> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        id: true,
-        name: true,
-        domain: true,
-        email: true,
-        emailSenderLocalPart: true,
-        emailDomainStatus: true,
-      },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: {
+          id: true,
+          name: true,
+          domain: true,
+          email: true,
+          emailSenderLocalPart: true,
+          emailDomainStatus: true,
+        },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
 
     const sender = resolveSender(store);
@@ -392,17 +412,19 @@ export class ResendService {
   ): Promise<{ ids: string[] }> {
     if (opts.to.length === 0) return { ids: [] };
     if (opts.to.length > 100) throw new Error('Resend batch accepts at most 100 emails');
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        id: true,
-        name: true,
-        domain: true,
-        email: true,
-        emailSenderLocalPart: true,
-        emailDomainStatus: true,
-      },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: {
+          id: true,
+          name: true,
+          domain: true,
+          email: true,
+          emailSenderLocalPart: true,
+          emailDomainStatus: true,
+        },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
 
     const sender = resolveSender(store);

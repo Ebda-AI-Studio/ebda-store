@@ -1675,10 +1675,12 @@ export async function getSubscriptionBillingState(storeId: string) {
   } catch {
     trialCardMode = null;
   }
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: { status: true, billingSuspendedReason: true, billingSuspendedAt: true },
-  });
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({
+      where: { id: storeId },
+      select: { status: true, billingSuspendedReason: true, billingSuspendedAt: true },
+    })
+  );
   const pendingClaims = await withStore(storeId, tx =>
     tx.manualPaymentClaim.count({ where: { storeId, status: 'pending' } })
   );

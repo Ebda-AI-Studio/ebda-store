@@ -26,7 +26,7 @@
  * card tester.
  */
 import { ipKeyGenerator } from 'express-rate-limit';
-import { prisma } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import { abuseConfig } from '../lib/abuse-config';
 import logger from '../lib/logger';
 import { AppError } from '../middleware/error-handler';
@@ -187,10 +187,12 @@ export class CardTestingGuard {
       );
       if (once !== 'OK') return { counted: true, alerted: false };
 
-      const store = await prisma.store.findUnique({
-        where: { id: input.storeId },
-        select: { id: true, name: true, slug: true },
-      });
+      const store = await withStore(input.storeId, tx =>
+        tx.store.findUnique({
+          where: { id: input.storeId },
+          select: { id: true, name: true, slug: true },
+        })
+      );
       void sendAlert({
         level: 'p1',
         scope: 'store',

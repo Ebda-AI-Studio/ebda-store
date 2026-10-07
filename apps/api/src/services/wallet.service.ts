@@ -6,6 +6,7 @@ import {
   withMoneyTx,
   hasTenantContext,
   type WalletTransactionType,
+  withStore,
 } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
@@ -336,7 +337,9 @@ export class WalletService {
     const [walletOn, checkoutOn, store] = await Promise.all([
       featureService.isFeatureEnabled(storeId, 'customer_wallet'),
       featureService.isFeatureEnabled(storeId, 'customer_wallet_checkout'),
-      prisma.store.findUnique({ where: { id: storeId }, select: { accountingEnabled: true } }),
+      withStore(storeId, tx =>
+        tx.store.findUnique({ where: { id: storeId }, select: { accountingEnabled: true } })
+      ),
     ]);
     if (!walletOn) return { available: false, reason: 'feature_off' };
     if (!checkoutOn) return { available: false, reason: 'checkout_feature_off' };

@@ -103,10 +103,12 @@ export async function bustStoreCaches(
  * wrong namespace entirely for store-level content.
  */
 export async function bustStoreCachesById(storeId: string): Promise<void> {
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: { slug: true, domain: true },
-  });
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({
+      where: { id: storeId },
+      select: { slug: true, domain: true },
+    })
+  );
   if (!store) return;
   await bustStoreCaches(storeId, store.slug, store.domain);
 }
@@ -258,10 +260,12 @@ export class StoreService {
    * path does.
    */
   static async setStatus(storeId: string, status: StoreStatus) {
-    const store = await prisma.store.update({
-      where: { id: storeId },
-      data: { status },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { status },
+      })
+    );
     await bustStoreCaches(store.id, store.slug, store.domain);
     return store;
   }
@@ -921,10 +925,12 @@ export class StoreService {
       );
     }
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: { template: template as 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { template: template as 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -945,10 +951,12 @@ export class StoreService {
     const existingTheme = (store.theme as Record<string, unknown>) || {};
     const mergedTheme = { ...existingTheme, ...theme };
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: { theme: mergedTheme as Prisma.InputJsonValue },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { theme: mergedTheme as Prisma.InputJsonValue },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -969,18 +977,20 @@ export class StoreService {
   ) {
     const store = await this.getById(storeId);
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        name: branding.name,
-        nameAr: branding.nameAr,
-        logo: branding.logo,
-        logoAr: branding.logoAr,
-        favicon: branding.favicon,
-        description: branding.description,
-        descriptionAr: branding.descriptionAr,
-      },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: {
+          name: branding.name,
+          nameAr: branding.nameAr,
+          logo: branding.logo,
+          logoAr: branding.logoAr,
+          favicon: branding.favicon,
+          description: branding.description,
+          descriptionAr: branding.descriptionAr,
+        },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -1019,10 +1029,12 @@ export class StoreService {
   static async updateSocialLinks(storeId: string, socialLinks: Prisma.InputJsonValue) {
     const store = await this.getById(storeId);
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: { socialLinks },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { socialLinks },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -1046,19 +1058,21 @@ export class StoreService {
   ) {
     const store = await this.getById(storeId);
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        email: contact.email,
-        phone: contact.phone,
-        phoneAr: contact.phoneAr,
-        whatsapp: contact.whatsapp,
-        address: contact.address,
-        addressAr: contact.addressAr,
-        businessHours: contact.businessHours,
-        googleMapsUrl: contact.googleMapsUrl,
-      },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: {
+          email: contact.email,
+          phone: contact.phone,
+          phoneAr: contact.phoneAr,
+          whatsapp: contact.whatsapp,
+          address: contact.address,
+          addressAr: contact.addressAr,
+          businessHours: contact.businessHours,
+          googleMapsUrl: contact.googleMapsUrl,
+        },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -1107,10 +1121,12 @@ export class StoreService {
     const existingSettings = (store.settings as Record<string, unknown>) || {};
     const mergedSettings = { ...existingSettings, floatingWidget };
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: { settings: mergedSettings as Prisma.InputJsonValue },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { settings: mergedSettings as Prisma.InputJsonValue },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -1135,25 +1151,27 @@ export class StoreService {
     const store = await this.getById(storeId);
     const previousOgImage = (store as { ogImage?: string | null }).ogImage ?? null;
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        metaTitle: seo.metaTitle,
-        metaTitleAr: seo.metaTitleAr,
-        metaDescription: seo.metaDescription,
-        metaDescriptionAr: seo.metaDescriptionAr,
-        ...(seo.metaDescriptionAeo !== undefined
-          ? { metaDescriptionAeo: seo.metaDescriptionAeo }
-          : {}),
-        ...(seo.metaDescriptionAeoAr !== undefined
-          ? { metaDescriptionAeoAr: seo.metaDescriptionAeoAr }
-          : {}),
-        ogImage: seo.ogImage,
-        twitterHandle: seo.twitterHandle,
-        googleSiteVerification: seo.googleSiteVerification,
-        emailSenderLocalPart: seo.emailSenderLocalPart,
-      },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: {
+          metaTitle: seo.metaTitle,
+          metaTitleAr: seo.metaTitleAr,
+          metaDescription: seo.metaDescription,
+          metaDescriptionAr: seo.metaDescriptionAr,
+          ...(seo.metaDescriptionAeo !== undefined
+            ? { metaDescriptionAeo: seo.metaDescriptionAeo }
+            : {}),
+          ...(seo.metaDescriptionAeoAr !== undefined
+            ? { metaDescriptionAeoAr: seo.metaDescriptionAeoAr }
+            : {}),
+          ogImage: seo.ogImage,
+          twitterHandle: seo.twitterHandle,
+          googleSiteVerification: seo.googleSiteVerification,
+          emailSenderLocalPart: seo.emailSenderLocalPart,
+        },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
@@ -1183,24 +1201,26 @@ export class StoreService {
       }
     >;
 
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        marketingPixels,
-        metaPixelId: pixels.meta?.enabled ? pixels.meta.pixelId : null,
-        tiktokPixelId: pixels.tiktok?.enabled ? pixels.tiktok.pixelId : null,
-        snapchatPixelId: pixels.snapchat?.enabled ? pixels.snapchat.pixelId : null,
-        googleAnalyticsId: pixels.googleAnalytics?.enabled
-          ? pixels.googleAnalytics.measurementId
-          : null,
-        googleTagManagerId: pixels.googleTagManager?.enabled
-          ? pixels.googleTagManager.containerId
-          : null,
-        googleAdsId: pixels.googleAds?.enabled ? pixels.googleAds.conversionId : null,
-        twitterPixelId: pixels.twitter?.enabled ? pixels.twitter.pixelId : null,
-        pinterestTagId: pixels.pinterest?.enabled ? pixels.pinterest.tagId : null,
-      },
-    });
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: {
+          marketingPixels,
+          metaPixelId: pixels.meta?.enabled ? pixels.meta.pixelId : null,
+          tiktokPixelId: pixels.tiktok?.enabled ? pixels.tiktok.pixelId : null,
+          snapchatPixelId: pixels.snapchat?.enabled ? pixels.snapchat.pixelId : null,
+          googleAnalyticsId: pixels.googleAnalytics?.enabled
+            ? pixels.googleAnalytics.measurementId
+            : null,
+          googleTagManagerId: pixels.googleTagManager?.enabled
+            ? pixels.googleTagManager.containerId
+            : null,
+          googleAdsId: pixels.googleAds?.enabled ? pixels.googleAds.conversionId : null,
+          twitterPixelId: pixels.twitter?.enabled ? pixels.twitter.pixelId : null,
+          pinterestTagId: pixels.pinterest?.enabled ? pixels.pinterest.tagId : null,
+        },
+      })
+    );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);

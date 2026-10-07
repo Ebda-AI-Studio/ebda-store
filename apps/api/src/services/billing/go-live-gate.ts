@@ -15,7 +15,7 @@
  *    that allows more than one store (Business) — that plan pays for it.
  * AND the store is within the owner's store allowance (oldest stores first).
  */
-import { prisma, withStore } from '@force/database';
+import { withStore, withUser } from '@force/database';
 import { AppError } from '../../middleware/error-handler';
 import { isGrantedPlan } from './period';
 import { resolveTrialCardMode, type TrialCardMode } from './index';
@@ -88,16 +88,22 @@ export async function assertStoreMayGoLive(storeId: string, now: Date = new Date
   // An additional store (rank > 0, within an allowance > 1) rides the owner's
   // OLDEST store — the billing parent whose plan granted the allowance.
   if (rank > 0) {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { ownerId: true },
-    });
-    const parent = store?.ownerId
-      ? await prisma.store.findFirst({
-          where: { ownerId: store.ownerId, deletedAt: null },
-          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-          select: { id: true },
-        })
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { ownerId: true },
+      })
+    );
+    // The owner's other stores are outside this store's scope: read them AS the owner.
+    const ownerId = store?.ownerId;
+    const parent = ownerId
+      ? await withUser(ownerId, tx =>
+          tx.store.findFirst({
+            where: { ownerId, deletedAt: null },
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+            select: { id: true },
+          })
+        )
       : null;
     if (parent && parent.id !== storeId && (await ownVerdict(parent.id, now)).ok) {
       return { ok: true as const, reason: 'paid_active' as const };

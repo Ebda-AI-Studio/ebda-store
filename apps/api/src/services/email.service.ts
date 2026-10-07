@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { ResendService } from './resend.service';
@@ -330,23 +330,25 @@ export class EmailService {
     // recursion. Lazy import breaks the EmailService↔emailQueue cycle.
     opts?: { queue?: boolean }
   ): Promise<void> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        id: true,
-        name: true,
-        nameAr: true,
-        logo: true,
-        theme: true,
-        email: true,
-        phone: true,
-        address: true,
-        settings: true,
-        domain: true,
-        emailSenderLocalPart: true,
-        emailDomainStatus: true,
-      },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: {
+          id: true,
+          name: true,
+          nameAr: true,
+          logo: true,
+          theme: true,
+          email: true,
+          phone: true,
+          address: true,
+          settings: true,
+          domain: true,
+          emailSenderLocalPart: true,
+          emailDomainStatus: true,
+        },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const storeDefaultLang = resolveDefaultLanguage(
       (store.settings as Record<string, unknown> | null)?.defaultLanguage
@@ -471,10 +473,12 @@ export class EmailService {
     data: OrderEmailData,
     language?: 'en' | 'ar'
   ): Promise<void> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, nameAr: true, settings: true, whatsapp: true, theme: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, nameAr: true, settings: true, whatsapp: true, theme: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
@@ -504,10 +508,12 @@ export class EmailService {
     language?: 'en' | 'ar'
   ): Promise<void> {
     if (!data.customerEmail) return;
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
@@ -538,10 +544,12 @@ export class EmailService {
     language?: 'en' | 'ar'
   ): Promise<void> {
     if (!data.customerEmail) return;
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
@@ -568,10 +576,12 @@ export class EmailService {
     data: OrderEmailData,
     language?: 'en' | 'ar'
   ): Promise<void> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
@@ -600,10 +610,12 @@ export class EmailService {
     },
     language?: 'en' | 'ar'
   ): Promise<void> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
@@ -630,10 +642,12 @@ export class EmailService {
     },
     language?: 'en' | 'ar'
   ): Promise<void> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
@@ -662,10 +676,12 @@ export class EmailService {
     },
     language?: 'en' | 'ar'
   ): Promise<void> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
@@ -685,10 +701,12 @@ export class EmailService {
     data: { email: string; name: string },
     language?: 'en' | 'ar'
   ): Promise<void> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
@@ -713,10 +731,12 @@ export class EmailService {
     },
     language?: 'en' | 'ar'
   ): Promise<void> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
@@ -742,10 +762,12 @@ export class EmailService {
     },
     language?: 'en' | 'ar'
   ): Promise<void> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
@@ -770,10 +792,12 @@ export class EmailService {
     },
     language?: 'en' | 'ar'
   ): Promise<void> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
@@ -800,10 +824,12 @@ export class EmailService {
     },
     language?: 'en' | 'ar'
   ) {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
@@ -841,10 +867,12 @@ export class EmailService {
     },
     language?: 'en' | 'ar'
   ) {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const lang: 'en' | 'ar' =
       language ??
@@ -873,10 +901,12 @@ export class EmailService {
     data: ReviewRequestData,
     language: 'en' | 'ar'
   ): Promise<void> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true },
+      })
+    );
     if (!store) throw new Error(`Store ${storeId} not found`);
     const subject = reviewRequestTemplate.subject[language](data, store.name);
     const content = reviewRequestTemplate[language](data, store.name);
@@ -924,10 +954,12 @@ export class EmailService {
     },
     language?: 'en' | 'ar'
   ): Promise<void> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { name: true, settings: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, settings: true },
+      })
+    );
     const lang: 'en' | 'ar' =
       language ??
       resolveDefaultLanguage(
