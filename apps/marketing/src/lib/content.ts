@@ -10,7 +10,6 @@ export interface Provider {
   icon?: 'cash' | 'truck';
 }
 
-export type SceneId = 'lamma' | 'dahab' | 'souq' | 'qamar' | 'jasmine';
 
 export interface RingCopy {
   label: string;
@@ -56,7 +55,6 @@ export interface Copy {
     phoneLabel: string;
   };
   how: { title: string; steps: { t: string; d: string }[] };
-  scenes: { title: string; lead: string; items: Record<SceneId, { place: string; alt: string }> };
   breakout: { title: string; words: [string, string, string] };
   dahab: { title: string; lead: string; ring: RingCopy };
   templates: {
@@ -161,23 +159,6 @@ export const COPY: Record<Locale, Copy> = {
         { t: 'اختار قالب وظبّطه', d: 'خمس قوالب، وكل حاجة فيهم تتعدّل.' },
         { t: 'استقبل الطلبات', d: 'وتابع الدفع والشحن من موبايلك.' },
       ],
-    },
-    scenes: {
-      title: 'متجرك، في كل مكان بتشتغل فيه.',
-      lead: 'نفس المتجر، شغّال من المطبخ للمحل.',
-      items: {
-        lamma: {
-          place: 'مطبخ البيت',
-          alt: 'موبايل على رخامة مطبخ جنب براد شاي بيعرض متجر أكل بيتي',
-        },
-        dahab: {
-          place: 'ترابيزة الدهب',
-          alt: 'موبايل على ترابيزة خشب جنب سلسلة بيعرض متجر مجوهرات',
-        },
-        souq: { place: 'المكتب بالليل', alt: 'لابتوب على مكتب بالليل بيعرض متجر إلكترونيات' },
-        qamar: { place: 'البوتيك', alt: 'موبايل على كاونتر بوتيك قدام رف هدوم بيعرض متجر أزياء' },
-        jasmine: { place: 'التسريحة', alt: 'موبايل وسط فرش المكياج بيعرض متجر تجميل' },
-      },
     },
     breakout: { title: 'منتجك هو البطل.', words: ['ابدأ', 'متجرك', 'دلوقتي'] },
     dahab: {
@@ -366,32 +347,6 @@ export const COPY: Record<Locale, Copy> = {
         { t: 'Pick a template and tune it', d: 'Five templates, everything editable.' },
         { t: 'Take orders', d: 'And follow payment and shipping from your phone.' },
       ],
-    },
-    scenes: {
-      title: 'Your store, wherever you work.',
-      lead: 'The same store, from the kitchen to the shop floor.',
-      items: {
-        lamma: {
-          place: 'The home kitchen',
-          alt: 'A phone on a kitchen counter showing a home-food store',
-        },
-        dahab: {
-          place: 'The jewellery table',
-          alt: 'A phone on a wooden table beside a necklace, showing a jewellery store',
-        },
-        souq: {
-          place: 'The desk at night',
-          alt: 'A laptop on a desk at night showing an electronics store',
-        },
-        qamar: {
-          place: 'The boutique',
-          alt: 'A phone on a boutique counter in front of a clothing rail, showing a fashion store',
-        },
-        jasmine: {
-          place: 'The vanity',
-          alt: 'A phone among makeup brushes, showing a beauty store',
-        },
-      },
     },
     breakout: { title: 'Your product is the star.', words: ['ابدأ', 'متجرك', 'دلوقتي'] },
     dahab: {

@@ -58,7 +58,6 @@ describe('marketing hero and structure', () => {
       'story',
       'how',
       'templates',
-      'scenes',
       'breakout',
       'dahab',
       'features',
@@ -202,9 +201,6 @@ describe('marketing honesty', () => {
       // four numbered steps, a real sequence
       expect(html.match(/class="step4"/g)).toHaveLength(4);
       expect(html).toContain('>01<');
-      // composited room scenes, one per template family, with alt text
-      for (const id of ['souq', 'lamma', 'dahab', 'qamar', 'jasmine'])
-        expect(html).toContain(`/scenes/${id}-1200.webp`);
       // 3D ring: poster first, swatches are real buttons with pressed state
       expect(html).toContain('/ring/ring-gold-diamond.webp');
       expect(html.match(/class="swatch"/g)).toHaveLength(6);

@@ -1622,66 +1622,6 @@ html[dir='rtl'] .not-found .lead {
   color: var(--muted);
 }
 
-/* ---------- scenes: the real storefront, in real places ---------- */
-.scene-grid {
-  display: grid;
-  gap: 18px;
-  grid-template-columns: repeat(6, 1fr);
-}
-.scene {
-  position: relative;
-  overflow: hidden;
-  margin: 0;
-  border-radius: 18px;
-  grid-column: span 3;
-  transition: transform 0.8s var(--ease);
-  aspect-ratio: 4 / 3;
-  background: #111;
-  isolation: isolate;
-}
-.scene:first-child {
-  grid-column: span 6;
-  aspect-ratio: 16 / 9;
-}
-.scene > picture img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: saturate(1.05) contrast(1.02);
-}
-/* warm cinematic grade over the room photo */
-.scene::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  background:
-    radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(10, 11, 12, 0.55)),
-    linear-gradient(180deg, transparent 55%, rgba(10, 11, 12, 0.78));
-  pointer-events: none;
-}
-.scene figcaption {
-  position: absolute;
-  z-index: 4;
-  inset-inline-start: 18px;
-  bottom: 14px;
-  font-weight: 700;
-  font-size: 1.05rem;
-  color: #f3efe6;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
-}
-@media (max-width: 899px) {
-  .scene-grid {
-    grid-template-columns: 1fr;
-  }
-  .scene,
-  .scene:first-child {
-    grid-column: auto;
-  }
-}
-
 /* ---------- breakout: the ring leaves the phone, gold wipes up, giant words drift ---------- */
 .breakout {
   position: relative;

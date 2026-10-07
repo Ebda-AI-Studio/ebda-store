@@ -20,7 +20,6 @@ import { About } from './About';
 import { Breakout } from './Breakout';
 import { Reveal, StoryScroll, TemplateShowcase } from './Motion';
 import { Ring3D } from './ring/Ring3D';
-import { Scenes } from './Scenes';
 import { NileNight } from './NileNight';
 
 function ProviderIcon({ kind }: { kind: 'cash' | 'truck' }) {
@@ -95,12 +94,6 @@ export function Home({ locale }: { locale: Locale }) {
             ))}
           </ol>
         </Reveal>
-      </Section>
-    ),
-    scenes: () => (
-      <Section id="scenes" title={c.scenes.title} className="scenes-section">
-        <p className="lead">{c.scenes.lead}</p>
-        <Scenes items={c.scenes.items} />
       </Section>
     ),
     about: () => (

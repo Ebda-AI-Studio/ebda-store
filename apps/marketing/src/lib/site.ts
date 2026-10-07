@@ -40,7 +40,6 @@ export const SECTION_ORDER = [
   'story',
   'how',
   'templates',
-  'scenes',
   'breakout',
   'dahab',
   'features',
