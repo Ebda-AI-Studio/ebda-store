@@ -28,6 +28,7 @@
 import { withStore, type Prisma } from '@force/database';
 import {
   DEFAULT_PLAN_SEEDS,
+  LOCKED_PUBLIC_PLANS,
   FALLBACK_PLAN_CODE,
   LEGACY_STORE_PLAN_TO_PLAN_CODE,
   planLimitsSchema,
@@ -58,6 +59,7 @@ export interface Entitlements {
 
 function seedFor(code: string) {
   return (
+    LOCKED_PUBLIC_PLANS.find(p => p.code === code) ??
     DEFAULT_PLAN_SEEDS.find(p => p.code === code) ??
     DEFAULT_PLAN_SEEDS.find(p => p.code === FALLBACK_PLAN_CODE)!
   );

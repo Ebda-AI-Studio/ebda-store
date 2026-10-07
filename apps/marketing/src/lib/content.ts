@@ -208,8 +208,8 @@ export const COPY: Record<Locale, Copy> = {
     pricing: {
       eyebrow: '9 · الأسعار',
       title: 'خطط لكل مرحلة من متجرك.',
-      lead: 'نعمل على الباقات الآن. هذه أسماء الخطط والمزايا المتوقعة، والأسعار تُعلن قريبًا.',
-      note: 'المزايا والحدود مبدئية وقابلة للتغيير قبل الإعلان.',
+      lead: 'جرّب باقة النمو لمدة ١٤ يومًا. لا توجد باقة مجانية أو عمولة على الطلبات.',
+      note: 'وفر ٢٥٪ بالدفع السنوي. رسوم بوابة الدفع منفصلة. بعد تجاوز حد الطلبات، لديك مهلة ٧ أيام للترقية.',
       cta: 'ابدأ البيع',
     },
     stories: {
@@ -462,8 +462,8 @@ export const COPY: Record<Locale, Copy> = {
     pricing: {
       eyebrow: '9 · Pricing',
       title: 'Plans for every stage of your store.',
-      lead: 'We are shaping the plans now. These are the plan names and the features we expect; prices will be announced soon.',
-      note: 'Features and limits are provisional and may change before announcement.',
+      lead: 'Try Growth for 14 days. No free plan and no platform commission on orders.',
+      note: 'Save 25% with annual billing. Gateway fees are separate. After exceeding the order cap, you have 7 days to upgrade.',
       cta: 'Start selling',
     },
     stories: {
@@ -489,7 +489,7 @@ export const COPY: Record<Locale, Copy> = {
         },
         {
           q: 'Do I need a domain?',
-          a: 'No. Every store gets a free <you>.ebda.app address, and you can attach your own custom domain on top (this may need a paid plan, to be announced).',
+          a: 'No. Every store gets a free <you>.ebda.app address, and you can attach your own custom domain on top (included in every paid plan).',
         },
         {
           q: 'Is the store in Arabic and English?',
