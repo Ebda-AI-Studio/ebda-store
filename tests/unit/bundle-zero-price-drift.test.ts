@@ -112,6 +112,7 @@ const { mockPrisma } = vi.hoisted(() => ({
     product: { findMany: vi.fn().mockResolvedValue([]) },
     store: { findUnique: vi.fn().mockResolvedValue({ name: 'Test Store', settings: null }) },
     taxRate: { findMany: vi.fn().mockResolvedValue([]) },
+    storeTaxProfile: { findUnique: vi.fn().mockResolvedValue(null) },
     customer: { findFirst: vi.fn().mockResolvedValue(null) },
     user: { findUnique: vi.fn().mockResolvedValue(null), findFirst: vi.fn() },
     promotion: { findMany: vi.fn().mockResolvedValue([]) },

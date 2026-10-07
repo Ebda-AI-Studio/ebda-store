@@ -1,4 +1,4 @@
-import { orderTaxPlacement } from '@force/shared';
+import { orderTaxPlacement, taxInvoiceInfo } from '@force/shared';
 import { escapeHtml, emailMoney } from './_util';
 import { waMeEmailBlock } from './_wa-me';
 import type { OrderEmailData } from '../email.service';
@@ -14,6 +14,9 @@ const LABELS = {
     shipping: 'Shipping',
     total: 'Total',
     taxIncluded: 'Incl. VAT',
+    vat: (rate: number | null) => (rate === null ? 'VAT' : `VAT (${rate}%)`),
+    vatIncluded: (rate: number | null) => (rate === null ? 'Incl. VAT' : `Incl. VAT (${rate}%)`),
+    sellerTrn: 'Seller tax registration no.',
   },
   ar: {
     subtotal: 'المجموع الفرعي',
@@ -25,6 +28,11 @@ const LABELS = {
     shipping: 'الشحن',
     total: 'الإجمالي',
     taxIncluded: 'شامل ضريبة القيمة المضافة',
+    vat: (rate: number | null) =>
+      rate === null ? 'ضريبة القيمة المضافة' : `ضريبة القيمة المضافة (${rate}%)`,
+    vatIncluded: (rate: number | null) =>
+      rate === null ? 'شامل ضريبة القيمة المضافة' : `شامل ضريبة القيمة المضافة (${rate}%)`,
+    sellerTrn: 'رقم التسجيل الضريبي للبائع',
   },
 } as const;
 
@@ -60,6 +68,9 @@ function totalsRows(d: OrderEmailData, locale: 'en' | 'ar'): string {
   const legacyLabel = hasLevers ? null : d.couponCode ? d.couponCode : promotionName;
   const legacyAnnotation = legacyLabel ? ` (${escapeHtml(legacyLabel)})` : '';
   const { taxRow, includedTaxCaption } = orderTaxPlacement(d);
+  // VAT wording + seller TRN only for an order priced under a VERIFIED tax
+  // profile (ruling TAX-2); otherwise the historic neutral labels.
+  const taxInfo = taxInvoiceInfo({ ...d, discount: d.discount ?? 0 });
   return [
     row(L.subtotal, money(d.subtotal)),
     coupon > 0
@@ -81,12 +92,19 @@ function totalsRows(d: OrderEmailData, locale: 'en' | 'ar'): string {
         )
       : '',
     other > 0 ? row(`${L.discount}${legacyAnnotation}`, `-${money(other)}`) : '',
-    taxRow !== null && taxRow > 0 ? row(L.tax, money(taxRow)) : '',
+    taxRow !== null && (taxRow > 0 || taxInfo)
+      ? row(taxInfo ? L.vat(taxInfo.ratePercent) : L.tax, money(taxRow))
+      : '',
     row(L.shipping, money(d.shipping)),
     row(L.total, money(d.total), 'total-row'),
     includedTaxCaption !== null
       ? `<tr class="tax-included">
-          <td colspan="3" style="text-align: end; color: #6b7280; font-size: 12px;">${L.taxIncluded} ${money(includedTaxCaption)}</td>
+          <td colspan="3" style="text-align: end; color: #6b7280; font-size: 12px;">${taxInfo ? L.vatIncluded(taxInfo.ratePercent) : L.taxIncluded} ${money(includedTaxCaption)}</td>
+        </tr>`
+      : '',
+    taxInfo
+      ? `<tr class="seller-trn">
+          <td colspan="3" style="text-align: end; color: #6b7280; font-size: 12px;">${L.sellerTrn}: <span dir="ltr">${escapeHtml(taxInfo.sellerTaxRegistrationNumber)}</span></td>
         </tr>`
       : '',
   ]

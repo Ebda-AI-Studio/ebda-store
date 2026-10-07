@@ -143,6 +143,7 @@ const { mockPrisma, capturedOrderCreate } = vi.hoisted(() => {
       product: { findMany: vi.fn().mockResolvedValue([]) },
       store: { findUnique: vi.fn().mockResolvedValue({ name: 'Test Store', settings: null }) },
       taxRate: { findMany: vi.fn().mockResolvedValue([]) },
+      storeTaxProfile: { findUnique: vi.fn().mockResolvedValue(null) },
       customer: { findFirst: vi.fn().mockResolvedValue(null) },
       user: { findUnique: vi.fn().mockResolvedValue(null), findFirst: vi.fn() },
       promotion: { findMany: vi.fn().mockResolvedValue([]) },
@@ -429,6 +430,12 @@ describe('coupon on a cart containing a bundle — quote must equal charge', () 
       taxEnabled: true,
     });
     mockPrisma.taxRate.findMany.mockResolvedValue([{ rate: 5 }]);
+    // VAT is charged only under a VERIFIED tax profile (ruling TAX-2).
+    mockPrisma.storeTaxProfile.findUnique.mockResolvedValue({
+      status: 'verified',
+      taxRegistrationNumber: '123456789',
+      legalName: 'Test Store LLC',
+    });
     setCart([LOOSE_LINE], 1);
 
     capturedOrderCreate.mockClear();

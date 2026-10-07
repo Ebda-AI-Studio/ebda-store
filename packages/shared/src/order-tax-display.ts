@@ -30,3 +30,42 @@ export function orderTaxPlacement(order: {
   }
   return { taxRow: order.tax, includedTaxCaption: null };
 }
+
+/**
+ * Whether a PLACED order's documents are a TAX invoice (ruling TAX-2): only
+ * when the order froze a seller tax registration number at sale time, which
+ * happens only when VAT was collected under a VERIFIED tax profile. `null` =
+ * an ordinary invoice: no "tax invoice" heading, no TRN, no rate label.
+ *
+ * `taxableAmount` is the VAT base (after discount, before VAT): for exclusive
+ * prices `subtotal − discount`, for inclusive prices that minus the extracted
+ * `tax` — the same base `computeOrderTax` used.
+ */
+export interface TaxInvoiceInfo {
+  sellerTaxRegistrationNumber: string;
+  sellerTaxLegalName: string | null;
+  /** e.g. 14 for 14%; null when the order did not record a rate. */
+  ratePercent: number | null;
+  taxableAmount: number;
+  vatAmount: number;
+}
+
+export function taxInvoiceInfo(order: {
+  sellerTaxRegistrationNumber?: string | null;
+  sellerTaxLegalName?: string | null;
+  taxRateBps?: number | null;
+  subtotal: number;
+  discount?: number | null;
+  tax: number;
+  taxIncludedInPrice?: boolean | null;
+}): TaxInvoiceInfo | null {
+  if (!order.sellerTaxRegistrationNumber) return null;
+  const base = Math.max(0, order.subtotal - (order.discount ?? 0));
+  return {
+    sellerTaxRegistrationNumber: order.sellerTaxRegistrationNumber,
+    sellerTaxLegalName: order.sellerTaxLegalName ?? null,
+    ratePercent: order.taxRateBps == null ? null : order.taxRateBps / 100,
+    taxableAmount: order.taxIncludedInPrice ? Math.max(0, base - order.tax) : base,
+    vatAmount: order.tax,
+  };
+}

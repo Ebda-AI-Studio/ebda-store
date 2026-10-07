@@ -38,7 +38,7 @@ import { affiliateService } from './affiliate.service';
 import { auditLog } from '../middleware/security';
 import { hasCapturedPayment, shouldApplyRefundEffects } from './order-refund-gating';
 import logger from '../lib/logger';
-import { computeOrderTax, resolveActiveTaxRate } from '../lib/order-tax';
+import { computeOrderTax, frozenTaxInvoiceFields, resolveActiveTaxRate } from '../lib/order-tax';
 import {
   invalidateStoreProductCachesAfterOrder,
   invalidateCustomersCache,
@@ -1384,6 +1384,9 @@ export class OrderService {
           // know whether it is inside `subtotal`/`total` or on top of them, and
           // the store-level switch it came from can be flipped afterwards.
           taxIncludedInPrice: activeTax.includedInPrice,
+          // Seller TRN / legal name / rate frozen for the tax invoice — only
+          // when VAT was collected under a VERIFIED profile (ruling TAX-2).
+          ...frozenTaxInvoiceFields(activeTax),
           shipping,
           discount,
           // Persist the coupon fields ONLY when the coupon actually applied.
@@ -2761,6 +2764,9 @@ export class OrderService {
           // See the public checkout path above — the convention `tax` was
           // charged under travels with the order, not with the store.
           taxIncludedInPrice: activeTax.includedInPrice,
+          // Seller TRN / legal name / rate frozen for the tax invoice — only
+          // when VAT was collected under a VERIFIED profile (ruling TAX-2).
+          ...frozenTaxInvoiceFields(activeTax),
           shipping,
           discount: couponDiscount,
           total,

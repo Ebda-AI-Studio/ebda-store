@@ -1,7 +1,8 @@
 /**
  * Issues 2357 + 2358, ruling TAX-1a.
  *
- * 2358 — tax COLLECTION is gated on `Store.taxEnabled` alone (ruling TAX-1: a
+ * 2358 — tax COLLECTION is not a plan feature (ruling TAX-1, kept by TAX-2, which adds the
+ * verified-VAT-registration gate in the resolver and the settings service; a
  * legal obligation, not a plan feature), so the switch that turns it off and
  * the rate list that sets what it charges must answer on EVERY plan. The
  * feature gate is mocked to deny everything, exactly a store that lapsed to

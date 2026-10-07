@@ -32,6 +32,8 @@ vi.mock('@force/database', () => ({
         defaultTaxRate: null,
       }),
     },
+    // updateSettings({ taxEnabled: true }) is gated on a VERIFIED profile (ruling TAX-2).
+    storeTaxProfile: { findUnique: vi.fn().mockResolvedValue({ status: 'verified' }) },
     taxRate: {
       create: vi.fn().mockResolvedValue(rateRow),
       update: vi.fn().mockResolvedValue(rateRow),

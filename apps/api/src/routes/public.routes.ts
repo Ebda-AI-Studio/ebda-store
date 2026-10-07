@@ -38,7 +38,7 @@ import {
   nextSaleWindowBoundarySeconds,
 } from '../services/bundle.service';
 import { stripMarketingPixelSecrets } from '../lib/marketing-pixels-secrets';
-import { resolveActiveTaxRate } from '../lib/order-tax';
+import { effectiveTaxFields, resolveActiveTaxRate } from '../lib/order-tax';
 import { publicStoreSettings } from '../lib/public-store-settings';
 import { verifyReviewToken } from '../lib/review-token';
 import { inngest } from '../lib/inngest/client';
@@ -1563,12 +1563,13 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
         settings: publicStoreSettings(store.settings),
         // The checkout/cart tax line needs the rate, not just the
-        // enabled/included booleans already on the Store row. Gated on
-        // `taxEnabled` only, at the sum of active rates (rulings M3-9, TAX-1) —
-        // the SAME resolver order creation charges against, so a merchant
-        // with tax off is never shown a VAT line NOR charged one, even if
-        // old TaxRate rows are still `isActive: true`.
-        taxRatePercent: (await resolveActiveTaxRate(store.id)).ratePercent,
+        // enabled/included booleans already on the Store row. The SAME
+        // resolver order creation charges against (ruling M3-9), so it carries
+        // the VAT gate (ruling TAX-2): an unverified store is never shown a
+        // VAT line NOR charged one, even with `taxEnabled` set and old TaxRate
+        // rows still `isActive: true`. `taxEnabled` is overwritten with the
+        // EFFECTIVE value so no storefront code can key on the merchant's wish.
+        ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
         ...(await fetchStoreFaqsAndHowtos(store.id)),
         // Issue 206: the storefront renders the SMS-offers opt-in ONLY when
         // this is true (sms feature on + provider configured + a promotional
@@ -1739,8 +1740,8 @@ router.get(
           ...store,
           marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
           settings: publicStoreSettings(store.settings),
-          // Keep in lock-step with the /stores/:slugOrId select above.
-          taxRatePercent: (await resolveActiveTaxRate(store.id)).ratePercent,
+          // Keep in lock-step with the /stores/:slugOrId select above (VAT gate, ruling TAX-2).
+          ...effectiveTaxFields(await resolveActiveTaxRate(store.id)),
           ...(await fetchStoreFaqsAndHowtos(store.id)),
           // Keep in lock-step with /stores/:slugOrId (issue 206, same staleness).
           smsMarketingOptIn: await notificationDispatcher.isSmsMarketingAvailable(store.id),

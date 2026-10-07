@@ -291,6 +291,10 @@ model Store {
   pinterestTagId     String? @map("pinterest_tag_id") // Pinterest Tag
 
   // Tax Settings
+  // `taxEnabled` is the merchant's WISH to collect VAT. Collection is effective
+  // only while the store's `StoreTaxProfile` is `verified` (ruling TAX-2,
+  // supersedes TAX-1's "taxEnabled alone"): `resolveActiveTaxRate` returns 0
+  // otherwise, and the settings route refuses `taxEnabled: true` until then.
   taxEnabled         Boolean  @default(false) @map("tax_enabled")
   taxIncludedInPrice Boolean  @default(false) @map("tax_included_in_price") // Prices include tax
   defaultTaxRate     Decimal? @map("default_tax_rate") @db.Decimal(5, 2) // Default tax percentage
@@ -435,6 +439,8 @@ model Store {
   shippingZones            ShippingZone[]
   shippingAreaRates        ShippingAreaRate[]
   taxRates                 TaxRate[]
+  taxProfile               StoreTaxProfile?
+  taxDocuments             StoreTaxDocument[]
   loyaltyPoints            LoyaltyPoints[]
   loyaltyTransactions      LoyaltyTransaction[]
   customerWallets          CustomerWallet[]
@@ -1337,6 +1343,14 @@ model Order {
   // invoice, confirmation email, admin + orders-app order cards, the account
   // order page — plus the XLSX export's "Tax Included In Price" column.
   taxIncludedInPrice    Boolean            @default(false) @map("tax_included_in_price")
+  // Frozen at creation ONLY when VAT was collected under a VERIFIED tax profile
+  // (ruling TAX-2): the seller's tax registration number and legal name as they
+  // stood at the sale, and the summed rate in basis points (1400 = 14%). They
+  // make the invoice a "tax invoice"; NULL = not a tax invoice (no VAT wording).
+  // A later revoke/re-verification never rewrites a past order.
+  sellerTaxRegistrationNumber String?      @map("seller_tax_registration_number")
+  sellerTaxLegalName          String?      @map("seller_tax_legal_name")
+  taxRateBps                  Int?         @map("tax_rate_bps")
   shipping              Int                @default(0)
   discount              Int                @default(0)
   total                 Int
@@ -4671,4 +4685,80 @@ model BillingWebhookEvent {
 
   @@unique([provider, eventId])
   @@map("billing_webhook_events")
+}
+
+/// Egypt VAT gate (ruling TAX-2). A merchant may charge VAT only once a
+/// super-admin has VERIFIED its VAT registration: issuing a VAT invoice while
+/// unregistered is tax evasion (Law 67/2016 Art. 68 item 8). One row per store,
+/// created lazily on the first merchant write; no row = `none`.
+/// UI: merchant `/stores/[id]/tax` (VAT registration card), super-admin
+/// `/tax-verification` (review queue). Every transition is audit-logged.
+enum TaxProfileStatus {
+  none
+  pending
+  verified
+  rejected
+  revoked
+}
+
+enum TaxDocumentKind {
+  tax_card
+  vat_certificate
+  other
+}
+
+model StoreTaxProfile {
+  id                    String           @id @default(uuid())
+  storeId               String           @unique @map("store_id")
+  status                TaxProfileStatus @default(none)
+  /// Egyptian tax registration number (TRN / RIN), digits only.
+  taxRegistrationNumber String?          @map("tax_registration_number")
+  /// The registered legal name of the taxpayer, as on the tax card.
+  legalName             String?          @map("legal_name")
+  /// When the merchant attested "I am VAT-registered with the ETA" on submit.
+  attestedAt            DateTime?        @map("attested_at")
+  submittedAt           DateTime?        @map("submitted_at")
+  submittedBy           String?          @map("submitted_by")
+  /// The super-admin who made the latest decision (approve / reject / revoke).
+  reviewedBy            String?          @map("reviewed_by")
+  reviewedAt            DateTime?        @map("reviewed_at")
+  verifiedAt            DateTime?        @map("verified_at")
+  revokedAt             DateTime?        @map("revoked_at")
+  /// Reason for the latest reject or revoke, shown to the merchant.
+  rejectionReason       String?          @map("rejection_reason")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  store     Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  documents StoreTaxDocument[]
+
+  @@index([status, submittedAt])
+  @@index([taxRegistrationNumber])
+  @@map("store_tax_profiles")
+}
+
+/// Evidence for a tax profile (tax card / VAT registration certificate). The
+/// file lives in the PRIVATE R2 bucket (`STORAGE_PRIVATE_BUCKET`) under
+/// `stores/<storeId>/tax-documents/`; it has no URL at all and is streamed by
+/// the API to the store's own admins and to super-admins only (ruling TAX-4).
+model StoreTaxDocument {
+  id         String          @id @default(uuid())
+  storeId    String          @map("store_id")
+  profileId  String          @map("profile_id")
+  kind       TaxDocumentKind
+  /// Object key in the private bucket (never a URL).
+  storageKey String          @map("storage_key")
+  fileName   String          @map("file_name")
+  mimeType   String          @map("mime_type")
+  sizeBytes  Int             @map("size_bytes")
+  sha256     String
+  uploadedBy String?         @map("uploaded_by")
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  store   Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  profile StoreTaxProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([profileId])
+  @@map("store_tax_documents")
 }

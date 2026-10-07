@@ -10,37 +10,39 @@ import { prisma } from '@force/database';
 export { computeOrderTax } from '@force/shared';
 
 /**
- * The store's tax rate as a percentage (e.g. 5 for 5%) and whether its listed
+ * The store's tax rate as a percentage (e.g. 14 for 14%) and whether its listed
  * prices already include it — the two facts `computeOrderTax` needs. ONE
- * resolver for both the CHARGE (order creation) and the DISPLAY (the public
- * storefront payload), so they cannot drift apart (ruling M3-9).
+ * resolver for both the CHARGE (order creation, public checkout and admin
+ * orders) and the DISPLAY (the public storefront payloads), so they cannot
+ * drift apart (ruling M3-9). Every place a tax line can be produced reads it.
  *
- * Gated on `Store.taxEnabled` ONLY (owner decision 2026-10-01, issue 2166,
- * ruling TAX-1). VAT collection is a legal obligation, not a billing feature:
- * the plan-derived `tax` feature used to gate the charge too, and `free` (the
- * lapsed-payment grace plan) does not carry it, so a merchant whose
- * subscription lapsed silently stopped collecting VAT. The admin tax page and
- * its routes are not feature-gated either (issue 2358, ruling TAX-1a): the
- * switch and the rate list work on every plan. A merchant who flips "Enable
- * tax" off (`taxEnabled: false`) is neither shown a VAT line nor charged one.
+ * THE VAT GATE (ruling TAX-2, supersedes TAX-1's "taxEnabled alone"): VAT is
+ * charged only when the merchant wants it (`Store.taxEnabled`) AND its VAT
+ * registration is VERIFIED by a super-admin (`StoreTaxProfile.status =
+ * 'verified'`). An unregistered seller issuing a VAT invoice is tax evasion
+ * (Egypt Law 67/2016 Art. 68 item 8). Fail closed: no profile, or any status
+ * other than `verified` (none / pending / rejected / revoked), yields 0 — a
+ * store that had `taxEnabled = true` before the gate shipped stops charging
+ * without its row being rewritten (ruling TAX-3).
  *
- * What it charges: the SUM of every ACTIVE rate (owner decision 2026-10-01,
- * issue 2114, ruling TAX-1) — 5% + 2% charges and shows 7%, matching what the
- * admin tax page lets a merchant configure. It does not read
- * `country`/`state`, `priority`, `isCompound` or `defaultTaxRate`: every
- * active rate applies additively to the taxable amount, and the tax routes
- * reject those fields (issue 2357, ruling TAX-1a).
+ * Still NOT plan-gated (ruling TAX-1a stands): a verified merchant whose
+ * subscription lapsed keeps collecting the VAT it owes.
  *
- * Returns `{ ratePercent: 0, includedInPrice }` when disabled OR there is no
- * active tax rate — identical to before for every store with tax off.
+ * What it charges: the SUM of every ACTIVE rate (ruling TAX-1) — 5% + 2%
+ * charges and shows 7%. It does not read `country`/`state`, `priority`,
+ * `isCompound` or `defaultTaxRate` (ruling TAX-1a).
+ *
+ * `seller` is the verified identity the order freezes for its tax invoice
+ * (seller TRN + legal name); `null` whenever `ratePercent` is 0.
  */
 export interface ActiveTaxRate {
   ratePercent: number;
   includedInPrice: boolean;
+  seller: { taxRegistrationNumber: string; legalName: string } | null;
 }
 
 export async function resolveActiveTaxRate(storeId: string): Promise<ActiveTaxRate> {
-  const [store, rates] = await Promise.all([
+  const [store, rates, profile] = await Promise.all([
     prisma.store.findUnique({
       where: { id: storeId },
       select: { taxEnabled: true, taxIncludedInPrice: true },
@@ -49,14 +51,58 @@ export async function resolveActiveTaxRate(storeId: string): Promise<ActiveTaxRa
       where: { storeId, isActive: true },
       select: { rate: true },
     }),
+    prisma.storeTaxProfile.findUnique({
+      where: { storeId },
+      select: { status: true, taxRegistrationNumber: true, legalName: true },
+    }),
   ]);
 
   // Rates are Decimal(5,2)-shaped percentages; sum in hundredths so 0.1 + 0.2
   // is exactly 0.3, never 0.30000000000000004.
   const sumHundredths = rates.reduce((n, r) => n + Math.round(Number(r.rate) * 100), 0);
 
+  const verified =
+    profile?.status === 'verified' && !!profile.taxRegistrationNumber && !!profile.legalName;
+  const collecting = !!store?.taxEnabled && verified && sumHundredths > 0;
+
   return {
-    ratePercent: store?.taxEnabled ? sumHundredths / 100 : 0,
+    ratePercent: collecting ? sumHundredths / 100 : 0,
     includedInPrice: !!store?.taxIncludedInPrice,
+    seller: collecting
+      ? { taxRegistrationNumber: profile!.taxRegistrationNumber!, legalName: profile!.legalName! }
+      : null,
   };
+}
+
+/**
+ * The tax-invoice identity an order freezes at creation (ruling TAX-2): set
+ * ONLY when the order was priced under a verified profile, so a later revoke or
+ * TRN change never rewrites a past invoice, and an unverified store's invoice
+ * carries no VAT wording at all. Spread into `order.create({ data })`.
+ */
+export function frozenTaxInvoiceFields(activeTax: ActiveTaxRate): {
+  sellerTaxRegistrationNumber: string | null;
+  sellerTaxLegalName: string | null;
+  taxRateBps: number | null;
+} {
+  if (!activeTax.seller || activeTax.ratePercent <= 0) {
+    return { sellerTaxRegistrationNumber: null, sellerTaxLegalName: null, taxRateBps: null };
+  }
+  return {
+    sellerTaxRegistrationNumber: activeTax.seller.taxRegistrationNumber,
+    sellerTaxLegalName: activeTax.seller.legalName,
+    taxRateBps: Math.round(activeTax.ratePercent * 100),
+  };
+}
+
+/**
+ * The tax facts a public storefront payload carries: the gated rate and the
+ * EFFECTIVE `taxEnabled` (true only while VAT is actually being charged), so
+ * the merchant's raw wish never reaches a storefront render path (ruling TAX-2).
+ */
+export function effectiveTaxFields(activeTax: ActiveTaxRate): {
+  taxRatePercent: number;
+  taxEnabled: boolean;
+} {
+  return { taxRatePercent: activeTax.ratePercent, taxEnabled: activeTax.ratePercent > 0 };
 }

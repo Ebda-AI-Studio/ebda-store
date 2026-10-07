@@ -18,12 +18,14 @@ import { join } from 'node:path';
 
 const storeFindUnique = vi.fn();
 const taxRateFindMany = vi.fn();
+const profileFindUnique = vi.fn();
 const isFeatureEnabled = vi.fn();
 
 vi.mock('@force/database', () => ({
   prisma: {
     store: { findUnique: (...args: unknown[]) => storeFindUnique(...args) },
     taxRate: { findMany: (...args: unknown[]) => taxRateFindMany(...args) },
+    storeTaxProfile: { findUnique: (...args: unknown[]) => profileFindUnique(...args) },
   },
 }));
 
@@ -31,12 +33,17 @@ vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: (...args: unknown[]) => isFeatureEnabled(...args) },
 }));
 
-const { resolveActiveTaxRate } = await import('@api/lib/order-tax');
+const { resolveActiveTaxRate, frozenTaxInvoiceFields, effectiveTaxFields } =
+  await import('@api/lib/order-tax');
+
+const VERIFIED = { status: 'verified', taxRegistrationNumber: '123456789', legalName: 'Acme LLC' };
+const SELLER = { taxRegistrationNumber: '123456789', legalName: 'Acme LLC' };
 
 describe('resolveActiveTaxRate — ONE resolver, same gate for charge and display', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     taxRateFindMany.mockResolvedValue([{ rate: '5.00' }]);
+    profileFindUnique.mockResolvedValue(VERIFIED);
   });
 
   it('taxEnabled=false + an active rate row: rate is 0 (charged AND displayed)', async () => {
@@ -44,27 +51,30 @@ describe('resolveActiveTaxRate — ONE resolver, same gate for charge and displa
     expect(await resolveActiveTaxRate('store-1')).toEqual({
       ratePercent: 0,
       includedInPrice: false,
+      seller: null,
     });
   });
 
-  // issue 2166 (owner 2026-10-01, ruling TAX-1): VAT is a legal obligation,
-  // not a plan feature. A store that lapsed to `free` (no `tax` feature)
-  // keeps collecting. Mutation-proof: re-adding the feature gate reddens it.
+  // issue 2166 (owner 2026-10-01, ruling TAX-1, kept by TAX-2): VAT is a legal
+  // obligation, not a plan feature. A VERIFIED store that lapsed to `free` keeps
+  // collecting. Mutation-proof: re-adding the feature gate reddens it.
   it('collects VAT whatever the plan: the `tax` feature is never consulted', async () => {
     storeFindUnique.mockResolvedValue({ taxEnabled: true, taxIncludedInPrice: false });
     isFeatureEnabled.mockResolvedValue(false); // e.g. a store on the `free` plan
     expect(await resolveActiveTaxRate('store-1')).toEqual({
       ratePercent: 5,
       includedInPrice: false,
+      seller: SELLER,
     });
     expect(isFeatureEnabled).not.toHaveBeenCalled();
   });
 
-  it('taxEnabled=true + an active rate row: the real rate (charged AND displayed)', async () => {
+  it('taxEnabled=true + verified + an active rate row: the real rate (charged AND displayed)', async () => {
     storeFindUnique.mockResolvedValue({ taxEnabled: true, taxIncludedInPrice: false });
     expect(await resolveActiveTaxRate('store-1')).toEqual({
       ratePercent: 5,
       includedInPrice: false,
+      seller: SELLER,
     });
   });
 
@@ -92,6 +102,7 @@ describe('resolveActiveTaxRate — ONE resolver, same gate for charge and displa
     expect(await resolveActiveTaxRate('store-1')).toEqual({
       ratePercent: 0,
       includedInPrice: false,
+      seller: null,
     });
   });
 
@@ -100,6 +111,89 @@ describe('resolveActiveTaxRate — ONE resolver, same gate for charge and displa
     expect(await resolveActiveTaxRate('store-1')).toEqual({
       ratePercent: 0,
       includedInPrice: true,
+      seller: null,
+    });
+  });
+});
+
+/**
+ * THE VAT GATE (ruling TAX-2, supersedes TAX-1's "taxEnabled alone"): an
+ * unregistered seller issuing a VAT invoice is tax evasion (Egypt Law 67/2016
+ * Art. 68 item 8). With `taxEnabled: true` AND an active rate, every status but
+ * `verified` charges 0 — the store a merchant enabled before the gate shipped
+ * stops charging without its row being rewritten (ruling TAX-3).
+ *
+ * Mutation proof (recorded in the PR): deleting `verified &&` from the
+ * `collecting` predicate in lib/order-tax.ts reddens every case below.
+ */
+describe('the VAT gate: taxEnabled is not enough — the profile must be VERIFIED', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    taxRateFindMany.mockResolvedValue([{ rate: '14.00' }]);
+    storeFindUnique.mockResolvedValue({ taxEnabled: true, taxIncludedInPrice: false });
+  });
+
+  it('no tax profile at all: 0 and no seller', async () => {
+    profileFindUnique.mockResolvedValue(null);
+    expect(await resolveActiveTaxRate('store-1')).toEqual({
+      ratePercent: 0,
+      includedInPrice: false,
+      seller: null,
+    });
+  });
+
+  for (const status of ['none', 'pending', 'rejected', 'revoked']) {
+    it(`status ${status}: 0 and no seller`, async () => {
+      profileFindUnique.mockResolvedValue({ ...VERIFIED, status });
+      const r = await resolveActiveTaxRate('store-1');
+      expect(r.ratePercent).toBe(0);
+      expect(r.seller).toBeNull();
+    });
+  }
+
+  it('verified but missing the TRN or legal name (a corrupted row) fails closed', async () => {
+    profileFindUnique.mockResolvedValue({ ...VERIFIED, taxRegistrationNumber: null });
+    expect((await resolveActiveTaxRate('store-1')).ratePercent).toBe(0);
+    profileFindUnique.mockResolvedValue({ ...VERIFIED, legalName: '' });
+    expect((await resolveActiveTaxRate('store-1')).ratePercent).toBe(0);
+  });
+
+  it('verified: 14% and the seller identity for the tax invoice', async () => {
+    profileFindUnique.mockResolvedValue(VERIFIED);
+    expect(await resolveActiveTaxRate('store-1')).toEqual({
+      ratePercent: 14,
+      includedInPrice: false,
+      seller: SELLER,
+    });
+  });
+
+  it('reads the profile of the SAME store', async () => {
+    profileFindUnique.mockResolvedValue(VERIFIED);
+    await resolveActiveTaxRate('store-42');
+    expect(profileFindUnique.mock.calls[0][0].where).toEqual({ storeId: 'store-42' });
+  });
+
+  it('frozenTaxInvoiceFields: identity + bps only while collecting, else all null', () => {
+    expect(
+      frozenTaxInvoiceFields({ ratePercent: 14, includedInPrice: false, seller: SELLER })
+    ).toEqual({
+      sellerTaxRegistrationNumber: '123456789',
+      sellerTaxLegalName: 'Acme LLC',
+      taxRateBps: 1400,
+    });
+    expect(
+      frozenTaxInvoiceFields({ ratePercent: 0, includedInPrice: false, seller: null })
+    ).toEqual({ sellerTaxRegistrationNumber: null, sellerTaxLegalName: null, taxRateBps: null });
+  });
+
+  it('effectiveTaxFields: the storefront never sees the raw taxEnabled wish', () => {
+    expect(effectiveTaxFields({ ratePercent: 0, includedInPrice: false, seller: null })).toEqual({
+      taxRatePercent: 0,
+      taxEnabled: false,
+    });
+    expect(effectiveTaxFields({ ratePercent: 14, includedInPrice: true, seller: SELLER })).toEqual({
+      taxRatePercent: 14,
+      taxEnabled: true,
     });
   });
 });
@@ -153,7 +247,15 @@ describe('resolveActiveTaxRate is the ONLY resolver — both call sites use it',
     expect(occurrences.length).toBe(2); // /stores/:slugOrId + /store/resolve
   });
 
-  it('public.routes.ts reads .ratePercent off the same shape order.service.ts reads .ratePercent/.includedInPrice from', () => {
-    expect(publicRoutes).toMatch(/\(await resolveActiveTaxRate\(store\.id\)\)\.ratePercent/);
+  it('public.routes.ts derives taxRatePercent AND the effective taxEnabled from the same resolver (ruling TAX-2)', () => {
+    const occurrences =
+      publicRoutes.match(/\.\.\.effectiveTaxFields\(await resolveActiveTaxRate\(store\.id\)\)/g) ??
+      [];
+    expect(occurrences.length).toBe(2);
+  });
+
+  it('both order paths freeze the tax-invoice identity from the resolver (ruling TAX-2)', () => {
+    const occurrences = orderService.match(/\.\.\.frozenTaxInvoiceFields\(activeTax\)/g) ?? [];
+    expect(occurrences.length).toBe(2);
   });
 });

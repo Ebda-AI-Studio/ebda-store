@@ -171,6 +171,10 @@ export async function handleOrderStatusChanged(
             subtotal: order.subtotal,
             tax: order.tax,
             taxIncludedInPrice: order.taxIncludedInPrice,
+            // Tax-invoice identity frozen at sale (ruling TAX-2); null = no VAT wording.
+            sellerTaxRegistrationNumber: order.sellerTaxRegistrationNumber,
+            sellerTaxLegalName: order.sellerTaxLegalName,
+            taxRateBps: order.taxRateBps,
             shipping: order.shipping,
             total: order.total,
             currency: order.currency,

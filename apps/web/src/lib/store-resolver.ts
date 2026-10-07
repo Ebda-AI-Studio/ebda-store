@@ -111,8 +111,9 @@ export interface ResolvedStore {
   taxEnabled?: boolean;
   taxIncludedInPrice?: boolean;
   /**
-   * The store's active VAT rate as a percentage (e.g. 5 for 5%) — zeroed
-   * unless the merchant has tax actually turned on (`resolveActiveTaxRate`,
+   * The store's active VAT rate as a percentage (e.g. 14 for 14%) — zeroed
+   * unless the merchant has tax turned on AND its VAT registration is verified
+   * (ruling TAX-2; `taxEnabled` here is that EFFECTIVE value) (`resolveActiveTaxRate`,
    * apps/api/src/lib/order-tax.ts — the ONE resolver order creation charges
    * against too, ruling M3-9, docs/RULINGS.md), so the checkout/cart tax
    * line never renders for a disabled store, and the charge agrees.
