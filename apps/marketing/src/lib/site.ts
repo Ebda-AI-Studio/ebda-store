@@ -34,30 +34,21 @@ export function pagePath(locale: Locale, page: PageSlug): string {
 export const absoluteUrl = (p: string) =>
   `${SITE_URL}${p === '/' ? '/' : p + '/'}`.replace(/\/\/$/, '/');
 
-/** Section ids, in the binding page order (docs/ebda/plans §5 SP9). */
-export const SECTION_ORDER = [
-  'create',
-  'how',
-  'builder',
-  'products',
-  'orders',
-  'payments',
-  'whatsapp',
-  'analytics',
-  'pricing',
-  'stories',
-  'faq',
-  'login',
-] as const;
+/** Section ids, in page order. Ruling R-EBDA-COPY-1 (2026-10-07) replaced the 12-section
+ *  order from docs/ebda/plans/domains-and-marketing-site.md with this shorter one. */
+export const SECTION_ORDER = ['how', 'features', 'payments', 'pricing', 'faq', 'start'] as const;
 export type SectionId = (typeof SECTION_ORDER)[number];
 
 /** Top-nav items other than the wordmark and the two account actions. */
 export const NAV_ANCHORS = [
-  { key: 'features', target: 'builder' },
+  { key: 'features', target: 'features' },
   { key: 'solutions', target: 'how' },
   { key: 'pricing', target: 'pricing' },
   { key: 'resources', target: 'faq' },
 ] as const satisfies readonly { key: string; target: SectionId }[];
+
+/** Company behind Ebda; every mention links here. */
+export const COMPANY_URL = 'https://whisky11.com';
 
 /**
  * Customer-stories placeholder. Amelia Aurum is merchant #1; no quotes are

@@ -3,6 +3,7 @@ import { BRAND } from '@force/shared/brand';
 import { COPY } from './content';
 import { PLANS, PRICING_PUBLISHED } from './plans';
 import {
+  COMPANY_URL,
   HOME,
   SIGNUP_URL,
   SITE_URL,
@@ -18,7 +19,7 @@ const OG_IMAGE = {
   url: '/og.png',
   width: 1200,
   height: 630,
-  alt: 'ebda · ابدأ — ابدأ متجرك',
+  alt: 'ابدأ Ebda: ابدأ متجرك أونلاين',
 };
 
 /** Metadata for a page in a locale, incl. canonical + hreflang alternates. */
@@ -81,7 +82,7 @@ export function jsonLd(locale: Locale) {
         logo: `${SITE_URL}/icon-512.png`,
         email: BRAND.supportEmail,
         sameAs: [] as string[],
-        parentOrganization: { '@type': 'Organization', name: BRAND.company },
+        parentOrganization: { '@type': 'Organization', name: BRAND.company, url: COMPANY_URL },
       },
       {
         '@type': 'WebSite',

@@ -18,6 +18,18 @@ Ruling R-EBDA-001: the backend runs FWB's Express API on Cloudflare Workers (`no
 
 ---
 
+## 2026-10-07 — Marketing copy and design (R-EBDA-COPY-\*)
+
+Branch `copy/egyptian-arabic`.
+
+Ruling R-EBDA-COPY-1 — the marketing home drops the 12-section order, the nav labels and the mandated hero line ("ابدأ بيع أونلاين." over an English sub on both locales) from `docs/ebda/plans/domains-and-marketing-site.md`, for six sections, a per-locale hero and Egyptian colloquial Arabic. Evidence: Ahmad 2026-10-07, "the Arabic sucks, use Egyptian Arabic, and there's a lot of talking"; visible words AR 842 → 407, EN 1007 → 474 (built HTML). Cost if wrong: the original brief's order is restored from the history kept in that doc and the old `SECTION_ORDER`.
+
+Ruling R-EBDA-COPY-2 — shipping (Bosta, Aramex) and cards/wallets stay "قريب / Coming soon" on the site although the brief for this change listed them as product features. Evidence: `docs/ebda/plans/STATUS.md` SP6/SP7 "done against stubs; sandboxes wait on keys". Cost if wrong: the site under-sells two features for the days between their sandbox proof and this copy changing.
+
+Ruling R-EBDA-COPY-3 — the hero poster is an inline SVG (`src/lib/hero-poster.ts`), not a CSS background image. Evidence: as a `url()` background it became the LCP element (4.6s on the uncompressed local server); inline SVG shapes are not LCP candidates, so the headline text is. Cost if wrong: ~24 KB (~4 KB brotli) more HTML per home page.
+
+Ruling R-EBDA-COPY-4 — the legal pages' "Whisky 11" operator line is NOT linked in this change; the footer (on every page, legal included) and the JSON-LD `parentOrganization.url` are. Evidence: a parallel PR (docs/legal-pages) owns the legal page content. Cost if wrong: one unlinked mention on the legal notice until that PR adds it.
+
 ## 2026-10-07 — Locked pricing (R-EBDA-PRICING-\*)
 
 Source: `docs/plans/2026-10-05-pricing-decisions.md`. Branch `feat/locked-pricing`.
