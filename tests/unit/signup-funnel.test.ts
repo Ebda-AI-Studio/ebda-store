@@ -308,3 +308,43 @@ describe('requireStoreAccess: over_store_limit store', () => {
     expect(await call('PUT', '/api/v1/stores/s1/products|/p1', 'super_admin')).toBeUndefined();
   });
 });
+
+describe('subscription charge amount (single platform-VAT seam)', () => {
+  it('VAT OFF (today): total equals the plan price exactly, no VAT line', async () => {
+    const { subscriptionChargeAmount, resolvePlatformVat } =
+      await import('@api/services/billing/charge-amount');
+    expect(resolvePlatformVat().enabled).toBe(false);
+    expect(subscriptionChargeAmount(349000)).toEqual({
+      totalMinor: 349000,
+      netMinor: 349000,
+      vatMinor: 0,
+      vat: null,
+    });
+  });
+  it('exclusive 14%: VAT added on top, half-up, with TRN on the line', async () => {
+    const { subscriptionChargeAmount } = await import('@api/services/billing/charge-amount');
+    const vat = {
+      enabled: true,
+      rateBps: 1400,
+      mode: 'exclusive' as const,
+      trn: '123',
+      legalName: 'Whisky 11',
+    };
+    expect(subscriptionChargeAmount(149000, vat)).toMatchObject({
+      totalMinor: 169860,
+      netMinor: 149000,
+      vatMinor: 20860,
+      vat: { trn: '123' },
+    });
+    expect(subscriptionChargeAmount(1, vat).totalMinor).toBe(1); // 0.14 piastre rounds to 0
+    expect(subscriptionChargeAmount(4, vat).vatMinor).toBe(1); // 0.56 rounds up
+  });
+  it('inclusive 14%: total unchanged, VAT carved out, parts add up', async () => {
+    const { subscriptionChargeAmount } = await import('@api/services/billing/charge-amount');
+    const vat = { enabled: true, rateBps: 1400, mode: 'inclusive' as const };
+    const r = subscriptionChargeAmount(349000, vat);
+    expect(r.totalMinor).toBe(349000);
+    expect(r.netMinor + r.vatMinor).toBe(349000);
+    expect(r.netMinor).toBe(306140);
+  });
+});

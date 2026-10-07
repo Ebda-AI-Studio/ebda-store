@@ -67,6 +67,10 @@ import { suspendForBilling } from './account.service';
 import { auditLog } from '../../middleware/security';
 import { instapayHandle, supportWhatsappUrl } from './manual-config';
 import { findReminderCandidates, sendDueReminder } from './reminders.service';
+import { subscriptionChargeAmount } from './charge-amount';
+
+/** Plan price -> amount charged. ONE seam for platform VAT (charge-amount.ts). */
+const charged = (priceMinor: number): number => subscriptionChargeAmount(priceMinor).totalMinor;
 
 type Tx = Prisma.TransactionClient;
 
@@ -622,7 +626,7 @@ export async function startCheckout(args: {
     type: 'checkout',
     planCode: plan.code,
     billingInterval: interval,
-    amountMinor: price,
+    amountMinor: charged(price),
     provider: provider.name,
     // Unique per attempt: each "Upgrade" click is its own checkout session.
     idempotencyKey: `checkout:${args.storeId}:${crypto.randomUUID()}`,
@@ -634,7 +638,7 @@ export async function startCheckout(args: {
   try {
     const out = await provider.createCheckoutForSubscription({
       merchantOrderId: eventId,
-      amountMinor: price,
+      amountMinor: charged(price),
       currency: 'EGP',
       description: `${plan.nameEn} (${interval})`,
       customer: { reference: args.storeId, email: store.owner.email, name: store.owner.firstName },
@@ -681,7 +685,7 @@ export async function selectTrialPlan(args: {
   if (count === 0) {
     throw new AppError(409, 'NOT_TRIALING', 'The plan can only be chosen here during the trial');
   }
-  return { planCode: plan.code, interval: args.interval, amountMinor: price };
+  return { planCode: plan.code, interval: args.interval, amountMinor: charged(price) };
 }
 
 /**
@@ -848,7 +852,7 @@ export async function renewSubscription(
     billingInterval: interval,
     forPeriodEnd: periodEnd,
     attempt,
-    amountMinor: price,
+    amountMinor: charged(price),
     provider: provider.name,
     idempotencyKey: key,
   });
@@ -869,7 +873,7 @@ export async function renewSubscription(
     provider,
     eventId,
     token,
-    amountMinor: price,
+    amountMinor: charged(price),
     idempotencyKey: key,
     description: `${plan.nameEn} subscription (${interval})`,
     now,
@@ -1100,7 +1104,7 @@ export async function changePlan(args: {
       planCode: plan.code,
       billingInterval: interval,
       forPeriodEnd: sub.currentPeriodEnd,
-      amountMinor: price,
+      amountMinor: charged(price),
       provider: provider.name,
       idempotencyKey: upgradeKey(sub.id, plan.code, sub.currentPeriodEnd, prior.length + 1),
     });
@@ -1121,7 +1125,7 @@ export async function changePlan(args: {
       provider,
       eventId,
       token,
-      amountMinor: price,
+      amountMinor: charged(price),
       idempotencyKey: upgradeKey(sub.id, plan.code, sub.currentPeriodEnd, prior.length + 1),
       description: `${plan.nameEn} upgrade (${interval})`,
       now,
@@ -1582,7 +1586,8 @@ export function nextChargeOf(
   const interval: BillingInterval = isInterval(sub.billingInterval)
     ? sub.billingInterval
     : 'monthly';
-  return { at, planCode, amountMinor: plan ? priceFor(plan, interval) : null };
+  const price = plan ? priceFor(plan, interval) : null;
+  return { at, planCode, amountMinor: price === null ? null : charged(price) };
 }
 
 /** Billing-cycle facts the merchant Billing page needs beyond the entitlements. */

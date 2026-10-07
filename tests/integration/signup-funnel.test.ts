@@ -756,7 +756,18 @@ describe.skipIf(!hasDb)('signup funnel', () => {
           },
         })
       );
-      const store = await StoreService.create(owner.id, { name: `PS ${run}` });
+      // A random suffix can fuzzy-match the protected brand list (leetspeak), so
+      // draw a fresh one until the slug is legal.
+      let store: Awaited<ReturnType<typeof StoreService.create>> | null = null;
+      for (let i = 0; i < 5 && !store; i++) {
+        store = await StoreService.create(owner.id, {
+          name: `Funnel Shop ${crypto.randomUUID().slice(0, 6)}`,
+        }).catch(err => {
+          if ((err as { code?: string }).code === 'SLUG_PROTECTED') return null;
+          throw err;
+        });
+      }
+      if (!store) throw new Error('no legal slug drawn');
       expect(store.status).toBe('inactive');
       expect(await sub(store.id)).toMatchObject({
         planCode: 'growth',

@@ -24,6 +24,7 @@ import { featureService } from '../feature.service';
 import { isInterval, type BillingInterval } from './period';
 import { loadPayablePlan } from './subscription-billing.service';
 import { instapayHandle } from './manual-config';
+import { subscriptionChargeAmount } from './charge-amount';
 
 type Tx = Prisma.TransactionClient;
 export type BillingSuspendReason = 'unpaid' | 'over_store_limit';
@@ -207,11 +208,13 @@ export async function instapayDetails(storeId: string) {
     ? sub.billingInterval
     : 'monthly';
   const plan = await prisma.plan.findUnique({ where: { code: planCode } });
-  const amountMinor = plan
+  const listPrice = plan
     ? interval === 'yearly'
       ? plan.priceYearlyMinor
       : plan.priceMonthlyMinor
     : null;
+  // Through the ONE charge-amount seam (platform VAT lands there).
+  const amountMinor = listPrice === null ? null : subscriptionChargeAmount(listPrice).totalMinor;
   return {
     handle,
     reference: sub.paymentReference,

@@ -22,6 +22,7 @@ import {
   priceFor,
 } from './period';
 import { instapayHandle, supportWhatsappUrl } from './manual-config';
+import { subscriptionChargeAmount } from './charge-amount';
 
 const DAY = 86_400_000;
 export type ReminderKind = 'd7' | 'd3' | 'd1' | 'd0';
@@ -133,7 +134,7 @@ export async function sendDueReminder(
         to: store.owner.email,
         storeName: store.name,
         planName: plan ? (lang === 'ar' ? plan.nameAr : plan.nameEn) : '',
-        amountMinor: (plan && priceFor(plan, interval)) || 0,
+        amountMinor: subscriptionChargeAmount((plan && priceFor(plan, interval)) || 0).totalMinor,
         billingUrl: `${config.adminUrl ?? ''}${url}`,
         dueOn,
         daysLeft,
