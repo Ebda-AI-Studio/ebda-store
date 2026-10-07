@@ -87,7 +87,7 @@ production traffic hits it:
 
 1. **Spike branch, not `main`.** Implement nonce middleware + `<Script
 nonce>` threading on `apps/web` only (highest-traffic, most SEO-sensitive
-   app) behind a Cloudflare Workers _preview_ deploy (`force-web-cf-preview`
+   app) behind a Cloudflare Workers _preview_ deploy (`ebda-web`
    already exists for this) — never against the production custom domain
    first.
 2. **Static rendering audit first.** Before touching CSP, map which

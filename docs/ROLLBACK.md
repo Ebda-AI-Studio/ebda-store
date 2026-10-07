@@ -1,6 +1,6 @@
 # Production rollback — Force Website Builder
 
-This monorepo deploys **web / admin / orders to Cloudflare Workers** (GitHub Actions `.github/workflows/cf-deploy.yml` → OpenNext build → `wrangler deploy`, workers `force-web-cf-preview` / `force-admin-cf-preview` / `force-orders-cf-preview`) + the **API to Railway** (git auto-deploy from `main`). Plus **Neon Postgres** (83 models, RLS via AsyncLocalStorage) and **Cloudflare R2** for assets.
+This monorepo deploys **web / admin / orders to Cloudflare Workers** (GitHub Actions `.github/workflows/cf-deploy.yml` → OpenNext build → `wrangler deploy`, workers `ebda-web` / `ebda-admin` / `ebda-orders`) + the **API to Railway** (git auto-deploy from `main`). Plus **Neon Postgres** (83 models, RLS via AsyncLocalStorage) and **Cloudflare R2** for assets.
 
 ## Three rollback paths
 

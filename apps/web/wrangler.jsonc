@@ -10,7 +10,7 @@
 // To change what actually deploys, edit scripts/cf-setup-local.sh.
 
 {
-  "name": "force-web-cf-preview",
+  "name": "ebda-web",
   // Custom worker entry (NOT the raw OpenNext output) — wraps the generated
   // fetch handler with @sentry/cloudflare so SSR/RSC errors are captured on
   // this target. See apps/web/sentry-worker-entry.ts for the why + sources.

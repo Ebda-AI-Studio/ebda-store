@@ -4,11 +4,11 @@
 
 ## Preview worker URLs
 
-| App                        | Worker                    | URL                                                        | Notes                                                                                                    |
-| -------------------------- | ------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `apps/web` (storefront)    | `force-web-cf-preview`    | https://force-web-cf-preview.ahmed0montaser.workers.dev    | Root = Platform landing. Real stores render by slug: `/pecannbee`, `/wady-aljuz`, `/palora` (see below). |
-| `apps/orders` (orders PWA) | `force-orders-cf-preview` | https://force-orders-cf-preview.ahmed0montaser.workers.dev | Clean — no blockers. SSR via OpenNext.                                                                   |
-| `apps/admin` (dashboard)   | `force-admin-cf-preview`  | https://force-admin-cf-preview.ahmed0montaser.workers.dev  | `instrumentation.ts` moved aside at build time (see below).                                              |
+| App                        | Worker        | URL                                            | Notes                                                                                                    |
+| -------------------------- | ------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `apps/web` (storefront)    | `ebda-web`    | https://ebda-web.ahmed0montaser.workers.dev    | Root = Platform landing. Real stores render by slug: `/pecannbee`, `/wady-aljuz`, `/palora` (see below). |
+| `apps/orders` (orders PWA) | `ebda-orders` | https://ebda-orders.ahmed0montaser.workers.dev | Clean — no blockers. SSR via OpenNext.                                                                   |
+| `apps/admin` (dashboard)   | `ebda-admin`  | https://ebda-admin.ahmed0montaser.workers.dev  | `instrumentation.ts` moved aside at build time (see below).                                              |
 
 All three: `next: 16.2.9` under `@opennextjs/cloudflare@1.19.11`, `compatibility_flags: ["nodejs_compat"]`, deploy to **Workers + Static Assets** (the `ASSETS` binding), ~20–31 ms cold start.
 
@@ -16,10 +16,10 @@ All three: `next: 16.2.9` under `@opennextjs/cloudflare@1.19.11`, `compatibility
 
 The storefront is multi-tenant: a custom domain resolves one store; a **platform host** serves the Platform landing at root and resolves stores by **slug** (`/<slug>`). `*.workers.dev` is now classed as a platform host (fix below), so without any DNS change you can view live stores on the preview worker:
 
-- https://force-web-cf-preview.ahmed0montaser.workers.dev/ — Platform landing
-- https://force-web-cf-preview.ahmed0montaser.workers.dev/pecannbee — Pecannbee
-- https://force-web-cf-preview.ahmed0montaser.workers.dev/wady-aljuz — Wady Aljuz (وادي الجوز)
-- https://force-web-cf-preview.ahmed0montaser.workers.dev/palora — Palora (بالورا)
+- https://ebda-web.ahmed0montaser.workers.dev/ — Platform landing
+- https://ebda-web.ahmed0montaser.workers.dev/pecannbee — Pecannbee
+- https://ebda-web.ahmed0montaser.workers.dev/wady-aljuz — Wady Aljuz (وادي الجوز)
+- https://ebda-web.ahmed0montaser.workers.dev/palora — Palora (بالورا)
 
 After the DNS move, each store is served at its OWN domain (e.g. `wadyaljuz.com`) with no `/<slug>` prefix — the same code path, just resolved by domain instead of slug.
 
@@ -29,7 +29,7 @@ After the DNS move, each store is served at its OWN domain (e.g. `wadyaljuz.com`
 
 ```bash
 export NEXT_PUBLIC_API_URL="https://api.force-ai.co/api/v1"  # corrected 2026-09-02: the old raw api-production-c058.up.railway.app host now 404s
-export NEXT_PUBLIC_SITE_URL="https://force-web-cf-preview.ahmed0montaser.workers.dev"  # optional (canonical/OG)
+export NEXT_PUBLIC_SITE_URL="https://ebda-web.ahmed0montaser.workers.dev"  # optional (canonical/OG)
 bash scripts/cf-build.sh web && (cd apps/web && npx wrangler deploy)
 ```
 
@@ -77,9 +77,9 @@ import { defineCloudflareConfig } from '@opennextjs/cloudflare';
 export default defineCloudflareConfig({});
 
 # 3. wrangler.jsonc (apps/<app>/wrangler.jsonc) — set "name" per app:
-#    force-admin-cf-preview / force-orders-cf-preview / force-web-cf-preview
+#    ebda-admin / ebda-orders / ebda-web
 {
-  "name": "force-<app>-cf-preview",
+  "name": "ebda-<app>",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-03-25",
   "compatibility_flags": ["nodejs_compat"],
@@ -93,13 +93,13 @@ From the repo root, after the devDeps + `wrangler.jsonc` + `open-next.config.ts`
 
 ```bash
 bash scripts/cf-build.sh orders                # -> apps/orders/.open-next/worker.js
-(cd apps/orders && npx wrangler deploy)         # -> force-orders-cf-preview.workers.dev
+(cd apps/orders && npx wrangler deploy)         # -> ebda-orders.workers.dev
 
 bash scripts/cf-build.sh admin
-(cd apps/admin && npx wrangler deploy)          # -> force-admin-cf-preview.workers.dev
+(cd apps/admin && npx wrangler deploy)          # -> ebda-admin.workers.dev
 
 bash scripts/cf-build.sh web
-(cd apps/web && npx wrangler deploy)            # -> force-web-cf-preview.workers.dev
+(cd apps/web && npx wrangler deploy)            # -> ebda-web.workers.dev
 ```
 
 `scripts/cf-build.sh` sets `OPEN_NEXT_CLOUDFLARE=1` (flips the `IS_CLOUDFLARE` image gate) and, for apps that have an `instrumentation.ts`, moves it aside for the build only and **always restores it** (EXIT trap — even on failure), so the committed Vercel path is never touched. `wrangler deploy` reads `wrangler.jsonc`; requires a prior `wrangler login`.
