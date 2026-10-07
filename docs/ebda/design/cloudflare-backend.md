@@ -27,7 +27,7 @@ Why not the alternatives:
 ```
 client ─▶ Cloudflare edge
           ├─ ebda.app, docs., help.               → static/OpenNext Workers (SP9)
-          ├─ app.ebda.app                         → admin Worker (OpenNext)
+          ├─ admin.ebda.app                         → admin Worker (OpenNext)
           ├─ <slug>.ebda.app, custom hostnames    → storefront Worker (OpenNext; CF-for-SaaS fallback origin)
           ├─ status.ebda.app                      → status Worker (own storage, independent; SP9)
           └─ api.ebda.app                         → API Worker (Express via httpServerHandler)

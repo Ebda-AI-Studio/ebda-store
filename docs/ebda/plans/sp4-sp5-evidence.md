@@ -108,7 +108,7 @@ A human timed run cannot be simulated here. The scripted figure above (about 5 s
 under 10 minutes" stays OPEN until someone does the clicks below on a real stack (staging, or local `npm run dev` for api + admin + web with
 the API's log open for the verification link, since local mail is only logged).
 
-Clicks, in order, start the stopwatch at the first one (admin app origin `https://app.ebda.app`, locally `http://localhost:3001`):
+Clicks, in order, start the stopwatch at the first one (admin app origin `https://admin.ebda.app`, locally `http://localhost:3001`):
 
 1. `/signup` (title "Create your store"): name, email, phone, password -> "Create my account".
 2. Open the verification mail link (`/verify-email?token=...`; locally copy it from the API log line `[PLATFORM-MAIL] captured`). It redirects to `/login?returnTo=%2Fonboarding` -> sign in.

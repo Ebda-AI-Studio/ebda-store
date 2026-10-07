@@ -163,7 +163,7 @@ const PROJECT_MARKERS: Array<{ tag: string; patterns: RegExp[] }> = [
     tag: 'FWB-API',
     patterns: [/force-website-builder.*api/i, /api\.ebda\.app/i, /api-production-c058/i],
   },
-  { tag: 'FWB-Admin', patterns: [/force-admin/i, /\bapp\.ebda\.app/i] },
+  { tag: 'FWB-Admin', patterns: [/force-admin/i, /\badmin\.ebda\.app/i] },
   {
     tag: 'FWB-Web',
     patterns: [/force-web\b/i, /wadyaljuz/i, /\bebda\.app/i, /force-web-sigma/i],

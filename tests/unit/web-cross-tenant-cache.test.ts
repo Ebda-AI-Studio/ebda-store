@@ -97,7 +97,7 @@ describe('middleware — the Host alone picks the store', () => {
   });
 
   it.each([
-    'app.ebda.app',
+    'admin.ebda.app',
     'api.ebda.app',
     'orders.ebda.app',
     'docs.ebda.app',
@@ -110,7 +110,7 @@ describe('middleware — the Host alone picks the store', () => {
 
   it.each([
     'store.ebda.app', // there is no store.ebda.app
-    'admin.ebda.app',
+    'app.ebda.app', // retired label: never served, never a store
     'x.y.ebda.app',
     'ab.ebda.app',
     '127.0.0.1:3000',
@@ -268,7 +268,7 @@ describe('store-resolver — per-host store cache', () => {
     await expect(resolver.getStoreByTenantParam('nobody.ebda.app')).rejects.toBe(NOT_FOUND);
     // Hand-built tenant keys that are not store hosts never resolve (and never reach the API).
     fetchMock.mockClear();
-    for (const bad of ['slug:amelia', 'app.ebda.app', 'ebda.app', '127.0.0.1']) {
+    for (const bad of ['slug:amelia', 'admin.ebda.app', 'ebda.app', '127.0.0.1']) {
       await expect(resolver.getStoreByTenantParam(bad)).rejects.toBe(NOT_FOUND);
     }
     expect(fetchMock).not.toHaveBeenCalled();

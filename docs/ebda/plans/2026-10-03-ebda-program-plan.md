@@ -30,7 +30,7 @@
 
 ## 1. Global Constraints
 
-- Domains: `ebda.app` marketing; `app.ebda.app` merchant dashboard; **every store at `<slug>.ebda.app`** (free), merchant **custom domains** on top; `api.`, `docs.`, `help.`, `status.`; `whatsapp.` reserved for later. **No `store.ebda.app`.** `.app` is HTTPS-only (HSTS preload).
+- Domains: `ebda.app` marketing; `admin.ebda.app` merchant dashboard; **every store at `<slug>.ebda.app`** (free), merchant **custom domains** on top; `api.`, `docs.`, `help.`, `status.`; `whatsapp.` reserved for later. **No `store.ebda.app`.** `.app` is HTTPS-only (HSTS preload).
 - Reserved slugs, enforced in validation from the first commit: `app api docs help status whatsapp www admin orders mail cdn assets static store dashboard billing support blog`.
 - **Self-serve like Shopify**: signup → live store with no human from Whisky 11.
 - **Arabic-first (RTL default) + English**, like FWB.
@@ -44,31 +44,31 @@
 
 ## 2. What Ahmad must provide (prerequisites) — check before each SP, stop and ask if missing
 
-| Needed for | Item |
-|---|---|
-| Start | Claude GitHub app access: READ `ForceAI-KW/force-website-builder`, WRITE `whisky-11/ebda` |
+| Needed for                               | Item                                                                                                                                     |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Start                                    | Claude GitHub app access: READ `ForceAI-KW/force-website-builder`, WRITE `whisky-11/ebda`                                                |
 | SP3 spike deploy (optional), SP4 staging | Cloudflare API token scoped to the Ebda account + `ebda.app` zone; a Neon project for Ebda (connection string as a cloud-session secret) |
-| SP5 | Kashier (or chosen) merchant-billing sandbox keys; Resend API key + verified `ebda.app` sender |
-| SP6 | Sandbox keys: Paymob, Kashier, Fawry, Valu (as available) |
-| SP7 | Sandbox keys: Bosta, Aramex (+ others chosen in SP10) |
-| SP9 | Decision on help-centre tool (build vs hosted) — default: build in-repo MDX |
-| Any time | Pricing numbers (after SP10 brief) |
+| SP5                                      | Kashier (or chosen) merchant-billing sandbox keys; Resend API key + verified `ebda.app` sender                                           |
+| SP6                                      | Sandbox keys: Paymob, Kashier, Fawry, Valu (as available)                                                                                |
+| SP7                                      | Sandbox keys: Bosta, Aramex (+ others chosen in SP10)                                                                                    |
+| SP9                                      | Decision on help-centre tool (build vs hosted) — default: build in-repo MDX                                                              |
+| Any time                                 | Pricing numbers (after SP10 brief)                                                                                                       |
 
 Without credentials you still build and test everything against local Postgres + provider sandboxes/mocks; deploy steps wait.
 
 ## 3. Budget and checkpoints ($235 cloud credits)
 
-| SP | Allocation | Model |
-|---|---|---|
-| SP10 research | $15 | Sonnet |
-| SP3 design + spike | $35 | Opus design, Sonnet spike |
-| SP4 clone + rebrand + EGP + hosts | $40 | Sonnet, Opus review of tenancy |
-| SP5 self-serve + billing | $30 | Sonnet, Opus review of billing |
-| SP6 payments | $40 | Sonnet adapters, Opus money review |
-| SP7 shipping | $20 | Sonnet |
-| SP8 WhatsApp free tier | $5 | Sonnet |
-| SP9 site/docs/help/status | $25 | Sonnet |
-| Reserve | $25 | — |
+| SP                                | Allocation | Model                              |
+| --------------------------------- | ---------- | ---------------------------------- |
+| SP10 research                     | $15        | Sonnet                             |
+| SP3 design + spike                | $35        | Opus design, Sonnet spike          |
+| SP4 clone + rebrand + EGP + hosts | $40        | Sonnet, Opus review of tenancy     |
+| SP5 self-serve + billing          | $30        | Sonnet, Opus review of billing     |
+| SP6 payments                      | $40        | Sonnet adapters, Opus money review |
+| SP7 shipping                      | $20        | Sonnet                             |
+| SP8 WhatsApp free tier            | $5         | Sonnet                             |
+| SP9 site/docs/help/status         | $25        | Sonnet                             |
+| Reserve                           | $25        | —                                  |
 
 After every SP: update `docs/plans/STATUS.md` (done-when evidence, PR links, spend so far, next SP). **If an SP overruns its allocation by 50%, stop and report to Ahmad before continuing.** Prefer fewer, larger subagent tasks over many tiny ones; never run more than 2 parallel subagents.
 
@@ -85,60 +85,71 @@ After every SP: update `docs/plans/STATUS.md` (done-when evidence, PR links, spe
 ## 5. Sub-projects (binding order)
 
 ### SP10 — Research (first, cheap, informs the rest)
+
 Briefs in `docs/research/`, sources cited, decision-ready:
+
 1. Pricing & packaging — Shopify, Wuilt, Zid, YouCan, ExpandCart in EGP; what to bundle per plan.
 2. Egyptian payment providers — API, sandbox, fees, settlement, KYC, subscriptions support.
 3. Egyptian shipping carriers — API, sandbox, COD collection/settlement, label/tracking webhooks.
 4. Meta WhatsApp Cloud API pricing for Egypt (current — do not assume).
-**Done when:** four briefs merged on `plan` branch; Ahmad notified for pricing numbers.
+   **Done when:** four briefs merged on `plan` branch; Ahmad notified for pricing numbers.
 
 ### SP3 — Cloudflare backend design + spike (Opus design)
+
 1. `docs/design/cloudflare-backend.md`: every FWB API dependency → Workers equivalent (router; Prisma pg adapter on workerd via Hyperdrive; Redis uses → DO/KV/rate-limiting each with consistency stated; Inngest → Queues/Cron or Inngest→Worker; R2; Resend; payments); host routing model for `<slug>.ebda.app` + Cloudflare-for-SaaS custom hostnames; tenancy (RLS GUCs per query); observability.
 2. Spike: port 3 routes (a public catalogue read, a cart write, a payment webhook) and run FWB's buy-flow parity harness (`scripts/buy-flow-parity/`) against them, on workerd (`wrangler dev`/miniflare) with the pg adapter.
 3. Decision (full port vs staged) written as a Ruling in `docs/RULINGS.md`.
-**Done when:** design + spike PR open; parity `result.json` green (read the JSON, not the exit code); **Ahmad approves the design** (stop here and wait).
+   **Done when:** design + spike PR open; parity `result.json` green (read the JSON, not the exit code); **Ahmad approves the design** (stop here and wait).
 
 ### SP4 — Clone, rebrand, Egypt base, hosts
+
 - `main` = FWB history; `git remote add upstream`; `docs/TWIN-PATHS.md` (shared paths) + `scripts/twin-diff.sh` (lists upstream commits touching shared paths since last sync).
 - Config-driven brand (`packages/shared/brand`): name, colours, logo, fonts; zero FWB / Force AI strings visible (CI grep test).
 - EGP minor units end to end; Egypt VAT config; Arabic-first default.
 - Reserved-slug validation; host resolver for `<slug>.ebda.app` + custom domains (throws on unknown host; tests per Review Focus 1).
-- Nile login animation on `app.ebda.app/login` (respect `prefers-reduced-motion`).
+- Nile login animation on `admin.ebda.app/login` (respect `prefers-reduced-motion`).
 - Backend per SP3 decision.
-**Done when:** Amelia Aurum's catalogue (CSV import) runs on a staging `amelia.ebda.app` (or local equivalent if no CF token yet) with parity green and the no-FWB-branding test passing.
+  **Done when:** Amelia Aurum's catalogue (CSV import) runs on a staging `amelia.ebda.app` (or local equivalent if no CF token yet) with parity green and the no-FWB-branding test passing.
 
 ### SP5 — Self-serve onboarding + merchant billing
+
 - Signup → email verify → store name/slug → template → first product → payment method → go live; dashboard setup-guide checklist.
 - Plans/limits engine (numbers configurable, filled after SP10).
 - EGP subscription billing via the chosen provider; dunning; plan downgrade on non-payment.
 - Abuse controls (Review Focus 4).
-**Done when:** a scripted E2E creates a store and takes an order unaided; a timed manual run under 10 minutes is recorded in STATUS.md.
+  **Done when:** a scripted E2E creates a store and takes an order unaided; a timed manual run under 10 minutes is recorded in STATUS.md.
 
 ### SP6 — Payments layer
+
 - `PaymentProvider` interface: createPayment, redirect/iframe, verifyWebhook, refund, partialRefund, idempotency keys; shared contract test suite.
 - Order: COD → InstaPay (manual confirm, expiry, double-confirm guard) → Paymob → Kashier → Fawry → Valu → others.
 - Encrypted per-merchant credentials; sandbox mode per adapter; outage isolation.
-**Done when:** every adapter passes the contract suite in sandbox; Opus money review signed off in the PR; real transactions only with Ahmad's OK.
+  **Done when:** every adapter passes the contract suite in sandbox; Opus money review signed off in the PR; real transactions only with Ahmad's OK.
 
 ### SP7 — Shipping layer
+
 - `ShippingCarrier` interface: quote, createShipment+label, cancel, tracking webhook → order status, COD reconciliation.
 - Adapters: Bosta → Aramex → others from SP10.
-**Done when:** contract suite green per adapter against sandboxes; COD reconciles to the piastre.
+  **Done when:** contract suite green per adapter against sandboxes; COD reconciles to the piastre.
 
 ### SP8 — WhatsApp free tier
+
 - `wa.me` click-to-chat: COD order confirmation, order questions, share product; prefilled Arabic/English; merchant number from store settings.
-**Done when:** live in storefront + order emails for every store; no WhatsApp API used.
+  **Done when:** live in storefront + order emails for every store; no WhatsApp API used.
 
 ### SP9 — Marketing site, docs, help, status
+
 - `ebda.app`: nav Features · Solutions · Pricing · Resources · Log in · **Start selling**; hero **"ابدأ بيع أونلاين."** / "Your business, your store, everything in one place."; sections in order: create your store → how EBDA works → store builder → products & inventory → orders → payments → WhatsApp integration → analytics → pricing → customer stories → FAQ → login. Arabic-first. Trust surface: real `/legal`, `/privacy`, `/terms` URLs, `security.txt`, JSON-LD, og:image, `llms.txt`.
 - `docs.ebda.app` (API + developer docs), `help.ebda.app` (MDX help centre).
 - `status.ebda.app`: its own Worker + storage, fed by external probes, independent of the API.
-**Done when:** all four build and pass Lighthouse/a11y gates; the status page shows an incident when a probe is forced to fail (tested).
+  **Done when:** all four build and pass Lighthouse/a11y gates; the status page shows an incident when a probe is forced to fail (tested).
 
 ### SP11 — UI enhancements (inside SP4/SP5/SP9, tracked)
+
 5-minute onboarding with setup guide; Arabic typography pairing, optional Eastern-Arabic numerals, `ج.م`; mobile-first merchant dashboard (one-thumb order / stock / InstaPay confirm); WhatsApp entry points; COD trust tools (risk flags, OTP confirm, carrier success rate); restrained gold-glow motion with reduced-motion; live split-screen store editor.
 
 ### Out of this cloud run (local / Ahmad)
+
 - FWB finish (in flight locally), lessons→skills, Umbra stability (pre-launch Phases 0–2).
 - DNS, Cloudflare zone, provider KYC/accounts, Facebook account.
 - **Launch (SP12):** production deploy, Amelia migration, monitoring/alerting/log drain, backups + DR drill, consent/erasure/export, five testing layers — run with Ahmad, after this cloud run.
@@ -146,16 +157,16 @@ Briefs in `docs/research/`, sources cited, decision-ready:
 
 ## 6. Order and evidence
 
-| Order | SP | Evidence |
-|---|---|---|
-| 1 | SP10 | 4 briefs merged |
-| 2 | SP3 | design + spike PR; parity green; **Ahmad approval (gate)** |
-| 3 | SP4 | Amelia catalogue on staging/local host; no-branding test green |
-| 4 | SP5 | unaided E2E store+order; <10 min timed |
-| 5 | SP6 | contract suite green per adapter; Opus money sign-off |
-| 6 | SP7 | contract suite green; COD reconciles |
-| 7 | SP8 | wa.me tier live |
-| 8 | SP9 | four hosts built; status-page failure test |
+| Order | SP   | Evidence                                                       |
+| ----- | ---- | -------------------------------------------------------------- |
+| 1     | SP10 | 4 briefs merged                                                |
+| 2     | SP3  | design + spike PR; parity green; **Ahmad approval (gate)**     |
+| 3     | SP4  | Amelia catalogue on staging/local host; no-branding test green |
+| 4     | SP5  | unaided E2E store+order; <10 min timed                         |
+| 5     | SP6  | contract suite green per adapter; Opus money sign-off          |
+| 6     | SP7  | contract suite green; COD reconciles                           |
+| 7     | SP8  | wa.me tier live                                                |
+| 8     | SP9  | four hosts built; status-page failure test                     |
 
 ## 7. Kickoff prompt (paste into the cloud session when Ahmad says go)
 

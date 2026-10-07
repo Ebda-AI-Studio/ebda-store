@@ -48,6 +48,6 @@ describe('brand helpers', () => {
     expect(brandFrom()).toBe('Ebda <no-reply@ebda.app>');
     expect(poweredByBrand()).toBe('Powered by Ebda');
     expect(poweredByBrand('ar')).toBe('مدعوم من ابدأ');
-    expect(brandUrl(BRAND.domains.app)).toBe('https://app.ebda.app');
+    expect(brandUrl(BRAND.domains.admin)).toBe('https://admin.ebda.app');
   });
 });

@@ -37,7 +37,7 @@ const ZONES = [
   'filters',
 ] as const;
 
-const TRUSTED_ADMIN_HOSTS = [BRAND.domains.app, 'localhost', '127.0.0.1'];
+const TRUSTED_ADMIN_HOSTS = [BRAND.domains.admin, 'localhost', '127.0.0.1'];
 
 function isTrustedParentOrigin(origin: string): boolean {
   try {

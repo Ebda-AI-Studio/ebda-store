@@ -2,4 +2,4 @@
 Contact: mailto:security@ebda.app
 Expires: 2027-07-15T00:00:00.000Z
 Preferred-Languages: en, ar
-Canonical: https://app.ebda.app/.well-known/security.txt
+Canonical: https://admin.ebda.app/.well-known/security.txt
