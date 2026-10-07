@@ -38,6 +38,7 @@ import {
   acrossStoresFlat,
   withStore,
   asPlatformOperator,
+  currentTenantGucs,
   currentStoreId,
   Prisma,
   UserRole,
@@ -92,8 +93,14 @@ router.use((req: Request, res: Response, next: NextFunction) =>
 // 'platform-operator' hatch, opened only after `ebda_is_super_admin()` confirms the
 // acting user inside this request's transaction. It opens `Store` and the identity
 // models only; per-store tenant tables still go through `acrossStores`.
+//
+// The hatch is entered ONLY on the request transaction `adminUserContext` opened for
+// this same user: `asPlatformOperator` then joins it (no transaction of its own), so
+// the hatch can never outlive a transaction that committed before the handler
+// finished. Without that transaction the hatch stays shut and the guard refuses.
 router.use((req: Request, res: Response, next: NextFunction) => {
   if (req.user?.role !== 'super_admin' || req.path.startsWith('/export')) return next();
+  if (currentTenantGucs()?.userId !== req.user.userId) return next();
   asPlatformOperator(req.user.userId, async () => next()).catch(next);
 });
 
