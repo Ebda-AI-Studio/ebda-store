@@ -40,10 +40,11 @@ import {
 } from './types';
 import { getBillingProvider, getBillingProviderByName } from './index';
 import {
-  COMPED_PLAN_CODE,
   DUNNING_RETRY_DAYS,
   FREE_PLAN_CODE,
+  GRANTED_PLAN_CODES,
   MAX_DUNNING_ATTEMPTS,
+  isGrantedPlan,
   addDays,
   addInterval,
   isInterval,
@@ -467,7 +468,7 @@ async function loadSub(storeId: string) {
 async function loadPayablePlan(planCode: string, interval: BillingInterval) {
   const plan = await prisma.plan.findUnique({ where: { code: planCode } });
   if (!plan) throw new AppError(404, 'PLAN_NOT_FOUND', 'Plan not found');
-  if (plan.code === FREE_PLAN_CODE || plan.code === COMPED_PLAN_CODE) {
+  if (plan.code === FREE_PLAN_CODE || isGrantedPlan(plan.code)) {
     throw new AppError(400, 'PLAN_NOT_PURCHASABLE', 'This plan cannot be purchased');
   }
   const price = priceFor(plan, interval);
@@ -581,7 +582,7 @@ export async function renewSubscription(
     : null;
   if (!sub) return { action: 'skipped', reason: 'not_found' };
   // Comped is NEVER charged (checked on both the status and the plan).
-  if (sub.status === 'comped' || sub.planCode === COMPED_PLAN_CODE) {
+  if (sub.status === 'comped' || isGrantedPlan(sub.planCode)) {
     return { action: 'skipped', reason: 'comped' };
   }
   const billable = ['active', 'trialing', 'past_due'].includes(sub.status);
@@ -692,7 +693,7 @@ export async function findDueSubscriptionIds(
       prisma.storeSubscription.findMany({
         where: {
           ...(only?.subscriptionIds ? { id: { in: only.subscriptionIds } } : {}),
-          planCode: { notIn: [COMPED_PLAN_CODE, FREE_PLAN_CODE] },
+          planCode: { notIn: [...GRANTED_PLAN_CODES, FREE_PLAN_CODE] },
           OR: [
             {
               status: { in: ['active', 'trialing'] },
@@ -775,7 +776,7 @@ export async function changePlan(args: {
   const provider = args.provider ?? getBillingProvider();
   const sub = await loadSub(args.storeId);
   if (!sub) throw new AppError(409, 'NO_SUBSCRIPTION', 'Start a plan first');
-  if (sub.status === 'comped' || sub.planCode === COMPED_PLAN_CODE) {
+  if (sub.status === 'comped' || isGrantedPlan(sub.planCode)) {
     throw new AppError(409, 'STORE_COMPED', 'Comped stores are not billed');
   }
   if (args.planCode === FREE_PLAN_CODE) {

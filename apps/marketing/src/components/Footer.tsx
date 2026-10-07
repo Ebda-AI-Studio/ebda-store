@@ -10,7 +10,14 @@ export function Footer({ locale }: { locale: Locale }) {
       <div className="wrap footer-row">
         <div>
           <p className="footer-brand">
-            <strong>EBDA</strong> <span lang="ar">{BRAND.nameAr}</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/lockup-dark.svg"
+              alt={`${BRAND.name} ${BRAND.nameAr}`}
+              className="footer-mark"
+              width={72}
+              height={24}
+            />
           </p>
           <p className="muted">{c.by}</p>
           <p className="muted">

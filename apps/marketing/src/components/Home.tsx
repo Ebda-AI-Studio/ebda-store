@@ -140,6 +140,13 @@ export function Home({ locale }: { locale: Locale }) {
                     }).format(p.price.amountMinor / 100)
                   : PRICING_PLACEHOLDER[locale]}
               </p>
+              <p className="muted">
+                {locale === 'ar' ? 'شهريًا · سنويًا: ' : 'per month · annual: '}
+                {new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', {
+                  style: 'currency',
+                  currency: 'EGP',
+                }).format(p.annualMinor / 100)}
+              </p>
               <ul className="plan-features">
                 {p.features[locale].map(f => (
                   <li key={f}>{f}</li>

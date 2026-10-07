@@ -20,18 +20,18 @@ Bug fixes and security fixes upstream usually apply here as-is. Port by cherry-p
 
 ## Ebda-only (never overwritten by a sync)
 
-| Path                                                       | Why                                                                                    |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `docs/ebda/`                                               | Ebda plans, research, design, brand brief                                              |
-| `docs/TWIN-PATHS.md`, `scripts/twin-diff.sh`, `.twin-sync` | this mechanism                                                                         |
-| `packages/shared/src/brand/`                               | `BRAND` identity, helpers                                                              |
-| `packages/shared/src/region/`                              | Egypt region config (EGP, governorates, phone formats) — lands with SP4 region work    |
-| Egyptian payment and shipping adapters                     | Paymob, Kashier, Fawry, Valu, InstaPay; Bosta, Aramex — behind the provider interfaces |
-| Cloudflare Workers API port (`spikes/`, API entrypoints)   | SP3 backend; FWB stays on Express/Railway                                              |
-| Self-serve onboarding, EGP subscription billing            | SP5                                                                                    |
-| `apps/*/public/` brand assets, manifests                   | Ebda marks and PWA icons (`scripts/generate-app-brand-icons.mjs`)                      |
-| `tests/unit/no-fwb-branding.test.ts`                       | guards the rebrand                                                                     |
-| Marketing site, docs site, help centre, status page        | SP9                                                                                    |
+| Path                                                       | Why                                                                                          |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `docs/ebda/`                                               | Ebda plans, research, design, brand brief                                                    |
+| `docs/TWIN-PATHS.md`, `scripts/twin-diff.sh`, `.twin-sync` | this mechanism                                                                               |
+| `packages/shared/src/brand/`                               | `BRAND` identity, helpers                                                                    |
+| `packages/shared/src/region/`                              | Egypt region config (EGP, governorates, phone formats) — lands with SP4 region work          |
+| Egyptian payment and shipping adapters                     | Paymob, Kashier, Fawry, Valu, InstaPay; Bosta, Aramex — behind the provider interfaces       |
+| Cloudflare Workers API port (`spikes/`, API entrypoints)   | SP3 backend; FWB stays on Express/Railway                                                    |
+| Self-serve onboarding, EGP subscription billing            | SP5                                                                                          |
+| `apps/*/public/` brand assets, manifests                   | Ebda "open door" mark and PWA icons (`brand/logo/`) (`scripts/generate-app-brand-icons.mjs`) |
+| `tests/unit/no-fwb-branding.test.ts`                       | guards the rebrand                                                                           |
+| Marketing site, docs site, help centre, status page        | SP9                                                                                          |
 
 ## Diverged files (sync by hand, expect conflicts)
 

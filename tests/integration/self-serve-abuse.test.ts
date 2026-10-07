@@ -19,6 +19,7 @@ import { prisma } from '@force/database';
 import { config } from '@api/config';
 import onboardingRoutes from '@api/routes/onboarding.routes';
 import { redis } from '@api/services/redis.service';
+import { planService } from '@api/services/plan.service';
 import { errorHandler } from '@api/middleware/error-handler';
 import { hasDb } from '../helpers/bundle-fixtures';
 
@@ -48,6 +49,14 @@ async function mkUser(tag: string, role: 'store_admin' | 'super_admin' = 'store_
   });
   userIds.push(u.id);
   return { id: u.id, jwt: token(u.id, role) };
+}
+
+/**
+ * Locked pricing: a SECOND store needs a plan with maxStores > 1 (Business = 3), so these
+ * velocity tests first move the owner's first store onto Business, then exercise the daily cap.
+ */
+async function upgradeToBusiness(storeId: string) {
+  await planService.assignPlan(storeId, { planCode: 'business' });
 }
 
 describe.skipIf(!hasDb)('self-serve abuse: slug squatting + store velocity', () => {
@@ -129,7 +138,9 @@ describe.skipIf(!hasDb)('self-serve abuse: slug squatting + store velocity', () 
   describe('per-account daily store cap', () => {
     it('allows STORES_PER_ACCOUNT_PER_DAY then refuses with STORE_DAILY_LIMIT', async () => {
       const m = await mkUser('cap');
-      expect((await post(m.jwt, `cap-a-${run}`)).status).toBe(201);
+      const first = await post(m.jwt, `cap-a-${run}`);
+      expect(first.status).toBe(201);
+      await upgradeToBusiness(first.body.data.store.id);
       expect((await post(m.jwt, `cap-b-${run}`)).status).toBe(201);
       const third = await post(m.jwt, `cap-c-${run}`);
       expect(third.status).toBe(429);
@@ -141,6 +152,7 @@ describe.skipIf(!hasDb)('self-serve abuse: slug squatting + store velocity', () 
       const m = await mkUser('capdel');
       const a = await post(m.jwt, `del-a-${run}`);
       expect(a.status).toBe(201);
+      await upgradeToBusiness(a.body.data.store.id);
       expect((await post(m.jwt, `del-b-${run}`)).status).toBe(201);
       await prisma.store.update({
         where: { id: a.body.data.store.id },
@@ -154,6 +166,7 @@ describe.skipIf(!hasDb)('self-serve abuse: slug squatting + store velocity', () 
     it('the window rolls: stores older than 24h no longer count', async () => {
       const m = await mkUser('roll');
       const a = await post(m.jwt, `roll-a-${run}`);
+      await upgradeToBusiness(a.body.data.store.id);
       const b = await post(m.jwt, `roll-b-${run}`);
       expect([a.status, b.status]).toEqual([201, 201]);
       await prisma.store.updateMany({
@@ -166,7 +179,8 @@ describe.skipIf(!hasDb)('self-serve abuse: slug squatting + store velocity', () 
     it("another account's budget is independent", async () => {
       const x = await mkUser('indx');
       const y = await mkUser('indy');
-      await post(x.jwt, `ind-a-${run}`);
+      const xa = await post(x.jwt, `ind-a-${run}`);
+      await upgradeToBusiness(xa.body.data.store.id);
       await post(x.jwt, `ind-b-${run}`);
       expect((await post(x.jwt, `ind-c-${run}`)).status).toBe(429);
       expect((await post(y.jwt, `ind-d-${run}`)).status).toBe(201);
@@ -174,11 +188,14 @@ describe.skipIf(!hasDb)('self-serve abuse: slug squatting + store velocity', () 
 
     it('a parallel burst cannot slip past the cap', async () => {
       const m = await mkUser('burst');
+      // One Business store already exists today, so the burst competes for the ONE remaining slot.
+      const seed = await post(m.jwt, `burst-seed-${run}`);
+      await upgradeToBusiness(seed.body.data.store.id);
       const results = await Promise.all(
         Array.from({ length: 6 }, (_, i) => post(m.jwt, `burst-${i}-${run}`))
       );
       const created = results.filter(r => r.status === 201).length;
-      expect(created).toBeLessThanOrEqual(2);
+      expect(created).toBeLessThanOrEqual(1);
       expect(await prisma.store.count({ where: { ownerId: m.id } })).toBeLessThanOrEqual(2);
     });
   });

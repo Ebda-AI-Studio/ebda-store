@@ -2,8 +2,8 @@
  * Self-serve onboarding (SP5 task 2): slug availability, store creation for a
  * verified merchant, payment-method confirmation and go-live.
  *
- * The store is created `inactive` on the `free` plan (store_subscriptions row
- * via the provisioning service's plan sync), so it is NOT reachable at
+ * The store is created `inactive` on a 14-day Growth trial (store_subscriptions
+ * row written by the provisioning service), so it is NOT reachable at
  * `<slug>.ebda.app` (the storefront resolver only serves `active` stores) until
  * `goLive`. Reuses ProvisioningService so a self-serve store gets exactly the
  * seed rows a super-admin-provisioned one does (VAT rate, default category,
@@ -21,6 +21,7 @@ import { ProvisioningService } from './provisioning.service';
 import { bustStoreCaches } from './store.service';
 import { SetupGuideService } from './setup-guide.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
+import { assertOwnerMayCreateStore } from './plan-limit.service';
 import { assertStoreCreationBudget, withStoreCreationLock } from './store-creation-limit';
 
 /** A self-serve owner may hold this many stores (abuse bound; raise with plans). */
@@ -178,12 +179,22 @@ export class OnboardingService {
       // Velocity cap (SP5 task 4): checked INSIDE the per-owner lock so a burst
       // of parallel creates cannot all read the same count.
       if (!owner.isSuperAdmin) await assertStoreCreationBudget(owner.userId);
+      // Plan gate (locked pricing): a SECOND store needs a plan that allows it
+      // (Business = 3). Also stops a Basic/Growth owner farming fresh Growth trials.
+      if (!owner.isSuperAdmin) await assertOwnerMayCreateStore(owner.userId);
+      const ownedNow = await prisma.store.count({
+        where: { ownerId: owner.userId, deletedAt: null },
+      });
       try {
         const result = await ProvisioningService.provisionStore({
           storeName: input.name,
           storeNameAr: input.nameAr,
           storeSlug: availability.slug,
-          plan: 'free',
+          // The first store starts the 14-day Growth trial. An additional store
+          // (only reachable on a plan that allows it) is covered by the owner's
+          // Business plan and starts on it, with no second trial.
+          plan: ownedNow > 0 ? 'enterprise' : 'professional',
+          growthTrial: ownedNow === 0,
           status: 'inactive',
           template: input.template,
           ownerEmail: user.email,

@@ -50,6 +50,11 @@ const tinyLimits: PlanLimits = planLimitsSchema.parse({
   platformFeeBps: 100,
   abandonedCartAutomation: false,
   whatsappAutomation: false,
+  maxStores: 1,
+  brandingRemoval: false,
+  apiAccess: false,
+  analyticsTier: 'basic',
+  supportTier: 'email',
 });
 
 const created = { stores: [] as string[], users: [] as string[], plans: [TINY, NO_DOMAIN] };

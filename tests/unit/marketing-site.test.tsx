@@ -95,14 +95,19 @@ describe('marketing hero and structure', () => {
 });
 
 describe('marketing honesty', () => {
-  it('pricing is placeholders only: no amounts, driven by one config', () => {
-    expect(PRICING_PUBLISHED).toBe(false);
-    expect(PLANS.every(p => p.price === null)).toBe(true);
+  it('pricing shows the locked EGP prices in both languages, driven by one config', () => {
+    expect(PRICING_PUBLISHED).toBe(true);
+    expect(PLANS.map(p => p.price?.amountMinor)).toEqual([149000, 349000, 999000]);
     const section = (h: string) => h.match(/<section id="pricing".*?<\/section>/s)![0];
-    expect(section(en)).toContain('Pricing coming soon');
-    expect(section(ar)).toContain('السعر قريبًا');
-    expect(section(en).match(/EGP|ج\.م|\$/)).toBeNull();
-    expect(section(en).match(/class="price">[^<]*\d/)).toBeNull();
+    for (const html of [en, ar]) {
+      const s = section(html).replace(/[\s\u00a0\u202f,٬،.]/g, '');
+      // Latin or Arabic-Indic digits: 1,490 / 3,490 / 9,990 per month
+      expect(s).toMatch(/1490|١٤٩٠/);
+      expect(s).toMatch(/3490|٣٤٩٠/);
+      expect(s).toMatch(/9990|٩٩٩٠/);
+    }
+    expect(section(en)).not.toContain('Pricing coming soon');
+    expect(section(ar)).not.toContain('السعر قريبًا');
   });
   it('payments mark unbuilt methods as coming and WhatsApp does not promise automation', () => {
     const pay = en.match(/<section id="payments".*?<\/section>/s)![0];

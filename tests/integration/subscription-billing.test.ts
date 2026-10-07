@@ -67,6 +67,11 @@ const limits = planLimitsSchema.parse({
   platformFeeBps: 100,
   abandonedCartAutomation: false,
   whatsappAutomation: false,
+  maxStores: 1,
+  brandingRemoval: false,
+  apiAccess: false,
+  analyticsTier: 'basic',
+  supportTier: 'email',
 });
 
 const T0 = new Date('2026-11-03T04:00:00.000Z');
@@ -242,9 +247,24 @@ describe.skipIf(!hasDb)('plan prices', () => {
     expect(stub.checkoutCalls).toHaveLength(0);
   });
 
-  it('the seeded paid plans still have null prices, so checkout refuses them by default', async () => {
+  it('the locked catalog is priced: Growth checks out at EGP 3,490/month and 31,410/year', async () => {
     const storeId = await makeStore();
-    const err = await startCheckout({ storeId, planCode: 'growth', provider: stub }).catch(e => e);
+    const m = await startCheckout({ storeId, planCode: 'growth', provider: stub });
+    expect(m.redirectUrl).toBeTruthy();
+    expect(stub.checkoutCalls.at(-1)).toMatchObject({ amountMinor: 349000, currency: 'EGP' });
+    const y = await startCheckout({
+      storeId,
+      planCode: 'growth',
+      interval: 'yearly',
+      provider: stub,
+    });
+    expect(y.redirectUrl).toBeTruthy();
+    expect(stub.checkoutCalls.at(-1)).toMatchObject({ amountMinor: 3141000, currency: 'EGP' });
+  });
+
+  it('hidden legacy plans stay unpurchasable (no price) so existing rows cannot be bought into', async () => {
+    const storeId = await makeStore();
+    const err = await startCheckout({ storeId, planCode: 'pro', provider: stub }).catch(e => e);
     expect(err.code).toBe('PLAN_PRICE_NOT_SET');
   });
 
@@ -259,7 +279,7 @@ describe.skipIf(!hasDb)('plan prices', () => {
     }).catch(e => e);
     expect(yearly.code).toBe('PLAN_PRICE_NOT_SET');
     await prisma.plan.update({ where: { code: NOPRICE }, data: { priceMonthlyMinor: null } });
-    for (const code of ['free', 'comped']) {
+    for (const code of ['free', 'comped', 'founding_free']) {
       const e = await startCheckout({ storeId, planCode: code, provider: stub }).catch(x => x);
       expect(e.code).toBe('PLAN_NOT_PURCHASABLE');
     }

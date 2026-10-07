@@ -23,3 +23,8 @@ Neon inventory could not be read: CLI required authentication; the pending login
 
 Ruling MERGE-1 — CI Worker dry-runs explicitly exercise cache-enabled generated bindings; production still requires an explicit repository cache setting. Evidence: no repository cache variable, dry-run provisions nothing, deploy assertion remains unchanged. Cost if wrong: CI misses the production empty-cache mode (covered by unit tests).
 Ruling MERGE-2 — allowlist only the two exact synthetic shipping fixture values; retain full-history secret scanning. Evidence: literal fixtures in contract/integration assertions, no production use. Cost if wrong: a matching real credential would be hidden.
+
+## Locked pricing (branch `feat/locked-pricing`, PR to main, not merged, not deployed)
+Basic / Growth / Business = EGP 1,490 / 3,490 / 9,990 (annual 25% off), 0 fee, no free plan, 14-day Growth trial. Source: docs/plans/2026-10-05-pricing-decisions.md; implementation map and rulings R-EBDA-PRICING-1..10 in docs/plans/2026-10-05-pricing-implementation.md and docs/RULINGS.md.
+Done: catalog migration `20261007000000_locked_pricing` (DB == `DEFAULT_PLAN_SEEDS`, hidden free/pro/comped kept, `founding_free` added unassigned); gates at the server write path for stores 1/1/3, branding removal (Growth+Business), API access (Business), analytics tiers, order cap incl. payment-links; marketing + help (ar/en) show real prices.
+Left: parent/child billing for extra stores (R-EBDA-PRICING-6); upsell UI for 402 on gated analytics pages; Amelia still on `comped`; first store created by `POST /stores` is Basic-active with no checkout; live billing/UAT/deploy not exercised. Local PG container `ebda-pricing-pg` (Apple `container`) can be removed.

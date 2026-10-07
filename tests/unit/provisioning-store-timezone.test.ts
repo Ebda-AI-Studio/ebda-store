@@ -7,9 +7,10 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { storeCreate, taxRateCreate } = vi.hoisted(() => ({
+const { storeCreate, taxRateCreate, subUpdate } = vi.hoisted(() => ({
   storeCreate: vi.fn(),
   taxRateCreate: vi.fn(),
+  subUpdate: vi.fn(),
 }));
 
 vi.mock('@force/database', () => {
@@ -32,7 +33,7 @@ vi.mock('@force/database', () => {
       create: vi.fn(async () => ({ id: 'u1', email: 'o@x.com' })),
     },
     store: { create: storeCreate },
-    storeSubscription: { upsert: vi.fn() },
+    storeSubscription: { upsert: vi.fn(), findUnique: vi.fn(async () => null), update: subUpdate },
     category: { create: vi.fn() },
     taxRate: { create: taxRateCreate },
     paymentConfig: { create: vi.fn() },
@@ -99,5 +100,25 @@ describe('provisioning time zone', () => {
   it('never writes an unresolvable zone to the column', async () => {
     await ProvisioningService.provisionStore({ ...base, settings: { timezone: 'Mars/Olympus' } });
     expect(createdData()).not.toHaveProperty('timezone');
+  });
+});
+
+describe('self-serve Growth trial (locked pricing: 14 days on Growth)', () => {
+  it('growthTrial: the subscription becomes growth/trialing for 14 days, in the provisioning transaction', async () => {
+    const before = Date.now();
+    await ProvisioningService.provisionStore({ ...base, plan: 'professional', growthTrial: true });
+    expect(subUpdate).toHaveBeenCalledTimes(1);
+    const { where, data } = subUpdate.mock.calls[0]![0];
+    expect(where).toEqual({ storeId: 's1' });
+    expect(data).toMatchObject({ planCode: 'growth', status: 'trialing' });
+    const days = (data.trialEndsAt.getTime() - before) / 86_400_000;
+    expect(days).toBeGreaterThan(13.99);
+    expect(days).toBeLessThan(14.01);
+    expect(data.currentPeriodEnd).toEqual(data.trialEndsAt);
+  });
+
+  it('without growthTrial (super-admin provisioning) no trial is started', async () => {
+    await ProvisioningService.provisionStore({ ...base });
+    expect(subUpdate).not.toHaveBeenCalled();
   });
 });

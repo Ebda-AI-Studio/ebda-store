@@ -18,8 +18,13 @@ export function LandingHeader() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-6">
         {/* Logo + wordmark */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
-          <img src="/logo.svg" alt={BRAND.name} className="h-8 w-auto" />
-          <span className="font-semibold text-white text-base leading-none">{BRAND.name}</span>
+          <img
+            src="/lockup-dark.svg"
+            alt={BRAND.name}
+            className="h-9 w-auto"
+            width={108}
+            height={36}
+          />
         </Link>
 
         {/* Desktop nav — hidden on mobile */}

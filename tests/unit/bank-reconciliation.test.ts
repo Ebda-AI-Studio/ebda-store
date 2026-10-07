@@ -336,6 +336,8 @@ vi.mock('@force/database', () => ({
 
 import {
   runAutoMatch,
+  importBankStatement,
+  MAX_STATEMENT_ROWS,
   applyManualMatch,
   getReconciliationDifference,
 } from '../../apps/api/src/services/accounting/bank-reconcile.service';
@@ -497,6 +499,50 @@ describe('runAutoMatch — matching rules', () => {
 
     expect(result.matched).toBe(1);
     expect(result.unmatched).toBe(1);
+  });
+});
+
+describe('bank matching row cap (FIX-013)', () => {
+  it('importBankStatement rejects an oversized statement with 422 STATEMENT_TOO_LARGE before any DB work', async () => {
+    const lines = ['Date,Description,Debit,Credit,Reference'];
+    for (let i = 0; i <= MAX_STATEMENT_ROWS; i++) {
+      lines.push(`2026-01-10,Row ${i},1.000,,REF${i}`);
+    }
+    await expect(
+      importBankStatement({
+        storeId: STORE_ID,
+        glAccountId: 'gl-1',
+        fileName: 'big.csv',
+        buffer: Buffer.from(lines.join('\n'), 'utf-8'),
+        fileType: 'csv',
+      })
+    ).rejects.toMatchObject({ statusCode: 422, code: 'STATEMENT_TOO_LARGE' });
+    expect(mockWithRlsBypass).not.toHaveBeenCalled();
+  });
+
+  it('runAutoMatch rejects a statement over the cap (legacy rows) and does not reach the match loop', async () => {
+    mockBankTxUpdateMany.mockResolvedValue({});
+    mockBankTxFindMany.mockResolvedValueOnce(
+      Array.from({ length: MAX_STATEMENT_ROWS + 1 }, (_, i) => makeTx({ id: `btx-${i}` }))
+    );
+    await expect(runAutoMatch(STMT_ID, STORE_ID)).rejects.toMatchObject({
+      code: 'STATEMENT_TOO_LARGE',
+    });
+    expect(mockJournalLineFindMany).not.toHaveBeenCalled();
+  });
+
+  it('runAutoMatch accepts a statement exactly at the cap', async () => {
+    mockBankTxUpdateMany.mockResolvedValue({});
+    mockBankTxFindMany
+      .mockResolvedValueOnce(
+        Array.from({ length: MAX_STATEMENT_ROWS }, (_, i) => makeTx({ id: `btx-${i}` }))
+      )
+      .mockResolvedValueOnce([]);
+    mockJournalLineFindMany.mockResolvedValue([]);
+    mockBankTxUpdate.mockResolvedValue({});
+    mockBankTxCount.mockResolvedValue(0);
+    mockBankStatementUpdate.mockResolvedValue({});
+    await expect(runAutoMatch(STMT_ID, STORE_ID)).resolves.toBeDefined();
   });
 });
 

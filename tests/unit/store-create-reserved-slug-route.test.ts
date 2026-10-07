@@ -145,8 +145,8 @@ describe('POST /stores — slug rules', () => {
     expect(res.status).toBe(201);
     expect(create).toHaveBeenCalledTimes(1);
     expect(create.mock.calls[0][1].slug).toBe('amelia-aurum');
-    // A store_admin never gets the protected-name override.
-    expect(create.mock.calls[0][2]).toEqual({ allowProtectedSlug: false });
+    // A store_admin never gets the protected-name override NOR the plan-gate bypass.
+    expect(create.mock.calls[0][2]).toEqual({ allowProtectedSlug: false, platformOperator: false });
   });
 
   it('a body with no slug is still accepted (the service derives one from the name)', async () => {

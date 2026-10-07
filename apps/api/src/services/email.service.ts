@@ -1,5 +1,6 @@
 import { prisma } from '@force/database';
 import { config } from '../config';
+import logger from '../lib/logger';
 import { ResendService } from './resend.service';
 // Static import is safe despite the email-queue↔email-service cycle: both sides
 // use the other only at call-time (sendForStore / the queue's drain), never at
@@ -48,7 +49,7 @@ import {
   subscriptionBillingTemplate,
   type SubscriptionBillingNoticeData,
 } from './email-templates/subscription-billing';
-import { BRAND, brandFrom, poweredByBrand } from '@force/shared';
+import { BRAND, BRAND_EMAIL_LOGO_URL, brandFrom, poweredByBrand } from '@force/shared';
 
 import { resolveDefaultLanguage } from '@force/shared';
 // ==========================================
@@ -100,6 +101,25 @@ export interface EmailStoreContext {
   phone?: string | null;
   address?: string | null;
   defaultLanguage?: 'en' | 'ar';
+  /** Omit the "Powered by Ebda" footer line (plan `brandingRemoval` -> `remove_branding`). */
+  hidePoweredBy?: boolean;
+}
+
+/**
+ * Whether a store's customer-facing mail drops the "Powered by Ebda" line.
+ * Same decision as the storefront footer: the `remove_branding` feature the
+ * plan layer resolves (Growth + Business, or a super-admin override). Fails
+ * toward SHOWING the line. Lazy import: feature.service -> store.service ->
+ * plan-limit.service -> email.service would otherwise be a cycle.
+ */
+export async function storeHidesPoweredBy(storeId: string): Promise<boolean> {
+  try {
+    const { featureService } = await import('./feature.service.js');
+    return await featureService.isFeatureEnabled(storeId, 'remove_branding');
+  } catch (err) {
+    logger.warn({ err, storeId }, '[email] branding lookup failed — keeping the Powered-by line');
+    return false;
+  }
 }
 
 /**
@@ -194,7 +214,7 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
               ${contactBlock}
               <p class="copyright" style="${footerP}color:${c.inkSoft};font-weight:500;">© ${year} ${storeName}</p>
               ${footerLines.map(l => `<p style="${footerP}">${l}</p>`).join('\n              ')}
-              <p class="powered" style="margin:14px 0 0;font-size:11px;color:${c.inkMute};">${poweredByBrand()}</p>
+              ${store.hidePoweredBy ? '' : `<p class="powered" style="margin:14px 0 0;font-size:11px;color:${c.inkMute};">${poweredByBrand()}</p>`}
             </td>
           </tr>
         </table>
@@ -336,6 +356,7 @@ export class EmailService {
       phone: store.phone,
       address: store.address,
       defaultLanguage: language,
+      hidePoweredBy: await storeHidesPoweredBy(storeId),
     });
     if (opts?.queue) {
       await emailQueue.enqueue(storeId, {
@@ -370,7 +391,7 @@ export class EmailService {
     const html = renderBrandedShell(args.content, {
       name: BRAND.name,
       nameAr: null,
-      logo: null,
+      logo: BRAND_EMAIL_LOGO_URL,
       theme: null,
       email: null,
       phone: null,
@@ -1014,7 +1035,7 @@ export class EmailService {
         renderBrandedShell(content, {
           name: BRAND.name,
           nameAr: null,
-          logo: null,
+          logo: BRAND_EMAIL_LOGO_URL,
           theme: null,
           email: null,
           phone: null,

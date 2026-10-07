@@ -14,9 +14,9 @@ export const COMPONENTS: readonly ComponentConfig[] = [
     expectBody: 'ebda|ابدأ',
   },
   {
-    id: 'app',
+    id: 'admin',
     name: { en: 'Merchant dashboard', ar: 'لوحة التحكم' },
-    url: `https://${d.app}/health`,
+    url: `https://${d.admin}/health`,
     expectStatus: 200,
     expectBody: '"status":\\s*"ok"',
   },

@@ -434,6 +434,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           socials={contact.socialLinks}
           navigation={filteredNavigation}
           footerLinks={footerLinks}
+          hidePoweredBy={store.enabledFeatures?.includes('remove_branding') === true}
           // Pages the merchant explicitly disabled in /content/<slug>.
           // The footer hides matching legal links so a disabled Privacy
           // page doesn't leave a dead "Privacy" link in the bottom bar.

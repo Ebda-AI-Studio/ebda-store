@@ -266,6 +266,12 @@ export interface ResolvedUtilityBar {
  */
 export interface FooterProps {
   branding: StoreBranding;
+  /**
+   * Plan decision resolved server-side (`remove_branding` in the store's feature
+   * map: Growth + Business): drop the "Powered by Ebda" attribution. Unknown =
+   * show it.
+   */
+  hidePoweredBy?: boolean;
   contact: StoreContact;
   socials: StoreSocials;
   navigation?: NavItem[];

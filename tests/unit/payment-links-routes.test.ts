@@ -18,18 +18,20 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 
-const { mockPrisma, mockPaymentService, mockIsFeatureEnabled, mockAuditLog } = vi.hoisted(() => ({
-  mockPrisma: {
-    store: { findUnique: vi.fn() },
-    whatsAppTemplate: { findUnique: vi.fn() },
-    product: { findMany: vi.fn() },
-    user: { findFirst: vi.fn(), create: vi.fn() },
-    order: { create: vi.fn(), delete: vi.fn() },
-  },
-  mockPaymentService: { getDefaultProvider: vi.fn(), createPayment: vi.fn() },
-  mockIsFeatureEnabled: vi.fn(),
-  mockAuditLog: vi.fn(),
-}));
+const { mockPrisma, mockPaymentService, mockIsFeatureEnabled, mockAuditLog, mockOrderGate } =
+  vi.hoisted(() => ({
+    mockOrderGate: vi.fn(),
+    mockPrisma: {
+      store: { findUnique: vi.fn() },
+      whatsAppTemplate: { findUnique: vi.fn() },
+      product: { findMany: vi.fn() },
+      user: { findFirst: vi.fn(), create: vi.fn() },
+      order: { create: vi.fn(), delete: vi.fn() },
+    },
+    mockPaymentService: { getDefaultProvider: vi.fn(), createPayment: vi.fn() },
+    mockIsFeatureEnabled: vi.fn(),
+    mockAuditLog: vi.fn(),
+  }));
 
 vi.mock('@force/database', () => ({ prisma: mockPrisma }));
 vi.mock('@api/middleware/auth', () => ({
@@ -55,11 +57,12 @@ vi.mock('@api/services/payment-providers/payment.factory', () => ({
 vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: mockIsFeatureEnabled },
 }));
+vi.mock('@api/services/plan-limit.service', () => ({ assertOrderAllowed: mockOrderGate }));
 vi.mock('@api/services/encryption.service', () => ({
   encryption: { decrypt: (v: string) => `plain(${v})` },
 }));
 vi.mock('@api/lib/logger', () => ({
-  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 const STORE_ID = '11111111-1111-4111-8111-111111111111';
@@ -124,6 +127,7 @@ beforeEach(() => {
     items: data.items.create.map((i: any, n: number) => ({ id: `oi-${n}`, ...i })),
   }));
   mockPrisma.order.delete.mockResolvedValue({});
+  mockOrderGate.mockResolvedValue(undefined);
   mockIsFeatureEnabled.mockResolvedValue(false);
   mockPaymentService.getDefaultProvider.mockResolvedValue('paymob');
   mockPaymentService.createPayment.mockResolvedValue({
@@ -166,6 +170,20 @@ describe('POST /stores/:id/payment-links', () => {
     expect(mockPaymentService.createPayment.mock.calls[0][0].amount).toBe(9000);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(mockPrisma.order.delete).not.toHaveBeenCalled();
+  });
+
+  it('order-cap gate: a store past its cap + grace gets 402 and NO customer/order row is written', async () => {
+    const { AppError } = await import('@api/middleware/error-handler');
+    mockOrderGate.mockRejectedValueOnce(
+      new AppError(402, 'PLAN_LIMIT_REACHED', 'cap', { limitKey: 'maxOrdersPerMonth' })
+    );
+    const res = await request(app).post(URL).send(BODY);
+    expect(res.status).toBe(402);
+    expect(res.body.error.code).toBe('PLAN_LIMIT_REACHED');
+    expect(mockOrderGate).toHaveBeenCalledWith(STORE_ID);
+    expect(mockPrisma.order.create).not.toHaveBeenCalled();
+    expect(mockPrisma.user.create).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('INVALID_BODY carries the validation issues under error.details', async () => {

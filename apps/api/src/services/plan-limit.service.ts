@@ -17,7 +17,14 @@
  *   automation   not a throwing write: the flags are layered into the feature
  *                map by FeatureService (abandoned_cart / whatsapp), so
  *                `requireFeature(...)` / `isFeatureEnabled(...)` already honour them
- *   maxOrdersPerMonth  NEVER blocks — see `noteOrderCreated`.
+ *   maxStores    StoreService.create (POST /stores) and OnboardingService.createStore,
+ *                via `assertOwnerMayCreateStore`: the owner's best plan across their
+ *                live stores must have room for one more (1 / 1 / 3)
+ *   brandingRemoval / apiAccess  not throwing writes: layered by FeatureService into
+ *                `remove_branding` (storefront footer) and `merchant_mcp` (key
+ *                issuance + the MCP runtime both `requireFeature`/feature-check it)
+ *   analyticsTier  `requireAnalyticsTier` on the insights routes (see below)
+ *   maxOrdersPerMonth  blocks after a seven-day grace; see `assertOrderAllowed`.
  *   maxStorageMb  declared + shown, not enforced: R2 usage per store is not
  *                 tracked yet (follow-up).
  */
@@ -105,6 +112,58 @@ function limitError(
   });
 }
 
+/**
+ * Store count is per OWNER, not per store (each store has its own subscription,
+ * so the owner's best plan decides). First store always allowed. Any live store
+ * whose plan is unlimited (`maxStores: null`) allows more. A canceled
+ * subscription resolves to the hidden free plan (1 store), so a lapsed Business
+ * owner cannot keep adding stores.
+ */
+export async function assertOwnerMayCreateStore(ownerId: string): Promise<void> {
+  const stores = await prisma.store.findMany({
+    where: { ownerId, deletedAt: null },
+    select: { id: true },
+  });
+  if (stores.length === 0) return;
+  let best = 0;
+  let planCode = 'unknown';
+  for (const s of stores) {
+    const e = await getEntitlements(s.id);
+    if (!e) continue;
+    const limit = e.limits.maxStores;
+    if (limit === null) return;
+    if (limit >= best) {
+      best = limit;
+      planCode = e.planCode;
+    }
+  }
+  if (stores.length + 1 > best) {
+    throw limitError({ planCode } as Entitlements, 'maxStores', best, stores.length, 1);
+  }
+}
+
+export const ANALYTICS_TIER_RANK = { basic: 0, standard: 1, advanced: 2 } as const;
+
+/** Throws 402 unless the store's plan analytics tier is at least `min`. */
+export async function assertAnalyticsTier(
+  storeId: string,
+  min: keyof typeof ANALYTICS_TIER_RANK
+): Promise<void> {
+  const e = await getEntitlements(storeId);
+  if (!e) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  if (ANALYTICS_TIER_RANK[e.limits.analyticsTier] >= ANALYTICS_TIER_RANK[min]) return;
+  const messageEn = `${min === 'advanced' ? 'Advanced' : 'Standard'} analytics are not included in your plan. Upgrade to unlock them.`;
+  const messageAr = `${min === 'advanced' ? 'التحليلات المتقدمة' : 'التحليلات القياسية'} غير متاحة في باقتك. قم بالترقية لفتحها.`;
+  throw new AppError(402, PLAN_LIMIT_ERROR_CODE, messageEn, {
+    limitKey: 'analyticsTier',
+    limit: e.limits.analyticsTier,
+    required: min,
+    planCode: e.planCode,
+    messageEn,
+    messageAr,
+  });
+}
+
 export async function assertWithinLimit(
   storeId: string,
   limitKey: GatedLimitKey,
@@ -126,21 +185,36 @@ export async function assertWithinLimit(
   if (used + delta > limit) throw limitError(e, limitKey, limit, used, delta);
 }
 
-/**
- * Orders are the one limit that must NEVER hard-fail the customer.
- *
- * DECISION (SP5 task 1): a checkout is a shopper handing the merchant money;
- * rejecting it silently loses the sale and the customer, and the merchant
- * finds out from an angry message, not the dashboard. So the order is always
- * accepted. Instead, when the month's count passes `maxOrdersPerMonth` this:
- *   1. flags the subscription (`orders_over_limit_month`, shown on the Billing
- *      page as an over-limit banner), and
- *   2. notifies the merchant ONCE per month (in-app bell + email to the owner,
- *      Arabic or English by the store's default language),
- * and returns `{ over: true }`. Enforcement beyond that (grace, then a
- * checkout notice) is a product call for SP6/Ahmad; the flag is what it reads.
- * Never throws — it runs after the order committed.
- */
+/** Gate orders before inventory, payment, or notification side effects. */
+export async function assertOrderAllowed(storeId: string): Promise<void> {
+  const e = await getEntitlements(storeId);
+  if (!e) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  if (
+    e.status === 'canceled' ||
+    (e.status === 'trialing' && (!e.trialEndsAt || e.trialEndsAt.getTime() <= Date.now()))
+  ) {
+    throw new AppError(402, 'SUBSCRIPTION_REQUIRED', 'Choose a paid plan to accept new orders');
+  }
+  const limit = e.limits.maxOrdersPerMonth;
+  if (limit === null) return;
+  const used = (await countUsage(storeId, 'maxOrdersPerMonth')) ?? 0;
+  if (used <= limit) return;
+  const sub = await withStore(storeId, tx =>
+    tx.storeSubscription.findUnique({ where: { storeId } })
+  );
+  const monthKey = new Date(`${regionYearMonth(new Date())}-01T00:00:00.000Z`);
+  if (
+    sub?.ordersOverLimitMonth?.getTime() === monthKey.getTime() &&
+    sub.ordersOverLimitNotifiedAt &&
+    Date.now() >= sub.ordersOverLimitNotifiedAt.getTime() + 7 * 24 * 60 * 60 * 1000
+  ) {
+    throw limitError(e, 'maxOrdersPerMonth', limit, used, 1);
+  }
+  // Recover a missed post-commit notification; its atomic claim starts grace once.
+  if (sub?.ordersOverLimitMonth?.getTime() !== monthKey.getTime()) await noteOrderCreated(storeId);
+}
+
+/** Records first over-limit time and notifies the merchant once per month. */
 export async function noteOrderCreated(storeId: string): Promise<{ over: boolean }> {
   try {
     const e = await getEntitlements(storeId);

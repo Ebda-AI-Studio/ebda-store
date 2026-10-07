@@ -8385,7 +8385,20 @@
       "platformFeeBps": "Platform fee, online orders (bps)",
       "codPlatformFeeBps": "Platform fee, cash on delivery (bps)",
       "abandonedCartAutomation": "Abandoned-cart recovery",
-      "whatsappAutomation": "WhatsApp automation"
+      "whatsappAutomation": "WhatsApp automation",
+      "maxStores": "Stores per owner",
+      "brandingRemoval": "Remove \"Powered by Ebda\"",
+      "apiAccess": "API access",
+      "analyticsTier": "Analytics tier",
+      "supportTier": "Support tier"
+    },
+    "tiers": {
+      "basic": "Basic",
+      "standard": "Standard",
+      "advanced": "Advanced",
+      "email": "Email",
+      "chat": "Chat",
+      "priority": "Priority"
     },
     "errors": {
       "invalidNumber": "Enter valid numbers for the price and sort order.",
@@ -8509,7 +8522,11 @@
     "maxStorageMb": "Your plan allows up to {limit} MB of storage. Upgrade to add more.",
     "customDomain": "Custom domains are not included in your plan. Upgrade to connect your own domain.",
     "abandonedCartAutomation": "Abandoned-cart recovery is not included in your plan. Upgrade to turn it on.",
-    "whatsappAutomation": "WhatsApp automation is not included in your plan. Upgrade to turn it on."
+    "whatsappAutomation": "WhatsApp automation is not included in your plan. Upgrade to turn it on.",
+    "maxStores": "Your plan allows up to {limit} store(s). Upgrade to add more.",
+    "brandingRemoval": "Removing the \"Powered by Ebda\" footer is not included in your plan. Upgrade to turn it off.",
+    "apiAccess": "API access is not included in your plan. Upgrade to Business to use it.",
+    "analyticsTier": "This analytics view is not included in your plan. Upgrade to unlock it."
   },
   "onboarding": {
     "signup": {
@@ -8654,10 +8671,19 @@
         "subtitle": "Cash on delivery is on by default.",
         "cod": "Cash on delivery",
         "codDesc": "Customers pay the courier when the order arrives.",
-        "moreLater": "Add InstaPay details or configure a supported payment gateway later in Settings > Payments.",
+        "moreLater": "Card gateways are set up later in Settings > Payments.",
         "saveFailed": "We could not save your payment settings. Please try again.",
         "needOne": "Keep at least one payment method on.",
-        "manualNote": "InstaPay transfers are confirmed manually by you. Add your payment details in the dashboard after setup."
+        "manualNote": "InstaPay transfers are confirmed manually by you: when the money reaches your InstaPay account, open the order and tap Payment received. Until then the order is held and does not ship.",
+        "instapay": "InstaPay",
+        "instapayDesc": "Customers transfer to your InstaPay address and you confirm each payment.",
+        "handleLabel": "InstaPay address (IPA)",
+        "handlePlaceholder": "yourname@instapay",
+        "phoneLabel": "Linked mobile number",
+        "phonePlaceholder": "01012345678",
+        "accountNameLabel": "Account name shown on the transfer (optional)",
+        "needHandleOrPhone": "Add an InstaPay address or a phone number to turn InstaPay on.",
+        "instapayInvalid": "Check the InstaPay address (name@bank) or the Egyptian mobile number."
       },
       "live": {
         "title": "Ready to launch",

@@ -63,11 +63,10 @@ export function SidebarHeader({
           <>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/90 shadow-lg shadow-primary/25">
               <Image
-                src="/logo.svg"
+                src="/logo-white.svg"
                 alt={tb('forceMediaAlt')}
-                width={20}
-                height={17}
-                className="brightness-0 invert"
+                width={22}
+                height={22}
                 unoptimized
               />
             </div>

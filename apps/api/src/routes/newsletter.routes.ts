@@ -6,7 +6,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
 import { ResendService } from '../services/resend.service';
-import { renderBrandedShell } from '../services/email.service';
+import { renderBrandedShell, storeHidesPoweredBy } from '../services/email.service';
 import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import logger from '../lib/logger';
 
@@ -262,6 +262,7 @@ router.post(
         address: store.address,
         defaultLanguage,
         theme: store.theme as { primaryColor?: string | null; primary?: string | null } | null,
+        hidePoweredBy: await storeHidesPoweredBy(storeId),
       };
       // Sanitize the merchant-composed HTML before relaying it to every
       // subscriber: strip <script>/<iframe>/<object> etc., on* handlers, and

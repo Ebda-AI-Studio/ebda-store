@@ -9,7 +9,7 @@ const OG_IMAGE = {
   url: '/og.png',
   width: 1200,
   height: 630,
-  alt: 'Ebda · ابدأ — Nile at night, each light is a store',
+  alt: 'ebda · ابدأ — ابدأ متجرك',
 };
 
 /** Metadata for a page in a locale, incl. canonical + hreflang alternates. */
@@ -43,12 +43,19 @@ export function pageMetadata(
       images: [OG_IMAGE],
     },
     twitter: { card: 'summary_large_image', title: t, description: d, images: [OG_IMAGE.url] },
-    icons: { icon: '/icon.svg' },
+    icons: {
+      icon: [
+        { url: '/icon.svg', type: 'image/svg+xml' },
+        { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
+      ],
+      shortcut: '/favicon.ico',
+      apple: '/apple-touch-icon.png',
+    },
     robots: { index: true, follow: true },
   };
 }
 
-/** JSON-LD graph: Organization + WebSite + SoftwareApplication. No ratings or offers (pricing undecided). */
+/** JSON-LD graph: Organization + WebSite + SoftwareApplication. No ratings or offers (add Offer nodes from PLANS if wanted). */
 export function jsonLd(locale: Locale) {
   const c = COPY[locale];
   const org = `${SITE_URL}/#organization`;
@@ -62,7 +69,7 @@ export function jsonLd(locale: Locale) {
         name: BRAND.name,
         alternateName: BRAND.nameAr,
         url: SITE_URL,
-        logo: `${SITE_URL}/icon.svg`,
+        logo: `${SITE_URL}/icon-512.png`,
         email: BRAND.supportEmail,
         parentOrganization: { '@type': 'Organization', name: BRAND.company },
       },

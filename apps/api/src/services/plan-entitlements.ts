@@ -29,7 +29,7 @@ import { withStore, type Prisma } from '@force/database';
 import {
   DEFAULT_PLAN_SEEDS,
   FALLBACK_PLAN_CODE,
-  LEGACY_STORE_PLAN_TO_PLAN_CODE,
+  STORE_PLAN_TO_PLAN_CODE,
   planLimitsSchema,
   type PlanLimits,
   type SubscriptionStatus,
@@ -82,7 +82,7 @@ export async function getEntitlements(
   storeId: string,
   tx?: Tx,
   /** The caller already read `stores.plan` (FeatureService does) — skips the second read. */
-  known?: { legacyPlan: keyof typeof LEGACY_STORE_PLAN_TO_PLAN_CODE }
+  known?: { legacyPlan: keyof typeof STORE_PLAN_TO_PLAN_CODE }
 ): Promise<Entitlements | null> {
   const run = async (db: Tx): Promise<Entitlements | null> => {
     const store =
@@ -92,7 +92,7 @@ export async function getEntitlements(
     if (!store) return null;
     const sub = await db.storeSubscription.findUnique({ where: { storeId } });
 
-    const subscribedPlanCode = sub?.planCode ?? LEGACY_STORE_PLAN_TO_PLAN_CODE[store.plan];
+    const subscribedPlanCode = sub?.planCode ?? STORE_PLAN_TO_PLAN_CODE[store.plan];
     const status: SubscriptionStatus | 'none' = sub?.status ?? 'none';
     const effectiveCode = status === 'canceled' ? FALLBACK_PLAN_CODE : subscribedPlanCode;
 
@@ -117,19 +117,26 @@ export async function getEntitlements(
 }
 
 /**
- * The two automation flags FeatureService layers over PLAN_BASELINE (and under
- * a StoreFeature override). `null` = no plan decision (unknown store).
+ * The plan flags FeatureService layers over PLAN_BASELINE (and under a
+ * StoreFeature override): the two automation flags, plus `brandingRemoval`
+ * (-> `remove_branding`) and `apiAccess` (-> `merchant_mcp`). `null` = no plan
+ * decision (unknown store).
  */
 export async function getAutomationFlags(
   storeId: string,
   tx?: Tx,
-  known?: { legacyPlan: keyof typeof LEGACY_STORE_PLAN_TO_PLAN_CODE }
-): Promise<Pick<PlanLimits, 'abandonedCartAutomation' | 'whatsappAutomation'> | null> {
+  known?: { legacyPlan: keyof typeof STORE_PLAN_TO_PLAN_CODE }
+): Promise<Pick<
+  PlanLimits,
+  'abandonedCartAutomation' | 'whatsappAutomation' | 'brandingRemoval' | 'apiAccess'
+> | null> {
   const e = await getEntitlements(storeId, tx, known);
   if (!e) return null;
   return {
     abandonedCartAutomation: e.limits.abandonedCartAutomation,
     whatsappAutomation: e.limits.whatsappAutomation,
+    brandingRemoval: e.limits.brandingRemoval,
+    apiAccess: e.limits.apiAccess,
   };
 }
 

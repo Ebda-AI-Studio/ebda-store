@@ -43,6 +43,11 @@ const limits = {
   codPlatformFeeBps: 0,
   abandonedCartAutomation: false,
   whatsappAutomation: false,
+  maxStores: 1,
+  brandingRemoval: false,
+  apiAccess: false,
+  analyticsTier: 'basic',
+  supportTier: 'email',
 };
 
 function billing(over: Partial<Record<string, unknown>> = {}) {

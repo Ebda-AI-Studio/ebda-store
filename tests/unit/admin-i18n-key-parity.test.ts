@@ -43,7 +43,9 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
   // in local format, a price in EGP) shown inside dir="ltr" inputs.
   // InstaPay settings (SP6a): an example address and a local-format mobile, LTR in both locales.
   'paymentSettings.instapay.handlePlaceholder',
+  'onboarding.flow.payment.handlePlaceholder',
   'paymentSettings.instapay.phonePlaceholder',
+  'onboarding.flow.payment.phonePlaceholder',
   'onboarding.signup.emailPlaceholder',
   'onboarding.signup.phonePlaceholder',
   'onboarding.flow.product.pricePlaceholder',

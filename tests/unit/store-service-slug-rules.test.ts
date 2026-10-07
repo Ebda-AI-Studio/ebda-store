@@ -11,11 +11,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const findUnique = vi.fn();
 const storeCreate = vi.fn();
+const storeGate = vi.hoisted(() => vi.fn());
 
 vi.mock('@force/database', () => ({
   prisma: {
     store: {
       findUnique: (a: unknown) => findUnique(a),
+      findMany: async () => [], // owner holds no store yet -> plan gate passes
       create: (a: unknown) => storeCreate(a),
     },
   },
@@ -25,7 +27,10 @@ vi.mock('@force/database', () => ({
   // seeds the default 14% VAT TaxRate row, both in the new store's own scope.
   withStore: vi.fn(async (_storeId: string, fn: (tx: unknown) => unknown) =>
     fn({
-      storeSubscription: { upsert: vi.fn().mockResolvedValue({}) },
+      storeSubscription: {
+        upsert: vi.fn().mockResolvedValue({}),
+        findUnique: vi.fn().mockResolvedValue(null),
+      },
       taxRate: { create: vi.fn().mockResolvedValue({}) },
     })
   ),
@@ -56,6 +61,12 @@ vi.mock('@api/services/accounting/account.service', () => ({
   seedCoaForStore: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Plan store-count gate (locked pricing): spied here, proven for real in plan-gates.test.ts.
+vi.mock('@api/services/plan-limit.service', async orig => ({
+  ...(await orig<typeof import('@api/services/plan-limit.service')>()),
+  assertOwnerMayCreateStore: storeGate,
+}));
+
 import { StoreService } from '@api/services/store.service';
 import { assertStoreSlug, deriveStoreSlug } from '@api/lib/store-slug';
 
@@ -68,6 +79,7 @@ beforeEach(() => {
     where.slug && taken.has(where.slug) ? { id: 'existing' } : null
   );
   storeCreate.mockReset();
+  storeGate.mockReset().mockResolvedValue(undefined);
   storeCreate.mockImplementation(async ({ data }: { data: { slug: string } }) => ({
     id: 'new-store',
     ...data,
@@ -182,5 +194,24 @@ describe('slug helpers', () => {
       expect(deriveStoreSlug(input).length).toBeGreaterThanOrEqual(3);
       expect(deriveStoreSlug(input).length).toBeLessThanOrEqual(40);
     }
+  });
+});
+
+describe('StoreService.create — plan store-count gate (maxStores 1/1/3)', () => {
+  it('asks the gate about the owner BEFORE writing, and a refusal writes nothing', async () => {
+    const refusal = Object.assign(new Error('402'), {
+      statusCode: 402,
+      code: 'PLAN_LIMIT_REACHED',
+    });
+    storeGate.mockRejectedValueOnce(refusal);
+    await expect(StoreService.create('owner-1', { name: 'Second Shop' })).rejects.toBe(refusal);
+    expect(storeGate).toHaveBeenCalledWith('owner-1');
+    expect(storeCreate).not.toHaveBeenCalled();
+  });
+
+  it('a platform operator (super_admin route) is not plan-bound', async () => {
+    await StoreService.create('owner-1', { name: 'Ops Shop' }, { platformOperator: true });
+    expect(storeGate).not.toHaveBeenCalled();
+    expect(storeCreate).toHaveBeenCalledTimes(1);
   });
 });
