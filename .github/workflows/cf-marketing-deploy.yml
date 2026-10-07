@@ -1,0 +1,60 @@
+name: Deploy Ebda marketing site to Cloudflare
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/marketing/**'
+      - 'packages/shared/**'
+      - '.github/workflows/cf-marketing-deploy.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ebda-marketing-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Require deployment credentials
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+      - run: npm ci
+      - run: npx vitest run tests/unit/marketing-site.test.tsx tests/unit/marketing-seo.test.ts
+      - name: Build marketing (static export to apps/marketing/out)
+        run: npm run build -w apps/marketing
+      - name: Require the built SEO surface
+        run: |
+          for f in out/index.html out/en/index.html out/sitemap.xml out/robots.txt out/llms.txt out/.well-known/security.txt; do
+            test -s "apps/marketing/$f" || { echo "::error::missing build output $f"; exit 1; }
+          done
+      - name: Deploy marketing Worker
+        working-directory: apps/marketing
+        run: npx wrangler deploy
+      - name: Verify the live site
+        run: |
+          # Poll: right after `wrangler deploy` the edge can still serve the previous
+          # state (or nothing, on the first deploy) for a few seconds, so a single read
+          # fails a good deploy. Each attempt prints the status it saw.
+          for url in https://ebda.app/sitemap.xml https://ebda.app/; do
+            ok=0
+            for i in $(seq 1 18); do
+              code=$(curl --silent --output /dev/null --write-out '%{http_code}' "$url") || code="unreachable"
+              echo "$url attempt $i: status=$code"
+              [ "$code" = "200" ] && ok=1 && break
+              sleep 5
+            done
+            [ "$ok" = "1" ] || { echo "::error::$url not 200 after 90s"; exit 1; }
+          done
