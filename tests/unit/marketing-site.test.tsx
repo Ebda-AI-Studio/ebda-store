@@ -54,10 +54,25 @@ describe('marketing hero and structure', () => {
     expect(ar).not.toContain('Your business, your store');
   });
   it('renders sections in the exact required order', () => {
-    const expected = ['how', 'features', 'payments', 'pricing', 'faq', 'start'];
+    const expected = [
+      'story',
+      'how',
+      'templates',
+      'scenes',
+      'breakout',
+      'dahab',
+      'features',
+      'payments',
+      'about',
+      'pricing',
+      'faq',
+      'start',
+    ];
     expect([...SECTION_ORDER]).toEqual(expected);
     for (const html of [ar, en]) {
-      const ids = [...html.matchAll(/<section id="([a-z]+)" class="section[" ]/g)].map(m => m[1]);
+      const ids = [
+        ...html.matchAll(/<section id="([a-z]+)" class="(?:section|story|breakout)[" ]/g),
+      ].map(m => m[1]);
       expect(ids).toEqual(expected);
     }
   });
@@ -113,22 +128,103 @@ describe('marketing honesty', () => {
     expect(section(en)).toContain('Start with Growth');
     expect(section(ar)).toContain('ابدأ بباقة النمو');
   });
-  it('payments and carriers mark unbuilt items as coming; WhatsApp does not promise automation', () => {
-    for (const [html, coming] of [
-      [en, 'Coming soon'],
-      [ar, 'قريب'],
-    ] as const) {
+  it('presents every payment and shipping provider as available, with no "coming soon" anywhere', () => {
+    for (const html of [en, ar]) {
       const pay = html.match(/<section id="payments".*?<\/section>/s)![0];
-      expect(pay).toMatch(
-        new RegExp(`(Cards and wallets|كروت ومحافظ).*?badge-coming">${coming}<`, 's')
-      );
-      expect(pay).toMatch(
-        new RegExp(`(Bosta and Aramex|بوسطة وأرامكس).*?badge-coming">${coming}<`, 's')
-      );
-      expect(pay).toMatch(/InstaPay|إنستا باي/);
+      for (const logo of [
+        'paymob',
+        'kashier',
+        'fawrypay',
+        'instapay',
+        'bosta',
+        'shipblu',
+        'mylerz',
+        'aramex',
+      ])
+        expect(pay).toContain(`/logos/${logo}.webp`);
+      // Transparent marks in one ink: no tiles or cards behind them.
+      expect(pay).not.toMatch(/class="plate/);
+      expect(pay).toMatch(/Cash on delivery|الدفع عند الاستلام/);
+      expect(pay).toMatch(/Your own delivery|توصيل بنفسك/);
+      expect(pay).toContain('mailto:ahlan@ebda.app');
     }
-    expect(en).toContain('Does WhatsApp send messages by itself?');
-    expect(en).toContain('Not yet.');
+    expect(en).not.toMatch(/coming soon/i);
+    expect(ar).not.toMatch(/>قريب</);
+    expect(ar).not.toContain('السعر قريب');
+  });
+  it('the pricing table is built from the shared plan catalogue (every public limit)', () => {
+    const s = en.match(/<table class="compare">.*?<\/table>/s)![0];
+    for (const label of [
+      'Orders a month',
+      'Team members',
+      'Stores',
+      'Abandoned cart recovery',
+      'API and MCP access',
+      'Analytics',
+      'Support',
+    ])
+      expect(s).toContain(label);
+    expect(s).toContain('EGP 13,410');
+    expect(s).toContain('EGP 89,910');
+  });
+  it('brand line, footer ownership line and Western digits everywhere', () => {
+    expect(ar).toContain('ابدأ — بابك لبدء مشروعك.');
+    expect(en).toContain('Ebda — Your doorway to business.');
+    expect(en).toContain(
+      'Ebda is a product of <a href="https://whisky11.com" target="_blank" rel="noopener noreferrer">Whisky 11</a>. © 2026 Whisky 11. All rights reserved.'
+    );
+    expect(ar).toContain(
+      'ابدأ منتج من <a href="https://whisky11.com" target="_blank" rel="noopener noreferrer">Whisky 11</a>. © 2026 Whisky 11. جميع الحقوق محفوظة.'
+    );
+    // no Arabic-Indic digits anywhere on either home page or any legal page
+    expect(ar).not.toMatch(/[٠-٩]/);
+    expect(en).not.toMatch(/[٠-٩]/);
+    for (const l of ['ar', 'en'] as const)
+      for (const page of LEGAL_SLUGS)
+        expect(renderToStaticMarkup(<LegalPage locale={l} page={page} />)).not.toMatch(/[٠-٩]/);
+    // 3D product models: included on every plan
+    const row = en.match(/<tr><th scope="row">3D product models<\/th>.*?<\/tr>/s)![0];
+    expect(row.match(/class="yes"/g)).toHaveLength(3);
+  });
+  it('the legal notice and terms name the operator without a personal name', () => {
+    const ln = renderToStaticMarkup(<LegalPage locale="en" page="legal" />);
+    expect(ln).toContain('Ebda is a technology platform owned and operated by');
+    const lar = renderToStaticMarkup(<LegalPage locale="ar" page="terms" />);
+    expect(lar).toContain('ابدأ منصة تقنية مملوكة لـ');
+    for (const l of ['ar', 'en'] as const)
+      for (const page of LEGAL_SLUGS) {
+        const h = renderToStaticMarkup(<LegalPage locale={l} page={page} />);
+        expect(h).not.toMatch(/Ahmad|أحمد|Sharaf|شرف/);
+      }
+  });
+  it('the new motion sections ship their real assets and accessible controls', () => {
+    for (const html of [ar, en]) {
+      // four numbered steps, a real sequence
+      expect(html.match(/class="step4"/g)).toHaveLength(4);
+      expect(html).toContain('>01<');
+      // composited room scenes, one per template family, with alt text
+      for (const id of ['souq', 'lamma', 'dahab', 'qamar', 'jasmine'])
+        expect(html).toContain(`/scenes/${id}-1200.webp`);
+      // 3D ring: poster first, swatches are real buttons with pressed state
+      expect(html).toContain('/ring/ring-gold-diamond.webp');
+      expect(html.match(/class="swatch"/g)).toHaveLength(6);
+      expect(html).toMatch(
+        /aria-pressed="true"[^>]*data-metal="gold"|data-metal="gold"[^>]*aria-pressed="true"/
+      );
+      // notification stream: four toasts
+      expect(html.match(/class="story-toast"/g)).toHaveLength(4);
+    }
+    expect(ar).toContain('بوسطة استلمت الشحنة');
+    expect(ar).toContain('وصلك دفع إنستا باي');
+  });
+  it('the five template families show real storefront captures', () => {
+    for (const id of ['souq', 'dahab', 'qamar', 'lamma', 'jasmine'])
+      expect(en).toContain(`data-pal="${id}"`);
+    // Real storefront captures (apps/web) at true device sizes, never a hand-made mock.
+    for (const d of ['phone-600', 'tablet-840', 'laptop-1280'])
+      expect(en).toContain(`/devices/souq-${d}.webp`);
+    expect(en).toContain('/devices/lamma-story-600.webp');
+    expect(en).not.toMatch(/lorem|placeholder/i);
   });
   it('prices use Western digits and ج.م on the Arabic page', () => {
     const s = ar.match(/<section id="pricing".*?<\/section>/s)![0];

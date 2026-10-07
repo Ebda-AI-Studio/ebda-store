@@ -10,7 +10,10 @@
     "lint": "eslint src scripts --ext .ts,.tsx,.mjs",
     "lint:fix": "eslint src scripts --ext .ts,.tsx,.mjs --fix",
     "og": "node scripts/make-og.mjs",
+    "demo-credits": "node scripts/demo-credits.mjs",
+    "capture:stores": "bash scripts/storefront-capture/run.sh",
     "poster": "node scripts/make-hero-poster.mjs && prettier --write src/lib/hero-poster.ts",
+    "check:links": "node scripts/check-links.mjs",
     "check:a11y": "node scripts/a11y-check.mjs",
     "check:lighthouse": "node scripts/lighthouse-check.mjs",
     "check": "npm run build && npm run check:a11y",
@@ -19,7 +22,8 @@
   "dependencies": {
     "next": "^16.3.8",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@force/site-kit": "*",
@@ -28,6 +32,7 @@
     "@playwright/test": "1.60.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "@types/three": "0.186.0",
     "eslint": "^9.0.0",
     "eslint-plugin-react": "^7.37.0",
     "eslint-plugin-react-hooks": "^5.1.0",

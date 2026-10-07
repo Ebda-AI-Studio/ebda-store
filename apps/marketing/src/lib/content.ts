@@ -3,7 +3,23 @@ import { LEGAL_EN } from './legal-en';
 import type { LegalPages } from './legal-types';
 import type { Locale } from './site';
 
-export type Status = 'launch' | 'coming';
+/** A payment or shipping provider; `logo` is a file in public/logos/ (none = our own icon). */
+export interface Provider {
+  name: string;
+  logo?: string;
+  icon?: 'cash' | 'truck';
+}
+
+export type SceneId = 'lamma' | 'dahab' | 'souq' | 'qamar' | 'jasmine';
+
+export interface RingCopy {
+  label: string;
+  hint: string;
+  metalLabel: string;
+  stoneLabel: string;
+  metals: { gold: string; white: string; rose: string };
+  stones: { diamond: string; emerald: string; ruby: string };
+}
 
 export interface Copy {
   meta: { title: string; description: string };
@@ -20,27 +36,44 @@ export interface Copy {
     switchTo: string;
     switchLabel: string;
   };
-  hero: { h1: string; sub: string; cta: string; secondary: string; slugLabel: string };
-  status: Record<Status, string>;
-  how: { title: string; steps: { t: string; d: string }[] };
-  features: {
-    title: string;
-    items: { t: string; d: string }[];
-    /** The illustrative phone storefront (an example store, not a real merchant). */
-    phone: {
-      label: string;
-      caption: string;
-      store: string;
-      slug: string;
-      products: { name: string; price: number; tone: string }[];
-      cod: string;
-      order: string;
-    };
+  hero: {
+    /** The brand line, «ابدأ — بابك لبدء مشروعك.» */
+    brand: string;
+    h1: string;
+    sub: string;
+    cta: string;
+    secondary: string;
+    slugLabel: string;
   };
-  payments: {
+  /** «حكاية ابدأ»: why the name and the open-door mark. */
+  about: { title: string; paras: string[]; close: string; markLabel: string };
+  /** The pinned scroll story: a store assembling inside a phone. */
+  story: {
     title: string;
-    methods: { name: string; desc: string; status: Status }[];
-    note: string;
+    steps: [string, string, string, string];
+    /** The notification stream at the end of the story, oldest first. */
+    toasts: { t: string; d: string }[];
+    phoneLabel: string;
+  };
+  how: { title: string; steps: { t: string; d: string }[] };
+  scenes: { title: string; lead: string; items: Record<SceneId, { place: string; alt: string }> };
+  breakout: { title: string; words: [string, string, string] };
+  dahab: { title: string; lead: string; ring: RingCopy };
+  templates: {
+    title: string;
+    lead: string;
+    groupLabel: string;
+    devicesLabel: string;
+  };
+  features: { title: string; items: { t: string; d: string }[] };
+  providers: {
+    title: string;
+    payLabel: string;
+    pay: Provider[];
+    shipLabel: string;
+    ship: Provider[];
+    ask: string;
+    askLink: string;
   };
   pricing: {
     title: string;
@@ -48,11 +81,16 @@ export interface Copy {
     note: string;
     perMonth: string;
     annual: string;
+    compareTitle: string;
+    yes: string;
+    no: string;
     trial: string;
     planCta: string;
     planCtaAnnual: string;
   };
   faq: { title: string; items: { q: string; a: string }[] };
+  /** Footer contact block; `company` precedes the linked company name ("Ebda by Whisky 11"). */
+  contact: { title: string; hello: string; security: string };
   start: {
     title: string;
     lead: string;
@@ -69,9 +107,9 @@ export interface Copy {
     merchant: string;
     acceptableUse: string;
     contact: string;
-    /** Text before the linked company name, e.g. "A product of" → "A product of Whisky 11". */
-    byPrefix: string;
-    draftNote: string;
+    legalVersion: string;
+    /** Ownership line around the linked company name: `${before}Whisky 11${after}`. */
+    ownership: { before: string; after: string };
   };
   legalPages: LegalPages;
 }
@@ -79,9 +117,9 @@ export interface Copy {
 export const COPY: Record<Locale, Copy> = {
   ar: {
     meta: {
-      title: 'ابدأ | اعمل متجرك أونلاين في دقايق',
+      title: 'ابدأ — بابك لبدء مشروعك. اعمل متجرك أونلاين',
       description:
-        'اعمل متجرك أونلاين في دقايق: لينك باسمك، دفع عند الاستلام وإنستا باي، وزرار واتساب. من غير عمولة على طلباتك، وجرّب 14 يوم.',
+        'ابدأ — بابك لبدء مشروعك. اعمل متجرك أونلاين في دقايق: لينك باسمك، دفع أونلاين وكاش وإنستا باي، وشحن مع بوسطة وأرامكس.',
     },
     skip: 'روح للمحتوى',
     nav: {
@@ -97,53 +135,102 @@ export const COPY: Record<Locale, Copy> = {
       switchLabel: 'Switch to English',
     },
     hero: {
+      brand: 'ابدأ — بابك لبدء مشروعك.',
       h1: 'ابدأ متجرك أونلاين في دقايق.',
       sub: 'لينك باسمك، منتجاتك، وطلباتك. كله من موبايلك.',
       cta: 'ابدأ دلوقتي',
       secondary: 'شوف إزاي',
       slugLabel: 'لينك متجرك',
     },
-    status: { launch: 'متاح', coming: 'قريب' },
+    story: {
+      title: 'متجرك بيتبني قدامك.',
+      steps: ['اختار اسم ولوجو.', 'نزّل منتجاتك.', 'غيّر الشكل بضغطة.', 'وأول طلب يوصلك.'],
+      toasts: [
+        { t: 'طلب جديد · 450 ج.م', d: 'كيكة شوكولاتة · الدفع عند الاستلام' },
+        { t: 'بوسطة استلمت الشحنة', d: 'الطلب رقم 1043 في الطريق للعميل' },
+        { t: 'وصلك دفع إنستا باي', d: '760 ج.م من سارة م.' },
+        { t: 'عميل جديد اشترك في النشرة', d: 'نهى اشتركت في عروض الأسبوع' },
+      ],
+      phoneLabel: 'متجر أكل بيتي بيتبني على الموبايل، وبعدين توصله الطلبات والإشعارات.',
+    },
     how: {
-      title: '3 خطوات وتستقبل أول طلب.',
+      title: '4 خطوات وتبدأ تبيع.',
       steps: [
-        { t: 'سجّل', d: 'اختار اسم متجرك واللينك بتاعه.' },
-        { t: 'نزّل منتجاتك', d: 'بالصور والأسعار، أو ارفعهم مرة واحدة من ملف CSV.' },
-        { t: 'استقبل الطلبات', d: 'وتابعها كلها من موبايلك.' },
+        { t: 'سجّل وسمّي متجرك', d: 'إيميل وباسورد، واختار اللينك بتاعك.' },
+        { t: 'نزّل منتجاتك', d: 'بالصور والأسعار والمقاسات، أو من ملف CSV.' },
+        { t: 'اختار قالب وظبّطه', d: 'خمس قوالب، وكل حاجة فيهم تتعدّل.' },
+        { t: 'استقبل الطلبات', d: 'وتابع الدفع والشحن من موبايلك.' },
       ],
     },
-    features: {
-      title: 'متجر حقيقي، مش صفحة على السوشيال.',
-      items: [
-        { t: 'شكله على ذوقك', d: 'اللوجو والألوان والصفحات، بالعربي والإنجليزي.' },
-        { t: 'مقاسات وألوان ومخزون', d: 'كل منتج بخياراته، والكميات بتتحدّث لوحدها.' },
-        { t: 'الطلب يوصلك على واتساب', d: 'العميل يبعتلك تفاصيل الطلب جاهزة بضغطة.' },
-        { t: 'أرقامك قدامك', d: 'اعرف إيه اللي بيتباع وإيه اللي واقف.' },
-      ],
-      phone: {
-        label: 'مثال لمتجر على الموبايل',
-        caption: 'مثال: متجر حلويات بيتي على ابدأ.',
-        store: 'حلويات سلمى',
-        slug: 'salma',
-        products: [
-          { name: 'كحك بالعجوة', price: 220, tone: 'a' },
-          { name: 'غُريبة', price: 180, tone: 'b' },
-          { name: 'بسكويت بالسمسم', price: 150, tone: 'c' },
-          { name: 'بيتي فور', price: 240, tone: 'd' },
-        ],
-        cod: 'الدفع عند الاستلام',
-        order: 'اطلب على واتساب',
+    scenes: {
+      title: 'متجرك، في كل مكان بتشتغل فيه.',
+      lead: 'نفس المتجر، شغّال من المطبخ للمحل.',
+      items: {
+        lamma: {
+          place: 'مطبخ البيت',
+          alt: 'موبايل على رخامة مطبخ جنب براد شاي بيعرض متجر أكل بيتي',
+        },
+        dahab: {
+          place: 'ترابيزة الدهب',
+          alt: 'موبايل على ترابيزة خشب جنب سلسلة بيعرض متجر مجوهرات',
+        },
+        souq: { place: 'المكتب بالليل', alt: 'لابتوب على مكتب بالليل بيعرض متجر إلكترونيات' },
+        qamar: { place: 'البوتيك', alt: 'موبايل على كاونتر بوتيك قدام رف هدوم بيعرض متجر أزياء' },
+        jasmine: { place: 'التسريحة', alt: 'موبايل وسط فرش المكياج بيعرض متجر تجميل' },
       },
     },
-    payments: {
-      title: 'الدفع والشحن، زي ما عملاءك متعودين.',
-      methods: [
-        { name: 'الدفع عند الاستلام', desc: 'شغّال من أول يوم.', status: 'launch' },
-        { name: 'إنستا باي', desc: 'العميل يحوّل، وإنت تأكد بضغطة.', status: 'launch' },
-        { name: 'كروت ومحافظ', desc: 'من خلال بوابات دفع مصرية.', status: 'coming' },
-        { name: 'بوسطة وأرامكس', desc: 'لحد ما يتربطوا، اشحن بطريقتك.', status: 'coming' },
+    breakout: { title: 'منتجك هو البطل.', words: ['ابدأ', 'متجرك', 'دلوقتي'] },
+    dahab: {
+      title: 'شوفه لايف، من كل زاوية.',
+      lead: 'لفّ الخاتم واختار المعدن والحجر. كده عميلك يشوف منتجك على متجرك.',
+      ring: {
+        label: 'خاتم سوليتير ثلاثي الأبعاد بيلف، تقدر تسحبه علشان تلفه',
+        hint: 'اسحب علشان تلفّه',
+        metalLabel: 'المعدن',
+        stoneLabel: 'الحجر',
+        metals: { gold: 'دهب أصفر', white: 'دهب أبيض', rose: 'روز جولد' },
+        stones: { diamond: 'ألماظ', emerald: 'زمرد', ruby: 'ياقوت' },
+      },
+    },
+    templates: {
+      title: 'خمس قوالب. اختار اللي على ذوقك.',
+      lead: 'نفس المتجر على الموبايل والتابلت واللابتوب.',
+      groupLabel: 'اختار قالب',
+      devicesLabel: 'المتجر بالقالب المختار على لابتوب وتابلت وموبايل',
+    },
+    features: {
+      title: 'كل اللي محتاجه عشان تبيع.',
+      items: [
+        { t: 'محرر صفحات', d: 'عدّل أي جزء في متجرك وشوفه قدامك على طول.' },
+        { t: 'ذكاء اصطناعي معاك', d: 'يكتب وصف منتجاتك ويترجمه عربي وإنجليزي.' },
+        { t: 'متجرك في جيبك', d: 'لوحة التحكم على موبايلك، وإشعار مع كل طلب.' },
+        { t: 'أرقامك قدامك', d: 'اعرف إيه اللي بيتباع وإيه اللي واقف.' },
+        { t: 'الضريبة محسوبة', d: 'لو مسجّل ضريبيًا، القيمة المضافة بتتحسب لوحدها.' },
+        { t: 'الطلب على واتساب', d: 'العميل يبعتلك تفاصيل الطلب جاهزة بضغطة.' },
+        { t: 'دومين باسمك', d: 'اربط دومينك، أو خليك على <اسمك>.ebda.app.' },
+        { t: 'عربي وإنجليزي', d: 'متجرك ولوحة التحكم بالعربي من الأساس، ومعاهم إنجليزي.' },
       ],
-      note: 'مش هنقولك على حاجة غير لما تشتغل فعلًا.',
+    },
+    providers: {
+      title: 'الدفع والشحن، زي ما عملاءك متعودين.',
+      payLabel: 'الدفع',
+      pay: [
+        { name: 'الدفع عند الاستلام', icon: 'cash' },
+        { name: 'إنستا باي', logo: 'instapay' },
+        { name: 'Paymob', logo: 'paymob' },
+        { name: 'Kashier', logo: 'kashier' },
+        { name: 'FawryPay', logo: 'fawrypay' },
+      ],
+      shipLabel: 'الشحن',
+      ship: [
+        { name: 'Bosta', logo: 'bosta' },
+        { name: 'ShipBlu', logo: 'shipblu' },
+        { name: 'Mylerz', logo: 'mylerz' },
+        { name: 'Aramex', logo: 'aramex' },
+        { name: 'توصيل بنفسك', icon: 'truck' },
+      ],
+      ask: 'محتاج شركة تانية؟',
+      askLink: 'قولّنا',
     },
     pricing: {
       title: 'باقة على قد متجرك.',
@@ -151,6 +238,9 @@ export const COPY: Record<Locale, Copy> = {
       note: 'وفّر 25% لو دفعت سنوي. رسوم بوابات الدفع منفصلة.',
       perMonth: 'في الشهر',
       annual: 'سنوي',
+      compareTitle: 'قارن الباقات',
+      yes: 'متاح',
+      no: 'مش متاح',
       trial: '14 يوم ببلاش',
       planCta: 'ابدأ بباقة {plan}',
       planCtaAnnual: 'أو ادفع سنوي ووفّر 25%',
@@ -167,18 +257,41 @@ export const COPY: Record<Locale, Copy> = {
           a: 'خالص. لو بتعرف تنزّل بوست، هتعرف تعمل متجرك.',
         },
         {
-          q: 'المتجر بالعربي؟',
-          a: 'أيوه، عربي من الأساس، ومعاه نسخة إنجليزي.',
+          q: 'عملائي يقدروا يدفعوا أونلاين؟',
+          a: 'أيوه، بالكارت والمحفظة عن طريق Paymob وKashier وFawryPay، وكمان كاش وإنستا باي.',
         },
         {
-          q: 'واتساب بيبعت رسايل لوحده؟',
-          a: 'لسه. دلوقتي فيه زرار واتساب، والعميل هو اللي بيدوس إرسال.',
+          q: 'الشحن بيشتغل إزاي؟',
+          a: 'اربط بوسطة أو ShipBlu أو مايلرز أو أرامكس من لوحة التحكم، أو وصّل بنفسك.',
+        },
+        {
+          q: 'فيه عمولة على الطلبات؟',
+          a: 'لأ، 0% على كل الباقات. بتدفع الاشتراك بس، ورسوم بوابة الدفع لو العميل دفع أونلاين.',
+        },
+        {
+          q: 'أقدر ألغي في أي وقت؟',
+          a: 'أيوه، من صفحة الاشتراك في لوحة التحكم، والإلغاء بيسري في آخر المدة المدفوعة.',
         },
         {
           q: 'بياناتي بتاعة مين؟',
           a: 'بتاعتك. منتجاتك وطلباتك وعملاءك ملكك إنت.',
         },
       ],
+    },
+    about: {
+      title: 'حكاية ابدأ',
+      paras: [
+        'كل مشروع بيبدأ قبل ما يبقى مشروع، بيبدأ بجملة: «عندي فكرة».',
+        'وبين الفكرة وأول عميل فيه أبواب كتير: موقع، وطلبات، وكلام مع العملاء، ومنتجات، ودفع، وتوصيل، وتكنولوجيا.',
+        'ابدأ موجودة علشان تسهّل أول باب. علشان كده اللوجو باب، واللي جوّاه هو صاحب الفكرة، واقف على العتبة. مش محتاج يفهم في منصات التجارة الإلكترونية ولا الـ API ولا البنية التحتية ولا ربط واتساب. محتاج بس ياخد أول خطوة.',
+      ],
+      close: 'ابدأ.',
+      markLabel: 'لوجو ابدأ: باب مفتوح، وصاحب الفكرة بيعدّي منه',
+    },
+    contact: {
+      title: 'تواصل معانا',
+      hello: 'أسئلة واستفسارات',
+      security: 'الإبلاغ عن ثغرة أمنية',
     },
     start: {
       title: 'الدور عليك.',
@@ -196,16 +309,16 @@ export const COPY: Record<Locale, Copy> = {
       merchant: 'اتفاقية التاجر',
       acceptableUse: 'الاستخدام المقبول',
       contact: 'تواصل: ahlan@ebda.app',
-      byPrefix: 'منتج من',
-      draftNote: 'الإصدار 1.0 من الوثائق القانونية · 2026-10-07.',
+      legalVersion: 'الإصدار 1.0 من الوثائق القانونية · 2026-10-07.',
+      ownership: { before: 'ابدأ منتج من ', after: '. © 2026 Whisky 11. جميع الحقوق محفوظة.' },
     },
     legalPages: LEGAL_AR,
   },
   en: {
     meta: {
-      title: 'Ebda | Open your online store in minutes',
+      title: 'Ebda — Your doorway to business. Open your store online',
       description:
-        'Open your online store in minutes: your own link, cash on delivery and InstaPay, and a WhatsApp button. No commission on orders. Try it 14 days.',
+        'Ebda — Your doorway to business. Open your online store in minutes: your own link, online payments, cash and InstaPay, shipping with Bosta and Aramex.',
     },
     skip: 'Skip to content',
     nav: {
@@ -221,61 +334,123 @@ export const COPY: Record<Locale, Copy> = {
       switchLabel: 'التبديل إلى العربية',
     },
     hero: {
+      brand: 'Ebda — Your doorway to business.',
       h1: 'Open your online store in minutes.',
       sub: 'Your own link, products and orders. All from your phone.',
       cta: 'Start now',
       secondary: 'See how',
       slugLabel: 'Your store link',
     },
-    status: { launch: 'Available', coming: 'Coming soon' },
-    how: {
-      title: 'Three steps to your first order.',
+    story: {
+      title: 'Watch your store come together.',
       steps: [
-        { t: 'Sign up', d: 'Pick your store name and link.' },
-        { t: 'Add products', d: 'With photos and prices, or upload a CSV in one go.' },
-        { t: 'Take orders', d: 'And follow them all from your phone.' },
+        'Pick a name and logo.',
+        'Add your products.',
+        'Restyle it in one tap.',
+        'And the first order arrives.',
+      ],
+      toasts: [
+        { t: 'New order · EGP 450', d: 'Chocolate cake · cash on delivery' },
+        { t: 'Bosta picked up the parcel', d: 'Order 1043 is on its way' },
+        { t: 'InstaPay payment received', d: 'EGP 760 from Sara M.' },
+        { t: 'New newsletter subscriber', d: 'Noha joined this week’s offers' },
+      ],
+      phoneLabel:
+        'A home-food store being built on a phone, then receiving orders and notifications.',
+    },
+    how: {
+      title: 'Four steps and you’re selling.',
+      steps: [
+        { t: 'Sign up and name your store', d: 'Email and password, then pick your link.' },
+        { t: 'Add your products', d: 'Photos, prices and sizes, or a CSV file.' },
+        { t: 'Pick a template and tune it', d: 'Five templates, everything editable.' },
+        { t: 'Take orders', d: 'And follow payment and shipping from your phone.' },
       ],
     },
-    features: {
-      title: 'A real store, not a social media page.',
-      items: [
-        { t: 'Your look', d: 'Logo, colours and pages, in Arabic and English.' },
-        { t: 'Sizes, colours, stock', d: 'Every option per product; stock updates itself.' },
-        { t: 'Orders on WhatsApp', d: 'Customers send you the order details in one tap.' },
-        { t: 'Your numbers', d: 'See what sells and what doesn’t.' },
-      ],
-      phone: {
-        label: 'Example store on a phone',
-        caption: 'Example: a home bakery on Ebda.',
-        store: 'Salma’s Sweets',
-        slug: 'salma',
-        products: [
-          { name: 'Date kahk', price: 220, tone: 'a' },
-          { name: 'Ghorayeba', price: 180, tone: 'b' },
-          { name: 'Sesame biscuits', price: 150, tone: 'c' },
-          { name: 'Petit four', price: 240, tone: 'd' },
-        ],
-        cod: 'Cash on delivery',
-        order: 'Order on WhatsApp',
+    scenes: {
+      title: 'Your store, wherever you work.',
+      lead: 'The same store, from the kitchen to the shop floor.',
+      items: {
+        lamma: {
+          place: 'The home kitchen',
+          alt: 'A phone on a kitchen counter showing a home-food store',
+        },
+        dahab: {
+          place: 'The jewellery table',
+          alt: 'A phone on a wooden table beside a necklace, showing a jewellery store',
+        },
+        souq: {
+          place: 'The desk at night',
+          alt: 'A laptop on a desk at night showing an electronics store',
+        },
+        qamar: {
+          place: 'The boutique',
+          alt: 'A phone on a boutique counter in front of a clothing rail, showing a fashion store',
+        },
+        jasmine: {
+          place: 'The vanity',
+          alt: 'A phone among makeup brushes, showing a beauty store',
+        },
       },
     },
-    payments: {
-      title: 'Payment and shipping, the way your customers expect.',
-      methods: [
-        { name: 'Cash on delivery', desc: 'Works from day one.', status: 'launch' },
+    breakout: { title: 'Your product is the star.', words: ['ابدأ', 'متجرك', 'دلوقتي'] },
+    dahab: {
+      title: 'See it live, from every angle.',
+      lead: 'Turn the ring and pick the metal and stone. That’s how customers see your product.',
+      ring: {
+        label: 'A 3D solitaire ring turning; drag to spin it',
+        hint: 'Drag to spin',
+        metalLabel: 'Metal',
+        stoneLabel: 'Stone',
+        metals: { gold: 'Yellow gold', white: 'White gold', rose: 'Rose gold' },
+        stones: { diamond: 'Diamond', emerald: 'Emerald', ruby: 'Ruby' },
+      },
+    },
+    templates: {
+      title: 'Five templates. Pick your style.',
+      lead: 'The same store on phone, tablet and laptop.',
+      groupLabel: 'Choose a template',
+      devicesLabel: 'The store in the chosen template on a laptop, tablet and phone',
+    },
+    features: {
+      title: 'Everything you need to sell.',
+      items: [
+        { t: 'Page builder', d: 'Edit any part of your store and see it live.' },
+        { t: 'AI on your side', d: 'Writes your product descriptions, in Arabic and English.' },
         {
-          name: 'InstaPay',
-          desc: 'The customer transfers; you confirm in one tap.',
-          status: 'launch',
+          t: 'Your store in your pocket',
+          d: 'The dashboard on your phone, with a ping for every order.',
         },
-        { name: 'Cards and wallets', desc: 'Through Egyptian payment gateways.', status: 'coming' },
+        { t: 'Your numbers', d: 'See what sells and what doesn’t.' },
+        { t: 'VAT, handled', d: 'Registered for VAT? It’s calculated for you.' },
+        { t: 'Orders on WhatsApp', d: 'Customers send you the order details in one tap.' },
+        { t: 'Your own domain', d: 'Connect your domain, or stay on <you>.ebda.app.' },
         {
-          name: 'Bosta and Aramex',
-          desc: 'Until they’re connected, ship your way.',
-          status: 'coming',
+          t: 'Arabic and English',
+          d: 'Your store and dashboard are Arabic first, with English too.',
         },
       ],
-      note: 'We won’t announce anything until it actually works.',
+    },
+    providers: {
+      title: 'Payment and shipping, the way your customers expect.',
+      payLabel: 'Payment',
+      pay: [
+        { name: 'Cash on delivery', icon: 'cash' },
+        { name: 'InstaPay', logo: 'instapay' },
+        { name: 'Paymob', logo: 'paymob' },
+        { name: 'Kashier', logo: 'kashier' },
+        { name: 'FawryPay', logo: 'fawrypay' },
+      ],
+      shipLabel: 'Shipping',
+      ship: [
+        { name: 'Bosta', logo: 'bosta' },
+        { name: 'ShipBlu', logo: 'shipblu' },
+        { name: 'Mylerz', logo: 'mylerz' },
+        { name: 'Aramex', logo: 'aramex' },
+        { name: 'Your own delivery', icon: 'truck' },
+      ],
+      ask: 'Need another provider?',
+      askLink: 'Tell us',
     },
     pricing: {
       title: 'A plan that fits your store.',
@@ -283,6 +458,9 @@ export const COPY: Record<Locale, Copy> = {
       note: 'Save 25% when you pay yearly. Payment gateway fees are separate.',
       perMonth: 'a month',
       annual: 'yearly',
+      compareTitle: 'Compare plans',
+      yes: 'Included',
+      no: 'Not included',
       trial: '14 days free',
       planCta: 'Start with {plan}',
       planCtaAnnual: 'Or pay yearly and save 25%',
@@ -299,18 +477,41 @@ export const COPY: Record<Locale, Copy> = {
           a: 'Not at all. If you can post on Instagram, you can build your store.',
         },
         {
-          q: 'Is the store in Arabic?',
-          a: 'Yes, Arabic first, with an English version.',
+          q: 'Can customers pay online?',
+          a: 'Yes, by card and wallet through Paymob, Kashier and FawryPay, plus cash and InstaPay.',
         },
         {
-          q: 'Does WhatsApp send messages by itself?',
-          a: 'Not yet. Today there’s a WhatsApp button, and the customer presses send.',
+          q: 'How does shipping work?',
+          a: 'Connect Bosta, ShipBlu, Mylerz or Aramex from your dashboard, or deliver yourself.',
+        },
+        {
+          q: 'Is there a commission on orders?',
+          a: 'No, 0% on every plan. You pay the subscription, plus gateway fees when a customer pays online.',
+        },
+        {
+          q: 'Can I cancel anytime?',
+          a: 'Yes, from the subscription page in your dashboard. It takes effect at the end of the paid period.',
         },
         {
           q: 'Who owns my data?',
           a: 'You do. Your products, orders and customers are yours.',
         },
       ],
+    },
+    about: {
+      title: 'The Ebda story',
+      paras: [
+        'Every business starts before it becomes a business. It starts with “I have an idea.”',
+        'Between the idea and the first customer there are too many doors: a website, orders, talking to customers, products, payments, delivery, technology.',
+        'Ebda exists to make the first door simple. That’s why the logo is a doorway, and the shape inside is the person with the idea, standing at the entrance. They don’t need to know e-commerce platforms, APIs, infrastructure or WhatsApp integrations. They just take the first step.',
+      ],
+      close: 'ابدأ.',
+      markLabel: 'The Ebda mark: an open doorway, with the person with the idea stepping through',
+    },
+    contact: {
+      title: 'Contact us',
+      hello: 'Questions and help',
+      security: 'Report a security issue',
     },
     start: {
       title: 'Your turn.',
@@ -328,8 +529,11 @@ export const COPY: Record<Locale, Copy> = {
       merchant: 'Merchant agreement',
       acceptableUse: 'Acceptable use',
       contact: 'Contact: ahlan@ebda.app',
-      byPrefix: 'A product of',
-      draftNote: 'Legal documents version 1.0 · 2026-10-07.',
+      legalVersion: 'Legal documents version 1.0 · 2026-10-07.',
+      ownership: {
+        before: 'Ebda is a product of ',
+        after: '. © 2026 Whisky 11. All rights reserved.',
+      },
     },
     legalPages: LEGAL_EN,
   },

@@ -34,9 +34,22 @@ export function pagePath(locale: Locale, page: PageSlug): string {
 export const absoluteUrl = (p: string) =>
   `${SITE_URL}${p === '/' ? '/' : p + '/'}`.replace(/\/\/$/, '/');
 
-/** Section ids, in page order. Ruling R-EBDA-COPY-1 (2026-10-07) replaced the 12-section
+/** Section ids, in page order. Ruling R-EBDA-COPY-1 (2026-10-07) and R-EBDA-COPY-5 replaced the 12-section
  *  order from docs/ebda/plans/domains-and-marketing-site.md with this shorter one. */
-export const SECTION_ORDER = ['how', 'features', 'payments', 'pricing', 'faq', 'start'] as const;
+export const SECTION_ORDER = [
+  'story',
+  'how',
+  'templates',
+  'scenes',
+  'breakout',
+  'dahab',
+  'features',
+  'payments',
+  'about',
+  'pricing',
+  'faq',
+  'start',
+] as const;
 export type SectionId = (typeof SECTION_ORDER)[number];
 
 /** Top-nav items other than the wordmark and the two account actions. */

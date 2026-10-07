@@ -1,16 +1,16 @@
 import Link from 'next/link';
 import { BRAND } from '@force/shared/brand';
 import { COPY } from '../lib/content';
-import { COMPANY_URL, pagePath, type Locale } from '../lib/site';
+import { COMPANY_URL, SECURITY_EMAIL, pagePath, type Locale } from '../lib/site';
 
 export function Footer({ locale }: { locale: Locale }) {
   const c = COPY[locale].footer;
+  const k = COPY[locale].contact;
   return (
     <footer className="site-footer">
       <div className="wrap footer-row">
         <div>
           <p className="footer-brand">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/lockup-dark.svg"
               alt={`${BRAND.name} ${BRAND.nameAr}`}
@@ -19,15 +19,21 @@ export function Footer({ locale }: { locale: Locale }) {
               height={24}
             />
           </p>
-          <p className="muted">
-            {c.byPrefix}{' '}
-            <a href={COMPANY_URL} target="_blank" rel="noopener noreferrer">
-              {BRAND.company}
-            </a>
-          </p>
-          <p className="muted">
-            <a href={`mailto:${BRAND.supportEmail}`}>{BRAND.supportEmail}</a>
-          </p>
+          <p className="footer-h">{k.title}</p>
+          <dl className="footer-contact">
+            <div>
+              <dt>{k.hello}</dt>
+              <dd>
+                <a href={`mailto:${BRAND.supportEmail}`}>{BRAND.supportEmail}</a>
+              </dd>
+            </div>
+            <div>
+              <dt>{k.security}</dt>
+              <dd>
+                <a href={`mailto:${SECURITY_EMAIL}`}>{SECURITY_EMAIL}</a>
+              </dd>
+            </div>
+          </dl>
         </div>
         <nav aria-label={c.legalNav}>
           <ul className="footer-links">
@@ -47,8 +53,17 @@ export function Footer({ locale }: { locale: Locale }) {
               <Link href={pagePath(locale, 'acceptable-use')}>{c.acceptableUse}</Link>
             </li>
           </ul>
-          <p className="muted small">{c.draftNote}</p>
+          <p className="muted small">{c.legalVersion}</p>
         </nav>
+      </div>
+      <div className="wrap footer-legal">
+        <p className="muted small">
+          {c.ownership.before}
+          <a href={COMPANY_URL} target="_blank" rel="noopener noreferrer">
+            {BRAND.company}
+          </a>
+          {c.ownership.after}
+        </p>
       </div>
     </footer>
   );

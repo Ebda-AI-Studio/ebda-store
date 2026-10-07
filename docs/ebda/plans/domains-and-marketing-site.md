@@ -24,11 +24,11 @@ Superseded 2026-10-07 by Ruling R-EBDA-COPY-1 (`docs/RULINGS.md`): Ahmad asked f
 
 Top nav (now): logo · Features · How it works · Pricing · FAQ · `Log in` · **Start now** (→ signup on admin.ebda.app). Arabic: المميزات · إزاي بيشتغل · الأسعار · أسئلة · دخول · ابدأ دلوقتي.
 
-Hero (now), per locale, over the Nile-at-night canvas (static inline poster first, canvas fades in):
+Brand line (2026-10-07): «ابدأ — بابك لبدء مشروعك.» / "Ebda — Your doorway to business." (hero, meta, OG). Hero (now), per locale, over the Nile-at-night canvas (static inline poster first, canvas fades in):
 
 > **ابدأ متجرك أونلاين في دقايق.** / **Open your online store in minutes.**
 
-Sections (now), in order (`SECTION_ORDER` in `apps/marketing/src/lib/site.ts`): How it works (3 steps) · Features (phone storefront mock) · Payments and shipping (status ledger) · Pricing · FAQ (max 6) · Closing call to action (with the first-merchant chip).
+Sections (now, R-EBDA-COPY-5/8/10/11), in order (`SECTION_ORDER` in `apps/marketing/src/lib/site.ts`): Story (pinned scroll: the real Lamma storefront scrolls inside a phone, flips through the other templates, then a stream of four notifications) · How it works (four numbered cards, a gold line draws each in) · Templates (real captures of the five families on laptop, tablet and phone, live switcher) · Scenes (the captures composited into five real rooms) · Break-out (pinned: the Dahab ring leaves the phone while gold wipes up and giant outlined «ابدأ / متجرك / دلوقتي» drift) · Dahab (live three.js ring, drag + scroll, metal and stone swatches) · Features · Payments and shipping (provider marks) · The Ebda story («حكاية ابدأ», the open-door mark animates: the light comes up, the person steps through) · Pricing (cards + full comparison table from the shared plan catalogue) · FAQ · Closing call to action. Footer: contact (ahlan@, security@) and "Ebda by Whisky 11" linked to whisky11.com.
 
 Original brief (2026-10-03, superseded):
 
