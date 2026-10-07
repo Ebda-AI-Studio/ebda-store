@@ -15,13 +15,23 @@ const photos = (await import(path.join(root, 'demo-photos.json'), { with: { type
 export const SIZES = [240, 480];
 
 for (const p of photos) {
-  const res = await fetch(p.url, { headers: { 'User-Agent': 'ebda-marketing/1.0 (+https://ebda.app)' } });
+  const res = await fetch(p.url, {
+    headers: { 'User-Agent': 'ebda-marketing/1.0 (+https://ebda.app)' },
+  });
   if (!res.ok) throw new Error(`${p.file}: HTTP ${res.status} for ${p.url}`);
   const src = Buffer.from(await res.arrayBuffer());
   for (const size of SIZES) {
-    const base = sharp(src).rotate().resize(size, size, { fit: 'cover', position: p.position ?? sharp.strategy.attention });
-    await base.clone().avif({ quality: 52, effort: 6 }).toFile(path.join(out, `${p.file}-${size}.avif`));
-    await base.clone().webp({ quality: 74 }).toFile(path.join(out, `${p.file}-${size}.webp`));
+    const base = sharp(src)
+      .rotate()
+      .resize(size, size, { fit: 'cover', position: p.position ?? sharp.strategy.attention });
+    await base
+      .clone()
+      .avif({ quality: 52, effort: 6 })
+      .toFile(path.join(out, `${p.file}-${size}.avif`));
+    await base
+      .clone()
+      .webp({ quality: 74 })
+      .toFile(path.join(out, `${p.file}-${size}.webp`));
   }
   console.log('ok', p.file);
 }

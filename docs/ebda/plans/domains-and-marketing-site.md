@@ -28,7 +28,7 @@ Hero (now), per locale, over the Nile-at-night canvas (static inline poster firs
 
 > **ابدأ متجرك أونلاين في دقايق.** / **Open your online store in minutes.**
 
-Sections (now), in order (`SECTION_ORDER` in `apps/marketing/src/lib/site.ts`): How it works (3 steps) · Features (phone storefront mock) · Payments and shipping (status ledger) · Pricing · FAQ (max 6) · Closing call to action (with the first-merchant chip).
+Sections (now, R-EBDA-COPY-5), in order (`SECTION_ORDER` in `apps/marketing/src/lib/site.ts`): Story (pinned scroll: a store assembles in a phone, restyles, receives an order) · Templates (the five families on laptop, tablet and phone, live switcher) · Features · Payments and shipping (provider logos) · Pricing (cards + full comparison table from the shared plan catalogue) · FAQ (max 8) · Closing call to action. Footer: contact (hello@, security@) and "Ebda by Whisky 11" linked to whisky11.com.
 
 Original brief (2026-10-03, superseded):
 

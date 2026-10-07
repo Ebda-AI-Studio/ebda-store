@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { COPY } from '../lib/content';
-import { HOME, type LegalSlug, type Locale } from '../lib/site';
+import { COMPANY_URL, HOME, type LegalSlug, type Locale } from '../lib/site';
 import type { LegalPages } from '../lib/legal-types';
 import { Footer } from './Footer';
 import { Header } from './Header';
@@ -16,6 +16,23 @@ const DOC_KEY: Record<
   'acceptable-use': 'acceptableUse',
 };
 
+const COMPANY = 'Whisky 11';
+
+/** Legal text with every "Whisky 11" mention linked to the company site (new tab). */
+function withCompanyLinks(text: string) {
+  const parts = text.split(COMPANY);
+  return parts.flatMap((part, i) =>
+    i === 0
+      ? [part]
+      : [
+          <a key={i} href={COMPANY_URL} target="_blank" rel="noopener noreferrer">
+            {COMPANY}
+          </a>,
+          part,
+        ]
+  );
+}
+
 export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug }) {
   const c = COPY[locale].legalPages;
   const doc = c[DOC_KEY[page]];
@@ -23,22 +40,46 @@ export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug })
     <>
       <Header locale={locale} page={page} />
       <main id="main" className="wrap legal">
-        <p className="draft-badge" role="note">
-          {c.draftBadge}
-        </p>
-        <h1>{doc.title}</h1>
-        <p className="draft-body">{c.draftBody}</p>
-        {doc.sections.map(s => (
-          <section key={s.h}>
-            <h2>{s.h}</h2>
-            {s.p.map(t => (
-              <p key={t}>{t}</p>
+        <header className="legal-head">
+          <h1>{doc.title}</h1>
+          <p className="legal-meta">
+            {c.updated.label} <time dateTime="2026-10-07">{c.updated.date}</time> ·{' '}
+            {c.updated.version}
+          </p>
+          <p className="legal-notice">{c.notice}</p>
+        </header>
+        <div className="legal-body">
+          <nav className="legal-toc" aria-labelledby="toc-h">
+            <p id="toc-h" className="legal-toc-h">
+              {c.toc}
+            </p>
+            <ol>
+              {doc.sections.map((s, i) => (
+                <li key={s.h}>
+                  <a href={`#s-${i + 1}`}>{s.h}</a>
+                </li>
+              ))}
+            </ol>
+          </nav>
+          <article className="legal-doc">
+            {doc.sections.map((s, i) => (
+              <section key={s.h} id={`s-${i + 1}`} aria-labelledby={`s-${i + 1}-h`}>
+                <h2 id={`s-${i + 1}-h`}>
+                  <a className="anchor" href={`#s-${i + 1}`} aria-hidden="true" tabIndex={-1}>
+                    #
+                  </a>
+                  {s.h}
+                </h2>
+                {s.p.map(t => (
+                  <p key={t}>{withCompanyLinks(t)}</p>
+                ))}
+              </section>
             ))}
-          </section>
-        ))}
-        <p>
-          <Link href={HOME[locale]}>{c.back}</Link>
-        </p>
+            <p className="legal-back">
+              <Link href={HOME[locale]}>{c.back}</Link>
+            </p>
+          </article>
+        </div>
       </main>
       <Footer locale={locale} />
     </>

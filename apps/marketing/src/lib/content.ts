@@ -3,6 +3,15 @@ import { LEGAL_EN } from './legal-en';
 import type { LegalPages } from './legal-types';
 import type { Locale } from './site';
 
+/** A payment or shipping provider; `logo` is a file in public/logos/ (none = our own icon). */
+export interface Provider {
+  name: string;
+  logo?: string;
+  /** The logo has white parts, so it sits on a dark plate. */
+  dark?: boolean;
+  icon?: 'cash' | 'truck';
+}
+
 export interface Copy {
   meta: { title: string; description: string };
   skip: string;
@@ -37,9 +46,9 @@ export interface Copy {
   providers: {
     title: string;
     payLabel: string;
-    pay: string[];
+    pay: Provider[];
     shipLabel: string;
-    ship: string[];
+    ship: Provider[];
     ask: string;
     askLink: string;
   };
@@ -49,11 +58,16 @@ export interface Copy {
     note: string;
     perMonth: string;
     annual: string;
+    compareTitle: string;
+    yes: string;
+    no: string;
     trial: string;
     planCta: string;
     planCtaAnnual: string;
   };
   faq: { title: string; items: { q: string; a: string }[] };
+  /** Footer contact block; `company` precedes the linked company name ("Ebda by Whisky 11"). */
+  contact: { title: string; hello: string; security: string; company: string };
   start: {
     title: string;
     lead: string;
@@ -70,9 +84,7 @@ export interface Copy {
     merchant: string;
     acceptableUse: string;
     contact: string;
-    /** Text before the linked company name, e.g. "A product of" → "A product of Whisky 11". */
-    byPrefix: string;
-    draftNote: string;
+    legalVersion: string;
   };
   legalPages: LegalPages;
 }
@@ -126,14 +138,28 @@ export const COPY: Record<Locale, Copy> = {
         { t: 'أرقامك قدامك', d: 'اعرف إيه اللي بيتباع وإيه اللي واقف.' },
         { t: 'الضريبة محسوبة', d: 'لو مسجّل ضريبيًا، القيمة المضافة بتتحسب لوحدها.' },
         { t: 'الطلب على واتساب', d: 'العميل يبعتلك تفاصيل الطلب جاهزة بضغطة.' },
+        { t: 'دومين باسمك', d: 'اربط دومينك، أو خليك على <اسمك>.ebda.app.' },
+        { t: 'عربي وإنجليزي', d: 'متجرك ولوحة التحكم بالعربي من الأساس، ومعاهم إنجليزي.' },
       ],
     },
     providers: {
       title: 'الدفع والشحن، زي ما عملاءك متعودين.',
       payLabel: 'الدفع',
-      pay: ['الدفع عند الاستلام', 'إنستا باي', 'Paymob', 'Kashier', 'FawryPay'],
+      pay: [
+        { name: 'الدفع عند الاستلام', icon: 'cash' },
+        { name: 'إنستا باي', logo: 'instapay' },
+        { name: 'Paymob', logo: 'paymob' },
+        { name: 'Kashier', logo: 'kashier' },
+        { name: 'FawryPay', logo: 'fawrypay' },
+      ],
       shipLabel: 'الشحن',
-      ship: ['Bosta', 'ShipBlu', 'Mylerz', 'Aramex', 'توصيل بنفسك'],
+      ship: [
+        { name: 'Bosta', logo: 'bosta' },
+        { name: 'ShipBlu', logo: 'shipblu' },
+        { name: 'Mylerz', logo: 'mylerz', dark: true },
+        { name: 'Aramex', logo: 'aramex' },
+        { name: 'توصيل بنفسك', icon: 'truck' },
+      ],
       ask: 'محتاج شركة تانية؟',
       askLink: 'قولّنا',
     },
@@ -143,6 +169,9 @@ export const COPY: Record<Locale, Copy> = {
       note: 'وفّر 25% لو دفعت سنوي. رسوم بوابات الدفع منفصلة.',
       perMonth: 'في الشهر',
       annual: 'سنوي',
+      compareTitle: 'قارن الباقات',
+      yes: 'متاح',
+      no: 'مش متاح',
       trial: '14 يوم ببلاش',
       planCta: 'ابدأ بباقة {plan}',
       planCtaAnnual: 'أو ادفع سنوي ووفّر 25%',
@@ -163,14 +192,28 @@ export const COPY: Record<Locale, Copy> = {
           a: 'أيوه، بالكارت والمحفظة عن طريق Paymob وKashier وFawryPay، وكمان كاش وإنستا باي.',
         },
         {
-          q: 'المتجر بالعربي؟',
-          a: 'أيوه، عربي من الأساس، ومعاه نسخة إنجليزي.',
+          q: 'الشحن بيشتغل إزاي؟',
+          a: 'اربط بوسطة أو ShipBlu أو مايلرز أو أرامكس من لوحة التحكم، أو وصّل بنفسك.',
+        },
+        {
+          q: 'فيه عمولة على الطلبات؟',
+          a: 'لأ، 0% على كل الباقات. بتدفع الاشتراك بس، ورسوم بوابة الدفع لو العميل دفع أونلاين.',
+        },
+        {
+          q: 'أقدر ألغي في أي وقت؟',
+          a: 'أيوه، من صفحة الاشتراك في لوحة التحكم، والإلغاء بيسري في آخر المدة المدفوعة.',
         },
         {
           q: 'بياناتي بتاعة مين؟',
           a: 'بتاعتك. منتجاتك وطلباتك وعملاءك ملكك إنت.',
         },
       ],
+    },
+    contact: {
+      title: 'تواصل معانا',
+      hello: 'أسئلة واستفسارات',
+      security: 'الإبلاغ عن ثغرة أمنية',
+      company: 'ابدأ من',
     },
     start: {
       title: 'الدور عليك.',
@@ -188,8 +231,7 @@ export const COPY: Record<Locale, Copy> = {
       merchant: 'اتفاقية التاجر',
       acceptableUse: 'الاستخدام المقبول',
       contact: 'تواصل: hello@ebda.app',
-      byPrefix: 'منتج من',
-      draftNote: 'الإصدار 1.0 من الوثائق القانونية · 2026-10-07.',
+      legalVersion: 'الإصدار 1.0 من الوثائق القانونية · 2026-10-07.',
     },
     legalPages: LEGAL_AR,
   },
@@ -242,18 +284,38 @@ export const COPY: Record<Locale, Copy> = {
       items: [
         { t: 'Page builder', d: 'Edit any part of your store and see it live.' },
         { t: 'AI on your side', d: 'Writes your product descriptions, in Arabic and English.' },
-        { t: 'Your store in your pocket', d: 'The dashboard on your phone, with a ping for every order.' },
+        {
+          t: 'Your store in your pocket',
+          d: 'The dashboard on your phone, with a ping for every order.',
+        },
         { t: 'Your numbers', d: 'See what sells and what doesn’t.' },
         { t: 'VAT, handled', d: 'Registered for VAT? It’s calculated for you.' },
         { t: 'Orders on WhatsApp', d: 'Customers send you the order details in one tap.' },
+        { t: 'Your own domain', d: 'Connect your domain, or stay on <you>.ebda.app.' },
+        {
+          t: 'Arabic and English',
+          d: 'Your store and dashboard are Arabic first, with English too.',
+        },
       ],
     },
     providers: {
       title: 'Payment and shipping, the way your customers expect.',
       payLabel: 'Payment',
-      pay: ['Cash on delivery', 'InstaPay', 'Paymob', 'Kashier', 'FawryPay'],
+      pay: [
+        { name: 'Cash on delivery', icon: 'cash' },
+        { name: 'InstaPay', logo: 'instapay' },
+        { name: 'Paymob', logo: 'paymob' },
+        { name: 'Kashier', logo: 'kashier' },
+        { name: 'FawryPay', logo: 'fawrypay' },
+      ],
       shipLabel: 'Shipping',
-      ship: ['Bosta', 'ShipBlu', 'Mylerz', 'Aramex', 'Your own delivery'],
+      ship: [
+        { name: 'Bosta', logo: 'bosta' },
+        { name: 'ShipBlu', logo: 'shipblu' },
+        { name: 'Mylerz', logo: 'mylerz', dark: true },
+        { name: 'Aramex', logo: 'aramex' },
+        { name: 'Your own delivery', icon: 'truck' },
+      ],
       ask: 'Need another provider?',
       askLink: 'Tell us',
     },
@@ -263,6 +325,9 @@ export const COPY: Record<Locale, Copy> = {
       note: 'Save 25% when you pay yearly. Payment gateway fees are separate.',
       perMonth: 'a month',
       annual: 'yearly',
+      compareTitle: 'Compare plans',
+      yes: 'Included',
+      no: 'Not included',
       trial: '14 days free',
       planCta: 'Start with {plan}',
       planCtaAnnual: 'Or pay yearly and save 25%',
@@ -283,14 +348,28 @@ export const COPY: Record<Locale, Copy> = {
           a: 'Yes, by card and wallet through Paymob, Kashier and FawryPay, plus cash and InstaPay.',
         },
         {
-          q: 'Is the store in Arabic?',
-          a: 'Yes, Arabic first, with an English version.',
+          q: 'How does shipping work?',
+          a: 'Connect Bosta, ShipBlu, Mylerz or Aramex from your dashboard, or deliver yourself.',
+        },
+        {
+          q: 'Is there a commission on orders?',
+          a: 'No, 0% on every plan. You pay the subscription, plus gateway fees when a customer pays online.',
+        },
+        {
+          q: 'Can I cancel anytime?',
+          a: 'Yes, from the subscription page in your dashboard. It takes effect at the end of the paid period.',
         },
         {
           q: 'Who owns my data?',
           a: 'You do. Your products, orders and customers are yours.',
         },
       ],
+    },
+    contact: {
+      title: 'Contact us',
+      hello: 'Questions and help',
+      security: 'Report a security issue',
+      company: 'Ebda by',
     },
     start: {
       title: 'Your turn.',
@@ -308,8 +387,7 @@ export const COPY: Record<Locale, Copy> = {
       merchant: 'Merchant agreement',
       acceptableUse: 'Acceptable use',
       contact: 'Contact: hello@ebda.app',
-      byPrefix: 'A product of',
-      draftNote: 'Legal documents version 1.0 · 2026-10-07.',
+      legalVersion: 'Legal documents version 1.0 · 2026-10-07.',
     },
     legalPages: LEGAL_EN,
   },

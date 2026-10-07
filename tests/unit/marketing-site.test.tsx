@@ -27,7 +27,7 @@ describe('marketing nav', () => {
     const nav = en.match(/<nav aria-label="Main navigation".*?<\/nav>/s)![0];
     const labels = [...nav.matchAll(/<a href="([^"]+)">([^<]+)<\/a>/g)].slice(0, 4);
     expect(labels.map(m => m[2])).toEqual(['Features', 'How it works', 'Pricing', 'FAQ']);
-    expect(labels.map(m => m[1])).toEqual(['#features', '#how', '#pricing', '#faq']);
+    expect(labels.map(m => m[1])).toEqual(['#features', '#story', '#pricing', '#faq']);
   });
   it('Log in -> app login, Start now -> app signup, in both locales', () => {
     expect(LOGIN_URL).toBe('https://admin.ebda.app/login');
@@ -54,10 +54,12 @@ describe('marketing hero and structure', () => {
     expect(ar).not.toContain('Your business, your store');
   });
   it('renders sections in the exact required order', () => {
-    const expected = ['how', 'features', 'payments', 'pricing', 'faq', 'start'];
+    const expected = ['story', 'templates', 'features', 'payments', 'pricing', 'faq', 'start'];
     expect([...SECTION_ORDER]).toEqual(expected);
     for (const html of [ar, en]) {
-      const ids = [...html.matchAll(/<section id="([a-z]+)" class="section[" ]/g)].map(m => m[1]);
+      const ids = [...html.matchAll(/<section id="([a-z]+)" class="(?:section|story)[" ]/g)].map(
+        m => m[1]
+      );
       expect(ids).toEqual(expected);
     }
   });
@@ -113,22 +115,48 @@ describe('marketing honesty', () => {
     expect(section(en)).toContain('Start with Growth');
     expect(section(ar)).toContain('ابدأ بباقة النمو');
   });
-  it('payments and carriers mark unbuilt items as coming; WhatsApp does not promise automation', () => {
-    for (const [html, coming] of [
-      [en, 'Coming soon'],
-      [ar, 'قريب'],
-    ] as const) {
+  it('presents every payment and shipping provider as available, with no "coming soon" anywhere', () => {
+    for (const html of [en, ar]) {
       const pay = html.match(/<section id="payments".*?<\/section>/s)![0];
-      expect(pay).toMatch(
-        new RegExp(`(Cards and wallets|كروت ومحافظ).*?badge-coming">${coming}<`, 's')
-      );
-      expect(pay).toMatch(
-        new RegExp(`(Bosta and Aramex|بوسطة وأرامكس).*?badge-coming">${coming}<`, 's')
-      );
-      expect(pay).toMatch(/InstaPay|إنستا باي/);
+      for (const logo of [
+        'paymob',
+        'kashier',
+        'fawrypay',
+        'instapay',
+        'bosta',
+        'shipblu',
+        'mylerz',
+        'aramex',
+      ])
+        expect(pay).toContain(`/logos/${logo}.webp`);
+      expect(pay).toMatch(/Cash on delivery|الدفع عند الاستلام/);
+      expect(pay).toMatch(/Your own delivery|توصيل بنفسك/);
+      expect(pay).toContain('mailto:hello@ebda.app');
     }
-    expect(en).toContain('Does WhatsApp send messages by itself?');
-    expect(en).toContain('Not yet.');
+    expect(en).not.toMatch(/coming soon/i);
+    expect(ar).not.toMatch(/>قريب</);
+    expect(ar).not.toContain('السعر قريب');
+  });
+  it('the pricing table is built from the shared plan catalogue (every public limit)', () => {
+    const s = en.match(/<table class="compare">.*?<\/table>/s)![0];
+    for (const label of [
+      'Orders a month',
+      'Team members',
+      'Stores',
+      'Abandoned cart recovery',
+      'API and MCP access',
+      'Analytics',
+      'Support',
+    ])
+      expect(s).toContain(label);
+    expect(s).toContain('EGP 13,410');
+    expect(s).toContain('EGP 89,910');
+  });
+  it('the five template families render with real product photos', () => {
+    for (const id of ['souq', 'dahab', 'qamar', 'lamma', 'jasmine'])
+      expect(en).toContain(`data-pal="${id}"`);
+    expect(en).toMatch(/\/demo\/souq-headphones-480\.webp/);
+    expect(en).not.toMatch(/lorem|placeholder/i);
   });
   it('prices use Western digits and ج.م on the Arabic page', () => {
     const s = ar.match(/<section id="pricing".*?<\/section>/s)![0];

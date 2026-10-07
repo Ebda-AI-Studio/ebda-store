@@ -28,7 +28,13 @@ Ruling R-EBDA-COPY-2 — shipping (Bosta, Aramex) and cards/wallets stay "قري
 
 Ruling R-EBDA-COPY-3 — the hero poster is an inline SVG (`src/lib/hero-poster.ts`), not a CSS background image. Evidence: as a `url()` background it became the LCP element (4.6s on the uncompressed local server); inline SVG shapes are not LCP candidates, so the headline text is. Cost if wrong: ~24 KB (~4 KB brotli) more HTML per home page.
 
-Ruling R-EBDA-COPY-4 — the legal pages' "Whisky 11" operator line is NOT linked in this change; the footer (on every page, legal included) and the JSON-LD `parentOrganization.url` are. Evidence: a parallel PR (docs/legal-pages) owns the legal page content. Cost if wrong: one unlinked mention on the legal notice until that PR adds it.
+Ruling R-EBDA-COPY-4 (superseded 2026-10-07: LegalPage now links every "Whisky 11" mention) — the legal pages' "Whisky 11" operator line is NOT linked in this change; the footer (on every page, legal included) and the JSON-LD `parentOrganization.url` are. Evidence: a parallel PR (docs/legal-pages) owns the legal page content. Cost if wrong: one unlinked mention on the legal notice until that PR adds it.
+
+Ruling R-EBDA-COPY-5 — the marketing site presents the full product as available: no "قريب / coming soon" labels; card/wallet payments (Paymob, Kashier, FawryPay), shipping (Bosta, ShipBlu, Mylerz, Aramex), the page builder with five templates, AI, VAT, the installable dashboard with push and analytics are listed as features. This supersedes R-EBDA-COPY-2. Evidence: Ahmad 2026-10-07 via the coordinator ("he will NOT launch until every feature is built"); `docs/ebda/plans/STATUS.md` still records SP6/SP7 as "done against stubs". Cost if wrong: a merchant who signs up before launch reads payment and shipping integrations as working while they still run against stubs.
+
+Ruling R-EBDA-COPY-6 — the demo-store photos are openly licensed stock (CC0 / CC BY 2.0 via Openverse), not AI-generated. Evidence: the Gemini image models answer 429 with a free-tier quota of 0 on the Ebda key (2026-10-07); credits in `apps/marketing/public/demo/CREDITS.md`, manifest `apps/marketing/demo-photos.json`. Cost if wrong: if a CC BY author objects, one photo is swapped and the manifest re-run.
+
+Ruling R-EBDA-COPY-7 — provider logos are shown on light plates in their own colours to name the integrations (nominative use); sources in `apps/marketing/public/logos/SOURCES.md`. Cost if wrong: a provider asks for its logo to be removed and the plate falls back to its name.
 
 ## 2026-10-07 — Locked pricing (R-EBDA-PRICING-\*)
 

@@ -13,16 +13,25 @@ import {
 
 type Page = PageSlug;
 
-export function Header({ locale, page = '' }: { locale: Locale; page?: Page }) {
+/** `offHome`: rendered on a page that is not the home (the 404), so nav anchors link to the home. */
+export function Header({
+  locale,
+  page = '',
+  offHome = false,
+}: {
+  locale: Locale;
+  page?: Page;
+  offHome?: boolean;
+}) {
   const c = COPY[locale];
   const other: Locale = locale === 'ar' ? 'en' : 'ar';
   const home = HOME[locale];
-  const anchor = (id: string) => (page === '' ? `#${id}` : `${home === '/' ? '' : home}/#${id}`);
+  const anchor = (id: string) =>
+    page === '' && !offHome ? `#${id}` : `${home === '/' ? '' : home}/#${id}`;
   return (
     <header className="site-header">
       <div className="wrap header-row">
         <Link href={home} className="wordmark" aria-label={`${BRAND.name} ${BRAND.nameAr}`}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/lockup-dark.svg" alt="" className="wm-lockup" width={84} height={28} />
         </Link>
         <nav aria-label={c.nav.label} className="nav">

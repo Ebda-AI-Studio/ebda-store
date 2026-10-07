@@ -5,8 +5,9 @@ import type { LegalPages } from './legal-types';
  * common protective structure of SaaS store-builder terms; not reviewed by counsel.
  */
 export const LEGAL_EN: LegalPages = {
-  draftBadge: 'Version 1.0 · 2026-10-07',
-  draftBody:
+  updated: { label: 'Last updated', date: '7 October 2026', version: 'Version 1.0' },
+  toc: 'On this page',
+  notice:
     'Version 1.0 of this document. We may update it as described in the "Changes" section. The Arabic text is the primary text.',
   back: 'Back to home',
   legal: {
