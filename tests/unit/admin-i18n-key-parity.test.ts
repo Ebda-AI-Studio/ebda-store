@@ -39,6 +39,9 @@ const arFlat = flatten(ar as Messages);
 
 // Reviewed exceptions where en === ar is correct, not a missed translation.
 const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
+  // Language toggle names each language in its own script, same in both locales.
+  'components.languageSwitcher.nativeEn',
+  'components.languageSwitcher.nativeAr',
   // Digits-only example: the admin shows Western digits in both languages (Ruling NUMERALS-1).
   'taxVerification.form.trnPlaceholder',
   // Self-serve onboarding: LTR example values (email address, Egyptian mobile
