@@ -37,11 +37,11 @@
  * DATABASE_URL, unique suffix, cleans up in afterAll.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass, runInTenantContext } from '@force/database';
 import { seedCoaForStore } from '../../../apps/api/src/services/accounting/account.service';
-import { postOrderPaymentJournal } from '../../../apps/api/src/services/accounting/posting/order-posting';
-import { postRefundJournal } from '../../../apps/api/src/services/accounting/posting/refund-posting';
-import { postPartialReturnJournal } from '../../../apps/api/src/services/accounting/posting/partial-return-posting';
+import { postOrderPaymentJournal as postOrderPaymentJournalRaw } from '../../../apps/api/src/services/accounting/posting/order-posting';
+import { postRefundJournal as postRefundJournalRaw } from '../../../apps/api/src/services/accounting/posting/refund-posting';
+import { postPartialReturnJournal as postPartialReturnJournalRaw } from '../../../apps/api/src/services/accounting/posting/partial-return-posting';
 import { generateTaxReport } from '../../../apps/api/src/services/accounting/tax-report.service';
 
 const hasDb =
@@ -50,6 +50,14 @@ const hasDb =
 const OWNER = '00000000-0000-0000-0000-0000000000ab';
 const CUSTOMER = '00000000-0000-0000-0000-0000000000ac';
 let storeId: string;
+// Production runs these inside runInTenantContext(storeId); the tenant guard
+// needs the same ambient store here.
+const postOrderPaymentJournal = (a: Parameters<typeof postOrderPaymentJournalRaw>[0]) =>
+  runInTenantContext(storeId, () => postOrderPaymentJournalRaw(a));
+const postRefundJournal = (a: Parameters<typeof postRefundJournalRaw>[0]) =>
+  runInTenantContext(storeId, () => postRefundJournalRaw(a));
+const postPartialReturnJournal = (a: Parameters<typeof postPartialReturnJournalRaw>[0]) =>
+  runInTenantContext(storeId, () => postPartialReturnJournalRaw(a));
 let productAId: string;
 let productBId: string;
 // COA account ids, resolved once in beforeAll

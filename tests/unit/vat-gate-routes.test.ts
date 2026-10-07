@@ -58,14 +58,19 @@ vi.mock('@api/services/platform-vat.service', () => ({
   getPlatformVat: h.getPlatformVat,
   updatePlatformVat: h.updatePlatformVat,
 }));
-vi.mock('@force/database', () => ({
-  Prisma: {},
-  withUser: (_u: string, fn: () => Promise<unknown>) => fn(),
-  prisma: {
-    storeTaxProfile: { findUnique: h.profileFindUnique },
-    store: { update: h.storeUpdate },
-  },
-}));
+vi.mock('@force/database', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod: Record<string, any> = {
+    Prisma: {},
+    withUser: (_u: string, fn: () => Promise<unknown>) => fn(),
+    prisma: {
+      storeTaxProfile: { findUnique: h.profileFindUnique },
+      store: { update: h.storeUpdate },
+    },
+  };
+  mod.withStore = (_id: string, fn: (tx: unknown) => unknown) => fn(mod.prisma);
+  return mod;
+});
 
 const STORE = '11111111-1111-4111-8111-111111111111';
 const DOC = '22222222-2222-4222-8222-222222222222';

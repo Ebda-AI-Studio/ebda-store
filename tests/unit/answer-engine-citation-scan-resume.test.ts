@@ -18,14 +18,19 @@ const { mockFindMany, mockCreate, mockRecordUsage } = vi.hoisted(() => ({
   mockRecordUsage: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
-  prisma: {
-    store: { findUnique: vi.fn().mockResolvedValue({ domain: 'shop.example', name: 'Shop' }) },
-    answerEngineCheck: { findMany: mockFindMany, create: mockCreate },
-  },
-  // withSavepoint (lib/savepoint.ts) asks this; no request transaction here.
-  hasTenantContext: () => false,
-}));
+vi.mock('@force/database', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod: Record<string, any> = {
+    prisma: {
+      store: { findUnique: vi.fn().mockResolvedValue({ domain: 'shop.example', name: 'Shop' }) },
+      answerEngineCheck: { findMany: mockFindMany, create: mockCreate },
+    },
+    // withSavepoint (lib/savepoint.ts) asks this; no request transaction here.
+    hasTenantContext: () => false,
+  };
+  mod.withStore = (_id: string, fn: (tx: unknown) => unknown) => fn(mod.prisma);
+  return mod;
+});
 vi.mock('@api/services/ai.service', () => ({ recordUsage: mockRecordUsage }));
 vi.mock('@api/services/answer-engine/budget', () => ({
   isPaidEngineOverBudget: vi.fn().mockResolvedValue(false),

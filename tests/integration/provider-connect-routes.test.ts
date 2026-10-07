@@ -111,7 +111,7 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
 
   beforeAll(async () => {
     vi.spyOn(inngest, 'send').mockResolvedValue({ ids: [] } as never);
-    owner = createPrismaClient({ connectionString: OWNER_URL, max: 3 });
+    owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
     stubServer = await serveStub(stub.fetch);
     process.env.KASHIER_BASE_URL = stubServer.url;
     app = express();

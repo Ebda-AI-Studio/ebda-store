@@ -80,6 +80,7 @@ export async function handlePaymentReconcileSweep(
         const alreadyReported = await withStore(p.order.storeId, tx =>
           tx.paymentEvent.findFirst({
             where: {
+              storeId: p.order.storeId,
               paymentId: p.id,
               eventType: 'reconciliation',
               details: { path: ['reason'], equals: MISMATCH_REASON },

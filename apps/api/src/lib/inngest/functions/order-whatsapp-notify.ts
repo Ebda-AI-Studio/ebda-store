@@ -110,7 +110,7 @@ export async function handleOrderWhatsAppNotify(
           name: true,
           wbsEnabled: true,
           wbsClientId: true,
-          wbsApiKey: true,
+          credentials: { select: { wbsApiKey: true } },
           wbsTemplates: true,
         },
       })
@@ -127,7 +127,7 @@ export async function handleOrderWhatsAppNotify(
     return { skipped: 'wbs-disabled' };
   }
 
-  if (!storeConfig.wbsClientId || !storeConfig.wbsApiKey) {
+  if (!storeConfig.wbsClientId || !storeConfig.credentials?.wbsApiKey) {
     logger.info({ storeId }, '[WBS-NOTIFY] WBS not fully configured — skipping');
     return { skipped: 'wbs-not-configured' };
   }
@@ -160,7 +160,7 @@ export async function handleOrderWhatsAppNotify(
   const order = await step.run('load-order', () =>
     runInTenantContext(storeId, () =>
       prisma.order.findUnique({
-        where: { id: orderId },
+        where: { id: orderId, storeId },
         select: {
           orderNumber: true,
           total: true,
@@ -230,7 +230,7 @@ export async function handleOrderWhatsAppNotify(
   const result = await step.run('send-whatsapp', async () => {
     try {
       return await wbsBridgeService.sendOrderNotification({
-        encryptedApiKey: storeConfig.wbsApiKey!,
+        encryptedApiKey: storeConfig.credentials!.wbsApiKey!,
         recipientPhone,
         templateName: templateConfig.name,
         languageCode: templateConfig.languageCode || 'en',

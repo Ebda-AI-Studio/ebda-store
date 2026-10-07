@@ -160,7 +160,7 @@ router.get(
       const { storeId, id } = req.params;
 
       const abandonedCart = await prisma.abandonedCart.findUnique({
-        where: { id },
+        where: { id, storeId },
         include: {
           customer: {
             select: { id: true, firstName: true, lastName: true, email: true, phone: true },

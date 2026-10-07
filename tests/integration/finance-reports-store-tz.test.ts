@@ -19,7 +19,7 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import ExcelJS from 'exceljs';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import { seedCoaForStore } from '../../apps/api/src/services/accounting/account.service';
 import { postOrderPaymentJournal } from '../../apps/api/src/services/accounting/posting/order-posting';
 
@@ -120,7 +120,8 @@ beforeAll(async () => {
         },
       },
     });
-    await postOrderPaymentJournal({ orderId: order.id });
+    // Production posts inside runInTenantContext(storeId).
+    await runInTenantContext(storeId, () => postOrderPaymentJournal({ orderId: order.id }));
     const moved = await prisma.journalEntry.updateMany({
       where: { storeId, source: 'order', sourceId: order.id },
       data: { postedAt: new Date(o.at) },

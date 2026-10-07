@@ -17,8 +17,8 @@
       "tier": "unit",
       "why": "clearance coupon minted from another store's dead-stock flag",
       "source": "apps/api/src/services/accounting/deadstock-scan.service.ts",
-      "find": "    where: { id: flagId, storeId },",
-      "replace": "    where: { id: flagId },",
+      "find": "const flag = await prisma.deadStockFlag.findFirst({\n    where: { id: flagId, storeId },",
+      "replace": "const flag = await prisma.deadStockFlag.findFirst({\n    where: { id: flagId },",
       "test": "tests/unit/deadstock-clearance-tenant-scoping.test.ts"
     },
     {
@@ -27,8 +27,8 @@
       "tier": "unit",
       "why": "purchase order raised against another store's reorder suggestion",
       "source": "apps/api/src/services/accounting/purchase-order.service.ts",
-      "find": "    where: { id: suggestionId, storeId },",
-      "replace": "    where: { id: suggestionId },",
+      "find": "const sug = await prisma.reorderSuggestion.findFirst({\n    where: { id: suggestionId, storeId },",
+      "replace": "const sug = await prisma.reorderSuggestion.findFirst({\n    where: { id: suggestionId },",
       "test": "tests/unit/purchase-order-service-tenant-scoping.test.ts"
     },
     {
@@ -507,8 +507,8 @@
       "tier": "unit",
       "why": "an attacker-supplied X-Original-Host lands in every AI product-feed link and is cached 600s in Redis and at the CDN",
       "source": "apps/api/src/routes/public.routes.ts",
-      "find": "    const baseUrl = store.domain ? `https://${store.domain}` : `${config.webUrl}/${store.slug}`;",
-      "replace": "    const baseUrl = store.domain\n      ? `https://${store.domain}`\n      : `https://${req.get('x-original-host') ?? req.get('host')}`;",
+      "find": "    const baseUrl = storefrontOrigin(store);",
+      "replace": "    const baseUrl = `https://${req.get('x-original-host') ?? req.get('host')}`;",
       "test": "tests/unit/feed-baseurl-ignores-request-header.test.ts"
     },
     {
@@ -517,8 +517,8 @@
       "tier": "unit",
       "why": "the agent write credential is shown exactly once at mint; a status endpoint that also returned it (plaintext or ciphertext) would make the one-time reveal meaningless and put the secret in every admin page load",
       "source": "apps/api/src/routes/agent-credential.routes.ts",
-      "find": "          hasKey: Boolean(store.agentApiKey),\n          rotatedAt: store.agentApiKeyRotatedAt,",
-      "replace": "          hasKey: Boolean(store.agentApiKey),\n          apiKey: store.agentApiKey,\n          rotatedAt: store.agentApiKeyRotatedAt,",
+      "find": "          hasKey: Boolean(store.credentials?.agentApiKey),\n          rotatedAt: store.agentApiKeyRotatedAt,",
+      "replace": "          hasKey: Boolean(store.credentials?.agentApiKey),\n          apiKey: store.credentials?.agentApiKey,\n          rotatedAt: store.agentApiKeyRotatedAt,",
       "test": "tests/unit/agent-credential-route.test.ts"
     },
     {
@@ -527,8 +527,8 @@
       "tier": "unit",
       "why": "a revoke that only re-stamped rotatedAt would answer the same 200 and show \"no key\" in the admin while the old credential kept authorising MCP writes",
       "source": "apps/api/src/routes/agent-credential.routes.ts",
-      "find": "        data: { agentApiKey: null, agentApiKeyRotatedAt: new Date() },",
-      "replace": "        data: { agentApiKeyRotatedAt: new Date() },",
+      "find": "            upsert: { create: { agentApiKey: null }, update: { agentApiKey: null } },",
+      "replace": "            upsert: { create: {}, update: {} },",
       "test": "tests/unit/agent-credential-route.test.ts"
     },
     {
@@ -545,30 +545,30 @@
       "id": "store-getbyid-omits-agent-credential",
       "domain": "secret exposure",
       "tier": "unit",
-      "why": "GET /stores/:id hands a whole Store row to the admin app; without the omit the agent credential ciphertext ships to the browser",
+      "why": "GET /stores/:id hands a whole Store row to the admin app; a read that also includes the `credentials` relation (StoreCredential, holding the agent key ciphertext) would ship it to the browser",
       "source": "apps/api/src/services/store.service.ts",
-      "find": "        omit: { agentApiKey: true },\n        include: {\n          owner: {\n            select: { id: true, email: true, firstName: true, lastName: true },\n          },\n        },\n      })\n    );",
-      "replace": "        include: {\n          owner: {\n            select: { id: true, email: true, firstName: true, lastName: true },\n          },\n        },\n      })\n    );",
+      "find": "      tx.store.findUnique({\n        where: { id: storeId },\n        include: {\n          owner: {",
+      "replace": "      tx.store.findUnique({\n        where: { id: storeId },\n        include: {\n          credentials: true,\n          owner: {",
       "test": "tests/unit/store-read-omits-agent-credential.test.ts"
     },
     {
       "id": "store-list-omits-agent-credential",
       "domain": "secret exposure",
       "tier": "unit",
-      "why": "the admin store list returns whole Store rows; without the omit every listed store ships its agent credential ciphertext",
+      "why": "the admin store list returns whole Store rows; a read that includes the `credentials` relation (StoreCredential) would ship every listed store's agent credential ciphertext",
       "source": "apps/api/src/services/store.service.ts",
-      "find": "        omit: { agentApiKey: true },\n        include: {\n          owner: {\n            select: { id: true, email: true, firstName: true, lastName: true },\n          },\n        },\n        orderBy: { createdAt: 'desc' },",
-      "replace": "        include: {\n          owner: {\n            select: { id: true, email: true, firstName: true, lastName: true },\n          },\n        },\n        orderBy: { createdAt: 'desc' },",
+      "find": "        take: limit,\n        include: {\n          owner: {",
+      "replace": "        take: limit,\n        include: {\n          credentials: true,\n          owner: {",
       "test": "tests/unit/store-read-omits-agent-credential.test.ts"
     },
     {
       "id": "store-getbyslug-omits-agent-credential",
       "domain": "secret exposure",
       "tier": "unit",
-      "why": "getBySlug writes its row into a 120s Redis cache, so without the omit the credential ciphertext is not leaked once but cached and served to every reader for the TTL",
+      "why": "getBySlug writes its row into a 120s Redis cache, so a read that includes the `credentials` relation (StoreCredential) would cache the credential ciphertext and serve it to every reader for the TTL",
       "source": "apps/api/src/services/store.service.ts",
-      "find": "      omit: { agentApiKey: true },\n    });\n\n    if (!store) {\n      throw new AppError(404, 'NOT_FOUND', 'Store not found');\n    }\n    const storeWithCounts",
-      "replace": "    });\n\n    if (!store) {\n      throw new AppError(404, 'NOT_FOUND', 'Store not found');\n    }\n    const storeWithCounts",
+      "find": "withStore(slugStoreId, tx => tx.store.findUnique({ where: { id: slugStoreId } }))\n      : null;\n\n    if (!store) {\n      throw new AppError(404, 'NOT_FOUND', 'Store not found');\n    }\n    const storeWithCounts",
+      "replace": "withStore(slugStoreId, tx =>\n          tx.store.findUnique({ where: { id: slugStoreId }, include: { credentials: true } })\n        )\n      : null;\n\n    if (!store) {\n      throw new AppError(404, 'NOT_FOUND', 'Store not found');\n    }\n    const storeWithCounts",
       "test": "tests/unit/store-read-omits-agent-credential.test.ts"
     },
     {
@@ -627,8 +627,8 @@
       "tier": "unit",
       "why": "a correct classifier wired to the wrong action or window is an alert that never fires, which is indistinguishable from a quiet system",
       "source": "apps/api/src/lib/inngest/functions/agent-write-denied-watch.ts",
-      "find": "      where: { action: 'agent.write.denied', createdAt: { gte: since } },",
-      "replace": "      where: { action: 'agent.write.failed', createdAt: { gte: since } },",
+      "find": "          tx.auditLog.findMany({\n            where: { action: 'agent.write.denied', createdAt: { gte: since }, storeId },",
+      "replace": "          tx.auditLog.findMany({\n            where: { action: 'agent.write.failed', createdAt: { gte: since }, storeId },",
       "test": "tests/unit/agent-write-denied-watch.test.ts"
     },
     {
@@ -685,11 +685,11 @@
       "id": "ssrf-carrier-merchant-base-url",
       "domain": "SSRF",
       "tier": "unit",
-      "why": "merchant-supplied carrier baseUrl reaches fetch() unvalidated — cloud metadata at 169.254.169.254 from the API host",
-      "source": "apps/api/src/services/carriers/icarry.carrier.ts",
-      "find": "  await assertPublicHttpUrl(trimmed);\n  return trimmed;",
-      "replace": "  return trimmed;",
-      "test": "tests/unit/carrier-ssrf.test.ts"
+      "why": "a merchant can store a `baseUrl` (or any key the catalog does not list) as a carrier credential, so the next Test connection fetches an internal address from the API host (cloud metadata at 169.254.169.254)",
+      "source": "apps/api/src/services/payment-providers/provider-connection.service.ts",
+      "find": "    if (!field) {\n      errors.push(`${key}: not a ${entry.code} credential`);\n      continue;\n    }",
+      "replace": "    if (!field) {\n      next[key] = String(raw);\n      continue;\n    }",
+      "test": "tests/unit/shipping-provider-connect.test.ts"
     },
     {
       "id": "impersonation-account-soft-delete",
@@ -777,8 +777,8 @@
       "tier": "unit",
       "why": "a rotated token's grace uses stop being spent — the claim is faked instead of written, so one stolen token replays in a loop for the whole window, minting a separate full-length session every pass",
       "source": "apps/api/src/services/auth.service.ts",
-      "find": "        ? await this.claimGraceUse(storedToken.id, storedToken.revokedReason)",
-      "replace": "        ? { claimed: true, exhausted: false, spent: 1 }",
+      "find": "? await this.claimGraceUse(storedToken.id, storedToken.revokedReason, storedToken.userId)",
+      "replace": "? { claimed: true, exhausted: false, spent: 1 }",
       "test": "tests/unit/refresh-token-rotation-race.test.ts"
     },
     {
@@ -787,8 +787,8 @@
       "tier": "unit",
       "why": "the rotation write stops being conditional on the row still being live — a second concurrent rotation overwrites replacedById and the chain walk follows a dead branch",
       "source": "apps/api/src/services/auth.service.ts",
-      "find": "        where: { id: storedToken.id, revokedAt: null },",
-      "replace": "        where: { id: storedToken.id },",
+      "find": "where: { id: storedToken.id, userId: storedToken.userId, revokedAt: null },\n          data: {\n            revokedAt: new Date(),\n            revokedReason: REASON_ROTATED,",
+      "replace": "where: { id: storedToken.id, userId: storedToken.userId },\n          data: {\n            revokedAt: new Date(),\n            revokedReason: REASON_ROTATED,",
       "test": "tests/unit/refresh-token-rotation-race.test.ts"
     },
     {
@@ -847,8 +847,8 @@
       "tier": "unit",
       "why": "mergeGuestCart creates a second cart carrying the guest's own sessionId while the guest row is still live — a deterministic violation of the FULL unique index carts_store_id_session_id_key, which inside the ambient transaction aborts the whole request",
       "source": "apps/api/src/services/cart.service.ts",
-      "find": "      await prisma.cart.update({\n        where: { id: guestCart.id },\n        data: { customerId },\n      });\n      return this.loadMergedCart(guestCart.id);",
-      "replace": "      const created = await prisma.cart.create({\n        data: { storeId, sessionId: guestSessionId, customerId },\n      });\n      return this.loadMergedCart(created.id);",
+      "find": "      await prisma.cart.update({\n        where: { id: guestCart.id, storeId },\n        data: { customerId },\n      });\n      return this.loadMergedCart(storeId, guestCart.id);",
+      "replace": "      const created = await prisma.cart.create({\n        data: { storeId, sessionId: guestSessionId, customerId },\n      });\n      return this.loadMergedCart(storeId, created.id);",
       "test": "tests/unit/cart.test.ts"
     },
     {
@@ -877,8 +877,8 @@
       "tier": "unit",
       "why": "hop 1 of the successor walk becomes a per-user scan plus sort (there is no (userId, createdAt) index) instead of a primary-key read — a pessimisation on the thundering-herd path, where the chain is almost always one hop",
       "source": "apps/api/src/services/auth.service.ts",
-      "find": "    const first = await prisma.refreshToken.findUnique({\n      where: { id: replacedById },\n      select: { revokedAt: true, revokedReason: true, replacedById: true },\n    });",
-      "replace": "    const first = (\n      await prisma.refreshToken.findMany({\n        where: { userId },\n        select: { id: true, revokedAt: true, revokedReason: true, replacedById: true },\n        orderBy: { createdAt: 'desc' },\n        take: 500,\n      })\n    ).find(r => r.id === replacedById);",
+      "find": "    const first = await withUser(userId, tx =>\n      tx.refreshToken.findUnique({\n        where: { id: replacedById, userId },\n        select: { revokedAt: true, revokedReason: true, replacedById: true },\n      })\n    );",
+      "replace": "    const first = (\n      await withUser(userId, tx =>\n        tx.refreshToken.findMany({\n          where: { userId },\n          select: { id: true, revokedAt: true, revokedReason: true, replacedById: true },\n          orderBy: { createdAt: 'desc' },\n          take: 500,\n        })\n      )\n    ).find(r => r.id === replacedById);",
       "test": "tests/unit/refresh-token-rotation-race.test.ts"
     },
     {
@@ -1105,29 +1105,29 @@
       "id": "carrier-merge-base-not-cached",
       "domain": "credential integrity",
       "tier": "unit",
-      "why": "the masked-resubmit merge base is read through a 300s Redis cache — a stale or wrong-shaped entry reads as \"no credentials\" and the merchant's carrier secret is dropped and overwritten",
+      "why": "the credential merge base is read through a 300s Redis cache: a stale or wrong-shaped entry reads as \"no credentials\" and the merchant's carrier secret is dropped and overwritten",
       "source": "apps/api/src/services/shipping-carrier.service.ts",
-      "find": "          const current = await prisma.shippingCarrierConfig.findUnique({\n            where: { storeId_carrier: { storeId, carrier } },\n            select: { credentials: true },\n          });\n          stored = current?.credentials ? this.decryptCredentials(current.credentials) : {};",
-      "replace": "          const current = await this.getCarrierConfig(storeId, carrier);\n          stored = ((current?.credentials as Record<string, string>) ?? {}) as Record<string, string>;",
+      "find": "      const existing = await tx.shippingCarrierConfig.findUnique({\n        where: { storeId_carrier: { storeId, carrier } },\n      });\n",
+      "replace": "      const existing = (await this.getCarrierConfig(storeId, carrier)) as any;\n",
       "test": "tests/unit/carrier-credentials-merge.test.ts"
     },
     {
       "id": "carrier-masked-field-refuses-drop",
       "domain": "credential integrity",
       "tier": "unit",
-      "why": "an unresolvable masked field is silently dropped instead of refusing the save, persisting a truncated credential set over a working Aramex/iCarry secret",
+      "why": "an unreadable stored credential blob is merged over instead of refusing the save, persisting a truncated credential set over a working carrier secret",
       "source": "apps/api/src/services/shipping-carrier.service.ts",
-      "find": "        } else {\n          throw new AppError(\n            400,\n            'CARRIER_CREDENTIALS_UNRESOLVED',\n            `Re-enter the ${carrier} credentials: the saved value for \"${key}\" could not be read, and saving now would erase it.`\n          );\n        }",
-      "replace": "        }",
+      "find": "          if (err instanceof AppError) throw err;\n",
+      "replace": "        throw err;\n",
       "test": "tests/unit/carrier-credentials-merge.test.ts"
     },
     {
       "id": "carrier-credentials-shape-fails-loudly",
       "domain": "credential integrity",
       "tier": "unit",
-      "why": "an already-decrypted (pre-v2 cache) credentials value falls into the catch and returns {}, indistinguishable from an unconfigured carrier — carrier auth fails on live orders and the erasing merge is fed",
+      "why": "an already-decrypted (pre-v3 cache) credentials value falls into the catch and returns {}, indistinguishable from an unconfigured carrier: carrier auth fails on live orders and the erasing merge is fed",
       "source": "apps/api/src/services/shipping-carrier.service.ts",
-      "find": "    if (typeof encryptedCredentials !== 'string') {\n      throw new Error(\n        '[ShippingCarrierService] credentials are not an encrypted string — refusing to read them as empty'\n      );\n    }\n",
+      "find": "    if (row.credentials && typeof row.credentials !== 'string') {\n      throw new Error(\n        '[ShippingCarrierService] credentials are not an encrypted string: refusing to read them as empty'\n      );\n    }\n",
       "replace": "",
       "test": "tests/unit/carrier-credentials-merge.test.ts"
     },
@@ -1287,8 +1287,8 @@
       "tier": "unit",
       "why": "an inactive or soft-deleted store's custom domain stays a credentials:true CORS origin indefinitely (#1214)",
       "source": "apps/api/src/lib/cors-cache.ts",
-      "find": "    status: { in: ['active', 'suspended'] as ('active' | 'suspended')[] },\n    deletedAt: null,",
-      "replace": "",
+      "find": "export function corsCustomDomainWhere(hostname: string) {\n  return {\n    ...storeDomainWhere(hostname),\n    status: { in: ['active', 'suspended'] as ('active' | 'suspended')[] },\n    deletedAt: null,\n",
+      "replace": "export function corsCustomDomainWhere(hostname: string) {\n  return {\n    ...storeDomainWhere(hostname),\n",
       "test": "tests/unit/cors-custom-domain-trust.test.ts"
     },
     {
@@ -1392,16 +1392,6 @@
       "test": "tests/unit/public-mount-admin-route-guard.test.ts"
     },
     {
-      "id": "cache-agent-docs-not-cookie-resolved",
-      "domain": "cache poisoning",
-      "tier": "unit",
-      "why": "platform-host llms.txt / ACP / UCP / product feed resolved from the sticky x-store-slug cookie while shared-cacheable — one store's document cached under the platform URL for every visitor (#1959)",
-      "source": "apps/web/middleware.ts",
-      "find": "  const cookieSlug = isUrlKeyedPublicPath(request.nextUrl.pathname)\n    ? undefined\n    : request.cookies.get('x-store-slug')?.value;",
-      "replace": "  const cookieSlug = request.cookies.get('x-store-slug')?.value;",
-      "test": "tests/unit/web-middleware-characterization.test.ts"
-    },
-    {
       "id": "csrf-router-level-admin-auth-not-at-public",
       "domain": "csrf / session",
       "tier": "unit",
@@ -1427,7 +1417,7 @@
       "tier": "unit",
       "why": "a merchant-initiated erasure forfeits and scrubs wallets in OTHER stores (owner decision 2026-09-26, Ruling W-7: a store deletes only its own data)",
       "source": "apps/api/src/services/wallet.service.ts",
-      "find": "const storeFilter = scope.storeId ? { storeId: scope.storeId } : {};",
+      "find": "const storeFilter = { storeId: scope.storeId ?? currentStoreId() };",
       "replace": "const storeFilter = {};",
       "test": "tests/unit/auth-erase-propagation.test.ts"
     },
@@ -1497,8 +1487,8 @@
       "tier": "unit",
       "why": "two duplicate order/status-changed deliveries both pass the findFirst fast path; without the status + commissionAmount predicate the loser's claim matches the already-paid referral again and the affiliate is credited twice (reproduced 6x against real Postgres, #618)",
       "source": "apps/api/src/services/affiliate.service.ts",
-      "find": "        where: { id: referral.id, status: 'converted', commissionAmount: null },",
-      "replace": "        where: { id: referral.id },",
+      "find": "where: { id: referral.id, storeId, status: 'converted', commissionAmount: null },",
+      "replace": "where: { id: referral.id, storeId },",
       "test": "tests/unit/affiliate-commission-idempotency.test.ts"
     },
     {
@@ -1507,8 +1497,8 @@
       "tier": "unit",
       "why": "the losing duplicate delivery claims 0 rows but credits totalEarned + pendingBalance anyway — a double commission payout (#618)",
       "source": "apps/api/src/services/affiliate.service.ts",
-      "find": "      if (claim.count !== 1) return false;\n      await db.affiliate.update({\n        where: { id: referral.affiliateId },\n        data: {\n          totalEarned: { increment: commissionAmount },",
-      "replace": "      await db.affiliate.update({\n        where: { id: referral.affiliateId },\n        data: {\n          totalEarned: { increment: commissionAmount },",
+      "find": "      if (claim.count !== 1) return false;\n      await db.affiliate.update({\n        where: { id: referral.affiliateId, storeId },\n        data: {\n          totalEarned: { increment: commissionAmount },",
+      "replace": "      await db.affiliate.update({\n        where: { id: referral.affiliateId, storeId },\n        data: {\n          totalEarned: { increment: commissionAmount },",
       "test": "tests/unit/affiliate-commission-idempotency.test.ts"
     },
     {
@@ -1517,8 +1507,8 @@
       "tier": "unit",
       "why": "a duplicate order-refunded delivery decrements the affiliate's earnings a second time, driving pendingBalance below what was ever paid (#618)",
       "source": "apps/api/src/services/affiliate.service.ts",
-      "find": "      if (claim.count !== 1) return false;\n      await db.affiliate.update({\n        where: { id: referral.affiliateId },\n        data: {\n          totalEarned: { decrement: amount },",
-      "replace": "      await db.affiliate.update({\n        where: { id: referral.affiliateId },\n        data: {\n          totalEarned: { decrement: amount },",
+      "find": "      if (claim.count !== 1) return false;\n      await db.affiliate.update({\n        where: { id: referral.affiliateId, storeId },\n        data: {\n          totalEarned: { decrement: amount },",
+      "replace": "      await db.affiliate.update({\n        where: { id: referral.affiliateId, storeId },\n        data: {\n          totalEarned: { decrement: amount },",
       "test": "tests/unit/affiliate-commission-idempotency.test.ts"
     },
     {
@@ -1656,7 +1646,7 @@
       "domain": "availability",
       "tier": "unit",
       "why": "with the global-cap bypass keyed on a header NAME, removing the dedicated /api/v1/inngest bucket leaves forged-signature POSTs unbounded — each a 10 MB JSON parse plus an HMAC on the shared event loop before the 401 (issue 2063)",
-      "source": "apps/api/src/index.ts",
+      "source": "apps/api/src/app.ts",
       "find": "app.use('/api/v1/inngest', inngestLimiter);",
       "replace": "void inngestLimiter;",
       "test": "tests/unit/global-rate-limit-skip.test.ts"
@@ -1697,7 +1687,7 @@
       "tier": "unit",
       "why": "the SMS opt-out link is MAC'd with JWT_SECRET again, so rotating the session secret permanently kills every delivered opt-out link — a guest's only login-free way to stop marketing SMS (issue 2424)",
       "source": "apps/api/src/lib/sms-consent.ts",
-      "find": "createHmac('sha256', derivedSecret('fwb:sms-optout-mac:v2'))",
+      "find": "createHmac('sha256', derivedSecret('ebda:sms-optout-mac:v2'))",
       "replace": "createHmac('sha256', process.env.JWT_SECRET!)",
       "test": "tests/unit/sms-consent-lib.test.ts"
     },
@@ -1727,7 +1717,7 @@
       "tier": "unit",
       "why": "new campaign unsubscribe links fall back to JWT_SECRET again, so a session-secret rotation kills the one-click unsubscribe in every campaign email sent from then on (issue 2424 class)",
       "source": "apps/api/src/lib/campaign-unsubscribe-token.ts",
-      "find": "process.env.CAMPAIGN_UNSUBSCRIBE_SECRET || derivedSecret('fwb:campaign-unsubscribe-mac:v1')\n  );",
+      "find": "process.env.CAMPAIGN_UNSUBSCRIBE_SECRET || derivedSecret('ebda:campaign-unsubscribe-mac:v1')\n  );",
       "replace": "process.env.CAMPAIGN_UNSUBSCRIBE_SECRET || config.jwtSecret\n  );",
       "test": "tests/unit/campaign-unsubscribe-token.test.ts"
     },
@@ -1737,7 +1727,7 @@
       "tier": "unit",
       "why": "new review-request links fall back to JWT_SECRET again, so a session-secret rotation kills every review link still inside its 90-day window (issue 2424 class)",
       "source": "apps/api/src/lib/review-token.ts",
-      "find": "return process.env.REVIEW_TOKEN_SECRET || derivedSecret('fwb:review-link-mac:v1');",
+      "find": "return process.env.REVIEW_TOKEN_SECRET || derivedSecret('ebda:review-link-mac:v1');",
       "replace": "return process.env.REVIEW_TOKEN_SECRET || config.jwtSecret;",
       "test": "tests/unit/review-token.test.ts"
     },
@@ -1842,12 +1832,142 @@
       "test": "tests/integration/egypt-gateway-webhooks.test.ts"
     },
     {
+      "id": "carrier-webhook-url-token-required",
+      "domain": "webhook authenticity",
+      "tier": "unit",
+      "why": "a carrier callback is applied without the per-store URL secret, so anyone who knows a store id can forge a \"delivered\" status on any tracking number",
+      "source": "apps/api/src/services/shipping-carrier.service.ts",
+      "find": "      if (!verifyWebhookToken(secret, token)) return 'unauthorized' as const;\n",
+      "replace": "",
+      "test": "tests/unit/carrier-webhook-auth.test.ts"
+    },
+    {
+      "id": "carrier-webhook-header-required",
+      "domain": "webhook authenticity",
+      "tier": "unit",
+      "why": "Bosta callbacks are accepted on the URL token alone, so a leaked callback URL is enough to forge tracking updates (the derived header is the second factor)",
+      "source": "apps/api/src/services/shipping-carrier.service.ts",
+      "find": "        if (!presented || !safeEqual(presented, impl.webhookHeader.valueFor(secret))) {",
+      "replace": "        if (false) {",
+      "test": "tests/unit/carrier-webhook-auth.test.ts"
+    },
+    {
+      "id": "carrier-enable-requires-current-test",
+      "domain": "provider gate",
+      "tier": "unit",
+      "why": "a carrier is enabled with credentials no Test connection has proven (or whose proof predates an edit or a mode switch), so bookings fail on live orders",
+      "source": "apps/api/src/services/carriers/carrier-connection.service.ts",
+      "find": "  if (!carrierTestIsCurrent(row)) {\n    throw new AppError(\n      409,\n      'CONNECTION_NOT_TESTED',",
+      "replace": "  if (false) {\n    throw new AppError(\n      409,\n      'CONNECTION_NOT_TESTED',",
+      "test": "tests/unit/shipping-provider-connect.test.ts"
+    },
+    {
+      "id": "carrier-enable-requires-verified",
+      "domain": "provider gate",
+      "tier": "unit",
+      "why": "a carrier that never completed a flow against its real sandbox (PROVIDERS-2) can be enabled by a merchant",
+      "source": "apps/api/src/services/carriers/carrier-connection.service.ts",
+      "find": "  if (!isProviderUsable(row.carrier)) {\n    throw new AppError(\n      409,\n      'PROVIDER_NOT_VERIFIED',",
+      "replace": "  if (false) {\n    throw new AppError(\n      409,\n      'PROVIDER_NOT_VERIFIED',",
+      "test": "tests/unit/shipping-provider-connect.test.ts"
+    },
+    {
+      "id": "carrier-test-fingerprint-checked",
+      "domain": "provider gate",
+      "tier": "unit",
+      "why": "the last successful Test connection is accepted for ANY credentials, so an edited key or a sandbox-to-live switch rides on a stale proof",
+      "source": "apps/api/src/services/carriers/carrier-connection.service.ts",
+      "find": "    return t.fingerprint === carrierFingerprint(row.carrier, mode, activeFieldSet(row));",
+      "replace": "    return true;",
+      "test": "tests/unit/shipping-provider-connect.test.ts"
+    },
+    {
+      "id": "carrier-credentials-write-only",
+      "domain": "credential integrity",
+      "tier": "unit",
+      "why": "the carrier config view returned to the browser still carries the ciphertext (and with it the webhook secret and every key)",
+      "source": "apps/api/src/services/carriers/carrier-connection.service.ts",
+      "find": "  delete rest.credentials;\n",
+      "replace": "",
+      "test": "tests/unit/shipping-provider-connect.test.ts"
+    },
+    {
+      "id": "carrier-save-locks-row",
+      "domain": "credential integrity",
+      "tier": "unit",
+      "why": "two concurrent carrier saves each merge over the same snapshot and the later write silently reverts the earlier one (a saved key or a rotated webhook secret is lost)",
+      "source": "apps/api/src/services/shipping-carrier.service.ts",
+      "find": "      await tx.$queryRaw`SELECT 1 FROM shipping_carrier_configs WHERE store_id = ${storeId} AND carrier = ${carrier} FOR UPDATE`;\n      // Straight from Prisma, never the cache",
+      "replace": "      // Straight from Prisma, never the cache",
+      "test": "tests/unit/carrier-credentials-merge.test.ts"
+    },
+    {
+      "id": "tenant-guard-keyverdict-mismatch-is-not-a-match",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "the code-level tenant guard compares a where's storeId/userId to the ambient one; if a mismatch counted as a match, every cross-store read/write would pass the guard and only RLS would stand between tenants",
+      "source": "packages/database/src/tenant-guard.ts",
+      "find": "if (typeof v === 'string') return seen.push(v === expected ? 'match' : 'mismatch');",
+      "replace": "if (typeof v === 'string') return seen.push('match');",
+      "test": "tests/unit/tenant-guard.test.ts"
+    },
+    {
+      "id": "tenant-guard-no-ambient-store-refused",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "a tenant-model query that runs with no ambient store (no runInTenantContext/withStore) must be refused; if it were allowed, a contextless query would reach the DB unscoped and depend on RLS alone",
+      "source": "packages/database/src/tenant-guard.ts",
+      "find": "if (v !== 'match' || !scope.storeId) {",
+      "replace": "if (v !== 'match' && scope.storeId) {",
+      "test": "tests/unit/tenant-guard.test.ts"
+    },
+    {
+      "id": "tenant-guard-raw-sql-contextless-refused",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "a raw SQL statement naming a tenant table with no tenant context must be refused; raw SQL bypasses the model-level checks, so without this refusal $queryRaw is a hole around the guard",
+      "source": "packages/database/src/tenant-guard.ts",
+      "find": "if (tables.length > 0) {",
+      "replace": "if (false) {",
+      "test": "tests/unit/tenant-guard.test.ts"
+    },
+    {
+      "id": "tenant-guard-create-must-name-ambient-store",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "a create on a tenant model must set storeId (or store.connect) to the ambient store; without it a request scoped to store A could insert a row into store B",
+      "source": "packages/database/src/tenant-guard.ts",
+      "find": "if (named.named && scope.storeId && named.value === scope.storeId) continue;",
+      "replace": "continue;",
+      "test": "tests/unit/tenant-guard.test.ts"
+    },
+    {
+      "id": "tenant-guard-user-keyed-model-scoped-to-ambient-user",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "user-keyed models (refresh tokens, etc.) must be queried by the ambient user's id; without the check one user's session could read or revoke another user's rows",
+      "source": "packages/database/src/tenant-guard.ts",
+      "find": "if (keyVerdict(a.where, userKey, scope.userId) !== 'match') {",
+      "replace": "if (false) {",
+      "test": "tests/unit/tenant-guard.test.ts"
+    },
+    {
+      "id": "tenant-guard-storeidmodels-reads-the-schema-snapshot",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "the set of tenant models is derived from the committed schema snapshot (every model with a storeId column; the snapshot is checked against the generated client by a unit test), so a new tenant table is guarded automatically; an empty set would leave every tenant model unguarded",
+      "source": "packages/database/src/tenant-guard.ts",
+      "find": "  return TENANT_GUARD_SCHEMA.filter(m => m.storeId).map(m => m.name);",
+      "replace": "  return [];",
+      "test": "tests/unit/tenant-guard-models.test.ts"
+    },
+    {
       "id": "password-reset-token-single-use-claim",
       "domain": "authn / session",
       "tier": "integration",
       "why": "two concurrent redemptions of one reset link both set a password (read -> write -> delete): whoever lands second silently owns the account the owner just recovered",
       "source": "apps/api/src/services/auth.service.ts",
-      "find": "    const claimed = await prisma.refreshToken.deleteMany({\n      where: { id: storedToken.id, revokedAt: null, expiresAt: { gt: new Date() } },\n    });",
+      "find": "    const claimed = await withUser(storedToken.userId, tx =>\n      tx.refreshToken.deleteMany({\n        where: {\n          id: storedToken.id,\n          userId: storedToken.userId,\n          revokedAt: null,\n          expiresAt: { gt: new Date() },\n        },\n      })\n    );",
       "replace": "    const claimed = { count: 1 };",
       "test": "tests/integration/merchant-password-reset.test.ts"
     },

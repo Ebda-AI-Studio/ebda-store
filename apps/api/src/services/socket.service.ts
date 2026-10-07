@@ -4,7 +4,7 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { isPlatformOrigin } from '../lib/cors-cache';
-import { prisma } from '@force/database';
+import { withUser } from '@force/database';
 import { getUserState } from '../lib/definer';
 import { redis } from './redis.service';
 import logger from '../lib/logger';
@@ -259,10 +259,13 @@ class SocketService {
       // store_admin can only subscribe to their own store
       if (role === 'store_admin') {
         try {
-          const store = await prisma.store.findFirst({
-            where: { id: storeId, ownerId: user.userId },
-            select: { id: true },
-          });
+          // `stores` is under RLS: read AS the user (owner match), not contextless.
+          const store = await withUser(user.userId, tx =>
+            tx.store.findFirst({
+              where: { id: storeId, ownerId: user.userId },
+              select: { id: true },
+            })
+          );
           if (!store) {
             socket.emit('error', { message: 'You do not have access to this store' });
             return;

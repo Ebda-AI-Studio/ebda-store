@@ -75,7 +75,7 @@ describe('createClearanceCouponFromFlag — cross-tenant scoping', () => {
       expect.objectContaining({ data: expect.objectContaining({ storeId: STORE_A }) })
     );
     expect(mockFlagUpdate).toHaveBeenCalledWith({
-      where: { id: 'flag-1' },
+      where: { id: 'flag-1', storeId: STORE_A },
       data: { status: 'accepted_clearance', couponCode: 'CLEAR-SKU123' },
     });
   });

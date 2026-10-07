@@ -1,0 +1,522 @@
+[
+  {
+    "asset": "ring-solitaire-1",
+    "kind": "p",
+    "unsplashId": "UktGGAIwQyQ",
+    "slug": "a-close-up-of-a-black-fabric-with-a-ring-on-it-UktGGAIwQyQ",
+    "photographer": "Expose Studio",
+    "username": "muskanmehreen17",
+    "alt": "a close up of a black fabric with a ring on it",
+    "raw": "https://images.unsplash.com/photo-1716511956048-e0532bd9746e"
+  },
+  {
+    "asset": "ring-solitaire-2",
+    "kind": "p",
+    "unsplashId": "EsjkVKMdN_I",
+    "slug": "a-womans-hand-displays-a-large-rectangular-diamond-ring-EsjkVKMdN_I",
+    "photographer": "Peter Muniz",
+    "username": "petepxl",
+    "alt": "A woman's hand displays a large rectangular diamond ring",
+    "raw": "https://images.unsplash.com/photo-1780250784120-c83d1bbbebe8"
+  },
+  {
+    "asset": "ring-braided-1",
+    "kind": "p",
+    "unsplashId": "MGlSslCP2LY",
+    "slug": "gold-earrings-with-small-diamonds-on-satin-fabric-MGlSslCP2LY",
+    "photographer": "JESSIE ABRAHAM",
+    "username": "jessicabelle",
+    "alt": "Gold earrings with small diamonds on satin fabric",
+    "raw": "https://images.unsplash.com/photo-1771173652661-8245a9d94095"
+  },
+  {
+    "asset": "ring-braided-2",
+    "kind": "p",
+    "unsplashId": "ltQW6B3rgvA",
+    "slug": "a-woman-with-a-ring-on-her-finger-ltQW6B3rgvA",
+    "photographer": "Sanju Pandita",
+    "username": "spxclicks",
+    "alt": "a woman with a ring on her finger",
+    "raw": "https://images.unsplash.com/photo-1698259947512-a6ac66f961f2"
+  },
+  {
+    "asset": "ring-emerald-1",
+    "kind": "p",
+    "unsplashId": "41PGxdWN0xo",
+    "slug": "a-persons-hand-holding-a-ring-with-a-green-stone-41PGxdWN0xo",
+    "photographer": "Hosniye sadeghi",
+    "username": "hosniyesadeghi",
+    "alt": "a person's hand holding a ring with a green stone",
+    "raw": "https://images.unsplash.com/photo-1685970732254-d2d1f43ddc7c"
+  },
+  {
+    "asset": "ring-emerald-2",
+    "kind": "p",
+    "unsplashId": "NTvXpPuSJrE",
+    "slug": "a-green-ring-sitting-on-top-of-a-black-stand-NTvXpPuSJrE",
+    "photographer": "Hosniye sadeghi",
+    "username": "hosniyesadeghi",
+    "alt": "a green ring sitting on top of a black stand",
+    "raw": "https://images.unsplash.com/photo-1685970730959-eb22c7b2bcd9"
+  },
+  {
+    "asset": "ring-bands-1",
+    "kind": "p",
+    "unsplashId": "ZYet8yoepik",
+    "slug": "gold-wedding-bands-on-fabric-ZYet8yoepik",
+    "photographer": "Mariano Rivas",
+    "username": "colormono",
+    "alt": "Two interlocking gold wedding bands on a textured cream fabric surface",
+    "raw": "https://images.unsplash.com/photo-1622398925373-3f91b1e275f5"
+  },
+  {
+    "asset": "ring-bands-2",
+    "kind": "p",
+    "unsplashId": "4U0i-ZlpyCk",
+    "slug": "gold-ring-on-black-surface-4U0i-ZlpyCk",
+    "photographer": "Razieh Bakhtom",
+    "username": "raziii1375",
+    "alt": "gold ring on black surface",
+    "raw": "https://images.unsplash.com/photo-1624634240157-8413a485be50"
+  },
+  {
+    "asset": "ring-bold-1",
+    "kind": "p",
+    "unsplashId": "PYklI-sQ0ig",
+    "slug": "a-close-up-of-a-person-holding-a-handbag-PYklI-sQ0ig",
+    "photographer": "Mikhail Blinov",
+    "username": "mishablinovv",
+    "alt": "A close up of a person holding a handbag",
+    "raw": "https://images.unsplash.com/photo-1724261366524-657929c7e0b2"
+  },
+  {
+    "asset": "ring-bold-2",
+    "kind": "p",
+    "unsplashId": "51FssjDQCPY",
+    "slug": "woman-wearing-gold-ring-and-gold-ring-51FssjDQCPY",
+    "photographer": "Mutzii",
+    "username": "mutzii",
+    "alt": "woman wearing gold ring and gold ring",
+    "raw": "https://images.unsplash.com/photo-1599481805056-1c61a8975797"
+  },
+  {
+    "asset": "necklace-teardrop-1",
+    "kind": "p",
+    "unsplashId": "TmOPo7TpLzw",
+    "slug": "a-necklace-on-a-mannequin-with-flowers-in-the-background-TmOPo7TpLzw",
+    "photographer": "Atul Mohan",
+    "username": "atulmohan",
+    "alt": "a necklace on a mannequin with flowers in the background",
+    "raw": "https://images.unsplash.com/photo-1705326452390-3ecf6070595f"
+  },
+  {
+    "asset": "necklace-teardrop-2",
+    "kind": "p",
+    "unsplashId": "QkZgJ7jWzIs",
+    "slug": "a-white-mannequin-with-a-gold-necklace-on-it-QkZgJ7jWzIs",
+    "photographer": "Atul Mohan",
+    "username": "atulmohan",
+    "alt": "a white mannequin with a gold necklace on it",
+    "raw": "https://images.unsplash.com/photo-1705326454924-f6777522b030"
+  },
+  {
+    "asset": "necklace-cuban-1",
+    "kind": "p",
+    "unsplashId": "Z3GHeY0NXGg",
+    "slug": "a-pair-of-gold-chain-bracelets-sitting-on-top-of-a-white-box-Z3GHeY0NXGg",
+    "photographer": "Oscar Ramirez",
+    "username": "oscareduardohr",
+    "alt": "a pair of gold chain bracelets sitting on top of a white box",
+    "raw": "https://images.unsplash.com/photo-1708220040856-131e4f86a1aa"
+  },
+  {
+    "asset": "necklace-cuban-2",
+    "kind": "p",
+    "unsplashId": "FV4STFfvcnw",
+    "slug": "a-woman-wearing-a-white-dress-and-gold-jewelry-FV4STFfvcnw",
+    "photographer": "PRAHANT STUDIO",
+    "username": "prahantstudio",
+    "alt": "A woman wearing a white dress and gold jewelry",
+    "raw": "https://images.unsplash.com/photo-1721206624465-7d7691ebe50f"
+  },
+  {
+    "asset": "necklace-crown-1",
+    "kind": "p",
+    "unsplashId": "_Ycmc96ZxWM",
+    "slug": "a-gold-necklace-with-a-crown-on-it-_Ycmc96ZxWM",
+    "photographer": "Hosniye sadeghi",
+    "username": "hosniyesadeghi",
+    "alt": "a gold necklace with a crown on it",
+    "raw": "https://images.unsplash.com/photo-1685970731194-e27b477e87ba"
+  },
+  {
+    "asset": "necklace-crown-2",
+    "kind": "p",
+    "unsplashId": "QwRwbZe6dWc",
+    "slug": "a-close-up-of-a-necklace-QwRwbZe6dWc",
+    "photographer": "Ruan Richard Rodrigues",
+    "username": "ricdeoliveira",
+    "alt": "a close-up of a necklace",
+    "raw": "https://images.unsplash.com/photo-1659708701940-e60893ef03d0"
+  },
+  {
+    "asset": "necklace-flower-1",
+    "kind": "p",
+    "unsplashId": "rvF5EglUXWg",
+    "slug": "a-necklace-with-white-flowers-on-a-gold-chain-rvF5EglUXWg",
+    "photographer": "Hosniye sadeghi",
+    "username": "hosniyesadeghi",
+    "alt": "a necklace with white flowers on a gold chain",
+    "raw": "https://images.unsplash.com/photo-1685970731571-72ede0cb26ea"
+  },
+  {
+    "asset": "necklace-flower-2",
+    "kind": "p",
+    "unsplashId": "XYa9DKDBbPs",
+    "slug": "a-close-up-of-a-person-wearing-a-necklace-XYa9DKDBbPs",
+    "photographer": "Marco J Haenssgen",
+    "username": "marcohaenssgen",
+    "alt": "A close up of a person wearing a necklace",
+    "raw": "https://images.unsplash.com/photo-1727252586975-578c9122ec95"
+  },
+  {
+    "asset": "necklace-coin-1",
+    "kind": "p",
+    "unsplashId": "7uQQHORcTpc",
+    "slug": "a-necklace-hanging-on-a-metal-chain-7uQQHORcTpc",
+    "photographer": "Eve Maier",
+    "username": "maierfoto",
+    "alt": "a necklace hanging on a metal chain",
+    "raw": "https://images.unsplash.com/photo-1635767798638-3e25273a8236"
+  },
+  {
+    "asset": "necklace-coin-2",
+    "kind": "p",
+    "unsplashId": "EnvGlhMhFrc",
+    "slug": "woman-in-white-tank-top-wearing-silver-necklace-EnvGlhMhFrc",
+    "photographer": "Kateryna Hliznitsova",
+    "username": "kate_gliz",
+    "alt": "woman in white tank top wearing silver necklace",
+    "raw": "https://images.unsplash.com/photo-1599459182681-c938b7f65af0"
+  },
+  {
+    "asset": "necklace-classic-1",
+    "kind": "p",
+    "unsplashId": "eVqKdSJKW9Q",
+    "slug": "a-black-mannequin-with-a-gold-necklace-on-it-eVqKdSJKW9Q",
+    "photographer": "Tetiana Shulika",
+    "username": "te_creator",
+    "alt": "a black mannequin with a gold necklace on it",
+    "raw": "https://images.unsplash.com/photo-1688406264720-e2f9389c9ed1"
+  },
+  {
+    "asset": "necklace-classic-2",
+    "kind": "p",
+    "unsplashId": "n2-AYPfb-Ug",
+    "slug": "woman-wearing-gold-jewelry-with-pearl-accents-n2-AYPfb-Ug",
+    "photographer": "Ahmadreza Rezaie",
+    "username": "ahmdrzarzai",
+    "alt": "Woman wearing gold jewelry with pearl accents",
+    "raw": "https://images.unsplash.com/photo-1770721478216-3e5dbbe8dcc2"
+  },
+  {
+    "asset": "bracelet-eye-1",
+    "kind": "p",
+    "unsplashId": "W49Oxm_WnmI",
+    "slug": "a-woman-wearing-a-bracelet-with-a-evil-eye-on-it-W49Oxm_WnmI",
+    "photographer": "PRAHANT STUDIO",
+    "username": "prahantstudio",
+    "alt": "A woman wearing a bracelet with a evil eye on it",
+    "raw": "https://images.unsplash.com/photo-1721206624492-3d05631471ea"
+  },
+  {
+    "asset": "bracelet-eye-2",
+    "kind": "p",
+    "unsplashId": "fP7s7YTfKx4",
+    "slug": "a-woman-sitting-on-a-bed-with-her-hands-on-her-chest-fP7s7YTfKx4",
+    "photographer": "PRAHANT STUDIO",
+    "username": "prahantstudio",
+    "alt": "A woman sitting on a bed with her hands on her chest",
+    "raw": "https://images.unsplash.com/photo-1721103428133-a2635d9e62eb"
+  },
+  {
+    "asset": "bracelet-cuff-1",
+    "kind": "p",
+    "unsplashId": "O7YCeE_65TE",
+    "slug": "a-close-up-of-a-gold-ring-on-a-table-O7YCeE_65TE",
+    "photographer": "Ruan Richard Rodrigues",
+    "username": "ricdeoliveira",
+    "alt": "a close up of a gold ring on a table",
+    "raw": "https://images.unsplash.com/photo-1689367436629-1d288f1e23b6"
+  },
+  {
+    "asset": "bracelet-cuff-2",
+    "kind": "p",
+    "unsplashId": "WDsohK10HAw",
+    "slug": "a-close-up-of-a-gold-ring-on-a-table-WDsohK10HAw",
+    "photographer": "Ruan Richard Rodrigues",
+    "username": "ricdeoliveira",
+    "alt": "a close up of a gold ring on a table",
+    "raw": "https://images.unsplash.com/photo-1689367436442-76c859315008"
+  },
+  {
+    "asset": "bracelet-gourmet-1",
+    "kind": "p",
+    "unsplashId": "oO0JAOJhquk",
+    "slug": "a-gold-chain-bracelet-sitting-on-top-of-a-magazine-oO0JAOJhquk",
+    "photographer": "Nataliya Melnychuk",
+    "username": "natinati",
+    "alt": "a gold chain bracelet sitting on top of a magazine",
+    "raw": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a"
+  },
+  {
+    "asset": "bracelet-gourmet-2",
+    "kind": "p",
+    "unsplashId": "h_ssRPj8UZo",
+    "slug": "a-close-up-of-a-person-wearing-a-bracelet-h_ssRPj8UZo",
+    "photographer": "Sama Hosseini",
+    "username": "samahosseini",
+    "alt": "a close up of a person wearing a bracelet",
+    "raw": "https://images.unsplash.com/photo-1633810543462-77c4a3b13f07"
+  },
+  {
+    "asset": "bracelet-bangles-1",
+    "kind": "p",
+    "unsplashId": "AoZrJQ80KCc",
+    "slug": "a-couple-of-bracelets-sitting-on-top-of-a-table-AoZrJQ80KCc",
+    "photographer": "Khizar Rathore",
+    "username": "khizar_rathore",
+    "alt": "a couple of bracelets sitting on top of a table",
+    "raw": "https://images.unsplash.com/photo-1679156271456-d6068c543ee7"
+  },
+  {
+    "asset": "bracelet-bangles-2",
+    "kind": "p",
+    "unsplashId": "aldDZePniqg",
+    "slug": "gold-chain-necklace-on-white-surface-aldDZePniqg",
+    "photographer": "Syed F Hashemi",
+    "username": "sfhashemi",
+    "alt": "gold chain necklace on white surface",
+    "raw": "https://images.unsplash.com/photo-1611107683227-e9060eccd846"
+  },
+  {
+    "asset": "bracelet-fine-1",
+    "kind": "p",
+    "unsplashId": "Jno26Xf1-WI",
+    "slug": "a-delicate-gold-bracelet-with-an-id-tag-Jno26Xf1-WI",
+    "photographer": "Diego Castañeda",
+    "username": "disfruta_cafe",
+    "alt": "A delicate gold bracelet with an id tag",
+    "raw": "https://images.unsplash.com/photo-1777999802051-f6f0296e76af"
+  },
+  {
+    "asset": "bracelet-fine-2",
+    "kind": "p",
+    "unsplashId": "GtOo17K-vTg",
+    "slug": "a-woman-wearing-a-gold-chain-bracelet-GtOo17K-vTg",
+    "photographer": "Sama Hosseini",
+    "username": "samahosseini",
+    "alt": "a woman wearing a gold chain bracelet",
+    "raw": "https://images.unsplash.com/photo-1633810542706-90e5ff7557be"
+  },
+  {
+    "asset": "earring-drop-1",
+    "kind": "p",
+    "unsplashId": "q4uRpPcvF88",
+    "slug": "a-pair-of-gold-earrings-sitting-on-top-of-a-white-sheet-q4uRpPcvF88",
+    "photographer": "Diego Castañeda",
+    "username": "disfruta_cafe",
+    "alt": "A pair of gold earrings sitting on top of a white sheet",
+    "raw": "https://images.unsplash.com/photo-1727990864588-757416bf8062"
+  },
+  {
+    "asset": "earring-drop-2",
+    "kind": "p",
+    "unsplashId": "5S0IV03f0i8",
+    "slug": "a-pair-of-gold-earrings-sitting-on-top-of-a-white-sheet-5S0IV03f0i8",
+    "photographer": "Diego Castañeda",
+    "username": "disfruta_cafe",
+    "alt": "A pair of gold earrings sitting on top of a white sheet",
+    "raw": "https://images.unsplash.com/photo-1727990865600-91f8cb8b0168"
+  },
+  {
+    "asset": "earring-hoop-1",
+    "kind": "p",
+    "unsplashId": "77vl4dH6KKQ",
+    "slug": "a-pair-of-gold-hoop-earrings-on-a-white-stand-77vl4dH6KKQ",
+    "photographer": "Oscar Ramirez",
+    "username": "oscareduardohr",
+    "alt": "a pair of gold hoop earrings on a white stand",
+    "raw": "https://images.unsplash.com/photo-1708220040824-b273dd0a17cc"
+  },
+  {
+    "asset": "earring-hoop-2",
+    "kind": "p",
+    "unsplashId": "s9idT2PQUt4",
+    "slug": "a-close-up-of-a-person-wearing-a-pair-of-earrings-s9idT2PQUt4",
+    "photographer": "Ruan Richard Rodrigues",
+    "username": "ricdeoliveira",
+    "alt": "a close up of a person wearing a pair of earrings",
+    "raw": "https://images.unsplash.com/photo-1671644730555-916aa8d8157f"
+  },
+  {
+    "asset": "earring-twist-1",
+    "kind": "p",
+    "unsplashId": "Ki7TPcA9204",
+    "slug": "gold-ring-on-white-textile-Ki7TPcA9204",
+    "photographer": "Nataliya Melnychuk",
+    "username": "natinati",
+    "alt": "gold ring on white textile",
+    "raw": "https://images.unsplash.com/photo-1617038260897-41a1f14a8ca0"
+  },
+  {
+    "asset": "earring-twist-2",
+    "kind": "p",
+    "unsplashId": "FEIoXyYIPik",
+    "slug": "a-woman-wearing-a-pair-of-gold-rings-FEIoXyYIPik",
+    "photographer": "Sanju Pandita",
+    "username": "spxclicks",
+    "alt": "a woman wearing a pair of gold rings",
+    "raw": "https://images.unsplash.com/photo-1698259947669-82602bc3a702"
+  },
+  {
+    "asset": "earring-huggie-1",
+    "kind": "p",
+    "unsplashId": "jqcmEaerPjU",
+    "slug": "two-textured-and-smooth-gold-hoop-earrings-on-white-jqcmEaerPjU",
+    "photographer": "Diego Castañeda",
+    "username": "disfruta_cafe",
+    "alt": "Two textured and smooth gold hoop earrings on white",
+    "raw": "https://images.unsplash.com/photo-1781901726815-29af905d0b46"
+  },
+  {
+    "asset": "earring-huggie-2",
+    "kind": "p",
+    "unsplashId": "6OHCS0XIKAQ",
+    "slug": "two-gold-hoop-earrings-one-ribbed-on-white-background-6OHCS0XIKAQ",
+    "photographer": "Diego Castañeda",
+    "username": "disfruta_cafe",
+    "alt": "Two gold hoop earrings, one ribbed, on white background",
+    "raw": "https://images.unsplash.com/photo-1784322662679-1823caf49e86"
+  },
+  {
+    "asset": "earring-wave-1",
+    "kind": "p",
+    "unsplashId": "pQYSjhWz4cQ",
+    "slug": "a-pair-of-gold-earrings-on-a-white-surface-pQYSjhWz4cQ",
+    "photographer": "Oscar Ramirez",
+    "username": "oscareduardohr",
+    "alt": "a pair of gold earrings on a white surface",
+    "raw": "https://images.unsplash.com/photo-1708220040828-9ab1673681d3"
+  },
+  {
+    "asset": "earring-wave-2",
+    "kind": "p",
+    "unsplashId": "n2-AYPfb-Ug",
+    "slug": "woman-wearing-gold-jewelry-with-pearl-accents-n2-AYPfb-Ug",
+    "photographer": "Ahmadreza Rezaie",
+    "username": "ahmdrzarzai",
+    "alt": "Woman wearing gold jewelry with pearl accents",
+    "raw": "https://images.unsplash.com/photo-1770721478216-3e5dbbe8dcc2"
+  },
+  {
+    "asset": "earring-link-1",
+    "kind": "p",
+    "unsplashId": "GaWRVzfRfbY",
+    "slug": "gold-chain-link-hoop-earrings-on-a-reflective-surface-GaWRVzfRfbY",
+    "photographer": "César O'neill",
+    "username": "cesaroneill",
+    "alt": "Gold chain-link hoop earrings on a reflective surface",
+    "raw": "https://images.unsplash.com/photo-1786052337799-983e1667dff8"
+  },
+  {
+    "asset": "earring-link-2",
+    "kind": "p",
+    "unsplashId": "I4GVWQXXIXQ",
+    "slug": "a-pair-of-gold-chain-link-hoop-earrings-on-a-mirror-I4GVWQXXIXQ",
+    "photographer": "César O'neill",
+    "username": "cesaroneill",
+    "alt": "A pair of gold chain-link hoop earrings on a mirror",
+    "raw": "https://images.unsplash.com/photo-1786052337390-567bce745609"
+  },
+  {
+    "asset": "hero-1",
+    "kind": "h",
+    "unsplashId": "sNRL7DRavPw",
+    "slug": "woman-with-curly-hair-and-jewelry-sNRL7DRavPw",
+    "photographer": "Tim Mossholder",
+    "username": "timmossholder",
+    "alt": "A woman with curly hair and gold jewelry against a background of palm fronds",
+    "raw": "https://images.unsplash.com/photo-1788562767053-6d185dad6e2e"
+  },
+  {
+    "asset": "hero-2",
+    "kind": "h",
+    "unsplashId": "mrljCG3nCR4",
+    "slug": "woman-with-long-brown-hair-looking-away-mrljCG3nCR4",
+    "photographer": "Niaz Ahmed",
+    "username": "nyaaaz",
+    "alt": "Woman with long brown hair looking away",
+    "raw": "https://images.unsplash.com/photo-1768845431923-0146cf14804d"
+  },
+  {
+    "asset": "collection-rings",
+    "kind": "s",
+    "unsplashId": "ltQW6B3rgvA",
+    "slug": "a-woman-with-a-ring-on-her-finger-ltQW6B3rgvA",
+    "photographer": "Sanju Pandita",
+    "username": "spxclicks",
+    "alt": "a woman with a ring on her finger",
+    "raw": "https://images.unsplash.com/photo-1698259947512-a6ac66f961f2"
+  },
+  {
+    "asset": "collection-necklaces",
+    "kind": "s",
+    "unsplashId": "FV4STFfvcnw",
+    "slug": "a-woman-wearing-a-white-dress-and-gold-jewelry-FV4STFfvcnw",
+    "photographer": "PRAHANT STUDIO",
+    "username": "prahantstudio",
+    "alt": "A woman wearing a white dress and gold jewelry",
+    "raw": "https://images.unsplash.com/photo-1721206624465-7d7691ebe50f"
+  },
+  {
+    "asset": "collection-bracelets",
+    "kind": "s",
+    "unsplashId": "fP7s7YTfKx4",
+    "slug": "a-woman-sitting-on-a-bed-with-her-hands-on-her-chest-fP7s7YTfKx4",
+    "photographer": "PRAHANT STUDIO",
+    "username": "prahantstudio",
+    "alt": "A woman sitting on a bed with her hands on her chest",
+    "raw": "https://images.unsplash.com/photo-1721103428133-a2635d9e62eb"
+  },
+  {
+    "asset": "collection-earrings",
+    "kind": "s",
+    "unsplashId": "FEIoXyYIPik",
+    "slug": "a-woman-wearing-a-pair-of-gold-rings-FEIoXyYIPik",
+    "photographer": "Sanju Pandita",
+    "username": "spxclicks",
+    "alt": "a woman wearing a pair of gold rings",
+    "raw": "https://images.unsplash.com/photo-1698259947669-82602bc3a702"
+  },
+  {
+    "asset": "story-craft",
+    "kind": "s",
+    "unsplashId": "muMwgeSo31A",
+    "slug": "person-holding-stone-muMwgeSo31A",
+    "photographer": "Ronja Flucke",
+    "username": "ronjamaria",
+    "alt": "person holding stone",
+    "raw": "https://images.unsplash.com/photo-1526907279934-3c9d2e53170f"
+  },
+  {
+    "asset": "gift-tray",
+    "kind": "s",
+    "unsplashId": "moRYg6k5-Kg",
+    "slug": "a-silver-tray-topped-with-lots-of-gold-jewelry-moRYg6k5-Kg",
+    "photographer": "Ruan Richard Rodrigues",
+    "username": "ricdeoliveira",
+    "alt": "a silver tray topped with lots of gold jewelry",
+    "raw": "https://images.unsplash.com/photo-1650455221359-3aebf920bcc5"
+  }
+]

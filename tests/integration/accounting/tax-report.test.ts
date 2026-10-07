@@ -9,13 +9,17 @@
  * Runs sequentially via vitest pool:forks + maxWorkers:1.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import { seedCoaForStore } from '../../../apps/api/src/services/accounting/account.service';
-import { postOrderPaymentJournal } from '../../../apps/api/src/services/accounting/posting/order-posting';
+import { postOrderPaymentJournal as postOrderPaymentJournalRaw } from '../../../apps/api/src/services/accounting/posting/order-posting';
 import { generateTaxReport } from '../../../apps/api/src/services/accounting/tax-report.service';
 
 const OWNER_ID = '00000000-0000-0000-0000-000000001234';
 let storeId: string;
+// Production runs these inside runInTenantContext(storeId); the tenant guard
+// needs the same ambient store here.
+const postOrderPaymentJournal = (a: Parameters<typeof postOrderPaymentJournalRaw>[0]) =>
+  runInTenantContext(storeId, () => postOrderPaymentJournalRaw(a));
 let productId: string;
 
 // Orders seeded by this test suite, keyed by slug

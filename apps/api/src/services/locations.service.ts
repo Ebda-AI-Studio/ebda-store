@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import type { LocationInput } from '@force/shared';
 import { bustStoreCaches } from './store.service';
 
@@ -27,7 +27,7 @@ export class LocationsService {
     // store-scope the update so a tenant can't touch another store's row by id
     const res = await prisma.storeLocation.updateMany({ where: { id, storeId }, data });
     if (res.count === 0) return null;
-    const location = await prisma.storeLocation.findUnique({ where: { id } });
+    const location = await prisma.storeLocation.findUnique({ where: { id, storeId } });
     await LocationsService.bustFooterCache(storeId);
     return location;
   }
@@ -47,10 +47,12 @@ export class LocationsService {
    * busts on every save.
    */
   private static async bustFooterCache(storeId: string): Promise<void> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { slug: true, domain: true },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: { slug: true, domain: true },
+      })
+    );
     if (!store) return;
     await bustStoreCaches(storeId, store.slug, store.domain);
   }

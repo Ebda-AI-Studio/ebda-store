@@ -234,7 +234,7 @@ export class ReviewService {
 
     // Enforce unique (orderId, productId) — one review per buyer-product pair
     const existingReview = await prisma.review.findFirst({
-      where: { orderId: data.orderId, productId: data.productId },
+      where: { storeId, orderId: data.orderId, productId: data.productId },
     });
 
     if (existingReview) {

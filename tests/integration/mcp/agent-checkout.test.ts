@@ -112,8 +112,8 @@ beforeAll(async () => {
       plan: 'starter',
       status: 'active',
       currency: 'EGP',
-      agentApiKey: encryption.encrypt(agentKeyA),
       agentApiKeyRotatedAt: new Date(),
+      credentials: { create: { agentApiKey: encryption.encrypt(agentKeyA) } },
     },
   });
   storeId = store.id;
@@ -560,8 +560,8 @@ describe('MCP endpoint — cross-tenant isolation (storeId scoping)', () => {
         plan: 'starter',
         status: 'active',
         currency: 'EGP',
-        agentApiKey: encryption.encrypt(agentKeyB),
         agentApiKeyRotatedAt: new Date(),
+        credentials: { create: { agentApiKey: encryption.encrypt(agentKeyB) } },
       },
     });
     storeBId = storeB.id;
@@ -926,9 +926,10 @@ describe('MCP endpoint — agent-write authorisation', () => {
 
   it("refuses STORE C's credential on STORE A's endpoint (cross-tenant)", async () => {
     const keyC = `fak_${randomUUID()}`;
-    await prisma.store.update({
-      where: { id: storeCId },
-      data: { agentApiKey: encryption.encrypt(keyC) },
+    await prisma.storeCredential.upsert({
+      where: { storeId: storeCId },
+      create: { storeId: storeCId, agentApiKey: encryption.encrypt(keyC) },
+      update: { agentApiKey: encryption.encrypt(keyC) },
     });
 
     const { client, transport } = mcpClient(slug, keyC); // C's key, A's endpoint
@@ -943,7 +944,7 @@ describe('MCP endpoint — agent-write authorisation', () => {
 
   it('refuses a REVOKED credential on the very next call', async () => {
     // Revoke, then present the key that worked a moment ago.
-    await prisma.store.update({ where: { id: storeId }, data: { agentApiKey: null } });
+    await prisma.storeCredential.update({ where: { storeId }, data: { agentApiKey: null } });
     const { client, transport } = mcpClient(slug, agentKeyA);
     await client.connect(transport);
     const res = await client.callTool({
@@ -954,8 +955,8 @@ describe('MCP endpoint — agent-write authorisation', () => {
     await client.close();
 
     // Restore for any later test / retry.
-    await prisma.store.update({
-      where: { id: storeId },
+    await prisma.storeCredential.update({
+      where: { storeId },
       data: { agentApiKey: encryption.encrypt(agentKeyA) },
     });
   });

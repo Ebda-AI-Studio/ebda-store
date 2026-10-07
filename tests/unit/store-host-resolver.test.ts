@@ -70,11 +70,22 @@ function matchesWhere(row: StoreRow, where: Record<string, unknown>): boolean {
   return true;
 }
 
+// The row the route reads once the store is known: `stores` is under RLS, so it is read inside
+// `withStore(id)` by exact id (never found by host/slug from an unscoped client).
+const storeRowById = (id: string) => {
+  const hit = (world.stores as StoreRow[]).find(s => s.id === id);
+  // Return the full row shape the route selects (extra keys are harmless).
+  return hit ? { ...hit, theme: {}, settings: {}, marketingPixels: null } : null;
+};
+
 vi.mock('@force/database', () => ({
+  withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
+    fn({
+      store: {
+        findUnique: async ({ where }: { where: { id: string } }) => storeRowById(where.id),
+      },
+    }),
   prisma: {
-    store: {
-      findFirst: (args: { where: Record<string, unknown> }) => storeFindFirst(args),
-    },
     storePage: { findMany: vi.fn().mockResolvedValue([]) },
     storeFaq: { findMany: vi.fn().mockResolvedValue([]) },
     storeHowto: { findMany: vi.fn().mockResolvedValue([]) },
@@ -83,9 +94,23 @@ vi.mock('@force/database', () => ({
   SlugEntityType: {},
 }));
 
-// Host / slug -> store id is the `ebda_resolve_store_id` definer; `storeFindFirst` stays the
-// source of truth for "which store does this host or slug name".
+// Host / slug -> store is the `ebda_store_lookup` / `ebda_resolve_store_id` definers;
+// `storeFindFirst` stays the source of truth for "which store does this host or slug name".
 vi.mock('@api/lib/definer', () => ({
+  lookupStore: async (
+    match: { id?: string | null; slug?: string | null; domain?: string | null },
+    statuses: string[] = ['active']
+  ) => {
+    const key = match.id
+      ? { id: match.id }
+      : match.domain
+        ? { domain: match.domain }
+        : { slug: match.slug };
+    const hit = (await storeFindFirst({
+      where: { ...key, status: { in: statuses }, deletedAt: null },
+    })) as { id: string; status: string } | null;
+    return hit ? { id: hit.id, status: hit.status } : null;
+  },
   resolveStoreId: async (match: { slug?: string | null; domain?: string | null }) => {
     const where: Record<string, unknown> = match.domain
       ? { domain: match.domain, status: { in: ['active', 'suspended'] }, deletedAt: null }

@@ -115,13 +115,10 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           // order so a store with no COD config never gets an orphan
           // agent order.
           const codConfig = await prisma.paymentConfig.findFirst({
-            where: {
-              OR: [
-                { storeId: store.id, provider: 'cod', isEnabled: true },
-                { storeId: null, provider: 'cod', isEnabled: true },
-              ],
-            },
-            orderBy: { storeId: 'desc' },
+            // The platform-wide (storeId null) row is invisible under the store's
+            // RLS and cannot be named under the tenant guard, so only the store's
+            // own row is looked up.
+            where: { storeId: store.id, provider: 'cod', isEnabled: true },
           });
           if (!codConfig) {
             throw new AppError(
@@ -193,7 +190,10 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           try {
             payment = await withTenantContext(store.id, async tx => {
               if (codFee > 0) {
-                await tx.order.update({ where: { id: order.id }, data: { total } });
+                await tx.order.update({
+                  where: { id: order.id, storeId: store.id },
+                  data: { total },
+                });
               }
               return tx.payment.create({
                 data: {

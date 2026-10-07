@@ -33,7 +33,7 @@
 //   (DO NOT run against a remote DB without an explicit go-ahead + a fresh backup.)
 import { createPrismaClient } from '@force/database';
 
-const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
+const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '', role: 'owner' });
 
 const stores = await prisma.store.findMany({
   where: { deletedAt: null },

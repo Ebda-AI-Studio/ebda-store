@@ -342,7 +342,7 @@ describe('POST /public/:storeId/coupons/validate — storefront cart lines (#136
     expect(res.status).toBe(200);
     expect(res.body.data.discount).toBe(1000);
     expect(mockPrisma.user.findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'user-vip' } })
+      expect.objectContaining({ where: { id: 'user-vip', storeId: STORE_ID } })
     );
   });
 

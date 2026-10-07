@@ -165,7 +165,7 @@ export async function verifyMerchantKey(req: Request, store: McpStore): Promise<
   // `wrong_store` case below stays only as defence in depth.
   const key = await withStore(store.id, tx =>
     tx.merchantApiKey.findUnique({
-      where: { keyHash: digest },
+      where: { keyHash: digest, storeId: store.id },
       select: {
         id: true,
         storeId: true,
@@ -233,7 +233,10 @@ export async function verifyMerchantKey(req: Request, store: McpStore): Promise<
   // this is telemetry, not a gate. Awaiting it would also put a write on the
   // hot path of every read tool call.
   void withStore(store.id, tx =>
-    tx.merchantApiKey.update({ where: { id: key.id }, data: { lastUsedAt: now } })
+    tx.merchantApiKey.update({
+      where: { id: key.id, storeId: store.id },
+      data: { lastUsedAt: now },
+    })
   ).catch(() => undefined);
 
   return {

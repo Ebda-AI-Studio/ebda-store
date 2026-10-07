@@ -294,7 +294,10 @@ async function audit(): Promise<AuditResult> {
   const objects = await listAllR2Objects(client, bucket);
   console.log(`Found ${objects.length} objects in bucket "${bucket}".`);
 
-  const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '' });
+  const prisma = createPrismaClient({
+    connectionString: process.env.DATABASE_URL ?? '',
+    role: 'owner',
+  });
   try {
     console.log('Collecting referenced keys from database...');
     const run = rlsBypassRunner(prisma);

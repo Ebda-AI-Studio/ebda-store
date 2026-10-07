@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, withStore } from '@force/database';
+import { withStore, storeDirectory } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -25,10 +25,10 @@ export const accountingPeriodReconciliation: InngestFunction.Any = inngest.creat
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     const stores = await step.run('list-stores', () =>
-      prisma.store.findMany({
-        where: { accountingEnabled: true, deletedAt: null },
-        select: { id: true, slug: true, name: true },
-      })
+      // `stores` is under RLS: a cron lists stores through the directory definer.
+      storeDirectory(s => s.accountingEnabled).then(list =>
+        list.map(s => ({ id: s.id, slug: s.slug, name: s.name }))
+      )
     );
 
     let drifts = 0;

@@ -65,7 +65,7 @@ const bulkAiRevertBalanceFn = inngest.createFunction(
     return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date() },
         })
       );
@@ -77,7 +77,10 @@ const bulkAiRevertBalanceFn = inngest.createFunction(
           where: { storeId, deletedAt: null },
           select: { id: true },
         });
-        await prisma.bulkAiJob.update({ where: { id: jobId }, data: { total: products.length } });
+        await prisma.bulkAiJob.update({
+          where: { id: jobId, storeId },
+          data: { total: products.length },
+        });
         return products.map(p => p.id);
       });
 
@@ -94,7 +97,7 @@ const bulkAiRevertBalanceFn = inngest.createFunction(
 
         const result: RevertBatchResult = await step.run(`batch-${i}`, async () => {
           const currentJob = await prisma.bulkAiJob.findUnique({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             select: { status: true },
           });
           if (currentJob?.status === 'cancelled') {
@@ -110,7 +113,7 @@ const bulkAiRevertBalanceFn = inngest.createFunction(
           }
 
           const items = await prisma.product.findMany({
-            where: { id: { in: batchIds } },
+            where: { id: { in: batchIds }, storeId },
             select: { id: true, name: true },
           });
           const byId = new Map(items.map(p => [p.id, p]));
@@ -178,7 +181,7 @@ const bulkAiRevertBalanceFn = inngest.createFunction(
 
         await step.run(`progress-${i}`, () =>
           prisma.bulkAiJob.update({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             data: { processed, filled: reverted, skipped, failed, errors: errors as object },
           })
         );
@@ -212,7 +215,7 @@ const bulkAiRevertBalanceFn = inngest.createFunction(
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
 
       await prisma.bulkAiJob.update({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         data: {
           status: 'completed',
           processed,

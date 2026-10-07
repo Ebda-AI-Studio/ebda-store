@@ -417,7 +417,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
 
             if (existing) {
               await tx.deadStockFlag.update({
-                where: { id: existing.id },
+                where: { id: existing.id, storeId },
                 data: { ...payload, scannedAt: scanStartedAt },
               });
             } else {
@@ -505,7 +505,7 @@ export async function createClearanceCouponFromFlag(
   });
 
   await prisma.deadStockFlag.update({
-    where: { id: flagId },
+    where: { id: flagId, storeId },
     data: { status: 'accepted_clearance', couponCode: code },
   });
 

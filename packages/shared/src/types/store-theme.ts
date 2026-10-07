@@ -10,7 +10,7 @@ import { colorToHslTriplet } from '../utils/color';
 /**
  * Available store templates
  */
-export type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
+export type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' | 'dahab';
 
 /**
  * Font family options for store themes
@@ -628,6 +628,46 @@ export const TEMPLATE_THEMES: Record<TemplateId, Partial<StoreTheme>> = {
     fontFamily: 'serif',
     borderRadius: 'md',
   },
+  // Dahab (jewellery, builder Phase 3 pilot): lapis night + hammered gold +
+  // ivory. The night carries a little blue (hue 222) — gold on lapis is the
+  // Egyptian goldsmith's own pairing — so it reads as night, not as a
+  // generic near-black. Every pair below is checked for WCAG AA in
+  // tests/unit/dahab-theme-contrast.test.ts.
+  dahab: {
+    primaryColor: '39 49% 58%', // gold #C9A35E
+    primaryForeground: '222 29% 8%', // night
+    secondaryColor: '222 26% 15%',
+    secondaryForeground: '39 52% 90%',
+    accentColor: '40 62% 70%', // bright gold #E2C285
+    accentForeground: '222 29% 8%',
+    backgroundColor: '222 29% 8%', // night #0E1119
+    foregroundColor: '39 52% 90%', // ivory #F2EADB
+    mutedColor: '222 26% 15%',
+    mutedForeground: '39 14% 68%',
+    borderColor: '38 24% 24%', // bronze hairline
+    cardColor: '222 27% 11%',
+    cardForeground: '39 52% 90%',
+    popoverColor: '222 27% 11%',
+    popoverForeground: '39 52% 90%',
+    inputColor: '38 24% 24%',
+    ringColor: '40 62% 70%',
+    destructiveColor: '4 62% 62%',
+    destructiveForeground: '222 29% 8%',
+    successColor: '146 32% 58%',
+    successForeground: '222 29% 8%',
+    warningColor: '40 78% 60%',
+    warningForeground: '222 29% 8%',
+    fontFamily: 'default',
+    borderRadius: 'sm',
+    backgroundPreset: 'none',
+    bgPage: '222 29% 8%',
+    bgSectionAlt: '223 28% 10%',
+    showBrandStory: false,
+    showTrustStrip: false,
+    // Dahab separates sections with its own heading hairline; the platform
+    // divider bands would double it.
+    dividers: { ...DEFAULT_DIVIDER_SETTINGS, enabled: false },
+  },
 };
 
 /**
@@ -683,6 +723,16 @@ export const TEMPLATES: TemplateInfo[] = [
     thumbnail: '/templates/elegant.png',
     tags: ['fashion', 'jewelry', 'beauty'],
     bestFor: 'Fashion, jewelry, and beauty brands',
+  },
+  {
+    id: 'dahab',
+    name: 'Dahab',
+    nameAr: 'دهب',
+    description: 'Gold on night: a jewellery and handmade-goods storefront',
+    descriptionAr: 'دهب على ليل: متجر للمجوهرات والمشغولات اليدوية',
+    thumbnail: '/templates/dahab.png',
+    tags: ['jewellery', 'handmade', 'gifts'],
+    bestFor: 'Jewellery, handmade and premium gifts',
   },
 ];
 

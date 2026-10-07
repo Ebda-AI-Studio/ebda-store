@@ -21,11 +21,12 @@
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
 import type { InngestFunction } from 'inngest';
-import { prisma, runInStoreScope } from '@force/database';
+import { prisma, runInStoreScope, storeDirectory, withStore } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { chunk, BULK_AI_BATCH_SIZE } from '../batch-utils';
-import { aiEligiblePlanFilter, isAiEligiblePlan } from '../../ai-plan-eligibility';
+import { isAiEligiblePlan } from '../../ai-plan-eligibility';
+import type { StorePlan } from '@force/shared';
 import { featureService } from '../../../services/feature.service';
 import { sendAlert } from '../../../services/alerts.service';
 import { resetGeminiGroundingWarnOnce } from '../../../services/answer-engine/gemini.provider';
@@ -151,19 +152,17 @@ const answerEngineCitationScanCronFn = inngest.createFunction(
     // deploy — called out here so a future "why isn't the weekly scan
     // running" investigation finds this fast.
 
-    // Cross-tenant cron — `stores` carries no RLS, so the list is a plain read;
+    // Cross-tenant cron — the store list comes from the directory definer;
     // each store is then scanned in its own scope.
     const stores = await step.run('list-stores', () =>
-      prisma.store.findMany({
-        where: {
-          deletedAt: null,
-          status: 'active',
-          aiFeaturesEnabled: true,
+      // `stores` is under RLS: a cron lists stores through the directory definer.
+      storeDirectory(
+        s =>
+          s.status === 'active' &&
+          s.aiFeaturesEnabled &&
           // free (lapsed-payment / demo) plans are excluded from AI spend.
-          ...aiEligiblePlanFilter,
-        },
-        select: { id: true },
-      })
+          isAiEligiblePlan(s.plan as StorePlan)
+      ).then(list => list.map(s => ({ id: s.id })))
     );
 
     // Memoized, so a retried per-store step below sees the SAME instant and
@@ -278,10 +277,12 @@ export const answerEngineScanOnDemand: InngestFunction.Any = inngest.createFunct
 
     // Plan gate — a super-admin `StoreFeature` override can force-enable
     // `answer_engine_insights` on a `free`/lapsed store; the CRON already
-    // excludes those via `aiEligiblePlanFilter` when enumerating stores, so
+    // excludes those via `isAiEligiblePlan` when enumerating stores, so
     // this on-demand twin must apply the same exclusion (mirrors
     // `stock-reorder-scan.ts`'s on-demand plan gate).
-    const store = await prisma.store.findUnique({ where: { id: storeId }, select: { plan: true } });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+    );
     if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
         { storeId, plan: store?.plan },

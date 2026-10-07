@@ -1,53 +1,64 @@
 'use client';
 
+import { useEffect, useTransition } from 'react';
 import { useLocale } from 'next-intl';
-import { useTransition } from 'react';
-import { isLocale, localeCookieName, type Locale } from '@/i18n/config';
+import { isLocale, type Locale } from '@/i18n/config';
+import { persistLocale, restorableLocale } from '@/i18n/locale-storage';
 import { useT } from '@/i18n/useT';
 
-function setLocaleCookie(locale: Locale) {
-  const oneYear = 60 * 60 * 24 * 365;
-  document.cookie = `${localeCookieName}=${locale}; path=/; max-age=${oneYear}; SameSite=Lax`;
-}
-
-export default function AdminLanguageSwitcher() {
+/**
+ * One visible button naming the OTHER language in its own script
+ * («English» on the Arabic UI, «العربية» on the English UI). Saves the choice
+ * (cookie + localStorage) and reloads so the server re-renders `lang` + `dir`.
+ */
+export default function AdminLanguageSwitcher({ className = '' }: { className?: string }) {
   const active = useLocale();
   const [isPending, startTransition] = useTransition();
   const t = useT('components.languageSwitcher');
 
-  const change = (next: Locale) => {
-    if (next === active) return;
-    setLocaleCookie(next);
+  // Cookie purged (ITP) but the saved choice survives → restore it once.
+  useEffect(() => {
+    const saved = restorableLocale(active);
+    if (saved) {
+      persistLocale(saved);
+      window.location.reload();
+    }
+  }, [active]);
+
+  const next: Locale = isLocale(active) && active === 'en' ? 'ar' : 'en';
+
+  const change = () => {
+    persistLocale(next);
     startTransition(() => {
       window.location.reload();
     });
   };
 
   return (
-    <div
-      role="group"
-      aria-label={t('ariaLabel')}
-      className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/40 p-1 text-xs"
+    <button
+      type="button"
+      onClick={change}
+      disabled={isPending}
+      lang={next}
+      dir={next === 'ar' ? 'rtl' : 'ltr'}
+      aria-label={`${t('ariaLabel')}: ${next === 'ar' ? t('nativeAr') : t('nativeEn')}`}
+      data-testid="language-toggle"
+      className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-60 cursor-pointer md:min-h-[36px] ${className}`}
     >
-      {(['en', 'ar'] as const).map(loc => {
-        const isActive = isLocale(active) && active === loc;
-        return (
-          <button
-            key={loc}
-            type="button"
-            onClick={() => change(loc)}
-            disabled={isPending}
-            aria-pressed={isActive}
-            className={`min-w-[44px] min-h-[44px] md:min-h-[32px] rounded-md px-2.5 py-1 font-semibold uppercase tracking-wide transition-colors disabled:opacity-60 cursor-pointer ${
-              isActive
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {loc === 'en' ? 'EN' : 'ع'}
-          </button>
-        );
-      })}
-    </div>
+      <svg
+        className="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        aria-hidden="true"
+      >
+        <circle cx="12" cy="12" r="9" strokeWidth={2} />
+        <path
+          strokeWidth={2}
+          d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9S14.5 18.3 12 21c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"
+        />
+      </svg>
+      {next === 'ar' ? t('nativeAr') : t('nativeEn')}
+    </button>
   );
 }

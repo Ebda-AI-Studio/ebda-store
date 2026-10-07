@@ -13,7 +13,7 @@
  * own handshake middleware.
  */
 import { Router, Request, Response } from 'express';
-import { prisma } from '@force/database';
+import { withUser } from '@force/database';
 import { authenticate } from '../middleware/auth';
 import { getAuthUser } from '../utils/store-helpers';
 
@@ -38,10 +38,13 @@ router.get('/stores/:storeId/access', authenticate, async (req: Request, res: Re
     return;
   }
   if (u.role === 'store_admin') {
-    const store = await prisma.store.findFirst({
-      where: { id: storeId, ownerId: u.userId },
-      select: { id: true },
-    });
+    // `stores` is under RLS: read AS the user (owner match), not contextless.
+    const store = await withUser(u.userId, tx =>
+      tx.store.findFirst({
+        where: { id: storeId, ownerId: u.userId },
+        select: { id: true },
+      })
+    );
     if (!store) {
       res.status(403).json({
         success: false,

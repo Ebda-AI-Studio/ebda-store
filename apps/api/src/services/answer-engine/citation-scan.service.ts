@@ -31,7 +31,7 @@
  *     propagates out of `runCitationScan` — the whole store's scan always
  *     completes.
  */
-import { prisma } from '@force/database';
+import { prisma, withStore } from '@force/database';
 import logger from '../../lib/logger';
 import { isAiQuotaCapError } from '../../lib/ai-quota';
 import { recordUsage } from '../ai.service';
@@ -99,10 +99,12 @@ export async function runCitationScan(
 
   // Loaded once and reused for every provider × prompt — detectCitation
   // only needs the domain (+ name-as-brand fallback for a brand mention).
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: { domain: true, name: true },
-  });
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({
+      where: { id: storeId },
+      select: { domain: true, name: true },
+    })
+  );
   const citationStore = { domain: store?.domain ?? null, brand: store?.name };
 
   // Pairs this run already answered before a step retry (#910). One read per

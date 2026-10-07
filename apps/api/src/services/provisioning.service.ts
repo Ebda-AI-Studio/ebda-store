@@ -5,11 +5,11 @@ import {
   Prisma,
   StoreStatus,
   acrossStores,
-  setTenantGucs,
+  scopeTransaction,
   withMoneyTx,
   withStore,
 } from '@force/database';
-import { ensureAdminUser } from '../lib/definer';
+import { ensureAdminUser, storeIdByDomain, storeIdBySlug } from '../lib/definer';
 import { bustStoreCaches } from './store.service';
 import { syncSubscriptionFromLegacyPlan } from './plan-sync';
 import { startSignupTrial, type TrialChoice } from './billing/trial';
@@ -53,7 +53,7 @@ export interface ProvisionStoreInput {
   /** Self-serve only: the plan + interval chosen at signup, billed at trial end. */
   trialChoice?: TrialChoice;
   /** Initial storefront template; defaults to the schema default. */
-  template?: 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
+  template?: 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' | 'dahab';
   storeNameAr?: string;
 
   // Owner details
@@ -120,21 +120,14 @@ export class ProvisioningService {
       : this.generateSlug(storeName);
 
     // Check if slug is available
-    const existingStore = await prisma.store.findUnique({
-      where: { slug },
-    });
-
-    if (existingStore) {
+    // `stores` is under RLS (R-EBDA-005): uniqueness probes go through definers.
+    if (await storeIdBySlug(slug)) {
       throw new AppError(400, 'SLUG_TAKEN', 'Store URL is already taken');
     }
 
     // Check if domain is available (if provided)
     if (domain) {
-      const existingDomain = await prisma.store.findUnique({
-        where: { domain },
-      });
-
-      if (existingDomain) {
+      if (await storeIdByDomain(domain)) {
         throw new AppError(400, 'DOMAIN_TAKEN', 'Domain is already in use');
       }
     }
@@ -224,61 +217,62 @@ export class ProvisioningService {
         });
 
         // The store exists now: from here the transaction acts as it, so the rows
-        // below satisfy the strict store policies (set_config, transaction-local).
-        await setTenantGucs(tx, { storeId: store.id });
+        // below satisfy the strict store policies (set_config, transaction-local) and
+        // the code-level tenant guard sees the store (`scopeTransaction`).
+        return scopeTransaction(tx, { storeId: store.id }, async () => {
+          // Subscription row for the plan the operator chose (SP5 plans engine).
+          // Super-admin provisioning is platform-controlled, so a custom domain
+          // here is NOT plan-gated (the operator is assigning the plan).
+          await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
+          if (input.growthTrial) await startSignupTrial(tx, store.id, input.trialChoice);
 
-        // Subscription row for the plan the operator chose (SP5 plans engine).
-        // Super-admin provisioning is platform-controlled, so a custom domain
-        // here is NOT plan-gated (the operator is assigning the plan).
-        await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
-        if (input.growthTrial) await startSignupTrial(tx, store.id, input.trialChoice);
+          // Default VAT (Ebda: `REGION.defaultVatBps` = 14%), seeded as an
+          // INACTIVE editable rate: a new store starts with VAT OFF and no active
+          // rate (ruling TAX-2). It is activated after the store's VAT
+          // registration is verified by a super-admin.
+          await tx.taxRate.create({
+            data: {
+              storeId: store.id,
+              name: 'VAT',
+              nameAr: 'ضريبة القيمة المضافة',
+              rate: REGION.defaultVatBps / 100,
+              isActive: false,
+            },
+          });
 
-        // Default VAT (Ebda: `REGION.defaultVatBps` = 14%), seeded as an
-        // INACTIVE editable rate: a new store starts with VAT OFF and no active
-        // rate (ruling TAX-2). It is activated after the store's VAT
-        // registration is verified by a super-admin.
-        await tx.taxRate.create({
-          data: {
-            storeId: store.id,
-            name: 'VAT',
-            nameAr: 'ضريبة القيمة المضافة',
-            rate: REGION.defaultVatBps / 100,
-            isActive: false,
-          },
+          // Create default category
+          await tx.category.create({
+            data: {
+              storeId: store.id,
+              name: 'Products',
+              slug: 'products',
+              description: 'All products',
+              position: 0,
+            },
+          });
+
+          // Provision Cash on Delivery as the default payment method.
+          // Without this row the storefront's POST /payments/create returns 400
+          // (COD_NOT_AVAILABLE) and customers can't check out — even though the
+          // UI offers COD by default. Store owners can disable / configure a fee
+          // later via /admin/payment-settings.
+          await tx.paymentConfig.create({
+            data: {
+              storeId: store.id,
+              provider: 'cod',
+              isEnabled: true,
+              displayName: 'Cash on Delivery',
+              displayNameAr: 'الدفع عند الاستلام',
+              testMode: false,
+              supportedMethods: ['cod'],
+              supportedCurrencies: [REGION.currency],
+              fixedFee: 0,
+              percentageFee: 0,
+            },
+          });
+
+          return { store, owner, isNewUser };
         });
-
-        // Create default category
-        await tx.category.create({
-          data: {
-            storeId: store.id,
-            name: 'Products',
-            slug: 'products',
-            description: 'All products',
-            position: 0,
-          },
-        });
-
-        // Provision Cash on Delivery as the default payment method.
-        // Without this row the storefront's POST /payments/create returns 400
-        // (COD_NOT_AVAILABLE) and customers can't check out — even though the
-        // UI offers COD by default. Store owners can disable / configure a fee
-        // later via /admin/payment-settings.
-        await tx.paymentConfig.create({
-          data: {
-            storeId: store.id,
-            provider: 'cod',
-            isEnabled: true,
-            displayName: 'Cash on Delivery',
-            displayNameAr: 'الدفع عند الاستلام',
-            testMode: false,
-            supportedMethods: ['cod'],
-            supportedCurrencies: [REGION.currency],
-            fixedFee: 0,
-            percentageFee: 0,
-          },
-        });
-
-        return { store, owner, isNewUser };
       });
 
       // Transaction committed — disarm the domain rollback so a successful
@@ -380,8 +374,8 @@ export class ProvisioningService {
 
     // `_count.products` / `_count.orders` read RLS-protected tables, so a
     // correlated count from the stores table would see no rows. The page of
-    // stores is read first (`stores` carries no RLS; the owner join resolves under
-    // the caller's user scope), then each store on the page is counted inside its
+    // stores is read first (under the caller's user scope: a super_admin's
+    // 'platform-operator' hatch or the owner; `stores` is under RLS, R-EBDA-005), then each store on the page is counted inside its
     // OWN store scope.
     const [pageStores, total] = await Promise.all([
       prisma.store.findMany({
@@ -400,10 +394,10 @@ export class ProvisioningService {
     const counts = new Map(
       (
         await acrossStores(
-          async () => {
+          async storeId => {
             const [products, orders] = await Promise.all([
-              prisma.product.count(),
-              prisma.order.count(),
+              prisma.product.count({ where: { storeId } }),
+              prisma.order.count({ where: { storeId } }),
             ]);
             return { products, orders };
           },
@@ -462,10 +456,12 @@ export class ProvisioningService {
    * Update store status
    */
   static async updateStoreStatus(storeId: string, status: 'active' | 'inactive' | 'suspended') {
-    const store = await prisma.store.update({
-      where: { id: storeId },
-      data: { status },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { status },
+      })
+    );
     // Account status is NEVER-stale (adversarial audit P1-7) — bust the
     // public resolve/slug/id caches + fire the storefront revalidate purge
     // on EVERY status writer, or a suspended store keeps serving the cached

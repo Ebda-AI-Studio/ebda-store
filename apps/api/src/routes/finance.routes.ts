@@ -1637,7 +1637,7 @@ router.delete(
       }
 
       await runInTenantContext(req.params.storeId, () =>
-        prisma.bankStatement.delete({ where: { id: req.params.sid } })
+        prisma.bankStatement.delete({ where: { id: req.params.sid, storeId: req.params.storeId } })
       );
 
       res.status(204).send();

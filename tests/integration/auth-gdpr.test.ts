@@ -37,6 +37,25 @@ async function registerCustomer() {
   const email = `gdpr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`;
   const passwordHash = await bcrypt.hash(GDPR_TEST_PASSWORD, 10);
 
+  // A storefront customer always belongs to a store (registration without a
+  // storeId is refused), and the tenant guard scopes every erase/export row to
+  // that store.
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const owner = await prisma.user.create({
+    data: {
+      email: `gdpr-owner-${Date.now()}-${suffix}@example.test`,
+      passwordHash,
+      firstName: 'Store',
+      lastName: 'Owner',
+      role: 'store_admin',
+      emailVerified: true,
+    },
+    select: { id: true },
+  });
+  const store = await prisma.store.create({
+    data: { name: `gdpr-${suffix}`, slug: `gdpr-${Date.now()}-${suffix}`, ownerId: owner.id },
+    select: { id: true },
+  });
   const user = await prisma.user.create({
     data: {
       email,
@@ -44,6 +63,7 @@ async function registerCustomer() {
       firstName: 'Privacy',
       lastName: 'Tester',
       role: 'customer',
+      storeId: store.id,
       emailVerified: true, // must be true so /auth/login issues tokens
     },
     select: { id: true },
@@ -52,7 +72,7 @@ async function registerCustomer() {
   const res = await fetch(`${API_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: GDPR_TEST_PASSWORD }),
+    body: JSON.stringify({ email, password: GDPR_TEST_PASSWORD, storeId: store.id }),
   });
   if (!res.ok) {
     const body = await res.text();
@@ -62,6 +82,7 @@ async function registerCustomer() {
   return {
     email,
     userId: user.id,
+    storeId: store.id,
     accessToken: json.data.accessToken as string,
   };
 }

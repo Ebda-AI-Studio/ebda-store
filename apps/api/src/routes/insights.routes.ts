@@ -229,7 +229,7 @@ router.get(
       const products = productIds.length
         ? await runInTenantContext(storeId, () =>
             prisma.product.findMany({
-              where: { id: { in: productIds } },
+              where: { storeId, id: { in: productIds } },
               select: { id: true, name: true, nameAr: true, sku: true },
             })
           )

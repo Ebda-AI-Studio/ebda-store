@@ -22,7 +22,7 @@ import { inngest } from '@api/lib/inngest/client';
 import { withDeferredWork } from '@api/lib/after-tenant-commit';
 import { OrderService } from '@api/services/order.service';
 import { seedCoaForStore } from '@api/services/accounting/account.service';
-import { postOrderPaymentJournal } from '@api/services/accounting/posting/order-posting';
+import { postOrderPaymentJournal as postOrderPaymentJournalRaw } from '@api/services/accounting/posting/order-posting';
 import { handlePartialReturnReversalSweep } from '@api/lib/inngest/functions/refund-reversal-stuck-sweep';
 
 const hasDb =
@@ -30,6 +30,10 @@ const hasDb =
 
 const OWNER = '00000000-0000-0000-0000-0000000000f9';
 let storeId: string;
+// Production runs these inside runInTenantContext(storeId); the tenant guard
+// needs the same ambient store here.
+const postOrderPaymentJournal = (a: Parameters<typeof postOrderPaymentJournalRaw>[0]) =>
+  runInTenantContext(storeId, () => postOrderPaymentJournalRaw(a));
 let productId: string;
 
 beforeAll(async () => {

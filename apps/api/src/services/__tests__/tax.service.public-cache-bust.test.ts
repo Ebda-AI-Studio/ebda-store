@@ -22,9 +22,8 @@ vi.mock('../../lib/logger', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock('@force/database', () => ({
-  Prisma: {},
-  prisma: {
+vi.mock('@force/database', () => {
+  const prisma = {
     store: {
       update: vi.fn().mockResolvedValue({
         taxEnabled: true,
@@ -40,8 +39,14 @@ vi.mock('@force/database', () => ({
       delete: vi.fn().mockResolvedValue(rateRow),
       findFirst: vi.fn().mockResolvedValue(rateRow),
     },
-  },
-}));
+  };
+  return {
+    Prisma: {},
+    prisma,
+    // The store row is written in the store's own scope (withStore passes its tx).
+    withStore: async (_s: string, fn: (tx: unknown) => unknown) => fn(prisma),
+  };
+});
 
 import { TaxService } from '../tax.service';
 

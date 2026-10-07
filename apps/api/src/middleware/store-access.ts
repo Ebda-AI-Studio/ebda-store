@@ -1,8 +1,16 @@
 import { upgradePlanFor } from '@force/shared';
 import { Request, Response, NextFunction } from 'express';
-import { prisma, withStore } from '@force/database';
+import { withStore, type Prisma } from '@force/database';
 import { AppError } from './error-handler';
 import { auditLog } from './security';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The store row an access check decides on, read in that store's own scope; null if none. */
+async function readStoreForAccess<S extends Prisma.StoreSelect>(storeId: string, select: S) {
+  if (!UUID_RE.test(storeId)) return null;
+  return withStore(storeId, tx => tx.store.findUnique({ where: { id: storeId }, select }));
+}
 
 /**
  * Store Access Control Middleware
@@ -37,10 +45,15 @@ export async function requireStoreAccess(
       throw new AppError(400, 'MISSING_STORE_ID', 'Store ID is required');
     }
 
-    // Validate store exists
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: { id: true, ownerId: true, name: true, status: true, billingSuspendedReason: true },
+    // Validate store exists. `stores` is under RLS (R-EBDA-005): the row this check
+    // decides on is read inside THAT store's scope (like the staff membership below);
+    // the access decision itself is made here, from ownerId / role / membership.
+    const store = await readStoreForAccess(storeId, {
+      id: true,
+      ownerId: true,
+      name: true,
+      status: true,
+      billingSuspendedReason: true,
     });
 
     if (!store) {
@@ -180,9 +193,10 @@ export async function checkStoreAccess(
   | { ok: true; store: { id: string; ownerId: string; status: string } }
   | { ok: false; status: number; code: string; message: string }
 > {
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: { id: true, ownerId: true, status: true },
+  const store = await readStoreForAccess(storeId, {
+    id: true,
+    ownerId: true,
+    status: true,
   });
   if (!store) {
     return { ok: false, status: 404, code: 'STORE_NOT_FOUND', message: 'Store not found' };

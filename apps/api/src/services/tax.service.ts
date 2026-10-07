@@ -1,4 +1,4 @@
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma, withStore } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { bustStoreCachesById } from './store.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
@@ -47,14 +47,16 @@ export class TaxService {
    * Get store tax settings
    */
   static async getSettings(storeId: string): Promise<TaxSettings> {
-    const store = await prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        taxEnabled: true,
-        taxIncludedInPrice: true,
-        defaultTaxRate: true,
-      },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.findUnique({
+        where: { id: storeId },
+        select: {
+          taxEnabled: true,
+          taxIncludedInPrice: true,
+          defaultTaxRate: true,
+        },
+      })
+    );
 
     if (!store) {
       throw new AppError(404, 'NOT_FOUND', 'Store not found');
@@ -84,18 +86,20 @@ export class TaxService {
         { verificationPath: `/stores/${storeId}/tax#vat-registration` }
       );
     }
-    const store = await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        taxEnabled: settings.taxEnabled,
-        taxIncludedInPrice: settings.taxIncludedInPrice,
-      },
-      select: {
-        taxEnabled: true,
-        taxIncludedInPrice: true,
-        defaultTaxRate: true,
-      },
-    });
+    const store = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: {
+          taxEnabled: settings.taxEnabled,
+          taxIncludedInPrice: settings.taxIncludedInPrice,
+        },
+        select: {
+          taxEnabled: true,
+          taxIncludedInPrice: true,
+          defaultTaxRate: true,
+        },
+      })
+    );
     bustPublicTaxCaches(storeId);
 
     return {

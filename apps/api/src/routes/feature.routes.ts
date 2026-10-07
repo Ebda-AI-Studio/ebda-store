@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
-import { prisma } from '@force/database';
+import { asPlatformOperator, prisma } from '@force/database';
 import { featureKeySchema, featureUpdatesSchema, FEATURE_REGISTRY } from '@force/shared';
 import { featureService } from '../services/feature.service';
 import { auditLog } from '../middleware/security';
@@ -52,10 +52,12 @@ router.get(
 
       const users =
         uniqueUserIds.length > 0
-          ? await prisma.user.findMany({
-              where: { id: { in: uniqueUserIds } },
-              select: { id: true, firstName: true, lastName: true },
-            })
+          ? await asPlatformOperator(req.user!.userId, () =>
+              prisma.user.findMany({
+                where: { id: { in: uniqueUserIds } },
+                select: { id: true, firstName: true, lastName: true },
+              })
+            )
           : [];
 
       const userMap = new Map(users.map(u => [u.id, `${u.firstName} ${u.lastName}`.trim()]));

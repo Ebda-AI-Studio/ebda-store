@@ -346,7 +346,7 @@ describe('admin bundle routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockPrisma.bundle.update).toHaveBeenCalledWith({
-        where: { id: BUNDLE_ID },
+        where: { id: BUNDLE_ID, storeId: STORE_ID },
         data: { isActive: false },
       });
       // No `bundle.delete` mock exists at all in this suite — if the route

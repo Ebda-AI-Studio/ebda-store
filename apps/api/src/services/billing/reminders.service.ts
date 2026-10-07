@@ -56,9 +56,10 @@ export async function findReminderCandidates(now: Date): Promise<string[]> {
   const horizon = new Date(now.getTime() + 7 * DAY);
   const floor = new Date(now.getTime() - DAY);
   const parts = await acrossStores(
-    () =>
+    storeId =>
       prisma.storeSubscription.findMany({
         where: {
+          storeId,
           planCode: { notIn: [...GRANTED_PLAN_CODES, FREE_PLAN_CODE] },
           cancelAtPeriodEnd: false,
           OR: [
@@ -88,7 +89,9 @@ export async function sendDueReminder(
   const storeId = await getEntityStoreId('store_subscription', subscriptionId);
   if (!storeId) return { sent: false, reason: 'not_found' };
   const claimed = await withStore(storeId, async tx => {
-    const sub = await tx.storeSubscription.findUnique({ where: { id: subscriptionId } });
+    const sub = await tx.storeSubscription.findUnique({
+      where: { id: subscriptionId, storeId },
+    });
     if (!sub || sub.cancelAtPeriodEnd) return null;
     const dueAt = reminderDueAt(sub);
     const kind = dueAt ? reminderKindAt(dueAt, now) : null;

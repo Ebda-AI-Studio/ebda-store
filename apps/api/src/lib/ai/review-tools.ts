@@ -1,5 +1,5 @@
 import { GeminiFailoverClient } from './gemini-keys';
-import { prisma } from '@force/database';
+import { prisma, currentStoreId } from '@force/database';
 import { config } from '../../config';
 import logger from '../logger';
 import { assertAiQuota } from '../ai-quota';
@@ -52,7 +52,7 @@ function stripFences(text: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 export async function translateReview(reviewId: string): Promise<void> {
   const review = await prisma.review.findUnique({
-    where: { id: reviewId },
+    where: { id: reviewId, storeId: currentStoreId() },
     select: { id: true, storeId: true, body: true, language: true, bodyTranslated: true },
   });
   if (!review) {
@@ -82,7 +82,7 @@ ${review.body}`;
   const parsed = JSON.parse(stripFences(result.response.text())) as { translated: string };
 
   await prisma.review.update({
-    where: { id: reviewId },
+    where: { id: reviewId, storeId: review.storeId },
     data: { bodyTranslated: parsed.translated, bodyTranslatedAt: new Date() },
   });
 
@@ -101,7 +101,7 @@ export interface SpamCheckResult {
 
 export async function detectSpamReview(reviewId: string): Promise<SpamCheckResult> {
   const review = await prisma.review.findUnique({
-    where: { id: reviewId },
+    where: { id: reviewId, storeId: currentStoreId() },
     select: { storeId: true, body: true, title: true, rating: true, language: true },
   });
   if (!review) {

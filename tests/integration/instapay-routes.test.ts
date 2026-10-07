@@ -146,7 +146,7 @@ describe.skipIf(!hasDb)('InstaPay over HTTP', () => {
 
   beforeAll(async () => {
     vi.spyOn(inngest, 'send').mockResolvedValue({ ids: [] } as never);
-    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4 });
+    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4, role: 'owner' });
     await redis.connect().catch(() => undefined);
     app = express();
     app.use(express.json());

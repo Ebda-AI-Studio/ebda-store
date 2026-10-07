@@ -322,7 +322,7 @@ class AffiliateService {
     await this.getById(storeId, id);
 
     const affiliate = await prisma.affiliate.update({
-      where: { id },
+      where: { id, storeId },
       data: {
         ...(data.commissionRate !== undefined && { commissionRate: data.commissionRate }),
         ...(data.notes !== undefined && { notes: data.notes }),
@@ -342,7 +342,7 @@ class AffiliateService {
     }
 
     const updated = await prisma.affiliate.update({
-      where: { id },
+      where: { id, storeId },
       data: { status: 'approved', approvedAt: new Date(), approvedBy: userId },
     });
 
@@ -366,7 +366,7 @@ class AffiliateService {
     }
 
     const updated = await prisma.affiliate.update({
-      where: { id },
+      where: { id, storeId },
       data: { status: 'rejected', approvedBy: userId },
     });
 
@@ -386,7 +386,7 @@ class AffiliateService {
     const affiliate = await this.getById(storeId, id);
 
     const updated = await prisma.affiliate.update({
-      where: { id },
+      where: { id, storeId },
       data: { status: 'suspended', approvedBy: userId },
     });
 
@@ -407,7 +407,7 @@ class AffiliateService {
   async delete(storeId: string, id: string) {
     await this.getById(storeId, id);
 
-    await prisma.affiliate.delete({ where: { id } });
+    await prisma.affiliate.delete({ where: { id, storeId } });
   }
 
   // ---- Click Tracking ----
@@ -473,7 +473,7 @@ class AffiliateService {
     }
 
     const updated = await prisma.affiliateReferral.update({
-      where: { id: referral.id },
+      where: { id: referral.id, storeId },
       data: { orderId, status: 'converted', convertedAt: new Date() },
     });
 
@@ -501,7 +501,7 @@ class AffiliateService {
       return null;
     }
 
-    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    const order = await prisma.order.findUnique({ where: { id: orderId, storeId } });
     if (!order) {
       logger.warn(
         { storeId, orderId },
@@ -531,12 +531,12 @@ class AffiliateService {
     // credit also un-claims the referral.
     const claimed = await inAffiliateMoneyTx(async db => {
       const claim = await db.affiliateReferral.updateMany({
-        where: { id: referral.id, status: 'converted', commissionAmount: null },
+        where: { id: referral.id, storeId, status: 'converted', commissionAmount: null },
         data: { commissionAmount, status: 'commission_paid' },
       });
       if (claim.count !== 1) return false;
       await db.affiliate.update({
-        where: { id: referral.affiliateId },
+        where: { id: referral.affiliateId, storeId },
         data: {
           totalEarned: { increment: commissionAmount },
           pendingBalance: { increment: commissionAmount },
@@ -600,12 +600,12 @@ class AffiliateService {
     // cannot decrement the affiliate twice.
     const claimed = await inAffiliateMoneyTx(async db => {
       const claim = await db.affiliateReferral.updateMany({
-        where: { id: referral.id, status: 'commission_paid' },
+        where: { id: referral.id, storeId, status: 'commission_paid' },
         data: { status: 'refunded' },
       });
       if (claim.count !== 1) return false;
       await db.affiliate.update({
-        where: { id: referral.affiliateId },
+        where: { id: referral.affiliateId, storeId },
         data: {
           totalEarned: { decrement: amount },
           pendingBalance: { decrement: amount },

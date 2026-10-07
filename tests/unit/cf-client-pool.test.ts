@@ -85,6 +85,90 @@ describe('ClientPool', () => {
   });
 });
 
+/**
+ * workerd CANCELS a request whose client disconnects: its pending promises never settle, so the
+ * `finally` that releases its lease never runs. Measured on the preview API (2026-10-07): six
+ * probes cut off by the client left `leased: 3` with nothing in flight; once all `max` clients were
+ * held by dead requests the isolate answered every request 503 OVERLOADED after 20 s, which is
+ * what the builder canvas's server render hit (no draft, no products, no editor overlay).
+ */
+describe('leases and waiters of requests that were cancelled', () => {
+  const clock = () => {
+    let t = 1_000;
+    return { now: () => t, advance: (ms: number) => (t += ms) };
+  };
+
+  it('a lease never released (its request was cancelled) is reclaimed once stale: the pool serves again', async () => {
+    const c = clock();
+    const pool = new ClientPool({
+      connectionString: URL,
+      max: 1,
+      staleLeaseMs: 50,
+      maxWaitMs: 20,
+      now: c.now,
+    });
+    const dead = await pool.acquire(); // its request is cancelled: release() is never called
+    await expect(pool.acquire()).rejects.toBeInstanceOf(ClientPoolTimeout); // still young: busy
+    c.advance(60);
+    const next = await pool.acquire();
+    expect(next.client).not.toBe(dead.client); // never hand out a client a live request may hold
+    expect(pool.stats()).toMatchObject({ created: 1, leased: 1, abandoned: 1 });
+    await next.release();
+    expect(pool.stats()).toMatchObject({ created: 1, leased: 0, idle: 1 });
+  });
+
+  it('a reclaimed lease released late (a slow request, not a dead one) is dropped, not double-counted', async () => {
+    const c = clock();
+    const pool = new ClientPool({ connectionString: URL, max: 1, staleLeaseMs: 50, now: c.now });
+    const slow = await pool.acquire();
+    c.advance(60);
+    const next = await pool.acquire();
+    await slow.release();
+    expect(pool.stats()).toMatchObject({ created: 1, leased: 1, idle: 0 });
+    await next.release();
+    expect(pool.stats()).toMatchObject({ created: 1, leased: 0, idle: 1 });
+  });
+
+  it('a live lease is never reclaimed while it is younger than staleLeaseMs', async () => {
+    const c = clock();
+    const pool = new ClientPool({
+      connectionString: URL,
+      max: 1,
+      staleLeaseMs: 50,
+      maxWaitMs: 20,
+      now: c.now,
+    });
+    const a = await pool.acquire();
+    c.advance(40);
+    await expect(pool.acquire()).rejects.toBeInstanceOf(ClientPoolTimeout);
+    expect(pool.stats()).toMatchObject({ abandoned: 0, leased: 1 });
+    await a.release();
+  });
+
+  it('a waiter older than maxWaitMs (its request was cancelled, its timer never fired) does not swallow a freed client', async () => {
+    const c = clock();
+    const pool = new ClientPool({ connectionString: URL, max: 1, maxWaitMs: 10_000, now: c.now });
+    const a = await pool.acquire();
+    void pool.acquire().catch(() => undefined); // a waiter whose request is then cancelled
+    await tick();
+    c.advance(10_001); // the real timer is still pending, as it is in a cancelled request
+    await a.release();
+    expect(pool.stats()).toMatchObject({ leased: 0, idle: 1 });
+    const b = await pool.acquire();
+    expect(b.client).toBe(a.client);
+    await b.release();
+  });
+
+  it('a waiter is served (not shed) when the lease it waited on went stale meanwhile', async () => {
+    const pool = new ClientPool({ connectionString: URL, max: 1, staleLeaseMs: 30, maxWaitMs: 60 });
+    const dead = await pool.acquire();
+    const waited = await pool.acquire(); // at its deadline the dead lease is 60 ms old > 30
+    expect(waited.client).not.toBe(dead.client);
+    expect(pool.stats()).toMatchObject({ abandoned: 1, leased: 1, waiting: 0 });
+    await waited.release();
+  });
+});
+
 describe('a client whose Prisma dispatch was lost', () => {
   const stick = (client: unknown) => {
     // Prisma's request DataLoader: `tickActive` stays true when its nextTick dispatch is lost.

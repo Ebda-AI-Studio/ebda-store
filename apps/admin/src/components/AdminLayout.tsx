@@ -27,6 +27,7 @@ import { CommandPalette } from './CommandPalette';
 import { SidebarNav } from './admin-layout/SidebarNav';
 import { SidebarFooter } from './admin-layout/SidebarFooter';
 import { TopBar } from './admin-layout/TopBar';
+import { DocumentTitle } from './DocumentTitle';
 import { FocusTopBar } from './admin-layout/FocusTopBar';
 import { MobileBottomNav } from './mobile/MobileBottomNav';
 import { useFocusMode } from '../contexts/FocusModeContext';
@@ -426,6 +427,7 @@ export function AdminLayout({
   if (isFocused) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
+        <DocumentTitle title={title} />
         <FocusTopBar storeBranding={resolvedStoreBranding} />
         <main id="admin-main-content" tabIndex={-1} className="min-w-0 flex-1 p-4 pb-6 lg:p-6">
           {children}

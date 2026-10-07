@@ -11,7 +11,7 @@
  * Real Postgres; every fixture is per-test unique (retry-safe).
  */
 import { describe, it, expect } from 'vitest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
 import { CartService } from '@api/services/cart.service';
 import { OrderService } from '@api/services/order.service';
 import { seedCoaForStore } from '@api/services/accounting/account.service';
@@ -108,7 +108,8 @@ describe.skipIf(!hasDb)('order lines snapshot the variant cost (finding 2)', () 
     await withRlsBypass(tx =>
       tx.order.update({ where: { id: order.id }, data: { paymentStatus: 'paid' } })
     );
-    await postOrderPaymentJournal({ orderId: order.id });
+    // Production posts inside runInTenantContext(storeId).
+    await runInTenantContext(store.storeId, () => postOrderPaymentJournal({ orderId: order.id }));
     const cogs = await withRlsBypass(tx =>
       tx.journalEntry.findFirst({
         where: { storeId: store.storeId, source: 'order', sourceId: `${order.id}:cogs` },

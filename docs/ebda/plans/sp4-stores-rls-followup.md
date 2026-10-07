@@ -1,6 +1,6 @@
 # SP4 follow-up: strict RLS on `stores`
 
-Status: NOT done in SP4 (accepted residual, R-EBDA-002). Decision date 2026-10-04.
+Status: DONE 2026-10-07 (R-EBDA-005, branch `feat/tenant-defence` + its stacked contract PR). Steps 1-5 below were carried out: `store_credentials`, the definers (named differently: `ebda_store_lookup`, `ebda_store_id_by_slug`, `ebda_store_id_by_domain`, `ebda_store_ids_claiming_domain`, `ebda_store_directory`, `ebda_public_store_page`, `ebda_owned_store_ids`, `ebda_wbs_bridge_keys`), the `stores` policy (own store, owner, staff, active super_admin), every call site converted (and checked at runtime by the code-level tenant guard, R-EBDA-003), and `stores` removed from `DOCUMENTED_NON_RLS`. Kept below as the original plan. Original decision date 2026-10-04.
 
 ## Why it is not in SP4
 

@@ -74,7 +74,7 @@ export async function handleOrderStatusChanged(
   const order = await step.run('load-order', () =>
     runInTenantContext(storeId, () =>
       prisma.order.findUnique({
-        where: { id: orderId },
+        where: { id: orderId, storeId },
         include: { customer: true, items: true },
       })
     )

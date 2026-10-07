@@ -5,9 +5,11 @@
  *   - booking: COD in piastres on the shipment, idempotent, InstaPay-awaiting orders never ship
  *   - outage isolation: carrier down -> order untouched, row `creation_failed`, retry books once,
  *     merchant told when a refusal cannot be retried
- *   - Bosta webhook auth by the per-store URL secret (wrong / unknown store = 401), replay no-op
+ *   - Bosta webhook auth by the per-store URL secret AND the derived header Bosta echoes
+ *     (wrong token / missing or wrong header / unknown store = 401), replay no-op
  *   - Aramex tracking is polled across stores (acrossStores) under strict RLS
- *   - credentials are encrypted at rest and never echoed
+ *   - credentials are saved through the connect flow (PUT, Test connection, enable), encrypted at
+ *     rest and write-only (hints only, never echoed); an unverified carrier never books
  *   - COD reconciliation over HTTP: import, idempotent re-import, partial remittances,
  *     unmatched lines, per-store isolation
  *
@@ -15,6 +17,10 @@
  *   - shipping-carrier.service.ts: remove `assertOrderFulfillable(order)` -> "InstaPay"
  *   - runTrackingCron: use a bare `prisma.shipment.findMany` -> "polls every store"
  *   - shipping-carrier.service.ts processCarrierWebhook: skip `verifyWebhookToken` -> "wrong token"
+ *   - shipping-carrier.service.ts processCarrierWebhook: skip the `impl.webhookHeader` check ->
+ *     "a missing or wrong header" (the missing-header test goes red)
+ *   - shipping-carrier.service.ts createShipmentForOrder: skip the runtime `isProviderUsable`
+ *     gate -> "an unverified carrier never books"
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import express, { type Express } from 'express';
@@ -31,6 +37,7 @@ import { config } from '@api/config';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import { serveStub, type ServedStub } from '../stubs/serve';
 import { BostaStub, BOSTA_STUB } from '../stubs/bosta-stub';
+import { webhookHeaderValue } from '@api/services/carriers/bosta.carrier';
 import { AramexStub, ARAMEX_STUB } from '../stubs/aramex-stub';
 import { shippingCarrierService } from '@api/services/shipping-carrier.service';
 import { planService } from '@api/services/plan.service';
@@ -134,6 +141,8 @@ describe.skipIf(!hasDb)('SP7 shipping (ebda_app, strict RLS)', () => {
           address1: '5 Nile Corniche',
           city: 'Giza',
           state: 'Giza',
+          // Bosta needs the district of the delivery address (else NEEDS_MAPPING)
+          area: 'Dokki',
           country: 'EG',
         },
         billingAddress: {},
@@ -147,21 +156,52 @@ describe.skipIf(!hasDb)('SP7 shipping (ebda_app, strict RLS)', () => {
     return order;
   }
 
-  const bostaConfig = (s: { id: string }, extra: Record<string, unknown> = {}) =>
-    inStore(s.id, () =>
-      shippingCarrierService.upsertCarrierConfig(s.id, 'bosta', {
-        enabled: true,
-        credentials: { apiKey: BOSTA_STUB.apiKey, businessLocationId: 'LOC1' },
-        settings: { pickupCity: 'Cairo', pickupLine1: '12 Tahrir St', ...extra },
+  /**
+   * Connect a carrier the way a merchant does (the stub is reached through the BOSTA_BASE_URL /
+   * ARAMEX_BASE_URL overrides, so a sandbox-mode key hits it): save the sandbox credentials,
+   * Test connection, enable. A row that already exists only gets its settings replaced.
+   */
+  const connectCarrier = async (
+    s: { id: string },
+    carrier: 'bosta' | 'aramex',
+    fields: Record<string, string>,
+    settings: Record<string, unknown>
+  ) => {
+    // One tenant scope per step (each commits), like three requests: the save takes a row lock.
+    const exists = await inStore(s.id, () =>
+      shippingCarrierService.getCarrierConfig(s.id, carrier)
+    );
+    if (exists) {
+      return inStore(s.id, () =>
+        shippingCarrierService.upsertCarrierConfig(s.id, carrier, { settings })
+      );
+    }
+    await inStore(s.id, () =>
+      shippingCarrierService.upsertCarrierConfig(s.id, carrier, {
+        credentials: { mode: 'sandbox', fields },
+        activate: true,
+        settings,
       })
     );
+    const t = await inStore(s.id, () => shippingCarrierService.testConnection(s.id, carrier));
+    expect(t.test.ok, JSON.stringify(t.test)).toBe(true);
+    return inStore(s.id, () =>
+      shippingCarrierService.upsertCarrierConfig(s.id, carrier, { enabled: true })
+    );
+  };
+  const bostaConfig = (s: { id: string }, extra: Record<string, unknown> = {}) =>
+    connectCarrier(
+      s,
+      'bosta',
+      { apiKey: BOSTA_STUB.apiKey, businessLocationId: 'LOC1' },
+      { pickupCity: 'Cairo', pickupLine1: '12 Tahrir St', ...extra }
+    );
   const aramexConfig = (s: { id: string }, codConfirmed = false) =>
-    inStore(s.id, () =>
-      shippingCarrierService.upsertCarrierConfig(s.id, 'aramex', {
-        enabled: true,
-        credentials: { ...ARAMEX_STUB.credentials },
-        settings: { pickupCity: 'Cairo', codEgpConfirmed: codConfirmed },
-      })
+    connectCarrier(
+      s,
+      'aramex',
+      { ...ARAMEX_STUB.credentials },
+      { pickupCity: 'Cairo', productType: 'CDS', codEgpConfirmed: codConfirmed }
     );
   const book = (
     s: { id: string },
@@ -182,7 +222,7 @@ describe.skipIf(!hasDb)('SP7 shipping (ebda_app, strict RLS)', () => {
   const auth = (j: string) => ({ Authorization: `Bearer ${j}` });
 
   beforeAll(async () => {
-    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4 });
+    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4, role: 'owner' });
     await redis.connect().catch(() => undefined);
     bostaServer = await serveStub(bosta.fetch);
     aramexServer = await serveStub(aramex.fetch);
@@ -234,7 +274,10 @@ describe.skipIf(!hasDb)('SP7 shipping (ebda_app, strict RLS)', () => {
       const o = await mkOrder(s, { cod: 123_45 });
       const sh = await book(s, o.id, 'bosta');
       expect(sh).toMatchObject({ status: 'created', carrier: 'bosta', codAmount: 12_345 });
-      expect(sh.trackingNumber).toMatch(/^BST/);
+      expect(sh.trackingNumber).toMatch(/^\d+$/);
+      // Bosta's carrierShipmentId is the tracking number; its own _id is the transaction id
+      expect(sh.carrierShipmentId).toBe(sh.trackingNumber);
+      expect(sh.carrierTransactionId).toBe(bosta.parcelByTracking(sh.trackingNumber!)?.id);
       expect(bosta.parcelByTracking(sh.trackingNumber!)?.codSent).toBe(123.45);
       expect((await owner.order.findUniqueOrThrow({ where: { id: o.id } })).status).toBe('shipped');
       // the callback URL Bosta was given carries this store's id and its secret
@@ -321,6 +364,37 @@ describe.skipIf(!hasDb)('SP7 shipping (ebda_app, strict RLS)', () => {
       });
       const parcel = aramex.parcels.get(retried.trackingNumber!);
       expect(parcel).toMatchObject({ codCurrency: 'EGP', codMinor: 50_000 });
+    });
+
+    it('an unverified carrier never books: an already-enabled row is refused at the point of use, before any carrier call', async () => {
+      const s = await mkStore('unverified');
+      await bostaConfig(s); // enabled + tested while the stub-suite seam is on
+      const o = await mkOrder(s);
+      const calls = bosta.requests.length;
+      const prev = process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
+      delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED; // run as production does
+      try {
+        await expect(book(s, o.id, 'bosta')).rejects.toMatchObject({
+          code: 'CARRIER_NOT_ENABLED',
+        });
+        const res = await asApp(async () =>
+          http()
+            .post(`/api/v1/stores/${s.id}/orders/${o.id}/ship`)
+            .set(auth(s.jwt))
+            .send({ carrier: 'bosta' })
+        );
+        expect(res.status).toBe(409);
+        expect(res.body.error.code).toBe('CARRIER_NOT_ENABLED');
+      } finally {
+        process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED = prev;
+      }
+      expect(bosta.requests.length).toBe(calls); // no carrier call at all
+      expect(await shipmentOf(o.id)).toBeNull();
+      expect((await owner.order.findUniqueOrThrow({ where: { id: o.id } })).status).toBe(
+        'confirmed'
+      );
+      // the seam back on, the same row books (the refusal was the gate, nothing else)
+      expect((await book(s, o.id, 'bosta')).status).toBe('created');
     });
 
     it('manual carrier: the merchant types the courier and the tracking number', async () => {
@@ -509,7 +583,7 @@ describe.skipIf(!hasDb)('SP7 shipping (ebda_app, strict RLS)', () => {
     });
   });
 
-  describe('Bosta webhook (secret in the URL)', () => {
+  describe('Bosta webhook (secret in the URL + derived header)', () => {
     async function booked(tag: string) {
       const s = await mkStore(tag);
       await bostaConfig(s);
@@ -518,24 +592,38 @@ describe.skipIf(!hasDb)('SP7 shipping (ebda_app, strict RLS)', () => {
       const secret = (
         await inStore(s.id, () => shippingCarrierService.getCarrierConfig(s.id, 'bosta'))
       )?.credentials.webhookSecret as string;
-      return { s, o, sh, secret };
+      // exactly what Bosta echoes back: the custom header the adapter registered at create
+      const hdr = bosta.webhookHeaders(sh.trackingNumber!);
+      return { s, o, sh, secret, hdr };
     }
-    const post = (storeId: string, tok: string, body: unknown) =>
+    const post = (
+      storeId: string,
+      tok: string,
+      body: unknown,
+      headers: Record<string, string> = {}
+    ) =>
       asApp(async () =>
         http()
           .post(`/api/v1/webhooks/shipping/bosta/${storeId}/${tok}`)
           .set('Content-Type', 'application/json')
+          .set(headers)
           .send(JSON.stringify(body))
       );
 
-    it('the right token moves the shipment; a replay is a no-op; an old event does not move it back', async () => {
-      const { s, o, sh, secret } = await booked('wh');
+    it('the header Bosta is given is derived from the secret, never the secret itself', async () => {
+      const { secret, hdr } = await booked('whhdr');
+      expect(hdr).toEqual({ 'x-ebda-webhook-secret': webhookHeaderValue(secret) });
+      expect(Object.values(hdr)[0]).not.toBe(secret);
+    });
+
+    it('the right token and header move the shipment; a replay is a no-op; an old event does not move it back', async () => {
+      const { s, o, sh, secret, hdr } = await booked('wh');
       // Ahead of the booking's own `created` entry (stamped now), or the event is stale and ignored.
       const base = Date.now() + 6 * 3_600_000;
       const at = (sec: number) => new Date(base + sec * 1000);
       const body = (status: any, ts: Date) => bosta.webhookBody(sh.trackingNumber!, status, ts);
 
-      expect((await post(s.id, secret, body('out_for_delivery', at(30)))).status).toBe(200);
+      expect((await post(s.id, secret, body('out_for_delivery', at(30)), hdr)).status).toBe(200);
       expect((await shipmentOf(o.id))?.status).toBe('out_for_delivery');
       const history = () =>
         owner.shipment
@@ -544,48 +632,82 @@ describe.skipIf(!hasDb)('SP7 shipping (ebda_app, strict RLS)', () => {
       const n = (await history()).length;
 
       // Bosta retries the same delivery
-      expect((await post(s.id, secret, body('out_for_delivery', at(30)))).status).toBe(200);
+      expect((await post(s.id, secret, body('out_for_delivery', at(30)), hdr)).status).toBe(200);
       expect((await history()).length).toBe(n);
 
       // a late, older event
-      expect((await post(s.id, secret, body('picked_up', at(10)))).status).toBe(200);
+      expect((await post(s.id, secret, body('picked_up', at(10)), hdr)).status).toBe(200);
       expect((await shipmentOf(o.id))?.status).toBe('out_for_delivery');
       expect((await history()).length).toBe(n + 1);
 
       // delivered flips the order too
-      expect((await post(s.id, secret, body('delivered', at(90)))).status).toBe(200);
+      expect((await post(s.id, secret, body('delivered', at(90)), hdr)).status).toBe(200);
       expect((await shipmentOf(o.id))?.status).toBe('delivered');
       expect((await owner.order.findUniqueOrThrow({ where: { id: o.id } })).status).toBe(
         'delivered'
       );
     });
 
-    it('a wrong token is 401 and changes nothing', async () => {
-      const { s, o, sh, secret } = await booked('whbad');
+    it('a wrong token is 401 and changes nothing (even with the right header)', async () => {
+      const { s, o, sh, secret, hdr } = await booked('whbad');
       const body = bosta.webhookBody(sh.trackingNumber!, 'delivered', new Date());
       for (const bad of ['nope', secret.slice(0, -1), `${secret}0`, secret.toUpperCase(), '0']) {
-        expect((await post(s.id, bad, body)).status, bad).toBe(401);
+        expect((await post(s.id, bad, body, hdr)).status, bad).toBe(401);
       }
       expect((await shipmentOf(o.id))?.status).toBe('created');
+    });
+
+    it('a missing or wrong header is 401 and changes nothing (the URL token alone is not enough)', async () => {
+      const { s, o, sh, secret, hdr } = await booked('whhdr2');
+      const other = await booked('whhdr3');
+      const name = Object.keys(hdr)[0];
+      const body = bosta.webhookBody(sh.trackingNumber!, 'delivered', new Date(Date.now() + 9e6));
+      const bad: Array<[string, Record<string, string>]> = [
+        ['no header', {}],
+        ['empty header', { [name]: '' }],
+        ['the raw secret instead of the derived value', { [name]: secret }],
+        ['a truncated value', { [name]: hdr[name].slice(0, -1) }],
+        ['an uppercased value', { [name]: hdr[name].toUpperCase() }],
+        ["another store's header value", other.hdr],
+        ['the right value under another name', { 'x-other': hdr[name] }],
+      ];
+      for (const [label, h] of bad) {
+        expect((await post(s.id, secret, body, h)).status, label).toBe(401);
+      }
+      expect((await shipmentOf(o.id))?.status).toBe('created');
+      // the same request with the real header is accepted
+      expect((await post(s.id, secret, body, hdr)).status).toBe(200);
+      expect((await shipmentOf(o.id))?.status).toBe('delivered');
     });
 
     it("one store's secret does not open another store's shipments, and an unknown store is 401", async () => {
       const a = await booked('wha');
       const b = await booked('whb');
       const body = bosta.webhookBody(a.sh.trackingNumber!, 'delivered', new Date());
-      expect((await post(b.s.id, a.secret, body)).status).toBe(401); // A's secret on B's URL
-      expect((await post(b.s.id, b.secret, body)).status).toBe(200); // B's secret, A's parcel: not B's
+      expect((await post(b.s.id, a.secret, body, a.hdr)).status).toBe(401); // A's secret on B's URL
+      expect((await post(b.s.id, a.secret, body, b.hdr)).status).toBe(401); // A's token, B's header
+      expect((await post(b.s.id, b.secret, body, a.hdr)).status).toBe(401); // B's token, A's header
+      expect((await post(b.s.id, b.secret, body, b.hdr)).status).toBe(200); // B's secret, A's parcel: not B's
       expect((await shipmentOf(a.o.id))?.status).toBe('created');
-      expect((await post(crypto.randomUUID(), a.secret, body)).status).toBe(401);
-      expect((await post('not-a-uuid', a.secret, body)).status).toBe(401);
+      expect((await post(crypto.randomUUID(), a.secret, body, a.hdr)).status).toBe(401);
+      expect((await post('not-a-uuid', a.secret, body, a.hdr)).status).toBe(401);
     });
 
-    it('a rotated secret stops the old URL at once', async () => {
-      const { s, o, sh, secret } = await booked('whrot');
+    it('a rotated secret stops the old URL and header at once, and the new pair works', async () => {
+      const { s, o, sh, secret, hdr } = await booked('whrot');
       await inStore(s.id, () => shippingCarrierService.rotateWebhookSecret(s.id, 'bosta'));
-      const body = bosta.webhookBody(sh.trackingNumber!, 'delivered', new Date());
-      expect((await post(s.id, secret, body)).status).toBe(401);
+      const body = bosta.webhookBody(sh.trackingNumber!, 'delivered', new Date(Date.now() + 9e6));
+      expect((await post(s.id, secret, body, hdr)).status).toBe(401);
+      const fresh = (
+        await inStore(s.id, () => shippingCarrierService.getCarrierConfig(s.id, 'bosta'))
+      )?.credentials.webhookSecret as string;
+      expect(fresh).not.toBe(secret);
+      // the new token with the OLD header is still refused: the header is derived from the secret
+      expect((await post(s.id, fresh, body, hdr)).status).toBe(401);
       expect((await shipmentOf(o.id))?.status).toBe('created');
+      const newHdr = { 'x-ebda-webhook-secret': webhookHeaderValue(fresh) };
+      expect((await post(s.id, fresh, body, newHdr)).status).toBe(200);
+      expect((await shipmentOf(o.id))?.status).toBe('delivered');
     });
 
     it('a carrier with no webhook (Aramex) has no callback route', async () => {
@@ -652,48 +774,72 @@ describe.skipIf(!hasDb)('SP7 shipping (ebda_app, strict RLS)', () => {
   });
 
   describe('credentials', () => {
-    it('are encrypted at rest, masked in the API, and the webhook secret is server-managed', async () => {
+    it('are saved write-only, encrypted at rest, never echoed, and the webhook secret is server-managed', async () => {
       const s = await mkStore('creds');
-      const put = await asApp(async () =>
-        http()
-          .put(`/api/v1/stores/${s.id}/shipping-carriers/configs/bosta`)
-          .set(auth(s.jwt))
-          .send({
-            enabled: true,
-            credentials: { apiKey: 'plain-bosta-key-123456', webhookSecret: 'attacker-chosen' },
-            settings: {},
-          })
-      );
-      expect(put.status, JSON.stringify(put.body)).toBe(200);
+      const url = `/api/v1/stores/${s.id}/shipping-carriers/configs/bosta`;
+      const KEY = 'plain-bosta-key-123456';
+      const put = (body: object) => asApp(async () => http().put(url).set(auth(s.jwt)).send(body));
+
+      // the webhook secret is not a field a merchant can set
+      const attack = await put({
+        mode: 'sandbox',
+        credentials: { apiKey: KEY, webhookSecret: 'attacker-chosen' },
+      });
+      expect(attack.status).toBe(422);
+      expect(attack.body.error.code).toBe('INVALID_CREDENTIALS');
+      expect(
+        await owner.shippingCarrierConfig.count({ where: { storeId: s.id, carrier: 'bosta' } })
+      ).toBe(0);
+
+      const saved = await put({
+        mode: 'sandbox',
+        credentials: { apiKey: KEY },
+        activate: true,
+        settings: {},
+      });
+      expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+      expect(saved.body.data.changed).toEqual(['apiKey']);
+      expect(JSON.stringify(saved.body)).not.toContain(KEY);
+      expect(saved.body.data.config.credentials).toBeUndefined();
+
       const raw = await owner.shippingCarrierConfig.findFirstOrThrow({
         where: { storeId: s.id, carrier: 'bosta' },
       });
-      expect(raw.credentials).not.toContain('plain-bosta-key-123456');
+      expect(raw.credentials).toBeTruthy();
+      expect(raw.credentials).not.toContain(KEY);
       expect(raw.credentials).not.toContain('attacker-chosen');
+      expect(JSON.stringify(raw.credentialHints)).not.toContain(KEY);
+
       const list = await asApp(async () =>
         http().get(`/api/v1/stores/${s.id}/shipping-carriers/configs`).set(auth(s.jwt))
       );
       const cfg = list.body.data.configs.find((c: { carrier: string }) => c.carrier === 'bosta');
-      expect(cfg.credentials.apiKey).toBe('plai' + '*'.repeat(18));
-      expect(JSON.stringify(list.body)).not.toContain('plain-bosta-key-123456');
+      expect(cfg.credentials).toBeUndefined();
+      expect(cfg.credentialHints.sandbox.apiKey).toEqual({ set: true, last4: KEY.slice(-4) });
+      expect(JSON.stringify(list.body)).not.toContain(KEY);
+      expect(JSON.stringify(list.body)).not.toContain('"credentials"');
+
+      // the server (and only the server) reads the decrypted active set + the webhook secret
       const real = await inStore(s.id, () =>
         shippingCarrierService.getCarrierConfig(s.id, 'bosta')
       );
+      expect(real?.credentials.apiKey).toBe(KEY);
       expect(real?.credentials.webhookSecret).toMatch(/^[0-9a-f]{48}$/);
       expect(real?.credentials.webhookSecret).not.toBe('attacker-chosen');
 
-      // saving again keeps the same secret (the URL Bosta already has keeps working)
-      await asApp(async () =>
-        http()
-          .put(`/api/v1/stores/${s.id}/shipping-carriers/configs/bosta`)
-          .set(auth(s.jwt))
-          .send({ enabled: true, credentials: { apiKey: cfg.credentials.apiKey }, settings: {} })
-      );
-      const again = await inStore(s.id, () =>
+      // saving again (a masked echo, as a form would send it) keeps the key and the secret
+      const again = await put({
+        mode: 'sandbox',
+        credentials: { apiKey: `****${KEY.slice(-4)}` },
+        settings: {},
+      });
+      expect(again.status).toBe(200);
+      expect(again.body.data.changed).toEqual([]);
+      const after = await inStore(s.id, () =>
         shippingCarrierService.getCarrierConfig(s.id, 'bosta')
       );
-      expect(again?.credentials.webhookSecret).toBe(real?.credentials.webhookSecret);
-      expect(again?.credentials.apiKey).toBe('plain-bosta-key-123456');
+      expect(after?.credentials.webhookSecret).toBe(real?.credentials.webhookSecret);
+      expect(after?.credentials.apiKey).toBe(KEY);
     });
 
     it("another store cannot read this store's carrier config", async () => {

@@ -44,6 +44,14 @@ there is one per isolate regardless of the client count. What a client adds, and
   A request leases one for its whole life (including its post-commit work) and returns it. A client therefore serves one
   request at a time: no shared DataLoader across concurrent requests, no cross-context execution. Requests beyond `max`
   wait (FIFO) up to `DB_CLIENT_WAIT_MS` (20 s), then `ClientPoolTimeout` becomes a `503 OVERLOADED` with `Retry-After`.
+- **Cancelled requests (2026-10-07).** workerd cancels a request whose client disconnects; its pending promises never
+  settle, so the `finally` that returns its lease never runs. Measured on the preview API: six probes cut off by the
+  client left `leased: 3` with nothing in flight, and once all `max` clients were held by dead requests the isolate
+  answered EVERY request `503 OVERLOADED` after 20 s, for the life of the isolate (the builder canvas's server render
+  landed on such an isolate: no draft, no products, no editor overlay). The pool now records when each client was handed
+  out; at capacity, a lease older than `staleLeaseMs` (30 s, the request transaction's own limit) is **abandoned** — no
+  longer counted, its client never reused, a late release drops it — and a waiter older than `DB_CLIENT_WAIT_MS` is
+  skipped as dead. `stats().abandoned` counts them. `tests/unit/cf-client-pool.test.ts` ("cancelled").
 - The pg connection stays per request and lazy: each lease gets a `ConnectionScope` (a pg pool of at most
   `connectionsPerRequest` = 3 sockets to the pooler, opened by the first query, ended after the response in
   `ctx.waitUntil`). The pooled client's driver adapter (`LeasedAdapter`) has no socket of its own: it delegates to the

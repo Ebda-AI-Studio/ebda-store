@@ -92,7 +92,7 @@ const bulkAiCategorizeFn = inngest.createFunction(
     return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date() },
         })
       );
@@ -123,7 +123,7 @@ const bulkAiCategorizeFn = inngest.createFunction(
           });
 
           await prisma.bulkAiJob.update({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             data: { total: products.length },
           });
 
@@ -154,7 +154,7 @@ const bulkAiCategorizeFn = inngest.createFunction(
 
           const result: BatchResult = await step.run(`batch-${i}`, async () => {
             const currentJob = await prisma.bulkAiJob.findUnique({
-              where: { id: jobId },
+              where: { id: jobId, storeId },
               select: { status: true },
             });
             if (currentJob?.status === 'cancelled') {
@@ -174,7 +174,7 @@ const bulkAiCategorizeFn = inngest.createFunction(
             // concurrently via the per-product suggest endpoint) no longer
             // matches `categories: { none: {} }` and is skipped here.
             const items = await prisma.product.findMany({
-              where: { id: { in: batchIds }, categories: { none: {} } },
+              where: { id: { in: batchIds }, storeId, categories: { none: {} } },
               select: { id: true, name: true, description: true },
             });
             const byId = new Map(items.map(p => [p.id, p]));
@@ -270,7 +270,7 @@ const bulkAiCategorizeFn = inngest.createFunction(
 
           await step.run(`progress-${i}`, () =>
             prisma.bulkAiJob.update({
-              where: { id: jobId },
+              where: { id: jobId, storeId },
               data: { processed, filled, skipped, failed, errors: errors as object },
             })
           );
@@ -298,7 +298,7 @@ const bulkAiCategorizeFn = inngest.createFunction(
       }
 
       const finalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         select: { status: true },
       });
 
@@ -311,7 +311,7 @@ const bulkAiCategorizeFn = inngest.createFunction(
       // via the tag the public fetches carry.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await prisma.bulkAiJob.update({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         data: {
           status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
           processed,

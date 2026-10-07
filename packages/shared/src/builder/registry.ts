@@ -19,7 +19,17 @@
  */
 import { z } from 'zod';
 import { storeLayoutSchema } from './layout-schema';
-import { imageTextSchema, newsletterSchema } from './sections-document-only';
+import {
+  imageTextSchema,
+  newsletterSchema,
+  featuredCollectionSchema,
+  productSpotlightSchema,
+  collectionListSchema,
+  collectionBlockSchema,
+  trustBadgesSchema,
+  trustBadgeBlockSchema,
+  TRUST_BADGE_ICONS,
+} from './sections-document-only';
 import { DEFAULT_LAYOUT_SETTINGS } from '../types/store-layout';
 import type { LegacyHomeSectionKey } from './section-keys';
 import { VIEWPORTS, type Viewport } from './viewports';
@@ -47,6 +57,8 @@ export interface BlockDefinition {
   labelAr: string;
   maxCount: number;
   settings: readonly SettingDefinition[];
+  /** Validator for a block's settings (document-only sections; hero slides are validated through the layout schema). */
+  propsSchema?: z.ZodTypeAny;
 }
 
 export interface SectionPreset {
@@ -146,6 +158,17 @@ export const HERO_SLIDE_BLOCK: BlockDefinition = {
     s.url('ctaHref', 'Button link', 'رابط الزر'),
     s.url('link', 'Whole-slide link', 'رابط الشريحة'),
   ],
+};
+
+const BADGE_ICON_LABELS: Record<(typeof TRUST_BADGE_ICONS)[number], [string, string]> = {
+  cod: ['Cash on delivery', 'الدفع عند الاستلام'],
+  instapay: ['InstaPay', 'إنستاباي'],
+  shipping: ['Delivery', 'التوصيل'],
+  certified: ['Certified', 'معتمد'],
+  returns: ['Returns', 'الاسترجاع'],
+  gift: ['Gift wrap', 'تغليف هدايا'],
+  engraving: ['Engraving', 'حفر'],
+  support: ['Support', 'الدعم'],
 };
 
 const carouselLimit = (max: number) => s.range('limit', 'Products to show', 'عدد المنتجات', 1, max);
@@ -479,6 +502,274 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
       s.text('heading', 'Heading', 'العنوان', { localized: true }),
       s.textarea('body', 'Text', 'النص', { localized: true }),
       s.text('buttonText', 'Button text', 'نص الزر', { localized: true }),
+      s.color('bgColor', 'Background', 'الخلفية'),
+      ...spacingSettings(),
+    ],
+  }),
+  def({
+    type: 'featured-collection',
+    labelEn: 'Featured collection',
+    labelAr: 'مجموعة مميزة',
+    legacyKey: null,
+    rendererKey: 'section.featuredCollection',
+    group: 'template',
+    propsSchema: featuredCollectionSchema,
+    presets: [
+      {
+        nameEn: 'Newest products grid',
+        nameAr: 'شبكة أحدث المنتجات',
+        settings: {
+          heading: 'New in',
+          headingAr: 'وصل حديثاً',
+          productSource: 'newest',
+          limit: 8,
+          columns: 4,
+          mobileColumns: 2,
+          buttonText: 'View all',
+          buttonTextAr: 'عرض الكل',
+          buttonLink: '/products',
+        },
+      },
+      {
+        nameEn: 'One collection',
+        nameAr: 'مجموعة واحدة',
+        settings: {
+          heading: 'Collection',
+          headingAr: 'مجموعة',
+          productSource: 'category',
+          limit: 4,
+          columns: 4,
+          mobileColumns: 2,
+        },
+      },
+    ],
+    settings: [
+      s.text('heading', 'Heading', 'العنوان', { localized: true }),
+      s.text('subheading', 'Subheading', 'العنوان الفرعي', { localized: true }),
+      s.select(
+        'productSource',
+        'Products',
+        'المنتجات',
+        [
+          opt('newest', 'Newest', 'الأحدث'),
+          opt('best_seller', 'Best sellers', 'الأكثر مبيعاً'),
+          opt('featured', 'Featured', 'المميزة'),
+          opt('category', 'From a category', 'من فئة'),
+          opt('manual', 'Hand-picked', 'مختارة يدوياً'),
+        ],
+        { group: 'content' }
+      ),
+      {
+        id: 'categorySlug',
+        type: 'category',
+        labelEn: 'Category',
+        labelAr: 'الفئة',
+        group: 'content',
+      },
+      {
+        id: 'manualProductIds',
+        type: 'product_list',
+        labelEn: 'Products',
+        labelAr: 'المنتجات',
+        group: 'content',
+        max: 24,
+      },
+      s.range('limit', 'Products to show', 'عدد المنتجات', 2, 12),
+      s.select('columns', 'Columns (desktop)', 'الأعمدة (سطح المكتب)', [
+        opt(2, '2', '2'),
+        opt(3, '3', '3'),
+        opt(4, '4', '4'),
+        opt(5, '5', '5'),
+      ]),
+      s.select('mobileColumns', 'Columns (mobile)', 'الأعمدة (الجوال)', [
+        opt(1, '1', '1'),
+        opt(2, '2', '2'),
+      ]),
+      s.text('buttonText', 'Button text', 'نص الزر', { localized: true }),
+      s.url('buttonLink', 'Button link', 'رابط الزر'),
+      s.color('bgColor', 'Background', 'الخلفية'),
+      ...spacingSettings(),
+    ],
+  }),
+  def({
+    type: 'collection-list',
+    labelEn: 'Collection list',
+    labelAr: 'قائمة المجموعات',
+    legacyKey: null,
+    rendererKey: 'section.collectionList',
+    group: 'template',
+    propsSchema: collectionListSchema,
+    blocks: [
+      {
+        type: 'collection',
+        labelEn: 'Collection',
+        labelAr: 'مجموعة',
+        maxCount: 8,
+        propsSchema: collectionBlockSchema,
+        settings: [
+          {
+            id: 'categorySlug',
+            type: 'category',
+            labelEn: 'Category',
+            labelAr: 'الفئة',
+            group: 'content',
+          },
+          s.image('image', 'Image', 'الصورة', { localized: true }),
+          s.text('label', 'Label', 'الاسم', { localized: true }),
+        ],
+      },
+    ],
+    presets: [
+      {
+        nameEn: 'Collection list',
+        nameAr: 'قائمة المجموعات',
+        settings: {
+          heading: 'Shop by collection',
+          headingAr: 'تسوق حسب المجموعة',
+          tileShape: 'arch',
+          columns: 4,
+        },
+        blocks: [],
+      },
+    ],
+    settings: [
+      s.text('heading', 'Heading', 'العنوان', { localized: true }),
+      s.select('tileShape', 'Tile shape', 'شكل البطاقة', [
+        opt('arch', 'Arch', 'قوس'),
+        opt('rectangle', 'Rectangle', 'مستطيل'),
+        opt('circle', 'Circle', 'دائري'),
+      ]),
+      s.select('columns', 'Columns (desktop)', 'الأعمدة (سطح المكتب)', [
+        opt(2, '2', '2'),
+        opt(3, '3', '3'),
+        opt(4, '4', '4'),
+      ]),
+      s.color('bgColor', 'Background', 'الخلفية'),
+      ...spacingSettings(),
+    ],
+  }),
+  def({
+    type: 'product-spotlight',
+    labelEn: 'Product spotlight',
+    labelAr: 'منتجات مختارة مع صورة',
+    legacyKey: null,
+    rendererKey: 'section.productSpotlight',
+    group: 'template',
+    propsSchema: productSpotlightSchema,
+    presets: [
+      {
+        nameEn: 'Gift ideas',
+        nameAr: 'أفكار للهدايا',
+        settings: {
+          heading: 'Gift ideas',
+          headingAr: 'أفكار للهدايا',
+          productSource: 'featured',
+          limit: 3,
+          imagePosition: 'start',
+        },
+      },
+    ],
+    settings: [
+      s.image('image', 'Image', 'الصورة', { localized: true }),
+      s.text('alt', 'Image description', 'وصف الصورة', { localized: true }),
+      s.text('heading', 'Heading', 'العنوان', { localized: true }),
+      s.textarea('body', 'Text', 'النص', { localized: true }),
+      s.select(
+        'productSource',
+        'Products',
+        'المنتجات',
+        [
+          opt('newest', 'Newest', 'الأحدث'),
+          opt('best_seller', 'Best sellers', 'الأكثر مبيعاً'),
+          opt('featured', 'Featured', 'المميزة'),
+          opt('category', 'From a category', 'من فئة'),
+          opt('manual', 'Hand-picked', 'مختارة يدوياً'),
+        ],
+        { group: 'content' }
+      ),
+      {
+        id: 'categorySlug',
+        type: 'category',
+        labelEn: 'Category',
+        labelAr: 'الفئة',
+        group: 'content',
+      },
+      {
+        id: 'manualProductIds',
+        type: 'product_list',
+        labelEn: 'Products',
+        labelAr: 'المنتجات',
+        group: 'content',
+        max: 4,
+      },
+      s.range('limit', 'Products to show', 'عدد المنتجات', 1, 4),
+      s.select('imagePosition', 'Image side', 'جهة الصورة', [
+        opt('start', 'Start (right in Arabic)', 'البداية (يمين في العربية)'),
+        opt('end', 'End (left in Arabic)', 'النهاية (يسار في العربية)'),
+      ]),
+      s.text('buttonText', 'Button text', 'نص الزر', { localized: true }),
+      s.url('buttonLink', 'Button link', 'رابط الزر'),
+      s.color('bgColor', 'Background', 'الخلفية'),
+      ...spacingSettings(),
+    ],
+  }),
+  def({
+    type: 'trust-badges',
+    labelEn: 'Trust badges',
+    labelAr: 'شارات الثقة',
+    legacyKey: null,
+    rendererKey: 'section.trustBadges',
+    group: 'template',
+    propsSchema: trustBadgesSchema,
+    maxCount: 2,
+    blocks: [
+      {
+        type: 'badge',
+        labelEn: 'Badge',
+        labelAr: 'شارة',
+        maxCount: 6,
+        propsSchema: trustBadgeBlockSchema,
+        settings: [
+          s.select(
+            'icon',
+            'Icon',
+            'الأيقونة',
+            TRUST_BADGE_ICONS.map(i => opt(i, BADGE_ICON_LABELS[i][0], BADGE_ICON_LABELS[i][1])),
+            { group: 'content' }
+          ),
+          s.text('title', 'Title', 'العنوان', { localized: true }),
+          s.text('text', 'Text', 'النص', { localized: true }),
+        ],
+      },
+    ],
+    presets: [
+      {
+        nameEn: 'Delivery and payment',
+        nameAr: 'التوصيل والدفع',
+        settings: { layout: 'row' },
+        blocks: [
+          {
+            type: 'badge',
+            settings: { icon: 'cod', title: 'Cash on delivery', titleAr: 'الدفع عند الاستلام' },
+          },
+          { type: 'badge', settings: { icon: 'instapay', title: 'InstaPay', titleAr: 'إنستاباي' } },
+          {
+            type: 'badge',
+            settings: {
+              icon: 'shipping',
+              title: 'Delivery across Egypt',
+              titleAr: 'توصيل لكل مصر',
+            },
+          },
+        ],
+      },
+    ],
+    settings: [
+      s.text('heading', 'Heading', 'العنوان', { localized: true }),
+      s.select('layout', 'Layout', 'التخطيط', [
+        opt('row', 'Row', 'صف'),
+        opt('grid', 'Grid', 'شبكة'),
+      ]),
       s.color('bgColor', 'Background', 'الخلفية'),
       ...spacingSettings(),
     ],

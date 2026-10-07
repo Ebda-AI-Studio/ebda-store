@@ -12,7 +12,7 @@
  */
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { prisma, withUser } from '@force/database';
+import { withUser } from '@force/database';
 import { normalizeEgyptianMobile } from '@force/shared';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
@@ -176,14 +176,17 @@ export class MerchantSignupService {
       return GENERIC_SIGNUP_RESULT;
     }
 
-    const recent = await prisma.verificationToken.findFirst({
-      where: {
-        userId: user.id,
-        type: 'email',
-        createdAt: { gt: new Date(Date.now() - RESEND_COOLDOWN_MS) },
-      },
-      select: { id: true },
-    });
+    // `verification_tokens` is user-keyed: read AS the user.
+    const recent = await withUser(user.id, tx =>
+      tx.verificationToken.findFirst({
+        where: {
+          userId: user.id,
+          type: 'email',
+          createdAt: { gt: new Date(Date.now() - RESEND_COOLDOWN_MS) },
+        },
+        select: { id: true },
+      })
+    );
     if (recent) return GENERIC_SIGNUP_RESULT;
 
     await AuthService.sendVerificationEmail(

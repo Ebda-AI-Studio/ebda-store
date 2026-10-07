@@ -202,7 +202,7 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
 
   beforeAll(async () => {
     vi.spyOn(OneSignalService, 'notifyAdminsOfInstapay').mockResolvedValue();
-    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4 });
+    owner = createPrismaClient({ connectionString: OWNER_URL, max: 4, role: 'owner' });
     const record = async () => {
       idleTxAtGatewayCall.push(await idleAppTransactions());
     };

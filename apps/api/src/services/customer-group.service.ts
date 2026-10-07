@@ -109,7 +109,7 @@ export const CustomerGroupService = {
 
       try {
         return await tx.customerGroup.update({
-          where: { id },
+          where: { id, storeId },
           data: {
             ...(input.name !== undefined ? { name: input.name } : {}),
             ...(input.nameAr !== undefined ? { nameAr: input.nameAr } : {}),
@@ -135,7 +135,7 @@ export const CustomerGroupService = {
     });
     if (!existing) throw new AppError(404, 'NOT_FOUND', 'Customer group not found');
 
-    await prisma.customerGroup.delete({ where: { id } });
+    await prisma.customerGroup.delete({ where: { id, storeId } });
   },
 
   /** Assign a customer to a group, or clear it when `groupId` is null. */
@@ -156,7 +156,7 @@ export const CustomerGroupService = {
     }
 
     return prisma.customer.update({
-      where: { id: customerId },
+      where: { id: customerId, storeId },
       data: { groupId },
       select: { id: true, groupId: true },
     });
@@ -217,7 +217,7 @@ export const CustomerGroupService = {
 
     if (existing) {
       return prisma.customer.update({
-        where: { id: existing.id },
+        where: { id: existing.id, storeId },
         data: {
           groupId,
           // Backfill contact/name fields we now know but the row may lack.
@@ -257,7 +257,7 @@ export const CustomerGroupService = {
         const raced = await prisma.customer.findFirst({ where: match, select: { id: true } });
         if (raced) {
           return prisma.customer.update({
-            where: { id: raced.id },
+            where: { id: raced.id, storeId },
             data: { groupId },
             select: assignReturnSelect,
           });

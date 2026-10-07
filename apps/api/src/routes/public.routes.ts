@@ -5,7 +5,7 @@ import { CartService } from '../services/cart.service';
 import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
-import { prisma, SlugEntityType } from '@force/database';
+import { prisma, SlugEntityType, withStore } from '@force/database';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
 import { AppError } from '../middleware/error-handler';
@@ -26,7 +26,8 @@ import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
 import { notificationDispatcher } from '../services/notification-dispatcher.service';
 import { getCached } from '../lib/public-cache';
-import { storeDomainWhere, storeLookupForHost } from '../lib/store-host';
+import { storeLookupForHost } from '../lib/store-host';
+import { lookupStore, publicStorePage } from '../lib/definer';
 import { isReservedSlug, storefrontOrigin } from '@force/shared';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { setEdgeCache } from '../lib/edge-cache';
@@ -1333,29 +1334,29 @@ router.get('/stores', async (req: Request, res: Response, next: NextFunction) =>
     const limitNum = Math.min(100, Math.max(1, parseInt(limit as string) || 10));
     const skip = (pageNum - 1) * limitNum;
 
-    const [stores, total] = await Promise.all([
-      prisma.store.findMany({
-        where: {
-          status: 'active',
-        },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          logo: true,
-          settings: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limitNum,
-      }),
-      prisma.store.count({
-        where: {
-          status: 'active',
-        },
-      }),
-    ]);
+    // `stores` is under RLS (R-EBDA-005): the page of active store ids (newest first) and
+    // the total come from a definer; each store's public fields are read in its own scope.
+    const storePage = await publicStorePage(skip, limitNum);
+    const total = storePage.total;
+    const stores = (
+      await Promise.all(
+        storePage.ids.map(id =>
+          withStore(id, tx =>
+            tx.store.findUnique({
+              where: { id },
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                logo: true,
+                settings: true,
+                createdAt: true,
+              },
+            })
+          )
+        )
+      )
+    ).filter((s): s is NonNullable<typeof s> => s !== null);
 
     setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
     res.json({
@@ -1445,19 +1446,21 @@ async function fetchFooterLocations(store: {
       ? (store.theme as Record<string, unknown>)
       : null;
   if (!store.locationsEnabled || theme?.showBranchesInFooter !== true) return undefined;
-  return prisma.storeLocation.findMany({
-    where: { storeId: store.id, isPublished: true },
-    orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-    select: {
-      id: true,
-      name: true,
-      nameAr: true,
-      address: true,
-      addressAr: true,
-      phone: true,
-      mapsUrl: true,
-    },
-  });
+  return readInStoreContext(store.id, () =>
+    prisma.storeLocation.findMany({
+      where: { storeId: store.id, isPublished: true },
+      orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        nameAr: true,
+        address: true,
+        addressAr: true,
+        phone: true,
+        mapsUrl: true,
+      },
+    })
+  );
 }
 
 // GET /stores/:slugOrId - Get store by slug or ID (public, cached 120s)
@@ -1488,69 +1491,75 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       // 404'ing). Inactive stores stay hidden — `inactive` is reserved for
       // archived/draft stores merchants haven't published. Soft-deleted
       // stores (`deletedAt` set) are also excluded.
-      const store = await prisma.store.findFirst({
-        where: {
-          ...(isUuid ? { id: slugOrId } : { slug: slugOrId }),
-          status: { in: ['active', 'suspended'] },
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-          name: true,
-          nameAr: true,
-          slug: true,
-          domain: true,
-          status: true,
-          logo: true,
-          logoAr: true,
-          favicon: true,
-          description: true,
-          descriptionAr: true,
-          currency: true,
-          timezone: true,
-          template: true,
-          theme: true,
-          typography: true,
-          socialLinks: true,
-          email: true,
-          phone: true,
-          phoneAr: true,
-          whatsapp: true,
-          address: true,
-          addressAr: true,
-          announcementBar: true,
-          metaTitle: true,
-          metaTitleAr: true,
-          metaDescription: true,
-          metaDescriptionAr: true,
-          metaDescriptionAeo: true,
-          metaDescriptionAeoAr: true,
-          ogImage: true,
-          twitterHandle: true,
-          googleSiteVerification: true,
-          settings: true,
-          taxEnabled: true,
-          taxIncludedInPrice: true,
-          marketingPixels: true,
-          pwaEnabled: true,
-          pwaSettings: true,
-          blogEnabled: true,
-          locationsEnabled: true,
-          returnWindowDays: true,
-          returnFeesPaidBy: true,
-          heroTitle: true,
-          heroTitleAr: true,
-          heroSubtitle: true,
-          heroSubtitleAr: true,
-          heroCtaText: true,
-          heroCtaTextAr: true,
-          heroCtaLink: true,
-          heroImage: true,
-          createdAt: true,
-          llmsTxt: true,
-          aboutJson: true,
-        },
-      });
+      // `stores` is under RLS (R-EBDA-005): resolve through the lookup definer, then read
+      // the row inside that store's own scope.
+      const hit = await lookupStore(isUuid ? { id: slugOrId } : { slug: slugOrId }, [
+        'active',
+        'suspended',
+      ]);
+      const store = hit
+        ? await withStore(hit.id, tx =>
+            tx.store.findUnique({
+              where: { id: hit.id },
+              select: {
+                id: true,
+                name: true,
+                nameAr: true,
+                slug: true,
+                domain: true,
+                status: true,
+                logo: true,
+                logoAr: true,
+                favicon: true,
+                description: true,
+                descriptionAr: true,
+                currency: true,
+                timezone: true,
+                template: true,
+                theme: true,
+                typography: true,
+                socialLinks: true,
+                email: true,
+                phone: true,
+                phoneAr: true,
+                whatsapp: true,
+                address: true,
+                addressAr: true,
+                announcementBar: true,
+                metaTitle: true,
+                metaTitleAr: true,
+                metaDescription: true,
+                metaDescriptionAr: true,
+                metaDescriptionAeo: true,
+                metaDescriptionAeoAr: true,
+                ogImage: true,
+                twitterHandle: true,
+                googleSiteVerification: true,
+                settings: true,
+                taxEnabled: true,
+                taxIncludedInPrice: true,
+                marketingPixels: true,
+                pwaEnabled: true,
+                pwaSettings: true,
+                blogEnabled: true,
+                locationsEnabled: true,
+                returnWindowDays: true,
+                returnFeesPaidBy: true,
+                heroTitle: true,
+                heroTitleAr: true,
+                heroSubtitle: true,
+                heroSubtitleAr: true,
+                heroCtaText: true,
+                heroCtaTextAr: true,
+                heroCtaLink: true,
+                heroImage: true,
+                createdAt: true,
+                llmsTxt: true,
+                aboutJson: true,
+              },
+            })
+          )
+        : null;
 
       if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
 
@@ -1584,10 +1593,12 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       // Mirror the /store/resolve endpoint: surface explicitly-disabled
       // CMS pages so the storefront footer can hide their links rather
       // than rendering a "Page unavailable" landing on click.
-      const disabledPages = await prisma.storePage.findMany({
-        where: { storeId: store.id, isPublished: false },
-        select: { slug: true },
-      });
+      const disabledPages = await readInStoreContext(store.id, () =>
+        prisma.storePage.findMany({
+          where: { storeId: store.id, isPublished: false },
+          select: { slug: true },
+        })
+      );
       const disabledCmsSlugs = disabledPages.map(p => p.slug);
       const locations = await fetchFooterLocations(store);
       return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
@@ -1652,68 +1663,74 @@ router.get(
         // `status` so the storefront can render the branded maintenance page
         // for that store. Inactive (archived/draft) and soft-deleted stores
         // stay hidden — those should still 404.
-        const store = await prisma.store.findFirst({
-          where: {
-            ...(lookup.by === 'slug' ? { slug: lookup.slug } : storeDomainWhere(lookup.domain)),
-            status: { in: ['active', 'suspended'] },
-            deletedAt: null,
-          },
-          select: {
-            id: true,
-            name: true,
-            nameAr: true,
-            slug: true,
-            domain: true,
-            status: true,
-            logo: true,
-            logoAr: true,
-            favicon: true,
-            description: true,
-            descriptionAr: true,
-            currency: true,
-            timezone: true,
-            template: true,
-            theme: true,
-            typography: true,
-            socialLinks: true,
-            email: true,
-            phone: true,
-            phoneAr: true,
-            whatsapp: true,
-            address: true,
-            addressAr: true,
-            announcementBar: true,
-            metaTitle: true,
-            metaTitleAr: true,
-            metaDescription: true,
-            metaDescriptionAr: true,
-            metaDescriptionAeo: true,
-            metaDescriptionAeoAr: true,
-            ogImage: true,
-            twitterHandle: true,
-            googleSiteVerification: true,
-            settings: true,
-            taxEnabled: true,
-            taxIncludedInPrice: true,
-            marketingPixels: true,
-            pwaEnabled: true,
-            pwaSettings: true,
-            blogEnabled: true,
-            locationsEnabled: true,
-            returnWindowDays: true,
-            returnFeesPaidBy: true,
-            heroTitle: true,
-            heroTitleAr: true,
-            heroSubtitle: true,
-            heroSubtitleAr: true,
-            heroCtaText: true,
-            heroCtaTextAr: true,
-            heroCtaLink: true,
-            heroImage: true,
-            llmsTxt: true,
-            aboutJson: true,
-          },
-        });
+        // `stores` is under RLS (R-EBDA-005): resolve through the lookup definer, then read
+        // the row inside that store's own scope.
+        const hit = await lookupStore(
+          lookup.by === 'slug' ? { slug: lookup.slug } : { domain: lookup.domain },
+          ['active', 'suspended']
+        );
+        const store = hit
+          ? await withStore(hit.id, tx =>
+              tx.store.findUnique({
+                where: { id: hit.id },
+                select: {
+                  id: true,
+                  name: true,
+                  nameAr: true,
+                  slug: true,
+                  domain: true,
+                  status: true,
+                  logo: true,
+                  logoAr: true,
+                  favicon: true,
+                  description: true,
+                  descriptionAr: true,
+                  currency: true,
+                  timezone: true,
+                  template: true,
+                  theme: true,
+                  typography: true,
+                  socialLinks: true,
+                  email: true,
+                  phone: true,
+                  phoneAr: true,
+                  whatsapp: true,
+                  address: true,
+                  addressAr: true,
+                  announcementBar: true,
+                  metaTitle: true,
+                  metaTitleAr: true,
+                  metaDescription: true,
+                  metaDescriptionAr: true,
+                  metaDescriptionAeo: true,
+                  metaDescriptionAeoAr: true,
+                  ogImage: true,
+                  twitterHandle: true,
+                  googleSiteVerification: true,
+                  settings: true,
+                  taxEnabled: true,
+                  taxIncludedInPrice: true,
+                  marketingPixels: true,
+                  pwaEnabled: true,
+                  pwaSettings: true,
+                  blogEnabled: true,
+                  locationsEnabled: true,
+                  returnWindowDays: true,
+                  returnFeesPaidBy: true,
+                  heroTitle: true,
+                  heroTitleAr: true,
+                  heroSubtitle: true,
+                  heroSubtitleAr: true,
+                  heroCtaText: true,
+                  heroCtaTextAr: true,
+                  heroCtaLink: true,
+                  heroImage: true,
+                  llmsTxt: true,
+                  aboutJson: true,
+                },
+              })
+            )
+          : null;
 
         if (!store)
           throw new AppError(404, 'STORE_NOT_FOUND', 'No store found for the specified domain');
@@ -1728,10 +1745,12 @@ router.get(
         // simply not being there. Only rows that exist AND are unpublished
         // need to be reported; if the row is missing the storefront falls
         // back to its built-in copy and the link should still work.
-        const disabledPages = await prisma.storePage.findMany({
-          where: { storeId: store.id, isPublished: false },
-          select: { slug: true },
-        });
+        const disabledPages = await readInStoreContext(store.id, () =>
+          prisma.storePage.findMany({
+            where: { storeId: store.id, isPublished: false },
+            select: { slug: true },
+          })
+        );
         const disabledCmsSlugs = disabledPages.map(p => p.slug);
 
         // Strip server-only marketing-pixel secrets before the store reaches the
@@ -1808,7 +1827,7 @@ router.post(
         // admin's send count stays correct.
         if (!existing.isActive) {
           await prisma.newsletterSubscriber.update({
-            where: { id: existing.id },
+            where: { id: existing.id, storeId },
             data: {
               isActive: true,
               unsubscribedAt: null,
@@ -1876,9 +1895,10 @@ router.get(
         token: z.string().min(1),
       });
       const { orderId, productId, token } = schema.parse(req.query);
+      const storeId = await getStoreIdFromRequest(req);
 
       const order = await prisma.order.findUnique({
-        where: { id: orderId },
+        where: { id: orderId, storeId },
         select: {
           id: true,
           status: true,
@@ -1910,7 +1930,7 @@ router.get(
 
       // Check no existing review for this (orderId, productId) pair
       const existing = await prisma.review.findUnique({
-        where: { orderId_productId: { orderId, productId } },
+        where: { orderId_productId: { orderId, productId }, storeId },
         select: { id: true },
       });
       if (existing) {
@@ -1920,7 +1940,7 @@ router.get(
 
       // Load product + store info for the form
       const product = await prisma.product.findUnique({
-        where: { id: productId },
+        where: { id: productId, storeId },
         select: { id: true, name: true, nameAr: true, images: true, storeId: true },
       });
       if (!product || product.storeId !== order.storeId) {
@@ -1958,10 +1978,11 @@ router.post(
         language: z.enum(['en', 'ar']).default('en'),
       });
       const data = schema.parse(req.body);
+      const storeId = await getStoreIdFromRequest(req);
 
       // Re-validate token + order state — never trust the form's prior check
       const order = await prisma.order.findUnique({
-        where: { id: data.orderId },
+        where: { id: data.orderId, storeId },
         select: {
           id: true,
           status: true,

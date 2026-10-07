@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma, Prisma, ProviderHealthStatus } from '@force/database';
+import { prisma, Prisma } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -22,9 +22,6 @@ import {
 } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
 import { providerHealth } from '../services/payment-providers/provider-health';
-import { toProviderCredentials } from '../services/payment-providers/credentials';
-import { getProviderV2, MANUAL_PROVIDERS } from '../services/payment-providers/registry';
-import { PaymentProviderError } from '../services/payment-providers/types';
 import {
   applyCredentialUpdate,
   assertEnableAllowed,
@@ -208,593 +205,28 @@ function encryptCredentials(data: {
 }
 
 // ==========================================
-// Routes - Global Payment Settings (Super Admin)
+// Global (platform-level) payment settings: RETIRED (R-EBDA-007)
 // ==========================================
-
-/**
- * GET /payment-settings
- * Get all global payment provider configurations
- */
-router.get(
-  '/',
-  authenticate,
-  requirePermission('settings:read'),
-  async (_req: Request, res: Response, next: NextFunction) => {
-    try {
-      const configs = await prisma.paymentConfig.findMany({
-        where: { storeId: null }, // Global configs only
-        orderBy: { provider: 'asc' },
-      });
-
-      // Mask sensitive credentials
-      const safeConfigs = configs.map(config => ({
-        ...publicPaymentConfig(config, null),
-        ...maskCredentials(config),
-      }));
-
-      res.json({
-        success: true,
-        data: { configs: safeConfigs },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * GET /payment-settings/:provider
- * Get a specific payment provider configuration
- */
-router.get(
-  '/:provider',
-  authenticate,
-  requirePermission('settings:read'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { provider } = req.params;
-
-      const config = await prisma.paymentConfig.findFirst({
-        where: {
-          provider: provider,
-          storeId: null,
-        },
-      });
-
-      if (!config) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Payment provider not configured' },
-        });
-        return;
-      }
-
-      res.json({
-        success: true,
-        data: {
-          config: {
-            ...publicPaymentConfig(config, config.storeId),
-            ...maskCredentials(config),
-          },
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * POST /payment-settings
- * Create a new payment provider configuration
- */
-router.post(
-  '/',
-  authenticate,
-  requirePermission('settings:write'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = paymentConfigSchema.parse(req.body);
-      const userId = getAuthUser(req).userId;
-
-      // Check if provider already exists
-      const existing = await prisma.paymentConfig.findFirst({
-        where: {
-          provider: data.provider,
-          storeId: null,
-        },
-      });
-
-      if (existing) {
-        res.status(409).json({
-          success: false,
-          error: { code: 'ALREADY_EXISTS', message: 'Provider already configured' },
-        });
-        return;
-      }
-
-      // If setting as default, unset other defaults
-      if (data.isDefault) {
-        await prisma.paymentConfig.updateMany({
-          where: { storeId: null, isDefault: true },
-          data: { isDefault: false },
-        });
-      }
-
-      // Encrypt credentials before storing
-      const encryptedCreds = encryptCredentials(data);
-
-      const config = await prisma.paymentConfig.create({
-        data: {
-          provider: data.provider,
-          isEnabled: data.isEnabled,
-          isDefault: data.isDefault,
-          displayName: data.displayName,
-          displayNameAr: data.displayNameAr,
-          apiKey: encryptedCreds.apiKey,
-          apiKeyLast4: encryptedCreds.apiKeyLast4,
-          secretKey: encryptedCreds.secretKey,
-          merchantId: encryptedCreds.merchantId,
-          merchantIdLast4: encryptedCreds.merchantIdLast4,
-          webhookSecret: encryptedCreds.webhookSecret,
-          testMode: data.testMode,
-          supportedMethods: data.supportedMethods,
-          supportedCurrencies: data.supportedCurrencies,
-          fixedFee: data.fixedFee,
-          percentageFee: data.percentageFee,
-          createdBy: userId,
-          updatedBy: userId,
-        },
-      });
-
-      await auditLog({
-        action: 'payment_config.created',
-        userId,
-        resourceType: 'payment_config',
-        resourceId: config.id,
-        details: { provider: data.provider },
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-      });
-
-      // Clear provider cache to reload with new config
-      PaymentService.clearCache();
-
-      res.status(201).json({
-        success: true,
-        data: {
-          config: {
-            ...publicPaymentConfig(config, config.storeId),
-            ...maskCredentials(config),
-          },
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * PUT /payment-settings/:provider
- * Update a payment provider configuration
- */
-router.put(
-  '/:provider',
-  authenticate,
-  requirePermission('settings:write'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { provider } = req.params;
-      const data = updateConfigSchema.parse(req.body);
-      const userId = getAuthUser(req).userId;
-
-      const existing = await prisma.paymentConfig.findFirst({
-        where: {
-          provider: provider,
-          storeId: null,
-        },
-      });
-
-      if (!existing) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Payment provider not configured' },
-        });
-        return;
-      }
-
-      // If setting as default, unset other defaults
-      if (data.isDefault) {
-        await prisma.paymentConfig.updateMany({
-          where: { storeId: null, isDefault: true, id: { not: existing.id } },
-          data: { isDefault: false },
-        });
-      }
-
-      // Only encrypt credentials if they're being updated (not masked values)
-      const updateData: Record<string, unknown> = {
-        ...data,
-        updatedBy: userId,
-      };
-
-      // Encrypt new credentials if provided
-      if (data.apiKey && !data.apiKey.includes('****')) {
-        updateData.apiKey = encryption.encrypt(data.apiKey);
-        updateData.apiKeyLast4 = credentialFingerprint(data.apiKey);
-      } else {
-        delete updateData.apiKey;
-      }
-
-      if (data.secretKey && data.secretKey !== '****') {
-        updateData.secretKey = encryption.encrypt(data.secretKey);
-      } else {
-        delete updateData.secretKey;
-      }
-
-      if (data.merchantId && !data.merchantId.includes('****')) {
-        updateData.merchantId = encryption.encrypt(data.merchantId);
-        updateData.merchantIdLast4 = credentialFingerprint(data.merchantId);
-      } else {
-        delete updateData.merchantId;
-      }
-
-      if (data.webhookSecret && data.webhookSecret !== '****') {
-        updateData.webhookSecret = encryption.encrypt(data.webhookSecret);
-      } else {
-        delete updateData.webhookSecret;
-      }
-
-      const config = await prisma.paymentConfig.update({
-        where: { id: existing.id },
-        data: updateData,
-      });
-
-      await auditLog({
-        action: 'payment_config.updated',
-        userId,
-        resourceType: 'payment_config',
-        resourceId: config.id,
-        details: { provider },
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-      });
-
-      // Clear provider cache to reload with updated config
-      PaymentService.clearCache();
-
-      res.json({
-        success: true,
-        data: {
-          config: {
-            ...publicPaymentConfig(config, config.storeId),
-            ...maskCredentials(config),
-          },
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * DELETE /payment-settings/:provider
- * Delete a payment provider configuration
- */
-router.delete(
-  '/:provider',
-  authenticate,
-  requirePermission('settings:delete'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { provider } = req.params;
-      const userId = getAuthUser(req).userId;
-
-      const existing = await prisma.paymentConfig.findFirst({
-        where: {
-          provider: provider,
-          storeId: null,
-        },
-      });
-
-      if (!existing) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Payment provider not configured' },
-        });
-        return;
-      }
-
-      await prisma.paymentConfig.delete({
-        where: { id: existing.id },
-      });
-
-      await auditLog({
-        action: 'payment_config.deleted',
-        userId,
-        resourceType: 'payment_config',
-        resourceId: existing.id,
-        details: { provider },
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-      });
-
-      // Clear provider cache after deletion
-      PaymentService.clearCache();
-
-      res.json({
-        success: true,
-        data: { message: 'Payment provider configuration deleted' },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * POST /payment-settings/:provider/toggle
- * Enable/disable a payment provider
- */
-router.post(
-  '/:provider/toggle',
-  authenticate,
-  requirePermission('settings:write'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { provider } = req.params;
-      const { enabled } = req.body;
-      const userId = getAuthUser(req).userId;
-
-      const existing = await prisma.paymentConfig.findFirst({
-        where: {
-          provider: provider,
-          storeId: null,
-        },
-      });
-
-      if (!existing) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Payment provider not configured' },
-        });
-        return;
-      }
-
-      const config = await prisma.paymentConfig.update({
-        where: { id: existing.id },
-        data: {
-          isEnabled: enabled,
-          updatedBy: userId,
-        },
-      });
-
-      await auditLog({
-        action: enabled ? 'payment_config.enabled' : 'payment_config.disabled',
-        userId,
-        resourceType: 'payment_config',
-        resourceId: config.id,
-        details: { provider },
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-      });
-
-      // Clear provider cache to reflect enabled/disabled status
-      PaymentService.clearCache();
-
-      res.json({
-        success: true,
-        data: {
-          config: {
-            ...publicPaymentConfig(config, config.storeId),
-            ...maskCredentials(config),
-          },
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * POST /payment-settings/:provider/set-default
- * Set a payment provider as default
- */
-router.post(
-  '/:provider/set-default',
-  authenticate,
-  requirePermission('settings:write'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { provider } = req.params;
-      const userId = getAuthUser(req).userId;
-
-      const existing = await prisma.paymentConfig.findFirst({
-        where: {
-          provider: provider,
-          storeId: null,
-        },
-      });
-
-      if (!existing) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Payment provider not configured' },
-        });
-        return;
-      }
-
-      // Unset all other defaults
-      await prisma.paymentConfig.updateMany({
-        where: { storeId: null, isDefault: true },
-        data: { isDefault: false },
-      });
-
-      // Set this one as default
-      const config = await prisma.paymentConfig.update({
-        where: { id: existing.id },
-        data: {
-          isDefault: true,
-          updatedBy: userId,
-        },
-      });
-
-      await auditLog({
-        action: 'payment_config.set_default',
-        userId,
-        resourceType: 'payment_config',
-        resourceId: config.id,
-        details: { provider },
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-      });
-
-      // Clear provider cache to reflect new default
-      PaymentService.clearCache();
-
-      res.json({
-        success: true,
-        data: {
-          config: {
-            ...publicPaymentConfig(config, config.storeId),
-            ...maskCredentials(config),
-          },
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * POST /payment-settings/:provider/test
- * Test a payment provider connection
- */
-router.post(
-  '/:provider/test',
-  authenticate,
-  requirePermission('settings:write'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { provider } = req.params;
-      const userId = getAuthUser(req).userId;
-
-      const config = await prisma.paymentConfig.findFirst({
-        where: {
-          provider: provider,
-          storeId: null,
-        },
-      });
-
-      if (!config) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'Payment provider not configured' },
-        });
-        return;
-      }
-
-      // Test the connection with the merchant's own decrypted credentials. The probe asks the
-      // gateway about a payment that cannot exist: "not found" proves the keys were accepted,
-      // a credential refusal is "invalid keys", and anything else (timeout, 5xx) is the gateway.
-      let testResult: { success: boolean; message: string; latency?: number } = {
-        success: false,
-        message: 'Unknown provider',
-      };
-      const startTime = Date.now();
-      const adapter = getProviderV2(provider);
-      if (adapter && !MANUAL_PROVIDERS.has(provider)) {
-        try {
-          await adapter.getStatus(
-            `ebda-connection-test-${Date.now()}`,
-            toProviderCredentials(config)
-          );
-          testResult = { success: true, message: 'Connection successful' };
-        } catch (error) {
-          if (error instanceof PaymentProviderError && error.code === 'PAYMENT_NOT_FOUND') {
-            testResult = { success: true, message: 'Connection successful' };
-          } else if (
-            error instanceof PaymentProviderError &&
-            error.code === 'PROVIDER_MISCONFIGURED'
-          ) {
-            testResult = { success: false, message: 'The gateway refused these credentials' };
-          } else {
-            testResult = {
-              success: false,
-              message: error instanceof Error ? error.message : 'Connection test failed',
-            };
-          }
-        }
-        testResult.latency = Date.now() - startTime;
-      }
-
-      // Update health status
-      const healthStatus: ProviderHealthStatus = testResult.success ? 'healthy' : 'down';
-      await prisma.paymentConfig.update({
-        where: { id: config.id },
-        data: {
-          healthStatus,
-          lastHealthCheck: new Date(),
-          updatedBy: userId,
-        },
-      });
-
-      await auditLog({
-        action: 'payment_config.tested',
-        userId,
-        resourceType: 'payment_config',
-        resourceId: config.id,
-        details: { provider, success: testResult.success },
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-      });
-
-      res.json({
-        success: true,
-        data: {
-          provider,
-          test: testResult,
-          healthStatus,
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * GET /payment-settings/health
- * Get health status of all payment providers
- */
-router.get(
-  '/health/all',
-  authenticate,
-  requirePermission('settings:read'),
-  async (_req: Request, res: Response, next: NextFunction) => {
-    try {
-      const configs = await prisma.paymentConfig.findMany({
-        where: { storeId: null },
-        select: {
-          provider: true,
-          isEnabled: true,
-          healthStatus: true,
-          lastHealthCheck: true,
-          testMode: true,
-        },
-      });
-
-      res.json({
-        success: true,
-        data: { providers: configs },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
+// Under strict RLS (role ebda_app) payment_configs rows with store_id IS NULL
+// are invisible and unwritable, and the tenant guard refuses an unscoped
+// paymentConfig query, so the old global routes could only list nothing or
+// fail. Payments are configured per store (/store/:storeId/...). Still behind
+// authenticate + settings:read so an anonymous caller gets 401, not a hint.
+router.use(
+  (req: Request, res: Response, next: NextFunction) =>
+    req.path.startsWith('/store/') ? next() : authenticate(req, res, next),
+  (req: Request, res: Response, next: NextFunction) =>
+    req.path.startsWith('/store/') ? next() : requirePermission('settings:read')(req, res, next),
+  (req: Request, _res: Response, next: NextFunction) =>
+    req.path.startsWith('/store/')
+      ? next()
+      : next(
+          new AppError(
+            410,
+            'GLOBAL_PAYMENT_CONFIG_UNSUPPORTED',
+            'Platform-level payment configuration is not supported; configure payments per store.'
+          )
+        )
 );
 
 // ==========================================
@@ -846,10 +278,6 @@ router.get(
       });
 
       // Get global configs to show which are available
-      const globalConfigs = await prisma.paymentConfig.findMany({
-        where: { storeId: null, isEnabled: true },
-        orderBy: { provider: 'asc' },
-      });
 
       // Mask sensitive credentials. `circuit` is the LIVE outage state of this
       // method on this node (open circuit = the checkout is hiding it right now);
@@ -860,16 +288,13 @@ router.get(
         circuit: providerHealth(storeId, config.provider),
       }));
 
-      const safeGlobalConfigs = globalConfigs.map(config => ({
-        ...publicPaymentConfig(config, null),
-        ...maskCredentials(config),
-      }));
-
       res.json({
         success: true,
         data: {
           storeConfigs: safeStoreConfigs,
-          globalConfigs: safeGlobalConfigs,
+          // No platform-level configs exist for the app role (R-EBDA-007); kept as an
+          // empty list so the response shape does not change.
+          globalConfigs: [],
         },
       });
     } catch (error) {
@@ -1133,7 +558,7 @@ router.put(
       }
 
       const config = await prisma.paymentConfig.update({
-        where: { id: existing.id },
+        where: { id: existing.id, storeId },
         data: updateData,
       });
 
@@ -1219,7 +644,7 @@ router.delete(
       }
 
       await prisma.paymentConfig.delete({
-        where: { id: existing.id },
+        where: { id: existing.id, storeId },
       });
 
       await auditLog({
@@ -1308,7 +733,7 @@ router.post(
       }
 
       const config = await prisma.paymentConfig.update({
-        where: { id: existing.id },
+        where: { id: existing.id, storeId },
         data: {
           isEnabled: enabled,
           updatedBy: userId,
@@ -1403,7 +828,7 @@ router.put(
         updatedBy: user.userId,
       };
       const config = existing
-        ? await prisma.paymentConfig.update({ where: { id: existing.id }, data })
+        ? await prisma.paymentConfig.update({ where: { id: existing.id, storeId }, data })
         : await prisma.paymentConfig.create({
             data: {
               ...data,
@@ -1478,7 +903,7 @@ router.post(
       const latency = Date.now() - startedAt;
 
       await prisma.paymentConfig.update({
-        where: { id: existing.id },
+        where: { id: existing.id, storeId },
         data: {
           connectionTest: stored as unknown as Prisma.InputJsonValue,
           healthStatus: result.ok ? 'healthy' : result.code === 'unreachable' ? 'degraded' : 'down',

@@ -47,7 +47,7 @@ const adjustSchema = z.object({
 /** 404 unless the id is a customer account of THIS store. */
 async function assertStoreCustomer(storeId: string, customerId: string, res: Response) {
   const customer = await prisma.user.findFirst({
-    where: storeCustomerWhere(storeId, customerId),
+    where: { ...storeCustomerWhere(storeId, customerId), storeId },
     select: { id: true },
   });
   if (!customer) {

@@ -69,7 +69,7 @@ vi.mock('@force/database', () => ({
   // same shape as the existing single-flight test's mock.
   withStore: vi.fn(async (_storeId: string, fn: (tx: unknown) => unknown) =>
     fn({
-      store: { findUnique: mockStoreFindUnique },
+      store: { findUnique: mockStoreFindUnique, update: mockStoreUpdate },
       storeFeature: { findMany: mockStoreFeatureFindMany, upsert: mockStoreFeatureUpsert },
       // plans engine (SP5): no subscription row -> the plan resolves from the legacy enum
       storeSubscription: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
