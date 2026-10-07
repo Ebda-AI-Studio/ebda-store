@@ -5598,7 +5598,46 @@
       "rememberMe": "Remember my email",
       "serverError": "Server returned an invalid response. Please try again.",
       "accessDenied": "Access denied. Admin or staff privileges required.",
-      "mfaVerifyFailed": "Verification failed"
+      "mfaVerifyFailed": "Verification failed",
+      "forgotPassword": "Forgot password?"
+    },
+    "forgot": {
+      "title": "Reset your password",
+      "subtitle": "Enter the email you use for Ebda Store. We will send you a link to choose a new password.",
+      "email": "Email address",
+      "emailPlaceholder": "you@example.com",
+      "submit": "Send reset link",
+      "submitting": "Sending…",
+      "emailInvalid": "Enter a valid email address",
+      "sentTitle": "Check your email",
+      "sentBody": "If an Ebda Store account exists for {email}, we sent a link to reset your password. The link works once and expires in {minutes} minutes.",
+      "sentHint": "No email? Check spam, or try again in a few minutes.",
+      "tryAgain": "Use a different email",
+      "rateLimited": "Too many requests. Please try again in a little while.",
+      "generic": "Something went wrong. Please try again.",
+      "backToLogin": "Back to sign in"
+    },
+    "reset": {
+      "title": "Choose a new password",
+      "subtitle": "After you save it, every device signed in to your account is signed out.",
+      "password": "New password",
+      "passwordPlaceholder": "Create a password",
+      "passwordHelp": "At least 8 characters with upper and lower case letters, a number and a symbol.",
+      "confirm": "Confirm new password",
+      "confirmPlaceholder": "Type it again",
+      "submit": "Save new password",
+      "submitting": "Saving…",
+      "passwordWeak": "Password needs 8+ characters, upper and lower case, a number and a symbol",
+      "mismatch": "The two passwords do not match",
+      "invalidTitle": "This link does not work",
+      "invalidBody": "Reset links work once and expire after {minutes} minutes. Request a new one and use the latest email.",
+      "requestNew": "Request a new link",
+      "successTitle": "Password updated",
+      "successBody": "Your password was changed and you were signed out everywhere. Sign in with your new password.",
+      "signIn": "Sign in",
+      "rateLimited": "Too many attempts. Please try again in a little while.",
+      "generic": "We could not update your password. Please try again.",
+      "backToLogin": "Back to sign in"
     }
   },
   "users": {
