@@ -877,31 +877,41 @@ const skipForLoadTest = (req: Request): boolean => {
   return req.header('x-load-test-token') === expected;
 };
 const skipForLoadTestOrTests = (req: Request): boolean => isTestEnv || skipForLoadTest(req);
-export const authLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'auth'),
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 15,
-  message: {
-    success: false,
-    error: { code: 'RATE_LIMITED', message: 'Too many login attempts, please try again later.' },
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
-  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
-  // false, which rethrew a Redis blip into a 500 on every limited route —
-  // Redis became a single point of failure for the whole write surface while
-  // the cache layer deliberately fails open. Unlimited-but-up beats down.
-  passOnStoreError: true,
-  skip: skipForLoadTestOrTests,
-  keyGenerator: req => {
-    // Use IP + email for more granular limiting. ipKeyGenerator() normalizes
-    // IPv6 to /64 prefix so an attacker can't rotate the lower 64 bits to
-    // get a fresh bucket per request (ERR_ERL_KEY_GEN_IPV6).
-    const email = req.body?.email || 'unknown';
-    return `${ipKeyGenerator(req.ip ?? '')}-${email}`;
-  },
-});
+/**
+ * The authLimiter bucket: client IP (IPv6 normalised to its /64, so rotating the
+ * low 64 bits is not a fresh bucket — ERR_ERL_KEY_GEN_IPV6) plus the submitted
+ * email. Exported for the same reason as `resetEmailLimiterKey`: every limiter
+ * is skipped under vitest, so a test can only see a 429 by building the limiter
+ * with the skip turned off.
+ */
+export function authLimiterKey(req: Request): string {
+  const email = req.body?.email || 'unknown';
+  return `${ipKeyGenerator(req.ip ?? '')}-${email}`;
+}
+
+export function createAuthLimiter(opts?: { skip?: (req: Request) => boolean; prefix?: string }) {
+  return rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, opts?.prefix ?? 'auth'),
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 15,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many login attempts, please try again later.' },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+    // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+    // false, which rethrew a Redis blip into a 500 on every limited route —
+    // Redis became a single point of failure for the whole write surface while
+    // the cache layer deliberately fails open. Unlimited-but-up beats down.
+    passOnStoreError: true,
+    skip: opts?.skip ?? skipForLoadTestOrTests,
+    keyGenerator: authLimiterKey,
+  });
+}
+
+export const authLimiter = createAuthLimiter();
 
 /**
  * Exported so it can be unit-tested directly (same reasoning as
@@ -953,24 +963,31 @@ export function resetEmailLimiterKey(req: Request): string {
  * already bounds it (IP + the literal string "unknown", since
  * `req.body?.email` is absent) at 15/15min/IP.
  */
-export const resetEmailLimiter = rateLimit({
-  store: makeRateLimitStore(rateLimitRedisClient, 'reset-email'),
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3,
-  message: {
-    success: false,
-    error: {
-      code: 'RATE_LIMITED',
-      message: 'Too many password reset requests for this account, please try again later.',
+export function createResetEmailLimiter(opts?: {
+  skip?: (req: Request) => boolean;
+  prefix?: string;
+}) {
+  return rateLimit({
+    store: makeRateLimitStore(rateLimitRedisClient, opts?.prefix ?? 'reset-email'),
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 3,
+    message: {
+      success: false,
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'Too many password reset requests for this account, please try again later.',
+      },
     },
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  // Same availability-over-strictness posture as the other auth limiters.
-  passOnStoreError: true,
-  skip: skipForLoadTestOrTests,
-  keyGenerator: resetEmailLimiterKey,
-});
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Same availability-over-strictness posture as the other auth limiters.
+    passOnStoreError: true,
+    skip: opts?.skip ?? skipForLoadTestOrTests,
+    keyGenerator: resetEmailLimiterKey,
+  });
+}
+
+export const resetEmailLimiter = createResetEmailLimiter();
 
 /**
  * Dedicated bucket for `POST /api/v1/inngest` (issue 2063).

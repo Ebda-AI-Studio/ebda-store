@@ -290,6 +290,11 @@ export default function LoginPage() {
                 className="mt-1"
                 placeholder={t('passwordPlaceholder')}
               />
+              <div className="mt-2 text-end">
+                <Link href="/forgot-password" className="text-sm text-primary-ink hover:underline">
+                  {t('forgotPassword')}
+                </Link>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">

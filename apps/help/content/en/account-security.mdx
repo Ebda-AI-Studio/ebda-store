@@ -1,15 +1,26 @@
 ---
 title: Account security
-description: Strong passwords, two-step verification (MFA), backup codes and what happens after failed sign-ins.
+description: Strong passwords, resetting a forgotten password, two-step verification (MFA), backup codes and what happens after failed sign-ins.
 section: Settings
 order: 10
 appPath: /account
-keywords: security mfa 2fa totp lockout password backup codes
+keywords: security mfa 2fa totp lockout password backup codes forgot reset recover
 ---
 
 ## Password and email
 
 Use a password with at least 8 characters, upper and lower case letters, a number and a symbol. Your email must be verified before you can set up a store.
+
+## Forgot your password
+
+1. On the sign-in page, tap **Forgot password?**
+2. Enter the email you use for Ebda Store and send the link. You always see the same "check your email" message, whether or not the address has an account. That is on purpose: the page never tells anyone which emails are registered.
+3. Open the email from **Ebda Store** (no-reply@ebda.app) and tap the button. The link works **once** and expires after **15 minutes**. If you asked more than once, use the newest email.
+4. Choose a new password (same rules as above), type it twice and save.
+
+After the reset you are **signed out on every device**, including the browser you used. Sign in again with the new password. If you use two-step verification, you still need your code: resetting the password does not turn MFA off. A reset also clears a [lockout](#lockout), so the new password works right away.
+
+You can request a reset link 3 times an hour per email. No email? Check your spam folder, wait a few minutes, or write to ahlan@ebda.app.
 
 ## Two-step verification (MFA)
 

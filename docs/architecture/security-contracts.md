@@ -262,12 +262,12 @@ non-customer role, which the handler should 403/401. Direct
 
 ## Email enumeration: the four flows
 
-| Flow                             | Behavior                                                                                                                                                             | Why                                                                                                                       |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `POST /auth/register`            | Returns `{ emailVerificationSent: true }` for both new and existing emails. Existing-email path sends a "registration attempt" notice to the rightful owner.         | T1-4 enumeration close. Identical response shape, identical wall-clock cost (bcrypt always runs), no enumeration channel. |
-| `POST /auth/login`               | Returns `INVALID_CREDENTIALS` when user doesn't exist OR password is wrong. Runs bcrypt against a constant dummy hash on the missing-user branch to equalize timing. | Indistinguishable response shape AND wall-clock cost.                                                                     |
-| `POST /auth/forgot-password`     | Returns `{ success: true }` regardless of whether the email is registered. Sends the reset email only when it is.                                                    | OWASP-standard masked response.                                                                                           |
-| `POST /auth/resend-verification` | Returns `{ success: true }` regardless.                                                                                                                              | Same pattern.                                                                                                             |
+| Flow                             | Behavior                                                                                                                                                                                                                                                                                                                                                | Why                                                                                                                       |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `POST /auth/register`            | Returns `{ emailVerificationSent: true }` for both new and existing emails. Existing-email path sends a "registration attempt" notice to the rightful owner.                                                                                                                                                                                            | T1-4 enumeration close. Identical response shape, identical wall-clock cost (bcrypt always runs), no enumeration channel. |
+| `POST /auth/login`               | Returns `INVALID_CREDENTIALS` when user doesn't exist OR password is wrong. Runs bcrypt against a constant dummy hash on the missing-user branch to equalize timing.                                                                                                                                                                                    | Indistinguishable response shape AND wall-clock cost.                                                                     |
+| `POST /auth/forgot-password`     | Returns `{ success: true }` regardless of whether the email is registered. Sends the reset email only when it is, handed to `cfWaitUntil` so the found branch does not wait on Resend. Store accounts get the branded store mail; Ebda Store accounts (`store_id` NULL) get the platform mail linking `store.ebda.app/reset-password` (EBDA-PWRESET-1). | OWASP-standard masked response; latency no longer tracks the mail send.                                                   |
+| `POST /auth/resend-verification` | Returns `{ success: true }` regardless.                                                                                                                                                                                                                                                                                                                 | Same pattern.                                                                                                             |
 
 The 409 ALREADY_EXISTS response is **gone** as of T1-4. Calling
 sites that previously expected a 409 response on duplicate-register
@@ -277,7 +277,10 @@ and route to a "check your email" page.
 ### Where this lives
 
 - `apps/api/src/services/auth.service.ts` — `register`, `login`,
-  `requestPasswordReset`
+  `requestPasswordReset`, `resetPassword` (atomic single-use claim, revokes
+  every session, clears the lockout, never touches MFA)
+- `apps/api/src/services/platform-mailer.ts` — `sendMerchantPasswordResetEmail`
+- `apps/admin/src/app/{forgot-password,reset-password}/` — the Ebda Store pages
 - `apps/api/src/routes/auth.routes.ts` — register handler, audit log
 - `apps/api/src/services/email.service.ts` — `sendDuplicateRegistrationNotice`
 - `apps/web/src/app/auth/check-email/` — the post-register landing

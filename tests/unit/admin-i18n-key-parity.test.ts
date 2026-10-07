@@ -240,6 +240,7 @@ const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
   'categories.form.descriptionArabicPlaceholder',
   'categories.form.required',
   'auth.login.emailPlaceholder',
+  'auth.forgot.emailPlaceholder',
   'auth.login.mfaCodePlaceholder',
   'components.imageUpload.uploadingPercent',
   'components.adminLayout.forcePlatformBrand',
