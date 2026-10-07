@@ -94,19 +94,22 @@ export interface CredentialUpdateResult {
   activeModeChanged: boolean;
 }
 
-/** Validate an update against the catalog and merge it into the stored blob. */
-export function applyCredentialUpdate(
+/**
+ * Validate `fields` against the catalog and merge them over `current` (one mode's stored values).
+ * Shared by the payment and the shipping connect routes: '' / undefined / a masked echo keep the
+ * stored value, null clears it, anything else must pass the field's own validation.
+ */
+export function mergeCredentialFields(
   entry: ProviderCatalogEntry,
-  row: Pick<ConnectableRow, 'credentials' | 'testMode'> | null,
-  update: CredentialUpdate
-): CredentialUpdateResult {
-  const blob: CredentialBlob = decryptCredentialBlob(row?.credentials ?? null);
-  const current = { ...(blob[update.mode] ?? {}) };
+  current: Record<string, string>,
+  fields: Record<string, string | number | null | undefined>
+): { next: Record<string, string>; changed: string[] } {
+  const next = { ...current };
   const known = new Map(entry.fields.map(f => [f.key, f]));
   const errors: string[] = [];
   const changed: string[] = [];
 
-  for (const [key, raw] of Object.entries(update.fields)) {
+  for (const [key, raw] of Object.entries(fields)) {
     const field = known.get(key);
     if (!field) {
       errors.push(`${key}: not a ${entry.code} credential`);
@@ -114,8 +117,8 @@ export function applyCredentialUpdate(
     }
     if (raw === undefined || raw === '' || isMaskedSecret(raw)) continue;
     if (raw === null) {
-      if (current[key] !== undefined) {
-        delete current[key];
+      if (next[key] !== undefined) {
+        delete next[key];
         changed.push(key);
       }
       continue;
@@ -126,14 +129,29 @@ export function applyCredentialUpdate(
       errors.push(`${key}: ${problem}`);
       continue;
     }
-    if (current[key] !== value) {
-      current[key] = value;
+    if (next[key] !== value) {
+      next[key] = value;
       changed.push(key);
     }
   }
   if (errors.length > 0) {
     throw new AppError(422, 'INVALID_CREDENTIALS', errors.join('; '));
   }
+  return { next, changed };
+}
+
+/** Validate an update against the catalog and merge it into the stored blob. */
+export function applyCredentialUpdate(
+  entry: ProviderCatalogEntry,
+  row: Pick<ConnectableRow, 'credentials' | 'testMode'> | null,
+  update: CredentialUpdate
+): CredentialUpdateResult {
+  const blob: CredentialBlob = decryptCredentialBlob(row?.credentials ?? null);
+  const { next: current, changed } = mergeCredentialFields(
+    entry,
+    blob[update.mode] ?? {},
+    update.fields
+  );
   const next: CredentialBlob = { ...blob, [update.mode]: current };
   return {
     cipher: encryptCredentialBlob(next),

@@ -1,10 +1,17 @@
 // ==========================================
-// Aramex Carrier Implementation
+// Aramex Carrier Implementation (SOAP 1.1, official WSDLs)
 // ==========================================
+//
+// Built from the four public WSDLs on ws.aramex.net (Shipping, RateCalculator, Tracking,
+// Location; one namespace, WCF BasicHttpBinding). Aramex enforces xs:sequence ORDER, so every
+// request is assembled by a small builder that emits children in the schema's order, and every
+// schema-required element is present even when empty. Aramex's manual is unreadable to us:
+// anything the WSDL does not define (product types, report ids, update codes, EGP COD, the test
+// host) is marked `UNVERIFIED:` and handled safely, never guessed silently.
 
 import logger from '../../lib/logger';
 import {
-  carrierRequest,
+  carrierRequestText,
   egpToPiastres,
   piastresToEgp,
   resolveCarrierBaseUrl,
@@ -21,8 +28,10 @@ import {
   CarrierQuoteRequest,
   CarrierShipmentRequest,
   CarrierShipmentResponse,
+  CarrierTestResult,
   CarrierTrackingResponse,
   CarrierWebhookResult,
+  ShipmentAddress,
   ShipmentStatus,
   ShippingCarrierProvider,
   TrackingHistoryEntry,
@@ -30,9 +39,16 @@ import {
 
 export const ARAMEX_BASE_URLS = {
   live: 'https://ws.aramex.net/ShippingAPI.V2',
-  // UNVERIFIED: the test host; Aramex hands out a test account with its developer docs.
+  // UNVERIFIED: the test host. It resolves but its WSDL could not be fetched from our network;
+  // whether it is IP-allow-listed is unknown. Aramex hands out test credentials with its docs.
   sandbox: 'https://ws.dev.aramex.net/ShippingAPI.V2',
 };
+
+const NS = 'http://ws.aramex.net/ShippingAPI/v1/';
+const ARR_NS = 'http://schemas.microsoft.com/2003/10/Serialization/Arrays';
+const ACTION_BASE = 'http://ws.aramex.net/ShippingAPI/v1/Service_1_0/';
+
+type Service = 'Shipping' | 'RateCalculator' | 'Tracking' | 'Location';
 
 export interface AramexCredentials {
   accountNumber: string;
@@ -41,20 +57,18 @@ export interface AramexCredentials {
   accountCountryCode: string;
   username: string;
   password: string;
-  version?: string; // API version, defaults to 'v1'
 }
 
-// Aramex UpdateCode → normalized ShipmentStatus
-// Reference: Aramex Tracking UpdateCode table
+// ------------------------------------------------------------------ status mapping
+
+// UNVERIFIED: this UpdateCode table is from memory, NOT from Aramex's manual (no WSDL carries
+// one: UpdateCode is a free string). It is only a fallback behind the description heuristic.
 const ARAMEX_STATUS_MAP: Record<string, ShipmentStatus> = {
-  // Created / booked
   SH005: 'created',
   SH006: 'created',
-  // Picked up
   SH010: 'picked_up',
   SH011: 'picked_up',
   SH012: 'picked_up',
-  // In transit
   SH020: 'in_transit',
   SH021: 'in_transit',
   SH022: 'in_transit',
@@ -62,59 +76,324 @@ const ARAMEX_STATUS_MAP: Record<string, ShipmentStatus> = {
   SH024: 'in_transit',
   SH025: 'in_transit',
   SH030: 'in_transit',
-  // Out for delivery
   SH040: 'out_for_delivery',
   SH041: 'out_for_delivery',
-  // Delivered
   SH050: 'delivered',
   SH051: 'delivered',
-  // Failed / exception
   SH060: 'failed',
   SH061: 'failed',
   SH062: 'failed',
   SH063: 'failed',
   SH064: 'failed',
-  // Returned
   SH070: 'returned',
   SH071: 'returned',
   SH072: 'returned',
-  // Cancelled
   SH080: 'cancelled',
   SH081: 'cancelled',
 };
 
-export function mapAramexStatus(updateCode: string): ShipmentStatus {
-  return ARAMEX_STATUS_MAP[updateCode] ?? 'in_transit';
-}
+// UNVERIFIED heuristic on UpdateDescription (free text). Order matters: "returned" and "failed"
+// are tested before "delivered" because "delivery attempt failed" / "returned, not delivered"
+// contain the word "deliver"; "out for delivery" before "delivered" for the same reason.
+const DESCRIPTION_RULES: Array<[RegExp, ShipmentStatus]> = [
+  [/return/i, 'returned'],
+  [/fail|unsuccess|attempt|undeliver|not delivered|refus|rejected/i, 'failed'],
+  [/out for delivery/i, 'out_for_delivery'],
+  [/deliver/i, 'delivered'],
+  [/cancel/i, 'cancelled'],
+  [/pick/i, 'picked_up'],
+];
 
-function buildClientInfo(credentials: AramexCredentials) {
-  return {
-    AccountNumber: credentials.accountNumber,
-    AccountPin: credentials.accountPin,
-    AccountEntity: credentials.accountEntity,
-    AccountCountryCode: credentials.accountCountryCode,
-    UserName: credentials.username,
-    Password: credentials.password,
-    Version: credentials.version ?? 'v1',
-  };
-}
-
-type Body = Record<string, any>;
-
-/** Aramex answers HTTP 200 with a `Notifications` list; a non-zero first code is the real error. */
-function notificationError(json: Body): string | null {
-  const notifications: Array<{ Code: string; Message: string }> = json.Notifications ?? [];
-  if (notifications.length > 0 && notifications[0].Code !== '0') {
-    // UNVERIFIED: codes 1 and 2 are the authentication failures (testConnection relies on them)
-    if (['1', '2'].includes(notifications[0].Code)) {
-      throw new CarrierError(
-        'CARRIER_MISCONFIGURED',
-        `Aramex refused the credentials: ${notifications[0].Message}`
-      );
-    }
-    return notifications.map(n => `[${n.Code}] ${n.Message}`).join('; ');
+/**
+ * UNVERIFIED mapping of one Aramex tracking event. Description pattern first, then the
+ * from-memory code table; an event with text that matches nothing is `in_transit`; an event with
+ * neither a usable description nor a known code keeps `previous` (the last known status) rather
+ * than inventing movement.
+ */
+export function mapAramexStatus(
+  updateCode: string,
+  updateDescription?: string,
+  previous?: ShipmentStatus
+): ShipmentStatus {
+  const description = (updateDescription ?? '').trim();
+  if (description) {
+    for (const [re, status] of DESCRIPTION_RULES) if (re.test(description)) return status;
   }
-  return null;
+  const byCode = ARAMEX_STATUS_MAP[(updateCode ?? '').trim().toUpperCase()];
+  if (byCode) return byCode;
+  if (description) return 'in_transit';
+  return previous ?? 'in_transit';
+}
+
+// ------------------------------------------------------------------ XML building
+
+/** Escape a value for element text and drop characters XML 1.0 cannot carry. */
+export function xmlEscape(value: unknown): string {
+  return String(value)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, '')
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/** An element with escaped text; absent -> omitted, or an empty element when schema-required. */
+function t(name: string, value: unknown, required = false): string {
+  if (value === undefined || value === null || value === '') return required ? `<${name}/>` : '';
+  return `<${name}>${xmlEscape(value)}</${name}>`;
+}
+
+/** An element whose body is already-built XML. */
+function el(name: string, inner: string): string {
+  return `<${name}>${inner}</${name}>`;
+}
+
+function num(name: string, value: number, required = false): string {
+  if (!Number.isFinite(value)) {
+    throw new CarrierError('CARRIER_REJECTED', `${name} must be a finite number`);
+  }
+  return t(name, String(value), required);
+}
+
+const money = (name: string, currency: string, value: number) =>
+  el(name, t('CurrencyCode', currency, true) + num('Value', value, true));
+const weight = (name: string, kg: number) =>
+  el(name, t('Unit', 'KG', true) + num('Value', kg, true)); // UNVERIFIED: unit code "KG"
+
+function clientInfo(c: AramexCredentials): string {
+  return el(
+    'ClientInfo',
+    t('UserName', c.username, true) +
+      t('Password', c.password, true) +
+      t('Version', 'v1.0', true) + // UNVERIFIED: version string
+      t('AccountNumber', c.accountNumber, true) +
+      t('AccountPin', c.accountPin, true) +
+      t('AccountEntity', c.accountEntity, true) +
+      t('AccountCountryCode', c.accountCountryCode, true) +
+      t('Source', 24) // UNVERIFIED: 24 is the commonly cited integration source id
+  );
+}
+
+/** Transaction has Reference1..5 all schema-required. */
+function transaction(ref1: string): string {
+  return el(
+    'Transaction',
+    t('Reference1', ref1, true) +
+      t('Reference2', '', true) +
+      t('Reference3', '', true) +
+      t('Reference4', '', true) +
+      t('Reference5', '', true)
+  );
+}
+
+const labelInfo = () =>
+  // UNVERIFIED: report 9201 + type URL = a hosted label link.
+  el('LabelInfo', num('ReportID', 9201, true) + t('ReportType', 'URL', true));
+
+function addressBody(a: ShipmentAddress, line3 = '', allRequired = false): string {
+  return (
+    t('Line1', a.line1, allRequired) +
+    t('Line2', a.line2, allRequired) +
+    t('Line3', line3, allRequired) +
+    t('City', a.city, allRequired) +
+    t('StateOrProvinceCode', a.state) +
+    t('PostCode', a.postalCode, allRequired) +
+    t('CountryCode', a.country, allRequired)
+  );
+}
+
+function contactBody(a: ShipmentAddress): string {
+  return (
+    t('PersonName', a.name, true) +
+    t('CompanyName', a.name) +
+    t('PhoneNumber1', a.phone, true) +
+    t('PhoneNumber2', '', true) + // schema-required, we hold one number
+    t('CellPhone', a.phone) +
+    t('EmailAddress', a.email) +
+    t('Type', '', true) // UNVERIFIED: allowed values
+  );
+}
+
+// ------------------------------------------------------------------ XML parsing (tolerant)
+
+export interface XNode {
+  name: string; // local name, namespace prefix dropped
+  text: string;
+  children: XNode[];
+  nil: boolean;
+}
+
+const MAX_XML_CHARS = 8_000_000;
+
+function decodeEntities(s: string): string {
+  return s.replace(/&(#x[0-9a-fA-F]+|#\d+|amp|lt|gt|quot|apos);/g, (_m, e: string) => {
+    if (e === 'amp') return '&';
+    if (e === 'lt') return '<';
+    if (e === 'gt') return '>';
+    if (e === 'quot') return '"';
+    if (e === 'apos') return "'";
+    const cp = e[1] === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+    return Number.isFinite(cp) && cp > 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : '';
+  });
+}
+
+/**
+ * A minimal namespace-agnostic XML reader: enough for SOAP answers, no DTD/entity expansion
+ * (only the five predefined entities and numeric references). Returns a synthetic root.
+ */
+export function parseXml(src: string): XNode {
+  if (src.length > MAX_XML_CHARS) {
+    throw new CarrierError('CARRIER_UNAVAILABLE', 'Aramex answered with an oversized body');
+  }
+  const root: XNode = { name: '#root', text: '', children: [], nil: false };
+  const stack: XNode[] = [root];
+  let i = 0;
+  while (i < src.length) {
+    const lt = src.indexOf('<', i);
+    const cur = stack[stack.length - 1];
+    if (lt === -1) {
+      cur.text += decodeEntities(src.slice(i));
+      break;
+    }
+    if (lt > i) cur.text += decodeEntities(src.slice(i, lt));
+    if (src.startsWith('<!--', lt)) {
+      const end = src.indexOf('-->', lt + 4);
+      i = end === -1 ? src.length : end + 3;
+    } else if (src.startsWith('<![CDATA[', lt)) {
+      const end = src.indexOf(']]>', lt + 9);
+      cur.text += src.slice(lt + 9, end === -1 ? src.length : end);
+      i = end === -1 ? src.length : end + 3;
+    } else if (src.startsWith('<?', lt)) {
+      const end = src.indexOf('?>', lt + 2);
+      i = end === -1 ? src.length : end + 2;
+    } else if (src.startsWith('<!', lt)) {
+      const end = src.indexOf('>', lt + 2);
+      i = end === -1 ? src.length : end + 1;
+    } else if (src.startsWith('</', lt)) {
+      const end = src.indexOf('>', lt + 2);
+      const name = localName(src.slice(lt + 2, end === -1 ? src.length : end).trim());
+      i = end === -1 ? src.length : end + 1;
+      for (let k = stack.length - 1; k > 0; k--) {
+        if (stack[k].name === name) {
+          stack.length = k;
+          break;
+        }
+      }
+    } else {
+      // open tag: find the closing '>' outside quoted attribute values
+      let j = lt + 1;
+      let quote = '';
+      while (j < src.length) {
+        const ch = src[j];
+        if (quote) {
+          if (ch === quote) quote = '';
+        } else if (ch === '"' || ch === "'") quote = ch;
+        else if (ch === '>') break;
+        j++;
+      }
+      let inner = src.slice(lt + 1, j);
+      const selfClose = inner.endsWith('/');
+      if (selfClose) inner = inner.slice(0, -1);
+      const m = /^([^\s/>]+)([\s\S]*)$/.exec(inner);
+      i = j + 1;
+      if (!m) continue;
+      const node: XNode = {
+        name: localName(m[1]),
+        text: '',
+        children: [],
+        nil: /\bnil\s*=\s*["']true["']/i.test(m[2]),
+      };
+      cur.children.push(node);
+      if (!selfClose) {
+        if (stack.length > 200) {
+          throw new CarrierError('CARRIER_UNAVAILABLE', 'Aramex answered with a malformed body');
+        }
+        stack.push(node);
+      }
+    }
+  }
+  return root;
+}
+
+const localName = (n: string) => n.slice(n.lastIndexOf(':') + 1);
+
+const kids = (n: XNode | undefined, name: string): XNode[] =>
+  n ? n.children.filter(c => c.name === name) : [];
+const kid = (n: XNode | undefined, name: string): XNode | undefined => kids(n, name)[0];
+const val = (n: XNode | undefined, name?: string): string => {
+  const x = name ? kid(n, name) : n;
+  return x && !x.nil ? x.text.trim() : '';
+};
+function descend(n: XNode, name: string): XNode | undefined {
+  for (const c of n.children) {
+    if (c.name === name) return c;
+    const d = descend(c, name);
+    if (d) return d;
+  }
+  return undefined;
+}
+
+// ------------------------------------------------------------------ errors
+
+interface Notification {
+  code: string;
+  message: string;
+}
+
+const notificationsOf = (n: XNode | undefined): Notification[] =>
+  kids(kid(n, 'Notifications'), 'Notification').map(x => ({
+    code: val(x, 'Code'),
+    message: val(x, 'Message'),
+  }));
+
+// UNVERIFIED: Aramex's auth-failure codes/texts are not in any WSDL, so classify by wording.
+const AUTH_LOOKING =
+  /authenticat|authoriz|unauthori|credential|password|user ?name|login|invalid (user|account)|\bpin\b|account (number|pin|entity)/i;
+
+function scrub(text: string, c?: AramexCredentials): string {
+  let out = text;
+  for (const secret of [c?.password, c?.accountPin]) {
+    if (secret && secret.length >= 3) out = out.split(secret).join('***');
+  }
+  return out.length > 300 ? `${out.slice(0, 300)}...` : out;
+}
+
+function describe(ns: Notification[], c?: AramexCredentials): string {
+  if (ns.length === 0) return 'Aramex reported an error without details';
+  return scrub(
+    ns
+      .slice(0, 5)
+      .map(n => `[${n.code}] ${n.message}`)
+      .join('; '),
+    c
+  );
+}
+
+const looksLikeAuth = (ns: Notification[]) => ns.some(n => AUTH_LOOKING.test(n.message));
+
+function refusal(op: string, ns: Notification[], c?: AramexCredentials): CarrierError {
+  if (looksLikeAuth(ns)) {
+    return new CarrierError('CARRIER_MISCONFIGURED', 'Aramex refused the credentials');
+  }
+  return new CarrierError('CARRIER_REJECTED', `${op}: Aramex error: ${describe(ns, c)}`);
+}
+
+// ------------------------------------------------------------------ the adapter
+
+export interface AramexPickupInput {
+  address: ShipmentAddress;
+  pickupDate: Date;
+  readyTime: Date;
+  lastPickupTime: Date;
+  closingTime: Date;
+  reference?: string;
+  comments?: string;
+  vehicle?: string; // UNVERIFIED: default 'Car'
+  shipments: number;
+  pieces?: number;
+  weightKg?: number;
 }
 
 export class AramexCarrier implements ShippingCarrierProvider {
@@ -123,27 +402,33 @@ export class AramexCarrier implements ShippingCarrierProvider {
   readonly capabilities: CarrierCapabilities = {
     quote: true,
     label: true,
-    // Aramex has no tracking push that we found (docs/ebda/research): tracking is POLLED.
+    // None of the four WSDLs has a push/subscription operation: tracking is POLLED.
     webhooks: false,
     polling: true,
-    // UNVERIFIED: domestic COD in EGP. One integrator source says COD amounts are USD-only, so
-    // COD is refused until the merchant records Aramex's written confirmation
-    // (settings.codEgpConfirmed). Prepaid shipments are unaffected.
+    // UNVERIFIED: domestic COD in EGP. COD is refused until the merchant records Aramex's
+    // written confirmation (settings.codEgpConfirmed). Prepaid shipments are unaffected.
     cod: 'unconfirmed',
   };
 
-  // Aramex has no idempotency header; this is the adapter-side half of "same reference, same
-  // shipment" (the service also keeps one shipment row per order).
+  // Aramex documents no idempotency key and has no search-by-reference operation, so a lost
+  // response after a successful CreateShipments CANNOT be detected here. UNVERIFIED: whether
+  // Aramex rejects a repeated Reference1. This per-process cache (credential-scoped, keyed on the
+  // merchant reference) only stops in-process repeats; the service keeps one shipment row per
+  // order, and retrying after an ambiguous failure is the merchant's / ops' decision.
   private readonly created = new IdempotencyCache<CarrierShipmentResponse>();
 
   constructor(private readonly http: CarrierHttpOptions = {}) {}
 
-  private async post(
-    op: string,
+  /** One SOAP call; returns the response element. Throws CarrierError on every failure shape. */
+  private async call(
+    service: Service,
+    operation: string,
+    requestName: string,
+    responseName: string,
+    body: string,
     ctx: CarrierCallContext | undefined,
-    path: string,
-    body: unknown
-  ): Promise<Body> {
+    creds: AramexCredentials
+  ): Promise<XNode> {
     const sandbox = ctx?.settings?.sandbox === true || ctx?.settings?.sandbox === 'true';
     const base = resolveCarrierBaseUrl(
       'ARAMEX_BASE_URL',
@@ -151,18 +436,128 @@ export class AramexCarrier implements ShippingCarrierProvider {
       sandbox,
       this.http.baseUrl
     );
-    const res = await carrierRequest<Body>(
+    const op = `aramex.${operation}`;
+    const envelope =
+      '<?xml version="1.0" encoding="utf-8"?>' +
+      '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>' +
+      `<${requestName} xmlns="${NS}" xmlns:arr="${ARR_NS}">${body}</${requestName}>` +
+      '</s:Body></s:Envelope>';
+    const res = await carrierRequestText(
       op,
       base,
-      path,
+      `/${service}/Service_1_0.svc`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        headers: {
+          'Content-Type': 'text/xml; charset=utf-8',
+          // SOAP 1.1 wants the action quoted
+          SOAPAction: `"${ACTION_BASE}${operation}"`,
+        },
+        body: envelope,
       },
-      this.http
+      { ...this.http, acceptStatus: [500] }
     );
-    return res.body;
+
+    let root: XNode;
+    try {
+      root = parseXml(res.text);
+    } catch (e) {
+      if (e instanceof CarrierError) throw e;
+      throw new CarrierError('CARRIER_UNAVAILABLE', `${op}: unreadable answer`);
+    }
+
+    const fault = descend(root, 'Fault');
+    if (fault || res.status === 500) {
+      const faultText = scrub(
+        val(fault, 'faultstring') || val(descend(fault ?? root, 'Text')),
+        creds
+      );
+      if (AUTH_LOOKING.test(faultText)) {
+        throw new CarrierError('CARRIER_MISCONFIGURED', 'Aramex refused the credentials');
+      }
+      const clientFault = /client|sender/i.test(val(fault, 'faultcode'));
+      logger.warn({ carrier: 'aramex', op, status: res.status }, 'Aramex SOAP fault');
+      throw new CarrierError(
+        clientFault && res.status < 500 ? 'CARRIER_REJECTED' : 'CARRIER_UNAVAILABLE',
+        `${op}: Aramex fault${faultText ? `: ${faultText}` : ` (HTTP ${res.status})`}`
+      );
+    }
+
+    const response = descend(root, responseName);
+    if (!response) {
+      throw new CarrierError(
+        'CARRIER_UNAVAILABLE',
+        `${op}: unexpected answer (no ${responseName})`
+      );
+    }
+    if (val(response, 'HasErrors').toLowerCase() === 'true') {
+      throw refusal(op, notificationsOf(response), creds);
+    }
+    return response;
+  }
+
+  private productSettings(ctx: CarrierCallContext | undefined, domestic: boolean) {
+    const productType = ctx?.settings?.productType;
+    if (typeof productType !== 'string' || !productType.trim()) {
+      throw new CarrierError(
+        'CARRIER_MISCONFIGURED',
+        'Set the Aramex product type in the carrier settings (ask Aramex which domestic product your account uses)'
+      );
+    }
+    const group = ctx?.settings?.productGroup;
+    return {
+      // UNVERIFIED: DOM for domestic Egypt, EXP otherwise
+      productGroup:
+        typeof group === 'string' && group.trim() ? group.trim() : domestic ? 'DOM' : 'EXP',
+      productType: productType.trim(),
+    };
+  }
+
+  private checkCod(codAmount: number | undefined, ctx: CarrierCallContext | undefined): number {
+    const cod = codAmount ?? 0;
+    if (!Number.isSafeInteger(cod) || cod < 0) {
+      throw new CarrierError('CARRIER_REJECTED', 'codAmount must be integer piastres');
+    }
+    if (cod > 0 && ctx?.settings?.codEgpConfirmed !== true) {
+      throw new CarrierError(
+        'COD_NOT_SUPPORTED',
+        'Aramex cash on delivery in EGP is not confirmed for this account. Ask Aramex to confirm in writing, then tick "COD in EGP confirmed" in the Aramex settings; until then ship COD orders with another carrier.'
+      );
+    }
+    return cod;
+  }
+
+  /** ShipmentDetails BODY in schema order (the same type is used by CreateShipments and CalculateRate). */
+  private details(o: {
+    group: string;
+    type: string;
+    kg: number;
+    goods: string;
+    origin: string;
+    dims?: { length: number; width: number; height: number };
+    cod: number;
+  }): string {
+    const d = o.dims ?? { length: 0, width: 0, height: 0 }; // UNVERIFIED: zeros accepted
+    return (
+      el(
+        'Dimensions',
+        num('Length', d.length, true) +
+          num('Width', d.width, true) +
+          num('Height', d.height, true) +
+          t('Unit', 'CM', true) // UNVERIFIED: unit code
+      ) +
+      weight('ActualWeight', o.kg) +
+      weight('ChargeableWeight', o.kg) +
+      t('DescriptionOfGoods', o.goods, true) +
+      t('GoodsOriginCountry', o.origin, true) +
+      num('NumberOfPieces', 1, true) + // one parcel per shipment
+      t('ProductGroup', o.group, true) +
+      t('ProductType', o.type, true) +
+      t('PaymentType', 'P', true) + // UNVERIFIED: P = prepaid by the shipper
+      t('PaymentOptions', '', true) +
+      (o.cod > 0 ? money('CashOnDeliveryAmount', 'EGP', piastresToEgp(o.cod)) : '') +
+      (o.cod > 0 ? t('Services', 'CODS') : '') // UNVERIFIED: COD service code
+    );
   }
 
   async createShipment(
@@ -170,23 +565,14 @@ export class AramexCarrier implements ShippingCarrierProvider {
     data: CarrierShipmentRequest,
     ctx?: CarrierCallContext
   ): Promise<CarrierShipmentResponse> {
-    const cod = data.codAmount ?? 0;
-    if (!Number.isSafeInteger(cod) || cod < 0) {
-      throw new CarrierError('CARRIER_REJECTED', 'codAmount must be integer piastres');
-    }
-    if (cod > 0 && ctx?.settings?.codEgpConfirmed !== true) {
-      // Refuse rather than book a COD parcel whose collected currency we cannot vouch for: the
-      // old code sent `amount / 1000` in a 3-decimal currency, which would have mis-priced EGP orders.
-      throw new CarrierError(
-        'COD_NOT_SUPPORTED',
-        'Aramex cash on delivery in EGP is not confirmed for this account. Ask Aramex to confirm in writing, then tick "COD in EGP confirmed" in the Aramex settings; until then ship COD orders with another carrier.'
-      );
-    }
+    const cod = this.checkCod(data.codAmount, ctx);
+    const domestic = data.pickupAddress.country === data.deliveryAddress.country;
+    const product = this.productSettings(ctx, domestic);
     const reference = data.merchantReference ?? data.orderId;
     return this.created.once(
       credentialScope([credentials.accountNumber, credentials.accountEntity]),
       reference,
-      () => this.book(credentials, data, ctx, cod)
+      () => this.book(credentials, data, ctx, cod, product, reference)
     );
   }
 
@@ -194,141 +580,77 @@ export class AramexCarrier implements ShippingCarrierProvider {
     credentials: AramexCredentials,
     data: CarrierShipmentRequest,
     ctx: CarrierCallContext | undefined,
-    cod: number
+    cod: number,
+    product: { productGroup: string; productType: string },
+    reference: string
   ): Promise<CarrierShipmentResponse> {
-    const domestic = data.pickupAddress.country === data.deliveryAddress.country;
-    // UNVERIFIED: domestic Egypt products are ProductGroup DOM / ProductType OND; the old
-    // Default product groups (EXP / PPX) stay for cross-border.
-    const productGroup = domestic ? 'DOM' : 'EXP';
-    const productType = domestic ? 'OND' : 'PPX';
-
-    const payload = {
-      ClientInfo: buildClientInfo(credentials),
-      Transaction: {
-        Reference1: data.orderNumber,
-        Reference2: data.merchantReference ?? data.orderId,
-      },
-      Shipments: [
-        {
-          Reference1: data.merchantReference ?? data.orderId,
-          Shipper: {
-            Reference1: data.orderNumber,
-            AccountNumber: credentials.accountNumber,
-            PartyAddress: {
-              Line1: data.pickupAddress.line1,
-              Line2: data.pickupAddress.line2 ?? '',
-              Line3: '',
-              City: data.pickupAddress.city,
-              StateOrProvinceCode: data.pickupAddress.state ?? '',
-              PostCode: data.pickupAddress.postalCode ?? '',
-              CountryCode: data.pickupAddress.country,
-            },
-            Contact: {
-              PersonName: data.pickupAddress.name,
-              CompanyName: data.pickupAddress.name,
-              PhoneNumber1: data.pickupAddress.phone,
-              EmailAddress: data.pickupAddress.email ?? '',
-            },
-          },
-          Consignee: {
-            Reference1: data.orderNumber,
-            PartyAddress: {
-              Line1: data.deliveryAddress.line1,
-              Line2: data.deliveryAddress.line2 ?? '',
-              Line3: [
-                data.deliveryAddress.area,
-                data.deliveryAddress.block,
-                data.deliveryAddress.street,
-              ]
-                .filter(Boolean)
-                .join(', '),
-              City: data.deliveryAddress.city,
-              StateOrProvinceCode: data.deliveryAddress.state ?? '',
-              PostCode: data.deliveryAddress.postalCode ?? '',
-              CountryCode: data.deliveryAddress.country,
-            },
-            Contact: {
-              PersonName: data.deliveryAddress.name,
-              CompanyName: data.deliveryAddress.name,
-              PhoneNumber1: data.deliveryAddress.phone,
-              EmailAddress: data.deliveryAddress.email ?? '',
-            },
-          },
-          ShippingDateTime: new Date().toISOString(),
-          DueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          Comments: data.notes ?? '',
-          PickupLocation: '',
-          OperationsInstructions: '',
-          AccountingInstrcutions: '',
-          Details: {
-            Dimensions: data.dimensions
-              ? {
-                  Length: data.dimensions.length,
-                  Width: data.dimensions.width,
-                  Height: data.dimensions.height,
-                  Unit: 'CM',
-                }
-              : null,
-            ActualWeight: {
-              Value: data.weight ?? 0.5,
-              Unit: 'KG',
-            },
-            ChargeableWeight: null,
-            DescriptionOfGoods: data.items.map(i => i.name).join(', '),
-            GoodsOriginCountry: data.pickupAddress.country,
-            NumberOfPieces: data.items.reduce((acc, i) => acc + i.quantity, 0),
-            ProductGroup: productGroup,
-            ProductType: productType,
-            PaymentType: cod ? 'C' : 'P', // C=Collect (COD), P=Prepaid
-            PaymentOptions: cod ? 'CODS' : '',
-            Services: cod ? 'CODS' : '',
-            // UNVERIFIED: EGP is accepted for a domestic Egypt COD amount (guarded above).
-            CashOnDeliveryAmount: cod ? { Value: piastresToEgp(cod), CurrencyCode: 'EGP' } : null,
-            InsuranceAmount: null,
-            CollectAmount: null,
-            Items: data.items.map(item => ({
-              PackageType: 'Box',
-              Quantity: item.quantity,
-              Weight: { Value: item.weight ?? 0.1, Unit: 'KG' },
-              Comments: item.name,
-              Reference: item.sku ?? '',
-            })),
-          },
-        },
-      ],
-      LabelInfo: {
-        ReportID: 9201,
-        ReportType: 'URL',
-      },
-    };
-
-    const json = await this.post(
-      'aramex.createShipments',
-      ctx,
-      '/Shipping/V1.0/json/CreateShipments',
-      payload
+    const d = data.deliveryAddress;
+    const line3 = [d.area, d.block, d.street].filter(Boolean).join(', ');
+    const shipment = el(
+      'Shipment',
+      t('Reference1', reference) +
+        el(
+          'Shipper',
+          t('Reference1', data.orderNumber) +
+            t('AccountNumber', credentials.accountNumber) +
+            el('PartyAddress', addressBody(data.pickupAddress)) +
+            el('Contact', contactBody(data.pickupAddress))
+        ) +
+        el(
+          'Consignee',
+          t('Reference1', data.orderNumber) +
+            el('PartyAddress', addressBody(d, line3)) +
+            el('Contact', contactBody(d))
+        ) +
+        t('ShippingDateTime', new Date().toISOString(), true) +
+        t('DueDate', new Date(Date.now() + 7 * 86_400_000).toISOString()) +
+        t('Comments', data.notes) +
+        el(
+          'Details',
+          this.details({
+            group: product.productGroup,
+            type: product.productType,
+            kg: data.weight ?? 0.5,
+            goods: data.items.map(i => i.name).join(', ') || 'Goods',
+            origin: data.pickupAddress.country,
+            dims: data.dimensions,
+            cod,
+          })
+        )
     );
-    const err = notificationError(json);
-    if (err) {
-      logger.error({ carrier: 'aramex' }, 'Aramex createShipment notifications');
-      throw new CarrierError('CARRIER_REJECTED', `Aramex error: ${err}`);
-    }
-    const shipment = json.Shipments?.[0];
-    if (!shipment) {
+    const response = await this.call(
+      'Shipping',
+      'CreateShipments',
+      'ShipmentCreationRequest',
+      'ShipmentCreationResponse',
+      clientInfo(credentials) +
+        transaction(data.orderNumber) +
+        el('Shipments', shipment) +
+        labelInfo(),
+      ctx,
+      credentials
+    );
+    const processed = kid(kid(response, 'Shipments'), 'ProcessedShipment');
+    if (!processed) {
       throw new CarrierError(
         'CARRIER_UNAVAILABLE',
-        'Aramex createShipment: no shipment in response'
+        'aramex.CreateShipments: no processed shipment in the answer'
       );
     }
-    const trackingNumber = shipment.WaybillNumber ?? shipment.ShipmentNumber ?? shipment.ID;
+    if (val(processed, 'HasErrors').toLowerCase() === 'true') {
+      throw refusal('aramex.CreateShipments', notificationsOf(processed), credentials);
+    }
+    const id = val(processed, 'ID');
+    if (!id) {
+      throw new CarrierError('CARRIER_UNAVAILABLE', 'aramex.CreateShipments: no waybill id');
+    }
+    const url = val(kid(processed, 'ShipmentLabel'), 'LabelURL');
     return {
-      carrierShipmentId: String(shipment.ID ?? shipment.ShipmentNumber ?? trackingNumber),
-      trackingNumber: String(trackingNumber),
-      trackingUrl: `https://www.aramex.com/express/track.aspx?mode=1&ShipmentNumber=${trackingNumber}`,
-      labelUrl: shipment.ShipmentLabel?.LabelURL ?? undefined,
-      estimatedDelivery: shipment.ScheduledDelivery
-        ? new Date(shipment.ScheduledDelivery)
-        : undefined,
+      carrierShipmentId: id,
+      trackingNumber: id,
+      // UNVERIFIED: public tracking page
+      trackingUrl: `https://www.aramex.com/express/track.aspx?mode=1&ShipmentNumber=${encodeURIComponent(id)}`,
+      labelUrl: /^https?:\/\//i.test(url) ? url : undefined,
     };
   }
 
@@ -337,20 +659,27 @@ export class AramexCarrier implements ShippingCarrierProvider {
     shipment: { carrierShipmentId: string; trackingNumber: string },
     ctx?: CarrierCallContext
   ): Promise<CarrierLabel> {
-    // UNVERIFIED: PrintLabel takes the shipment number and returns a hosted label URL.
-    const json = await this.post('aramex.printLabel', ctx, '/Shipping/V1.0/json/PrintLabel', {
-      ClientInfo: buildClientInfo(credentials),
-      Transaction: { Reference1: `label-${shipment.trackingNumber}` },
-      LabelInfo: { ReportID: 9201, ReportType: 'URL' },
-      OriginEntity: credentials.accountEntity,
-      ProductGroup: 'DOM',
-      ShipmentNumber: shipment.trackingNumber,
-    });
-    const err = notificationError(json);
-    if (err) throw new CarrierError('CARRIER_REJECTED', `Aramex error: ${err}`);
-    const url = json.ShipmentLabel?.LabelURL;
-    if (!url) throw new CarrierError('CARRIER_UNAVAILABLE', 'Aramex printLabel: no label URL');
-    return { url };
+    const group = ctx?.settings?.productGroup;
+    const response = await this.call(
+      'Shipping',
+      'PrintLabel',
+      'LabelPrintingRequest',
+      'LabelPrintingResponse',
+      clientInfo(credentials) +
+        transaction(`label-${shipment.trackingNumber}`) +
+        t('ShipmentNumber', shipment.trackingNumber, true) +
+        t('ProductGroup', typeof group === 'string' && group ? group : 'DOM') +
+        t('OriginEntity', credentials.accountEntity) + // UNVERIFIED: the shipment's origin entity
+        labelInfo(),
+      ctx,
+      credentials
+    );
+    const lbl = kid(response, 'ShipmentLabel');
+    const url = val(lbl, 'LabelURL');
+    if (/^https?:\/\//i.test(url)) return { url };
+    const b64 = val(lbl, 'LabelFileContents').replace(/\s+/g, '');
+    if (b64 && /^[A-Za-z0-9+/]+={0,2}$/.test(b64)) return { pdfBase64: b64 };
+    throw new CarrierError('CARRIER_UNAVAILABLE', 'aramex.PrintLabel: no label in the answer');
   }
 
   async quote(
@@ -358,35 +687,104 @@ export class AramexCarrier implements ShippingCarrierProvider {
     data: CarrierQuoteRequest,
     ctx?: CarrierCallContext
   ): Promise<CarrierQuote> {
-    // UNVERIFIED: Rate Calculator request/response shape.
-    const json = await this.post('aramex.rate', ctx, '/RateCalculator/V1.0/json/CalculateRate', {
-      ClientInfo: buildClientInfo(credentials),
-      Transaction: { Reference1: 'quote' },
-      OriginAddress: { City: data.pickupAddress.city, CountryCode: data.pickupAddress.country },
-      DestinationAddress: {
-        City: data.deliveryAddress.city,
-        CountryCode: data.deliveryAddress.country,
-      },
-      ShipmentDetails: {
-        PaymentType: 'P',
-        ProductGroup: 'DOM',
-        ProductType: 'OND',
-        ActualWeight: { Value: data.weight ?? 0.5, Unit: 'KG' },
-        ChargeableWeight: { Value: data.weight ?? 0.5, Unit: 'KG' },
-        NumberOfPieces: 1,
-      },
+    const cod = this.checkCod(data.codAmount, ctx);
+    const domestic = data.pickupAddress.country === data.deliveryAddress.country;
+    const product = this.productSettings(ctx, domestic);
+    const details = this.details({
+      group: product.productGroup,
+      type: product.productType,
+      kg: data.weight ?? 0.5,
+      goods: 'Goods',
+      origin: data.pickupAddress.country,
+      cod,
     });
-    const err = notificationError(json);
-    if (err) throw new CarrierError('CARRIER_REJECTED', `Aramex error: ${err}`);
-    const total = json.TotalAmount;
-    if (!total || total.CurrencyCode !== 'EGP') {
+    const response = await this.call(
+      'RateCalculator',
+      'CalculateRate',
+      'RateCalculatorRequest',
+      'RateCalculatorResponse',
+      clientInfo(credentials) +
+        transaction('quote') +
+        el('OriginAddress', addressBody(data.pickupAddress, '', true)) +
+        el('DestinationAddress', addressBody(data.deliveryAddress, '', true)) +
+        el('ShipmentDetails', details) +
+        t('PreferredCurrencyCode', 'EGP'),
+      ctx,
+      credentials
+    );
+    const total = kid(response, 'TotalAmount');
+    const currency = val(total, 'CurrencyCode');
+    if (!total || currency !== 'EGP') {
       // never convert silently: a USD quote is not a piastre amount
       throw new CarrierError(
         'CARRIER_REJECTED',
-        `Aramex quoted in ${String(total?.CurrencyCode)}, not EGP`
+        `Aramex quoted in ${currency || 'an unknown currency'}, not EGP`
       );
     }
-    return { amountPiastres: egpToPiastres(String(total.Value)), source: 'api' };
+    return { amountPiastres: egpToPiastres(val(total, 'Value')), source: 'api' };
+  }
+
+  /** Not part of the shared interface: book a courier pickup (Shipping/CreatePickup). */
+  async createPickup(
+    credentials: AramexCredentials,
+    input: AramexPickupInput,
+    ctx?: CarrierCallContext
+  ): Promise<{ pickupId: string; pickupGuid: string }> {
+    const product = this.productSettings(ctx, true);
+    const kg = input.weightKg ?? 0.5;
+    const pickup = el(
+      'Pickup',
+      el('PickupAddress', addressBody(input.address)) +
+        el('PickupContact', contactBody(input.address)) +
+        t('PickupLocation', 'Reception', true) + // UNVERIFIED: free text
+        t('PickupDate', input.pickupDate.toISOString(), true) +
+        t('ReadyTime', input.readyTime.toISOString(), true) +
+        t('LastPickupTime', input.lastPickupTime.toISOString(), true) +
+        t('ClosingTime', input.closingTime.toISOString(), true) +
+        t('Comments', input.comments, true) +
+        t('Reference1', input.reference) +
+        t('Vehicle', input.vehicle ?? 'Car', true) + // UNVERIFIED: vehicle vocabulary
+        el(
+          'PickupItems',
+          el(
+            'PickupItemDetail',
+            t('ProductGroup', product.productGroup, true) +
+              t('ProductType', product.productType, true) +
+              num('NumberOfShipments', input.shipments, true) +
+              t('PackageType', 'Box', true) + // UNVERIFIED
+              t('Payment', 'P', true) + // UNVERIFIED
+              weight('ShipmentWeight', kg) +
+              el('ShipmentVolume', t('Unit', 'CM3', true) + num('Value', 0, true)) + // UNVERIFIED
+              num('NumberOfPieces', input.pieces ?? input.shipments, true) +
+              money('CashAmount', 'EGP', 0) +
+              money('ExtraCharges', 'EGP', 0) +
+              el(
+                'ShipmentDimensions',
+                num('Length', 0, true) +
+                  num('Width', 0, true) +
+                  num('Height', 0, true) +
+                  t('Unit', 'CM', true)
+              ) +
+              t('Comments', '', true)
+          )
+        )
+    );
+    const response = await this.call(
+      'Shipping',
+      'CreatePickup',
+      'PickupCreationRequest',
+      'PickupCreationResponse',
+      clientInfo(credentials) + transaction(input.reference ?? 'pickup') + pickup + labelInfo(),
+      ctx,
+      credentials
+    );
+    const p = kid(response, 'ProcessedPickup');
+    const pickupId = val(p, 'ID');
+    const pickupGuid = val(p, 'GUID');
+    if (!pickupId && !pickupGuid) {
+      throw new CarrierError('CARRIER_UNAVAILABLE', 'aramex.CreatePickup: no pickup in the answer');
+    }
+    return { pickupId, pickupGuid };
   }
 
   async trackShipment(
@@ -394,117 +792,124 @@ export class AramexCarrier implements ShippingCarrierProvider {
     trackingNumber: string,
     ctx?: CarrierCallContext
   ): Promise<CarrierTrackingResponse> {
-    const json = await this.post('aramex.track', ctx, '/Tracking/V1.0/json/TrackShipments', {
-      ClientInfo: buildClientInfo(credentials),
-      Transaction: { Reference1: `track-${trackingNumber}` },
-      Shipments: [trackingNumber],
-      GetLastTrackingUpdateOnly: false,
-    });
-    const err = notificationError(json);
-    if (err) throw new CarrierError('CARRIER_REJECTED', `Aramex tracking error: ${err}`);
-
-    const trackingResult = json.TrackingResults?.[0];
-    if (!trackingResult) {
+    const response = await this.call(
+      'Tracking',
+      'TrackShipments',
+      'ShipmentTrackingRequest',
+      'ShipmentTrackingResponse',
+      clientInfo(credentials) +
+        transaction(`track-${trackingNumber}`) +
+        el('Shipments', `<arr:string>${xmlEscape(trackingNumber)}</arr:string>`) +
+        '<GetLastTrackingUpdateOnly>false</GetLastTrackingUpdateOnly>',
+      ctx,
+      credentials
+    );
+    const missing = kids(kid(response, 'NonExistingWaybills'), 'string').map(s => val(s));
+    if (missing.includes(trackingNumber)) {
       throw new CarrierError(
         'CARRIER_REJECTED',
-        'Aramex trackShipment: no tracking result in response'
+        'Aramex does not know this waybill (unknown waybill)'
       );
     }
-    const updates: any[] = trackingResult.Value ?? [];
+    // the dictionary type name carries a generated suffix in the WSDL: match by prefix
+    const pool = (kid(response, 'TrackingResults')?.children ?? []).filter(c =>
+      c.name.startsWith('KeyValueOfstringArrayOfTrackingResult')
+    );
+    const entry = pool.find(e => val(e, 'Key') === trackingNumber) ?? pool[0];
+    const results = kids(kid(entry, 'Value'), 'TrackingResult');
 
-    // Oldest first, whatever order Aramex returns them in; the current status is the newest.
-    const history: TrackingHistoryEntry[] = updates
-      .map((u: any) => ({
-        status: mapAramexStatus(u.UpdateCode),
-        timestamp: u.UpdateDateTime ? new Date(u.UpdateDateTime) : new Date(),
-        location: u.UpdateLocation ?? undefined,
-        description: u.UpdateDescription ?? undefined,
+    const raw = results
+      .map(r => ({
+        code: val(r, 'UpdateCode'),
+        description: val(r, 'UpdateDescription'),
+        timestamp: parseAramexDate(val(r, 'UpdateDateTime')),
+        location: val(r, 'UpdateLocation') || undefined,
       }))
       .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-    const current = history.length ? history[history.length - 1].status : 'created';
-    return { status: current, statusHistory: history, estimatedDelivery: undefined };
+    // oldest first; an event Aramex gives us nothing usable for keeps the last known status
+    let last: ShipmentStatus = 'created';
+    const history: TrackingHistoryEntry[] = raw.map(e => {
+      last = mapAramexStatus(e.code, e.description, last);
+      return {
+        status: last,
+        timestamp: e.timestamp,
+        location: e.location,
+        description: e.description || undefined,
+      };
+    });
+    return {
+      status: history.length ? history[history.length - 1].status : 'created',
+      statusHistory: history,
+      estimatedDelivery: undefined,
+    };
   }
 
   async cancelShipment(
-    credentials: AramexCredentials,
-    carrierShipmentId: string,
-    ctx?: CarrierCallContext
+    _credentials: AramexCredentials,
+    _carrierShipmentId: string,
+    _ctx?: CarrierCallContext
   ): Promise<CarrierCancelResult> {
-    // UNVERIFIED: whether Shipping Services v1 has a shipment-cancel call at all (pickup cancel
-    // is documented). A refusal is reported as `failed`, never silently as cancelled.
-    let json: Body;
-    try {
-      json = await this.post('aramex.cancel', ctx, '/Shipping/V1.0/json/CancelShipments', {
-        ClientInfo: buildClientInfo(credentials),
-        Transaction: { Reference1: `cancel-${carrierShipmentId}` },
-        Shipments: [carrierShipmentId],
-      });
-    } catch (e) {
-      if (e instanceof CarrierError && e.code === 'CARRIER_REJECTED') {
-        return { status: 'not_cancellable', message: e.message };
-      }
-      throw e;
-    }
-    const err = notificationError(json);
-    if (err) {
-      logger.error({ carrier: 'aramex', carrierShipmentId }, 'Aramex cancelShipment failed');
-      return {
-        status: /pick|transit|deliver/i.test(err) ? 'not_cancellable' : 'failed',
-        message: err,
-      };
-    }
-    return { status: 'cancelled' };
+    // None of the four WSDLs has a cancel-shipment operation (only CancelPickup by pickup GUID,
+    // and HoldShipments). No network call: never report a cancel Aramex did not perform.
+    return {
+      status: 'not_cancellable',
+      message:
+        'Aramex has no cancel API for shipments: ask Aramex support to cancel it (or cancel in your Aramex portal), then use force-cancel here',
+    };
   }
 
-  processWebhook(body: unknown, _headers: Record<string, string>): CarrierWebhookResult | null {
-    if (!body || typeof body !== 'object') return null;
-
-    const payload = body as Record<string, any>;
-
-    // Aramex push notification payload shape:
-    // { ShipmentNumber, WaybillNumber, UpdateCode, UpdateDescription, UpdateDateTime, UpdateLocation }
-    const trackingNumber =
-      payload.WaybillNumber ?? payload.ShipmentNumber ?? payload.waybill_number;
-    const updateCode = payload.UpdateCode ?? payload.update_code;
-
-    if (!trackingNumber || !updateCode) {
-      logger.warn({ payload }, 'Aramex webhook missing WaybillNumber or UpdateCode');
-      return null;
-    }
-
-    return {
-      trackingNumber: String(trackingNumber),
-      status: mapAramexStatus(String(updateCode)),
-      timestamp: payload.UpdateDateTime ? new Date(payload.UpdateDateTime) : new Date(),
-      location: payload.UpdateLocation ?? undefined,
-      description: payload.UpdateDescription ?? undefined,
-    };
+  processWebhook(_body: unknown, _headers: Record<string, string>): CarrierWebhookResult | null {
+    return null; // no push/subscription operation exists in the Aramex WSDLs
   }
 
   async testConnection(
     credentials: AramexCredentials,
     ctx?: CarrierCallContext
-  ): Promise<{ success: boolean; error?: string }> {
-    // TrackShipments with a known non-existent waybill: Aramex answers with notifications, and
-    // anything but an auth-related code means the credentials were accepted.
+  ): Promise<CarrierTestResult> {
     try {
-      const json = await this.post('aramex.test', ctx, '/Tracking/V1.0/json/TrackShipments', {
-        ClientInfo: buildClientInfo(credentials),
-        Transaction: { Reference1: 'connection-test' },
-        Shipments: ['TEST000000000'],
-        GetLastTrackingUpdateOnly: true,
-      });
-      const hasAuthError = (json.Notifications ?? []).some(
-        (n: any) => n.Code === '1' || n.Code === '2' // auth-related error codes
+      // Location/FetchCountries: a read-only lookup. OBSERVED 2026-10-07 against the live host with a
+      // fake account: it DOES authenticate ClientInfo (HTTP 200, HasErrors=true, ERR75 "Failed to
+      // login"), so garbage credentials cannot pass it (tests/unit/aramex-observed-auth-failure.test.ts).
+      const response = await this.call(
+        'Location',
+        'FetchCountries',
+        'CountriesFetchingRequest',
+        'CountriesFetchingResponse',
+        clientInfo(credentials) + transaction('connection-test'),
+        ctx,
+        credentials
       );
-      if (hasAuthError) return { success: false, error: json.Notifications[0].Message };
+      void response;
       return { success: true };
     } catch (err) {
-      const message = (err as Error).message;
+      if (err instanceof CarrierError) {
+        if (err.code === 'CARRIER_MISCONFIGURED') {
+          return {
+            success: false,
+            code: 'bad_credentials',
+            error: 'Aramex refused the credentials',
+          };
+        }
+        if (err.code === 'CARRIER_UNAVAILABLE') {
+          return { success: false, code: 'unreachable', error: scrub(err.message, credentials) };
+        }
+        return { success: false, code: 'unknown', error: scrub(err.message, credentials) };
+      }
       logger.error({ carrier: 'aramex' }, 'Aramex testConnection error');
-      return { success: false, error: message };
+      return { success: false, code: 'unknown', error: 'Aramex test failed' };
     }
   }
+}
+
+/**
+ * UNVERIFIED: Aramex answers xs:dateTime, often without a zone. A zone-less value is read as UTC
+ * (deterministic, independent of the server's TZ); it may be Cairo local time, i.e. 2-3 h off.
+ */
+function parseAramexDate(s: string): Date {
+  if (!s) return new Date();
+  const iso = /(Z|[+-]\d{2}:?\d{2})$/.test(s) ? s : `${s}Z`;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? new Date() : d;
 }
 
 export const aramexCarrier = new AramexCarrier();
