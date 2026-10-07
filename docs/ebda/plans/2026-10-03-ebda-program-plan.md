@@ -139,7 +139,7 @@ Briefs in `docs/research/`, sources cited, decision-ready:
 
 ### SP9 — Marketing site, docs, help, status
 
-- `ebda.app`: nav Features · Solutions · Pricing · Resources · Log in · **Start selling**; hero **"ابدأ بيع أونلاين."** / "Your business, your store, everything in one place."; sections in order: create your store → how EBDA works → store builder → products & inventory → orders → payments → WhatsApp integration → analytics → pricing → customer stories → FAQ → login. Arabic-first. Trust surface: real `/legal`, `/privacy`, `/terms` URLs, `security.txt`, JSON-LD, og:image, `llms.txt`.
+- (Superseded for the home page copy, nav and section order by Ruling R-EBDA-COPY-1, 2026-10-07; see `domains-and-marketing-site.md`.) `ebda.app`: nav Features · Solutions · Pricing · Resources · Log in · **Start selling**; hero **"ابدأ بيع أونلاين."** / "Your business, your store, everything in one place."; sections in order: create your store → how EBDA works → store builder → products & inventory → orders → payments → WhatsApp integration → analytics → pricing → customer stories → FAQ → login. Arabic-first. Trust surface: real `/legal`, `/privacy`, `/terms` URLs, `security.txt`, JSON-LD, og:image, `llms.txt`.
 - `docs.ebda.app` (API + developer docs), `help.ebda.app` (MDX help centre).
 - `status.ebda.app`: its own Worker + storage, fed by external probes, independent of the API.
   **Done when:** all four build and pass Lighthouse/a11y gates; the status page shows an incident when a probe is forced to fail (tested).

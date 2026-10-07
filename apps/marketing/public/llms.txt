@@ -1,11 +1,11 @@
 # Ebda (ابدأ)
 
-> Ebda is a self-serve online store builder for sellers in Egypt, built by Whisky 11. Arabic-first (RTL) with English. Merchants sign up, build and run their own store; every store gets a free <slug>.ebda.app address and can attach a custom domain.
+> Ebda is a self-serve online store builder for sellers in Egypt, built by Whisky 11 (https://whisky11.com). Arabic-first (RTL) with English. Merchants sign up, build and run their own store; every store gets a free <slug>.ebda.app address and can attach a custom domain.
 
 Status: pre-launch. Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; 25% off annual; 14-day Growth trial; no free plan; no commission on orders. Payment methods beyond cash on delivery, and shipping-carrier integrations, are marked "coming" on the site.
 
 ## Pages
-- [Home (Arabic)](https://ebda.app/): product overview, how it works, payments, WhatsApp, pricing, FAQ
+- [Home (Arabic, Egyptian colloquial)](https://ebda.app/): how it works, features, payments and shipping, pricing, FAQ
 - [Home (English)](https://ebda.app/en/): the same in English
 - [Legal](https://ebda.app/legal/): company and legal notice (draft)
 - [Privacy](https://ebda.app/privacy/): privacy policy (draft)

@@ -11,9 +11,13 @@ const pages = [
   '/legal/',
   '/privacy/',
   '/terms/',
+  '/merchant-agreement/',
+  '/acceptable-use/',
   '/en/legal/',
   '/en/privacy/',
   '/en/terms/',
+  '/en/merchant-agreement/',
+  '/en/acceptable-use/',
 ];
 
 await runA11y({
