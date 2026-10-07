@@ -23,6 +23,8 @@ export interface UploadOptions {
    * shape is preserved so platform assets aren't accidentally tenant-scoped.
    */
   storeId?: string | null;
+  /** Defaults to a 1-year public cache; private evidence passes `private, no-store`. */
+  cacheControl?: string;
 }
 
 export interface UploadResult {
@@ -64,6 +66,10 @@ const ALLOWED_TENANT_FOLDERS = new Set<string>([
   // Per-store PWA icon set (source upload + generated sizes), B5:
   // stores/<storeId>/pwa/... — see PWAService.generatePwaIconSet.
   'pwa',
+  // Merchant VAT registration evidence (tax card / VAT certificate), ruling
+  // TAX-4: the URL is never sent to a browser; the API streams the bytes to
+  // the store's admins and super-admins only (StorageService.getObject).
+  'tax-documents',
 ]);
 
 /**
@@ -126,6 +132,7 @@ export class StorageService {
       maxSize = DEFAULT_MAX_SIZE,
       allowedTypes = DEFAULT_ALLOWED_TYPES,
       storeId,
+      cacheControl = 'public, max-age=31536000', // 1 year cache
     } = options;
 
     // Determine content type
@@ -167,7 +174,7 @@ export class StorageService {
         Key: key,
         Body: buffer,
         ContentType: mimeType,
-        CacheControl: 'public, max-age=31536000', // 1 year cache
+        CacheControl: cacheControl,
       })
     );
 
@@ -326,6 +333,22 @@ export class StorageService {
   static async deleteByPrefix(prefix: string): Promise<number> {
     const { deleted } = await this.deleteByPrefixVerified(prefix);
     return deleted;
+  }
+
+  /**
+   * Read an object's bytes server-side (for files whose URL must never reach a
+   * browser, e.g. tax documents). The caller authorises the request first.
+   */
+  static async getObject(key: string): Promise<{ body: Buffer; contentType: string | null }> {
+    const client = await this.getClient();
+    const out = await client.send(
+      new (await loadS3()).GetObjectCommand({ Bucket: config.storageBucket, Key: key })
+    );
+    if (!out.Body) throw new AppError(404, 'NOT_FOUND', 'File not found');
+    const bytes = await (
+      out.Body as { transformToByteArray: () => Promise<Uint8Array> }
+    ).transformToByteArray();
+    return { body: Buffer.from(bytes), contentType: out.ContentType ?? null };
   }
 
   /**

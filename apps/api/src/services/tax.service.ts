@@ -3,6 +3,8 @@ import { AppError } from '../middleware/error-handler';
 import { bustStoreCachesById } from './store.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
+import { TAX_NOT_VERIFIED_CODE } from '@force/shared';
+import { TaxProfileService } from './tax-profile.service';
 
 /**
  * Issue 2212: `taxRatePercent` (and taxEnabled/taxIncludedInPrice) ride the
@@ -69,6 +71,19 @@ export class TaxService {
    * Update store tax settings
    */
   static async updateSettings(storeId: string, settings: TaxSettingsPatch) {
+    // THE WRITE GATE (ruling TAX-2): VAT may be switched ON only for a store
+    // whose VAT registration a super-admin has verified. Switching it OFF, and
+    // the inclusive/exclusive preference, are always allowed. The resolver
+    // (lib/order-tax.ts) is the authoritative gate; this one stops the switch
+    // from claiming something the charge will not do.
+    if (settings.taxEnabled === true && !(await TaxProfileService.isVerified(storeId))) {
+      throw new AppError(
+        409,
+        TAX_NOT_VERIFIED_CODE,
+        'VAT can be enabled only after your VAT registration is verified. Upload your tax card and tax registration number on the Tax page. / لا يمكن تفعيل ضريبة القيمة المضافة إلا بعد توثيق تسجيلك الضريبي. ارفع البطاقة الضريبية ورقم التسجيل الضريبي من صفحة الضرائب.',
+        { verificationPath: `/stores/${storeId}/tax#vat-registration` }
+      );
+    }
     const store = await prisma.store.update({
       where: { id: storeId },
       data: {

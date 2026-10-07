@@ -431,9 +431,9 @@ export class StoreService {
     // store's own scope (store_subscriptions is under strict RLS).
     //
     // Default VAT (Ebda: 14%, `REGION.defaultVatBps`) is seeded in the same
-    // scope as an ACTIVE rate row so the merchant's tax page shows it and only
-    // has to flip `taxEnabled` once VAT-registered (the charge is gated on
-    // `Store.taxEnabled`, ruling TAX-1); it is editable per store like any other.
+    // scope as an INACTIVE rate row (ruling TAX-2): a new store starts with VAT
+    // OFF and no active rate. The merchant activates it after a super-admin
+    // verifies its VAT registration; the charge is gated on that verification.
     await withStore(store.id, async tx => {
       await syncSubscriptionFromLegacyPlan(tx, store.id, store.plan);
       await tx.taxRate.create({
@@ -442,7 +442,7 @@ export class StoreService {
           name: 'VAT',
           nameAr: 'ضريبة القيمة المضافة',
           rate: REGION.defaultVatBps / 100,
-          isActive: true,
+          isActive: false,
         },
       });
     });

@@ -21,6 +21,7 @@ import paymentSettingsRoutes from './payment-settings.routes';
 import uploadRoutes from './upload.routes';
 import adminRoutes from './admin.routes';
 import adminAnswerEngineRoutes from './admin-answer-engine.routes';
+import platformTaxRoutes from './platform-tax.routes';
 import couponRoutes from './coupon.routes';
 import shippingRoutes from './shipping.routes';
 import taxRoutes from './tax.routes';
@@ -149,6 +150,11 @@ router.use('/uploads', uploadRoutes);
 // chain per route (matching feature.routes.ts / insights.routes.ts), so MFA
 // enforcement is self-contained here regardless of mount order.
 router.use('/admin', tenantContext, adminAnswerEngineRoutes);
+
+// Super-admin VAT review queue + Ebda's own VAT setting (ruling TAX-2/TAX-6).
+// Mounted BEFORE adminRoutes for reachability past its catch-all MFA gate; it
+// carries its own authenticate → requireMfaEnrolled → authorize('super_admin').
+router.use('/admin', platformTaxRoutes);
 
 // Admin routes (super_admin only).
 //

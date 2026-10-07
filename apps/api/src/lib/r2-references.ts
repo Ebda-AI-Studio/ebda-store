@@ -357,6 +357,14 @@ export const R2_REFERENCE_COLUMNS: readonly R2ReferenceColumn[] = [
     why: 'receipt photo uploaded to R2 (expenses.routes)',
   },
   {
+    model: 'StoreTaxDocument',
+    field: 'fileUrl',
+    table: 'store_tax_documents',
+    column: 'file_url',
+    kind: 'url',
+    why: 'VAT registration evidence (tax card / certificate) uploaded to R2 (tax.routes, ruling TAX-4)',
+  },
+  {
     model: 'StockAdjustment',
     field: 'evidenceUrl',
     table: 'stock_adjustments',

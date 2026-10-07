@@ -87,13 +87,14 @@ describe('provisioning time zone', () => {
     expect(createdData().settings).toMatchObject({ currency: 'AED' });
   });
 
-  it('defaults an Ebda store to EGP + Arabic and seeds the 14% default VAT rate (inactive charge until taxEnabled)', async () => {
+  it('defaults an Ebda store to EGP + Arabic and seeds the 14% default VAT rate INACTIVE (VAT off until verified, ruling TAX-2)', async () => {
     await ProvisioningService.provisionStore({ ...base });
     expect(createdData().settings).toMatchObject({ currency: 'EGP', defaultLanguage: 'ar' });
-    // `taxEnabled` is not set here: the charge stays off until the merchant is VAT-registered.
+    // `taxEnabled` is not set and the seeded rate is INACTIVE: a new store starts
+    // with VAT OFF and no active rate (ruling TAX-2).
     expect(createdData()).not.toHaveProperty('taxEnabled');
     expect(taxRateCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({ storeId: 's1', name: 'VAT', rate: 14, isActive: true }),
+      data: expect.objectContaining({ storeId: 's1', name: 'VAT', rate: 14, isActive: false }),
     });
   });
 
