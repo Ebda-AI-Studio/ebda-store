@@ -372,7 +372,7 @@ router.put('/visibility', async (req: Request, res: Response, next: NextFunction
       });
     } else {
       wishlist = await prisma.wishlist.update({
-        where: { id: wishlist.id },
+        where: { id: wishlist.id, storeId },
         data: { isPublic },
       });
     }

@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import {
   prisma,
   Prisma,
+  currentStoreId,
   hasTenantContext,
   runInTenantContext,
   withStore,
@@ -1652,7 +1653,10 @@ export class AuthService {
     // themselves (`users` is RLS-scoped to app.current_user_id).
     const user =
       (hasTenantContext()
-        ? await prisma.user.findUnique({ where: { id: userId }, select: eraseUserSelect })
+        ? await prisma.user.findUnique({
+            where: { id: userId, storeId: currentStoreId() },
+            select: eraseUserSelect,
+          })
         : null) ??
       (await withUser(userId, tx =>
         tx.user.findUnique({ where: { id: userId }, select: eraseUserSelect })
@@ -1707,13 +1711,16 @@ export class AuthService {
     const outcome: EraseOutcome = { crmChecked: false, crmRowsScrubbed: 0, crmAmbiguous: false };
 
     const anonymize = async (tx: Prisma.TransactionClient) => {
+      // The ambient store of this erasure: the shopper's own store (self-service,
+      // retention cron) or the merchant route's store (== user.storeId, checked above).
+      const eraseStoreId = user.storeId ?? currentStoreId();
       // Orders: preserve for tax records (Egypt MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before
       // the user row is deactivated. Address JSON snapshots get scrubbed
       // because they duplicate the now-deleted addresses table data.
       await tx.order.updateMany({
-        where: { customerId: userId },
+        where: { customerId: userId, storeId: eraseStoreId },
         data: {
           customerId: null,
           shippingAddress: anonymizedAddressJson,
@@ -1726,7 +1733,7 @@ export class AuthService {
       // but drop the author link. SetNull happens via FK on user-delete,
       // but we don't delete the user row; null explicitly.
       await tx.review.updateMany({
-        where: { customerId: userId },
+        where: { customerId: userId, storeId: eraseStoreId },
         data: { customerId: null },
       });
 
@@ -1744,15 +1751,19 @@ export class AuthService {
       // moved off).
       await deleteUserAddresses(userId);
 
-      await tx.abandonedCart.deleteMany({ where: { customerId: userId } });
-      await tx.cart.deleteMany({ where: { customerId: userId } });
-      await tx.wishlist.deleteMany({ where: { userId } });
-      await tx.pushSubscription.deleteMany({ where: { customerId: userId } });
+      await tx.abandonedCart.deleteMany({ where: { customerId: userId, storeId: eraseStoreId } });
+      await tx.cart.deleteMany({ where: { customerId: userId, storeId: eraseStoreId } });
+      await tx.wishlist.deleteMany({ where: { userId, storeId: eraseStoreId } });
+      await tx.pushSubscription.deleteMany({
+        where: { customerId: userId, storeId: eraseStoreId },
+      });
       await tx.oneSignalSubscription.deleteMany({ where: { userId } });
       await tx.refreshToken.deleteMany({ where: { userId } });
       await tx.verificationToken.deleteMany({ where: { userId } });
-      await tx.loyaltyTransaction.deleteMany({ where: { customerId: userId } });
-      await tx.loyaltyPoints.deleteMany({ where: { customerId: userId } });
+      await tx.loyaltyTransaction.deleteMany({
+        where: { customerId: userId, storeId: eraseStoreId },
+      });
+      await tx.loyaltyPoints.deleteMany({ where: { customerId: userId, storeId: eraseStoreId } });
 
       // Customer wallet (D1, Ruling W-4). Unlike loyalty, the wallet ledger is
       // a FINANCIAL record of money the merchant owed and paid out, so it is
@@ -1866,7 +1877,7 @@ export class AuthService {
           // phone-matched and an email-matched row are both erased.
           for (const id of crmIds) {
             await tx.customer.update({
-              where: { id },
+              where: { id, storeId: user.storeId },
               data: {
                 email: `erased-${id}@anonymized.local`,
                 firstName: 'Erased',
@@ -1910,7 +1921,7 @@ export class AuthService {
         });
         for (const r of inWindow) {
           await tx.campaignRecipient.update({
-            where: { id: r.id },
+            where: { id: r.id, storeId: user.storeId },
             data: {
               email: `erased-${r.id}@anonymized.local`,
               subscriberId: null,
@@ -1949,7 +1960,7 @@ export class AuthService {
       }
       await tx.smsMarketingConsent.deleteMany({
         where: {
-          ...(opts.scopeStoreId !== undefined ? { storeId: opts.scopeStoreId } : {}),
+          storeId: opts.scopeStoreId ?? eraseStoreId,
           OR: smsConsentOr,
         },
       });
@@ -1968,7 +1979,7 @@ export class AuthService {
       // that could write a name/phone straight back onto this row. Atomic with
       // the erase, so a rolled-back erase does not revoke anything.
       const erased = await tx.user.update({
-        where: { id: userId },
+        where: { id: userId, ...(user.storeId ? { storeId: user.storeId } : {}) },
         data: {
           email: anonymizedEmail,
           firstName: 'Erased',
@@ -2115,6 +2126,9 @@ export class AuthService {
     userId: string,
     user: { id: string; storeId: string | null } & Record<string, unknown>
   ) {
+    // The ambient store of this export: the shopper's own store, or the
+    // merchant route's store.
+    const storeId = user.storeId ?? currentStoreId();
     const [
       addresses,
       orders,
@@ -2138,22 +2152,22 @@ export class AuthService {
       // connection carries no atomicity or independent-commit hazard.
       withUser(userId, tx => tx.address.findMany({ where: { userId } })),
       prisma.order.findMany({
-        where: { customerId: userId },
+        where: { customerId: userId, storeId },
         include: { items: true, payments: true },
       }),
-      prisma.abandonedCart.findMany({ where: { customerId: userId } }),
-      prisma.wishlist.findMany({ where: { userId } }),
-      prisma.review.findMany({ where: { customerId: userId } }),
-      prisma.return.findMany({ where: { customerId: userId } }),
-      prisma.loyaltyPoints.findMany({ where: { customerId: userId } }),
-      prisma.loyaltyTransaction.findMany({ where: { customerId: userId } }),
+      prisma.abandonedCart.findMany({ where: { customerId: userId, storeId } }),
+      prisma.wishlist.findMany({ where: { userId, storeId } }),
+      prisma.review.findMany({ where: { customerId: userId, storeId } }),
+      prisma.return.findMany({ where: { customerId: userId, storeId } }),
+      prisma.loyaltyPoints.findMany({ where: { customerId: userId, storeId } }),
+      prisma.loyaltyTransaction.findMany({ where: { customerId: userId, storeId } }),
       // Customer wallet (D1): balance + full ledger — the customer's own money.
       prisma.customerWallet.findMany({
-        where: { customerId: userId },
+        where: { customerId: userId, storeId },
         select: { id: true, storeId: true, balance: true, createdAt: true, updatedAt: true },
       }),
       prisma.walletTransaction.findMany({
-        where: { customerId: userId },
+        where: { customerId: userId, storeId },
         orderBy: { createdAt: 'asc' },
         select: {
           id: true,
@@ -2168,7 +2182,7 @@ export class AuthService {
         },
       }),
       prisma.pushSubscription.findMany({
-        where: { customerId: userId },
+        where: { customerId: userId, storeId },
         select: { id: true, endpoint: true, createdAt: true },
       }),
       prisma.oneSignalSubscription.findMany({
@@ -2178,7 +2192,7 @@ export class AuthService {
       // SMS-marketing consent (issue 206): what was given, when, where, and
       // any withdrawal. Keyed by the user id (the shopper's own rows).
       prisma.smsMarketingConsent.findMany({
-        where: { OR: [{ userId }, { customerKey: userId }] },
+        where: { storeId, OR: [{ userId }, { customerKey: userId }] },
         select: {
           storeId: true,
           phone: true,

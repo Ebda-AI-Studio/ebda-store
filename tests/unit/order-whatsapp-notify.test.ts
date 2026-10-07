@@ -106,7 +106,7 @@ const ACTIVE_STORE = {
   name: 'Test Store',
   wbsEnabled: true,
   wbsClientId: CLIENT_ID,
-  wbsApiKey: 'encrypted-key',
+  credentials: { wbsApiKey: 'encrypted-key' },
   wbsTemplates: {
     orderPaid: { name: 'order_confirmation', languageCode: 'en' },
     orderShipped: { name: 'shipping_update', languageCode: 'en' },
@@ -176,7 +176,7 @@ describe('orderWhatsAppNotify', () => {
     mockPrismaStore.findUnique.mockResolvedValue({
       ...ACTIVE_STORE,
       wbsClientId: null,
-      wbsApiKey: null,
+      credentials: null,
     });
     const result = await runHandler('order/created', ORDER_ID, STORE_ID);
     expect(result).toMatchObject({ skipped: 'wbs-not-configured' });

@@ -18,6 +18,8 @@ import {
   storeIdModels,
   TENANT_CHILD_MODELS,
   IDENTITY_MODELS,
+  USER_KEYED_MODELS,
+  GLOBAL_MODELS,
   TenantScopeViolation,
 } from '../../packages/database/src/tenant-guard';
 
@@ -99,6 +101,39 @@ describe('tenant guard model coverage (schema.prisma vs the guard)', () => {
   for (const model of TENANT_CHILD_MODELS) {
     it(`${model} (child): refused with no ambient store`, () => {
       expect(() => assertTenantScoped(model, 'findMany', {}, {})).toThrow(TenantScopeViolation);
+    });
+  }
+
+  it('EVERY model is in exactly one class (a new model fails here until it is classified)', () => {
+    const tenant = new Set(declared);
+    const classes: Record<string, string[]> = {};
+    for (const m of models) {
+      const c = [
+        tenant.has(m.name) ? 'tenant(storeId)' : null,
+        m.name === 'Store' ? 'store' : null,
+        TENANT_CHILD_MODELS.includes(m.name) ? 'child' : null,
+        m.name in USER_KEYED_MODELS ? 'user-keyed' : null,
+        GLOBAL_MODELS.includes(m.name) ? 'global' : null,
+      ].filter((x): x is string => x !== null);
+      classes[m.name] = c;
+    }
+    const unclassified = Object.entries(classes).filter(([, c]) => c.length !== 1);
+    expect(unclassified, JSON.stringify(unclassified)).toEqual([]);
+  });
+
+  for (const model of Object.keys(USER_KEYED_MODELS)) {
+    it(`${model} (user-keyed): refused without the ambient user as its key`, () => {
+      const key = USER_KEYED_MODELS[model];
+      const U = '33333333-3333-4333-8333-333333333333';
+      expect(() => assertTenantScoped(model, 'findMany', { where: { [key]: U } }, {})).toThrow(
+        TenantScopeViolation
+      );
+      expect(() =>
+        assertTenantScoped(model, 'findMany', { where: { [key]: 'other' } }, { userId: U })
+      ).toThrow(TenantScopeViolation);
+      expect(() =>
+        assertTenantScoped(model, 'findMany', { where: { [key]: U } }, { userId: U })
+      ).not.toThrow();
     });
   }
 });

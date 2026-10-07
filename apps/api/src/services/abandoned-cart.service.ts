@@ -10,7 +10,14 @@
  *     └─ processReminders()       — send scheduled reminder steps
  */
 
-import { prisma, acrossStores, acrossStoresFlat, runInStoreScope } from '@force/database';
+import {
+  prisma,
+  acrossStores,
+  acrossStoresFlat,
+  runInStoreScope,
+  storeDirectory,
+  withStore,
+} from '@force/database';
 import { storefrontOrigin } from '@force/shared';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { redis } from './redis.service';
@@ -393,20 +400,34 @@ class AbandonedCartService {
       return;
     }
 
-    // Load store WBS config for eligible stores
-    const stores = await prisma.store.findMany({
-      where: {
-        id: { in: eligibleStoreIds },
-        wbsEnabled: true,
-        wbsApiKey: { not: null },
-      },
-      select: {
-        id: true,
-        name: true,
-        wbsApiKey: true,
-        wbsTemplates: true,
-      },
-    });
+    // Load store WBS config for eligible stores. The directory picks the
+    // wbsEnabled + eligible stores; each store's config + credential is then
+    // read inside its own store scope.
+    const eligible = new Set(eligibleStoreIds);
+    const directory = await storeDirectory(s => s.wbsEnabled && eligible.has(s.id));
+    const loaded = await Promise.all(
+      directory.map(d =>
+        withStore(d.id, tx =>
+          tx.store.findUnique({
+            where: { id: d.id },
+            select: {
+              id: true,
+              name: true,
+              wbsTemplates: true,
+              credentials: { select: { wbsApiKey: true } },
+            },
+          })
+        )
+      )
+    );
+    const stores = loaded
+      .filter((s): s is NonNullable<typeof s> => s !== null && s.credentials?.wbsApiKey != null)
+      .map(s => ({
+        id: s.id,
+        name: s.name,
+        wbsApiKey: s.credentials!.wbsApiKey,
+        wbsTemplates: s.wbsTemplates,
+      }));
 
     logger.info(
       { correlationId, storeCount: stores.length },

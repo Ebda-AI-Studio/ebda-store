@@ -70,7 +70,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
     const claim = await step.run('claim-order-created', () =>
       runInTenantContext(storeId, () =>
         prisma.order.updateMany({
-          where: { id: orderId, orderCreatedNotifiedAt: null },
+          where: { id: orderId, storeId, orderCreatedNotifiedAt: null },
           data: { orderCreatedNotifiedAt: new Date() },
         })
       )
@@ -90,7 +90,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
     const order = await step.run('load-order', async () =>
       runInTenantContext(storeId, async () => {
         const row = await prisma.order.findUnique({
-          where: { id: orderId },
+          where: { id: orderId, storeId },
           include: {
             customer: true,
             // Pull the live product's Arabic name so the Arabic confirmation

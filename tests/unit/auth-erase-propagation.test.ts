@@ -112,6 +112,7 @@ vi.mock('@force/database', () => ({
   // tenant-transaction branch is covered against a real DB + RLS in
   // tests/integration/customer-privacy-cross-tenant.test.ts.
   hasTenantContext: () => false,
+  currentStoreId: () => 'store-1',
   // Delegates to the mocked $transaction, invoking the callback with the
   // same mock prisma object (tx.* === prisma.* here, which is fine — the
   // real distinction only matters for RLS/isolation, not this test).
@@ -207,7 +208,7 @@ describe('AuthService.eraseAccount — third-party propagation', () => {
 
     // The primary anonymization transaction still ran to completion.
     expect(mockPrisma.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: CUSTOMER.id } })
+      expect.objectContaining({ where: { id: CUSTOMER.id, storeId: CUSTOMER.storeId } })
     );
   });
 
@@ -330,7 +331,7 @@ describe('AuthService.eraseAccount — the CRM scrub refuses an ambiguous identi
     await AuthService.eraseAccount(CUSTOMER.id);
 
     expect(mockPrisma.customer.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'crm-only' } })
+      expect.objectContaining({ where: { id: 'crm-only', storeId: CUSTOMER.storeId } })
     );
     expect(mockPrisma.customerAddress.deleteMany).toHaveBeenCalledWith({
       where: { customerId: { in: ['crm-only'] } },
@@ -369,7 +370,7 @@ describe('AuthService.eraseAccount — revokes live access tokens (#1871)', () =
 
     expect(mockPrisma.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: CUSTOMER.id },
+        where: { id: CUSTOMER.id, storeId: CUSTOMER.storeId },
         data: expect.objectContaining({ tokenVersion: { increment: 1 } }),
       })
     );

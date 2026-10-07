@@ -259,7 +259,7 @@ export async function orderSearchWhere(
 
   const [customers, guestOrderIds] = await Promise.all([
     prisma.user.findMany({
-      where: { OR: customerMatch, orders: { some: { storeId } } },
+      where: { storeId, OR: customerMatch, orders: { some: { storeId } } },
       select: { id: true },
       take: ORDER_SEARCH_CUSTOMER_ID_CAP + 1,
     }),
@@ -1183,7 +1183,7 @@ export class OrderService {
               )?.allowBackorder
             : (
                 await tx.product.findUnique({
-                  where: { id: productId },
+                  where: { id: productId, storeId },
                   select: { allowBackorder: true },
                 })
               )?.allowBackorder;
@@ -1355,6 +1355,7 @@ export class OrderService {
         const reserve = await tx.coupon.updateMany({
           where: {
             id: appliedCoupon.id,
+            storeId,
             isActive: true,
             ...(appliedCoupon.usageLimit ? { usageCount: { lt: appliedCoupon.usageLimit } } : {}),
           },
@@ -1605,7 +1606,7 @@ export class OrderService {
         });
         if (abandonedCart) {
           await tx.abandonedCart.update({
-            where: { id: abandonedCart.id },
+            where: { id: abandonedCart.id, storeId },
             data: {
               status: 'recovered',
               recoveredAt: new Date(),
@@ -1752,7 +1753,7 @@ export class OrderService {
       //    that was never debited while leaving the variant permanently short.
       for (const item of order.items) {
         const product = await tx.product.findUnique({
-          where: { id: item.productId },
+          where: { id: item.productId, storeId },
           select: { trackInventory: true, inventory: true },
         });
         if (!product?.trackInventory) continue;
@@ -1767,7 +1768,7 @@ export class OrderService {
           previousStock = restored.inventory - item.quantity;
         } else {
           await tx.product.update({
-            where: { id: item.productId },
+            where: { id: item.productId, storeId },
             data: { inventory: { increment: item.quantity } },
           });
           previousStock = product.inventory;
@@ -1909,7 +1910,7 @@ export class OrderService {
       // inventable on a loop, firing organically on every legitimate failed
       // payment-create.
       await tx.order.update({
-        where: { id: order.id },
+        where: { id: order.id, storeId },
         data: {
           status: 'cancelled',
           refundReversedAt: new Date(),
@@ -2738,6 +2739,7 @@ export class OrderService {
         const reserve = await tx.coupon.updateMany({
           where: {
             id: appliedCoupon.id,
+            storeId,
             isActive: true,
             ...(!overrideCoupon && appliedCoupon.usageLimit
               ? { usageCount: { lt: appliedCoupon.usageLimit } }

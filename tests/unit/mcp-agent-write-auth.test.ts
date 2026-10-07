@@ -25,7 +25,7 @@ const mockStoreFindUnique = vi.fn();
 const mockIsFeatureEnabled = vi.fn();
 
 vi.mock('@force/database', () => ({
-  prisma: { store: { findUnique: (...a: unknown[]) => mockStoreFindUnique(...a) } },
+  prisma: { storeCredential: { findUnique: (...a: unknown[]) => mockStoreFindUnique(...a) } },
   runInTenantContext: vi.fn((_storeId: string, fn: () => unknown) => fn()),
 }));
 
@@ -246,7 +246,7 @@ describe('resolveAgentAuth — never rejects, tenant-pinned', () => {
     const auth = await resolveAgentAuth(req({ [AGENT_KEY_HEADER]: 'fak_store-b-key' }), storeA);
     expect(auth.scopes).toEqual([]);
     expect(mockStoreFindUnique).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'store-a' } })
+      expect.objectContaining({ where: { storeId: 'store-a' } })
     );
   });
 

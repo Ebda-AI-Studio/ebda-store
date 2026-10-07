@@ -255,7 +255,7 @@ export async function processExpenseReceipt(
   // ── 8. Attach OCR metadata ────────────────────────────────────────────────
   try {
     await prisma.expense.update({
-      where: { id: exp.id },
+      where: { id: exp.id, storeId },
       data: {
         ocrJson: parsed as any,
         categoryAiConfidence: parsed.confidence ?? null,

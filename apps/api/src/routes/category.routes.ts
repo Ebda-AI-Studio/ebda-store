@@ -482,7 +482,7 @@ router.put(
       // (not a nested `prisma.$transaction`) lets both the update and the
       // capture ride that ambient tx — atomic, and RLS-enforced.
       const category = await prisma.category.update({
-        where: { id: categoryId },
+        where: { id: categoryId, storeId },
         data: {
           name: data.name,
           nameAr: data.nameAr,
@@ -587,7 +587,7 @@ router.delete(
 
       // Soft delete
       await prisma.category.update({
-        where: { id: categoryId },
+        where: { id: categoryId, storeId },
         data: { deletedAt: new Date() },
       });
 

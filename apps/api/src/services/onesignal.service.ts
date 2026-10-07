@@ -13,7 +13,8 @@
  * at consent time so `broadcastToStore` can target only that tenant.
  */
 
-import { prisma, Prisma } from '@force/database';
+import { withStore, withUser } from '@force/database';
+import { adminPushPlayerIds } from '../lib/definer';
 import { config } from '../config';
 import logger from '../lib/logger';
 
@@ -924,30 +925,19 @@ export class OneSignalService {
     role: 'super_admin' | 'store_admin';
     ownsStoreId?: string;
   }): Promise<string[]> {
-    // `stores` is the User → Store[] back-relation in schema.prisma —
-    // the inverse of `Store.ownerId`. store_admins are scoped to the
-    // stores they own; super_admins are unscoped (they manage the
-    // platform across tenants).
-    const userWhere: Prisma.UserWhereInput = {
-      role: criteria.role,
-      deletedAt: null,
-    };
-    if (criteria.role === 'store_admin' && criteria.ownsStoreId) {
-      userWhere.stores = { some: { id: criteria.ownsStoreId } };
+    // The audience is users OUTSIDE the store scope the notification runs in (the
+    // owner's and the super_admins' rows have store_id NULL) and their device rows
+    // are user-keyed, so neither `users` nor `onesignal_subscriptions` can be read
+    // here under strict RLS + the tenant guard. The `ebda_admin_push_player_ids`
+    // definer returns device ids only; a store_admin audience is answered only for
+    // the store the transaction is scoped to, hence `withStore` (it reuses the
+    // caller's transaction when it is already that store's).
+    if (criteria.role === 'store_admin') {
+      if (!criteria.ownsStoreId) return [];
+      const storeId = criteria.ownsStoreId;
+      return withStore(storeId, () => adminPushPlayerIds('store_admin', storeId));
     }
-
-    const users = await prisma.user.findMany({
-      where: userWhere,
-      select: { id: true },
-    });
-    const userIds = users.map(u => u.id);
-    if (userIds.length === 0) return [];
-
-    const subs = await prisma.oneSignalSubscription.findMany({
-      where: { userId: { in: userIds } },
-      select: { playerId: true },
-    });
-    return Array.from(new Set(subs.map(s => s.playerId).filter(Boolean)));
+    return adminPushPlayerIds('super_admin', null);
   }
 
   /**
@@ -961,27 +951,32 @@ export class OneSignalService {
     playerId: string,
     deviceLabel?: string
   ): Promise<void> {
-    await prisma.oneSignalSubscription.upsert({
-      where: { userId_playerId: { userId, playerId } },
-      create: { userId, playerId, deviceLabel },
-      update: { deviceLabel },
-    });
+    // User-keyed rows (RLS on app.current_user_id): written AS the user.
+    await withUser(userId, tx =>
+      tx.oneSignalSubscription.upsert({
+        where: { userId_playerId: { userId, playerId } },
+        create: { userId, playerId, deviceLabel },
+        update: { deviceLabel },
+      })
+    );
   }
 
   static async listSubscriptions(userId: string) {
-    return prisma.oneSignalSubscription.findMany({
-      where: { userId },
-      orderBy: { updatedAt: 'desc' },
-    });
+    return withUser(userId, tx =>
+      tx.oneSignalSubscription.findMany({
+        where: { userId },
+        orderBy: { updatedAt: 'desc' },
+      })
+    );
   }
 
   static async deleteSubscription(userId: string, playerId: string): Promise<void> {
-    await prisma.oneSignalSubscription
-      .delete({ where: { userId_playerId: { userId, playerId } } })
-      .catch(err => {
-        // not-found is fine — the user may have already removed it elsewhere
-        if (err?.code !== 'P2025') throw err;
-      });
+    await withUser(userId, tx =>
+      tx.oneSignalSubscription.delete({ where: { userId_playerId: { userId, playerId } } })
+    ).catch(err => {
+      // not-found is fine — the user may have already removed it elsewhere
+      if (err?.code !== 'P2025') throw err;
+    });
   }
 
   /**

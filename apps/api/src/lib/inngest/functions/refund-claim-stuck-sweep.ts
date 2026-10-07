@@ -111,7 +111,7 @@ export async function handleStuckRefundClaimSweep(step: SweepStep): Promise<{ st
     // paging inside its own tenant scope. A cursor id only exists in one store,
     // so cursors never cross stores.
     await acrossStores(
-      async () => {
+      async storeId => {
         let cursorId: string | null = null;
         let storeWindowExhausted = false;
         for (let page = 0; page < CLAIM_MAX_PAGES && claims.length < CLAIM_SCAN_LIMIT; page++) {
@@ -129,6 +129,7 @@ export async function handleStuckRefundClaimSweep(step: SweepStep): Promise<{ st
             occurredAt: Date;
           }> = await prisma.paymentEvent.findMany({
             where: {
+              storeId,
               eventType: REFUND_CLAIM_EVENT,
               occurredAt: { gt: floor, lt: new Date(cutoff) },
             },
@@ -157,7 +158,11 @@ export async function handleStuckRefundClaimSweep(step: SweepStep): Promise<{ st
           for (;;) {
             const resolutionRows: Array<{ id: string; details: unknown }> =
               await prisma.paymentEvent.findMany({
-                where: { eventType: { in: RESOLVING_EVENTS }, paymentId: { in: paymentIds } },
+                where: {
+                  storeId,
+                  eventType: { in: RESOLVING_EVENTS },
+                  paymentId: { in: paymentIds },
+                },
                 select: { id: true, details: true },
                 orderBy: { id: 'asc' },
                 take: RESOLUTION_PAGE_SIZE,

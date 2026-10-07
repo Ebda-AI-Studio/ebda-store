@@ -103,7 +103,7 @@ export const productMetaSync = async ({
       let productPayload: Record<string, unknown> | null = null;
       if (action === 'upsert') {
         const product = await prisma.product.findUnique({
-          where: { id: productId },
+          where: { id: productId, storeId },
           select: {
             id: true,
             name: true,

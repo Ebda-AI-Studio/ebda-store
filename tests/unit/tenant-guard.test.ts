@@ -331,3 +331,40 @@ describe('raw SQL (R-EBDA-004)', () => {
     expect(() => assertRawScoped('$queryRaw', { weird: true }, none)).toThrow(/unreadable/);
   });
 });
+
+describe('user-keyed models (RefreshToken, VerificationToken, OneSignalSubscription, Address)', () => {
+  const me: AmbientScope = { userId: U };
+  it('where and create must key on the ambient user', () => {
+    ok('RefreshToken', 'updateMany', { where: { userId: U, revokedAt: null }, data: {} }, me);
+    ok('RefreshToken', 'create', { data: { userId: U, tokenHash: 'h' } }, me);
+    ok('Address', 'create', { data: { user: { connect: { id: U } } } }, me);
+    ok(
+      'OneSignalSubscription',
+      'upsert',
+      {
+        where: { userId_playerId: { userId: U, playerId: 'p' } },
+        create: { userId: U },
+        update: {},
+      },
+      me
+    );
+    refused('RefreshToken', 'findUnique', { where: { tokenHash: 'h' } }, me, /ambient user/);
+    refused(
+      'RefreshToken',
+      'findUnique',
+      { where: { tokenHash: 'h' } },
+      none,
+      /needs an ambient user/
+    );
+    refused('VerificationToken', 'create', { data: { userId: 'other' } }, me);
+    refused('Address', 'findMany', { where: { userId: U } }, inA, /needs an ambient user/);
+  });
+  it("the platform operator may act on any user's rows", () => {
+    ok(
+      'RefreshToken',
+      'deleteMany',
+      { where: { userId: 'someone' } },
+      { userId: U, hatch: 'platform-operator' }
+    );
+  });
+});

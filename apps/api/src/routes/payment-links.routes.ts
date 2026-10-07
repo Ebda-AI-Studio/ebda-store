@@ -125,7 +125,7 @@ router.post(
           slug: true,
           currency: true,
           wbsEnabled: true,
-          wbsApiKey: true,
+          credentials: { select: { wbsApiKey: true } },
         },
       });
       if (!store) {
@@ -135,7 +135,7 @@ router.post(
         });
         return;
       }
-      if (!store.wbsEnabled || !store.wbsApiKey) {
+      if (!store.wbsEnabled || !store.credentials?.wbsApiKey) {
         res.status(400).json({
           success: false,
           error: {
@@ -384,7 +384,7 @@ router.post(
       // ── Send via WBS paymentLink template ──────────────────────────────────
       let wbsApiKey: string;
       try {
-        wbsApiKey = encryption.decrypt(store.wbsApiKey);
+        wbsApiKey = encryption.decrypt(store.credentials.wbsApiKey);
       } catch {
         // Clean up the draft order before failing
         await prisma.order.delete({ where: { id: draftOrderId } }).catch(() => {});

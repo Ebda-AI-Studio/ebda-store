@@ -35,9 +35,10 @@ export const instapayExpiry: InngestFunction.Any = inngest.createFunction(
     const now = new Date();
     const due = await step.run('find-due', () =>
       sweepAcrossStores({
-        fetch: () =>
+        fetch: storeId =>
           prisma.order.findMany({
             where: {
+              storeId,
               status: AWAITING_PAYMENT_CONFIRMATION,
               deletedAt: null,
               paymentConfirmationExpiresAt: { lte: now },

@@ -379,7 +379,7 @@ export async function runAutoMatch(
         const confidence = computeConfidence(btx.amountFils, exactAmt);
 
         await tx.bankTransaction.update({
-          where: { id: btx.id },
+          where: { id: btx.id, storeId },
           data: {
             matchStatus: 'auto_matched',
             matchedJournalEntryId: candidate.entryId,
@@ -410,7 +410,7 @@ export async function runAutoMatch(
       matchedTotal === totalTx ? 'reconciled' : matchedTotal > 0 ? 'reconciling' : 'pending';
 
     await tx.bankStatement.update({
-      where: { id: statementId },
+      where: { id: statementId, storeId },
       data: { status: newStatus },
     });
   });
@@ -452,7 +452,7 @@ export async function applyManualMatch(input: ManualMatchInput): Promise<BankTra
   return withStore(storeId, async tx => {
     // Verify the bank transaction belongs to this store
     const btx = await tx.bankTransaction.findUnique({
-      where: { id: transactionId },
+      where: { id: transactionId, storeId },
       select: { id: true, storeId: true, statementId: true },
     });
 
@@ -462,7 +462,7 @@ export async function applyManualMatch(input: ManualMatchInput): Promise<BankTra
 
     if (action === 'unmatch') {
       const updated = await tx.bankTransaction.update({
-        where: { id: transactionId },
+        where: { id: transactionId, storeId },
         data: { matchStatus: 'unmatched', matchedJournalEntryId: null, confidence: 0 },
       });
       await refreshStatementStatus(tx, btx.statementId, storeId);
@@ -471,7 +471,7 @@ export async function applyManualMatch(input: ManualMatchInput): Promise<BankTra
 
     if (action === 'ignore') {
       const updated = await tx.bankTransaction.update({
-        where: { id: transactionId },
+        where: { id: transactionId, storeId },
         data: { matchStatus: 'ignored', matchedJournalEntryId: null, confidence: 0 },
       });
       await refreshStatementStatus(tx, btx.statementId, storeId);
@@ -508,7 +508,7 @@ export async function applyManualMatch(input: ManualMatchInput): Promise<BankTra
     }
 
     const updated = await tx.bankTransaction.update({
-      where: { id: transactionId },
+      where: { id: transactionId, storeId },
       data: {
         matchStatus: 'manual_matched',
         matchedJournalEntryId: journalEntryId,
@@ -542,7 +542,7 @@ async function refreshStatementStatus(
         : 'pending';
 
   await tx.bankStatement.update({
-    where: { id: statementId },
+    where: { id: statementId, storeId },
     data: { status: newStatus },
   });
 }

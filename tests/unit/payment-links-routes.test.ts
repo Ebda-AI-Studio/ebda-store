@@ -77,7 +77,7 @@ const STORE = {
   slug: 'shop',
   currency: 'EGP',
   wbsEnabled: true,
-  wbsApiKey: 'enc-key',
+  credentials: { wbsApiKey: 'enc-key' },
 };
 const PRODUCT = {
   id: PRODUCT_ID,
@@ -194,7 +194,7 @@ describe('POST /stores/:id/payment-links', () => {
   });
 
   it('WBS_NOT_CONFIGURED when the store has no WBS key', async () => {
-    mockPrisma.store.findUnique.mockResolvedValue({ ...STORE, wbsApiKey: null });
+    mockPrisma.store.findUnique.mockResolvedValue({ ...STORE, credentials: null });
     expectEnvelope(await request(app).post(URL).send(BODY), 400, 'WBS_NOT_CONFIGURED');
   });
 

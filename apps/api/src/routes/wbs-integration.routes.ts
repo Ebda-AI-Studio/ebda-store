@@ -156,7 +156,6 @@ router.get(
           name: true,
           wbsEnabled: true,
           wbsClientId: true,
-          wbsApiKey: true,
           wbsTemplates: true,
           wbsTemplateUseLogoHeader: true,
           waCustomerOrderingEnabled: true,
@@ -167,7 +166,8 @@ router.get(
           botServiceMenu: true,
           metaCatalogId: true,
           metaBusinessId: true,
-          metaAccessToken: true, // only used to derive hasToken — never returned plain
+          // wbsApiKey / metaAccessToken: only used to derive hasApiKey / hasToken — never returned plain
+          credentials: { select: { wbsApiKey: true, metaAccessToken: true } },
         },
       });
 
@@ -198,9 +198,9 @@ router.get(
       // must NOT show green "Connected".
       let wbsLiveVerified = false;
 
-      if (store.wbsApiKey) {
+      if (store.credentials?.wbsApiKey) {
         try {
-          const plaintextKey = encryption.decrypt(store.wbsApiKey);
+          const plaintextKey = encryption.decrypt(store.credentials.wbsApiKey);
           const metadata = await wbsBridgeService.fetchMetadata(plaintextKey);
           connectedTenant = {
             businessName: metadata.businessName,
@@ -267,8 +267,8 @@ router.get(
           wbsEnabled: store.wbsEnabled,
           wbsClientId: store.wbsClientId,
           // Never return the raw/decrypted key — return masked version only
-          wbsApiKeyMasked: maskApiKey(store.wbsApiKey),
-          hasApiKey: Boolean(store.wbsApiKey),
+          wbsApiKeyMasked: maskApiKey(store.credentials?.wbsApiKey ?? null),
+          hasApiKey: Boolean(store.credentials?.wbsApiKey),
           wbsTemplates: store.wbsTemplates,
           wbsTemplateUseLogoHeader: store.wbsTemplateUseLogoHeader,
           waCustomerOrderingEnabled: store.waCustomerOrderingEnabled,
@@ -279,7 +279,7 @@ router.get(
           botServiceMenu: store.botServiceMenu ?? null,
           metaCatalogId: store.metaCatalogId ?? null,
           metaBusinessId: store.metaBusinessId ?? null,
-          hasMetaToken: Boolean(store.metaAccessToken),
+          hasMetaToken: Boolean(store.credentials?.metaAccessToken),
           // wbsLiveVerified: true ONLY when fetchMetadata() succeeded this request.
           // connectedTenant may be non-null even when false (local-template fallback).
           // The settings card MUST use this field — not connectedTenant — to determine
@@ -338,7 +338,7 @@ router.put(
       // Load current store to check key state
       const currentStore = await prisma.store.findUnique({
         where: { id: storeId },
-        select: { wbsApiKey: true, wbsEnabled: true },
+        select: { credentials: { select: { wbsApiKey: true } }, wbsEnabled: true },
       });
 
       if (!currentStore) {
@@ -347,7 +347,7 @@ router.put(
       }
 
       // Rule: cannot enable when no key is set
-      if (input.wbsEnabled === true && !currentStore.wbsApiKey && !isNewApiKey) {
+      if (input.wbsEnabled === true && !currentStore.credentials?.wbsApiKey && !isNewApiKey) {
         res.status(400).json({
           success: false,
           error: {
@@ -392,6 +392,8 @@ router.put(
       // ── Build update data ───────────────────────────────────────────────────
 
       const updateData: Record<string, unknown> = {};
+      // Encrypted credentials live in StoreCredential (nested upsert below).
+      const credentialData: { wbsApiKey?: string | null; metaAccessToken?: string | null } = {};
 
       if (input.wbsEnabled !== undefined) {
         updateData.wbsEnabled = input.wbsEnabled;
@@ -438,16 +440,16 @@ router.put(
       }
       if (input.metaAccessToken !== undefined) {
         // null = clear token; any other value = encrypt and store
-        updateData.metaAccessToken =
+        credentialData.metaAccessToken =
           input.metaAccessToken === null ? null : encryption.encrypt(input.metaAccessToken);
       }
 
       // API key handling
       if (isNewApiKey && input.wbsApiKey) {
-        updateData.wbsApiKey = encryption.encrypt(input.wbsApiKey);
+        credentialData.wbsApiKey = encryption.encrypt(input.wbsApiKey);
         logger.info({ storeId }, '[WBS-INTEGRATION] API key updated');
       } else if (isClearApiKey) {
-        updateData.wbsApiKey = null;
+        credentialData.wbsApiKey = null;
         updateData.wbsClientId = null;
         updateData.wbsEnabled = false;
         logger.info({ storeId }, '[WBS-INTEGRATION] API key cleared — integration disabled');
@@ -467,6 +469,12 @@ router.put(
             })
           : null;
 
+      if (Object.keys(credentialData).length > 0) {
+        updateData.credentials = {
+          upsert: { create: credentialData, update: credentialData },
+        };
+      }
+
       const updated = await prisma.store.update({
         where: { id: storeId },
         data: updateData,
@@ -477,7 +485,6 @@ router.put(
           logo: true,
           wbsEnabled: true,
           wbsClientId: true,
-          wbsApiKey: true,
           wbsTemplates: true,
           wbsTemplateUseLogoHeader: true,
           waCustomerOrderingEnabled: true,
@@ -487,7 +494,7 @@ router.put(
           botServiceMenu: true,
           metaCatalogId: true,
           metaBusinessId: true,
-          metaAccessToken: true, // used to derive hasMetaToken only
+          credentials: { select: { wbsApiKey: true, metaAccessToken: true } }, // wbsApiKey: masked/sync only; token: hasMetaToken only
         },
       });
 
@@ -518,10 +525,11 @@ router.put(
       // Non-blocking: any error here MUST NOT fail the save — the FWB Store
       // record is the source of truth; WBS sync is best-effort and can be
       // retried by the next save. Log the error for observability.
-      if (input.waCustomerOrderingEnabled !== undefined && updated.wbsApiKey) {
+      const updatedWbsApiKey = updated.credentials?.wbsApiKey;
+      if (input.waCustomerOrderingEnabled !== undefined && updatedWbsApiKey) {
         (async () => {
           try {
-            const plaintextKey = encryption.decrypt(updated.wbsApiKey!);
+            const plaintextKey = encryption.decrypt(updatedWbsApiKey);
             await wbsBridgeService.syncWaOrdering(plaintextKey, updated.waCustomerOrderingEnabled);
             logger.info(
               { storeId, waCustomerOrderingEnabled: updated.waCustomerOrderingEnabled },
@@ -686,8 +694,8 @@ router.put(
         data: {
           wbsEnabled: updated.wbsEnabled,
           wbsClientId: updated.wbsClientId,
-          wbsApiKeyMasked: maskApiKey(updated.wbsApiKey),
-          hasApiKey: Boolean(updated.wbsApiKey),
+          wbsApiKeyMasked: maskApiKey(updated.credentials?.wbsApiKey ?? null),
+          hasApiKey: Boolean(updated.credentials?.wbsApiKey),
           wbsTemplates: updated.wbsTemplates,
           waCustomerOrderingEnabled: updated.waCustomerOrderingEnabled,
           botCopy: updated.botCopy ?? null,
@@ -696,7 +704,7 @@ router.put(
           botServiceMenu: updated.botServiceMenu ?? null,
           metaCatalogId: updated.metaCatalogId ?? null,
           metaBusinessId: updated.metaBusinessId ?? null,
-          hasMetaToken: Boolean(updated.metaAccessToken),
+          hasMetaToken: Boolean(updated.credentials?.metaAccessToken),
           // Phase 7 atomic: surface what happened to the auto-generated
           // templates so the UI can show "Connected + 12 templates pending"
           ...(templatesAutoSeeded !== undefined && {
@@ -808,14 +816,19 @@ router.post(
         data: {
           metaCatalogId: result.catalogId,
           metaBusinessId: result.businessId,
-          metaAccessToken: encryption.encrypt(result.accessToken),
+          credentials: {
+            upsert: {
+              create: { metaAccessToken: encryption.encrypt(result.accessToken) },
+              update: { metaAccessToken: encryption.encrypt(result.accessToken) },
+            },
+          },
         },
         select: {
           slug: true,
           name: true,
           metaCatalogId: true,
           metaBusinessId: true,
-          metaAccessToken: true,
+          credentials: { select: { metaAccessToken: true } },
         },
       });
 
@@ -850,7 +863,7 @@ router.post(
         data: {
           metaCatalogId: updated.metaCatalogId,
           metaBusinessId: updated.metaBusinessId,
-          hasMetaToken: Boolean(updated.metaAccessToken),
+          hasMetaToken: Boolean(updated.credentials?.metaAccessToken),
         },
       });
     } catch (err) {

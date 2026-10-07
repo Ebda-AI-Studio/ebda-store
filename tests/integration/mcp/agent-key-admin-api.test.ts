@@ -171,13 +171,17 @@ describe('agent key admin API — the merchant lifecycle', () => {
     expect(mintBody.data.rotated).toBe(false);
 
     // The stored value is the ciphertext, not the key.
-    const row = await prisma.store.findUnique({
+    const row = await prisma.storeCredential.findUnique({
+      where: { storeId },
+      select: { agentApiKey: true },
+    });
+    const stamp = await prisma.store.findUnique({
       where: { id: storeId },
-      select: { agentApiKey: true, agentApiKeyRotatedAt: true },
+      select: { agentApiKeyRotatedAt: true },
     });
     expect(row?.agentApiKey).toBeTruthy();
     expect(row?.agentApiKey).not.toBe(key);
-    expect(row?.agentApiKeyRotatedAt).toBeInstanceOf(Date);
+    expect(stamp?.agentApiKeyRotatedAt).toBeInstanceOf(Date);
 
     // And no read after the mint can produce it.
     const status = await fetch(keyEndpoint(), { headers: auth() });
@@ -220,9 +224,10 @@ describe('agent key admin API — the merchant lifecycle', () => {
     // GET /admin/stores/:id ran a bare findUnique + include and shipped every
     // ciphertext column to the admin client (Ruling M5 residual). Set all
     // three so the leak is possible, then read every wide store endpoint.
-    await prisma.store.update({
-      where: { id: storeId },
-      data: { wbsApiKey: 'ciphertext-wbs', metaAccessToken: 'ciphertext-meta' },
+    await prisma.storeCredential.upsert({
+      where: { storeId },
+      create: { storeId, wbsApiKey: 'ciphertext-wbs', metaAccessToken: 'ciphertext-meta' },
+      update: { wbsApiKey: 'ciphertext-wbs', metaAccessToken: 'ciphertext-meta' },
     });
     for (const path of [`/admin/stores/${storeId}`, `/stores/${storeId}`, '/stores']) {
       const res = await fetch(`${API}${path}`, { headers: auth() });
@@ -232,9 +237,10 @@ describe('agent key admin API — the merchant lifecycle', () => {
         expect(raw, `${path} must not return ${field}`).not.toContain(field);
       }
     }
-    await prisma.store.update({
-      where: { id: storeId },
-      data: { wbsApiKey: null, metaAccessToken: null },
+    await prisma.storeCredential.upsert({
+      where: { storeId },
+      create: { storeId, wbsApiKey: null, metaAccessToken: null },
+      update: { wbsApiKey: null, metaAccessToken: null },
     });
   });
 
@@ -242,9 +248,10 @@ describe('agent key admin API — the merchant lifecycle', () => {
     // The PUT writers (theme/branding/social/contact/announcement/...) return
     // the raw `prisma.store.update` row, which store.routes.ts serialises
     // verbatim. Only the global omit keeps the ciphertexts out of it.
-    await prisma.store.update({
-      where: { id: storeId },
-      data: { wbsApiKey: 'ciphertext-wbs', metaAccessToken: 'ciphertext-meta' },
+    await prisma.storeCredential.upsert({
+      where: { storeId },
+      create: { storeId, wbsApiKey: 'ciphertext-wbs', metaAccessToken: 'ciphertext-meta' },
+      update: { wbsApiKey: 'ciphertext-wbs', metaAccessToken: 'ciphertext-meta' },
     });
     const minted = await fetch(keyEndpoint(), { method: 'POST', headers: auth() });
     expect(minted.status).toBe(201);
@@ -263,9 +270,10 @@ describe('agent key admin API — the merchant lifecycle', () => {
     }
 
     await fetch(keyEndpoint(), { method: 'DELETE', headers: auth() });
-    await prisma.store.update({
-      where: { id: storeId },
-      data: { wbsApiKey: null, metaAccessToken: null },
+    await prisma.storeCredential.upsert({
+      where: { storeId },
+      create: { storeId, wbsApiKey: null, metaAccessToken: null },
+      update: { wbsApiKey: null, metaAccessToken: null },
     });
   });
 
@@ -275,16 +283,18 @@ describe('agent key admin API — the merchant lifecycle', () => {
     // (abandoned-cart, order-whatsapp-notify, wa-bridge-auth) that would turn
     // into SILENT no-ops if it did not. Pin the positive read-back for all
     // three, not just agentApiKey.
-    await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        wbsApiKey: 'ciphertext-wbs',
-        metaAccessToken: 'ciphertext-meta',
-        agentApiKey: 'ciphertext-agent',
-      },
+    const creds = {
+      wbsApiKey: 'ciphertext-wbs',
+      metaAccessToken: 'ciphertext-meta',
+      agentApiKey: 'ciphertext-agent',
+    };
+    await prisma.storeCredential.upsert({
+      where: { storeId },
+      create: { storeId, ...creds },
+      update: creds,
     });
-    const row = await prisma.store.findUnique({
-      where: { id: storeId },
+    const row = await prisma.storeCredential.findUnique({
+      where: { storeId },
       select: { wbsApiKey: true, metaAccessToken: true, agentApiKey: true },
     });
     expect(row).toEqual({
@@ -293,14 +303,15 @@ describe('agent key admin API — the merchant lifecycle', () => {
       agentApiKey: 'ciphertext-agent',
     });
     // Negative control: without the select the same row carries none of them.
-    const bare = await prisma.store.findUnique({ where: { id: storeId } });
+    const bare = await prisma.storeCredential.findUnique({ where: { storeId } });
     expect(bare).not.toHaveProperty('wbsApiKey');
     expect(bare).not.toHaveProperty('metaAccessToken');
     expect(bare).not.toHaveProperty('agentApiKey');
 
-    await prisma.store.update({
-      where: { id: storeId },
-      data: { wbsApiKey: null, metaAccessToken: null, agentApiKey: null },
+    await prisma.storeCredential.upsert({
+      where: { storeId },
+      create: { storeId, wbsApiKey: null, metaAccessToken: null, agentApiKey: null },
+      update: { wbsApiKey: null, metaAccessToken: null, agentApiKey: null },
     });
   });
 
@@ -316,8 +327,8 @@ describe('agent key admin API — the merchant lifecycle', () => {
     expect((await revoked.json()).data.hasKey).toBe(false);
 
     // The column is actually cleared — not merely re-stamped.
-    const row = await prisma.store.findUnique({
-      where: { id: storeId },
+    const row = await prisma.storeCredential.findUnique({
+      where: { storeId },
       select: { agentApiKey: true },
     });
     expect(row?.agentApiKey).toBeNull();

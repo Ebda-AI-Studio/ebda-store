@@ -99,9 +99,10 @@ export async function handleRefundReversalStuckSweep(
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
   const stuck: StuckReversal[] = await step.run('find-stuck-reversals', async () =>
     sweepAcrossStores({
-      fetch: () =>
+      fetch: storeId =>
         prisma.order.findMany({
           where: {
+            storeId,
             refundReversedAt: null,
             // Window: reversal is overdue, but NOT older than the recency floor —
             // so the historical back-catalog is never re-fired.
@@ -230,9 +231,10 @@ export async function handlePartialReturnReversalSweep(
 
   const stuck: StuckPartialReturn[] = await step.run('find-stuck-partial-returns', async () =>
     sweepAcrossStores({
-      fetch: () =>
+      fetch: storeId =>
         prisma.return.findMany({
           where: {
+            storeId,
             reversalAppliedAt: null,
             // NO recency floor (PR 2279 audit): the column is new and NULL for
             // every historical return, so there is no back-catalog to protect,

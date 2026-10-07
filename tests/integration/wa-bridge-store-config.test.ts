@@ -19,7 +19,7 @@ const mockStore = {
   },
   metaCatalogId: 'cat-123',
   metaBusinessId: 'biz-123',
-  metaAccessToken: 'encrypted-token-xyz',
+  credentials: { metaAccessToken: 'encrypted-token-xyz' },
 };
 
 vi.mock('@force/database', () => ({
@@ -141,7 +141,12 @@ describe('POST /wa-bridge/store/meta-catalog-config', () => {
     expect(prisma.store.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          metaAccessToken: 'enc:my-token',
+          credentials: {
+            upsert: {
+              create: { metaAccessToken: 'enc:my-token' },
+              update: { metaAccessToken: 'enc:my-token' },
+            },
+          },
         }),
       })
     );

@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import {
+  currentStoreId,
   prisma,
   Prisma,
   withMoneyTx,
@@ -93,16 +94,16 @@ async function onClient<T>(
 
 /**
  * Prisma `where` for "this user is a customer of this store". Customer
- * accounts are store-scoped (`users.store_id`); a legacy customer row created
- * before that scoping has `store_id` NULL, and counts as the store's customer
- * only if it has actually ordered there. Never matches an admin/staff row, and
- * never matches another store's shopper.
+ * accounts are store-scoped (`users.store_id`). Never matches an admin/staff
+ * row, and never matches another store's shopper.
  */
 export function storeCustomerWhere(storeId: string, customerId: string): Prisma.UserWhereInput {
   return {
     id: customerId,
     role: 'customer',
-    OR: [{ storeId }, { storeId: null, orders: { some: { storeId } } }],
+    // Top-level `storeId` (the tenant guard refuses an `OR`). A legacy customer row with
+    // `store_id` NULL is invisible from any store scope under RLS, so it never matched here.
+    storeId,
   };
 }
 
@@ -233,7 +234,7 @@ export class WalletService {
         select: ENTRY_SELECT,
       });
       await c.customerWallet.update({
-        where: { id: wallet.id },
+        where: { id: wallet.id, storeId },
         data: { balance: newBalance },
       });
 
@@ -525,7 +526,7 @@ export class WalletService {
     client: WalletClient,
     scope: { storeId: string | null; actorId: string }
   ): Promise<void> {
-    const storeFilter = scope.storeId ? { storeId: scope.storeId } : {};
+    const storeFilter = { storeId: scope.storeId ?? currentStoreId() };
     const run = async () => {
       // Which stores' ledgers this run is about to scrub (PR 2279 audit): a
       // store whose balance was 0 still has merchant-authored notes nulled,
@@ -563,7 +564,7 @@ export class WalletService {
         // key and fail the whole erasure. A plain re-run finds balance 0 and
         // never reaches here.
         const latest = await client.walletTransaction.findFirst({
-          where: { walletId: w.id },
+          where: { storeId: w.storeId, walletId: w.id },
           orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           select: { id: true },
         });

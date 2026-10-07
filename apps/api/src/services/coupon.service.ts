@@ -261,9 +261,9 @@ export class CouponService {
     return updatedCoupon;
   }
 
-  static async incrementUsage(couponId: string) {
+  static async incrementUsage(storeId: string, couponId: string) {
     await prisma.coupon.update({
-      where: { id: couponId },
+      where: { id: couponId, storeId },
       data: { usageCount: { increment: 1 } },
     });
   }

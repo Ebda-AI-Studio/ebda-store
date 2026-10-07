@@ -81,9 +81,10 @@ export async function handleOrderStatusFanoutStuckSweep(
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
   const stuck: StuckTransition[] = await step.run('find-stuck-status-fanouts', async () =>
     sweepAcrossStores({
-      fetch: () =>
+      fetch: storeId =>
         prisma.order.findMany({
           where: {
+            storeId,
             statusFanoutClaimedAt: null,
             statusFanoutRequestedAt: { lt: cutoff, gt: floorCutoff },
             status: { in: [...FANOUT_STATUSES] },
@@ -151,6 +152,7 @@ export async function handleOrderStatusFanoutStuckSweep(
             tx.order.updateMany({
               where: {
                 id: o.id,
+                storeId: o.storeId,
                 statusFanoutClaimedAt: null,
                 statusFanoutRequestedAt: o.statusFanoutRequestedAt,
               },
@@ -248,9 +250,10 @@ async function reportFailedAfterClaim(
 ): Promise<number> {
   const failed = await step.run('find-failed-after-claim', () =>
     sweepAcrossStores({
-      fetch: () =>
+      fetch: storeId =>
         prisma.order.findMany({
           where: {
+            storeId,
             statusFanoutClaimedAt: { lt: cutoff, gt: floorCutoff },
             statusFanoutCompletedAt: null,
             statusFanoutRequestedStatus: { not: null },

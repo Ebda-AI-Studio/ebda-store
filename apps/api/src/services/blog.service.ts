@@ -191,7 +191,7 @@ export class BlogService {
     // nested `prisma.$transaction`) lets both the update and the capture ride
     // that ambient tx — atomic, and RLS-enforced.
     const updated = await prisma.blogPost.update({
-      where: { id: postId },
+      where: { id: postId, storeId },
       data: updateData,
     });
 
@@ -214,7 +214,7 @@ export class BlogService {
 
   static async remove(storeId: string, postId: string) {
     const existing = await this.getById(storeId, postId);
-    await prisma.blogPost.delete({ where: { id: postId } });
+    await prisma.blogPost.delete({ where: { id: postId, storeId } });
     if (existing.coverImage) {
       void deleteR2ObjectIfOrphan(existing.coverImage).catch(err =>
         logger.warn({ err, storeId, postId }, '[blog.remove] r2 cleanup failed')

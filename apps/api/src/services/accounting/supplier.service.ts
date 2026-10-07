@@ -79,7 +79,7 @@ export async function updateSupplier(
   });
   if (!owned) throw new Error(`Supplier ${id} not found in store ${storeId}`);
   return prisma.supplier.update({
-    where: { id },
+    where: { id, storeId },
     data: {
       ...patch,
       address: patch.address ? (patch.address as Prisma.InputJsonValue) : undefined,
@@ -111,5 +111,8 @@ export async function softDeleteSupplier(storeId: string, id: string): Promise<v
     select: { id: true },
   });
   if (!owned) throw new Error(`Supplier ${id} not found in store ${storeId}`);
-  await prisma.supplier.update({ where: { id }, data: { deletedAt: new Date(), isActive: false } });
+  await prisma.supplier.update({
+    where: { id, storeId },
+    data: { deletedAt: new Date(), isActive: false },
+  });
 }

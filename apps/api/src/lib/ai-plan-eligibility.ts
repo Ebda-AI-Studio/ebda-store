@@ -19,15 +19,6 @@ import type { StorePlan } from '@force/shared';
 /** Plans excluded from AI spend. Keep in sync with PLAN_BASELINE.free. */
 const AI_INELIGIBLE_PLANS: readonly StorePlan[] = ['free'] as const;
 
-/**
- * Prisma `where` fragment for the scan crons enumerating eligible stores.
- * Deliberately not `as const`: Prisma's generated `notIn` wants a mutable
- * array, and a readonly one fails to typecheck against `StoreWhereInput`.
- */
-export const aiEligiblePlanFilter: { plan: { notIn: StorePlan[] } } = {
-  plan: { notIn: [...AI_INELIGIBLE_PLANS] },
-};
-
 /** True when a store's plan may consume AI budget. */
 export function isAiEligiblePlan(plan: StorePlan): boolean {
   return !AI_INELIGIBLE_PLANS.includes(plan);

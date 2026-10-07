@@ -218,8 +218,8 @@ export async function resolveAgentAuth(req: Request, store: McpStore): Promise<A
   const presented = (req.header(AGENT_KEY_HEADER) ?? '').toString().trim();
   if (presented) {
     try {
-      const row = await prisma.store.findUnique({
-        where: { id: store.id },
+      const row = await prisma.storeCredential.findUnique({
+        where: { storeId: store.id },
         select: { agentApiKey: true },
       });
       if (!row?.agentApiKey) {

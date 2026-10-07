@@ -41,7 +41,7 @@ router.get(
       // Fetch the store's WBS API key
       const store = await prisma.store.findUnique({
         where: { id: storeId },
-        select: { wbsApiKey: true, wbsEnabled: true },
+        select: { credentials: { select: { wbsApiKey: true } }, wbsEnabled: true },
       });
 
       if (!store) {
@@ -49,7 +49,7 @@ router.get(
         return;
       }
 
-      if (!store.wbsEnabled || !store.wbsApiKey) {
+      if (!store.wbsEnabled || !store.credentials?.wbsApiKey) {
         res.status(400).json({
           success: false,
           error: { code: 'WBS_NOT_CONNECTED' },
@@ -61,7 +61,7 @@ router.get(
       // Decrypt the API key before forwarding
       let apiKey: string;
       try {
-        apiKey = encryption.decrypt(store.wbsApiKey);
+        apiKey = encryption.decrypt(store.credentials.wbsApiKey);
       } catch {
         res.status(500).json({
           success: false,

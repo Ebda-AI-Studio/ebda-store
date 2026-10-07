@@ -123,10 +123,14 @@ export const paymentWebhookProcess: InngestFunction.Any = inngest.createFunction
         }> => {
           // Re-check idempotency by the route's contract: if there is already an
           // order marked processed for this idempotency key, skip re-applying.
-          const existing = await prisma.order.findUnique({
-            where: { idempotencyKey: row.idempotencyKey },
-            select: { id: true, webhookProcessedAt: true },
-          });
+          // Order is a tenant model: with no store scope (no storeId on the
+          // inbox row) there is nothing to look up and nothing to mark.
+          const existing = storeId
+            ? await prisma.order.findUnique({
+                where: { idempotencyKey: row.idempotencyKey, storeId },
+                select: { id: true, webhookProcessedAt: true },
+              })
+            : null;
           // Idempotency layer 2 (pure decision in shouldApplyWebhookEffects).
           if (!shouldApplyWebhookEffects(existing)) {
             return { success: true, status: 'already_processed', orderId: existing!.id };
@@ -142,9 +146,9 @@ export const paymentWebhookProcess: InngestFunction.Any = inngest.createFunction
 
           // markWebhookProcessed (mirrors webhook.routes.ts) — only when we have
           // an order. Runs in the same tenant context as the mutation.
-          if (r.orderId) {
+          if (r.orderId && storeId) {
             await prisma.order.update({
-              where: { id: r.orderId },
+              where: { id: r.orderId, storeId },
               data: { idempotencyKey: row.idempotencyKey, webhookProcessedAt: new Date() },
             });
           }

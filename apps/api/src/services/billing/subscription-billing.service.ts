@@ -24,7 +24,7 @@
  *    after `failed` DOES settle (the money was taken).
  */
 import crypto from 'crypto';
-import { prisma, withStore, acrossStores, type Prisma } from '@force/database';
+import { prisma, withStore, acrossStores, currentStoreId, type Prisma } from '@force/database';
 import { getBillingRefundStoreId, getEntityStoreId } from '../../lib/definer';
 import { pageAcrossStores } from '../../lib/cross-store';
 import { AppError } from '../../middleware/error-handler';
@@ -118,11 +118,11 @@ interface ClaimInput {
  */
 async function inEventStore<T>(
   eventId: string,
-  fn: (tx: Tx) => Promise<T>,
+  fn: (tx: Tx, storeId: string) => Promise<T>,
   whenMissing: T
 ): Promise<T> {
   const storeId = await getEntityStoreId('billing_event', eventId);
-  return storeId ? withStore(storeId, fn) : whenMissing;
+  return storeId ? withStore(storeId, tx => fn(tx, storeId)) : whenMissing;
 }
 
 /**
@@ -161,9 +161,9 @@ async function claimEvent(input: ClaimInput): Promise<string | null> {
 async function markFailedUnlessSettled(id: string, reason: string, raw?: unknown): Promise<void> {
   await inEventStore(
     id,
-    tx =>
+    (tx, storeId) =>
       tx.billingEvent.updateMany({
-        where: { id, status: 'pending' },
+        where: { id, storeId, status: 'pending' },
         data: {
           status: 'failed',
           failureReason: reason,
@@ -352,12 +352,15 @@ export async function settleInTx(
   now: Date,
   effects: BillingEffect[]
 ): Promise<{ transitioned: boolean }> {
-  const row = await tx.billingEvent.findUnique({ where: { id: eventId } });
+  // Runs inside the event's store scope (inEventStore / the webhook's withStore).
+  const row = await tx.billingEvent.findUnique({
+    where: { id: eventId, storeId: currentStoreId() },
+  });
   if (!row) return { transitioned: false };
   const raw = (o.raw ?? undefined) as Prisma.InputJsonValue | undefined;
   if (o.status === 'succeeded') {
     const upd = await tx.billingEvent.updateMany({
-      where: { id: eventId, status: { in: ['pending', 'failed'] } },
+      where: { id: eventId, storeId: row.storeId, status: { in: ['pending', 'failed'] } },
       data: {
         status: 'succeeded',
         failureReason: null,
@@ -370,7 +373,7 @@ export async function settleInTx(
     return { transitioned: true };
   }
   const upd = await tx.billingEvent.updateMany({
-    where: { id: eventId, status: 'pending' },
+    where: { id: eventId, storeId: row.storeId, status: 'pending' },
     data: {
       status: 'failed',
       failureReason: o.failureReason ?? 'failed',
@@ -437,9 +440,9 @@ async function chargeAndSettle(args: {
   if (res.status === 'pending') {
     await inEventStore(
       args.eventId,
-      tx =>
+      (tx, storeId) =>
         tx.billingEvent.updateMany({
-          where: { id: args.eventId, status: 'pending' },
+          where: { id: args.eventId, storeId, status: 'pending' },
           data: { providerRef: res.chargeId ?? undefined },
         }),
       { count: 0 }
@@ -550,7 +553,7 @@ export async function startCheckout(args: {
     });
     await withStore(args.storeId, tx =>
       tx.billingEvent.updateMany({
-        where: { id: eventId, status: 'pending' },
+        where: { id: eventId, storeId: args.storeId, status: 'pending' },
         data: { raw: { providerSessionId: out.providerSessionId } },
       })
     );
@@ -577,7 +580,7 @@ export async function renewSubscription(
   const subStoreId = await getEntityStoreId('store_subscription', subscriptionId);
   const sub = subStoreId
     ? await withStore(subStoreId, tx =>
-        tx.storeSubscription.findUnique({ where: { id: subscriptionId } })
+        tx.storeSubscription.findUnique({ where: { id: subscriptionId, storeId: subStoreId } })
       )
     : null;
   if (!sub) return { action: 'skipped', reason: 'not_found' };
@@ -689,9 +692,10 @@ export async function findDueSubscriptionIds(
   // Per store, each in its own scope (store_subscriptions is strict-RLS): no
   // bypass, and a store whose scope fails does not hide the rest.
   const parts = await acrossStores(
-    () =>
+    storeId =>
       prisma.storeSubscription.findMany({
         where: {
+          storeId,
           ...(only?.subscriptionIds ? { id: { in: only.subscriptionIds } } : {}),
           planCode: { notIn: [...GRANTED_PLAN_CODES, FREE_PLAN_CODE] },
           OR: [
@@ -719,9 +723,9 @@ export async function findDueSubscriptionIds(
 export async function expireStaleCheckouts(now: Date): Promise<number> {
   const cutoff = new Date(now.getTime() - STALE_CHECKOUT_MS);
   const parts = await acrossStores(
-    () =>
+    storeId =>
       prisma.billingEvent.updateMany({
-        where: { type: 'checkout', status: 'pending', createdAt: { lt: cutoff } },
+        where: { storeId, type: 'checkout', status: 'pending', createdAt: { lt: cutoff } },
         data: { status: 'failed', failureReason: 'abandoned' },
       }),
     { onStoreError: (storeId, err) => logger.error({ err, storeId }, '[billing] expiry failed') }
@@ -803,6 +807,7 @@ export async function changePlan(args: {
     const prior = await withStore(args.storeId, tx =>
       tx.billingEvent.findMany({
         where: {
+          storeId: args.storeId,
           subscriptionId: sub.id,
           type: 'upgrade',
           planCode: plan.code,
@@ -932,6 +937,7 @@ export async function applyWebhookEvent(
   ) {
     webhookStoreId = await getEntityStoreId('billing_event', event.merchantOrderId);
   }
+  const scopedStoreId = webhookStoreId;
   const apply = async (tx: Tx): Promise<WebhookResult> => {
     const ins = await tx.billingWebhookEvent.createMany({
       data: [
@@ -958,19 +964,22 @@ export async function applyWebhookEvent(
 
     // Refund confirmations (async refunds only; sync ones are settled by refundCharge).
     if (event.kind === 'refund.succeeded' || event.kind === 'refund.failed') {
-      const refundRow = event.providerRef
-        ? await tx.billingEvent.findFirst({
-            where: {
-              type: 'refund',
-              provider: providerName,
-              providerRef: event.providerRef,
-              status: 'pending',
-            },
-          })
-        : null;
+      const refundRow =
+        event.providerRef && scopedStoreId
+          ? await tx.billingEvent.findFirst({
+              where: {
+                storeId: scopedStoreId,
+                type: 'refund',
+                provider: providerName,
+                providerRef: event.providerRef,
+                status: 'pending',
+              },
+            })
+          : null;
       if (!refundRow) return ignore('unknown_refund');
       await settleRefundInTx(
         tx,
+        refundRow.storeId,
         refundRow.id,
         event.kind === 'refund.succeeded',
         event.failureReason
@@ -979,8 +988,10 @@ export async function applyWebhookEvent(
     }
 
     const row =
-      event.merchantOrderId && UUID_RE.test(event.merchantOrderId)
-        ? await tx.billingEvent.findUnique({ where: { id: event.merchantOrderId } })
+      event.merchantOrderId && UUID_RE.test(event.merchantOrderId) && scopedStoreId
+        ? await tx.billingEvent.findUnique({
+            where: { id: event.merchantOrderId, storeId: scopedStoreId },
+          })
         : null;
     if (!row || row.provider !== providerName || row.type === 'refund') {
       logger.warn({ providerName, eventId: event.eventId }, '[billing] webhook for unknown order');
@@ -1032,28 +1043,31 @@ export async function handleBillingWebhook(
 
 async function settleRefundInTx(
   tx: Tx,
+  storeId: string,
   refundId: string,
   succeeded: boolean,
   reason?: string
 ): Promise<void> {
   const upd = await tx.billingEvent.updateMany({
-    where: { id: refundId, status: 'pending' },
+    where: { id: refundId, storeId, status: 'pending' },
     data: succeeded
       ? { status: 'succeeded' }
       : { status: 'failed', failureReason: reason ?? 'refund_failed' },
   });
   if (upd.count === 0 || !succeeded) return;
-  const refund = await tx.billingEvent.findUnique({ where: { id: refundId } });
+  const refund = await tx.billingEvent.findUnique({ where: { id: refundId, storeId } });
   if (!refund?.relatedEventId) return;
-  const charge = await tx.billingEvent.findUnique({ where: { id: refund.relatedEventId } });
+  const charge = await tx.billingEvent.findUnique({
+    where: { id: refund.relatedEventId, storeId },
+  });
   if (!charge) return;
   const agg = await tx.billingEvent.aggregate({
-    where: { relatedEventId: charge.id, type: 'refund', status: 'succeeded' },
+    where: { storeId, relatedEventId: charge.id, type: 'refund', status: 'succeeded' },
     _sum: { amountMinor: true },
   });
   if ((agg._sum.amountMinor ?? 0) >= charge.amountMinor) {
     await tx.billingEvent.updateMany({
-      where: { id: charge.id, status: 'succeeded' },
+      where: { id: charge.id, storeId, status: 'succeeded' },
       data: { status: 'refunded' },
     });
   }
@@ -1072,7 +1086,7 @@ export async function refundCharge(args: {
   const chargeStoreId = await getEntityStoreId('billing_event', args.eventId);
   const charge = chargeStoreId
     ? await withStore(chargeStoreId, tx =>
-        tx.billingEvent.findUnique({ where: { id: args.eventId } })
+        tx.billingEvent.findUnique({ where: { id: args.eventId, storeId: chargeStoreId } })
       )
     : null;
   if (!charge || charge.type === 'refund')
@@ -1083,6 +1097,7 @@ export async function refundCharge(args: {
   const prior = await withStore(charge.storeId, tx =>
     tx.billingEvent.findMany({
       where: {
+        storeId: charge.storeId,
         relatedEventId: charge.id,
         type: 'refund',
         status: { in: ['pending', 'succeeded'] },
@@ -1122,11 +1137,17 @@ export async function refundCharge(args: {
     });
     await withStore(charge.storeId, async tx => {
       await tx.billingEvent.updateMany({
-        where: { id: refundId, status: 'pending' },
+        where: { id: refundId, storeId: charge.storeId, status: 'pending' },
         data: { providerRef: res.refundId ?? undefined, raw: res.raw as Prisma.InputJsonValue },
       });
       if (res.status !== 'pending') {
-        await settleRefundInTx(tx, refundId, res.status === 'succeeded', res.failureReason);
+        await settleRefundInTx(
+          tx,
+          charge.storeId,
+          refundId,
+          res.status === 'succeeded',
+          res.failureReason
+        );
       }
     });
     return { refundEventId: refundId, status: res.status };
@@ -1195,8 +1216,9 @@ export async function listLedger(args: {
     take,
     orderKey: r => r.createdAt,
     fetch: async window => {
+      // Each fetch runs inside one store's scope (pageAcrossStores): that store.
       const where = {
-        ...(args.storeId ? { storeId: args.storeId } : {}),
+        storeId: currentStoreId(),
         ...(args.status ? { status: args.status } : {}),
         ...(args.type ? { type: args.type } : {}),
         ...(args.before ? { createdAt: { lt: args.before } } : {}),

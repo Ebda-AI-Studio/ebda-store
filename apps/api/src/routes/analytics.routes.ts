@@ -339,7 +339,7 @@ router.get(
 
         // Batch-load allowBackorder flag for these products
         const productFlags = await prisma.product.findMany({
-          where: { id: { in: productIds } },
+          where: { storeId, id: { in: productIds } },
           select: { id: true, allowBackorder: true },
         });
         const allowBackorderById = new Map(productFlags.map(p => [p.id, p.allowBackorder]));

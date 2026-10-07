@@ -100,7 +100,7 @@ const bulkAiSeoFn = inngest.createFunction(
     return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), force },
         })
       );
@@ -128,7 +128,7 @@ const bulkAiSeoFn = inngest.createFunction(
         ];
 
         await prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { total: work.length },
         });
 
@@ -144,7 +144,7 @@ const bulkAiSeoFn = inngest.createFunction(
 
       if (items.length === 0) {
         await prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
         });
         return;
@@ -164,7 +164,7 @@ const bulkAiSeoFn = inngest.createFunction(
 
         const result: BatchResult = await step.run(`batch-${i}`, async () => {
           const currentJob = await prisma.bulkAiJob.findUnique({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             select: { status: true },
           });
           if (currentJob?.status === 'cancelled') {
@@ -258,7 +258,7 @@ const bulkAiSeoFn = inngest.createFunction(
 
             if (item.kind === 'category') {
               const c = await prisma.category.findUnique({
-                where: { id: item.id },
+                where: { id: item.id, storeId },
                 select: {
                   id: true,
                   name: true,
@@ -295,7 +295,7 @@ const bulkAiSeoFn = inngest.createFunction(
                     `seo:category:${c.id}`
                   );
                   await prisma.category.update({
-                    where: { id: c.id },
+                    where: { id: c.id, storeId },
                     data: {
                       metaTitle: c.metaTitle?.trim() || r.suggestion.title,
                       metaTitleAr: c.metaTitleAr?.trim() || r.suggestion.titleAr,
@@ -325,7 +325,7 @@ const bulkAiSeoFn = inngest.createFunction(
 
             // item.kind === 'product'
             const p = await prisma.product.findUnique({
-              where: { id: item.id },
+              where: { id: item.id, storeId },
               select: {
                 id: true,
                 name: true,
@@ -364,7 +364,7 @@ const bulkAiSeoFn = inngest.createFunction(
                   `seo:product:${p.id}`
                 );
                 await prisma.product.update({
-                  where: { id: p.id },
+                  where: { id: p.id, storeId },
                   data: {
                     metaTitle: p.metaTitle?.trim() || r.suggestion.title,
                     metaTitleAr: p.metaTitleAr?.trim() || r.suggestion.titleAr,
@@ -414,7 +414,7 @@ const bulkAiSeoFn = inngest.createFunction(
 
         await step.run(`progress-${i}`, () =>
           prisma.bulkAiJob.update({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             data: { processed, filled, skipped, failed, errors: errors as object },
           })
         );
@@ -441,7 +441,7 @@ const bulkAiSeoFn = inngest.createFunction(
       }
 
       const finalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         select: { status: true },
       });
 
@@ -461,7 +461,7 @@ const bulkAiSeoFn = inngest.createFunction(
       // pre-sweep store data until that key's TTL expired.
       await step.run('bust-store-cache', () => bustStoreCachesById(storeId));
       await prisma.bulkAiJob.update({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         data: {
           status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
           processed,

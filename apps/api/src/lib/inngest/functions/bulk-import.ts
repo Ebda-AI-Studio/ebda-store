@@ -60,7 +60,9 @@ export const bulkImportProducts: InngestFunction.Any = inngest.createFunction(
     // and the job is read inside that store's scope.
     const jobStoreId = event.data.storeId ?? (await getEntityStoreId('bulk_import_job', jobId));
     const job = jobStoreId
-      ? await withStore(jobStoreId, tx => tx.bulkImportJob.findUnique({ where: { id: jobId } }))
+      ? await withStore(jobStoreId, tx =>
+          tx.bulkImportJob.findUnique({ where: { id: jobId, storeId: jobStoreId } })
+        )
       : null;
     if (!job) {
       logger.warn({ jobId }, 'bulk-import/started fired for missing job');
@@ -81,7 +83,7 @@ export const bulkImportProducts: InngestFunction.Any = inngest.createFunction(
     // and withMoneyTx batches start with the same store GUC.
     await runInStoreScope(job.storeId, async () => {
       await prisma.bulkImportJob.update({
-        where: { id: jobId },
+        where: { id: jobId, storeId: job.storeId },
         data: { status: 'running', startedAt: new Date() },
       });
 
@@ -107,7 +109,7 @@ export const bulkImportProducts: InngestFunction.Any = inngest.createFunction(
         }
 
         await prisma.bulkImportJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId: job.storeId },
           data: {
             status: 'completed',
             total: result.total,
@@ -123,7 +125,7 @@ export const bulkImportProducts: InngestFunction.Any = inngest.createFunction(
         const message = err instanceof Error ? err.message : String(err);
         logger.error({ err, jobId }, 'Bulk import job failed');
         await prisma.bulkImportJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId: job.storeId },
           data: {
             status: 'failed',
             errorMessage: message,

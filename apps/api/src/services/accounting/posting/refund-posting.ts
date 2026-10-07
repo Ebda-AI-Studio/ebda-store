@@ -1,3 +1,4 @@
+import { currentStoreId } from '@force/database';
 import { withScopedToOrderStore } from './order-scope';
 import type { Prisma } from '@prisma/client';
 import { reverseEntry } from '../journal.service';
@@ -57,7 +58,7 @@ export async function postRefundJournal(args: {
   const candidates = await tx.journalEntry.findMany({
     where: {
       source: 'order',
-      ...(storeId ? { storeId } : {}),
+      storeId: storeId ?? currentStoreId(),
       OR: [
         { sourceId: { in: [orderId, `${orderId}:cogs`] } },
         { sourceId: { startsWith: `${orderId}:partial:`, not: { endsWith: ':reversal' } } },

@@ -187,7 +187,7 @@ export async function handleOrderRefunded(
   const order = await step.run('load-order', () =>
     runInTenantContext(storeId, async () => {
       const row = await prisma.order.findUnique({
-        where: { id: orderId },
+        where: { id: orderId, storeId },
         include: {
           customer: true,
           items: true,
@@ -248,7 +248,7 @@ export async function handleOrderRefunded(
           } else {
             prevStock = lockedProduct.inventory;
             await tx.product.update({
-              where: { id: item.productId },
+              where: { id: item.productId, storeId },
               data: { inventory: { increment: qty } },
             });
           }
@@ -556,7 +556,7 @@ export async function handleOrderRefunded(
     if (!isPartial) {
       return runInTenantContext(storeId, () =>
         prisma.backorderLine.updateMany({
-          where: { orderItem: { orderId }, fulfilledAt: null, cancelledAt: null },
+          where: { storeId, orderItem: { orderId }, fulfilledAt: null, cancelledAt: null },
           data: { cancelledAt: new Date(), cancelledReason: 'Order refunded' },
         })
       );
@@ -834,7 +834,7 @@ export async function handleOrderRefunded(
                 if (released.length === 0) return [];
                 // Re-claim exactly the released channels.
                 await tx.orderEvent.update({
-                  where: { id: sent.id },
+                  where: { id: sent.id, storeId },
                   data: { metadata: { ...meta, released: [] } as Prisma.InputJsonValue },
                 });
                 return released;
@@ -1096,7 +1096,7 @@ export async function handleOrderRefunded(
             const meta = (claim.metadata ?? {}) as Record<string, unknown>;
             const released = [...new Set([...releasedChannels(meta), 'email' as const])];
             await tx.orderEvent.update({
-              where: { id: claim.id },
+              where: { id: claim.id, storeId },
               data: { metadata: { ...meta, released } as Prisma.InputJsonValue },
             });
             return { released };

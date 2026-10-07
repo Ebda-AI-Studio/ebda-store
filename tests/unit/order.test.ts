@@ -1223,7 +1223,7 @@ describe('OrderService', () => {
         expect(result.orderNumber).toBeDefined();
         // The use is reserved in the order transaction (#1370).
         expect(txCouponReserve).toHaveBeenCalledWith({
-          where: { id: 'coupon-1', isActive: true },
+          where: { id: 'coupon-1', storeId: mockStoreId, isActive: true },
           data: { usageCount: { increment: 1 } },
         });
       });

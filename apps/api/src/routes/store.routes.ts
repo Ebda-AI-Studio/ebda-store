@@ -1511,7 +1511,9 @@ router.put(
       if (faq.count === 0) {
         throw new AppError(404, 'NOT_FOUND', 'FAQ not found');
       }
-      const updated = await prisma.storeFaq.findUnique({ where: { id: req.params.faqId } });
+      const updated = await prisma.storeFaq.findUnique({
+        where: { id: req.params.faqId, storeId: req.params.id },
+      });
       res.json({ success: true, data: updated });
     } catch (error) {
       next(error);
@@ -1651,7 +1653,7 @@ router.put(
       if (body.orderIndex !== undefined) updateData.orderIndex = body.orderIndex;
       if (body.isActive !== undefined) updateData.isActive = body.isActive;
       const updated = await prisma.storeHowto.update({
-        where: { id: req.params.howtoId },
+        where: { id: req.params.howtoId, storeId: req.params.id },
         data: updateData,
       });
       res.json({ success: true, data: updated });

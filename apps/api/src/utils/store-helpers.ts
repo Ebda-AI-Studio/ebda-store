@@ -1,9 +1,8 @@
 import { Request } from 'express';
-import { prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { AuthPayload } from '../middleware/auth';
 import { storeLookupForHost } from '../lib/store-host';
-import { resolveStoreId } from '../lib/definer';
+import { lookupStore, resolveStoreId } from '../lib/definer';
 
 /**
  * Extracts the authenticated user from the request.
@@ -50,10 +49,9 @@ export async function resolvePublicStoreId(req: Request): Promise<string | undef
 async function lookupPublicStoreId(req: Request): Promise<string | undefined> {
   const headerStoreId = req.headers['x-store-id'] as string | undefined;
   if (headerStoreId) {
-    const store = await prisma.store.findFirst({
-      where: { id: headerStoreId, status: 'active' },
-      select: { id: true },
-    });
+    // `stores` is under RLS (R-EBDA-005): an ACTIVE, not-deleted store with this id,
+    // through the lookup definer (id only).
+    const store = await lookupStore({ id: headerStoreId }, ['active']);
     if (store) return store.id;
   }
 

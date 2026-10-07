@@ -97,7 +97,7 @@ const bulkAiTranslateFn = inngest.createFunction(
     return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date() },
         })
       );
@@ -124,7 +124,7 @@ const bulkAiTranslateFn = inngest.createFunction(
 
         // Each entity has 2 fields (name + description); upper bound only.
         await prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { total: work.length * 2 },
         });
 
@@ -145,7 +145,7 @@ const bulkAiTranslateFn = inngest.createFunction(
 
         const result: BatchResult = await step.run(`batch-${i}`, async () => {
           const currentJob = await prisma.bulkAiJob.findUnique({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             select: { status: true },
           });
           if (currentJob?.status === 'cancelled') {
@@ -178,7 +178,7 @@ const bulkAiTranslateFn = inngest.createFunction(
             // snapshot).
             if (item.kind === 'product') {
               const p = await prisma.product.findUnique({
-                where: { id: item.id },
+                where: { id: item.id, storeId },
                 select: {
                   id: true,
                   name: true,
@@ -264,7 +264,7 @@ const bulkAiTranslateFn = inngest.createFunction(
 
               if (Object.keys(updates).length > 0) {
                 try {
-                  await prisma.product.update({ where: { id: p.id }, data: updates });
+                  await prisma.product.update({ where: { id: p.id, storeId }, data: updates });
                 } catch (err) {
                   await recordError({
                     entityKind: 'product',
@@ -280,7 +280,7 @@ const bulkAiTranslateFn = inngest.createFunction(
 
             if (item.kind === 'category') {
               const c = await prisma.category.findUnique({
-                where: { id: item.id },
+                where: { id: item.id, storeId },
                 select: {
                   id: true,
                   name: true,
@@ -362,7 +362,7 @@ const bulkAiTranslateFn = inngest.createFunction(
 
               if (Object.keys(updates).length > 0) {
                 try {
-                  await prisma.category.update({ where: { id: c.id }, data: updates });
+                  await prisma.category.update({ where: { id: c.id, storeId }, data: updates });
                 } catch (err) {
                   await recordError({
                     entityKind: 'category',
@@ -488,7 +488,7 @@ const bulkAiTranslateFn = inngest.createFunction(
 
         await step.run(`progress-${i}`, () =>
           prisma.bulkAiJob.update({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             data: { processed, filled, skipped, failed, errors: errors as object },
           })
         );
@@ -525,7 +525,7 @@ const bulkAiTranslateFn = inngest.createFunction(
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
 
       await prisma.bulkAiJob.update({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         data: {
           status: 'completed',
           processed,

@@ -495,7 +495,7 @@ export class InstapayService {
             logger.error({ err, orderId }, '[INSTAPAY] failed to enqueue order/created')
           );
         const order = await prisma.order.findFirst({
-          where: { id: orderId },
+          where: { id: orderId, storeId },
           select: { orderNumber: true, total: true },
         });
         if (order) {
@@ -546,7 +546,7 @@ export class InstapayService {
       });
       await OrderService.updateStatus(storeId, orderId, 'cancelled');
       await prisma.order.update({
-        where: { id: orderId },
+        where: { id: orderId, storeId },
         data: {
           notes:
             (before?.notes ? before.notes + '\n' : '') +
@@ -582,6 +582,7 @@ export class InstapayService {
     const due = await withStore(storeId, () =>
       prisma.order.findMany({
         where: {
+          storeId,
           status: AWAITING_PAYMENT_CONFIRMATION,
           deletedAt: null,
           paymentConfirmationExpiresAt: { lte: now },

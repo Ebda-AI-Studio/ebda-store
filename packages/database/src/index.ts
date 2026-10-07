@@ -35,6 +35,8 @@ export {
   storeIdModels,
   TENANT_CHILD_MODELS,
   IDENTITY_MODELS,
+  USER_KEYED_MODELS,
+  GLOBAL_MODELS,
 } from './tenant-guard';
 export { ambientScope, type AmbientScope, type TenantGuardHatch } from './tenant-scope';
 export type { ClientLease, ClientPoolOptions } from './client-pool';
@@ -732,6 +734,7 @@ export function withUser<T>(
 export interface StoreDirectoryEntry {
   id: string;
   slug: string;
+  name: string;
   status: string;
   plan: string;
   accountingEnabled: boolean;
@@ -750,6 +753,7 @@ export async function storeDirectory(
     Array<{
       id: string;
       slug: string;
+      name: string;
       status: string;
       plan: string;
       accounting_enabled: boolean;
@@ -763,6 +767,7 @@ export async function storeDirectory(
   const all = rows.map(r => ({
     id: r.id,
     slug: r.slug,
+    name: r.name,
     status: r.status,
     plan: r.plan,
     accountingEnabled: r.accounting_enabled,
@@ -888,7 +893,7 @@ export async function acrossStoresFlat<T>(
  * a NAME, not a bypass: it opens no table to `ebda_app`, and only the definers
  * that list it (`ebda_is_system_job`) consult it.
  */
-export type SystemJob = 'audit-log-retention' | 'webhook-inbox';
+export type SystemJob = 'audit-log-retention' | 'webhook-inbox' | 'token-retention';
 
 /**
  * Run `fn` with `app.system_job = job` set TRANSACTION-LOCALLY, so the definer

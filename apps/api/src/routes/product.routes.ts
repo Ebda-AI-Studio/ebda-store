@@ -438,7 +438,7 @@ router.put(
       await prisma.$transaction(
         orderedProductIds.map((id, index) =>
           prisma.product.update({
-            where: { id },
+            where: { id, storeId },
             data: { newArrivalPosition: index },
           })
         )
@@ -522,7 +522,7 @@ router.put(
       await prisma.$transaction(
         orderedProductIds.map((id, index) =>
           prisma.product.update({
-            where: { id },
+            where: { id, storeId },
             data: { bestSellerPosition: index },
           })
         )

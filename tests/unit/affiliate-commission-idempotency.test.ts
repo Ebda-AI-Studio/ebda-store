@@ -86,7 +86,7 @@ describe('processCommission — duplicate delivery (#618)', () => {
       rate: 10,
     });
     expect(h.referralUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'ref-1', status: 'converted', commissionAmount: null },
+      where: { id: 'ref-1', storeId: 's1', status: 'converted', commissionAmount: null },
       data: { commissionAmount: 100, status: 'commission_paid' },
     });
     expect(h.affiliateUpdate).toHaveBeenCalledTimes(1);
@@ -116,7 +116,7 @@ describe('reverseCommission — duplicate delivery (#618)', () => {
 
     await expect(affiliateService.reverseCommission('s1', 'order-1')).resolves.toBeNull();
     expect(h.referralUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'ref-1', status: 'commission_paid' },
+      where: { id: 'ref-1', storeId: 's1', status: 'commission_paid' },
       data: { status: 'refunded' },
     });
     expect(h.affiliateUpdate).not.toHaveBeenCalled();
@@ -130,7 +130,7 @@ describe('reverseCommission — duplicate delivery (#618)', () => {
       amount: 100,
     });
     expect(h.affiliateUpdate).toHaveBeenCalledWith({
-      where: { id: 'aff-1' },
+      where: { id: 'aff-1', storeId: 's1' },
       data: { totalEarned: { decrement: 100 }, pendingBalance: { decrement: 100 } },
     });
   });

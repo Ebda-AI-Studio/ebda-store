@@ -354,7 +354,7 @@ class RecommendationService {
       throw Object.assign(new Error('Relation not found'), { statusCode: 404 });
     }
 
-    await prisma.productRelation.delete({ where: { id: relationId } });
+    await prisma.productRelation.delete({ where: { id: relationId, storeId } });
     await this.invalidateCache(storeId, productId);
   }
 
@@ -460,7 +460,9 @@ class RecommendationService {
         .map(row => row.id);
 
       if (staleIds.length > 0) {
-        await prisma.frequentlyBoughtTogether.deleteMany({ where: { id: { in: staleIds } } });
+        await prisma.frequentlyBoughtTogether.deleteMany({
+          where: { storeId, id: { in: staleIds } },
+        });
       }
 
       // Invalidate all recommendation caches for this store

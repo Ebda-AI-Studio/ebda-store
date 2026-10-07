@@ -4,7 +4,7 @@
  */
 
 import crypto from 'crypto';
-import { prisma } from '@force/database';
+import { prisma, runInStoreScope } from '@force/database';
 import { redis } from './redis.service';
 import { smsService, SmsConfig } from './sms.service';
 import { withCircuitBreaker, circuitBreaker } from './circuit-breaker.service';
@@ -120,7 +120,7 @@ class SmsQueueService {
     const recipientPhoneHash = crypto.createHash('sha256').update(sms.recipientPhone).digest('hex');
     await prisma.notificationLog
       .upsert({
-        where: { idempotencyKey: sms.idempotencyKey },
+        where: { idempotencyKey: sms.idempotencyKey, storeId: sms.storeId },
         create: {
           storeId: sms.storeId,
           channel: 'sms',
@@ -211,7 +211,7 @@ class SmsQueueService {
         }
         return;
       }
-      await this.sendSms(sms);
+      await runInStoreScope(sms.storeId, () => this.sendSms(sms));
     } catch (error) {
       logger.error({ err: error }, '[SMS QUEUE] Error processing queue');
     } finally {
@@ -241,7 +241,7 @@ class SmsQueueService {
       // blip) used to escape to processQueue's catch after the rpop, and the
       // SMS was gone. It now retries and, on the last attempt, dead-letters.
       const existing = await prisma.notificationLog.findUnique({
-        where: { idempotencyKey: sms.idempotencyKey },
+        where: { idempotencyKey: sms.idempotencyKey, storeId: sms.storeId },
       });
 
       if (existing && existing.status === 'sent') {
@@ -266,7 +266,7 @@ class SmsQueueService {
 
       // Log success
       await prisma.notificationLog.upsert({
-        where: { idempotencyKey: sms.idempotencyKey },
+        where: { idempotencyKey: sms.idempotencyKey, storeId: sms.storeId },
         create: {
           storeId: sms.storeId,
           channel: 'sms',
@@ -329,7 +329,7 @@ class SmsQueueService {
 
         await prisma.notificationLog
           .upsert({
-            where: { idempotencyKey: sms.idempotencyKey },
+            where: { idempotencyKey: sms.idempotencyKey, storeId: sms.storeId },
             create: {
               storeId: sms.storeId,
               channel: 'sms',

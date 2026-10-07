@@ -219,7 +219,7 @@ class LoyaltyAutomationService {
 
               await prisma.$transaction([
                 prisma.loyaltyPoints.update({
-                  where: { id: member.id },
+                  where: { id: member.id, storeId: store.id },
                   data: {
                     points: { increment: birthdayBonus },
                     totalEarned: { increment: birthdayBonus },
@@ -369,11 +369,10 @@ class LoyaltyAutomationService {
         groupKeys.length === 0
           ? []
           : await prisma.loyaltyPoints.findMany({
+              // Every group belongs to `storeId` (the scan above is store-scoped).
               where: {
-                OR: groupKeys.map(g => ({
-                  storeId: g.storeId,
-                  customerId: g.customerId,
-                })),
+                storeId,
+                customerId: { in: groupKeys.map(g => g.customerId) },
               },
               select: { id: true, storeId: true, customerId: true, points: true },
             });
@@ -396,7 +395,7 @@ class LoyaltyAutomationService {
           if (deduction <= 0) {
             // Still null-out the expiresAt so we don't re-process
             await prisma.loyaltyTransaction.updateMany({
-              where: { id: { in: group.txnIds } },
+              where: { id: { in: group.txnIds }, storeId },
               data: { expiresAt: null },
             });
             continue;
@@ -404,7 +403,7 @@ class LoyaltyAutomationService {
 
           await prisma.$transaction([
             prisma.loyaltyPoints.update({
-              where: { id: loyaltyRecord.id },
+              where: { id: loyaltyRecord.id, storeId },
               data: {
                 points: { decrement: deduction },
                 totalRedeemed: { increment: deduction },
@@ -421,7 +420,7 @@ class LoyaltyAutomationService {
             }),
             // Null out expiresAt to mark as processed (idempotency)
             prisma.loyaltyTransaction.updateMany({
-              where: { id: { in: group.txnIds } },
+              where: { id: { in: group.txnIds }, storeId },
               data: { expiresAt: null },
             }),
           ]);

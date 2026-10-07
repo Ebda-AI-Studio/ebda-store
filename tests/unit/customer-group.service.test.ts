@@ -133,7 +133,7 @@ describe('CustomerGroupService.assignCustomer', () => {
 
     expect(mockGroup.findFirst).not.toHaveBeenCalled();
     expect(mockCustomer.update).toHaveBeenCalledWith({
-      where: { id: 'c1' },
+      where: { id: 'c1', storeId: STORE },
       data: { groupId: null },
       select: { id: true, groupId: true },
     });
@@ -187,7 +187,7 @@ describe('CustomerGroupService.assignByIdentity', () => {
     });
     expect(mockCustomer.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'c1' },
+        where: { id: 'c1', storeId: STORE },
         data: expect.objectContaining({
           groupId: 'g1',
           phone: '+96599001234',
@@ -239,7 +239,7 @@ describe('CustomerGroupService.assignByIdentity', () => {
     );
 
     expect(mockCustomer.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'c3' }, data: { groupId: 'g1' } })
+      expect.objectContaining({ where: { id: 'c3', storeId: STORE }, data: { groupId: 'g1' } })
     );
     expect(result).toMatchObject({ id: 'c3', groupId: 'g1' });
   });

@@ -390,7 +390,7 @@ export async function runCohortRollup(storeId: string): Promise<number> {
       toUpdate,
       ({ id, row }) =>
         prisma.customerCohortSnapshot.update({
-          where: { id },
+          where: { id, storeId },
           data: {
             customersTotal: row.customersTotal,
             customersActive: row.customersActive,
@@ -545,7 +545,7 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
       toUpdate,
       ({ id, row }) =>
         prisma.funnelSnapshot.update({
-          where: { id },
+          where: { id, storeId },
           data: {
             productViews: row.productViews,
             cartsCreated: row.cartsCreated,
@@ -730,7 +730,7 @@ export async function runRfmRollup(storeId: string): Promise<number> {
       toUpdate,
       ({ id, row, previousSegment }) =>
         prisma.customerRfmSnapshot.update({
-          where: { id },
+          where: { id, storeId },
           data: {
             isGuest: row.isGuest,
             recencyDays: row.recencyDays,

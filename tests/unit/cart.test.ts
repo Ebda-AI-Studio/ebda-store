@@ -610,7 +610,7 @@ describe('CartService', () => {
       await CartService.mergeGuestCart(mockStoreId, 'guest-session', mockCustomerId);
 
       expect(prisma.cart.delete).toHaveBeenCalledWith({
-        where: { id: mockGuestCart.id },
+        where: { id: mockGuestCart.id, storeId: mockStoreId },
       });
     });
 
@@ -643,7 +643,7 @@ describe('CartService', () => {
       await CartService.mergeGuestCart(mockStoreId, 'guest-session', mockCustomerId);
 
       expect(prisma.cart.update).toHaveBeenCalledWith({
-        where: { id: mockGuestCart.id },
+        where: { id: mockGuestCart.id, storeId: mockStoreId },
         data: { customerId: mockCustomerId },
       });
       expect(prisma.cart.create).not.toHaveBeenCalled();

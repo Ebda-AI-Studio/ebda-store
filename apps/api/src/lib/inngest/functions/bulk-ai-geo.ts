@@ -125,7 +125,7 @@ const bulkAiLlmsTxtFn = inngest.createFunction(
     return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), total: 1, force },
         })
       );
@@ -292,7 +292,7 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
 
       if (result.notFound) {
         await prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
         });
         return;
@@ -301,7 +301,7 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
       const quotaReached = result.quotaReached === true;
 
       const llmsFinalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         select: { status: true },
       });
 
@@ -311,7 +311,7 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
       // busts the wrong namespace entirely (#1333).
       await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
       await prisma.bulkAiJob.update({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         data: {
           status: llmsFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
           processed: result.filled + result.skipped + result.failed,
@@ -381,7 +381,7 @@ const bulkAiCitationCopyFn = inngest.createFunction(
     return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), force },
         })
       );
@@ -396,13 +396,16 @@ const bulkAiCitationCopyFn = inngest.createFunction(
           where: { storeId, deletedAt: null },
           select: { id: true },
         });
-        await prisma.bulkAiJob.update({ where: { id: jobId }, data: { total: products.length } });
+        await prisma.bulkAiJob.update({
+          where: { id: jobId, storeId },
+          data: { total: products.length },
+        });
         return { storeFound: true, productIds: products.map(p => p.id) };
       });
 
       if (!storeFound) {
         await prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
         });
         return;
@@ -428,7 +431,7 @@ const bulkAiCitationCopyFn = inngest.createFunction(
 
         const result: CitationBatchResult = await step.run(`batch-${i}`, async () => {
           const currentJob = await prisma.bulkAiJob.findUnique({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             select: { status: true },
           });
           if (currentJob?.status === 'cancelled') {
@@ -450,7 +453,7 @@ const bulkAiCitationCopyFn = inngest.createFunction(
           });
 
           const items = await prisma.product.findMany({
-            where: { id: { in: batchIds } },
+            where: { id: { in: batchIds }, storeId },
             select: {
               id: true,
               name: true,
@@ -515,7 +518,7 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
 
               if (typeof parsed.en === 'string' && parsed.en.trim()) {
                 await prisma.product.update({
-                  where: { id: p.id },
+                  where: { id: p.id, storeId },
                   data: {
                     citationCopy: parsed.en.trim().slice(0, 500),
                     citationCopyAr: parsed.ar?.trim().slice(0, 500) || p.citationCopyAr || null,
@@ -565,7 +568,7 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
 
         await step.run(`progress-${i}`, () =>
           prisma.bulkAiJob.update({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             data: { processed, filled, skipped, failed, errors: errors as object },
           })
         );
@@ -591,7 +594,7 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
       }
 
       const citationFinalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         select: { status: true },
       });
 
@@ -608,7 +611,7 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
       // pre-sweep store data until that key's TTL expired.
       await step.run('bust-store-cache', () => bustStoreCachesById(storeId));
       await prisma.bulkAiJob.update({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         data: {
           status: citationFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
           processed,
@@ -660,7 +663,7 @@ const bulkAiBrandFactsFn = inngest.createFunction(
     return runInStoreScope(storeId, async () => {
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), total: 1, force },
         })
       );
@@ -807,7 +810,7 @@ Populate using only the information provided above. For keyCategories, use the c
 
       if (result.notFound) {
         await prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
         });
         return;
@@ -816,7 +819,7 @@ Populate using only the information provided above. For keyCategories, use the c
       const quotaReached = result.quotaReached === true;
 
       const factsFinalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         select: { status: true },
       });
 
@@ -826,7 +829,7 @@ Populate using only the information provided above. For keyCategories, use the c
       // (#1333). Bust ONCE at the end, never per item.
       await step.run('bust-store-caches', () => bustStoreCachesById(storeId));
       await prisma.bulkAiJob.update({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         data: {
           status: factsFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
           processed: result.filled + result.skipped + result.failed,

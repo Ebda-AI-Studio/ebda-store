@@ -142,7 +142,7 @@ describe('bulk-ai-excerpt sweep', () => {
 
     expect(mockUpdateProduct).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'p1' },
+        where: { id: 'p1', storeId: 'store-1' },
         data: expect.objectContaining({
           excerpt: 'Short excerpt.',
           excerptAr: 'ملخص قصير.',

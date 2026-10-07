@@ -774,7 +774,7 @@ export async function resolveStoreCustomerOrThrow(storeId: string, customerId: s
     throw new AppError(404, 'NOT_FOUND', 'Customer not found');
   }
   const user = await prisma.user.findUnique({
-    where: { id: customerId },
+    where: { id: customerId, storeId },
     select: { id: true, storeId: true, role: true },
   });
   if (!user || user.role !== 'customer' || user.storeId !== storeId) {

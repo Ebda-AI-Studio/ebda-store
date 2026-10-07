@@ -141,6 +141,7 @@ CREATE OR REPLACE FUNCTION public.ebda_store_directory()
 RETURNS TABLE (
   id text,
   slug text,
+  name text,
   status text,
   plan text,
   accounting_enabled boolean,
@@ -153,11 +154,34 @@ RETURNS TABLE (
 LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
 AS $fn$
-  SELECT s.id, s.slug, s.status::text, s.plan::text, s.accounting_enabled, s.ai_features_enabled,
+  SELECT s.id, s.slug, s.name, s.status::text, s.plan::text, s.accounting_enabled, s.ai_features_enabled,
          s.loyalty_enabled, s.wbs_enabled, s.domain IS NOT NULL, s.pending_domain IS NOT NULL
   FROM public.stores s
   WHERE s.deleted_at IS NULL
   ORDER BY s.id
+$fn$;
+
+-- 2.3b One page of the PUBLIC store list (`GET /public/stores`, consumed by the
+--      platform llms.txt): ACTIVE, not-deleted stores, newest first, ids only,
+--      with the total. UNGUARDED ON PURPOSE (public endpoint); the API reads each
+--      store's public fields inside that store's scope.
+CREATE OR REPLACE FUNCTION public.ebda_public_store_page(p_offset integer, p_limit integer)
+RETURNS TABLE (id text, total bigint)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+  WITH live AS (
+    SELECT s.id, s.created_at FROM public.stores s
+    WHERE s.status = 'active' AND s.deleted_at IS NULL
+  ), page AS (
+    SELECT l.id, l.created_at FROM live l
+    ORDER BY l.created_at DESC, l.id
+    OFFSET greatest(p_offset, 0) LIMIT least(greatest(p_limit, 1), 100)
+  )
+  -- the total rides on every row; an empty page still returns it (id NULL)
+  SELECT pg.id, (SELECT count(*) FROM live) FROM page pg
+  UNION ALL
+  SELECT NULL, (SELECT count(*) FROM live) WHERE NOT EXISTS (SELECT 1 FROM page)
 $fn$;
 
 -- 2.4 Stores a user owns (live, not soft-deleted): plan limits and signup state
@@ -195,6 +219,88 @@ AS $fn$
 $fn$;
 
 -- ---------------------------------------------------------------------------
+-- 2b. Pre-identity reads of the USER-KEYED tables (refresh_tokens,
+--     verification_tokens, onesignal_subscriptions). The contract step puts them
+--     under RLS keyed on app.current_user_id; these are the lookups that must run
+--     before the user is known. The caller then does everything else AS that
+--     user (`withUser`).
+-- ---------------------------------------------------------------------------
+
+-- A presented refresh token (its sha256, as stored) -> the user it belongs to.
+-- UNGUARDED ON PURPOSE: it is the step that authenticates the refresh; the
+-- caller must already hold the token, and it returns a user id only.
+CREATE OR REPLACE FUNCTION public.ebda_refresh_token_user(p_token text)
+RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+  SELECT t.user_id FROM public.refresh_tokens t WHERE t.token = p_token LIMIT 1
+$fn$;
+
+-- A presented verification / reset token -> the user it belongs to. Same reasoning.
+CREATE OR REPLACE FUNCTION public.ebda_verification_token_user(p_token text)
+RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+  SELECT t.user_id FROM public.verification_tokens t WHERE t.token = p_token LIMIT 1
+$fn$;
+
+-- Retention of refresh tokens across every user (expired, or revoked before
+-- p_revoked_before). Cron only: the caller must be the named platform job
+-- 'token-retention' (`withSystemJob`). Returns the number of rows deleted.
+CREATE OR REPLACE FUNCTION public.ebda_refresh_tokens_purge(p_now timestamp, p_revoked_before timestamp)
+RETURNS bigint
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+DECLARE
+  n bigint;
+BEGIN
+  IF NOT public.ebda_is_system_job('token-retention') THEN
+    RAISE EXCEPTION 'ebda_refresh_tokens_purge: not the token-retention job' USING ERRCODE = '42501';
+  END IF;
+  DELETE FROM public.refresh_tokens t
+  WHERE t.expires_at < p_now OR t.revoked_at < p_revoked_before;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END
+$fn$;
+
+-- Push audience for an order notification: the OneSignal player ids of the
+-- store's owner (role 'store_admin', only for the store the transaction is
+-- scoped to) or of every active super_admin (role 'super_admin'). Device ids
+-- only; GUARDED: a store_admin audience needs app.current_store_id = p_store_id.
+CREATE OR REPLACE FUNCTION public.ebda_admin_push_player_ids(p_role text, p_store_id text)
+RETURNS SETOF text
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+BEGIN
+  IF p_role = 'store_admin' THEN
+    IF p_store_id IS NULL
+       OR p_store_id IS DISTINCT FROM nullif(current_setting('app.current_store_id', true), '') THEN
+      RAISE EXCEPTION 'ebda_admin_push_player_ids: not scoped to that store' USING ERRCODE = '42501';
+    END IF;
+    RETURN QUERY
+      SELECT DISTINCT o.player_id
+      FROM public.onesignal_subscriptions o
+      JOIN public.users u ON u.id = o.user_id
+      JOIN public.stores s ON s.owner_id = u.id
+      WHERE s.id = p_store_id AND u.role = 'store_admin' AND u.deleted_at IS NULL;
+  ELSIF p_role = 'super_admin' THEN
+    RETURN QUERY
+      SELECT DISTINCT o.player_id
+      FROM public.onesignal_subscriptions o
+      JOIN public.users u ON u.id = o.user_id
+      WHERE u.role = 'super_admin' AND u.deleted_at IS NULL;
+  ELSE
+    RAISE EXCEPTION 'ebda_admin_push_player_ids: unknown role %', p_role USING ERRCODE = '22023';
+  END IF;
+END
+$fn$;
+
+-- ---------------------------------------------------------------------------
 -- 3. Function privileges: nobody but ebda_app (same rule as the strict-RLS migration).
 -- ---------------------------------------------------------------------------
 DO $priv$
@@ -208,7 +314,9 @@ BEGIN
     WHERE n.nspname = 'public'
       AND p.proname IN ('ebda_store_lookup', 'ebda_store_id_by_slug', 'ebda_store_id_by_domain',
                         'ebda_store_ids_claiming_domain', 'ebda_store_directory',
-                        'ebda_owned_store_ids', 'ebda_wbs_bridge_keys')
+                        'ebda_owned_store_ids', 'ebda_wbs_bridge_keys', 'ebda_refresh_token_user',
+                        'ebda_verification_token_user', 'ebda_refresh_tokens_purge',
+                        'ebda_admin_push_player_ids', 'ebda_public_store_page')
   LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f.sig);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO ebda_app', f.sig);

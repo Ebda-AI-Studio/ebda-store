@@ -63,7 +63,7 @@ router.get(
       const { id: storeId } = req.params;
       const store = await prisma.store.findUnique({
         where: { id: storeId },
-        select: { agentApiKey: true, agentApiKeyRotatedAt: true },
+        select: { credentials: { select: { agentApiKey: true } }, agentApiKeyRotatedAt: true },
       });
       if (!store) {
         res.status(404).json({ success: false, error: { code: 'STORE_NOT_FOUND' } });
@@ -85,7 +85,7 @@ router.get(
       res.json({
         success: true,
         data: {
-          hasKey: Boolean(store.agentApiKey),
+          hasKey: Boolean(store.credentials?.agentApiKey),
           rotatedAt: store.agentApiKeyRotatedAt,
           header: 'x-agent-key',
           openWrites,
@@ -107,7 +107,7 @@ router.post(
       const { id: storeId } = req.params;
       const store = await prisma.store.findUnique({
         where: { id: storeId },
-        select: { agentApiKey: true },
+        select: { credentials: { select: { agentApiKey: true } } },
       });
       if (!store) {
         res.status(404).json({ success: false, error: { code: 'STORE_NOT_FOUND' } });
@@ -117,7 +117,15 @@ router.post(
       const key = mintKey();
       await prisma.store.update({
         where: { id: storeId },
-        data: { agentApiKey: encryption.encrypt(key), agentApiKeyRotatedAt: new Date() },
+        data: {
+          agentApiKeyRotatedAt: new Date(),
+          credentials: {
+            upsert: {
+              create: { agentApiKey: encryption.encrypt(key) },
+              update: { agentApiKey: encryption.encrypt(key) },
+            },
+          },
+        },
       });
 
       await auditLog({
@@ -128,7 +136,7 @@ router.post(
         storeId,
         ip: req.ip,
         userAgent: req.get('user-agent'),
-        details: { rotated: Boolean(store.agentApiKey) },
+        details: { rotated: Boolean(store.credentials?.agentApiKey) },
       });
 
       // The ONLY time the plaintext leaves the server. Rotating invalidates the
@@ -139,7 +147,7 @@ router.post(
         data: {
           apiKey: key,
           header: 'x-agent-key',
-          rotated: Boolean(store.agentApiKey),
+          rotated: Boolean(store.credentials?.agentApiKey),
           message:
             'Store this key now — it is shown once and cannot be retrieved again. ' +
             'Rotating issues a new key and immediately invalidates this one.',
@@ -161,7 +169,7 @@ router.delete(
       const { id: storeId } = req.params;
       const store = await prisma.store.findUnique({
         where: { id: storeId },
-        select: { agentApiKey: true },
+        select: { credentials: { select: { agentApiKey: true } } },
       });
       if (!store) {
         res.status(404).json({ success: false, error: { code: 'STORE_NOT_FOUND' } });
@@ -170,7 +178,12 @@ router.delete(
 
       await prisma.store.update({
         where: { id: storeId },
-        data: { agentApiKey: null, agentApiKeyRotatedAt: new Date() },
+        data: {
+          agentApiKeyRotatedAt: new Date(),
+          credentials: {
+            upsert: { create: { agentApiKey: null }, update: { agentApiKey: null } },
+          },
+        },
       });
 
       await auditLog({
@@ -181,7 +194,7 @@ router.delete(
         storeId,
         ip: req.ip,
         userAgent: req.get('user-agent'),
-        details: { hadKey: Boolean(store.agentApiKey) },
+        details: { hadKey: Boolean(store.credentials?.agentApiKey) },
       });
 
       res.json({ success: true, data: { hasKey: false } });

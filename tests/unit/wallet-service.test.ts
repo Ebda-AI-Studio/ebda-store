@@ -80,9 +80,8 @@ function makeClient(opts: { customers?: Array<{ id: string; storeId: string }> }
     user: {
       findFirst: vi.fn(async ({ where }: any) => {
         calls.push('user.findFirst');
-        // storeCustomerWhere: { id, role, OR: [{ storeId }, …] } — the fake
-        // models the store-scoped branch.
-        const storeId = where.OR?.[0]?.storeId;
+        // storeCustomerWhere: { id, role, storeId } — the store-scoped branch.
+        const storeId = where.storeId;
         return customers.find(c => c.id === where.id && c.storeId === storeId) ?? null;
       }),
     },

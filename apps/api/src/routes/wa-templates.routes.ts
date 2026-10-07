@@ -277,10 +277,10 @@ router.post(
 
       const store = await prisma.store.findUnique({
         where: { id: storeId },
-        select: { wbsEnabled: true, wbsApiKey: true },
+        select: { wbsEnabled: true, credentials: { select: { wbsApiKey: true } } },
       });
 
-      if (!store?.wbsEnabled || !store.wbsApiKey) {
+      if (!store?.wbsEnabled || !store.credentials?.wbsApiKey) {
         res.status(400).json({
           success: false,
           error: 'WBS_NOT_CONFIGURED',
@@ -291,7 +291,7 @@ router.post(
 
       let apiKey: string;
       try {
-        apiKey = encryption.decrypt(store.wbsApiKey);
+        apiKey = encryption.decrypt(store.credentials.wbsApiKey);
       } catch {
         res.status(400).json({ success: false, error: 'WBS_KEY_INVALID' });
         return;

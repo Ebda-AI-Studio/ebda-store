@@ -787,3 +787,30 @@ export async function wbsBridgeKeys(): Promise<Array<{ storeId: string; wbsApiKe
     SELECT store_id, wbs_api_key FROM public.ebda_wbs_bridge_keys()`;
   return rows.map(r => ({ storeId: r.store_id, wbsApiKey: r.wbs_api_key }));
 }
+
+/**
+ * OneSignal player ids of a store's owner (`'store_admin'`, only for the store the
+ * transaction is scoped to: wrap in `withStore(storeId, ...)`) or of every active
+ * super_admin (`'super_admin'`). Device ids only.
+ */
+export async function adminPushPlayerIds(
+  role: 'store_admin' | 'super_admin',
+  storeId: string | null
+): Promise<string[]> {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT ebda_admin_push_player_ids AS id FROM public.ebda_admin_push_player_ids(${role}, ${storeId})`;
+  return rows.map(r => r.id).filter(Boolean);
+}
+
+/**
+ * One page of the PUBLIC store list (active, not deleted, newest first): ids and the total.
+ * The caller reads each store's public fields inside `withStore(id, ...)`.
+ */
+export async function publicStorePage(
+  skip: number,
+  take: number
+): Promise<{ ids: string[]; total: number }> {
+  const rows = await prisma.$queryRaw<Array<{ id: string; total: bigint }>>`
+    SELECT id, total FROM public.ebda_public_store_page(${skip}::int, ${take}::int)`;
+  return { ids: rows.map(r => r.id), total: rows.length ? Number(rows[0].total) : 0 };
+}

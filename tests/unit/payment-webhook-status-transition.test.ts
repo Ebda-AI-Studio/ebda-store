@@ -33,6 +33,7 @@ let paymentFindManyOverride: ((...a: unknown[]) => Promise<unknown[]>) | null = 
 const txMock = vi.fn((ops: unknown[]) => Promise.all(ops));
 
 vi.mock('@force/database', () => ({
+  currentStoreId: () => STORE_ID,
   prisma: {
     payment: {
       findFirst: (...a: unknown[]) => paymentFindFirst(...a),
@@ -353,7 +354,7 @@ describe('PaymentService.handleWebhook — state machine guard (sites 2/3 & 3/3)
 
     expect(assertValidTransitionMock).toHaveBeenCalledWith('pending', 'confirmed');
     expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: ORDER_ID },
+      where: { id: ORDER_ID, storeId: STORE_ID },
       data: { status: 'confirmed', paymentStatus: 'paid' },
     });
   });
@@ -721,7 +722,7 @@ describe('refund webhook — whole-order effects only for a refund that exhausts
 
     expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
     expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: ORDER_ID },
+      where: { id: ORDER_ID, storeId: STORE_ID },
       data: { status: 'refunded', paymentStatus: 'refunded' },
     });
     expect(refundWrite()?.status).toBe('refunded');

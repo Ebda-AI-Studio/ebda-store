@@ -199,7 +199,9 @@ export class TaxProfileService {
         'Upload a PDF, JPG or PNG. / ارفع ملف PDF أو JPG أو PNG.'
       );
     }
-    const count = await prisma.storeTaxDocument.count({ where: { profileId: current.id } });
+    const count = await prisma.storeTaxDocument.count({
+      where: { storeId, profileId: current.id },
+    });
     if (count >= TAX_DOCUMENT_MAX_COUNT) {
       throw new AppError(
         409,
@@ -262,7 +264,7 @@ export class TaxProfileService {
       select: { id: true, storageKey: true, kind: true },
     });
     if (!doc) throw new AppError(404, 'NOT_FOUND', 'Document not found');
-    await prisma.storeTaxDocument.delete({ where: { id: doc.id } });
+    await prisma.storeTaxDocument.delete({ where: { id: doc.id, storeId } });
     const storageKey = doc.storageKey;
     void deferAfterTenantCommit('taxProfile.deletePrivateObject', () =>
       StorageService.deletePrivate(storageKey)

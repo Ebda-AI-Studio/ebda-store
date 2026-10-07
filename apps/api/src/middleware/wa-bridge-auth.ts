@@ -15,7 +15,8 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '@force/database';
+import { withStore } from '@force/database';
+import { wbsBridgeKeys } from '../lib/definer';
 import { encryption } from '../services/encryption.service';
 import logger from '../lib/logger';
 
@@ -45,22 +46,12 @@ export async function waBridgeAuth(req: Request, res: Response, next: NextFuncti
   // tenant count today (<10 stores) — O(n) acceptable. For scale: index
   // a hash of the key into a separate `wbsApiKeyHash` column.
   try {
-    const stores = await prisma.store.findMany({
-      where: { wbsEnabled: true, wbsApiKey: { not: null } },
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        currency: true,
-        wbsClientId: true,
-        wbsApiKey: true,
-      },
-    });
+    const candidates = await wbsBridgeKeys();
 
-    const match = stores.find((s: (typeof stores)[number]) => {
-      if (!s.wbsApiKey) return false;
+    const match = candidates.find(c => {
+      if (!c.wbsApiKey) return false;
       try {
-        return encryption.decrypt(s.wbsApiKey) === apiKey;
+        return encryption.decrypt(c.wbsApiKey) === apiKey;
       } catch {
         return false;
       }
@@ -72,12 +63,25 @@ export async function waBridgeAuth(req: Request, res: Response, next: NextFuncti
       return;
     }
 
+    const store = await withStore(match.storeId, tx =>
+      tx.store.findUnique({
+        where: { id: match.storeId },
+        select: { id: true, slug: true, name: true, currency: true, wbsClientId: true },
+      })
+    );
+
+    if (!store) {
+      logger.warn({ ip: req.ip }, '[wa-bridge-auth] invalid api key');
+      res.status(401).json({ success: false, error: 'WBS_API_KEY_INVALID' });
+      return;
+    }
+
     req.bridgeStore = {
-      id: match.id,
-      slug: match.slug,
-      name: match.name,
-      currency: match.currency,
-      wbsClientId: match.wbsClientId,
+      id: store.id,
+      slug: store.slug,
+      name: store.name,
+      currency: store.currency,
+      wbsClientId: store.wbsClientId,
     };
     next();
   } catch (err) {

@@ -85,7 +85,11 @@ export async function sweepAllWarehouseStores(step: FanoutStep): Promise<Warehou
   // FORCE RLS: cron has no storeId — visit every store and keep the ones that
   // have at least one warehouse row.
   const stores = await step.run('list-stores-with-warehouses', async () =>
-    (await acrossStores(() => prisma.warehouse.findFirst({ select: { storeId: true } })))
+    (
+      await acrossStores(storeId =>
+        prisma.warehouse.findFirst({ where: { storeId }, select: { storeId: true } })
+      )
+    )
       .filter(r => r.value !== null)
       .map(r => ({ storeId: r.storeId }))
   );

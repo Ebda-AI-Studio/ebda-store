@@ -1,9 +1,10 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, storeDirectory } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runDeadstockScan } from '../../../services/accounting/deadstock-scan.service';
-import { aiEligiblePlanFilter, isAiEligiblePlan } from '../../ai-plan-eligibility';
+import { isAiEligiblePlan } from '../../ai-plan-eligibility';
+import type { StorePlan } from '@force/shared';
 import { featureService } from '../../../services/feature.service';
 
 import { REGION } from '@force/shared';
@@ -35,16 +36,14 @@ export const stockDeadstockScanCron: InngestFunction.Any = inngest.createFunctio
     // stores table does not filter to 0 rows (no tenant GUC is set).
     // runDeadstockScan() already wraps its own DB work in withRlsBypass.
     const stores = await step.run('list-stores', () =>
-      prisma.store.findMany({
-        where: {
-          accountingEnabled: true,
-          aiFeaturesEnabled: true,
-          deletedAt: null,
+      // `stores` is under RLS: a cron lists stores through the directory definer.
+      storeDirectory(
+        s =>
+          s.accountingEnabled &&
+          s.aiFeaturesEnabled &&
           // free (lapsed-payment / demo) plans are excluded from AI spend.
-          ...aiEligiblePlanFilter,
-        },
-        select: { id: true },
-      })
+          isAiEligiblePlan(s.plan as StorePlan)
+      ).then(list => list.map(s => ({ id: s.id })))
     );
 
     let totalFlagged = 0;

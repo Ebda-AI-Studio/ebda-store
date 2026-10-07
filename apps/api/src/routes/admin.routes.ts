@@ -28,7 +28,8 @@ import {
   acrossStores,
   acrossStoresFlat,
   withStore,
-  withUser,
+  asPlatformOperator,
+  currentStoreId,
   Prisma,
   UserRole,
   ProductStatus,
@@ -559,8 +560,8 @@ router.get(
       }
 
       const [users, total] = await Promise.all([
-        withUser(req.user!.userId, tx =>
-          tx.user.findMany({
+        asPlatformOperator(req.user!.userId, () =>
+          prisma.user.findMany({
             where,
             skip,
             take: limit,
@@ -580,7 +581,7 @@ router.get(
             },
           })
         ),
-        withUser(req.user!.userId, tx => tx.user.count({ where })),
+        asPlatformOperator(req.user!.userId, () => prisma.user.count({ where })),
       ]);
 
       res.json({
@@ -629,8 +630,8 @@ router.post(
       const data = schema.parse(req.body);
       const email = data.email.toLowerCase();
 
-      const existing = await withUser(req.user!.userId, tx =>
-        tx.user.findFirst({
+      const existing = await asPlatformOperator(req.user!.userId, () =>
+        prisma.user.findFirst({
           where: { email, storeId: null },
           select: { id: true },
         })
@@ -644,8 +645,8 @@ router.post(
       }
 
       const newPasswordHash = await bcrypt.hash(data.password, 12);
-      const user = await withUser(req.user!.userId, tx =>
-        tx.user.create({
+      const user = await asPlatformOperator(req.user!.userId, () =>
+        prisma.user.create({
           data: {
             email,
             firstName: data.firstName,
@@ -698,8 +699,8 @@ router.get(
     try {
       const { id } = req.params;
 
-      const user = await withUser(req.user!.userId, tx =>
-        tx.user.findUnique({
+      const user = await asPlatformOperator(req.user!.userId, () =>
+        prisma.user.findUnique({
           where: { id },
           select: {
             id: true,
@@ -760,8 +761,8 @@ router.put(
       });
       const data = schema.parse(req.body);
 
-      const existing = await withUser(req.user!.userId, tx =>
-        tx.user.findUnique({ where: { id } })
+      const existing = await asPlatformOperator(req.user!.userId, () =>
+        prisma.user.findUnique({ where: { id } })
       );
       if (!existing) {
         res.status(404).json({
@@ -774,8 +775,8 @@ router.put(
       // Email collision: if changing email, ensure no other user has it.
       if (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()) {
         const newEmail = data.email.toLowerCase();
-        const collide = await withUser(req.user!.userId, tx =>
-          tx.user.findFirst({
+        const collide = await asPlatformOperator(req.user!.userId, () =>
+          prisma.user.findFirst({
             where: { email: newEmail, id: { not: id } },
             select: { id: true },
           })
@@ -802,8 +803,8 @@ router.put(
         updateData.passwordHash = await bcrypt.hash(data.password, 12);
       }
 
-      const user = await withUser(req.user!.userId, tx =>
-        tx.user.update({
+      const user = await asPlatformOperator(req.user!.userId, () =>
+        prisma.user.update({
           where: { id },
           data: updateData,
           select: {
@@ -911,8 +912,8 @@ router.delete(
         return;
       }
 
-      const target = await withUser(req.user!.userId, tx =>
-        tx.user.findUnique({
+      const target = await asPlatformOperator(req.user!.userId, () =>
+        prisma.user.findUnique({
           where: { id },
           select: {
             id: true,
@@ -931,8 +932,8 @@ router.delete(
       }
 
       if (target.role === 'super_admin') {
-        const supers = await withUser(req.user!.userId, tx =>
-          tx.user.count({ where: { role: 'super_admin' } })
+        const supers = await asPlatformOperator(req.user!.userId, () =>
+          prisma.user.count({ where: { role: 'super_admin' } })
         );
         if (supers <= 1) {
           res.status(400).json({
@@ -965,7 +966,7 @@ router.delete(
       }
 
       try {
-        await withUser(req.user!.userId, tx => tx.user.delete({ where: { id } }));
+        await asPlatformOperator(req.user!.userId, () => prisma.user.delete({ where: { id } }));
       } catch (delErr) {
         // Any remaining FK reference (beyond the store-ownership guard above)
         // surfaces as a clean 409 instead of a raw 500.
@@ -1028,13 +1029,15 @@ router.get(
           // User count is platform-wide and only meaningful for super admins.
           // Store admins don't have access to the cross-tenant user table —
           // return 0 so the dashboard widget renders without leaking data.
-          ownerScope ? Promise.resolve(0) : prisma.user.count(),
+          ownerScope
+            ? Promise.resolve(0)
+            : asPlatformOperator(req.user!.userId, () => prisma.user.count()),
           acrossStores(
-            async () => {
+            async storeId => {
               const [count, revenue] = await Promise.all([
-                prisma.order.count(),
+                prisma.order.count({ where: { storeId } }),
                 prisma.order.aggregate({
-                  where: { paymentStatus: 'paid' },
+                  where: { storeId, paymentStatus: 'paid' },
                   _sum: { total: true },
                 }),
               ]);
@@ -1058,6 +1061,7 @@ router.get(
             orderKey: (row: { createdAt: Date }) => row.createdAt,
             fetch: async window => ({
               rows: await prisma.order.findMany({
+                where: { storeId: currentStoreId() },
                 take: window,
                 orderBy: { createdAt: 'desc' },
                 include: {
@@ -1125,9 +1129,10 @@ router.get(
 
         orderKey: (row: { createdAt: Date }) => row.createdAt,
         fetch: async window => {
+          const scoped: Prisma.ProductWhereInput = { ...where, storeId: currentStoreId() };
           const [rows, count] = await Promise.all([
             prisma.product.findMany({
-              where,
+              where: scoped,
               take: window,
               orderBy: { createdAt: 'desc' },
               include: {
@@ -1135,7 +1140,7 @@ router.get(
                 images: { take: 1 },
               },
             }),
-            prisma.product.count({ where }),
+            prisma.product.count({ where: scoped }),
           ]);
           return { rows, total: count };
         },
@@ -1177,7 +1182,7 @@ router.get(
       const product = productStoreId
         ? await withStore(productStoreId, tx =>
             tx.product.findUnique({
-              where: { id },
+              where: { id, storeId: productStoreId },
               include: {
                 store: { select: { id: true, name: true, slug: true } },
                 images: { orderBy: { position: 'asc' } },
@@ -1249,9 +1254,10 @@ router.get(
 
         orderKey: (row: { createdAt: Date }) => row.createdAt,
         fetch: async window => {
+          const scoped: Prisma.OrderWhereInput = { ...where, storeId: currentStoreId() };
           const [rows, count] = await Promise.all([
             prisma.order.findMany({
-              where,
+              where: scoped,
               take: window,
               orderBy: { createdAt: 'desc' },
               include: {
@@ -1260,7 +1266,7 @@ router.get(
                 items: { take: 3 },
               },
             }),
-            prisma.order.count({ where }),
+            prisma.order.count({ where: scoped }),
           ]);
           return { rows, total: count };
         },
@@ -1314,9 +1320,10 @@ router.get(
 
         orderKey: (row: { createdAt: Date }) => row.createdAt,
         fetch: async window => {
+          const scoped: Prisma.CustomerWhereInput = { ...where, storeId: currentStoreId() };
           const [rows, count] = await Promise.all([
             prisma.customer.findMany({
-              where,
+              where: scoped,
               take: window,
               orderBy: { createdAt: 'desc' },
               select: {
@@ -1331,7 +1338,7 @@ router.get(
                 store: { select: { id: true, name: true } },
               },
             }),
-            prisma.customer.count({ where }),
+            prisma.customer.count({ where: scoped }),
           ]);
           return { rows, total: count };
         },
@@ -1440,11 +1447,17 @@ router.get(
       // aiUsage has RLS: aggregate store by store (`acrossStores`, one short tenant
       // transaction each) and merge the per-store partials.
       const result = await (async () => {
-        const perStore = await acrossStores(async () => {
+        const perStore = await acrossStores(async storeId => {
           const [today, month, cached] = await Promise.all([
-            prisma.aiUsage.count({ where: { createdAt: { gte: startOfDay }, cachedHit: false } }),
-            prisma.aiUsage.count({ where: { createdAt: { gte: startOfMonth }, cachedHit: false } }),
-            prisma.aiUsage.count({ where: { createdAt: { gte: startOfMonth }, cachedHit: true } }),
+            prisma.aiUsage.count({
+              where: { storeId, createdAt: { gte: startOfDay }, cachedHit: false },
+            }),
+            prisma.aiUsage.count({
+              where: { storeId, createdAt: { gte: startOfMonth }, cachedHit: false },
+            }),
+            prisma.aiUsage.count({
+              where: { storeId, createdAt: { gte: startOfMonth }, cachedHit: true },
+            }),
           ]);
           // Per-store aggregations: today count, month count, last call, feature breakdown
           const stats = await prisma.$queryRaw<
@@ -1616,15 +1629,23 @@ router.get(
  * (A string-key sibling — the warehouse backfill's `distinct` + `skip` /
  * `take` over 240 rows — was checked the same way and pages correctly.)
  */
-export async function loadUsageHistoryRows(tx: Prisma.TransactionClient, months: number) {
+export async function loadUsageHistoryRows(
+  tx: Prisma.TransactionClient,
+  months: number,
+  // The store being read. `acrossStores` always passes it; only the owner-role
+  // integration test (RLS bypassed, every store at once) calls without.
+  storeId?: string
+) {
+  const storeFilter = storeId ? { storeId } : {};
   const periods = await tx.storeUsageSnapshot.groupBy({
     by: ['periodStart'],
+    where: storeFilter,
     orderBy: { periodStart: 'desc' },
     take: months,
   });
   if (periods.length === 0) return [];
   return tx.storeUsageSnapshot.findMany({
-    where: { periodStart: { in: periods.map(p => p.periodStart) } },
+    where: { ...storeFilter, periodStart: { in: periods.map(p => p.periodStart) } },
     orderBy: [{ periodStart: 'desc' }],
     include: { store: { select: { slug: true, name: true, plan: true } } },
   });
@@ -1637,8 +1658,8 @@ export async function loadUsageHistoryRows(tx: Prisma.TransactionClient, months:
  * `months` are always inside that store's own top `months`).
  */
 export async function loadUsageHistoryRowsAcrossStores(months: number) {
-  const perStore = await acrossStores(() =>
-    loadUsageHistoryRows(prisma as unknown as Prisma.TransactionClient, months)
+  const perStore = await acrossStores(storeId =>
+    loadUsageHistoryRows(prisma as unknown as Prisma.TransactionClient, months, storeId)
   );
   const rows = perStore.flatMap(p => p.value);
   const keep = new Set(
@@ -1804,7 +1825,7 @@ router.get(
         while (true) {
           const rows = await withStore(exportStoreId, tx =>
             tx.order.findMany({
-              where,
+              where: { ...where, storeId: exportStoreId },
               orderBy: { id: 'asc' }, // stable cursor anchor
               take: EXPORT_CHUNK_SIZE,
               // Prisma cursor: skip the cursor row itself (skip: 1) on every
@@ -1912,9 +1933,9 @@ router.get(
       // cut to the same 50 000-row ceiling as before.
       const orders = (
         await acrossStoresFlat(
-          () =>
+          sid =>
             prisma.order.findMany({
-              where,
+              where: { ...where, storeId: sid },
               orderBy: { createdAt: 'asc' },
               take: 50000,
               select: {
@@ -2055,17 +2076,19 @@ router.post(
       // users table has no RLS — plain lookup works under ebda_app without bypass.
       // We intentionally leave this as-is: adding withRlsBypass here would be
       // over-engineering (the policy doesn't exist) and would waste a tx slot.
-      const target = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          storeId: true,
-          deletedAt: true,
-          tokenVersion: true,
-        },
-      });
+      const target = await asPlatformOperator(req.user!.userId, () =>
+        prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            storeId: true,
+            deletedAt: true,
+            tokenVersion: true,
+          },
+        })
+      );
 
       if (!target) {
         res.status(404).json({

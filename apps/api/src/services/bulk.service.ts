@@ -132,6 +132,7 @@ export function buildVariantTitle(values: string[]): string {
  */
 async function createVariantsForProductTx(
   tx: Prisma.TransactionClient,
+  storeId: string,
   productId: string,
   variants: VariantImportRow[]
 ): Promise<number> {
@@ -251,7 +252,7 @@ async function createVariantsForProductTx(
   }
 
   // 5) We bypass variant.service, so we own the hasVariants flag.
-  await tx.product.update({ where: { id: productId }, data: { hasVariants: true } });
+  await tx.product.update({ where: { id: productId, storeId }, data: { hasVariants: true } });
   return createdVariants.length;
 }
 
@@ -979,7 +980,7 @@ export class BulkService {
               if (existing) {
                 // Update existing product
                 await tx.product.update({
-                  where: { id: existing.id },
+                  where: { id: existing.id, storeId },
                   data: productFields,
                 });
                 productId = existing.id;
@@ -1097,6 +1098,7 @@ export class BulkService {
               if (productFields.sku && variantsByParent.has(productFields.sku)) {
                 const made = await createVariantsForProductTx(
                   tx,
+                  storeId,
                   productId,
                   variantsByParent.get(productFields.sku)!
                 );
@@ -1156,7 +1158,7 @@ export class BulkService {
       }
       try {
         await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-          const made = await createVariantsForProductTx(tx, existing.id, variants);
+          const made = await createVariantsForProductTx(tx, storeId, existing.id, variants);
           result.variantsCreated += made;
         });
       } catch (error) {

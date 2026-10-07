@@ -97,6 +97,31 @@ export const IDENTITY_MODELS: Readonly<Record<string, string>> = {
 
 export const STORE_MODEL = 'Store';
 
+/**
+ * Rows that belong to ONE USER, not to a store (no storeId): their RLS keys on
+ * `app.current_user_id`. The key must be the ambient user (`withUser` / `userContext`), or
+ * the 'platform-operator' hatch. Value: the user-id column.
+ */
+export const USER_KEYED_MODELS: Readonly<Record<string, string>> = {
+  Address: 'userId',
+  OneSignalSubscription: 'userId',
+  RefreshToken: 'userId',
+  VerificationToken: 'userId',
+};
+
+/**
+ * Platform-global models: no tenant and no user data (catalog, config, provider-event
+ * dedupe). Not guarded. Every model must be in exactly one class; the list is checked
+ * against the schema by tests/unit/tenant-guard-models.test.ts, so a new model fails CI
+ * until it is classified.
+ */
+export const GLOBAL_MODELS: readonly string[] = [
+  'AnswerEngineProviderConfig',
+  'BillingWebhookEvent',
+  'Plan',
+  'SystemSetting',
+];
+
 interface ModelMeta {
   tenant: Set<string>;
   child: Set<string>;
@@ -130,7 +155,10 @@ function modelMeta(): ModelMeta {
       guardedTables.add((m.dbName ?? m.name).toLowerCase());
     }
   }
-  guardedTables.add('store_credentials');
+  for (const name of Object.keys(USER_KEYED_MODELS)) {
+    const um = models.find(x => x.name === name);
+    if (um) guardedTables.add((um.dbName ?? um.name).toLowerCase());
+  }
   meta = { tenant, child, relations, guardedTables };
   return meta;
 }
@@ -291,6 +319,25 @@ export function assertTenantScoped(
   const isTenant = m.tenant.has(model);
   const isStore = model === STORE_MODEL;
   const isChild = m.child.has(model);
+  const userKey = USER_KEYED_MODELS[model];
+  if (userKey) {
+    if (!KNOWN_OPS.has(operation)) fail(`unknown operation (the guard fails closed)`);
+    if (scope.hatch === 'platform-operator') return;
+    if (!scope.userId) fail('a user-keyed model needs an ambient user (withUser / userContext)');
+    if (WHERE_OPS.has(operation) || operation === 'upsert') {
+      if (keyVerdict(a.where, userKey, scope.userId) !== 'match') {
+        fail(`where.${userKey} is not the ambient user`);
+      }
+    }
+    if (CREATE_OPS.has(operation) || operation === 'upsert') {
+      for (const r of operation === 'upsert' ? rows(a.create) : rows(a.data)) {
+        const owner =
+          r[userKey] ?? (isObj(r.user) && isObj(r.user.connect) ? r.user.connect.id : undefined);
+        if (owner !== scope.userId) fail(`create does not set ${userKey} to the ambient user`);
+      }
+    }
+    return;
+  }
   if (!isTenant && !isStore && !isChild) {
     // Not tenant data (plans, tokens, settings): only nested tenant writes are checked.
     checkNestedWrites(model, a.data, scope, fail);

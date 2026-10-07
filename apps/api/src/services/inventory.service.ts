@@ -314,7 +314,7 @@ export class InventoryService {
     // Update product and create history in transaction
     const [updatedProduct, history] = await prisma.$transaction([
       prisma.product.update({
-        where: { id: adjustment.productId },
+        where: { id: adjustment.productId, storeId },
         data: { inventory: newStock },
         select: {
           id: true,
@@ -490,7 +490,7 @@ export class InventoryService {
     await prisma.$transaction([
       ...plans.map(p =>
         prisma.product.update({
-          where: { id: p.adjustment.productId },
+          where: { id: p.adjustment.productId, storeId },
           data: { inventory: p.newStock },
         })
       ),
@@ -555,7 +555,7 @@ export class InventoryService {
     // Update product and create history in transaction
     const [updatedProduct, history] = await prisma.$transaction([
       prisma.product.update({
-        where: { id: productId },
+        where: { id: productId, storeId },
         data: { inventory: newQuantity },
         select: {
           id: true,
@@ -649,7 +649,7 @@ export class InventoryService {
     }
 
     const updated = await prisma.product.update({
-      where: { id: productId },
+      where: { id: productId, storeId },
       data: { lowStockThreshold: threshold },
       select: {
         id: true,
@@ -800,7 +800,7 @@ export class InventoryService {
 
     await prisma.$transaction([
       prisma.product.update({
-        where: { id: productId },
+        where: { id: productId, storeId },
         data: { inventory: newStock },
       }),
       prisma.inventoryHistory.create({
@@ -844,7 +844,7 @@ export class InventoryService {
 
     await prisma.$transaction([
       prisma.product.update({
-        where: { id: productId },
+        where: { id: productId, storeId },
         data: { inventory: newStock },
       }),
       prisma.inventoryHistory.create({

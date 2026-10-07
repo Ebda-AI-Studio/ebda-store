@@ -191,9 +191,9 @@ export async function handleAgentWriteDeniedWatch(): Promise<{
   // single global `take`.
   // Per store (each in its own tenant scope): `audit_logs` is store-scoped.
   const activeStores = (
-    await acrossStores(() =>
+    await acrossStores(storeId =>
       prisma.auditLog.count({
-        where: { action: 'agent.write.denied', createdAt: { gte: since } },
+        where: { action: 'agent.write.denied', createdAt: { gte: since }, storeId },
       })
     )
   )
@@ -277,7 +277,8 @@ export async function handleAgentWriteDeniedWatch(): Promise<{
   const priorAgentStores = new Set<string>();
   if (storeIdsInWindow.length > 0) {
     const prior = await acrossStores(
-      () => prisma.order.findFirst({ where: { source: 'agent' }, select: { storeId: true } }),
+      storeId =>
+        prisma.order.findFirst({ where: { source: 'agent', storeId }, select: { storeId: true } }),
       { storeIds: storeIdsInWindow }
     );
     for (const row of prior) {

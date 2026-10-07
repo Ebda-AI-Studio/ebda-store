@@ -453,7 +453,7 @@ export class LoyaltyService {
 
     const txs: Prisma.PrismaPromise<unknown>[] = [
       prisma.loyaltyPoints.update({
-        where: { id: loyalty.id },
+        where: { id: loyalty.id, storeId },
         data: {
           points: { increment: pointsEarned },
           totalEarned: { increment: pointsEarned },
@@ -607,7 +607,7 @@ export class LoyaltyService {
 
         const newTier = this.calculateTier(newTotalEarned, settings);
         const updated = await tx.loyaltyPoints.update({
-          where: { id: loyalty.id },
+          where: { id: loyalty.id, storeId },
           data: {
             points: newPoints,
             totalEarned: newTotalEarned,
@@ -869,7 +869,7 @@ export class LoyaltyService {
         if (raced) return { pointsRecredited: 0, newBalance: loyalty.points };
 
         const updated = await tx.loyaltyPoints.update({
-          where: { id: loyalty.id },
+          where: { id: loyalty.id, storeId },
           data: {
             points: { increment: pointsToRecredit },
             totalRedeemed: Math.max(0, loyalty.totalRedeemed - pointsToRecredit),
@@ -955,7 +955,7 @@ export class LoyaltyService {
     const isPositive = points > 0;
     const [updated] = await prisma.$transaction([
       prisma.loyaltyPoints.update({
-        where: { id: loyalty.id },
+        where: { id: loyalty.id, storeId },
         data: {
           points: { increment: points },
           totalEarned: isPositive ? { increment: points } : undefined,
@@ -1062,7 +1062,7 @@ export class LoyaltyService {
 
     await prisma.$transaction([
       prisma.loyaltyPoints.update({
-        where: { id: loyalty.id },
+        where: { id: loyalty.id, storeId },
         data: {
           points: { increment: reviewBonus },
           totalEarned: { increment: reviewBonus },

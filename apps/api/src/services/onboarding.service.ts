@@ -235,7 +235,7 @@ export class OnboardingService {
     }
     if (existing) {
       await prisma.paymentConfig.update({
-        where: { id: existing.id },
+        where: { id: existing.id, storeId },
         data: { isEnabled: methods.cod },
       });
     } else {

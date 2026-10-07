@@ -207,7 +207,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
       // failures — a Gemini error doesn't roll back this update.
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: { status: 'running', startedAt: new Date(), force },
         })
       );
@@ -225,7 +225,10 @@ const bulkAiRecommendationsFn = inngest.createFunction(
           },
         });
 
-        await prisma.bulkAiJob.update({ where: { id: jobId }, data: { total: products.length } });
+        await prisma.bulkAiJob.update({
+          where: { id: jobId, storeId },
+          data: { total: products.length },
+        });
 
         return products.map(p => ({
           id: p.id,
@@ -242,7 +245,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
         // invalidating nothing.
         await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
         await prisma.bulkAiJob.update({
-          where: { id: jobId },
+          where: { id: jobId, storeId },
           data: {
             status: 'completed',
             completedAt: new Date(),
@@ -274,7 +277,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
 
         const result: RecBatchResult = await step.run(`batch-${i}`, async () => {
           const currentJob = await prisma.bulkAiJob.findUnique({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             select: { status: true },
           });
           if (currentJob?.status === 'cancelled') {
@@ -332,7 +335,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
 
             // Fresh re-fetch — the idempotency re-check.
             const product = await prisma.product.findUnique({
-              where: { id: productId },
+              where: { id: productId, storeId },
               select: { id: true, name: true, description: true },
             });
             if (!product) {
@@ -492,7 +495,7 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
 
         await step.run(`progress-${i}`, () =>
           prisma.bulkAiJob.update({
-            where: { id: jobId },
+            where: { id: jobId, storeId },
             data: { processed, filled, skipped, failed, errors: errors as object },
           })
         );
@@ -520,7 +523,7 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
       // Only mark completed if the merchant didn't cancel — otherwise the
       // status row already says 'cancelled' from the cancel endpoint.
       const finalRow = await prisma.bulkAiJob.findUnique({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         select: { status: true },
       });
 
@@ -533,7 +536,7 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
       // via the tag the public fetches carry.
       await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await prisma.bulkAiJob.update({
-        where: { id: jobId },
+        where: { id: jobId, storeId },
         data: {
           status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
           processed,

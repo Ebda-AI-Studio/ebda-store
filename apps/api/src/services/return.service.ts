@@ -790,6 +790,7 @@ export class ReturnService {
 
       if (isGatewayRefund && returnRequest.orderId && !skipProvider) {
         const plan = await this.planGatewayRefund(
+          storeId,
           returnId,
           returnRequest.orderId,
           isFullReturn,
@@ -1142,6 +1143,7 @@ export class ReturnService {
     } else {
       try {
         const plan = await this.planGatewayRefund(
+          storeId,
           returnId,
           returnRequest.orderId,
           isFullReturn,
@@ -1263,8 +1265,12 @@ export class ReturnService {
    * left to do. PaymentService refuses the same key again under the payment
    * lock; this names it before any other check can give a misleading reason.
    */
-  private static async refuseIfRefundAlreadyIssued(paymentId: string, returnId: string) {
-    const outstanding = await findOutstandingRefundClaims(paymentId, `return:${returnId}`);
+  private static async refuseIfRefundAlreadyIssued(
+    storeId: string,
+    paymentId: string,
+    returnId: string
+  ) {
+    const outstanding = await findOutstandingRefundClaims(paymentId, `return:${returnId}`, storeId);
     if (outstanding.length > 0) {
       throw new AppError(
         409,
@@ -1279,6 +1285,7 @@ export class ReturnService {
    * to send. Throws the merchant-facing reason when the gateway cannot take it.
    */
   private static async planGatewayRefund(
+    storeId: string,
     returnId: string,
     orderId: string,
     isFullReturn: boolean,
@@ -1323,7 +1330,7 @@ export class ReturnService {
         select: { id: true },
       });
       if (spent) {
-        await this.refuseIfRefundAlreadyIssued(spent.id, returnId);
+        await this.refuseIfRefundAlreadyIssued(storeId, spent.id, returnId);
         throw new AppError(
           409,
           'PAYMENT_FULLY_REFUNDED',
@@ -1351,7 +1358,7 @@ export class ReturnService {
     // Before any amount check: if THIS return already sent a refund, every
     // other reason to refuse is a distraction — the balance is short because
     // of that very refund.
-    await this.refuseIfRefundAlreadyIssued(payment.id, returnId);
+    await this.refuseIfRefundAlreadyIssued(storeId, payment.id, returnId);
     // Everything below budgets against what is LEFT on the payment, not its
     // original amount — a prior partial refund already sent part of it back.
     const alreadyRefunded = payment.refundedAmount ?? 0;

@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, withStore } from '@force/database';
+import { withStore, storeDirectory } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -23,10 +23,10 @@ export const accountingDailyClose: InngestFunction.Any = inngest.createFunction(
   async ({ step }) => {
     // FORCE RLS: cross-tenant cron — use withRlsBypass to enumerate stores.
     const stores = await step.run('list-stores-with-accounting', () =>
-      prisma.store.findMany({
-        where: { accountingEnabled: true, deletedAt: null },
-        select: { id: true, name: true, slug: true },
-      })
+      // `stores` is under RLS: a cron lists stores through the directory definer.
+      storeDirectory(s => s.accountingEnabled).then(list =>
+        list.map(s => ({ id: s.id, name: s.name, slug: s.slug }))
+      )
     );
 
     let drifts = 0;

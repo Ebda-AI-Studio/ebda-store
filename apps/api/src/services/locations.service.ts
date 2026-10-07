@@ -27,7 +27,7 @@ export class LocationsService {
     // store-scope the update so a tenant can't touch another store's row by id
     const res = await prisma.storeLocation.updateMany({ where: { id, storeId }, data });
     if (res.count === 0) return null;
-    const location = await prisma.storeLocation.findUnique({ where: { id } });
+    const location = await prisma.storeLocation.findUnique({ where: { id, storeId } });
     await LocationsService.bustFooterCache(storeId);
     return location;
   }

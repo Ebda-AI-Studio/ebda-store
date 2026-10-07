@@ -117,7 +117,7 @@ beforeEach(() => {
 describe('GET status — never the key, in any form', () => {
   it('reports hasKey without returning the stored ciphertext', async () => {
     mockPrisma.store.findUnique.mockResolvedValue({
-      agentApiKey: 'CIPHERTEXT(fak_the_real_secret)',
+      credentials: { agentApiKey: 'CIPHERTEXT(fak_the_real_secret)' },
       agentApiKeyRotatedAt: new Date('2026-09-09T10:00:00.000Z'),
     });
 
@@ -136,7 +136,7 @@ describe('GET status — never the key, in any form', () => {
 
   it('reports hasKey=false and a null rotation stamp when no key was ever issued', async () => {
     mockPrisma.store.findUnique.mockResolvedValue({
-      agentApiKey: null,
+      credentials: null,
       agentApiKeyRotatedAt: null,
     });
 
@@ -158,7 +158,7 @@ describe('GET status — never the key, in any form', () => {
 describe('GET status — the escape hatch is reported honestly', () => {
   beforeEach(() => {
     mockPrisma.store.findUnique.mockResolvedValue({
-      agentApiKey: null,
+      credentials: null,
       agentApiKeyRotatedAt: null,
     });
   });
@@ -186,7 +186,7 @@ describe('GET status — the escape hatch is reported honestly', () => {
 
 describe('POST mint/rotate — the plaintext leaves exactly once', () => {
   it('returns the plaintext key on mint and stores only the ciphertext', async () => {
-    mockPrisma.store.findUnique.mockResolvedValue({ agentApiKey: null });
+    mockPrisma.store.findUnique.mockResolvedValue({ credentials: null });
 
     const res = await request(app).post(BASE);
 
@@ -198,19 +198,26 @@ describe('POST mint/rotate — the plaintext leaves exactly once', () => {
     expect(mockPrisma.store.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: STORE_ID },
-        data: expect.objectContaining({ agentApiKey: `CIPHERTEXT(${key})` }),
+        data: expect.objectContaining({
+          credentials: {
+            upsert: {
+              create: { agentApiKey: `CIPHERTEXT(${key})` },
+              update: { agentApiKey: `CIPHERTEXT(${key})` },
+            },
+          },
+        }),
       })
     );
   });
 
   it('a subsequent read cannot produce the key that was just minted', async () => {
-    mockPrisma.store.findUnique.mockResolvedValue({ agentApiKey: null });
+    mockPrisma.store.findUnique.mockResolvedValue({ credentials: null });
     const mint = await request(app).post(BASE);
     const key = mint.body.data.apiKey as string;
 
     // The store now holds the ciphertext the mint wrote.
     mockPrisma.store.findUnique.mockResolvedValue({
-      agentApiKey: `CIPHERTEXT(${key})`,
+      credentials: { agentApiKey: `CIPHERTEXT(${key})` },
       agentApiKeyRotatedAt: new Date(),
     });
 
@@ -220,27 +227,30 @@ describe('POST mint/rotate — the plaintext leaves exactly once', () => {
   });
 
   it('mints a DIFFERENT key each time — never a derivable or reused value', async () => {
-    mockPrisma.store.findUnique.mockResolvedValue({ agentApiKey: null });
+    mockPrisma.store.findUnique.mockResolvedValue({ credentials: null });
     const a = (await request(app).post(BASE)).body.data.apiKey;
     const b = (await request(app).post(BASE)).body.data.apiKey;
     expect(a).not.toBe(b);
   });
 
   it('flags a rotation and immediately overwrites the previous ciphertext', async () => {
-    mockPrisma.store.findUnique.mockResolvedValue({ agentApiKey: 'CIPHERTEXT(fak_old)' });
+    mockPrisma.store.findUnique.mockResolvedValue({
+      credentials: { agentApiKey: 'CIPHERTEXT(fak_old)' },
+    });
 
     const res = await request(app).post(BASE);
 
     expect(res.status).toBe(201);
     expect(res.body.data.rotated).toBe(true);
-    const written = mockPrisma.store.update.mock.calls[0][0].data.agentApiKey as string;
+    const written = mockPrisma.store.update.mock.calls[0][0].data.credentials.upsert.update
+      .agentApiKey as string;
     expect(written).not.toBe('CIPHERTEXT(fak_old)');
     // No overlap window: the old value is replaced, not kept alongside.
     expect(JSON.stringify(mockPrisma.store.update.mock.calls[0][0])).not.toContain('fak_old');
   });
 
   it('audits the issue with the acting user', async () => {
-    mockPrisma.store.findUnique.mockResolvedValue({ agentApiKey: null });
+    mockPrisma.store.findUnique.mockResolvedValue({ credentials: null });
     const res = await request(app).post(BASE);
     expect(mockAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'store.agent_key_issued', userId: 'admin-1' })
@@ -252,7 +262,9 @@ describe('POST mint/rotate — the plaintext leaves exactly once', () => {
 
 describe('DELETE revoke — the column is actually cleared', () => {
   it('nulls agentApiKey, not just the rotation stamp', async () => {
-    mockPrisma.store.findUnique.mockResolvedValue({ agentApiKey: 'CIPHERTEXT(fak_live)' });
+    mockPrisma.store.findUnique.mockResolvedValue({
+      credentials: { agentApiKey: 'CIPHERTEXT(fak_live)' },
+    });
 
     const res = await request(app).delete(BASE);
 
@@ -263,13 +275,17 @@ describe('DELETE revoke — the column is actually cleared', () => {
     expect(mockPrisma.store.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: STORE_ID },
-        data: expect.objectContaining({ agentApiKey: null }),
+        data: expect.objectContaining({
+          credentials: { upsert: { create: { agentApiKey: null }, update: { agentApiKey: null } } },
+        }),
       })
     );
   });
 
   it('audits the revoke and records whether there was a key to revoke', async () => {
-    mockPrisma.store.findUnique.mockResolvedValue({ agentApiKey: 'CIPHERTEXT(fak_live)' });
+    mockPrisma.store.findUnique.mockResolvedValue({
+      credentials: { agentApiKey: 'CIPHERTEXT(fak_live)' },
+    });
     await request(app).delete(BASE);
     expect(mockAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({

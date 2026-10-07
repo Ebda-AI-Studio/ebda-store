@@ -25,7 +25,10 @@ const h = vi.hoisted(() => ({
   sendSms: vi.fn(async () => ({ messageId: 'm1' })),
 }));
 
-vi.mock('@force/database', () => ({ prisma: { notificationLog: h.notificationLog } }));
+vi.mock('@force/database', () => ({
+  prisma: { notificationLog: h.notificationLog },
+  runInStoreScope: (_storeId: string, fn: () => unknown) => fn(),
+}));
 vi.mock('@api/services/redis.service', () => ({
   redis: { isAvailable: () => true, getClient: () => h.client },
 }));

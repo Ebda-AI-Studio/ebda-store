@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, storeDirectory } from '@force/database';
 import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';
@@ -43,10 +43,8 @@ export const stockLowStockAlertCron: InngestFunction.Any = inngest.createFunctio
   async ({ step }) => {
     // FORCE RLS: cron has no storeId — use withRlsBypass to enumerate stores.
     const stores = await step.run('list-stores', () =>
-      prisma.store.findMany({
-        where: { deletedAt: null },
-        select: { id: true },
-      })
+      // `stores` is under RLS: a cron lists stores through the directory definer.
+      storeDirectory().then(list => list.map(s => ({ id: s.id })))
     );
 
     let totalAlerted = 0;

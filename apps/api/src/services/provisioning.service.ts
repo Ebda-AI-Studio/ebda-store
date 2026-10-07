@@ -408,10 +408,10 @@ export class ProvisioningService {
     const counts = new Map(
       (
         await acrossStores(
-          async () => {
+          async storeId => {
             const [products, orders] = await Promise.all([
-              prisma.product.count(),
-              prisma.order.count(),
+              prisma.product.count({ where: { storeId } }),
+              prisma.order.count({ where: { storeId } }),
             ]);
             return { products, orders };
           },

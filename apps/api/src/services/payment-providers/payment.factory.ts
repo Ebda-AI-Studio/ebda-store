@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { prisma, Prisma, runInTenantContext, withStore } from '@force/database';
+import { currentStoreId, prisma, Prisma, runInTenantContext, withStore } from '@force/database';
 import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
@@ -139,38 +139,27 @@ class PaymentFactory {
     let defaultProvider: PaymentProvider | null = null;
 
     try {
-      // First try to get store-specific config, then fall back to global.
+      // A store's providers come only from ITS OWN paymentConfig rows, read inside that
+      // store's scope (`withStore`: it reuses the request's transaction when one is open
+      // for the same store, otherwise it opens a short one). Without the scope the first
+      // caller outside a transaction (the storefront's GET /payments/config) cached "no
+      // providers" for five minutes and every online checkout failed (SP6a).
       //
-      // Under strict RLS a read with no store scope sees NO tenant rows, so a
-      // store's configs are read inside that store's scope (`withStore`: it reuses
-      // the request's transaction when one is open for the same store, otherwise
-      // it opens a short one). Without this the first caller outside a transaction
-      // (the storefront's GET /payments/config) cached "no providers" for five
-      // minutes and every online checkout failed (SP6a).
-      const read = <T>(fn: () => Promise<T>): Promise<T> =>
-        storeId !== null ? withStore(storeId, fn) : fn();
-      let dbConfigs = await read(() =>
-        prisma.paymentConfig.findMany({
-          where: {
-            storeId: storeId,
-            isEnabled: true,
-          },
-          orderBy: { provider: 'asc' },
-        })
-      );
-
-      // If no store-specific config, try global config
-      if (dbConfigs.length === 0 && storeId !== null) {
-        dbConfigs = await read(() =>
-          prisma.paymentConfig.findMany({
-            where: {
-              storeId: null,
-              isEnabled: true,
-            },
-            orderBy: { provider: 'asc' },
-          })
-        );
-      }
+      // There are no platform-level (storeId NULL) configs for the app role: strict RLS
+      // hides NULL-store rows and the code-level tenant guard refuses an unscoped read
+      // (R-EBDA-007), so the old "fall back to global" read could only ever return nothing.
+      const dbConfigs =
+        storeId === null
+          ? []
+          : await withStore(storeId, () =>
+              prisma.paymentConfig.findMany({
+                where: {
+                  storeId: storeId,
+                  isEnabled: true,
+                },
+                orderBy: { provider: 'asc' },
+              })
+            );
 
       // There is NO environment-variable fallback: providers come only from a
       // paymentConfig row the merchant saved in settings (their own keys), so a
@@ -408,7 +397,7 @@ export async function alertIfDuplicateCapture(
     });
     if (!duplicate) return;
     const order = await prisma.order.findUnique({
-      where: { id: orderId },
+      where: { id: orderId, storeId: currentStoreId() },
       select: { storeId: true, store: { select: { name: true } } },
     });
     logger.error(
@@ -454,10 +443,12 @@ function commitOnOwnTransaction<T>(storeId: string | undefined, fn: () => Promis
  */
 export async function findOutstandingRefundClaims(
   paymentId: string,
-  refundKey: string
+  refundKey: string,
+  storeId: string
 ): Promise<string[]> {
   const rows = await prisma.paymentEvent.findMany({
     where: {
+      storeId,
       paymentId,
       eventType: { in: [REFUND_CLAIM_EVENT, REFUND_RELEASED_EVENT] },
       details: { path: ['refundKey'], equals: refundKey },
@@ -1052,7 +1043,11 @@ export class PaymentService {
       // Evaluated after the CAS so the payment row lock serialises two claims
       // for the same key.
       if (request.refundKey) {
-        const outstanding = await findOutstandingRefundClaims(payment.id, request.refundKey);
+        const outstanding = await findOutstandingRefundClaims(
+          payment.id,
+          request.refundKey,
+          moneyStoreId
+        );
         if (outstanding.length > 0) {
           throw new AppError(
             409,
@@ -1229,7 +1224,7 @@ export class PaymentService {
         });
         if (flipsOrder) {
           await prisma.order.update({
-            where: { id: payment.orderId },
+            where: { id: payment.orderId, storeId: moneyStoreId },
             data: { status: 'refunded', paymentStatus: 'refunded' },
           });
         }
@@ -1324,7 +1319,7 @@ export class PaymentService {
     // double-up the restore.
     if (flipsOrder) {
       const order = await prisma.order.findUnique({
-        where: { id: payment.orderId },
+        where: { id: payment.orderId, storeId: moneyStoreId },
         select: { storeId: true },
       });
       if (order) {
@@ -1706,7 +1701,7 @@ export class PaymentService {
         // retry re-enters this branch and re-runs the (idempotent) effects +
         // this flip, instead of losing the order flip forever.
         await prisma.order.update({
-          where: { id: payment.orderId },
+          where: { id: payment.orderId, storeId: payment.order.storeId },
           data: { status: 'refunded', paymentStatus: 'refunded' },
         });
         // Bust the admin aggregated-customers snapshot — this paymentStatus
@@ -2069,7 +2064,7 @@ export class PaymentService {
     // transition.
     if (webhookData.status !== 'pending' && webhookData.status !== 'processing') {
       await prisma.order.update({
-        where: { id: payment.orderId },
+        where: { id: payment.orderId, storeId: currentStoreId() },
         data: {
           status: orderStatus,
           paymentStatus: orderPaymentStatus,

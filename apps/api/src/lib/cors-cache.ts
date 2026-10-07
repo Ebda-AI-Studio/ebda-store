@@ -172,6 +172,13 @@ export function corsStoreOriginWhere(rawHost: string) {
       lookup.by === 'slug'
         ? { slug: lookup.slug, ...live }
         : { ...storeDomainWhere(lookup.domain), ...live },
+    /**
+     * The same predicate as `where`, for the `ebda_store_lookup` definer (`lookupStore`):
+     * the app role cannot read `stores` before a scope exists (R-EBDA-005). `where` stays
+     * for owner-role callers (tests, scripts).
+     */
+    match: lookup.by === 'slug' ? { slug: lookup.slug } : { domain: lookup.domain },
+    statuses: live.status.in,
   };
 }
 
