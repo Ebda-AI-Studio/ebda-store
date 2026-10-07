@@ -4760,30 +4760,6 @@
       "percentLabel": "نسبة رسوم إضافية (٪)",
       "percentHelp": "اختياري: نسبة من إجمالي الطلب تُضاف إلى الرسم الثابت وتُقرَّب إلى أقرب قرش."
     },
-    "gateway": {
-      "apiKeyLabel": "مفتاح API",
-      "apiKeyPlaceholder": "أدخل مفتاح API",
-      "secretKeyLabel": "المفتاح السري",
-      "secretKeyPlaceholder": "أدخل المفتاح السري",
-      "webhookSecretLabel": "سر webhook",
-      "webhookSecretPlaceholder": "أدخل سر webhook",
-      "webhookUrlLabel": "رابط الـ Webhook (الصقه في لوحة مزود الدفع)",
-      "webhookUrlDescription": {
-        "paymob": "في لوحة Paymob، الصق هذا الرابط في «Transaction processed callback» لتكاملاتك. تضيف Paymob توقيعها إليه، ونتحقق منه بسر HMAC الخاص بك (أعلاه).",
-        "kashier": "يُرسَل هذا الرابط إلى Kashier مع كل عملية دفع، فلا حاجة للصقه. يظهر هنا للعلم فقط: تُتحقَّق أحداث الدفع بمفتاح Payment API الخاص بك (أعلاه).",
-        "fawry": "في بوابة تجّار فوري، اضبط هذا الرابط كرابط إشعارات الخادم. نتحقق من كل إشعار بمفتاحك الآمن (أعلاه)."
-      },
-      "webhookUrlCopy": "نسخ",
-      "webhookUrlCopied": "تم النسخ!",
-      "merchantIdLabel": "معرّف التاجر",
-      "merchantIdPlaceholder": "أدخل معرّف التاجر (إن وُجد)",
-      "testModeOn": "وضع الاختبار مفعّل",
-      "testModeOff": "وضع الاختبار معطّل",
-      "testModeDescriptionOn": "يستخدم بيانات اختبار — لا تُعالَج مدفوعات حقيقية",
-      "testModeDescriptionOff": "الوضع المباشر — ستُعالَج مدفوعات حقيقية",
-      "savedValue": "المحفوظ: {value}",
-      "savedResaveToShow": "المحفوظ: **** — أعد حفظ المفتاح لإظهار آخر 4 أحرف منه."
-    },
     "messages": {
       "savedSuccess": "تم الحفظ بنجاح",
       "failedToSave": "تعذّر الحفظ",
@@ -4811,61 +4787,94 @@
       "unknown": "لم يُفحص بعد",
       "note": "عند تعطّل مزوّد الدفع أو انتهاء مهلته تُخفى هذه الطريقة وحدها من صفحة الدفع لدقيقة أو دقيقتين، وتبقى بقية الطرق (مثل الدفع عند الاستلام) تعمل."
     },
-    "paymob": {
-      "secretKeyLabel": "المفتاح السري",
-      "secretKeyHelp": "لوحة Paymob > الإعدادات > معلومات الحساب. يُستخدم في كل طلب من الخادم.",
-      "secretKeyPlaceholder": "الصق المفتاح السري",
-      "hmacLabel": "سر HMAC",
-      "hmacHelp": "لوحة Paymob > الإعدادات > معلومات الحساب > HMAC. يتحقّق من إشعارات Paymob.",
-      "hmacPlaceholder": "الصق سر HMAC",
-      "publicKeyLabel": "المفتاح العام",
-      "publicKeyHelp": "يظهر في رابط الدفع وليس سرّاً.",
-      "publicKeyPlaceholder": "الصق المفتاح العام",
-      "integrationsTitle": "طرق الدفع",
-      "integrationsHelp": "الصق معرّف التكامل (Integration ID) لكل طريقة تريد عرضها (لوحة Paymob > Developers > Payment Integrations). اترك الطريقة فارغة لإخفائها.",
-      "integrationPlaceholder": "معرّف التكامل",
-      "methods": {
-        "card": "بطاقة",
-        "meeza": "ميزة",
-        "wallet": "محفظة إلكترونية (فودافون كاش، أورنج، اتصالات)",
-        "valu": "تقسيط فاليو"
-      }
-    },
-    "kashier": {
-      "merchantIdLabel": "معرّف التاجر (MID)",
-      "merchantIdHelp": "لوحة Kashier > Integrations. يبدو هكذا: MID-1234-56.",
-      "merchantIdPlaceholder": "MID-...",
-      "apiKeyLabel": "مفتاح Payment API",
-      "apiKeyHelp": "لوحة Kashier > Integrations. يتحقّق أيضاً من إشعارات Kashier.",
-      "apiKeyPlaceholder": "الصق مفتاح Payment API",
-      "secretKeyLabel": "المفتاح السري",
-      "secretKeyHelp": "لوحة Kashier > Integrations. يُستخدم في كل طلب من الخادم.",
-      "secretKeyPlaceholder": "الصق المفتاح السري",
-      "displayLabel": "لغة صفحة الدفع",
-      "display": {
-        "ar": "العربية",
-        "en": "الإنجليزية"
+    "connect": {
+      "configure": "اربط",
+      "status": {
+        "enabled": "شغّال",
+        "connected": "متوصّل",
+        "notConnected": "مش متوصّل",
+        "comingSoon": "قريبًا"
       },
-      "methodsTitle": "الطرق في صفحة الدفع",
+      "comingSoonLine": "قريبًا: لسه بنجرّب الشركة دي على حساب التجربة بتاعها. أول ما تبقى جاهزة هتلاقيها هنا وتقدر توصّلها.",
+      "superAdminNote": "لسه متأكدناش منها (قريبًا للتجار). كسوبر أدمن تقدر تحفظ البيانات وتجرّب الاتصال، بس مينفعش تتفعّل غير لما تتأكد.",
+      "modes": {
+        "label": "وضع البيانات",
+        "sandbox": "تجربة",
+        "live": "حقيقي",
+        "active": "شغّال",
+        "notActive": "الوضع الشغّال دلوقتي هو {mode}. البيانات دي لسه مش مستخدمة.",
+        "useThis": "استخدم الوضع ده"
+      },
+      "secretSaved": "محفوظ",
+      "secretSavedLast4": "محفوظ ••••{last4}",
+      "secretPlaceholder": "الصق القيمة",
+      "whereToFind": "فين ألاقيه؟",
+      "docsCredentials": "دليل الشركة للمفاتيح دي",
+      "docsDashboard": "افتح لوحة الشركة",
+      "validation": {
+        "required": "مطلوب",
+        "controlChars": "فيه رموز مش مسموحة",
+        "tooLong": "أطول من اللازم",
+        "wholeNumber": "لازم يكون رقم صحيح",
+        "wrongFormat": "الشكل غلط",
+        "generic": "مش صالح"
+      },
+      "actions": {
+        "save": "احفظ البيانات",
+        "saving": "بيحفظ...",
+        "test": "اختبار الاتصال ({mode})",
+        "testing": "بيختبر..."
+      },
+      "testDisabled": "احفظ كل الخانات المطلوبة للوضع الشغّال ({mode}) علشان تقدر تختبر الاتصال.",
+      "test": {
+        "ok": "اتصلنا: الشركة قبلت بياناتك.",
+        "bad_credentials": "الشركة رفضت البيانات دي. راجعها واحفظها تاني.",
+        "wrong_mode": "البيانات دي شكلها بتاعة الوضع التاني (تجربة / حقيقي). راجع الوضع.",
+        "incomplete": "فيه خانات مطلوبة ناقصة. كمّلها واحفظ.",
+        "unreachable": "معرفناش نوصل للشركة. جرّب تاني بعد دقيقة.",
+        "unknown": "الاختبار مدّاش نتيجة واضحة. جرّب تاني أو كلّم الدعم.",
+        "latency": "{ms} مللي ثانية"
+      },
+      "messages": {
+        "saved": "اتحفظ",
+        "savedDisabled": "اتحفظ. البيانات الشغّالة اتغيّرت فاتقفلت الشركة لحد ما تختبر الاتصال تاني.",
+        "modeActivated": "دلوقتي شغّال بوضع {mode}. اختبر الاتصال قبل ما تفعّل.",
+        "nothingToSave": "مفيش حاجة تتحفظ: اكتب قيمة الأول.",
+        "failed": "حصلت مشكلة. جرّب تاني."
+      },
+      "enable": {
+        "label": "استقبل الدفع من الشركة دي",
+        "notVerified": "مينفعش تتفعّل لسه: الشركة دي لسه متأكدناش منها.",
+        "saveFirst": "احفظ البيانات الأول.",
+        "testFirst": "اختبر الاتصال بنجاح على البيانات المحفوظة الأول."
+      },
+      "webhook": {
+        "label": "رابط الـ Webhook",
+        "automatic": "تلقائي",
+        "pasteIt": "الصقه في لوحة الشركة",
+        "copy": "انسخ",
+        "copied": "اتنسخ!"
+      },
+      "options": {
+        "title": "اختيارات",
+        "methods": "الطرق اللي هتظهر",
+        "display": "لغة صفحة الدفع",
+        "displayAr": "عربي",
+        "displayEn": "إنجليزي",
+        "expiryHours": "الكود صالح لمدة (ساعات، من 1 لـ 720)",
+        "expiryInvalid": "اكتب عدد ساعات صحيح من 1 لـ 720.",
+        "save": "احفظ الاختيارات"
+      },
       "methods": {
-        "card": "بطاقة",
-        "wallet": "محفظة إلكترونية"
-      }
-    },
-    "fawry": {
-      "merchantCodeLabel": "كود التاجر",
-      "merchantCodeHelp": "تمنحه فوري عند فتح حسابك.",
-      "merchantCodePlaceholder": "الصق كود التاجر",
-      "secureKeyLabel": "المفتاح الآمن",
-      "secureKeyHelp": "يوقّع كل طلب ويتحقّق من كل إشعار من فوري.",
-      "secureKeyPlaceholder": "الصق المفتاح الآمن",
-      "expiryLabel": "مدة صلاحية كود الدفع (ساعات)",
-      "expiryHelp": "المدة التي يملكها العميل لدفع الكود في أي منفذ. الافتراضي ٧٢.",
-      "methodsTitle": "الطرق",
-      "methods": {
-        "payatfawry": "ادفع في فوري (كود دفع)",
-        "card": "بطاقة"
-      }
+        "card": "كارت",
+        "wallet": "محفظة موبايل",
+        "valu": "فاليو",
+        "kiosk": "كشك",
+        "applepay": "أبل باي",
+        "bnpl": "تقسيط",
+        "payatfawry": "ادفع في فوري"
+      },
+      "requestProvider": "محتاج شركة دفع أو شحن تانية؟ كلّمنا"
     }
   },
   "hero": {

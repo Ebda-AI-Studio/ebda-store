@@ -1,0 +1,19 @@
+{
+  "_source": "status v2 + refund pages: documented statusCode meanings",
+  "wrongSignature": {
+    "type": " PaymentStatusResponse ",
+    "statusCode": 9946,
+    "statusDescription": "Wrong Signature"
+  },
+  "merchantInvalid": {
+    "statusCode": 9901,
+    "statusDescription": "merchant code is blank or invalid."
+  },
+  "orderNotFound": { "statusCode": 9938, "statusDescription": "Order not found." },
+  "refundTooBig": {
+    "type": "ChargeResponse",
+    "statusCode": 9935,
+    "statusDescription": "Refunded amount greater than paid amount"
+  },
+  "notPaid": { "statusCode": 9954, "statusDescription": "Order is not paid" }
+}

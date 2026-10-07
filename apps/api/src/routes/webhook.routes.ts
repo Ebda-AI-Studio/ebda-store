@@ -284,7 +284,32 @@ async function resolveStoreIdFromWebhookPayload(
  * POST /webhooks/payment/:provider
  * Handle payment provider webhooks with idempotency
  */
-router.post('/payment/:provider', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/payment/:provider', (req: Request, res: Response, next: NextFunction) =>
+  handleGatewayWebhook(req, res, next, undefined)
+);
+
+/**
+ * POST /webhooks/payment/:provider/s/:storeId
+ * The per-store URL the settings page shows the merchant (`paymentWebhookUrl`). Same pipeline as
+ * above; the store in the path is only an EXPECTATION: the owning store is still resolved from the
+ * payment reference in the body, and a delivery whose payment belongs to a different store is
+ * ignored (200, nothing processed) rather than trusted.
+ */
+router.post('/payment/:provider/s/:storeId', (req: Request, res: Response, next: NextFunction) => {
+  const storeId = req.params.storeId;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storeId)) {
+    res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Not found' } });
+    return;
+  }
+  return handleGatewayWebhook(req, res, next, storeId);
+});
+
+async function handleGatewayWebhook(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  urlStoreId: string | undefined
+): Promise<void> {
   try {
     const provider = req.params.provider as PaymentProvider;
 
@@ -404,6 +429,17 @@ router.post('/payment/:provider', async (req: Request, res: Response, next: Next
       return;
     }
 
+    // Per-store URL: the payment must belong to the store the URL names. Same 200 "ignored" as
+    // an unknown payment, so the answer is no oracle for which store owns a reference.
+    if (urlStoreId && urlStoreId !== storeIdForWebhook) {
+      logger.warn(
+        { provider, idempotencyKey, urlStoreId },
+        '[WEBHOOK] Payment belongs to another store than the webhook URL; ignored'
+      );
+      res.json({ success: true, data: { message: 'Webhook accepted', status: 'ignored' } });
+      return;
+    }
+
     // Offload the heavy PaymentService.handleWebhook mutation off this request:
     // persist the raw event to the durable WebhookEvent inbox, enqueue an
     // Inngest event, and ACK 200 immediately. The payment-webhook-process
@@ -451,7 +487,7 @@ router.post('/payment/:provider', async (req: Request, res: Response, next: Next
     logger.error({ err: error }, '[WEBHOOK ERROR] Failed to process webhook');
     next(error);
   }
-});
+}
 
 /**
  * POST /webhooks/payment

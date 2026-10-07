@@ -410,3 +410,20 @@ export function publicStoreContext(req: Request, res: Response, next: NextFuncti
     else storeScopeContext(req, res, next);
   })();
 }
+
+/**
+ * The payment-settings router's context, chosen PER REQUEST (provider catalog, 2026-10-07): every
+ * route stays on ONE request transaction except `POST /store/:storeId/:provider/test`, which calls
+ * the payment gateway (Test connection). That one runs under store scope, so the gateway call
+ * holds no transaction and no pooled connection: short read, call, short write of the result.
+ * Registered with `router.param('storeId', ...)` inside the router.
+ */
+const PAYMENT_CONNECTION_TEST_PATH = /^\/store\/[^/]+\/[^/]+\/test\/?$/;
+
+export function paymentSettingsRouteContext(req: Request, res: Response, next: NextFunction): void {
+  if (req.method === 'POST' && PAYMENT_CONNECTION_TEST_PATH.test(req.path)) {
+    storeScopeContext(req, res, next);
+    return;
+  }
+  tenantContext(req, res, next);
+}

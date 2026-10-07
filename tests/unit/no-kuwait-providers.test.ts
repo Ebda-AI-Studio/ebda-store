@@ -135,8 +135,9 @@ describe('the Kuwait payment gateways are removed from Ebda', () => {
       path.join(ROOT, 'apps/admin/src/app/stores/[id]/payment-settings/page.tsx'),
       'utf8'
     );
-    const ids = [...page.matchAll(/id: '([a-z]+)'/g)].map(m => m[1]).sort();
-    expect(ids).toEqual(['cod', 'fawry', 'instapay', 'kashier', 'paymob']);
+    // The page is driven by the provider catalog (gateways) + its manual entries, not a literal list.
+    expect(page).toMatch(/PROVIDER_CATALOG/);
+    expect(page).not.toMatch(/id: '[a-z]+'/);
     expect(page).not.toMatch(/comingSoon/);
   });
 });
