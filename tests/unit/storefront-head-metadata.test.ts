@@ -23,7 +23,7 @@ vi.mock('next/headers', () => ({
 }));
 vi.mock('next/font/google', () => {
   const font = () => ({ className: 'f', variable: '--f', style: { fontFamily: 'f' } });
-  return { Plus_Jakarta_Sans: font, IBM_Plex_Sans_Arabic: font };
+  return { Plus_Jakarta_Sans: font, IBM_Plex_Sans_Arabic: font, Amiri: font, Marcellus: font };
 });
 vi.mock('../../apps/web/src/lib/store-resolver', async importOriginal => {
   const real = await importOriginal<typeof import('../../apps/web/src/lib/store-resolver')>();

@@ -8,6 +8,7 @@ import {
   withMoneyTx,
   StoreStatus,
 } from '@force/database';
+import type { StoreTemplate } from '@force/database';
 import { detachStoreAuditLogs, unlinkUserAuditLogs } from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
@@ -902,7 +903,7 @@ export class StoreService {
   static async updateTemplate(storeId: string, template: string) {
     const store = await this.getById(storeId);
 
-    const validTemplates = ['modern', 'classic', 'minimal', 'bold', 'elegant'];
+    const validTemplates = ['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab'];
     if (!validTemplates.includes(template)) {
       throw new AppError(
         400,
@@ -913,7 +914,7 @@ export class StoreService {
 
     const updatedStore = await prisma.store.update({
       where: { id: storeId },
-      data: { template: template as 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' },
+      data: { template: template as StoreTemplate },
     });
 
     await StoreService.invalidateCache(store);

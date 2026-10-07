@@ -30,6 +30,8 @@ c8e3b3ba15048ba4c9c9d741d902698ef06a3355:.github/workflows/ci.yml:generic-api-ke
 # independent — a fingerprint stops matching the moment a squash-merge gives
 # that commit a new SHA, which is how this exact line would have gone stale).
 
-# Dahab demo photo ids ("key": "bracelet-gourmet-*") matched generic-api-key; not secrets. Field renamed later; history entries pinned.
+# Dahab demo photo manifest (PR #43, commit 312745de): the field was named `key`
+# and its values ("bracelet-gourmet-1/-2") are image file names, not secrets.
+# The field is now `asset` (no hit in the current tree); these pin the history.
 312745de0dc8f742437d34ca3f170adc0bfc8833:scripts/dahab-demo/photos.json:generic-api-key:263
 312745de0dc8f742437d34ca3f170adc0bfc8833:scripts/dahab-demo/photos.json:generic-api-key:273

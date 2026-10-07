@@ -216,6 +216,10 @@ Expand step of rulings PROVIDERS-1/2. `payment_configs.provider` became TEXT (+ 
 
 Expand step of rulings PROVIDERS-9/10. `shipping_carrier_configs` gained `test_mode` (default false), `credential_hints` and `connection_test`; the `credentials` column keeps its type and now holds a per-mode blob (a flat legacy blob is still read). Data steps in the same migration: iCarry configs deleted, iCarry shipments relabelled `manual` (carrier name "iCarry") with their COD remittance lines, every enabled config disabled (its credentials were never tested), `settings.sandbox = 'true'` rows set to `test_mode = true`. Rollback: revert the code, then `ALTER TABLE shipping_carrier_configs DROP COLUMN test_mode, DROP COLUMN credential_hints, DROP COLUMN connection_test;` and delete the row from `_prisma_migrations`. The data steps are NOT reversible by SQL: restore from the Neon PITR window taken before the deploy if the iCarry rows or the enabled flags must come back. A row saved after the deploy holds the new blob shape (`{sandbox, live, webhookSecret}`) which the previous code cannot read: merchants re-enter their carrier keys. Re-verify RLS state on the three touched tables after any restore (the migration lifts FORCE for its own transaction and restores it).
 
+## Dahab template enum value (`20261008000000_store_template_dahab`)
+
+Adds `dahab` to the `"StoreTemplate"` enum (builder Phase 3 pilot). Postgres cannot drop an enum value, so a rollback is: revert the code, move any store on the new value back (`UPDATE stores SET template = 'elegant' WHERE template = 'dahab';` — re-check RLS policy state after, per the note above), and leave the value unused. Delete the row from `_prisma_migrations` only if you also restore from a pre-migration branch.
+
 ## Trace: what migrated when
 
 ```bash
