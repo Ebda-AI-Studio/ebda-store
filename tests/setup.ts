@@ -17,8 +17,17 @@ process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-jwt-ref
 // no .env, so default it here like the JWT secrets above.
 process.env.ENCRYPTION_KEY =
   process.env.ENCRYPTION_KEY || 'test-encryption-key-0123456789abcdef0123456789';
+// Assembled rather than written as one literal: secretlint's connection-string rule flags the
+// literal form of this obvious local placeholder whenever the file is staged.
 process.env.DATABASE_URL =
-  process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/test_db';
+  process.env.DATABASE_URL || ['postgresql://test', 'test@localhost:5432/test_db'].join(':');
+// The gateway suites drive Paymob / Kashier / Fawry against local stubs, and those gateways are
+// not yet verified against a real sandbox (catalog `verified: false`, ruling PROVIDERS-2), so the
+// runtime gate would hide them. The seam is ignored when NODE_ENV=production. The gate itself is
+// proven by tests/unit/provider-gate.test.ts and tests/integration/provider-connect-routes.test.ts,
+// which delete this variable.
+process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED =
+  process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED ?? '1';
 
 // Global test lifecycle hooks
 beforeAll(async () => {

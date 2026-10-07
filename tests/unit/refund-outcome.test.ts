@@ -60,6 +60,8 @@ describe('refundMayHaveExecuted', () => {
 interface Rig {
   bridge: V2ProviderBridge;
   transactionId: string;
+  /** Which gateway call of `refund` is the money-moving one (the earlier ones only read). */
+  refundCall: number;
   failOnCall(n: number, how: 'reject-4xx' | 'server-5xx' | 'timeout' | 'unreachable'): void;
 }
 
@@ -92,6 +94,8 @@ async function rig(name: 'paymob' | 'kashier' | 'fawry'): Promise<Rig> {
     creds = {
       mode: 'sandbox',
       apiKey: PAYMOB_STUB.secretKey,
+      // Paymob API key: the status inquiry needs an auth token from POST /api/auth/tokens.
+      secretKey: PAYMOB_STUB.apiKey,
       webhookSecret: PAYMOB_STUB.hmacSecret,
       settings: { publicKey: PAYMOB_STUB.publicKey, integrationIds: PAYMOB_STUB.integrationIds },
     };
@@ -137,6 +141,8 @@ async function rig(name: 'paymob' | 'kashier' | 'fawry'): Promise<Rig> {
   return {
     bridge: new V2ProviderBridge(adapter, creds),
     transactionId: created.providerRef,
+    // Paymob (developers.paymob.com): auth token, then transaction inquiry, then the refund.
+    refundCall: name === 'paymob' ? 3 : 2,
     failOnCall: (n, how) => {
       plan = { n, how };
       calls = 0;
@@ -149,7 +155,7 @@ describe.each(['paymob', 'kashier', 'fawry'] as const)(
   name => {
     it('the gateway refusing the refund is a REJECTION (nothing moved: the claim may be released)', async () => {
       const r = await rig(name);
-      r.failOnCall(2, 'reject-4xx');
+      r.failOnCall(r.refundCall, 'reject-4xx');
       await expect(
         r.bridge.refund({ transactionId: r.transactionId, amount: 1_000 })
       ).rejects.toBeInstanceOf(ProviderRejectedError);
@@ -159,7 +165,7 @@ describe.each(['paymob', 'kashier', 'fawry'] as const)(
       'a %s on the refund call may have executed: NOT a rejection (the claim is kept)',
       async how => {
         const r = await rig(name);
-        r.failOnCall(2, how);
+        r.failOnCall(r.refundCall, how);
         const err = await r.bridge
           .refund({ transactionId: r.transactionId, amount: 1_000 })
           .catch(e => e);

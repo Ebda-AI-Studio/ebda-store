@@ -1,15 +1,24 @@
 /**
- * Paymob (Accept) adapter, Intention API (SP6b).
+ * Paymob (Accept) adapter, Intention API (SP6b), aligned with Paymob's official docs
+ * (developers.paymob.com, extracted 2026-10-07).
  *
- * One integration for cards, Meeza, mobile wallets (Vodafone Cash, Orange, e&, WE Pay)
- * and valU (BNPL): each customer-facing method is a Paymob INTEGRATION ID the merchant
+ * One integration for cards (Meeza rides the card integration), mobile wallets, valU (BNPL),
+ * kiosk and Apple Pay: each customer-facing method is a Paymob INTEGRATION ID the merchant
  * pastes in settings, and the customer picks among the enabled ones on Paymob's unified
- * checkout page (a redirect). A request may name `metadata.method` to offer just one.
+ * checkout page (a redirect to `https://eg.checkout.paymob.com/?publicKey=..&clientSecret=..`).
+ * A request may name `metadata.method` to offer just one.
  *
- * Credentials (per merchant, encrypted at rest, see `credentials.ts`):
- *   apiKey        Secret key (`Authorization: Token <secret>` on every server call)
- *   webhookSecret HMAC secret (verifies the transaction callback)
- *   settings      { publicKey, integrationIds: { card, meeza, wallet, valu } } (not secret)
+ * Credential slots (fixed by the provider catalog, packages/shared/src/providers/catalog.ts):
+ *   creds.apiKey          Paymob SECRET key (`Authorization: Token <secret>` on intention /
+ *                         refund / void)
+ *   creds.secretKey       Paymob API KEY (only for `POST /api/auth/tokens {api_key}` -> `token`,
+ *                         which the transaction inquiry needs as `auth_token`)
+ *   creds.webhookSecret   HMAC secret (verifies the transaction callback)
+ *   creds.settings        { publicKey, integrationIds: { card, wallet, valu, kiosk, applepay } }
+ *                         (not secret)
+ *
+ * Test and live use the SAME API host (accept.paymob.com); the keys + integration ids decide
+ * the mode (docs, overview page).
  *
  * MONEY: Paymob's `amount` / `amount_cents` are integer cents of the currency, i.e.
  * PIASTRES for EGP. No conversion (and so no float) is involved: piastres in, piastres
@@ -22,10 +31,8 @@
  * adapter interface has). The HMAC covers the amount, the success / pending / voided /
  * refunded flags and the order id, so a tampered amount or status fails verification.
  *
- * Every field marked `UNVERIFIED:` below could not be confirmed against Paymob's own
- * documentation (the developer portal was unreachable when this was written; shapes come
- * from the research brief, the official `Paymob-AI-Integration-Skill` repo and
- * third-party integrations) and must be checked in 6c against a real sandbox.
+ * Every detail marked `UNVERIFIED:` below is NOT stated by Paymob's official docs and must be
+ * checked in 6c against a real sandbox.
  */
 import crypto from 'node:crypto';
 import { paymobSettingsBaseSchema, PAYMOB_METHODS, type PaymobMethod } from '@force/shared';
@@ -46,6 +53,7 @@ import { assertChargeable, assertRefundAmount } from './provider-call';
 import {
   PaymentProviderError,
   type CreatePaymentV2Request,
+  type ConnectionTestResult,
   type CreatePaymentV2Result,
   type PartialRefundV2Request,
   type PaymentProviderV2,
@@ -63,11 +71,22 @@ import {
 export const PAYMOB_HMAC_HEADER = 'x-paymob-hmac';
 
 export const PAYMOB_BASE_URLS = {
-  // UNVERIFIED: Paymob uses one host for both modes and tells them apart by the keys
-  // (a test-mode secret key vs a live one); there is no separate sandbox host.
+  // Docs: "Test and live use the same regional base URL ... The mode is controlled by the keys
+  // and integration IDs you use." (Egypt: accept.paymob.com)
   sandbox: 'https://accept.paymob.com',
   live: 'https://accept.paymob.com',
 };
+
+/** Unified checkout host (docs: unified-checkout-redirection, Egypt). Same host for both modes. */
+export const PAYMOB_CHECKOUT_URLS = {
+  sandbox: 'https://eg.checkout.paymob.com',
+  live: 'https://eg.checkout.paymob.com',
+};
+
+export interface PaymobAdapterOptions extends GatewayAdapterOptions {
+  /** Explicit checkout host (tests); beats `PAYMOB_CHECKOUT_URL` (non-production only) and the default. */
+  checkoutBaseUrls?: Partial<Record<'sandbox' | 'live', string>>;
+}
 
 /**
  * The 20 callback fields the HMAC covers, in Paymob's documented (lexicographic) order.
@@ -108,9 +127,16 @@ function hmacText(v: unknown): string {
   return typeof v === 'boolean' ? (v ? 'true' : 'false') : String(v);
 }
 
+/**
+ * The string Paymob's HMAC is computed over: the 20 documented values of the callback `obj`
+ * concatenated with no separator (booleans lowercase, a missing value empty).
+ */
+export function paymobHmacMessage(obj: Record<string, unknown>): string {
+  return PAYMOB_HMAC_FIELDS.map(f => hmacText(pick(obj, f))).join('');
+}
+
 export function paymobHmac(obj: Record<string, unknown>, secret: string): string {
-  const message = PAYMOB_HMAC_FIELDS.map(f => hmacText(pick(obj, f))).join('');
-  return crypto.createHmac('sha512', secret).update(message).digest('hex');
+  return crypto.createHmac('sha512', secret).update(paymobHmacMessage(obj)).digest('hex');
 }
 
 const capabilities: ProviderCapabilities = {
@@ -137,6 +163,8 @@ interface PaymobTransaction {
   created_at?: string;
   currency?: string;
   parent_transaction?: number | string | null;
+  has_parent_transaction?: boolean;
+  is_refund?: boolean;
   source_data?: { sub_type?: string; type?: string };
   order?: { id?: number | string; amount_cents?: number | string; merchant_order_id?: string };
 }
@@ -146,7 +174,16 @@ export interface PaymobProvider extends PaymentProviderV2 {
   voidPayment(req: RefundV2Request, creds: ProviderCredentials): Promise<RefundV2Result>;
 }
 
-export function createPaymobProvider(options: GatewayAdapterOptions = {}): PaymobProvider {
+/** Docs show some booleans as the strings "true"/"" (flattened examples); accept both. */
+const isTrue = (v: unknown): boolean => v === true || v === 'true';
+
+/**
+ * UNVERIFIED: which `source_data.type` strings mean "kiosk" (docs say only that Kiosk payments
+ * cannot be refunded). Matches `kiosk` and the `aggregator` type third-party code reports.
+ */
+const KIOSK_SOURCE = /kiosk|aggregator/i;
+
+export function createPaymobProvider(options: PaymobAdapterOptions = {}): PaymobProvider {
   const fetchImpl: FetchLike = options.fetchImpl ?? ((url, init) => fetch(url, init));
   const created = new IdempotencyCache<CreatePaymentV2Result>();
   const refunds = new IdempotencyCache<RefundV2Result>();
@@ -172,11 +209,15 @@ export function createPaymobProvider(options: GatewayAdapterOptions = {}): Paymo
     return parsed.data;
   };
 
-  const headers = (secret: string) => ({
-    Authorization: `Token ${secret}`,
-    'Content-Type': 'application/json',
-  });
+  const checkoutBase = (creds: ProviderCredentials) =>
+    resolveBaseUrl(
+      'PAYMOB_CHECKOUT_URL',
+      PAYMOB_CHECKOUT_URLS,
+      creds.mode,
+      options.checkoutBaseUrls
+    );
 
+  /** POST with the Secret key (`Authorization: Token <secret>`): intention, refund, void. */
   const post = <T>(op: string, creds: ProviderCredentials, path: string, body: unknown) =>
     gatewayRequest<T>(
       op,
@@ -184,28 +225,72 @@ export function createPaymobProvider(options: GatewayAdapterOptions = {}): Paymo
       `${base(creds)}${path}`,
       {
         method: 'POST',
-        headers: headers(requireSecretKey(creds)),
+        headers: {
+          Authorization: `Token ${requireSecretKey(creds)}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(body),
       },
       options.timeoutMs
     );
 
-  /** The payment's transaction as Paymob reports it (by Accept order id). */
-  const inquire = (creds: ProviderCredentials, providerRef: string) =>
-    post<PaymobTransaction>(
+  /** POST /api/auth/tokens {api_key}: no Authorization header (docs). */
+  const authTokens = <T>(op: string, creds: ProviderCredentials, apiKey: string) =>
+    gatewayRequest<T>(
+      op,
+      fetchImpl,
+      `${base(creds)}/api/auth/tokens`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: apiKey }),
+      },
+      options.timeoutMs
+    );
+
+  /** A short-lived auth token from the Paymob API key; used for ONE call, never cached. */
+  const authToken = async (creds: ProviderCredentials): Promise<string> => {
+    if (!creds.secretKey) {
+      throw new PaymentProviderError(
+        'PROVIDER_MISCONFIGURED',
+        'Paymob is not set up: add the API key'
+      );
+    }
+    const res = await authTokens<{ token?: string }>('paymob.authToken', creds, creds.secretKey);
+    if (!res.token) {
+      throw new PaymentProviderError(
+        'PROVIDER_UNAVAILABLE',
+        'Paymob answered without an auth token'
+      );
+    }
+    return res.token;
+  };
+
+  /**
+   * The LAST transaction of an Accept order (docs: transaction inquiry by order id): auth token
+   * first, then POST /api/ecommerce/orders/transaction_inquiry {auth_token, order_id} with no
+   * Authorization header.
+   */
+  const inquire = async (creds: ProviderCredentials, providerRef: string) => {
+    const token = await authToken(creds);
+    return gatewayRequest<PaymobTransaction>(
       'paymob.inquiry',
-      creds,
-      // UNVERIFIED: path, auth scheme and response shape of the order/transaction inquiry.
-      // Legacy Accept docs use POST /api/ecommerce/orders/transaction_inquiry with a Bearer
-      // auth token from /api/auth/tokens; the Intention-era page was not reachable.
-      '/api/ecommerce/orders/transaction_inquiry',
-      { order_id: providerRef }
+      fetchImpl,
+      `${base(creds)}/api/ecommerce/orders/transaction_inquiry`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auth_token: token, order_id: providerRef }),
+      },
+      options.timeoutMs
     ).catch(err => {
+      // UNVERIFIED: how Paymob answers an unknown order id (a 4xx is read as "not found").
       if (err instanceof PaymentProviderError && err.code === 'PROVIDER_REJECTED') {
         throw new PaymentProviderError('PAYMENT_NOT_FOUND', `no Paymob order ${providerRef}`);
       }
       throw err;
     });
+  };
 
   function toStatus(tx: PaymobTransaction): PaymentStatusV2 {
     const amountMinor = integerPiastres(tx.amount_cents ?? tx.order?.amount_cents, 'amount_cents');
@@ -254,6 +339,12 @@ export function createPaymobProvider(options: GatewayAdapterOptions = {}): Paymo
     if (st.capturedMinor <= 0 || tx.id === null || tx.id === undefined) {
       throw new PaymentProviderError('PAYMENT_NOT_CAPTURED', 'cannot refund an uncaptured payment');
     }
+    if (KIOSK_SOURCE.test(tx.source_data?.type ?? '')) {
+      throw new PaymentProviderError(
+        'REFUND_NOT_SUPPORTED',
+        'Paymob kiosk payments cannot be refunded'
+      );
+    }
     const remaining = st.capturedMinor - st.refundedMinor;
     const amount = wantMinor ?? remaining;
     if (amount <= 0 || amount > remaining) {
@@ -266,11 +357,13 @@ export function createPaymobProvider(options: GatewayAdapterOptions = {}): Paymo
       opts.allowVoid &&
       st.refundedMinor === 0 &&
       amount === st.capturedMinor &&
+      // Docs: void is for Card payments only.
+      tx.source_data?.type === 'card' &&
       sameCairoDay(tx.created_at);
     let res: PaymobTransaction | null = null;
     if (canVoid) {
       try {
-        // UNVERIFIED: void body/path (`transaction_id` in the body, secret-key Token auth).
+        // Docs: POST api/acceptance/void_refund/void {transaction_id}, secret-key Token auth.
         res = await post<PaymobTransaction>(
           'paymob.void',
           creds,
@@ -284,21 +377,36 @@ export function createPaymobProvider(options: GatewayAdapterOptions = {}): Paymo
       }
     }
     if (!res) {
-      res = await post<PaymobTransaction>(
-        'paymob.refund',
-        creds,
-        // UNVERIFIED: refund path, body (`transaction_id`, `amount_cents`) and that the
-        // Intention-era secret-key Token is accepted here (legacy used a Bearer auth token).
-        '/api/acceptance/void_refund/refund',
-        { transaction_id: tx.id, amount_cents: amount }
-      );
+      try {
+        // Docs: POST api/acceptance/void_refund/refund {transaction_id, amount_cents}, secret-key
+        // Token auth; the answer is a NEW transaction (is_refund, parent_transaction).
+        res = await post<PaymobTransaction>(
+          'paymob.refund',
+          creds,
+          '/api/acceptance/void_refund/refund',
+          { transaction_id: tx.id, amount_cents: amount }
+        );
+      } catch (err) {
+        // Docs: 400 "Requested Refund Amount is greater than the maximum refund amount permissible".
+        if (
+          err instanceof PaymentProviderError &&
+          err.code === 'PROVIDER_REJECTED' &&
+          /greater than/i.test(err.message)
+        ) {
+          throw new PaymentProviderError(
+            'REFUND_EXCEEDS_CAPTURED',
+            'Paymob says the refund exceeds the refundable amount'
+          );
+        }
+        throw err;
+      }
     }
-    if (res.success !== true && res.pending !== true) {
+    if (!isTrue(res.success) && !isTrue(res.pending)) {
       throw new PaymentProviderError('PROVIDER_REJECTED', 'Paymob did not accept the refund');
     }
     return {
       refundRef: String(res.id ?? `paymob-refund-${tx.id}-${st.refundedMinor + amount}`),
-      status: res.pending === true ? 'pending' : 'completed',
+      status: isTrue(res.pending) ? 'pending' : 'completed',
       amountMinor: amount,
       refundedTotalMinor: st.refundedMinor + amount,
     };
@@ -309,6 +417,73 @@ export function createPaymobProvider(options: GatewayAdapterOptions = {}): Paymo
   return {
     name: 'paymob',
     capabilities,
+
+    /**
+     * One call: POST /api/auth/tokens with the API key (creates nothing at Paymob). Prefix
+     * checks first (docs: `sk_test_` / `pk_test_` in test, `sk_live_` / `pk_live_` in live).
+     * NOTE: this proves the API KEY only; the Secret key (`Token` auth) has no documented
+     * side-effect-free call, so a wrong Secret key surfaces on the first real payment.
+     * UNVERIFIED: that a wrong api_key answers 400/401/403 (all read as bad_credentials).
+     */
+    async testConnection(creds: ProviderCredentials): Promise<ConnectionTestResult> {
+      const settings = paymobSettingsBaseSchema.safeParse(creds.settings ?? {});
+      const hasIntegration =
+        settings.success && Object.values(settings.data.integrationIds).some(n => n !== undefined);
+      const missing = [
+        !creds.apiKey && 'Secret key',
+        !creds.secretKey && 'API key',
+        !creds.webhookSecret && 'HMAC secret',
+        !(settings.success && settings.data.publicKey) && 'Public key',
+        !hasIntegration && 'at least one integration ID',
+      ].filter(Boolean);
+      if (missing.length > 0) {
+        return {
+          ok: false,
+          code: 'incomplete',
+          message: `Missing or invalid: ${missing.join(', ')}`,
+        };
+      }
+      const want = creds.mode === 'live' ? 'live' : 'test';
+      if (
+        !creds.apiKey!.startsWith(`sk_${want}_`) ||
+        !(settings.success && settings.data.publicKey!.startsWith(`pk_${want}_`))
+      ) {
+        return {
+          ok: false,
+          code: 'wrong_mode',
+          message: `The Secret key and Public key must start with sk_${want}_ and pk_${want}_ in ${creds.mode} mode`,
+        };
+      }
+      try {
+        const res = await authTokens<{ token?: string; profile?: { id?: number | string } }>(
+          'paymob.testConnection',
+          creds,
+          creds.secretKey!
+        );
+        if (!res.token) {
+          return { ok: false, code: 'unknown', message: 'Paymob answered without an auth token' };
+        }
+        const id = res.profile && typeof res.profile === 'object' ? res.profile.id : undefined;
+        return {
+          ok: true,
+          code: 'ok',
+          message: 'Paymob accepted the API key',
+          ...(typeof id === 'number' || typeof id === 'string'
+            ? { details: { profileId: id } }
+            : {}),
+        };
+      } catch (err) {
+        if (err instanceof PaymentProviderError) {
+          if (err.code === 'PROVIDER_MISCONFIGURED' || err.code === 'PROVIDER_REJECTED') {
+            return { ok: false, code: 'bad_credentials', message: 'Paymob refused the API key' };
+          }
+          if (err.isOutage) {
+            return { ok: false, code: 'unreachable', message: 'Paymob could not be reached' };
+          }
+        }
+        return { ok: false, code: 'unknown', message: 'Unexpected answer from Paymob' };
+      }
+    },
 
     async createPayment(
       req: CreatePaymentV2Request,
@@ -374,8 +549,9 @@ export function createPaymobProvider(options: GatewayAdapterOptions = {}): Paymo
           currency: 'EGP',
           payment_methods: methodIds,
           items,
-          // UNVERIFIED: Paymob requires billing_data and rejects empty values; "NA" is its
-          // documented filler for the fields a shop does not collect.
+          // Docs require first_name, last_name, email, phone_number (a missing phone_number is a
+          // 400). UNVERIFIED: that "NA" is accepted as a filler for values the shop did not
+          // collect (it is what Paymob itself stores for them in its order records).
           billing_data: {
             first_name: first || 'NA',
             last_name: rest.join(' ') || 'NA',
@@ -388,17 +564,16 @@ export function createPaymobProvider(options: GatewayAdapterOptions = {}): Paymo
             city: 'NA',
             state: 'NA',
             country: 'EG',
-            postal_code: 'NA',
-          },
-          customer: {
-            first_name: first || 'NA',
-            last_name: rest.join(' ') || 'NA',
-            email: req.customer.email || 'NA',
           },
           special_reference: specialReference,
+          // Docs: notification_url applies to card integrations only; still sent.
           notification_url: req.webhookUrl,
           redirection_url: req.returnUrls.success,
           extras: { order_id: req.orderId },
+          // Docs: `expiration` is in seconds.
+          ...(req.expiresAt
+            ? { expiration: Math.max(1, Math.ceil((req.expiresAt.getTime() - Date.now()) / 1000)) }
+            : {}),
         };
         const res = await post<{
           id?: string;
@@ -416,13 +591,13 @@ export function createPaymobProvider(options: GatewayAdapterOptions = {}): Paymo
           typeof res.intention_detail?.amount === 'number'
             ? res.intention_detail.amount
             : req.amountMinor;
-        const url = `${base(creds)}/unifiedcheckout/?publicKey=${encodeURIComponent(
+        const url = `${checkoutBase(creds)}/?publicKey=${encodeURIComponent(
           settings.publicKey!
         )}&clientSecret=${encodeURIComponent(res.client_secret)}`;
         return {
           providerRef: String(res.intention_order_id),
           invoiceId: specialReference,
-          // UNVERIFIED: the unified checkout URL shape (publicKey + clientSecret query).
+          // Docs: unified checkout redirection (publicKey + clientSecret query).
           instruction: { kind: 'redirect', url },
           status: 'pending',
           amountMinor: recorded,
@@ -540,6 +715,12 @@ export function createPaymobProvider(options: GatewayAdapterOptions = {}): Paymo
             'cannot void an uncaptured payment'
           );
         }
+        if (tx.source_data?.type !== 'card') {
+          throw new PaymentProviderError(
+            'REFUND_NOT_SUPPORTED',
+            'Paymob voids are for card payments only'
+          );
+        }
         if (st.refundedMinor > 0 || !sameCairoDay(tx.created_at)) {
           throw new PaymentProviderError(
             'REFUND_NOT_SUPPORTED',
@@ -552,7 +733,7 @@ export function createPaymobProvider(options: GatewayAdapterOptions = {}): Paymo
           '/api/acceptance/void_refund/void',
           { transaction_id: tx.id }
         );
-        if (res.success !== true) {
+        if (!isTrue(res.success)) {
           throw new PaymentProviderError('PROVIDER_REJECTED', 'Paymob did not accept the void');
         }
         return {

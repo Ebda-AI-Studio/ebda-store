@@ -90,6 +90,9 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'OrderEvent.metadata': 'status-transition audit metadata',
   'Payment.paymentUrl': 'payment-gateway hosted checkout URL (third-party)',
   'Payment.metadata': 'gateway response metadata',
+  'PaymentConfig.credentialHints':
+    'non-secret credential display hints (last 4 / public values, keyed fingerprints), no media',
+  'PaymentConfig.connectionTest': 'last Test connection result {ok, code, mode, at}, no media',
   'PaymentConfig.settings':
     'non-secret per-provider settings (InstaPay handle/phone/expiry, COD percentage), no media',
   'PaymentEvent.providerPayload': 'raw gateway payload',
