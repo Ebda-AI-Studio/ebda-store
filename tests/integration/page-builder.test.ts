@@ -25,6 +25,7 @@ import {
   runWithRequestDb,
   runInTenantContext,
   prisma,
+  TenantScopeViolation,
   type AppPrismaClient,
 } from '@force/database';
 import { layoutToDefinition, resolveLayoutSettings, type PageDefinition } from '@force/shared';
@@ -92,7 +93,7 @@ async function freshStore(tag: string): Promise<string> {
 }
 
 beforeAll(async () => {
-  owner = createPrismaClient({ connectionString: OWNER_URL, max: 3 });
+  owner = createPrismaClient({ connectionString: OWNER_URL, max: 3, role: 'owner' });
   await owner.$executeRawUnsafe(`ALTER ROLE ebda_app WITH LOGIN PASSWORD '${APP_PASSWORD}'`);
   ids.storeA = await freshStore('a');
   ids.storeB = await freshStore('b');
@@ -353,13 +354,22 @@ describe('tenant isolation (strict RLS on store_page_revisions)', { retry: 0 }, 
         userId: null,
       })
     );
-    const seen = await inStore(storeB, () =>
-      prisma.storePageRevision.count({ where: { storeId: storeA } })
+    // Layer 1, the code-level tenant guard (R-EBDA-003): a query naming store A from B's
+    // scope is refused before it reaches Postgres, whether issued directly or by the service.
+    await expect(
+      inStore(storeB, () => prisma.storePageRevision.count({ where: { storeId: storeA } }))
+    ).rejects.toBeInstanceOf(TenantScopeViolation);
+    await expect(inStore(storeB, () => getPageState(storeA, HOME))).rejects.toBeInstanceOf(
+      TenantScopeViolation
     );
-    expect(seen).toBe(0);
-    // the service, asked for A from B's scope, sees an empty page (rev 0), never A's draft
-    const st = await inStore(storeB, () => getPageState(storeA, HOME));
-    expect(st?.rev).toBe(0);
+    // Layer 2, RLS: the same read in raw SQL (allowed in a scope) still sees none of A's rows.
+    const [{ n }] = await inStore(
+      storeB,
+      () =>
+        prisma.$queryRaw<Array<{ n: bigint }>>`
+        SELECT count(*) AS n FROM public.store_page_revisions WHERE store_id = ${storeA}`
+    );
+    expect(Number(n)).toBe(0);
     await expect(
       inStore(storeB, () =>
         prisma.storePageRevision.create({
@@ -373,6 +383,17 @@ describe('tenant isolation (strict RLS on store_page_revisions)', { retry: 0 }, 
             docBytes: 2,
           },
         })
+      )
+    ).rejects.toBeInstanceOf(TenantScopeViolation);
+    // ... and RLS rejects the same write issued as raw SQL from B's scope.
+    await expect(
+      inStore(
+        storeB,
+        () =>
+          prisma.$executeRaw`
+          INSERT INTO public.store_page_revisions
+            (id, store_id, page_key, rev, status, schema_version, document, doc_bytes)
+          VALUES (${crypto.randomUUID()}, ${storeA}, ${HOME}, 51, 'archived', 1, '{}'::jsonb, 2)`
       )
     ).rejects.toThrow(/row-level security/i);
     // control: A sees its own
