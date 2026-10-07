@@ -225,7 +225,7 @@ export class OneSignalService {
 
     const [storeAdminPlayerIds, superAdminPlayerIds] = await Promise.all([
       this.getAdminPlayerIds({ role: 'store_admin', ownsStoreId: input.storeId }),
-      this.getAdminPlayerIds({ role: 'super_admin' }),
+      this.getAdminPlayerIds({ role: 'super_admin', ownsStoreId: input.storeId }),
     ]);
 
     const storeAdminBody = {
@@ -451,7 +451,7 @@ export class OneSignalService {
 
     const [storeAdminPlayerIds, superAdminPlayerIds] = await Promise.all([
       this.getAdminPlayerIds({ role: 'store_admin', ownsStoreId: input.storeId }),
-      this.getAdminPlayerIds({ role: 'super_admin' }),
+      this.getAdminPlayerIds({ role: 'super_admin', ownsStoreId: input.storeId }),
     ]);
 
     const storeAdminBody = {
@@ -550,7 +550,7 @@ export class OneSignalService {
 
     const [storeAdminPlayerIds, superAdminPlayerIds] = await Promise.all([
       this.getAdminPlayerIds({ role: 'store_admin', ownsStoreId: input.storeId }),
-      this.getAdminPlayerIds({ role: 'super_admin' }),
+      this.getAdminPlayerIds({ role: 'super_admin', ownsStoreId: input.storeId }),
     ]);
 
     const storeAdminBody = {
@@ -643,7 +643,7 @@ export class OneSignalService {
 
     const [storeAdminPlayerIds, superAdminPlayerIds] = await Promise.all([
       this.getAdminPlayerIds({ role: 'store_admin', ownsStoreId: input.storeId }),
-      this.getAdminPlayerIds({ role: 'super_admin' }),
+      this.getAdminPlayerIds({ role: 'super_admin', ownsStoreId: input.storeId }),
     ]);
 
     const storeAdminBody = {
@@ -735,7 +735,7 @@ export class OneSignalService {
 
     const [storeAdminPlayerIds, superAdminPlayerIds] = await Promise.all([
       this.getAdminPlayerIds({ role: 'store_admin', ownsStoreId: input.storeId }),
-      this.getAdminPlayerIds({ role: 'super_admin' }),
+      this.getAdminPlayerIds({ role: 'super_admin', ownsStoreId: input.storeId }),
     ]);
 
     const storeAdminBody = {
@@ -937,7 +937,10 @@ export class OneSignalService {
       const storeId = criteria.ownsStoreId;
       return withStore(storeId, () => adminPushPlayerIds('store_admin', storeId));
     }
-    return adminPushPlayerIds('super_admin', null);
+    // The super_admin audience is answered only to a scoped caller: run it in the
+    // notification's store scope (reused when the caller is already in it).
+    if (!criteria.ownsStoreId) return [];
+    return withStore(criteria.ownsStoreId, () => adminPushPlayerIds('super_admin', null));
   }
 
   /**

@@ -175,14 +175,18 @@ AS $fn$
     SELECT s.id, s.created_at FROM public.stores s
     WHERE s.status = 'active' AND s.deleted_at IS NULL
   ), page AS (
-    SELECT l.id, l.created_at FROM live l
+    SELECT l.id, row_number() OVER (ORDER BY l.created_at DESC, l.id) AS ord FROM live l
     ORDER BY l.created_at DESC, l.id
     OFFSET greatest(p_offset, 0) LIMIT least(greatest(p_limit, 1), 100)
   )
-  -- the total rides on every row; an empty page still returns it (id NULL)
-  SELECT pg.id, (SELECT count(*) FROM live) FROM page pg
-  UNION ALL
-  SELECT NULL, (SELECT count(*) FROM live) WHERE NOT EXISTS (SELECT 1 FROM page)
+  -- newest first; the total rides on every row, and an empty page still returns
+  -- it in one row with id NULL (the API wrapper drops that row)
+  SELECT x.id, x.total FROM (
+    SELECT pg.id, (SELECT count(*) FROM live) AS total, pg.ord FROM page pg
+    UNION ALL
+    SELECT NULL, (SELECT count(*) FROM live), 0 WHERE NOT EXISTS (SELECT 1 FROM page)
+  ) x
+  ORDER BY x.ord
 $fn$;
 
 -- 2.4 Stores a user owns (live, not soft-deleted): plan limits and signup state
@@ -300,7 +304,8 @@ $fn$;
 -- Push audience for an order notification: the OneSignal player ids of the
 -- store's owner (role 'store_admin', only for the store the transaction is
 -- scoped to) or of every active super_admin (role 'super_admin'). Device ids
--- only; GUARDED: a store_admin audience needs app.current_store_id = p_store_id.
+-- only; GUARDED: a store_admin audience needs app.current_store_id = p_store_id,
+-- a super_admin audience needs SOME scope (a store or a user) on the caller.
 CREATE OR REPLACE FUNCTION public.ebda_admin_push_player_ids(p_role text, p_store_id text)
 RETURNS SETOF text
 LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -319,6 +324,12 @@ BEGIN
       JOIN public.stores s ON s.owner_id = u.id
       WHERE s.id = p_store_id AND u.role = 'store_admin' AND u.deleted_at IS NULL;
   ELSIF p_role = 'super_admin' THEN
+    -- Only from a scoped caller (an order notification runs in its store's scope),
+    -- never from a contextless one.
+    IF nullif(current_setting('app.current_store_id', true), '') IS NULL
+       AND nullif(current_setting('app.current_user_id', true), '') IS NULL THEN
+      RAISE EXCEPTION 'ebda_admin_push_player_ids: no scope' USING ERRCODE = '42501';
+    END IF;
     RETURN QUERY
       SELECT DISTINCT o.player_id
       FROM public.onesignal_subscriptions o
