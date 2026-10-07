@@ -23,8 +23,35 @@ export interface SubscriptionBillingNoticeData {
   /** InstaPay: where to send the money and the reference to write on the transfer. */
   instapayHandle?: string | null;
   paymentReference?: string | null;
-  /** wa.me link to Ebda support (no WhatsApp API is used). */
+  /** wa.me link to Ebda support (no WhatsApp API is used); null = not configured. */
   whatsappUrl?: string | null;
+  /** Ebda support email: the contact shown when there is no WhatsApp link. */
+  supportEmail?: string | null;
+  /** Ebda VAT inside `amountMinor` (null/absent = no VAT wording at all). */
+  vat?: {
+    netMinor: number;
+    vatMinor: number;
+    rateBps: number;
+    trn: string | null;
+    legalName: string | null;
+  } | null;
+}
+
+/** "14" / "2.5" from basis points. */
+const pct = (bps: number) => String(Math.round(bps) / 100);
+
+/** The VAT line under the amount, only when Ebda's VAT applies (Ruling EBDA-BILLFU-3). */
+function vatLine(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): string {
+  const v = d.vat;
+  if (!v || v.vatMinor <= 0) return '';
+  const vat = escapeHtml(emailMoney(v.vatMinor, 'EGP', lang));
+  const net = escapeHtml(emailMoney(v.netMinor, 'EGP', lang));
+  const seller = v.legalName ? ` ${escapeHtml(v.legalName)}` : '';
+  const trnAr = v.trn ? `، رقم التسجيل الضريبي <span dir="ltr">${escapeHtml(v.trn)}</span>` : '';
+  const trnEn = v.trn ? `, tax registration number ${escapeHtml(v.trn)}` : '';
+  return lang === 'ar'
+    ? `<p dir="rtl">يشمل المبلغ ضريبة القيمة المضافة ${pct(v.rateBps)}% (${vat}) على ${net}.${seller ? `${seller}${trnAr}.` : ''}</p>`
+    : `<p>The amount includes VAT ${pct(v.rateBps)}% (${vat}) on ${net}.${seller ? `${seller}${trnEn}.` : ''}</p>`;
 }
 
 function instapayBlock(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): string {
@@ -37,11 +64,21 @@ function instapayBlock(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): str
     with the reference <strong>${escapeHtml(d.paymentReference ?? '')}</strong> in the note, then submit the transfer reference on your billing page.</p>`;
 }
 
+/**
+ * How to reach Ebda: the wa.me link when configured, otherwise the support
+ * email. Never an empty wa.me link (Ruling EBDA-BILLFU-2).
+ */
 function whatsappLine(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): string {
-  if (!d.whatsappUrl) return '';
+  if (d.whatsappUrl) {
+    return lang === 'ar'
+      ? `<p dir="rtl"><a href="${escapeHtml(d.whatsappUrl)}">راسلنا على واتساب</a></p>`
+      : `<p><a href="${escapeHtml(d.whatsappUrl)}">Message us on WhatsApp</a></p>`;
+  }
+  if (!d.supportEmail) return '';
+  const mail = escapeHtml(d.supportEmail);
   return lang === 'ar'
-    ? `<p dir="rtl"><a href="${escapeHtml(d.whatsappUrl)}">راسلنا على واتساب</a></p>`
-    : `<p><a href="${escapeHtml(d.whatsappUrl)}">Message us on WhatsApp</a></p>`;
+    ? `<p dir="rtl">أسئلة؟ راسلنا على <a href="mailto:${mail}" dir="ltr">${mail}</a></p>`
+    : `<p>Questions? Email us at <a href="mailto:${mail}">${mail}</a></p>`;
 }
 
 function dueText(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): string {
@@ -87,6 +124,7 @@ export const subscriptionBillingTemplate = {
       ? `
     <h2>Payment reminder</h2>
     <p>${dueText(d, 'en')}</p>
+    ${vatLine(d, 'en')}
     ${instapayBlock(d, 'en')}
     <p><a href="${escapeHtml(d.billingUrl)}">Open billing</a></p>
     ${whatsappLine(d, 'en')}`
@@ -115,6 +153,7 @@ export const subscriptionBillingTemplate = {
       ? `
     <h2 dir="rtl">تذكير بالدفع</h2>
     <p dir="rtl">${dueText(d, 'ar')}</p>
+    ${vatLine(d, 'ar')}
     ${instapayBlock(d, 'ar')}
     <p dir="rtl"><a href="${escapeHtml(d.billingUrl)}">افتح صفحة الفواتير</a></p>
     ${whatsappLine(d, 'ar')}`

@@ -67,6 +67,7 @@ import { ImageUpload } from '../../../../components/ImageUpload';
 import { FooterLinksEditor } from '../../../../components/FooterLinksEditor';
 import { NavMenuEditor } from '../../../../components/NavMenuEditor';
 import { apiGet, apiPost, apiPut, apiFetch } from '../../../../lib/api';
+import { loadPageRev, saveLayoutAsPage } from '../../../../lib/page-builder-save';
 import { getStoreHref } from '../../../../lib/store-url';
 
 interface StoreInfo {
@@ -101,6 +102,10 @@ export default function StoreLayoutPage() {
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  // Visual builder Phase 1: head rev of the homepage document — Save goes
+  // through draft + publish naming it (409 on a concurrent edit). null = the
+  // API has no builder routes yet; Save falls back to the legacy PUT.
+  const [pageRev, setPageRev] = useState<number | null>(null);
   // Bumps after every successful Save so the live-preview iframe reloads.
   // The iframe `src` includes this as a query param — change → React re-renders
   // → iframe issues a fresh request → merchant sees their saved changes.
@@ -117,10 +122,13 @@ export default function StoreLayoutPage() {
   // crops/shifts it (a real phone at 390px is fine). 'mobile' pins the iframe
   // to a true phone width (390px, centered); 'desktop' renders a wide canvas
   // (1280px) scaled to fit the pane so the desktop layout is shown un-cropped.
-  // Preview is mobile-only — Ahmad 2026-06-22 "remove the desktop preview, only
-  // mobile is great". The storefront is mobile-first and the desktop canvas added
-  // no value for the merchant's day-to-day editing. Pinned to a true phone width
-  // (390px, centered) so the mobile hero asset renders un-cropped.
+  // Preview was made mobile-only by Ahmad 2026-06-22 ("remove the desktop
+  // preview, only mobile is great"). SUPERSEDED by Ruling BUILDER-PREVIEW-1
+  // (Ahmad 2026-10-07): the builder previews desktop + tablet + mobile
+  // (VIEWPORT_RANGES in @force/shared: 1280 / 820 / 390). The three-way switcher
+  // ships with the new editor (Phase 2); this legacy page keeps its look in
+  // Phase 1, pinned to a true phone width (390px) so the mobile hero renders
+  // un-cropped.
   const previewDevice = 'mobile' as const;
   // Smart Palette + future brand-token edits stage their theme updates here
   // instead of writing immediately to /theme. The main Save button flushes
@@ -227,13 +235,15 @@ export default function StoreLayoutPage() {
     setIsLoading(true);
     try {
       // Typography endpoint returns { success: true, data: { typography: { fonts, zones } } }
-      const [layoutRes, storeRes, typographyRes] = await Promise.all([
+      const [layoutRes, storeRes, typographyRes, rev] = await Promise.all([
         apiGet<{ layout: StoreLayoutSettings }>(`/api/v1/admin/stores/${storeId}/layout`),
         apiGet<{ store: StoreInfo }>(`/api/v1/admin/stores/${storeId}`),
         apiGet<{ typography: { fonts?: unknown[]; zones: Record<string, ZoneOverride> } }>(
           `/api/v1/stores/${storeId}/typography`
         ),
+        loadPageRev(storeId),
       ]);
+      setPageRev(rev);
       if (layoutRes.error) {
         toastError(t('loadError'));
       } else if (layoutRes.data?.layout) {
@@ -275,6 +285,16 @@ export default function StoreLayoutPage() {
     setLayout(prev => (prev ? { ...prev, [key]: updater(prev[key]) } : prev));
   };
 
+  // Layout save: builder draft + publish when the API has it (revisioned,
+  // conflict-checked), else the legacy PUT. Resolves to the `{ error }`
+  // shape the batch below already inspects.
+  const saveLayout = async (current: StoreLayoutSettings) => {
+    if (pageRev === null) return apiPut(`/api/v1/admin/stores/${storeId}/layout`, current);
+    const r = await saveLayoutAsPage(storeId, current, pageRev);
+    setPageRev(r.rev);
+    return r.ok ? { data: undefined, error: null } : { data: undefined, error: r.error };
+  };
+
   const handleSave = async () => {
     if (!layout) return;
     setIsSaving(true);
@@ -293,7 +313,7 @@ export default function StoreLayoutPage() {
           : Promise.resolve({ data: undefined, error: undefined } as const);
 
       const [layoutResult, typographyResult, themeResult] = await Promise.allSettled([
-        apiPut(`/api/v1/admin/stores/${storeId}/layout`, layout),
+        saveLayout(layout),
         apiPut(`/api/v1/stores/${storeId}/typography`, {
           fonts: typographyFonts,
           zones: globalZones,
@@ -326,7 +346,14 @@ export default function StoreLayoutPage() {
         (themeResult.status === 'rejected' ||
           (themeResult.status === 'fulfilled' && !!themeResult.value.error));
 
-      if (layoutFailed && typographyFailed) {
+      const layoutConflict =
+        layoutResult.status === 'fulfilled' && layoutResult.value.error?.code === 'REV_CONFLICT';
+
+      if (layoutConflict) {
+        // Another tab/editor saved the page since this one loaded: never
+        // overwrite it silently — the merchant reloads and re-applies.
+        toastError(t('saveConflict'));
+      } else if (layoutFailed && typographyFailed) {
         toastError(t('saveError'));
       } else if (layoutFailed) {
         toastError(t('saveErrorLayoutOnly'));

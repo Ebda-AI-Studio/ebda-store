@@ -416,6 +416,66 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     );
   });
 
+  it('no support WhatsApp configured: the notice links the support email, never an empty wa.me', async () => {
+    mockApi(
+      billing({
+        storeStatus: 'suspended',
+        billing: billingFixture({
+          suspension: { reason: 'unpaid', at: '2026-11-20T00:00:00.000Z' },
+          supportWhatsappUrl: null,
+          supportEmail: 'hello@ebda.app',
+        }),
+      })
+    );
+    render(<StoreBillingPage />);
+    await screen.findByRole('alert');
+    expect(screen.queryByRole('link', { name: 'whatsapp' })).toBeNull();
+    expect(
+      screen.getByRole('link', { name: 'email:{"email":"hello@ebda.app"}' }).getAttribute('href')
+    ).toBe('mailto:hello@ebda.app');
+    expect(document.querySelector('a[href*="wa.me"]')).toBeNull();
+  });
+
+  it('invoices: a VAT line + Ebda TRN only on a charge that carried Ebda VAT', async () => {
+    mockApi(billing({}), [
+      {
+        id: 'c1',
+        type: 'renewal',
+        planCode: 'growth',
+        amountMinor: 397860,
+        vatMinor: 48860,
+        vat: {
+          netMinor: 349000,
+          vatMinor: 48860,
+          rateBps: 1400,
+          mode: 'exclusive',
+          trn: '123456789',
+          legalName: 'Whisky 11',
+        },
+        status: 'succeeded',
+        failureReason: null,
+        attempt: 0,
+        createdAt: '2026-11-20T00:00:00.000Z',
+      },
+      {
+        id: 'c0',
+        type: 'checkout',
+        planCode: 'growth',
+        amountMinor: 349000,
+        vatMinor: 0,
+        vat: null,
+        status: 'succeeded',
+        failureReason: null,
+        attempt: 0,
+        createdAt: '2026-10-20T00:00:00.000Z',
+      },
+    ]);
+    render(<StoreBillingPage />);
+    expect(await screen.findByText(/invoiceVat:\{"rate":14,"vat":"EGP 488.60"\}/)).toBeTruthy();
+    expect(screen.getAllByText(/invoiceVat/)).toHaveLength(1);
+    expect(screen.getByTestId('tax-invoice-seller').textContent).toContain('123456789');
+  });
+
   it('over-store-limit suspension is a read-only notice that points to the plans', async () => {
     mockApi(
       billing({

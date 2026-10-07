@@ -8,8 +8,8 @@ const doc = COPY['en'].legalPages.privacy;
 export const metadata: Metadata = pageMetadata(
   'en',
   'privacy',
-  `${doc.title} (${COPY['en'].legalPages.draftBadge})`,
-  COPY['en'].legalPages.draftBody
+  doc.title,
+  doc.sections[0].p[0].slice(0, 160)
 );
 
 export default function Page() {

@@ -1,0 +1,12 @@
+{
+  "newArrivals": { "enabled": false, "limit": 16 },
+  "bestSellers": { "enabled": false, "limit": 12 },
+  "categories": {
+    "enabled": false,
+    "layout": "grid",
+    "captionPosition": "below",
+    "desktopColumns": 3,
+    "mobileColumns": 2
+  },
+  "hero": { "enabled": false, "mode": "slider", "autoplayMs": 5000, "slides": [] }
+}

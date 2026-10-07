@@ -10,9 +10,10 @@ import {
   absoluteUrl,
   pagePath,
   type Locale,
+  type PageSlug,
 } from './site';
 
-type Page = '' | 'legal' | 'privacy' | 'terms';
+type Page = PageSlug;
 
 const OG_IMAGE = {
   url: '/og.png',
