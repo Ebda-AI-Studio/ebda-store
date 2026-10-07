@@ -1,7 +1,7 @@
 # Tenant routing canary (palora first)
 
 Scope: turning on the tenant-cacheable storefront rewrite for ONE store on the shared Worker
-`force-web-cf-preview`. One Worker serves palora (`store.force-ai.co/palora`), `pecannbee.com.kw` and
+`ebda-web`. One Worker serves palora (`store.force-ai.co/palora`), `pecannbee.com.kw` and
 `wadyaljuz.com`, so the flag alone is Worker-wide. Three secrets scope it (Rulings TRC-1, TRC-5, TRC-6):
 
 | Secret                             | Meaning                                                             | Bad state           |
@@ -16,7 +16,7 @@ switch is never on with a wider scope than intended. Run `wrangler` from an EMPT
 
 ## Before
 
-1. `CLOUDFLARE_ACCOUNT_ID=9f70414f9a626137f1004fa2f4add904 npx wrangler secret list --name force-web-cf-preview`
+1. `CLOUDFLARE_ACCOUNT_ID=9f70414f9a626137f1004fa2f4add904 npx wrangler secret list --name ebda-web`
    Expect only `REVALIDATE_SECRET`. Anything else was set outside git; record it first.
 2. Capture a baseline of pecannbee and wadyaljuz, which must NOT change: for each of `/`, `/about`, `/faq`
    on `https://pecannbee.com.kw` and `https://wadyaljuz.com`, save the status, `cache-control`, `x-store-domain`
@@ -35,9 +35,9 @@ Use `palora:ar` when palora's default language is Arabic, bare `palora` when Eng
 ```
 cd "$(mktemp -d)"
 export CLOUDFLARE_ACCOUNT_ID=9f70414f9a626137f1004fa2f4add904
-printf 'palora:ar'  | npx wrangler secret put STOREFRONT_TENANT_ROUTING_STORES --name force-web-cf-preview
-printf 'about,faq'  | npx wrangler secret put STOREFRONT_TENANT_ROUTING_ROUTES  --name force-web-cf-preview
-printf 'true'       | npx wrangler secret put STOREFRONT_TENANT_ROUTING         --name force-web-cf-preview
+printf 'palora:ar'  | npx wrangler secret put STOREFRONT_TENANT_ROUTING_STORES --name ebda-web
+printf 'about,faq'  | npx wrangler secret put STOREFRONT_TENANT_ROUTING_ROUTES  --name ebda-web
+printf 'true'       | npx wrangler secret put STOREFRONT_TENANT_ROUTING         --name ebda-web
 ```
 
 ## Verify
@@ -59,7 +59,7 @@ Delete the master switch; unset is inert and no redeploy is needed:
 
 ```
 cd "$(mktemp -d)"
-CLOUDFLARE_ACCOUNT_ID=9f70414f9a626137f1004fa2f4add904 npx wrangler secret delete STOREFRONT_TENANT_ROUTING --name force-web-cf-preview
+CLOUDFLARE_ACCOUNT_ID=9f70414f9a626137f1004fa2f4add904 npx wrangler secret delete STOREFRONT_TENANT_ROUTING --name ebda-web
 ```
 
 Then `wrangler secret list` again to confirm. Deleting `STOREFRONT_TENANT_ROUTING_STORES` alone also turns
