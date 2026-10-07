@@ -558,7 +558,7 @@ router.put(
       }
 
       const config = await prisma.paymentConfig.update({
-        where: { id: existing.id },
+        where: { id: existing.id, storeId },
         data: updateData,
       });
 
@@ -644,7 +644,7 @@ router.delete(
       }
 
       await prisma.paymentConfig.delete({
-        where: { id: existing.id },
+        where: { id: existing.id, storeId },
       });
 
       await auditLog({
@@ -733,7 +733,7 @@ router.post(
       }
 
       const config = await prisma.paymentConfig.update({
-        where: { id: existing.id },
+        where: { id: existing.id, storeId },
         data: {
           isEnabled: enabled,
           updatedBy: userId,
@@ -828,7 +828,7 @@ router.put(
         updatedBy: user.userId,
       };
       const config = existing
-        ? await prisma.paymentConfig.update({ where: { id: existing.id }, data })
+        ? await prisma.paymentConfig.update({ where: { id: existing.id, storeId }, data })
         : await prisma.paymentConfig.create({
             data: {
               ...data,
@@ -903,7 +903,7 @@ router.post(
       const latency = Date.now() - startedAt;
 
       await prisma.paymentConfig.update({
-        where: { id: existing.id },
+        where: { id: existing.id, storeId },
         data: {
           connectionTest: stored as unknown as Prisma.InputJsonValue,
           healthStatus: result.ok ? 'healthy' : result.code === 'unreachable' ? 'degraded' : 'down',
