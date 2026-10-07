@@ -13,7 +13,6 @@ import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import { StorageService } from './storage.service';
 import { bustStoreCachesById } from './store.service';
-import { deleteR2ObjectIfOrphan, urlToR2Key } from './r2-cleanup.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
 
@@ -44,7 +43,7 @@ const PROFILE_SELECT = {
   rejectionReason: true,
   documents: {
     orderBy: { createdAt: 'asc' as const },
-    // fileUrl is NEVER selected for a response (ruling TAX-4).
+    // storageKey is NEVER selected for a response (ruling TAX-4).
     select: {
       id: true,
       kind: true,
@@ -208,33 +207,40 @@ export class TaxProfileService {
         `At most ${TAX_DOCUMENT_MAX_COUNT} documents. Remove one first.`
       );
     }
-    if (!StorageService.isAvailable()) {
-      throw new AppError(503, 'STORAGE_NOT_CONFIGURED', 'File storage is not configured');
-    }
     const sha256 = createHash('sha256').update(file.buffer).digest('hex');
     const fileName = (file.originalname || `document${EXT[mime]}`).slice(0, 200);
-    const uploaded = await StorageService.upload(file.buffer, `document${EXT[mime]}`, {
-      folder: 'tax-documents',
+    // PRIVATE bucket only (ruling TAX-4). Throws 503 PRIVATE_STORAGE_NOT_CONFIGURED
+    // when it is not configured — never falls back to the public bucket.
+    const { key } = await StorageService.putPrivate(file.buffer, {
       storeId,
+      folder: 'tax-documents',
+      ext: EXT[mime],
       contentType: mime,
-      allowedTypes: [...TAX_DOCUMENT_MIME_TYPES],
-      maxSize: TAX_DOCUMENT_MAX_BYTES,
-      cacheControl: 'private, no-store',
     });
-    const doc = await prisma.storeTaxDocument.create({
-      data: {
-        storeId,
-        profileId: current.id,
-        kind,
-        fileUrl: uploaded.url,
-        fileName,
-        mimeType: mime,
-        sizeBytes: file.buffer.length,
-        sha256,
-        uploadedBy: actor.userId,
-      },
-      select: PROFILE_SELECT.documents.select,
-    });
+    let doc;
+    try {
+      doc = await prisma.storeTaxDocument.create({
+        data: {
+          storeId,
+          profileId: current.id,
+          kind,
+          storageKey: key,
+          fileName,
+          mimeType: mime,
+          sizeBytes: file.buffer.length,
+          sha256,
+          uploadedBy: actor.userId,
+        },
+        select: PROFILE_SELECT.documents.select,
+      });
+    } catch (err) {
+      // Compensate: the object would otherwise sit unreferenced in the private
+      // bucket (no orphan sweep runs there).
+      await StorageService.deletePrivate(key).catch(e =>
+        logger.error({ err: e, storeId }, '[tax-profile] could not remove orphaned private object')
+      );
+      throw err;
+    }
     await auditLog({
       action: 'tax_profile.document_uploaded',
       userId: actor.userId,
@@ -253,11 +259,16 @@ export class TaxProfileService {
     assertEditable(current.status);
     const doc = await prisma.storeTaxDocument.findFirst({
       where: { id: documentId, storeId },
-      select: { id: true, fileUrl: true, kind: true },
+      select: { id: true, storageKey: true, kind: true },
     });
     if (!doc) throw new AppError(404, 'NOT_FOUND', 'Document not found');
     await prisma.storeTaxDocument.delete({ where: { id: doc.id } });
-    void deleteR2ObjectIfOrphan(doc.fileUrl);
+    const storageKey = doc.storageKey;
+    void deferAfterTenantCommit('taxProfile.deletePrivateObject', () =>
+      StorageService.deletePrivate(storageKey)
+    ).catch(err =>
+      logger.error({ err, storeId }, '[tax-profile] private evidence object delete failed')
+    );
     await auditLog({
       action: 'tax_profile.document_deleted',
       userId: actor.userId,
@@ -277,12 +288,10 @@ export class TaxProfileService {
   ): Promise<{ body: Buffer; mimeType: string; fileName: string }> {
     const doc = await prisma.storeTaxDocument.findFirst({
       where: { id: documentId, storeId },
-      select: { fileUrl: true, mimeType: true, fileName: true },
+      select: { storageKey: true, mimeType: true, fileName: true },
     });
     if (!doc) throw new AppError(404, 'NOT_FOUND', 'Document not found');
-    const key = urlToR2Key(doc.fileUrl);
-    if (!key) throw new AppError(404, 'NOT_FOUND', 'Document not found');
-    const { body } = await StorageService.getObject(key);
+    const { body } = await StorageService.getPrivate(doc.storageKey);
     return { body, mimeType: doc.mimeType, fileName: doc.fileName };
   }
 

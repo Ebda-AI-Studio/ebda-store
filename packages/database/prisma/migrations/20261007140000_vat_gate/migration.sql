@@ -59,7 +59,7 @@ CREATE TABLE "store_tax_documents" (
     "store_id" TEXT NOT NULL,
     "profile_id" TEXT NOT NULL,
     "kind" "TaxDocumentKind" NOT NULL,
-    "file_url" TEXT NOT NULL,
+    "storage_key" TEXT NOT NULL,
     "file_name" TEXT NOT NULL,
     "mime_type" TEXT NOT NULL,
     "size_bytes" INTEGER NOT NULL,

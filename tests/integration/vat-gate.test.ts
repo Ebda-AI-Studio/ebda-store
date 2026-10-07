@@ -130,7 +130,7 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
         storeId,
         profileId: p.id,
         kind: 'tax_card',
-        fileUrl: `https://example.invalid/stores/${storeId}/tax-documents/x.pdf`,
+        storageKey: `stores/${storeId}/tax-documents/x.pdf`,
         fileName: 'card.pdf',
         mimeType: 'application/pdf',
         sizeBytes: 10,

@@ -771,6 +771,32 @@ export class StoreService {
       );
     }
 
+    // The PRIVATE bucket holds this store's VAT evidence (ruling TAX-4) under
+    // the same `stores/<storeId>/` prefix; reclaim it too, same alerting.
+    try {
+      const privateBucket = StorageService.privateBucket();
+      const { deleted, failedKeys, remaining } = await StorageService.deleteByPrefixVerified(
+        `stores/${storeId}/`,
+        privateBucket
+      );
+      logger.info({ storeId, deleted, remaining }, '[STORE_DELETE] purged private R2 objects');
+      if (remaining > 0) {
+        void sendAlert({
+          level: 'p1',
+          scope: 'platform',
+          source: 'store.delete.r2_private_orphaned',
+          title: 'Private R2 purge incomplete after store delete',
+          body: `${remaining} private object(s) (tax documents) survived the purge of stores/${storeId}/ in the private bucket. Delete the prefix manually.`,
+          context: { storeId, deleted, remaining, failedKeys: failedKeys.slice(0, 20) },
+        }).catch(() => undefined);
+      }
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown', storeId },
+        '[STORE_DELETE] private R2 prefix purge failed or not configured (DB delete stands)'
+      );
+    }
+
     return { id: storeId, name: store.name, slug: store.slug };
   }
 

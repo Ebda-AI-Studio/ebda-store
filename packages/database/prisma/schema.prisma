@@ -4672,15 +4672,16 @@ model StoreTaxProfile {
 }
 
 /// Evidence for a tax profile (tax card / VAT registration certificate). The
-/// file lives in R2 under `stores/<storeId>/tax-documents/`; its URL is NEVER
-/// sent to a browser — it is streamed by the API to the store's own admins and
-/// to super-admins only (ruling TAX-4).
+/// file lives in the PRIVATE R2 bucket (`STORAGE_PRIVATE_BUCKET`) under
+/// `stores/<storeId>/tax-documents/`; it has no URL at all and is streamed by
+/// the API to the store's own admins and to super-admins only (ruling TAX-4).
 model StoreTaxDocument {
   id         String          @id @default(uuid())
   storeId    String          @map("store_id")
   profileId  String          @map("profile_id")
   kind       TaxDocumentKind
-  fileUrl    String          @map("file_url")
+  /// Object key in the private bucket (never a URL).
+  storageKey String          @map("storage_key")
   fileName   String          @map("file_name")
   mimeType   String          @map("mime_type")
   sizeBytes  Int             @map("size_bytes")
