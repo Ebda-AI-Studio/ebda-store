@@ -3,7 +3,7 @@
 #
 # ## Why a size check is not a backup check
 #
-# On 2026-08-02 the Force Media CRM production database was wiped, and the
+# On 2026-08-02 a production database was wiped, and the
 # nightly backup archived 30 consecutive SCHEMA-ONLY dumps — ~3.5KB each, far
 # above any sane byte floor — reporting success every single night. The DR that
 # was supposed to make the wipe survivable had been backing up an empty database
@@ -11,7 +11,7 @@
 # "the table definitions and nothing in them".
 #
 # The mirror failure is the one this repo produced locally: 6 of 193 archives in
-# ~/Desktop/projects/_backups/force-website-builder/ are valid gzip files
+# a local backup directory are valid gzip files
 # containing ZERO bytes, written when pg_dump aborted and only `gzip` was left to
 # decide the pipeline's fate. The file is present, recent and correctly named. It
 # restores nothing.
