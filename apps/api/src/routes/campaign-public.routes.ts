@@ -1,7 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma, runInTenantContext } from '@force/database';
 import { publicLimiter } from '../middleware/security';
-import { verifyUnsubscribeToken } from '../lib/campaign-unsubscribe-token';
+import {
+  verifyUnsubscribeToken,
+  verifySubscriberUnsubscribeToken,
+} from '../lib/campaign-unsubscribe-token';
 import logger from '../lib/logger';
 
 /**
@@ -43,11 +46,81 @@ function maskEmail(email: string): string {
   return `${local.slice(0, 1)}***@${domain}`;
 }
 
+/**
+ * Broadcast (non-campaign) unsubscribe — token names the subscriber row
+ * (NEWSLETTER-UNSUB-1). Store-scoped: every query carries the store id from the
+ * signed token, inside that store's tenant context.
+ */
+async function respondSubscriberInfo(
+  res: Response,
+  ids: { storeId: string; subscriberId: string }
+): Promise<void> {
+  const found = await runInTenantContext(ids.storeId, async () => {
+    const subscriber = await prisma.newsletterSubscriber.findFirst({
+      where: { id: ids.subscriberId, storeId: ids.storeId },
+      select: { email: true, isActive: true },
+    });
+    if (!subscriber) return null;
+    const store = await prisma.store.findUnique({
+      where: { id: ids.storeId },
+      select: { name: true, nameAr: true },
+    });
+    return { subscriber, store };
+  });
+  if (!found) {
+    res.status(404).json({ success: false, error: { code: 'INVALID_TOKEN' } });
+    return;
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    success: true,
+    data: {
+      email: maskEmail(found.subscriber.email),
+      storeName: found.store?.name ?? null,
+      storeNameAr: found.store?.nameAr ?? null,
+      alreadyUnsubscribed: !found.subscriber.isActive,
+    },
+  });
+}
+
+/** Idempotent: an already-unsubscribed subscriber answers the same success. */
+async function unsubscribeSubscriber(
+  res: Response,
+  ids: { storeId: string; subscriberId: string }
+): Promise<void> {
+  const exists = await runInTenantContext(ids.storeId, async () => {
+    const subscriber = await prisma.newsletterSubscriber.findFirst({
+      where: { id: ids.subscriberId, storeId: ids.storeId },
+      select: { id: true },
+    });
+    if (!subscriber) return false;
+    await prisma.newsletterSubscriber.updateMany({
+      where: { id: ids.subscriberId, storeId: ids.storeId, isActive: true },
+      data: { isActive: false, unsubscribedAt: new Date() },
+    });
+    return true;
+  });
+  if (!exists) {
+    res.status(404).json({ success: false, error: { code: 'INVALID_TOKEN' } });
+    return;
+  }
+  logger.info(
+    { storeId: ids.storeId, subscriberId: ids.subscriberId },
+    '[NEWSLETTER] unsubscribed'
+  );
+  res.json({ success: true, data: { unsubscribed: true } });
+}
+
 router.get(
   '/unsubscribe',
   publicLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const sub = verifySubscriberUnsubscribeToken(tokenFrom(req));
+      if (sub) {
+        await respondSubscriberInfo(res, sub);
+        return;
+      }
       const ids = verifyUnsubscribeToken(tokenFrom(req));
       if (!ids) {
         res.status(400).json({ success: false, error: { code: 'INVALID_TOKEN' } });
@@ -90,6 +163,11 @@ router.post(
   publicLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const sub = verifySubscriberUnsubscribeToken(tokenFrom(req));
+      if (sub) {
+        await unsubscribeSubscriber(res, sub);
+        return;
+      }
       const ids = verifyUnsubscribeToken(tokenFrom(req));
       if (!ids) {
         res.status(400).json({ success: false, error: { code: 'INVALID_TOKEN' } });

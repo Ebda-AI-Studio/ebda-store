@@ -1,13 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '@force/database';
-import { csvField, resolveDefaultLanguage } from '@force/shared';
+import { csvField } from '@force/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
 import { ResendService } from '../services/resend.service';
-import { renderBrandedShell, storeHidesPoweredBy } from '../services/email.service';
-import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
+import { storeHidesPoweredBy } from '../services/email.service';
+import { buildBroadcastMessage } from '../lib/newsletter-broadcast';
 import logger from '../lib/logger';
 
 /**
@@ -223,6 +223,8 @@ router.post(
           emailSenderLocalPart: true,
           emailDomainStatus: true,
           domain: true,
+          slug: true,
+          id: true,
         },
       });
 
@@ -239,7 +241,7 @@ router.post(
 
       const subscribers = await prisma.newsletterSubscriber.findMany({
         where,
-        select: { email: true },
+        select: { id: true, email: true, language: true },
       });
 
       if (subscribers.length === 0) {
@@ -247,29 +249,23 @@ router.post(
         return;
       }
 
-      const emails = subscribers.map(s => s.email);
-
-      const settingsJson = store.settings as Record<string, unknown> | null;
-      const defaultLanguage: 'en' | 'ar' = resolveDefaultLanguage(settingsJson?.defaultLanguage);
-
-      // Wrap the provided HTML in the branded shell
-      const storeContext = {
-        name: store.name,
-        nameAr: store.nameAr,
-        logo: store.logo,
-        email: store.email,
-        phone: store.phone,
-        address: store.address,
-        defaultLanguage,
-        theme: store.theme as { primaryColor?: string | null; primary?: string | null } | null,
-        hidePoweredBy: await storeHidesPoweredBy(storeId),
-      };
-      // Sanitize the merchant-composed HTML before relaying it to every
-      // subscriber: strip <script>/<iframe>/<object> etc., on* handlers, and
-      // javascript:/data: URLs. Stops a careless or malicious admin from
-      // broadcasting active/phishing content through our sender reputation.
-      const safeHtml = sanitizeNewsletterHtml(body.html);
-      const wrappedHtml = renderBrandedShell(safeHtml, storeContext);
+      const hidePoweredBy = await storeHidesPoweredBy(storeId);
+      // Every broadcast email carries its OWN per-subscriber one-click
+      // unsubscribe link + RFC 8058 headers (Ruling NEWSLETTER-UNSUB-1), rendered
+      // inside the branded shell. The merchant HTML is sanitized inside
+      // `renderCampaignEmail` (strips <script>/<iframe>/on* handlers/javascript:
+      // URLs) so a careless or malicious admin can't relay active content
+      // through our sender reputation.
+      const messages = subscribers.map(sub =>
+        buildBroadcastMessage({
+          store,
+          subscriber: sub,
+          subject: body.subject,
+          html: body.html,
+          text: body.text,
+          hidePoweredBy,
+        })
+      );
 
       // Send in chunks of 50. Each chunk is ONE Resend batch call carrying 50
       // SEPARATE emails, one address each. It used to be one email with the
@@ -279,14 +275,12 @@ router.post(
       let sent = 0;
       const errors: string[] = [];
 
-      for (let i = 0; i < emails.length; i += CHUNK) {
-        const chunk = emails.slice(i, i + CHUNK);
+      for (let i = 0; i < messages.length; i += CHUNK) {
+        const chunk = messages.slice(i, i + CHUNK);
         try {
           await ResendService.sendBrandedBatch(storeId, {
-            to: chunk,
-            subject: body.subject,
-            html: wrappedHtml,
-            text: body.text,
+            subject: chunk[0].subject,
+            messages: chunk.map(({ to, html, text, headers }) => ({ to, html, text, headers })),
           });
           sent += chunk.length;
         } catch (err: any) {
@@ -302,7 +296,7 @@ router.post(
         success: true,
         data: {
           sent,
-          total: emails.length,
+          total: messages.length,
           errors: errors.length > 0 ? errors : undefined,
         },
       });

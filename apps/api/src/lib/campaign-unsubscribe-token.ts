@@ -75,3 +75,43 @@ export function verifyUnsubscribeToken(
   }
   return null;
 }
+
+/**
+ * Per-SUBSCRIBER unsubscribe token for the legacy newsletter broadcast
+ * (Ruling NEWSLETTER-UNSUB-1). A broadcast has no `campaign_recipients` row, so
+ * the token names the `newsletter_subscribers` row instead:
+ *
+ *   token = s.<storeId>.<subscriberId>.<base64url(HMAC-SHA256(secret, "newsletter-unsubscribe:v1:<storeId>:<subscriberId>"))>
+ *
+ * Same signing/verify keys as the campaign token, but a DIFFERENT domain
+ * prefix and a 4-part shape (leading `s.`), so a campaign token can never
+ * verify as a subscriber token or vice versa, and one public route serves both.
+ */
+function subscriberMac(key: string | Buffer, storeId: string, subscriberId: string): Buffer {
+  return createHmac('sha256', key)
+    .update(`newsletter-unsubscribe:v1:${storeId}:${subscriberId}`)
+    .digest();
+}
+
+export function signSubscriberUnsubscribeToken(storeId: string, subscriberId: string): string {
+  return `s.${storeId}.${subscriberId}.${subscriberMac(signingKey(), storeId, subscriberId).toString('base64url')}`;
+}
+
+export function verifySubscriberUnsubscribeToken(
+  token: unknown
+): { storeId: string; subscriberId: string } | null {
+  if (typeof token !== 'string' || token.length > 200) return null;
+  const parts = token.split('.');
+  if (parts.length !== 4 || parts[0] !== 's') return null;
+  const [, storeId, subscriberId, sig] = parts;
+  if (!UUID_RE.test(storeId) || !UUID_RE.test(subscriberId)) return null;
+  if (!/^[A-Za-z0-9_-]{43}$/.test(sig)) return null;
+  const given = Buffer.from(sig, 'base64url');
+  if (given.length !== 32) return null;
+  for (const key of verifyKeys()) {
+    if (timingSafeEqual(given, subscriberMac(key, storeId, subscriberId))) {
+      return { storeId, subscriberId };
+    }
+  }
+  return null;
+}

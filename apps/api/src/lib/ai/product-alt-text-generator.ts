@@ -13,7 +13,7 @@
  * Inngest function) matches the FAQ/category/excerpt/tags pattern and
  * leaves room for one later.
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GeminiFailoverClient } from './gemini-keys';
 import sharp from 'sharp';
 import { safeFetchImage } from '../safe-fetch';
 import { rethrowAsAppError } from './gemini-errors';
@@ -95,7 +95,7 @@ Rules:
 - Maximum ${ALT_TEXT_MAX_LENGTH} characters.
 - Output ONLY the alt-text string — no quotes, no markdown, no explanation, no trailing period requirement.`;
 
-  const genai = new GoogleGenerativeAI(apiKey);
+  const genai = new GeminiFailoverClient(apiKey);
   const model = genai.getGenerativeModel({ model: modelName });
 
   let result;
