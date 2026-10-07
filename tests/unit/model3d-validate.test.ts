@@ -63,6 +63,21 @@ describe('validateGlb — accepts a well-formed self-contained GLB', () => {
     ).toBe('OK');
   });
 
+  it('counts a POSITION accessor shared by two primitives once', () => {
+    const g = sampleGltf({
+      meshes: [
+        {
+          primitives: [
+            { attributes: { POSITION: 0 }, material: 0 },
+            { attributes: { POSITION: 0 }, material: 1 },
+          ],
+        },
+      ],
+    });
+    const r = validateGlb(buildGlb(g, new Uint8Array(36)));
+    expect(r.ok && r.stats.vertices).toBe(3);
+  });
+
   it('warns (still accepts) above the soft vertex budget', () => {
     const g = sampleGltf();
     (g.accessors as Array<{ count: number }>)[0].count = 600_000;

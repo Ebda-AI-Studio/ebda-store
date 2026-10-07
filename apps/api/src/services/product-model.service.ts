@@ -14,6 +14,7 @@ import type {
   PublicModel3d,
 } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
+import { withSavepoint } from '../lib/savepoint';
 
 export const PUBLIC_MODEL3D_SELECT = {
   modelUrl: true,
@@ -166,8 +167,18 @@ export async function upsertModel(
     stats: input.stats as unknown as Prisma.InputJsonValue,
   };
   if (!existing) {
-    await prisma.productModel.create({ data: { storeId, productId, ...data } });
-    return { previousModelUrl: null, droppedBindings: 0 };
+    // Two concurrent first uploads race on UNIQUE(product_id). The savepoint
+    // keeps the request transaction alive when ours loses (CLAUDE.md RLS note);
+    // the loser then takes the replace path below against the winner's row.
+    try {
+      await withSavepoint(() =>
+        prisma.productModel.create({ data: { storeId, productId, ...data } })
+      );
+      return { previousModelUrl: null, droppedBindings: 0 };
+    } catch (err) {
+      if ((err as { code?: string }).code !== 'P2002') throw err;
+      return upsertModel(storeId, productId, input);
+    }
   }
   await prisma.productModel.update({ where: { id: existing.id }, data });
   const materialNames = input.materials.map(m => m.name);

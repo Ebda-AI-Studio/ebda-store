@@ -420,6 +420,8 @@ export const ProductModelViewer = forwardRef<ProductModelViewerHandle, ProductMo
       a.href = href;
       a.appendChild(document.createElement('img'));
       a.click();
+      // Quick Look has read the blob once the sheet opens; free it after.
+      if (source === 'generated') setTimeout(() => URL.revokeObjectURL(href!), 60_000);
     }
 
     const showAr =

@@ -233,6 +233,24 @@ describe('product 3D model lifecycle (store A, in order)', { retry: 0 }, () => {
   });
 });
 
+describe('concurrent first uploads for one product', { retry: 0 }, () => {
+  it('both requests succeed and leave ONE row (the loser replaces the winner)', async () => {
+    const p = await owner.product.create({
+      data: {
+        storeId: ids.storeA,
+        name: 'race',
+        slug: `${PREFIX}race-${crypto.randomUUID().slice(0, 6)}`,
+        price: 1,
+      },
+    });
+    const results = await Promise.all(
+      ['r1', 'r2'].map(tag => inStore(ids.storeA, () => upsertModel(ids.storeA, p.id, MODEL(tag))))
+    );
+    expect(results).toHaveLength(2);
+    expect(await owner.productModel.count({ where: { productId: p.id } })).toBe(1);
+  });
+});
+
 describe('strict RLS on product_models / product_model_bindings', { retry: 0 }, () => {
   it('store B sees none of store A rows and cannot write into store A', async () => {
     const seen = await inStore(ids.storeB, async () => ({
@@ -273,7 +291,7 @@ describe('strict RLS on product_models / product_model_bindings', { retry: 0 }, 
       )
     ).rejects.toThrow();
     // ...while the owner sees store A's row exists (the zero above is RLS, not emptiness).
-    expect(await owner.productModel.count({ where: { storeId: ids.storeA } })).toBe(1);
+    expect(await owner.productModel.count({ where: { productId: ids.productA } })).toBe(1);
   });
 
   it('the CHECK constraints refuse an out-of-range binding even past the API', async () => {
@@ -305,7 +323,9 @@ describe('strict RLS on product_models / product_model_bindings', { retry: 0 }, 
 
   it('deleting the product cascades its model and bindings', async () => {
     await owner.product.delete({ where: { id: ids.productA } });
-    expect(await owner.productModel.count({ where: { storeId: ids.storeA } })).toBe(0);
-    expect(await owner.productModelBinding.count({ where: { storeId: ids.storeA } })).toBe(0);
+    expect(await owner.productModel.count({ where: { productId: ids.productA } })).toBe(0);
+    expect(
+      await owner.productModelBinding.count({ where: { model: { productId: ids.productA } } })
+    ).toBe(0);
   });
 });

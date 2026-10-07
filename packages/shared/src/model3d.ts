@@ -183,15 +183,18 @@ export function validateGlb(bytes: Uint8Array, maxBytes = MODEL3D_MAX_BYTES): Gl
     return fail('TOO_COMPLEX', 'counts');
   }
 
-  // Vertices = sum of POSITION accessor counts over every primitive.
+  // Vertices = sum of POSITION accessor counts, each accessor counted ONCE
+  // (primitives may share one; counting it per primitive over-reports).
   const accessors = arr(json.accessors);
+  const seenPositions = new Set<number>();
   let vertices = 0;
   for (const mesh of meshes) {
     if (!isRecord(mesh)) continue;
     for (const prim of arr(mesh.primitives)) {
       if (!isRecord(prim) || !isRecord(prim.attributes)) continue;
       const pos = prim.attributes.POSITION;
-      if (typeof pos !== 'number') continue;
+      if (typeof pos !== 'number' || seenPositions.has(pos)) continue;
+      seenPositions.add(pos);
       const acc = accessors[pos];
       if (isRecord(acc) && typeof acc.count === 'number' && acc.count > 0) vertices += acc.count;
     }
