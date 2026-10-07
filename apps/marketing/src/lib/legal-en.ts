@@ -1,4 +1,7 @@
+import { BRAND } from '@force/shared/brand';
 import type { LegalPages } from './legal-types';
+
+const OP = BRAND.company.shortNameEn;
 
 /**
  * English legal text, version 1.0 (2026-10-07). Original wording written from the
@@ -16,7 +19,9 @@ export const LEGAL_EN: LegalPages = {
       {
         h: 'Who we are',
         p: [
-          'Ebda (ابدأ), available at ebda.app, is an online store builder for merchants in Egypt. Ebda is a technology platform owned and operated by Whisky 11 ("Ebda", "we", "us").',
+          'Ebda (ابدأ), available at ebda.app, is an online store builder for merchants in Egypt. Ebda is a technology platform owned and operated by ' +
+            OP +
+            ' ("Ebda", "we", "us").',
         ],
       },
       {
@@ -57,7 +62,9 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '1. Acceptance',
         p: [
-          'These terms are an agreement between you and Ebda. Ebda is a technology platform owned and operated by Whisky 11. By creating an account, opening a store or using the website or any Ebda service (the "Service"), you accept these terms, the Merchant Agreement, the Acceptable Use Policy and the Privacy Policy. If you do not accept them, do not use the Service. If you accept on behalf of a business, you confirm that you have authority to do so.',
+          'These terms are an agreement between you and Ebda. Ebda is a technology platform owned and operated by ' +
+            OP +
+            '. By creating an account, opening a store or using the website or any Ebda service (the "Service"), you accept these terms, the Merchant Agreement, the Acceptable Use Policy and the Privacy Policy. If you do not accept them, do not use the Service. If you accept on behalf of a business, you confirm that you have authority to do so.',
         ],
       },
       {
@@ -126,7 +133,9 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '12. Indemnity',
         p: [
-          'You will defend, compensate and hold harmless Ebda, Whisky 11 and its owner, personnel and service providers against claims, losses, penalties and costs (including reasonable legal fees) brought by any third party, customer or authority arising from your store, products, Content, taxes, customer data, breach of these terms or the Acceptable Use Policy, or violation of law or third-party rights.',
+          'You will defend, compensate and hold harmless Ebda, ' +
+            OP +
+            ' and its owner, personnel and service providers against claims, losses, penalties and costs (including reasonable legal fees) brought by any third party, customer or authority arising from your store, products, Content, taxes, customer data, breach of these terms or the Acceptable Use Policy, or violation of law or third-party rights.',
         ],
       },
       {
@@ -169,7 +178,9 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '1. Scope',
         p: [
-          'This agreement applies to anyone who opens a store on Ebda ("Merchant") and supplements the Terms of Service. If they conflict on a merchant matter, this agreement prevails.',
+          'This agreement applies to anyone who opens a store on Ebda ("Merchant") and supplements the Terms of Service. If they conflict on a merchant matter, this agreement prevails. Ebda is owned and operated by ' +
+            OP +
+            '.',
         ],
       },
       {
@@ -271,7 +282,9 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '1. Purpose',
         p: [
-          'This policy sets what may not be done on or through Ebda. It applies to merchants, their staff, and anyone using the Service. We may update it as described in the Terms of Service.',
+          'This policy sets what may not be done on or through Ebda. It applies to merchants, their staff, and anyone using the Service. Ebda is owned and operated by ' +
+            OP +
+            '. We may update it as described in the Terms of Service.',
         ],
       },
       {
@@ -313,7 +326,9 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '1. Who this covers',
         p: [
-          "This policy explains how Ebda (a product of Whisky 11) handles personal data under Egypt's Personal Data Protection Law No. 151 of 2020. It covers: merchants and their staff who use Ebda; visitors to ebda.app; and shoppers who buy from a merchant's store. Contact: ahlan@ebda.app.",
+          'This policy explains how Ebda (a product of ' +
+            OP +
+            ") handles personal data under Egypt's Personal Data Protection Law No. 151 of 2020. It covers: merchants and their staff who use Ebda; visitors to ebda.app; and shoppers who buy from a merchant's store. Contact: ahlan@ebda.app.",
         ],
       },
       {

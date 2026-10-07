@@ -1,6 +1,6 @@
 # Ebda — Project Guidelines
 
-This repository is **Ebda** (ebda.app), Whisky 11's self-serve store builder for **Egypt** (EGP, Arabic-first). Plans, research, design and the brand brief live in `docs/ebda/` (start with `docs/ebda/plans/2026-10-03-ebda-program-plan.md`). Brand strings, colours, fonts, domains and sender addresses come from `BRAND` in `packages/shared/src/brand/` — never hardcode them.
+This repository is **Ebda** (ebda.app), Ebda AI Studio's self-serve store builder for **Egypt** (EGP, Arabic-first). Plans, research, design and the brand brief live in `docs/ebda/` (start with `docs/ebda/plans/2026-10-03-ebda-program-plan.md`). Brand strings, colours, fonts, domains and sender addresses come from `BRAND` in `packages/shared/src/brand/` — never hardcode them.
 
 Rules + invariants only (slimmed 2026-07-11). Reference catalogs live elsewhere: **env vars → `docs/ENVIRONMENT.md`**, **theme flags / canonical editors / card-CTA system → `docs/architecture/store-theme-flags.md`**, **sizing baselines → `design.md`**. Cross-project rules live in the global `~/.claude/CLAUDE.md` — they are NOT repeated here.
 

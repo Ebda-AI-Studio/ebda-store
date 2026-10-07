@@ -315,7 +315,7 @@ ${prodLines || '_No active products._'}${buildAgentSections(store, base)}
 ## Platform
 
 This store is hosted on Ebda, a multi-tenant e-commerce platform by
-Whisky 11. See https://ebda.app/llms.txt for the
+Ebda AI Studio. See https://ebda.app/llms.txt for the
 platform-wide index.
 `;
 }
