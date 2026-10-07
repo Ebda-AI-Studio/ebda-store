@@ -25,7 +25,7 @@ export function billingFixture(over: Partial<BillingInfo> = {}): BillingInfo {
     overdue: false,
     suspendAt: null,
     supportWhatsappUrl: null,
-    supportEmail: 'hello@ebda.app',
+    supportEmail: 'ahlan@ebda.app',
     suspension: null,
     ...over,
   };

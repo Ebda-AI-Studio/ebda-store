@@ -200,7 +200,7 @@ describe('marketing SEO and trust surface', () => {
       for (const page of LEGAL_SLUGS) {
         const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);
         expect(html).toContain('2026-10-07');
-        expect(html).toContain('hello@ebda.app');
+        expect(html).toContain('ahlan@ebda.app');
         expect(html).not.toMatch(/\[[^\]]*\]/);
         expect(html.match(/<section/g)!.length).toBeGreaterThanOrEqual(5);
       }
