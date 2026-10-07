@@ -11,3 +11,5 @@ export * from './adapter';
 export * from './validate';
 export { storeLayoutSchema, heroSlideSchema } from './layout-schema';
 export * from './template-families';
+export * from './sections-document-only';
+export * from './editor';

@@ -1,5 +1,7 @@
 'use client';
 
+import { useStoreNumerals } from '../../hooks/useNumerals';
+import { intlLocale } from '@force/shared';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -31,6 +33,7 @@ interface BlogListItem {
 export default function BlogIndexPage() {
   const { store } = useStore();
   const { isRtl } = useLanguage();
+  const numerals = useStoreNumerals();
   const storeUrl = useStoreUrl();
   const [posts, setPosts] = useState<BlogListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -109,11 +112,14 @@ export default function BlogIndexPage() {
                       </div>
                       <div className="p-4">
                         <p className="text-xs text-foreground/55">
-                          {new Date(date).toLocaleDateString(isRtl ? 'ar-EG' : 'en-EG', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })}
+                          {new Date(date).toLocaleDateString(
+                            intlLocale(isRtl ? 'ar' : 'en', numerals),
+                            {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            }
+                          )}
                         </p>
                         <h2 className="mt-1 text-lg font-bold text-foreground line-clamp-2">
                           {title}

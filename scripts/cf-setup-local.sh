@@ -4,7 +4,7 @@
 #
 # apps/<app>/open-next.config.ts and wrangler.jsonc ARE committed (.gitignore
 # records why), but THIS script overwrites both on every deploy
-# (.github/workflows/cf-deploy.yml) and in ci.yml's worker-dry-run — the
+# (.github/workflows/cf-{web,admin,orders}-deploy.yml) and in ci.yml's worker-dry-run — the
 # committed copies are a local-dev fallback, and editing them changes nothing
 # that ships. Edit this script instead. The generated result is asserted by
 # scripts/assert-cf-cache-bindings.sh in both places.
@@ -34,23 +34,16 @@ done
 # 2. per-app open-next.config.ts + wrangler.jsonc
 #
 # ROUTES — the `ebda.app` production hostnames each worker owns. These MUST be
-# emitted here so a CI `wrangler deploy` (.github/workflows/cf-deploy.yml) binds
+# emitted here so a CI `wrangler deploy` (.github/workflows/cf-{web,admin,orders}-deploy.yml) binds
 # the correct domains; a route-less worker deploys to *.workers.dev only and the
 # live custom hostnames stop resolving.
 #
-# web carries an extra `*/*` zone route: it is the Cloudflare-for-SaaS FALLBACK
-# ORIGIN, so every merchant Custom Hostname (demo-shop.example, …) proxies through
-# the storefront worker. A bare fallback-origin custom domain alone returns HTTP
-# 522 — the `*/*` zone route is what makes the worker actually answer those
-# proxied requests (GOTCHA 4 in the cutover runbook).
-#
-# CRITICAL (GOTCHA 5, 2026-06-25): that `*/*` route OVERRIDES the admin/orders
-# custom domains in the SAME zone — Cloudflare does NOT let a custom domain win
-# over a `*/*` zone route, so admin/orders.ebda.app would just serve the
-# storefront. The fix: give admin/orders a MORE-SPECIFIC zone route
-# (`admin.ebda.app/*`) which DOES beat `*/*`. So each carries BOTH its
-# custom_domain (for DNS + edge cert) AND the specific zone route (to win routing
-# priority). wrangler accepts both for the same host. Verified live 2026-06-25.
+# web owns ONLY the `*.ebda.app/*` zone route (every `<slug>.ebda.app` store);
+# it never claims the apex, which belongs to the ebda-marketing Worker. admin and
+# orders carry BOTH a custom_domain (DNS + edge cert) AND a more-specific
+# `<host>/*` zone route: zone routes run BEFORE custom domains, so without the
+# specific route the storefront wildcard would answer admin/orders. Route table
+# + the media./preview. exclusions: scripts/cf-routes.cjs, docs/DEPLOYMENT.md.
 for app in "${APPS[@]}"; do
   dir="$ROOT/apps/$app"
   [ -d "$dir" ] || { echo "skip config: no apps/$app"; continue; }
@@ -71,13 +64,13 @@ for app in "${APPS[@]}"; do
   fi
   # OpenNext cache config (2026-06-27). DEFAULT = empty config = current
   # behaviour, ZERO risk. When OPENNEXT_CACHE=true (a repo variable threaded by
-  # cf-deploy.yml) AND this is the storefront (web), emit the R2 incremental
+  # cf-web-deploy.yml) AND this is the storefront (web), emit the R2 incremental
   # cache + sharded-Durable-Object tag cache + DO queue so revalidateTag works
   # ACROSS isolates — a merchant theme/brand-color save then applies in ~1s
   # instead of up to ~15s (each isolate's memory cache was independent).
   #
-  # PRE-REQS before enabling: the R2 bucket `ebda-web-opennext-cache` must exist
-  # (cf-deploy.yml creates it idempotently), and the change MUST be verified on a
+  # PRE-REQS before enabling: the R2 bucket `ebda-web-isr-cache` must exist
+  # (it exists: ebda-web-isr-cache), and the change MUST be verified on a
   # CF PREVIEW deploy first — the DO binding class names below are the documented
   # OpenNext names and must match `.open-next/worker.js`'s exports for that
   # version. Import paths + default-export shapes verified against
@@ -135,7 +128,7 @@ EOF
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "ebda-$app" }],
-  "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "ebda-web-opennext-cache" }],
+  "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "ebda-web-isr-cache" }],
   "durable_objects": { "bindings": [
     { "name": "NEXT_TAG_CACHE_DO_SHARDED", "class_name": "DOShardedTagCache" },
     { "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" }

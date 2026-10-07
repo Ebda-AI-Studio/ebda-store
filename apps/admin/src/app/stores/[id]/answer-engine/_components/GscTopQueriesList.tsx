@@ -2,6 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import { formatPercent, type GscTopQuery } from './types';
+import { withNumerals } from '@force/shared';
 
 interface GscTopQueriesListProps {
   topQueries: GscTopQuery[];
@@ -26,8 +27,9 @@ export function GscTopQueriesList({ topQueries }: GscTopQueriesListProps) {
               {q.query}
             </p>
             <p className="shrink-0 text-xs text-muted-foreground whitespace-nowrap">
-              {q.clicks.toLocaleString()} {t('clicks').toLowerCase()} ·{' '}
-              {q.impressions.toLocaleString()} {t('impressions').toLowerCase()}
+              {q.clicks.toLocaleString(undefined, withNumerals())} {t('clicks').toLowerCase()} ·{' '}
+              {q.impressions.toLocaleString(undefined, withNumerals())}{' '}
+              {t('impressions').toLowerCase()}
               {q.impressions > 0 && ` · ${formatPercent(q.clicks / q.impressions)}`}
             </p>
           </li>

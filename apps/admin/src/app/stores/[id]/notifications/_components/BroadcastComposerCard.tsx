@@ -20,6 +20,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../lib/api';
+import { withNumerals } from '@force/shared';
 
 interface BroadcastFormState {
   titleEn: string;
@@ -291,7 +292,7 @@ export function BroadcastComposerCard({ storeId }: { storeId: string }) {
               const heading = b.headings?.en || b.headings?.ar || t('untitled');
               const sent = (b.successful ?? 0) + (b.failed ?? 0);
               const ts = b.completed_at || b.queued_at;
-              const when = ts ? new Date(ts * 1000).toLocaleString() : '';
+              const when = ts ? new Date(ts * 1000).toLocaleString(undefined, withNumerals()) : '';
               return (
                 <li
                   key={b.id}

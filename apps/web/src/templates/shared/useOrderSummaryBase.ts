@@ -14,7 +14,7 @@ import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
 import type { OrderSummaryProps } from '../types';
 
-import { minorToDecimalString, REGION } from '@force/shared';
+import { REGION } from '@force/shared';
 export interface OrderSummaryBaseResult {
   isRtl: boolean;
   /** Format a piastres-denominated price as "X.XXX EGP" */
@@ -58,12 +58,12 @@ export function useOrderSummaryBase({
   | 'taxIncludedInPrice'
 >): OrderSummaryBaseResult {
   const { isRtl: ctxIsRtl } = useLanguage();
-  const { localize } = useNumerals();
+  const { localize, money } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
 
   return {
     isRtl,
-    fmt: (p: number) => `${localize(minorToDecimalString(p))} ${currency}`,
+    fmt: (p: number) => `${money(p)} ${currency}`,
     ctaText: isRtl ? (ctaLabelAr ?? ctaLabel) : (ctaLabel ?? ctaLabelAr),
     summaryLabelBold: summaryColors?.bold !== false,
     labelColorStyle: summaryColors?.labelColor ? { color: summaryColors.labelColor } : undefined,

@@ -18,7 +18,7 @@
  * claim-override) is a false-positive tax on real merchants.
  */
 export const PROTECTED_BRAND_NAMES: readonly string[] = [
-  // Ebda / Whisky 11 (the platform and its operator)
+  // Ebda / Ebda AI Studio (the platform and its operator); whisky11 stays reserved
   'ebda',
   'ebdaapp',
   'ebdaeg',
@@ -26,6 +26,14 @@ export const PROTECTED_BRAND_NAMES: readonly string[] = [
   'ebda-support',
   'ebda-billing',
   'ebda-team',
+  'ebdastudio',
+  'ebda-studio',
+  'ebda-ai-studio',
+  'ebda-store',
+  'ebdastore',
+  'ebda-whatsapp',
+  'ebda-crm',
+  'ebda-erp',
   'whisky11',
   'whisky-11',
   'whisky',

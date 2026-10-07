@@ -1,5 +1,6 @@
 'use client';
 
+import { storeNumerals } from '@force/shared';
 import { useState, useEffect } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Link from 'next/link';
@@ -72,6 +73,7 @@ export default function AccountDashboardClient() {
     return formatStoreDate(date, {
       timezone: store.timezone,
       language,
+      numerals: storeNumerals(store?.theme),
       style: 'long',
     });
   }

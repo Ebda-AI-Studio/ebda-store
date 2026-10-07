@@ -4,6 +4,7 @@ import { pickLocalizedName } from '../../templates/shared/display-helpers';
 import Link from 'next/link';
 import { resolveProductCardCtaOosDefaults } from '../../templates/shared/product-card-defaults';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
+import { useStoreNumerals } from '../../hooks/useNumerals';
 import Image from 'next/image';
 import type { Product } from '@/lib/api';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
@@ -42,6 +43,7 @@ export function ProductListItem({
   const { store, layout } = useStore();
   const storeUrl = useStoreUrl();
   const formatPrice = useLocalePrice();
+  const numerals = useStoreNumerals();
   const priceVisible = showCardPrice !== false;
   // Localized name for alt text + heading. Falls through to English when
   // the merchant hasn't supplied an Arabic translation.
@@ -52,7 +54,7 @@ export function ProductListItem({
   // (often stale) standalone price.
   const pricing = getProductPricing(product, undefined, 'card');
   // BUG 1 fix: use helper for correct EGP/pct badge text.
-  const discountBadgeText = getDiscountBadgeText(product, isRtl);
+  const discountBadgeText = getDiscountBadgeText(product, isRtl, undefined, undefined, numerals);
   // Task 13: orderable = truly in-stock OR backorder allowed. Derived from
   // inventory because ProductListItem uses a richer inventory check (undefined
   // means variant-managed stock → treat as orderable). OOS + backorder = orderable.

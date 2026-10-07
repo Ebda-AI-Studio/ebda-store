@@ -175,13 +175,13 @@ describe('message builders (EGP formatting)', () => {
     expect(
       buildProductShareMessage({ locale: 'en', productName: 'Linen Shirt', priceMinor: 49900, url })
     ).toMatchInlineSnapshot(`
-      "Check this out: Linen Shirt — EGP 499.00
+      "Check this out: Linen Shirt — EGP 499
       https://nile.ebda.app/products/linen-shirt"
     `);
     expect(
       buildProductShareMessage({ locale: 'ar', productName: 'قميص كتان', priceMinor: 49900, url })
     ).toMatchInlineSnapshot(`
-      "شوف ده: قميص كتان — 499.00 ج.م
+      "شوف ده: قميص كتان — 499 ج.م
       https://nile.ebda.app/products/linen-shirt"
     `);
   });

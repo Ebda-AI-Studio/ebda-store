@@ -9,6 +9,7 @@ import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { apiDelete, apiGet, apiPost, getApiUrl } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { withNumerals } from '@force/shared';
 
 /**
  * Merchant screen for the MCP merchant-admin keys — issue, review, revoke.
@@ -182,7 +183,8 @@ export default function MerchantKeysPage() {
     setScopes(prev => (prev.includes(scope) ? prev.filter(s => s !== scope) : [...prev, scope]));
   }, []);
 
-  const fmt = (v: string | null) => (v ? new Date(v).toLocaleString() : t('table.never'));
+  const fmt = (v: string | null) =>
+    v ? new Date(v).toLocaleString(undefined, withNumerals()) : t('table.never');
 
   const keyColumns: DataTableColumn<KeyRow>[] = [
     {
@@ -438,11 +440,10 @@ export default function MerchantKeysPage() {
                     'my-store': {
                       type: 'http',
                       // `getApiUrl()`, not string surgery on the admin origin.
-                      // `.replace('admin.', 'api.')` only works on
-                      // admin.ebda.app: on admin.ebda.app it is a
-                      // no-op and the merchant copies the ADMIN worker's host,
-                      // and on admin.ebda.app it yields a host that is
-                      // not the API either. This snippet is the only artifact
+                      // `.replace('admin.', 'api.')` only ever worked on an
+                      // `admin.` host: on store.ebda.app it is a no-op and the
+                      // merchant copies the merchant-app worker's host, which
+                      // is not the API. This snippet is the only artifact
                       // handed over alongside a secret that can never be shown
                       // again — a merchant who pastes a wrong host gets a 404
                       // from a surface designed to 404 at everything, with no

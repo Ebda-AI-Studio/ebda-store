@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma, Prisma, PaymentProvider } from '@force/database';
+import { prisma, Prisma } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -8,36 +8,52 @@ import { encryption } from '../services/encryption.service';
 import { auditLog } from '../middleware/security';
 import { PaymentService } from '../services/payment.service';
 import { getAuthUser } from '../utils/store-helpers';
-import { tenantContext } from '../middleware/tenant-context';
+import { paymentSettingsRouteContext } from '../middleware/tenant-context';
 
 import {
   REGION,
+  PAYMENT_PROVIDER_CODES,
+  getProviderEntry,
   codSettingsSchema,
   fawrySettingsSchema,
   instapaySettingsBaseSchema,
   instapaySettingsSchema,
   kashierSettingsSchema,
-  paymobSettingsBaseSchema,
-  paymobSettingsSchema,
 } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
 import { providerHealth } from '../services/payment-providers/provider-health';
+import {
+  applyCredentialUpdate,
+  assertEnableAllowed,
+  assertMayConfigure,
+  connectableEntry,
+  publicPaymentConfig,
+  runConnectionTest,
+} from '../services/payment-providers/provider-connection.service';
 const router = Router();
 
-// Mounted bare at '/payment-settings' in routes/index.ts. Every '/store/:storeId/...' route below sets RLS tenant context
+// Mounted bare at '/payment-settings' in routes/index.ts — the global
+// (super-admin, storeId-less) routes above stay outside tenant context by
+// design. Every '/store/:storeId/...' route below sets RLS tenant context
 // once Express resolves :storeId, matching coupon.routes.ts /
 // shipping.routes.ts. Closes the one F2-GAP router with zero DB backstop
 // over PaymentConfig (encrypted provider secrets) — see
 // docs/audits/2026-07-16-rls-cutover-readiness-map.md §2/§6#3. Confirmed no
-// external I/O in these handlers (no fetch/3rd-party calls).
-router.param('storeId', tenantContext);
+// external I/O in these handlers (no fetch/3rd-party calls; that only
+// happens in the storeId-less /:provider/test route above).
+// The Test connection route calls the gateway, so it runs under store scope instead of the
+// request transaction (`paymentSettingsRouteContext`); every other store route keeps ONE tx.
+router.param('storeId', paymentSettingsRouteContext);
 
 // ==========================================
 // Validation Schemas
 // ==========================================
 
 const paymentConfigSchema = z.object({
-  provider: z.enum(['cod', 'instapay', 'paymob', 'kashier', 'fawry']),
+  // A catalog code (PROVIDERS-1: the list lives in @force/shared, not in a DB enum).
+  provider: z
+    .string()
+    .refine(code => PAYMENT_PROVIDER_CODES.includes(code), { message: 'Unknown payment provider' }),
   isEnabled: z.boolean().default(false),
   isDefault: z.boolean().default(false),
   displayName: z.string().optional(),
@@ -127,18 +143,16 @@ export function normalizeProviderSettings(
     }
     return parsed.data;
   }
-  // The Egyptian gateways: only their NON-secret settings live here (the keys are in the
-  // encrypted columns). An enabled Paymob needs its public key and an integration id.
+  // The Egyptian gateways: only their mode-independent, NON-secret settings live here. Paymob's
+  // public key and integration ids differ between sandbox and live, so they are credential fields
+  // of the catalog (encrypted blob, per mode) and Paymob keeps nothing in this column.
+  if (provider === 'paymob') return {};
   const gatewaySchema =
-    provider === 'paymob'
-      ? isEnabled
-        ? paymobSettingsSchema
-        : paymobSettingsBaseSchema
-      : provider === 'kashier'
-        ? kashierSettingsSchema
-        : provider === 'fawry'
-          ? fawrySettingsSchema
-          : null;
+    provider === 'kashier'
+      ? kashierSettingsSchema
+      : provider === 'fawry'
+        ? fawrySettingsSchema
+        : null;
   if (gatewaySchema) {
     const parsed = gatewaySchema.safeParse(raw);
     if (!parsed.success) {
@@ -153,45 +167,23 @@ export function normalizeProviderSettings(
   return {};
 }
 
-/**
- * The credentials an enabled gateway cannot work without, by provider. An enabled gateway with a
- * missing key would be offered at checkout and fail for every customer, so enabling is refused
- * until they are all saved (a saved credential counts: the form leaves it blank to keep it).
- */
-const REQUIRED_CREDENTIALS: Record<string, Array<keyof CredentialPresence>> = {
-  paymob: ['apiKey', 'webhookSecret'],
-  kashier: ['merchantId', 'apiKey', 'secretKey'],
-  fawry: ['merchantId', 'apiKey'],
-};
-interface CredentialPresence {
-  apiKey: boolean;
-  secretKey: boolean;
-  merchantId: boolean;
-  webhookSecret: boolean;
-}
-const CREDENTIAL_LABEL: Record<string, string> = {
-  apiKey: 'API / secret key',
-  secretKey: 'secret key',
-  merchantId: 'merchant ID',
-  webhookSecret: 'HMAC / webhook secret',
-};
+const LEGACY_CREDENTIAL_KEYS = ['apiKey', 'secretKey', 'merchantId', 'webhookSecret'] as const;
 
-export function assertGatewayCredentials(
-  provider: string,
-  isEnabled: boolean,
-  saved: Partial<Record<keyof CredentialPresence, string | null | undefined>>,
-  incoming: Partial<Record<keyof CredentialPresence, string | null | undefined>>
-): void {
-  const required = REQUIRED_CREDENTIALS[provider];
-  if (!isEnabled || !required) return;
-  const missing = required.filter(
-    k => !(saved[k] || (incoming[k] && !incoming[k]!.includes('****')))
-  );
-  if (missing.length > 0) {
+/**
+ * Single writer for gateway credentials: on the STORE routes a non-manual provider's keys are
+ * saved ONLY through `PUT /store/:storeId/:provider/credentials` (catalog fields, per mode, then
+ * Test connection). The generic create/update routes refuse them instead of writing the legacy
+ * columns, so there is one path that validates, encrypts, audits and invalidates the test.
+ */
+function refuseLegacyGatewayCredentials(provider: string, body: Record<string, unknown>): void {
+  const entry = getProviderEntry(provider);
+  if (!entry || entry.manual) return;
+  const sent = LEGACY_CREDENTIAL_KEYS.filter(k => typeof body[k] === 'string' && body[k] !== '');
+  if (sent.length > 0) {
     throw new AppError(
       422,
-      'INVALID_PAYMENT_SETTINGS',
-      `Cannot enable ${provider}: missing ${missing.map(k => CREDENTIAL_LABEL[k]).join(', ')}`
+      'USE_CREDENTIALS_ENDPOINT',
+      `Save ${provider} credentials with PUT /payment-settings/store/:storeId/${provider}/credentials`
     );
   }
 }
@@ -213,7 +205,7 @@ function encryptCredentials(data: {
 }
 
 // ==========================================
-// Platform-level (global) payment settings: RETIRED (R-EBDA-007)
+// Global (platform-level) payment settings: RETIRED (R-EBDA-007)
 // ==========================================
 // Under strict RLS (role ebda_app) payment_configs rows with store_id IS NULL
 // are invisible and unwritable, and the tenant guard refuses an unscoped
@@ -285,11 +277,13 @@ router.get(
         orderBy: { provider: 'asc' },
       });
 
+      // Get global configs to show which are available
+
       // Mask sensitive credentials. `circuit` is the LIVE outage state of this
       // method on this node (open circuit = the checkout is hiding it right now);
       // `healthStatus` is the last persisted value.
       const safeStoreConfigs = storeConfigs.map(config => ({
-        ...config,
+        ...publicPaymentConfig(config, storeId),
         ...maskCredentials(config),
         circuit: providerHealth(storeId, config.provider),
       }));
@@ -351,7 +345,7 @@ router.post(
       // Check if provider already exists for this store
       const existing = await prisma.paymentConfig.findFirst({
         where: {
-          provider: data.provider as PaymentProvider,
+          provider: data.provider,
           storeId,
         },
       });
@@ -372,7 +366,17 @@ router.post(
         });
       }
 
-      assertGatewayCredentials(data.provider, data.isEnabled, {}, data);
+      refuseLegacyGatewayCredentials(data.provider, req.body ?? {});
+      // A gateway created enabled has no tested credentials yet: the gate refuses it.
+      if (data.isEnabled) {
+        assertEnableAllowed({
+          provider: data.provider,
+          testMode: data.testMode,
+          isEnabled: true,
+          credentials: null,
+          connectionTest: null,
+        });
+      }
 
       // Encrypt credentials before storing
       const encryptedCreds = encryptCredentials(data);
@@ -380,7 +384,7 @@ router.post(
       const config = await prisma.paymentConfig.create({
         data: {
           storeId,
-          provider: data.provider as PaymentProvider,
+          provider: data.provider,
           isEnabled: data.isEnabled,
           isDefault: data.isDefault,
           displayName: data.displayName,
@@ -423,7 +427,7 @@ router.post(
         success: true,
         data: {
           config: {
-            ...config,
+            ...publicPaymentConfig(config, config.storeId),
             ...maskCredentials(config),
           },
         },
@@ -475,7 +479,7 @@ router.put(
 
       const existing = await prisma.paymentConfig.findFirst({
         where: {
-          provider: provider as PaymentProvider,
+          provider: provider,
           storeId,
         },
       });
@@ -528,7 +532,19 @@ router.put(
         delete updateData.webhookSecret;
       }
 
-      assertGatewayCredentials(provider, data.isEnabled ?? existing.isEnabled, existing, data);
+      refuseLegacyGatewayCredentials(provider, req.body ?? {});
+      // The enable gate on the RESULTING state: enabling, or switching the mode of an enabled
+      // gateway (the other mode's credentials were never tested), needs a current test.
+      const resultingEnabled = data.isEnabled ?? existing.isEnabled;
+      if (resultingEnabled) {
+        assertEnableAllowed({
+          provider,
+          testMode: data.testMode ?? existing.testMode,
+          isEnabled: true,
+          credentials: existing.credentials,
+          connectionTest: existing.connectionTest,
+        });
+      }
 
       if (data.settings !== undefined || data.isEnabled !== undefined) {
         updateData.settings = normalizeProviderSettings(
@@ -542,7 +558,7 @@ router.put(
       }
 
       const config = await prisma.paymentConfig.update({
-        where: { id: existing.id, storeId },
+        where: { id: existing.id },
         data: updateData,
       });
 
@@ -563,7 +579,7 @@ router.put(
         success: true,
         data: {
           config: {
-            ...config,
+            ...publicPaymentConfig(config, config.storeId),
             ...maskCredentials(config),
           },
         },
@@ -614,7 +630,7 @@ router.delete(
 
       const existing = await prisma.paymentConfig.findFirst({
         where: {
-          provider: provider as PaymentProvider,
+          provider: provider,
           storeId,
         },
       });
@@ -628,7 +644,7 @@ router.delete(
       }
 
       await prisma.paymentConfig.delete({
-        where: { id: existing.id, storeId },
+        where: { id: existing.id },
       });
 
       await auditLog({
@@ -695,7 +711,7 @@ router.post(
 
       const existing = await prisma.paymentConfig.findFirst({
         where: {
-          provider: provider as PaymentProvider,
+          provider: provider,
           storeId,
         },
       });
@@ -708,8 +724,16 @@ router.post(
         return;
       }
 
+      // Disabling is always allowed; enabling a gateway needs a verified provider and a
+      // successful Test connection of the credentials stored now (PROVIDERS-2 + plan 4.2/5).
+      if (enabled === true) {
+        assertEnableAllowed(existing);
+      } else if (enabled !== false) {
+        throw new AppError(400, 'VALIDATION_ERROR', '`enabled` must be true or false');
+      }
+
       const config = await prisma.paymentConfig.update({
-        where: { id: existing.id, storeId },
+        where: { id: existing.id },
         data: {
           isEnabled: enabled,
           updatedBy: userId,
@@ -733,8 +757,182 @@ router.post(
         success: true,
         data: {
           config: {
-            ...config,
+            ...publicPaymentConfig(config, config.storeId),
             ...maskCredentials(config),
+          },
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ==========================================
+// Connect a provider (catalog, plan 4.2): credentials -> Test connection -> enable
+// ==========================================
+
+const credentialUpdateSchema = z.object({
+  mode: z.enum(['sandbox', 'live']),
+  fields: z.record(z.string(), z.union([z.string().max(2000), z.number(), z.null()])),
+  /** Optionally make this mode the ACTIVE one (switching disables an enabled gateway until re-tested). */
+  activate: z.boolean().optional(),
+});
+
+/** Loads the store and repeats the inline ownership check the other store routes make. */
+async function loadOwnedStore(req: Request, storeId: string) {
+  const store = await prisma.store.findUnique({ where: { id: storeId } });
+  if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+  const user = getAuthUser(req);
+  if (user.role !== 'super_admin' && store.ownerId !== user.userId) {
+    throw new AppError(403, 'FORBIDDEN', 'Access denied');
+  }
+  return { store, user };
+}
+
+/**
+ * PUT /payment-settings/store/:storeId/:provider/credentials
+ * Save (write-only) credential fields for one mode. Creates the config row (disabled) when the
+ * store has none. Changing the ACTIVE mode's credentials of an enabled gateway disables it: the
+ * new keys have not been tested.
+ */
+router.put(
+  '/store/:storeId/:provider/credentials',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requirePermission('store:settings'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, provider } = req.params;
+      const body = credentialUpdateSchema.parse(req.body);
+      const { user } = await loadOwnedStore(req, storeId);
+      const entry = connectableEntry(provider);
+      assertMayConfigure(provider, user.role);
+
+      const existing = await prisma.paymentConfig.findFirst({ where: { provider, storeId } });
+      const update = applyCredentialUpdate(entry, existing, {
+        mode: body.mode,
+        fields: body.fields,
+      });
+      const nextTestMode = body.activate ? body.mode === 'sandbox' : (existing?.testMode ?? true);
+      const modeSwitched = existing ? existing.testMode !== nextTestMode : false;
+      const mustDisable =
+        Boolean(existing?.isEnabled) && (update.activeModeChanged || modeSwitched);
+
+      const data = {
+        credentials: update.cipher,
+        credentialHints: update.hints as Prisma.InputJsonValue,
+        testMode: nextTestMode,
+        ...(mustDisable ? { isEnabled: false } : {}),
+        updatedBy: user.userId,
+      };
+      const config = existing
+        ? await prisma.paymentConfig.update({ where: { id: existing.id }, data })
+        : await prisma.paymentConfig.create({
+            data: {
+              ...data,
+              storeId,
+              provider,
+              isEnabled: false,
+              displayName: entry.name.en,
+              displayNameAr: entry.name.ar,
+              supportedMethods: [...entry.capabilities.methods],
+              settings: normalizeProviderSettings(provider, {}, false) as Prisma.InputJsonValue,
+              createdBy: user.userId,
+            },
+          });
+
+      // Names of the fields that changed, never their values.
+      await auditLog({
+        action: 'store_payment_config.credentials_updated',
+        storeId,
+        userId: user.userId,
+        resourceType: 'payment_config',
+        resourceId: config.id,
+        details: {
+          storeId,
+          provider,
+          mode: body.mode,
+          fields: update.changed,
+          activated: Boolean(body.activate),
+          disabledUntilRetested: mustDisable,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      PaymentService.clearCache(storeId);
+
+      res.json({
+        success: true,
+        data: {
+          config: { ...publicPaymentConfig(config, storeId), ...maskCredentials(config) },
+          changed: update.changed,
+          disabledUntilRetested: mustDisable,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /payment-settings/store/:storeId/:provider/test
+ * ONE harmless authenticated call to the gateway with the ACTIVE mode's stored credentials. Runs
+ * under store scope (`paymentSettingsRouteContext`): no transaction is held across the call.
+ */
+router.post(
+  '/store/:storeId/:provider/test',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requirePermission('store:settings'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, provider } = req.params;
+      const { user } = await loadOwnedStore(req, storeId);
+      connectableEntry(provider);
+      assertMayConfigure(provider, user.role);
+      const existing = await prisma.paymentConfig.findFirst({ where: { provider, storeId } });
+      if (!existing) {
+        throw new AppError(404, 'NOT_FOUND', 'Save the credentials before testing the connection');
+      }
+      const startedAt = Date.now();
+      const { result, stored } = await runConnectionTest(existing);
+      const latency = Date.now() - startedAt;
+
+      await prisma.paymentConfig.update({
+        where: { id: existing.id },
+        data: {
+          connectionTest: stored as unknown as Prisma.InputJsonValue,
+          healthStatus: result.ok ? 'healthy' : result.code === 'unreachable' ? 'degraded' : 'down',
+          lastHealthCheck: new Date(stored.at),
+          updatedBy: user.userId,
+        },
+      });
+      await auditLog({
+        action: 'store_payment_config.connection_tested',
+        storeId,
+        userId: user.userId,
+        resourceType: 'payment_config',
+        resourceId: existing.id,
+        details: { storeId, provider, mode: stored.mode, ok: result.ok, code: result.code },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      res.json({
+        success: true,
+        data: {
+          provider,
+          mode: stored.mode,
+          test: {
+            ok: result.ok,
+            code: result.code,
+            message: result.message,
+            details: result.details ?? {},
+            latency,
           },
         },
       });

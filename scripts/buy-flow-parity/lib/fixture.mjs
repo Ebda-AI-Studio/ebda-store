@@ -22,7 +22,11 @@ const OWNER_HASH = '$2b$10$YZe6BZQ1L6DcDfyLDvHQLOXyy9PqCJ1Ml.fS6JBxcdoaNwOo0nEQi
 export const PM_SECRET_KEY = 'bfp-parity-paymob-secret-key';
 export const PM_HMAC_SECRET = 'bfp-parity-paymob-hmac-secret';
 export const PM_PUBLIC_KEY = 'bfp-parity-paymob-public-key';
-export const PM_INTEGRATIONS = { card: 11, meeza: 22, wallet: 33, valu: 44 };
+// Methods both the base and the head ref understand (the head dropped `meeza`: Meeza rides the card
+// integration per Paymob's docs).
+export const PM_INTEGRATIONS = { card: 11, wallet: 33, valu: 44 };
+/** Paymob API key (POST /api/auth/tokens), read from the legacy `secret_key` column by the head ref. */
+export const PM_API_KEY = 'bfp-parity-paymob-api-key';
 export const COD_FEE = 500; // piastres (5.00 EGP)
 export const VAT_RATE = '14.00';
 
@@ -127,9 +131,10 @@ export function buildFixture({ encryptionKey, scenarios }) {
         is_default: true,
         display_name: 'Paymob',
         api_key: encryptSecret(PM_SECRET_KEY, encryptionKey),
+        secret_key: encryptSecret(PM_API_KEY, encryptionKey),
         webhook_secret: encryptSecret(PM_HMAC_SECRET, encryptionKey),
         test_mode: true,
-        supported_methods: ['card', 'meeza', 'wallet', 'valu'],
+        supported_methods: ['card', 'wallet', 'valu'],
         supported_currencies: ['EGP'],
         settings: { publicKey: PM_PUBLIC_KEY, integrationIds: PM_INTEGRATIONS },
         updated_at: ts,

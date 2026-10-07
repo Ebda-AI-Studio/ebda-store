@@ -22,6 +22,9 @@
 
 import { EGYPT_GOVERNORATE_LIST, type Governorate } from './governorates';
 import { zonedDayStart, zonedIsoDay } from '../schemas/report-range';
+import type { Numerals } from './numerals';
+
+export * from './numerals';
 
 export { EGYPT_GOVERNORATE_LIST };
 export type { Governorate };
@@ -289,12 +292,20 @@ export function toEasternArabicDigits(input: string | number): string {
 }
 
 export interface FormatMoneyOptions {
-  /** Render digits as ٠١٢٣٤٥٦٧٨٩ with ٬ / ٫ separators (Arabic locale only). Default false. */
+  /** Digit system (Ruling NUMERALS-1). Default `'latn'` (0-9) in BOTH locales;
+   *  `'arab'` (٠١٢٣ with ٬ / ٫) only applies to the Arabic locale. Pass the
+   *  store's choice (`storeNumerals(theme)`) on customer-facing output only. */
+  numerals?: Numerals;
+  /** @deprecated use `numerals: 'arab'`. Kept so older callers keep compiling. */
   easternArabicDigits?: boolean;
   /** Currency of `minor`. Default `REGION.currency`. */
   currency?: string;
   /** Omit the currency symbol/code. Default false. */
   hideSymbol?: boolean;
+  /** Always print `currencyExponent` decimals (`450.00`). Default false: a
+   *  whole amount drops its zero fraction (`450 ج.م`), an amount with
+   *  piastres keeps every decimal (`450.50 ج.م`). */
+  fixedDecimals?: boolean;
 }
 
 function groupThousands(whole: string): string {
@@ -303,9 +314,11 @@ function groupThousands(whole: string): string {
 
 /**
  * Format a MINOR-unit amount for display. Deterministic (no ICU dependence):
- *  - en: `EGP 1,299.50`
- *  - ar: `1,299.50 ج.م` (Latin digits) or `١٬٢٩٩٫٥٠ ج.م` with `easternArabicDigits`.
- * Always shows exactly `currencyExponent` decimals.
+ *  - en: `EGP 1,299.50`, `EGP 450`
+ *  - ar: `1,299.50 ج.م`, `450 ج.م` — Western digits by default (Ruling
+ *    NUMERALS-1); `١٬٢٩٩٫٥٠ ج.م` only with `numerals: 'arab'`.
+ * A whole amount drops its all-zero fraction ("450 ج.م", not "450.00 ج.م");
+ * an amount with a fractional part shows every decimal of the currency.
  */
 export function formatMoney(
   minor: number,
@@ -316,11 +329,13 @@ export function formatMoney(
   const plain = minorToDecimalString(minor, currency);
   const neg = plain.startsWith('-');
   const [whole, frac] = plain.replace('-', '').split('.');
-  let num = groupThousands(whole) + (frac !== undefined ? `.${frac}` : '');
-  if (locale === 'ar' && opts.easternArabicDigits) {
+  const keepFrac = frac !== undefined && (opts.fixedDecimals === true || /[1-9]/.test(frac));
+  let num = groupThousands(whole) + (keepFrac ? `.${frac}` : '');
+  const numerals: Numerals = opts.numerals ?? (opts.easternArabicDigits ? 'arab' : 'latn');
+  if (locale === 'ar' && numerals === 'arab') {
     num = toEasternArabicDigits(num).replace(/,/g, '٬').replace(/\./g, '٫');
   }
-  const signed = neg ? `-${num}` : num;
+  const signed = neg && /[1-9١-٩]/.test(num) ? `-${num}` : num;
   if (opts.hideSymbol) return signed;
   const symbol =
     currency.toUpperCase() === REGION.currency

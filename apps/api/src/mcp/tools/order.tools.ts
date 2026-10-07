@@ -9,7 +9,6 @@ import type { Currency } from '../../services/payment-providers/types';
 import { recordPaymentEvent } from '../../services/payment-event.service';
 import { auditLog } from '../../middleware/security';
 import { AppError } from '../../middleware/error-handler';
-import { config } from '../../config';
 import logger from '../../lib/logger';
 import { buildPaymentLineItems } from '../../lib/payment-line-items';
 import {
@@ -25,6 +24,7 @@ import {
 import { ok } from './tool-result';
 
 import { codFeeMinor } from '@force/shared';
+import { paymentWebhookUrl } from '../../services/payment-providers/webhook-url';
 /**
  * Agent orders reuse the SAME required-field contract as a human guest
  * order (`shippingAddressSchema` in `public.routes.ts`): firstName+lastName
@@ -371,7 +371,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
             items: buildPaymentLineItems(order.items),
             callbackUrl: `${base}/checkout/success`,
             errorUrl: `${base}/checkout/error`,
-            webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${provider}`,
+            webhookUrl: paymentWebhookUrl(provider, store.id),
           };
           const { providerName: acceptedBy, response: payment } =
             await PaymentService.requestProviderPayment(paymentRequest, provider, store.id);

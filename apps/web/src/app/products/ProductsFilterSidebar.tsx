@@ -9,7 +9,7 @@ import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { buildSidebarVars, countActiveFilters } from './filter-sidebar-state';
 import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
 
-import { REGION, minorToDecimalString, roundToMinor } from '@force/shared';
+import { REGION, roundToMinor } from '@force/shared';
 interface SortOption {
   value: string;
   label: string;
@@ -200,7 +200,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     fgTriplet,
   } = props;
   const { t } = useLanguage();
-  const { localize } = useNumerals();
+  const { localize, money } = useNumerals();
 
   const sidebarVars = buildSidebarVars(bgTriplet, fgTriplet);
 
@@ -339,11 +339,11 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs lg:text-sm text-[hsl(var(--primary-foreground)/0.8)]">
                 <span>
-                  {localize(minorToDecimalString(roundToMinor(priceMin)))}{' '}
+                  {money(roundToMinor(priceMin))}{' '}
                   {t(REGION.currencySymbol.en, REGION.currencySymbol.ar)}
                 </span>
                 <span>
-                  {localize(minorToDecimalString(roundToMinor(priceMax)))}{' '}
+                  {money(roundToMinor(priceMax))}{' '}
                   {t(REGION.currencySymbol.en, REGION.currencySymbol.ar)}
                 </span>
               </div>

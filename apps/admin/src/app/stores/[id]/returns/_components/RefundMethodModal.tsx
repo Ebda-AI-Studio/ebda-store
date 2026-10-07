@@ -47,7 +47,7 @@ const KNOWN_GATEWAY_REASONS = new Set([
 ]);
 
 function formatCurrency(piastres: number) {
-  return formatMoney(piastres, 'en');
+  return formatMoney(piastres, 'en', { fixedDecimals: true });
 }
 
 interface RefundMethodModalProps {

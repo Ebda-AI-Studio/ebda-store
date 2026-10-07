@@ -1,0 +1,17 @@
+{
+  "_source": "https://developer.fawrystaging.com/docs/express-checkout/fawrypay-hosted-checkout (sample request shape; item ids/prices are from the page, the second item is added by this repo to pin the sort-by-itemId rule the page states in prose)",
+  "merchantCode": "1tSa6uxz2nTwlaAmt38enA==",
+  "merchantRefNum": "2312465464",
+  "customerMobile": "01234567891",
+  "customerEmail": "customer@example.com",
+  "customerName": "example",
+  "customerProfileId": "777777",
+  "paymentExpiry": "1631138400000",
+  "language": "en-gb",
+  "chargeItems": [
+    { "itemId": "b-item", "description": "Item B", "price": 50.0, "quantity": 2 },
+    { "itemId": "a-item", "description": "Item A", "price": 12.5, "quantity": 1 }
+  ],
+  "returnUrl": "https://merchant.example/return",
+  "authCaptureModePayment": false
+}

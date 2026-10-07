@@ -46,14 +46,16 @@ describe('platform settings — Ebda VAT', () => {
   it('confirms, then saves all five keys when enabling with TRN + name', async () => {
     apiGet.mockResolvedValue({ data: { vat: off }, error: null });
     apiPut.mockResolvedValue({
-      data: { vat: { ...off, enabled: true, trn: '123456789', legalName: 'Whisky 11' } },
+      data: { vat: { ...off, enabled: true, trn: '123456789', legalName: 'Ebda AI Studio' } },
       error: null,
     });
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<PlatformSettingsPage />);
     await screen.findByText('vat.title');
     fireEvent.change(screen.getByLabelText('vat.trn'), { target: { value: '123-456-789' } });
-    fireEvent.change(screen.getByLabelText('vat.legalName'), { target: { value: 'Whisky 11' } });
+    fireEvent.change(screen.getByLabelText('vat.legalName'), {
+      target: { value: 'Ebda AI Studio' },
+    });
     fireEvent.click(screen.getByRole('switch'));
     fireEvent.click(screen.getByText('vat.save'));
     await waitFor(() =>
@@ -62,7 +64,7 @@ describe('platform settings — Ebda VAT', () => {
         rate: 14,
         mode: 'exclusive',
         trn: '123456789',
-        legalName: 'Whisky 11',
+        legalName: 'Ebda AI Studio',
       })
     );
     expect(confirm).toHaveBeenCalled();

@@ -39,6 +39,8 @@ const arFlat = flatten(ar as Messages);
 
 // Reviewed exceptions where en === ar is correct, not a missed translation.
 const IDENTICAL_VALUE_ALLOWLIST = new Set<string>([
+  // Digits-only example: the admin shows Western digits in both languages (Ruling NUMERALS-1).
+  'taxVerification.form.trnPlaceholder',
   // Self-serve onboarding: LTR example values (email address, Egyptian mobile
   // in local format, a price in EGP) shown inside dir="ltr" inputs.
   // InstaPay settings (SP6a): an example address and a local-format mobile, LTR in both locales.

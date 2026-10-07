@@ -1,30 +1,39 @@
 /**
- * Kashier adapter: hosted payment session (SP6b).
+ * Kashier adapter: hosted payment session (SP6b), aligned to Kashier's OFFICIAL docs
+ * (developers.kashier.io, fetched 2026-10-07; the facts this file leans on are pinned by
+ * tests/unit/kashier-official-contract.test.ts and tests/contracts/kashier/*.json).
  *
- * The customer is redirected to Kashier's hosted page (card, wallet) created by a
+ * The customer is redirected to Kashier's hosted page (card, wallet, bnpl) created by a
  * payment SESSION; Kashier then calls our webhook and the customer returns to the
- * storefront. The session's merchant order id is OUR reference (`ORD-1042-3fa9c1d2b7`):
- * it is the provider reference everywhere (status, refund, webhook), so the payment can
- * be found from either side.
+ * storefront. The session's `order` is OUR reference (`ORD-1042-3fa9c1d2b7`): it is the
+ * provider reference everywhere (status, refund, webhook `merchantOrderId`), so the payment
+ * can be found from either side.
  *
  * Credentials (per merchant, encrypted at rest):
- *   merchantId  MID-...                    apiKey  Payment API key (also the webhook key)
- *   secretKey   Secret key (`Authorization` header on server calls)
- *   settings    { methods: ['card','wallet'], display: 'ar' | 'en' }
+ *   merchantId  MID-<digits>-<digits>      body field `merchantId`
+ *   apiKey      Payment API key            `api-key` header on create-session ONLY, and the
+ *                                          HMAC key of the webhook signature
+ *   secretKey   Secret key                 `Authorization: <secret>` (raw, NO Bearer)
+ *   settings    { methods: ['card','wallet','bnpl'], display: 'ar' | 'en' }
  *
- * MONEY: Kashier takes and returns DECIMAL amounts with two places ("123.45"). Piastres
+ * HOSTS (mode-scoped keys: a test key validates only on the test- hosts):
+ *   dashboard API  test-api.kashier.io | api.kashier.io   sessions, order search, validate-credentials
+ *   FEP            test-fep.kashier.io | fep.kashier.io   PUT /v3/orders/:kashierOrderId (refund)
+ *
+ * MONEY: Kashier takes the session amount as a DECIMAL STRING ("100.00") and sends/returns
+ * decimal numbers elsewhere (refund request `transaction.amount` is a JSON NUMBER). Piastres
  * are converted at this edge only, by integer string math (`minorToDecimalString` /
- * `toMinor`), never by `/ 100`.
+ * `moneyFromGateway`), never by `/ 100`.
  *
- * WEBHOOK: `x-kashier-signature` is HMAC-SHA256 (hex) over `key=value&...` of the keys
- * the payload NAMES in `data.signatureKeys`, sorted alphabetically. A payload that names
- * its own signed keys must not be trusted to name the right ones, so the adapter also
- * REQUIRES the keys that carry the order, amount, currency and status to be among them:
- * otherwise an attacker could sign nothing but a harmless field and edit the amount.
+ * WEBHOOK: `x-kashier-signature` is HMAC-SHA256 (hex) over `k=v&k=v` of the keys the payload
+ * NAMES in `data.signatureKeys`, sorted alphabetically, ONLY the values URL-encoded (RFC 3986).
+ * A payload that names its own signed keys must not be trusted to name the right ones, so the
+ * adapter also REQUIRES the keys that carry the order, amount, currency, status and
+ * transaction id to be among them: otherwise an attacker could sign nothing but a harmless
+ * field and edit the amount.
  *
- * `UNVERIFIED:` marks every field that could not be confirmed against Kashier's own
- * documentation (developers.kashier.io was unreachable when this was written); 6c
- * checks each against a real sandbox.
+ * `UNVERIFIED:` marks every field that Kashier's documentation does not publish; 6c checks
+ * each against a real sandbox.
  */
 import crypto from 'node:crypto';
 import { kashierSettingsSchema, minorToDecimalString } from '@force/shared';
@@ -45,6 +54,7 @@ import {
 import { assertChargeable, assertRefundAmount } from './provider-call';
 import {
   PaymentProviderError,
+  type ConnectionTestResult,
   type CreatePaymentV2Request,
   type CreatePaymentV2Result,
   type PartialRefundV2Request,
@@ -61,35 +71,54 @@ import {
 
 export const KASHIER_SIGNATURE_HEADER = 'x-kashier-signature';
 
+/** Dashboard / management API: payment sessions, order search, validate-credentials. */
 export const KASHIER_API_URLS: BaseUrls = {
-  // Payment sessions. Sandbox host from the research brief (developers.kashier.io).
   sandbox: 'https://test-api.kashier.io',
-  // UNVERIFIED: the live API host.
   live: 'https://api.kashier.io',
 };
+/** FEP (payment API): `PUT /v3/orders/:kashierOrderId` refund / void / capture. */
 export const KASHIER_ORDERS_URLS: BaseUrls = {
-  // UNVERIFIED: order retrieval / refund live on the "fep" host (test-fep.kashier.io is
-  // named in the research brief; which endpoint uses which host is not confirmed).
   sandbox: 'https://test-fep.kashier.io',
   live: 'https://fep.kashier.io',
 };
 
-/** Keys whose values decide the payment: all four must be covered by the signature. */
+/** A Kashier merchant id: `MID-<digits>-<digits>` (dashboard top bar). */
+export const KASHIER_MID_PATTERN = /^MID-\d+-\d+$/;
+
+/** A session is payable for this long when the caller gives no `expiresAt`. */
+const DEFAULT_SESSION_TTL_MS = 60 * 60_000;
+
+/**
+ * Keys whose values decide the payment: all must be covered by the signature. `transactionId`
+ * is here because the event id (the inbox dedupe key) is built from it, and a delivery whose
+ * transaction id is unsigned could be re-labelled into a "new" event.
+ */
 export const KASHIER_REQUIRED_SIGNED_KEYS = [
   'merchantOrderId',
   'amount',
   'currency',
   'status',
+  'transactionId',
 ] as const;
 
-/** The signature input: sorted keys, `key=value` pairs joined by `&`, values URL-encoded. */
+/** RFC 3986 percent-encoding: `encodeURIComponent` leaves `!'()*` alone; RFC 3986 encodes them. */
+const rfc3986 = (v: string): string =>
+  encodeURIComponent(v).replace(
+    /[!'()*]/g,
+    c => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`
+  );
+
+/**
+ * The signature input: keys sorted ordinally, `key=value` pairs joined by `&`, ONLY the values
+ * URL-encoded (RFC 3986: space -> %20, `|` -> %7C, `(` -> %28).
+ */
 export function kashierSignaturePayload(
   data: Record<string, unknown>,
   signatureKeys: string[]
 ): string {
   return [...signatureKeys]
     .sort()
-    .map(k => `${k}=${encodeURIComponent(String(data[k] ?? ''))}`)
+    .map(k => `${k}=${rfc3986(String(data[k] ?? ''))}`)
     .join('&');
 }
 
@@ -115,32 +144,67 @@ const capabilities: ProviderCapabilities = {
   savedCards: false,
 };
 
-const STATUS_MAP: Record<string, PaymentStatus> = {
-  SUCCESS: 'completed',
-  PAID: 'completed',
+/** Order-level `OrderStatus` (order search). PARTIALLY_REFUNDED / REFUNDED appear on refund responses. */
+const ORDER_STATUS_MAP: Record<string, PaymentStatus> = {
+  INITIATED: 'pending',
   CAPTURED: 'completed',
-  PENDING: 'pending',
-  PROCESSING: 'processing',
-  CREATED: 'pending',
+  AUTHORIZED: 'processing',
   FAILED: 'failed',
-  FAILURE: 'failed',
-  DECLINED: 'failed',
-  ERROR: 'failed',
-  EXPIRED: 'expired',
+  REJECTED: 'failed',
   CANCELLED: 'cancelled',
-  CANCELED: 'cancelled',
+  REVERSED: 'cancelled',
+  EXPIRED: 'expired',
+  // UNVERIFIED: not in the search enum, but `response.payload.order.status` of a refund shows them.
+  PARTIALLY_REFUNDED: 'partially_refunded',
+  REFUNDED: 'refunded',
 };
 
-interface KashierOrder {
+/** `data.status` of a webhook is the TRANSACTION status: SUCCESS | FAILURE | PENDING. */
+const WEBHOOK_STATUS_MAP: Record<string, PaymentStatus> = {
+  SUCCESS: 'completed',
+  FAILURE: 'failed',
+  PENDING: 'pending',
+};
+
+/** Webhook `event`s that move money back to the customer. */
+const REFUND_EVENTS = new Set(['refund', 'partial_refund', 'void', 'reversal']);
+/** Webhook `event`s that report the payment itself. */
+const PAYMENT_EVENTS = new Set(['pay', 'authorize', 'capture', 'reject']);
+
+/** One entry of `GET /v3/payment/orders` (documented projection: no amounts). */
+interface KashierOrderEntry {
   merchantOrderId?: string;
+  /** The Kashier order id (uuid): the path parameter of `PUT /v3/orders/:id`. */
+  orderId?: string;
   status?: string;
+  // UNVERIFIED: the documented projection carries no money; read only if a response has them.
   amount?: string | number;
   capturedAmount?: string | number;
   refundedAmount?: string | number;
-  currency?: string;
   method?: string;
   paidAt?: string;
 }
+
+interface OrderSearchResponse {
+  data?: KashierOrderEntry[];
+  pagination?: { page?: number; pages?: number };
+}
+
+interface RefundResponse {
+  status?: string;
+  response?: {
+    status?: string;
+    transactionId?: string;
+    amount?: string | number;
+    payload?: {
+      order?: { status?: string; totalRefundedAmount?: string | number };
+      transaction?: { amount?: string | number };
+    };
+  };
+}
+
+const present = (v: unknown): v is string | number =>
+  typeof v === 'string' || typeof v === 'number';
 
 export function createKashierProvider(options: GatewayAdapterOptions = {}): PaymentProviderV2 {
   const fetchImpl: FetchLike = options.fetchImpl ?? ((url, init) => fetch(url, init));
@@ -149,7 +213,7 @@ export function createKashierProvider(options: GatewayAdapterOptions = {}): Paym
 
   const apiBase = (c: ProviderCredentials) =>
     resolveBaseUrl('KASHIER_BASE_URL', KASHIER_API_URLS, c.mode, options.baseUrls);
-  const ordersBase = (c: ProviderCredentials) =>
+  const fepBase = (c: ProviderCredentials) =>
     resolveBaseUrl('KASHIER_BASE_URL', KASHIER_ORDERS_URLS, c.mode, options.baseUrls);
 
   const requireKeys = (c: ProviderCredentials) => {
@@ -162,50 +226,80 @@ export function createKashierProvider(options: GatewayAdapterOptions = {}): Paym
     return { merchantId: c.merchantId, secretKey: c.secretKey, apiKey: c.apiKey };
   };
 
-  const headers = (c: ProviderCredentials) => {
-    const k = requireKeys(c);
-    return {
-      // UNVERIFIED: header names. Kashier documents the secret key as `Authorization` and the
-      // Payment API key as `api-key` for payment sessions.
-      Authorization: k.secretKey,
-      'api-key': k.apiKey,
-      'Content-Type': 'application/json',
-    };
+  /** `Authorization: <secret>` (raw value, not Bearer). Every call but create-session sends only this. */
+  const authHeaders = (c: ProviderCredentials) => {
+    if (!c.secretKey) {
+      throw new PaymentProviderError(
+        'PROVIDER_MISCONFIGURED',
+        'Kashier is not set up: add the Secret key'
+      );
+    }
+    return { Authorization: c.secretKey, 'Content-Type': 'application/json' };
   };
 
-  const readOrder = async (c: ProviderCredentials, providerRef: string): Promise<KashierOrder> => {
-    const res = await gatewayRequest<{ response?: KashierOrder } & KashierOrder>(
-      'kashier.getStatus',
-      fetchImpl,
-      // UNVERIFIED: GET /v3/orders/{merchantOrderId} and its `{ response: {...} }` envelope.
-      `${ordersBase(c)}/v3/orders/${encodeURIComponent(providerRef)}`,
-      { method: 'GET', headers: headers(c) },
-      options.timeoutMs,
-      { notFound: 'PAYMENT_NOT_FOUND' }
+  /**
+   * The order search entry whose merchantOrderId EQUALS `providerRef`. `search` is a partial,
+   * case-insensitive match, so the exact entry may sit among look-alikes (a few pages at most).
+   */
+  const findOrder = async (
+    c: ProviderCredentials,
+    providerRef: string
+  ): Promise<KashierOrderEntry> => {
+    for (let page = 1; page <= 3; page++) {
+      const res = await gatewayRequest<OrderSearchResponse>(
+        'kashier.getStatus',
+        fetchImpl,
+        `${apiBase(c)}/v3/payment/orders?search=${encodeURIComponent(providerRef)}&page=${page}`,
+        { method: 'GET', headers: authHeaders(c) },
+        options.timeoutMs,
+        { notFound: 'PAYMENT_NOT_FOUND' }
+      );
+      const hit = (res.data ?? []).find(o => o.merchantOrderId === providerRef);
+      if (hit) return hit;
+      if (!res.pagination?.pages || page >= res.pagination.pages) break;
+    }
+    throw new PaymentProviderError(
+      'PAYMENT_NOT_FOUND',
+      'kashier.getStatus: no order for that reference'
     );
-    return res.response ?? res;
   };
 
-  const toStatus = (o: KashierOrder): PaymentStatusV2 => {
-    const amountMinor = moneyFromGateway(o.amount, 'amount');
-    const captured =
-      o.capturedAmount !== undefined ? moneyFromGateway(o.capturedAmount, 'capturedAmount') : 0;
-    const refundedMinor =
-      o.refundedAmount !== undefined ? moneyFromGateway(o.refundedAmount, 'refundedAmount') : 0;
-    const mapped = STATUS_MAP[String(o.status ?? '').toUpperCase()] ?? 'pending';
-    const paid = mapped === 'completed' || captured > 0;
+  /**
+   * Money truth does NOT come from this call: the documented order-search projection has no
+   * amounts. When a response carries them (UNVERIFIED) they are used; otherwise the amounts are
+   * reported as 0 and `amountsKnown` is false. The amount and the refund total of record come
+   * from the signed webhook and the refund response.
+   */
+  const toStatus = (o: KashierOrderEntry): { st: PaymentStatusV2; amountsKnown: boolean } => {
+    const mapped = ORDER_STATUS_MAP[String(o.status ?? '').toUpperCase()] ?? 'pending';
+    const amountsKnown = present(o.amount);
+    const amountMinor = amountsKnown ? moneyFromGateway(o.amount, 'amount') : 0;
+    const captured = present(o.capturedAmount)
+      ? moneyFromGateway(o.capturedAmount, 'capturedAmount')
+      : 0;
+    const refundedMinor = present(o.refundedAmount)
+      ? moneyFromGateway(o.refundedAmount, 'refundedAmount')
+      : 0;
+    const paid =
+      mapped === 'completed' ||
+      mapped === 'partially_refunded' ||
+      mapped === 'refunded' ||
+      captured > 0;
     let status: PaymentStatus = mapped;
-    if (paid && refundedMinor > 0) {
+    if (amountsKnown && paid && refundedMinor > 0) {
       status = refundedMinor >= amountMinor ? 'refunded' : 'partially_refunded';
     }
     return {
-      status,
-      amountMinor,
-      capturedMinor: paid ? captured || amountMinor : 0,
-      refundedMinor: paid ? refundedMinor : 0,
-      currency: 'EGP',
-      method: o.method,
-      paidAt: o.paidAt ? new Date(o.paidAt) : undefined,
+      amountsKnown,
+      st: {
+        status,
+        amountMinor,
+        capturedMinor: amountsKnown && paid ? captured || amountMinor : 0,
+        refundedMinor: amountsKnown && paid ? refundedMinor : 0,
+        currency: 'EGP',
+        method: o.method,
+        paidAt: o.paidAt ? new Date(o.paidAt) : undefined,
+      },
     };
   };
 
@@ -215,56 +309,155 @@ export function createKashierProvider(options: GatewayAdapterOptions = {}): Paym
     wantMinor: number | null,
     reason?: string
   ): Promise<RefundV2Result> {
-    const st = toStatus(await readOrder(c, providerRef));
-    if (st.capturedMinor <= 0) {
+    const order = await findOrder(c, providerRef);
+    const { st, amountsKnown } = toStatus(order);
+    const paid =
+      st.status === 'completed' || st.status === 'partially_refunded' || st.status === 'refunded';
+    if (!paid) {
       throw new PaymentProviderError('PAYMENT_NOT_CAPTURED', 'cannot refund an uncaptured payment');
     }
-    const remaining = st.capturedMinor - st.refundedMinor;
-    const amount = wantMinor ?? remaining;
-    if (amount <= 0 || amount > remaining) {
+    if (typeof order.orderId !== 'string' || !order.orderId) {
       throw new PaymentProviderError(
-        'REFUND_EXCEEDS_CAPTURED',
-        `refund ${amount} exceeds the ${remaining} piastres still refundable`
+        'PROVIDER_REJECTED',
+        'kashier.refund: order has no Kashier order id'
       );
     }
-    const res = await gatewayRequest<{
-      status?: string;
-      response?: { transactionId?: string; status?: string };
-    }>(
+    // Local bound only when the order reported amounts; otherwise Kashier enforces it.
+    let amount = wantMinor;
+    if (amountsKnown) {
+      const remaining = st.capturedMinor - st.refundedMinor;
+      amount = wantMinor ?? remaining;
+      if (amount <= 0 || amount > remaining) {
+        throw new PaymentProviderError(
+          'REFUND_EXCEEDS_CAPTURED',
+          `refund ${amount} exceeds the ${remaining} piastres still refundable`
+        );
+      }
+    }
+    const res = await gatewayRequest<RefundResponse>(
       'kashier.refund',
       fetchImpl,
-      // UNVERIFIED: PUT /v3/orders/{id} with `apiOperation: "REFUND"` (research brief names the
-      // path; the body shape and the string-typed amount are not confirmed).
-      `${ordersBase(c)}/v3/orders/${encodeURIComponent(providerRef)}`,
+      `${fepBase(c)}/v3/orders/${encodeURIComponent(order.orderId)}`,
       {
         method: 'PUT',
-        headers: headers(c),
+        headers: authHeaders(c),
         body: JSON.stringify({
           apiOperation: 'REFUND',
           reason: reason ?? 'refund',
-          transaction: { amount: minorToDecimalString(amount) },
+          // JSON NUMBER (documented), from the exact decimal string: no float math.
+          // Omitted = full refund of what remains (only when the remainder is unknowable here).
+          ...(amount !== null
+            ? { transaction: { amount: Number(minorToDecimalString(amount)) } }
+            : {}),
         }),
       },
       options.timeoutMs
     );
-    const ok = String(res.status ?? res.response?.status ?? '').toUpperCase();
-    if (ok !== 'SUCCESS' && ok !== 'PENDING') {
+    const outcome = String(res.status ?? res.response?.status ?? '').toUpperCase();
+    if (outcome !== 'SUCCESS' && outcome !== 'PENDING') {
       throw new PaymentProviderError('PROVIDER_REJECTED', 'Kashier did not accept the refund');
+    }
+    const payload = res.response?.payload;
+    const reported = present(payload?.order?.totalRefundedAmount)
+      ? moneyFromGateway(payload?.order?.totalRefundedAmount, 'totalRefundedAmount')
+      : undefined;
+    const sentOrReported =
+      amount ??
+      (present(res.response?.amount)
+        ? moneyFromGateway(res.response?.amount, 'amount')
+        : present(payload?.transaction?.amount)
+          ? moneyFromGateway(payload?.transaction?.amount, 'amount')
+          : reported !== undefined
+            ? reported - st.refundedMinor
+            : undefined);
+    if (sentOrReported === undefined || sentOrReported <= 0) {
+      throw new PaymentProviderError(
+        'PROVIDER_UNAVAILABLE',
+        'Kashier accepted the refund but did not report its amount'
+      );
     }
     return {
       refundRef:
-        res.response?.transactionId ?? `kashier-refund-${providerRef}-${st.refundedMinor + amount}`,
-      status: ok === 'PENDING' ? 'pending' : 'completed',
-      amountMinor: amount,
-      refundedTotalMinor: st.refundedMinor + amount,
+        res.response?.transactionId ??
+        `kashier-refund-${providerRef}-${st.refundedMinor + sentOrReported}`,
+      status: outcome === 'PENDING' ? 'pending' : 'completed',
+      amountMinor: sentOrReported,
+      // `totalRefundedAmount` is Kashier's own running total; UNVERIFIED fallback when it is absent.
+      refundedTotalMinor: reported ?? st.refundedMinor + sentOrReported,
     };
   }
 
   const scope = (c: ProviderCredentials) => credentialScope([c.merchantId, c.secretKey, c.mode]);
 
+  /** An explicit false/invalid flag in an (unpublished-shape) validate-credentials body. */
+  const bodyRejects = (body: unknown, depth = 0): boolean => {
+    if (!body || typeof body !== 'object' || depth > 3) return false;
+    for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
+      if (['valid', 'isValid', 'success', 'verified'].includes(k) && v === false) return true;
+      if (bodyRejects(v, depth + 1)) return true;
+    }
+    return false;
+  };
+
   return {
     name: 'kashier',
     capabilities,
+
+    async testConnection(creds: ProviderCredentials): Promise<ConnectionTestResult> {
+      if (!creds.merchantId || !creds.secretKey || !creds.apiKey) {
+        return {
+          ok: false,
+          code: 'incomplete',
+          message: 'Add the merchant id, Payment API key and Secret key',
+        };
+      }
+      if (!KASHIER_MID_PATTERN.test(creds.merchantId)) {
+        return {
+          ok: false,
+          code: 'incomplete',
+          message: 'The merchant id must look like MID-1234-567',
+        };
+      }
+      const mode = creds.mode === 'live' ? 'live' : 'test';
+      try {
+        const body = await gatewayRequest<unknown>(
+          'kashier.testConnection',
+          fetchImpl,
+          `${apiBase(creds)}/v2/merchants/validate-credentials`,
+          {
+            method: 'POST',
+            headers: authHeaders(creds),
+            body: JSON.stringify({
+              secretKeys: [{ mode, key: creds.secretKey }],
+              apiKeys: [{ mode, key: creds.apiKey }],
+            }),
+          },
+          options.timeoutMs
+        );
+        // UNVERIFIED: the 200 body is unpublished; only an explicit false/invalid flag is read.
+        if (bodyRejects(body)) {
+          return {
+            ok: false,
+            code: 'bad_credentials',
+            message: 'Kashier did not accept these keys for this mode',
+          };
+        }
+        return { ok: true, code: 'ok', message: 'Kashier accepted the credentials' };
+      } catch (err) {
+        const code = err instanceof PaymentProviderError ? err.code : 'PROVIDER_UNAVAILABLE';
+        if (code === 'PROVIDER_MISCONFIGURED') {
+          return { ok: false, code: 'bad_credentials', message: 'Kashier refused the Secret key' };
+        }
+        if (code === 'PROVIDER_TIMEOUT' || code === 'PROVIDER_UNAVAILABLE') {
+          return {
+            ok: false,
+            code: 'unreachable',
+            message: 'Kashier could not be reached; try again',
+          };
+        }
+        return { ok: false, code: 'unknown', message: 'Kashier answered something unexpected' };
+      }
+    },
 
     async createPayment(
       req: CreatePaymentV2Request,
@@ -281,31 +474,33 @@ export function createKashierProvider(options: GatewayAdapterOptions = {}): Paym
         const merchantOrderId = merchantReference(req.orderNumber, req.idempotencyKey);
         const res = await gatewayRequest<{
           _id?: string;
-          sessionId?: string;
           sessionUrl?: string;
-          amount?: string | number;
+          paymentParams?: { amount?: string | number };
         }>(
           'kashier.createPayment',
           fetchImpl,
-          // UNVERIFIED: POST /v3/payment/sessions and the field names of body and response.
           `${apiBase(creds)}/v3/payment/sessions`,
           {
             method: 'POST',
-            headers: headers(creds),
+            // Authorization + api-key: the only call that sends the Payment API key.
+            headers: { ...authHeaders(creds), 'api-key': keys.apiKey },
             body: JSON.stringify({
-              merchantId: keys.merchantId,
-              order: merchantOrderId,
+              expireAt: (
+                req.expiresAt ?? new Date(Date.now() + DEFAULT_SESSION_TTL_MS)
+              ).toISOString(),
+              maxFailureAttempts: 3,
               amount: minorToDecimalString(req.amountMinor),
               currency: 'EGP',
-              type: 'one-time',
-              allowedMethods: settings.methods.join(','),
-              display: settings.display,
+              order: merchantOrderId,
+              merchantId: keys.merchantId,
               merchantRedirect: req.returnUrls.success,
+              type: 'one-time',
+              display: settings.display,
+              customer: { email: req.customer.email || undefined, reference: req.customer.id },
+              allowedMethods: settings.methods.join(','),
               failureRedirect: false,
               serverWebhook: req.webhookUrl,
-              customer: { email: req.customer.email || undefined, reference: req.customer.id },
               metaData: { orderId: req.orderId },
-              ...(req.expiresAt ? { expireAt: req.expiresAt.toISOString() } : {}),
             }),
           },
           options.timeoutMs
@@ -317,11 +512,13 @@ export function createKashierProvider(options: GatewayAdapterOptions = {}): Paym
             'Kashier answered without a session URL'
           );
         }
-        const recorded =
-          res.amount !== undefined ? moneyFromGateway(res.amount, 'amount') : req.amountMinor;
+        const recordedAmount = res.paymentParams?.amount;
+        const recorded = present(recordedAmount)
+          ? moneyFromGateway(recordedAmount, 'amount')
+          : req.amountMinor;
         return {
           providerRef: merchantOrderId,
-          invoiceId: res._id ?? res.sessionId,
+          invoiceId: res._id,
           instruction: { kind: 'redirect', url, expiresAt: req.expiresAt },
           status: 'pending',
           amountMinor: recorded,
@@ -352,11 +549,11 @@ export function createKashierProvider(options: GatewayAdapterOptions = {}): Paym
       }
       const keys = signed as string[];
       // The payload names its own signed keys: refuse one that leaves the amount, status,
-      // currency or order id unsigned, however valid its signature is.
+      // currency, order id or transaction id unsigned, however valid its signature is.
       if (!KASHIER_REQUIRED_SIGNED_KEYS.every(k => keys.includes(k))) {
         throw new PaymentProviderError(
           'WEBHOOK_BAD_SIGNATURE',
-          'signatureKeys do not cover the order, amount, currency and status'
+          'signatureKeys do not cover the order, amount, currency, status and transaction'
         );
       }
       if (!safeEqual(kashierSignature(d, keys, key), given.toLowerCase())) {
@@ -367,56 +564,63 @@ export function createKashierProvider(options: GatewayAdapterOptions = {}): Paym
       if (typeof merchantOrderId !== 'string' || !merchantOrderId) {
         throw new PaymentProviderError('WEBHOOK_MALFORMED', 'missing merchantOrderId');
       }
+      const transactionId = d.transactionId;
+      if (typeof transactionId !== 'string' || !transactionId) {
+        throw new PaymentProviderError('WEBHOOK_MALFORMED', 'missing transactionId');
+      }
       if (d.currency !== 'EGP') {
         throw new PaymentProviderError('WEBHOOK_MALFORMED', 'unsupported currency');
       }
+      // `data.amount` is a decimal NUMBER (the docs' example shows 11334 beside card.amount 11334).
+      // UNVERIFIED: that it is major units (EGP) rather than piastres; read as EGP decimal here.
       const amountMinor = moneyFromGateway(d.amount, 'amount');
       const rawStatus = String(d.status ?? '').toUpperCase();
-      // Identity only from SIGNED values: `body.event` and any key `signatureKeys` leaves out
-      // are not covered by the signature, so a captured delivery could be edited to look new
-      // (a second `order/created`) or to look like a refund.
-      const txn =
-        keys.includes('transactionId') && typeof d.transactionId === 'string'
-          ? d.transactionId
-          : undefined;
-      const identity = `${merchantOrderId}:${rawStatus}:${amountMinor}:${txn ?? ''}`;
+      const txnStatus = WEBHOOK_STATUS_MAP[rawStatus];
+      if (!txnStatus) throw new PaymentProviderError('WEBHOOK_MALFORMED', 'unknown status');
 
-      // A refund is told from the SIGNED status, not from the unsigned `event` field.
-      // UNVERIFIED: the status strings Kashier uses for refunds.
-      if (/^(PARTIALLY_?|PARTIAL_?)?REFUND/.test(rawStatus)) {
+      // Stable across redeliveries and bound to SIGNED values only. `event` is NOT covered by
+      // the signature, so the id deliberately omits it: a captured delivery re-labelled
+      // `pay` <-> `refund` keeps the SAME id and the inbox drops it as a replay, so a relabel
+      // cannot be counted twice. RESIDUAL: if an attacker wins the race against the genuine
+      // delivery, the relabelled one is the first stored; Kashier signs nothing that tells a
+      // refund from a payment, so only TLS + the `event` whitelist below bound that.
+      const eventId = `kashier:${transactionId}:${rawStatus}`;
+      const event = typeof body.event === 'string' ? body.event.toLowerCase() : '';
+
+      if (REFUND_EVENTS.has(event)) {
         return {
           kind: 'refund',
-          eventId: `kashier:refund:${identity}`,
+          eventId,
           providerRef: merchantOrderId,
-          refundRef: txn ?? `${merchantOrderId}-refund-${amountMinor}`,
-          status: /FAIL|REJECT|DECLIN/.test(rawStatus)
-            ? 'failed'
-            : /PEND/.test(rawStatus)
-              ? 'pending'
-              : 'completed',
+          refundRef: transactionId,
+          status:
+            txnStatus === 'completed' ? 'completed' : txnStatus === 'failed' ? 'failed' : 'pending',
           amountMinor,
           currency: 'EGP',
           rawPayload: body,
         };
       }
-      const status = STATUS_MAP[rawStatus];
-      if (!status) throw new PaymentProviderError('WEBHOOK_MALFORMED', 'unknown status');
+      // `idempotency` (a replay marker) and anything unknown is NOT guessed into a payment.
+      if (!PAYMENT_EVENTS.has(event)) {
+        throw new PaymentProviderError('WEBHOOK_MALFORMED', 'unsupported event');
+      }
+      // authorize + SUCCESS = funds held, not captured: not `completed`.
+      const status: PaymentStatus =
+        event === 'authorize' && txnStatus === 'completed' ? 'processing' : txnStatus;
       return {
         kind: 'payment',
-        eventId: `kashier:pay:${identity}`,
+        eventId,
         providerRef: merchantOrderId,
         status,
         amountMinor,
         currency: 'EGP',
-        method: typeof d.method === 'string' ? d.method : undefined,
-        paidAt:
-          status === 'completed' && typeof d.paidAt === 'string' ? new Date(d.paidAt) : undefined,
+        method: keys.includes('method') && typeof d.method === 'string' ? d.method : undefined,
         rawPayload: body,
       };
     },
 
     async getStatus(providerRef: string, creds: ProviderCredentials): Promise<PaymentStatusV2> {
-      return toStatus(await readOrder(creds, providerRef));
+      return toStatus(await findOrder(creds, providerRef)).st;
     },
 
     async refund(req: RefundV2Request, creds: ProviderCredentials): Promise<RefundV2Result> {

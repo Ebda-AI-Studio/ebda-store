@@ -55,7 +55,10 @@ describe('sendBrandedBatch', () => {
     });
     const to = ['a@x.test', 'b@x.test', 'c@x.test'];
 
-    const { ids } = await ResendService.sendBrandedBatch('s1', { to, subject: 'S', html: '<p/>' });
+    const { ids } = await ResendService.sendBrandedBatch('s1', {
+      subject: 'S',
+      messages: to.map(t => ({ to: t, html: '<p/>' })),
+    });
 
     expect(batchSend).toHaveBeenCalledOnce();
     const payload = batchSend.mock.calls[0][0] as Array<{
@@ -72,7 +75,10 @@ describe('sendBrandedBatch', () => {
   it('refuses more than Resend’s 100-per-batch limit', async () => {
     const to = Array.from({ length: 101 }, (_, i) => `u${i}@x.test`);
     await expect(
-      ResendService.sendBrandedBatch('s1', { to, subject: 'S', html: '<p/>' })
+      ResendService.sendBrandedBatch('s1', {
+        subject: 'S',
+        messages: to.map(t => ({ to: t, html: '<p/>' })),
+      })
     ).rejects.toThrow(/at most 100/);
     expect(batchSend).not.toHaveBeenCalled();
   });

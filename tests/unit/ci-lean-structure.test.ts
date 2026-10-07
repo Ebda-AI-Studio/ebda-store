@@ -35,6 +35,7 @@ const MAIN_LANE = [
   'test-rls-ebda-app',
   'test-rls-payload-parity',
   'test-e2e',
+  'builder-e2e',
   'security',
   'mutation',
 ];

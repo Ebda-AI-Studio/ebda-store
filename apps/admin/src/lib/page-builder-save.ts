@@ -13,7 +13,12 @@
  * Worker and the Railway API deploy separately): the caller then falls back
  * to the legacy `PUT /layout`, so a deploy-order gap never breaks Save.
  */
-import { layoutToDefinition, type StoreLayoutSettings } from '@force/shared';
+import {
+  layoutToDefinition,
+  mergeDocumentOnlySections,
+  type PageDefinition,
+  type StoreLayoutSettings,
+} from '@force/shared';
 import { apiGet, apiPost, apiPut, type ApiError } from './api';
 
 export const HOME_PAGE = 'home';
@@ -37,7 +42,14 @@ export async function saveLayoutAsPage(
   layout: StoreLayoutSettings,
   baseRev: number
 ): Promise<PageSaveResult> {
-  const definition = layoutToDefinition(layout, HOME_PAGE);
+  // The layout knows nothing about document-only sections (image-text,
+  // newsletter — added in the new builder): carry them over from the current
+  // document, or this legacy Save would delete them.
+  const current = await apiGet<{ definition: PageDefinition }>(base(storeId));
+  const definition = mergeDocumentOnlySections(
+    layoutToDefinition(layout, HOME_PAGE),
+    current.data?.definition
+  );
   const draft = await apiPut<{ rev: number }>(`${base(storeId)}/draft`, { baseRev, definition });
   if (draft.error || !draft.data) {
     const error = draft.error ?? { code: 'SERVER_ERROR', message: 'Save failed', status: 0 };

@@ -84,7 +84,7 @@ beforeEach(() => findFirst.mockReset());
 describe('invoice totals block', () => {
   it('formats money in the order currency (USD minor units are cents)', async () => {
     const t = await totals(order({ currency: 'USD', subtotal: 10000, shipping: 0, total: 10000 }));
-    expect(t).toContain('USD 100.00');
+    expect(t).toContain('USD 100');
     expect(t).not.toContain('EGP');
   });
 
@@ -92,7 +92,7 @@ describe('invoice totals block', () => {
     const t = await totals(
       order({ discount: 1000, loyaltyDiscount: 1000, loyaltyPointsRedeemed: 200, total: 4500 })
     );
-    expect(t).toContain('Loyalty points (200) −10.00 EGP');
+    expect(t).toContain('Loyalty points (200) −10 EGP');
     expect(t).not.toMatch(/Discount −/);
   });
 
@@ -106,8 +106,8 @@ describe('invoice totals block', () => {
         total: 4000,
       })
     );
-    expect(t).toContain('Coupon (SAVE) −5.00 EGP');
-    expect(t).toContain('Loyalty points −10.00 EGP');
+    expect(t).toContain('Coupon (SAVE) −5 EGP');
+    expect(t).toContain('Loyalty points −10 EGP');
   });
 
   it('shows exclusive tax as a summed row before Total', async () => {
@@ -119,6 +119,6 @@ describe('invoice totals block', () => {
   it('shows inclusive tax as a caption AFTER Total, never a summed row', async () => {
     const t = await totals(order({ tax: 238, taxIncludedInPrice: true, total: 5500 }));
     expect(t).not.toMatch(/(^| )Tax 0\.238/);
-    expect(t.indexOf('Incl. VAT 2.38 EGP')).toBeGreaterThan(t.indexOf('Total 55.00 EGP'));
+    expect(t.indexOf('Incl. VAT 2.38 EGP')).toBeGreaterThan(t.indexOf('Total 55 EGP'));
   });
 });

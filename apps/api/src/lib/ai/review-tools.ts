@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GeminiFailoverClient } from './gemini-keys';
 import { prisma, currentStoreId } from '@force/database';
 import { config } from '../../config';
 import logger from '../logger';
@@ -14,7 +14,7 @@ function getModel() {
   if (!config.googleAiKey) {
     throw new Error('AI_NOT_CONFIGURED: GOOGLE_GENERATIVE_AI_KEY missing');
   }
-  const genAI = new GoogleGenerativeAI(config.googleAiKey);
+  const genAI = new GeminiFailoverClient();
   const modelName = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
   return genAI.getGenerativeModel({
     model: modelName,

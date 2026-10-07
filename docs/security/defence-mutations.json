@@ -1752,6 +1752,86 @@
       "test": "tests/integration/sms-marketing-consent.test.ts"
     },
     {
+      "id": "money-paymob-webhook-hmac",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a forged Paymob transaction callback (any amount/status) is believed: the HMAC-SHA512 compare is the only proof it came from Paymob",
+      "source": "apps/api/src/services/payment-providers/paymob.provider.ts",
+      "find": "      if (!safeEqual(paymobHmac(tx, creds.webhookSecret), given.toLowerCase())) {",
+      "replace": "      if (false) {",
+      "test": "tests/unit/paymob-official-contract.test.ts"
+    },
+    {
+      "id": "money-kashier-webhook-signature",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a forged Kashier webhook is believed: x-kashier-signature is the only proof it came from Kashier",
+      "source": "apps/api/src/services/payment-providers/kashier.provider.ts",
+      "find": "      if (!safeEqual(kashierSignature(d, keys, key), given.toLowerCase())) {",
+      "replace": "      if (false) {",
+      "test": "tests/unit/kashier-official-contract.test.ts"
+    },
+    {
+      "id": "money-fawry-notification-signature",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a forged FawryPay server notification marks an unpaid order paid: messageSignature is the only proof it came from Fawry",
+      "source": "apps/api/src/services/payment-providers/fawry.provider.ts",
+      "find": "      if (!safeEqual(expected, body.messageSignature.toLowerCase())) {",
+      "replace": "      if (false) {",
+      "test": "tests/unit/fawry-official-contract.test.ts"
+    },
+    {
+      "id": "money-provider-enable-needs-current-test",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a gateway is enabled with credentials that never passed Test connection (or were edited after it), so every customer checkout fails or pays into the wrong account",
+      "source": "apps/api/src/services/payment-providers/provider-connection.service.ts",
+      "find": "  if (!connectionTestIsCurrent(row)) {",
+      "replace": "  if (false) {",
+      "test": "tests/unit/provider-connect.test.ts"
+    },
+    {
+      "id": "money-provider-unverified-not-usable",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a gateway never verified against its real sandbox is enabled and offered to paying customers (PROVIDERS-2)",
+      "source": "apps/api/src/services/payment-providers/provider-gate.ts",
+      "find": "  return isProviderSelectable(entry) || unverifiedProvidersAllowed();",
+      "replace": "  return true;",
+      "test": "tests/unit/provider-connect.test.ts"
+    },
+    {
+      "id": "money-provider-credentials-write-only",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "the encrypted credential blob and the legacy encrypted columns are returned to the browser from the payment-settings routes",
+      "source": "apps/api/src/services/payment-providers/provider-connection.service.ts",
+      "find": "  for (const key of ['credentials', 'apiKey', 'secretKey', 'merchantId', 'webhookSecret']) {\n    delete rest[key];\n  }",
+      "replace": "  void rest;",
+      "test": "tests/unit/provider-connect.test.ts"
+    },
+    {
+      "id": "money-provider-toggle-enable-gate",
+      "domain": "money / payment / refund",
+      "tier": "integration",
+      "why": "the store toggle route enables a gateway without a current passing Test connection",
+      "source": "apps/api/src/routes/payment-settings.routes.ts",
+      "find": "        assertEnableAllowed(existing);",
+      "replace": "        void existing;",
+      "test": "tests/integration/provider-connect-routes.test.ts"
+    },
+    {
+      "id": "money-webhook-per-store-url-crosscheck",
+      "domain": "money / payment / refund",
+      "tier": "integration",
+      "why": "a valid delivery posted to another store's per-store webhook URL is processed as if that store's URL were authoritative",
+      "source": "apps/api/src/routes/webhook.routes.ts",
+      "find": "    if (urlStoreId && urlStoreId !== storeIdForWebhook) {",
+      "replace": "    if (false) {",
+      "test": "tests/integration/egypt-gateway-webhooks.test.ts"
+    },
+    {
       "id": "tenant-guard-keyverdict-mismatch-is-not-a-match",
       "domain": "tenant / RLS",
       "tier": "unit",

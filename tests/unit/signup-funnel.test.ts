@@ -351,7 +351,7 @@ describe('subscription charge amount (single platform-VAT seam)', () => {
       rateBps: 1400,
       mode: 'exclusive' as const,
       trn: '123',
-      legalName: 'Whisky 11',
+      legalName: 'Ebda AI Studio',
     };
     expect(subscriptionChargeAmount(149000, vat)).toMatchObject({
       totalMinor: 169860,

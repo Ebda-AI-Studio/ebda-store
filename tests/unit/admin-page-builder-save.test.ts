@@ -20,7 +20,27 @@ const BASE = '/api/v1/admin/stores/s1/builder/pages/home';
 describe('admin page-builder save via draft + publish', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('keeps document-only sections (image-text) the new builder added', async () => {
+    const { reduceDocument } = await import('@force/shared');
+    const withImage = reduceDocument(layoutToDefinition(LAYOUT), {
+      type: 'addSection',
+      list: 'template',
+      sectionType: 'image-text',
+      presetIndex: 0,
+      index: 1,
+    }).doc;
+    api.apiGet.mockResolvedValue({ data: { definition: withImage, rev: 7 }, error: null });
+    api.apiPut.mockResolvedValue({ data: { rev: 8 }, error: null });
+    api.apiPost.mockResolvedValue({ data: { rev: 8 }, error: null });
+    await saveLayoutAsPage('s1', LAYOUT, 7);
+    const sent = api.apiPut.mock.calls[0][1].definition;
+    expect(sent.sections.map((s: { id: string }) => s.id)).toEqual(
+      withImage.sections.map(s => s.id)
+    );
+  });
+
   it('drafts the adapter document at the loaded rev, then publishes the draft rev', async () => {
+    api.apiGet.mockResolvedValue({ data: null, error: null });
     api.apiPut.mockResolvedValue({ data: { rev: 8 }, error: null });
     api.apiPost.mockResolvedValue({ data: { rev: 8 }, error: null });
     expect(await saveLayoutAsPage('s1', LAYOUT, 7)).toEqual({ ok: true, rev: 8 });

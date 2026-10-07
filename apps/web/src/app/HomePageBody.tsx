@@ -8,11 +8,14 @@ import {
   type StoreLayoutSettings,
   resolveDefaultLanguage,
   pageDefinitionSchema,
+  definitionToLayout,
   type PageDefinition,
 } from '@force/shared';
 import { storeJsonLd, breadcrumbJsonLd, itemList, storeAbsoluteUrl } from '../lib/structured-data';
 import { JsonLd } from '../components/JsonLd';
 import { HomePageContent } from './HomePageContent';
+import { BuilderPreviewShell } from '../builder/preview/BuilderPreviewShell';
+import { allowedParentOrigins } from '../builder/preview/allowed-parent-origins';
 import { emitZoneCss } from '../lib/emit-zone-css';
 
 /**
@@ -257,6 +260,27 @@ function parseDefinition(raw: unknown): PageDefinition | undefined {
   return parsed.success ? parsed.data : undefined;
 }
 
+/**
+ * Builder canvas: the working DRAFT for a preview token (never cached). Null
+ * on any failure, and the page then renders exactly like a normal visit.
+ */
+async function fetchBuilderPreview(
+  storeId: string,
+  token: string
+): Promise<PageDefinition | undefined> {
+  try {
+    const res = await fetch(
+      `${API_URL}/public/stores/${storeId}/builder-preview?token=${encodeURIComponent(token)}`,
+      { cache: 'no-store' }
+    );
+    if (!res.ok) return undefined;
+    const json = await res.json();
+    return parseDefinition(json?.data?.definition);
+  } catch {
+    return undefined;
+  }
+}
+
 async function fetchLayoutSettings(storeId: string, draftToken?: string): Promise<DraftBundle> {
   if (!storeId || storeId === 'demo') {
     return { layout: resolveLayoutSettings({}) };
@@ -291,6 +315,7 @@ async function fetchLayoutSettings(storeId: string, draftToken?: string): Promis
 export async function HomePageBody({
   store,
   draftToken,
+  builderToken,
 }: {
   store: ResolvedStore;
   /** Admin page-builder "preview unsaved changes" token. Always `undefined`
@@ -298,6 +323,8 @@ export async function HomePageBody({
    *  entirely (middleware's `!isPreviewIframe` gate), so there's no draft
    *  concept to thread through there. */
   draftToken?: string;
+  /** Visual builder canvas token (`?_builder=` inside the `?_preview` iframe). */
+  builderToken?: string;
 }) {
   // Bare-root on a platform domain (no slug, no custom domain) — send the
   // visitor to the marketing site rather than rendering a second one here.
@@ -331,8 +358,14 @@ export async function HomePageBody({
   const featuredPromise = fetchFeaturedProducts(storeHeaders, store.id);
   const categoriesPromise = fetchHomeCategories(storeHeaders, store.id);
 
-  const draftBundle = await fetchLayoutSettings(store.id, draftToken);
-  const layout = draftBundle.layout;
+  const [draftBundle, builderDefinition] = await Promise.all([
+    fetchLayoutSettings(store.id, draftToken),
+    builderToken ? fetchBuilderPreview(store.id, builderToken) : Promise.resolve(undefined),
+  ]);
+  // Builder canvas: the DRAFT drives everything the page fetches and the
+  // chrome reads (a draft carousel must load its own products), projected
+  // onto the legacy shape the fetchers understand.
+  const layout = builderDefinition ? definitionToLayout(builderDefinition) : draftBundle.layout;
   // Draft typography + theme override CSS — emitted in body so source order
   // beats the head-emitted committed-store typography. Only present when the
   // admin live-preview iframe passes ?_layoutDraft=<token> AND the draft
@@ -401,18 +434,34 @@ export async function HomePageBody({
       <JsonLd data={homeStoreJsonLd} />
       <JsonLd data={homeBreadcrumbJsonLd} />
       {homeItemListJsonLd && <JsonLd data={homeItemListJsonLd} />}
-      <HomePageContent
-        templateId={store.template}
-        featuredProducts={featuredProducts}
-        newArrivals={newArrivals}
-        bestSellers={bestSellers}
-        categories={categories}
-        testimonials={testimonials}
-        extraProducts={extraProducts}
-        storeName={store.name}
-        layout={layout}
-        definition={draftBundle.definition}
-      />
+      {builderDefinition ? (
+        <BuilderPreviewShell
+          templateId={store.template}
+          featuredProducts={featuredProducts}
+          newArrivals={newArrivals}
+          bestSellers={bestSellers}
+          categories={categories}
+          testimonials={testimonials}
+          extraProducts={extraProducts}
+          storeName={store.name}
+          layout={layout}
+          initialDefinition={builderDefinition}
+          allowedOrigins={allowedParentOrigins()}
+        />
+      ) : (
+        <HomePageContent
+          templateId={store.template}
+          featuredProducts={featuredProducts}
+          newArrivals={newArrivals}
+          bestSellers={bestSellers}
+          categories={categories}
+          testimonials={testimonials}
+          extraProducts={extraProducts}
+          storeName={store.name}
+          layout={layout}
+          definition={draftBundle.definition}
+        />
+      )}
     </>
   );
 }

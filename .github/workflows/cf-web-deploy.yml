@@ -1,0 +1,98 @@
+name: Deploy Ebda storefront to Cloudflare
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/shared/**'
+      - 'packages/ui/**'
+      - 'package-lock.json'
+      - 'scripts/cf-setup-local.sh'
+      - 'scripts/cf-routes.cjs'
+      - 'scripts/cf-build.sh'
+      - 'scripts/assert-cf-cache-bindings.sh'
+      - '.github/workflows/cf-web-deploy.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ebda-web-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ${{ fromJSON(vars.EBDA_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 30
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Require deployment credentials
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run -w packages/shared build
+      - run: npm run -w packages/database build
+      - run: npx vitest run tests/unit/ebda-cf-generated-routes.test.ts tests/unit/cf-cache-bindings-assert.test.ts
+      - name: Generate the web Worker config (routes from BRAND, scripts/cf-routes.cjs)
+        env:
+          OPENNEXT_CACHE: 'true'
+          CF_SETUP_SKIP_DEPS: '1'
+        run: |
+          bash scripts/cf-setup-local.sh web
+          bash scripts/assert-cf-cache-bindings.sh web
+      - name: Build web for Cloudflare (OpenNext)
+        env:
+          # NEXT_PUBLIC_* are baked into the browser bundle at build time.
+          NEXT_PUBLIC_API_URL: https://api.ebda.app/api/v1
+          NEXT_PUBLIC_SENTRY_DSN_WEB: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN_WEB }}
+          NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
+          NEXT_PUBLIC_POSTHOG_HOST: ${{ vars.NEXT_PUBLIC_POSTHOG_HOST }}
+          NEXT_PUBLIC_ONESIGNAL_APP_ID: ${{ vars.NEXT_PUBLIC_ONESIGNAL_APP_ID }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT_WEB }}
+        run: |
+          bash scripts/cf-build.sh web
+          echo "BUILD_ID=$(cat apps/web/.next/BUILD_ID)" >> "$GITHUB_ENV"
+      - name: Require configured runtime secrets
+        working-directory: apps/web
+        run: |
+          npx wrangler secret list --name ebda-web > "$RUNNER_TEMP/ebda-web-secret-names.json"
+          node -e 'const names = new Set(require(process.argv[1]).map(x => x.name)); for (const name of process.argv.slice(2)) { if (!names.has(name)) throw new Error(`Missing Worker secret on ebda-web: ${name}`); }' "$RUNNER_TEMP/ebda-web-secret-names.json" REVALIDATE_SECRET
+      - name: Deploy ebda-web Worker
+        working-directory: apps/web
+        env:
+          SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN_WEB }}
+        run: |
+          # Server-side Sentry DSN for sentry-worker-entry.ts; omitted (clean no-op) when unset.
+          if [ -n "$SENTRY_DSN" ]; then npx wrangler deploy --var "SENTRY_DSN:$SENTRY_DSN"; else npx wrangler deploy; fi
+      - name: Verify the live Worker serves THIS build
+        run: |
+          # Poll: right after `wrangler deploy` the edge can still serve the previous
+          # version for a few seconds, so a single read fails a good deploy.
+          # Identity: /_next/static/<BUILD_ID>/_buildManifest.js exists only in this
+          # build's assets. Then a store host that exists for no merchant must get the storefront's
+          # store-not-found page (404 from ebda-web, not a Cloudflare error).
+          # --resolve pins the zone's edge IP so the probe never depends on the
+          # runner's DNS cache. Each attempt prints what it saw (positive control).
+          host=ebda-deploy-probe.ebda.app
+          ip=$(dig +short api.ebda.app | head -1)
+          test -n "$ip" || { echo "::error::could not resolve the ebda.app edge IP"; exit 1; }
+          for i in $(seq 1 24); do
+            id=$(curl --silent --resolve "$host:443:$ip" --output /dev/null --write-out '%{http_code}' "https://$host/_next/static/$BUILD_ID/_buildManifest.js") || id="unreachable"
+            page=$(curl --silent --resolve "$host:443:$ip" --output /dev/null --write-out '%{http_code}' "https://$host/") || page="unreachable"
+            echo "attempt $i: build=$BUILD_ID manifest=$id /=$page"
+            [ "$id" = "200" ] && [ "$page" = "404" ] && exit 0
+            sleep 5
+          done
+          echo "::error::ebda-web does not serve build $BUILD_ID with /=404 after 120s"
+          exit 1

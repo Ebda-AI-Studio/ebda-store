@@ -1,5 +1,6 @@
 'use client';
 
+import { storeNumerals } from '@force/shared';
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -147,12 +148,13 @@ export default function ReviewSection({ storeId, productId }: Props) {
 
   // Tenant-aware date formatter for review timestamps. Uses the store's
   // timezone so a 23:30 UTC review from an Egypt store reads "Jan 5"
-  // (Africa/Cairo), not "Jan 4" (UTC). Switches to Arabic numerals for
-  // ar-EG visitors.
+  // (Africa/Cairo), not "Jan 4" (UTC). Western digits unless the store opted
+  // into Arabic-Indic (Ruling NUMERALS-1).
   const formatDate = (dateStr: string) =>
     formatStoreDate(dateStr, {
       timezone: store.timezone,
       language,
+      numerals: storeNumerals(store?.theme),
       style: 'long',
     });
 

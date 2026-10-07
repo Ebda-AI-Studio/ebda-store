@@ -14,6 +14,8 @@
  * truly bespoke can still drop down to `Intl.DateTimeFormat` directly, but
  * that should be rare.
  */
+import { intlLocale, type Numerals } from '@force/shared';
+
 export type FormatDateStyle = 'short' | 'long' | 'datetime';
 
 export interface FormatDateOptions {
@@ -23,18 +25,24 @@ export interface FormatDateOptions {
   language?: 'en' | 'ar';
   /** Visual preset. Default: 'long'. */
   style?: FormatDateStyle;
+  /** Digit system (Ruling NUMERALS-1): Western by default in both languages;
+   *  pass `useStoreNumerals()` so an opted-in store's Arabic readers get ٠-٩. */
+  numerals?: Numerals;
 }
 
 const DEFAULT_TIMEZONE = 'Africa/Cairo';
 
 /**
  * Map the storefront's `'en' | 'ar'` language to the BCP-47 tag we hand to
- * `Intl.DateTimeFormat`. Arabic visitors get Arabic-Egypt formatting (so
- * digits and month names render in Arabic) — same convention `formatPrice`
- * already uses elsewhere.
+ * `Intl.DateTimeFormat`, with the digit system pinned: Arabic visitors get
+ * Arabic month names with WESTERN digits (`ar-EG-u-nu-latn`) unless the store
+ * opted into Arabic-Indic digits. Bare `ar-EG` defaults to ٠-٩ on every CLDR.
  */
-function resolveLocale(language: FormatDateOptions['language']): string {
-  return language === 'ar' ? 'ar-EG' : 'en-US';
+function resolveLocale(
+  language: FormatDateOptions['language'],
+  numerals: FormatDateOptions['numerals']
+): string {
+  return intlLocale(language ?? 'en', numerals ?? 'latn');
 }
 
 function presetOptions(style: FormatDateStyle): Intl.DateTimeFormatOptions {
@@ -71,7 +79,7 @@ export function formatDate(input: string | number | Date, opts: FormatDateOption
   const date = toDate(input);
   if (!date) return '';
 
-  const locale = resolveLocale(opts.language);
+  const locale = resolveLocale(opts.language, opts.numerals);
   const timeZone = opts.timezone || DEFAULT_TIMEZONE;
   const options: Intl.DateTimeFormatOptions = {
     ...presetOptions(opts.style ?? 'long'),

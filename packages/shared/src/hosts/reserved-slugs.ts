@@ -28,6 +28,12 @@ export const RESERVED_SLUGS = [
   'billing',
   'support',
   'blog',
+  // Ebda product family (PRODUCT-NAME-1): `store` also hosts cache revalidation.
+  'crm',
+  'erp',
+  'hub',
+  'id',
+  'accounts',
 ] as const;
 
 export type ReservedSlug = (typeof RESERVED_SLUGS)[number];

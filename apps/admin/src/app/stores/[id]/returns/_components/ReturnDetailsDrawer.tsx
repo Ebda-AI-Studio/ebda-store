@@ -12,7 +12,7 @@ import type { ReturnItem, ReturnRecord } from './types';
 
 import { formatMoney } from '@force/shared';
 function formatCurrency(amount: number) {
-  return formatMoney(amount, 'en');
+  return formatMoney(amount, 'en', { fixedDecimals: true });
 }
 
 export type ReturnDetailsEntry =

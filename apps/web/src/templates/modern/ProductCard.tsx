@@ -17,7 +17,13 @@ import {
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor, getProductCardTextSizes, fromMinor, REGION } from '@force/shared';
+import {
+  resolveColor,
+  getProductCardTextSizes,
+  fromMinor,
+  REGION,
+  storeNumerals,
+} from '@force/shared';
 import { Price, ProductBadge, ProductBadgeGroup, Rating, cn } from '@force/ui';
 import { getDiscountBadgeText } from '../../lib/product-pricing';
 import { getDiscountBadgeColor } from '../shared/discount-badge';
@@ -71,6 +77,8 @@ function ModernProductCard({
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
+  // Ruling NUMERALS-1: Western digits unless the store opted in (Arabic only).
+  const numerals = storeNumerals(store?.theme);
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isHovered, setIsHovered] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -99,7 +107,7 @@ function ModernProductCard({
   const normalizeImages = store.theme?.normalizeProductImages === true;
 
   // BUG 1 fix: use helper so fixed-EGP discounts show "Save EGP X.XX" instead of pct.
-  const discountBadgeText = getDiscountBadgeText(product, isRtl);
+  const discountBadgeText = getDiscountBadgeText(product, isRtl, undefined, undefined, numerals);
   // Localized name for alt text + display. Falls through to English when
   // the merchant hasn't supplied an Arabic translation.
   const displayName = isRtl && product.nameAr ? product.nameAr : product.name;
@@ -445,6 +453,7 @@ function ModernProductCard({
                     compareAtPrice={product.compareAtPrice}
                     currency={currency}
                     isRtl={isRtl}
+                    numerals={numerals}
                     size="md"
                     showDiscount={false}
                     className={textSizes.price}

@@ -3,7 +3,6 @@ import { currentStoreId, prisma, Prisma, runInTenantContext, withStore } from '@
 import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
-import { encryption } from '../encryption.service';
 import { OrderService, assertValidTransition } from '../order.service';
 import { socketService } from '../socket.service';
 import { inngest } from '../../lib/inngest/client';
@@ -30,6 +29,8 @@ import {
 import { callThroughBreaker } from './provider-health';
 import { withProviderDeadline } from './provider-call';
 import { getProviderV2, MANUAL_PROVIDERS } from './registry';
+import { toProviderCredentials } from './credentials';
+import { isProviderUsable } from './provider-gate';
 import { V2ProviderBridge } from './v2-bridge';
 import { PaymentProviderError, type WebhookPayload } from './types';
 import {
@@ -52,6 +53,7 @@ import {
 } from './refund-outcome';
 
 import { REGION } from '@force/shared';
+import { paymentWebhookUrl } from './webhook-url';
 // ==========================================
 // Payment Factory
 // Database-driven configuration for payment providers
@@ -176,14 +178,29 @@ class PaymentFactory {
         // Initialize from database config
         for (const dbConfig of dbConfigs) {
           try {
+            // COD and InstaPay have no gateway behind them: they are not factory providers.
+            if (MANUAL_PROVIDERS.has(dbConfig.provider)) continue;
+
+            // PROVIDERS-2 runtime gate: a gateway the catalog does not list as verified against
+            // its real sandbox is never offered, even if a row says enabled (a legacy row, or
+            // a write that bypassed the settings routes). The settings routes refuse to enable
+            // it; this is the second line.
+            if (!isProviderUsable(dbConfig.provider)) {
+              logger.warn(
+                { provider: dbConfig.provider, storeId },
+                '[PAYMENT] Skipping provider: not verified in the provider catalog'
+              );
+              continue;
+            }
+
+            // One decryption path for every reader (catalog blob, else the legacy columns).
+            const creds = toProviderCredentials(dbConfig);
             const providerConfig: ProviderConfig = {
               provider: dbConfig.provider as PaymentProvider,
-              apiKey: dbConfig.apiKey ? encryption.decrypt(dbConfig.apiKey) : '',
-              secretKey: dbConfig.secretKey ? encryption.decrypt(dbConfig.secretKey) : undefined,
-              merchantId: dbConfig.merchantId ? encryption.decrypt(dbConfig.merchantId) : undefined,
-              webhookSecret: dbConfig.webhookSecret
-                ? encryption.decrypt(dbConfig.webhookSecret)
-                : undefined,
+              apiKey: creds.apiKey ?? '',
+              secretKey: creds.secretKey,
+              merchantId: creds.merchantId,
+              webhookSecret: creds.webhookSecret,
               isTestMode: dbConfig.testMode,
               isEnabled: dbConfig.isEnabled,
               isDefault: dbConfig.isDefault,
@@ -193,16 +210,8 @@ class PaymentFactory {
               supportedCurrencies: dbConfig.supportedCurrencies,
               fixedFee: Number(dbConfig.fixedFee),
               percentageFee: Number(dbConfig.percentageFee),
-              settings:
-                dbConfig.settings &&
-                typeof dbConfig.settings === 'object' &&
-                !Array.isArray(dbConfig.settings)
-                  ? (dbConfig.settings as Record<string, unknown>)
-                  : {},
+              settings: (creds.settings ?? {}) as Record<string, unknown>,
             };
-
-            // COD and InstaPay have no gateway behind them: they are not factory providers.
-            if (MANUAL_PROVIDERS.has(dbConfig.provider)) continue;
 
             if (!providerConfig.apiKey) {
               logger.warn(
@@ -2243,7 +2252,7 @@ export class PaymentService {
         items: buildPaymentLineItems(order.items),
         callbackUrl: `${config.webUrl}/checkout/success`,
         errorUrl: `${config.webUrl}/checkout/error`,
-        webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${provider || payment.provider}`,
+        webhookUrl: paymentWebhookUrl(provider || payment.provider, order.storeId),
       },
       provider || (payment.provider as PaymentProvider),
       order.storeId

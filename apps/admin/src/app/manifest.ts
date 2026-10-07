@@ -15,9 +15,9 @@ import { BRAND } from '@force/shared';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: `${BRAND.name} Admin`,
-    short_name: `${BRAND.name} Admin`,
-    description: `${BRAND.name} merchant dashboard`,
+    name: `${BRAND.product.nameEn} Admin`,
+    short_name: `${BRAND.product.nameEn} Admin`,
+    description: `${BRAND.product.nameEn} merchant dashboard`,
     start_url: '/',
     scope: '/',
     display: 'standalone',

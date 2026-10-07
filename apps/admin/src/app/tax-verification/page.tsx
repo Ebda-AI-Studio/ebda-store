@@ -20,6 +20,7 @@ import { DataTable, type DataTableColumn } from '../../components/mobile/DataTab
 import { apiGet, apiPost } from '../../lib/api';
 import { openProtectedDocument } from '../../lib/open-document';
 import { useT } from '../../i18n/useT';
+import { withNumerals } from '@force/shared';
 
 type Tab = 'pending' | 'verified' | 'rejected' | 'revoked' | 'all';
 const TABS: Tab[] = ['pending', 'verified', 'rejected', 'revoked', 'all'];
@@ -85,7 +86,9 @@ function TaxVerificationInner() {
   const [working, setWorking] = useState(false);
 
   const fmt = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-GB') : '—';
+    iso
+      ? new Date(iso).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-GB', withNumerals())
+      : '—';
 
   const fetchList = useCallback(async () => {
     setLoading(true);

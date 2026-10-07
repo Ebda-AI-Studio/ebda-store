@@ -12,7 +12,7 @@
  * `existingCategories` list the caller passes in. If nothing is a
  * confident match, returns an empty match list (caller treats as skip).
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GeminiFailoverClient } from './gemini-keys';
 import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
 import { recordUsage } from '../../services/ai.service';
@@ -73,7 +73,7 @@ export async function suggestProductCategory(
 ): Promise<SuggestedCategoryMatch[]> {
   if (input.existingCategories.length === 0) return [];
 
-  const genai = new GoogleGenerativeAI(apiKey);
+  const genai = new GeminiFailoverClient(apiKey);
   const model = genai.getGenerativeModel({ model: modelName });
 
   const prompt = buildCategorizePrompt(input);

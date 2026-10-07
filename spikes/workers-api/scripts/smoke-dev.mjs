@@ -41,7 +41,7 @@ await Promise.all(
   })
 );
 const u = await req('nope.ebda.app', '/products'),
-  a = await req('admin.ebda.app', '/products');
+  a = await req('store.ebda.app', '/products');
 console.log(
   JSON.stringify({
     requests: N,

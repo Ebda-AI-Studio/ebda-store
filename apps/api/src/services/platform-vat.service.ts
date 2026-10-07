@@ -10,7 +10,7 @@ import logger from '../lib/logger';
 import { parseInput } from '../lib/parse-input';
 
 /**
- * Ebda's OWN VAT on its subscription invoices (ruling TAX-6). Ebda (Whisky 11)
+ * Ebda's OWN VAT on its subscription invoices (ruling TAX-6). Ebda AI Studio
  * is not VAT-registered, so this is OFF by default; a super-admin switches it
  * on from the admin "Platform settings → Ebda VAT" section once registered.
  *

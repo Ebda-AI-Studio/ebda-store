@@ -158,6 +158,19 @@ describe('admin chrome stays mounted (no early return before <AdminLayout>)', ()
     expect(offenders).toEqual([]);
   });
 
+  // Full-screen editors that deliberately replace the admin chrome with their
+  // own top bar (including a way back). Each entry needs a reason; the list
+  // is checked for rot below. Ruling BUILDER2-CHROME-1.
+  const FULL_SCREEN_EDITORS: Record<string, string> = {
+    [path.join('app', 'stores', '[id]', 'builder', 'page.tsx')]:
+      'visual builder: a Shopify-theme-editor-style full-screen editor with its own top bar and a back link',
+  };
+
+  it('the full-screen editor exemptions still exist', () => {
+    for (const rel of Object.keys(FULL_SCREEN_EDITORS))
+      expect(fs.existsSync(path.join(SRC, rel)), rel).toBe(true);
+  });
+
   it('every store page reaches <AdminLayout> unless it is a redirect', () => {
     const offenders: string[] = [];
     for (const file of files.filter(
@@ -165,6 +178,7 @@ describe('admin chrome stays mounted (no early return before <AdminLayout>)', ()
         f.includes(`${path.sep}stores${path.sep}[id]${path.sep}`) &&
         f.endsWith(`${path.sep}page.tsx`)
     )) {
+      if (path.relative(SRC, file) in FULL_SCREEN_EDITORS) continue;
       const sf = parse(file);
       const text = sf.text;
       if (text.includes('<AdminLayout')) continue;

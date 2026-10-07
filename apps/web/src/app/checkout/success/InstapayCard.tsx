@@ -1,5 +1,6 @@
 'use client';
 
+import { storeNumerals } from '@force/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@force/ui';
 import { api } from '@/lib/api';
@@ -180,6 +181,7 @@ export function InstapayCard({
             {formatDate(ins.expiresAt, {
               timezone: store.timezone,
               language,
+              numerals: storeNumerals(store?.theme),
               style: 'short',
             })}
             {t(

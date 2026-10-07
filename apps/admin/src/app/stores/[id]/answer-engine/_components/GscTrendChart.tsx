@@ -2,6 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import { formatPercent, formatPosition, type GscTrendPoint } from './types';
+import { withNumerals } from '@force/shared';
 
 interface GscTrendChartProps {
   trend: GscTrendPoint[];
@@ -40,7 +41,7 @@ export function GscTrendChart({ trend }: GscTrendChartProps) {
                 data-chart-bar
                 className="relative w-full bg-primary/20 rounded-t transition-all"
                 style={{ height: `${Math.max(impressionsHeight, 2)}%` }}
-                title={`${point.date}: ${point.impressions.toLocaleString()} ${t('impressions')}, ${point.clicks.toLocaleString()} ${t('clicks')}, ${formatPercent(point.ctr)} ${t('ctr')}, ${t('avgPosition')} ${formatPosition(point.position)}`}
+                title={`${point.date}: ${point.impressions.toLocaleString(undefined, withNumerals())} ${t('impressions')}, ${point.clicks.toLocaleString(undefined, withNumerals())} ${t('clicks')}, ${formatPercent(point.ctr)} ${t('ctr')}, ${t('avgPosition')} ${formatPosition(point.position)}`}
               >
                 <div
                   className="absolute bottom-0 w-full bg-primary rounded-t group-hover:bg-primary/90"

@@ -8,6 +8,7 @@
  *   POST /pages/:pageKey/publish             { baseRev }             -> { rev, layout } (purges every cache layer)
  *   GET  /pages/:pageKey/revisions           ?cursor=<rev>&limit=<n> -> { revisions, nextCursor }
  *   POST /pages/:pageKey/rollback            { targetRev, baseRev }  -> { rev, discardedDraftRev, layout }
+ *   POST /pages/:pageKey/preview-token       {}                      -> { token, expiresIn } (editor canvas)
  *
  * Concurrency: every write names the head rev it was based on (`baseRev`);
  * a stale one gets 409 REV_CONFLICT with `details.latest` (the current
@@ -23,8 +24,12 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
+import { randomBytes } from 'node:crypto';
+import { redis } from '../services/redis.service';
 import {
   HOME_PAGE_KEY,
+  PREVIEW_TOKEN_TTL_SECONDS,
+  previewTokenKey,
   getPageState,
   listRevisions,
   publishDraft,
@@ -198,6 +203,35 @@ router.post(
         userAgent: req.headers['user-agent'],
       });
       res.json({ success: true, data: r.value });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * A short-lived token the editor canvas (storefront iframe) presents to
+ * `GET /public/stores/:storeId/builder-preview` to read the working DRAFT.
+ * crypto.randomBytes (192 bits), Redis-stored and store-scoped, so a leaked
+ * token never crosses tenants and expires in an hour; drafts are otherwise
+ * never served publicly.
+ */
+router.post(
+  '/pages/:pageKey/preview-token',
+  ...guard,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const pageKey = pageKeyOr404(req, res);
+      if (!pageKey) return;
+      const token = randomBytes(24).toString('base64url');
+      await redis.set(
+        previewTokenKey(req.params.storeId, token),
+        { pageKey },
+        PREVIEW_TOKEN_TTL_SECONDS
+      );
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json({ success: true, data: { token, expiresIn: PREVIEW_TOKEN_TTL_SECONDS } });
     } catch (error) {
       next(error);
     }

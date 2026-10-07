@@ -23,7 +23,7 @@
  *     (2026-07-05 — was a duplicated local copy).
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GeminiFailoverClient } from '../../lib/ai/gemini-keys';
 import { assertAiQuota } from '../../lib/ai-quota';
 import logger from '../../lib/logger';
 import { AppError } from '../../middleware/error-handler';
@@ -36,16 +36,16 @@ import { recordUsage, type AccountingAiFeature } from '../ai.service';
 
 const MODEL = process.env.GEMINI_MODEL ?? 'gemini-flash-lite-latest';
 
-let _client: GoogleGenerativeAI | null = null;
+let _client: GeminiFailoverClient | null = null;
 
-function getClient(): GoogleGenerativeAI {
+function getClient(): GeminiFailoverClient {
   // Accept GEMINI_API_KEY as a fallback so a prod deploy that set the shorter
   // var name still works without a reconfig (trap: silent 503 if neither is set).
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_KEY ?? process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new AppError(503, 'AI_NOT_CONFIGURED', 'GOOGLE_GENERATIVE_AI_KEY is not set.');
   }
-  if (!_client) _client = new GoogleGenerativeAI(apiKey);
+  if (!_client) _client = new GeminiFailoverClient();
   return _client;
 }
 

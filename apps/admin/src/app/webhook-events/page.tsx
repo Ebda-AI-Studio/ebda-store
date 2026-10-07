@@ -8,6 +8,7 @@ import { apiGet, apiPost } from '../../lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '../../i18n/useT';
 import { useLatestRequest } from '../../hooks/useLatestRequest';
+import { withNumerals } from '@force/shared';
 
 /**
  * Super-admin: payment webhook inbox (WebhookEvent rows) + one-click replay.
@@ -108,7 +109,9 @@ export default function WebhookEventsPage() {
     {
       header: t('columns.received'),
       cell: ev => (
-        <span className="text-muted-foreground">{new Date(ev.receivedAt).toLocaleString()}</span>
+        <span className="text-muted-foreground">
+          {new Date(ev.receivedAt).toLocaleString(undefined, withNumerals())}
+        </span>
       ),
     },
     {

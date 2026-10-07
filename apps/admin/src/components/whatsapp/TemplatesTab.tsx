@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button, useToast } from '@force/ui';
 import { apiGet, apiPost, apiPut } from '../../lib/api';
 import { useT } from '../../i18n/useT';
+import { withNumerals } from '@force/shared';
 
 const Icon = {
   Sparkles: (p: { className?: string }) => (
@@ -481,7 +482,8 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
                           {row.lastSyncedAt && (
                             <>
                               {' '}
-                              · {t('lastSync')} {new Date(row.lastSyncedAt).toLocaleString()}
+                              · {t('lastSync')}{' '}
+                              {new Date(row.lastSyncedAt).toLocaleString(undefined, withNumerals())}
                             </>
                           )}
                         </p>

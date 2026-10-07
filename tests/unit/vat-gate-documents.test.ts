@@ -123,7 +123,7 @@ describe('printable invoice', () => {
     expect(t).toContain('Tax registration no.: 123456789');
     expect(t).toContain('Acme Trading LLC');
     expect(t).toContain('Taxable amount (excl. VAT)');
-    expect(t).toMatch(/VAT \(14%\) 14\.00/);
+    expect(t).toMatch(/VAT \(14%\) 14 /);
   });
 
   it('ar: verified — فاتورة ضريبية + رقم التسجيل الضريبي', async () => {
@@ -137,8 +137,8 @@ describe('printable invoice', () => {
   it('en: verified + inclusive — the VAT is a caption with its rate, not a summed row', async () => {
     findFirst.mockResolvedValue(order(VERIFIED_INCL));
     const t = text(await InvoiceService.generateInvoice('s1', 'o1', 'en'));
-    expect(t).toContain('Incl. VAT (14%) 14.00');
-    expect(t).toContain('Taxable amount (excl. VAT) 100.00');
+    expect(t).toContain('Incl. VAT (14%) 14 ');
+    expect(t).toContain('Taxable amount (excl. VAT) 100 ');
   });
 });
 

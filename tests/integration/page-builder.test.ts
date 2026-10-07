@@ -20,6 +20,8 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import crypto from 'node:crypto';
+import express from 'express';
+import request from 'supertest';
 import {
   createPrismaClient,
   runWithRequestDb,
@@ -28,7 +30,16 @@ import {
   TenantScopeViolation,
   type AppPrismaClient,
 } from '@force/database';
-import { layoutToDefinition, resolveLayoutSettings, type PageDefinition } from '@force/shared';
+import {
+  applyTemplateFamily,
+  layoutToDefinition,
+  pageDefinitionSchema,
+  reduceDocument,
+  resolveLayoutSettings,
+  TEMPLATE_FAMILIES,
+  type PageDefinition,
+} from '@force/shared';
+import publicStoreLayoutRoutes from '../../apps/api/src/routes/public-store-layout.routes';
 import {
   getPageState,
   saveDraft,
@@ -71,7 +82,7 @@ async function layoutOf(storeId: string) {
 const docFor = (raw: unknown): PageDefinition =>
   layoutToDefinition(resolveLayoutSettings(raw, 'modern'));
 
-async function freshStore(tag: string): Promise<string> {
+async function freshStore(tag: string, template = 'modern'): Promise<string> {
   const u = await owner.user.create({
     data: {
       email: `${PREFIX}${tag}-${crypto.randomUUID().slice(0, 6)}@test.com`,
@@ -86,7 +97,7 @@ async function freshStore(tag: string): Promise<string> {
       slug: `${PREFIX}${tag}-${crypto.randomUUID().slice(0, 6)}`,
       name: tag,
       ownerId: u.id,
-      template: 'modern',
+      template,
     },
   });
   return s.id;
@@ -140,7 +151,11 @@ describe('draft -> publish -> revisions -> rollback (one store, in order)', { re
     );
     expect(r).toMatchObject({ ok: true, value: { rev: 1 } });
     expect(await layoutOf(storeId)).toEqual({});
-    const pub = await getPublishedDefinition(storeId, resolveLayoutSettings({}, 'modern'));
+    const pub = await getPublishedDefinition(
+      storeId,
+      resolveLayoutSettings({}, 'modern'),
+      'modern'
+    );
     expect(pub.rev).toBeNull();
     expect(pub.definition.sections.find(s => s.type === 'new-arrivals')!.hidden).toBe(false);
     const st = await inStore(storeId, () => getPageState(storeId, HOME));
@@ -184,7 +199,7 @@ describe('draft -> publish -> revisions -> rollback (one store, in order)', { re
     const stored = await layoutOf(storeId);
     expect((stored.newArrivals as { enabled: boolean }).enabled).toBe(false);
     const layout = resolveLayoutSettings(stored, 'modern');
-    const pub = await getPublishedDefinition(storeId, layout);
+    const pub = await getPublishedDefinition(storeId, layout, 'modern');
     expect(pub.rev).toBe(1);
     expect(pub.definition.sections.find(s => s.type === 'new-arrivals')!.hidden).toBe(true);
   });
@@ -430,7 +445,11 @@ describe('integrity guards', { retry: 0 }, () => {
     await inStore(storeId, () => publishDraft({ storeId, pageKey: HOME, baseRev: 1 }));
     const drifted = { ...(await layoutOf(storeId)), bestSellers: { enabled: false, limit: 3 } };
     await owner.store.update({ where: { id: storeId }, data: { layoutSettings: drifted } });
-    const pub = await getPublishedDefinition(storeId, resolveLayoutSettings(drifted, 'modern'));
+    const pub = await getPublishedDefinition(
+      storeId,
+      resolveLayoutSettings(drifted, 'modern'),
+      'modern'
+    );
     expect(pub.definition.sections.find(s => s.type === 'best-sellers')!.hidden).toBe(true);
   });
 
@@ -454,5 +473,125 @@ describe('integrity guards', { retry: 0 }, () => {
     );
     await owner.store.delete({ where: { id: storeId } });
     expect(await owner.storePageRevision.count({ where: { storeId } })).toBe(0);
+  });
+});
+
+describe('document-only sections survive the legacy save paths', { retry: 0 }, () => {
+  it('a legacy layout PUT keeps an image-text section the new builder added', async () => {
+    const { reduceDocument } = await import('@force/shared');
+    const storeId = await freshStore('doconly');
+    const withImage = reduceDocument(docFor({}), {
+      type: 'addSection',
+      list: 'template',
+      sectionType: 'image-text',
+      presetIndex: 0,
+      index: 1,
+    }).doc;
+    await inStore(storeId, () =>
+      saveDraft({ storeId, pageKey: HOME, baseRev: 0, definition: withImage, userId: null })
+    );
+    await inStore(storeId, () => publishDraft({ storeId, pageKey: HOME, baseRev: 1 }));
+    const legacy = resolveLayoutSettings({ bestSellers: { enabled: false, limit: 2 } }, 'modern');
+    expect(
+      await inStore(storeId, () => publishLegacyLayout({ storeId, layout: legacy, userId: null }))
+    ).toBe('ok');
+    // the legacy PUT route writes layout_settings right after (store-layout.routes.ts)
+    await owner.store.update({
+      where: { id: storeId },
+      data: { layoutSettings: legacy as unknown as object },
+    });
+    const pub = await owner.storePageRevision.findFirst({
+      where: { storeId, status: 'published' },
+    });
+    const ids = (pub!.document as unknown as PageDefinition).sections.map(s => s.id);
+    expect(ids[1]).toBe('image-text-1');
+    // and the public read serves it (projection still agrees with layout_settings)
+    const layout = resolveLayoutSettings(await layoutOf(storeId), 'modern');
+    const served = await getPublishedDefinition(storeId, layout, 'modern');
+    expect(served.definition.sections.some(s => s.type === 'image-text')).toBe(true);
+  });
+});
+
+/**
+ * Ruling BUILDER-PUBLISH-1 regression: builder publish -> the PUBLIC layout
+ * route (the storefront's only source) must serve the published document,
+ * never the layout-derived fallback. Before the fix every template family
+ * and every removed section fell back, on every store template.
+ */
+describe('builder publish -> storefront route serves the published document', { retry: 0 }, () => {
+  const app = express();
+  app.use('/public', publicStoreLayoutRoutes);
+
+  async function publishAndRead(template: string, edit: (d: PageDefinition) => PageDefinition) {
+    const storeId = await freshStore(`pub-${template}`, template);
+    const st = await inStore(storeId, () => getPageState(storeId, HOME));
+    expect(st!.source).toBe('layout');
+    const doc = edit(st!.definition);
+    const saved = await inStore(storeId, () =>
+      saveDraft({ storeId, pageKey: HOME, baseRev: 0, definition: doc, userId: null })
+    );
+    expect(saved).toMatchObject({ ok: true, value: { rev: 1 } });
+    const pub = await inStore(storeId, () => publishDraft({ storeId, pageKey: HOME, baseRev: 1 }));
+    expect(pub).toMatchObject({ ok: true, value: { rev: 1 } });
+    const row = await owner.storePageRevision.findFirst({
+      where: { storeId, pageKey: HOME, status: 'published' },
+      select: { document: true },
+    });
+    const res = await request(app).get(`/public/stores/${storeId}/layout`);
+    expect(res.status).toBe(200);
+    return { storeId, res, published: row!.document as unknown as PageDefinition };
+  }
+
+  for (const template of ['modern', 'elegant', 'bold']) {
+    for (const family of TEMPLATE_FAMILIES) {
+      it(`${template} store, ${family.id} family: the storefront renders the published document`, async () => {
+        const { res, published } = await publishAndRead(template, d =>
+          applyTemplateFamily(d, family.id)
+        );
+        expect(res.body.data.rev).toBe(1);
+        // what the storefront parses (HomePageBody.parseDefinition) is the published document
+        const parsed = pageDefinitionSchema.safeParse(res.body.data.definition);
+        expect(parsed.success).toBe(true);
+        expect(parsed.success && parsed.data).toEqual(published);
+        expect(res.body.data.definition.sections.map((s: { type: string }) => s.type)).toEqual(
+          published.sections.map(s => s.type)
+        );
+      });
+    }
+  }
+
+  it('an editor-removed section stays removed on the storefront (classic store)', async () => {
+    const { res, published } = await publishAndRead('classic', d => {
+      const r = reduceDocument(d, { type: 'removeSection', id: 'new-arrivals' });
+      expect(r.rejected).toBeUndefined();
+      return r.doc;
+    });
+    expect(published.sections.some(s => s.type === 'new-arrivals')).toBe(false);
+    expect(res.body.data.definition).toEqual(published);
+  });
+
+  it('an out-of-band layout_settings write still falls back (the guard still guards)', async () => {
+    const { storeId } = await publishAndRead('minimal', d => applyTemplateFamily(d, 'lamma'));
+    const raw = await layoutOf(storeId);
+    await owner.store.update({
+      where: { id: storeId },
+      data: {
+        layoutSettings: {
+          ...raw,
+          hero: { ...(raw.hero as object), enabled: false },
+        } as unknown as object,
+      },
+    });
+    const res = await request(app).get(`/public/stores/${storeId}/layout`);
+    expect(res.body.data.rev).toBe(1);
+    expect(
+      res.body.data.definition.sections.find((s: { type: string }) => s.type === 'hero').hidden
+    ).toBe(true);
+    expect(res.body.data.definition.sections.map((s: { type: string }) => s.type)).not.toEqual(
+      applyTemplateFamily(
+        layoutToDefinition(resolveLayoutSettings({}, 'minimal')),
+        'lamma'
+      ).sections.map(s => s.type)
+    );
   });
 });

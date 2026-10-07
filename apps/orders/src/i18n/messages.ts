@@ -499,8 +499,8 @@ export const MESSAGES: Record<Locale, Messages> = {
     },
     dateRange: {
       today: 'اليوم',
-      last7: 'آخر ٧ أيام',
-      last30: 'آخر ٣٠ يومًا',
+      last7: 'آخر 7 أيام',
+      last30: 'آخر 30 يومًا',
       custom: 'مخصص',
       from: 'من',
       to: 'إلى',

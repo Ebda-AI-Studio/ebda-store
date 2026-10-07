@@ -1927,7 +1927,9 @@ enum ReturnStatus {
 model PaymentConfig {
   id            String          @id @default(uuid())
   storeId       String?         @map("store_id") // null = global default
-  provider      PaymentProvider
+  /// Catalog provider code ('paymob', 'kashier', 'fawry', 'cod', 'instapay', ...), validated against
+  /// packages/shared/src/providers/catalog.ts (was the closed enum PaymentProvider until 2026-10-07).
+  provider      String
   isEnabled     Boolean         @default(false) @map("is_enabled")
   isDefault     Boolean         @default(false) @map("is_default")
   displayName   String?         @map("display_name")
@@ -1946,6 +1948,15 @@ model PaymentConfig {
   // "re-save to show" hint until the key is saved again.
   apiKeyLast4     String? @map("api_key_last4")
   merchantIdLast4 String? @map("merchant_id_last4")
+
+  // Catalog credentials (2026-10-07, expand step). `credentials` is the AES-256-GCM ciphertext of
+  // {"sandbox": {field: value}, "live": {field: value}} keyed by the catalog's field keys; the four
+  // legacy columns above are read only when it is NULL and are dropped by the contract migration.
+  // `credentialHints` is non-secret display data ({set,last4} / {set,value}); `connectionTest` is
+  // the last Test connection result and its credential fingerprint (the enable gate).
+  credentials     String?
+  credentialHints Json    @default("{}") @map("credential_hints")
+  connectionTest  Json?   @map("connection_test")
 
   // Provider-specific settings
   testMode            Boolean  @default(true) @map("test_mode")
@@ -1978,6 +1989,8 @@ model PaymentConfig {
   @@map("payment_configs")
 }
 
+/// UNUSED since 20261007210000_payment_provider_codes (payment_configs.provider is TEXT now). Kept
+/// until the contract migration so a rollback can cast the column back; do not reference it.
 enum PaymentProvider {
   cod
   instapay

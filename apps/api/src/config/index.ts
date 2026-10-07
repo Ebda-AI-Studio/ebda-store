@@ -135,7 +135,7 @@ export const config = {
   onesignalAppId: process.env.ONESIGNAL_APP_ID || '',
   onesignalRestApiKey: process.env.ONESIGNAL_REST_API_KEY || '',
   // Admin OneSignal app — push notifications to store admins about new
-  // orders, etc. Origin must match https://admin.ebda.app. When
+  // orders, etc. Origin must match https://store.ebda.app. When
   // unset, falls back to the storefront app (admin pushes won't actually
   // deliver because the origin won't match — operator should create a
   // dedicated admin OneSignal app and set these).
@@ -145,7 +145,7 @@ export const config = {
   // Orders PWA OneSignal app — push notifications to store staff about new
   // orders on the Orders PWA (origin orders.ebda.app). OneSignal locks
   // each app to a single chrome_web_origin, so the Orders app needs its OWN
-  // OneSignal app distinct from the admin one (admin.ebda.app). No
+  // OneSignal app distinct from the admin one (store.ebda.app). No
   // fallback to the admin app id — an origin mismatch would silently fail to
   // subscribe Orders devices, so we leave it empty and skip sends when unset.
   onesignalOrdersAppId: process.env.ONESIGNAL_ORDERS_APP_ID || '',
@@ -179,7 +179,7 @@ export const config = {
   smtpPort: parseInt(process.env.SMTP_PORT || '1025', 10),
   smtpUser: process.env.SMTP_USER || '',
   smtpPassword: process.env.SMTP_PASSWORD || '',
-  smtpFromName: process.env.SMTP_FROM_NAME || BRAND.name,
+  smtpFromName: process.env.SMTP_FROM_NAME || BRAND.product.nameEn,
   smtpFromEmail: process.env.SMTP_FROM_EMAIL || BRAND.noReplyEmail,
 
   // Resend SDK key (single platform-wide account; all merchant domains live
