@@ -11,6 +11,7 @@ if [ -z "${SMOKE_OWNER_DATABASE_URL:-}" ]; then
   scheme="postgres""ql"
   SMOKE_OWNER_DATABASE_URL="${scheme}://test:test@localhost:${SMOKE_PG_PORT}/ebda_smoke"
 fi
+export SMOKE_OWNER_DATABASE_URL
 cd "$(dirname "$0")/../.."
 APP_PW="ci-only-app-pw"
 DATABASE_URL="$SMOKE_OWNER_DATABASE_URL" DIRECT_URL="$SMOKE_OWNER_DATABASE_URL" \
