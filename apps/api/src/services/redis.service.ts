@@ -191,6 +191,38 @@ class RedisService {
   }
 
   /**
+   * Cache generation counters (`lib/public-cache.ts`, FIX-001). Kept OUT of
+   * the `cache:` namespace on purpose: they are coordination state, not
+   * payloads — on Workers that routes them to the strongly consistent AuthState
+   * Durable Object (atomic INCR), never to eventually consistent KV. Throws when Redis is unavailable or any read fails — the caller
+   * must then treat the shared layer as unverifiable and skip its fill.
+   */
+  async getCacheGenerations(names: string[]): Promise<Array<string | null>> {
+    if (!this.isAvailable()) throw new Error('Redis unavailable');
+    const pipe = this.getConnectedClient().pipeline();
+    for (const name of names) pipe.get(`cachegen:${name}`);
+    const results = await pipe.exec();
+    if (!results) throw new Error('Redis pipeline returned no results');
+    return results.map(([err, value]) => {
+      if (err) throw err;
+      return (value as string | null) ?? null;
+    });
+  }
+
+  /** Atomically bump one generation (INCR + refresh its TTL). Throws on failure. */
+  async bumpCacheGeneration(name: string, ttlSeconds: number): Promise<void> {
+    if (!this.isAvailable()) throw new Error('Redis unavailable');
+    const key = `cachegen:${name}`;
+    const results = await this.getConnectedClient()
+      .multi()
+      .incr(key)
+      .expire(key, ttlSeconds)
+      .exec();
+    const failed = results?.find(([err]) => err)?.[0];
+    if (!results || failed) throw failed ?? new Error('Redis MULTI returned no results');
+  }
+
+  /**
    * Delete every cache entry whose logical key starts with `prefix`
    * (Redis key `cache:${prefix}*`). Uses a non-blocking SCAN cursor + UNLINK
    * so busting a store's product cache never stalls the event loop or blocks

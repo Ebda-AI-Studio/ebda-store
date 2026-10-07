@@ -100,6 +100,10 @@ vi.mock('@api/services/redis.service', () => ({
     set: async (key: string, value: string) => void redisData.set(key, value),
     delete: async (key: string) => void redisData.delete(key),
     deleteByPattern: async () => undefined,
+    // FIX-001/002: healthy Redis with generations that never move.
+    isAvailable: () => true,
+    getCacheGenerations: async (names: string[]) => names.map(() => null),
+    bumpCacheGeneration: async () => undefined,
   },
 }));
 vi.mock('@api/lib/revalidate-storefront', () => ({ revalidateStorefront: vi.fn() }));
