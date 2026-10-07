@@ -1,4 +1,4 @@
-import { prisma, withStore } from '@force/database';
+import { storeDirectory, withStore } from '@force/database';
 import { config } from '../config';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { StorageService } from './storage.service';
@@ -69,11 +69,11 @@ export function urlToR2Key(url: string | null | undefined): string | null {
  * by it, but the bulk orphan sweep (owner-role only) does read it.
  */
 async function isStillReferenced(url: string, key: string): Promise<boolean> {
-  // Store by store: each registered column is store-scoped under strict RLS, so
-  // "referenced ANYWHERE" is the OR over every store's own view (`stores` itself
-  // carries no RLS, so every scope also sees every store's brand columns). Stops
-  // at the first store that still references it.
-  const stores = await prisma.store.findMany({ select: { id: true }, orderBy: { id: 'asc' } });
+  // Store by store: each registered column (including the store's own brand columns:
+  // `stores` is under RLS too, R-EBDA-005) is store-scoped, so "referenced ANYWHERE" is
+  // the OR over every store's own view. Soft-deleted stores count (the safe direction).
+  // Stops at the first store that still references it.
+  const stores = await storeDirectory(undefined, { includeDeleted: true });
   for (const { id } of stores) {
     const referenced = await withStore(id, async tx => {
       // issue 2249: the substring half of the check is a full scan of the

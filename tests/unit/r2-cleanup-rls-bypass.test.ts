@@ -31,9 +31,10 @@ const {
   // straight through `prisma` instead of `tx`, this decoy would be the one
   // invoked, and the assertions below would catch it.
   const prismaQueryRaw = vi.fn().mockResolvedValue([{ referenced: false }]);
-  // `stores` carries no RLS, so the bare client lists them; everything else is read per store.
+  // `stores` is under RLS: the stores are listed through the directory definer (`storeDirectory`),
+  // and everything else is read per store, in that store's scope.
   const storeFindMany = vi.fn().mockResolvedValue([{ id: 'store-1' }]);
-  const prismaDecoy = { $queryRawUnsafe: prismaQueryRaw, store: { findMany: storeFindMany } };
+  const prismaDecoy = { $queryRawUnsafe: prismaQueryRaw };
 
   const withRlsBypassMock = vi.fn(
     (_storeId: string, fn: (tx: typeof bypassTx) => Promise<unknown>) => fn(bypassTx)
@@ -52,6 +53,7 @@ const {
 
 vi.mock('@force/database', () => ({
   prisma: prismaDecoy,
+  storeDirectory: storeFindMany,
   withStore: withRlsBypassMock,
 }));
 vi.mock('../../apps/api/src/services/storage.service', () => ({
@@ -83,6 +85,8 @@ describe('r2-cleanup isStillReferenced reads every store in its own scope (#1599
   it('goes through withStore (one scope per store), not the bare prisma export', async () => {
     await deleteR2ObjectIfOrphan('https://cdn.example.com/products/some-key.jpg');
 
+    // Soft-deleted stores are listed too: a clone's reference there still counts (safe direction).
+    expect(storeFindMany).toHaveBeenCalledWith(undefined, { includeDeleted: true });
     expect(withRlsBypassMock).toHaveBeenCalledTimes(1); // the one store listed
     // The registry-built probes landed on the bypass client: the exact-URL
     // half first (with the URL), then — because it missed — the substring

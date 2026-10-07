@@ -133,11 +133,12 @@ AS $fn$
 $fn$;
 
 -- 2.3 The store directory for crons and platform sweeps (`acrossStores` and the
---     Inngest fan-outs): every store that is not soft-deleted, with the flags the
+--     Inngest fan-outs): every store that is not soft-deleted (or every store,
+--     for the R2 per-URL reference check), with the flags the
 --     sweeps filter on. The sweep then works on each store inside its OWN tenant
 --     transaction. UNGUARDED ON PURPOSE (crons have no principal); routing facts
 --     and booleans only.
-CREATE OR REPLACE FUNCTION public.ebda_store_directory()
+CREATE OR REPLACE FUNCTION public.ebda_store_directory(p_include_deleted boolean DEFAULT false)
 RETURNS TABLE (
   id text,
   slug text,
@@ -157,7 +158,7 @@ AS $fn$
   SELECT s.id, s.slug, s.name, s.status::text, s.plan::text, s.accounting_enabled, s.ai_features_enabled,
          s.loyalty_enabled, s.wbs_enabled, s.domain IS NOT NULL, s.pending_domain IS NOT NULL
   FROM public.stores s
-  WHERE s.deleted_at IS NULL
+  WHERE p_include_deleted OR s.deleted_at IS NULL
   ORDER BY s.id
 $fn$;
 
@@ -267,6 +268,35 @@ BEGIN
 END
 $fn$;
 
+-- Erasure of a user's sessions and devices (refresh/reset tokens, verification
+-- tokens, OneSignal registrations). A merchant erasing a customer, or the
+-- operator deleting a store owner, runs with ANOTHER user's id set, so a plain
+-- DELETE on these user-keyed tables would match nothing. GUARDED exactly like
+-- `ebda_user_addresses_delete`: the user themself, a super_admin, or the
+-- merchant whose store the user belongs to (`ebda_may_act_on_user`).
+CREATE OR REPLACE FUNCTION public.ebda_user_tokens_delete(p_user_id text)
+RETURNS integer
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $fn$
+DECLARE
+  v_n integer := 0;
+  v_k integer;
+BEGIN
+  IF NOT public.ebda_may_act_on_user(p_user_id) THEN
+    RAISE EXCEPTION 'ebda_user_tokens_delete: caller may not act on user %', p_user_id
+      USING ERRCODE = '42501';
+  END IF;
+  DELETE FROM public.onesignal_subscriptions o WHERE o.user_id = p_user_id;
+  GET DIAGNOSTICS v_k = ROW_COUNT; v_n := v_n + v_k;
+  DELETE FROM public.refresh_tokens t WHERE t.user_id = p_user_id;
+  GET DIAGNOSTICS v_k = ROW_COUNT; v_n := v_n + v_k;
+  DELETE FROM public.verification_tokens t WHERE t.user_id = p_user_id;
+  GET DIAGNOSTICS v_k = ROW_COUNT; v_n := v_n + v_k;
+  RETURN v_n;
+END
+$fn$;
+
 -- Push audience for an order notification: the OneSignal player ids of the
 -- store's owner (role 'store_admin', only for the store the transaction is
 -- scoped to) or of every active super_admin (role 'super_admin'). Device ids
@@ -316,7 +346,8 @@ BEGIN
                         'ebda_store_ids_claiming_domain', 'ebda_store_directory',
                         'ebda_owned_store_ids', 'ebda_wbs_bridge_keys', 'ebda_refresh_token_user',
                         'ebda_verification_token_user', 'ebda_refresh_tokens_purge',
-                        'ebda_admin_push_player_ids', 'ebda_public_store_page')
+                        'ebda_admin_push_player_ids', 'ebda_public_store_page',
+                        'ebda_user_tokens_delete')
   LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f.sig);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO ebda_app', f.sig);

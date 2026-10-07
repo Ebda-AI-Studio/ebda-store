@@ -1446,19 +1446,21 @@ async function fetchFooterLocations(store: {
       ? (store.theme as Record<string, unknown>)
       : null;
   if (!store.locationsEnabled || theme?.showBranchesInFooter !== true) return undefined;
-  return prisma.storeLocation.findMany({
-    where: { storeId: store.id, isPublished: true },
-    orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-    select: {
-      id: true,
-      name: true,
-      nameAr: true,
-      address: true,
-      addressAr: true,
-      phone: true,
-      mapsUrl: true,
-    },
-  });
+  return readInStoreContext(store.id, () =>
+    prisma.storeLocation.findMany({
+      where: { storeId: store.id, isPublished: true },
+      orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        nameAr: true,
+        address: true,
+        addressAr: true,
+        phone: true,
+        mapsUrl: true,
+      },
+    })
+  );
 }
 
 // GET /stores/:slugOrId - Get store by slug or ID (public, cached 120s)
@@ -1591,10 +1593,12 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
       // Mirror the /store/resolve endpoint: surface explicitly-disabled
       // CMS pages so the storefront footer can hide their links rather
       // than rendering a "Page unavailable" landing on click.
-      const disabledPages = await prisma.storePage.findMany({
-        where: { storeId: store.id, isPublished: false },
-        select: { slug: true },
-      });
+      const disabledPages = await readInStoreContext(store.id, () =>
+        prisma.storePage.findMany({
+          where: { storeId: store.id, isPublished: false },
+          select: { slug: true },
+        })
+      );
       const disabledCmsSlugs = disabledPages.map(p => p.slug);
       const locations = await fetchFooterLocations(store);
       return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
@@ -1741,10 +1745,12 @@ router.get(
         // simply not being there. Only rows that exist AND are unpublished
         // need to be reported; if the row is missing the storefront falls
         // back to its built-in copy and the link should still work.
-        const disabledPages = await prisma.storePage.findMany({
-          where: { storeId: store.id, isPublished: false },
-          select: { slug: true },
-        });
+        const disabledPages = await readInStoreContext(store.id, () =>
+          prisma.storePage.findMany({
+            where: { storeId: store.id, isPublished: false },
+            select: { slug: true },
+          })
+        );
         const disabledCmsSlugs = disabledPages.map(p => p.slug);
 
         // Strip server-only marketing-pixel secrets before the store reaches the

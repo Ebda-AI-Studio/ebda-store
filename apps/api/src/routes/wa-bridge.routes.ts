@@ -1230,7 +1230,7 @@ router.post('/templates/status', waBridgeAuth, async (req: Request, res: Respons
     }
 
     await prisma.whatsAppTemplate.update({
-      where: { id: existing.id },
+      where: { id: existing.id, storeId: fwbStoreId },
       data: {
         status,
         rejectionReason: status === 'rejected' ? rejectionReason || null : null,

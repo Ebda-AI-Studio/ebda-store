@@ -152,7 +152,7 @@ const answerEngineCitationScanCronFn = inngest.createFunction(
     // deploy — called out here so a future "why isn't the weekly scan
     // running" investigation finds this fast.
 
-    // Cross-tenant cron — `stores` carries no RLS, so the list is a plain read;
+    // Cross-tenant cron — the store list comes from the directory definer;
     // each store is then scanned in its own scope.
     const stores = await step.run('list-stores', () =>
       // `stores` is under RLS: a cron lists stores through the directory definer.

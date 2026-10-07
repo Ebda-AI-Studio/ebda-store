@@ -30,6 +30,9 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@force/database', () => ({
+  // tests/setup-e2e.ts builds the owner-role fixture client from this export;
+  // these suites never touch a database, so a stub is enough.
+  createPrismaClient: vi.fn(),
   prisma: {
     order: { findFirst: (...a: unknown[]) => h.orderFindFirst(...a), update: vi.fn() },
     payment: {

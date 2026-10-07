@@ -765,7 +765,7 @@ export async function startCardSetup(args: {
     });
     await withStore(args.storeId, tx =>
       tx.billingEvent.updateMany({
-        where: { id: eventId, status: 'pending' },
+        where: { id: eventId, storeId: args.storeId, status: 'pending' },
         data: { raw: { providerSessionId: out.providerSessionId } },
       })
     );
@@ -909,7 +909,7 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
   if (sub.status !== 'past_due') {
     const { count } = await withStore(sub.storeId, tx =>
       tx.storeSubscription.updateMany({
-        where: { id: sub.id, status: sub.status, billingMethod: 'instapay' },
+        where: { id: sub.id, storeId: sub.storeId, status: sub.status, billingMethod: 'instapay' },
         data: {
           status: 'past_due',
           currentPeriodEnd: periodEnd,
@@ -936,7 +936,7 @@ async function manualPayDue(sub: SubRow, periodEnd: Date, now: Date): Promise<Re
   }
   const { count } = await withStore(sub.storeId, tx =>
     tx.storeSubscription.updateMany({
-      where: { id: sub.id, status: 'past_due', nextRetryAt: sub.nextRetryAt },
+      where: { id: sub.id, storeId: sub.storeId, status: 'past_due', nextRetryAt: sub.nextRetryAt },
       data: { nextRetryAt: null },
     })
   );
@@ -1704,9 +1704,9 @@ export async function listSubscriptionsForAdmin(
     select: { code: true, priceMonthlyMinor: true, priceYearlyMinor: true },
   });
   const parts = await acrossStores(
-    () =>
+    storeId =>
       prisma.storeSubscription.findMany({
-        where: args.status ? { status: args.status as never } : {},
+        where: args.status ? { storeId, status: args.status as never } : { storeId },
         include: {
           store: {
             select: {

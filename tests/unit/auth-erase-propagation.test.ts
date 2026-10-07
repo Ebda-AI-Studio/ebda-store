@@ -131,6 +131,14 @@ vi.mock('@force/database', () => ({
 // `auditLog.create` stay the fakes the assertions below read.
 vi.mock('@api/lib/definer', () => ({
   deleteUserAddresses: (userId: string) => mockPrisma.address.deleteMany({ where: { userId } }),
+  // `ebda_user_tokens_delete` clears the user's push subscriptions + refresh + verification tokens
+  // in one guarded call.
+  deleteUserTokens: async (userId: string) => {
+    await mockPrisma.oneSignalSubscription.deleteMany({ where: { userId } });
+    await mockPrisma.refreshToken.deleteMany({ where: { userId } });
+    await mockPrisma.verificationToken.deleteMany({ where: { userId } });
+    return 0;
+  },
   insertAuditLog: (e: { action: string; storeId?: string | null; details?: unknown }) =>
     mockPrisma.auditLog.create({
       data: { action: e.action, storeId: e.storeId ?? null, details: e.details },

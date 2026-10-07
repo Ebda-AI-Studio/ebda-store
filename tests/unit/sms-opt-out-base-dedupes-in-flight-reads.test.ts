@@ -11,8 +11,10 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@force/database', () => ({
-  // `stores` carries no RLS: a plain read on the bare client.
   prisma: { store: { findUnique: h.findUnique } },
+  // `stores` is under RLS: the base is read inside the store's own scope (`withStore`).
+  withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
+    fn({ store: { findUnique: h.findUnique } }),
 }));
 vi.mock('@api/services/feature.service', () => ({ featureService: {} }));
 vi.mock('@api/services/notification-config.service', () => ({ notificationConfigService: {} }));

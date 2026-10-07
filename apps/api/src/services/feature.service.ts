@@ -231,11 +231,13 @@ class FeatureService {
    */
   private async bustPublicStoreCache(storeId: string): Promise<void> {
     try {
-      // `stores` carries no RLS: a plain read.
-      const store = await prisma.store.findUnique({
-        where: { id: storeId },
-        select: { slug: true, domain: true },
-      });
+      // `stores` is under RLS (R-EBDA-005): read in the store's own scope.
+      const store = await withStore(storeId, tx =>
+        tx.store.findUnique({
+          where: { id: storeId },
+          select: { slug: true, domain: true },
+        })
+      );
       if (!store) return;
       await bustStoreCaches(storeId, store.slug, store.domain);
     } catch (err) {

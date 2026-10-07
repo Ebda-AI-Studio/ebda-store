@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { PLAN_BASELINE, STORE_PLANS } from '@force/shared';
-import { aiEligiblePlanFilter, isAiEligiblePlan } from '../../apps/api/src/lib/ai-plan-eligibility';
+import { isAiEligiblePlan } from '../../apps/api/src/lib/ai-plan-eligibility';
 
 describe('AI plan eligibility', () => {
   it('excludes free from AI spend', () => {
@@ -13,8 +13,11 @@ describe('AI plan eligibility', () => {
     }
   });
 
-  it('the prisma filter excludes exactly the ineligible plans', () => {
-    expect(aiEligiblePlanFilter.plan.notIn).toEqual(['free']);
+  // The Prisma `aiEligiblePlanFilter` was removed with the tenant guard: scans now read plan from
+  // the store directory and filter in code with `isAiEligiblePlan`, so the predicate itself must
+  // exclude exactly the ineligible plans.
+  it('the predicate excludes exactly the ineligible plans', () => {
+    expect(STORE_PLANS.filter(p => !isAiEligiblePlan(p))).toEqual(['free']);
   });
 
   it('every plan in STORE_PLANS is classified', () => {

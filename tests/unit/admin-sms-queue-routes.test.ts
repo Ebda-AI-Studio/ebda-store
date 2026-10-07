@@ -50,6 +50,13 @@ vi.mock('@api/middleware/tenant-context', () => ({
   userContext: () => (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
+// A super_admin request is wrapped in the named 'platform-operator' guard hatch (R-EBDA-003);
+// there is no database here, so the hatch is a pass-through.
+vi.mock('@force/database', async importOriginal => ({
+  ...(await importOriginal<typeof import('@force/database')>()),
+  asPlatformOperator: (_userId: string, fn: () => unknown) => fn(),
+}));
+
 import adminRoutes from '@api/routes/admin.routes';
 import { errorHandler } from '@api/middleware/error-handler';
 

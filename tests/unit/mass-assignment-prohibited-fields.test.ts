@@ -125,6 +125,18 @@ vi.mock('@force/database', () => ({
   Prisma: { DbNull: null },
   StoreStatus: { active: 'active', suspended: 'suspended' },
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  withStore: (_s: string, fn: any) => fn(prismaStub),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  withUser: (_u: string, fn: any) => fn(prismaStub),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  asPlatformOperator: (_u: string, fn: any) => fn(),
+}));
+vi.mock('@api/middleware/tenant-context', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tenantContext: (_req: any, _res: any, next: any) => next(),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  storeScopeContext: (_req: any, _res: any, next: any) => next(),
 }));
 
 // ─── store.routes.ts peripheral mocks ───────────────────────────────────────

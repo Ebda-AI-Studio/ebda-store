@@ -21,6 +21,7 @@ import { ProvisioningService } from './provisioning.service';
 import { bustStoreCaches } from './store.service';
 import { SetupGuideService } from './setup-guide.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
+import { storeIdBySlug } from '../lib/definer';
 import { assertOwnerMayCreateStore } from './plan-limit.service';
 import { assertStoreCreationBudget, withStoreCreationLock } from './store-creation-limit';
 import { assertStoreMayGoLive } from './billing/go-live-gate';
@@ -62,8 +63,8 @@ export class OnboardingService {
       return { slug, host, available: false, reason: valid.code, message: valid.message };
     }
     // `slug` is unique across live AND soft-deleted stores, so check both.
-    const taken = await prisma.store.findUnique({ where: { slug }, select: { id: true } });
-    if (taken) {
+    // `stores` is under RLS (R-EBDA-005): the probe is the `ebda_store_id_by_slug` definer.
+    if (await storeIdBySlug(slug)) {
       return {
         slug,
         host,
@@ -85,19 +86,21 @@ export class OnboardingService {
     );
     if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
-    const store = await prisma.store.findFirst({
-      where: { ownerId: userId, deletedAt: null },
-      orderBy: { createdAt: 'asc' },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        domain: true,
-        status: true,
-        template: true,
-        plan: true,
-      },
-    });
+    const store = await withUser(userId, tx =>
+      tx.store.findFirst({
+        where: { ownerId: userId, deletedAt: null },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          domain: true,
+          status: true,
+          template: true,
+          plan: true,
+        },
+      })
+    );
 
     let productCount = 0;
     let codEnabled = false;
@@ -168,7 +171,9 @@ export class OnboardingService {
       throw new AppError(403, 'FORBIDDEN', 'Only merchant accounts can create a store');
     }
 
-    const owned = await prisma.store.count({ where: { ownerId: owner.userId, deletedAt: null } });
+    const owned = await withUser(owner.userId, tx =>
+      tx.store.count({ where: { ownerId: owner.userId, deletedAt: null } })
+    );
     if (owned >= MAX_SELF_SERVE_STORES_PER_OWNER) {
       throw new AppError(409, 'STORE_LIMIT_REACHED', 'Store limit reached for this account');
     }
@@ -198,9 +203,11 @@ export class OnboardingService {
       // Plan gate (locked pricing): a SECOND store needs a plan that allows it
       // (Business = 3). Also stops a Basic/Growth owner farming fresh Growth trials.
       if (!owner.isSuperAdmin) await assertOwnerMayCreateStore(owner.userId);
-      const ownedNow = await prisma.store.count({
-        where: { ownerId: owner.userId, deletedAt: null },
-      });
+      const ownedNow = await withUser(owner.userId, tx =>
+        tx.store.count({
+          where: { ownerId: owner.userId, deletedAt: null },
+        })
+      );
       try {
         const result = await ProvisioningService.provisionStore({
           storeName: input.name,

@@ -128,7 +128,9 @@ vi.mock('@force/database', async () => ({
   Prisma: {},
 }));
 // `getUserState` is the `ebda_user_state` definer; `user.findUnique` stays the source of truth.
+// `refreshTokenUser` is the `ebda_refresh_token_user` definer: the presented token names its owner.
 vi.mock('@api/lib/definer', () => ({
+  refreshTokenUser: async () => byToken.get('__presented__')?.userId ?? null,
   getUserState: async () => (await mockPrisma.user.findUnique()) ?? null,
 }));
 vi.mock('@api/lib/logger', () => ({ default: mockLogger }));

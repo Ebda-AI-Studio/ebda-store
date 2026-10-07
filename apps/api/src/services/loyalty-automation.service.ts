@@ -11,7 +11,7 @@
  *     └─ processPointExpiration()
  */
 
-import { prisma, runInStoreScope } from '@force/database';
+import { prisma, runInStoreScope, storeDirectory } from '@force/database';
 import { featureService } from './feature.service';
 import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';
@@ -93,11 +93,9 @@ class LoyaltyAutomationService {
     );
 
     try {
-      // Find all stores with loyalty enabled
-      const stores = await prisma.store.findMany({
-        where: { loyaltyEnabled: true, deletedAt: null },
-        select: { id: true, loyaltySettings: true },
-      });
+      // Find all stores with loyalty enabled (`stores` is under RLS: the cron lists
+      // them through the directory definer and reads each one's settings in its scope).
+      const stores = await storeDirectory(s => s.loyaltyEnabled);
 
       for (const store of stores) {
         await runInStoreScope(store.id, async () => {
@@ -105,7 +103,11 @@ class LoyaltyAutomationService {
           const loyaltyEnabled = await featureService.isFeatureEnabled(store.id, 'loyalty');
           if (!loyaltyEnabled) return;
 
-          const settings = store.loyaltySettings as Record<string, unknown> | null;
+          const row = await prisma.store.findUnique({
+            where: { id: store.id },
+            select: { loyaltySettings: true },
+          });
+          const settings = (row?.loyaltySettings ?? null) as Record<string, unknown> | null;
           const birthdayBonus =
             typeof settings?.birthdayBonus === 'number'
               ? settings.birthdayBonus
@@ -264,10 +266,8 @@ class LoyaltyAutomationService {
   // ──────────────────────────────────────────
 
   async processPointExpiration(): Promise<void> {
-    const stores = await prisma.store.findMany({
-      where: { deletedAt: null },
-      select: { id: true },
-    });
+    // `stores` is under RLS: the cron lists stores through the directory definer.
+    const stores = await storeDirectory();
     for (const store of stores) {
       await runInStoreScope(store.id, () => this.processStorePointExpiration(store.id));
     }

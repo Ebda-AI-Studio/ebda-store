@@ -12,9 +12,13 @@ import {
 } from '@force/database';
 import {
   deleteUserAddresses,
+  deleteUserTokens,
   findUserIdByEmail,
   getUserState,
+  purgeRefreshTokens,
+  refreshTokenUser,
   revokeUserSessionsRow,
+  verificationTokenUser,
 } from '../lib/definer';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
@@ -359,14 +363,15 @@ export class AuthService {
     // network IO so the variance is dominated by SMTP latency, not
     // the existence check.
     if (existingUser) {
-      const storeName = existingUser.storeId
+      const existingStoreId = existingUser.storeId;
+      const storeName = existingStoreId
         ? (
-            await prisma.store
-              .findUnique({
-                where: { id: existingUser.storeId },
+            await withStore(existingStoreId, tx =>
+              tx.store.findUnique({
+                where: { id: existingStoreId },
                 select: { name: true },
               })
-              .catch(() => null)
+            ).catch(() => null)
           )?.name
         : undefined;
       const recipientName =
@@ -462,13 +467,16 @@ export class AuthService {
     storeId: string | null = null,
     language?: 'en' | 'ar'
   ): Promise<void> {
-    // Delete any existing verification tokens for this user
-    await prisma.verificationToken.deleteMany({
-      where: {
-        userId,
-        type: 'email',
-      },
-    });
+    // Delete any existing verification tokens for this user. Token rows are
+    // user-keyed (RLS on app.current_user_id): every write runs AS the user.
+    await withUser(userId, tx =>
+      tx.verificationToken.deleteMany({
+        where: {
+          userId,
+          type: 'email',
+        },
+      })
+    );
 
     // Generate verification token
     const token = crypto.randomBytes(32).toString('hex');
@@ -481,14 +489,16 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
     // Store verification token
-    await prisma.verificationToken.create({
-      data: {
-        token: tokenHash,
-        userId,
-        type: 'email',
-        expiresAt,
-      },
-    });
+    await withUser(userId, tx =>
+      tx.verificationToken.create({
+        data: {
+          token: tokenHash,
+          userId,
+          type: 'email',
+          expiresAt,
+        },
+      })
+    );
 
     // Send verification email
     if (storeId) {
@@ -527,14 +537,22 @@ export class AuthService {
     // Hash the provided token
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
-    // Find the verification token
-    const verificationToken = await prisma.verificationToken.findFirst({
-      where: {
-        token: tokenHash,
-        type: 'email',
-        usedAt: null,
-      },
-    });
+    // Find the verification token: the presented token names its user through the
+    // `ebda_verification_token_user` definer (it is the credential), and the row is
+    // then read AS that user (`verification_tokens` is RLS-keyed on the user).
+    const tokenOwner = await verificationTokenUser(tokenHash);
+    const verificationToken = tokenOwner
+      ? await withUser(tokenOwner, tx =>
+          tx.verificationToken.findFirst({
+            where: {
+              userId: tokenOwner,
+              token: tokenHash,
+              type: 'email',
+              usedAt: null,
+            },
+          })
+        )
+      : null;
 
     if (!verificationToken) {
       throw new AppError(400, 'TOKEN_INVALID', 'Invalid verification token');
@@ -564,9 +582,11 @@ export class AuthService {
 
     if (verificationToken.expiresAt < new Date()) {
       // Delete expired token
-      await prisma.verificationToken.delete({
-        where: { id: verificationToken.id },
-      });
+      await withUser(verificationToken.userId, tx =>
+        tx.verificationToken.delete({
+          where: { id: verificationToken.id, userId: verificationToken.userId },
+        })
+      );
       throw new AppError(
         400,
         'TOKEN_EXPIRED',
@@ -587,7 +607,7 @@ export class AuthService {
           data: { emailVerified: true },
         });
         await tx.verificationToken.update({
-          where: { id: verificationToken.id },
+          where: { id: verificationToken.id, userId: verificationToken.userId },
           data: { usedAt: new Date() },
         });
       },
@@ -650,13 +670,15 @@ export class AuthService {
     }
 
     // Check if there's a recent verification token (within last 2 minutes) to prevent spam
-    const recentToken = await prisma.verificationToken.findFirst({
-      where: {
-        userId: user.id,
-        type: 'email',
-        createdAt: { gt: new Date(Date.now() - 2 * 60 * 1000) },
-      },
-    });
+    const recentToken = await withUser(user.id, tx =>
+      tx.verificationToken.findFirst({
+        where: {
+          userId: user.id,
+          type: 'email',
+          createdAt: { gt: new Date(Date.now() - 2 * 60 * 1000) },
+        },
+      })
+    );
 
     if (recentToken) {
       throw new AppError(
@@ -891,10 +913,13 @@ export class AuthService {
     // queries instead of the original ten; the common case is one, as it was
     // before either change. No new index, so Ruling P2-B1-1's "no migration on
     // the hottest table in the schema" still holds.
-    const first = await prisma.refreshToken.findUnique({
-      where: { id: replacedById },
-      select: { revokedAt: true, revokedReason: true, replacedById: true },
-    });
+    // `refresh_tokens` is user-keyed (RLS on app.current_user_id): read AS the user.
+    const first = await withUser(userId, tx =>
+      tx.refreshToken.findUnique({
+        where: { id: replacedById, userId },
+        select: { revokedAt: true, revokedReason: true, replacedById: true },
+      })
+    );
     if (!first) return false;
     if (!first.revokedAt) return true;
     if (!this.endedByRotation(first.revokedReason)) return false;
@@ -904,12 +929,14 @@ export class AuthService {
     // grace window that led here, so it is part of this user's newest rows;
     // read that slice once and finish in memory rather than paying a
     // round-trip per remaining hop.
-    const rows = await prisma.refreshToken.findMany({
-      where: { userId },
-      select: { id: true, revokedAt: true, revokedReason: true, replacedById: true },
-      orderBy: { createdAt: 'desc' },
-      take: 500,
-    });
+    const rows = await withUser(userId, tx =>
+      tx.refreshToken.findMany({
+        where: { userId },
+        select: { id: true, revokedAt: true, revokedReason: true, replacedById: true },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      })
+    );
     const byId = new Map(rows.map(r => [r.id, r]));
 
     let cursor: string | null = first.replacedById;
@@ -980,7 +1007,8 @@ export class AuthService {
    */
   private static async claimGraceUse(
     tokenId: string,
-    revokedReason: string | null
+    revokedReason: string | null,
+    userId: string
   ): Promise<GraceClaim> {
     let reason = revokedReason;
 
@@ -988,16 +1016,21 @@ export class AuthService {
       const spent = this.graceUsesSpent(reason);
       if (spent >= ROTATION_RACE_MAX_GRACE_USES) return { claimed: false, exhausted: true, spent };
 
-      const claimed = await prisma.refreshToken.updateMany({
-        where: { id: tokenId, revokedReason: reason },
-        data: { revokedReason: `${REASON_GRACE_PREFIX}${spent + 1}` },
-      });
+      const expected = reason;
+      const claimed = await withUser(userId, tx =>
+        tx.refreshToken.updateMany({
+          where: { id: tokenId, userId, revokedReason: expected },
+          data: { revokedReason: `${REASON_GRACE_PREFIX}${spent + 1}` },
+        })
+      );
       if (claimed.count > 0) return { claimed: true, exhausted: false, spent: spent + 1 };
 
-      const fresh = await prisma.refreshToken.findUnique({
-        where: { id: tokenId },
-        select: { revokedReason: true },
-      });
+      const fresh = await withUser(userId, tx =>
+        tx.refreshToken.findUnique({
+          where: { id: tokenId, userId },
+          select: { revokedReason: true },
+        })
+      );
       // The row is gone — pruned, or deleted underneath us. That is not a
       // budget problem, and reporting it as one would blame the cap for
       // something the cap did not do.
@@ -1012,9 +1045,18 @@ export class AuthService {
     // Hash the token to look it up
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
 
-    const storedRow = await prisma.refreshToken.findUnique({
-      where: { token: tokenHash },
-    });
+    // The presented token names its user through the `ebda_refresh_token_user` definer
+    // (it is the credential); every read and write of the user-keyed `refresh_tokens`
+    // after that runs AS that user, each in its own short transaction, so a revocation
+    // written just before a 401 is committed, not rolled back with the error.
+    const tokenUserId = await refreshTokenUser(tokenHash);
+    const storedRow = tokenUserId
+      ? await withUser(tokenUserId, tx =>
+          tx.refreshToken.findUnique({
+            where: { token: tokenHash, userId: tokenUserId },
+          })
+        )
+      : null;
 
     if (!storedRow) {
       throw new AppError(401, 'TOKEN_INVALID', 'Invalid refresh token');
@@ -1084,7 +1126,7 @@ export class AuthService {
       // the test would be a line no mutation can reach, which reads as covered
       // while proving nothing.
       const claim = raceSignalsAgree
-        ? await this.claimGraceUse(storedToken.id, storedToken.revokedReason)
+        ? await this.claimGraceUse(storedToken.id, storedToken.revokedReason, storedToken.userId)
         : { claimed: false, exhausted: false, spent: 0 };
       const rotationRace = claim.claimed;
 
@@ -1111,10 +1153,12 @@ export class AuthService {
             ? 'Refresh-token grace budget exhausted — revoking all tokens for user'
             : 'Refresh-token reuse detected — revoking all tokens for user'
         );
-        await prisma.refreshToken.updateMany({
-          where: { userId: storedToken.userId, revokedAt: null },
-          data: { revokedAt: new Date(), revokedReason: 'reuse_detected' },
-        });
+        await withUser(storedToken.userId, tx =>
+          tx.refreshToken.updateMany({
+            where: { userId: storedToken.userId, revokedAt: null },
+            data: { revokedAt: new Date(), revokedReason: 'reuse_detected' },
+          })
+        );
         throw new AppError(401, 'TOKEN_REUSED', 'Token reuse detected — please sign in again');
       }
 
@@ -1135,19 +1179,23 @@ export class AuthService {
     }
 
     if (storedToken.expiresAt < new Date()) {
-      await prisma.refreshToken.update({
-        where: { id: storedToken.id },
-        data: { revokedAt: new Date(), revokedReason: 'expired' },
-      });
+      await withUser(storedToken.userId, tx =>
+        tx.refreshToken.update({
+          where: { id: storedToken.id, userId: storedToken.userId },
+          data: { revokedAt: new Date(), revokedReason: 'expired' },
+        })
+      );
       throw new AppError(401, 'TOKEN_EXPIRED', 'Refresh token expired');
     }
 
     // Reject refresh if user has been soft-deleted
     if (storedToken.user.deletedAt) {
-      await prisma.refreshToken.update({
-        where: { id: storedToken.id },
-        data: { revokedAt: new Date(), revokedReason: 'account_deleted' },
-      });
+      await withUser(storedToken.userId, tx =>
+        tx.refreshToken.update({
+          where: { id: storedToken.id, userId: storedToken.userId },
+          data: { revokedAt: new Date(), revokedReason: 'account_deleted' },
+        })
+      );
       throw new AppError(401, 'ACCOUNT_DELETED', 'Account has been deleted');
     }
 
@@ -1161,10 +1209,12 @@ export class AuthService {
     // whether the admin PUT handler also revoked the row (belt and braces
     // with the revokeAllSessions call added to that handler).
     if (storedToken.user.status !== 'active') {
-      await prisma.refreshToken.update({
-        where: { id: storedToken.id },
-        data: { revokedAt: new Date(), revokedReason: 'account_suspended' },
-      });
+      await withUser(storedToken.userId, tx =>
+        tx.refreshToken.update({
+          where: { id: storedToken.id, userId: storedToken.userId },
+          data: { revokedAt: new Date(), revokedReason: 'account_suspended' },
+        })
+      );
       throw new AppError(401, 'ACCOUNT_SUSPENDED', 'Account is not active');
     }
 
@@ -1193,10 +1243,12 @@ export class AuthService {
     );
 
     const newHash = crypto.createHash('sha256').update(newTokens.refreshToken).digest('hex');
-    const newRow = await prisma.refreshToken.findUnique({
-      where: { token: newHash },
-      select: { id: true },
-    });
+    const newRow = await withUser(storedToken.userId, tx =>
+      tx.refreshToken.findUnique({
+        where: { token: newHash, userId: storedToken.userId },
+        select: { id: true },
+      })
+    );
 
     // Only the row that is still live gets marked rotated. On the race path
     // the row is ALREADY revoked, and rewriting `revokedAt` to now would slide
@@ -1212,14 +1264,16 @@ export class AuthService {
     // still keeps the tokens it minted, which is the race resolving, not an
     // error.
     if (!storedToken.revokedAt) {
-      await prisma.refreshToken.updateMany({
-        where: { id: storedToken.id, revokedAt: null },
-        data: {
-          revokedAt: new Date(),
-          revokedReason: REASON_ROTATED,
-          replacedById: newRow?.id ?? null,
-        },
-      });
+      await withUser(storedToken.userId, tx =>
+        tx.refreshToken.updateMany({
+          where: { id: storedToken.id, userId: storedToken.userId, revokedAt: null },
+          data: {
+            revokedAt: new Date(),
+            revokedReason: REASON_ROTATED,
+            replacedById: newRow?.id ?? null,
+          },
+        })
+      );
     }
 
     // The liveness check above and the row just written are not one atomic
@@ -1232,10 +1286,12 @@ export class AuthService {
     // the rest.
     const currentVersion = await getUserState(storedToken.userId);
     if (!currentVersion || currentVersion.tokenVersion !== storedToken.user.tokenVersion) {
-      await prisma.refreshToken.updateMany({
-        where: { token: newHash, revokedAt: null },
-        data: { revokedAt: new Date(), revokedReason: 'revoke_all' },
-      });
+      await withUser(storedToken.userId, tx =>
+        tx.refreshToken.updateMany({
+          where: { token: newHash, userId: storedToken.userId, revokedAt: null },
+          data: { revokedAt: new Date(), revokedReason: 'revoke_all' },
+        })
+      );
       logger.warn(
         { userId: storedToken.userId, tokenId: storedToken.id },
         'Sessions revoked while a refresh was in flight — discarding the new token'
@@ -1265,19 +1321,12 @@ export class AuthService {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const expired = await prisma.refreshToken.deleteMany({
-      where: { expiresAt: { lt: now } },
-    });
-    const revoked = await prisma.refreshToken.deleteMany({
-      where: { revokedAt: { lt: thirtyDaysAgo } },
-    });
-
-    const total = expired.count + revoked.count;
+    // `refresh_tokens` is user-keyed under RLS; the cross-user purge is the
+    // `ebda_refresh_tokens_purge` definer, which only the named platform job
+    // 'token-retention' may call (`withSystemJob`).
+    const total = await purgeRefreshTokens(now, thirtyDaysAgo);
     if (total > 0) {
-      logger.info(
-        { expired: expired.count, revoked: revoked.count },
-        'Refresh-token cleanup removed stale rows'
-      );
+      logger.info({ deleted: total }, 'Refresh-token cleanup removed stale rows');
     }
     return total;
   }
@@ -1287,10 +1336,16 @@ export class AuthService {
     // Mark instead of delete so a stolen copy of the same token replayed
     // after logout still triggers the reuse-detection path in
     // refreshTokens() instead of returning a generic TOKEN_INVALID.
-    await prisma.refreshToken.updateMany({
-      where: { token: tokenHash, revokedAt: null },
-      data: { revokedAt: new Date(), revokedReason: 'logout' },
-    });
+    // `refresh_tokens` is user-keyed: the token names its user through the definer,
+    // and the revoke runs AS that user. An unknown token is a no-op, as before.
+    const ownerId = await refreshTokenUser(tokenHash);
+    if (!ownerId) return;
+    await withUser(ownerId, tx =>
+      tx.refreshToken.updateMany({
+        where: { token: tokenHash, userId: ownerId, revokedAt: null },
+        data: { revokedAt: new Date(), revokedReason: 'logout' },
+      })
+    );
   }
 
   static async getProfile(userId: string) {
@@ -1467,10 +1522,12 @@ export class AuthService {
     // reads `password_reset` off these rows to tell a redeemed reset from a
     // sign-out — so folding a password change or reset into a generic
     // `revoke_all` would buy correct ordering at the cost of the audit trail.
-    await prisma.refreshToken.updateMany({
-      where: { userId, revokedAt: null },
-      data: { revokedAt: new Date(), revokedReason: reason },
-    });
+    await withUser(userId, tx =>
+      tx.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date(), revokedReason: reason },
+      })
+    );
 
     // Belt and braces on top of the revoke above (S5-1, 2026-09-22 security
     // audit): password-reset rows are stored as `reset:<hash>` RefreshToken
@@ -1479,9 +1536,11 @@ export class AuthService {
     // not a fix for a gap the updateMany leaves open — that no outstanding
     // reset link survives a revocation. Deleting rather than revoking mirrors
     // resetPassword's own single-use cleanup (it deletes the row it redeems).
-    await prisma.refreshToken.deleteMany({
-      where: { userId, token: { startsWith: 'reset:' } },
-    });
+    await withUser(userId, tx =>
+      tx.refreshToken.deleteMany({
+        where: { userId, token: { startsWith: 'reset:' } },
+      })
+    );
   }
 
   static async requestPasswordReset(email: string, storeId: string | null = null): Promise<void> {
@@ -1518,13 +1577,15 @@ export class AuthService {
     const resetExpires = new Date(Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000);
 
     // Store reset token as a special refresh token
-    await prisma.refreshToken.create({
-      data: {
-        token: `reset:${resetTokenHash}`,
-        userId: user.id,
-        expiresAt: resetExpires,
-      },
-    });
+    await withUser(user.id, tx =>
+      tx.refreshToken.create({
+        data: {
+          token: `reset:${resetTokenHash}`,
+          userId: user.id,
+          expiresAt: resetExpires,
+        },
+      })
+    );
 
     // Send reset email
     const resetUrl = `${config.webUrl}/auth/reset-password?token=${resetToken}`;
@@ -1555,13 +1616,19 @@ export class AuthService {
     // revoked (by an intervening password change, or by redeeming a sibling
     // reset link) was still redeemable — the token lookup never looked at
     // whether the row had been revoked at all. S5-1, 2026-09-22 security audit.
-    const storedToken = await prisma.refreshToken.findFirst({
-      where: {
-        token: `reset:${tokenHash}`,
-        expiresAt: { gt: new Date() },
-        revokedAt: null,
-      },
-    });
+    const resetOwner = await refreshTokenUser(`reset:${tokenHash}`);
+    const storedToken = resetOwner
+      ? await withUser(resetOwner, tx =>
+          tx.refreshToken.findFirst({
+            where: {
+              userId: resetOwner,
+              token: `reset:${tokenHash}`,
+              expiresAt: { gt: new Date() },
+              revokedAt: null,
+            },
+          })
+        )
+      : null;
 
     if (!storedToken) {
       throw new AppError(400, 'TOKEN_INVALID', 'Invalid or expired reset token');
@@ -1579,9 +1646,11 @@ export class AuthService {
     );
 
     // Delete the reset token (single-use, no reuse-detection value).
-    await prisma.refreshToken.delete({
-      where: { id: storedToken.id },
-    });
+    await withUser(storedToken.userId, tx =>
+      tx.refreshToken.delete({
+        where: { id: storedToken.id, userId: storedToken.userId },
+      })
+    );
 
     // Revoke all sessions — same call, and the same ordering, as
     // changePassword. The reset-token row was already deleted above.
@@ -1698,10 +1767,12 @@ export class AuthService {
     // (fired after commit, below) needs these to reach OneSignal's API.
     // Read-only, so it doesn't need to be inside the transaction.
     const oneSignalPlayerIds = (
-      await prisma.oneSignalSubscription.findMany({
-        where: { userId },
-        select: { playerId: true },
-      })
+      await withUser(userId, tx =>
+        tx.oneSignalSubscription.findMany({
+          where: { userId },
+          select: { playerId: true },
+        })
+      )
     ).map(s => s.playerId);
 
     // Set by `anonymize` below: the user's token version after the erase bumps it.
@@ -1757,9 +1828,9 @@ export class AuthService {
       await tx.pushSubscription.deleteMany({
         where: { customerId: userId, storeId: eraseStoreId },
       });
-      await tx.oneSignalSubscription.deleteMany({ where: { userId } });
-      await tx.refreshToken.deleteMany({ where: { userId } });
-      await tx.verificationToken.deleteMany({ where: { userId } });
+      // User-keyed rows: like `addresses` above, deleted by the shopper's id through a
+      // guarded definer INSIDE this transaction (the GUC may be the merchant's id).
+      await deleteUserTokens(userId);
       await tx.loyaltyTransaction.deleteMany({
         where: { customerId: userId, storeId: eraseStoreId },
       });
@@ -2185,10 +2256,12 @@ export class AuthService {
         where: { customerId: userId, storeId },
         select: { id: true, endpoint: true, createdAt: true },
       }),
-      prisma.oneSignalSubscription.findMany({
-        where: { userId },
-        select: { id: true, playerId: true, createdAt: true },
-      }),
+      withUser(userId, tx =>
+        tx.oneSignalSubscription.findMany({
+          where: { userId },
+          select: { id: true, playerId: true, createdAt: true },
+        })
+      ),
       // SMS-marketing consent (issue 206): what was given, when, where, and
       // any withdrawal. Keyed by the user id (the shopper's own rows).
       prisma.smsMarketingConsent.findMany({
@@ -2284,13 +2357,16 @@ export class AuthService {
         ? refreshRowExpiresAt
         : defaultExpiresAt;
 
-    await prisma.refreshToken.create({
-      data: {
-        token: tokenHash,
-        userId: payload.userId,
-        expiresAt,
-      },
-    });
+    // `refresh_tokens` is user-keyed: the row is written AS its user.
+    await withUser(payload.userId, tx =>
+      tx.refreshToken.create({
+        data: {
+          token: tokenHash,
+          userId: payload.userId,
+          expiresAt,
+        },
+      })
+    );
 
     return { accessToken, refreshToken };
   }

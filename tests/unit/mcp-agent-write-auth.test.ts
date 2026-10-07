@@ -24,10 +24,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockStoreFindUnique = vi.fn();
 const mockIsFeatureEnabled = vi.fn();
 
-vi.mock('@force/database', () => ({
-  prisma: { storeCredential: { findUnique: (...a: unknown[]) => mockStoreFindUnique(...a) } },
-  runInTenantContext: vi.fn((_storeId: string, fn: () => unknown) => fn()),
-}));
+vi.mock('@force/database', () => {
+  const prisma = {
+    storeCredential: { findUnique: (...a: unknown[]) => mockStoreFindUnique(...a) },
+  };
+  return {
+    prisma,
+    // `store_credentials` is store-scoped: the key is read inside the store's own scope.
+    withStore: vi.fn(async (_storeId: string, fn: (tx: typeof prisma) => unknown) => fn(prisma)),
+    runInTenantContext: vi.fn((_storeId: string, fn: () => unknown) => fn()),
+  };
+});
 
 vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: (...a: unknown[]) => mockIsFeatureEnabled(...a) },

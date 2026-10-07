@@ -54,6 +54,11 @@ vi.mock('@force/database', () => ({
   acrossStores: async (_fn: unknown, o?: { storeIds?: string[] }) =>
     (o?.storeIds ?? []).map(storeId => ({ storeId, value: { products: 0, orders: 0 } })),
 }));
+// slug -> id is the `ebda_store_id_by_slug` definer; the row is then read inside `withStore`.
+vi.mock('../../apps/api/src/lib/definer', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../apps/api/src/lib/definer')>()),
+  storeIdBySlug: vi.fn(async () => '11111111-1111-1111-1111-111111111111'),
+}));
 vi.mock('@force/shared', async importOriginal => ({
   // Keep the real region config (REGION is read at import time by api config/services).
   ...(await importOriginal<typeof import('@force/shared')>()),

@@ -98,9 +98,23 @@ describe.skipIf(!haveBouncer)('tenant isolation behind a transaction-mode pooler
   // The Workers design (SP4 Stage 2): pooled, reused clients leased per request, a connection per request.
   let shared: IsolateDb;
   type Mode = 'client per request' | 'leased clients';
-  const read = (storeId: string | null) => () => {
-    const q = () => prisma.storeFaq.findMany({ select: { storeId: true, question: true } });
-    return storeId ? runInTenantContext(storeId, q) : q();
+  // The code-level tenant guard (R-EBDA-003) refuses an unscoped model query before it
+  // reaches the pooler, so this file probes the DATABASE layer with raw SQL: inside a
+  // store scope an UNFILTERED read (RLS alone must narrow it to the store), and with no
+  // scope the GUC itself (a pooled connection that kept another request's store would
+  // show it here; that is the leak RLS would then turn into rows).
+  const read = (storeId: string | null) => async () => {
+    if (!storeId) {
+      const [{ leaked }] = await prisma.$queryRaw<Array<{ leaked: string | null }>>`
+        SELECT nullif(current_setting('app.current_store_id', true), '') AS leaked`;
+      return leaked ? [{ storeId: leaked, question: 'GUC leaked onto a contextless request' }] : [];
+    }
+    return runInTenantContext(
+      storeId,
+      () =>
+        prisma.$queryRaw<Array<{ storeId: string; question: string }>>`
+        SELECT store_id AS "storeId", question FROM public.store_faqs`
+    );
   };
 
   /** One "request": its own connection (max 1), its own tenant transaction. */
@@ -352,8 +366,13 @@ describe.skipIf(!haveBouncer)('tenant isolation behind a transaction-mode pooler
     const db = createIsolateDb({ connectionString: poolerUrl, max: 1, connectionsPerRequest: 2 });
     const rows = await db.run(() =>
       runInTenantContext(storeA, async () => {
-        const outer = await prisma.storeFaq.findMany({ select: { storeId: true } });
-        const inner = await prisma.$transaction(async tx => tx.storeFaq.findMany());
+        const outer = await prisma.storeFaq.findMany({
+          where: { storeId: storeA },
+          select: { storeId: true },
+        });
+        const inner = await prisma.$transaction(async tx =>
+          tx.storeFaq.findMany({ where: { storeId: storeA } })
+        );
         return { outer: outer.length, inner: inner.length };
       })
     );
@@ -370,7 +389,7 @@ describe.skipIf(!haveBouncer)('tenant isolation behind a transaction-mode pooler
     await expect(
       db.run(() =>
         runInTenantContext(storeA, async () =>
-          prisma.$transaction(async tx => tx.storeFaq.findMany())
+          prisma.$transaction(async tx => tx.storeFaq.findMany({ where: { storeId: storeA } }))
         )
       )
     ).rejects.toThrow(/timeout/i);

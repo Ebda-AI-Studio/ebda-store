@@ -160,7 +160,7 @@ export async function handleOrderWhatsAppNotify(
   const order = await step.run('load-order', () =>
     runInTenantContext(storeId, () =>
       prisma.order.findUnique({
-        where: { id: orderId },
+        where: { id: orderId, storeId },
         select: {
           orderNumber: true,
           total: true,

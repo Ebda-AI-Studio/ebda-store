@@ -14,6 +14,7 @@ import {
   prisma,
   acrossStores,
   acrossStoresFlat,
+  currentStoreId,
   runInStoreScope,
   storeDirectory,
   withStore,
@@ -182,9 +183,9 @@ class AbandonedCartService {
     // context, and the scan is INTENTIONALLY cross-tenant (all eligible stores).
     // Contextless, the policy returns 0 rows → the whole abandoned-cart system
     // silently never runs. So the scan visits each store in its own scope.
-    const storeFeatures = await acrossStoresFlat(() =>
+    const storeFeatures = await acrossStoresFlat(storeId =>
       prisma.storeFeature.findMany({
-        where: { featureKey: 'abandoned_cart', enabled: true },
+        where: { storeId, featureKey: 'abandoned_cart', enabled: true },
         select: { storeId: true },
       })
     );
@@ -371,14 +372,14 @@ class AbandonedCartService {
     // Find all stores with both abandoned_cart + whatsapp features enabled.
     // Cross-tenant platform cron over FORCE-RLS store_features → per-store scan
     // (same reason as detectNewAbandonments above).
-    const perStore = await acrossStores(() =>
+    const perStore = await acrossStores(storeId =>
       Promise.all([
         prisma.storeFeature.findMany({
-          where: { featureKey: 'abandoned_cart', enabled: true },
+          where: { storeId, featureKey: 'abandoned_cart', enabled: true },
           select: { storeId: true },
         }),
         prisma.storeFeature.findMany({
-          where: { featureKey: 'whatsapp', enabled: true },
+          where: { storeId, featureKey: 'whatsapp', enabled: true },
           select: { storeId: true },
         }),
       ])
@@ -676,9 +677,10 @@ class AbandonedCartService {
   async processReminders(correlationId?: string): Promise<void> {
     const now = new Date();
 
-    const pending = await acrossStoresFlat(() =>
+    const pending = await acrossStoresFlat(storeId =>
       prisma.abandonedCart.findMany({
         where: {
+          storeId,
           status: { in: ['pending', 'step1_sent', 'step2_sent'] },
           nextStepAt: { lte: now },
         },
@@ -734,7 +736,7 @@ class AbandonedCartService {
       if (nextEnabledStep === null) {
         // No more steps — expire the record
         await prisma.abandonedCart.update({
-          where: { id: abandonedCart.id },
+          where: { id: abandonedCart.id, storeId },
           data: { status: 'expired', nextStepAt: null },
         });
         logger.info(
@@ -810,7 +812,7 @@ class AbandonedCartService {
     }
 
     await prisma.abandonedCart.update({
-      where: { id: abandonedCart.id },
+      where: { id: abandonedCart.id, storeId },
       data: updateData,
     });
   }
@@ -862,7 +864,7 @@ class AbandonedCartService {
 
       // Link coupon to the abandoned cart
       await prisma.abandonedCart.update({
-        where: { id: abandonedCartId },
+        where: { id: abandonedCartId, storeId },
         data: { couponId: coupon.id },
       });
 
@@ -887,7 +889,7 @@ class AbandonedCartService {
 
   async markRecovered(abandonedCartId: string, orderId: string): Promise<void> {
     await prisma.abandonedCart.update({
-      where: { id: abandonedCartId },
+      where: { id: abandonedCartId, storeId: currentStoreId() },
       data: {
         status: 'recovered',
         recoveredAt: new Date(),

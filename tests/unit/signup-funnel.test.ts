@@ -262,16 +262,23 @@ describe('manual payment config', () => {
 const db = vi.hoisted(() => ({ store: vi.fn() }));
 vi.mock('@force/database', async importOriginal => {
   const real = await importOriginal<Record<string, unknown>>();
-  return { ...real, prisma: { store: { findUnique: db.store } } };
+  return {
+    ...real,
+    prisma: { store: { findUnique: db.store } },
+    // requireStoreAccess reads the store inside its own scope (`withStore`, strict RLS).
+    withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
+      fn({ store: { findUnique: db.store } }),
+  };
 });
 vi.mock('@api/middleware/security', () => ({ auditLog: vi.fn() }));
 
+const OVER_LIMIT_STORE_ID = '11111111-1111-4111-8111-111111111111';
 describe('requireStoreAccess: over_store_limit store', () => {
   beforeEach(() => db.store.mockReset());
   async function call(method: string, path: string, role = 'store_admin') {
     const { requireStoreAccess } = await import('@api/middleware/store-access');
     db.store.mockResolvedValue({
-      id: 's1',
+      id: OVER_LIMIT_STORE_ID,
       ownerId: 'u1',
       name: 'S',
       status: 'suspended',
@@ -282,7 +289,7 @@ describe('requireStoreAccess: over_store_limit store', () => {
     await requireStoreAccess(
       {
         method,
-        params: { storeId: 's1' },
+        params: { storeId: OVER_LIMIT_STORE_ID },
         user: { userId: 'u1', role },
         baseUrl,
         path: sub ?? '/',

@@ -11,7 +11,8 @@ import { socketService } from '@api/services/socket.service';
 
 // Mock dependencies
 vi.mock('@force/database', () => ({
-  setTenantGucs: async () => undefined,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  scopeTransaction: (tx: any, _g: unknown, fn: any) => fn(tx),
   prisma: {
     order: {
       findMany: vi.fn(),
@@ -108,6 +109,10 @@ vi.mock('@force/database', () => ({
   },
   Prisma: {},
   OrderStatus: {},
+  // Tenant-scoped reads (resolveActiveTaxRate etc.) run through withStore; pass the mocked client through.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  withStore: async (_storeId: string, fn: any) => fn((await import('@force/database')).prisma),
+  hasTenantContext: () => true,
   // withMoneyTx (F6) wraps prisma.$transaction. Delegate to the mocked
   // $transaction so existing `expect(prisma.$transaction).toHaveBeenCalled()`
   // assertions still hold; fall back to invoking the callback directly if a

@@ -54,7 +54,7 @@ import {
   assignSubscriptionSchema,
 } from '@force/shared';
 import { userContext } from '../middleware/tenant-context';
-import { getEntityStoreId, platformAuditLogs, webhookInbox } from '../lib/definer';
+import { getEntityStoreId, lookupStore, platformAuditLogs, webhookInbox } from '../lib/definer';
 import { ownedStoreIds, pageAcrossStores } from '../lib/cross-store';
 import { planService } from '../services/plan.service';
 
@@ -86,6 +86,16 @@ const adminUserContext = userContext(req => req.user?.userId);
 router.use((req: Request, res: Response, next: NextFunction) =>
   req.path.startsWith('/export') ? next() : adminUserContext(req, res, next)
 );
+
+// A super_admin request reads the PLATFORM directory (every store row, the user
+// directory): under the code-level tenant guard (R-EBDA-003) that is the named
+// 'platform-operator' hatch, opened only after `ebda_is_super_admin()` confirms the
+// acting user inside this request's transaction. It opens `Store` and the identity
+// models only; per-store tenant tables still go through `acrossStores`.
+router.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.user?.role !== 'super_admin' || req.path.startsWith('/export')) return next();
+  asPlatformOperator(req.user.userId, async () => next()).catch(next);
+});
 
 // Helper: enforce ownership when a store_admin is the caller. Super admins
 // pass through unscoped. Returns the userId to filter by, or undefined
@@ -260,14 +270,21 @@ router.get(
     try {
       const { id } = req.params;
 
-      const store = await prisma.store.findUnique({
-        where: { id },
-        include: {
-          owner: {
-            select: { id: true, email: true, firstName: true, lastName: true },
-          },
-        },
-      });
+      // `stores` is under RLS (R-EBDA-005): resolve the id through the definer, then read
+      // the row inside that store's own scope. Ownership is checked below.
+      const hit = await lookupStore({ id }, ['active', 'inactive', 'suspended']);
+      const store = hit
+        ? await withStore(hit.id, tx =>
+            tx.store.findUnique({
+              where: { id: hit.id },
+              include: {
+                owner: {
+                  select: { id: true, email: true, firstName: true, lastName: true },
+                },
+              },
+            })
+          )
+        : null;
 
       if (!store) {
         res.status(404).json({

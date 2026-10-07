@@ -962,7 +962,9 @@ describe('handleWebhook — a provider id matching MORE than one payment is refu
     paymentFindManyOverride = async () => [row('pay-a', 'store-a'), row('pay-b', 'store-b')];
     try {
       await expect(
-        PaymentService.handleWebhook('paymob', { fake: true }, 'sig')
+        // The store is always resolved before a webhook is handled: the global
+        // (store-less) provider-config fallback is gone, so a store-less call is refused.
+        PaymentService.handleWebhook('paymob', { fake: true }, 'sig', STORE_ID)
       ).rejects.toMatchObject({ statusCode: 409, code: 'AMBIGUOUS_PAYMENT' });
       expect(paymentUpdateMany).not.toHaveBeenCalled();
       expect(paymentUpdate).not.toHaveBeenCalled();

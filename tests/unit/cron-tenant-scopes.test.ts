@@ -8,7 +8,13 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock('@force/database', () => ({
   prisma: {
-    store: { findMany: async () => m.stores.map(id => ({ id, loyaltySettings: {} })) },
+    // Per-store settings are read INSIDE the store's scope, never from an unscoped list.
+    store: {
+      findUnique: async ({ where }: { where: { id: string } }) => {
+        if (!m.scope) throw new Error('unscoped store read');
+        return { id: where.id, loyaltySettings: {} };
+      },
+    },
     storeFeature: {
       findMany: async () => {
         if (!m.scope) throw new Error('unscoped feature');
@@ -44,6 +50,19 @@ vi.mock('@force/database', () => ({
     m.scope = id;
     try {
       return await fn();
+    } finally {
+      m.scope = '';
+    }
+  },
+  // `stores` is under RLS: crons list stores through the directory definer.
+  storeDirectory: async (filter?: (s: Record<string, unknown>) => boolean) =>
+    m.stores
+      .map(id => ({ id, loyaltyEnabled: true, wbsEnabled: true }))
+      .filter(s => (filter ? filter(s) : true)),
+  withStore: async (id: string, fn: (tx: unknown) => Promise<unknown>) => {
+    m.scope = id;
+    try {
+      return await fn({});
     } finally {
       m.scope = '';
     }

@@ -30,7 +30,7 @@
  */
 
 import { upgradePlanFor } from '@force/shared';
-import { prisma, withStore, type Prisma } from '@force/database';
+import { prisma, withStore, withUser, type Prisma } from '@force/database';
 import {
   PLAN_LIMIT_ERROR_CODE,
   isNumericLimitKey,
@@ -127,11 +127,13 @@ export async function assertOwnerMayCreateStore(ownerId: string): Promise<void> 
   // (Ruling EBDA-FUNNEL-13; same rule as account.service ownerStoreAllowance).
   // An additional store's own subscription never grants more stores, so a
   // lapsed parent cannot be worked around through a child.
-  const stores = await prisma.store.findMany({
-    where: { ownerId, deletedAt: null },
-    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    select: { id: true },
-  });
+  const stores = await withUser(ownerId, tx =>
+    tx.store.findMany({
+      where: { ownerId, deletedAt: null },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: { id: true },
+    })
+  );
   if (stores.length === 0) return;
   const e = await getEntitlements(stores[0].id);
   const max = e?.limits.maxStores;

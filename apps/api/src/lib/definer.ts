@@ -814,3 +814,41 @@ export async function publicStorePage(
     SELECT id, total FROM public.ebda_public_store_page(${skip}::int, ${take}::int)`;
   return { ids: rows.map(r => r.id), total: rows.length ? Number(rows[0].total) : 0 };
 }
+
+// ---------------------------------------------------------------------------
+// User-keyed token tables (R-EBDA-005): pre-identity lookups and the retention purge.
+// ---------------------------------------------------------------------------
+
+/** The user a stored refresh / reset token (its stored form, e.g. sha256 or `reset:<sha256>`) belongs to. */
+export async function refreshTokenUser(storedToken: string): Promise<string | null> {
+  const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
+    SELECT public.ebda_refresh_token_user(${storedToken}) AS id`;
+  return rows[0]?.id ?? null;
+}
+
+/** The user a stored verification token (its sha256) belongs to. */
+export async function verificationTokenUser(storedToken: string): Promise<string | null> {
+  const rows = await prisma.$queryRaw<Array<{ id: string | null }>>`
+    SELECT public.ebda_verification_token_user(${storedToken}) AS id`;
+  return rows[0]?.id ?? null;
+}
+
+/** Delete refresh tokens that expired before `now` or were revoked before `revokedBefore`. */
+export async function purgeRefreshTokens(now: Date, revokedBefore: Date): Promise<number> {
+  return withSystemJob('token-retention', async () => {
+    const rows = await prisma.$queryRaw<Array<{ n: bigint }>>`
+      SELECT public.ebda_refresh_tokens_purge(${now}::timestamp, ${revokedBefore}::timestamp) AS n`;
+    return Number(rows[0]?.n ?? 0);
+  });
+}
+
+/**
+ * Delete a user's refresh/reset tokens, verification tokens and OneSignal registrations
+ * inside the CURRENT transaction (erasure, store-owner deletion). Guarded in SQL like
+ * `deleteUserAddresses`: the user, a super_admin, or the merchant of the user's store.
+ */
+export async function deleteUserTokens(userId: string): Promise<number> {
+  const rows = await prisma.$queryRaw<Array<{ n: number }>>`
+    SELECT public.ebda_user_tokens_delete(${userId}) AS n`;
+  return Number(rows[0]?.n ?? 0);
+}

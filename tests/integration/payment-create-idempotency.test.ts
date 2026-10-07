@@ -28,7 +28,7 @@ vi.mock('@api/services/alerts.service', () => ({ sendAlert: h.sendAlert }));
 
 import express from 'express';
 import request from 'supertest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
 import paymentRoutes from '@api/routes/payment.routes';
 import { alertIfDuplicateCapture } from '@api/services/payment-providers/payment.factory';
 
@@ -206,7 +206,10 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
     );
 
     h.sendAlert.mockClear();
-    await alertIfDuplicateCapture(dup.id, paidOrderId, 'kashier');
+    // The webhook handler calls this inside the store's tenant scope.
+    await runInTenantContext(storeId, () =>
+      alertIfDuplicateCapture(dup.id, paidOrderId, 'kashier')
+    );
     expect(h.sendAlert).toHaveBeenCalledTimes(1);
     expect(h.sendAlert.mock.calls[0][0]).toMatchObject({
       level: 'p0',
@@ -218,7 +221,9 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
     const solo = await withRlsBypass(tx =>
       tx.payment.findFirstOrThrow({ where: { orderId: onlineOrderId } })
     );
-    await alertIfDuplicateCapture(solo.id, onlineOrderId, 'paymob');
+    await runInTenantContext(storeId, () =>
+      alertIfDuplicateCapture(solo.id, onlineOrderId, 'paymob')
+    );
     expect(h.sendAlert).not.toHaveBeenCalled();
   });
 });

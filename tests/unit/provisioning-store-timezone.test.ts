@@ -39,13 +39,20 @@ vi.mock('@force/database', () => {
     paymentConfig: { create: vi.fn() },
   };
   return {
-    prisma: { store: { findUnique: vi.fn(async () => null) } },
+    prisma: {},
     Prisma: {},
     StoreStatus: {},
     withMoneyTx: vi.fn(async (_p: unknown, fn: (t: unknown) => unknown) => fn(tx)),
-    setTenantGucs: vi.fn(),
+    scopeTransaction: vi.fn(async (t: unknown, _g: unknown, fn: (t: unknown) => unknown) => fn(t)),
   };
 });
+// `stores` is under RLS: the slug / domain uniqueness probes are definers (null = free).
+// The owner definer (`ensureAdminUser`) stays real and runs on the mocked tx above.
+vi.mock('../../apps/api/src/lib/definer', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../apps/api/src/lib/definer')>()),
+  storeIdBySlug: vi.fn(async () => null),
+  storeIdByDomain: vi.fn(async () => null),
+}));
 vi.mock('bcryptjs', () => ({ default: { hash: vi.fn(async () => 'hash') } }));
 vi.mock('../../apps/api/src/services/store.service', () => ({ bustStoreCaches: vi.fn() }));
 vi.mock('../../apps/api/src/services/email.service', () => ({

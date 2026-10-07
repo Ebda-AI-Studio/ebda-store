@@ -747,7 +747,8 @@ export interface StoreDirectoryEntry {
 
 /** Every store that is not soft-deleted (id order), optionally filtered. See `StoreDirectoryEntry`. */
 export async function storeDirectory(
-  filter?: (s: StoreDirectoryEntry) => boolean
+  filter?: (s: StoreDirectoryEntry) => boolean,
+  opts: { includeDeleted?: boolean } = {}
 ): Promise<StoreDirectoryEntry[]> {
   const rows = await prisma.$queryRaw<
     Array<{
@@ -763,7 +764,7 @@ export async function storeDirectory(
       has_domain: boolean;
       has_pending_domain: boolean;
     }>
-  >`SELECT * FROM public.ebda_store_directory()`;
+  >`SELECT * FROM public.ebda_store_directory(${opts.includeDeleted === true})`;
   const all = rows.map(r => ({
     id: r.id,
     slug: r.slug,

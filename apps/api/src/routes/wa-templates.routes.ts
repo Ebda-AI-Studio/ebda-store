@@ -220,7 +220,7 @@ router.post(
         // refresh travel together — they're both part of "regenerate
         // from canonical".
         await prisma.whatsAppTemplate.update({
-          where: { id: row.id },
+          where: { id: row.id, storeId },
           data: {
             metaName: built.name,
             body: bodyComp?.text || '',
