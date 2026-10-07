@@ -18,6 +18,16 @@ export interface BillingCard {
   savedAt: string | null;
 }
 
+/** Ebda's own VAT inside an amount (present only when the "Ebda VAT" setting is ON). */
+export interface PlatformVatLine {
+  netMinor: number;
+  vatMinor: number;
+  rateBps: number;
+  mode: 'inclusive' | 'exclusive';
+  trn: string | null;
+  legalName: string | null;
+}
+
 export interface BillingInfo {
   billingInterval: BillingInterval;
   /** Plan chosen at signup; billed when the trial ends. */
@@ -28,7 +38,12 @@ export interface BillingInfo {
   billedByPlatform: boolean;
   card: BillingCard | null;
   trialEndsAt: string | null;
-  nextCharge: { at: string; planCode: string; amountMinor: number | null } | null;
+  nextCharge: {
+    at: string;
+    planCode: string;
+    amountMinor: number | null;
+    vat?: PlatformVatLine | null;
+  } | null;
   /** The card option is offered only when 'card_on_file'. */
   trialCardMode: 'card_on_file' | 'pay_at_trial_end' | null;
   billingMethod: 'card' | 'instapay' | null;
@@ -37,6 +52,10 @@ export interface BillingInfo {
     handle: string | null;
     reference: string | null;
     amountMinor: number | null;
+    /** VAT inside `amountMinor`; null/absent = no VAT line. */
+    vat?: PlatformVatLine | null;
+    /** Ebda's InstaPay QR image; null/absent = no QR. */
+    qrUrl?: string | null;
     pendingClaims: number;
   };
   dueSoon: { dueAt: string; daysLeft: number } | null;
@@ -45,6 +64,8 @@ export interface BillingInfo {
   suspendAt: string | null;
   /** wa.me link, or null when support WhatsApp is not configured. */
   supportWhatsappUrl: string | null;
+  /** Ebda support email: shown whenever there is no WhatsApp link. */
+  supportEmail?: string | null;
   suspension: { reason: 'unpaid' | 'over_store_limit'; at: string } | null;
 }
 

@@ -1,0 +1,2 @@
+# Append-only ledgers: keep both sides on parallel-branch merges
+docs/RULINGS.md merge=union

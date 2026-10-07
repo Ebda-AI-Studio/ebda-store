@@ -7,6 +7,7 @@ import { useLocale } from 'next-intl';
 import { apiGet } from '../../lib/api';
 import { useT } from '../../i18n/useT';
 import { billingNotice, noticeText } from './notice';
+import { SupportLink } from './SupportLink';
 import type { BillingInfo } from './types';
 
 /**
@@ -48,9 +49,12 @@ export function BillingStatusBanner({ storeId }: { storeId: string }) {
       }`}
     >
       <span>{title}</span>
-      <Link href={`/stores/${storeId}/billing`} className="font-medium underline">
-        {t('view')}
-      </Link>
+      <span className="flex flex-wrap gap-x-4">
+        <Link href={`/stores/${storeId}/billing`} className="font-medium underline">
+          {t('view')}
+        </Link>
+        {urgent && <SupportLink whatsappUrl={info.supportWhatsappUrl} email={info.supportEmail} />}
+      </span>
     </div>
   );
 }
