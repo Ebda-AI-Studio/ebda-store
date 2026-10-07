@@ -26,7 +26,9 @@ async function fetchLocationsPageSettings(
   try {
     const res = await fetch(
       publicLayoutUrl(API_URL, store.id, draftToken),
-      draftToken ? { cache: 'no-store' } : { next: { revalidate: 60 } }
+      draftToken
+        ? { cache: 'no-store' }
+        : { next: { revalidate: 60, tags: [`layout:${store.id}`] } }
     );
     if (!res.ok) return undefined;
     const json = await res.json();

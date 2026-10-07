@@ -79,7 +79,10 @@ export async function bustStoreCaches(
   // Purge the storefront's Next data cache too (fire-and-forget, no-op if the
   // STOREFRONT_REVALIDATE_URL / REVALIDATE_SECRET env pair isn't configured) so
   // a merchant's edit shows on the live storefront within ~a second.
-  revalidateStorefront({ slug, domain });
+  // `layout:<storeId>` is the tag on every storefront fetch of the page-builder
+  // layout (`GET /public/stores/:id/layout`); without it a layout save could not
+  // reach the Next data cache and stayed stale for the 60s revalidate window.
+  revalidateStorefront({ slug, domain, tags: [`layout:${storeId}`] });
 }
 
 /**

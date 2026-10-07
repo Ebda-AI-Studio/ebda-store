@@ -43,7 +43,7 @@ export async function fetchProductDetailLayoutSettings(
   try {
     const res = await fetch(
       publicLayoutUrl(API_URL, storeId, draftToken),
-      draftToken ? { cache: 'no-store' } : { next: { revalidate: 60 } }
+      draftToken ? { cache: 'no-store' } : { next: { revalidate: 60, tags: [`layout:${storeId}`] } }
     );
     if (!res.ok) return resolveLayoutSettings({});
     const json = await res.json();
