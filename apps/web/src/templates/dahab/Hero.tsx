@@ -7,12 +7,14 @@
  * gold rule draws in and the copy rises (CSS only, `dahab-rise` /
  * `dahab-draw` in globals.css, skipped under reduced motion).
  *
- * Art direction: a separate mobile crop through <picture> (Cloudflare serves
- * storefront images unoptimized, so the crop IS the delivered file). The
- * first slide is the LCP element: eager, high priority.
+ * Art direction: a separate mobile crop through <picture>, each source carrying
+ * the upload pipeline's width ladder as a srcset (PERF-STORE-3) so a phone
+ * downloads the rung it needs, not the 1920 px desktop file. The first slide is
+ * the LCP element: eager, high priority.
  */
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { imageVariantSrcSet } from '@force/shared';
 import type { HeroBannerProps, HeroProps, HeroSliderProps } from '../types';
 import { resolveBannerLink } from '../shared/hero-banner-link-utils';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -44,10 +46,16 @@ function Slide({
     <>
       <picture>
         {imageMobile && imageMobile !== image && (
-          <source media="(max-width: 1023px)" srcSet={imageMobile} />
+          <source
+            media="(max-width: 1023px)"
+            srcSet={imageVariantSrcSet(imageMobile) || imageMobile}
+            sizes="100vw"
+          />
         )}
         <img
           src={image}
+          srcSet={imageVariantSrcSet(image) || undefined}
+          sizes="100vw"
           alt={slide.alt || headline || ''}
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : 'auto'}

@@ -65,7 +65,7 @@ export default function ClassicProductGrid({
                 isInCompare={compareIds?.has(product.id) ?? false}
                 onToggleCompare={onToggleCompare}
                 onRemoveFromWishlist={onRemoveFromWishlist}
-                priority={i < 6}
+                priority={i < 2}
               />
             </div>
           ))}

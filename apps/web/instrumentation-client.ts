@@ -22,13 +22,26 @@
  * docs/legal/gcc-data-protection.md): Sentry runs as "legitimate interest" for bug
  * fixing. Default config sends NO PII (no IP, no body, no cookies). This is
  * distinct from PostHog which IS marketing analytics and needs explicit consent.
+ *
+ * PERFORMANCE (docs/RULINGS.md PERF-STORE-2): the SDK is ~55 KB gzip and sat in
+ * every page's first-load JS, competing with the LCP image for bandwidth. It is
+ * now `import()`ed once the page is idle, on the first interaction, or on the
+ * first error, whichever comes first. Until it loads, a ~0.3 KB buffer listens
+ * for `error` / `unhandledrejection` and replays them into Sentry once it is
+ * ready, so an early error is delayed, not lost. What changes: the pageload
+ * tracing span (sampled at 10%) now starts when the SDK does, and an early
+ * error carries no breadcrumbs from before the load.
  */
-import * as Sentry from '@sentry/nextjs';
 import { isHostInjectedScriptEvent } from '@force/shared';
+
+type SentryModule = typeof import('@sentry/nextjs');
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN_WEB;
 
-if (dsn) {
+let sentry: SentryModule | null = null;
+const earlyErrors: unknown[] = [];
+
+function initSentry(Sentry: SentryModule): void {
   Sentry.init({
     dsn,
     // Adjust sample rates per env so production doesn't blow the free-tier
@@ -83,7 +96,55 @@ if (dsn) {
   });
 }
 
+if (dsn && typeof window !== 'undefined') {
+  const onEarlyError = (e: ErrorEvent) => earlyErrors.push(e.error ?? e.message);
+  const onEarlyRejection = (e: PromiseRejectionEvent) => earlyErrors.push(e.reason);
+  const interactionEvents = ['pointerdown', 'keydown', 'touchstart', 'scroll'] as const;
+  let started = false;
+
+  const start = () => {
+    if (started) return;
+    started = true;
+    window.removeEventListener('error', onEarlyError);
+    window.removeEventListener('unhandledrejection', onEarlyRejection);
+    for (const ev of interactionEvents) window.removeEventListener(ev, start);
+    void import('@sentry/nextjs')
+      .then(Sentry => {
+        initSentry(Sentry);
+        sentry = Sentry;
+        for (const err of earlyErrors.splice(0)) Sentry.captureException(err);
+      })
+      .catch(() => {
+        // Offline / blocked chunk: error reporting is best-effort.
+      });
+  };
+
+  // An error means "load it now"; the error itself is replayed afterwards.
+  window.addEventListener('error', e => {
+    onEarlyError(e);
+    start();
+  });
+  window.addEventListener('unhandledrejection', e => {
+    onEarlyRejection(e);
+    start();
+  });
+  for (const ev of interactionEvents)
+    window.addEventListener(ev, start, { once: true, passive: true });
+  const idle = () => {
+    const ric = (
+      window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }
+    ).requestIdleCallback;
+    if (ric) ric(start, { timeout: 4000 });
+    else window.setTimeout(start, 2500);
+  };
+  if (document.readyState === 'complete') idle();
+  else window.addEventListener('load', idle, { once: true });
+}
+
 // Next.js App Router navigation instrumentation — lets Sentry tie client-side
-// route transitions to their spans/errors. Safe to export even when Sentry is
-// not initialised (the SDK no-ops).
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+// route transitions to their spans/errors. A no-op until the SDK has loaded
+// (the first navigation almost always happens after an interaction, which
+// triggers the load).
+export const onRouterTransitionStart = (
+  ...args: Parameters<SentryModule['captureRouterTransitionStart']>
+) => sentry?.captureRouterTransitionStart(...args);

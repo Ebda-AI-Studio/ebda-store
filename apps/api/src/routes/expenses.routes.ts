@@ -307,6 +307,7 @@ router.post(
           storeId: req.params.storeId,
           contentType: req.file!.mimetype,
           allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+          skipVariants: true,
         })
       );
 

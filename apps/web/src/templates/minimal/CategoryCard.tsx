@@ -6,6 +6,7 @@ import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { categorySizeClass, cardShapeClasses } from '../shared/card-size';
 import { responsiveFontSize } from '../shared/section-typography';
+import { ResponsiveImg } from '../../components/ResponsiveImg';
 
 export default function MinimalCategoryCard({
   category,
@@ -37,8 +38,9 @@ export default function MinimalCategoryCard({
           rather than soft. Named cardShape overrides both aspect + radius. */}
       <div className={`relative ${aspectClass} bg-muted/30 overflow-hidden ${radiusClass} mb-3`}>
         {category.image ? (
-          <img
+          <ResponsiveImg
             src={category.image}
+            sizes="(min-width: 1024px) 25vw, 50vw"
             alt={displayName}
             className="w-full h-full object-cover group-hover:opacity-85 transition-opacity duration-700 ease-out"
             loading="lazy"

@@ -8,6 +8,7 @@ import { useStore } from '../../contexts/StoreContext';
 import { categorySizeClass, cardShapeClasses } from '../shared/card-size';
 import { responsiveFontSize } from '../shared/section-typography';
 import { getCategoryCountUnit } from '../../lib/category-count-unit';
+import { ResponsiveImg } from '../../components/ResponsiveImg';
 
 export default function BoldCategoryCard({
   category,
@@ -43,8 +44,9 @@ export default function BoldCategoryCard({
       >
         {/* Image */}
         {category.image ? (
-          <img
+          <ResponsiveImg
             src={category.image}
+            sizes="(min-width: 1024px) 25vw, 50vw"
             alt={displayName}
             className="w-full h-full object-cover group-hover:scale-[1.06] transition-transform duration-700 ease-out"
             loading="lazy"

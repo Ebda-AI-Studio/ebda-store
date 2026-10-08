@@ -242,6 +242,10 @@ async function main() {
   for (const key of oldKeysToDelete) {
     try {
       await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+      // Image-variant ladder (packages/shared image-variants.ts); a missing key is a no-op.
+      for (const w of [320, 640, 960, 1280]) {
+        await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: `${key}.w${w}.webp` }));
+      }
       console.log(`  deleted old ${key}`);
     } catch (e) {
       console.warn(`  ⚠ delete failed ${key}: ${e.message} (will surface in r2-orphan-audit)`);

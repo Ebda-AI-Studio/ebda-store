@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
 import { cookies, headers } from 'next/headers';
-import { Plus_Jakarta_Sans, IBM_Plex_Sans_Arabic, Amiri, Marcellus } from 'next/font/google';
 import { ToastProvider } from '@force/ui';
 import { LanguageProvider } from '../contexts/LanguageContext';
 import { StoreProvider } from '../contexts/StoreContext';
@@ -30,42 +29,27 @@ import { CookiePreferencesLink } from '../components/CookiePreferencesLink';
 import { type MarketingPixels, BRAND, resolveDefaultLanguage } from '@force/shared';
 import { buildThemeStyleTag } from '../lib/theme-css';
 import { jsonLdScriptContent } from '../lib/json-ld-script';
+import { IMAGE_ERROR_FALLBACK_SCRIPT } from '../lib/image-error-fallback';
 import '../styles/globals.css';
+import '../styles/fonts.css';
+import plexArabic400 from '../fonts/ibm-plex-sans-arabic-400.woff2';
+import jakartaVariable from '../fonts/plus-jakarta-sans-var.woff2';
 
-const plusJakarta = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  variable: '--font-sans',
-  display: 'swap',
-  weight: ['400', '500', '600', '700', '800'],
-});
+// Web fonts are self-hosted subsets declared in styles/fonts.css (PERF-STORE-4);
+// the one face a page's body text needs first is preloaded below, the rest are
+// fetched only if text on the page uses them.
+/** A bundler asset import is a string URL (Next/Turbopack) or `{ src }` (vite/other). */
+function fontUrl(asset: string | { src: string }): string {
+  return typeof asset === 'string' ? asset : asset.src;
+}
 
-const ibmPlexArabic = IBM_Plex_Sans_Arabic({
-  subsets: ['arabic'],
-  variable: '--font-arabic',
-  display: 'swap',
-  weight: ['400', '500', '600', '700'],
-});
+/** Same string LanguageContext applies on the client for Arabic. */
+const ARABIC_BODY_FONT = 'var(--font-arabic), var(--font-sans), sans-serif';
 
-// Dahab template display faces (builder Phase 3 pilot). `preload: false`:
-// the @font-face rules exist for every store, but a browser only downloads a
-// face that some element actually uses — i.e. only on Dahab storefronts.
-const dahabArabic = Amiri({
-  // Display only, and only the bold cut: Arabic headings are set in Amiri 700
-  // (globals.css); Latin headings use Marcellus. One file on Arabic pages.
-  subsets: ['arabic'],
-  variable: '--font-dahab-ar',
-  display: 'swap',
-  weight: '700',
-  preload: false,
-});
-
-const dahabLatin = Marcellus({
-  subsets: ['latin'],
-  variable: '--font-dahab-latin',
-  display: 'swap',
-  weight: '400',
-  preload: false,
-});
+const BODY_FONT_PRELOAD = {
+  ar: plexArabic400,
+  en: jakartaVariable,
+} as const;
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -203,6 +187,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       : resolveDefaultLanguage(storeDefaultLanguage);
   const lang = resolvedLanguage;
   const dir = resolvedLanguage === 'ar' ? 'rtl' : 'ltr';
+  // The one face this language's body text starts in (see fonts.css).
+  const bodyFontHref = fontUrl(BODY_FONT_PRELOAD[lang]);
 
   // Cookie consent — read server-side so MarketingPixelsProvider is only
   // RENDERED into the HTML when the user has consented to marketing.
@@ -504,13 +490,39 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={lang} dir={dir} suppressHydrationWarning>
       <head>
+        <link
+          rel="preload"
+          as="font"
+          type="font/woff2"
+          href={bodyFontHref}
+          crossOrigin="anonymous"
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdScriptContent(orgJsonLd) }}
         />
-        {googleFontUrls.map(url => (
-          <link key={url} rel="stylesheet" href={url} />
-        ))}
+        {/* Merchant-chosen Google Fonts stylesheets must never block first paint
+            (a render-blocking third-party round trip on every page of that store):
+            load as `media=print`, flip to `all` once fetched. PERF-STORE-4. */}
+        {googleFontUrls.length > 0 && (
+          <>
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+            {googleFontUrls.map(url => (
+              <link key={url} rel="stylesheet" href={url} media="print" data-font-swap="" />
+            ))}
+            <script
+              dangerouslySetInnerHTML={{
+                __html:
+                  "document.querySelectorAll('link[data-font-swap]').forEach(function(l){var a=function(){l.media='all'};l.sheet?a():l.addEventListener('load',a)})",
+              }}
+            />
+            <noscript>
+              {googleFontUrls.map(url => (
+                <link key={url} rel="stylesheet" href={url} />
+              ))}
+            </noscript>
+          </>
+        )}
         {combinedStyleTag && <style dangerouslySetInnerHTML={{ __html: combinedStyleTag }} />}
         {/* Detect system dark mode preference and apply .dark class before paint */}
         <script
@@ -527,6 +539,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             `,
           }}
         />
+        {/* Width-variant image 404 -> original (PERF-STORE-3). Registered in <head>
+            so it also catches failures before hydration. */}
+        <script dangerouslySetInnerHTML={{ __html: IMAGE_ERROR_FALLBACK_SCRIPT }} />
         {/* Favicon is set via generateMetadata().icons -- no manual <link> needed */}
         {/* Manifest is generated by src/app/manifest.ts -- Next.js links it automatically */}
       </head>
@@ -537,7 +552,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         // sibling. ShopChrome carries its own pb-32 for content inside it;
         // body-level reserve is the only way to also protect siblings
         // rendered after ShopChrome by the providers. Ahmad 2026-05-17 evening.
-        className={`${plusJakarta.variable} ${ibmPlexArabic.variable} ${dahabArabic.variable} ${dahabLatin.variable} font-sans antialiased bg-background text-foreground overflow-x-hidden pb-32 md:pb-0`}
+        className="font-sans antialiased bg-background text-foreground overflow-x-hidden pb-32 md:pb-0"
+        // Arabic from the FIRST paint: LanguageContext sets the same value in a
+        // layout effect, so before this the SSR HTML painted Arabic text in the
+        // Latin stack's system fallback (Arial) and swapped to Plex on hydration.
+        style={lang === 'ar' ? { fontFamily: ARABIC_BODY_FONT } : undefined}
         // Skin hook for pack-level CSS (Dahab's display face, globals.css), on the
         // server-rendered body so the first paint already has it (the chrome
         // itself loads on the client). Only Dahab sets it: other stores' markup

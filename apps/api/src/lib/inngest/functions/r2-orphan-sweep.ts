@@ -7,6 +7,7 @@ import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 import { config } from '../../../config';
 import { urlToR2Key } from '../../../services/r2-cleanup.service';
+import { isVariantEligibleKey, isVariantKey, variantKeysFor } from '@force/shared';
 import { assertStrictTablesVisible, collectReferencedR2Keys } from '../../r2-references';
 
 /**
@@ -203,6 +204,9 @@ export const r2OrphanSweep: InngestFunction.Any = inngest.createFunction(
 
     for (const obj of objects) {
       totalBytes += obj.size;
+      // A generated image variant is never an orphan on its own: it lives and dies
+      // with its original (deleted together below).
+      if (isVariantKey(obj.key)) continue;
       if (referenced.has(obj.key)) continue;
       // Skip objects younger than 24 h — the DB row may not have landed yet
       // (upload-to-DB write is not atomic; protecting against that race).
@@ -256,12 +260,18 @@ export const r2OrphanSweep: InngestFunction.Any = inngest.createFunction(
     if (applyDeletes && orphans.length > 0) {
       deleted = await step.run('delete-orphans', async () => {
         let count = 0;
-        for (let i = 0; i < orphans.length; i += DELETE_BATCH) {
-          const slice = orphans.slice(i, i + DELETE_BATCH);
+        // Each eligible original takes its 4 variants with it (5 keys), so the
+        // original count per request is capped to stay within DELETE_BATCH keys.
+        const perBatch = Math.floor(DELETE_BATCH / (1 + variantKeysFor('x').length));
+        for (let i = 0; i < orphans.length; i += perBatch) {
+          const slice = orphans.slice(i, i + perBatch);
+          const keys = slice.flatMap(k =>
+            isVariantEligibleKey(k) ? [k, ...variantKeysFor(k)] : [k]
+          );
           await client.send(
             new DeleteObjectsCommand({
               Bucket: bucket,
-              Delete: { Objects: slice.map(Key => ({ Key })), Quiet: true },
+              Delete: { Objects: keys.map(Key => ({ Key })), Quiet: true },
             })
           );
           count += slice.length;

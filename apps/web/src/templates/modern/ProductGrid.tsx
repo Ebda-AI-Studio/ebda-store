@@ -87,7 +87,7 @@ export default function ModernProductGrid({
             isInCompare={compareIds?.has(product.id) ?? false}
             onToggleCompare={onToggleCompare}
             onRemoveFromWishlist={onRemoveFromWishlist}
-            priority={index < 6}
+            priority={index < 2}
           />
         </div>
       ))}

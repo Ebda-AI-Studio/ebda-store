@@ -368,7 +368,8 @@ try {
   }
 
   // ── store ──────────────────────────────────────────────────────────────
-  let store = await prisma.store.findUnique({ where: { slug: SLUG } });
+  // Owner-role read: the tenant guard refuses an unscoped `prisma.store` lookup.
+  let store = await withOwnerTx(tx => tx.store.findUnique({ where: { slug: SLUG } }));
   if (!store)
     store = await StoreService.create(
       owner.id,

@@ -16,6 +16,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
 import type { SectionPaddingMaxWidthVisibility } from '@force/shared';
+import { ResponsiveImg } from '../../components/ResponsiveImg';
 
 export interface ImageTextSettings extends SectionPaddingMaxWidthVisibility {
   image?: string;
@@ -73,8 +74,9 @@ export function ImageTextSection({
       >
         <div className={imageFirst ? 'md:order-1' : 'md:order-2'}>
           {image ? (
-            <img
+            <ResponsiveImg
               src={image}
+              sizes="(min-width: 768px) 50vw, 100vw"
               alt={alt}
               loading="lazy"
               className={`w-full rounded-[var(--radius)] object-cover ${ASPECT[settings.imageAspect ?? 'square']}`}

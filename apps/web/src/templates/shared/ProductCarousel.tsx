@@ -474,7 +474,7 @@ function SharedProductCarousel({
                               src={img}
                               alt={product.images?.[0]?.alt || name}
                               fill
-                              priority={i < 4}
+                              priority={i < 2}
                               sizes="(max-width: 640px) 60vw, (max-width: 1024px) 30vw, 300px"
                               // Only fade out on hover when there's a second
                               // image to crossfade IN. Without this guard,

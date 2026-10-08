@@ -1,7 +1,7 @@
 'use client';
 
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import * as Sentry from '@sentry/nextjs';
+import { reportError } from '../lib/sentry-lazy';
 
 interface SectionErrorBoundaryProps {
   children: ReactNode;
@@ -41,7 +41,7 @@ export class SectionErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    Sentry.captureException(error, {
+    reportError(error, {
       tags: { section: this.props.section },
       extra: { componentStack: errorInfo.componentStack },
     });

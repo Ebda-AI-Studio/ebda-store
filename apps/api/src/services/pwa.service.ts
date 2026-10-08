@@ -202,6 +202,7 @@ export async function generatePwaIconSet(
       filename: `source-${version}`,
       contentType: 'image/png',
       allowedTypes: ['image/png'],
+      skipVariants: true,
     });
     results.iconSource = sourceUpload.url;
 
@@ -221,6 +222,7 @@ export async function generatePwaIconSet(
           filename: `${target.key}-${version}`,
           contentType: 'image/png',
           allowedTypes: ['image/png'],
+          skipVariants: true,
         });
         results[target.key] = uploaded.url;
       })

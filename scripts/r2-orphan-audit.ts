@@ -36,6 +36,7 @@ import type { PrismaClient } from '@prisma/client';
 import { createPrismaClient } from '@force/database';
 import * as fs from 'fs';
 import * as path from 'path';
+import { isVariantEligibleKey, isVariantKey, variantKeysFor } from '@force/shared';
 import {
   assertStrictTablesVisible,
   collectReferencedR2Keys,
@@ -237,6 +238,9 @@ export function classifyOrphans(
 
   for (const obj of objects) {
     totalBytes += obj.size;
+    // Generated image variants are never orphans on their own; they are deleted
+    // with their original (see deleteKeysInBatches).
+    if (isVariantKey(obj.key)) continue;
     if (referenced.has(obj.key)) continue;
 
     const ageMs = obj.lastModified ? now - obj.lastModified.getTime() : Infinity;
@@ -258,8 +262,10 @@ export const DELETE_BATCH_SIZE = 1000;
 async function deleteKeysInBatches(
   client: S3Client,
   bucket: string,
-  keys: string[]
+  originals: string[]
 ): Promise<void> {
+  // Each eligible original takes its webp ladder with it; deleting a missing key is a no-op.
+  const keys = originals.flatMap(k => (isVariantEligibleKey(k) ? [k, ...variantKeysFor(k)] : [k]));
   for (let i = 0; i < keys.length; i += DELETE_BATCH_SIZE) {
     const slice = keys.slice(i, i + DELETE_BATCH_SIZE);
     await client.send(

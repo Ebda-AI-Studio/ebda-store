@@ -180,6 +180,10 @@ async function transformOne(url, storeId) {
   for (const u of staged) {
     try {
       await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: u.oldKey }));
+      // Image-variant ladder (packages/shared image-variants.ts); a missing key is a no-op.
+      for (const w of [320, 640, 960, 1280]) {
+        await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: `${u.oldKey}.w${w}.webp` }));
+      }
       console.log(`  deleted ${u.oldKey}`);
     } catch (err) {
       console.warn(`  failed to delete ${u.oldKey}: ${err.message}`);

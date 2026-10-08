@@ -4,3 +4,11 @@
 /*
   X-Content-Type-Options: nosniff
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+# Content-hashed build output: cache for a year. @opennextjs/cloudflare does NOT add
+# this itself once the app ships its own _headers (only `opennextjs-cloudflare migrate`
+# writes it), so before this every JS / CSS / font on the Worker answered
+# `cache-control: public, max-age=0, must-revalidate` and a repeat visit revalidated
+# each one (docs/RULINGS.md PERF-STORE-5).
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable

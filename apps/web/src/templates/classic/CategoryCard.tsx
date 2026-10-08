@@ -8,6 +8,7 @@ import { useStore } from '../../contexts/StoreContext';
 import { categorySizeClass, cardShapeClasses } from '../shared/card-size';
 import { responsiveFontSize } from '../shared/section-typography';
 import { getCategoryCountUnit } from '../../lib/category-count-unit';
+import { ResponsiveImg } from '../../components/ResponsiveImg';
 
 export default function ClassicCategoryCard({
   category,
@@ -43,8 +44,9 @@ export default function ClassicCategoryCard({
         className={`relative ${aspectClass} mb-3 overflow-hidden ${radiusClass} border border-border/60 bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out`}
       >
         {category.image ? (
-          <img
+          <ResponsiveImg
             src={category.image}
+            sizes="(min-width: 1024px) 25vw, 50vw"
             alt={displayName}
             className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out"
             loading="lazy"

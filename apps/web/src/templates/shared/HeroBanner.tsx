@@ -4,7 +4,7 @@ import type React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { cn } from '@force/ui';
-import { IMAGE_STANDARDS, sanitizeUrl } from '@force/shared';
+import { IMAGE_STANDARDS, sanitizeUrl, imageVariantSrcSet } from '@force/shared';
 import type { HeroBannerProps } from '../types';
 import { getPackStyles } from './pack-styles';
 import { responsiveFontSize } from './section-typography';
@@ -125,13 +125,22 @@ export function HeroBanner({
       <HeroBannerLink link={link} label={bannerLabel} urlPrefix={urlPrefix}>
         {desktopSrc && (
           <picture>
-            <source media="(max-width: 639px)" srcSet={mobileSrc} />
+            <source
+              media="(max-width: 639px)"
+              srcSet={imageVariantSrcSet(mobileSrc) || mobileSrc}
+              sizes="100vw"
+            />
             <Image
               src={desktopSrc}
               alt={alt}
               fill
-              priority={priority}
-              loading={priority ? undefined : 'lazy'}
+              // Not `priority`: that emits a media-less <link rel=preload> for the DESKTOP
+              // src, so a phone (which paints the <source> above) downloaded both images
+              // and the preload competed with the real LCP image. The <img> is in the
+              // server HTML, so the preload scanner already honours the <source media>;
+              // eager + fetchPriority=high is all the LCP image needs (PERF-STORE-3).
+              loading={priority ? 'eager' : 'lazy'}
+              fetchPriority={priority ? 'high' : undefined}
               sizes="100vw"
               // object-cover (full-bleed): backend auto-resize lands every new
               // upload at the exact container aspect (16:9 mobile / 1920×700

@@ -66,11 +66,10 @@
     --radius: 0.75rem;
 
     /* Font Families */
-    --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+    /* --font-sans / --font-arabic / --font-dahab-*: styles/fonts.css */
     --font-serif: 'Playfair Display', Georgia, serif;
     --font-modern: 'Space Grotesk', system-ui, sans-serif;
     --font-rounded: 'Nunito', 'Quicksand', system-ui, sans-serif;
-    --font-arabic: 'IBM Plex Sans Arabic', system-ui, sans-serif;
 
     /* Spacing Scale */
     --spacing-xs: 0.25rem;

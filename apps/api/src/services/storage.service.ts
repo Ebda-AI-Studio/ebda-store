@@ -4,6 +4,9 @@ import { randomUUID } from 'node:crypto';
 import path from 'path';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
+import logger from '../lib/logger';
+import { isVariantEligibleKey, isVariantKey, variantKey, variantKeysFor } from '@force/shared';
+import { generateImageVariants } from './image-variants.service';
 
 // ==========================================
 // Storage Service
@@ -23,6 +26,11 @@ export interface UploadOptions {
    * shape is preserved so platform assets aren't accidentally tenant-scoped.
    */
   storeId?: string | null;
+  /**
+   * Do not generate the webp width ladder for this upload (PWA icons, receipts:
+   * never rendered at storefront card sizes). See docs/architecture/image-variants.md.
+   */
+  skipVariants?: boolean;
 }
 
 export interface UploadResult {
@@ -83,6 +91,9 @@ function sanitizeFilename(name: string): string {
   return safe.slice(0, 64) || 'file';
 }
 
+const CACHE_ONE_YEAR = 'public, max-age=31536000';
+const CACHE_IMMUTABLE = 'public, max-age=31536000, immutable';
+
 export class StorageService {
   private static client: S3Client | null = null;
 
@@ -131,6 +142,7 @@ export class StorageService {
       maxSize = DEFAULT_MAX_SIZE,
       allowedTypes = DEFAULT_ALLOWED_TYPES,
       storeId,
+      skipVariants,
     } = options;
 
     // Determine content type
@@ -172,9 +184,16 @@ export class StorageService {
         Key: key,
         Body: buffer,
         ContentType: mimeType,
-        CacheControl: 'public, max-age=31536000', // 1 year cache
+        // A key minted here carries a fresh UUID, so its bytes never change:
+        // `immutable` is safe. A caller-chosen `filename` can be re-used (overwrite),
+        // so those keep the plain 1-year cache.
+        CacheControl: filename ? CACHE_ONE_YEAR : CACHE_IMMUTABLE,
       })
     );
+
+    if (!skipVariants && mimeType.startsWith('image/') && isVariantEligibleKey(key)) {
+      await this.putVariants(client, key, buffer);
+    }
 
     return {
       key,
@@ -182,6 +201,43 @@ export class StorageService {
       size: buffer.length,
       contentType: mimeType,
     };
+  }
+
+  /**
+   * Write the webp width ladder next to a freshly uploaded original.
+   * Fail-soft: a variant failure is logged and never fails the upload.
+   */
+  private static async putVariants(client: S3Client, key: string, buffer: Buffer): Promise<void> {
+    try {
+      const variants = await generateImageVariants(buffer);
+      if (variants.length === 0) return;
+      const { PutObjectCommand } = await loadS3();
+      await Promise.all(
+        variants.map(async v => {
+          try {
+            await client.send(
+              new PutObjectCommand({
+                Bucket: config.storageBucket,
+                Key: variantKey(key, v.width),
+                Body: v.buffer,
+                ContentType: 'image/webp',
+                CacheControl: CACHE_IMMUTABLE,
+              })
+            );
+          } catch (err) {
+            logger.warn(
+              { err: err instanceof Error ? err.message : 'unknown', key, width: v.width },
+              'storage: variant upload failed (original kept)'
+            );
+          }
+        })
+      );
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown', key },
+        'storage: variant generation failed (original kept)'
+      );
+    }
   }
 
   /**
@@ -206,6 +262,24 @@ export class StorageService {
         Key: key,
       })
     );
+
+    // Best-effort: remove the webp ladder with its original. Deleting a rung
+    // that does not exist is a no-op in S3/R2.
+    if (isVariantEligibleKey(key)) {
+      const { DeleteObjectCommand } = await loadS3();
+      await Promise.all(
+        variantKeysFor(key).map(async vKey => {
+          try {
+            await client.send(new DeleteObjectCommand({ Bucket: config.storageBucket, Key: vKey }));
+          } catch (err) {
+            logger.warn(
+              { err: err instanceof Error ? err.message : 'unknown', key: vKey },
+              'storage: variant delete failed'
+            );
+          }
+        })
+      );
+    }
   }
 
   /**
@@ -224,6 +298,9 @@ export class StorageService {
    * of objects removed. Caller is responsible for passing a correctly-scoped,
    * trailing-slash prefix so a prefix can never match a sibling tenant
    * (`stores/abc/` never matches `stores/abcd/`).
+   *
+   * Image variants (`<key>.w640.webp`) share the original's prefix, so this and
+   * `deleteByPrefixVerified` list and remove them with no extra handling.
    */
   /**
    * Delete every object under a prefix and REPORT WHAT SURVIVED.
@@ -482,6 +559,9 @@ export class StorageService {
     const items = (listed.Contents ?? [])
       .filter((o): o is typeof o & { Key: string } => Boolean(o.Key))
       .filter(o => /\.(jpe?g|png|gif|webp|svg|avif)$/i.test(o.Key))
+      // Generated webp ladder files are not media-library items. The page may
+      // come back shorter than `limit`; the cursor stays correct.
+      .filter(o => !isVariantKey(o.Key))
       .map(o => ({
         key: o.Key,
         url: this.getPublicUrl(o.Key),

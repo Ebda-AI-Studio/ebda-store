@@ -33,6 +33,7 @@ import {
   ChevronIcon,
   cx,
 } from './ui';
+import { ResponsiveImg } from '../../components/ResponsiveImg';
 
 export interface DahabProductDetailProps {
   images: Array<{ id?: string; url: string; alt?: string | null }>;
@@ -238,9 +239,10 @@ function Gallery({
         {lightbox && (
           <div className="mx-auto flex max-w-4xl flex-col gap-4 p-4 pt-16">
             {images.map((img, i) => (
-              <img
+              <ResponsiveImg
                 key={img.id ?? i}
                 src={img.url}
+                sizes="(min-width: 896px) 896px, 100vw"
                 alt={img.alt || name}
                 loading={i === selected ? 'eager' : 'lazy'}
                 className="w-full rounded-[var(--radius)]"

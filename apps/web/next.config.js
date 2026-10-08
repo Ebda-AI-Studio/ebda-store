@@ -11,6 +11,8 @@ const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAG
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  productionBrowserSourceMaps: !!process.env.PERF_SOURCEMAPS,
+  distDir: process.env.PERF_SOURCEMAPS ? ".next-sm" : ".next",
   // ZAP 10037: don't advertise the framework (x-powered-by: Next.js).
   poweredByHeader: false,
 
@@ -31,11 +33,16 @@ const nextConfig = {
   transpilePackages: ['@force/ui', '@force/shared'],
 
   images: {
-    // Cloudflare build only: disable Next's sharp-based image optimizer (native,
-    // Workers-incompatible). Storefront images come from R2 already backend-
-    // resized, so there's no quality loss. On Vercel this stays false → Vercel's
-    // image optimization is unchanged (zero regression).
-    unoptimized: IS_CLOUDFLARE,
+    // Storefront images are served through our own width ladder, never Next's
+    // sharp-based optimiser (native, Workers-incompatible): the upload pipeline
+    // writes `<key>.w{480,720,960,1280}.webp` next to every raster original and
+    // `src/lib/image-loader.ts` maps a requested width onto a rung (PERF-STORE-3).
+    // The ladder IS the size list, so every `srcset` candidate is a file that exists.
+    loader: 'custom',
+    loaderFile: './src/lib/image-loader.ts',
+    // 1920 maps to the ORIGINAL (the loader returns it for anything above the top rung).
+    deviceSizes: [480, 720, 960, 1280, 1920],
+    imageSizes: [128],
     remotePatterns: [
       // Only allow localhost image sources in non-production environments
       ...(process.env.NODE_ENV !== 'production'
@@ -234,7 +241,7 @@ module.exports = withSentryConfig(nextConfig, {
     // the SDK default for Turbopack builds; pinned here so a future SDK
     // default change cannot start publishing our source. Deletion runs with
     // or without an auth token.
-    deleteSourcemapsAfterUpload: true,
+    deleteSourcemapsAfterUpload: !process.env.PERF_SOURCEMAPS,
   },
   // A failed release/upload (bad or expired token, Sentry outage) must never
   // fail a production deploy: warn and ship the build without symbolication.

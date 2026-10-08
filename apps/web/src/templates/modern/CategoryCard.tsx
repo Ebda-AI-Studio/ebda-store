@@ -6,6 +6,7 @@ import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { categorySizeClass, cardAspectClass, cardShapeClasses } from '../shared/card-size';
 import { responsiveFontSize } from '../shared/section-typography';
+import { ResponsiveImg } from '../../components/ResponsiveImg';
 
 /**
  * Modern category card — image + label-below layout. Per-store
@@ -56,8 +57,9 @@ export default function ModernCategoryCard({
         className={`relative ${aspectClass} ${radiusClass} overflow-hidden bg-muted shadow-[0_4px_12px_-6px_hsl(var(--foreground)/0.10)] ${hoverShadow} transition-shadow duration-500 ease-out`}
       >
         {category.image ? (
-          <img
+          <ResponsiveImg
             src={category.image}
+            sizes="(min-width: 1024px) 25vw, 50vw"
             alt={displayName}
             className={`absolute inset-0 w-full h-full object-cover ${hoverScale} transition-transform duration-500 ease-out`}
             loading="lazy"

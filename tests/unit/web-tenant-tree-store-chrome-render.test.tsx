@@ -62,12 +62,6 @@ vi.mock('next/headers', () => ({
   headers: async () => new Headers({ host: 'demo-shop.example', 'x-is-platform': '0' }),
 }));
 
-vi.mock('next/font/google', () => ({
-  Plus_Jakarta_Sans: () => ({ variable: 'font-sans-var' }),
-  IBM_Plex_Sans_Arabic: () => ({ variable: 'font-arabic-var' }),
-  Amiri: () => ({ variable: 'font-dahab-ar-var' }),
-  Marcellus: () => ({ variable: 'font-dahab-latin-var' }),
-}));
 
 vi.mock('../../apps/web/src/lib/store-resolver', () => ({
   getStore: async () => STORE,

@@ -21,10 +21,6 @@ vi.mock('next/headers', () => ({
       k === 'force-language' && state.cookieLang ? { value: state.cookieLang } : undefined,
   }),
 }));
-vi.mock('next/font/google', () => {
-  const font = () => ({ className: 'f', variable: '--f', style: { fontFamily: 'f' } });
-  return { Plus_Jakarta_Sans: font, IBM_Plex_Sans_Arabic: font, Amiri: font, Marcellus: font };
-});
 vi.mock('../../apps/web/src/lib/store-resolver', async importOriginal => {
   const real = await importOriginal<typeof import('../../apps/web/src/lib/store-resolver')>();
   return {

@@ -31,6 +31,7 @@
 import { useEffect } from 'react';
 import { useStore } from '../contexts/StoreContext';
 import { useFeatures } from '../contexts/FeatureContext';
+import { afterLoadIdle } from '../lib/after-load-idle';
 
 // Minimal v16 typings — we only touch the surfaces we use, so we don't
 // pull in the full @types/onesignal-sdk just for two methods.
@@ -106,13 +107,18 @@ export function OneSignalStorefrontInit() {
     // 1. Inject the v16 page SDK exactly once. Re-mounting this component
     //    (e.g. on a route change in dev) MUST NOT re-add the script tag —
     //    OneSignal explodes if its globals already exist.
-    if (!document.getElementById(SDK_SCRIPT_ID) && !window.OneSignal) {
-      const script = document.createElement('script');
-      script.id = SDK_SCRIPT_ID;
-      script.src = SDK_SRC;
-      script.defer = true;
-      document.head.appendChild(script);
-    }
+    //    A third-party SDK: inject it once the page has loaded and gone idle (or
+    //    on the first interaction), never during the load that decides
+    //    LCP/FCP (PERF-STORE-2). The deferred queue below waits for it.
+    const cancelDeferred = afterLoadIdle(() => {
+      if (!document.getElementById(SDK_SCRIPT_ID) && !window.OneSignal) {
+        const script = document.createElement('script');
+        script.id = SDK_SCRIPT_ID;
+        script.src = SDK_SRC;
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+    });
 
     // 2. Init + tag.
     enqueue(async OneSignal => {
@@ -175,6 +181,7 @@ export function OneSignalStorefrontInit() {
 
     return () => {
       cancelled = true;
+      cancelDeferred();
     };
   }, [store?.id, store?.theme?.storefrontWebPushEnabled, isEnabled]);
 
