@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { orderActionVisibility, refundViaProviderRemaining } from '@force/shared';
 import { useT } from '@/i18n/useT';
-import { statusOptionsFor } from '../../_components/types';
+import { statusOptionsForRole } from '../../_components/types';
 import { PaymentLinkButton } from './PaymentLinkButton';
 import { RefreshPaymentButton } from './RefreshPaymentButton';
 import { RefundButton } from './RefundButton';
@@ -15,6 +15,11 @@ interface ActionFooterProps {
   order: OrderDetail;
   storeId: string;
   isUpdating: boolean;
+  /**
+   * False for staff: refunding (via the provider or by recording one) needs the API's
+   * `orders:refund` permission, so neither the Refund button nor the "Refunded" status is shown.
+   */
+  canRefund: boolean;
   onStatusChange: (newStatus: string) => void;
   onMarkPaid: () => void;
   /** InstaPay: the merchant saw the transfer arrive. */
@@ -29,6 +34,7 @@ export function ActionFooter({
   order,
   storeId,
   isUpdating,
+  canRefund,
   onStatusChange,
   onMarkPaid,
   onConfirmInstapay,
@@ -57,7 +63,7 @@ export function ActionFooter({
   // cancelled order's only option is `refunded` (PR #770), so `cancelled` is
   // not final here; before #1947 it was, and this page offered no way to
   // record that refund. The page confirms a `refunded` pick before sending it.
-  const transitions = statusOptionsFor(order);
+  const transitions = statusOptionsForRole(order, canRefund);
   const nextStatus = transitions.find(s => s !== 'cancelled') ?? null;
   const canCancel = transitions.includes('cancelled');
   // Final = the shared transition map offers nothing more (#2144). A hand-kept
@@ -84,8 +90,6 @@ export function ActionFooter({
     showRefundViaProvider,
     showRefreshRefundStatus,
   } = orderActionVisibility(order);
-  // Refunds need orders:refund, which staff do not have (the API answers 403).
-  const canRefund = userRole !== 'staff';
   // InstaPay refund RECORD: the store owner only, for a paid InstaPay payment.
   const instapayPayment = (order.payments ?? []).find(
     p =>

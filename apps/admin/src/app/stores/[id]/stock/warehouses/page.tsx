@@ -390,7 +390,7 @@ export default function WarehousesPage() {
                     value={form.lat}
                     onChange={e => setForm(f => ({ ...f, lat: e.target.value }))}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    placeholder="29.3759"
+                    placeholder="30.0444"
                   />
                 </label>
                 <label className="block">
@@ -403,7 +403,7 @@ export default function WarehousesPage() {
                     value={form.lng}
                     onChange={e => setForm(f => ({ ...f, lng: e.target.value }))}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    placeholder="47.9774"
+                    placeholder="31.2357"
                   />
                 </label>
               </div>

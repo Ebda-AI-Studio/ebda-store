@@ -659,7 +659,7 @@
         "price": "السعر (ج.م)",
         "costPrice": "التكلفة (ج.م)",
         "profitLabel": "هامش الربح لكل وحدة:",
-        "pricePlaceholder": "0.000",
+        "pricePlaceholder": "0.00",
         "discountLabel": "الخصم",
         "discountNone": "بدون خصم",
         "discountPercentage": "نسبة مئوية (%)",
@@ -878,7 +878,7 @@
         "mediaHint": "اسحب وأفلت الصور هنا، أو انقر للاختيار",
         "mediaSizeHint": "الموصى به 1000×1000 (مربع). حتى 10 ميجابايت لكل ملف — نقوم بضغطها تلقائياً للمتجر.",
         "price": "السعر (ج.م)",
-        "pricePlaceholder": "0.000",
+        "pricePlaceholder": "0.00",
         "costPrice": "التكلفة (ج.م)",
         "pricingHint": "أدخل الأسعار بالجنيه المصري. تعيين الخصم سيضبط السعر قبل الخصم تلقائيًا في المتجر.",
         "discountLabel": "الخصم",
@@ -1100,8 +1100,19 @@
         "confirm": "تأكيد",
         "cancel": "إلغاء",
         "manualRefundTitle": "تعليم الطلب كمسترد؟",
-        "manualRefundDescription": "هذا يسجّل الاسترداد فقط: يعيد المخزون ويلغي الكوبون ونقاط الولاء ويُبلغ العميل بأنه تم الاسترداد — لكنه لا يعيد أي مبلغ. لإعادة دفعة البطاقة فعلياً، افتح الطلب واستخدم \"استرداد عبر مزوّد الدفع\".",
-        "manualRefundDescriptionCancelled": "تم إلغاء هذا الطلب، لذا أُعيد مخزونه وأُلغي الكوبون ونقاط الولاء عند الإلغاء. هذا يسجّل الاسترداد على الطلب فقط — ولا يعيد أي مبلغ، ولا يُرسل إشعار جديد إلى العميل. لإعادة دفعة البطاقة فعلياً، استخدم \"استرداد عبر مزوّد الدفع\".",
+        "manualRefundDescription": "أكّد فقط بعد أن تكون قد أعدت المبلغ إلى العميل فعلاً. هذا الإجراء يسجّل الاسترداد ولا يرسل أي مبلغ. يعيد المخزون ويلغي الكوبون ونقاط الولاء، وسيُبلَّغ العميل بأنه تم إصدار استرداده.",
+        "manualRefundDescriptionCancelled": "تم إلغاء هذا الطلب، لذا أُعيد مخزونه وأُلغي الكوبون ونقاط الولاء مسبقاً. أكّد فقط بعد أن تكون قد أعدت المبلغ إلى العميل فعلاً. هذا الإجراء يسجّل الاسترداد على الطلب ولا يرسل أي مبلغ، وسيُبلَّغ العميل بأنه تم إصدار استرداده.",
+        "refundMethodLabel": "كيف أعدت المبلغ إلى العميل؟",
+        "refundMethods": {
+          "cash": "نقداً",
+          "instapay": "إنستاباي",
+          "bank_transfer": "تحويل بنكي",
+          "store_credit": "رصيد في المتجر",
+          "other": "أخرى"
+        },
+        "refundReferenceLabel": "المرجع (اختياري)",
+        "refundReferencePlaceholder": "رقم التحويل أو ملاحظة قصيرة",
+        "refundFailed": "تعذّر تسجيل الاسترداد. حاول مرة أخرى.",
         "instapayTitle": "تأكيد تحويل إنستاباي؟",
         "instapayDescription": "أكّد أن مبلغ هذا الطلب وصل إلى حسابك في إنستاباي. سيصبح الطلب مؤكداً وجاهزاً للشحن. الضغط مرتين آمن."
       },
@@ -1176,8 +1187,8 @@
         "viaSource": "(عبر {source})",
         "noRateConfigured": "لا يوجد سعر شحن مُعدّ لهذه المنطقة — حدّد رسومًا أدناه، وإلا سيُحفظ الطلب برسوم شحن 0 ج.م",
         "overrideLabel": "تجاوز رسوم الشحن (ج.م) — اتركه فارغًا لاستخدام الرسوم المحسوبة",
-        "overridePlaceholder": "مثال: 1.500",
-        "overrideActive": "التجاوز اليدوي مفعّل: سيُستخدم {price} ({piastres} فلس) بدلاً من الرسوم المحسوبة."
+        "overridePlaceholder": "مثال: 15.00",
+        "overrideActive": "التجاوز اليدوي مفعّل: سيُستخدم {price} بدلاً من الرسوم المحسوبة."
       },
       "productsSection": {
         "heading": "المنتجات",
@@ -1246,6 +1257,7 @@
       "tax": "الضريبة",
       "taxIncluded": "شامل ضريبة القيمة المضافة",
       "deliveryFee": "التوصيل",
+      "codFee": "رسوم الدفع عند الاستلام",
       "total": "الإجمالي",
       "items": "المنتجات",
       "itemCount": "{count} منتج",
@@ -1405,7 +1417,11 @@
             "failed": "فشل",
             "cancelled": "أُلغي"
           }
-        }
+        },
+        "confirmReturnTitle": "تعليم الشحنة كمرتجعة إليك؟",
+        "confirmReturnDescription": "سيُلغى الطلب ولن يكون هناك أي مبلغ مستحق في الدفع عند الاستلام.",
+        "restockLabel": "إرجاع المنتجات للمخزون",
+        "confirmReturn": "تعليم كمرتجعة"
       }
     },
     "layout": {
@@ -2159,7 +2175,7 @@
           "credit": "إضافة رصيد",
           "debit": "خصم",
           "amountLabel": "المبلغ (ج.م)",
-          "amountPlaceholder": "0.000",
+          "amountPlaceholder": "0.00",
           "noteLabel": "السبب",
           "notePlaceholder": "لماذا يتغير الرصيد؟ يظهر هذا لفريقك فقط.",
           "currentBalance": "الرصيد الحالي: {amount}",
@@ -2680,7 +2696,7 @@
       "phone": "الهاتف",
       "phoneAr": "الهاتف (عرض عربي)",
       "phonePlaceholder": "+20 1XX XXX XXXX",
-      "phoneArPlaceholder": "965 XXXX XXXX+",
+      "phoneArPlaceholder": "+20 1XX XXX XXXX",
       "address": "العنوان",
       "addressAr": "العنوان (بالعربية)",
       "addressPlaceholder": "123 Street, City, Egypt",
@@ -2849,9 +2865,9 @@
       "valuePercentageLabel": "النسبة (%) *",
       "valueAmountLabel": "المبلغ (ج.م) *",
       "minOrderLabel": "الحد الأدنى للطلب (ج.م)",
-      "minOrderPlaceholder": "10.000",
+      "minOrderPlaceholder": "10.00",
       "maxDiscountLabel": "الحد الأقصى للخصم (ج.م)",
-      "maxDiscountPlaceholder": "50.000",
+      "maxDiscountPlaceholder": "50.00",
       "usageLimitLabel": "إجمالي حد الاستخدام",
       "usageLimitPlaceholder": "100",
       "usageLimitPerUserLabel": "حد الاستخدام لكل عميل",
@@ -2890,7 +2906,6 @@
       "valueLabelPercentage": "القيمة (%)",
       "valueLabelFixed": "القيمة (ج.م)",
       "valuePercentage": "{value}%",
-      "valueFixed": "{value} فلس",
       "maxDiscount": "الحد الأقصى للخصم (ج.م)",
       "priority": "الأولوية",
       "startsAt": "تاريخ البدء",
@@ -3242,9 +3257,9 @@
       "areasArLabel": "المناطق (بالعربية)",
       "areasArPlaceholder": "القاهرة، الجيزة، الإسكندرية",
       "deliveryFeeLabel": "رسوم التوصيل (ج.م)",
-      "deliveryFeePlaceholder": "1.000",
+      "deliveryFeePlaceholder": "1.00",
       "freeShippingLabel": "شحن مجاني فوق (ج.م)",
-      "freeShippingPlaceholder": "25.000",
+      "freeShippingPlaceholder": "25.00",
       "estimatedDaysLabel": "مدة التسليم المتوقعة (أيام)",
       "estimatedDaysMinPlaceholder": "الحد الأدنى",
       "estimatedDaysMaxPlaceholder": "الحد الأقصى",
@@ -3311,7 +3326,7 @@
     },
     "returnPolicy": {
       "title": "سياسة الإرجاع",
-      "help": "تُنشر لجوجل ولمساعدات التسوّق الذكية. اترك المدة فارغة لعدم نشر أي سياسة إرجاع. أدخل 0 لنشر “لا نقبل الإرجاع”.",
+      "help": "تُنشر لجوجل ولمساعدات التسوّق الذكية ولصفحات الإرجاع والشروط والأسئلة الشائعة في متجرك، وتُطبَّق على طلبات الإرجاع (من تاريخ التسليم). اترك المدة فارغة لعدم تحديد سياسة (ولن يُطبَّق أي حدّ). أدخل 0 لنشر “لا نقبل الإرجاع”.",
       "windowLabel": "مدة الإرجاع (أيام)",
       "notDeclared": "غير محددة",
       "feesLabel": "من يتحمّل شحن الإرجاع",
@@ -3841,7 +3856,7 @@
       "instructionsTitle": "كيفية استيراد المنتجات",
       "step1": "نزّل قالب CSV باستخدام الزر أدناه",
       "step2": "املأ بيانات منتجاتك متبعًا تنسيق القالب",
-      "step3": "الأسعار بالجنيه المصري (مثال: 12.500)",
+      "step3": "الأسعار بالجنيه المصري، مثال 250 أو 250.50 (رقمان عشريان كحد أقصى)",
       "step4": "لتعدد الفئات/الوسوم/الصور، افصل بفواصل داخل علامات الاقتباس",
       "step5": "ارفع ملف CSV المكتمل وانقر على استيراد",
       "downloadTemplate": "تنزيل القالب",
@@ -3861,7 +3876,34 @@
       "trackInventory": "تتبع المخزون (الإنقاص عند البيع)",
       "importing": "جارٍ الاستيراد...",
       "importProducts": "استيراد المنتجات",
+      "previewButton": "معاينة الاستيراد",
+      "previewing": "جارٍ فحص الملف...",
       "clear": "مسح"
+    },
+    "preview": {
+      "title": "راجع قبل الاستيراد",
+      "summary": "{valid} من {total} صفًا جاهزة للاستيراد و{invalid} بها أخطاء. لم يتم حفظ أي شيء بعد.",
+      "colRow": "الصف",
+      "colName": "الاسم",
+      "colSku": "رمز المنتج",
+      "colPrice": "السعر",
+      "colCompare": "السعر قبل الخصم",
+      "colCost": "التكلفة",
+      "variantOf": "نسخة من {sku}",
+      "truncated": "يتم عرض أول {shown} صفًا فقط.",
+      "errorsHeading": "صفوف بها أخطاء (لن يتم استيرادها):",
+      "errorRow": "الصف {row}، {column}:",
+      "warnPiastres": "هذه الأسعار أعلى بنحو 100 ضعف من منتجاتك الحالية (وسيط الملف {file}، وسيط المتجر {store}). الأسعار الآن بالجنيه وليست بالقروش: 5000 تعني 5,000 جنيه. إذا كنت تقصد 50 جنيهًا فعدّل الملف وعاين من جديد.",
+      "confirm": "تأكيد واستيراد {count} صف",
+      "back": "رجوع",
+      "noValidRows": "لا يمكن استيراد أي صف. صحّح الأخطاء وارفع الملف مرة أخرى."
+    },
+    "priceErrors": {
+      "PRICE_REQUIRED": "السعر مطلوب (بالجنيه، مثال 250 أو 250.50).",
+      "PRICE_INVALID": "مبلغ غير صالح بالجنيه. استخدم أرقامًا فقط، مثال 250 أو 250.50.",
+      "PRICE_NEGATIVE": "يجب ألا يكون السعر سالبًا.",
+      "PRICE_AMBIGUOUS_DECIMALS": "ثلاثة أرقام عشرية غير واضحة (12.500 قد تعني 12.5 أو 12,500). استخدم رقمين عشريين كحد أقصى، مثال 250 أو 250.50.",
+      "PRICE_TOO_MANY_DECIMALS": "أكثر من رقمين عشريين. استخدم مثلًا 250 أو 250.50."
     },
     "results": {
       "title": "نتائج الاستيراد",
@@ -3892,7 +3934,7 @@
         "allFields": "جميع حقول المنتج مضمنة في التصدير",
         "commaSeparated": "الفئات والوسوم والصور مفصولة بفواصل داخل أعمدتها",
         "reImport": "يمكن تعديل الملف المصدّر وإعادة استيراده لتحديث المنتجات",
-        "pricesInFils": "الأسعار بالجنيه المصري (مثال: 12.500)"
+        "pricesInFils": "الأسعار بالجنيه المصري، مثال 250 أو 250.50 (رقمان عشريان كحد أقصى)"
       }
     },
     "errors": {
@@ -4872,7 +4914,7 @@
       "displayNameArLabel": "الاسم المعروض (العربية)",
       "displayNameArPlaceholder": "الدفع عند الاستلام",
       "fixedFeeLabel": "رسوم إضافية (ج.م)",
-      "fixedFeePlaceholder": "0.000",
+      "fixedFeePlaceholder": "0.00",
       "fixedFeeEquals": "= {amount} ج.م",
       "fixedFeeHelpPrefix": "رسوم إضافية تُضاف إلى الطلب عند دفع العميل نقدًا عند الاستلام. أدخل",
       "fixedFeeHelpZero": "0",
@@ -5859,6 +5901,7 @@
         "blog": "المدونة",
         "floatingWidget": "الزر العائم",
         "orders": "الطلبات",
+        "invoices": "الفواتير والإشعارات",
         "customers": "العملاء",
         "reviews": "التقييمات",
         "returns": "المرتجعات",
@@ -5938,6 +5981,7 @@
       "navPlatformPlans": "الباقات (المنصة)",
       "navPlatformBillingEvents": "سجل الفوترة (المنصة)",
       "navPlatformTaxVerification": "توثيق ضريبة القيمة المضافة (المنصة)",
+      "navPlatformTaxArchive": "الأرشيف الضريبي (المنصة)",
       "navPlatformSettings": "إعدادات المنصة",
       "navPlatformProviderActivation": "طلبات التفعيل (المنصة)"
     },
@@ -6314,7 +6358,7 @@
         "currencyLabel": "العملة",
         "fxRateLabel": "سعر الصرف (1 {currency} = ؟ ج.م)",
         "fxRateHint": "أدخل سعر الصرف من البنك أو تاريخ الإيصال.",
-        "fxRatePlaceholder": "مثال: 0.30700",
+        "fxRatePlaceholder": "مثال: 50.00",
         "errorExpenseDateRequired": "تاريخ المصروف مطلوب",
         "errorExpenseCategoryRequired": "فئة المصروف مطلوبة",
         "errorPaidFromRequired": "حساب الدفع مطلوب",
@@ -6504,7 +6548,7 @@
       "featureInactiveDesc": "ميزة المحاسبة — متعددة العملات غير مفعّلة لهذا المتجر. تواصل مع مدير حسابك لتفعيلها ضمن خطة Enterprise.",
       "recordNewRate": "تسجيل سعر جديد",
       "rateMeaning": "معنى السعر: 1 وحدة من العملة المختارة = السعر بالجنيه المصري.",
-      "rateExample": "مثال: الدولار الأمريكي بسعر 0.307 يعني 1 دولار = 0.307 جنيه مصري (307 فلوس).",
+      "rateExample": "مثال: الدولار الأمريكي بسعر 50.00 يعني 1 دولار = 50.00 جنيه مصري.",
       "currencyLabel": "العملة",
       "rateLabel": "السعر (ج.م مقابل 1 {currency})",
       "rateDateLabel": "تاريخ السعر",
@@ -8132,7 +8176,7 @@
       "minOrderSectionTitle": "الحد الأدنى لقيمة الطلب",
       "minOrderSectionHint": "لا يمكن للعملاء إتمام الطلب إذا كان مجموع المنتجات أقل من هذا المبلغ. اتركه فارغًا أو 0 للتعطيل.",
       "minOrderLabel": "الحد الأدنى للطلب (ج.م)",
-      "minOrderPlaceholder": "مثال: 5.000",
+      "minOrderPlaceholder": "مثال: 500.00",
       "invoiceEmailSectionTitle": "بريد فاتورة الطلب",
       "invoiceEmailSectionHint": "يتم إرسال فاتورة كل طلب في هذا المتجر إلى هذا البريد أيضًا (مثل صاحب المتجر). اتركه فارغًا للتعطيل.",
       "invoiceEmailLabel": "بريد مستلم الفاتورة",
@@ -9431,6 +9475,77 @@
       "disclaimer": "إبدأ لا تقدّم إقراراتك الضريبية ولا تصدر الإيصالات الإلكترونية نيابةً عنك. تظل مسؤولًا عن إقراراتك الضريبية."
     },
     "error": "حدث خطأ. حاول مرة أخرى."
+  },
+  "invoices": {
+    "title": "الفواتير والإشعارات",
+    "subtitle": "كل فاتورة ضريبية وإيصال وإشعار دائن أصدره متجرك.",
+    "filterLabel": "نوع المستند",
+    "allTypes": "كل المستندات",
+    "loading": "جارٍ التحميل…",
+    "loadFailed": "تعذّر تحميل المستندات. حاول مرة أخرى.",
+    "loadMore": "تحميل المزيد",
+    "emptyTitle": "لا توجد مستندات بعد",
+    "emptyDescription": "تُصدَر فاتورة ضريبية أو إيصال بيع تلقائياً مع كل عملية بيع، وإشعار دائن أو إيصال استرداد مع كل استرداد. ستظهر هنا.",
+    "open": "فتح",
+    "againstInvoice": "على الفاتورة",
+    "columns": {
+      "number": "الرقم",
+      "type": "النوع",
+      "status": "الحالة",
+      "issuedAt": "تاريخ الإصدار",
+      "order": "الطلب",
+      "net": "الصافي",
+      "vat": "ضريبة القيمة المضافة",
+      "total": "الإجمالي",
+      "actions": "الإجراءات"
+    },
+    "types": {
+      "tax_invoice": "فاتورة ضريبية",
+      "receipt": "إيصال بيع",
+      "credit_note": "إشعار دائن",
+      "refund_receipt": "إيصال استرداد",
+      "order_record": "سجل طلب مؤرشف",
+      "billing_record": "سجل فاتورة اشتراك مؤرشف"
+    },
+    "statuses": {
+      "issued": "صادر",
+      "cancelled": "ملغى"
+    },
+    "documentsCard": {
+      "title": "المستندات",
+      "empty": "لم يُصدَر أي مستند لهذا الطلب بعد.",
+      "loadFailed": "تعذّر تحميل مستندات هذا الطلب."
+    },
+    "viewer": {
+      "title": "مستند",
+      "back": "رجوع",
+      "language": "لغة المستند",
+      "arabic": "العربية",
+      "english": "الإنجليزية",
+      "print": "طباعة",
+      "loading": "جارٍ تحميل المستند…",
+      "loadFailed": "تعذّر تحميل المستند.",
+      "printFailed": "تعذّر فتح نافذة الطباعة."
+    }
+  },
+  "taxArchive": {
+    "title": "الأرشيف الضريبي",
+    "subtitle": "المستندات المالية المحفوظة للجهات الضريبية، متجراً بمتجر.",
+    "storeTitle": "مستندات المتجر",
+    "retention": "تُحفظ المستندات المالية لمدة 6 سنوات، حتى بعد حذف المتجر.",
+    "columns": {
+      "store": "المتجر",
+      "documents": "المستندات",
+      "lastIssued": "آخر إصدار",
+      "actions": "الإجراءات"
+    },
+    "deletedStore": "متجر محذوف",
+    "viewDocuments": "عرض المستندات",
+    "loading": "جارٍ التحميل…",
+    "loadFailed": "تعذّر تحميل الأرشيف. حاول مرة أخرى.",
+    "empty": "لا توجد مستندات مؤرشفة بعد.",
+    "emptyStore": "لا توجد مستندات مؤرشفة لهذا المتجر.",
+    "backToStores": "كل المتاجر"
   },
   "taxReview": {
     "title": "توثيق ضريبة القيمة المضافة",

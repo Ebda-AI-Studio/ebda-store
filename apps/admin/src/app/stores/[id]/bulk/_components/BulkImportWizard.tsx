@@ -3,20 +3,35 @@
 import { useRef, useState } from 'react';
 import { Button, Input, Label } from '@force/ui';
 import { useT } from '@/i18n/useT';
-import type { DefaultStatus, FileKind, ImportJob, ImportOptions, ImportResult } from './types';
+import type {
+  DefaultStatus,
+  FileKind,
+  ImportJob,
+  ImportOptions,
+  ImportPreview,
+  ImportResult,
+} from './types';
+import { BulkImportPreview } from './BulkImportPreview';
 import { BulkImportResults } from './BulkImportResults';
+
+interface ImportArgs {
+  fileKind: FileKind;
+  csvContent: string;
+  xlsxBase64: string;
+  options: ImportOptions;
+}
 
 interface BulkImportWizardProps {
   isImporting: boolean;
   importResult: ImportResult | null;
   importProgress: ImportJob | null;
   onDownloadTemplate: () => void;
-  onImport: (args: {
-    fileKind: FileKind;
-    csvContent: string;
-    xlsxBase64: string;
-    options: ImportOptions;
-  }) => Promise<void> | void;
+  preview: ImportPreview | null;
+  isPreviewing: boolean;
+  previewError: string | null;
+  onPreview: (args: ImportArgs) => Promise<void> | void;
+  onClearPreview: () => void;
+  onImport: (args: ImportArgs) => Promise<void> | void;
   onClearResult: () => void;
   onViewProducts: () => void;
 }
@@ -30,6 +45,11 @@ export function BulkImportWizard({
   isImporting,
   importResult,
   importProgress,
+  preview,
+  isPreviewing,
+  previewError,
+  onPreview,
+  onClearPreview,
   onDownloadTemplate,
   onImport,
   onClearResult,
@@ -53,6 +73,7 @@ export function BulkImportWizard({
     if (!file) return;
 
     setSelectedFileName(file.name);
+    onClearPreview();
     const isXlsx = /\.xlsx$/i.test(file.name) || file.type.includes('sheet');
 
     if (isXlsx) {
@@ -84,15 +105,16 @@ export function BulkImportWizard({
     setXlsxBase64('');
     setSelectedFileName('');
     setFileKind(null);
+    onClearPreview();
     onClearResult();
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   }
 
-  async function handleImportClick() {
-    if (!fileKind) return;
-    await onImport({
+  function currentArgs(): ImportArgs | null {
+    if (!fileKind) return null;
+    return {
       fileKind,
       csvContent,
       xlsxBase64,
@@ -103,10 +125,22 @@ export function BulkImportWizard({
         defaultStatus,
         trackInventory,
       },
-    });
+    };
   }
 
-  const importDisabled = isImporting || (fileKind === 'xlsx' ? !xlsxBase64 : !csvContent);
+  // Step 1: dry run. Nothing is saved until the merchant confirms the preview.
+  async function handlePreviewClick() {
+    const args = currentArgs();
+    if (args) await onPreview(args);
+  }
+
+  async function handleConfirmClick() {
+    const args = currentArgs();
+    if (args) await onImport(args);
+  }
+
+  const previewDisabled =
+    isPreviewing || isImporting || (fileKind === 'xlsx' ? !xlsxBase64 : !csvContent);
   const hasFile = fileKind === 'csv' ? Boolean(csvContent) : Boolean(xlsxBase64);
 
   return (
@@ -260,8 +294,8 @@ export function BulkImportWizard({
 
           {/* Import Button */}
           <div className="flex gap-2">
-            <Button onClick={handleImportClick} disabled={importDisabled} className="flex-1">
-              {isImporting ? (
+            <Button onClick={handlePreviewClick} disabled={previewDisabled} className="flex-1">
+              {isPreviewing || isImporting ? (
                 <span className="inline-flex items-center gap-2">
                   <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle
@@ -278,7 +312,7 @@ export function BulkImportWizard({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  {t('importing')}
+                  {isImporting ? t('importing') : t('previewing')}
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-2">
@@ -290,7 +324,7 @@ export function BulkImportWizard({
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
                     />
                   </svg>
-                  {t('importProducts')}
+                  {t('previewButton')}
                 </span>
               )}
             </Button>
@@ -301,6 +335,12 @@ export function BulkImportWizard({
             )}
           </div>
 
+          {previewError && (
+            <p role="alert" className="text-sm text-destructive-ink">
+              {previewError}
+            </p>
+          )}
+
           {isImporting && importProgress && importProgress.total > 0 && (
             <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
               {`${importProgress.processed}/${importProgress.total} (${importProgress.status})`}
@@ -308,6 +348,15 @@ export function BulkImportWizard({
           )}
         </div>
       </div>
+
+      {preview && !importResult && (
+        <BulkImportPreview
+          preview={preview}
+          isImporting={isImporting}
+          onConfirm={handleConfirmClick}
+          onBack={onClearPreview}
+        />
+      )}
 
       {importResult && <BulkImportResults result={importResult} onViewProducts={onViewProducts} />}
     </div>

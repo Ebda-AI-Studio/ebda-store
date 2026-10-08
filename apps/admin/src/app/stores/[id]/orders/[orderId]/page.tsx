@@ -23,7 +23,9 @@ import { ActionFooter } from './_components/ActionFooter';
 import { OrderInstapayPanel } from './_components/OrderInstapayPanel';
 import { OrderLifecycleTimeline } from '../../../../../components/order-timeline/OrderLifecycleTimeline';
 import type { OrderDetail } from './_components/types';
-import { manualRefundDescriptionKey } from '../_components/manualRefundCopy';
+import { manualRefundBody, type ManualRefundInput } from '../_components/manualRefundCopy';
+import { ManualRefundModal } from '../../../../../components/ManualRefundModal';
+import { OrderDocumentsCard } from './_components/OrderDocumentsCard';
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -71,9 +73,11 @@ export default function OrderDetailPage() {
   // Choosing "Refunded" only RECORDS a refund: no money moves (that is
   // "Refund via provider"). Confirm first, the same as the order list (#762) —
   // the footer offers it as the primary action on a paid, cancelled order.
+  const canRefund = !!user && user.role !== 'staff';
   const requestStatusChange = (newStatus: string) => {
-    if (newStatus === 'refunded') setConfirmRefundOpen(true);
-    else void handleStatusChange(newStatus);
+    if (newStatus === 'refunded') {
+      if (canRefund) setConfirmRefundOpen(true);
+    } else void handleStatusChange(newStatus);
   };
 
   const handleStatusChange = async (newStatus: string) => {
@@ -92,6 +96,27 @@ export default function OrderDetailPage() {
       }
     } catch {
       toastError(t('errors.statusUpdateFailed'));
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Records a refund the merchant has already paid out. Resolves to null on success, or the API's
+  // message (403 for staff, 409 REFUND_NOT_RECORDED) for the dialog to show.
+  const handleManualRefund = async (input: ManualRefundInput) => {
+    if (!order) return null;
+    setIsUpdating(true);
+    try {
+      const { error: apiError } = await apiPut(
+        `/api/v1/stores/${storeId}/orders/${order.id}/status`,
+        manualRefundBody(input)
+      );
+      if (apiError) return apiError.message || t('errors.statusUpdateFailed');
+      toastSuccess(t('toast.statusUpdated'));
+      await fetchOrder();
+      return null;
+    } catch {
+      return t('errors.statusUpdateFailed');
     } finally {
       setIsUpdating(false);
     }
@@ -276,6 +301,7 @@ export default function OrderDetailPage() {
               <div className="space-y-4">
                 <ItemsCard order={order} previewLimit={5} />
                 <SummaryCard order={order} />
+                <OrderDocumentsCard storeId={storeId} orderId={orderId} />
                 <PlatformCard order={order} />
               </div>
             </div>
@@ -286,6 +312,7 @@ export default function OrderDetailPage() {
               order={order}
               storeId={storeId}
               isUpdating={isUpdating}
+              canRefund={canRefund}
               onStatusChange={requestStatusChange}
               onMarkPaid={() => setConfirmMarkPaidOpen(true)}
               onConfirmInstapay={() => setConfirmInstapayOpen(true)}
@@ -317,18 +344,10 @@ export default function OrderDetailPage() {
           onClose={() => setConfirmInstapayOpen(false)}
         />
 
-        <ConfirmActionModal
+        <ManualRefundModal
           open={confirmRefundOpen}
-          title={tList('confirm.manualRefundTitle')}
-          description={tList(`confirm.${manualRefundDescriptionKey(order?.status)}`)}
-          confirmLabel={tList('confirm.confirm')}
-          cancelLabel={tList('confirm.cancel')}
-          variant="destructive"
-          isLoading={isUpdating}
-          onConfirm={async () => {
-            await handleStatusChange('refunded');
-            setConfirmRefundOpen(false);
-          }}
+          orderStatus={order?.status}
+          onConfirm={handleManualRefund}
           onClose={() => setConfirmRefundOpen(false)}
         />
       </div>

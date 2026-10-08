@@ -26,8 +26,8 @@ interface AreaRate {
 // Per-row local state (EGP strings for inputs)
 interface AreaRowState {
   isActive: boolean;
-  feeMajor: string; // "1.500"
-  thresholdMajor: string; // "10.000" or ""
+  feeMajor: string; // "15.00"
+  thresholdMajor: string; // "100.00" or ""
 }
 
 type AreaStateMap = Record<string, AreaRowState>; // key = `${governorate}||${area}`

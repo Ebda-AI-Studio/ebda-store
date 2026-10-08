@@ -31,6 +31,11 @@ export default function BulkOperationsPage() {
     importProgress,
     downloadTemplate,
     importFile,
+    preview,
+    isPreviewing,
+    previewError,
+    previewFile,
+    clearPreview,
     exportProducts,
     exportProductsXlsx,
     clearImportResult,
@@ -70,6 +75,11 @@ export default function BulkOperationsPage() {
           importResult={importResult}
           importProgress={importProgress}
           onDownloadTemplate={downloadTemplate}
+          preview={preview}
+          isPreviewing={isPreviewing}
+          previewError={previewError}
+          onPreview={previewFile}
+          onClearPreview={clearPreview}
           onImport={importFile}
           onClearResult={clearImportResult}
           onViewProducts={() => router.push(`/stores/${storeId}/products`)}

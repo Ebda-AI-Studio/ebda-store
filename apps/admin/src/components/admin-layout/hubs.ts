@@ -26,6 +26,7 @@ export type HubLabels = {
   floatingWidget: string;
   // Sales tabs
   orders: string;
+  invoices: string;
   customers: string;
   customerGroups: string;
   reviews: string;
@@ -109,6 +110,7 @@ export const HUBS: HubDefinition[] = [
     key: 'sales',
     urlPrefixes: [
       '/orders',
+      '/invoices',
       '/customers',
       '/customer-groups',
       '/sales',
@@ -122,6 +124,9 @@ export const HUBS: HubDefinition[] = [
     ],
     buildTabs: (storeId, labels) => [
       { label: labels.orders, href: `/stores/${storeId}/orders` },
+      // Fiscal documents (tax invoices, receipts, credit notes): issued automatically per
+      // sale / refund, so this is a read-only list, not a gated feature.
+      { label: labels.invoices, href: `/stores/${storeId}/invoices` },
       { label: labels.customers, href: `/stores/${storeId}/customers` },
       { label: labels.customerGroups, href: `/stores/${storeId}/customer-groups` },
       { label: labels.reviews, href: `/stores/${storeId}/reviews` },

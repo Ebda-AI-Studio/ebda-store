@@ -82,6 +82,19 @@ export const VALID_TRANSITIONS: Readonly<Record<string, readonly string[]>> =
  */
 export const statusOptionsFor = orderStatusOptions;
 
+/**
+ * `statusOptionsFor` minus `refunded` for a user who cannot refund. Recording a refund needs the
+ * API's `orders:refund` permission, which staff lack, so the option is hidden rather than offered
+ * and answered with a 403.
+ */
+export function statusOptionsForRole(
+  order: Parameters<typeof orderStatusOptions>[0],
+  canRefund: boolean
+): string[] {
+  const options = orderStatusOptions(order);
+  return canRefund ? [...options] : options.filter(s => s !== 'refunded');
+}
+
 export const STATUS_FILTERS = [
   'all',
   'pending',

@@ -20,6 +20,7 @@ import { ScopePicker } from '../_components/ScopePicker';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 import { fromMinor, roundToMinor } from '@force/shared';
+import { formatPrice } from '@/lib/format';
 type PromotionType = 'percentage' | 'fixed';
 
 interface Promotion {
@@ -149,7 +150,7 @@ export default function PromotionsPage() {
       description: promo.description ?? '',
       descriptionAr: promo.descriptionAr ?? '',
       type: promo.type,
-      // `fixed` promotions are stored in piastres → show as EGP (÷1000) in the
+      // `fixed` promotions are stored in piastres → show as EGP (÷100) in the
       // form. `percentage` promotions store the raw percent, shown as-is.
       value: String(promo.type === 'fixed' ? fromMinor(promo.value) : promo.value),
       maxDiscount: promo.maxDiscount != null ? String(fromMinor(promo.maxDiscount)) : '',
@@ -250,7 +251,7 @@ export default function PromotionsPage() {
         <span className="tabular-nums">
           {promo.type === 'percentage'
             ? t('valuePercentage', { value: promo.value })
-            : t('valueFixed', { value: promo.value })}
+            : formatPrice(promo.value)}
         </span>
       ),
     },

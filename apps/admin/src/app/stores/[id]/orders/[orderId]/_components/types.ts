@@ -95,6 +95,8 @@ export interface OrderDetail {
   /** Frozen at sale time (Ruling M3-8): `tax` is already inside subtotal/total. */
   taxIncludedInPrice?: boolean;
   shipping: number;
+  /** COD fee frozen at creation, inside `total` (ruling MONEYB-3). */
+  codFee?: number;
   discount: number;
   total: number;
   currency: string;

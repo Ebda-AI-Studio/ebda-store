@@ -8,7 +8,7 @@ import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { EmptyOrdersState } from './EmptyOrdersState';
-import { statusOptionsFor, type Order, type OrderLineItem } from './types';
+import { statusOptionsForRole, type Order, type OrderLineItem } from './types';
 
 interface OrdersTableProps {
   orders: Order[];
@@ -16,6 +16,8 @@ interface OrdersTableProps {
   hasActiveFilters: boolean;
   updatingId: string | null;
   selectedOrders: Set<string>;
+  /** False for staff: the "Refunded" status needs orders:refund, so it is not offered. */
+  canRefund: boolean;
   onStatusChange: (order: Order, newStatus: string) => void;
   onMarkPaid: (orderId: string) => void;
   onOpenInvoice: (orderId: string) => void;
@@ -72,6 +74,7 @@ export function OrdersTable({
   hasActiveFilters,
   updatingId,
   selectedOrders,
+  canRefund,
   onStatusChange,
   onMarkPaid,
   onOpenInvoice,
@@ -166,7 +169,7 @@ export function OrdersTable({
       header: t('table.status'),
       mobileBadge: true,
       cell: order => {
-        const transitions = statusOptionsFor(order);
+        const transitions = statusOptionsForRole(order, canRefund);
         const isUpdating = updatingId === order.id;
         // Reuses OrderStatusBadge's colorMap override (same pattern the
         // returns/shipments/notifications surfaces use) instead of a new

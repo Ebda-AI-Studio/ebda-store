@@ -659,7 +659,7 @@
         "price": "Price (EGP)",
         "costPrice": "Cost (EGP)",
         "profitLabel": "Profit margin per unit:",
-        "pricePlaceholder": "0.000",
+        "pricePlaceholder": "0.00",
         "discountLabel": "Discount",
         "discountNone": "None",
         "discountPercentage": "Percentage (%)",
@@ -878,7 +878,7 @@
         "mediaHint": "Drag and drop images here, or click to select",
         "mediaSizeHint": "Recommended 1000×1000 (square). Up to 10MB per file — we auto-compress for the storefront.",
         "price": "Price (EGP)",
-        "pricePlaceholder": "0.000",
+        "pricePlaceholder": "0.00",
         "costPrice": "Cost (EGP)",
         "pricingHint": "Enter prices in EGP. The discount dropdown auto-sets the compare-at price on the storefront.",
         "discountLabel": "Discount",
@@ -1100,8 +1100,19 @@
         "confirm": "Confirm",
         "cancel": "Cancel",
         "manualRefundTitle": "Mark Order as Refunded?",
-        "manualRefundDescription": "This only records a refund. It restores stock, reverses the coupon and loyalty points, and tells the customer a refund was issued — but it does NOT send any money back. To actually return a card payment, open the order and use \"Refund via provider\".",
-        "manualRefundDescriptionCancelled": "This order was cancelled, so its stock, coupon and loyalty points were already reversed at cancellation. This only records the refund on the order — it does NOT send any money back, and the customer is not sent a new notice. To actually return a card payment, use \"Refund via provider\".",
+        "manualRefundDescription": "Confirm only after you have already given the customer their money back. This records the refund — it does not send any money. It restores stock, reverses the coupon and loyalty points, and the customer will be told their refund was issued.",
+        "manualRefundDescriptionCancelled": "This order was cancelled, so its stock, coupon and loyalty points were already reversed. Confirm only after you have already given the customer their money back. This records the refund on the order — it does not send any money — and the customer will be told their refund was issued.",
+        "refundMethodLabel": "How did you refund the customer?",
+        "refundMethods": {
+          "cash": "Cash",
+          "instapay": "InstaPay",
+          "bank_transfer": "Bank transfer",
+          "store_credit": "Store credit",
+          "other": "Other"
+        },
+        "refundReferenceLabel": "Reference (optional)",
+        "refundReferencePlaceholder": "Transfer number or a short note",
+        "refundFailed": "Could not record the refund. Please try again.",
         "instapayTitle": "Confirm the InstaPay transfer?",
         "instapayDescription": "Confirm that the money for this order is in your InstaPay account. The order is then confirmed and can be shipped. Tapping twice is safe."
       },
@@ -1176,8 +1187,8 @@
         "viaSource": "(via {source})",
         "noRateConfigured": "No rate configured for this area — set a fee below or the order will save with 0 EGP shipping.",
         "overrideLabel": "Shipping fee override (EGP) — leave blank to use the calculated fee",
-        "overridePlaceholder": "e.g. 1.500",
-        "overrideActive": "Override active: {price} ({piastres} piastres) will be used instead of the calculated fee."
+        "overridePlaceholder": "e.g. 15.00",
+        "overrideActive": "Override active: {price} will be used instead of the calculated fee."
       },
       "productsSection": {
         "heading": "Products",
@@ -1246,6 +1257,7 @@
       "tax": "Taxes",
       "taxIncluded": "Incl. VAT",
       "deliveryFee": "Delivery",
+      "codFee": "Cash on delivery fee",
       "total": "Total",
       "items": "Items",
       "itemCount": "{count} items",
@@ -1405,7 +1417,11 @@
             "failed": "Failed",
             "cancelled": "Cancelled"
           }
-        }
+        },
+        "confirmReturnTitle": "Mark the parcel as returned to you?",
+        "confirmReturnDescription": "The order will be cancelled and nothing is owed on cash on delivery.",
+        "restockLabel": "Put the items back in stock",
+        "confirmReturn": "Mark as returned"
       }
     },
     "layout": {
@@ -2159,7 +2175,7 @@
           "credit": "Add credit",
           "debit": "Deduct",
           "amountLabel": "Amount (EGP)",
-          "amountPlaceholder": "0.000",
+          "amountPlaceholder": "0.00",
           "noteLabel": "Reason",
           "notePlaceholder": "Why is this balance changing? Only your team sees this.",
           "currentBalance": "Current balance: {amount}",
@@ -2680,7 +2696,7 @@
       "phone": "Phone",
       "phoneAr": "Phone (Arabic Display)",
       "phonePlaceholder": "+20 1XX XXX XXXX",
-      "phoneArPlaceholder": "965 XXXX XXXX+",
+      "phoneArPlaceholder": "+20 1XX XXX XXXX",
       "address": "Address",
       "addressAr": "Address (Arabic)",
       "addressPlaceholder": "123 Street, City, Egypt",
@@ -2849,9 +2865,9 @@
       "valuePercentageLabel": "Percentage (%) *",
       "valueAmountLabel": "Amount (EGP) *",
       "minOrderLabel": "Minimum Order (EGP)",
-      "minOrderPlaceholder": "10.000",
+      "minOrderPlaceholder": "10.00",
       "maxDiscountLabel": "Max Discount (EGP)",
-      "maxDiscountPlaceholder": "50.000",
+      "maxDiscountPlaceholder": "50.00",
       "usageLimitLabel": "Total Usage Limit",
       "usageLimitPlaceholder": "100",
       "usageLimitPerUserLabel": "Limit Per Customer",
@@ -2890,7 +2906,6 @@
       "valueLabelPercentage": "Value (%)",
       "valueLabelFixed": "Value (EGP)",
       "valuePercentage": "{value}%",
-      "valueFixed": "{value} piastres",
       "maxDiscount": "Max discount (EGP)",
       "priority": "Priority",
       "startsAt": "Start date",
@@ -3242,9 +3257,9 @@
       "areasArLabel": "Areas (Arabic)",
       "areasArPlaceholder": "القاهرة، الجيزة، الإسكندرية",
       "deliveryFeeLabel": "Delivery Fee (EGP)",
-      "deliveryFeePlaceholder": "1.000",
+      "deliveryFeePlaceholder": "1.00",
       "freeShippingLabel": "Free Shipping Over (EGP)",
-      "freeShippingPlaceholder": "25.000",
+      "freeShippingPlaceholder": "25.00",
       "estimatedDaysLabel": "Estimated Delivery Time (Days)",
       "estimatedDaysMinPlaceholder": "Min days",
       "estimatedDaysMaxPlaceholder": "Max days",
@@ -3311,7 +3326,7 @@
     },
     "returnPolicy": {
       "title": "Return policy",
-      "help": "Published to Google and to AI shopping assistants. Leave the window blank to publish no return policy at all. Enter 0 to publish “returns not accepted”.",
+      "help": "Published to Google, AI shopping assistants and your store's Returns, Terms and FAQ pages, and enforced on return requests (counted from the delivery date). Leave the window blank to declare no policy (no limit is enforced). Enter 0 for “returns not accepted”.",
       "windowLabel": "Return window (days)",
       "notDeclared": "Not declared",
       "feesLabel": "Return shipping paid by",
@@ -3841,7 +3856,7 @@
       "instructionsTitle": "How to Import Products",
       "step1": "Download the CSV template using the button below",
       "step2": "Fill in your product data following the template format",
-      "step3": "Prices are in EGP (e.g. 12.500)",
+      "step3": "Prices are in EGP, e.g. 250 or 250.50 (two decimals at most)",
       "step4": "For multiple categories/tags/images, separate with commas within quotes",
       "step5": "Upload the completed CSV file and click Import",
       "downloadTemplate": "Download Template",
@@ -3861,7 +3876,34 @@
       "trackInventory": "Track inventory (decrement on sale)",
       "importing": "Importing...",
       "importProducts": "Import Products",
+      "previewButton": "Preview Import",
+      "previewing": "Checking file...",
       "clear": "Clear"
+    },
+    "preview": {
+      "title": "Review before importing",
+      "summary": "{valid} of {total} rows are ready to import, {invalid} have errors. Nothing has been saved yet.",
+      "colRow": "Row",
+      "colName": "Name",
+      "colSku": "SKU",
+      "colPrice": "Price",
+      "colCompare": "Compare-at",
+      "colCost": "Cost",
+      "variantOf": "Variant of {sku}",
+      "truncated": "Showing the first {shown} rows only.",
+      "errorsHeading": "Rows with errors (these will not be imported):",
+      "errorRow": "Row {row}, {column}:",
+      "warnPiastres": "These prices look about 100 times higher than your current products (file median {file}, store median {store}). Prices are now in EGP, not piastres: 5000 means EGP 5,000. If you meant EGP 50, fix the file and preview again.",
+      "confirm": "Confirm and Import {count} Rows",
+      "back": "Back",
+      "noValidRows": "No rows can be imported. Fix the errors and upload the file again."
+    },
+    "priceErrors": {
+      "PRICE_REQUIRED": "Price is required (EGP, e.g. 250 or 250.50).",
+      "PRICE_INVALID": "Not a valid EGP amount. Use digits only, e.g. 250 or 250.50.",
+      "PRICE_NEGATIVE": "Price must not be negative.",
+      "PRICE_AMBIGUOUS_DECIMALS": "Three decimals are ambiguous (12.500 could mean 12.5 or 12,500). Use at most 2 decimals, e.g. 250 or 250.50.",
+      "PRICE_TOO_MANY_DECIMALS": "More than 2 decimals. Use e.g. 250 or 250.50."
     },
     "results": {
       "title": "Import Results",
@@ -3892,7 +3934,7 @@
         "allFields": "All product fields are included in the export",
         "commaSeparated": "Categories, tags, and images are comma-separated within their columns",
         "reImport": "The exported file can be edited and re-imported to update products",
-        "pricesInFils": "Prices are in EGP (e.g. 12.500)"
+        "pricesInFils": "Prices are in EGP, e.g. 250 or 250.50 (two decimals at most)"
       }
     },
     "errors": {
@@ -4872,7 +4914,7 @@
       "displayNameArLabel": "Display Name (Arabic)",
       "displayNameArPlaceholder": "الدفع عند الاستلام",
       "fixedFeeLabel": "Surcharge Fee (EGP)",
-      "fixedFeePlaceholder": "0.000",
+      "fixedFeePlaceholder": "0.00",
       "fixedFeeEquals": "= {amount} EGP",
       "fixedFeeHelpPrefix": "Extra charge added to the order when the customer pays cash on delivery. Enter",
       "fixedFeeHelpZero": "0",
@@ -5859,6 +5901,7 @@
         "blog": "Blog",
         "floatingWidget": "Floating Widget",
         "orders": "Orders",
+        "invoices": "Invoices & credit notes",
         "customers": "Customers",
         "reviews": "Reviews",
         "returns": "Returns",
@@ -5938,6 +5981,7 @@
       "navPlatformPlans": "Plans (platform)",
       "navPlatformBillingEvents": "Billing ledger (platform)",
       "navPlatformTaxVerification": "VAT verification (platform)",
+      "navPlatformTaxArchive": "Tax archive (platform)",
       "navPlatformSettings": "Platform settings",
       "navPlatformProviderActivation": "Activation requests (platform)"
     },
@@ -6314,7 +6358,7 @@
         "currencyLabel": "Currency",
         "fxRateLabel": "FX Rate (1 {currency} = ? EGP)",
         "fxRateHint": "Enter the exchange rate from your bank or receipt date.",
-        "fxRatePlaceholder": "e.g. 0.30700",
+        "fxRatePlaceholder": "e.g. 50.00",
         "errorExpenseDateRequired": "Expense date is required",
         "errorExpenseCategoryRequired": "Expense category is required",
         "errorPaidFromRequired": "Paid-from account is required",
@@ -6504,7 +6548,7 @@
       "featureInactiveDesc": "The Accounting — Multi-Currency feature is not enabled for this store. Contact your account manager to enable it on an Enterprise plan.",
       "recordNewRate": "Record a New Rate",
       "rateMeaning": "Rate meaning: 1 unit of the selected currency = rate EGP.",
-      "rateExample": "Example: USD at 0.307 means 1 USD = 0.307 EGP (307 piastres).",
+      "rateExample": "Example: USD at 50.00 means 1 USD = 50.00 EGP.",
       "currencyLabel": "Currency",
       "rateLabel": "Rate (EGP per 1 {currency})",
       "rateDateLabel": "Rate Date",
@@ -8132,7 +8176,7 @@
       "minOrderSectionTitle": "Minimum order value",
       "minOrderSectionHint": "Customers can't check out with an items subtotal below this amount. Leave empty or 0 to disable.",
       "minOrderLabel": "Minimum order (EGP)",
-      "minOrderPlaceholder": "e.g. 5.000",
+      "minOrderPlaceholder": "e.g. 500.00",
       "invoiceEmailSectionTitle": "Order invoice email",
       "invoiceEmailSectionHint": "Every order in this store also emails the invoice to this address (e.g. the store owner). Leave empty to disable.",
       "invoiceEmailLabel": "Invoice recipient email",
@@ -9431,6 +9475,77 @@
       "disclaimer": "Ebda does not file taxes or issue e-receipts on your behalf. You stay responsible for your own VAT filings."
     },
     "error": "Something went wrong. Please try again."
+  },
+  "invoices": {
+    "title": "Invoices & credit notes",
+    "subtitle": "Every tax invoice, receipt and credit note your store has issued.",
+    "filterLabel": "Document type",
+    "allTypes": "All documents",
+    "loading": "Loading…",
+    "loadFailed": "Could not load the documents. Please try again.",
+    "loadMore": "Load more",
+    "emptyTitle": "No documents yet",
+    "emptyDescription": "A tax invoice or sales receipt is issued automatically for every sale, and a credit note or refund receipt for every refund. They will appear here.",
+    "open": "Open",
+    "againstInvoice": "Against invoice",
+    "columns": {
+      "number": "Number",
+      "type": "Type",
+      "status": "Status",
+      "issuedAt": "Issued",
+      "order": "Order",
+      "net": "Net",
+      "vat": "VAT",
+      "total": "Total",
+      "actions": "Actions"
+    },
+    "types": {
+      "tax_invoice": "Tax invoice",
+      "receipt": "Sales receipt",
+      "credit_note": "Credit note",
+      "refund_receipt": "Refund receipt",
+      "order_record": "Archived order record",
+      "billing_record": "Archived subscription billing record"
+    },
+    "statuses": {
+      "issued": "Issued",
+      "cancelled": "Cancelled"
+    },
+    "documentsCard": {
+      "title": "Documents",
+      "empty": "No documents have been issued for this order yet.",
+      "loadFailed": "Could not load this order's documents."
+    },
+    "viewer": {
+      "title": "Document",
+      "back": "Back",
+      "language": "Document language",
+      "arabic": "Arabic",
+      "english": "English",
+      "print": "Print",
+      "loading": "Loading the document…",
+      "loadFailed": "Could not load the document.",
+      "printFailed": "Could not open the print dialog."
+    }
+  },
+  "taxArchive": {
+    "title": "Tax archive",
+    "subtitle": "Fiscal documents kept for the tax authority, store by store.",
+    "storeTitle": "Store documents",
+    "retention": "Fiscal documents are kept for 6 years, even after a store is deleted.",
+    "columns": {
+      "store": "Store",
+      "documents": "Documents",
+      "lastIssued": "Last issued",
+      "actions": "Actions"
+    },
+    "deletedStore": "Deleted store",
+    "viewDocuments": "View documents",
+    "loading": "Loading…",
+    "loadFailed": "Could not load the archive. Please try again.",
+    "empty": "No archived documents yet.",
+    "emptyStore": "This store has no archived documents.",
+    "backToStores": "All stores"
   },
   "taxReview": {
     "title": "VAT verification",
