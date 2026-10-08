@@ -543,6 +543,34 @@ describe('label, quote, pickup, tracking', () => {
     ).rejects.toMatchObject({ code: 'CARRIER_UNAVAILABLE' });
   });
 
+  it('quote: a bundle account (priceAfterVat 0, bundleDiscount == shippingFee) is a real 0 quote', async () => {
+    const { stub } = mk();
+    const pickup = shipmentRequest().pickupAddress;
+    const dest = shipmentRequest().deliveryAddress;
+    const calc = (data: object) =>
+      new BostaCarrier({
+        baseUrl: BOSTA_STUB.baseUrl,
+        fetchImpl: async (url, init) =>
+          new URL(url).pathname.endsWith('/calculator')
+            ? new Response(JSON.stringify({ success: true, data }), { status: 200 })
+            : stub.fetch(url, init),
+      });
+    // Shape observed on a live Bosta account, 2026-10-08.
+    const bundle = {
+      shippingFee: 102,
+      bundleDiscount: { amount: 102 },
+      priceAfterVat: 0,
+      vat: 0.14,
+    };
+    await expect(
+      calc(bundle).quote(creds, { pickupAddress: pickup, deliveryAddress: dest })
+    ).resolves.toEqual({ amountPiastres: 0, source: 'api' });
+    // A 0 without the itemised discount is still no quote.
+    await expect(
+      calc({ priceAfterVat: 0 }).quote(creds, { pickupAddress: pickup, deliveryAddress: dest })
+    ).rejects.toMatchObject({ code: 'CARRIER_UNAVAILABLE' });
+  });
+
   it('requestPickup: POST /pickups with the location id; needs businessLocationId', async () => {
     const { stub, carrier } = mk();
     const out = await carrier.requestPickup(

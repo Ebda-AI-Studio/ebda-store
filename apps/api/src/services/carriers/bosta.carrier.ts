@@ -743,9 +743,20 @@ export class BostaCarrier implements ShippingCarrierProvider {
     // UNVERIFIED: every pricing response body (the docs list status codes only). Parsed defensively;
     // when no positive number is found there is no quote: never a guess.
     const d = res.body.data;
-    const fee = [d?.priceAfterVat, d?.price, res.body.priceAfterVat, res.body.price, d]
+    let fee = [d?.priceAfterVat, d?.price, res.body.priceAfterVat, res.body.price, d]
       .map(numeric)
       .find(n => n !== null && n > 0);
+    // Verified on a live account (2026-10-08): a business on a Bosta bundle gets
+    // `priceAfterVat: 0` with `bundleDiscount === shippingFee`. That is a real quote of 0 EGP,
+    // not a missing one; only accept it when Bosta itemised the fee and the discount.
+    if (
+      fee === undefined &&
+      numeric(d?.priceAfterVat) === 0 &&
+      numeric(d?.shippingFee) !== null &&
+      numeric(d?.bundleDiscount?.amount) === numeric(d?.shippingFee)
+    ) {
+      fee = 0;
+    }
     if (fee === undefined || fee === null) {
       throw new CarrierError('CARRIER_UNAVAILABLE', 'bosta.quote: no price in the response');
     }
