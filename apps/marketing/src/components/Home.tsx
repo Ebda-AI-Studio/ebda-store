@@ -165,7 +165,8 @@ export function Home({ locale }: { locale: Locale }) {
           ))}
         </dl>
         <p className="muted">
-          {c.providers.ask} <a href={`mailto:${BRAND.supportEmail}`}>{c.providers.askLink}</a>
+          {c.providers.activation} {c.providers.ask}{' '}
+          <a href={`mailto:${BRAND.supportEmail}`}>{c.providers.askLink}</a>
         </p>
       </Section>
     ),
