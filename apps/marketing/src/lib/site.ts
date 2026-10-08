@@ -60,10 +60,7 @@ export const NAV_ANCHORS = [
 ] as const satisfies readonly { key: string; target: SectionId }[];
 
 /**
- * Customer-stories placeholder. Amelia Aurum is merchant #1; no quotes are
- * published. Set to `null` to remove the name chip entirely.
+ * Customer-stories placeholder. Null until a merchant has a live, reachable
+ * store (the first named merchant's domain did not resolve, 2026-10-08).
  */
-export const FIRST_MERCHANT: { name: string; domain: string } | null = {
-  name: 'Amelia Aurum',
-  domain: 'ameliaaurum.com',
-};
+export const FIRST_MERCHANT: { name: string; domain: string } | null = null;

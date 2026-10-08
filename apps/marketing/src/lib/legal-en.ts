@@ -141,7 +141,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '13. Suspension and termination',
         p: [
-          'You may stop using the Service and close your account at any time by writing to ahlan@ebda.app; fees already paid are not refunded.',
+          'You may stop using the Service and close your account at any time from the dashboard, or by writing to ahlan@ebda.app; fees already paid are not refunded.',
           'We may suspend, restrict or terminate an account, a store or any feature, with or without notice, if we reasonably believe you breached these terms, the Merchant Agreement or the Acceptable Use Policy; if a store is, or appears to be, unlawful, fraudulent or harmful; if required by law or an authority; if fees are unpaid; or to protect the Service, our users or third parties. We will try to give notice where it is practical and lawful. Where fees are unpaid, the process in the Merchant Agreement applies.',
           'On termination your right to use the Service ends, unpaid fees become due, and your store and data are then deleted as described in the Merchant Agreement and the Privacy Policy. Sections that by their nature should survive (including 5, 10, 11, 12, 14 and 16) survive.',
         ],
@@ -229,7 +229,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '9. Plans and fees',
         p: [
-          "Ebda Store offers monthly plans: Basic (EGP 1,490), Growth (EGP 3,490) and Business (EGP 9,990), with no commission charged by Ebda Store on orders. Prices, features and limits are shown on the Pricing section and may change with 30 days' notice; a change takes effect from the next billing period. Plan prices are in Egyptian pounds; taxes, if any, are additional.",
+          "Ebda Store offers monthly and yearly plans: Basic (EGP 1,490), Growth (EGP 3,490) and Business (EGP 9,990) per month, or the same plans billed yearly at 25% off (EGP 13,410, 31,410 and 89,910 per year), with no commission charged by Ebda Store on orders. New stores may try the Growth plan free for 14 days; nothing is charged during the trial, and when it ends the store moves to a paid plan only once you choose and pay for one. Prices, features and limits are shown on the Pricing section and may change with 30 days' notice; a change takes effect from the next billing period. Plan prices are in Egyptian pounds; taxes, if any, are additional.",
         ],
       },
       {
@@ -241,7 +241,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '11. No refunds',
         p: [
-          'Subscription fees are charged in advance and are non-refundable, including for partial periods, downgrades, unused time and closure of the account, except where mandatory law requires a refund or where we charged you in error, in which case we will correct the error. Ending a plan stops future charges; it does not refund past ones.',
+          'Subscription fees (monthly or yearly) are charged in advance and are non-refundable, including for partial periods, downgrades, unused time (including the rest of a yearly term) and closure of the account, except where mandatory law requires a refund or where we charged you in error, in which case we will correct the error. You can cancel from the subscription page in the dashboard at any time; cancelling stops future charges and does not refund past ones. Fees are never charged during the free trial.',
         ],
       },
       {
