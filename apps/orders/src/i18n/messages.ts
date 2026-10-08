@@ -100,6 +100,7 @@ export interface Messages {
     tax: string;
     shipping: string;
     deliveryFee: string;
+    codFee: string;
     taxIncluded: string;
     discount: string;
     coupon: string;
@@ -152,6 +153,14 @@ export interface Messages {
     address_building: string;
     address_floor: string;
     address_apt: string;
+    documents: {
+      title: string;
+      empty: string;
+      loadFailed: string;
+      issued: string;
+      cancelled: string;
+      types: Record<string, string>;
+    };
     actions: {
       processed: string;
       cancel: string;
@@ -200,6 +209,11 @@ export interface Messages {
       manualRefundTitle: string;
       manualRefundDesc: string;
       manualRefundConfirm: string;
+      manualRefundMethodLabel: string;
+      manualRefundMethods: Record<string, string>;
+      manualRefundReferenceLabel: string;
+      manualRefundReferencePlaceholder: string;
+      manualRefundFailed: string;
     };
   };
   nav: {
@@ -334,6 +348,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       tax: 'Tax',
       shipping: 'Shipping',
       deliveryFee: 'Delivery fee',
+      codFee: 'Cash on delivery fee',
       taxIncluded: 'Incl. VAT',
       discount: 'Discount',
       coupon: 'Coupon',
@@ -383,6 +398,21 @@ export const MESSAGES: Record<Locale, Messages> = {
       address_building: 'Building',
       address_floor: 'Floor',
       address_apt: 'Apt',
+      documents: {
+        title: 'Documents',
+        empty: 'No documents have been issued for this order yet.',
+        loadFailed: 'Could not load this order’s documents.',
+        issued: 'Issued',
+        cancelled: 'Cancelled',
+        types: {
+          tax_invoice: 'Tax invoice',
+          receipt: 'Sales receipt',
+          credit_note: 'Credit note',
+          refund_receipt: 'Refund receipt',
+          order_record: 'Archived order record',
+          billing_record: 'Archived subscription billing record',
+        },
+      },
       actions: {
         processed: 'Mark processed',
         cancel: 'Cancel',
@@ -433,8 +463,19 @@ export const MESSAGES: Record<Locale, Messages> = {
         invoiceOpenFailed: 'Could not open invoice',
         manualRefundTitle: 'Mark order as refunded?',
         manualRefundDesc:
-          'This only records a refund — it does NOT send any money back. To return a card payment, use “Refund via provider”.',
+          'Confirm only after you have already given the customer their money back. The customer will be told their refund was issued. This records the refund — it does not send any money.',
         manualRefundConfirm: 'Mark refunded',
+        manualRefundMethodLabel: 'How did you refund the customer?',
+        manualRefundMethods: {
+          cash: 'Cash',
+          instapay: 'InstaPay',
+          bank_transfer: 'Bank transfer',
+          store_credit: 'Store credit',
+          other: 'Other',
+        },
+        manualRefundReferenceLabel: 'Reference (optional)',
+        manualRefundReferencePlaceholder: 'Transfer number or a short note',
+        manualRefundFailed: 'Could not record the refund. Please try again.',
       },
     },
     nav: {
@@ -568,6 +609,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       tax: 'الضريبة',
       shipping: 'الشحن',
       deliveryFee: 'رسوم التوصيل',
+      codFee: 'رسوم الدفع عند الاستلام',
       taxIncluded: 'شامل ضريبة القيمة المضافة',
       discount: 'الخصم',
       coupon: 'كوبون',
@@ -617,6 +659,21 @@ export const MESSAGES: Record<Locale, Messages> = {
       address_building: 'مبنى',
       address_floor: 'دور',
       address_apt: 'شقة',
+      documents: {
+        title: 'المستندات',
+        empty: 'لم يُصدَر أي مستند لهذا الطلب بعد.',
+        loadFailed: 'تعذّر تحميل مستندات هذا الطلب.',
+        issued: 'صادر',
+        cancelled: 'ملغى',
+        types: {
+          tax_invoice: 'فاتورة ضريبية',
+          receipt: 'إيصال بيع',
+          credit_note: 'إشعار دائن',
+          refund_receipt: 'إيصال استرداد',
+          order_record: 'سجل طلب مؤرشف',
+          billing_record: 'سجل فاتورة اشتراك مؤرشف',
+        },
+      },
       actions: {
         processed: 'تعليم كمُجهَّز',
         cancel: 'إلغاء',
@@ -666,8 +723,19 @@ export const MESSAGES: Record<Locale, Messages> = {
         invoiceOpenFailed: 'تعذّر فتح الفاتورة',
         manualRefundTitle: 'تعليم الطلب كمسترد؟',
         manualRefundDesc:
-          'هذا يسجّل الاسترداد فقط — ولا يعيد أي مبلغ. لإعادة دفعة البطاقة استخدم «استرداد عبر المزوّد».',
+          'أكّد فقط بعد أن تكون قد أعدت المبلغ إلى العميل فعلاً. سيُبلَّغ العميل بأنه تم إصدار استرداده. هذا الإجراء يسجّل الاسترداد ولا يرسل أي مبلغ.',
         manualRefundConfirm: 'تعليم كمسترد',
+        manualRefundMethodLabel: 'كيف أعدت المبلغ إلى العميل؟',
+        manualRefundMethods: {
+          cash: 'نقداً',
+          instapay: 'إنستاباي',
+          bank_transfer: 'تحويل بنكي',
+          store_credit: 'رصيد في المتجر',
+          other: 'أخرى',
+        },
+        manualRefundReferenceLabel: 'المرجع (اختياري)',
+        manualRefundReferencePlaceholder: 'رقم التحويل أو ملاحظة قصيرة',
+        manualRefundFailed: 'تعذّر تسجيل الاسترداد. حاول مرة أخرى.',
       },
     },
     nav: {
