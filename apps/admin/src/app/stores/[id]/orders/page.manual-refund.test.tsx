@@ -38,6 +38,8 @@ vi.mock('../../../../components/AdminLayout', () => ({
 }));
 vi.mock('../../../../components/DateRangePicker', () => ({ DateRangePicker: () => null }));
 vi.mock('../../../../lib/api', () => api);
+const auth = vi.hoisted(() => ({ role: 'store_admin' as string }));
+vi.mock('../../../../lib/auth', () => ({ useAuth: () => ({ user: { role: auth.role } }) }));
 
 import { ToastProvider } from '@force/ui';
 import OrdersPage from './page';
@@ -68,6 +70,7 @@ beforeEach(() => {
     data: { orders: [ORDER], meta: { total: 1, totalPages: 1 } },
   });
   api.apiPut.mockResolvedValue({ data: {} });
+  auth.role = 'store_admin';
 });
 afterEach(() => {
   cleanup();
@@ -88,18 +91,52 @@ async function pick(status: string) {
 }
 
 describe('orders list — manual "Refunded" needs confirmation', () => {
-  it('does not PUT refunded on pick; asks first, and PUTs only after confirm', async () => {
+  it('does not PUT refunded on pick; asks first, and PUTs only after confirm, recording the refund', async () => {
     await pick('refunded');
 
     expect(api.apiPut).not.toHaveBeenCalled();
+    // The dialog says the money must already have been returned, and asks how.
     expect(await screen.findByText('manualRefundDescription')).toBeTruthy();
+    expect(screen.getByLabelText('refundMethodLabel')).toBeTruthy();
 
     fireEvent.click(screen.getByText('confirm'));
     await waitFor(() =>
       expect(api.apiPut).toHaveBeenCalledWith('/api/v1/stores/store-1/orders/order-1/status', {
         status: 'refunded',
+        refundRecorded: true,
+        refundMethod: 'cash',
       })
     );
+  });
+
+  it('sends the chosen method and trimmed reference', async () => {
+    await pick('refunded');
+    fireEvent.change(await screen.findByLabelText('refundMethodLabel'), {
+      target: { value: 'instapay' },
+    });
+    fireEvent.change(screen.getByLabelText('refundReferenceLabel'), {
+      target: { value: '  TXN-42  ' },
+    });
+    fireEvent.click(screen.getByText('confirm'));
+    await waitFor(() =>
+      expect(api.apiPut).toHaveBeenCalledWith('/api/v1/stores/store-1/orders/order-1/status', {
+        status: 'refunded',
+        refundRecorded: true,
+        refundMethod: 'instapay',
+        refundReference: 'TXN-42',
+      })
+    );
+  });
+
+  it('shows the API message inside the dialog when the server refuses (409/403)', async () => {
+    api.apiPut.mockResolvedValue({
+      error: { code: 'REFUND_NOT_RECORDED', message: 'Record the refund first', status: 409 },
+    });
+    await pick('refunded');
+    fireEvent.click(await screen.findByText('confirm'));
+    expect(await screen.findByText('Record the refund first')).toBeTruthy();
+    // still open so the merchant can retry
+    expect(screen.getByText('manualRefundDescription')).toBeTruthy();
   });
 
   it('cancelling the dialog changes nothing', async () => {
@@ -115,5 +152,20 @@ describe('orders list — manual "Refunded" needs confirmation', () => {
         status: 'processing',
       })
     );
+  });
+
+  it('staff are not offered Refunded in the status dropdown', async () => {
+    auth.role = 'staff';
+    render(
+      <ToastProvider>
+        <OrdersPage />
+      </ToastProvider>
+    );
+    const select = (await screen.findAllByLabelText(
+      'actions.updateStatusLabel'
+    )) as HTMLSelectElement[];
+    const values = Array.from(select[0].options).map(o => o.value);
+    expect(values).not.toContain('refunded');
+    expect(values).toContain('processing');
   });
 });

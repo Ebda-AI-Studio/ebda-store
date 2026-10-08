@@ -2,7 +2,7 @@
 
 import { orderActionVisibility, refundViaProviderRemaining } from '@force/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { statusOptionsFor, type OrderDetail } from '@/lib/orders';
+import { statusOptionsForRole, type OrderDetail } from '@/lib/orders';
 import { PaymentLinkButton } from './PaymentLinkButton';
 import { RefreshPaymentButton } from './RefreshPaymentButton';
 import { RefundButton } from './RefundButton';
@@ -14,6 +14,8 @@ interface ActionFooterProps {
   order: OrderDetail;
   storeId: string;
   isUpdating: boolean;
+  /** False for staff (no orders:refund): no Refund button and no "Refunded" status. */
+  canRefund: boolean;
   onStatusChange: (newStatus: string) => void;
   onMarkPaid: () => void;
   onRefetch: () => void;
@@ -33,6 +35,7 @@ export function ActionFooter({
   order,
   storeId,
   isUpdating,
+  canRefund,
   onStatusChange,
   onMarkPaid,
   onRefetch,
@@ -43,7 +46,7 @@ export function ActionFooter({
   // Same options the admin offers (#1936): a PAID cancelled order's only
   // option is `refunded`, so `cancelled` is not final here. The page confirms
   // a `refunded` pick before sending it.
-  const transitions = statusOptionsFor(order);
+  const transitions = statusOptionsForRole(order, canRefund);
   const nextStatus = transitions.find(s => s !== 'cancelled') ?? null;
   const canCancel = transitions.includes('cancelled');
   // Final = the shared transition map offers nothing more (#2144). A hand-kept
@@ -143,7 +146,7 @@ export function ActionFooter({
           />
         )}
 
-        {showRefundViaProvider && (
+        {showRefundViaProvider && canRefund && (
           <RefundButton
             storeId={storeId}
             orderId={order.id}

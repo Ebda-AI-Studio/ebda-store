@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useToast } from '@force/ui';
+import { Button, Modal, useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 import { apiGet, apiPost } from '../../../../../../lib/api';
@@ -80,6 +80,9 @@ export function ShipmentCard({ storeId, orderId, onChanged }: ShipmentCardProps)
   const [manualTracking, setManualTracking] = useState('');
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [forceCancel, setForceCancel] = useState(false);
+  // Manual shipment moved to "returned" (return to origin): ask whether the items go back in stock.
+  const [confirmReturn, setConfirmReturn] = useState(false);
+  const [restock, setRestock] = useState(true);
 
   const base = `/api/v1/stores/${storeId}`;
 
@@ -292,7 +295,12 @@ export function ShipmentCard({ storeId, orderId, onChanged }: ShipmentCardProps)
                   disabled={busy !== null}
                   onChange={e => {
                     const status = e.target.value;
-                    if (status) {
+                    if (status === 'returned') {
+                      // Cancels the order and frees the stock: confirm first.
+                      e.target.value = '';
+                      setRestock(true);
+                      setConfirmReturn(true);
+                    } else if (status) {
                       void run('status', () =>
                         apiPost(`${base}/shipments/${shipment.id}/status`, { status })
                       );
@@ -423,6 +431,46 @@ export function ShipmentCard({ storeId, orderId, onChanged }: ShipmentCardProps)
         </div>
       )}
 
+      <Modal
+        isOpen={confirmReturn}
+        onClose={() => setConfirmReturn(false)}
+        title={t('confirmReturnTitle')}
+        size="sm"
+      >
+        <p className="text-sm text-muted-foreground">{t('confirmReturnDescription')}</p>
+        <label className="mt-4 flex items-center gap-2 text-sm text-foreground">
+          <input
+            type="checkbox"
+            checked={restock}
+            onChange={e => setRestock(e.target.checked)}
+            className="h-4 w-4"
+          />
+          {t('restockLabel')}
+        </label>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button
+            variant="outline"
+            onClick={() => setConfirmReturn(false)}
+            disabled={busy !== null}
+          >
+            {t('keep')}
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={busy !== null}
+            isLoading={busy === 'status'}
+            onClick={async () => {
+              if (!shipment) return;
+              await run('status', () =>
+                apiPost(`${base}/shipments/${shipment.id}/status`, { status: 'returned', restock })
+              );
+              setConfirmReturn(false);
+            }}
+          >
+            {t('confirmReturn')}
+          </Button>
+        </div>
+      </Modal>
       <ConfirmActionModal
         open={confirmCancel}
         title={t('confirmCancelTitle')}

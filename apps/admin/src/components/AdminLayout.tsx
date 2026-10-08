@@ -117,6 +117,7 @@ export function AdminLayout({
     platformBillingEvents: t('navPlatformBillingEvents'),
     platformTaxVerification: t('navPlatformTaxVerification'),
     platformProviderActivation: t('navPlatformProviderActivation'),
+    platformTaxArchive: t('navPlatformTaxArchive'),
     platformSettings: t('navPlatformSettings'),
     // Super-admin store-scoped
     manageFeatures: t('navManageFeatures'),
@@ -132,6 +133,7 @@ export function AdminLayout({
     floatingWidget: t('hubTabs.floatingWidget'),
     // Sales tabs
     orders: t('hubTabs.orders'),
+    invoices: t('hubTabs.invoices'),
     customers: t('hubTabs.customers'),
     customerGroups: t('hubTabs.customerGroups'),
     reviews: t('hubTabs.reviews'),

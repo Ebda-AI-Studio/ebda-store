@@ -80,7 +80,7 @@ function statusOptionValues(): string[] {
     .filter(v => v !== '');
 }
 
-function renderTable(orders: Order[]) {
+function renderTable(orders: Order[], canRefund = true) {
   return render(
     <OrdersTable
       orders={orders}
@@ -88,6 +88,7 @@ function renderTable(orders: Order[]) {
       hasActiveFilters={false}
       updatingId={null}
       selectedOrders={new Set()}
+      canRefund={canRefund}
       onStatusChange={() => {}}
       onMarkPaid={() => {}}
       onOpenInvoice={() => {}}
@@ -109,6 +110,22 @@ describe('OrdersTable status dropdown (renders the real DOM via jsdom)', () => {
     // transitions map silently dropped an entry.
     expect(optionValues).toEqual(['processing', 'shipped', 'delivered', 'cancelled', 'refunded']);
     expect(optionValues).toContain('refunded');
+  });
+
+  it('staff (canRefund=false) is never offered Refunded; the other transitions stay', () => {
+    renderTable(
+      [baseOrder({ id: 'order-staff', status: 'confirmed', paymentStatus: 'paid' })],
+      false
+    );
+    expect(statusOptionValues()).toEqual(['processing', 'shipped', 'delivered', 'cancelled']);
+  });
+
+  it('a delivered paid order has no status control at all for staff (its only option is Refunded)', () => {
+    renderTable(
+      [baseOrder({ id: 'order-staff-2', status: 'delivered', paymentStatus: 'paid' })],
+      false
+    );
+    expect(screen.queryByLabelText('actions.updateStatusLabel')).toBeNull();
   });
 
   it('offers every transition including refunded for a PAID pending order (#1967)', () => {

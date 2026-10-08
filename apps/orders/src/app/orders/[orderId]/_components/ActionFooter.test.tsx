@@ -16,7 +16,9 @@ vi.mock('@/contexts/LanguageContext', () => {
 });
 vi.mock('./PaymentLinkButton', () => ({ PaymentLinkButton: () => null }));
 vi.mock('./RefreshPaymentButton', () => ({ RefreshPaymentButton: () => null }));
-vi.mock('./RefundButton', () => ({ RefundButton: () => null }));
+vi.mock('./RefundButton', () => ({
+  RefundButton: () => <button data-testid="refund-button">refund</button>,
+}));
 vi.mock('./RefreshRefundStatusButton', () => ({ RefreshRefundStatusButton: () => null }));
 vi.mock('./InvoiceButton', () => ({ InvoiceButton: () => null }));
 
@@ -39,12 +41,13 @@ function order(status: string, paymentStatus: string): OrderDetail {
   } as unknown as OrderDetail;
 }
 
-function renderFooter(o: OrderDetail, onStatusChange = vi.fn()) {
+function renderFooter(o: OrderDetail, onStatusChange = vi.fn(), canRefund = true) {
   render(
     <ActionFooter
       order={o}
       storeId="s1"
       isUpdating={false}
+      canRefund={canRefund}
       onStatusChange={onStatusChange}
       onMarkPaid={() => {}}
       onRefetch={() => {}}
@@ -78,6 +81,37 @@ describe('orders PWA ActionFooter — status action (#1936)', () => {
 
   it('keeps the usual next step for an active order', () => {
     const onStatusChange = renderFooter(order('shipped', 'paid'));
+    fireEvent.click(screen.getByText('delivered'));
+    expect(onStatusChange).toHaveBeenCalledWith('delivered');
+  });
+});
+
+// Recording or issuing a refund needs the API's orders:refund permission; staff lack it.
+describe('orders PWA ActionFooter - staff (canRefund=false)', () => {
+  const online = (o: OrderDetail) =>
+    ({
+      ...o,
+      payments: [{ provider: 'paymob', status: 'completed', transactionId: 'txn_1' }],
+    }) as unknown as OrderDetail;
+
+  it('hides Refund-via-provider on a paid online order, but a refund-capable user sees it', () => {
+    renderFooter(online(order('confirmed', 'paid')), vi.fn(), false);
+    expect(screen.queryByTestId('refund-button')).toBeNull();
+    cleanup();
+    renderFooter(online(order('confirmed', 'paid')), vi.fn(), true);
+    expect(screen.getByTestId('refund-button')).toBeTruthy();
+  });
+
+  it.each(['delivered', 'confirmed', 'cancelled'])(
+    'never offers the Refunded status on a paid %s order',
+    status => {
+      renderFooter(order(status, 'paid'), vi.fn(), false);
+      expect(screen.queryByText('refunded')).toBeNull();
+    }
+  );
+
+  it('keeps the usual next step', () => {
+    const onStatusChange = renderFooter(order('shipped', 'paid'), vi.fn(), false);
     fireEvent.click(screen.getByText('delivered'));
     expect(onStatusChange).toHaveBeenCalledWith('delivered');
   });

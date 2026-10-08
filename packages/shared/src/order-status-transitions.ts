@@ -21,7 +21,8 @@ export const ORDER_STATUS_TRANSITIONS: Readonly<Record<string, readonly string[]
   pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
   confirmed: ['processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
   processing: ['shipped', 'delivered', 'cancelled', 'refunded'],
-  shipped: ['delivered', 'refunded', 'processing'],
+  // `shipped → cancelled` = return to origin (ruling MONEYB-5).
+  shipped: ['delivered', 'refunded', 'processing', 'cancelled'],
   delivered: ['refunded'],
   cancelled: ['refunded'],
   refunded: [],

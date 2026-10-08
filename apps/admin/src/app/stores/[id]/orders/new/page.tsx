@@ -672,7 +672,6 @@ export default function NewOrderPage() {
                 <p className="text-xs text-primary">
                   {t('shippingSection.overrideActive', {
                     price: formatPrice(shippingOverrideFils),
-                    piastres: shippingOverrideFils,
                   })}
                 </p>
               )}

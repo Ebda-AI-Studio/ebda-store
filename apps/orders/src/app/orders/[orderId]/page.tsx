@@ -10,6 +10,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/contexts/ToastContext';
 import { can } from '@/lib/permissions';
+import { ManualRefundDialog, type ManualRefundInput } from './_components/ManualRefundDialog';
+import { OrderDocuments } from './_components/OrderDocuments';
 import { StatusBadge } from '@/components/StatusBadge';
 import { formatDateTime } from '@/lib/format';
 import { DeliveryCard } from './_components/DeliveryCard';
@@ -34,6 +36,7 @@ export default function OrderDetailPage() {
   const { notify } = useToast();
 
   const canManage = can(user, 'orders:manage');
+  const canRefund = can(user, 'orders:refund');
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -71,8 +74,9 @@ export default function OrderDetailPage() {
   // "Refund via provider"). Confirm first — the footer offers it as the
   // primary action on a paid, cancelled order (#1936).
   const requestStatusChange = (newStatus: string) => {
-    if (newStatus === 'refunded') setConfirmRefundOpen(true);
-    else void handleStatusChange(newStatus);
+    if (newStatus === 'refunded') {
+      if (canRefund) setConfirmRefundOpen(true);
+    } else void handleStatusChange(newStatus);
   };
 
   const handleStatusChange = async (newStatus: string) => {
@@ -95,6 +99,34 @@ export default function OrderDetailPage() {
       }
     } catch {
       notify(t.orders.error, 'error');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Records a refund the merchant already paid out. Resolves to null on success, or the API's
+  // message (403 for staff, 409 REFUND_NOT_RECORDED) for the dialog to show.
+  const handleManualRefund = async (input: ManualRefundInput): Promise<string | null> => {
+    if (!order) return null;
+    const parsed = statusUpdateSchema.safeParse({
+      status: 'refunded',
+      refundRecorded: true,
+      refundMethod: input.method,
+      ...(input.reference.trim() ? { refundReference: input.reference.trim() } : {}),
+    });
+    if (!parsed.success) return t.detail.actions.manualRefundFailed;
+    setIsUpdating(true);
+    try {
+      const { error: apiError } = await apiPut(
+        `/api/v1/stores/${storeId}/orders/${order.id}/status`,
+        parsed.data
+      );
+      if (apiError) return apiError.message || t.detail.actions.manualRefundFailed;
+      notify(t.detail.statusUpdated, 'success');
+      await fetchOrder();
+      return null;
+    } catch {
+      return t.detail.actions.manualRefundFailed;
     } finally {
       setIsUpdating(false);
     }
@@ -184,6 +216,7 @@ export default function OrderDetailPage() {
             <ItemsCard order={order} previewLimit={5} />
             <SummaryCard order={order} />
             <NotesCard order={order} />
+            <OrderDocuments storeId={storeId} orderId={orderId} />
             <OrderTimeline storeId={storeId} orderId={orderId} />
 
             {canManage ? (
@@ -191,6 +224,7 @@ export default function OrderDetailPage() {
                 order={order}
                 storeId={storeId}
                 isUpdating={isUpdating}
+                canRefund={canRefund}
                 onStatusChange={requestStatusChange}
                 onMarkPaid={handleMarkPaid}
                 onRefetch={fetchOrder}
@@ -202,44 +236,11 @@ export default function OrderDetailPage() {
         )}
       </main>
 
-      {confirmRefundOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="manual-refund-title"
-        >
-          <div className="w-full max-w-sm rounded-t-3xl border border-border bg-card p-5 shadow-xl sm:rounded-3xl">
-            <p id="manual-refund-title" className="text-sm font-semibold text-foreground">
-              {t.detail.actions.manualRefundTitle}
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {t.detail.actions.manualRefundDesc}
-            </p>
-            <div className="mt-4 flex gap-3">
-              <button
-                type="button"
-                disabled={isUpdating}
-                onClick={async () => {
-                  await handleStatusChange('refunded');
-                  setConfirmRefundOpen(false);
-                }}
-                className="flex-1 inline-flex h-11 items-center justify-center rounded-xl bg-destructive text-sm font-semibold text-destructive-foreground disabled:opacity-50 active:opacity-80"
-              >
-                {isUpdating ? '…' : t.detail.actions.manualRefundConfirm}
-              </button>
-              <button
-                type="button"
-                disabled={isUpdating}
-                onClick={() => setConfirmRefundOpen(false)}
-                className="flex-1 inline-flex h-11 items-center justify-center rounded-xl border border-border bg-card text-sm font-semibold text-foreground disabled:opacity-50 active:bg-muted/60"
-              >
-                {t.detail.actions.cancel}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ManualRefundDialog
+        open={confirmRefundOpen}
+        onConfirm={handleManualRefund}
+        onClose={() => setConfirmRefundOpen(false)}
+      />
     </div>
   );
 }

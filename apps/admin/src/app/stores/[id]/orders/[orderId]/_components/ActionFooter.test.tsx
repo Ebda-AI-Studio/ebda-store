@@ -104,6 +104,7 @@ function baseOrder(
 function renderFooter(
   order: OrderDetail,
   onStatusChange: (s: string) => void = () => {},
+  canRefund = true,
   userRole?: 'super_admin' | 'store_admin' | 'customer' | 'staff'
 ) {
   return render(
@@ -112,6 +113,7 @@ function renderFooter(
       order={order}
       storeId="store-1"
       isUpdating={false}
+      canRefund={canRefund}
       onStatusChange={onStatusChange}
       onMarkPaid={() => {}}
       onPrintInvoice={() => {}}
@@ -230,6 +232,34 @@ describe('ActionFooter — status action for a cancelled order (#1947)', () => {
     renderFooter(baseOrder({ status: 'refunded', paymentStatus: 'paid' }));
     expect(screen.queryByText('refunded')).toBeNull();
   });
+
+  // Recording or issuing a refund needs the API's orders:refund permission; staff lack it.
+  describe('staff (canRefund=false) sees no refund option anywhere', () => {
+    const online = payment({ provider: 'paymob', status: 'completed', transactionId: 'txn_1' });
+
+    it('hides Refund-via-provider on a paid online order, but a refund-capable user still sees it', () => {
+      const order = baseOrder({ status: 'confirmed', paymentStatus: 'paid', payments: [online] });
+      renderFooter(order, () => {}, false);
+      expect(screen.queryByTestId('refund-button')).toBeNull();
+      cleanup();
+      renderFooter(order, () => {}, true);
+      expect(screen.getByTestId('refund-button')).toBeTruthy();
+    });
+
+    it.each(['delivered', 'confirmed', 'cancelled'])(
+      'never offers the Refunded status on a paid %s order',
+      status => {
+        renderFooter(baseOrder({ status, paymentStatus: 'paid' }), () => {}, false);
+        expect(screen.queryByText('refunded')).toBeNull();
+      }
+    );
+
+    it('keeps the non-refund actions (the next step and Cancel)', () => {
+      renderFooter(baseOrder({ status: 'confirmed', paymentStatus: 'paid' }), () => {}, false);
+      expect(screen.getByText('processing')).toBeTruthy();
+      expect(screen.getByText('cancel')).toBeTruthy();
+    });
+  });
 });
 
 // #2069 — the refund confirm quoted the order value even after a partial
@@ -274,6 +304,7 @@ describe('ActionFooter — InstaPay awaiting confirmation', () => {
         order={awaiting()}
         storeId="store-1"
         isUpdating={false}
+        canRefund
         onStatusChange={() => {}}
         onMarkPaid={() => {}}
         onConfirmInstapay={onConfirm}
@@ -319,20 +350,20 @@ describe('ActionFooter: refunds are owner-only', () => {
   });
 
   it('the owner sees "Record refund" on a paid InstaPay order', () => {
-    renderFooter(paidInstapay, () => {}, 'store_admin');
+    renderFooter(paidInstapay, () => {}, true, 'store_admin');
     expect(screen.getByTestId('instapay-refund-button')).toBeTruthy();
   });
 
   it('staff see neither the InstaPay record-refund nor the provider refund button', () => {
-    renderFooter(paidInstapay, () => {}, 'staff');
+    renderFooter(paidInstapay, () => {}, false, 'staff');
     expect(screen.queryByTestId('instapay-refund-button')).toBeNull();
     cleanup();
-    renderFooter(paidCard, () => {}, 'staff');
+    renderFooter(paidCard, () => {}, false, 'staff');
     expect(screen.queryByTestId('refund-button')).toBeNull();
   });
 
   it('Ebda super-admin gets no InstaPay refund record', () => {
-    renderFooter(paidInstapay, () => {}, 'super_admin');
+    renderFooter(paidInstapay, () => {}, true, 'super_admin');
     expect(screen.queryByTestId('instapay-refund-button')).toBeNull();
   });
 });

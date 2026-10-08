@@ -227,7 +227,7 @@ describe('document metadata is identical flag off and flag on (issue 2407)', () 
   it('the root resolves ar for a cookie-less visitor (the case the route segment gets wrong)', async () => {
     languageCookie.value = undefined;
     const md = await rootMetadata();
-    expect(JSON.stringify(md)).toContain('ar_KW');
+    expect(JSON.stringify(md)).toContain('ar_EG');
   });
 });
 
@@ -292,7 +292,7 @@ describe('allowlisted store: route segment and metadata agree with the store def
     const segment = routeSegment('demo-shop.example:ar', undefined);
     expect(segment).toBe('ar');
     const { off, on } = await mergedMetadata(segment);
-    expect(ogLocale(on)).toBe('ar_KW');
+    expect(ogLocale(on)).toBe('ar_EG');
     expect(on).toEqual(off);
   });
 
@@ -302,7 +302,7 @@ describe('allowlisted store: route segment and metadata agree with the store def
     const segment = routeSegment('demo-shop.example:ar', 'en');
     expect(segment).toBe('en');
     const { off, on } = await mergedMetadata(segment);
-    expect(ogLocale(on)).toBe('en_KW');
+    expect(ogLocale(on)).toBe('en_US');
     expect(on).toEqual(off);
   });
 
@@ -311,7 +311,7 @@ describe('allowlisted store: route segment and metadata agree with the store def
     const segment = routeSegment('demo-shop.example', undefined);
     expect(segment).toBe('en');
     const { off, on } = await mergedMetadata(segment);
-    expect(ogLocale(on)).toBe('en_KW');
+    expect(ogLocale(on)).toBe('en_US');
     expect(on).toEqual(off);
   });
 });

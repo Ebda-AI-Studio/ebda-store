@@ -140,7 +140,7 @@ describe('message builders (EGP formatting)', () => {
         "مرحباً متجر النيل، أريد تأكيد طلبي رقم #EB-1042 (الدفع عند الاستلام).
         الأصناف: 2× قميص كتان، 1× Leather Belt
         الإجمالي: 1,250.50 ج.م
-        عنوان التوصيل: 12 Tahrir St, Dokki, Giza
+        عنوان التوصيل: 12 Tahrir St، Dokki، Giza
         رد بـ «نعم» للتأكيد."
       `);
   });

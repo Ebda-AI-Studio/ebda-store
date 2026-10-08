@@ -7,8 +7,8 @@ import { apiPut } from '@/lib/api';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
 
 /**
- * IANA zones offered in the picker: the GCC markets plus the neighbours the
- * platform sells into. A store whose saved zone is not listed still shows it
+ * IANA zones offered in the picker: Egypt first (the default), then the
+ * Gulf and Levant neighbours Egyptian stores ship to, plus UTC. A store whose saved zone is not listed still shows it
  * (see `options`), so opening this card never silently rewrites a valid zone.
  */
 const TIME_ZONES = [
@@ -21,7 +21,6 @@ const TIME_ZONES = [
   'Asia/Baghdad',
   'Asia/Amman',
   'Asia/Beirut',
-  'Africa/Cairo',
   'Europe/Istanbul',
   'Europe/London',
   'UTC',

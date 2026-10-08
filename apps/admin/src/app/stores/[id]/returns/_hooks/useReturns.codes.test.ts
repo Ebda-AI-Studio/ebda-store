@@ -26,6 +26,8 @@ const NOT_ON_COMPLETION = new Set([
   // The bounded create-path lock (lockOrderReturnsBounded) — complete() takes
   // the blocking lock, so a merchant completion never sees it.
   'RETURN_ORDER_BUSY',
+  // Create-path only: the store's published return window has closed / is 0.
+  'RETURN_WINDOW_CLOSED',
 ]);
 
 describe('return completion refusals are all translated (issue 2033)', () => {

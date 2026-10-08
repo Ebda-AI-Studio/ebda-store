@@ -119,6 +119,8 @@ export interface OrderDetail extends Order {
   /** Frozen at sale time (Ruling M3-8): `tax` is already inside subtotal/total. */
   taxIncludedInPrice?: boolean;
   shipping: number;
+  /** COD fee frozen at creation, inside `total` (ruling MONEYB-3). */
+  codFee?: number;
   discount: number;
   couponCode?: string | null;
   couponDiscount?: number;
@@ -233,4 +235,20 @@ export const statusUpdateSchema = z.object({
     'cancelled',
     'refunded',
   ]),
+  // Recording a refund the merchant already paid out (the API's REFUND_NOT_RECORDED gate).
+  refundRecorded: z.literal(true).optional(),
+  refundMethod: z.enum(['cash', 'instapay', 'bank_transfer', 'store_credit', 'other']).optional(),
+  refundReference: z.string().trim().max(120).optional(),
 });
+
+/**
+ * `statusOptionsFor` minus `refunded` for a user who cannot refund. Recording a refund needs the
+ * API's `orders:refund` permission, which staff lack, so the option is hidden, not offered and 403'd.
+ */
+export function statusOptionsForRole(
+  order: Parameters<typeof orderStatusOptions>[0],
+  canRefund: boolean
+): string[] {
+  const options = orderStatusOptions(order);
+  return canRefund ? [...options] : options.filter(s => s !== 'refunded');
+}

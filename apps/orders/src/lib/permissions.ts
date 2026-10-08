@@ -15,15 +15,16 @@
 
 export type Role = 'customer' | 'staff' | 'store_admin' | 'super_admin';
 
-export type OrderPermission = 'orders:read' | 'orders:write' | 'orders:manage';
+export type OrderPermission = 'orders:read' | 'orders:write' | 'orders:manage' | 'orders:refund';
 
 // Subset of apps/api/src/middleware/rbac.ts relevant to this app.
 const ROLE_ORDER_PERMISSIONS: Record<Role, OrderPermission[]> = {
   customer: ['orders:read'],
   // staff: the PWA's primary audience — mirrors API rbac.ts staff entry exactly.
+  // No orders:refund: staff cannot refund or record a refund (the API answers 403).
   staff: ['orders:read', 'orders:write', 'orders:manage'],
-  store_admin: ['orders:read', 'orders:write', 'orders:manage'],
-  super_admin: ['orders:read', 'orders:write', 'orders:manage'],
+  store_admin: ['orders:read', 'orders:write', 'orders:manage', 'orders:refund'],
+  super_admin: ['orders:read', 'orders:write', 'orders:manage', 'orders:refund'],
 };
 
 export interface PermissionSubject {

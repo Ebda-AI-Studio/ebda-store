@@ -84,7 +84,11 @@ const requestPickupSchema = z.object({
   // One per dialog submit: a double click or a retried request is the SAME pickup.
   idempotencyKey: z.string().trim().min(8).max(100),
 });
-const manualStatusSchema = z.object({ status: z.enum(SHIPMENT_STATUSES as [string, ...string[]]) });
+const manualStatusSchema = z.object({
+  status: z.enum(SHIPMENT_STATUSES as [string, ...string[]]),
+  /** Return to origin only: put the items back in stock (default true). */
+  restock: z.boolean().optional(),
+});
 const importSettlementSchema = z.object({
   carrier: z.enum(CARRIER_CODES),
   // the statement as text: a CSV a merchant downloads from their carrier's portal
@@ -568,7 +572,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const { status } = manualStatusSchema.parse(req.body);
+      const { status, restock } = manualStatusSchema.parse(req.body);
       const { prisma } = await import('@force/database');
       const existing = await prisma.shipment.findFirst({ where: { id, storeId } });
       if (!existing) {
@@ -580,7 +584,8 @@ router.post(
       }
       const shipment = await shippingCarrierService.manualUpdateStatus(
         id,
-        status as (typeof SHIPMENT_STATUSES)[number]
+        status as (typeof SHIPMENT_STATUSES)[number],
+        { restock }
       );
       res.json({ success: true, data: { shipment } });
     } catch (error) {

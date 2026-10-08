@@ -69,14 +69,14 @@ describe('root layout generateMetadata', () => {
     state.cookieLang = 'ar';
     const { generateMetadata } = await import('../../apps/web/src/app/layout');
     const meta = await generateMetadata();
-    expect((meta.openGraph as { locale?: string }).locale).toBe('ar_KW');
+    expect((meta.openGraph as { locale?: string }).locale).toBe('ar_EG');
     expect(String(meta.description)).toMatch(/[؀-ۿ]/);
   });
 
   it('#1856: no cookie keeps the store default', async () => {
     const { generateMetadata } = await import('../../apps/web/src/app/layout');
     const meta = await generateMetadata();
-    expect((meta.openGraph as { locale?: string }).locale).toBe('en_KW');
+    expect((meta.openGraph as { locale?: string }).locale).toBe('en_US');
   });
 });
 

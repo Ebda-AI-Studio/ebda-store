@@ -28,6 +28,7 @@ import providerActivationRoutes, {
 import couponRoutes from './coupon.routes';
 import shippingRoutes from './shipping.routes';
 import taxRoutes from './tax.routes';
+import { fiscalArchiveRoutes, fiscalDocumentRoutes } from './fiscal-document.routes';
 import customerGroupRoutes from './customer-groups.routes';
 import promotionRoutes from './promotion.routes';
 import bundleRoutes from './bundle.routes';
@@ -163,6 +164,7 @@ router.use('/admin', tenantContext, adminAnswerEngineRoutes);
 // Mounted BEFORE adminRoutes for reachability past its catch-all MFA gate; it
 // carries its own authenticate → requireMfaEnrolled → authorize('super_admin').
 router.use('/admin', platformTaxRoutes);
+router.use('/admin', fiscalArchiveRoutes);
 
 // Provider activation queue (PROVIDERS-ACTIVATION). Same reachability rule as the tax routes: before
 // adminRoutes' catch-all MFA gate; it carries its own authenticate → MFA → super_admin chain.
@@ -309,6 +311,7 @@ router.use('/stores', tenantContext, setupGuideRoutes);
 router.use('/stores', tenantContext, couponRoutes);
 router.use('/stores', tenantContext, shippingRoutes);
 router.use('/stores', tenantContext, taxRoutes);
+router.use('/stores', tenantContext, fiscalDocumentRoutes);
 router.use('/stores', tenantContext, customerGroupRoutes);
 router.use('/stores', tenantContext, promotionRoutes);
 router.use('/stores', tenantContext, bundleRoutes);

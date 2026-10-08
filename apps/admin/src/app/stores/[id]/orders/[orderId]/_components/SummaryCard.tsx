@@ -93,6 +93,21 @@ export function SummaryCard({ order }: SummaryCardProps) {
           },
         ]
       : []),
+    {
+      label: t('deliveryFee'),
+      value: formatMoney(order.shipping, order.currency),
+      muted: order.shipping === 0,
+    },
+    // Cash-on-delivery fee: its own row, before VAT (rulings MONEYB-2/3).
+    ...((order.codFee ?? 0) > 0
+      ? [
+          {
+            label: t('codFee'),
+            value: formatMoney(order.codFee ?? 0, order.currency),
+            muted: false,
+          },
+        ]
+      : []),
     // Exclusive tax is a summed row; inclusive tax is already inside
     // subtotal/total and is captioned after Total instead (issue 2210).
     ...(taxPlacement.taxRow !== null
@@ -104,11 +119,6 @@ export function SummaryCard({ order }: SummaryCardProps) {
           },
         ]
       : []),
-    {
-      label: t('deliveryFee'),
-      value: formatMoney(order.shipping, order.currency),
-      muted: order.shipping === 0,
-    },
   ];
 
   return (

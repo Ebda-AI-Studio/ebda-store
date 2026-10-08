@@ -51,7 +51,10 @@ export const VALID_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   // which is why that writer could not be guarded. Adding it here changes no
   // behaviour — it makes the existing behaviour expressible, so the guard can
   // be applied to every Order.status writer instead of all but four.
-  shipped: ['delivered', 'refunded', 'processing'],
+  // 'cancelled' models RETURN TO ORIGIN (ruling MONEYB-5): the courier brings
+  // the parcel back (refused COD, failed delivery), so the order is cancelled —
+  // nothing collected on COD, stock back per the merchant's choice.
+  shipped: ['delivered', 'refunded', 'processing', 'cancelled'],
   delivered: ['refunded'],
   cancelled: ['refunded'],
   refunded: [],

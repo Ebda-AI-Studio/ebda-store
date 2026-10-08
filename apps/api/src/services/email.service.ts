@@ -247,7 +247,11 @@ export interface OrderEmailData {
   sellerTaxRegistrationNumber?: string | null;
   sellerTaxLegalName?: string | null;
   taxRateBps?: number | null;
+  /** Frozen VAT base (ruling MONEYB-2); null/absent on legacy orders. */
+  taxableAmount?: number | null;
   shipping: number;
+  /** COD fee frozen at creation, inside `total` (ruling MONEYB-3). */
+  codFee?: number;
   discount?: number;
   /** The levers `discount` is made of (issue 2239) — see order.service create(). */
   couponDiscount?: number;
@@ -273,6 +277,11 @@ export interface OrderEmailData {
     state: string;
     postalCode: string;
     country: string;
+    /** Egyptian checkout fields (city/state/postalCode are empty there). */
+    area?: string;
+    areaAr?: string;
+    governorate?: string;
+    governorateAr?: string;
   };
   /** Cash-on-delivery order — drives the "Confirm on WhatsApp" prompt. */
   isCod?: boolean;

@@ -1,5 +1,5 @@
 import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@force/database';
-import { csvField, slugifyWithFallback } from '@force/shared';
+import { csvField, minorToDecimalString, slugifyWithFallback } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
 import { recordSlugRedirect } from './slug-redirect.service';
 import { assertWithinLimit } from './plan-limit.service';
@@ -342,6 +342,11 @@ export class BulkService {
     ];
 
     const blanks = (n: number) => Array(n).fill('');
+    // Prices are exported as EGP decimals ("250.50") — the same unit the import
+    // reads — so an exported file re-imports to identical prices. Never raw
+    // piastres: that would silently re-import 100x too high.
+    const egp = (minor: number | null | undefined) =>
+      minor === null || minor === undefined ? '' : minorToDecimalString(minor);
 
     // Build CSV rows — one base row per product, then one row per variant
     // (parentSku = product.sku) so the export round-trips back through import.
@@ -357,9 +362,9 @@ export class BulkService {
         product.slug,
         csvField(product.description || ''),
         csvField(product.descriptionAr || ''),
-        product.price,
-        product.compareAtPrice || '',
-        product.costPrice || '',
+        egp(product.price),
+        egp(product.compareAtPrice || null),
+        egp(product.costPrice || null),
         csvField(product.sku || ''),
         csvField(product.barcode || ''),
         product.inventory,
@@ -395,9 +400,9 @@ export class BulkService {
         return [
           '', // id (new variant on re-import)
           ...blanks(5), // name..descriptionAr (inherited from parent)
-          variant.price ?? '',
-          variant.compareAtPrice ?? '',
-          variant.costPrice ?? '',
+          egp(variant.price),
+          egp(variant.compareAtPrice),
+          egp(variant.costPrice),
           csvField(variant.sku || ''),
           csvField(variant.barcode || ''),
           variant.inventory,
@@ -467,9 +472,9 @@ export class BulkService {
       'product-slug',
       'Product description goes here',
       'وصف المنتج هنا',
-      '5000', // 50.00 EGP in piastres
-      '7500', // Compare at price
-      '3000', // Cost price
+      '250.50', // price in EGP (two decimals at most)
+      '300', // Compare at price in EGP
+      '180', // Cost price in EGP
       'SKU-001',
       '1234567890123',
       '100',
@@ -504,7 +509,7 @@ export class BulkService {
       '', // slug
       '', // description
       '', // descriptionAr
-      '5500', // variant price (55.00 EGP in piastres)
+      '275', // variant price in EGP
       '', // compareAtPrice
       '', // costPrice
       'SKU-001-1KG', // variant sku
@@ -695,7 +700,7 @@ export class BulkService {
             result.failed++;
             result.errors.push({
               row: rowIndex,
-              error: `Variant ${badVariantAmount} "${row[badVariantAmount]}" must be a whole number of piastres`,
+              error: `Variant ${badVariantAmount} "${row[badVariantAmount]}" must be a whole number of piastres (internal format; the upload converter should have produced it)`,
             });
             continue;
           }
@@ -739,7 +744,7 @@ export class BulkService {
           result.errors.push({
             row: rowIndex,
             error:
-              'Price is required and must be a whole number of piastres (spreadsheets and Shopify files use EGP with at most 2 decimals)',
+              'Price is required and must be a whole number of piastres (internal format; the upload converter should have produced it)',
           });
           continue;
         }

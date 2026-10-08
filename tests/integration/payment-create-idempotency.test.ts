@@ -45,6 +45,7 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
   let codOrderId: string;
   let onlineOrderId: string;
   let paidOrderId: string;
+  let unquotedOrderId: string;
   const COD_FEE = 500;
   const ORDER_TOTAL = 10000;
 
@@ -79,7 +80,7 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
         },
       });
 
-      const mkOrder = (n: string) =>
+      const mkOrder = (n: string, codFee = 0) =>
         tx.order.create({
           data: {
             storeId,
@@ -88,12 +89,16 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
             status: 'pending',
             paymentStatus: 'unpaid',
             subtotal: ORDER_TOTAL,
-            total: ORDER_TOTAL,
+            // Ruling MONEYB-3: a COD order is created with its fee frozen in
+            // `codFee` and already inside `total` (quoted at checkout).
+            codFee,
+            total: ORDER_TOTAL + codFee,
             shippingAddress: {},
             billingAddress: {},
           },
         });
-      codOrderId = (await mkOrder('COD')).id;
+      codOrderId = (await mkOrder('COD', COD_FEE)).id;
+      unquotedOrderId = (await mkOrder('UNQ')).id;
       onlineOrderId = (await mkOrder('ONL')).id;
       paidOrderId = (await mkOrder('PAID')).id;
 
@@ -135,7 +140,23 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
     });
   });
 
-  it('replayed COD create adds the fee ONCE and keeps a single payment row', async () => {
+  it('a COD create on an order NOT priced for COD is refused while the store charges a fee (MONEYB-3)', async () => {
+    const res = await request(app)
+      .post('/api/v1/payments/create')
+      .send({ orderId: unquotedOrderId, provider: 'cod' });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('COD_FEE_NOT_QUOTED');
+    const after = await withRlsBypass(tx =>
+      tx.order.findUniqueOrThrow({ where: { id: unquotedOrderId } })
+    );
+    expect(after.total).toBe(ORDER_TOTAL); // no fee added behind the shopper's back
+    const payments = await withRlsBypass(tx =>
+      tx.payment.findMany({ where: { orderId: unquotedOrderId } })
+    );
+    expect(payments).toHaveLength(0);
+  });
+
+  it('replayed COD create never adds a fee and keeps a single payment row', async () => {
     const first = await request(app)
       .post('/api/v1/payments/create')
       .send({ orderId: codOrderId, provider: 'cod' });
@@ -146,6 +167,7 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
     const afterFirst = await withRlsBypass(tx =>
       tx.order.findUniqueOrThrow({ where: { id: codOrderId } })
     );
+    // The frozen fee is already inside total — /payments/create adds nothing.
     expect(afterFirst.total).toBe(ORDER_TOTAL + COD_FEE);
 
     // Replay (double-click / retry) — same response, NO second fee, NO

@@ -10,10 +10,23 @@ import {
 import {
   checkMinimumOrder,
   allocateBundlePrice,
+  codFeeForOrder,
+  computeOrderAmounts,
   fromMinor,
   minorToDecimalString,
+  normalizePhoneForStorage,
   REGION,
 } from '@force/shared';
+import { FiscalDocumentService } from './fiscal-document.service';
+import { recordPaymentEvent } from './payment-event.service';
+
+/** An address JSON with its `phone` in the one stored form (ruling MONEYB-7). */
+function withStoredPhone(addr: Record<string, unknown>): Record<string, unknown> {
+  return typeof addr.phone === 'string'
+    ? { ...addr, phone: normalizePhoneForStorage(addr.phone) }
+    : addr;
+}
+import { loadCodFeeConfig } from './payment-providers/cod.provider';
 import { generateOrderNumber } from '../utils/order-number';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { pairBackorderedLines } from '../lib/backorder-pairing';
@@ -45,7 +58,7 @@ import { affiliateService } from './affiliate.service';
 import { auditLog } from '../middleware/security';
 import { hasCapturedPayment, shouldApplyRefundEffects } from './order-refund-gating';
 import logger from '../lib/logger';
-import { computeOrderTax, frozenTaxInvoiceFields, resolveActiveTaxRate } from '../lib/order-tax';
+import { frozenTaxInvoiceFields, resolveActiveTaxRate } from '../lib/order-tax';
 import {
   invalidateStoreProductCachesAfterOrder,
   invalidateCustomersCache,
@@ -574,6 +587,23 @@ export class OrderService {
     referralCode?: string
   ) {
     await assertOrderAllowed(storeId);
+    // One stored phone form (ruling MONEYB-7): E.164 for an Egyptian mobile,
+    // ASCII digits otherwise — whatever keyboard the shopper typed on.
+    data = {
+      ...data,
+      shippingAddress: {
+        ...data.shippingAddress,
+        phone: normalizePhoneForStorage(data.shippingAddress.phone),
+      },
+      ...(data.billingAddress
+        ? {
+            billingAddress: {
+              ...data.billingAddress,
+              phone: normalizePhoneForStorage(data.billingAddress.phone),
+            },
+          }
+        : {}),
+    };
     // Get cart
     const cart = await CartService.getOrCreate(storeId, sessionId, customerId);
     // Raw CartBundle rows ({ id, bundleId, quantity } — one per BOX type in
@@ -823,7 +853,6 @@ export class OrderService {
     // Resolve the store's configured tax rate. The tax itself is computed
     // below, once the discount is known — VAT is levied after discount (#193).
     const activeTax = await resolveActiveTaxRate(storeId);
-    const taxRate = activeTax.ratePercent / 100;
 
     // Resolve shipping for the order's delivery area. Until now this was
     // hardcoded to 0 — the storefront cart/checkout calls
@@ -1013,13 +1042,24 @@ export class OrderService {
     }
 
     const discount = primaryDiscount + loyaltyDiscount;
-    const tax = computeOrderTax(subtotal, discount, taxRate, activeTax.includedInPrice);
-    // Tax already inside the listed price is NOT added again — the customer
-    // paid it as part of `subtotal` (ruling M3-6, docs/RULINGS.md).
-    const total = Math.max(
-      0,
-      subtotal + (activeTax.includedInPrice ? 0 : tax) + shipping - discount
-    );
+    // COD fee (ruling MONEYB-3): quoted at checkout from the same config and
+    // the same function, frozen here, inside `total` and the VAT base — never
+    // added after the shopper pressed "Place order".
+    const codFee =
+      data.paymentMethod === 'cod'
+        ? codFeeForOrder({ subtotal, discount, shipping }, await loadCodFeeConfig(storeId))
+        : 0;
+    // subtotal → discounts → shipping → COD fee → VAT → total (ruling MONEYB-2):
+    // shipping and the COD fee the seller charges are in the VAT base; tax
+    // already inside listed prices is extracted, never added again (M3-6).
+    const { tax, total, taxableAmount } = computeOrderAmounts({
+      subtotal,
+      discount,
+      shipping,
+      codFee,
+      ratePercent: activeTax.ratePercent,
+      includedInPrice: activeTax.includedInPrice,
+    });
 
     // Customer wallet (D1). Resolved on the SERVER from the real balance; the
     // debit itself happens inside the order transaction below and re-checks the
@@ -1411,6 +1451,8 @@ export class OrderService {
             // when VAT was collected under a VERIFIED profile (ruling TAX-2).
             ...frozenTaxInvoiceFields(activeTax),
             shipping,
+            codFee,
+            taxableAmount,
             discount,
             // Persist the coupon fields ONLY when the coupon actually applied.
             // If a promotion out-discounted the coupon it was not consumed (no
@@ -1613,6 +1655,11 @@ export class OrderService {
         // out again believing the first attempt failed (double charge).
         await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
         await tx.cartBundle.deleteMany({ where: { cartId: cart.id } });
+
+        // The sale's fiscal document (tax invoice or receipt) with its gap-free
+        // serial, in THIS transaction: the order and its number commit or roll
+        // back together (ruling MONEYB-1).
+        await FiscalDocumentService.issueSaleDocument(tx, storeId, newOrder.id);
 
         // Check for abandoned cart recovery
         try {
@@ -1932,6 +1979,10 @@ export class OrderService {
       // stock a SECOND time and decremented the coupon again — stock
       // inventable on a loop, firing organically on every legitimate failed
       // payment-create.
+      // No money was ever taken (the payment step failed): the sale's fiscal
+      // document keeps its number and is marked cancelled (MONEYB-1).
+      await FiscalDocumentService.cancelSaleDocument(tx, storeId, order.id);
+
       await tx.order.update({
         where: { id: order.id, storeId },
         data: {
@@ -1964,7 +2015,13 @@ export class OrderService {
       | 'shipped'
       | 'delivered'
       | 'cancelled'
-      | 'refunded'
+      | 'refunded',
+    /**
+     * `restoreInventory: false` — a cancel whose goods are NOT going back on
+     * the shelf (a return to origin the merchant chose not to restock,
+     * ruling MONEYB-5). Every other caller restores stock as before.
+     */
+    opts: { restoreInventory?: boolean } = {}
   ) {
     const order = await this.getById(storeId, orderId);
 
@@ -2016,6 +2073,17 @@ export class OrderService {
     if (status === 'delivered' && order.status !== 'delivered') {
       statusData.deliveredAt = new Date();
     }
+    // Paid on delivery (ruling MONEYB-7): a cash-on-delivery parcel handed over
+    // IS the cash collected — the courier does not release it unpaid. Delivered
+    // settles the COD payment the same way "Mark paid" does, so revenue, the GL
+    // and the customer's order page stop showing a delivered order as unpaid.
+    const codToSettle =
+      status === 'delivered' && order.paymentStatus === 'unpaid'
+        ? (order.payments ?? []).find(p => p.provider === 'cod' && p.status === 'cod_pending')
+        : undefined;
+    if (codToSettle) {
+      statusData.paymentStatus = 'paid';
+    }
 
     const updatedOrder = await prisma.order.update({
       where: { id: orderId, storeId },
@@ -2042,6 +2110,32 @@ export class OrderService {
     ).catch(err =>
       logger.warn({ err, storeId, orderId }, '[order.updateStatus] cache invalidation failed')
     );
+
+    if (codToSettle) {
+      await prisma.payment.update({
+        where: { id: codToSettle.id },
+        data: { status: 'completed', paidAt: new Date() },
+      });
+      await recordPaymentEvent({
+        paymentId: codToSettle.id,
+        storeId,
+        orderId,
+        eventType: 'status_change',
+        fromStatus: 'cod_pending',
+        toStatus: 'completed',
+        provider: 'cod',
+        triggeredByUserId: null,
+        details: { reason: 'cod_collected_on_delivery', orderNumber: order.orderNumber },
+      });
+      // Same post-payment fan-out as "Mark paid" (journal posting); its
+      // notification half is deduped by orderCreatedNotifiedAt.
+      void deferAfterTenantCommit('order.codCollectedOnDelivery', () =>
+        inngest.send({
+          name: 'order/created',
+          data: { orderId, storeId, paymentMethod: 'cod', locale: undefined },
+        })
+      );
+    }
 
     // Append-only status audit trail. `order.status` was read (via getById)
     // BEFORE the update above, so it is the true prior status. Best-effort:
@@ -2102,6 +2196,7 @@ export class OrderService {
       // above, so `order.status` is the true prior status.
       await this.applyRefundEffects(storeId, orderId, {
         fireRefundNotification: shouldApplyRefundEffects(status, order),
+        ...(opts.restoreInventory === false ? { restoreInventory: false } : {}),
       });
     }
 
@@ -2347,6 +2442,62 @@ export class OrderService {
   }
 
   /**
+   * Record a refund the merchant made OUTSIDE a payment provider (cash handed
+   * back, an InstaPay or bank transfer) when they mark the order refunded
+   * (ruling MONEYB-5). Without this record a `refunded` status moved no money
+   * on paper either, yet the customer was told "refund issued". Each captured
+   * payment row is marked refunded for its full amount with the method,
+   * reference and who recorded it; the order's paymentStatus follows.
+   */
+  static async recordManualRefund(
+    storeId: string,
+    orderId: string,
+    input: { method: string; reference: string | null; actorId: string | null }
+  ): Promise<void> {
+    const payments = await prisma.payment.findMany({
+      where: {
+        orderId,
+        order: { storeId },
+        status: { in: ['completed', 'partially_refunded'] },
+      },
+      select: { id: true, amount: true, metadata: true, status: true, provider: true },
+    });
+    const now = new Date();
+    for (const p of payments) {
+      await prisma.payment.update({
+        where: { id: p.id },
+        data: {
+          status: 'refunded',
+          refundedAmount: p.amount,
+          metadata: {
+            ...((p.metadata as Record<string, unknown> | null) ?? {}),
+            refundMethod: input.method,
+            refundReference: input.reference,
+            refundRecordedBy: input.actorId,
+            refundRecordedAt: now.toISOString(),
+            refundSource: 'manual_record',
+          } as Prisma.InputJsonValue,
+        },
+      });
+      await recordPaymentEvent({
+        paymentId: p.id,
+        storeId,
+        orderId,
+        eventType: 'status_change',
+        fromStatus: p.status,
+        toStatus: 'refunded',
+        provider: p.provider,
+        triggeredByUserId: input.actorId,
+        details: { reason: 'manual_refund_recorded', method: input.method },
+      });
+    }
+    await prisma.order.update({
+      where: { id: orderId, storeId },
+      data: { paymentStatus: 'refunded' },
+    });
+  }
+
+  /**
    * A partial refund made OUTSIDE a return — in the provider's dashboard (the
    * refund webhook, a refund-status refresh) or the order page's
    * refund-via-provider with an amount. Owner decision 2026-10-01 (#1209,
@@ -2550,7 +2701,6 @@ export class OrderService {
     // Tax: same store-level resolution as the public checkout path, levied
     // after the coupon discount below (#193).
     const activeTax = await resolveActiveTaxRate(storeId);
-    const taxRate = activeTax.ratePercent / 100;
 
     // Shipping: try to resolve via ShippingService; fall back to 0 on
     // error (same defensive posture as public checkout).
@@ -2679,12 +2829,16 @@ export class OrderService {
       couponCode = appliedCoupon.code;
     }
 
-    const tax = computeOrderTax(subtotal, couponDiscount, taxRate, activeTax.includedInPrice);
-    // Tax already inside the listed price is NOT added again (ruling M3-6).
-    const total = Math.max(
-      0,
-      subtotal + (activeTax.includedInPrice ? 0 : tax) + shipping - couponDiscount
-    );
+    // Same order of operations and VAT base as checkout (ruling MONEYB-2):
+    // shipping is in the base; inclusive tax is extracted, never added (M3-6).
+    // Admin manual orders carry no COD fee (the merchant sets the price).
+    const { tax, total, taxableAmount } = computeOrderAmounts({
+      subtotal,
+      discount: couponDiscount,
+      shipping,
+      ratePercent: activeTax.ratePercent,
+      includedInPrice: activeTax.includedInPrice,
+    });
     const orderNumber = generateOrderNumber();
 
     // Create the order + items in one transaction. Inventory is NOT
@@ -2793,12 +2947,15 @@ export class OrderService {
           // when VAT was collected under a VERIFIED profile (ruling TAX-2).
           ...frozenTaxInvoiceFields(activeTax),
           shipping,
+          taxableAmount,
           discount: couponDiscount,
           total,
           currency: data.currency ?? REGION.currency,
           couponCode: couponCode ?? null,
-          shippingAddress: data.shippingAddress as Prisma.InputJsonValue,
-          billingAddress: (data.billingAddress ?? data.shippingAddress) as Prisma.InputJsonValue,
+          shippingAddress: withStoredPhone(data.shippingAddress) as Prisma.InputJsonValue,
+          billingAddress: withStoredPhone(
+            data.billingAddress ?? data.shippingAddress
+          ) as Prisma.InputJsonValue,
           notes: data.notes ?? null,
           items: {
             create: resolved.map(r => ({
@@ -2848,6 +3005,8 @@ export class OrderService {
           },
         });
       }
+      // Fiscal document + gap-free serial in the same transaction (MONEYB-1).
+      await FiscalDocumentService.issueSaleDocument(tx, storeId, created.id);
       return created;
     });
 

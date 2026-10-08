@@ -155,6 +155,13 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
               paymentStatus: 'unpaid',
               deletedAt: null,
               createdAt: { lt: threshold },
+              // Cash on delivery is never "abandoned at the gateway": the
+              // shopper pays the courier, days later. Cancelling an untouched
+              // COD order at 2 days (Eid, a weekend) told a shopper who did
+              // nothing wrong their order was cancelled (sense audit O6,
+              // ruling MONEYB-7). COD orders leave only by the merchant's
+              // cancel, a return to origin, or delivery (which settles them).
+              payments: { none: { provider: 'cod' } },
             },
             select: {
               createdAt: true,

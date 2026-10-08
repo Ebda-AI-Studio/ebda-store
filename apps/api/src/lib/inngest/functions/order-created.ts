@@ -161,6 +161,8 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
       sellerTaxLegalName: order.sellerTaxLegalName,
       taxRateBps: order.taxRateBps,
       shipping: order.shipping,
+      codFee: order.codFee,
+      taxableAmount: order.taxableAmount,
       discount: order.discount,
       couponDiscount: order.couponDiscount,
       promotionDiscount: order.promotionDiscount,

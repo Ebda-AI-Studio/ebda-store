@@ -40,3 +40,38 @@ export interface ImportOptions {
   defaultStatus: DefaultStatus;
   trackInventory: boolean;
 }
+
+export interface ImportPreviewRow {
+  row: number;
+  name: string;
+  sku: string;
+  parentSku: string;
+  /** Integer piastres. */
+  price: number | null;
+  compareAtPrice: number | null;
+  costPrice: number | null;
+  error: string | null;
+}
+
+export interface ImportPreviewError {
+  row: number;
+  column: string | null;
+  code: string | null;
+  error: string;
+}
+
+export interface ImportPreviewWarning {
+  code: 'PRICES_LOOK_LIKE_PIASTRES';
+  fileMedianMinor: number;
+  storeMedianMinor: number;
+}
+
+export interface ImportPreview {
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  rows: ImportPreviewRow[];
+  errors: ImportPreviewError[];
+  warnings: ImportPreviewWarning[];
+  truncated: boolean;
+}

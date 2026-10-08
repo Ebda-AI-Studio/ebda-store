@@ -28,7 +28,9 @@ import {
   findGovernorateByArea,
   resolveColor,
   checkMinimumOrder,
-  computeOrderTax,
+  codFeeForOrder,
+  computeOrderAmounts,
+  type CodFeeConfig,
   type CheckoutDeliverySettings,
   fromMinor,
   REGION,
@@ -405,6 +407,9 @@ export default function CheckoutClient() {
 
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
+  // COD fee settings from /payments/config — the checkout quotes the fee with
+  // the SAME function the order freezes it with (codFeeForOrder, MONEYB-3).
+  const [codFeeConfig, setCodFeeConfig] = useState<CodFeeConfig | null>(null);
 
   // "Save my info" — persists contact + address to localStorage (device-local,
   // store-scoped). Default false. Never stores payment data.
@@ -571,7 +576,12 @@ export default function CheckoutClient() {
             /** Per online provider, the methods the merchant turned on. */
             methods?: Record<string, Array<{ code: string; name: string; nameAr: string }>>;
             defaultProvider?: string;
-            cod?: { fixedFee: number; displayName: string; displayNameAr: string | null };
+            cod?: {
+              fixedFee: number;
+              percentBps?: number;
+              displayName: string;
+              displayNameAr: string | null;
+            };
             instapay?: { displayName: string; displayNameAr: string | null; expiryHours: number };
           }>('/payments/config'),
         ]);
@@ -628,14 +638,19 @@ export default function CheckoutClient() {
 
           // Add COD as a provider option if enabled
           if (paymentResult.data.cod) {
-            const codFee = paymentResult.data.cod.fixedFee || 0;
-            const feeText = codFee > 0 ? ` (+${formatPrice(codFee)})` : '';
+            // The whole fee — fixed AND percentage — is quoted in the summary
+            // as its own row once COD is chosen (ruling MONEYB-3); the option
+            // label only says a fee applies.
+            const cod = paymentResult.data.cod;
+            setCodFeeConfig({ fixedFee: cod.fixedFee || 0, percentBps: cod.percentBps || 0 });
+            const hasFee = (cod.fixedFee || 0) > 0 || (cod.percentBps || 0) > 0;
+            const pct = cod.percentBps ? `${Number((cod.percentBps / 100).toFixed(2))}%` : '';
+            const fixed = cod.fixedFee ? formatPrice(cod.fixedFee) : '';
+            const feeText = hasFee ? ` (+${[fixed, pct].filter(Boolean).join(' + ')})` : '';
             allProviders.push({
               id: 'cod',
-              name: `${paymentResult.data.cod.displayName || 'Cash on Delivery'}${feeText}`,
-              nameAr: paymentResult.data.cod.displayNameAr
-                ? `${paymentResult.data.cod.displayNameAr}${feeText}`
-                : undefined,
+              name: `${cod.displayName || 'Cash on Delivery'}${feeText}`,
+              nameAr: `${cod.displayNameAr || 'الدفع عند الاستلام'}${feeText}`,
               description: 'Pay when your order is delivered',
               descriptionAr: 'ادفع عند استلام طلبك',
             });
@@ -1066,8 +1081,8 @@ export default function CheckoutClient() {
   const discount = primaryDiscount + loyaltyDiscount;
   const shipping = freeShipping ? 0 : shippingCost;
   // VAT — the SAME formula the API charges at order creation
-  // (computeOrderTax, ruling M3-9 in docs/RULINGS.md): the taxable base is
-  // subtotal net of discount. `taxRatePercent` is already zeroed by the API
+  // (computeOrderAmounts, rulings M3-9 + MONEYB-2): the taxable base is
+  // subtotal net of discount, plus shipping and the COD fee. `taxRatePercent` is already zeroed by the API
   // for a disabled store (resolveActiveTaxRate — the ONE resolver order
   // creation charges against too, since M3-9), so `tax = 0` and the
   // summary renders byte-identically to before this line existed. When
@@ -1076,8 +1091,22 @@ export default function CheckoutClient() {
   // informational only — NOT added to `total`.
   const taxRatePercent = store?.taxRatePercent ?? 0;
   const taxIncludedInPrice = !!store?.taxIncludedInPrice;
-  const tax = computeOrderTax(subtotal, discount, taxRatePercent / 100, taxIncludedInPrice);
-  const total = Math.max(0, subtotal - discount + shipping + (taxIncludedInPrice ? 0 : tax));
+  // Cash-on-delivery fee, shown BEFORE "Place order" (ruling MONEYB-3).
+  const codFee =
+    selectedProvider.split(':')[0] === 'cod'
+      ? codFeeForOrder({ subtotal, discount, shipping }, codFeeConfig)
+      : 0;
+  // subtotal → discounts → shipping → COD fee → VAT → total, VAT on the whole
+  // supply incl. shipping and the COD fee (ruling MONEYB-2) — the function the
+  // order is charged with, so this summary is the order's numbers.
+  const { tax, total } = computeOrderAmounts({
+    subtotal,
+    discount,
+    shipping,
+    codFee,
+    ratePercent: taxRatePercent,
+    includedInPrice: taxIncludedInPrice,
+  });
   // Display estimate of the wallet portion; the server re-resolves it.
   const walletApplied =
     walletSpendable && useWalletBalance && wallet ? Math.min(wallet.balance, total) : 0;
@@ -1256,13 +1285,16 @@ export default function CheckoutClient() {
 
       // Compose address1 from structured fields for back-compat with
       // existing order display / admin views.
+      // Labels in the shopper's language so an Arabic address never reads
+      // "شارع النصر, Building 5" on the invoice and the courier label.
       const address1Parts = [
         formData.street,
-        formData.building ? `Building ${formData.building}` : '',
-        formData.floor ? `Floor ${formData.floor}` : '',
-        formData.apartment ? `Apt ${formData.apartment}` : '',
+        formData.building ? `${t('Building', 'مبنى')} ${formData.building}` : '',
+        formData.floor ? `${t('Floor', 'الدور')} ${formData.floor}` : '',
+        formData.apartment ? `${t('Apt', 'شقة')} ${formData.apartment}` : '',
       ].filter(Boolean);
-      const composedAddress1 = address1Parts.join(', ') || formData.address;
+      const composedAddress1 =
+        address1Parts.join(language === 'ar' ? '، ' : ', ') || formData.address;
 
       // Persist the chosen delivery window (+ day) on the order via `notes`
       // — there's no dedicated column for it. Prepended so it's the first
@@ -1507,6 +1539,14 @@ export default function CheckoutClient() {
           friendly = t(
             'Cash on delivery is currently unavailable. Please choose another payment method.',
             'الدفع عند الاستلام غير متاح حالياً. يرجى اختيار طريقة دفع أخرى.'
+          );
+          break;
+        case 'COD_FEE_NOT_QUOTED':
+          // The order was priced without the cash-on-delivery fee (MONEYB-3);
+          // it was rolled back, so placing it again shows the fee first.
+          friendly = t(
+            'The cash-on-delivery fee was not included in your total. Your cart is back — review the total with the fee and place the order again.',
+            'لم تُحتسب رسوم الدفع عند الاستلام في الإجمالي. أعدنا سلتك كما كانت — راجع الإجمالي مع الرسوم ثم أكّد الطلب مرة أخرى.'
           );
           break;
         case 'PAYMENT_PROVIDER_ERROR':
@@ -2299,6 +2339,7 @@ export default function CheckoutClient() {
               discount={discount}
               promotionDiscount={promotionAppliedDiscount}
               shipping={shipping}
+              codFee={codFee}
               tax={tax}
               taxRatePercent={taxRatePercent}
               taxIncludedInPrice={taxIncludedInPrice}

@@ -1,6 +1,7 @@
 'use client';
 
 import { CmsPageContent, ShopChrome } from '../../components';
+import { termsReturnSentence } from '../../lib/return-policy-text';
 import { useStore, useStoreContact } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { formatDate } from '../../lib/format-date';
@@ -214,10 +215,7 @@ function TermsFallback() {
               {t('7. Returns and Refunds', '7. المرتجعات والاسترداد')}
             </h2>
             <p className="mt-2 text-muted-foreground">
-              {t(
-                'Our return policy allows returns within 30 days of delivery. Please refer to our Returns page for complete details on eligibility and process.',
-                'تسمح سياسة الإرجاع لدينا بالإرجاع خلال 30 يوماً من التوصيل. يرجى الرجوع إلى صفحة المرتجعات لمعرفة التفاصيل الكاملة حول الأهلية والإجراءات.'
-              )}
+              {termsReturnSentence(store.returnWindowDays, language)}
             </p>
           </section>
 

@@ -7,6 +7,8 @@ import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { DateRangePicker } from '../../../../components/DateRangePicker';
 import { apiGet, apiPut, apiPost, apiFetch } from '../../../../lib/api';
+import { useAuth } from '../../../../lib/auth';
+import { ManualRefundModal } from '../../../../components/ManualRefundModal';
 import { useT } from '@/i18n/useT';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
@@ -19,7 +21,7 @@ import type { Order, Pagination, StatusFilter } from './_components/types';
 import { ConfirmActionModal } from '../../../../components/ConfirmActionModal';
 import type { Period, ResolvedDateRange } from '../analytics/_components/types';
 import { resolveDateRange } from '../analytics/_components/types';
-import { manualRefundDescriptionKey } from './_components/manualRefundCopy';
+import { manualRefundBody, type ManualRefundInput } from './_components/manualRefundCopy';
 
 type ConfirmType = 'markPaid' | 'bulkMarkPaid' | 'manualRefund';
 
@@ -37,6 +39,9 @@ export default function StoreOrdersPage() {
   const storeId = params?.id as string;
   const t = useT('orders.list');
   const tConfirm = useT('orders.list.confirm');
+  // Staff cannot record a refund (the API needs orders:refund): hide the option, not just fail it.
+  const { user } = useAuth();
+  const canRefund = !!user && user.role !== 'staff';
 
   // Per-page preference is persisted per store so the user's choice survives
   // navigation. Falls back to 25 (admin default) when nothing is stored or the
@@ -195,6 +200,7 @@ export default function StoreOrdersPage() {
   // the customer told so) by a stray pick (#762).
   const handleStatusChange = async (order: Order, newStatus: string) => {
     if (newStatus === 'refunded') {
+      if (!canRefund) return;
       setConfirmState({ open: true, type: 'manualRefund', orderId: order.id, order });
       return;
     }
@@ -221,6 +227,30 @@ export default function StoreOrdersPage() {
       }
     } catch {
       showError(t('toast.errorTitle'), t('errors.connection'));
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // Records a refund the merchant has already paid out. Resolves to null on success, or the API's
+  // message (403 for staff, 409 REFUND_NOT_RECORDED) for the dialog to show.
+  const executeManualRefund = async (order: Order, input: ManualRefundInput) => {
+    setUpdatingId(order.id);
+    try {
+      const { error: apiError } = await apiPut(
+        `/api/v1/stores/${storeId}/orders/${order.id}/status`,
+        manualRefundBody(input)
+      );
+      if (apiError) return apiError.message || t('errors.statusUpdate');
+      setOrders(prev => prev.map(o => (o.id === order.id ? { ...o, status: 'refunded' } : o)));
+      toastSuccess(
+        t('toast.statusUpdatedTitle'),
+        t('toast.statusUpdatedDescription', { status: t('status.refunded') })
+      );
+      setRefreshKey(k => k + 1);
+      return null;
+    } catch {
+      return t('errors.connection');
     } finally {
       setUpdatingId(null);
     }
@@ -349,32 +379,21 @@ export default function StoreOrdersPage() {
       const ids = confirmState.ids;
       setConfirmState(prev => ({ ...prev, open: false }));
       await executeBulkMarkPaid(ids);
-    } else if (confirmState.type === 'manualRefund' && confirmState.order) {
-      const order = confirmState.order;
-      setConfirmState(prev => ({ ...prev, open: false }));
-      await executeStatusChange(order, 'refunded');
     }
   };
 
   const closeConfirm = () => setConfirmState(prev => ({ ...prev, open: false }));
 
   const confirmTitle =
-    confirmState.type === 'markPaid'
-      ? tConfirm('markPaidTitle')
-      : confirmState.type === 'manualRefund'
-        ? tConfirm('manualRefundTitle')
-        : tConfirm('bulkMarkPaidTitle');
+    confirmState.type === 'markPaid' ? tConfirm('markPaidTitle') : tConfirm('bulkMarkPaidTitle');
 
   const confirmDescription =
     confirmState.type === 'markPaid'
       ? tConfirm('markPaidDescription')
-      : confirmState.type === 'manualRefund'
-        ? tConfirm(manualRefundDescriptionKey(confirmState.order?.status))
-        : tConfirm('bulkMarkPaidDescription', { count: confirmState.ids?.length ?? 0 });
+      : tConfirm('bulkMarkPaidDescription', { count: confirmState.ids?.length ?? 0 });
 
   const isConfirmLoading =
-    ((confirmState.type === 'markPaid' || confirmState.type === 'manualRefund') &&
-      updatingId === confirmState.orderId) ||
+    (confirmState.type === 'markPaid' && updatingId === confirmState.orderId) ||
     (confirmState.type === 'bulkMarkPaid' && isBulkProcessing);
 
   const handleToggleSelected = (orderId: string, checked: boolean) => {
@@ -480,6 +499,7 @@ export default function StoreOrdersPage() {
           hasActiveFilters={hasActiveFilters}
           updatingId={updatingId}
           selectedOrders={selectedOrders}
+          canRefund={canRefund}
           onStatusChange={handleStatusChange}
           onMarkPaid={handleMarkPaid}
           onOpenInvoice={openInvoice}
@@ -496,13 +516,23 @@ export default function StoreOrdersPage() {
         />
       </div>
 
+      <ManualRefundModal
+        open={confirmState.open && confirmState.type === 'manualRefund'}
+        orderStatus={confirmState.order?.status}
+        onConfirm={input =>
+          confirmState.order
+            ? executeManualRefund(confirmState.order, input)
+            : Promise.resolve(tConfirm('refundFailed'))
+        }
+        onClose={closeConfirm}
+      />
+
       <ConfirmActionModal
-        open={confirmState.open}
+        open={confirmState.open && confirmState.type !== 'manualRefund'}
         title={confirmTitle}
         description={confirmDescription}
         confirmLabel={tConfirm('confirm')}
         cancelLabel={tConfirm('cancel')}
-        variant={confirmState.type === 'manualRefund' ? 'destructive' : 'default'}
         onConfirm={handleConfirm}
         onClose={closeConfirm}
         isLoading={isConfirmLoading}

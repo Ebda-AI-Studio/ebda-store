@@ -8,7 +8,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 
-import { REGION } from '@force/shared';
+import { REGION, areasForGovernorate, orderAddressLines } from '@force/shared';
 interface Address {
   id: string;
   firstName: string;
@@ -20,6 +20,11 @@ interface Address {
   governorate?: string;
   governorateAr?: string;
   area?: string;
+  areaAr?: string;
+  street?: string | null;
+  building?: string | null;
+  floor?: string | null;
+  apartment?: string | null;
   postalCode?: string;
   country: string;
   phone?: string;
@@ -36,6 +41,11 @@ const EMPTY_FORM = {
   governorate: '',
   governorateAr: '',
   area: '',
+  areaAr: '',
+  street: '',
+  building: '',
+  floor: '',
+  apartment: '',
   postalCode: '',
   country: REGION.countryName.en,
   phone: '',
@@ -46,7 +56,7 @@ export default function AddressesClient() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { success, error: toastError } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const storeUrl = useStoreUrl();
 
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -91,20 +101,44 @@ export default function AddressesClient() {
       const endpoint = editingId ? `/addresses/${editingId}` : '/addresses';
       const method = editingId ? 'put' : 'post';
 
-      const result = await api[method]<{ address: Address }>(endpoint, formData);
+      // address1 is the composed street line (same shape as checkout) so every
+      // order/invoice/label reader keeps working; the structured parts ride along.
+      const address1 = [
+        formData.street.trim(),
+        formData.building.trim() && `${t('Building', 'عمارة')} ${formData.building.trim()}`,
+        formData.floor.trim() && `${t('Floor', 'دور')} ${formData.floor.trim()}`,
+        formData.apartment.trim() && `${t('Apt', 'شقة')} ${formData.apartment.trim()}`,
+      ]
+        .filter(Boolean)
+        .join(language === 'ar' ? '، ' : ', ');
+      const payload = {
+        ...formData,
+        address1,
+        country: REGION.countryName.en,
+        postalCode: '',
+      };
+
+      const result = await api[method]<{ address: Address }>(endpoint, payload);
 
       if (result.success) {
         success(
-          editingId ? 'Address updated' : 'Address added',
-          editingId ? 'Your address has been updated.' : 'New address has been saved.'
+          editingId
+            ? t('Address updated', 'تم تحديث العنوان')
+            : t('Address added', 'تمت إضافة العنوان'),
+          editingId
+            ? t('Your address has been updated.', 'تم تحديث عنوانك.')
+            : t('New address has been saved.', 'تم حفظ العنوان الجديد.')
         );
         fetchAddresses();
         resetForm();
       } else {
-        toastError('Error', result.error?.message || 'Failed to save address');
+        toastError(
+          t('Error', 'خطأ'),
+          result.error?.message || t('Failed to save address', 'تعذر حفظ العنوان')
+        );
       }
     } catch {
-      toastError('Error', 'An unexpected error occurred.');
+      toastError(t('Error', 'خطأ'), t('An unexpected error occurred.', 'حدث خطأ غير متوقع.'));
     } finally {
       setIsSaving(false);
     }
@@ -117,12 +151,15 @@ export default function AddressesClient() {
       const result = await api.delete(`/addresses/${deleteTargetId}`);
       if (result.success) {
         setAddresses(prev => prev.filter(a => a.id !== deleteTargetId));
-        success('Address deleted', 'The address has been removed.');
+        success(
+          t('Address deleted', 'تم حذف العنوان'),
+          t('The address has been removed.', 'تمت إزالة العنوان.')
+        );
       } else {
-        toastError('Error', 'Failed to delete address');
+        toastError(t('Error', 'خطأ'), t('Failed to delete address', 'تعذر حذف العنوان'));
       }
     } catch {
-      toastError('Error', 'An unexpected error occurred.');
+      toastError(t('Error', 'خطأ'), t('An unexpected error occurred.', 'حدث خطأ غير متوقع.'));
     } finally {
       setIsDeleting(false);
       setDeleteTargetId(null);
@@ -134,10 +171,16 @@ export default function AddressesClient() {
       const result = await api.put(`/addresses/${id}`, { isDefault: true });
       if (result.success) {
         setAddresses(prev => prev.map(a => ({ ...a, isDefault: a.id === id })));
-        success('Default updated', 'Default address has been changed.');
+        success(
+          t('Default updated', 'تم تحديث العنوان الافتراضي'),
+          t('Default address has been changed.', 'تم تغيير العنوان الافتراضي.')
+        );
       }
     } catch {
-      toastError('Error', 'Failed to update default address');
+      toastError(
+        t('Error', 'خطأ'),
+        t('Failed to update default address', 'تعذر تحديث العنوان الافتراضي')
+      );
     }
   }
 
@@ -147,12 +190,19 @@ export default function AddressesClient() {
       firstName: address.firstName,
       lastName: address.lastName,
       address1: address.address1,
+      // address2 holds the landmark («علامة مميزة»), same as checkout.
       address2: address.address2 || '',
       city: address.city,
       state: address.state,
       governorate: address.governorate || address.state,
       governorateAr: address.governorateAr || '',
       area: address.area || '',
+      areaAr: address.areaAr || '',
+      // Older saved addresses only have the composed address1 line.
+      street: address.street || address.address1 || '',
+      building: address.building || '',
+      floor: address.floor || '',
+      apartment: address.apartment || '',
       postalCode: address.postalCode || '',
       country: address.country,
       phone: address.phone || '',
@@ -166,6 +216,8 @@ export default function AddressesClient() {
     setEditingId(null);
     setFormData(EMPTY_FORM);
   }
+
+  const areaOptions = areasForGovernorate(formData.governorate);
 
   if (isLoading || authLoading) {
     return (
@@ -258,32 +310,7 @@ export default function AddressesClient() {
               placeholder={REGION.phone.placeholderIntl}
             />
 
-            <Input
-              label={t(
-                'Street Address',
-                '\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0634\u0627\u0631\u0639'
-              )}
-              value={formData.address1}
-              onChange={e => setFormData({ ...formData, address1: e.target.value })}
-              required
-            />
-
-            <Input
-              label={t(
-                'Apt / Suite / Building (optional)',
-                '\u0634\u0642\u0629 / \u062c\u0646\u0627\u062d / \u0645\u0628\u0646\u0649 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
-              )}
-              value={formData.address2}
-              onChange={e => setFormData({ ...formData, address2: e.target.value })}
-            />
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Input
-                label={t('City / District', 'المدينة / الحي')}
-                value={formData.city}
-                onChange={e => setFormData({ ...formData, city: e.target.value })}
-                required
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
               <Select
                 label={t('Governorate', 'المحافظة')}
                 value={formData.governorate}
@@ -295,6 +322,8 @@ export default function AddressesClient() {
                     governorate: e.target.value,
                     governorateAr: gov?.nameAr ?? '',
                     state: e.target.value,
+                    area: '',
+                    areaAr: '',
                   });
                 }}
                 options={[
@@ -306,29 +335,65 @@ export default function AddressesClient() {
                 ]}
                 required
               />
+              {areaOptions.length > 0 ? (
+                <Select
+                  label={t('Area', 'المنطقة')}
+                  value={formData.area}
+                  onChange={e => {
+                    const picked = areaOptions.find(a => a.en === e.target.value);
+                    setFormData({
+                      ...formData,
+                      area: e.target.value,
+                      areaAr: picked?.ar ?? '',
+                    });
+                  }}
+                  options={[
+                    { value: '', label: t('Select…', 'اختر…') },
+                    ...areaOptions.map(a => ({ value: a.en, label: t(a.en, a.ar) })),
+                  ]}
+                  required
+                />
+              ) : (
+                <Input
+                  label={t('Area', 'المنطقة')}
+                  value={formData.area}
+                  onChange={e => setFormData({ ...formData, area: e.target.value, areaAr: '' })}
+                  disabled={!formData.governorate}
+                  required
+                />
+              )}
+            </div>
+
+            <Input
+              label={t('Street', 'الشارع')}
+              value={formData.street}
+              onChange={e => setFormData({ ...formData, street: e.target.value })}
+              required
+            />
+
+            <div className="grid gap-4 sm:grid-cols-3">
               <Input
-                label={t(
-                  'Postal Code',
-                  '\u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0628\u0631\u064a\u062f\u064a'
-                )}
-                value={formData.postalCode}
-                onChange={e => setFormData({ ...formData, postalCode: e.target.value })}
+                label={t('Building (optional)', 'رقم العمارة (اختياري)')}
+                value={formData.building}
+                onChange={e => setFormData({ ...formData, building: e.target.value })}
+              />
+              <Input
+                label={t('Floor (optional)', 'الدور (اختياري)')}
+                value={formData.floor}
+                onChange={e => setFormData({ ...formData, floor: e.target.value })}
+              />
+              <Input
+                label={t('Apartment (optional)', 'الشقة (اختياري)')}
+                value={formData.apartment}
+                onChange={e => setFormData({ ...formData, apartment: e.target.value })}
               />
             </div>
 
-            <Select
-              label={t('Country', '\u0627\u0644\u062f\u0648\u0644\u0629')}
-              value={formData.country}
-              onChange={e => setFormData({ ...formData, country: e.target.value })}
-              options={[
-                { value: REGION.countryName.en, label: REGION.countryName.en },
-                { value: 'Saudi Arabia', label: 'Saudi Arabia' },
-                { value: 'UAE', label: 'United Arab Emirates' },
-                { value: 'Bahrain', label: 'Bahrain' },
-                { value: 'Qatar', label: 'Qatar' },
-                { value: 'Oman', label: 'Oman' },
-              ]}
-              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            <Input
+              label={t('Landmark (optional)', 'علامة مميزة (اختياري)')}
+              value={formData.address2}
+              onChange={e => setFormData({ ...formData, address2: e.target.value })}
+              placeholder={t('Next to the pharmacy…', 'جنب الصيدلية…')}
             />
 
             <label className="flex items-center gap-2">
@@ -383,14 +448,13 @@ export default function AddressesClient() {
               <p className="font-medium text-foreground">
                 {address.firstName} {address.lastName}
               </p>
-              <p className="mt-1 text-sm text-muted-foreground">{address.address1}</p>
-              {address.address2 && (
-                <p className="text-sm text-muted-foreground">{address.address2}</p>
+              {orderAddressLines(address as unknown as Record<string, unknown>, language).map(
+                (line, i) => (
+                  <p key={i} className={`text-sm text-muted-foreground ${i === 0 ? 'mt-1' : ''}`}>
+                    {line}
+                  </p>
+                )
               )}
-              <p className="text-sm text-muted-foreground">
-                {address.city}, {address.state} {address.postalCode}
-              </p>
-              <p className="text-sm text-muted-foreground">{address.country}</p>
               {address.phone && (
                 <p className="mt-2 text-sm text-muted-foreground">{address.phone}</p>
               )}

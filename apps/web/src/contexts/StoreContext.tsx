@@ -116,6 +116,8 @@ export interface StoreData {
   descriptionAr?: string;
   currency: string;
   timezone: string;
+  /** Merchant's published return window in days: 0 = returns not accepted, null/absent = not declared. */
+  returnWindowDays?: number | null;
   template: TemplateId;
   theme: StoreTheme;
   socialLinks: StoreSocialLinks;

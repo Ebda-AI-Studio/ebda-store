@@ -11,23 +11,52 @@ keywords: order status cod cash on delivery paid unpaid
 
 COD is on by default. The customer pays the courier when the order arrives. You can add [InstaPay](/en/instapay/) next to it, and you must keep at least one payment method turned on.
 
+### The COD fee
+
+If you charge a fee for cash on delivery (a fixed amount, a percentage, or both, in **Payment settings**), your customer sees it **before** they place the order: the payment option says a fee applies, and the order summary shows a **Cash on delivery fee** line with the exact amount, inside the total. The percentage is taken from the goods (after discounts) plus shipping. The fee is then fixed on the order: what the customer saw is what the courier collects, and it is part of the invoice.
+
+### When a COD order counts as paid
+
+When the order is **Delivered**, the cash is collected: the order is marked **Paid** automatically, the same as pressing **Mark paid**. A COD order is never cancelled automatically for being unpaid, because the customer pays on delivery, which can be days later. You cancel it yourself, or it is cancelled when the parcel comes back to you (see below).
+
+### When the parcel comes back
+
+If the courier brings the parcel back (the customer refused it, or delivery failed), move the shipment to **Returned**. The order is cancelled, nothing is owed on cash on delivery, and the items go back into stock unless you untick **Put the items back in stock**. For a carrier that reports a return by itself, the items go back into stock.
+
 After a COD order your customer can see a **Confirm on WhatsApp** button (see [WhatsApp buttons](/en/whatsapp-buttons/)), which makes it easy to confirm the address and time before you ship.
 
 ## Order statuses
 
 Every order has a status you move forward as you work on it:
 
-| Status     | Meaning                                 |
-| ---------- | --------------------------------------- |
-| Pending    | New order, not yet looked at            |
-| Confirmed  | You have confirmed it with the customer |
-| Processing | You are preparing it                    |
-| Shipped    | It is on its way                        |
-| Delivered  | The customer has it                     |
-| Cancelled  | The order was cancelled                 |
-| Refunded   | The money was returned                  |
+| Status                        | Meaning                                                       |
+| ----------------------------- | ------------------------------------------------------------- |
+| Pending                       | New order, not yet looked at                                  |
+| Awaiting payment confirmation | An InstaPay transfer you still need to confirm (see InstaPay) |
+| Confirmed                     | You have confirmed it with the customer                       |
+| Processing                    | You are preparing it                                          |
+| Shipped                       | It is on its way                                              |
+| Delivered                     | The customer has it                                           |
+| Cancelled                     | The order was cancelled                                       |
+| Refunded                      | The money was returned                                        |
 
-Separately, a payment status shows whether the order is **Paid** or **Unpaid**.
+Separately, a payment status shows whether the order is **Paid** or **Unpaid** (or failed, refunded or disputed). Your customers see these same statuses, in Arabic or English, in their account under **Orders**.
+
+## The delivery address
+
+Every order shows the delivery address the way your customer entered it: the street, building, floor and apartment, then the **area and governorate**, and the **landmark** (the «علامة مميزة» field) on its own line. Read the landmark before you hand the order to the courier, because it is often how the courier finds the door. Customers can also save addresses in their account with the same fields, and pick them again at checkout.
+
+## Returns
+
+In **Shipping**, the **Return policy** card sets how many days after delivery a customer can ask for a return:
+
+- A number of days (for example 14) is shown on your store's Returns, Terms and FAQ pages, and customers cannot request a return after that many days from the delivery date.
+- **0** means you do not accept returns. The Returns page says so and the request form is hidden.
+- Leaving it blank means you have not declared a window. Your pages then print no number and no limit is enforced.
+
+## Recording a refund
+
+When you give a customer their money back outside a payment provider (cash, InstaPay or a bank transfer), set the order to **Refunded** and choose how you refunded it. This records the refund on the order and tells the customer their refund was issued, so do it only **after** you sent the money. It does not send money itself. Only the store owner can record a refund; staff accounts do not see the option. Every refund also issues a **credit note** (see [Invoices and credit notes](/en/invoices-and-credit-notes/)).
 
 ## Message a customer
 

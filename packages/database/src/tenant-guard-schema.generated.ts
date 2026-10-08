@@ -1360,4 +1360,16 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       store: 'Store',
     },
   },
+  {
+    name: 'FiscalDocument',
+    table: 'fiscal_documents',
+    storeId: true,
+    relations: {},
+  },
+  {
+    name: 'FiscalDocumentCounter',
+    table: 'fiscal_document_counters',
+    storeId: true,
+    relations: {},
+  },
 ];

@@ -1,7 +1,14 @@
-import { orderTaxPlacement, taxInvoiceInfo } from '@force/shared';
+import { orderAddressLines, orderTaxPlacement, taxInvoiceInfo } from '@force/shared';
 import { escapeHtml, emailMoney } from './_util';
 import { waMeEmailBlock } from './_wa-me';
 import type { OrderEmailData } from '../email.service';
+
+/** Delivery-address lines (street, landmark, area + governorate, country) with no empty/stray lines. */
+function addressHtml(addr: OrderEmailData['shippingAddress'], locale: 'ar' | 'en'): string {
+  return orderAddressLines(addr as unknown as Record<string, unknown>, locale)
+    .map(escapeHtml)
+    .join('<br>');
+}
 
 const LABELS = {
   en: {
@@ -12,6 +19,7 @@ const LABELS = {
     discount: 'Discount',
     tax: 'Tax',
     shipping: 'Shipping',
+    codFee: 'Cash on delivery fee',
     total: 'Total',
     taxIncluded: 'Incl. VAT',
     vat: (rate: number | null) => (rate === null ? 'VAT' : `VAT (${rate}%)`),
@@ -26,6 +34,7 @@ const LABELS = {
     discount: 'الخصم',
     tax: 'الضريبة',
     shipping: 'الشحن',
+    codFee: 'رسوم الدفع عند الاستلام',
     total: 'الإجمالي',
     taxIncluded: 'شامل ضريبة القيمة المضافة',
     vat: (rate: number | null) =>
@@ -92,10 +101,12 @@ function totalsRows(d: OrderEmailData, locale: 'en' | 'ar'): string {
         )
       : '',
     other > 0 ? row(`${L.discount}${legacyAnnotation}`, `-${money(other)}`) : '',
+    // subtotal → discounts → shipping → COD fee → VAT → total (ruling MONEYB-2)
+    row(L.shipping, money(d.shipping)),
+    (d.codFee ?? 0) > 0 ? row(L.codFee, money(d.codFee ?? 0)) : '',
     taxRow !== null && (taxRow > 0 || taxInfo)
       ? row(taxInfo ? L.vat(taxInfo.ratePercent) : L.tax, money(taxRow))
       : '',
-    row(L.shipping, money(d.shipping)),
     row(L.total, money(d.total), 'total-row'),
     includedTaxCaption !== null
       ? `<tr class="tax-included">
@@ -154,10 +165,7 @@ export const orderConfirmationTemplate = {
     <div class="address-box">
       <strong>Shipping Address</strong><br>
       ${escapeHtml(d.shippingAddress.firstName)} ${escapeHtml(d.shippingAddress.lastName)}<br>
-      ${escapeHtml(d.shippingAddress.address1)}<br>
-      ${d.shippingAddress.address2 ? escapeHtml(d.shippingAddress.address2) + '<br>' : ''}
-      ${escapeHtml(d.shippingAddress.city)}, ${escapeHtml(d.shippingAddress.state)} ${escapeHtml(d.shippingAddress.postalCode)}<br>
-      ${escapeHtml(d.shippingAddress.country)}
+      ${addressHtml(d.shippingAddress, 'en')}
     </div>
     ${waMeEmailBlock(d.waMe, 'en')}
   `;
@@ -199,10 +207,7 @@ export const orderConfirmationTemplate = {
     <div class="address-box">
       <strong>عنوان الشحن</strong><br>
       ${escapeHtml(d.shippingAddress.firstName)} ${escapeHtml(d.shippingAddress.lastName)}<br>
-      ${escapeHtml(d.shippingAddress.address1)}<br>
-      ${d.shippingAddress.address2 ? escapeHtml(d.shippingAddress.address2) + '<br>' : ''}
-      ${escapeHtml(d.shippingAddress.city)}, ${escapeHtml(d.shippingAddress.state)} ${escapeHtml(d.shippingAddress.postalCode)}<br>
-      ${escapeHtml(d.shippingAddress.country)}
+      ${addressHtml(d.shippingAddress, 'ar')}
     </div>
     ${waMeEmailBlock(d.waMe, 'ar')}
   `;

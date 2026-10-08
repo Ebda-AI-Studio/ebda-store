@@ -8,6 +8,7 @@ import { useStoreContact, useStore, useStoreUrl } from '../../contexts/StoreCont
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api, API_URL, type Order } from '../../lib/api';
 import { groupOrderLinesForDisplay } from '@force/shared';
+import { returnPolicyCopy, returnPolicyKind } from '../../lib/return-policy-text';
 
 const RETURN_REASONS = [
   {
@@ -248,23 +249,30 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
           json.error?.code === 'NETWORK_ERROR' || json.error?.code === 'TIMEOUT';
         // A merchant is completing another return on this order right now.
         const orderBusy = json.error?.code === 'RETURN_ORDER_BUSY';
+        // Outside the store's published return window (or returns switched off).
+        const windowClosed = json.error?.code === 'RETURN_WINDOW_CLOSED';
         setSubmitResult({
           type: 'error',
-          text: orderBusy
+          text: windowClosed
             ? t(
-                'Another return on this order is being processed. Please try again in a moment.',
-                'يتم الآن معالجة إرجاع آخر لهذا الطلب. يرجى المحاولة مرة أخرى بعد قليل.'
+                'The return period for this order has ended, so a return can no longer be requested online. Please contact the store.',
+                'انتهت مدة الإرجاع لهذا الطلب ولم يعد ممكناً تقديم طلب الإرجاع إلكترونياً. يرجى التواصل مع المتجر.'
               )
-            : transportFailure
+            : orderBusy
               ? t(
-                  'Failed to submit return request. Please check your connection.',
-                  '\u0641\u0634\u0644 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643.'
+                  'Another return on this order is being processed. Please try again in a moment.',
+                  'يتم الآن معالجة إرجاع آخر لهذا الطلب. يرجى المحاولة مرة أخرى بعد قليل.'
                 )
-              : json.error?.message ||
-                t(
-                  'Failed to submit return request. Please try again.',
-                  '\u0641\u0634\u0644 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.'
-                ),
+              : transportFailure
+                ? t(
+                    'Failed to submit return request. Please check your connection.',
+                    '\u0641\u0634\u0644 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643.'
+                  )
+                : json.error?.message ||
+                  t(
+                    'Failed to submit return request. Please try again.',
+                    '\u0641\u0634\u0644 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.'
+                  ),
         });
       }
     } catch {
@@ -557,7 +565,8 @@ export default function ReturnsClient() {
   const { email } = useStoreContact();
   const { store } = useStore();
   const storeUrl = useStoreUrl();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const policy = returnPolicyCopy(store.returnWindowDays, language);
   const returnsEmail =
     email || t('our support team', '\u0641\u0631\u064a\u0642 \u0627\u0644\u062f\u0639\u0645');
   return (
@@ -596,19 +605,9 @@ export default function ReturnsClient() {
                   />
                 </svg>
               </div>
-              <h2 className="text-xl font-semibold text-foreground">
-                {t(
-                  '30-Day Return Policy',
-                  '\u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u0625\u0631\u062c\u0627\u0639 \u062e\u0644\u0627\u0644 30 \u064a\u0648\u0645\u0627\u064b'
-                )}
-              </h2>
+              <h2 className="text-xl font-semibold text-foreground">{policy.title}</h2>
             </div>
-            <p className="mt-4 text-muted-foreground">
-              {t(
-                "We want you to be completely satisfied with your purchase. If you're not happy with your order, you can return it within 30 days of delivery for a full refund or exchange.",
-                '\u0646\u0631\u064a\u062f\u0643 \u0623\u0646 \u062a\u0643\u0648\u0646 \u0631\u0627\u0636\u064a\u0627\u064b \u062a\u0645\u0627\u0645\u0627\u064b \u0639\u0646 \u0645\u0634\u062a\u0631\u064a\u0627\u062a\u0643. \u0625\u0630\u0627 \u0644\u0645 \u062a\u0643\u0646 \u0633\u0639\u064a\u062f\u0627\u064b \u0628\u0637\u0644\u0628\u0643\u060c \u064a\u0645\u0643\u0646\u0643 \u0625\u0631\u062c\u0627\u0639\u0647 \u062e\u0644\u0627\u0644 30 \u064a\u0648\u0645\u0627\u064b \u0645\u0646 \u0627\u0644\u062a\u0648\u0635\u064a\u0644 \u0644\u0627\u0633\u062a\u0631\u062f\u0627\u062f \u0643\u0627\u0645\u0644 \u0627\u0644\u0645\u0628\u0644\u063a \u0623\u0648 \u0627\u0644\u0627\u0633\u062a\u0628\u062f\u0627\u0644.'
-              )}
-            </p>
+            <p className="mt-4 text-muted-foreground">{policy.body}</p>
           </section>
 
           <section className="rounded-xl border bg-card p-6 shadow-sm">
@@ -737,8 +736,8 @@ export default function ReturnsClient() {
                     '\u0627\u0633\u062a\u0644\u0627\u0645 \u0627\u0644\u0645\u0628\u0644\u063a \u0627\u0644\u0645\u0633\u062a\u0631\u062f'
                   ),
                   desc: t(
-                    "Once we receive and inspect the item, we'll process your refund within 5-7 business days.",
-                    '\u0628\u0645\u062c\u0631\u062f \u0627\u0633\u062a\u0644\u0627\u0645 \u0627\u0644\u0645\u0646\u062a\u062c \u0648\u0641\u062d\u0635\u0647\u060c \u0633\u0646\u0642\u0648\u0645 \u0628\u0645\u0639\u0627\u0644\u062c\u0629 \u0627\u0633\u062a\u0631\u062f\u0627\u062f \u0627\u0644\u0645\u0628\u0644\u063a \u062e\u0644\u0627\u0644 5-7 \u0623\u064a\u0627\u0645 \u0639\u0645\u0644.'
+                    "Once we receive and inspect the item, we'll process your refund.",
+                    'بمجرد استلام المنتج وفحصه، سنقوم بمعالجة استرداد المبلغ.'
                   ),
                 },
               ].map(({ step, title, desc }) => (
@@ -771,8 +770,8 @@ export default function ReturnsClient() {
               </li>
               <li>
                 {t(
-                  'Please allow 5-7 business days for the refund to appear',
-                  '\u064a\u0631\u062c\u0649 \u0627\u0644\u0627\u0646\u062a\u0638\u0627\u0631 5-7 \u0623\u064a\u0627\u0645 \u0639\u0645\u0644 \u0644\u0638\u0647\u0648\u0631 \u0627\u0644\u0645\u0628\u0644\u063a \u0627\u0644\u0645\u0633\u062a\u0631\u062f'
+                  'Refund timing depends on your payment method and bank',
+                  'يختلف موعد ظهور المبلغ المسترد حسب وسيلة الدفع والبنك'
                 )}
               </li>
               <li>
@@ -791,7 +790,11 @@ export default function ReturnsClient() {
           </section>
 
           {/* Return Request Form */}
-          {store.id && store.id !== 'demo' && <ReturnRequestForm storeId={store.id} />}
+          {store.id &&
+            store.id !== 'demo' &&
+            returnPolicyKind(store.returnWindowDays) !== 'none' && (
+              <ReturnRequestForm storeId={store.id} />
+            )}
         </div>
 
         <div className="mt-8 text-center">

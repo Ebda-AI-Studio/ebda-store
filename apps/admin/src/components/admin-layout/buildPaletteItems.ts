@@ -48,6 +48,7 @@ const PAGE_KEYWORDS: Record<string, string> = {
   'floating-widget': 'chat button float whatsapp زر عائم دردشة',
   navigation: 'menu links nav header قائمة تنقل روابط',
   orders: 'sales purchases checkout invoices طلبات مبيعات فواتير',
+  invoices: 'tax invoice receipt credit note refund vat فواتير فاتورة ضريبية إشعار دائن إيصال',
   customers: 'clients buyers crm contacts عملاء زبائن جهات اتصال',
   reviews: 'ratings feedback stars مراجعات تقييمات نجوم',
   returns: 'refunds exchanges rma إرجاع استرجاع استبدال',

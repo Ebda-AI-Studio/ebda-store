@@ -1,11 +1,15 @@
 /**
  * Cash on delivery as a provider-shaped method (SP6a). No network: the courier
- * collects, the merchant marks the order paid. Existing COD behaviour is kept
- * exactly: the fee is `codFeeMinor` (fixed + optional percentage, half-up to the
- * piastre), added to the order total ONCE (a replayed create never stacks it),
- * and the courier collects `total + fee - wallet`.
+ * collects, the merchant marks the order paid.
+ *
+ * The COD fee (fixed + optional percentage, half-up to the piastre) is quoted
+ * at checkout and FROZEN on the order at creation (`orders.cod_fee`, ruling
+ * MONEYB-3) by `codFeeForOrder` — the same function the storefront quotes
+ * with. Nothing here adds a fee any more: `/payments/create` only records what
+ * the courier collects, `order.total − wallet`.
  */
-import { codFeeMinor } from '@force/shared';
+import { prisma } from '@force/database';
+import { type CodFeeConfig } from '@force/shared';
 import { assertChargeable } from './provider-call';
 import {
   PaymentProviderError,
@@ -15,44 +19,31 @@ import {
   type ProviderCapabilities,
 } from './types';
 
-export interface CodChargeInput {
-  /** `order.total` as stored (already includes the fee if it was applied before). */
-  orderTotalMinor: number;
-  /** Customer-wallet portion, piastres. */
-  walletMinor?: number;
-  fixedFeeMinor: number;
-  percentBps?: number;
-  /** A COD payment row already exists for the order, so the fee is already folded into `orderTotalMinor`. */
-  feeAlreadyApplied: boolean;
-}
-
-export interface CodCharge {
-  feeMinor: number;
-  /** New `order.total` (fee folded in once). */
-  chargedTotalMinor: number;
-  /** What the courier collects. */
-  collectMinor: number;
-  /** Whether `order.total` must be updated. */
-  applyFee: boolean;
-}
-
-/**
- * The COD arithmetic of `/payments/create`, extracted so the fee, the replay
- * guard and the wallet split are one tested function. Integer piastres only.
- */
-export function computeCodCharge(input: CodChargeInput): CodCharge {
-  const feeMinor = codFeeMinor(input.orderTotalMinor, {
-    fixedMinor: input.fixedFeeMinor,
-    percentBps: input.percentBps,
-  });
-  const applyFee = feeMinor > 0 && !input.feeAlreadyApplied;
-  const chargedTotalMinor = applyFee ? input.orderTotalMinor + feeMinor : input.orderTotalMinor;
+/** The fee settings of a COD `payment_configs` row (fixed piastres + percentage bps). */
+export function codFeeConfigFromRow(row: {
+  fixedFee: unknown;
+  settings: unknown;
+}): Required<CodFeeConfig> {
+  const fixed = Number(row.fixedFee);
+  const bps = Number((row.settings as { percentBps?: unknown } | null)?.percentBps ?? 0);
   return {
-    feeMinor,
-    chargedTotalMinor,
-    collectMinor: chargedTotalMinor - (input.walletMinor ?? 0),
-    applyFee,
+    fixedFee: Number.isFinite(fixed) && fixed > 0 ? Math.round(fixed) : 0,
+    percentBps: Number.isFinite(bps) && bps > 0 ? Math.round(bps) : 0,
   };
+}
+
+/** The store's enabled COD fee settings, or null when COD is off. Store-scoped read. */
+export async function loadCodFeeConfig(storeId: string): Promise<Required<CodFeeConfig> | null> {
+  const row = await prisma.paymentConfig.findFirst({
+    where: { storeId, provider: 'cod', isEnabled: true },
+    select: { fixedFee: true, settings: true },
+  });
+  return row ? codFeeConfigFromRow(row) : null;
+}
+
+/** What the courier collects for a COD order: its total (fee already inside) less the wallet part. */
+export function codCollectMinor(orderTotalMinor: number, walletMinor = 0): number {
+  return Math.max(0, orderTotalMinor - Math.max(0, walletMinor));
 }
 
 const capabilities: ProviderCapabilities = {

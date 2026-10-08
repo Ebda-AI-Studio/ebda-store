@@ -37,9 +37,8 @@ export function orderTaxPlacement(order: {
  * happens only when VAT was collected under a VERIFIED tax profile. `null` =
  * an ordinary invoice: no "tax invoice" heading, no TRN, no rate label.
  *
- * `taxableAmount` is the VAT base (after discount, before VAT): for exclusive
- * prices `subtotal − discount`, for inclusive prices that minus the extracted
- * `tax` — the same base `computeOrderTax` used.
+ * `taxableAmount` is the VAT base (after discount, before VAT) the order froze
+ * at creation: goods after discount + shipping + COD fee (ruling MONEYB-2).
  */
 export interface TaxInvoiceInfo {
   sellerTaxRegistrationNumber: string;
@@ -58,14 +57,19 @@ export function taxInvoiceInfo(order: {
   discount?: number | null;
   tax: number;
   taxIncludedInPrice?: boolean | null;
+  /** Frozen VAT base (ruling MONEYB-2); NULL on orders placed before it existed. */
+  taxableAmount?: number | null;
 }): TaxInvoiceInfo | null {
   if (!order.sellerTaxRegistrationNumber) return null;
-  const base = Math.max(0, order.subtotal - (order.discount ?? 0));
+  // Orders since MONEYB-2 froze their own base (goods after discount + shipping
+  // + COD fee). Older orders were taxed on goods only — rebuild that base.
+  const legacyBase = Math.max(0, order.subtotal - (order.discount ?? 0));
+  const legacyTaxable = order.taxIncludedInPrice ? Math.max(0, legacyBase - order.tax) : legacyBase;
   return {
     sellerTaxRegistrationNumber: order.sellerTaxRegistrationNumber,
     sellerTaxLegalName: order.sellerTaxLegalName ?? null,
     ratePercent: order.taxRateBps == null ? null : order.taxRateBps / 100,
-    taxableAmount: order.taxIncludedInPrice ? Math.max(0, base - order.tax) : base,
+    taxableAmount: order.taxableAmount ?? legacyTaxable,
     vatAmount: order.tax,
   };
 }

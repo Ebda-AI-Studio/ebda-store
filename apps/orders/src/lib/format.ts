@@ -26,7 +26,7 @@ export function formatDateTime(iso: string | null | undefined, locale: string): 
 /**
  * Tiny `{token}` interpolation for the PWA's flat dictionary (the admin uses
  * next-intl's ICU; this is the lightweight equivalent). `fmt('Remaining: {amount}',
- * { amount: '1.500 EGP' })` → `'Remaining: 1.500 EGP'`.
+ * { amount: '15.00 EGP' })` → `'Remaining: 15.00 EGP'`.
  */
 export function fmt(template: string, vars: Record<string, string | number> = {}): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => (key in vars ? String(vars[key]) : `{${key}}`));
@@ -89,7 +89,17 @@ export function formatAddressLines(
   const areaAr = a.areaAr?.trim() || '';
   const area = isAr ? areaAr || areaEn : areaEn || areaAr;
 
-  const head = [country, city, area].filter(Boolean).join(' - ');
+  // Egyptian checkout writes `governorate`/`governorateAr` (city stays empty).
+  const govEn = a.governorate?.trim() || '';
+  const govAr = a.governorateAr?.trim() || '';
+  const governorate = isAr ? govAr || govEn : govEn || govAr;
+
+  // De-duplicate so "Cairo - Cairo" (city == governorate) prints once.
+  const headParts: string[] = [];
+  for (const p of [country, city, area, governorate]) {
+    if (p && !headParts.includes(p)) headParts.push(p);
+  }
+  const head = headParts.join(' - ');
   if (head) lines.push(head);
 
   const streetEn = a.street?.trim() || '';
@@ -103,9 +113,13 @@ export function formatAddressLines(
   if (a.house) blockBits.push(`${labels.house} ${a.house}`);
   if (blockBits.length === 0 && a.address1) {
     blockBits.push(a.address1.trim());
-    if (a.address2?.trim()) blockBits.push(a.address2.trim());
   }
   if (blockBits.length) lines.push(blockBits.join(', '));
+
+  // Landmark («علامة مميزة») is stored in `address2` by the storefront checkout.
+  // It is always shown on its own labelled line — never only as a fallback.
+  const landmark = a.address2?.trim();
+  if (landmark) lines.push(`${isAr ? 'علامة مميزة' : 'Landmark'}: ${landmark}`);
 
   const buildingBits: string[] = [];
   if (a.building) buildingBits.push(`${labels.building} ${a.building}`);
@@ -124,6 +138,8 @@ export function formatAddressLines(
     'cityAr',
     'area',
     'areaAr',
+    'governorate',
+    'governorateAr',
     'state',
     'governorate',
     'governorateAr',

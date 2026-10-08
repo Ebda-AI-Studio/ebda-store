@@ -154,7 +154,8 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
     return s;
   }
 
-  async function mkOrder(s: { id: string; productId: string }) {
+  // `codFee`: a COD order is created with its fee frozen and inside total (MONEYB-3).
+  async function mkOrder(s: { id: string; productId: string }, codFee = 0) {
     seq += 1;
     return owner.order.create({
       data: {
@@ -163,7 +164,8 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
         status: 'pending',
         paymentStatus: 'unpaid',
         subtotal: TOTAL,
-        total: TOTAL,
+        codFee,
+        total: TOTAL + codFee,
         shippingAddress: { firstName: 'Mona', lastName: 'Adel', email: 'mona@example.com' },
         billingAddress: {},
         items: {
@@ -320,7 +322,7 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
     const k = await create(kOrder.id, 'kashier');
     expect(k.status).toBe(200);
     expect(k.body.data.paymentUrl).toContain('payments.kashier.stub/session/');
-    const codOrder = await mkOrder(a);
+    const codOrder = await mkOrder(a, 500);
     const cod = await create(codOrder.id, 'cod');
     expect(cod.status).toBe(200);
     expect(cod.body.data).toMatchObject({ cod: true, codFee: 500 });

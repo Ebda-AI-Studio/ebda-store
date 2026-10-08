@@ -195,8 +195,9 @@ export function buildStorefrontMetadata(
     },
     openGraph: {
       type: 'website',
-      locale: preferAr ? 'ar_KW' : 'en_KW',
-      alternateLocale: preferAr ? 'en_KW' : 'ar_KW',
+      // Facebook/WhatsApp Open Graph locales: Egypt for Arabic, US English (en_EG is not a valid FB locale).
+      locale: preferAr ? 'ar_EG' : 'en_US',
+      alternateLocale: preferAr ? 'en_US' : 'ar_EG',
       siteName: localizedStoreName,
       title: titleDefault,
       description,

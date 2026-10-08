@@ -167,6 +167,55 @@ describe('ShipmentCard', () => {
       })
     );
   });
+
+  describe('manual shipment moved to "returned" (return to origin)', () => {
+    const manual = () =>
+      shipment({ carrier: 'manual', carrierName: 'Sprint', trackingNumber: 'SPR-1' });
+    const pickReturned = async () => {
+      const select = (await screen.findByLabelText('moveTo')) as HTMLSelectElement;
+      fireEvent.change(select, { target: { value: 'returned' } });
+    };
+
+    it('asks first (nothing is sent on pick) and restocks by default', async () => {
+      card({ shipment: manual() });
+      await pickReturned();
+      expect(await screen.findByText('confirmReturnDescription')).toBeTruthy();
+      expect((screen.getByLabelText('restockLabel') as HTMLInputElement).checked).toBe(true);
+      expect(api.apiPost).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByText('confirmReturn'));
+      await waitFor(() =>
+        expect(api.apiPost).toHaveBeenCalledWith('/api/v1/stores/s1/shipments/sh-1/status', {
+          status: 'returned',
+          restock: true,
+        })
+      );
+    });
+
+    it('sends restock:false when the merchant unticks the box', async () => {
+      card({ shipment: manual() });
+      await pickReturned();
+      fireEvent.click(await screen.findByLabelText('restockLabel'));
+      fireEvent.click(screen.getByText('confirmReturn'));
+      await waitFor(() =>
+        expect(api.apiPost).toHaveBeenCalledWith('/api/v1/stores/s1/shipments/sh-1/status', {
+          status: 'returned',
+          restock: false,
+        })
+      );
+    });
+
+    it('other manual statuses are sent straight away, without a restock flag', async () => {
+      card({ shipment: manual() });
+      const select = (await screen.findByLabelText('moveTo')) as HTMLSelectElement;
+      fireEvent.change(select, { target: { value: 'in_transit' } });
+      await waitFor(() =>
+        expect(api.apiPost).toHaveBeenCalledWith('/api/v1/stores/s1/shipments/sh-1/status', {
+          status: 'in_transit',
+        })
+      );
+    });
+  });
 });
 
 export type { ReactNode };

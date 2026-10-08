@@ -23,7 +23,6 @@ import {
 } from '../agent-auth';
 import { ok } from './tool-result';
 
-import { codFeeMinor } from '@force/shared';
 import { paymentWebhookUrl } from '../../services/payment-providers/webhook-url';
 /**
  * Agent orders reuse the SAME required-field contract as a human guest
@@ -169,8 +168,11 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           // cod branch, so an agent COD order is indistinguishable from a
           // human COD order to the rest of the platform (admin order detail,
           // "mark cash collected" flow, payment events).
-          const codFee = codFeeMinor(order.total, { fixedMinor: Number(codConfig.fixedFee) || 0 });
-          const total = codFee > 0 ? order.total + codFee : order.total;
+          // The fee (fixed + percentage) was frozen into `order.total` by
+          // OrderService.create (paymentMethod 'cod', ruling MONEYB-3) — the
+          // same figure a human shopper is quoted. Nothing is added here.
+          const codFee = order.codFee;
+          const total = order.total;
 
           // Tenant-scoped AND atomic: `withTenantContext` runs both writes
           // inside ONE Prisma interactive transaction with `app.current_store_id`
@@ -189,12 +191,6 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
           let payment;
           try {
             payment = await withTenantContext(store.id, async tx => {
-              if (codFee > 0) {
-                await tx.order.update({
-                  where: { id: order.id, storeId: store.id },
-                  data: { total },
-                });
-              }
               return tx.payment.create({
                 data: {
                   orderId: order.id,
@@ -203,7 +199,7 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
                   status: 'cod_pending',
                   amount: total,
                   currency: order.currency,
-                  metadata: { codFee, originalTotal: order.total, source: 'agent' },
+                  metadata: { codFee, originalTotal: order.total - codFee, source: 'agent' },
                 },
               });
             });
@@ -240,7 +236,12 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
               eventType: 'created',
               toStatus: 'cod_pending',
               provider: 'cod',
-              details: { amount: total, codFee, originalTotal: order.total, source: 'agent' },
+              details: {
+                amount: total,
+                codFee,
+                originalTotal: order.total - codFee,
+                source: 'agent',
+              },
             }).catch(err =>
               logger.error(
                 { err, orderId: order.id },

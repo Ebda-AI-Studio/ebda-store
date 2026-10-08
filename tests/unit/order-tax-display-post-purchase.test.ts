@@ -12,7 +12,10 @@ import { orderTaxPlacement } from '@force/shared';
 
 const mockFindFirst = vi.fn();
 vi.mock('@force/database', () => ({
-  prisma: { order: { findFirst: (...a: unknown[]) => mockFindFirst(...a) } },
+  prisma: {
+    fiscalDocument: { findMany: async () => [] }, // legacy order: no fiscal document (MONEYB-1)
+    order: { findFirst: (...a: unknown[]) => mockFindFirst(...a) },
+  },
 }));
 
 import { InvoiceService } from '@api/services/invoice.service';

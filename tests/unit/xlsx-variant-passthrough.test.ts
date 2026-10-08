@@ -35,12 +35,12 @@ describe('xlsx variant passthrough', () => {
     expect(csv).toContain('450'); // 4.5 EGP -> 450 piastres
   });
 
-  it('REJECTS a price with more than 2 decimals instead of rounding it (sentinel NaN → bulk validator flags it)', async () => {
+  it('REJECTS a price with more than 2 decimals instead of rounding it (row carries a PRICE_* _error)', async () => {
     const buf = await sheetToBuffer([header, ['Item', 'S1', '1.999', '', '', '']]);
     const csv = await xlsxBufferToImportCsv(buf);
-    expect(csv).toContain('NaN');
-    expect(csv).not.toContain('199');
-    expect(csv).not.toContain('200');
+    expect(csv).toContain('PRICE_AMBIGUOUS_DECIMALS');
+    expect(csv).not.toContain('199,');
+    expect(csv).not.toContain('200,');
   });
 
   it('still drops a truly empty/nameless row with no parentSku', async () => {

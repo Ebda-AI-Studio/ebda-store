@@ -7,6 +7,7 @@ import type {
   FileKind,
   ImportJob,
   ImportOptions,
+  ImportPreview,
   ImportResult,
 } from '../_components/types';
 
@@ -21,6 +22,26 @@ const POLL_MAX_ATTEMPTS = 600; // 15 min cap
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/** Request body shared by the preview and the real import, so what is previewed is what is imported. */
+const buildBody = (args: {
+  fileKind: FileKind;
+  csvContent: string;
+  xlsxBase64: string;
+  options: ImportOptions;
+}) =>
+  args.fileKind === 'xlsx'
+    ? {
+        xlsxBase64: args.xlsxBase64,
+        options: {
+          updateExisting: args.options.updateExisting,
+          skuPrefix: args.options.skuPrefix.trim() || undefined,
+          defaultInventory: args.options.defaultInventory,
+          defaultStatus: args.options.defaultStatus,
+          trackInventory: args.options.trackInventory,
+        },
+      }
+    : { csvData: args.csvContent, options: { updateExisting: args.options.updateExisting } };
+
 /**
  * Groups the import/export network calls so the page component can
  * stay focused on composition and the slices stay purely presentational.
@@ -34,6 +55,9 @@ export function useBulkOperations({
   const [isExporting, setIsExporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importProgress, setImportProgress] = useState<ImportJob | null>(null);
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const downloadTemplate = useCallback(async () => {
     try {
@@ -55,6 +79,39 @@ export function useBulkOperations({
     }
   }, [storeId]);
 
+  /** Dry run: the server parses the file and returns what WOULD be imported. Nothing is saved. */
+  const previewFile = useCallback(
+    async (args: {
+      fileKind: FileKind;
+      csvContent: string;
+      xlsxBase64: string;
+      options: ImportOptions;
+    }) => {
+      if (args.fileKind === 'xlsx' ? !args.xlsxBase64 : !args.csvContent) return;
+      setIsPreviewing(true);
+      setPreview(null);
+      setPreviewError(null);
+      try {
+        const res = await apiPost<{ preview: ImportPreview }>(
+          `/api/v1/stores/${storeId}/bulk/import-preview`,
+          buildBody(args)
+        );
+        if (res.data) setPreview(res.data.preview);
+        else setPreviewError(res.error?.message || importFailedMessage);
+      } catch {
+        setPreviewError(networkErrorMessage);
+      } finally {
+        setIsPreviewing(false);
+      }
+    },
+    [storeId, importFailedMessage, networkErrorMessage]
+  );
+
+  const clearPreview = useCallback(() => {
+    setPreview(null);
+    setPreviewError(null);
+  }, []);
+
   const importFile = useCallback(
     async (args: {
       fileKind: FileKind;
@@ -62,10 +119,11 @@ export function useBulkOperations({
       xlsxBase64: string;
       options: ImportOptions;
     }) => {
-      const { fileKind, csvContent, xlsxBase64, options } = args;
+      const { fileKind, csvContent, xlsxBase64 } = args;
       if (fileKind === 'xlsx' ? !xlsxBase64 : !csvContent) return;
 
       setIsImporting(true);
+      setPreview(null);
       setImportResult(null);
       setImportProgress(null);
 
@@ -74,18 +132,7 @@ export function useBulkOperations({
         const endpoint = isXlsx
           ? `/api/v1/stores/${storeId}/bulk/import-xlsx`
           : `/api/v1/stores/${storeId}/bulk/import`;
-        const body = isXlsx
-          ? {
-              xlsxBase64,
-              options: {
-                updateExisting: options.updateExisting,
-                skuPrefix: options.skuPrefix.trim() || undefined,
-                defaultInventory: options.defaultInventory,
-                defaultStatus: options.defaultStatus,
-                trackInventory: options.trackInventory,
-              },
-            }
-          : { csvData: csvContent, options: { updateExisting: options.updateExisting } };
+        const body = buildBody(args);
 
         const enqueue = await apiPost<{ job: ImportJob }>(endpoint, body);
 
@@ -226,6 +273,11 @@ export function useBulkOperations({
     importProgress,
     downloadTemplate,
     importFile,
+    preview,
+    isPreviewing,
+    previewError,
+    previewFile,
+    clearPreview,
     exportProducts,
     exportProductsXlsx,
     clearImportResult,

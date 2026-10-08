@@ -15,7 +15,10 @@ import { taxInvoiceInfo } from '@force/shared';
 
 const findFirst = vi.fn();
 vi.mock('@force/database', () => ({
-  prisma: { order: { findFirst: (...a: unknown[]) => findFirst(...a) } },
+  prisma: {
+    fiscalDocument: { findMany: async () => [] }, // legacy order: no fiscal document (MONEYB-1)
+    order: { findFirst: (...a: unknown[]) => findFirst(...a) },
+  },
 }));
 
 const { InvoiceService, renderInvoiceEmailContent } = await import('@api/services/invoice.service');

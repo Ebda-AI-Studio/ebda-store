@@ -23,6 +23,7 @@ import {
 } from './accounting/posting/prior-reversed-qty';
 import { featureService } from './feature.service';
 import { WalletService } from './wallet.service';
+import { evaluateReturnWindow } from '../lib/return-window';
 
 import { minorToDecimalString } from '@force/shared';
 interface CreateReturnItemInput {
@@ -285,7 +286,7 @@ export class ReturnService {
           select: { email: true, firstName: true, lastName: true },
         },
         store: {
-          select: { name: true },
+          select: { name: true, returnWindowDays: true },
         },
       },
     });
@@ -293,6 +294,28 @@ export class ReturnService {
 
     if (!order) {
       throw new AppError(400, 'INVALID_ORDER', 'Order not found or not eligible for return');
+    }
+
+    // The merchant's published return window binds the seller (Law 181/2018);
+    // refuse a request outside it instead of letting support absorb it.
+    const windowVerdict = evaluateReturnWindow({
+      returnWindowDays: order.store?.returnWindowDays,
+      deliveredAt: order.deliveredAt,
+      updatedAt: order.updatedAt,
+    });
+    if (!windowVerdict.open) {
+      throw new AppError(
+        422,
+        'RETURN_WINDOW_CLOSED',
+        windowVerdict.reason === 'NOT_ACCEPTED'
+          ? 'This store does not accept returns'
+          : 'The return window for this order has closed',
+        {
+          reason: windowVerdict.reason,
+          returnWindowDays: order.store?.returnWindowDays,
+          closesAt: windowVerdict.closesAt?.toISOString() ?? null,
+        }
+      );
     }
 
     // Bundle groups requested as atomic units (see `bundleGroupIds` on

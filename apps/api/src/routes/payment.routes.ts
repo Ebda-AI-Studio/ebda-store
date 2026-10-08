@@ -30,11 +30,20 @@ import {
   type OrphanedProviderInvoice,
 } from '../services/payment-providers/orphaned-invoice-alert';
 
-import { INSTAPAY_RECEIPT_MAX_BYTES, REGION, instapayReceiptFieldsSchema } from '@force/shared';
+import {
+  INSTAPAY_RECEIPT_MAX_BYTES,
+  REGION,
+  codFeeForOrder,
+  instapayReceiptFieldsSchema,
+} from '@force/shared';
 import multer from 'multer';
 import { AppError } from '../middleware/error-handler';
 import { InstapayService, runPostCommit } from '../services/payment-providers/instapay.service';
-import { computeCodCharge, codProvider } from '../services/payment-providers/cod.provider';
+import {
+  codCollectMinor,
+  codFeeConfigFromRow,
+  codProvider,
+} from '../services/payment-providers/cod.provider';
 import { isProviderAvailable } from '../services/payment-providers/provider-health';
 import { enabledMethods, METHOD_LABELS } from '../services/payment-providers/provider-methods';
 import { PaymentProviderError } from '../services/payment-providers/types';
@@ -161,8 +170,15 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
   // Check if COD is enabled for this store. There is no platform-level (storeId NULL) COD
   // row for the app role: strict RLS hides it and the tenant guard refuses an unscoped read
   // (R-EBDA-007), so only the store's own row counts.
-  let codConfig: { fixedFee: number; displayName: string; displayNameAr: string | null } | null =
-    null;
+  // `fixedFee` + `percentBps` so the checkout can quote the WHOLE fee before the
+  // order is placed (ruling MONEYB-3) with `codFeeForOrder`, the function the
+  // order uses to freeze it.
+  let codConfig: {
+    fixedFee: number;
+    percentBps: number;
+    displayName: string;
+    displayNameAr: string | null;
+  } | null = null;
   const codRecord = storeId
     ? await prisma.paymentConfig.findFirst({
         where: { storeId, provider: 'cod' as const, isEnabled: true },
@@ -170,7 +186,7 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
     : null;
   if (codRecord) {
     codConfig = {
-      fixedFee: codRecord.fixedFee ? Number(codRecord.fixedFee) : 0,
+      ...codFeeConfigFromRow(codRecord),
       displayName: codRecord.displayName || 'Cash on Delivery',
       displayNameAr: codRecord.displayNameAr,
     };
@@ -537,38 +553,51 @@ router.post(
             };
           }
 
-          // The COD fee in integer piastres via the single helper (fixed fee plus an
-          // optional percentage, rounded half up to the piastre). It is added to
-          // order.total only when NO prior COD payment row exists for this order — a
-          // prior row (even a failed/cancelled one, which the idempotency guard above
-          // lets through) means the fee was already folded into order.total once and
-          // must not stack. What the courier collects is the order value (incl. any
-          // COD fee) less the part already paid from the wallet.
+          // The COD fee was quoted at checkout and frozen on the order at
+          // creation (ruling MONEYB-3) — it is already inside `order.total`,
+          // so nothing is added here and a replay can never stack it. An order
+          // that was NOT priced for COD (created for another method) while the
+          // store charges a COD fee is refused: charging a fee the shopper was
+          // never shown is the defect this replaced. A prior COD payment row
+          // means a replay (or a legacy order whose fee was folded in then).
           const priorCodPayment = await prisma.payment.findFirst({
             where: { orderId: order.id, provider: 'cod' },
             select: { id: true },
           });
-          const percentBps = Number(
-            (codConfig.settings as { percentBps?: unknown } | null)?.percentBps ?? 0
-          );
-          const {
-            feeMinor: codFee,
-            applyFee,
-            chargedTotalMinor: chargedTotal,
-            collectMinor: collectAmount,
-          } = computeCodCharge({
-            orderTotalMinor: order.total,
-            walletMinor: walletAmount,
-            fixedFeeMinor: Number(codConfig.fixedFee) || 0,
-            percentBps: Number.isFinite(percentBps) ? percentBps : 0,
-            feeAlreadyApplied: Boolean(priorCodPayment),
-          });
-          if (applyFee) {
-            await prisma.order.update({
-              where: { id: order.id, storeId: order.storeId },
-              data: { total: chargedTotal },
-            });
+          const frozenFee = order.codFee;
+          if (!priorCodPayment && frozenFee === 0) {
+            const quote = codFeeForOrder(
+              { subtotal: order.subtotal, discount: order.discount, shipping: order.shipping },
+              codFeeConfigFromRow(codConfig)
+            );
+            if (quote > 0) {
+              if (rollbackContext) {
+                await OrderService.rollbackForPaymentFailure(
+                  rollbackContext.storeId,
+                  rollbackContext.orderId,
+                  rollbackContext.sessionId
+                ).catch(err =>
+                  logger.error(
+                    { err, ...rollbackContext },
+                    'Order rollback failed (cod-not-quoted)'
+                  )
+                );
+              }
+              return {
+                status: 409,
+                body: {
+                  success: false,
+                  error: {
+                    code: 'COD_FEE_NOT_QUOTED',
+                    message:
+                      'This order was not priced for cash on delivery. Go back to checkout and choose cash on delivery there.',
+                  },
+                },
+              };
+            }
           }
+          const codFee = frozenFee;
+          const collectAmount = codCollectMinor(order.total, walletAmount);
           // The provider-shaped COD adapter validates the charge (positive integer
           // piastres, EGP) and builds the instruction; no network.
           await codProvider.createPayment(
@@ -595,7 +624,7 @@ router.post(
               currency: order.currency,
               metadata: {
                 codFee,
-                originalTotal: chargedTotal - codFee,
+                originalTotal: order.total - codFee,
                 ...(walletAmount > 0 ? { walletAmount } : {}),
               },
             },
@@ -618,7 +647,7 @@ router.post(
             details: {
               amount: collectAmount,
               codFee,
-              originalTotal: chargedTotal - codFee,
+              originalTotal: order.total - codFee,
               ...(walletAmount > 0 ? { walletAmount } : {}),
             },
           });

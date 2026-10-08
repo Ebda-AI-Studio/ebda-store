@@ -19,7 +19,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const findFirst = vi.fn();
 vi.mock('@force/database', () => ({
-  prisma: { order: { findFirst: (...a: unknown[]) => findFirst(...a) } },
+  prisma: {
+    fiscalDocument: { findMany: async () => [] }, // legacy order: no fiscal document (MONEYB-1)
+    order: { findFirst: (...a: unknown[]) => findFirst(...a) },
+  },
 }));
 
 import { InvoiceService } from '@api/services/invoice.service';

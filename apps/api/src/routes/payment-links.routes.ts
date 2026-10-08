@@ -26,9 +26,9 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { storefrontOrigin } from '@force/shared';
+import { computeOrderAmounts, normalizePhoneForStorage, storefrontOrigin } from '@force/shared';
 import { z } from 'zod';
-import { prisma } from '@force/database';
+import { hasTenantContext, prisma, withMoneyTx, type Prisma } from '@force/database';
 import { config } from '../config';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -37,6 +37,8 @@ import { encryption } from '../services/encryption.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { getAuthUser } from '../utils/store-helpers';
 import { generateOrderNumber } from '../utils/order-number';
+import { frozenTaxInvoiceFields, resolveActiveTaxRate } from '../lib/order-tax';
+import { FiscalDocumentService } from '../services/fiscal-document.service';
 import { EFFECTIVE_STOCK_SELECT, isOrderable } from '../lib/effective-inventory';
 import { featureService } from '../services/feature.service';
 import { assertOrderAllowed } from '../services/plan-limit.service';
@@ -239,7 +241,20 @@ router.post(
         const p = byId.get(it.productId);
         return sum + (p ? p.price * it.quantity : 0);
       }, 0);
-      const totalFils = itemsSubtotal + extraFils;
+      // VAT (rulings TAX-2, MONEYB-2): a payment-link order is a sale like any
+      // other — a VAT-verified store charges VAT on the items AND on the extra
+      // amount (a service fee / deposit is part of the supply). It used to be
+      // created with tax 0 whatever the store's registration.
+      const activeTax = await resolveActiveTaxRate(storeId);
+      const amounts = computeOrderAmounts({
+        subtotal: itemsSubtotal,
+        discount: 0,
+        shipping: 0,
+        codFee: extraFils,
+        ratePercent: activeTax.ratePercent,
+        includedInPrice: activeTax.includedInPrice,
+      });
+      const totalFils = amounts.total;
 
       // Plan order cap (locked pricing): a WhatsApp payment link creates an order too, so
       // it passes the same gate as checkout BEFORE any customer/order row is written.
@@ -286,7 +301,10 @@ router.post(
           status: 'pending',
           paymentStatus: 'unpaid',
           subtotal: itemsSubtotal,
-          tax: 0,
+          tax: amounts.tax,
+          taxIncludedInPrice: activeTax.includedInPrice,
+          ...frozenTaxInvoiceFields(activeTax),
+          taxableAmount: amounts.taxableAmount,
           shipping: 0,
           discount: 0,
           total: totalFils,
@@ -294,13 +312,13 @@ router.post(
           extraAmountNote: extraAmountNote || null,
           currency: store.currency || REGION.currency,
           shippingAddress: {
-            phone: customerPhone,
+            phone: normalizePhoneForStorage(customerPhone),
             firstName: customer.firstName,
             lastName: customer.lastName,
             _source: 'wa_payment_link',
           },
           billingAddress: {
-            phone: customerPhone,
+            phone: normalizePhoneForStorage(customerPhone),
             firstName: customer.firstName,
             lastName: customer.lastName,
             _source: 'wa_payment_link',
@@ -457,6 +475,23 @@ router.post(
           },
         });
         return;
+      }
+
+      // The sale's fiscal document, once the link really went out (a failed
+      // mint/send above deletes the draft order, and an issued document can
+      // never be deleted). Same request transaction as the order (MONEYB-1).
+      // Inside the request's tenant transaction when there is one (the order
+      // was written on it; a second transaction could not see it).
+      if (hasTenantContext()) {
+        await FiscalDocumentService.issueSaleDocument(
+          prisma as unknown as Prisma.TransactionClient,
+          storeId,
+          draftOrder.id
+        );
+      } else {
+        await withMoneyTx(prisma, tx =>
+          FiscalDocumentService.issueSaleDocument(tx, storeId, draftOrder.id)
+        );
       }
 
       // ── Audit log ──────────────────────────────────────────────────────────
