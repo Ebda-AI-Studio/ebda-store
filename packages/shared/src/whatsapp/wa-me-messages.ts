@@ -20,6 +20,11 @@ export interface WaMeAddress {
   address1?: string | null;
   city?: string | null;
   state?: string | null;
+  /** Egyptian checkout fields (city/state are empty there). */
+  area?: string | null;
+  areaAr?: string | null;
+  governorate?: string | null;
+  governorateAr?: string | null;
 }
 
 function itemName(i: WaMeOrderItem, locale: WaMeLocale): string {
@@ -37,13 +42,21 @@ export function summarizeItems(items: readonly WaMeOrderItem[], locale: WaMeLoca
   return locale === 'ar' ? `${shown} (+${extra} أخرى)` : `${shown} (+${extra} more)`;
 }
 
-/** Short delivery address: street, city, governorate. */
-export function shortAddress(a: WaMeAddress | null | undefined): string {
+/** Short delivery address: street, area, governorate (city/state on legacy orders). */
+export function shortAddress(a: WaMeAddress | null | undefined, locale: WaMeLocale = 'en'): string {
   if (!a) return '';
-  return [a.address1, a.city, a.state]
-    .map(p => (p ?? '').trim())
-    .filter(Boolean)
-    .join(', ');
+  const pick = (ar?: string | null, en?: string | null) =>
+    ((locale === 'ar' ? ar || en : en || ar) ?? '').trim();
+  const parts: string[] = [];
+  for (const p of [
+    (a.address1 ?? '').trim(),
+    pick(a.areaAr, a.area),
+    (a.city ?? '').trim(),
+    pick(a.governorateAr, a.governorate) || (a.state ?? '').trim(),
+  ]) {
+    if (p && !parts.includes(p)) parts.push(p);
+  }
+  return parts.join(locale === 'ar' ? '، ' : ', ');
 }
 
 export interface CodConfirmationInput {
@@ -59,7 +72,7 @@ export interface CodConfirmationInput {
 /** Customer → merchant: confirm a cash-on-delivery order. */
 export function buildCodConfirmationMessage(i: CodConfirmationInput): string {
   const total = formatMoney(i.totalMinor, i.locale);
-  const addr = shortAddress(i.address);
+  const addr = shortAddress(i.address, i.locale);
   const items = summarizeItems(i.items, i.locale);
   if (i.locale === 'ar') {
     return [

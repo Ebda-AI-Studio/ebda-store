@@ -156,7 +156,8 @@ export function percentOfMinor(amountMinor: number, bps: number): number {
 
 /**
  * VAT on an order, charged AFTER discount. The taxable base is
- * `subtotal - discount`, never negative. Rounded half up to the minor unit.
+ * `max(0, subtotal - discount) + charges` (shipping + COD fee the seller
+ * bills). Rounded half up to the minor unit.
  *
  * `includedInPrice` selects EXTRACTION: the listed prices already contain the
  * tax, so the tax portion is `base * bps / (10000 + bps)` (the caller must not
@@ -166,9 +167,13 @@ export function vatOnDiscounted(
   subtotalMinor: number,
   discountMinor: number,
   vatBps: number,
-  includedInPrice = false
+  includedInPrice = false,
+  chargesMinor = 0
 ): number {
-  const base = Math.max(0, subtotalMinor - discountMinor);
+  // `chargesMinor` = the seller's own charges on the same supply (shipping it
+  // bills, the COD fee): part of the taxable value under VAT Law 67/2016
+  // Art. 10(2) (ruling MONEYB-2), taxed at the goods' rate, never discounted.
+  const base = Math.max(0, subtotalMinor - discountMinor) + Math.max(0, chargesMinor);
   if (includedInPrice) return mulDivRound(base, vatBps, 10_000 + vatBps);
   return mulDivRound(base, vatBps, 10_000);
 }
@@ -381,6 +386,23 @@ export function normalizeEgyptianMobile(input: string): string | null {
   if (!REGION.phone.mobileRegex.test(digits)) return null;
   const national = digits.replace(/^(?:\+?20|0020|0)/, '');
   return `${REGION.phone.callingCode}${national}`;
+}
+
+/**
+ * The phone as an order STORES it (ruling MONEYB-7): an Egyptian mobile in
+ * E.164 (`+201012345678`) whatever the shopper typed (`٠١٠ ١٢٣٤ ٥٦٧٨`,
+ * `0020…`, spaces, dashes); anything else (a landline, a foreign number) as
+ * ASCII digits with its leading `+` kept, separators dropped. Empty stays
+ * empty. wa.me links, couriers (Bosta wants Latin digits) and the guest-order
+ * lookup all read this one form.
+ */
+export function normalizePhoneForStorage<T extends string | null | undefined>(input: T): T {
+  if (input == null) return input;
+  const trimmed = String(input).trim();
+  if (!trimmed) return trimmed as T;
+  const mobile = normalizeEgyptianMobile(trimmed);
+  if (mobile) return mobile as T;
+  return normalizeNumeric(trimmed).replace(/[\s\-().]/g, '') as T;
 }
 
 export function isValidEgyptianMobile(input: string): boolean {

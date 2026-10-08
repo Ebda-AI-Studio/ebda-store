@@ -28,6 +28,7 @@ export * from './order-status-transitions';
 export * from './payments';
 export * from './instapay-receipt';
 export * from './order-tax-display';
+export * from './address-format';
 export * from './tax-profile';
 export * from './setup-guide';
 export * from './whatsapp';
