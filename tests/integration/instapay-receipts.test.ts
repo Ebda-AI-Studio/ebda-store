@@ -730,6 +730,17 @@ describe.skipIf(!hasDb)('InstaPay receipts (money batch A)', () => {
             amountMinor: 1,
           })
         ),
+        // Sibling money routes hold the same line (security review: gate parity).
+        await asApp(async () => http().post(`${base}/mark-paid`).set(bearer(superAdmin.jwt))),
+        await asApp(async () =>
+          http()
+            .post(`/api/v1/stores/${s.id}/orders/bulk-mark-paid`)
+            .set(bearer(superAdmin.jwt))
+            .send({ orderIds: [o.id] })
+        ),
+        await asApp(async () =>
+          http().post(`${base}/refund-via-provider`).set(bearer(superAdmin.jwt)).send({})
+        ),
       ]) {
         expect(res.status).toBe(403);
       }

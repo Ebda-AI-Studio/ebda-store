@@ -792,8 +792,10 @@ router.get('/my/list', authenticate, async (req: Request, res: Response, next: N
 router.post(
   '/:orderId/mark-paid',
   authenticate,
-  authorize('store_admin', 'super_admin', 'staff'),
+  // A store's order money is the merchant's to settle: Ebda's super-admin never marks it paid.
+  authorize('store_admin', 'staff'),
   requireStoreAccess,
+  requirePermission('orders:manage'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
@@ -1101,8 +1103,10 @@ router.post(
 router.post(
   '/bulk-mark-paid',
   authenticate,
-  authorize('store_admin', 'super_admin', 'staff'),
+  // A store's order money is the merchant's to settle: Ebda's super-admin never marks it paid.
+  authorize('store_admin', 'staff'),
   requireStoreAccess,
+  requirePermission('orders:manage'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -1645,11 +1649,11 @@ const refundViaProviderSchema = z.object({
 router.post(
   '/:orderId/refund-via-provider',
   authenticate,
-  authorize('store_admin', 'super_admin', 'staff'),
+  authorize('store_admin', 'staff'),
   requireStoreAccess,
   // Triggers a real provider refund + flips Payment.status — staff lacks
-  // 'orders:refund' (see rolePermissions in middleware/rbac.ts), so only
-  // store_admin/super_admin may call this despite passing authorize() above.
+  // 'orders:refund' (see rolePermissions in middleware/rbac.ts), so only the
+  // store's admin may call this. Ebda's super-admin never refunds a store's order.
   requirePermission('orders:refund'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
