@@ -24,6 +24,7 @@ import { errorHandler } from '@api/middleware/error-handler';
 import { planService } from '@api/services/plan.service';
 import { redis } from '@api/services/redis.service';
 import { PaymentService } from '@api/services/payment-providers/payment.factory';
+import { getProviderEntry } from '@force/shared';
 import { KashierStub, KASHIER_STUB } from '../stubs/kashier-stub';
 import { serveStub, type ServedStub } from '../stubs/serve';
 
@@ -31,6 +32,19 @@ const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw';
 const hasDb = !!OWNER_URL && !OWNER_URL.includes('localhost:5432/test_db');
 const run = crypto.randomUUID().slice(0, 8);
+
+/** Kashier is verified since 2026-10-08; these PROVIDERS-2 cases need an UNVERIFIED gateway with a
+ *  working stub, so they flip the catalog entry for the duration of the case and restore it. */
+async function asUnverifiedKashier<T>(fn: () => Promise<T>): Promise<T> {
+  const entry = getProviderEntry('kashier')!;
+  const was = entry.verified;
+  (entry as { verified: boolean }).verified = false;
+  try {
+    return await fn();
+  } finally {
+    (entry as { verified: boolean }).verified = was;
+  }
+}
 
 function appUrl(): string {
   const u = new URL(OWNER_URL);
@@ -318,17 +332,19 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
     });
     expect((await post(s, `${base(s)}/test`)).body.data.test.ok).toBe(true);
 
-    // ...then run the routes as production does: the catalog says kashier is unverified.
+    // ...then run the routes as production does, with kashier marked unverified.
     const prev = process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
     delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
     try {
-      const save = await saveSandbox(s, { secretKey: 'another-secret-value-123456' });
-      expect(save.status).toBe(403);
-      expect(save.body.error.code).toBe('PROVIDER_NOT_AVAILABLE');
-      const on = await post(s, `${base(s)}/toggle`, { enabled: true });
-      expect(on.status).toBe(409);
-      expect(on.body.error.code).toBe('PROVIDER_NOT_VERIFIED');
-      expect((await row(s)).isEnabled).toBe(false);
+      await asUnverifiedKashier(async () => {
+        const save = await saveSandbox(s, { secretKey: 'another-secret-value-123456' });
+        expect(save.status).toBe(403);
+        expect(save.body.error.code).toBe('PROVIDER_NOT_AVAILABLE');
+        const on = await post(s, `${base(s)}/toggle`, { enabled: true });
+        expect(on.status).toBe(409);
+        expect(on.body.error.code).toBe('PROVIDER_NOT_VERIFIED');
+        expect((await row(s)).isEnabled).toBe(false);
+      });
     } finally {
       process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED = prev;
     }
@@ -351,8 +367,10 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
     delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
     try {
       PaymentService.clearCache(s.id);
-      expect(await asApp(() => PaymentService.getAvailableProviders(s.id))).not.toContain(
-        'kashier'
+      await asUnverifiedKashier(async () =>
+        expect(await asApp(() => PaymentService.getAvailableProviders(s.id))).not.toContain(
+          'kashier'
+        )
       );
     } finally {
       process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED = prev;

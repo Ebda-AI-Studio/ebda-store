@@ -73,8 +73,10 @@ describe('provider catalog', () => {
       if (p.verified)
         expect(p.verification.sandboxVerifiedAt, p.code).toMatch(/^\d{4}-\d{2}-\d{2}/);
     }
-    // Today nothing has run against a real sandbox.
-    expect(PROVIDER_CATALOG.filter(p => !p.manual && p.verified)).toEqual([]);
+    // Kashier ran end to end against a real test account on 2026-10-08; nothing else has yet.
+    expect(PROVIDER_CATALOG.filter(p => !p.manual && p.verified).map(p => p.code)).toEqual([
+      'kashier',
+    ]);
   });
 
   it('every field is bilingual, binds to a real slot, and links only to official pages', () => {
@@ -131,7 +133,7 @@ describe('PROVIDERS-2 gate', () => {
   it('an unverified gateway is not usable; manual methods always are', () => {
     delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
     expect(isProviderUsable('paymob')).toBe(false);
-    expect(isProviderUsable('kashier')).toBe(false);
+    expect(isProviderUsable('kashier')).toBe(true);
     expect(isProviderUsable('fawry')).toBe(false);
     expect(isProviderUsable('cod')).toBe(true);
     expect(isProviderUsable('instapay')).toBe(true);
@@ -318,7 +320,12 @@ describe('enable gate: a passing test of EXACTLY the stored credentials', () => 
 
   it('refuses an unverified provider even with a current test (PROVIDERS-2)', () => {
     delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
-    expect(() => assertEnableAllowed(row())).toThrow(/coming soon/);
+    expect(() => assertEnableAllowed(row({ provider: 'paymob' }))).toThrow(/coming soon/);
+  });
+
+  it('allows a verified provider with a current test (PROVIDERS-2)', () => {
+    delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
+    expect(() => assertEnableAllowed(row())).not.toThrow();
   });
 
   it('manual methods are not gated', () => {
