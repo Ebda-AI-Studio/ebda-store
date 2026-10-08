@@ -262,10 +262,10 @@ describe('marketing honesty', () => {
     expect(urls).toContain('https://ebda.app/about/');
     expect(urls).toContain('https://ebda.app/en/about/');
   });
-  it('first-merchant block carries no invented quote', () => {
-    expect(en).toContain('data-testid="first-merchant"');
-    expect(en).toContain('ameliaaurum.com');
-    expect(en).not.toMatch(/<blockquote|&quot;.*Amelia/);
+  it('shows no named merchant or invented quote until one has a live store', () => {
+    expect(en).not.toContain('data-testid="first-merchant"');
+    expect(en).not.toContain('ameliaaurum.com');
+    expect(en).not.toMatch(/<blockquote/);
   });
 });
 
