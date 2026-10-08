@@ -190,36 +190,43 @@ export class ProvisioningService {
         // It is deliberately NOT copied into the `settings` JSON, where no
         // code reads it (issue 2412).
         const { timezone: requestedZone, ...settingsRest } = settings ?? {};
-        const store = await tx.store.create({
-          data: {
-            name: storeName,
-            slug,
-            domain,
-            // Operator-assigned (super_admin) domains are trusted: active at once.
-            ...(domain ? { domainStatus: 'active', domainVerifiedAt: new Date() } : {}),
-            domainProvider: input.domainProvider ?? null,
-            ...(storeNameAr ? { nameAr: storeNameAr } : {}),
-            ownerId: owner.id,
-            status,
-            ...(template ? { template } : {}),
-            plan,
-            ...(isValidTimeZone(requestedZone) ? { timezone: requestedZone } : {}),
-            settings: {
-              theme: settingsRest.theme || 'default',
-              currency: settingsRest.currency || REGION.currency,
-              ...settingsRest,
-              // Arabic-first unless the caller said otherwise (spread above wins if present).
-              defaultLanguage:
-                (settingsRest as { defaultLanguage?: string }).defaultLanguage ||
-                REGION.defaultLocale,
+        // The store row is inserted AS ITS OWNER: the `stores` policy's WITH CHECK and the
+        // code-level tenant guard (R-EBDA-003) both admit a new store only when `owner_id`
+        // is the acting user. No caller can supply that scope (self-serve onboarding runs
+        // with no tenant context; super-admin provisioning acts as the operator, not as the
+        // new owner), so the transaction binds it itself, to the owner it just resolved.
+        const store = await scopeTransaction(tx, { userId: owner.id }, () =>
+          tx.store.create({
+            data: {
+              name: storeName,
+              slug,
+              domain,
+              // Operator-assigned (super_admin) domains are trusted: active at once.
+              ...(domain ? { domainStatus: 'active', domainVerifiedAt: new Date() } : {}),
+              domainProvider: input.domainProvider ?? null,
+              ...(storeNameAr ? { nameAr: storeNameAr } : {}),
+              ownerId: owner.id,
+              status,
+              ...(template ? { template } : {}),
+              plan,
+              ...(isValidTimeZone(requestedZone) ? { timezone: requestedZone } : {}),
+              settings: {
+                theme: settingsRest.theme || 'default',
+                currency: settingsRest.currency || REGION.currency,
+                ...settingsRest,
+                // Arabic-first unless the caller said otherwise (spread above wins if present).
+                defaultLanguage:
+                  (settingsRest as { defaultLanguage?: string }).defaultLanguage ||
+                  REGION.defaultLocale,
+              },
             },
-          },
-        });
+          })
+        );
 
         // The store exists now: from here the transaction acts as it, so the rows
         // below satisfy the strict store policies (set_config, transaction-local) and
         // the code-level tenant guard sees the store (`scopeTransaction`).
-        return scopeTransaction(tx, { storeId: store.id }, async () => {
+        return scopeTransaction(tx, { storeId: store.id, userId: owner.id }, async () => {
           // Subscription row for the plan the operator chose (SP5 plans engine).
           // Super-admin provisioning is platform-controlled, so a custom domain
           // here is NOT plan-gated (the operator is assigning the plan).
