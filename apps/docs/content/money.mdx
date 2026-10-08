@@ -22,7 +22,7 @@ Every monetary amount in the API is an **integer count of piastres** (the minor 
 
 ## Imports use major units where noted
 
-The product CSV importer accepts the Shopify export format, where prices are written in **major EGP** (`4850.00`, not `485000`, and not `4,850.00` with a thousands separator). The importer converts strictly: two decimals at most, and a row with a third decimal is reported as a row error instead of being rounded. Ebda's own CSV template uses integer piastres. Details are in the [help centre](https://help.ebda.app/en/products-and-csv-import/).
+The product CSV and XLSX importers read prices as **major EGP, written as a merchant would type them** (`250`, `250.50`, `1,250.50`, and the Shopify export format `4850.00`), never as piastres: `24950` means EGP 24,950. The importer converts strictly: two decimals at most, and a row with a third decimal (`12.500`, ambiguous) or a non-numeric price is reported as a row error instead of being rounded. `POST /stores/:storeId/bulk/import-preview` is a dry run that returns the parsed rows with prices in piastres. Exports write prices in the same EGP decimal format, so an exported file re-imports to the same prices. Details are in the [help centre](https://help.ebda.app/en/products-and-csv-import/).
 
 ```js
 // Display only

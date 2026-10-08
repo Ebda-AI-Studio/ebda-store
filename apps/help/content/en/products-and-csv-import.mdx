@@ -1,10 +1,10 @@
 ---
 title: Products and CSV import
-description: Add products one by one or import a CSV, including a Shopify export. Prices use EGP with two decimals.
+description: Add products one by one or import a CSV, including a Shopify export. Prices are in EGP with two decimals at most, and you preview before importing.
 section: Selling
 order: 2
 appPath: /stores
-keywords: csv shopify import export bulk xlsx price piastres
+keywords: csv shopify import export bulk xlsx price egp decimals preview
 ---
 
 ## Add a product
@@ -17,15 +17,19 @@ Use **Bulk import** to upload a CSV or XLSX file.
 
 1. Download the CSV template from the import page.
 2. Fill it in, one product per row. Variants are linked to their parent product by `parentSku`.
-3. Upload the file and click Import.
+3. Upload the file and click **Preview Import**. Check the table, then confirm. Nothing is saved until you confirm.
 
-In Ebda's own template the `price` column is written in **piastres** (whole numbers: 100 piastres = EGP 1, so EGP 249.50 is `24950`).
+Prices (`price`, `compareAtPrice`, `costPrice`) are in **Egyptian pounds, written as you would type them**: `250`, `250.5`, `250.50` or `1,250.50` (Arabic digits like `٢٥٠٫٥٠` work too). Use **two decimals at most**. A price with three decimals, such as `12.500`, is rejected as ambiguous because it could mean 12.5 or 12,500. Negative or non-numeric prices are rejected too, and a product row with no price is an error.
+
+The same rules apply to XLSX files, and the file you export from Ebda can be edited and uploaded again with the same prices.
+
+**Old template (prices in piastres):** earlier versions asked for whole piastres (`24950` for EGP 249.50). That is no longer the case: `24950` now means EGP 24,950. If you prepared a file under the old instruction, divide the price columns by 100. The preview shows every price in EGP and warns you when the file looks about 100 times more expensive than your current products.
 
 ## Import from Shopify
 
 Export your products from Shopify and upload that CSV as it is. Ebda recognises the Shopify layout (`Handle`, `Title`, `Body (HTML)`, ...) and groups rows by `Handle` into products with variants.
 
-- Shopify prices are in pounds: write `4850.00`, not `4,850.00`. A thousands separator makes the row invalid.
+- Shopify prices are in pounds: `4850.00` and `4,850.00` both work.
 - At most **two decimals**. A third decimal is reported as a row error and is never silently rounded.
 - Image links (`Image Src`) are kept as links to the original image. They are not copied into Ebda storage yet, so keep the original images online.
 
