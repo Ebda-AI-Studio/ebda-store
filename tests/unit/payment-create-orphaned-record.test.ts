@@ -30,6 +30,7 @@ vi.mock('@force/database', () => ({
       count: async () => 0,
     },
     paymentConfig: { findMany: (...a: unknown[]) => h.paymentConfigFindMany(...a) },
+    providerActivationRequest: { findMany: async () => [] },
   },
   Prisma: {},
   runInTenantContext: (_s: unknown, fn: () => Promise<unknown>) => fn(),

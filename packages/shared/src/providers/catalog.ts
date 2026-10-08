@@ -793,6 +793,18 @@ export function isProviderSelectable(entry: ProviderCatalogEntry | undefined): b
   return Boolean(entry && (entry.manual || entry.verified));
 }
 
+/**
+ * PROVIDERS-ACTIVATION: a provider a merchant can ask Ebda to switch on. Every API provider the
+ * catalog lists that is not verified yet; the merchant saves and tests their own credentials
+ * first, Ebda activates it for that store after its own test passes. Manual methods need none.
+ */
+export function isActivationRequestable(entry: ProviderCatalogEntry | undefined): boolean {
+  return Boolean(entry && !entry.manual && !entry.verified);
+}
+
+/** Hours Ebda tells a merchant activation takes (the marketing site and the admin say the same). */
+export const ACTIVATION_HOURS = 5;
+
 /** "Need another provider?": prefilled mail to support. */
 export function providerRequestMailto(supportEmail: string, kind: ProviderKind): string {
   const subject =

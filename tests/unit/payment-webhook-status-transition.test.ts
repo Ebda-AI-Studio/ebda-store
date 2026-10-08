@@ -54,6 +54,7 @@ vi.mock('@force/database', () => ({
       findUnique: (...a: unknown[]) => orderFindUnique(...a),
     },
     store: { findUnique: vi.fn() },
+    providerActivationRequest: { findMany: async () => [] },
     paymentConfig: {
       findMany: (...a: unknown[]) => paymentConfigFindMany(...a),
     },

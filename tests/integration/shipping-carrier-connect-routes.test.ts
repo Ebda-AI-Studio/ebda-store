@@ -9,7 +9,7 @@
  *   - unknown credential keys (a base URL, a webhook secret) are refused: no SSRF, no merchant-set secret;
  *   - enabling needs a successful Test connection of EXACTLY the stored credentials, and any edit
  *     of the active mode, or a mode switch, takes that away;
- *   - a "coming soon" (unverified) carrier cannot be connected by a merchant or enabled by anyone,
+ *   - an unverified carrier can be saved and tested by a merchant but enabled by nobody (until activated),
  *     and a row left enabled never books (PROVIDERS-2 at the point of use);
  *   - default needs enabled, and a store has exactly one default;
  *   - another store's admin can neither read nor drive this store's carrier;
@@ -561,8 +561,8 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
     ).toBe(1);
   });
 
-  describe('PROVIDERS-2: an unverified carrier is "coming soon"', () => {
-    it('store_admin is 403 PROVIDER_NOT_AVAILABLE on save and test; the super admin may save and test but never enable', async () => {
+  describe('PROVIDERS-2 (relaxed by PROVIDERS-ACTIVATION): an unverified carrier', () => {
+    it('store_admin may save and test; nobody (store_admin or super admin) can enable it', async () => {
       const s = await mkStore('soon');
       const op = await mkSuperAdmin();
       const fields = { apiKey: BOSTA_STUB.apiKey };
@@ -573,14 +573,10 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
           credentials: fields,
           activate: true,
         });
-        expect(save.status).toBe(403);
-        expect(save.body.error.code).toBe('PROVIDER_NOT_AVAILABLE');
+        expect(save.status, JSON.stringify(save.body)).toBe(200);
         const test = await post(s, testUrl(s, 'bosta'));
-        expect(test.status).toBe(403);
-        expect(test.body.error.code).toBe('PROVIDER_NOT_AVAILABLE');
-        expect(
-          await owner.shippingCarrierConfig.count({ where: { storeId: s.id, carrier: 'bosta' } })
-        ).toBe(0);
+        expect(test.status, JSON.stringify(test.body)).toBe(200);
+        expect(test.body.data.test.ok).toBe(true);
 
         // the super admin saves and tests (that is how a carrier gets verified)...
         const opSave = await put(op, cfgUrl(s, 'bosta'), {
@@ -596,11 +592,9 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
         // ...but nobody enables it, however well it tested
         for (const who of [op, s]) {
           const on = await put(who, cfgUrl(s, 'bosta'), { enabled: true });
-          // the merchant is stopped at the door, the operator at the enable gate
-          expect(on.status).toBe(who === op ? 409 : 403);
-          expect(on.body.error.code).toBe(
-            who === op ? 'PROVIDER_NOT_VERIFIED' : 'PROVIDER_NOT_AVAILABLE'
-          );
+          // both stop at the enable gate until the store is activated
+          expect(on.status).toBe(409);
+          expect(on.body.error.code).toBe('PROVIDER_NOT_VERIFIED');
         }
         expect((await row(s, 'bosta')).enabled).toBe(false);
         // and the default (which needs enabled) is out of reach too

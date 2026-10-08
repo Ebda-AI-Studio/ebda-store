@@ -320,7 +320,31 @@ describe('enable gate: a passing test of EXACTLY the stored credentials', () => 
 
   it('refuses an unverified provider even with a current test (PROVIDERS-2)', () => {
     delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
-    expect(() => assertEnableAllowed(row({ provider: 'paymob' }))).toThrow(/coming soon/);
+    expect(() => assertEnableAllowed(row({ provider: 'paymob' }))).toThrow(/not activated/);
+  });
+
+  it('accepts an unverified provider for a store Ebda activated it for, but still needs the test (PROVIDERS-ACTIVATION)', () => {
+    delete process.env.PAYMENT_PROVIDERS_ALLOW_UNVERIFIED;
+    const paymobTest = {
+      ...okTest,
+      fingerprint: connectionFingerprint('paymob', 'sandbox', fields),
+    };
+    expect(() =>
+      assertEnableAllowed(row({ provider: 'paymob', connectionTest: paymobTest }), {
+        storeActivated: true,
+      })
+    ).not.toThrow();
+    // not activated for this store: still refused with the same current test
+    expect(() =>
+      assertEnableAllowed(row({ provider: 'paymob', connectionTest: paymobTest }), {
+        storeActivated: false,
+      })
+    ).toThrow(/not activated/);
+    expect(() =>
+      assertEnableAllowed(row({ provider: 'paymob', connectionTest: null }), {
+        storeActivated: true,
+      })
+    ).toThrow(/Test connection/);
   });
 
   it('allows a verified provider with a current test (PROVIDERS-2)', () => {

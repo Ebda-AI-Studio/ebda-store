@@ -42,7 +42,10 @@ import {
   runCarrierConnectionTest,
   type CarrierCredentialUpdate,
 } from './carriers/carrier-connection.service';
-import { isProviderUsable } from './payment-providers/provider-gate';
+import {
+  isProviderActivatedForStore,
+  isProviderUsableForStore,
+} from './payment-providers/provider-gate';
 import {
   ShippingCarrierProvider,
   CarrierCode,
@@ -240,15 +243,18 @@ class ShippingCarrierService {
       const nextSettings = input.settings ? settings : ((existing?.settings as object) ?? {});
 
       if (nextEnabled) {
-        assertCarrierEnableAllowed({
-          carrier,
-          enabled: true,
-          testMode: nextTestMode,
-          credentials: cipher,
-          settings: nextSettings,
-          credentialHints: hints,
-          connectionTest: existing?.connectionTest ?? null,
-        });
+        assertCarrierEnableAllowed(
+          {
+            carrier,
+            enabled: true,
+            testMode: nextTestMode,
+            credentials: cipher,
+            settings: nextSettings,
+            credentialHints: hints,
+            connectionTest: existing?.connectionTest ?? null,
+          },
+          { storeActivated: await isProviderActivatedForStore(storeId, carrier) }
+        );
       }
 
       const data = {
@@ -466,7 +472,10 @@ class ShippingCarrierService {
     }
     // PROVIDERS-2 at the point of use (belt and braces next to the enable gate): a carrier the
     // catalog does not list as verified never books a parcel, whatever a stored row says.
-    if (resolvedCarrierCode !== 'manual' && !isProviderUsable(resolvedCarrierCode)) {
+    if (
+      resolvedCarrierCode !== 'manual' &&
+      !(await isProviderUsableForStore(resolvedCarrierCode, storeId))
+    ) {
       throw new AppError(
         409,
         'CARRIER_NOT_ENABLED',
@@ -1335,7 +1344,7 @@ class ShippingCarrierService {
     }
   }
 
-  private async invalidateCarrierConfigCache(storeId: string) {
+  async invalidateCarrierConfigCache(storeId: string) {
     try {
       await redis.delete(`${CARRIER_CONFIG_CACHE_PREFIX}${storeId}`);
     } catch (err) {

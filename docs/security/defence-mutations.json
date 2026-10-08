@@ -2030,6 +2030,26 @@
       "find": "                reference: kashierCustomerReference(req.customer.id, req.orderId),",
       "replace": "                reference: req.customer.id,",
       "test": "tests/unit/kashier-webhook-confirmation.test.ts"
+    },
+    {
+      "id": "money-provider-activation-needs-passing-test",
+      "domain": "money / payment / refund",
+      "tier": "integration",
+      "why": "Ebda activates a provider for a store whose latest Test connection failed, never ran, or no longer covers the stored credentials (PROVIDERS-ACTIVATION)",
+      "source": "apps/api/src/services/provider-activation.service.ts",
+      "find": "    if (!passed) {",
+      "replace": "    if (false as boolean) {",
+      "test": "tests/integration/provider-activation.test.ts"
+    },
+    {
+      "id": "money-provider-activation-store-scoped",
+      "domain": "money / payment / refund",
+      "tier": "integration",
+      "why": "one store's activation makes an unverified provider enable-able and offered at checkout for EVERY store (PROVIDERS-ACTIVATION)",
+      "source": "apps/api/src/services/payment-providers/provider-gate.ts",
+      "find": "      where: { storeId, status: 'activated' },",
+      "replace": "      where: { status: 'activated' },",
+      "test": "tests/integration/provider-activation.test.ts"
     }
   ]
 }

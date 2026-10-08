@@ -30,7 +30,7 @@ import { callThroughBreaker } from './provider-health';
 import { withProviderDeadline } from './provider-call';
 import { getProviderV2, MANUAL_PROVIDERS } from './registry';
 import { toProviderCredentials } from './credentials';
-import { isProviderUsable } from './provider-gate';
+import { activatedProvidersForStore, isProviderUsable } from './provider-gate';
 import { V2ProviderBridge } from './v2-bridge';
 import { PaymentProviderError, type WebhookPayload } from './types';
 import type { PaymentStatus as DbPaymentStatus } from '@force/database';
@@ -176,6 +176,9 @@ class PaymentFactory {
           '[PAYMENT] No paymentConfig rows for store; no online providers available'
         );
       } else {
+        // PROVIDERS-ACTIVATION: a provider Ebda activated for THIS store counts as verified.
+        const activated =
+          storeId === null ? new Set<string>() : await activatedProvidersForStore(storeId);
         // Initialize from database config
         for (const dbConfig of dbConfigs) {
           try {
@@ -183,10 +186,10 @@ class PaymentFactory {
             if (MANUAL_PROVIDERS.has(dbConfig.provider)) continue;
 
             // PROVIDERS-2 runtime gate: a gateway the catalog does not list as verified against
-            // its real sandbox is never offered, even if a row says enabled (a legacy row, or
+            // its real sandbox (and that Ebda did not activate for this store) is never offered, even if a row says enabled (a legacy row, or
             // a write that bypassed the settings routes). The settings routes refuse to enable
             // it; this is the second line.
-            if (!isProviderUsable(dbConfig.provider)) {
+            if (!isProviderUsable(dbConfig.provider) && !activated.has(dbConfig.provider)) {
               logger.warn(
                 { provider: dbConfig.provider, storeId },
                 '[PAYMENT] Skipping provider: not verified in the provider catalog'
