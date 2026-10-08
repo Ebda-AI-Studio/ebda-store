@@ -1,6 +1,10 @@
 # Egypt payments and shipping: connect-any-provider integrations
 
 Status: RESEARCH + PLAN ONLY (no implementation). Date: 2026-10-07. Owner: Ahmad.
+
+Follow-ups (2026-10-08, branch `fix/provider-followups`): Kashier webhooks are confirmed server-to-server
+before they change money state (Ruling PROVIDERS-17); merchants request courier pickups for Bosta, Aramex
+and Mylerz from the order's shipment card (PROVIDERS-18, residuals PROVIDERS-19).
 Base: `origin/main` @ `7463d841`. Branch `docs/egypt-providers`.
 
 Goal: a merchant connects any payment gateway or carrier by ONLY entering that provider's credentials
