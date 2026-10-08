@@ -112,6 +112,15 @@ export const KASHIER_REQUIRED_SIGNED_KEYS = [
   'transactionId',
 ] as const;
 
+/**
+ * The session's `customer.reference`: the shopper's customer id, else `guest-<orderId>` for a
+ * guest checkout. Both are opaque ids (no PII: never a phone number or an email).
+ */
+export function kashierCustomerReference(customerId: string | undefined, orderId: string): string {
+  const id = customerId?.trim();
+  return id ? id : `guest-${orderId}`;
+}
+
 /** RFC 3986 percent-encoding: `encodeURIComponent` leaves `!'()*` alone; RFC 3986 encodes them. */
 const rfc3986 = (v: string): string =>
   encodeURIComponent(v).replace(
@@ -507,7 +516,13 @@ export function createKashierProvider(options: GatewayAdapterOptions = {}): Paym
               merchantRedirect: req.returnUrls.success,
               type: 'one-time',
               display: settings.display,
-              customer: { email: req.customer.email || undefined, reference: req.customer.id },
+              // `customer.reference` is REQUIRED by the real API (sandbox 2026-10-08: 400
+              // '"customer.reference" is required'). A guest has no customer id, so the
+              // reference is derived from the order: stable, and never the phone or email.
+              customer: {
+                email: req.customer.email || undefined,
+                reference: kashierCustomerReference(req.customer.id, req.orderId),
+              },
               allowedMethods: settings.methods.join(','),
               failureRedirect: false,
               serverWebhook: req.webhookUrl,

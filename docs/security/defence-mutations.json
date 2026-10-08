@@ -2020,6 +2020,16 @@
       "find": "      if (winner) return { pickup: winner, created: false };",
       "replace": "      if (false as boolean && winner) return { pickup: winner!, created: false };",
       "test": "tests/integration/shipment-pickup.test.ts"
+    },
+    {
+      "id": "kashier-guest-customer-reference",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a guest checkout sends no customer.reference, which the real Kashier API refuses (400), so every guest Kashier payment fails",
+      "source": "apps/api/src/services/payment-providers/kashier.provider.ts",
+      "find": "                reference: kashierCustomerReference(req.customer.id, req.orderId),",
+      "replace": "                reference: req.customer.id,",
+      "test": "tests/unit/kashier-webhook-confirmation.test.ts"
     }
   ]
 }

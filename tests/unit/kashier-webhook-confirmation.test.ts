@@ -287,6 +287,49 @@ describe('Kashier adapter confirmWebhookEvent', () => {
   });
 });
 
+describe('Kashier payment session: customer.reference (required by the real API)', () => {
+  const sessionBody = async (customer: {
+    id?: string;
+    name: string;
+    email: string;
+    phone?: string;
+  }) => {
+    const { adapter, fake } = adapterWith(() => ({
+      status: 201,
+      body: { _id: 'ks_1', sessionUrl: 'https://payments.kashier.test/s/1' },
+    }));
+    await adapter.createPayment(
+      {
+        orderId: '11111111-2222-4333-8444-555555555555',
+        orderNumber: 'ORD-1042',
+        amountMinor: 100,
+        currency: 'EGP',
+        customer,
+        returnUrls: { success: 'https://shop.test/ok', failure: 'https://shop.test/fail' },
+        idempotencyKey: `k-${Math.random()}`,
+      },
+      creds
+    );
+    return JSON.parse(String(fake.calls[0].init?.body)) as { customer: Record<string, unknown> };
+  };
+
+  it('a GUEST checkout (no customer id) sends a stable guest reference derived from the order, never PII', async () => {
+    const body = await sessionBody({
+      name: 'Mona Adel',
+      email: 'mona@example.com',
+      phone: '+201012345678',
+    });
+    expect(body.customer.reference).toBe('guest-11111111-2222-4333-8444-555555555555');
+    expect(String(body.customer.reference)).not.toContain('mona');
+    expect(String(body.customer.reference)).not.toContain('2010');
+  });
+
+  it('a signed-in customer sends their customer id', async () => {
+    const body = await sessionBody({ id: 'cust-42', name: 'Mona', email: 'mona@example.com' });
+    expect(body.customer.reference).toBe('cust-42');
+  });
+});
+
 describe('Paymob and FawryPay: every money-deciding field is signed (no confirmation needed)', () => {
   it('Paymob HMAC covers the refund/void/success/pending/auth/capture flags, the amount and the order', () => {
     for (const f of [

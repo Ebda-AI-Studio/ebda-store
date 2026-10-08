@@ -56,6 +56,8 @@ export interface KashierConfig {
 
 export const KASHIER_SANDBOX_URL = 'https://test-api.kashier.io';
 const SESSIONS_PATH = '/v3/payment/sessions';
+/** A subscription checkout page stays payable this long. */
+const CHECKOUT_TTL_MS = 60 * 60_000;
 const CHARGE_PATH = '/v3/orders';
 const refundPath = (orderId: string) => `/v3/orders/${encodeURIComponent(orderId)}`;
 
@@ -72,6 +74,14 @@ const REQUIRED_SIGNED_KEYS = [
   // The id the dedupe key, the refund lookup and the PROVIDERS-17 confirmation use.
   'transactionId',
 ] as const;
+
+/** The FEP (order operations) host for a dashboard API base: (test-)api.kashier.io -> (test-)fep. */
+export function kashierFepBase(apiBase: string): string {
+  return apiBase.replace(
+    /^https:\/\/(test-)?api\.kashier\.io/,
+    (_m, t) => `https://${t ?? ''}fep.kashier.io`
+  );
+}
 
 /** Integer piastres -> Kashier's decimal string ("199.99"). Integer math only. */
 export function gatewayAmount(amountMinor: number): string {
@@ -154,7 +164,8 @@ export class KashierBillingProvider implements BillingProvider {
   private async call(
     method: 'GET' | 'POST' | 'PUT',
     path: string,
-    body: unknown
+    body: unknown,
+    base: string = this.cfg.baseUrl
   ): Promise<{ status: number; json: Record<string, unknown> }> {
     if (!this.cfg.secretKey || !this.cfg.merchantId) {
       throw new BillingProviderError('Kashier is not configured (merchant id / secret key)', true);
@@ -163,7 +174,7 @@ export class KashierBillingProvider implements BillingProvider {
     const timer = setTimeout(() => ctl.abort(), this.cfg.timeoutMs);
     let res: Response;
     try {
-      res = await this.cfg.fetchImpl(`${this.cfg.baseUrl}${path}`, {
+      res = await this.cfg.fetchImpl(`${base}${path}`, {
         method,
         headers: {
           'content-type': 'application/json',
@@ -207,9 +218,15 @@ export class KashierBillingProvider implements BillingProvider {
   }
 
   async createCheckoutForSubscription(req: CheckoutRequest): Promise<CheckoutResult> {
+    // The fields the payment-sessions API REQUIRES (developers.kashier.io API reference,
+    // CreatePaymentSessionRequest: expireAt, maxFailureAttempts, amount, currency, order,
+    // merchantId, merchantRedirect, type, display, customer); `order` is what webhooks echo as
+    // `merchantOrderId`. The merchant adapter (payment-providers/kashier.provider.ts) sends the same.
     const { status, json } = await this.call('POST', SESSIONS_PATH, {
+      expireAt: new Date(Date.now() + CHECKOUT_TTL_MS).toISOString(),
+      maxFailureAttempts: 3,
       merchantId: this.cfg.merchantId,
-      merchantOrderId: req.merchantOrderId,
+      order: req.merchantOrderId,
       amount: gatewayAmount(req.amountMinor),
       currency: req.currency,
       paymentType: 'credit',
@@ -266,11 +283,19 @@ export class KashierBillingProvider implements BillingProvider {
   }
 
   async refund(req: RefundRequest): Promise<RefundResult> {
-    const { status, json } = await this.call('PUT', refundPath(req.chargeId), {
-      apiOperation: 'REFUND',
-      reason: `refund ${req.idempotencyKey}`,
-      transaction: { amount: gatewayAmount(req.amountMinor) },
-    });
+    // Order operations live on the FEP host (API reference `updateOrder`: test-fep.kashier.io /
+    // fep.kashier.io), not on the dashboard API host the other calls use.
+    const { status, json } = await this.call(
+      'PUT',
+      refundPath(req.chargeId),
+      {
+        apiOperation: 'REFUND',
+        reason: `refund ${req.idempotencyKey}`,
+        // A JSON NUMBER (API reference, RefundRequest; the merchant adapter does the same).
+        transaction: { amount: Number(gatewayAmount(req.amountMinor)) },
+      },
+      kashierFepBase(this.cfg.baseUrl)
+    );
     const raw = stripTokens(json);
     const state = scalar(json.status).toUpperCase();
     const refundId = scalar(json.transactionId ?? json.refundId) || null;

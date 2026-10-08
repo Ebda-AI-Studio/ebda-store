@@ -164,6 +164,12 @@ export class KashierStub {
     if (typeof b.expireAt !== 'string' || !(new Date(b.expireAt).getTime() > Date.now())) {
       return json(400, { message: 'expireAt must be a future ISO date' });
     }
+    // Measured against the real sandbox 2026-10-08: a session without a customer reference is
+    // refused with 400 '"customer.reference" is required'.
+    const customer = b.customer as { reference?: unknown } | undefined;
+    if (typeof customer?.reference !== 'string' || !customer.reference) {
+      return json(400, { message: '"customer.reference" is required' });
+    }
     if (b.merchantId !== KASHIER_STUB.merchantId) return json(400, { message: 'unknown merchant' });
     if (typeof b.amount !== 'string' || !/^\d+\.\d{2}$/.test(b.amount) || Number(b.amount) <= 0) {
       return json(400, { message: 'amount must be a positive decimal with 2 places' });

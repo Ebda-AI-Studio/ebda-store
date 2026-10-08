@@ -14,6 +14,7 @@ import {
   kashierSignaturePayload,
   parseGatewayAmount,
   stripTokens,
+  kashierFepBase,
 } from '../../apps/api/src/services/billing/kashier.provider';
 import {
   BillingProviderError,
@@ -240,11 +241,11 @@ describe('Kashier requests', () => {
     expect(refused.notCharged).toBe(true);
   });
 
-  it('refunds via PUT /v3/orders/:id with the partial amount as a decimal string', async () => {
+  it('refunds via PUT /v3/orders/:id with the partial amount as a JSON number', async () => {
     const f = fakeFetch(200, { status: 'SUCCESS', transactionId: 'R1' });
     await mk(f.impl).refund({ chargeId: 'ORD 1', amountMinor: 5000, idempotencyKey: 'refund:x:1' });
     expect(f.calls[0].url).toBe('https://kashier.test/v3/orders/ORD%201');
-    expect((f.calls[0].body.transaction as { amount: string }).amount).toBe('50.00');
+    expect((f.calls[0].body.transaction as { amount: number }).amount).toBe(50);
   });
 
   it('creates a hosted checkout and returns the redirect URL', async () => {
@@ -261,11 +262,37 @@ describe('Kashier requests', () => {
     expect(out.redirectUrl).toBe('https://checkout.kashier.test/s/1');
     expect(f.calls[0].body.amount).toBe('499.00');
     expect(f.calls[0].body.saveCard).toBe('forced');
+    // Every field the payment-sessions API requires (CreatePaymentSessionRequest).
+    for (const k of [
+      'expireAt',
+      'maxFailureAttempts',
+      'amount',
+      'currency',
+      'order',
+      'merchantId',
+      'merchantRedirect',
+      'type',
+      'display',
+      'customer',
+    ]) {
+      expect(f.calls[0].body[k], k).toBeDefined();
+    }
+    expect(f.calls[0].body.order).toBe(ORDER);
+    expect(new Date(String(f.calls[0].body.expireAt)).getTime()).toBeGreaterThan(Date.now());
+    expect(f.calls[0].body.customer).toEqual({ reference: 'store-1', email: 'a@b.eg' });
   });
 
   it('parseReturn is a hint only', () => {
     const r = provider().parseReturn({ merchantOrderId: ORDER, paymentStatus: 'SUCCESS' });
     expect(r).toMatchObject({ merchantOrderId: ORDER, outcome: 'success', trusted: false });
+  });
+});
+
+describe('kashierFepBase', () => {
+  it('maps the dashboard API host to the FEP host (sandbox and live); leaves other hosts alone', () => {
+    expect(kashierFepBase('https://test-api.kashier.io')).toBe('https://test-fep.kashier.io');
+    expect(kashierFepBase('https://api.kashier.io')).toBe('https://fep.kashier.io');
+    expect(kashierFepBase('https://kashier.test')).toBe('https://kashier.test');
   });
 });
 
