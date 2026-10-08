@@ -1430,6 +1430,16 @@ model Order {
   taxRateBps                  Int?               @map("tax_rate_bps")
   shipping                    Int                @default(0)
   discount                    Int                @default(0)
+  // Cash-on-delivery fee frozen at creation (ruling MONEYB-3): quoted to the
+  // shopper BEFORE the order is placed and already inside `total`. 0 = none
+  // (non-COD orders, and COD orders placed before the column existed, whose fee
+  // was folded into `total` after submit — see payments.metadata.codFee).
+  codFee                      Int                @default(0) @map("cod_fee")
+  // The VAT base this order was taxed on (ruling MONEYB-2): goods after the
+  // invoice-shown discounts + shipping + COD fee (+ a payment link's extra
+  // amount), excl. VAT. NULL = placed before the column existed (taxed on goods
+  // only; `taxInvoiceInfo` rebuilds that legacy base).
+  taxableAmount               Int?               @map("taxable_amount")
   total                       Int
   // Extra out-of-catalog amount used by merchant-initiated payment
   // links — a custom service fee, deposit, or quote that doesn't map
@@ -4948,6 +4958,24 @@ enum TaxProfileStatus {
   revoked
 }
 
+/// Fiscal documents (ruling MONEYB-1). Each numbered type has its OWN gap-free
+/// serial per store; the two `*_record` types are un-numbered archive rows
+/// written when a store is deleted (ruling MONEYB-4).
+enum FiscalDocType {
+  /// "فاتورة ضريبية" — only for a sale priced under a VERIFIED VAT profile.
+  tax_invoice
+  /// Plain sales receipt — every other sale (no VAT wording).
+  receipt
+  /// Refund/adjustment of a tax invoice; references the invoice number + date.
+  credit_note
+  /// Refund of a plain receipt; references the receipt number + date.
+  refund_receipt
+  /// Store-deletion archive of an order that had no issued document (legacy).
+  order_record
+  /// Store-deletion archive of Ebda's own subscription billing row (VAT ledger).
+  billing_record
+}
+
 enum TaxDocumentKind {
   tax_card
   vat_certificate
@@ -5034,4 +5062,79 @@ model ProviderActivationRequest {
   @@index([storeId])
   @@index([status, requestedAt])
   @@map("provider_activation_requests")
+}
+
+/// An ISSUED fiscal document — tax invoice, receipt, credit note, refund
+/// receipt — or a store-deletion archive record (rulings MONEYB-1, MONEYB-4).
+///
+/// Immutable once written: a trigger (migration 20261008120000) refuses DELETE
+/// before `retain_until` and every UPDATE except the cancellation and ETA
+/// submission columns. `payload` is the document AS ISSUED (seller, buyer,
+/// lines, totals) so a later order/store edit or a store deletion can never
+/// rewrite or erase it.
+///
+/// NO foreign keys on `store_id` / `order_id` ON PURPOSE: deleting a store or an
+/// order must leave its tax documents in place for 6 years (UTPL 206/2020
+/// Art. 38/44; PDPL 151/2020 Art. 3 legal-obligation basis).
+///
+/// Viewers: merchant admin /stores/[id]/invoices (list + open), order detail
+/// "Documents" card; super-admin /tax-archive (stores already deleted).
+/// RLS: strict store policy.
+model FiscalDocument {
+  id                 String        @id @default(uuid())
+  storeId            String        @map("store_id")
+  orderId            String?       @map("order_id")
+  docType            FiscalDocType @map("doc_type")
+  /// Gap-free serial within (store, docType); NULL for archive records.
+  serial             Int?
+  /// Merchant-facing number = ETA `internalID` (e.g. INV-000042). Never the order number.
+  number             String?
+  /// issued | cancelled. A cancelled document keeps its number (UTPL Art. 37).
+  status             String        @default("issued")
+  issuedAt           DateTime      @default(now()) @map("issued_at")
+  cancelledAt        DateTime?     @map("cancelled_at")
+  /// Credit note / refund receipt: the document it adjusts.
+  originalDocumentId String?       @map("original_document_id")
+  originalNumber     String?       @map("original_number")
+  originalIssuedAt   DateTime?     @map("original_issued_at")
+  currency           String        @default("EGP")
+  /// Net (excl. VAT), VAT and gross of the document, minor units.
+  netAmount          Int           @map("net_amount")
+  vatAmount          Int           @default(0) @map("vat_amount")
+  totalAmount        Int           @map("total_amount")
+  vatRateBps         Int?          @map("vat_rate_bps")
+  sellerTrn          String?       @map("seller_trn")
+  payload            Json
+  /// Idempotency of a credit note / refund receipt per refund event.
+  refundRef          String?       @map("refund_ref")
+  /// Future ETA e-invoicing (separate from our `number`): ETA-issued uuid,
+  /// submission id and status. Never used as the display number.
+  etaUuid            String?       @map("eta_uuid")
+  etaSubmissionId    String?       @map("eta_submission_id")
+  etaStatus          String?       @map("eta_status")
+  etaSubmittedAt     DateTime?     @map("eta_submitted_at")
+  /// issued_at + 6 years: the trigger refuses DELETE before this.
+  retainUntil        DateTime      @map("retain_until")
+  createdAt          DateTime      @default(now()) @map("created_at")
+
+  @@unique([storeId, docType, serial])
+  @@unique([storeId, refundRef])
+  @@index([storeId, orderId])
+  @@index([storeId, issuedAt(sort: Desc)])
+  @@map("fiscal_documents")
+}
+
+/// The last serial handed out per (store, document type). Bumped with one
+/// `INSERT .. ON CONFLICT DO UPDATE .. RETURNING` inside the transaction that
+/// writes the document, so a rolled-back sale never burns a number (gap-free).
+/// No FK to stores: a deleted store's series must not restart.
+/// Viewers: the serials themselves show on every document (merchant /invoices).
+model FiscalDocumentCounter {
+  storeId    String        @map("store_id")
+  docType    FiscalDocType @map("doc_type")
+  lastSerial Int           @default(0) @map("last_serial")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+
+  @@id([storeId, docType])
+  @@map("fiscal_document_counters")
 }

@@ -112,7 +112,6 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       shippingCarrierConfigs: 'ShippingCarrierConfig',
       shipments: 'Shipment',
       shipmentPickups: 'ShipmentPickup',
-      providerActivationRequests: 'ProviderActivationRequest',
       codRemittances: 'CodRemittance',
       pageRevisions: 'StorePageRevision',
       productModels: 'ProductModel',
@@ -1353,11 +1352,15 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
     },
   },
   {
-    name: 'ProviderActivationRequest',
-    table: 'provider_activation_requests',
+    name: 'FiscalDocument',
+    table: 'fiscal_documents',
     storeId: true,
-    relations: {
-      store: 'Store',
-    },
+    relations: {},
+  },
+  {
+    name: 'FiscalDocumentCounter',
+    table: 'fiscal_document_counters',
+    storeId: true,
+    relations: {},
   },
 ];
