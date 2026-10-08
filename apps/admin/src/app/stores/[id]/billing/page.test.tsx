@@ -13,8 +13,13 @@ const { apiGet, apiPost, role } = vi.hoisted(() => ({
   role: { current: 'store_admin' },
 }));
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'store-1' }) }));
+vi.mock('next/link', () => ({
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+}));
 vi.mock('next-intl', () => ({ useLocale: () => 'en' }));
-vi.mock('../../../../lib/api', () => ({ apiGet, apiPost, apiPut: vi.fn() }));
+vi.mock('../../../../lib/api', () => ({ apiGet, apiPost, apiPut: vi.fn(), apiFetch: vi.fn() }));
 vi.mock('../../../../lib/auth', () => ({ useAuth: () => ({ user: { role: role.current } }) }));
 vi.mock('../../../../components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -356,45 +361,115 @@ describe('signup funnel: plan, payment method, notices, go live', () => {
     });
   });
 
-  it('InstaPay: shows the reference, validates the payer reference, and says nothing is activated by it', async () => {
+  const instapayClaim = {
+    id: 'cl1',
+    planCode: 'growth',
+    billingInterval: 'yearly',
+    amountMinor: 3141000,
+    method: 'instapay',
+    paymentReference: 'EBD-7K2Q',
+    status: 'pending',
+    reviewNote: null,
+    createdAt: '2026-11-06T00:00:00.000Z',
+    reviewedAt: null,
+    receipt: { fields: { reference: '123456789012' } },
+  };
+
+  it('InstaPay: shows the reference and the receipt upload that says the Ebda team reviews', async () => {
+    mockApi(billing({ subscription: trialing, billing: instapayChosen }), [], [instapayClaim]);
+    render(<StoreBillingPage />);
+    expect(await screen.findByText('EBD-7K2Q')).toBeTruthy();
+    expect(screen.getByText('123456789012')).toBeTruthy();
+    expect(screen.getByText('claims.status.pending')).toBeTruthy();
+    expect(screen.getByTestId('receipt-reviewer-note').textContent).toBe('pay.reviewerNote');
+    expect(screen.getByLabelText('file')).toBeTruthy();
+    // The old typed-reference box is gone (the endpoint answers 410).
+    expect(screen.queryByLabelText('pay.payerRef')).toBeNull();
+  });
+
+  it('a rejected claim shows its reason and an "upload the right receipt" action', async () => {
     mockApi(
       billing({ subscription: trialing, billing: instapayChosen }),
       [],
-      [
-        {
-          id: 'cl1',
-          planCode: 'growth',
-          billingInterval: 'yearly',
-          amountMinor: 3141000,
-          method: 'instapay',
-          paymentReference: 'EBD-7K2Q',
-          payerReference: 'IPN-99887766',
-          status: 'pending',
-          reviewNote: null,
-          createdAt: '2026-11-06T00:00:00.000Z',
-          reviewedAt: null,
-        },
-      ]
+      [{ ...instapayClaim, status: 'rejected', reviewNote: 'Wrong amount' }]
     );
-    apiPost.mockResolvedValue({ data: {}, error: null });
     render(<StoreBillingPage />);
-    expect(await screen.findByText('EBD-7K2Q')).toBeTruthy();
-    expect(screen.getByText('IPN-99887766')).toBeTruthy();
-    expect(screen.getByText('claims.status.pending')).toBeTruthy();
+    expect(await screen.findByText('Wrong amount')).toBeTruthy();
+    const link = screen.getByText('claims.uploadRight');
+    expect(link.getAttribute('href')).toBe('#instapay-upload');
+  });
 
-    const input = screen.getByLabelText('pay.payerRef');
-    fireEvent.change(input, { target: { value: 'ab' } });
-    fireEvent.click(screen.getByRole('button', { name: 'pay.send' }));
-    expect(await screen.findByText('pay.payerRefInvalid')).toBeTruthy();
-    expect(apiPost).not.toHaveBeenCalled();
-
-    fireEvent.change(input, { target: { value: 'IPN-12345678' } });
-    fireEvent.click(screen.getByRole('button', { name: 'pay.send' }));
-    await waitFor(() =>
-      expect(apiPost).toHaveBeenCalledWith('/api/v1/stores/store-1/billing/payment-claims', {
-        payerReference: 'IPN-12345678',
+  it('InstaPay merchant: plan buttons and cancel are offered (not only for card holders)', async () => {
+    mockApi(
+      billing({
+        subscription: { ...trialing, status: 'active' },
+        availablePlans: [
+          { ...plans[0], code: 'basic', nameEn: 'Basic' },
+          { ...plans[0], code: 'growth' },
+        ],
+        plan: { code: 'basic', nameEn: 'Basic', nameAr: 'أساسي', subscribedPlanCode: 'basic' },
+        billing: { ...instapayChosen, pendingPlanCode: null },
       })
     );
+    apiPost.mockImplementation(async (url: string) => ({
+      data: url.endsWith('/instapay-plan')
+        ? {
+            handle: 'ebda@instapay',
+            reference: 'EBD-7K2Q',
+            planCode: 'growth',
+            interval: 'monthly',
+            amountMinor: 349000,
+          }
+        : {},
+      error: null,
+    }));
+    render(<StoreBillingPage />);
+    const choose = await screen.findByRole('button', { name: 'chooseThisPlan' });
+    expect(screen.getByRole('button', { name: 'cancelPlan' })).toBeTruthy();
+    fireEvent.click(choose);
+    await waitFor(() =>
+      expect(apiPost).toHaveBeenCalledWith('/api/v1/stores/store-1/billing/instapay-plan', {
+        planCode: 'growth',
+        interval: 'monthly',
+      })
+    );
+    expect(await screen.findByTestId('instapay-quote')).toBeTruthy();
+    expect(document.getElementById('plans')).toBeTruthy();
+  });
+
+  it('canceled store: "subscription ended" copy, never "Free plan limits apply", plan picker shown', async () => {
+    mockApi(
+      billing({
+        subscription: { ...trialing, status: 'canceled', trialEndsAt: null },
+        availablePlans: plans,
+        billing: { ...instapayChosen, pendingPlanCode: null },
+      })
+    );
+    render(<StoreBillingPage />);
+    expect(await screen.findByText('canceledTitle')).toBeTruthy();
+    expect(screen.getByText('canceledBody')).toBeTruthy();
+    expect(screen.queryByText(/Free plan/i)).toBeNull();
+    expect(screen.getByRole('button', { name: 'chooseThisPlan' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'cancelPlan' })).toBeNull();
+  });
+
+  it('payOnStore: tells the owner to pay on the main store, links to it, hides pay/plan actions', async () => {
+    mockApi(
+      billing({
+        payOnStore: 'main-store',
+        subscription: { ...trialing, status: 'active' },
+        availablePlans: plans,
+        billing: { ...instapayChosen, pendingPlanCode: null },
+      })
+    );
+    render(<StoreBillingPage />);
+    expect(await screen.findByText('payOnStoreBody')).toBeTruthy();
+    expect(screen.getByText('payOnStoreLink').getAttribute('href')).toBe(
+      '/stores/main-store/billing'
+    );
+    expect(screen.queryByRole('button', { name: 'chooseThisPlan' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'cancelPlan' })).toBeNull();
+    expect(screen.queryByLabelText('file')).toBeNull();
   });
 
   it('unpaid suspension: an alert with the pay instructions and the support WhatsApp link', async () => {

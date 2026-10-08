@@ -9,17 +9,20 @@ import { useLocalePrice } from '../../../hooks/useLocalePrice';
 import { formatDate } from '@/lib/format-date';
 import { useStore } from '../../../contexts/StoreContext';
 import type { InstapayInstructions } from '@force/shared';
+import { InstapayReceiptUploader, type InstapayProof } from './InstapayReceiptUploader';
 
 interface InstapayView {
   orderStatus: string;
   paymentStatus: string;
   instructions: InstapayInstructions;
+  /** The shopper's latest receipt, if any (the store owner reviews it). */
+  proof?: InstapayProof | null;
 }
 
 /**
  * The InstaPay manual-transfer instructions (SP6a): who to pay (the merchant's
  * handle / phone), the EXACT amount, the order reference to quote, the deadline,
- * and a place for the customer to enter the transfer reference. The merchant
+ * and the receipt upload (the store owner reviews it). The merchant
  * confirms the transfer on their side; this card polls and reflects it.
  */
 export function InstapayCard({
@@ -35,10 +38,6 @@ export function InstapayCard({
   const { store } = useStore();
   const [view, setView] = useState<InstapayView | null>(null);
   const [loadError, setLoadError] = useState(false);
-  const [reference, setReference] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [refError, setRefError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -82,29 +81,6 @@ export function InstapayCard({
       setTimeout(() => setCopied(c => (c === key ? null : c)), 1500);
     } catch {
       // Clipboard unavailable: the value is on screen to type.
-    }
-  }
-
-  async function submitReference() {
-    setSaving(true);
-    setRefError(null);
-    try {
-      const res = await api.post(`/payments/instapay/${orderId}/reference`, { reference });
-      if (res.success) {
-        setSaved(true);
-        await load();
-      } else {
-        setRefError(
-          t(
-            'Could not save the reference. Use letters, digits and - _ . / # only.',
-            'تعذّر حفظ المرجع. استخدم أحرفاً وأرقاماً و - _ . / # فقط.'
-          )
-        );
-      }
-    } catch {
-      setRefError(t('Could not save the reference.', 'تعذّر حفظ المرجع.'));
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -176,50 +152,27 @@ export function InstapayCard({
               ins.reference
             )}
           </div>
-          <p className="mt-3 text-sm text-warning-ink">
-            {t('Pay before', 'ادفع قبل')}{' '}
-            {formatDate(ins.expiresAt, {
-              timezone: store.timezone,
-              language,
-              numerals: storeNumerals(store?.theme),
-              style: 'short',
-            })}
-            {t(
-              '. After that the order is cancelled and the items go back on sale.',
-              '. بعدها يُلغى الطلب وتعود المنتجات للبيع.'
-            )}
-          </p>
+          {view.proof?.status === 'submitted' ? null : (
+            <p className="mt-3 text-sm text-warning-ink">
+              {t('Pay before', 'ادفع قبل')}{' '}
+              {formatDate(ins.expiresAt, {
+                timezone: store.timezone,
+                language,
+                numerals: storeNumerals(store?.theme),
+                style: 'short',
+              })}
+              {t(
+                '. After that the order is cancelled and the items go back on sale.',
+                '. بعدها يُلغى الطلب وتعود المنتجات للبيع.'
+              )}
+            </p>
+          )}
 
-          <div className="mt-4">
-            <label className="text-sm font-medium text-foreground" htmlFor="instapay-ref">
-              {t('Transfer reference (optional)', 'مرجع التحويل (اختياري)')}
-            </label>
-            <div className="mt-1 flex gap-2">
-              <input
-                id="instapay-ref"
-                value={reference}
-                onChange={e => setReference(e.target.value)}
-                maxLength={64}
-                dir="ltr"
-                className="min-h-11 w-full rounded-md border bg-background px-3 text-sm"
-                placeholder={ins.customerReference ?? 'IPN 1234 5678'}
-              />
-              <Button
-                type="button"
-                onClick={() => void submitReference()}
-                disabled={saving || reference.trim().length < 3}
-              >
-                {t('Send', 'إرسال')}
-              </Button>
-            </div>
-            {(saved || ins.customerReference) && !refError && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                {t('Saved', 'تم الحفظ')}:{' '}
-                <span dir="ltr">{ins.customerReference ?? reference}</span>
-              </p>
-            )}
-            {refError && <p className="mt-1 text-xs text-destructive-ink">{refError}</p>}
-          </div>
+          <InstapayReceiptUploader
+            orderId={orderId}
+            proof={view.proof ?? null}
+            onSubmitted={() => void load()}
+          />
         </>
       )}
 

@@ -17,10 +17,11 @@
  * this page shows a banner instead (see PlanLimitService.noteOrderCreated).
  */
 
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button, Input, Select, useToast } from '@force/ui';
+import { Badge, Button, Select, useToast } from '@force/ui';
 import { formatMoney, type PlanLimits, withNumerals } from '@force/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
@@ -28,6 +29,7 @@ import { useAuth } from '../../../../lib/auth';
 import { useT } from '../../../../i18n/useT';
 import { InstapayPanel } from '../../../../components/billing/InstapayPanel';
 import { SupportLink } from '../../../../components/billing/SupportLink';
+import { InstapayReceiptForm } from '../../../../components/instapay/InstapayReceiptForm';
 import {
   cardLabel,
   fmtDate as fmtBillingDate,
@@ -69,8 +71,21 @@ interface BillingData {
   ordersOverLimitMonth: string | null;
   availablePlans: PlanSummary[];
   billing?: BillingInfo;
+  /** Set when this store is beyond the owner's store allowance: paying here buys nothing. */
+  payOnStore?: string | null;
   storeStatus?: 'active' | 'inactive' | 'suspended';
   provider?: 'kashier' | 'stub' | null;
+}
+
+/** `POST /billing/instapay-plan`: what to transfer for the plan just picked. */
+interface InstapayQuote {
+  handle: string | null;
+  qrUrl?: string | null;
+  reference: string | null;
+  planCode: string;
+  interval: 'monthly' | 'yearly';
+  amountMinor: number | null;
+  vat?: PlatformVatLine | null;
 }
 
 interface Charge {
@@ -155,8 +170,7 @@ export default function StoreBillingPage() {
     'idle'
   );
   const [claims, setClaims] = useState<PaymentClaim[]>([]);
-  const [payerReference, setPayerReference] = useState('');
-  const [claimError, setClaimError] = useState('');
+  const [quote, setQuote] = useState<InstapayQuote | null>(null);
   const [cardUnavailable, setCardUnavailable] = useState(false);
   const [goLiveError, setGoLiveError] = useState('');
   const [highlightPlan, setHighlightPlan] = useState<string | null>(null);
@@ -194,6 +208,13 @@ export default function StoreBillingPage() {
       loadClaims();
     }
   }, [load, loadCharges, loadClaims, storeId]);
+
+  // Upgrade prompts link to `#plans`; the section only exists once the data is in.
+  const dataReady = !!data;
+  useEffect(() => {
+    if (!dataReady || typeof window === 'undefined' || window.location.hash !== '#plans') return;
+    document.getElementById('plans')?.scrollIntoView?.({ block: 'start' });
+  }, [dataReady]);
 
   // `?plan=<code>` comes from the upsell dialog: mark that plan below.
   useEffect(() => {
@@ -378,31 +399,44 @@ export default function StoreBillingPage() {
     }
   }
 
-  async function sendClaim(e: React.FormEvent) {
-    e.preventDefault();
-    const ref = payerReference.trim();
-    if (ref.length < 4 || ref.length > 64) {
-      setClaimError(t('pay.payerRefInvalid'));
-      return;
-    }
-    setClaimError('');
-    setBusy('claim');
+  // InstaPay merchants pick a plan here (any status, canceled included): the API
+  // answers what to transfer, the receipt form below sends the proof.
+  async function chooseInstapayPlan(planCode: string) {
+    setBusy(planCode);
     try {
-      // No screenshot field on purpose: the only admin upload helper (ImageUpload)
-      // writes to the PUBLIC media bucket, which is the wrong home for a payment proof.
-      const { error: err } = await apiPost(`/api/v1/stores/${storeId}/billing/payment-claims`, {
-        payerReference: ref,
-      });
-      if (err) {
-        setClaimError(t('pay.claimFailed'));
+      if (!instapayChosen) {
+        const { error: methodError } = await apiPost(
+          `/api/v1/stores/${storeId}/billing/payment-method`,
+          { method: 'instapay' }
+        );
+        if (methodError) {
+          toastError(
+            methodError.code === 'INSTAPAY_NOT_CONFIGURED'
+              ? t('pay.instapayUnavailable')
+              : t('pay.instapayFailed')
+          );
+          return;
+        }
+      }
+      const { data: d, error: e } = await apiPost<InstapayQuote>(
+        `/api/v1/stores/${storeId}/billing/instapay-plan`,
+        { planCode, interval }
+      );
+      if (e || !d) {
+        toastError(t('instapayPlanFailed'), e?.message);
         return;
       }
-      setPayerReference('');
-      toastSuccess(t('pay.claimSent'));
-      await Promise.all([loadClaims(), load()]);
+      setQuote(d);
+      await load();
+      document.getElementById('instapay-pay')?.scrollIntoView?.({ block: 'start' });
     } finally {
       setBusy(null);
     }
+  }
+
+  async function onReceiptSent() {
+    toastSuccess(t('pay.claimSent'));
+    await Promise.all([loadClaims(), load()]);
   }
 
   async function goLive() {
@@ -448,12 +482,20 @@ export default function StoreBillingPage() {
   const chargePlan = data?.availablePlans.find(p => p.code === info?.nextCharge?.planCode);
   const instapay = info?.instapay;
   const instapayChosen = info?.billingMethod === 'instapay';
+  // What the merchant is shown to transfer: the plan just picked, else the stored quote.
+  const payDetails = instapay && quote ? { ...instapay, ...quote } : instapay;
   const showCardControls =
     !cardUnavailable && (info?.trialCardMode === 'card_on_file' || !!info?.hasPaymentMethod);
   // Card payments exist only when the card mode is on or a card is already saved.
   const cardPayments = info?.trialCardMode === 'card_on_file' || !!info?.hasPaymentMethod;
+  // InstaPay merchants: chose it, or have no card route. Plans are paid by transfer.
+  const instapayPlans =
+    !!instapay && (instapay.available || instapayChosen) && (instapayChosen || !cardPayments);
+  // Beyond the owner's store allowance: paying on this store buys nothing.
+  const payOnOtherStore = data?.payOnStore ?? null;
   const showPaymentMethod =
     !!info &&
+    !payOnOtherStore &&
     (showCardControls ||
       !!instapay?.available ||
       instapayChosen ||
@@ -480,6 +522,22 @@ export default function StoreBillingPage() {
       {!error && !data && <p className="text-sm text-muted-foreground">{t('loading')}</p>}
       {data && (
         <div className="space-y-4">
+          {payOnOtherStore && (
+            <div
+              role="alert"
+              className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
+            >
+              <p className="font-semibold">{t('payOnStoreTitle')}</p>
+              <p className="mt-1">{t('payOnStoreBody')}</p>
+              <Link
+                href={`/stores/${payOnOtherStore}/billing`}
+                className="mt-2 inline-block font-medium underline"
+              >
+                {t('payOnStoreLink')}
+              </Link>
+            </div>
+          )}
+
           {noticeCopy && (
             <div
               role={noticeUrgent ? 'alert' : 'status'}
@@ -556,6 +614,11 @@ export default function StoreBillingPage() {
                   limit: (data.limits.maxOrdersPerMonth ?? 0).toLocaleString('en'),
                 })}
               </p>
+              {!payOnOtherStore && (
+                <a href="#plans" className="mt-2 inline-block font-medium underline">
+                  {tNotice('seePlans')}
+                </a>
+              )}
             </div>
           )}
 
@@ -769,25 +832,31 @@ export default function StoreBillingPage() {
                       {t('pay.useInstapay')}
                     </Button>
                   ) : (
-                    <>
-                      <InstapayPanel instapay={instapay} locale={locale} />
-                      <form onSubmit={sendClaim} className="space-y-2" noValidate>
-                        <h4 className="text-sm font-medium">{t('pay.paidTitle')}</h4>
-                        <p className="text-xs text-muted-foreground">{t('pay.paidHelp')}</p>
-                        <Input
-                          id="payer-reference"
-                          dir="ltr"
-                          label={t('pay.payerRef')}
-                          value={payerReference}
-                          maxLength={64}
-                          onChange={e => setPayerReference(e.target.value)}
-                          error={claimError || undefined}
-                        />
-                        <Button type="submit" className="max-md:min-h-11" disabled={busy !== null}>
-                          {busy === 'claim' ? t('pay.sending') : t('pay.send')}
-                        </Button>
-                      </form>
-                    </>
+                    <div id="instapay-pay" className="space-y-4">
+                      {quote && (
+                        <div className="space-y-1" data-testid="instapay-quote">
+                          <p className="text-sm font-medium">
+                            {t('instapayQuoteTitle', {
+                              plan: planLabel(
+                                data.availablePlans.find(p => p.code === quote.planCode),
+                                quote.planCode,
+                                locale
+                              ),
+                              interval: t(
+                                quote.interval === 'yearly' ? 'intervalYearly' : 'intervalMonthly'
+                              ),
+                            })}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{t('instapayPlanNote')}</p>
+                        </div>
+                      )}
+                      <InstapayPanel instapay={payDetails ?? instapay} locale={locale} />
+                      <InstapayReceiptForm
+                        baseUrl={`/api/v1/stores/${storeId}/billing/receipts`}
+                        reviewerNote={t('pay.reviewerNote')}
+                        onSubmitted={onReceiptSent}
+                      />
+                    </div>
                   )}
                 </div>
               )}
@@ -800,7 +869,7 @@ export default function StoreBillingPage() {
                       <li key={c.id} className="rounded-lg border p-3 text-sm">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span dir="ltr" className="font-medium">
-                            {c.payerReference}
+                            {c.receipt?.fields.reference ?? c.payerReference ?? c.paymentReference}
                           </span>
                           <Badge
                             variant={
@@ -819,6 +888,14 @@ export default function StoreBillingPage() {
                           {fmtBillingDate(c.createdAt, locale)}
                         </p>
                         {c.reviewNote && <p className="mt-1">{c.reviewNote}</p>}
+                        {c.status === 'rejected' && instapayChosen && (
+                          <a
+                            href="#instapay-upload"
+                            className="mt-1 inline-block text-sm font-medium text-primary-ink underline"
+                          >
+                            {t('claims.uploadRight')}
+                          </a>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -875,11 +952,11 @@ export default function StoreBillingPage() {
           </section>
 
           <section id="plans" className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-            {/* InstaPay-only (no card gateway): plans are shown for reference; the
-                plan is paid by transfer and activated by a super-admin. */}
+            {/* InstaPay merchants pick a plan here too: it is paid by transfer and
+                activated when the Ebda team confirms the receipt. */}
             <h2 className="mb-1 text-base font-semibold">{t('subscribeTitle')}</h2>
             <p className="mb-3 text-sm text-muted-foreground">
-              {cardPayments ? t('subscribeBody') : t('subscribeBodyInstapay')}
+              {cardPayments && !instapayChosen ? t('subscribeBody') : t('subscribeBodyInstapay')}
             </p>
             <div className="mb-3 inline-flex rounded-full bg-muted p-1 text-sm" role="group">
               {(['monthly', 'yearly'] as const).map(k => (
@@ -900,7 +977,9 @@ export default function StoreBillingPage() {
                 const isCurrent = p.code === data.plan.subscribedPlanCode;
                 const paid = p.code !== 'free' && p.code !== 'comped' && p.code !== 'founding_free';
                 const hasCard =
-                  !!data.billing?.hasPaymentMethod && data.subscription.status === 'active';
+                  !!data.billing?.hasPaymentMethod &&
+                  data.subscription.status === 'active' &&
+                  !instapayChosen;
                 return (
                   <div
                     key={p.code}
@@ -915,10 +994,28 @@ export default function StoreBillingPage() {
                         <span> {interval === 'yearly' ? t('perYear') : t('perMonth')}</span>
                       )}
                     </p>
-                    {isCurrent && <Badge variant="info">{t('currentBadge')}</Badge>}
+                    {isCurrent && data.subscription.status !== 'canceled' && (
+                      <Badge variant="info">{t('currentBadge')}</Badge>
+                    )}
+                    {(!isCurrent || data.subscription.status === 'canceled') &&
+                      paid &&
+                      data.subscription.status !== 'comped' &&
+                      !payOnOtherStore &&
+                      instapayPlans && (
+                        <Button
+                          size="sm"
+                          className="max-md:min-h-11"
+                          disabled={price === null || busy !== null}
+                          onClick={() => chooseInstapayPlan(p.code)}
+                        >
+                          {price === null ? t('priceUnset') : t('chooseThisPlan')}
+                        </Button>
+                      )}
                     {!isCurrent &&
                       paid &&
                       data.subscription.status !== 'comped' &&
+                      !payOnOtherStore &&
+                      !instapayPlans &&
                       (cardPayments || hasCard) && (
                         <Button
                           size="sm"
@@ -937,9 +1034,10 @@ export default function StoreBillingPage() {
                 );
               })}
             </div>
-            {data.billing?.hasPaymentMethod &&
+            {!payOnOtherStore &&
+              (data.billing?.hasPaymentMethod || instapayChosen) &&
               ['active', 'trialing'].includes(data.subscription.status) &&
-              (data.subscription.cancelAtPeriodEnd || data.billing.pendingPlanCode ? (
+              (data.subscription.cancelAtPeriodEnd || data.billing?.pendingPlanCode ? (
                 <Button
                   variant="outline"
                   className="max-md:min-h-11"
@@ -958,16 +1056,18 @@ export default function StoreBillingPage() {
                   {t('cancelPlan')}
                 </Button>
               ))}
-            {data.billing?.hasPaymentMethod && data.subscription.status === 'past_due' && (
-              <Button
-                variant="outline"
-                className="max-md:min-h-11"
-                disabled={busy !== null}
-                onClick={cancelPlan}
-              >
-                {t('cancelPlan')}
-              </Button>
-            )}
+            {!payOnOtherStore &&
+              (data.billing?.hasPaymentMethod || instapayChosen) &&
+              data.subscription.status === 'past_due' && (
+                <Button
+                  variant="outline"
+                  className="max-md:min-h-11"
+                  disabled={busy !== null}
+                  onClick={cancelPlan}
+                >
+                  {t('cancelPlan')}
+                </Button>
+              )}
             {data.subscription.cancelAtPeriodEnd && data.subscription.currentPeriodEnd && (
               <p className="mt-2 text-xs text-muted-foreground">
                 {t('cancelsOn')} {fmtDate(data.subscription.currentPeriodEnd)}

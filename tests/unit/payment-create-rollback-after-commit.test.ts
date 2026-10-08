@@ -55,6 +55,8 @@ vi.mock('@api/middleware/rbac', () => ({
 }));
 vi.mock('@api/middleware/security', () => ({
   paymentLimiter: (_req: any, _res: any, next: any) => next(),
+  uploadLimiter: (_req: any, _res: any, next: any) => next(),
+  dailyUploadLimiter: (_req: any, _res: any, next: any) => next(),
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@api/utils/store-helpers', () => ({

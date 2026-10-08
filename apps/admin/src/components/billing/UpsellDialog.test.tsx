@@ -45,7 +45,7 @@ describe('UpsellDialog', () => {
     const dialog = screen.getByRole('alertdialog');
     expect(dialog.textContent).toContain('You reached your product limit.');
     const link = screen.getByRole('link', { name: 'upgradeTo:{"plan":"Growth"}' });
-    expect(link.getAttribute('href')).toBe('/stores/abc-123/billing?plan=growth');
+    expect(link.getAttribute('href')).toBe('/stores/abc-123/billing?plan=growth#plans');
   });
 
   it('names the plan in the Arabic UI and falls back to "See plans" with no target', () => {
@@ -69,7 +69,7 @@ describe('UpsellDialog', () => {
       limitKey: null,
     });
     const link = screen.getByRole('link', { name: 'seePlans' });
-    expect(link.getAttribute('href')).toBe('/stores/s1/billing');
+    expect(link.getAttribute('href')).toBe('/stores/s1/billing#plans');
   });
 
   it('falls back to /stores outside a store page, and dismisses with the button or Escape', () => {
@@ -92,9 +92,9 @@ describe('UpsellDialog', () => {
 
   it('billingHref parses the store id from the path', () => {
     expect(billingHref('/stores/xyz/settings/payments', 'growth')).toBe(
-      '/stores/xyz/billing?plan=growth'
+      '/stores/xyz/billing?plan=growth#plans'
     );
-    expect(billingHref('/stores/xyz', null)).toBe('/stores/xyz/billing');
+    expect(billingHref('/stores/xyz', null)).toBe('/stores/xyz/billing#plans');
     expect(billingHref('/login', 'growth')).toBe('/stores');
   });
 });

@@ -1,38 +1,70 @@
 ---
-title: InstaPay manual confirmation
-description: Let customers pay by InstaPay transfer, and confirm each payment by hand once the money arrives.
+title: Accepting InstaPay from shoppers
+description: Let shoppers pay by InstaPay transfer, then review the receipt they upload and approve or reject it.
 section: Selling
 order: 4
 appPath: /stores
-keywords: instapay transfer manual confirm payment received
+keywords: instapay transfer receipt screenshot approve reject refund shopper payment
 ---
 
-InstaPay has no merchant API, so Ebda cannot see a transfer on its own. The customer transfers to your InstaPay address or mobile number, and **you** confirm each payment after you see the money in your banking app.
+InstaPay has no merchant API, so Ebda cannot see a transfer on its own. The shopper transfers to your InstaPay address or mobile number and uploads a screenshot of the receipt. **You** review it and confirm the payment. Ebda's team does not see or approve your shoppers' payments.
+
+Paying your own Ebda subscription by InstaPay is a different flow: see [How to pay Ebda with InstaPay](/en/pay-ebda-with-instapay/).
 
 ## Turn it on
 
-You can do it in two places:
-
 - **During setup**, on the payment step: switch on **InstaPay** and enter your InstaPay address (for example `yourname@instapay`) or the Egyptian mobile number linked to your account. An account name is optional.
-- **Later**, in **Settings > Payments**, open the InstaPay card. There you can also change how long an order is held (default 48 hours) and add a note for customers in English and Arabic.
+- **Later**, in **Settings > Payments**, open the InstaPay card. There you can also change how long an order is held (default 48 hours) and add a note for shoppers in English and Arabic.
 
 InstaPay needs an address or a mobile number before it can be turned on. It is in Egyptian pounds only.
 
-## What your customer sees
+## What your shopper does
 
-At checkout the customer picks InstaPay. After placing the order they see your InstaPay address or number, the exact amount, the order number to quote in the transfer note, and the deadline. They can optionally type the transfer reference from their banking app, which you will see on the order.
+1. Picks InstaPay at checkout and places the order.
+2. Sees your InstaPay address or number, the exact amount, and the order number.
+3. Transfers the money and takes a screenshot of the receipt.
+4. Uploads the screenshot. The AI reads it and fills in the details.
+5. Checks the details and submits. They see "The store owner will review your transfer."
 
-## What you do
+## What you do: review the receipt
 
-1. The order appears as **Awaiting InstaPay**. Check your banking app for the amount.
-2. When the money is there, open the order and tap **Payment received** (in the dashboard or in the Orders app).
-3. The order is confirmed and can be shipped.
+1. Open the order. Orders waiting on InstaPay show **Awaiting InstaPay**.
+2. In the receipt panel, compare the screenshot with the submitted details and with your banking app.
+3. Look at the warnings (they are hints, not blocks):
+   - amount different from the order
+   - wrong or missing receiver
+   - date older than the order, too old, or in the future
+   - low confidence in the AI read
+   - looks edited
+   - same screenshot used before
+4. Tap **Payment received** to approve. The order is confirmed and can be shipped.
+5. Or reject with a reason (at least 3 characters). The shopper sees the reason and can upload again. The order waits 24 more hours.
+
+A transfer reference that was already used is refused automatically.
 
 ## The rules
 
-- An order waiting for confirmation is **not shipped** and is **not counted as paid revenue**.
-- If you do not confirm it before the deadline, the order **expires**: it is cancelled, the stock goes back on sale, and you and the customer are notified.
+- An order waiting for review is **not shipped** and **not counted as paid revenue**.
+- No proof sent: if you do not confirm before the deadline, the order **expires**: it is cancelled, stock goes back on sale, and you and the shopper are notified.
+- Shopper already sent proof: the order is **not** auto-cancelled after 48 hours. It waits for your review.
 - An order can be confirmed **only once**. Tapping twice is safe.
-- Only confirm after you have seen the money. Ebda cannot check it for you.
+- Only approve after you have seen the money in your banking app.
+
+## Refunds
+
+Ebda cannot send money back for you. Refund the shopper yourself by InstaPay, then record it on the order.
+
+1. Send the money back by InstaPay.
+2. Open the order and tap **Record InstaPay refund**.
+3. Enter the reference, date, recipient name exactly as shown, and the amount. A screenshot is optional.
+4. A full refund marks the order **refunded** and puts the stock back. A smaller amount marks it partially refunded.
+
+Only the store owner can record refunds. Staff cannot, even with other order permissions.
+
+## For your shoppers (FAQ)
+
+- **Who checks my transfer?** The store owner. In Arabic: «صاحب المتجر هيراجع التحويل».
+- **Can I fix a wrong receipt?** Yes. If it is rejected you see the reason and can upload again.
+- **When is my order confirmed?** When the store owner approves the transfer.
 
 See also [Orders and cash on delivery](/en/orders-and-cod/).

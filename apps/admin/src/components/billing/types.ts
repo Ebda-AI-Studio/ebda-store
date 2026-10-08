@@ -4,6 +4,8 @@
  * merchant billing page and the store-wide banner cannot drift.
  */
 
+import type { InstapayReceiptView } from '@force/shared';
+
 export type BillingInterval = 'monthly' | 'yearly';
 export type TrialPlanCode = 'basic' | 'growth' | 'business';
 
@@ -76,11 +78,13 @@ export interface PaymentClaim {
   amountMinor: number;
   method: string;
   paymentReference: string | null;
-  payerReference: string;
+  /** Legacy typed reference; claims made with a receipt carry it in `receipt.fields.reference`. */
+  payerReference?: string | null;
   status: 'pending' | 'confirmed' | 'rejected';
   reviewNote: string | null;
   createdAt: string;
   reviewedAt: string | null;
+  receipt?: InstapayReceiptView | null;
 }
 
 /** Minimal plan row needed to show a price card. */

@@ -650,6 +650,12 @@ export interface ManualPaymentInput {
   periodEnd?: Date | null;
   actorId: string;
   claimId?: string;
+  /**
+   * The ledger is append-only, so a VOIDED payment keeps its key. To record the same
+   * transfer reference for the right store, name the voided payment here: it must be a
+   * voided manual payment with exactly this reference; it can be replaced once.
+   */
+  replacesVoidedEventId?: string | null;
   now?: Date;
 }
 
@@ -689,7 +695,34 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
     throw new AppError(400, 'INVALID_PERIOD', 'The period must end after it starts');
   }
   const { plan } = await loadPayablePlan(input.planCode, input.interval);
-  const key = manualPaymentKey(input.method, reference);
+  let key = manualPaymentKey(input.method, reference);
+  if (input.replacesVoidedEventId) {
+    const vStore = await getEntityStoreId('billing_event', input.replacesVoidedEventId);
+    const voided = vStore
+      ? await withStore(vStore, async tx => {
+          const ev = await tx.billingEvent.findUnique({
+            where: { id: input.replacesVoidedEventId!, storeId: vStore },
+          });
+          const voidRow = await tx.billingEvent.findUnique({
+            where: {
+              idempotencyKey: `manual-void:${input.replacesVoidedEventId}`,
+              storeId: vStore,
+            },
+          });
+          return ev && voidRow && ev.type === 'manual_payment' && ev.status === 'refunded'
+            ? ev
+            : null;
+        })
+      : null;
+    if (!voided || voided.idempotencyKey !== key) {
+      throw new AppError(
+        409,
+        'NOT_A_VOIDED_PAYMENT',
+        'That payment was not voided, or it has a different reference'
+      );
+    }
+    key = `${key}:after-void:${voided.id}`;
+  }
   // The money received is the gross: carve Ebda's VAT (if ON) out of it for the ledger.
   const paidVat = ledgerVat(vatOfPaidAmount(input.amountMinor, await resolvePlatformVat()));
   // Runs from the super-admin route with no store scope: resolve the store through
@@ -838,7 +871,8 @@ export interface ManualRefundInput {
   /**
    * refund = money went back to the payer outside Ebda (a refund transfer exists);
    * void = the payment was recorded in error (wrong store, never arrived): the
-   * whole amount is reversed and its transfer reference is freed for re-recording.
+   * whole amount is reversed, the merchant's receipt/claim reference is freed, and the
+   * same reference can be recorded for the right store with `replacesVoidedEventId`.
    */
   kind: 'refund' | 'void';
   /** refund: the refund transfer's reference (idempotency key). void: optional. */
@@ -905,7 +939,12 @@ export async function recordManualRefund(input: ManualRefundInput) {
           'This refund reference was already recorded'
         );
       }
-      return { duplicate: true, refundEventId: existing.id, periodEnd: null as Date | null };
+      return {
+        duplicate: true,
+        refundEventId: existing.id,
+        periodEnd: null as Date | null,
+        voidedEventId: null as string | null,
+      };
     }
     const charge = await tx.billingEvent.findUnique({ where: { id: input.eventId, storeId } });
     if (!charge || charge.type !== 'manual_payment') {
@@ -1004,9 +1043,6 @@ export async function recordManualRefund(input: ManualRefundInput) {
         data: {
           status: 'refunded',
           // A void frees the transfer reference so it can be recorded for the right store.
-          ...(input.kind === 'void'
-            ? { idempotencyKey: `voided:${charge.id}:${charge.idempotencyKey}`.slice(0, 250) }
-            : {}),
         },
       });
     }
@@ -1025,10 +1061,15 @@ export async function recordManualRefund(input: ManualRefundInput) {
         await InstapayReceiptService.voidByClaim(storeId, c.id, note, input.actorId);
       }
     }
-    return { duplicate: false, refundEventId: refundId, periodEnd };
+    return {
+      duplicate: false,
+      refundEventId: refundId,
+      periodEnd,
+      voidedEventId: input.kind === 'void' ? charge.id : null,
+    };
   }).catch(async err => {
     if (screenshotKey) {
-        await StorageService.deletePrivate(screenshotKey).catch(() => undefined);
+      await StorageService.deletePrivate(screenshotKey).catch(() => undefined);
     }
     throw err;
   });

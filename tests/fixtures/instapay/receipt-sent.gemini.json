@@ -1,0 +1,22 @@
+{
+  "recordedAt": "2026-10-08T10:15:21.652Z",
+  "model": "gemini-flash-lite-latest",
+  "image": "receipt-sent.png",
+  "response": {
+    "amount": 1234.5,
+    "reference": "482193377105",
+    "date": "2026-10-05",
+    "time": "15:15",
+    "payerName": "SYNTH TEST PAYER",
+    "payerAddress": "synthpayer@instapay",
+    "payerMobile": null,
+    "payerBank": "CIB",
+    "receiverName": "DEMO STORE LLC",
+    "receiverAddress": "demostore@instapay",
+    "receiverMobile": null,
+    "note": "Order SYN-1001",
+    "direction": "sent",
+    "looksEdited": false,
+    "confidence": 1
+  }
+}

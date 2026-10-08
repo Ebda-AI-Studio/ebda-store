@@ -498,15 +498,20 @@ export class InstapayService {
           );
         const order = await prisma.order.findFirst({
           where: { id: orderId, storeId },
-          select: { orderNumber: true, total: true },
+          select: { orderNumber: true, total: true, shippingAddress: true },
         });
         if (order) {
+          // The shopper's name (audit X4), not the payment method.
+          const addr = metaOf(order.shippingAddress);
+          const shopper = [addr.firstName, addr.lastName]
+            .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+            .join(' ');
           try {
             socketService.newOrderNotification(storeId, {
               orderId,
               orderNumber: order.orderNumber,
               total: order.total,
-              customerName: 'InstaPay',
+              customerName: shopper || order.orderNumber,
             });
           } catch (err) {
             logger.warn({ err, orderId }, '[INSTAPAY] socket emit failed');

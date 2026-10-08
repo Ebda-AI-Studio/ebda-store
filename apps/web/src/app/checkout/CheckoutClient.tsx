@@ -13,6 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
 import { CheckoutErrorAlert } from './CheckoutErrorAlert';
+import { subscriptionRequiredCopy } from './_lib/checkoutErrors';
 import { checkoutBundleErrorCopy } from '../../lib/checkout-bundle-errors';
 import {
   PRODUCT_NO_LONGER_AVAILABLE,
@@ -1488,6 +1489,14 @@ export default function CheckoutClient() {
       const bundleFriendly = checkoutBundleErrorCopy(code, raw, t);
       if (bundleFriendly) {
         setCheckoutError(bundleFriendly);
+        setIsProcessing(false);
+        return;
+      }
+
+      // The store's subscription ended (402): a shopper-facing message, not the merchant-directed one.
+      const subscriptionFriendly = subscriptionRequiredCopy(code, t);
+      if (subscriptionFriendly) {
+        setCheckoutError(subscriptionFriendly);
         setIsProcessing(false);
         return;
       }

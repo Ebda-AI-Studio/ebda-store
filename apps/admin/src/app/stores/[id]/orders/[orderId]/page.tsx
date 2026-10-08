@@ -20,6 +20,7 @@ import { CustomerCard } from './_components/CustomerCard';
 import { NotesCard } from './_components/NotesCard';
 import { ShipmentCard } from './_components/ShipmentCard';
 import { ActionFooter } from './_components/ActionFooter';
+import { OrderInstapayPanel } from './_components/OrderInstapayPanel';
 import { OrderLifecycleTimeline } from '../../../../../components/order-timeline/OrderLifecycleTimeline';
 import type { OrderDetail } from './_components/types';
 import { manualRefundDescriptionKey } from '../_components/manualRefundCopy';
@@ -261,6 +262,14 @@ export default function OrderDetailPage() {
                 <DeliveryCard order={order} locale={locale} />
                 <ShipmentCard storeId={storeId} orderId={orderId} onChanged={fetchOrder} />
                 <PaymentCard order={order} userRole={user?.role} />
+                <OrderInstapayPanel
+                  order={order}
+                  storeId={storeId}
+                  userRole={user?.role}
+                  isUpdating={isUpdating}
+                  onApprove={() => setConfirmInstapayOpen(true)}
+                  onChanged={fetchOrder}
+                />
                 <CustomerCard order={order} />
                 <NotesCard order={order} />
               </div>
@@ -282,6 +291,7 @@ export default function OrderDetailPage() {
               onConfirmInstapay={() => setConfirmInstapayOpen(true)}
               onPrintInvoice={openInvoice}
               onPaymentRefreshed={fetchOrder}
+              userRole={user?.role}
             />
           </>
         )}

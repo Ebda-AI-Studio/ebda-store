@@ -7,6 +7,7 @@ import { statusOptionsFor } from '../../_components/types';
 import { PaymentLinkButton } from './PaymentLinkButton';
 import { RefreshPaymentButton } from './RefreshPaymentButton';
 import { RefundButton } from './RefundButton';
+import { InstapayRefundButton } from './InstapayRefundButton';
 import { RefreshRefundStatusButton } from './RefreshRefundStatusButton';
 import type { OrderDetail } from './types';
 
@@ -20,6 +21,8 @@ interface ActionFooterProps {
   onConfirmInstapay?: () => void;
   onPrintInvoice: () => void;
   onPaymentRefreshed?: () => void;
+  /** Viewer role: staff lack orders:refund; Ebda's super-admin has no say on a store's InstaPay. */
+  userRole?: 'super_admin' | 'store_admin' | 'customer' | 'staff';
 }
 
 export function ActionFooter({
@@ -31,6 +34,7 @@ export function ActionFooter({
   onConfirmInstapay,
   onPrintInvoice,
   onPaymentRefreshed,
+  userRole,
 }: ActionFooterProps) {
   const t = useT('orders.detail.actions');
   const tStatus = useT('orders.status');
@@ -80,6 +84,18 @@ export function ActionFooter({
     showRefundViaProvider,
     showRefreshRefundStatus,
   } = orderActionVisibility(order);
+  // Refunds need orders:refund, which staff do not have (the API answers 403).
+  const canRefund = userRole !== 'staff';
+  // InstaPay refund RECORD: the store owner only, for a paid InstaPay payment.
+  const instapayPayment = (order.payments ?? []).find(
+    p =>
+      p.provider === 'instapay' && (p.status === 'completed' || p.status === 'partially_refunded')
+  );
+  const showInstapayRefund =
+    userRole === 'store_admin' && !!instapayPayment && order.status !== 'refunded';
+  const instapayRemaining = instapayPayment
+    ? Math.max(0, instapayPayment.amount - (instapayPayment.refundedAmount ?? 0))
+    : 0;
 
   return (
     // Lifted above the fixed MobileBottomNav (h-14 = 56px) on mobile so the
@@ -92,7 +108,7 @@ export function ActionFooter({
     >
       <div className="flex flex-wrap items-center gap-2">
         {/* InstaPay: the one primary action. Idempotent on the server, so a second tap is safe. */}
-        {showConfirmInstapay && onConfirmInstapay && (
+        {showConfirmInstapay && onConfirmInstapay && userRole !== 'super_admin' && (
           <button
             type="button"
             onClick={onConfirmInstapay}
@@ -170,7 +186,17 @@ export function ActionFooter({
             customer's card. Distinct from the "Refunded" status menu
             entry, which is only DB bookkeeping for already-refunded
             COD / bank-transfer cases. */}
-        {showRefundViaProvider && (
+        {showInstapayRefund && instapayRemaining > 0 && (
+          <InstapayRefundButton
+            storeId={storeId}
+            orderId={order.id}
+            orderNumber={order.orderNumber}
+            remainingMinor={instapayRemaining}
+            disabled={isUpdating}
+            onRecorded={onPaymentRefreshed}
+          />
+        )}
+        {showRefundViaProvider && canRefund && (
           <RefundButton
             storeId={storeId}
             orderId={order.id}

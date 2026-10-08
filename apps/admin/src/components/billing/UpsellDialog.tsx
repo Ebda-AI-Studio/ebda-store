@@ -12,11 +12,14 @@ import type { UpsellEventDetail } from '../../lib/api';
  */
 const HANDLED_INLINE = new Set(['PAYMENT_METHOD_REQUIRED', 'TRIAL_EXPIRED', 'NO_SUBSCRIPTION']);
 
-/** Where "Upgrade" goes: this store's billing page, read from the current /stores/<id>/... path. */
+/**
+ * Where "Upgrade" goes: this store's billing page plan picker (`#plans`), read from the
+ * current /stores/<id>/... path. The picker works for card and InstaPay merchants alike.
+ */
 export function billingHref(pathname: string, planCode: string | null): string {
   const m = /^\/stores\/([^/]+)/.exec(pathname);
   if (!m) return '/stores';
-  return `/stores/${m[1]}/billing${planCode ? `?plan=${encodeURIComponent(planCode)}` : ''}`;
+  return `/stores/${m[1]}/billing${planCode ? `?plan=${encodeURIComponent(planCode)}` : ''}#plans`;
 }
 
 /**

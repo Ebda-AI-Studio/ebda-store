@@ -518,6 +518,7 @@ router.post(
           periodStart: z.coerce.date().optional().nullable(),
           periodEnd: z.coerce.date().optional().nullable(),
           claimId: z.string().uuid().optional(),
+          replacesVoidedEventId: z.string().uuid().optional().nullable(),
         })
         .strict()
         .parse(req.body);

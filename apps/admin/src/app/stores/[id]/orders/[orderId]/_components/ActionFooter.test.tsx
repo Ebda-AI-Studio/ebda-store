@@ -53,6 +53,10 @@ vi.mock('./RefreshRefundStatusButton', () => ({
   ),
 }));
 
+vi.mock('./InstapayRefundButton', () => ({
+  InstapayRefundButton: () => <button data-testid="instapay-refund-button">record-refund</button>,
+}));
+
 import { ActionFooter } from './ActionFooter';
 
 afterEach(() => {
@@ -97,9 +101,14 @@ function baseOrder(
   };
 }
 
-function renderFooter(order: OrderDetail, onStatusChange: (s: string) => void = () => {}) {
+function renderFooter(
+  order: OrderDetail,
+  onStatusChange: (s: string) => void = () => {},
+  userRole?: 'super_admin' | 'store_admin' | 'customer' | 'staff'
+) {
   return render(
     <ActionFooter
+      userRole={userRole}
       order={order}
       storeId="store-1"
       isUpdating={false}
@@ -294,5 +303,36 @@ describe('ActionFooter — InstaPay awaiting confirmation', () => {
     );
     expect(screen.queryByTestId('confirm-instapay')).toBeNull();
     expect(screen.queryByTestId('refund-button')).toBeNull();
+  });
+});
+
+describe('ActionFooter: refunds are owner-only', () => {
+  const paidInstapay = baseOrder({
+    status: 'confirmed',
+    paymentStatus: 'paid',
+    payments: [payment({ provider: 'instapay', status: 'completed', amount: 12000 })],
+  });
+  const paidCard = baseOrder({
+    status: 'confirmed',
+    paymentStatus: 'paid',
+    payments: [payment({ provider: 'paymob', status: 'completed', transactionId: 't1' })],
+  });
+
+  it('the owner sees "Record refund" on a paid InstaPay order', () => {
+    renderFooter(paidInstapay, () => {}, 'store_admin');
+    expect(screen.getByTestId('instapay-refund-button')).toBeTruthy();
+  });
+
+  it('staff see neither the InstaPay record-refund nor the provider refund button', () => {
+    renderFooter(paidInstapay, () => {}, 'staff');
+    expect(screen.queryByTestId('instapay-refund-button')).toBeNull();
+    cleanup();
+    renderFooter(paidCard, () => {}, 'staff');
+    expect(screen.queryByTestId('refund-button')).toBeNull();
+  });
+
+  it('Ebda super-admin gets no InstaPay refund record', () => {
+    renderFooter(paidInstapay, () => {}, 'super_admin');
+    expect(screen.queryByTestId('instapay-refund-button')).toBeNull();
   });
 });
