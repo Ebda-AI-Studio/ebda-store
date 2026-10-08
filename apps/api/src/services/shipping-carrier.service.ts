@@ -888,6 +888,12 @@ class ShippingCarrierService {
     });
     if (!order) return;
     if (order.status === 'cancelled' || order.status === 'refunded') return;
+    if (order.status === 'delivered') {
+      // Delivered then returned is a customer return, not a return to origin:
+      // the returns flow owns it (refund, restock per line).
+      logger.warn({ storeId, orderId }, '[RTO] shipment returned after delivery — left to returns');
+      return;
+    }
     // The merchant's choice on the manual flow; a carrier-reported return puts
     // the goods back (they physically came back to the merchant).
     const restoreInventory = restock ?? true;
@@ -896,12 +902,6 @@ class ShippingCarrierService {
       if (p.provider === 'cod' && p.status === 'cod_pending') {
         await prisma.payment.update({ where: { id: p.id }, data: { status: 'cancelled' } });
       }
-    }
-    if (order.status === 'delivered') {
-      // Delivered then returned is a customer return, not a return to origin:
-      // the returns flow owns it (refund, restock per line).
-      logger.warn({ storeId, orderId }, '[RTO] shipment returned after delivery — left to returns');
-      return;
     }
     await setOrderStatusGuarded(prisma, storeId, orderId, 'cancelled', { restoreInventory });
   }
