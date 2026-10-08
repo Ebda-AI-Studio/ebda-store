@@ -366,20 +366,6 @@ export default function LoginPage() {
           <div className="relative flex h-full flex-col items-center justify-center px-12 text-white">
             <h1 className="text-4xl font-bold">{t('brandTitle')}</h1>
             <p className="mt-4 text-lg text-white/85 text-center max-w-md">{t('brandSubtitle')}</p>
-            <div className="mt-12 grid grid-cols-3 gap-8 text-center">
-              <div>
-                <p className="text-3xl font-bold">100+</p>
-                <p className="text-sm text-white/70">{t('statActiveStores')}</p>
-              </div>
-              <div>
-                <p className="text-3xl font-bold">10K+</p>
-                <p className="text-sm text-white/70">{t('statProducts')}</p>
-              </div>
-              <div>
-                <p className="text-3xl font-bold">50K+</p>
-                <p className="text-sm text-white/70">{t('statOrders')}</p>
-              </div>
-            </div>
           </div>
         </div>
       </div>
