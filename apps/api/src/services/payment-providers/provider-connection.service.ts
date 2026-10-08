@@ -66,17 +66,13 @@ export function connectableEntry(provider: string): ProviderCatalogEntry {
 }
 
 /**
- * PROVIDERS-2 for writes: a merchant cannot connect a "coming soon" provider; a super admin may
- * save and TEST its credentials (that is how it gets verified), but nobody can enable it.
+ * PROVIDERS-2 as relaxed by PROVIDERS-ACTIVATION, for SAVE and TEST only: every provider in the
+ * catalog accepts a merchant's own credentials and a Test connection, verified or not (Ebda tests
+ * the same connection before it activates the provider for the store). ENABLING is still gated by
+ * `assertEnableAllowed`. An unknown provider is refused by `connectableEntry`.
  */
-export function assertMayConfigure(provider: string, role: string): void {
-  if (isProviderUsable(provider)) return;
-  if (role === 'super_admin') return;
-  throw new AppError(
-    403,
-    'PROVIDER_NOT_AVAILABLE',
-    `${provider} is coming soon: it has not been verified against its sandbox yet`
-  );
+export function assertMayConfigure(provider: string, _role: string): void {
+  connectableEntry(provider);
 }
 
 export interface CredentialUpdate {
@@ -209,17 +205,20 @@ export function connectionTestLooksCurrent(row: ConnectableRow): boolean {
  * The enable gate, for EVERY write path that can leave a non-manual provider enabled (create,
  * update, toggle, mode switch). Manual providers (COD, InstaPay) are not gated here.
  */
-export function assertEnableAllowed(row: ConnectableRow): void {
+export function assertEnableAllowed(
+  row: ConnectableRow,
+  opts: { storeActivated?: boolean } = {}
+): void {
   const entry = getProviderEntry(row.provider);
   if (!entry || entry.kind !== 'payments') {
     throw new AppError(422, 'UNKNOWN_PROVIDER', `Unknown payment provider "${row.provider}"`);
   }
   if (entry.manual) return;
-  if (!isProviderUsable(row.provider)) {
+  if (!isProviderUsable(row.provider) && !opts.storeActivated) {
     throw new AppError(
       409,
       'PROVIDER_NOT_VERIFIED',
-      `${row.provider} is coming soon and cannot be enabled yet`
+      `${row.provider} is not activated for this store yet: request activation first`
     );
   }
   if (!connectionTestIsCurrent(row)) {

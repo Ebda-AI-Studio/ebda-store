@@ -7,7 +7,8 @@
  *   - credentials are write-only: no response, and no column but the ciphertext, ever holds them;
  *   - enabling needs a successful Test connection of EXACTLY the stored credentials, and any edit
  *     of the active mode, or a mode switch, takes that away;
- *   - a "coming soon" (unverified) provider cannot be connected by a merchant or enabled by anyone;
+ *   - an unverified provider can be saved and tested by a merchant but enabled by nobody until Ebda
+ *     activates it for the store (PROVIDERS-2 as relaxed by PROVIDERS-ACTIVATION);
  *   - the audit log names the changed fields, never their values.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
@@ -322,7 +323,7 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
     expect(all).not.toContain(API_KEY);
   });
 
-  it('PROVIDERS-2: an unverified provider is "coming soon" for merchants and never enable-able', async () => {
+  it('PROVIDERS-2 (relaxed): an unverified provider can be saved and tested by the merchant but never enabled', async () => {
     const s = await mkStore('soon');
     // Seed a fully tested row while the stub-suite seam is on...
     await saveSandbox(s, {
@@ -338,8 +339,10 @@ describe.skipIf(!hasDb)('connect a provider: credentials, Test connection, enabl
     try {
       await asUnverifiedKashier(async () => {
         const save = await saveSandbox(s, { secretKey: 'another-secret-value-123456' });
-        expect(save.status).toBe(403);
-        expect(save.body.error.code).toBe('PROVIDER_NOT_AVAILABLE');
+        expect(save.status).toBe(200);
+        // the edit voided the test; re-save the good key and test again: save + test both work
+        expect((await saveSandbox(s, { secretKey: SECRET_KEY })).status).toBe(200);
+        expect((await post(s, `${base(s)}/test`)).body.data.test.ok).toBe(true);
         const on = await post(s, `${base(s)}/toggle`, { enabled: true });
         expect(on.status).toBe(409);
         expect(on.body.error.code).toBe('PROVIDER_NOT_VERIFIED');

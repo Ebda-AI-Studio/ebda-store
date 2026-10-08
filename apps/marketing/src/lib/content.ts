@@ -73,6 +73,7 @@ export interface Copy {
     pay: Provider[];
     shipLabel: string;
     ship: Provider[];
+    activation: string;
     ask: string;
     askLink: string;
   };
@@ -213,6 +214,7 @@ export const COPY: Record<Locale, Copy> = {
         { name: 'Aramex', logo: 'aramex' },
         { name: 'توصيل بنفسك', icon: 'truck' },
       ],
+      activation: 'تفعيل أي خدمة بياخد حوالي 5 ساعات.',
       ask: 'محتاج شركة تانية؟',
       askLink: 'قولّنا',
     },
@@ -414,6 +416,7 @@ export const COPY: Record<Locale, Copy> = {
         { name: 'Aramex', logo: 'aramex' },
         { name: 'Your own delivery', icon: 'truck' },
       ],
+      activation: 'Activation takes about 5 hours per service.',
       ask: 'Need another provider?',
       askLink: 'Tell us',
     },

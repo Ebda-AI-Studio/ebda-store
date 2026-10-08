@@ -3088,11 +3088,8 @@
         "status": {
           "enabled": "Enabled",
           "connected": "Connected",
-          "notConnected": "Not connected",
-          "comingSoon": "Coming soon"
+          "notConnected": "Not connected"
         },
-        "comingSoonLine": "Coming soon: we are still testing this carrier against the company's test account. It will appear here for you to connect as soon as it is ready.",
-        "superAdminNote": "Not verified yet (coming soon for merchants). As a super admin you can save credentials and test the connection, but it cannot be enabled until it is verified.",
         "modes": {
           "label": "Credentials mode",
           "sandbox": "Sandbox",
@@ -3144,9 +3141,9 @@
         },
         "enable": {
           "label": "Ship orders with this carrier",
-          "notVerified": "Cannot be enabled yet: this carrier is not verified.",
           "saveFirst": "Save the credentials first.",
-          "testFirst": "Run Test connection successfully on the saved credentials first."
+          "testFirst": "Run Test connection successfully on the saved credentials first.",
+          "notActivated": "Request activation first. You can enable it once we activate it."
         },
         "capabilities": {
           "cod": "Cash on delivery",
@@ -4916,11 +4913,8 @@
       "status": {
         "enabled": "Enabled",
         "connected": "Connected",
-        "notConnected": "Not connected",
-        "comingSoon": "Coming soon"
+        "notConnected": "Not connected"
       },
-      "comingSoonLine": "Coming soon: we are still testing this provider against the company's test account. It will appear here for you to connect as soon as it is ready.",
-      "superAdminNote": "Not verified yet (coming soon for merchants). As a super admin you can save credentials and test the connection, but it cannot be enabled until it is verified.",
       "modes": {
         "label": "Credentials mode",
         "sandbox": "Sandbox",
@@ -4968,9 +4962,9 @@
       },
       "enable": {
         "label": "Accept payments with this provider",
-        "notVerified": "Cannot be enabled yet: this provider is not verified.",
         "saveFirst": "Save the credentials first.",
-        "testFirst": "Run Test connection successfully on the saved credentials first."
+        "testFirst": "Run Test connection successfully on the saved credentials first.",
+        "notActivated": "Request activation first. You can enable it once we activate it."
       },
       "webhook": {
         "label": "Webhook URL",
@@ -5944,7 +5938,8 @@
       "navPlatformPlans": "Plans (platform)",
       "navPlatformBillingEvents": "Billing ledger (platform)",
       "navPlatformTaxVerification": "VAT verification (platform)",
-      "navPlatformSettings": "Platform settings"
+      "navPlatformSettings": "Platform settings",
+      "navPlatformProviderActivation": "Activation requests (platform)"
     },
     "errorState": {
       "defaultTitle": "Something went wrong",
@@ -9786,6 +9781,66 @@
         "duplicate": "This refund reference was already recorded. Nothing changed.",
         "failed": "We could not record this refund."
       }
+    }
+  },
+  "providerActivation": {
+    "request": "Request activation",
+    "requestAgain": "Request again",
+    "requesting": "Sending…",
+    "hint": "Save your credentials first. We activate within about {hours} hours.",
+    "requestedLine": "We'll activate it within about {hours} hours",
+    "requestedAt": "Requested: {time}",
+    "rejectedTitle": "Activation was declined. Note from the team:",
+    "credentialsRequired": "Save your credentials first",
+    "failed": "Couldn't send the request. Try again.",
+    "activatedChip": "Activated for your store"
+  },
+  "activationRequests": {
+    "title": "Activation requests",
+    "subtitle": "Merchants' requests to activate a provider for their store. Run the test, then activate or reject.",
+    "loading": "Loading…",
+    "loadFailed": "Could not load the requests.",
+    "empty": "No requests in this view.",
+    "status": {
+      "requested": "Pending",
+      "activated": "Activated",
+      "rejected": "Rejected"
+    },
+    "kind": {
+      "payments": "Payments",
+      "shipping": "Shipping"
+    },
+    "columns": {
+      "store": "Store",
+      "provider": "Provider",
+      "kind": "Kind",
+      "requested": "Requested",
+      "status": "Status",
+      "lastTest": "Last test",
+      "actions": "Actions"
+    },
+    "test": {
+      "ok": "Passed",
+      "failed": "Failed",
+      "stale": "Stale: credentials changed since",
+      "never": "Not tested yet"
+    },
+    "actions": {
+      "runTest": "Run test",
+      "activate": "Activate for this store",
+      "reject": "Reject with note",
+      "activated": "Activated. The merchant can enable it now.",
+      "rejected": "Rejected. The merchant was emailed.",
+      "notTested": "Run a passing test on the current credentials first.",
+      "failed": "Failed: {message}"
+    },
+    "rejectDialog": {
+      "title": "Reject {provider} for {store}",
+      "noteLabel": "Note for the merchant",
+      "emailNote": "The merchant gets this note by email.",
+      "noteRequired": "Enter a note of at least 3 characters.",
+      "cancel": "Cancel",
+      "working": "Working…"
     }
   }
 }

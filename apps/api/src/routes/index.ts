@@ -22,6 +22,9 @@ import uploadRoutes from './upload.routes';
 import adminRoutes from './admin.routes';
 import adminAnswerEngineRoutes from './admin-answer-engine.routes';
 import platformTaxRoutes from './platform-tax.routes';
+import providerActivationRoutes, {
+  adminProviderActivationRoutes,
+} from './provider-activation.routes';
 import couponRoutes from './coupon.routes';
 import shippingRoutes from './shipping.routes';
 import taxRoutes from './tax.routes';
@@ -133,6 +136,9 @@ router.use('/payments', paymentRoutes);
 // Payment settings (super admin)
 router.use('/payment-settings', paymentSettingsRoutes);
 
+// Merchant: ask Ebda to activate a provider that is not verified yet (PROVIDERS-ACTIVATION)
+router.use('/provider-activation', providerActivationRoutes);
+
 // Upload routes
 router.use('/uploads', uploadRoutes);
 
@@ -157,6 +163,10 @@ router.use('/admin', tenantContext, adminAnswerEngineRoutes);
 // Mounted BEFORE adminRoutes for reachability past its catch-all MFA gate; it
 // carries its own authenticate → requireMfaEnrolled → authorize('super_admin').
 router.use('/admin', platformTaxRoutes);
+
+// Provider activation queue (PROVIDERS-ACTIVATION). Same reachability rule as the tax routes: before
+// adminRoutes' catch-all MFA gate; it carries its own authenticate → MFA → super_admin chain.
+router.use('/admin', adminProviderActivationRoutes);
 
 // Admin routes (super_admin only).
 //

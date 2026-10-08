@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import {
+  isActivationRequestable,
   isMaskedSecret,
   validateCredentialValue,
   type CredentialFieldDef,
@@ -12,6 +13,11 @@ import {
 import { useT } from '@/i18n/useT';
 import { Alert } from '../../../../../components/Alert';
 import { apiPost, apiPut } from '../../../../../lib/api';
+import type { ActivationRequest } from '../../../../../lib/provider-activation';
+import {
+  ActivatedChip,
+  ProviderActivationPanel,
+} from '../../../../../components/ProviderActivationPanel';
 
 /** One saved-credential hint: secrets only say they are set (+ last 4), non-secrets echo the value. */
 type CredentialHint = { set: true; last4?: string; value?: string };
@@ -49,7 +55,8 @@ interface Props {
   entry: ProviderCatalogEntry;
   config: GatewayConfig | undefined;
   storeId: string;
-  isSuperAdmin: boolean;
+  /** This provider's activation request for the store (unverified providers only). */
+  activation?: ActivationRequest;
   /** Refetch the store's configs after any write. */
   onChanged: () => Promise<void> | void;
 }
@@ -76,7 +83,7 @@ const asStringList = (v: unknown, fallback: string[]): string[] =>
     ? (v as string[])
     : fallback;
 
-export function GatewayConnectCard({ entry, config, storeId, isSuperAdmin, onChanged }: Props) {
+export function GatewayConnectCard({ entry, config, storeId, activation, onChanged }: Props) {
   const t = useT('paymentSettings.connect');
   const locale: 'ar' | 'en' = useLocale() === 'ar' ? 'ar' : 'en';
   const base = `/api/v1/payment-settings/store/${storeId}/${entry.code}`;
@@ -113,33 +120,27 @@ export function GatewayConnectCard({ entry, config, storeId, isSuperAdmin, onCha
     entry.fields.every(f => !f.required || hintFor(m, f.key) !== null);
   const activeReady = Boolean(config) && requiredSavedFor(activeMode);
 
-  const hardGated = !entry.verified && !isSuperAdmin;
+  // An unverified provider is usable only once Ebda activated it for this store.
+  const requestable = isActivationRequestable(entry);
+  const activated = requestable && activation?.status === 'activated';
+  const usable = !requestable || activated;
   const connected = Boolean(config?.connectionTestCurrent && config?.connectionTest?.ok);
-  const canEnable =
-    Boolean(config?.connectionTestCurrent && config?.connectionTest?.ok) && entry.verified;
-  const enableBlockedReason = !entry.verified
-    ? t('enable.notVerified')
+  const canEnable = connected && usable;
+  const enableBlockedReason = !usable
+    ? t('enable.notActivated')
     : !config
       ? t('enable.saveFirst')
       : !config.connectionTestCurrent || !config.connectionTest?.ok
         ? t('enable.testFirst')
         : null;
 
-  const statusKey = !entry.verified
-    ? 'comingSoon'
-    : config?.isEnabled
-      ? 'enabled'
-      : connected
-        ? 'connected'
-        : 'notConnected';
+  const statusKey = config?.isEnabled ? 'enabled' : connected ? 'connected' : 'notConnected';
   const statusTone =
     statusKey === 'enabled'
       ? 'bg-success/10 text-success-ink'
       : statusKey === 'connected'
         ? 'bg-info/10 text-info-ink'
-        : statusKey === 'comingSoon'
-          ? 'bg-warning/10 text-warning-ink'
-          : 'bg-muted text-muted-foreground';
+        : 'bg-muted text-muted-foreground';
 
   function localizedReason(field: CredentialFieldDef, reason: string): string {
     const k = VALIDATION_REASONS[reason];
@@ -219,7 +220,7 @@ export function GatewayConnectCard({ entry, config, storeId, isSuperAdmin, onCha
         apiErr.code === 'CONNECTION_NOT_TESTED'
           ? t('enable.testFirst')
           : apiErr.code === 'PROVIDER_NOT_VERIFIED'
-            ? t('enable.notVerified')
+            ? t('enable.notActivated')
             : apiErr.message || t('messages.failed');
       setNotice({ type: 'error', text });
       return;
@@ -262,6 +263,7 @@ export function GatewayConnectCard({ entry, config, storeId, isSuperAdmin, onCha
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusTone}`}>
               {t(`status.${statusKey}`)}
             </span>
+            {activated && <ActivatedChip />}
             {config?.isEnabled && <HealthChip config={config} />}
           </div>
           <div className="mt-1 flex flex-wrap gap-1">
@@ -275,28 +277,29 @@ export function GatewayConnectCard({ entry, config, storeId, isSuperAdmin, onCha
             ))}
           </div>
         </div>
-        {!hardGated && (
-          <button
-            type="button"
-            onClick={() => setOpen(o => !o)}
-            aria-expanded={open}
-            className={btnOutline}
-          >
-            {t('configure')}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+          className={btnOutline}
+        >
+          {t('configure')}
+        </button>
       </div>
 
-      {hardGated && (
-        <p className="border-t bg-muted px-4 py-3 text-sm text-muted-foreground">
-          {t('comingSoonLine')}
-        </p>
+      {requestable && !activated && (
+        <div className="border-t px-4 py-3">
+          <ProviderActivationPanel
+            provider={entry.code}
+            storeId={storeId}
+            activation={activation}
+            onChanged={onChanged}
+          />
+        </div>
       )}
 
-      {!hardGated && open && (
+      {open && (
         <div className="space-y-4 border-t bg-muted p-4">
-          {!entry.verified && <Alert compact variant="warning" description={t('superAdminNote')} />}
-
           {/* mode switch */}
           <div>
             <div role="tablist" aria-label={t('modes.label')} className="flex gap-2">

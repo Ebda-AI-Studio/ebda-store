@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import {
+  isActivationRequestable,
   isMaskedSecret,
   validateCredentialValue,
   type CredentialFieldDef,
@@ -12,6 +13,11 @@ import {
 import { useT } from '@/i18n/useT';
 import { Alert } from '../../../../../components/Alert';
 import { apiPost, apiPut } from '../../../../../lib/api';
+import type { ActivationRequest } from '../../../../../lib/provider-activation';
+import {
+  ActivatedChip,
+  ProviderActivationPanel,
+} from '../../../../../components/ProviderActivationPanel';
 import { PickupAddressForm, type PickupAddress } from './PickupAddressForm';
 import {
   pickupFromSettings,
@@ -36,7 +42,8 @@ interface Props {
   entry: ProviderCatalogEntry;
   config: CarrierConfigRow | undefined;
   storeId: string;
-  isSuperAdmin: boolean;
+  /** This provider's activation request for the store (unverified providers only). */
+  activation?: ActivationRequest;
   /** Refetch the store's configs after any write. */
   onChanged: () => Promise<void> | void;
 }
@@ -65,7 +72,7 @@ const SHIPBLU_SIZES = ['1', '2', '3', '4'];
  * Mylerz, Aramex): credential fields per mode (write-only secrets), Test connection, the enable
  * gate, and the carrier's non-secret settings (pickup address, weight, size, Aramex product).
  */
-export function CarrierConnectCard({ entry, config, storeId, isSuperAdmin, onChanged }: Props) {
+export function CarrierConnectCard({ entry, config, storeId, activation, onChanged }: Props) {
   const t = useT('shipping.carriers.connect');
   const locale: 'ar' | 'en' = useLocale() === 'ar' ? 'ar' : 'en';
   const base = `/api/v1/stores/${storeId}/shipping-carriers`;
@@ -103,32 +110,27 @@ export function CarrierConnectCard({ entry, config, storeId, isSuperAdmin, onCha
     entry.fields.every(f => !f.required || hintFor(m, f.key) !== null);
   const activeReady = Boolean(config) && requiredSavedFor(activeMode);
 
-  const hardGated = !entry.verified && !isSuperAdmin;
+  // An unverified provider is usable only once Ebda activated it for this store.
+  const requestable = isActivationRequestable(entry);
+  const activated = requestable && activation?.status === 'activated';
+  const usable = !requestable || activated;
   const connected = Boolean(config?.connectionTestCurrent && config?.connectionTest?.ok);
-  const canEnable = connected && entry.verified;
-  const enableBlockedReason = !entry.verified
-    ? t('enable.notVerified')
+  const canEnable = connected && usable;
+  const enableBlockedReason = !usable
+    ? t('enable.notActivated')
     : !config
       ? t('enable.saveFirst')
       : !connected
         ? t('enable.testFirst')
         : null;
 
-  const statusKey = !entry.verified
-    ? 'comingSoon'
-    : config?.enabled
-      ? 'enabled'
-      : connected
-        ? 'connected'
-        : 'notConnected';
+  const statusKey = config?.enabled ? 'enabled' : connected ? 'connected' : 'notConnected';
   const statusTone =
     statusKey === 'enabled'
       ? 'bg-success/10 text-success-ink'
       : statusKey === 'connected'
         ? 'bg-info/10 text-info-ink'
-        : statusKey === 'comingSoon'
-          ? 'bg-warning/10 text-warning-ink'
-          : 'bg-muted text-muted-foreground';
+        : 'bg-muted text-muted-foreground';
 
   function localizedReason(field: CredentialFieldDef, reason: string): string {
     const k = VALIDATION_REASONS[reason];
@@ -211,7 +213,7 @@ export function CarrierConnectCard({ entry, config, storeId, isSuperAdmin, onCha
         apiErr.code === 'CONNECTION_NOT_TESTED'
           ? t('enable.testFirst')
           : apiErr.code === 'PROVIDER_NOT_VERIFIED'
-            ? t('enable.notVerified')
+            ? t('enable.notActivated')
             : apiErr.message || t('messages.failed');
       setNotice({ type: 'error', text });
       return;
@@ -271,6 +273,7 @@ export function CarrierConnectCard({ entry, config, storeId, isSuperAdmin, onCha
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusTone}`}>
               {t(`status.${statusKey}`)}
             </span>
+            {activated && <ActivatedChip />}
             {config?.isDefault && (
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary-ink">
                 {t('default.badge')}
@@ -288,28 +291,29 @@ export function CarrierConnectCard({ entry, config, storeId, isSuperAdmin, onCha
             ))}
           </div>
         </div>
-        {!hardGated && (
-          <button
-            type="button"
-            onClick={() => setOpen(o => !o)}
-            aria-expanded={open}
-            className={btnOutline}
-          >
-            {t('configure')}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+          className={btnOutline}
+        >
+          {t('configure')}
+        </button>
       </div>
 
-      {hardGated && (
-        <p className="border-t bg-muted px-4 py-3 text-sm text-muted-foreground">
-          {t('comingSoonLine')}
-        </p>
+      {requestable && !activated && (
+        <div className="border-t px-4 py-3">
+          <ProviderActivationPanel
+            provider={entry.code}
+            storeId={storeId}
+            activation={activation}
+            onChanged={onChanged}
+          />
+        </div>
       )}
 
-      {!hardGated && open && (
+      {open && (
         <div className="space-y-4 border-t bg-muted p-4">
-          {!entry.verified && <Alert compact variant="warning" description={t('superAdminNote')} />}
-
           {/* mode switch */}
           <div>
             <div role="tablist" aria-label={t('modes.label')} className="flex gap-2">

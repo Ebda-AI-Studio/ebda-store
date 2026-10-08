@@ -49,6 +49,8 @@ export type NavLabels = {
   platformBillingEvents: string;
   /** Merchant VAT-registration review queue (super_admin only) */
   platformTaxVerification: string;
+  /** Provider activation requests queue (super_admin only) */
+  platformProviderActivation: string;
   /** Platform-wide settings, e.g. Ebda's own VAT (super_admin only) */
   platformSettings: string;
   // Super-admin store-scoped item
@@ -107,6 +109,12 @@ export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
       name: labels.platformTaxVerification,
       href: '/tax-verification',
       icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+    },
+    {
+      // Plug icon — merchants' provider activation requests.
+      name: labels.platformProviderActivation,
+      href: '/provider-activation',
+      icon: 'M13 10V3L4 14h7v7l9-11h-7z',
     },
     {
       // Cog icon — platform-wide settings (Ebda's own VAT).

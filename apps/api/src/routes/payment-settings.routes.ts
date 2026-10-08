@@ -22,6 +22,7 @@ import {
 } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
 import { providerHealth } from '../services/payment-providers/provider-health';
+import { isProviderActivatedForStore } from '../services/payment-providers/provider-gate';
 import {
   applyCredentialUpdate,
   assertEnableAllowed,
@@ -369,13 +370,16 @@ router.post(
       refuseLegacyGatewayCredentials(data.provider, req.body ?? {});
       // A gateway created enabled has no tested credentials yet: the gate refuses it.
       if (data.isEnabled) {
-        assertEnableAllowed({
-          provider: data.provider,
-          testMode: data.testMode,
-          isEnabled: true,
-          credentials: null,
-          connectionTest: null,
-        });
+        assertEnableAllowed(
+          {
+            provider: data.provider,
+            testMode: data.testMode,
+            isEnabled: true,
+            credentials: null,
+            connectionTest: null,
+          },
+          { storeActivated: await isProviderActivatedForStore(storeId, data.provider) }
+        );
       }
 
       // Encrypt credentials before storing
@@ -537,13 +541,16 @@ router.put(
       // gateway (the other mode's credentials were never tested), needs a current test.
       const resultingEnabled = data.isEnabled ?? existing.isEnabled;
       if (resultingEnabled) {
-        assertEnableAllowed({
-          provider,
-          testMode: data.testMode ?? existing.testMode,
-          isEnabled: true,
-          credentials: existing.credentials,
-          connectionTest: existing.connectionTest,
-        });
+        assertEnableAllowed(
+          {
+            provider,
+            testMode: data.testMode ?? existing.testMode,
+            isEnabled: true,
+            credentials: existing.credentials,
+            connectionTest: existing.connectionTest,
+          },
+          { storeActivated: await isProviderActivatedForStore(storeId, provider) }
+        );
       }
 
       if (data.settings !== undefined || data.isEnabled !== undefined) {
@@ -727,7 +734,9 @@ router.post(
       // Disabling is always allowed; enabling a gateway needs a verified provider and a
       // successful Test connection of the credentials stored now (PROVIDERS-2 + plan 4.2/5).
       if (enabled === true) {
-        assertEnableAllowed(existing);
+        assertEnableAllowed(existing, {
+          storeActivated: await isProviderActivatedForStore(storeId, existing.provider),
+        });
       } else if (enabled !== false) {
         throw new AppError(400, 'VALIDATION_ERROR', '`enabled` must be true or false');
       }

@@ -459,6 +459,7 @@ model Store {
   shippingCarrierConfigs   ShippingCarrierConfig[]
   shipments                Shipment[]
   shipmentPickups          ShipmentPickup[]
+  providerActivationRequests ProviderActivationRequest[]
   codRemittances           CodRemittance[]
   pageRevisions            StorePageRevision[]
   productModels            ProductModel[]
@@ -5007,4 +5008,30 @@ model StoreTaxDocument {
   @@index([storeId])
   @@index([profileId])
   @@map("store_tax_documents")
+}
+
+// PROVIDERS-ACTIVATION. A merchant asked Ebda to switch on a payment gateway / shipping carrier
+// the catalog does not list as verified. `activated` is the per-store override the enable gates
+// accept (catalog-verified OR store-activated); only a super admin sets it, and only after that
+// store's own Test connection passed. One live (requested | activated) row per store + provider.
+model ProviderActivationRequest {
+  id            String    @id @default(uuid())
+  storeId       String    @map("store_id")
+  provider      String
+  // requested | activated | rejected
+  status        String    @default("requested")
+  // The super admin's note (required on a rejection).
+  note          String?
+  requestedById String?   @map("requested_by_id")
+  requestedAt   DateTime  @default(now()) @map("requested_at")
+  decidedById   String?   @map("decided_by_id")
+  decidedAt     DateTime? @map("decided_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([status, requestedAt])
+  @@map("provider_activation_requests")
 }

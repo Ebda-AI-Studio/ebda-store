@@ -64,17 +64,14 @@ export function carrierEntry(carrier: string): ProviderCatalogEntry {
 }
 
 /**
- * PROVIDERS-2 for writes: a merchant cannot connect a "coming soon" carrier; a super admin may
- * save and TEST its credentials (that is how it gets verified), but nobody can enable it.
+ * PROVIDERS-2 as relaxed by PROVIDERS-ACTIVATION, for SAVE and TEST only: every carrier in the
+ * catalog accepts a merchant's own credentials and a Test connection, verified or not. ENABLING
+ * is still gated by `assertCarrierEnableAllowed`.
  */
-export function assertMayConfigureCarrier(carrier: string, role: string): void {
-  if (isProviderUsable(carrier)) return;
-  if (role === 'super_admin') return;
-  throw new AppError(
-    403,
-    'PROVIDER_NOT_AVAILABLE',
-    `${carrier} is coming soon: it has not been verified against its sandbox yet`
-  );
+export function assertMayConfigureCarrier(carrier: string, _role: string): void {
+  // Manual delivery has no credentials and is always configurable (its settings, not a connection).
+  if (getProviderEntry(carrier)?.manual) return;
+  carrierEntry(carrier);
 }
 
 export interface CarrierCredentialUpdate {
@@ -156,17 +153,20 @@ export function carrierTestLooksCurrent(row: ConnectableCarrierRow): boolean {
 }
 
 /** The enable gate, for EVERY write path that can leave an API carrier enabled. */
-export function assertCarrierEnableAllowed(row: ConnectableCarrierRow): void {
+export function assertCarrierEnableAllowed(
+  row: ConnectableCarrierRow,
+  opts: { storeActivated?: boolean } = {}
+): void {
   const entry = getProviderEntry(row.carrier);
   if (!entry || entry.kind !== 'shipping') {
     throw new AppError(422, 'UNKNOWN_CARRIER', `Unknown carrier "${row.carrier}"`);
   }
   if (entry.manual) return;
-  if (!isProviderUsable(row.carrier)) {
+  if (!isProviderUsable(row.carrier) && !opts.storeActivated) {
     throw new AppError(
       409,
       'PROVIDER_NOT_VERIFIED',
-      `${row.carrier} is coming soon and cannot be enabled yet`
+      `${row.carrier} is not activated for this store yet: request activation first`
     );
   }
   if (!carrierTestIsCurrent(row)) {

@@ -259,7 +259,20 @@ describe('the enable gate (PROVIDERS-2 + current Test connection)', () => {
       assertCarrierEnableAllowed(
         row(u.cipher, true, { connectionTest: okTest('sandbox', { apiKey: key }) })
       )
-    ).toThrow(/coming soon/);
+    ).toThrow(/not activated/);
+  });
+
+  it('an unverified carrier activated for the store passes the verified check but still needs the test', () => {
+    const u = make(true);
+    expect(() =>
+      assertCarrierEnableAllowed(
+        row(u.cipher, true, { connectionTest: okTest('sandbox', { apiKey: key }) }),
+        { storeActivated: true }
+      )
+    ).not.toThrow();
+    expect(() => assertCarrierEnableAllowed(row(u.cipher, true), { storeActivated: true })).toThrow(
+      /Test connection/
+    );
   });
 
   it('with the stub seam: needs a successful test for EXACTLY the current credentials', () => {
@@ -290,9 +303,10 @@ describe('the enable gate (PROVIDERS-2 + current Test connection)', () => {
     ).toBe(false);
   });
 
-  it('a super admin may configure and test an unverified carrier; a merchant may not', () => {
-    expect(() => assertMayConfigureCarrier('bosta', 'store_admin')).toThrow(/coming soon/);
+  it('anyone may configure and test an unverified carrier (PROVIDERS-ACTIVATION); unknown ones are refused', () => {
+    expect(() => assertMayConfigureCarrier('bosta', 'store_admin')).not.toThrow();
     expect(() => assertMayConfigureCarrier('bosta', 'super_admin')).not.toThrow();
+    expect(() => assertMayConfigureCarrier('icarry', 'store_admin')).toThrow(/Unknown carrier/);
     expect(() => assertMayConfigureCarrier('manual', 'store_admin')).not.toThrow();
   });
 

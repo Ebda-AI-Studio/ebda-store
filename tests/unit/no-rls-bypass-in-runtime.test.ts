@@ -95,6 +95,10 @@ describe('no RLS bypass in the API runtime', () => {
       'apps/api/src/services/store.service.ts':
         'super-admin store hard-delete: the owner account cleanup',
       'apps/api/src/routes/store.routes.ts': 'super-admin GET /stores: every store with its owner',
+      'apps/api/src/services/provider-activation.service.ts':
+        'super-admin provider activation: the store owner to email the decision to',
+      'apps/api/src/routes/provider-activation.routes.ts':
+        'super-admin provider activation queue: every store, one transaction each',
     };
     const offenders: string[] = [];
     const used = new Set<string>();

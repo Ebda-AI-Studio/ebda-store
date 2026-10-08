@@ -8,7 +8,7 @@ import { BRAND, PROVIDER_CATALOG, providerRequestMailto } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
-import { useAuth } from '../../../../lib/auth';
+import { useStoreActivations } from '../../../../lib/provider-activation';
 import {
   ProviderCard,
   type ProviderDef,
@@ -46,8 +46,7 @@ export default function StorePaymentSettingsPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('paymentSettings');
-  const { user } = useAuth();
-  const isSuperAdmin = user?.role === 'super_admin';
+  const { requests: activations, refetch: refetchActivations } = useStoreActivations(storeId);
 
   const [configs, setConfigs] = useState<AnyConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -244,8 +243,10 @@ export default function StorePaymentSettingsPage() {
             entry={entry}
             config={configs.find(c => c.provider === entry.code)}
             storeId={storeId}
-            isSuperAdmin={isSuperAdmin}
-            onChanged={fetchConfigs}
+            activation={activations.find(r => r.provider === entry.code)}
+            onChanged={async () => {
+              await Promise.all([fetchConfigs(), refetchActivations()]);
+            }}
           />
         ))}
         {PROVIDERS.map(provider => {

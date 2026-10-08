@@ -30,7 +30,7 @@ import {
   type ShippingCarrierProvider,
 } from './carriers/types';
 import { cairoToday, isPickupDate, isPickupTime } from './carriers/pickup-time';
-import { isProviderUsable } from './payment-providers/provider-gate';
+import { isProviderUsableForStore } from './payment-providers/provider-gate';
 import { shippingCarrierService } from './shipping-carrier.service';
 
 /** How far ahead a pickup may be asked for (carriers publish no limit; Bosta lists ~a week). */
@@ -69,7 +69,7 @@ async function loadShipment(storeId: string, shipmentId: string) {
 /** The carrier's stored config, enabled and usable, as the adapter needs it. */
 async function usableConfig(storeId: string, carrier: CarrierCode) {
   const cfg = await shippingCarrierService.getCarrierConfig(storeId, carrier);
-  if (!cfg || !cfg.enabled || !isProviderUsable(carrier)) {
+  if (!cfg || !cfg.enabled || !(await isProviderUsableForStore(carrier, storeId))) {
     throw new AppError(
       409,
       'CARRIER_NOT_ENABLED',
