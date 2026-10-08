@@ -5067,7 +5067,7 @@ model ProviderActivationRequest {
 /// An ISSUED fiscal document — tax invoice, receipt, credit note, refund
 /// receipt — or a store-deletion archive record (rulings MONEYB-1, MONEYB-4).
 ///
-/// Immutable once written: a trigger (migration 20261008120000) refuses DELETE
+/// Immutable once written: a trigger (migration 20261008160000) refuses DELETE
 /// before `retain_until` and every UPDATE except the cancellation and ETA
 /// submission columns. `payload` is the document AS ISSUED (seller, buyer,
 /// lines, totals) so a later order/store edit or a store deletion can never
