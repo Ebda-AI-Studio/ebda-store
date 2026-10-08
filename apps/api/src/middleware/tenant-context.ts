@@ -251,7 +251,8 @@ export function orderRouteContext(req: Request, res: Response, next: NextFunctio
  * Before this the router was CONTEXT-LESS: under strict RLS every read returned nothing and every
  * write was rejected, so the carrier settings page and the order shipping actions could not work.
  */
-const SHIPPING_EXTERNAL_GET = /^\/[^/]+\/shipments\/[^/]+\/label\/?$/;
+// The label and the carrier's pickup slots (Mylerz) are GETs that call the carrier.
+const SHIPPING_EXTERNAL_GET = /^\/[^/]+\/shipments\/[^/]+\/(label|pickup\/windows)\/?$/;
 
 export function shippingCarrierRouteContext(req: Request, res: Response, next: NextFunction): void {
   if (SAFE_METHODS.has(req.method) && !SHIPPING_EXTERNAL_GET.test(req.path)) {

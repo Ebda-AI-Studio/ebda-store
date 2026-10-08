@@ -55,6 +55,10 @@ only a credentials step in **Settings > Payments**:
   to see the live keys; test keys only work in Sandbox.
 - The Kashier user who created the secret key needs the refund permission for refunds to work.
 - **Webhook:** nothing to paste. Ebda sends the URL with every payment.
+- **Every Kashier notification is double-checked.** Before a Kashier notification marks an order paid or
+  records a refund, Ebda asks Kashier directly what that transaction really is, and only Kashier's answer
+  is used. If Kashier cannot be reached, nothing changes yet and Ebda tries again a little later; the
+  order page's payment events show each check.
 
 ## FawryPay
 

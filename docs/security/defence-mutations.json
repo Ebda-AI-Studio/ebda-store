@@ -1980,6 +1980,56 @@
       "find": "            details: { email: maskEmail(parsed.data.email) },\n            ip: req.ip,\n            userAgent: req.headers['user-agent'],\n          });\n        }",
       "replace": "            details: { email: maskEmail(parsed.data.email) },\n            ip: req.ip,\n            userAgent: req.headers['user-agent'],\n          });\n          res.json({ success: true, data: { message: 'Reset link sent.' } });\n          return;\n        }",
       "test": "tests/integration/merchant-password-reset.test.ts"
+    },
+    {
+      "id": "kashier-webhook-confirm-before-apply",
+      "domain": "webhook authenticity",
+      "tier": "integration",
+      "why": "Kashier's signature does not cover `event`, so a relabelled genuine delivery (pay -> refund) would be applied as the label says instead of as Kashier records it",
+      "source": "apps/api/src/services/payment-providers/payment.factory.ts",
+      "find": "    if (p.confirmWebhook) {",
+      "replace": "    if (false as boolean) {",
+      "test": "tests/integration/egypt-gateway-webhooks.test.ts"
+    },
+    {
+      "id": "kashier-billing-webhook-confirm-before-apply",
+      "domain": "webhook authenticity",
+      "tier": "integration",
+      "why": "a relabelled Kashier subscription delivery would be applied as the unsigned label says (a charge read as a refund, the plan never activated, the genuine delivery then deduped)",
+      "source": "apps/api/src/services/billing/subscription-billing.service.ts",
+      "find": "  if (provider.confirmWebhookEvent && event.kind !== 'ignored') {",
+      "replace": "  if (false as boolean) {",
+      "test": "tests/integration/subscription-billing.test.ts"
+    },
+    {
+      "id": "kashier-confirm-transaction-must-match",
+      "domain": "webhook authenticity",
+      "tier": "unit",
+      "why": "a transaction-details answer about a DIFFERENT transaction would be taken as the confirmation of this one",
+      "source": "apps/api/src/services/payment-providers/kashier-confirm.ts",
+      "find": "  if (str(b.transactionId) !== expect.transactionId) {",
+      "replace": "  if (false) {",
+      "test": "tests/unit/kashier-webhook-confirmation.test.ts"
+    },
+    {
+      "id": "shipment-pickup-claim-race-recovery",
+      "domain": "idempotency",
+      "tier": "integration",
+      "why": "two concurrent pickup requests would surface a raw unique violation instead of returning the one live pickup (and a retry could book a second courier)",
+      "source": "apps/api/src/services/shipment-pickup.service.ts",
+      "find": "      if (winner) return { pickup: winner, created: false };",
+      "replace": "      if (false as boolean && winner) return { pickup: winner!, created: false };",
+      "test": "tests/integration/shipment-pickup.test.ts"
+    },
+    {
+      "id": "kashier-guest-customer-reference",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a guest checkout sends no customer.reference, which the real Kashier API refuses (400), so every guest Kashier payment fails",
+      "source": "apps/api/src/services/payment-providers/kashier.provider.ts",
+      "find": "                reference: kashierCustomerReference(req.customer.id, req.orderId),",
+      "replace": "                reference: req.customer.id,",
+      "test": "tests/unit/kashier-webhook-confirmation.test.ts"
     }
   ]
 }

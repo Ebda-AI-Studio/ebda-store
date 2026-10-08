@@ -23,6 +23,7 @@ import {
   BillingSignatureError,
   headerValue,
   type BillingProvider,
+  type BillingWebhookConfirmation,
   type BillingWebhookEvent,
   type BillingWebhookKind,
   type CardSetupRequest,
@@ -36,6 +37,11 @@ import {
   type RefundResult,
 } from './types';
 import { hmacSha256Hex, safeEqual } from './signature';
+import {
+  classifyKashierTransaction,
+  KASHIER_TRANSACTION_DETAILS_SOURCE,
+  kashierTransactionDetailsPath,
+} from '../payment-providers/kashier-confirm';
 
 export interface KashierConfig {
   baseUrl: string;
@@ -50,6 +56,8 @@ export interface KashierConfig {
 
 export const KASHIER_SANDBOX_URL = 'https://test-api.kashier.io';
 const SESSIONS_PATH = '/v3/payment/sessions';
+/** A subscription checkout page stays payable this long. */
+const CHECKOUT_TTL_MS = 60 * 60_000;
 const CHARGE_PATH = '/v3/orders';
 const refundPath = (orderId: string) => `/v3/orders/${encodeURIComponent(orderId)}`;
 
@@ -58,7 +66,22 @@ const refundPath = (orderId: string) => `/v3/orders/${encodeURIComponent(orderId
  * `signatureKeys` omits any of these could have its unsigned amount/status
  * rewritten in transit, so it is rejected.
  */
-const REQUIRED_SIGNED_KEYS = ['amount', 'currency', 'merchantOrderId', 'status'] as const;
+const REQUIRED_SIGNED_KEYS = [
+  'amount',
+  'currency',
+  'merchantOrderId',
+  'status',
+  // The id the dedupe key, the refund lookup and the PROVIDERS-17 confirmation use.
+  'transactionId',
+] as const;
+
+/** The FEP (order operations) host for a dashboard API base: (test-)api.kashier.io -> (test-)fep. */
+export function kashierFepBase(apiBase: string): string {
+  return apiBase.replace(
+    /^https:\/\/(test-)?api\.kashier\.io/,
+    (_m, t) => `https://${t ?? ''}fep.kashier.io`
+  );
+}
 
 /** Integer piastres -> Kashier's decimal string ("199.99"). Integer math only. */
 export function gatewayAmount(amountMinor: number): string {
@@ -139,9 +162,10 @@ export class KashierBillingProvider implements BillingProvider {
   }
 
   private async call(
-    method: 'POST' | 'PUT',
+    method: 'GET' | 'POST' | 'PUT',
     path: string,
-    body: unknown
+    body: unknown,
+    base: string = this.cfg.baseUrl
   ): Promise<{ status: number; json: Record<string, unknown> }> {
     if (!this.cfg.secretKey || !this.cfg.merchantId) {
       throw new BillingProviderError('Kashier is not configured (merchant id / secret key)', true);
@@ -150,14 +174,14 @@ export class KashierBillingProvider implements BillingProvider {
     const timer = setTimeout(() => ctl.abort(), this.cfg.timeoutMs);
     let res: Response;
     try {
-      res = await this.cfg.fetchImpl(`${this.cfg.baseUrl}${path}`, {
+      res = await this.cfg.fetchImpl(`${base}${path}`, {
         method,
         headers: {
           'content-type': 'application/json',
           authorization: this.cfg.secretKey,
           'api-key': this.cfg.apiKey,
         },
-        body: JSON.stringify(body),
+        ...(method === 'GET' ? {} : { body: JSON.stringify(body) }),
         signal: ctl.signal,
       });
     } catch (err) {
@@ -194,9 +218,15 @@ export class KashierBillingProvider implements BillingProvider {
   }
 
   async createCheckoutForSubscription(req: CheckoutRequest): Promise<CheckoutResult> {
+    // The fields the payment-sessions API REQUIRES (developers.kashier.io API reference,
+    // CreatePaymentSessionRequest: expireAt, maxFailureAttempts, amount, currency, order,
+    // merchantId, merchantRedirect, type, display, customer); `order` is what webhooks echo as
+    // `merchantOrderId`. The merchant adapter (payment-providers/kashier.provider.ts) sends the same.
     const { status, json } = await this.call('POST', SESSIONS_PATH, {
+      expireAt: new Date(Date.now() + CHECKOUT_TTL_MS).toISOString(),
+      maxFailureAttempts: 3,
       merchantId: this.cfg.merchantId,
-      merchantOrderId: req.merchantOrderId,
+      order: req.merchantOrderId,
       amount: gatewayAmount(req.amountMinor),
       currency: req.currency,
       paymentType: 'credit',
@@ -253,11 +283,19 @@ export class KashierBillingProvider implements BillingProvider {
   }
 
   async refund(req: RefundRequest): Promise<RefundResult> {
-    const { status, json } = await this.call('PUT', refundPath(req.chargeId), {
-      apiOperation: 'REFUND',
-      reason: `refund ${req.idempotencyKey}`,
-      transaction: { amount: gatewayAmount(req.amountMinor) },
-    });
+    // Order operations live on the FEP host (API reference `updateOrder`: test-fep.kashier.io /
+    // fep.kashier.io), not on the dashboard API host the other calls use.
+    const { status, json } = await this.call(
+      'PUT',
+      refundPath(req.chargeId),
+      {
+        apiOperation: 'REFUND',
+        reason: `refund ${req.idempotencyKey}`,
+        // A JSON NUMBER (API reference, RefundRequest; the merchant adapter does the same).
+        transaction: { amount: Number(gatewayAmount(req.amountMinor)) },
+      },
+      kashierFepBase(this.cfg.baseUrl)
+    );
     const raw = stripTokens(json);
     const state = scalar(json.status).toUpperCase();
     const refundId = scalar(json.transactionId ?? json.refundId) || null;
@@ -269,6 +307,11 @@ export class KashierBillingProvider implements BillingProvider {
       failureReason: scalar(json.message ?? json.reason) || `refund rejected (${status})`,
       raw,
     };
+  }
+
+  /** Every value a webhook needs: the Payment API key (HMAC), and the secret key + MID it confirms with. */
+  isConfigured(): boolean {
+    return !!(this.cfg.apiKey && this.cfg.secretKey && this.cfg.merchantId);
   }
 
   verifyWebhook(rawBody: Buffer | string, headers: HeaderBag): BillingWebhookEvent {
@@ -337,6 +380,56 @@ export class KashierBillingProvider implements BillingProvider {
         scalar((data.customer as { reference?: unknown } | undefined)?.reference) || undefined,
       occurredAt: Number.isNaN(created) ? new Date() : new Date(created),
       raw: stripTokens(payload),
+    };
+  }
+
+  /**
+   * PROVIDERS-17: `event` (refund vs payment) is not covered by Kashier's signature, so the
+   * kind applied is the one Kashier's transaction-details API reports for the SIGNED
+   * transaction id. Throws (the route answers 500, Kashier redelivers, nothing is marked seen)
+   * when Kashier cannot be asked or does not answer clearly.
+   */
+  async confirmWebhookEvent(event: BillingWebhookEvent): Promise<BillingWebhookConfirmation> {
+    if (!event.providerRef) {
+      throw new BillingProviderError('Kashier webhook has no transaction id to confirm', false);
+    }
+    const { status, json } = await this.call(
+      'GET',
+      kashierTransactionDetailsPath(event.providerRef),
+      undefined
+    );
+    if (status >= 400) {
+      throw new BillingProviderError(`Kashier transaction details answered ${status}`, false);
+    }
+    let txn;
+    try {
+      txn = classifyKashierTransaction(json, {
+        transactionId: event.providerRef,
+        merchantOrderId: event.merchantOrderId,
+      });
+    } catch (err) {
+      throw new BillingProviderError(
+        `Kashier did not confirm the webhook: ${(err as Error).message}`,
+        false
+      );
+    }
+    // A held authorization is not a charge; a pending transaction moves nothing yet.
+    const kind: BillingWebhookKind =
+      txn.status === 'PENDING' || txn.kind === 'authorize'
+        ? 'ignored'
+        : txn.kind === 'refund'
+          ? txn.status === 'SUCCESS'
+            ? 'refund.succeeded'
+            : 'refund.failed'
+          : txn.status === 'SUCCESS'
+            ? 'charge.succeeded'
+            : 'charge.failed';
+    return {
+      event: { ...event, kind },
+      claimed: event.kind,
+      confirmed: kind,
+      mismatch: kind !== event.kind,
+      source: KASHIER_TRANSACTION_DETAILS_SOURCE,
     };
   }
 

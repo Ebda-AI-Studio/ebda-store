@@ -140,7 +140,24 @@ export interface BillingProvider {
   chargeSavedCard(req: ChargeRequest): Promise<ChargeResult>;
   refund(req: RefundRequest): Promise<RefundResult>;
   verifyWebhook(rawBody: Buffer | string, headers: HeaderBag): BillingWebhookEvent;
+  /** False when the credentials this provider needs are missing (its webhooks then answer 503). */
+  isConfigured?(): boolean;
+  /**
+   * Server-to-server confirmation of a verified webhook before it is applied (PROVIDERS-17),
+   * for a gateway whose signature leaves the event kind unsigned (Kashier). Throws when the
+   * gateway cannot confirm: the caller must apply nothing and let the gateway redeliver.
+   */
+  confirmWebhookEvent?(event: BillingWebhookEvent): Promise<BillingWebhookConfirmation>;
   parseReturn(query: Record<string, unknown>): ParsedReturn;
+}
+
+export interface BillingWebhookConfirmation {
+  /** The event to APPLY: the delivery with the gateway's own kind. */
+  event: BillingWebhookEvent;
+  claimed: BillingWebhookKind;
+  confirmed: BillingWebhookKind;
+  mismatch: boolean;
+  source: string;
 }
 
 export class BillingSignatureError extends Error {

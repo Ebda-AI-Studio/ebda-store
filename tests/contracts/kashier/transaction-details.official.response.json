@@ -1,0 +1,54 @@
+{
+  "body": {
+    "transactionId": "TX-243585751279",
+    "method": "card",
+    "provider": "mpgs",
+    "pcc": { "financial_institution": "qnb" },
+    "currency": "EGP",
+    "paymentChannel": "online | e-commerce",
+    "status": "SUCCESS",
+    "paymentStatus": "SUCCESS",
+    "date": "2025-08-03 09:25:24.335000+00:00",
+    "trxType": "payment",
+    "merchantOrderId": 71754213106,
+    "metaData": {
+      "kashier payment UI version": "V3",
+      "referral url": "http://localhost/",
+      "termsAndConditions": { "ip": "203.0.113.58" },
+      "merchantWebhook": "https://your-call-back-url.com/webhook"
+    },
+    "paymentOrigin": "new_woo_demo",
+    "transactionResponseCode": "00",
+    "transactionResponseMessage": { "en": "Approved", "ar": "تمت الموافقة" },
+    "isReversed": false,
+    "isVoided": false,
+    "order": {
+      "orderReference": "TEST-ORD-193402001",
+      "feeTrxAmount": "0.00",
+      "feeVatAmount": "0.00",
+      "accountType": "PF",
+      "orderId": "00916dc7-7a3a-4875-af44-118bc678378b"
+    },
+    "sourceOfFunds": {
+      "maskedCard": "512345******2346",
+      "cardBrand": "Mastercard",
+      "cardHolderName": "John Doe",
+      "cardDataToken": "example-card-token",
+      "expiryYear": "26",
+      "expiryMonth": "05",
+      "storedOnFile": "NOT_STORED",
+      "save": false,
+      "agreement": null
+    },
+    "transactions": [
+      {
+        "status": "SUCCESS",
+        "currency": "EGP",
+        "operation": "pay",
+        "transactionId": "TX-243585751279",
+        "date": "2025-08-03 09:25:24.335000+00:00"
+      }
+    ]
+  },
+  "message": "The payment transaction has been retreived successfully"
+}

@@ -12,6 +12,12 @@ import {
   SHIPMENT_STATUSES,
 } from '../services/carriers/types';
 import { codReconciliationService } from '../services/cod-reconciliation.service';
+import {
+  cancelPickup,
+  getPickupState,
+  listPickupWindows,
+  requestPickup,
+} from '../services/shipment-pickup.service';
 import { assertMayConfigureCarrier } from '../services/carriers/carrier-connection.service';
 import { auditLog } from '../middleware/security';
 import { AppError } from '../middleware/error-handler';
@@ -63,6 +69,21 @@ const shipOrderSchema = z
   });
 
 const cancelShipmentSchema = z.object({ force: z.boolean().optional() });
+// PROVIDERS-18. Times are Africa/Cairo wall clock; the service checks them against what the
+// shipment's carrier accepts (date only, a from/to window, or one of its own slots).
+const requestPickupSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  window: z
+    .object({
+      from: z.string().regex(/^\d{2}:\d{2}$/),
+      to: z.string().regex(/^\d{2}:\d{2}$/),
+    })
+    .optional(),
+  windowId: z.string().trim().min(1).max(40).optional(),
+  windowLabel: z.string().trim().max(100).optional(),
+  // One per dialog submit: a double click or a retried request is the SAME pickup.
+  idempotencyKey: z.string().trim().min(8).max(100),
+});
 const manualStatusSchema = z.object({ status: z.enum(SHIPMENT_STATUSES as [string, ...string[]]) });
 const importSettlementSchema = z.object({
   carrier: z.enum(CARRIER_CODES),
@@ -461,6 +482,75 @@ router.get(
       }
       const label = await shippingCarrierService.getLabel(id);
       res.json({ success: true, data: { label } });
+    } catch (error) {
+      next(carrierErrorToHttp(error));
+    }
+  }
+);
+
+// ==========================================
+// Courier pickups (PROVIDERS-18)
+//   GET  /:storeId/shipments/:id/pickup                       the panel state + history
+//   GET  /:storeId/shipments/:id/pickup/windows               the carrier's own slots (Mylerz)
+//   POST /:storeId/shipments/:id/pickup                       request (idempotent)
+//   POST /:storeId/shipments/:id/pickup/:pickupId/cancel      cancel at the carrier
+// ==========================================
+
+router.get(
+  '/:storeId/shipments/:id/pickup',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await getPickupState(req.params.storeId, req.params.id);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.get(
+  '/:storeId/shipments/:id/pickup/windows',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const windows = await listPickupWindows(req.params.storeId, req.params.id);
+      res.json({ success: true, data: { windows } });
+    } catch (error) {
+      next(carrierErrorToHttp(error));
+    }
+  }
+);
+
+router.post(
+  '/:storeId/shipments/:id/pickup',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const input = requestPickupSchema.parse(req.body ?? {});
+      const { pickup, created } = await requestPickup(req.params.storeId, req.params.id, input, {
+        userId: req.user?.userId,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.status(created ? 201 : 200).json({ success: true, data: { pickup, created } });
+    } catch (error) {
+      next(carrierErrorToHttp(error));
+    }
+  }
+);
+
+router.post(
+  '/:storeId/shipments/:id/pickup/:pickupId/cancel',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const pickup = await cancelPickup(req.params.storeId, req.params.id, req.params.pickupId, {
+        userId: req.user?.userId,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { pickup } });
     } catch (error) {
       next(carrierErrorToHttp(error));
     }

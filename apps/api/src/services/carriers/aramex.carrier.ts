@@ -35,7 +35,10 @@ import {
   ShipmentStatus,
   ShippingCarrierProvider,
   TrackingHistoryEntry,
+  type CarrierPickupRequest,
+  type CarrierPickupResult,
 } from './types';
+import { cairoWallClock } from './pickup-time';
 
 export const ARAMEX_BASE_URLS = {
   live: 'https://ws.aramex.net/ShippingAPI.V2',
@@ -408,6 +411,11 @@ export class AramexCarrier implements ShippingCarrierProvider {
     // UNVERIFIED: domestic COD in EGP. COD is refused until the merchant records Aramex's
     // written confirmation (settings.codEgpConfirmed). Prepaid shipments are unaffected.
     cod: 'unconfirmed',
+    // Shipping/CreatePickup (PickupDate, ReadyTime, LastPickupTime, ClosingTime): a merchant window.
+    pickup: 'request',
+    pickupWindow: 'times',
+    // Shipping/CancelPickup (PickupGUID).
+    pickupCancel: true,
   };
 
   // Aramex documents no idempotency key and has no search-by-reference operation, so a lost
@@ -785,6 +793,64 @@ export class AramexCarrier implements ShippingCarrierProvider {
       throw new CarrierError('CARRIER_UNAVAILABLE', 'aramex.CreatePickup: no pickup in the answer');
     }
     return { pickupId, pickupGuid };
+  }
+
+  /** Shared pickup action (PROVIDERS-18): the merchant's Cairo window becomes the four times. */
+  async schedulePickup(
+    credentials: AramexCredentials,
+    req: CarrierPickupRequest,
+    ctx?: CarrierCallContext
+  ): Promise<CarrierPickupResult> {
+    if (!req.window) {
+      throw new CarrierError('CARRIER_REJECTED', 'Aramex needs a pickup window (from / to)');
+    }
+    const from = cairoWallClock(req.date, req.window.from);
+    const to = cairoWallClock(req.date, req.window.to);
+    const out = await this.createPickup(
+      credentials,
+      {
+        address: req.address,
+        pickupDate: from,
+        readyTime: from,
+        lastPickupTime: to,
+        closingTime: to,
+        reference: req.reference,
+        shipments: Math.max(1, req.trackingNumbers.length),
+        weightKg: req.weightKg,
+        comments: req.trackingNumbers.length ? `AWB ${req.trackingNumbers.join(', ')}` : undefined,
+      },
+      ctx
+    );
+    // CancelPickup takes the GUID; the ID is what Aramex's people quote.
+    return { carrierPickupId: out.pickupGuid || out.pickupId, carrierReference: out.pickupId };
+  }
+
+  /** Shipping/CancelPickup by GUID; `HasErrors` (thrown by `call`) is a refusal. */
+  async cancelPickup(
+    credentials: AramexCredentials,
+    pickup: { carrierPickupId: string },
+    ctx?: CarrierCallContext
+  ): Promise<CarrierCancelResult> {
+    try {
+      await this.call(
+        'Shipping',
+        'CancelPickup',
+        'PickupCancelationRequest',
+        'PickupCancelationResponse',
+        clientInfo(credentials) +
+          transaction('cancel-pickup') +
+          t('PickupGUID', pickup.carrierPickupId, true) +
+          t('Comments', 'Cancelled by the merchant', true),
+        ctx,
+        credentials
+      );
+    } catch (err) {
+      if (err instanceof CarrierError && err.code === 'CARRIER_REJECTED') {
+        return { status: 'not_cancellable', message: err.message };
+      }
+      throw err;
+    }
+    return { status: 'cancelled' };
   }
 
   async trackShipment(

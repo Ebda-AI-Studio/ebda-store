@@ -6,6 +6,10 @@
  * `data.signatureKeys` are the documented ten. One base URL serves both the dashboard host and
  * the FEP host (the adapter picks the path). Order search carries the amounts only while
  * `emitAmounts` is true: the documented projection has none (UNVERIFIED in the adapter).
+ * Transaction details (GET /v2/aggregator/transactions/:transactionId, PROVIDERS-17) answer
+ * from `transactions`, Kashier's own record: a capture records a `pay`, a refund a `refund`,
+ * and a webhook built for a transaction id the stub has no record of records one from the
+ * delivery (so a FORGED relabel of a recorded transaction does not rewrite the record).
  */
 import crypto from 'node:crypto';
 import { toMinor, minorToDecimalString } from '@force/shared';
@@ -64,6 +68,8 @@ export class KashierStub {
   readonly faults = new FaultGate();
   /** Order search carries `amount` / `capturedAmount` / `refundedAmount` (UNVERIFIED: not documented). */
   emitAmounts = true;
+  /** Kashier's own record of each transaction (what transaction details report). */
+  readonly transactions = new Map<string, { order: string; operation: string; status: string }>();
   private seq = 0;
 
   get createdCount(): number {
@@ -93,10 +99,36 @@ export class KashierStub {
     if (method === 'GET' && path === '/v3/payment/orders') {
       return this.searchOrders(u.searchParams.get('search'));
     }
+    const t = path.match(/^\/v2\/aggregator\/transactions\/([^/]+)$/);
+    if (t && method === 'GET') return this.transactionDetails(decodeURIComponent(t[1]));
     const m = path.match(/^\/v3\/orders\/([^/]+)$/);
     if (m && method === 'PUT') return this.refund(decodeURIComponent(m[1]), body);
     return json(404, { message: 'not found' });
   };
+
+  /** The documented details shape: `{ body: {...}, message }`, stored status vocabulary. */
+  private transactionDetails(transactionId: string): Response {
+    const rec = this.transactions.get(transactionId);
+    if (!rec) return json(404, { message: 'Transaction not found' });
+    return json(200, {
+      body: {
+        transactionId,
+        method: 'card',
+        currency: 'EGP',
+        status: rec.status,
+        paymentStatus: rec.status,
+        trxType: rec.operation === 'pay' ? 'payment' : rec.operation,
+        merchantOrderId: rec.order,
+        isReversed: false,
+        isVoided: false,
+        order: { orderId: kashierOrderIdOf(rec.order) },
+        transactions: [
+          { status: rec.status, currency: 'EGP', operation: rec.operation, transactionId },
+        ],
+      },
+      message: 'The payment transaction has been retreived successfully',
+    });
+  }
 
   private validateCredentials(b: Record<string, unknown>): Response {
     const sk = b.secretKeys as Array<{ mode: string; key: string }> | undefined;
@@ -131,6 +163,12 @@ export class KashierStub {
     }
     if (typeof b.expireAt !== 'string' || !(new Date(b.expireAt).getTime() > Date.now())) {
       return json(400, { message: 'expireAt must be a future ISO date' });
+    }
+    // Measured against the real sandbox 2026-10-08: a session without a customer reference is
+    // refused with 400 '"customer.reference" is required'.
+    const customer = b.customer as { reference?: unknown } | undefined;
+    if (typeof customer?.reference !== 'string' || !customer.reference) {
+      return json(400, { message: '"customer.reference" is required' });
     }
     if (b.merchantId !== KASHIER_STUB.merchantId) return json(400, { message: 'unknown merchant' });
     if (typeof b.amount !== 'string' || !/^\d+\.\d{2}$/.test(b.amount) || Number(b.amount) <= 0) {
@@ -238,13 +276,15 @@ export class KashierStub {
       });
     }
     s.refunds.push(amount);
+    const refundTxn = `TX-r${++this.seq}`;
+    this.transactions.set(refundTxn, { order: s.order, operation: 'refund', status: 'SUCCESS' });
     const totalRefunded = this.refundedMinor(s);
     const full = totalRefunded >= toMinor(s.amount);
     return json(200, {
       response: {
         status: 'SUCCESS',
         gatewayCode: 'APPROVED',
-        transactionId: `TX-r${++this.seq}`,
+        transactionId: refundTxn,
         amount: Number(amount),
         currency: 'EGP',
         operation: 'refund',
@@ -271,6 +311,7 @@ export class KashierStub {
     if (!s) throw new Error(`no stub kashier order ${order}`);
     s.state = 'PAID';
     s.transactionId = `TX-${++this.seq}`;
+    this.transactions.set(s.transactionId, { order, operation: 'pay', status: 'SUCCESS' });
   }
 
   /**
@@ -303,6 +344,16 @@ export class KashierStub {
       signatureKeys: o.signatureKeys ?? KASHIER_DOCUMENTED_SIGNATURE_KEYS,
       platform: {},
     };
+    // Kashier keeps a record of every transaction it delivers; a delivery for one it already
+    // has (e.g. a relabelled replay) does not change that record.
+    if (!this.transactions.has(o.transactionId)) {
+      const ev = (o.event ?? 'pay').toLowerCase();
+      this.transactions.set(o.transactionId, {
+        order,
+        operation: ev === 'pay' ? 'pay' : ev,
+        status: o.status,
+      });
+    }
     const signature = kashierSignature(data, data.signatureKeys as string[], KASHIER_STUB.apiKey);
     return {
       rawBody: JSON.stringify({ event: o.event ?? 'pay', data }),

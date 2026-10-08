@@ -42,6 +42,9 @@ import {
   ShipmentStatus,
   ShippingCarrierProvider,
   TrackingHistoryEntry,
+  type CarrierPickupRequest,
+  type CarrierPickupResult,
+  type CarrierPickupWindow,
 } from './types';
 import {
   carrierRequest,
@@ -130,6 +133,11 @@ export class MylerzCarrier implements ShippingCarrierProvider {
     webhooks: false,
     polling: true,
     cod: true,
+    // PickupOrder/CreatePickupOrder with a slot from Lookup/GetAllPickupTimeWindow.
+    pickup: 'request',
+    pickupWindow: 'carrier_slots',
+    // The spec has no pickup-cancel operation (only packages/CancelPackage).
+    pickupCancel: false,
   };
 
   // Keyed by sha256(username + password + host): never the raw credentials, never shared
@@ -620,7 +628,11 @@ export class MylerzCarrier implements ShippingCarrierProvider {
       '/api/PickupOrder/CreatePickupOrder',
       {
         PickupLocationName: c.warehouseName,
-        PickupDueDate: new Date(Date.now() + 86_400_000).toISOString().slice(0, 19),
+        // The merchant's date when asked through schedulePickup, else tomorrow (no zone, as S3's sample).
+        PickupDueDate:
+          typeof s.mylerzPickupDueDate === 'string'
+            ? s.mylerzPickupDueDate
+            : new Date(Date.now() + 86_400_000).toISOString().slice(0, 19),
         ExpectedPackageCount: barcodes.length,
         Packages: barcodes.map(Barcode => ({ Barcode })),
         ...(num(s.mylerzPickupTimeWindowId) !== undefined
@@ -636,6 +648,58 @@ export class MylerzCarrier implements ShippingCarrierProvider {
     );
     const code = Array.isArray(value) ? value[0]?.PickupOrderCode : undefined;
     return { pickupOrderCode: code ? String(code) : undefined };
+  }
+
+  /** Lookup/GetAllPickupTimeWindow: `{ Id, SlotTime, IsDefault }` (PickupTimeWindowDto). */
+  async pickupWindows(
+    credentials: MylerzCredentials,
+    ctx?: CarrierCallContext
+  ): Promise<CarrierPickupWindow[]> {
+    const value = await this.api<Body[]>(
+      'mylerz.pickupWindows',
+      credentials,
+      ctx,
+      '/api/Lookup/GetAllPickupTimeWindow',
+      { method: 'GET' }
+    );
+    return (Array.isArray(value) ? value : [])
+      .filter(w => w && (typeof w.Id === 'number' || typeof w.Id === 'string'))
+      .map(w => ({
+        id: String(w.Id),
+        label: typeof w.SlotTime === 'string' && w.SlotTime ? w.SlotTime : `#${w.Id}`,
+        isDefault: w.IsDefault === true,
+      }));
+  }
+
+  /**
+   * Shared pickup action (PROVIDERS-18): CreatePickupOrder for the shipment's barcode on the
+   * chosen date and Mylerz slot. UNVERIFIED (as on `createPickup`): whether AddOrders' own
+   * automatic pickup order makes this one redundant for a just-booked parcel.
+   */
+  async schedulePickup(
+    credentials: MylerzCredentials,
+    req: CarrierPickupRequest,
+    ctx?: CarrierCallContext
+  ): Promise<CarrierPickupResult> {
+    const windowId = req.windowId !== undefined ? Number(req.windowId) : undefined;
+    if (windowId !== undefined && !Number.isSafeInteger(windowId)) {
+      throw new CarrierError('CARRIER_REJECTED', 'Mylerz pickup slot must be one of its slot ids');
+    }
+    const out = await this.createPickup(credentials, req.trackingNumbers, {
+      ...ctx,
+      settings: {
+        ...(ctx?.settings ?? {}),
+        ...(windowId !== undefined ? { mylerzPickupTimeWindowId: windowId } : {}),
+        mylerzPickupDueDate: `${req.date}T09:00:00`,
+      },
+    });
+    if (!out.pickupOrderCode) {
+      throw new CarrierError(
+        'CARRIER_UNAVAILABLE',
+        'mylerz.pickup: no PickupOrderCode in the answer'
+      );
+    }
+    return { carrierPickupId: out.pickupOrderCode };
   }
 
   async trackShipment(

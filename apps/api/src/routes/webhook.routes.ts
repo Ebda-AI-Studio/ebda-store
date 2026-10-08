@@ -178,14 +178,33 @@ async function enqueueOrProcessWebhook(args: {
       { err: sendErr, provider, webhookEventId },
       '[WEBHOOK] inngest.send failed — falling back to inline processing'
     );
-    const result = await processWebhookInline({
-      provider,
-      idempotencyKey,
-      storeId,
-      payload,
-      rawBody,
-      signature,
-    });
+    let result: Awaited<ReturnType<typeof processWebhookInline>>;
+    try {
+      result = await processWebhookInline({
+        provider,
+        idempotencyKey,
+        storeId,
+        payload,
+        rawBody,
+        signature,
+      });
+    } catch (inlineErr) {
+      // The tenant transaction rolled back, so nothing inside it (payment events included)
+      // records WHY. Keep the reason on the durable inbox row (super-admin /webhook-events,
+      // replayable), the same 'failed' + lastError the Inngest consumer writes, then rethrow:
+      // the 5xx makes the gateway redeliver. Example: a Kashier delivery Kashier could not
+      // confirm yet (PROVIDERS-17).
+      await webhookInbox
+        .update(webhookEventId, {
+          status: 'failed',
+          lastError: (inlineErr instanceof Error ? inlineErr.message : String(inlineErr)).slice(
+            0,
+            1000
+          ),
+        })
+        .catch(() => undefined);
+      throw inlineErr;
+    }
     // Mark the inbox row processed so a later replay sweep doesn't re-run it.
     await webhookInbox
       .update(webhookEventId, {

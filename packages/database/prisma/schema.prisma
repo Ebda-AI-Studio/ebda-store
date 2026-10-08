@@ -458,6 +458,7 @@ model Store {
   aiRecommendations        AiRecommendation[]
   shippingCarrierConfigs   ShippingCarrierConfig[]
   shipments                Shipment[]
+  shipmentPickups          ShipmentPickup[]
   codRemittances           CodRemittance[]
   pageRevisions            StorePageRevision[]
   productModels            ProductModel[]
@@ -2398,11 +2399,54 @@ model Shipment {
   store          Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
   order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   codRemittances CodRemittance[]
+  pickups        ShipmentPickup[]
 
   @@index([storeId])
   @@index([trackingNumber])
   @@index([storeId, status])
   @@map("shipments")
+}
+
+// A courier pickup the merchant asked a carrier for (Bosta, Aramex, Mylerz; ShipBlu requests its
+// own at booking). One ACTIVE (`requesting` | `requested`) pickup per shipment, enforced by the
+// partial unique index `shipment_pickups_one_active`; a `failed` or `cancelled` one may be asked
+// again. `idempotency_key` (per store) makes a double-submitted request one row and ONE carrier
+// call. Dates/times are Africa/Cairo wall-clock as the merchant chose them. Shown on the order
+// page's shipping card (admin `ShipmentPickupPanel`).
+model ShipmentPickup {
+  id               String    @id @default(uuid())
+  storeId          String    @map("store_id")
+  shipmentId       String    @map("shipment_id")
+  carrier          String
+  // requesting (claimed, carrier not answered yet) | requested | failed | cancelled
+  status           String    @default("requesting")
+  pickupDate       String    @map("pickup_date")
+  windowFrom       String?   @map("window_from")
+  windowTo         String?   @map("window_to")
+  // A carrier-defined slot (Mylerz PickupTimeWindowId) and its label.
+  windowId         String?   @map("window_id")
+  windowLabel      String?   @map("window_label")
+  // What cancel / lookup take (Bosta `_id`, Aramex GUID, Mylerz PickupOrderCode).
+  carrierPickupId  String?   @map("carrier_pickup_id")
+  // The human-facing number (Bosta PUID, Aramex pickup ID).
+  carrierReference String?   @map("carrier_reference")
+  // The slot the carrier assigned (Bosta `scheduledTimeSlot`).
+  carrierTimeSlot  String?   @map("carrier_time_slot")
+  address          Json
+  idempotencyKey   String    @map("idempotency_key")
+  error            String?
+  requestedById    String?   @map("requested_by_id")
+  cancelledAt      DateTime? @map("cancelled_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  store    Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, idempotencyKey])
+  @@index([storeId])
+  @@index([shipmentId])
+  @@map("shipment_pickups")
 }
 
 // SP7. One line of a carrier's COD settlement: money the carrier collected for a shipment

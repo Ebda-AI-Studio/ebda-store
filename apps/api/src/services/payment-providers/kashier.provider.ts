@@ -32,6 +32,10 @@
  * transaction id to be among them: otherwise an attacker could sign nothing but a harmless
  * field and edit the amount.
  *
+ * CONFIRMATION (PROVIDERS-17): the signature does not cover `event`, so no delivery is
+ * applied as it arrives: `confirmWebhookEvent` asks Kashier's transaction-details API what the
+ * signed transaction id really is, and that answer is what the payment pipeline applies.
+ *
  * `UNVERIFIED:` marks every field that Kashier's documentation does not publish; 6c checks
  * each against a real sandbox.
  */
@@ -65,9 +69,16 @@ import {
   type ProviderCredentials,
   type RefundV2Request,
   type RefundV2Result,
+  type WebhookConfirmation,
   type WebhookEventV2,
   type WebhookHeaders,
 } from './types';
+import {
+  classifyKashierTransaction,
+  KASHIER_TRANSACTION_DETAILS_SOURCE,
+  kashierTransactionDetailsPath,
+  type KashierConfirmedTxn,
+} from './kashier-confirm';
 
 export const KASHIER_SIGNATURE_HEADER = 'x-kashier-signature';
 
@@ -100,6 +111,15 @@ export const KASHIER_REQUIRED_SIGNED_KEYS = [
   'status',
   'transactionId',
 ] as const;
+
+/**
+ * The session's `customer.reference`: the shopper's customer id, else `guest-<orderId>` for a
+ * guest checkout. Both are opaque ids (no PII: never a phone number or an email).
+ */
+export function kashierCustomerReference(customerId: string | undefined, orderId: string): string {
+  const id = customerId?.trim();
+  return id ? id : `guest-${orderId}`;
+}
 
 /** RFC 3986 percent-encoding: `encodeURIComponent` leaves `!'()*` alone; RFC 3986 encodes them. */
 const rfc3986 = (v: string): string =>
@@ -496,7 +516,13 @@ export function createKashierProvider(options: GatewayAdapterOptions = {}): Paym
               merchantRedirect: req.returnUrls.success,
               type: 'one-time',
               display: settings.display,
-              customer: { email: req.customer.email || undefined, reference: req.customer.id },
+              // `customer.reference` is REQUIRED by the real API (sandbox 2026-10-08: 400
+              // '"customer.reference" is required'). A guest has no customer id, so the
+              // reference is derived from the order: stable, and never the phone or email.
+              customer: {
+                email: req.customer.email || undefined,
+                reference: kashierCustomerReference(req.customer.id, req.orderId),
+              },
               allowedMethods: settings.methods.join(','),
               failureRedirect: false,
               serverWebhook: req.webhookUrl,
@@ -582,8 +608,10 @@ export function createKashierProvider(options: GatewayAdapterOptions = {}): Paym
       // the signature, so the id deliberately omits it: a captured delivery re-labelled
       // `pay` <-> `refund` keeps the SAME id and the inbox drops it as a replay, so a relabel
       // cannot be counted twice. RESIDUAL: if an attacker wins the race against the genuine
-      // delivery, the relabelled one is the first stored; Kashier signs nothing that tells a
-      // refund from a payment, so only TLS + the `event` whitelist below bound that.
+      // delivery, the relabelled one is the first stored. That is why the label is never
+      // APPLIED: the payment pipeline calls `confirmWebhookEvent` (PROVIDERS-17) and acts on
+      // the kind Kashier's own transaction record reports, so a relabel stores a delivery whose
+      // applied effect is the genuine one.
       const eventId = `kashier:${transactionId}:${rawStatus}`;
       const event = typeof body.event === 'string' ? body.event.toLowerCase() : '';
 
@@ -615,7 +643,81 @@ export function createKashierProvider(options: GatewayAdapterOptions = {}): Paym
         amountMinor,
         currency: 'EGP',
         method: keys.includes('method') && typeof d.method === 'string' ? d.method : undefined,
+        transactionRef: transactionId,
         rawPayload: body,
+      };
+    },
+
+    /**
+     * PROVIDERS-17: `event` is unsigned, so the kind (and the status) applied is the one
+     * Kashier's transaction-details API reports for the SIGNED transaction id, never the
+     * delivery's label. The signed amount, currency, order and transaction id are kept.
+     * Throws (nothing applied, the webhook queue retries) when Kashier cannot be asked or
+     * its answer is not a clear match.
+     */
+    async confirmWebhookEvent(
+      ev: WebhookEventV2,
+      creds: ProviderCredentials
+    ): Promise<WebhookConfirmation> {
+      const transactionId = ev.kind === 'refund' ? ev.refundRef : ev.transactionRef;
+      if (!transactionId) {
+        throw new PaymentProviderError('WEBHOOK_MALFORMED', 'event has no Kashier transaction id');
+      }
+      const res = await gatewayRequest<unknown>(
+        'kashier.confirmWebhook',
+        fetchImpl,
+        `${apiBase(creds)}${kashierTransactionDetailsPath(transactionId)}`,
+        { method: 'GET', headers: authHeaders(creds) },
+        options.timeoutMs,
+        // Not found YET is not "did not happen": retried like an outage.
+        { notFound: 'PROVIDER_UNAVAILABLE' }
+      );
+      let txn: KashierConfirmedTxn;
+      try {
+        txn = classifyKashierTransaction(res, { transactionId, merchantOrderId: ev.providerRef });
+      } catch (err) {
+        throw new PaymentProviderError(
+          'PROVIDER_UNAVAILABLE',
+          `kashier.confirmWebhook: ${err instanceof Error ? err.message : 'unconfirmed'}`
+        );
+      }
+      const base = {
+        eventId: ev.eventId,
+        providerRef: ev.providerRef,
+        amountMinor: ev.amountMinor,
+        currency: 'EGP' as const,
+        rawPayload: ev.rawPayload,
+      };
+      let event: WebhookEventV2;
+      if (txn.kind === 'refund') {
+        event = {
+          ...base,
+          kind: 'refund',
+          refundRef: transactionId,
+          status:
+            txn.status === 'SUCCESS'
+              ? 'completed'
+              : txn.status === 'FAILURE'
+                ? 'failed'
+                : 'pending',
+        };
+      } else {
+        const st = WEBHOOK_STATUS_MAP[txn.status];
+        event = {
+          ...base,
+          kind: 'payment',
+          // authorize + SUCCESS = funds held, not captured.
+          status: txn.kind === 'authorize' && st === 'completed' ? 'processing' : st,
+          method: ev.kind === 'payment' ? ev.method : undefined,
+          transactionRef: transactionId,
+        };
+      }
+      return {
+        event,
+        claimed: { kind: ev.kind, status: ev.status },
+        confirmed: { kind: event.kind, status: event.status },
+        mismatch: event.kind !== ev.kind || event.status !== ev.status,
+        source: KASHIER_TRANSACTION_DETAILS_SOURCE,
       };
     },
 

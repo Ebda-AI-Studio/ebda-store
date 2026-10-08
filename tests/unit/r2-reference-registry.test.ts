@@ -113,6 +113,7 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'Shipment.pickupAddress': 'postal address',
   'Shipment.deliveryAddress': 'postal address',
   'Shipment.dimensions': 'parcel dimensions',
+  'ShipmentPickup.address': 'postal address (the carrier card pickup address)',
   'Shipment.statusHistory': 'carrier status timeline',
   'AffiliateEvent.details': 'affiliate audit details',
   'AuditLog.details': 'audit trail — records past values, must not keep files alive',

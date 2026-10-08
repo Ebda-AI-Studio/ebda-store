@@ -9,6 +9,7 @@ import { ConfirmActionModal } from '../../../../../../components/ConfirmActionMo
 import { OrderStatusBadge } from '../../../../../../components/OrderStatusBadge';
 import { SHIPMENT_COLORS } from '../../../shipping-carriers/_components/types';
 import { formatMoney } from './format';
+import { ShipmentPickupPanel } from './ShipmentPickupPanel';
 
 interface HistoryEntry {
   status: string;
@@ -308,6 +309,14 @@ export function ShipmentCard({ storeId, orderId, onChanged }: ShipmentCardProps)
                 </select>
               </label>
             )}
+
+          {shipment.carrier !== 'manual' && (
+            <ShipmentPickupPanel
+              storeId={storeId}
+              shipmentId={shipment.id}
+              carrierName={current?.name ?? shipment.carrier}
+            />
+          )}
 
           <div>
             <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">

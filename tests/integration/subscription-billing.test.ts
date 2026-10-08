@@ -40,7 +40,12 @@ import {
   renewSubscription,
   runBillingCycle,
   startCheckout,
+  handleBillingWebhook,
 } from '../../apps/api/src/services/billing/subscription-billing.service';
+import {
+  KashierBillingProvider,
+  kashierSignaturePayload,
+} from '../../apps/api/src/services/billing/kashier.provider';
 import { addDays, addInterval } from '../../apps/api/src/services/billing/period';
 import { encryption } from '../../apps/api/src/services/encryption.service';
 import { EmailService } from '../../apps/api/src/services/email.service';
@@ -898,5 +903,117 @@ describe.skipIf(!hasDb)('POST /api/v1/webhooks/billing/:provider', () => {
     expect(await ledger(storeId)).toHaveLength(1);
 
     expect((await post(rawBody, headers, 'nope')).status).toBe(404);
+  });
+});
+
+// ── PROVIDERS-17: a Kashier billing delivery is applied only as Kashier's own record says.
+// `event` (refund vs payment) is outside Kashier's signature: a relabelled genuine charge must
+// still activate the plan, and nothing is applied (nor marked seen) while Kashier cannot answer.
+describe.skipIf(!hasDb)('Kashier billing webhook: confirm before apply', () => {
+  const KEY = 'billing-kashier-api-key';
+  let detailsDown = false;
+  const txnRecords = new Map<string, { order: string; operation: string; status: string }>();
+  const kashierFetch = (async (url: string, init?: RequestInit) => {
+    const u = new URL(url);
+    const reply = (status: number, body: unknown) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      });
+    if (init?.method === 'POST' && u.pathname === '/v3/payment/sessions') {
+      return reply(201, {
+        _id: `ks_${crypto.randomUUID()}`,
+        sessionUrl: 'https://pay.kashier.test/s',
+      });
+    }
+    const m = u.pathname.match(/^\/v2\/aggregator\/transactions\/(.+)$/);
+    if (m && (init?.method ?? 'GET') === 'GET') {
+      if (detailsDown) return reply(503, { message: 'down' });
+      const id = decodeURIComponent(m[1]);
+      const rec = txnRecords.get(id);
+      if (!rec) return reply(404, { message: 'not found' });
+      return reply(200, {
+        body: {
+          transactionId: id,
+          status: rec.status,
+          trxType: rec.operation === 'pay' ? 'payment' : rec.operation,
+          merchantOrderId: rec.order,
+          currency: 'EGP',
+          transactions: [{ operation: rec.operation, status: rec.status, transactionId: id }],
+        },
+        message: 'ok',
+      });
+    }
+    return reply(404, { message: 'not found' });
+  }) as unknown as typeof fetch;
+  const kashier = new KashierBillingProvider({
+    baseUrl: 'https://kashier.test',
+    merchantId: 'MID-1-1',
+    secretKey: 'billing-secret',
+    apiKey: KEY,
+    fetchImpl: kashierFetch,
+  });
+
+  const signedDelivery = (event: string, order: string, txn: string, amount: string) => {
+    const data: Record<string, unknown> = {
+      merchantOrderId: order,
+      transactionId: txn,
+      status: 'SUCCESS',
+      amount,
+      currency: 'EGP',
+      signatureKeys: ['amount', 'currency', 'merchantOrderId', 'status', 'transactionId'],
+    };
+    const sig = crypto
+      .createHmac('sha256', KEY)
+      .update(kashierSignaturePayload(data, data.signatureKeys as string[]))
+      .digest('hex');
+    return { raw: JSON.stringify({ event, data }), headers: { 'x-kashier-signature': sig } };
+  };
+
+  // Kashier's card checkout is off until Kashier enables no-charge tokenization
+  // (EBDA-FUNNEL-2); this suite opens it to reach the webhook path the route already serves.
+  Object.assign(kashier, { capabilities: { cardSetupWithoutCharge: true } });
+  beforeAll(() => setBillingProviderForTests(kashier));
+  afterAll(async () => {
+    setBillingProviderForTests(stub);
+    await withRlsBypass(tx =>
+      tx.billingWebhookEvent.deleteMany({ where: { provider: 'kashier' } })
+    );
+  });
+
+  it('a genuine CHARGE delivery relabelled as a refund still activates the plan (the record is applied)', async () => {
+    const storeId = await makeStore();
+    const { billingEventId } = await startCheckout({ storeId, planCode: PRO, provider: kashier });
+    const txn = `TX-bill-${crypto.randomUUID().slice(0, 8)}`;
+    txnRecords.set(txn, { order: billingEventId, operation: 'pay', status: 'SUCCESS' });
+    const w = signedDelivery('refund', billingEventId, txn, '499.00');
+    const res = await handleBillingWebhook('kashier', w.raw, w.headers);
+    expect(res).toMatchObject({ duplicate: false, outcome: 'processed' });
+    expect((await getSub(storeId)).status).toBe('active');
+    const [row] = await ledger(storeId);
+    expect(row.status).toBe('succeeded');
+  });
+
+  it('when Kashier cannot confirm, nothing is applied or marked seen; the redelivery applies it', async () => {
+    const storeId = await makeStore();
+    const { billingEventId } = await startCheckout({ storeId, planCode: PRO, provider: kashier });
+    const txn = `TX-bill-${crypto.randomUUID().slice(0, 8)}`;
+    txnRecords.set(txn, { order: billingEventId, operation: 'pay', status: 'SUCCESS' });
+    const w = signedDelivery('pay', billingEventId, txn, '499.00');
+    detailsDown = true;
+    try {
+      await expect(handleBillingWebhook('kashier', w.raw, w.headers)).rejects.toThrow();
+    } finally {
+      detailsDown = false;
+    }
+    expect((await getSubOrNull(storeId))?.status).not.toBe('active');
+    expect(
+      await withRlsBypass(tx =>
+        tx.billingWebhookEvent.count({ where: { provider: 'kashier', eventId: `${txn}:SUCCESS` } })
+      )
+    ).toBe(0);
+    const again = await handleBillingWebhook('kashier', w.raw, w.headers);
+    expect(again).toMatchObject({ duplicate: false, outcome: 'processed' });
+    expect((await getSub(storeId)).status).toBe('active');
   });
 });

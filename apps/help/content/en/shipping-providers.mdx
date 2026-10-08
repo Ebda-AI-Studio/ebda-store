@@ -5,7 +5,7 @@ section: Selling
 order: 7
 status: soon
 appPath: /stores
-keywords: shipping carrier bosta shipblu mylerz aramex connect api key cod cash on delivery label tracking sandbox test connection
+keywords: shipping carrier bosta shipblu mylerz aramex connect api key cod cash on delivery label tracking sandbox test connection pickup courier pickup request
 ---
 
 <Callout type="soon" title="Coming soon">
@@ -37,14 +37,32 @@ delivery are between you and the carrier, not Ebda. Connecting is only a credent
 5. Fill in your **pickup address** and the carrier's settings on the same card.
 
 When an order is ready, **Ship** books the parcel with your default carrier. The cash to collect is the
-order's unpaid cash-on-delivery amount, sent in EGP. Printing the label, tracking and cancelling are on
-the order.
+order's unpaid cash-on-delivery amount, sent in EGP. Printing the label, tracking, cancelling and
+requesting the courier pickup are on the order.
+
+## Courier pickup
+
+Once a parcel is booked with Bosta, Aramex or Mylerz, the order's shipment card has **Request pickup**:
+
+1. Choose the **pickup date** (today up to 14 days ahead, Cairo time).
+2. **Aramex:** choose the window the courier can come (from / to). **Mylerz:** choose one of Mylerz's own
+   time slots. **Bosta:** Bosta assigns the time slot itself and the card shows it after the request.
+3. Press **Send pickup request**. The courier comes to the **pickup address** saved on the carrier's card.
+
+The card then shows the request (Requested, Failed or Cancelled), the carrier's reference and the slot.
+Pressing the button twice, or again while a pickup is already requested, never books a second courier.
+If the carrier does not answer, the request shows **Failed** with a note: the pickup may still have been
+booked, so check the carrier's dashboard before asking again.
+
+**Cancel pickup** is on the card for Bosta and Aramex. Mylerz has no cancel in its API: cancel it in your
+Mylerz portal. ShipBlu requests the pickup itself when the parcel is booked, so its card only shows that.
 
 ## Bosta
 
 - **API key:** Bosta dashboard > Settings > API Integration > Request OTP > Create API key. Bosta shows
   the key once. Give it **Read/Write** access, or **Full** access if you want Ebda to cancel deliveries.
-- **Pickup location ID (optional):** Settings > Pickup locations. Empty uses your default location.
+- **Pickup location ID:** Settings > Pickup locations. Empty uses your default location for parcels;
+  **Request pickup** needs it filled in.
 - **Tracking:** Bosta pushes every status change to Ebda automatically. Nothing to paste: Ebda gives
   Bosta the callback address and a secret header with each delivery. If you use a firewall, Bosta calls
   from 34.89.199.241 and 35.246.223.19.

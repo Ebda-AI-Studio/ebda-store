@@ -35,6 +35,8 @@ import {
   ShipmentStatus,
   ShippingCarrierProvider,
   TrackingHistoryEntry,
+  type CarrierPickupRequest,
+  type CarrierPickupResult,
 } from './types';
 import {
   carrierRequest,
@@ -295,6 +297,8 @@ export interface BostaPickupInput {
 export interface BostaPickupResult {
   /** Bosta's pickup request id (PUID). */
   pickupId?: string;
+  /** The pickup document id (`_id`, e.g. '070000002519'): what GET/PUT/DELETE /pickups/{id} take. */
+  id?: string;
   scheduledDate?: string;
   scheduledTimeSlot?: string;
   state?: string;
@@ -311,6 +315,11 @@ export class BostaCarrier implements ShippingCarrierProvider {
     webhooks: true,
     polling: true,
     cod: true,
+    // POST /pickups takes a date only; Bosta assigns the time slot (`scheduledTimeSlot`).
+    pickup: 'request',
+    pickupWindow: 'none',
+    // DELETE /pickups/{id} ("Deletes a pickup by ID").
+    pickupCancel: true,
   };
   readonly webhookHeader = { name: BOSTA_WEBHOOK_HEADER, valueFor: webhookHeaderValue };
 
@@ -778,10 +787,63 @@ export class BostaCarrier implements ShippingCarrierProvider {
     const d: Body = res.body.data ?? {};
     return {
       pickupId: d.puid ? String(d.puid) : d._id ? String(d._id) : undefined,
+      id: d._id ? String(d._id) : undefined,
       scheduledDate: d.scheduledDate,
       scheduledTimeSlot: d.scheduledTimeSlot,
       state: typeof d.state === 'string' ? d.state : undefined,
     };
+  }
+
+  /** Shared pickup action (PROVIDERS-18): one pickup for the shipment's parcels on `date`. */
+  async schedulePickup(
+    credentials: BostaCredentials,
+    req: CarrierPickupRequest,
+    ctx?: CarrierCallContext
+  ): Promise<CarrierPickupResult> {
+    const out = await this.requestPickup(
+      credentials,
+      {
+        scheduledDate: req.date,
+        numberOfParcels: Math.max(1, req.trackingNumbers.length),
+        contactPerson: {
+          name: req.address.name,
+          phone: req.address.phone,
+          email: req.address.email,
+        },
+        trackingNumbers: req.trackingNumbers,
+      },
+      ctx
+    );
+    const id = out.id ?? out.pickupId;
+    if (!id) {
+      // Bosta answered 2xx without a pickup: it MAY exist; the merchant checks the dashboard.
+      throw new CarrierError('CARRIER_UNAVAILABLE', 'bosta.pickup: no pickup id in the answer');
+    }
+    return { carrierPickupId: id, carrierReference: out.pickupId, timeSlot: out.scheduledTimeSlot };
+  }
+
+  /** DELETE /pickups/{id}. UNVERIFIED: which states Bosta still lets a business delete. */
+  async cancelPickup(
+    credentials: BostaCredentials,
+    pickup: { carrierPickupId: string },
+    ctx?: CarrierCallContext
+  ): Promise<CarrierCancelResult> {
+    const res = await this.call<Body>(
+      'bosta.pickup.cancel',
+      credentials,
+      ctx,
+      `/pickups/${encodeURIComponent(pickup.carrierPickupId)}`,
+      { method: 'DELETE' },
+      [400]
+    );
+    if (res.status === 400) {
+      const msg = typeof res.body?.message === 'string' ? res.body.message : '';
+      return {
+        status: 'not_cancellable',
+        message: `Bosta did not cancel the pickup${msg ? `: ${msg.slice(0, 200)}` : ''}`,
+      };
+    }
+    return { status: 'cancelled' };
   }
 
   // ---------------------------------------------------------------- tracking (spec 3a, 7)

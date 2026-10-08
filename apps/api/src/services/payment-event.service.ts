@@ -23,7 +23,12 @@ export type PaymentEventType =
   | 'webhook' // provider webhook receipt (may or may not flip status)
   | 'refund' // refund issued (admin or webhook driven)
   | 'admin_action' // admin manually marked failed / disputed / etc
-  | 'reconciliation'; // settlement-vs-row diff written by a future cron
+  | 'reconciliation' // settlement-vs-row diff written by a future cron
+  // PROVIDERS-17 confirm-before-apply: a webhook checked server-to-server with the gateway
+  | 'webhook_confirmed' // the gateway's record matched the delivery
+  | 'webhook_corrected'; // the delivery's label disagreed; the gateway's record was applied
+// (a delivery that could NOT be confirmed writes no row: its transaction rolls back; the reason
+// is on the webhook inbox row's lastError, see confirmBeforeApply)
 
 interface RecordPaymentEventInput {
   paymentId: string;

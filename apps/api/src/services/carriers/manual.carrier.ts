@@ -27,6 +27,9 @@ export class ManualCarrier implements ShippingCarrierProvider {
     webhooks: false,
     polling: false,
     cod: true,
+    pickup: 'none',
+    pickupWindow: 'none',
+    pickupCancel: false,
   };
 
   async createShipment(
