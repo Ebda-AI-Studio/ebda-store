@@ -49,7 +49,6 @@ import {
 } from '@api/services/billing/subscription-billing.service';
 import {
   chooseInstapay,
-  createPaymentClaim,
   enforceStoreAllowance,
   reconcileStoreAccess,
   recordManualPayment,
@@ -69,6 +68,12 @@ import { errorHandler } from '@api/middleware/error-handler';
 import { config } from '@api/config';
 import adminRoutes from '@api/routes/admin.routes';
 import { hasDb } from '../helpers/bundle-fixtures';
+import {
+  freshReference,
+  mockPrivateStorage,
+  resetModel,
+  submitTestSubscriptionReceipt,
+} from '../helpers/instapay-receipt-fixtures';
 
 // Card paths are exercised explicitly; the product default is InstaPay-only.
 process.env.BILLING_TRIAL_CARD_MODE = 'card_on_file';
@@ -159,11 +164,14 @@ beforeEach(() => {
   emailSpy = vi.spyOn(EmailService, 'sendSubscriptionBillingNotice').mockResolvedValue(undefined);
   vi.spyOn(EmailService, 'sendWelcome').mockResolvedValue(undefined as never);
   vi.spyOn(socketService, 'notifyStore').mockImplementation(() => undefined);
+  // The InstaPay receipt screenshot goes to the private bucket: in-memory here.
+  mockPrivateStorage();
 });
 
 afterAll(async () => {
   if (!hasDb) return;
   setBillingProviderForTests(null);
+  resetModel();
   delete process.env.EBDA_INSTAPAY_HANDLE;
   await withRlsBypass(async tx => {
     const users = await tx.user.findMany({
@@ -446,11 +454,12 @@ describe.skipIf(!hasDb)('signup funnel', () => {
         expect.anything()
       );
 
-      // The merchant's claim alone activates nothing.
-      const claim = await createPaymentClaim({ storeId, payerReference: `IP${run}A` });
+      // The merchant's receipt (screenshot + checked fields) alone activates nothing.
+      const ipRef = freshReference();
+      const { claim } = await submitTestSubscriptionReceipt(storeId, { reference: ipRef });
       expect(claim.status).toBe('pending');
       await expect(
-        createPaymentClaim({ storeId, payerReference: `IP${run}A` })
+        submitTestSubscriptionReceipt(storeId, { reference: ipRef })
       ).rejects.toMatchObject({
         code: 'DUPLICATE_REFERENCE',
       });
@@ -491,7 +500,7 @@ describe.skipIf(!hasDb)('signup funnel', () => {
         interval: 'monthly' as const,
         amountMinor: await planPrice('growth', 'monthly'),
         method: 'instapay' as const,
-        reference: `IP${run}A`,
+        reference: ipRef,
         paidAt: new Date(),
         periodStart,
         periodEnd,
@@ -500,7 +509,10 @@ describe.skipIf(!hasDb)('signup funnel', () => {
       };
       const rec = await recordManualPayment(input);
       expect(rec.duplicate).toBe(false);
-      const rec2 = await recordManualPayment({ ...input, reference: ` ip${run}a ` });
+      const rec2 = await recordManualPayment({
+        ...input,
+        reference: ` ${ipRef.slice(0, 4)} ${ipRef.slice(4)} `,
+      });
       expect(rec2).toEqual({ duplicate: true, billingEventId: rec.billingEventId });
       expect((await ledger(storeId)).filter(r => r.type === 'manual_payment')).toHaveLength(1);
       expect(await storeRow(storeId)).toMatchObject({
@@ -690,7 +702,7 @@ describe.skipIf(!hasDb)('signup funnel', () => {
       const b = await trialStore('rlsinsta');
       await asApp(async () => {
         await chooseInstapay(b.storeId);
-        await createPaymentClaim({ storeId: b.storeId, payerReference: `RLS${run}` });
+        await submitTestSubscriptionReceipt(b.storeId);
         // As the route runs it: in the store's scope (router.param tenantContext).
         await runInStoreScope(b.storeId, () => OnboardingService.goLive(b.storeId));
       });

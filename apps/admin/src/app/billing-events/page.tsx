@@ -29,6 +29,7 @@ import { useT } from '../../i18n/useT';
 import { useLatestRequest } from '../../hooks/useLatestRequest';
 import { ClaimsPanel } from './_components/ClaimsPanel';
 import { ManualPaymentForm, type ManualPaymentPrefill } from './_components/ManualPaymentForm';
+import { ManualRefundForm, type ManualRefundTarget } from './_components/ManualRefundForm';
 import { SubscriptionsPanel } from './_components/SubscriptionsPanel';
 
 interface LedgerRow {
@@ -71,7 +72,13 @@ function statusVariant(s: string): 'success' | 'warning' | 'destructive' | 'defa
   return 'default';
 }
 
-function LedgerPanel({ refreshSignal }: { refreshSignal: number }) {
+function LedgerPanel({
+  refreshSignal,
+  onRecordRefund,
+}: {
+  refreshSignal: number;
+  onRecordRefund: (target: ManualRefundTarget) => void;
+}) {
   const t = useT('billingEvents');
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const [rows, setRows] = useState<LedgerRow[]>([]);
@@ -214,7 +221,17 @@ function LedgerPanel({ refreshSignal }: { refreshSignal: number }) {
       header: t('columns.action'),
       mobileActions: true,
       cell: r =>
-        r.status === 'succeeded' && r.type !== 'refund' && r.providerRef ? (
+        r.status === 'succeeded' && r.type === 'manual_payment' ? (
+          // Money recorded by hand went back by hand too: record it, never call a gateway.
+          <Button
+            variant="outline"
+            size="sm"
+            className="max-md:min-h-11 max-md:px-4"
+            onClick={() => onRecordRefund({ eventId: r.id, storeName: r.storeName })}
+          >
+            {t('recordRefund')}
+          </Button>
+        ) : r.status === 'succeeded' && r.type !== 'refund' && r.providerRef ? (
           <Button
             variant="outline"
             size="sm"
@@ -299,6 +316,7 @@ function BillingEventsInner() {
   const [tab, setTab] = useState<(typeof TABS)[number]>('ledger');
   const [refreshKey, setRefreshKey] = useState(0);
   const [form, setForm] = useState<ManualPaymentPrefill | null>(null);
+  const [refundTarget, setRefundTarget] = useState<ManualRefundTarget | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   return (
@@ -330,7 +348,9 @@ function BillingEventsInner() {
           </div>
         )}
 
-        {tab === 'ledger' && <LedgerPanel refreshSignal={refreshKey} />}
+        {tab === 'ledger' && (
+          <LedgerPanel refreshSignal={refreshKey} onRecordRefund={setRefundTarget} />
+        )}
         {tab === 'subscriptions' && (
           <SubscriptionsPanel refreshKey={refreshKey} onRecordPayment={setForm} />
         )}
@@ -340,6 +360,22 @@ function BillingEventsInner() {
             onConfirm={setForm}
             onChanged={m => {
               setMessage(m);
+              setRefreshKey(k => k + 1);
+            }}
+          />
+        )}
+
+        {refundTarget && (
+          <ManualRefundForm
+            target={refundTarget}
+            onClose={() => setRefundTarget(null)}
+            onDone={(outcome, voidedEventId) => {
+              setRefundTarget(null);
+              setMessage(
+                voidedEventId
+                  ? t('manualRefund.voidedFreed', { id: voidedEventId })
+                  : t(outcome === 'duplicate' ? 'manualRefund.duplicate' : 'manualRefund.done')
+              );
               setRefreshKey(k => k + 1);
             }}
           />

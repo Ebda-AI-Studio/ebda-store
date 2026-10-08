@@ -203,6 +203,27 @@ export function zonedDayStart(day: string, timeZone: string): Date | undefined {
   return new Date(t);
 }
 
+/**
+ * The instant a wall-clock `YYYY-MM-DD` + `HH:mm` happens in `timeZone` (DST-aware,
+ * same two-pass method as `zonedDayStart`). Undefined when either part is invalid.
+ */
+export function zonedLocalToUtc(day: string, hhmm: string, timeZone: string): Date | undefined {
+  const m = DAY_RE.exec(day);
+  const t = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hhmm);
+  if (!m || !t) return undefined;
+  const wall = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(t[1]), Number(t[2]));
+  if (Number.isNaN(wall) || new Date(wall).toISOString().slice(0, 10) !== day) return undefined;
+  let u = wall - offsetAt(new Date(wall), timeZone);
+  u = wall - offsetAt(new Date(u), timeZone);
+  return new Date(u);
+}
+
+/** `HH:mm` wall-clock time of an instant in `timeZone`. */
+export function zonedClock(d: Date, timeZone: string): string {
+  const w = wallClock(d, timeZone);
+  return `${String(w.hour).padStart(2, '0')}:${String(w.minute).padStart(2, '0')}`;
+}
+
 /** The last millisecond of `YYYY-MM-DD` in `timeZone` (next day's start − 1ms). */
 export function zonedDayEnd(day: string, timeZone: string): Date | undefined {
   const start = zonedDayStart(day, timeZone);

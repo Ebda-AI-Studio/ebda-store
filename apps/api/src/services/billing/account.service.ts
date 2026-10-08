@@ -21,8 +21,24 @@ import logger from '../../lib/logger';
 import { getEntitlements } from '../plan-entitlements';
 import { bustStoreCaches } from '../store.service';
 import { featureService } from '../feature.service';
-import { isInterval, type BillingInterval } from './period';
-import { lookupStore } from '../../lib/definer';
+import {
+  INSTAPAY_GRACE_DAYS,
+  addDays,
+  addInterval,
+  isInterval,
+  type BillingInterval,
+} from './period';
+import { normalizeInstapayReference, type InstapayReceiptFields } from '@force/shared';
+import {
+  InstapayReceiptService,
+  sniffReceiptMime,
+  toReceiptView,
+} from '../payment-providers/instapay-receipt.service';
+import { StorageService } from '../storage.service';
+// Cycle-safe: billing-notify imports this module too; both only call each other at run time.
+import { runBillingEffects } from './billing-notify';
+import { getEntityStoreId, lookupStore } from '../../lib/definer';
+import { withSavepoint } from '../../lib/savepoint';
 import { loadPayablePlan } from './subscription-billing.service';
 import { instapayHandle, instapayQrUrl } from './manual-config';
 import {
@@ -84,6 +100,8 @@ export async function restoreFromBilling(
   );
   if (count === 0) return false;
   await afterStatusChange(storeId);
+  // Tell the merchant the store is back (audit #11).
+  await runBillingEffects([{ kind: 'store_restored', storeId, reason }]);
   await auditLog({
     action: 'billing.store_restored',
     resourceType: 'store',
@@ -246,19 +264,47 @@ export async function instapayDetails(storeId: string) {
 }
 
 /**
+ * Paying for a store beyond the owner's store allowance buys nothing: the allowance
+ * follows the OLDEST store's plan, so the extra store would be suspended again at once
+ * (audit M4). Refuse with the store to pay on instead (409 PAY_ON_PARENT_STORE).
+ */
+export async function assertPayableStore(storeId: string): Promise<void> {
+  const store = await withStore(storeId, tx =>
+    tx.store.findUnique({
+      where: { id: storeId },
+      select: { ownerId: true, billingSuspendedReason: true },
+    })
+  );
+  if (!store?.ownerId) return;
+  const { rank, allowance } = await storeRank(storeId);
+  if (store.billingSuspendedReason !== 'over_store_limit' && (rank < 0 || rank < allowance)) return;
+  const stores = await ownerStores(store.ownerId);
+  const parentStoreId = stores[0]?.id ?? null;
+  if (!parentStoreId || parentStoreId === storeId) return;
+  throw new AppError(
+    409,
+    'PAY_ON_PARENT_STORE',
+    'This store is paused because your plan allows fewer stores. Upgrade your main store to bring it back.',
+    { parentStoreId, allowance: Number.isFinite(allowance) ? allowance : null }
+  );
+}
+
+/**
  * The merchant picks how the subscription is paid. `instapay` needs the handle
  * configured (fail closed) and gets a unique payment reference once. `card` is
- * recorded by the card-setup webhook, not here.
+ * recorded by the card-setup webhook, not here. A CANCELED store may choose it
+ * too: paying is how it comes back (audit #2).
  */
 export async function chooseInstapay(storeId: string) {
   if (!instapayHandle()) {
     throw new AppError(409, 'INSTAPAY_NOT_CONFIGURED', 'InstaPay is not available right now');
   }
+  await assertPayableStore(storeId);
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const updated = await withStore(storeId, async tx => {
         const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
-        if (!sub || !['trialing', 'active', 'past_due'].includes(sub.status)) {
+        if (!sub || !['trialing', 'active', 'past_due', 'canceled'].includes(sub.status)) {
           throw new AppError(
             409,
             'NO_BILLABLE_SUBSCRIPTION',
@@ -283,69 +329,174 @@ export async function chooseInstapay(storeId: string) {
   throw new AppError(503, 'REFERENCE_UNAVAILABLE', 'Try again');
 }
 
+/**
+ * InstaPay plan choice (audit M3): the plan + interval the NEXT InstaPay payment
+ * buys, for any state — trialing (billed at trial end), active/past_due (upgrade or
+ * downgrade: applied when the payment is approved), canceled (paying brings the store
+ * back). Nothing is charged and nothing changes tier here; the approved payment does.
+ * Card subscriptions keep `changePlan`.
+ */
+export async function chooseInstapayPlan(args: {
+  storeId: string;
+  planCode: string;
+  interval: BillingInterval;
+}) {
+  const { plan } = await loadPayablePlan(args.planCode, args.interval);
+  if (!plan.isPublic) {
+    throw new AppError(400, 'PLAN_NOT_PURCHASABLE', 'This plan cannot be purchased');
+  }
+  await assertPayableStore(args.storeId);
+  await withStore(args.storeId, async tx => {
+    const sub = await tx.storeSubscription.findUnique({ where: { storeId: args.storeId } });
+    if (!sub) throw new AppError(409, 'NO_SUBSCRIPTION', 'This store has no subscription');
+    if (sub.status === 'comped') {
+      throw new AppError(409, 'STORE_COMPED', 'Comped stores are not billed');
+    }
+    if (sub.billingMethod === 'card' && sub.providerPaymentMethodRef && sub.status !== 'canceled') {
+      throw new AppError(409, 'USE_CHANGE_PLAN', 'This store pays by card: use change plan');
+    }
+    const samePlan =
+      sub.status !== 'canceled' && sub.status !== 'trialing' && plan.code === sub.planCode;
+    await tx.storeSubscription.update({
+      where: { storeId: args.storeId },
+      data: {
+        pendingPlanCode: samePlan ? null : plan.code,
+        billingInterval: args.interval,
+        cancelAtPeriodEnd: false,
+      },
+    });
+  });
+  await chooseInstapay(args.storeId);
+  return instapayDetails(args.storeId);
+}
+
+// ───────────────────────────── period rule ────────────────────────────────
+
+/**
+ * Where a manually paid period starts (audit M2): never before the time the store
+ * already has. Paying early (reminders start 7 days ahead) starts at the current period
+ * end; paying during the trial starts at the trial end; paying late, or from canceled,
+ * starts now. Pure: unit-tested and mutation-checked.
+ */
+export function manualPeriodFor(
+  sub: { status: string; trialEndsAt: Date | null; currentPeriodEnd: Date | null } | null,
+  interval: BillingInterval,
+  now: Date
+): { periodStart: Date; periodEnd: Date } {
+  let start = now;
+  if (sub?.status === 'trialing' && sub.trialEndsAt && sub.trialEndsAt > now) {
+    start = sub.trialEndsAt;
+  } else if (
+    (sub?.status === 'active' || sub?.status === 'past_due') &&
+    sub.currentPeriodEnd &&
+    sub.currentPeriodEnd > now
+  ) {
+    start = sub.currentPeriodEnd;
+  }
+  return { periodStart: start, periodEnd: addInterval(start, interval) };
+}
+
+export async function suggestManualPeriod(
+  storeId: string,
+  interval: BillingInterval,
+  now: Date = new Date()
+) {
+  const sub = await withStore(storeId, tx =>
+    tx.storeSubscription.findUnique({ where: { storeId } })
+  );
+  return manualPeriodFor(sub, interval, now);
+}
+
 // ───────────────────────────── claims ─────────────────────────────────────
 
-const PROOF_URL = /^https:\/\/[^\s]{1,480}$/;
-
-/** Merchant: "I paid by InstaPay" with the transfer reference. Never activates anything. */
-export async function createPaymentClaim(args: {
+/**
+ * Merchant: submit the InstaPay receipt for the subscription (the screenshot was
+ * uploaded first, the AI pre-filled it, the merchant corrected it). Creates the claim
+ * the super-admin reviews. NEVER activates anything (only the super-admin's recorded
+ * payment does).
+ */
+export async function submitSubscriptionReceipt(args: {
   storeId: string;
-  payerReference: string;
-  proofUrl?: string | null;
+  receiptId: string;
+  fields: InstapayReceiptFields;
+  now?: Date;
 }) {
-  const payerReference = args.payerReference.trim();
-  if (!/^[A-Za-z0-9._\-/ ]{4,64}$/.test(payerReference)) {
-    throw new AppError(400, 'INVALID_REFERENCE', 'Enter the InstaPay transaction reference');
-  }
-  if (args.proofUrl && !PROOF_URL.test(args.proofUrl)) {
-    throw new AppError(400, 'INVALID_PROOF_URL', 'The screenshot link is not valid');
-  }
+  const now = args.now ?? new Date();
+  await assertPayableStore(args.storeId);
   const details = await instapayDetails(args.storeId);
   if (!details?.reference || !details.amountMinor) {
-    throw new AppError(409, 'INSTAPAY_NOT_CHOSEN', 'Choose InstaPay first');
+    throw new AppError(409, 'INSTAPAY_NOT_CHOSEN', 'Choose a plan and InstaPay first');
   }
-  try {
-    return await withStore(args.storeId, async tx => {
-      const sub = await tx.storeSubscription.findUnique({ where: { storeId: args.storeId } });
-      const pending = await tx.manualPaymentClaim.count({
-        where: { storeId: args.storeId, status: 'pending' },
-      });
-      if (pending >= 3) {
-        throw new AppError(
-          429,
-          'TOO_MANY_PENDING_CLAIMS',
-          'We are still checking your earlier payments'
-        );
-      }
-      return tx.manualPaymentClaim.create({
-        data: {
-          storeId: args.storeId,
-          subscriptionId: sub?.id ?? null,
-          planCode: details.planCode,
-          billingInterval: details.interval,
-          amountMinor: details.amountMinor!,
-          method: 'instapay',
-          paymentReference: details.reference!,
-          payerReference,
-          proofUrl: args.proofUrl ?? null,
-        },
-      });
+  const reference = normalizeInstapayReference(args.fields.reference)!;
+  return withStore(args.storeId, async tx => {
+    const sub = await tx.storeSubscription.findUnique({ where: { storeId: args.storeId } });
+    const pending = await tx.manualPaymentClaim.count({
+      where: { storeId: args.storeId, status: 'pending' },
     });
-  } catch (err) {
-    if ((err as { code?: string }).code === 'P2002') {
+    if (pending >= 3) {
+      throw new AppError(
+        429,
+        'TOO_MANY_PENDING_CLAIMS',
+        'We are still checking your earlier payments'
+      );
+    }
+    const lastPaid = await tx.billingEvent.findFirst({
+      where: { storeId: args.storeId, type: 'manual_payment', status: 'succeeded' },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+    const oldest = new Date(now.getTime() - 30 * 86_400_000);
+    const notBefore = lastPaid && lastPaid.createdAt > oldest ? lastPaid.createdAt : oldest;
+    const receipt = await InstapayReceiptService.submit({
+      storeId: args.storeId,
+      receiptId: args.receiptId,
+      scope: { kind: 'subscription' },
+      fields: args.fields,
+      expectedAmountMinor: details.amountMinor,
+      expectedReceivers: details.handle ? [details.handle] : [],
+      notBefore,
+      now,
+    });
+    let claim;
+    try {
+      claim = await withSavepoint(() =>
+        tx.manualPaymentClaim.create({
+          data: {
+            storeId: args.storeId,
+            subscriptionId: sub?.id ?? null,
+            planCode: details.planCode,
+            billingInterval: details.interval,
+            amountMinor: details.amountMinor!,
+            method: 'instapay',
+            paymentReference: details.reference!,
+            payerReference: reference,
+          },
+        })
+      );
+    } catch (err) {
+      if ((err as { code?: string }).code !== 'P2002') throw err;
+      // A legacy claim already holds this transfer reference: undo the receipt claim.
+      await tx.instapayReceipt.updateMany({
+        where: { id: receipt.id, storeId: args.storeId },
+        data: { status: 'draft', referenceKey: null, submittedAt: null },
+      });
       throw new AppError(
         409,
         'DUPLICATE_REFERENCE',
-        'This transaction reference was already submitted'
+        'This transfer reference was already used. Each transfer can pay only once.'
       );
     }
-    throw err;
-  }
+    const linked = await tx.instapayReceipt.update({
+      where: { id: receipt.id, storeId: args.storeId },
+      data: { claimId: claim.id },
+    });
+    return { claim, receipt: toReceiptView(linked) };
+  });
 }
 
 export async function listStoreClaims(storeId: string) {
-  return withStore(storeId, tx =>
-    tx.manualPaymentClaim.findMany({
+  return withStore(storeId, async tx => {
+    const claims = await tx.manualPaymentClaim.findMany({
       where: { storeId },
       orderBy: { createdAt: 'desc' },
       take: 20,
@@ -362,29 +513,63 @@ export async function listStoreClaims(storeId: string) {
         createdAt: true,
         reviewedAt: true,
       },
-    })
-  );
+    });
+    const receipts = claims.length
+      ? await tx.instapayReceipt.findMany({
+          where: { storeId, claimId: { in: claims.map(c => c.id) } },
+        })
+      : [];
+    return claims.map(c => {
+      const r = receipts.find(x => x.claimId === c.id);
+      return { ...c, receipt: r ? toReceiptView(r) : null };
+    });
+  });
 }
 
 /** Super-admin queue: claims across stores (each read in its own store scope). */
 export async function listClaimsForAdmin(status: 'pending' | 'confirmed' | 'rejected' = 'pending') {
-  const parts = await acrossStores(storeId =>
-    prisma.manualPaymentClaim.findMany({
+  const now = new Date();
+  const parts = await acrossStores(async storeId => {
+    const claims = await prisma.manualPaymentClaim.findMany({
       where: { storeId, status },
-      include: { store: { select: { name: true, slug: true, status: true } } },
+      include: {
+        store: { select: { name: true, slug: true, status: true, billingSuspendedReason: true } },
+      },
       orderBy: { createdAt: 'asc' },
       take: 200,
-    })
-  );
+    });
+    if (claims.length === 0) return [];
+    const [receipts, sub] = await Promise.all([
+      prisma.instapayReceipt.findMany({
+        where: { storeId, claimId: { in: claims.map(c => c.id) } },
+      }),
+      prisma.storeSubscription.findUnique({ where: { storeId } }),
+    ]);
+    return claims.map(c => {
+      const r = receipts.find(x => x.claimId === c.id);
+      const interval: BillingInterval = isInterval(c.billingInterval)
+        ? c.billingInterval
+        : 'monthly';
+      const period = manualPeriodFor(sub, interval, now);
+      return {
+        claim: c,
+        receipt: r ? toReceiptView(r) : null,
+        period,
+        subStatus: sub?.status ?? null,
+      };
+    });
+  });
   return parts
     .flatMap(p => p.value)
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-    .map(c => ({
+    .sort((a, b) => a.claim.createdAt.getTime() - b.claim.createdAt.getTime())
+    .map(({ claim: c, receipt, period, subStatus }) => ({
       id: c.id,
       storeId: c.storeId,
       storeName: c.store.name,
       storeSlug: c.store.slug,
       storeStatus: c.store.status,
+      storeSuspendedReason: c.store.billingSuspendedReason,
+      subscriptionStatus: subStatus,
       planCode: c.planCode,
       billingInterval: c.billingInterval,
       amountMinor: c.amountMinor,
@@ -393,9 +578,18 @@ export async function listClaimsForAdmin(status: 'pending' | 'confirmed' | 'reje
       payerReference: c.payerReference,
       proofUrl: c.proofUrl,
       status: c.status,
+      reviewNote: c.reviewNote,
       createdAt: c.createdAt,
+      receipt,
+      /** The period an approval would record (audit M2: never burns paid days). */
+      suggestedPeriodStart: period.periodStart,
+      suggestedPeriodEnd: period.periodEnd,
     }));
 }
+
+/** A rejected/voided claim frees its transfer reference (the claim's unique index) for re-filing. */
+const freedReference = (ref: string, claimId: string, tag: 'rejected' | 'voided') =>
+  `${ref}#${tag}-${claimId.slice(0, 8)}`.slice(0, 120);
 
 export async function rejectClaim(args: {
   storeId: string;
@@ -403,18 +597,38 @@ export async function rejectClaim(args: {
   note: string;
   actorId: string;
 }) {
-  const { count } = await withStore(args.storeId, tx =>
-    tx.manualPaymentClaim.updateMany({
+  const note = args.note.trim();
+  if (note.length < 3)
+    throw new AppError(400, 'REASON_REQUIRED', 'Write why the payment is rejected');
+  await withStore(args.storeId, async tx => {
+    const claim = await tx.manualPaymentClaim.findFirst({
       where: { id: args.claimId, storeId: args.storeId, status: 'pending' },
+    });
+    if (!claim) throw new AppError(409, 'CLAIM_NOT_PENDING', 'This claim is not pending');
+    await tx.manualPaymentClaim.update({
+      where: { id: claim.id, storeId: args.storeId },
       data: {
         status: 'rejected',
-        reviewNote: args.note.slice(0, 500),
+        payerReference: freedReference(claim.payerReference, claim.id, 'rejected'),
+        reviewNote: note.slice(0, 500),
         reviewedBy: args.actorId,
         reviewedAt: new Date(),
       },
-    })
-  );
-  if (count === 0) throw new AppError(409, 'CLAIM_NOT_PENDING', 'This claim is not pending');
+    });
+    const receipt = await tx.instapayReceipt.findFirst({
+      where: { storeId: args.storeId, claimId: claim.id },
+      select: { id: true },
+    });
+    if (receipt) {
+      await InstapayReceiptService.markReviewed(
+        args.storeId,
+        receipt.id,
+        { status: 'rejected', note },
+        args.actorId
+      );
+    }
+  });
+  await runBillingEffects([{ kind: 'payment_rejected', storeId: args.storeId, note }]);
 }
 
 // ─────────────────────────── manual payment ───────────────────────────────
@@ -428,27 +642,44 @@ export interface ManualPaymentInput {
   /** The payer's transaction reference (InstaPay txn id, bank ref, receipt no.). */
   reference: string;
   paidAt: Date;
-  periodStart: Date;
-  periodEnd: Date;
+  /**
+   * Omitted (the default) = the period rule (`manualPeriodFor`): never burns paid
+   * days. Given = an explicit operator override (both must be set).
+   */
+  periodStart?: Date | null;
+  periodEnd?: Date | null;
   actorId: string;
   claimId?: string;
+  /**
+   * The ledger is append-only, so a VOIDED payment keeps its key. To record the same
+   * transfer reference for the right store, name the voided payment here: it must be a
+   * voided manual payment with exactly this reference; it can be replaced once.
+   */
+  replacesVoidedEventId?: string | null;
+  now?: Date;
 }
 
-export type ManualPaymentResult = { duplicate: boolean; billingEventId: string };
+export type ManualPaymentResult = {
+  duplicate: boolean;
+  billingEventId: string;
+  periodStart?: Date;
+  periodEnd?: Date;
+};
 
 /** The idempotency key of a manual payment: one per (method, payer reference). */
 export const manualPaymentKey = (method: ManualMethod, reference: string) =>
-  `manual:${method}:${reference.trim().toLowerCase()}`;
+  `manual:${method}:${(method === 'instapay' ? (normalizeInstapayReference(reference) ?? reference) : reference).trim().toLowerCase()}`;
 
 /**
  * Super-admin "Record manual payment & activate". ONE store-scoped transaction:
  * the ledger row (UNIQUE idempotency key = method + payer reference), the
- * subscription period, the store's plan tier and the claim confirmation. A
- * repeat with the same reference changes nothing and returns the first row.
- * Effects (restore an `unpaid` suspension, re-apply the store allowance, caches)
- * run after the commit.
+ * subscription period, the store's plan tier, the claim confirmation and the
+ * receipt approval. A repeat with the same reference changes nothing and returns the
+ * first row. Effects (restore an `unpaid` suspension, re-apply the store allowance,
+ * caches, the merchant's "payment confirmed" notice) run after the commit.
  */
 export async function recordManualPayment(input: ManualPaymentInput): Promise<ManualPaymentResult> {
+  const now = input.now ?? new Date();
   const reference = input.reference.trim();
   if (reference.length < 3 || reference.length > 100) {
     throw new AppError(400, 'INVALID_REFERENCE', 'Enter the payment reference');
@@ -456,33 +687,59 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
   if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0) {
     throw new AppError(400, 'INVALID_AMOUNT', 'The amount must be a positive number of piastres');
   }
-  if (!(input.periodEnd.getTime() > input.periodStart.getTime())) {
+  const explicit = !!input.periodStart || !!input.periodEnd;
+  if (explicit && !(input.periodStart && input.periodEnd)) {
+    throw new AppError(400, 'INVALID_PERIOD', 'Give both the period start and end, or neither');
+  }
+  if (explicit && !(input.periodEnd!.getTime() > input.periodStart!.getTime())) {
     throw new AppError(400, 'INVALID_PERIOD', 'The period must end after it starts');
   }
   const { plan } = await loadPayablePlan(input.planCode, input.interval);
-  const key = manualPaymentKey(input.method, reference);
+  let key = manualPaymentKey(input.method, reference);
+  if (input.replacesVoidedEventId) {
+    const vStore = await getEntityStoreId('billing_event', input.replacesVoidedEventId);
+    const voided = vStore
+      ? await withStore(vStore, async tx => {
+          const ev = await tx.billingEvent.findUnique({
+            where: { id: input.replacesVoidedEventId!, storeId: vStore },
+          });
+          const voidRow = await tx.billingEvent.findUnique({
+            where: {
+              idempotencyKey: `manual-void:${input.replacesVoidedEventId}`,
+              storeId: vStore,
+            },
+          });
+          return ev && voidRow && ev.type === 'manual_payment' && ev.status === 'refunded'
+            ? ev
+            : null;
+        })
+      : null;
+    if (!voided || voided.idempotencyKey !== key) {
+      throw new AppError(
+        409,
+        'NOT_A_VOIDED_PAYMENT',
+        'That payment was not voided, or it has a different reference'
+      );
+    }
+    key = `${key}:after-void:${voided.id}`;
+  }
   // The money received is the gross: carve Ebda's VAT (if ON) out of it for the ledger.
   const paidVat = ledgerVat(vatOfPaidAmount(input.amountMinor, await resolvePlatformVat()));
   // Runs from the super-admin route with no store scope: resolve the store through
   // the definer (any status), then do the writes inside withStore below.
   const store = await lookupStore({ id: input.storeId }, ['active', 'inactive', 'suspended']);
   if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  await assertPayableStore(input.storeId);
 
   const result = await withStore(input.storeId, async (tx: Tx) => {
     const existing = await tx.billingEvent.findUnique({
       where: { idempotencyKey: key, storeId: input.storeId },
     });
-    if (existing) {
-      if (existing.storeId !== input.storeId) {
-        throw new AppError(
-          409,
-          'REFERENCE_USED_ELSEWHERE',
-          'This reference was recorded for another store'
-        );
-      }
-      return { duplicate: true, billingEventId: existing.id };
-    }
+    if (existing) return { duplicate: true, billingEventId: existing.id } as ManualPaymentResult;
     const sub = await tx.storeSubscription.findUnique({ where: { storeId: input.storeId } });
+    const { periodStart, periodEnd } = explicit
+      ? { periodStart: input.periodStart!, periodEnd: input.periodEnd! }
+      : manualPeriodFor(sub, input.interval, now);
     const eventId = crypto.randomUUID();
     const { count } = await tx.billingEvent.createMany({
       data: [
@@ -493,7 +750,7 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
           type: 'manual_payment',
           planCode: plan.code,
           billingInterval: input.interval,
-          forPeriodEnd: input.periodEnd,
+          forPeriodEnd: periodEnd,
           amountMinor: input.amountMinor,
           currency: 'EGP',
           provider: 'manual',
@@ -505,8 +762,11 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
           raw: {
             method: input.method,
             paidAt: input.paidAt.toISOString(),
-            periodStart: input.periodStart.toISOString(),
-            periodEnd: input.periodEnd.toISOString(),
+            periodStart: periodStart.toISOString(),
+            periodEnd: periodEnd.toISOString(),
+            periodRule: explicit ? 'operator_override' : 'max(now, current_end)',
+            previousPeriodEnd: sub?.currentPeriodEnd?.toISOString() ?? null,
+            previousStatus: sub?.status ?? null,
             recordedBy: input.actorId,
           },
         },
@@ -526,7 +786,7 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
           'This reference was recorded for another store'
         );
       }
-      return { duplicate: true, billingEventId: winner.id };
+      return { duplicate: true, billingEventId: winner.id } as ManualPaymentResult;
     }
     const hasCard = !!sub?.provider && !!sub?.providerPaymentMethodRef;
     const billingMethod = sub?.billingMethod === 'instapay' || !hasCard ? 'instapay' : 'card';
@@ -534,8 +794,8 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
       planCode: plan.code,
       status: 'active' as const,
       billingInterval: input.interval,
-      currentPeriodStart: input.periodStart,
-      currentPeriodEnd: input.periodEnd,
+      currentPeriodStart: periodStart,
+      currentPeriodEnd: periodEnd,
       trialEndsAt: null,
       pendingPlanCode: null,
       cancelAtPeriodEnd: false,
@@ -556,21 +816,265 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
         status: 'pending',
         ...(input.claimId
           ? { id: input.claimId }
-          : { method: input.method, payerReference: reference }),
+          : {
+              method: input.method,
+              payerReference: {
+                in: [reference, normalizeInstapayReference(reference) ?? reference],
+              },
+            }),
       },
       data: {
         status: 'confirmed',
         reviewedBy: input.actorId,
-        reviewedAt: new Date(),
+        reviewedAt: now,
         billingEventId: eventId,
       },
     });
-    return { duplicate: false, billingEventId: eventId };
+    // ...and the receipt behind it: approved by the super-admin (the human approval).
+    const confirmed = await tx.manualPaymentClaim.findMany({
+      where: { storeId: input.storeId, billingEventId: eventId },
+      select: { id: true },
+    });
+    if (confirmed.length) {
+      await tx.instapayReceipt.updateMany({
+        where: {
+          storeId: input.storeId,
+          claimId: { in: confirmed.map(c => c.id) },
+          status: 'submitted',
+        },
+        data: { status: 'approved', reviewedBy: input.actorId, reviewedAt: now },
+      });
+    }
+    return { duplicate: false, billingEventId: eventId, periodStart, periodEnd };
   });
 
   if (!result.duplicate) {
     await featureService.invalidateCache(input.storeId).catch(() => undefined);
     await reconcileStoreAccess(input.storeId);
+    await runBillingEffects([
+      {
+        kind: 'payment_confirmed',
+        storeId: input.storeId,
+        planCode: plan.code,
+        periodEnd: result.periodEnd!,
+      },
+    ]);
   }
   return result;
+}
+
+// ───────────────────────── manual refund / void ───────────────────────────
+
+export interface ManualRefundInput {
+  /** The `manual_payment` ledger row. */
+  eventId: string;
+  /**
+   * refund = money went back to the payer outside Ebda (a refund transfer exists);
+   * void = the payment was recorded in error (wrong store, never arrived): the
+   * whole amount is reversed, the merchant's receipt/claim reference is freed, and the
+   * same reference can be recorded for the right store with `replacesVoidedEventId`.
+   */
+  kind: 'refund' | 'void';
+  /** refund: the refund transfer's reference (idempotency key). void: optional. */
+  reference?: string | null;
+  refundedAt: Date;
+  /** Who received the refund, exactly as shown on the refund receipt. */
+  recipientName?: string | null;
+  /** refund: defaults to the remaining amount. void: always the remaining amount. */
+  amountMinor?: number | null;
+  note: string;
+  /** Override where the paid period now ends; default = full reversal -> the period start it bought. */
+  newPeriodEnd?: Date | null;
+  screenshot?: Buffer | null;
+  actorId: string;
+  now?: Date;
+}
+
+/**
+ * Super-admin "Record manual refund / void" for an InstaPay (manual) subscription
+ * payment (audit M1). No money moves here: the refund happened outside Ebda; this
+ * RECORDS it, idempotent on the refund reference (void: one per payment), and adjusts
+ * the paid period. Audit-logged by the route.
+ */
+export async function recordManualRefund(input: ManualRefundInput) {
+  const now = input.now ?? new Date();
+  const note = input.note.trim();
+  if (note.length < 3) throw new AppError(400, 'REASON_REQUIRED', 'Write why');
+  const storeId = await getEntityStoreId('billing_event', input.eventId);
+  if (!storeId) throw new AppError(404, 'CHARGE_NOT_FOUND', 'Payment not found');
+  let refundRef: string | null = null;
+  if (input.kind === 'refund') {
+    refundRef = normalizeInstapayReference(input.reference);
+    if (!refundRef) {
+      throw new AppError(400, 'INVALID_REFERENCE', 'The refund reference is 8 to 20 digits');
+    }
+    if (!input.recipientName?.trim()) {
+      throw new AppError(400, 'RECIPIENT_REQUIRED', 'Write the name shown on the refund receipt');
+    }
+  }
+  const key =
+    input.kind === 'refund' ? `manual-refund:${refundRef}` : `manual-void:${input.eventId}`;
+
+  let screenshotKey: string | null = null;
+  if (input.screenshot?.length) {
+    const mime = sniffReceiptMime(input.screenshot);
+    if (!mime) throw new AppError(400, 'INVALID_FILE_TYPE', 'Upload a JPG, PNG or WebP screenshot');
+    screenshotKey = (
+      await StorageService.putPrivate(input.screenshot, {
+        storeId,
+        folder: 'instapay-refunds',
+        ext: mime === 'image/png' ? '.png' : mime === 'image/webp' ? '.webp' : '.jpg',
+        contentType: mime,
+      })
+    ).key;
+  }
+
+  const out = await withStore(storeId, async tx => {
+    const existing = await tx.billingEvent.findUnique({ where: { idempotencyKey: key, storeId } });
+    if (existing) {
+      if (existing.relatedEventId !== input.eventId) {
+        throw new AppError(
+          409,
+          'REFERENCE_USED_ELSEWHERE',
+          'This refund reference was already recorded'
+        );
+      }
+      return {
+        duplicate: true,
+        refundEventId: existing.id,
+        periodEnd: null as Date | null,
+        voidedEventId: null as string | null,
+      };
+    }
+    const charge = await tx.billingEvent.findUnique({ where: { id: input.eventId, storeId } });
+    if (!charge || charge.type !== 'manual_payment') {
+      throw new AppError(404, 'CHARGE_NOT_FOUND', 'Manual payment not found');
+    }
+    if (!['succeeded', 'refunded'].includes(charge.status)) {
+      throw new AppError(409, 'NOT_REFUNDABLE', 'Only a recorded payment can be refunded');
+    }
+    const prior = await tx.billingEvent.aggregate({
+      where: { storeId, relatedEventId: charge.id, type: 'refund', status: 'succeeded' },
+      _sum: { amountMinor: true },
+    });
+    const remaining = charge.amountMinor - (prior._sum.amountMinor ?? 0);
+    if (remaining <= 0)
+      throw new AppError(409, 'ALREADY_REFUNDED', 'This payment is fully refunded');
+    const amount = input.kind === 'void' ? remaining : (input.amountMinor ?? remaining);
+    if (!Number.isSafeInteger(amount) || amount <= 0 || amount > remaining) {
+      throw new AppError(
+        400,
+        'INVALID_REFUND_AMOUNT',
+        `Refund must be between 1 and ${remaining} piastres`
+      );
+    }
+    const vatMinor = charge.vatMinor
+      ? Math.round((charge.vatMinor * amount) / charge.amountMinor)
+      : 0;
+    const raw = (charge.raw ?? {}) as Record<string, unknown>;
+    const fullReversal =
+      amount === remaining && (prior._sum.amountMinor ?? 0) + amount >= charge.amountMinor;
+
+    // Period: a full reversal gives back exactly the time it bought; a partial
+    // refund changes the period only when the operator says so.
+    const sub = await tx.storeSubscription.findUnique({ where: { storeId } });
+    let periodEnd: Date | null = null;
+    const boughtStart = typeof raw.periodStart === 'string' ? new Date(raw.periodStart) : null;
+    const target = input.newPeriodEnd ?? (fullReversal ? boughtStart : null);
+    const ownsCurrentPeriod =
+      !!sub?.currentPeriodEnd &&
+      !!charge.forPeriodEnd &&
+      sub.currentPeriodEnd.getTime() === charge.forPeriodEnd.getTime();
+    if (
+      sub &&
+      target &&
+      ['active', 'past_due'].includes(sub.status) &&
+      (ownsCurrentPeriod || input.newPeriodEnd)
+    ) {
+      periodEnd = target;
+      const overdue = target.getTime() <= now.getTime();
+      await tx.storeSubscription.update({
+        where: { storeId },
+        data: overdue
+          ? {
+              currentPeriodEnd: target,
+              status: 'past_due',
+              nextRetryAt: new Date(
+                Math.max(now.getTime(), addDays(target, INSTAPAY_GRACE_DAYS).getTime())
+              ),
+            }
+          : { currentPeriodEnd: target },
+      });
+    }
+
+    const refundId = crypto.randomUUID();
+    await tx.billingEvent.create({
+      data: {
+        id: refundId,
+        storeId,
+        subscriptionId: charge.subscriptionId,
+        type: 'refund',
+        planCode: charge.planCode,
+        billingInterval: charge.billingInterval,
+        amountMinor: amount,
+        currency: charge.currency,
+        provider: 'manual',
+        providerRef: refundRef,
+        idempotencyKey: key,
+        status: 'succeeded',
+        relatedEventId: charge.id,
+        vatMinor,
+        raw: {
+          kind: input.kind,
+          refundReference: input.reference?.trim() || null,
+          refundedAt: input.refundedAt.toISOString(),
+          recipientName: input.recipientName?.trim() || null,
+          note,
+          screenshotKey,
+          previousPeriodEnd: sub?.currentPeriodEnd?.toISOString() ?? null,
+          newPeriodEnd: periodEnd?.toISOString() ?? null,
+          recordedBy: input.actorId,
+        },
+      },
+    });
+    if (fullReversal) {
+      await tx.billingEvent.update({
+        where: { id: charge.id, storeId },
+        data: {
+          status: 'refunded',
+          // A void frees the transfer reference so it can be recorded for the right store.
+        },
+      });
+    }
+    if (input.kind === 'void') {
+      const claims = await tx.manualPaymentClaim.findMany({
+        where: { storeId, billingEventId: charge.id },
+      });
+      for (const c of claims) {
+        await tx.manualPaymentClaim.update({
+          where: { id: c.id, storeId },
+          data: {
+            payerReference: freedReference(c.payerReference, c.id, 'voided'),
+            reviewNote: `voided: ${note}`.slice(0, 500),
+          },
+        });
+        await InstapayReceiptService.voidByClaim(storeId, c.id, note, input.actorId);
+      }
+    }
+    return {
+      duplicate: false,
+      refundEventId: refundId,
+      periodEnd,
+      voidedEventId: input.kind === 'void' ? charge.id : null,
+    };
+  }).catch(async err => {
+    if (screenshotKey) {
+      await StorageService.deletePrivate(screenshotKey).catch(() => undefined);
+    }
+    throw err;
+  });
+  if (!out.duplicate) {
+    await featureService.invalidateCache(storeId).catch(() => undefined);
+  }
+  return { ...out, storeId };
 }

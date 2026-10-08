@@ -154,6 +154,12 @@ type WarehouseReconcileRequestedEvent = EventPayload & {
   };
 };
 
+/** Read an uploaded InstaPay transfer receipt with Gemini (money batch A). */
+type InstapayReceiptExtractEvent = EventPayload & {
+  name: 'instapay/receipt-extract';
+  data: { storeId: string; receiptId: string };
+};
+
 type AccountingExpenseOcrProcessEvent = EventPayload & {
   name: 'accounting/expense-ocr-process';
   data: {
@@ -325,6 +331,7 @@ export type AppEvent =
   | StockLowStockScanRequestedEvent
   | WarehouseReconcileRequestedEvent
   | AccountingExpenseOcrProcessEvent
+  | InstapayReceiptExtractEvent
   | InsightsRollupRequestedEvent
   | PaymentWebhookReceivedEvent
   | ShipmentCreateRequestedEvent

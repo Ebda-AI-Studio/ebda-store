@@ -510,6 +510,7 @@ model Store {
   subscription             StoreSubscription?
   billingEvents            BillingEvent[]
   manualPaymentClaims      ManualPaymentClaim[]
+  instapayReceipts         InstapayReceipt[]
   billingReminders         BillingReminder[]
 
   @@index([ownerId])
@@ -4764,6 +4765,68 @@ model BillingEvent {
 /// A merchant's "I paid by InstaPay" claim (signup funnel). Never activates
 /// anything by itself; a super-admin confirms it with the manual-payment action.
 /// RLS: strict store policy (migration 20261007120000).
+/// An InstaPay transfer screenshot and what it says (money batch A, Rulings EBDA-MONEYA-1..).
+/// The payer uploads it (merchant paying Ebda = `subscription`, shopper paying a store order =
+/// `order`); Gemini pre-fills the fields, the payer corrects and submits, a human approves
+/// (super-admin for subscriptions, the merchant for orders). Nothing activates on a receipt alone.
+/// The image lives ONLY in the private bucket (`storage_key`), never behind a URL.
+model InstapayReceipt {
+  id                  String    @id @default(uuid())
+  storeId             String    @map("store_id")
+  /// subscription | order
+  kind                String
+  /// subscription: the claim created on submit.
+  claimId             String?   @unique @map("claim_id")
+  /// order: the order (and its pending InstaPay payment) this transfer pays.
+  orderId             String?   @map("order_id")
+  paymentId           String?   @map("payment_id")
+  storageKey          String    @map("storage_key")
+  mimeType            String    @map("mime_type")
+  sizeBytes           Int       @map("size_bytes")
+  sha256              String
+  /// pending | done | failed (failed = manual entry)
+  extractionStatus    String    @default("pending") @map("extraction_status")
+  /// What the AI read, verbatim after normalisation (shown to the approver next to the submitted fields).
+  extracted           Json?
+  confidence          Float?
+  extractionError     String?   @map("extraction_error")
+  /// The fields the payer submitted (pre-filled from `extracted`, correctable).
+  amountMinor         Int?      @map("amount_minor")
+  reference           String?
+  /// Normalised reference digits. UNIQUE across every store while the receipt is live
+  /// (submitted/approved); cleared on reject/void so the same transfer can be re-filed.
+  referenceKey        String?   @unique @map("reference_key")
+  transferredAt       DateTime? @map("transferred_at")
+  payerName           String?   @map("payer_name")
+  payerAddress        String?   @map("payer_address")
+  payerMobile         String?   @map("payer_mobile")
+  payerBank           String?   @map("payer_bank")
+  receiverName        String?   @map("receiver_name")
+  receiverHandle      String?   @map("receiver_handle")
+  receiverMobile      String?   @map("receiver_mobile")
+  note                String?
+  /// What the approver expects (frozen at submit): amount in piastres and the receiver handle/mobile.
+  expectedAmountMinor Int?      @map("expected_amount_minor")
+  expectedReceiver    String?   @map("expected_receiver")
+  /// Automatic checks for the approver (flags, never a block): AMOUNT_MISMATCH, RECEIVER_MISMATCH, ...
+  flags               String[]  @default([])
+  /// draft | submitted | approved | rejected | voided
+  status              String    @default("draft")
+  submittedAt         DateTime? @map("submitted_at")
+  reviewNote          String?   @map("review_note")
+  reviewedBy          String?   @map("reviewed_by")
+  reviewedAt          DateTime? @map("reviewed_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt(sort: Desc)])
+  @@index([storeId, orderId])
+  @@index([storeId, sha256])
+  @@map("instapay_receipts")
+}
+
 model ManualPaymentClaim {
   id               String    @id @default(uuid())
   storeId          String    @map("store_id")

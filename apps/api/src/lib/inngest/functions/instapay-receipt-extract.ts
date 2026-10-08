@@ -1,0 +1,35 @@
+import type { InngestFunction } from 'inngest';
+import { runInStoreScope } from '@force/database';
+import logger from '../../logger';
+import { inngest } from '../client';
+import { InstapayReceiptService } from '../../../services/payment-providers/instapay-receipt.service';
+
+/**
+ * Read an uploaded InstaPay receipt with Gemini (money batch A, Ruling EBDA-MONEYA-2).
+ *
+ * Runs under a STORE SCOPE (per-query, no transaction held across the AI call). The
+ * service bounds the call with a timeout and turns every failure into
+ * `extraction_status = failed`, which the payer sees as manual entry — so the function
+ * itself never needs a retry to keep the payer moving (retries: 0: a retry would only
+ * re-spend AI quota on an image that already failed).
+ */
+export const instapayReceiptExtract: InngestFunction.Any = inngest.createFunction(
+  {
+    id: 'instapay-receipt-extract',
+    name: 'InstaPay — read an uploaded transfer receipt',
+    retries: 0,
+    concurrency: { limit: 3, key: 'event.data.storeId' },
+    triggers: [{ event: 'instapay/receipt-extract' }],
+  },
+  async ({ event, step }) => {
+    const { storeId, receiptId } = (event.data ?? {}) as { storeId?: string; receiptId?: string };
+    if (!storeId || !receiptId) {
+      logger.warn({ data: event.data }, 'instapayReceiptExtract: missing ids');
+      return { skipped: 'missing-ids' };
+    }
+    const outcome = await step.run('read-receipt', () =>
+      runInStoreScope(storeId, () => InstapayReceiptService.runExtraction(storeId, receiptId))
+    );
+    return { storeId, receiptId, outcome };
+  }
+);

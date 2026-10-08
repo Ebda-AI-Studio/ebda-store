@@ -58,7 +58,7 @@ export function goLiveVerdict(sub: GateSub | null, _mode: TrialCardMode, now: Da
 }
 
 const MESSAGES: Record<Exclude<GateVerdict, { ok: true }>['code'], string> = {
-  PAYMENT_METHOD_REQUIRED: 'Add a payment card before your store goes live',
+  PAYMENT_METHOD_REQUIRED: 'Choose InstaPay (or add a payment card) before your store goes live',
   TRIAL_EXPIRED: 'Your trial has ended; choose a plan and pay to go live',
   NO_SUBSCRIPTION: 'This store has no plan yet',
   STORE_LIMIT_REACHED: 'Your plan does not include another live store; upgrade to Business',

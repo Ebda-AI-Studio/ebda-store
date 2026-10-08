@@ -276,23 +276,8 @@ describe.skipIf(!hasDb)('InstaPay manual payment', () => {
         data: { isEnabled: true },
       });
     });
-
-    it('stores the customer-entered transfer reference, only while awaiting', async () => {
-      const o = await mkOrder();
-      await hold(o.id);
-      await asApp(() => InstapayService.submitReference(storeId, o.id, 'IPN 4821 9937'));
-      const [p] = await paymentsOf(o.id);
-      expect((p.metadata as Record<string, unknown>).customerReference).toBe('IPN 4821 9937');
-      await expect(
-        asApp(() => InstapayService.submitReference(storeId, o.id, '<script>'))
-      ).rejects.toThrow();
-      await asApp(() =>
-        InstapayService.confirm({ storeId, orderId: o.id, actorUserId: ownerUserId })
-      );
-      await expect(
-        asApp(() => InstapayService.submitReference(storeId, o.id, 'late-ref-1'))
-      ).rejects.toMatchObject({ code: 'INSTAPAY_NOT_AWAITING' });
-    });
+    // The typed-reference path was retired for the receipt screenshot (money batch A):
+    // tests/integration/instapay-receipts.test.ts covers the shopper's proof.
   });
 
   // -------------------------------------------------------------------------

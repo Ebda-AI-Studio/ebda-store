@@ -20,3 +20,8 @@ export function uniqueViolationTarget(err: unknown): string[] {
   const m = /unique constraint "([^"]+)"/.exec(String(cause?.originalMessage ?? ''));
   return m ? [m[1]] : [];
 }
+
+/** True for a Prisma unique-constraint violation (P2002), whatever engine raised it. */
+export function isP2002(err: unknown): boolean {
+  return (err as { code?: unknown } | null | undefined)?.code === 'P2002';
+}

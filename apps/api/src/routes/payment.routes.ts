@@ -7,7 +7,12 @@ import { PaymentProvider, Currency } from '../services/payment-providers/types';
 import { authenticate, optionalAuthenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { prisma, runInTenantContext, withStore } from '@force/database';
-import { paymentLimiter, auditLog } from '../middleware/security';
+import {
+  paymentLimiter,
+  auditLog,
+  uploadLimiter,
+  dailyUploadLimiter,
+} from '../middleware/security';
 import { config } from '../config';
 import { getAuthUser, resolvePublicStoreId } from '../utils/store-helpers';
 import {
@@ -25,7 +30,8 @@ import {
   type OrphanedProviderInvoice,
 } from '../services/payment-providers/orphaned-invoice-alert';
 
-import { REGION, instapayReferenceSchema } from '@force/shared';
+import { INSTAPAY_RECEIPT_MAX_BYTES, REGION, instapayReceiptFieldsSchema } from '@force/shared';
+import multer from 'multer';
 import { AppError } from '../middleware/error-handler';
 import { InstapayService, runPostCommit } from '../services/payment-providers/instapay.service';
 import { computeCodCharge, codProvider } from '../services/payment-providers/cod.provider';
@@ -889,20 +895,83 @@ router.get(
 );
 
 /**
- * POST /payments/instapay/:orderId/reference
- * The customer enters the transfer reference. Only while the order is still waiting.
+ * POST /payments/instapay/:orderId/reference — RETIRED (money batch A): a typed
+ * reference alone is no longer proof. The shopper uploads the receipt screenshot.
+ */
+router.post('/instapay/:orderId/reference', paymentLimiter, (_req: Request, res: Response) => {
+  res.status(410).json({
+    success: false,
+    error: { code: 'RECEIPT_REQUIRED', message: 'Upload the InstaPay receipt screenshot' },
+  });
+});
+
+const receiptUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: INSTAPAY_RECEIPT_MAX_BYTES, files: 1 },
+});
+
+/**
+ * POST /payments/instapay/:orderId/receipt — the shopper uploads the InstaPay receipt
+ * screenshot (multipart `file`). Public by order id (an unguessable v4 UUID, like the
+ * rest of this flow). Rate-limited per IP and capped per order; stored in the PRIVATE
+ * bucket only; the AI read is queued and the shopper polls GET .../receipt/:id.
  */
 router.post(
-  '/instapay/:orderId/reference',
+  '/instapay/:orderId/receipt',
+  paymentLimiter,
+  uploadLimiter,
+  dailyUploadLimiter,
+  receiptUpload.single('file'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orderId = z.string().uuid().parse(req.params.orderId);
+      if (!req.file) throw new AppError(400, 'NO_FILE', 'No file uploaded. Send field name: file');
+      const storeId = await getOrderStoreId(orderId);
+      if (!storeId) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+      const receipt = await InstapayService.uploadReceipt(storeId, orderId, req.file.buffer);
+      res.status(201).json({ success: true, data: { receipt } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** GET /payments/instapay/:orderId/receipt/:receiptId — the AI's pre-filled fields (poll). */
+router.get(
+  '/instapay/:orderId/receipt/:receiptId',
   paymentLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const orderId = z.string().uuid().parse(req.params.orderId);
-      const { reference } = z.object({ reference: instapayReferenceSchema }).parse(req.body);
+      const receiptId = z.string().uuid().parse(req.params.receiptId);
       const storeId = await getOrderStoreId(orderId);
       if (!storeId) throw new AppError(404, 'NOT_FOUND', 'Order not found');
-      const result = await InstapayService.submitReference(storeId, orderId, reference);
-      res.json({ success: true, data: result });
+      const receipt = await InstapayService.getReceipt(storeId, orderId, receiptId);
+      res.json({ success: true, data: { receipt } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /payments/instapay/:orderId/receipt/:receiptId/submit — the shopper's checked
+ * fields. The store owner reviews; a duplicate transfer reference anywhere is refused
+ * (409 DUPLICATE_REFERENCE). Freezes the hold: the order is not auto-cancelled while
+ * the store reviews.
+ */
+router.post(
+  '/instapay/:orderId/receipt/:receiptId/submit',
+  paymentLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orderId = z.string().uuid().parse(req.params.orderId);
+      const receiptId = z.string().uuid().parse(req.params.receiptId);
+      const fields = instapayReceiptFieldsSchema.parse(req.body);
+      const storeId = await getOrderStoreId(orderId);
+      if (!storeId) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+      const receipt = await InstapayService.submitReceipt({ storeId, orderId, receiptId, fields });
+      res.status(201).json({ success: true, data: { receipt } });
     } catch (error) {
       next(error);
     }

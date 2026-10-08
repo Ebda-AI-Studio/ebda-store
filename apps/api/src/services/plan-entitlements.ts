@@ -54,6 +54,10 @@ export interface Entitlements {
   trialEndsAt: Date | null;
   cancelAtPeriodEnd: boolean;
   ordersOverLimitMonth: Date | null;
+  /** card | instapay | null (not chosen). */
+  billingMethod: string | null;
+  /** A card the trial-end/renewal job can charge is on file. */
+  hasSavedCard: boolean;
 }
 
 function seedFor(code: string) {
@@ -111,6 +115,8 @@ export async function getEntitlements(
       trialEndsAt: sub?.trialEndsAt ?? null,
       cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
       ordersOverLimitMonth: sub?.ordersOverLimitMonth ?? null,
+      billingMethod: sub?.billingMethod ?? null,
+      hasSavedCard: !!sub?.provider && !!sub?.providerPaymentMethodRef,
     };
   };
   return tx ? run(tx) : withStore(storeId, run);

@@ -26,10 +26,19 @@ import {
 } from '../services/billing/subscription-billing.service';
 import { SIGNUP_PLAN_CODES } from '../services/billing/trial';
 import {
+  assertPayableStore,
   chooseInstapay,
-  createPaymentClaim,
+  chooseInstapayPlan,
   listStoreClaims,
+  submitSubscriptionReceipt,
 } from '../services/billing/account.service';
+import multer from 'multer';
+import { INSTAPAY_RECEIPT_MAX_BYTES, instapayReceiptFieldsSchema } from '@force/shared';
+import {
+  InstapayReceiptService,
+  toReceiptView,
+} from '../services/payment-providers/instapay-receipt.service';
+import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
 import { auditLog } from '../middleware/security';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
@@ -83,6 +92,15 @@ router.get(
               return null; // InstaPay-only: no card gateway configured
             }
           })(),
+          /**
+           * Set when this store is beyond the owner's store allowance: paying HERE buys
+           * nothing (audit M4); the UI sends the merchant to the main store instead.
+           */
+          payOnStore: await assertPayableStore(storeId).then(
+            () => null,
+            (err: { code?: string; details?: { parentStoreId?: string } }) =>
+              err?.code === 'PAY_ON_PARENT_STORE' ? (err.details?.parentStoreId ?? null) : null
+          ),
           /** `inactive` until the go-live gate passes (onboarding / this page). */
           storeStatus:
             (await prisma.store.findUnique({ where: { id: storeId }, select: { status: true } }))
@@ -233,36 +251,133 @@ router.get('/payment-claims', ...guard, async (req: Request, res: Response, next
 });
 
 /**
- * POST /payment-claims — "I paid by InstaPay": the transfer reference (and an
- * optional screenshot URL from the upload endpoint). Goes to the super-admin
- * queue; it NEVER activates anything by itself.
+ * POST /payment-claims — RETIRED (money batch A): a reference alone is no longer
+ * proof. The merchant uploads the InstaPay receipt screenshot (POST /receipts), then
+ * submits the checked fields (POST /receipts/:id/submit). 410 tells an old client why.
+ */
+router.post('/payment-claims', ...guard, (_req: Request, res: Response) => {
+  res.status(410).json({
+    success: false,
+    error: {
+      code: 'RECEIPT_REQUIRED',
+      message: 'Upload the InstaPay receipt screenshot to report a payment',
+    },
+  });
+});
+
+/**
+ * POST /instapay-plan — the plan + interval the next InstaPay payment buys (audit M3):
+ * upgrade, downgrade, or pick a plan to come back from canceled. Nothing is charged
+ * and the tier does not change until Ebda approves the payment.
+ */
+router.post('/instapay-plan', ...guard, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const input = z
+      .object({ planCode: z.string().min(1).max(64), interval: z.enum(['monthly', 'yearly']) })
+      .strict()
+      .parse(req.body);
+    const details = await chooseInstapayPlan({ storeId: req.params.storeId, ...input });
+    await auditLog({
+      action: 'billing.instapay_plan_chosen',
+      userId: req.user!.userId,
+      storeId: req.params.storeId,
+      resourceType: 'store_subscription',
+      resourceId: req.params.storeId,
+      details: input,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+    res.json({ success: true, data: details });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const receiptUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: INSTAPAY_RECEIPT_MAX_BYTES, files: 1 },
+});
+
+/**
+ * POST /receipts — the merchant uploads the InstaPay receipt screenshot for the
+ * subscription (multipart `file`). Stored in the PRIVATE bucket only; the AI read is
+ * queued. Ebda's team (super-admin) reviews it — never the merchant.
  */
 router.post(
-  '/payment-claims',
+  '/receipts',
+  ...guard,
+  uploadLimiter,
+  dailyUploadLimiter,
+  receiptUpload.single('file'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) throw new AppError(400, 'NO_FILE', 'No file uploaded. Send field name: file');
+      await assertPayableStore(req.params.storeId);
+      const receipt = await InstapayReceiptService.upload({
+        storeId: req.params.storeId,
+        kind: 'subscription',
+        file: req.file.buffer,
+      });
+      res.status(201).json({ success: true, data: { receipt } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/** GET /receipts/:receiptId — poll the AI read (pre-filled fields + confidence). */
+router.get(
+  '/receipts/:receiptId',
   ...guard,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const input = z
-        .object({
-          payerReference: z.string().trim().min(4).max(64),
-          proofUrl: z.string().url().max(500).optional().nullable(),
-        })
-        .strict()
-        .parse(req.body);
-      const claim = await createPaymentClaim({ storeId: req.params.storeId, ...input });
+      const receiptId = z.string().uuid().parse(req.params.receiptId);
+      const row = await InstapayReceiptService.get(req.params.storeId, receiptId, {
+        kind: 'subscription',
+      });
+      res.json({ success: true, data: { receipt: toReceiptView(row) } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /receipts/:receiptId/submit — the merchant's checked fields. Creates the
+ * claim Ebda reviews. NEVER activates anything; a duplicate transfer reference
+ * anywhere is refused (409 DUPLICATE_REFERENCE).
+ */
+router.post(
+  '/receipts/:receiptId/submit',
+  ...guard,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const receiptId = z.string().uuid().parse(req.params.receiptId);
+      const fields = instapayReceiptFieldsSchema.parse(req.body);
+      const out = await submitSubscriptionReceipt({
+        storeId: req.params.storeId,
+        receiptId,
+        fields,
+      });
       await auditLog({
         action: 'billing.payment_claimed',
         userId: req.user!.userId,
         storeId: req.params.storeId,
         resourceType: 'manual_payment_claim',
-        resourceId: claim.id,
-        details: { amountMinor: claim.amountMinor, planCode: claim.planCode },
+        resourceId: out.claim.id,
+        details: {
+          amountMinor: out.claim.amountMinor,
+          planCode: out.claim.planCode,
+          receiptId,
+          flags: out.receipt.flags,
+        },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
-      res
-        .status(201)
-        .json({ success: true, data: { claim: { id: claim.id, status: claim.status } } });
+      res.status(201).json({
+        success: true,
+        data: { claim: { id: out.claim.id, status: out.claim.status }, receipt: out.receipt },
+      });
     } catch (err) {
       next(err);
     }

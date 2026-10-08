@@ -224,7 +224,9 @@ describe('billing ledger: signup-funnel additions', () => {
     expect((screen.getByLabelText('amount') as HTMLInputElement).value).toBe('89910.00');
     expect((screen.getByLabelText('plan') as HTMLSelectElement).value).toBe('business');
     expect((screen.getByLabelText('interval') as HTMLSelectElement).value).toBe('yearly');
-    expect((screen.getByLabelText('periodEnd') as HTMLInputElement).value).toBe('2027-11-05');
+    // No period inputs by default: the server applies its rule (no paid days burned).
+    expect(screen.queryByLabelText('periodEnd')).toBeNull();
+    expect(screen.getByTestId('mp-period-auto')).toBeTruthy();
 
     const amount = screen.getByLabelText('amount');
     fireEvent.change(screen.getByLabelText('reference'), { target: { value: 'IPN-1' } });
@@ -244,10 +246,54 @@ describe('billing ledger: signup-funnel additions', () => {
       method: 'instapay',
       reference: 'IPN-1',
       paidAt: '2026-11-05T00:00:00.000Z',
-      periodStart: '2026-11-05T00:00:00.000Z',
-      periodEnd: '2027-11-05T00:00:00.000Z',
     });
     expect(await screen.findByText('manual.recorded')).toBeTruthy();
+  });
+
+  it('manual payment: "Edit period" sends BOTH period dates; the suggestion is fetched, not guessed', async () => {
+    mockTabs();
+    apiGet.mockImplementation(async (url: string) => {
+      if (url.includes('/manual-payment/suggest'))
+        return {
+          data: { periodStart: '2026-12-01T00:00:00.000Z', periodEnd: '2027-12-01T00:00:00.000Z' },
+          error: null,
+        };
+      if (url.includes('/billing/subscriptions'))
+        return { data: { subscriptions: [sub()] }, error: null };
+      return { data: { events: [], claims: [] }, error: null };
+    });
+    apiPost.mockResolvedValue({ data: { duplicate: false }, error: null });
+    render(<BillingEventsPage />);
+    openTab('tabs.subscriptions');
+    fireEvent.click((await screen.findAllByRole('button', { name: 'record' }))[0]);
+    await waitFor(() =>
+      expect(apiGet).toHaveBeenCalledWith(
+        '/api/v1/admin/stores/s9/manual-payment/suggest?interval=yearly'
+      )
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'editPeriod' }));
+    expect((screen.getByLabelText('periodStart') as HTMLInputElement).value).toBe('2026-12-01');
+    fireEvent.change(screen.getByLabelText('reference'), { target: { value: 'IPN-1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }));
+    await waitFor(() => expect(apiPost).toHaveBeenCalled());
+    expect(apiPost.mock.calls[0][1]).toMatchObject({
+      periodStart: '2026-12-01T00:00:00.000Z',
+      periodEnd: '2027-12-01T00:00:00.000Z',
+    });
+  });
+
+  it('manual payment: a 409 REFERENCE_USED_ELSEWHERE explains the voided-payment path', async () => {
+    mockTabs();
+    apiPost.mockResolvedValue({
+      data: null,
+      error: { code: 'REFERENCE_USED_ELSEWHERE', message: 'x', status: 409 },
+    });
+    render(<BillingEventsPage />);
+    openTab('tabs.subscriptions');
+    fireEvent.click((await screen.findAllByRole('button', { name: 'record' }))[0]);
+    fireEvent.change(screen.getByLabelText('reference'), { target: { value: 'IPN-1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('referenceUsedElsewhere');
   });
 
   it('manual payment: a repeated reference reports "duplicate" instead of success', async () => {
@@ -290,8 +336,6 @@ describe('billing ledger: signup-funnel additions', () => {
     fireEvent.click((await screen.findAllByRole('button', { name: 'confirm' }))[0]);
     expect((screen.getByLabelText('reference') as HTMLInputElement).value).toBe('IPN-99887766');
     expect((screen.getByLabelText('amount') as HTMLInputElement).value).toBe('3490.00');
-    // Jan 31 + 1 month clamps to the end of February, not March 3.
-    expect((screen.getByLabelText('periodEnd') as HTMLInputElement).value).toBe('2026-02-28');
     fireEvent.click(screen.getByRole('button', { name: 'submit' }));
     await waitFor(() => expect(apiPost).toHaveBeenCalled());
     expect(apiPost.mock.calls[0][1]).toMatchObject({

@@ -718,6 +718,11 @@ class ApiClient {
       headers['X-Store-ID'] = this.storeId;
     }
 
+    // A multipart body needs the browser to set Content-Type (with the boundary).
+    if (typeof FormData !== 'undefined' && options.body instanceof FormData) {
+      delete headers['Content-Type'];
+    }
+
     // iOS body lane only — see ACCESS_TOKEN_KEY. The cookie still rides along
     // (credentials: 'include'); the API prefers the Bearer when both exist.
     const accessToken = readStoredAccessToken();
@@ -1370,6 +1375,11 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  /** Multipart upload (e.g. an InstaPay receipt image). Same auth/session headers as `post`. */
+  async postForm<T>(endpoint: string, form: FormData) {
+    return this.request<T>(endpoint, { method: 'POST', body: form });
   }
 
   async put<T>(endpoint: string, data: unknown) {

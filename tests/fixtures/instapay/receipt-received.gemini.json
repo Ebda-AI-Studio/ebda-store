@@ -1,0 +1,22 @@
+{
+  "recordedAt": "2026-10-08T10:15:23.439Z",
+  "model": "gemini-flash-lite-latest",
+  "image": "receipt-received.png",
+  "response": {
+    "amount": 3490,
+    "reference": "771034829156",
+    "date": "2026-10-07",
+    "time": "21:40",
+    "payerName": "SYN*** T*** P***",
+    "payerAddress": null,
+    "payerMobile": "010****4321",
+    "payerBank": null,
+    "receiverName": "EBDA TEST ACCOUNT",
+    "receiverAddress": "ebdatest@instapay",
+    "receiverMobile": null,
+    "note": null,
+    "direction": "received",
+    "looksEdited": false,
+    "confidence": 1
+  }
+}

@@ -797,7 +797,7 @@ export class OneSignalService {
    */
   static async notifyAdminsOfInstapay(
     input: Omit<NotifyOrderInput, 'customerName' | 'paymentMethod'> & {
-      kind: 'awaiting' | 'expired';
+      kind: 'awaiting' | 'expired' | 'proof_submitted';
     }
   ): Promise<void> {
     if (!isAdminConfigured()) {
@@ -807,6 +807,7 @@ export class OneSignalService {
     const url = adminOrderUrl(input.storeId, input.orderId);
     const moneyText = formatMoney(input.total, input.currency);
     const awaiting = input.kind === 'awaiting';
+    const proof = input.kind === 'proof_submitted';
     const storeAdminPlayerIds = await this.getAdminPlayerIds({
       role: 'store_admin',
       ownsStoreId: input.storeId,
@@ -816,23 +817,34 @@ export class OneSignalService {
       url,
       web_buttons: [{ id: 'view-order', text: 'View order', url }],
       data: {
-        type: awaiting ? 'order.instapay_awaiting' : 'order.instapay_expired',
+        type: proof
+          ? 'order.instapay_proof_submitted'
+          : awaiting
+            ? 'order.instapay_awaiting'
+            : 'order.instapay_expired',
         orderId: input.orderId,
         storeId: input.storeId,
         storeName: input.storeName,
       },
-      headings: awaiting
-        ? { en: 'InstaPay transfer to confirm', ar: 'تحويل إنستاباي بانتظار التأكيد' }
-        : { en: 'InstaPay order expired', ar: 'انتهت مهلة طلب إنستاباي' },
-      contents: awaiting
+      headings: proof
+        ? { en: 'InstaPay receipt to review', ar: 'إيصال إنستاباي بانتظار المراجعة' }
+        : awaiting
+          ? { en: 'InstaPay transfer to confirm', ar: 'تحويل إنستاباي بانتظار التأكيد' }
+          : { en: 'InstaPay order expired', ar: 'انتهت مهلة طلب إنستاباي' },
+      contents: proof
         ? {
-            en: `${input.orderNumber} — ${moneyText}. Confirm once the transfer arrives.`,
-            ar: `${input.orderNumber} — ${moneyText}. أكّد الطلب بمجرد وصول التحويل.`,
+            en: `${input.orderNumber} — ${moneyText}. The shopper uploaded the transfer receipt. Check it and approve or reject.`,
+            ar: `${input.orderNumber} — ${moneyText}. العميل رفع إيصال التحويل. راجعه ثم وافق أو ارفض.`,
           }
-        : {
-            en: `${input.orderNumber} — ${moneyText}. No confirmation in time: cancelled, stock released.`,
-            ar: `${input.orderNumber} — ${moneyText}. لم يتم التأكيد في الوقت المحدد: أُلغي الطلب وأُعيد المخزون.`,
-          },
+        : awaiting
+          ? {
+              en: `${input.orderNumber} — ${moneyText}. Confirm once the transfer arrives.`,
+              ar: `${input.orderNumber} — ${moneyText}. أكّد الطلب بمجرد وصول التحويل.`,
+            }
+          : {
+              en: `${input.orderNumber} — ${moneyText}. No confirmation in time: cancelled, stock released.`,
+              ar: `${input.orderNumber} — ${moneyText}. لم يتم التأكيد في الوقت المحدد: أُلغي الطلب وأُعيد المخزون.`,
+            },
       ...(storeAdminPlayerIds.length > 0
         ? { include_player_ids: storeAdminPlayerIds }
         : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
