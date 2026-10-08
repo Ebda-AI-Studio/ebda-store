@@ -284,6 +284,11 @@ export class KashierBillingProvider implements BillingProvider {
     };
   }
 
+  /** Every value a webhook needs: the Payment API key (HMAC), and the secret key + MID it confirms with. */
+  isConfigured(): boolean {
+    return !!(this.cfg.apiKey && this.cfg.secretKey && this.cfg.merchantId);
+  }
+
   verifyWebhook(rawBody: Buffer | string, headers: HeaderBag): BillingWebhookEvent {
     const provided = headerValue(headers, 'x-kashier-signature');
     if (!provided) throw new BillingSignatureError('Missing x-kashier-signature');

@@ -6,14 +6,18 @@
  * operations: verify -> dedupe (provider event id, UNIQUE) -> settle, all
  * inside one DB transaction in the service. Answers:
  *   401 bad/missing signature (nothing is parsed or stored)
+ *   404 a provider this deployment does not serve
+ *   503 BILLING_NOT_CONFIGURED (billing not set up here), WEBHOOK_UNCONFIRMED (the gateway could
+ *       not confirm it yet) or BILLING_WEBHOOK_FAILED (processing failed): the gateway retries,
+ *       and nothing was marked seen. Never a 500 (Ruling PROVIDERS-20).
  *   200 processed OR a replay (`duplicate: true`) OR ignored event/order
- *   500 processing failed -> the gateway retries, and nothing was marked seen
  */
 import { Router, Request, Response, NextFunction } from 'express';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
 import { BillingSignatureError } from '../services/billing';
 import { handleBillingWebhook } from '../services/billing/subscription-billing.service';
+import { AppError } from '../middleware/error-handler';
 
 const router = Router();
 
@@ -38,7 +42,13 @@ router.post('/:provider', async (req: Request, res: Response, next: NextFunction
       });
       return;
     }
-    next(err);
+    if (err instanceof AppError) {
+      next(err);
+      return;
+    }
+    // A failure inside processing (DB, effects): retriable, logged in full, never a bare 500.
+    logger.error({ err, provider: req.params.provider }, '[billing-webhook] processing failed');
+    next(new AppError(503, 'BILLING_WEBHOOK_FAILED', 'Webhook not processed; retry later'));
   }
 });
 

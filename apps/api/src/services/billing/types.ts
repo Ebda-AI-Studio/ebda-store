@@ -140,6 +140,8 @@ export interface BillingProvider {
   chargeSavedCard(req: ChargeRequest): Promise<ChargeResult>;
   refund(req: RefundRequest): Promise<RefundResult>;
   verifyWebhook(rawBody: Buffer | string, headers: HeaderBag): BillingWebhookEvent;
+  /** False when the credentials this provider needs are missing (its webhooks then answer 503). */
+  isConfigured?(): boolean;
   /**
    * Server-to-server confirmation of a verified webhook before it is applied (PROVIDERS-17),
    * for a gateway whose signature leaves the event kind unsigned (Kashier). Throws when the

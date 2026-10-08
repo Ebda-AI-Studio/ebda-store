@@ -1361,14 +1361,41 @@ export async function applyWebhookEvent(
   return result;
 }
 
-/** Route entry: resolve adapter, verify signature, apply. Throws BillingSignatureError / AppError(404). */
+/**
+ * The adapter a billing webhook URL names. 404 for a provider this deployment does not serve;
+ * 503 `BILLING_NOT_CONFIGURED` when subscription billing is not set up (production with no
+ * `BILLING_PROVIDER`, or Kashier without its keys): a configuration gap is the server's state,
+ * not the caller's fault and not a crash, so it is never a 500 (Ruling PROVIDERS-20).
+ */
+function billingWebhookProvider(providerName: string) {
+  let provider: ReturnType<typeof getBillingProviderByName>;
+  try {
+    provider = getBillingProviderByName(providerName);
+  } catch (err) {
+    logger.warn(
+      { providerName, reason: (err as Error).message },
+      '[billing-webhook] subscription billing is not configured'
+    );
+    throw new AppError(503, 'BILLING_NOT_CONFIGURED', 'Subscription billing is not configured');
+  }
+  if (!provider) throw new AppError(404, 'UNKNOWN_PROVIDER', 'Unknown billing provider');
+  if (provider.isConfigured && !provider.isConfigured()) {
+    logger.warn({ providerName }, '[billing-webhook] provider credentials are missing');
+    throw new AppError(503, 'BILLING_NOT_CONFIGURED', 'Subscription billing is not configured');
+  }
+  return provider;
+}
+
+/**
+ * Route entry: resolve adapter, verify signature, confirm, apply. Throws AppError 404 / 503 and
+ * BillingSignatureError (401 at the route).
+ */
 export async function handleBillingWebhook(
   providerName: string,
   rawBody: Buffer | string,
   headers: Record<string, string | string[] | undefined>
 ): Promise<WebhookResult> {
-  const provider = getBillingProviderByName(providerName);
-  if (!provider) throw new AppError(404, 'UNKNOWN_PROVIDER', 'Unknown billing provider');
+  const provider = billingWebhookProvider(providerName);
   let event = provider.verifyWebhook(rawBody, headers);
   // PROVIDERS-17 confirm-before-apply: only the gateway's own record of the transaction is
   // applied. Failure throws (500, the gateway redelivers, the dedupe row is never written).
@@ -1388,7 +1415,11 @@ export async function handleBillingWebhook(
           reason: (err as Error).message.slice(0, 300),
         },
       });
-      throw err;
+      throw new AppError(
+        503,
+        'WEBHOOK_UNCONFIRMED',
+        'The gateway could not confirm this webhook; it was not applied and will be retried'
+      );
     }
     await auditLog({
       action: confirmation.mismatch ? 'BILLING_WEBHOOK_CORRECTED' : 'BILLING_WEBHOOK_CONFIRMED',
