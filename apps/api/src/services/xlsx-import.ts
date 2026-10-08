@@ -1,7 +1,7 @@
 import { loadExcelJS } from '../lib/lazy-modules';
 import { AppError } from '../middleware/error-handler';
 
-import { tryToMinor } from '@force/shared';
+import { parsePriceCell } from './price-cell';
 /**
  * Convert an XLSX buffer into the platform's CSV import format.
  *
@@ -12,8 +12,9 @@ import { tryToMinor } from '@force/shared';
  * metadata get folded into the description field instead of lost.
  *
  * Rules:
- *  - Prices in the sheet are human currency (e.g. 1.25 = 1.250 EGP);
- *    we convert to piastres (× 100, strict: max 2 decimals).
+ *  - Prices in the sheet are human currency (e.g. 250.5 = 250.50 EGP);
+ *    `parsePriceCell` converts to piastres (strict: max 2 decimals, a 3-decimal
+ *    value is ambiguous). A bad price fails ITS row via an `_error` cell.
  *  - Sequential `#N` style identifiers become `${skuPrefix}-${N}`.
  *  - Arabic columns keep their text (we don't transliterate).
  */
@@ -82,12 +83,17 @@ export async function xlsxBufferToImportCsv(
     // Skip completely empty rows.
     if (values.every(v => !v.trim())) continue;
 
-    const rowOut = rowToProduct(values, columnMap, {
-      skuPrefix,
-      defaultInventory,
-      defaultStatus,
-      trackInventory,
-    });
+    const rowOut = rowToProduct(
+      values,
+      columnMap,
+      {
+        skuPrefix,
+        defaultInventory,
+        defaultStatus,
+        trackInventory,
+      },
+      r
+    );
     if (rowOut) outRows.push(rowOut);
   }
 
@@ -139,7 +145,10 @@ type CanonicalKey =
   | '_sequenceNumber'
   | '_origin'
   | '_weightText'
-  | '_unmapped';
+  | '_unmapped'
+  // Import-time meta columns written by this converter (read by BulkService).
+  | 'sourceRow'
+  | '_error';
 
 const HEADER_ALIASES: Record<string, CanonicalKey> = {
   // English canonical
@@ -152,6 +161,14 @@ const HEADER_ALIASES: Record<string, CanonicalKey> = {
   descriptionar: 'descriptionAr',
   'description ar': 'descriptionAr',
   price: 'price',
+  // Headers written by our own XLSX export (round-trip).
+  'price (egp)': 'price',
+  'compare at price (egp)': 'compareAtPrice',
+  'cost price (egp)': 'costPrice',
+  'name (ar)': 'nameAr',
+  'description (ar)': 'descriptionAr',
+  'meta title (ar)': 'metaTitleAr',
+  'meta description (ar)': 'metaDescriptionAr',
   compareatprice: 'compareAtPrice',
   'compare at price': 'compareAtPrice',
   costprice: 'costPrice',
@@ -264,7 +281,8 @@ function rowToProduct(
     defaultInventory: number;
     defaultStatus: 'draft' | 'active' | 'archived';
     trackInventory: boolean;
-  }
+  },
+  sheetRow: number
 ): ProductRowOut | null {
   const raw: Partial<Record<CanonicalKey, string>> = {};
   columnMap.forEach((key, i) => {
@@ -280,20 +298,22 @@ function rowToProduct(
 
   const out: Partial<ProductRowOut> = { ...raw };
 
-  // Price — convert from human currency (12.50) to piastres (1250). STRICT:
-  // more than the currency's decimals ("12.505") is rejected, never rounded —
-  // the row gets the sentinel 'NaN', which the bulk validator reports as an
-  // invalid price instead of silently importing a mangled amount.
+  // Price — human currency (250.50) to piastres (25050). STRICT: more than
+  // 2 decimals, a 3-decimal (ambiguous) value or junk is never rounded or
+  // guessed — the row is failed via `_error` (bilingual-friendly PRICE_* code)
+  // and reported against its sheet row number. Only base rows require a price;
+  // a variant row (parentSku) may inherit the parent's.
+  const priceErrors: string[] = [];
   for (const key of ['price', 'compareAtPrice', 'costPrice'] as const) {
-    const cell = raw[key];
-    if (!cell) continue;
-    const minor = tryToMinor(cell);
-    if (minor !== null) {
-      out[key] = String(minor);
-    } else if (Number.isFinite(parseFloat(cell))) {
-      out[key] = 'NaN';
-    }
+    const r = parsePriceCell(raw[key], {
+      label: key,
+      required: key === 'price' && !raw.parentSku,
+    });
+    if (!r.ok) priceErrors.push(r.message);
+    else if (r.minor !== null) out[key] = String(r.minor);
   }
+  if (priceErrors.length > 0) out._error = priceErrors.join('; ');
+  out.sourceRow = String(sheetRow);
 
   // SKU — prefer explicit SKU column, otherwise derive from #N sequence.
   if (!out.sku && raw._sequenceNumber) {
@@ -369,6 +389,8 @@ const CSV_COLUMNS: CanonicalKey[] = [
   'option2Value',
   'option3Name',
   'option3Value',
+  'sourceRow',
+  '_error',
 ];
 
 function buildCsv(rows: ProductRowOut[]): string {

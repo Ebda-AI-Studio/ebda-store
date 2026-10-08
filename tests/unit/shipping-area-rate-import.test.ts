@@ -21,8 +21,11 @@ describe('parseMajorToMinor', () => {
   it('REJECTS more decimals than a piastre (never rounds a fee silently)', () => {
     expect(parseMajorToMinor('1.2345')).toBeNull();
     expect(parseMajorToMinor('1.999')).toBeNull();
-    // trailing zeros past the exponent lose nothing → accepted
-    expect(parseMajorToMinor('2.500')).toBe(250);
+    // A 3-decimal value is AMBIGUOUS in Egypt ("2.500" reads as two thousand
+    // five hundred) — refused like the product import (ruling MONEYB-8).
+    expect(parseMajorToMinor('2.500')).toBeNull();
+    expect(parseMajorToMinor('2.50')).toBe(250);
+    expect(parseMajorToMinor('٢٥٫٥٠')).toBe(2550);
   });
 
   it('returns null for blank / undefined / invalid / negative', () => {

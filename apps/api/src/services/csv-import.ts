@@ -1,11 +1,11 @@
-import { tryToMinor } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
+import { parsePriceCell } from './price-cell';
 
 /**
  * CSV → platform import CSV.
  *
  * The bulk-import pipeline has ONE importer (`BulkService.importProducts`), fed
- * a "platform CSV" (Ebda's own template: prices in integer piastres, variant
+ * a "platform CSV" (INTERNAL format: prices in integer piastres, variant
  * rows linked by `parentSku`). `xlsx-import.ts` converts spreadsheets into that
  * format; this module does the same for CSV files, so a merchant who uploads a
  * `.csv` goes through exactly the same importer, job row, cache busting and
@@ -13,12 +13,14 @@ import { AppError } from '../middleware/error-handler';
  *
  * Two layouts are accepted:
  *
- *  - Ebda's own template (`name,price,...`): passed through untouched except for
- *    a leading UTF-8 BOM being stripped. Prices there are INTEGER PIASTRES.
+ *  - Ebda's own template (`name,price,...`): the merchant-facing file. Prices
+ *    there are EGP as typed ("250", "250.50", "1,250.50", Arabic digits) and
+ *    are converted to integer piastres by `platformCsvPricesToPiastres`; a bad
+ *    price fails its own row (`_error`). A leading BOM is stripped.
  *  - The Shopify product export (`Handle,Title,Body (HTML),...`): one row per
- *    variant/image, grouped by `Handle`. Prices there are MAJOR EGP ("4,850.00"
- *    is not valid, "4850.00" is) and are parsed with `tryToMinor` — strict, two
- *    decimals max, a third decimal is a row error and is never rounded.
+ *    variant/image, grouped by `Handle`. Prices are EGP too, parsed by the same
+ *    `parsePriceCell` — two decimals max, a 3-decimal value is ambiguous and
+ *    is a row error, never rounded.
  *
  * Rows that cannot be imported are NOT dropped and do NOT abort the file: they
  * are emitted with an `_error` cell, which the importer reports against the
@@ -180,7 +182,8 @@ export function importCsvToPlatformCsv(text: string): CsvConversion {
   }
   const format = detectCsvFormat(records[0].fields);
   if (format === 'platform') {
-    return { format, csv: stripBom(text), rows: [], rowErrors: [] };
+    const platform = platformCsvPricesToPiastres(records);
+    return { format, csv: platform.csv, rows: [], rowErrors: platform.rowErrors };
   }
   const rows = shopifyRecordsToRows(records);
   return {
@@ -265,20 +268,62 @@ function cleanImageUrl(raw: string): string {
 }
 
 function parseMoney(raw: string, label: string): { value: number | null; error: string | null } {
-  let text = raw.trim();
-  if (text === '') return { value: null, error: null };
-  // Spreadsheet-formatted amounts ("4,850.00"): accept ONLY well-formed
-  // thousands grouping; "4,85" or "1,2345.00" stay invalid rather than guessed.
-  if (/^\d{1,3}(,\d{3})+(\.\d*)?$/.test(text)) text = text.replace(/,/g, '');
-  const minor = tryToMinor(text);
-  if (minor === null) {
-    return {
-      value: null,
-      error: `${label} "${text}" is not a valid EGP amount (at most 2 decimals, digits only)`,
-    };
+  const r = parsePriceCell(raw, { label });
+  return r.ok ? { value: r.minor, error: null } : { value: null, error: r.message };
+}
+
+const PRICE_COLUMNS = ['price', 'compareAtPrice', 'costPrice'] as const;
+
+/**
+ * Merchant-facing platform CSV (EGP prices) -> internal platform CSV (integer
+ * piastres). Only the three price columns are rewritten; every other column,
+ * including ones this module does not know (e.g. the export's `id`), passes
+ * through. A row with an unparsable price gets an `_error` (appended as a
+ * column if the file has none) and `sourceRow`, so the importer fails that row
+ * only. A base row (no `parentSku`) requires `price`; a variant row may omit it
+ * and inherit the parent's.
+ */
+export function platformCsvPricesToPiastres(records: Array<{ number: number; fields: string[] }>): {
+  csv: string;
+  rowErrors: Array<{ row: number; error: string }>;
+} {
+  const header = records[0].fields.map(h => h.replace(/^\uFEFF/, '').trim());
+  const priceAt = PRICE_COLUMNS.map(c => header.indexOf(c));
+  const parentAt = header.indexOf('parentSku');
+  let errAt = header.indexOf('_error');
+  let srcAt = header.indexOf('sourceRow');
+  const outHeader = [...header];
+  if (errAt < 0) {
+    errAt = outHeader.length;
+    outHeader.push('_error');
   }
-  if (minor < 0) return { value: null, error: `${label} "${text}" must not be negative` };
-  return { value: minor, error: null };
+  if (srcAt < 0) {
+    srcAt = outHeader.length;
+    outHeader.push('sourceRow');
+  }
+
+  const rowErrors: Array<{ row: number; error: string }> = [];
+  const lines = [outHeader.map(csvEscape).join(',')];
+  for (const rec of records.slice(1)) {
+    const cells = outHeader.map((_, i) => (rec.fields[i] ?? '').trim());
+    const isVariant = parentAt >= 0 && cells[parentAt] !== '';
+    const errs: string[] = [];
+    PRICE_COLUMNS.forEach((col, k) => {
+      const at = priceAt[k];
+      if (at < 0) return;
+      const r = parsePriceCell(cells[at], { label: col, required: col === 'price' && !isVariant });
+      if (!r.ok) errs.push(r.message);
+      else cells[at] = r.minor === null ? '' : String(r.minor);
+    });
+    if (errs.length > 0) {
+      const error = errs.join('; ');
+      cells[errAt] = cells[errAt] ? `${cells[errAt]}; ${error}` : error;
+      rowErrors.push({ row: rec.number, error });
+    }
+    if (cells[srcAt] === '') cells[srcAt] = String(rec.number);
+    lines.push(cells.map(csvEscape).join(','));
+  }
+  return { csv: lines.join('\n'), rowErrors };
 }
 
 export function shopifyRecordsToRows(

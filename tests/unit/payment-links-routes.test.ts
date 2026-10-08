@@ -33,7 +33,32 @@ const { mockPrisma, mockPaymentService, mockIsFeatureEnabled, mockAuditLog, mock
     mockAuditLog: vi.fn(),
   }));
 
-vi.mock('@force/database', () => ({ prisma: mockPrisma }));
+// Money batch B: fiscal documents + the frozen COD fee are covered end-to-end
+// by tests/integration/fiscal-documents.test.ts; this unit suite stubs them.
+vi.mock('@api/lib/order-tax', async importOriginal => ({
+  ...(await importOriginal<typeof import('@api/lib/order-tax')>()),
+  // A store that does not collect VAT (the gate is tested in vat-gate tests).
+  resolveActiveTaxRate: vi
+    .fn()
+    .mockResolvedValue({ ratePercent: 0, includedInPrice: false, seller: null }),
+}));
+vi.mock('@api/services/fiscal-document.service', () => ({
+  FiscalDocumentService: {
+    issueSaleDocument: vi.fn().mockResolvedValue(null),
+    cancelSaleDocument: vi.fn().mockResolvedValue(null),
+    issueRefundDocument: vi.fn().mockResolvedValue(null),
+  },
+}));
+vi.mock('@api/services/payment-providers/cod.provider', async importOriginal => ({
+  ...(await importOriginal<typeof import('@api/services/payment-providers/cod.provider')>()),
+  loadCodFeeConfig: vi.fn().mockResolvedValue(null),
+}));
+vi.mock('@force/database', () => ({
+  prisma: mockPrisma,
+  // The route runs inside the request's tenant transaction in production.
+  hasTenantContext: () => true,
+  withMoneyTx: (_p: unknown, fn: (tx: unknown) => unknown) => fn(mockPrisma),
+}));
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'admin-1', role: 'store_admin' };

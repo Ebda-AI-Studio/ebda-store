@@ -2,6 +2,7 @@ import { prisma } from '@force/database';
 import {
   groupOrderLinesForDisplay,
   intlLocale,
+  orderAddressLines,
   orderTaxPlacement,
   REGION,
   taxInvoiceInfo,
@@ -50,6 +51,15 @@ const INVOICE_LABELS = {
   en: {
     invoice: 'Invoice',
     taxInvoice: 'Tax invoice',
+    receipt: 'Sales receipt',
+    orderSummary: 'Order summary',
+    orderNo: 'Order',
+    codFee: 'Cash on delivery fee',
+    extraCharge: 'Additional charge',
+    refundDocs: 'Credit notes & refunds',
+    creditNote: 'Credit note',
+    refundReceipt: 'Refund receipt',
+    originalDoc: 'Original',
     sellerTrn: 'Tax registration no.',
     taxableAmount: 'Taxable amount (excl. VAT)',
     vat: (rate: number | null) => (rate === null ? 'VAT' : `VAT (${rate}%)`),
@@ -84,6 +94,15 @@ const INVOICE_LABELS = {
   ar: {
     invoice: 'فاتورة',
     taxInvoice: 'فاتورة ضريبية',
+    receipt: 'إيصال بيع',
+    orderSummary: 'ملخص الطلب',
+    orderNo: 'طلب',
+    codFee: 'رسوم الدفع عند الاستلام',
+    extraCharge: 'مبلغ إضافي',
+    refundDocs: 'إشعارات دائنة ومرتجعات',
+    creditNote: 'إشعار دائن',
+    refundReceipt: 'إيصال استرداد',
+    originalDoc: 'الأصل',
     sellerTrn: 'رقم التسجيل الضريبي',
     taxableAmount: 'المبلغ الخاضع للضريبة (بدون الضريبة)',
     vat: (rate: number | null) =>
@@ -167,6 +186,75 @@ function loadInvoiceOrder(storeId: string, orderId: string) {
 
 export type InvoiceOrder = NonNullable<Awaited<ReturnType<typeof loadInvoiceOrder>>>;
 
+/** The order's fiscal documents as the invoice prints them (ruling MONEYB-1). */
+export interface InvoiceDocs {
+  sale: {
+    docType: string;
+    number: string | null;
+    status: string;
+    issuedAt: Date | string;
+  } | null;
+  refunds: Array<{
+    docType: string;
+    number: string | null;
+    issuedAt: Date | string;
+    totalAmount: number;
+    vatAmount: number;
+    originalNumber: string | null;
+  }>;
+}
+
+async function loadInvoiceDocs(storeId: string, orderId: string): Promise<InvoiceDocs> {
+  const docs = await prisma.fiscalDocument.findMany({
+    where: { storeId, orderId },
+    orderBy: [{ issuedAt: 'asc' }, { serial: 'asc' }],
+    select: {
+      docType: true,
+      number: true,
+      status: true,
+      issuedAt: true,
+      totalAmount: true,
+      vatAmount: true,
+      originalNumber: true,
+    },
+  });
+  return {
+    sale: docs.find(d => d.docType === 'tax_invoice' || d.docType === 'receipt') ?? null,
+    refunds: docs.filter(d => d.docType === 'credit_note' || d.docType === 'refund_receipt'),
+  };
+}
+
+type InvoiceLabels = (typeof INVOICE_LABELS)[InvoiceLocale];
+
+/**
+ * Heading, number and date of the printed document. The NUMBER is the fiscal
+ * document's own gap-free serial (INV-/RCT-), never the random order number;
+ * an order placed before numbering existed prints as an order summary under
+ * its order number, honestly not called an invoice.
+ */
+function documentHeading(
+  order: InvoiceOrder,
+  docs: InvoiceDocs | undefined,
+  labels: InvoiceLabels,
+  isTax: boolean
+): { title: string; number: string; issuedAt: Date; cancelled: boolean } {
+  const sale = docs?.sale;
+  if (sale?.number) {
+    return {
+      title: sale.docType === 'tax_invoice' ? labels.taxInvoice : labels.receipt,
+      number: sale.number,
+      issuedAt: new Date(sale.issuedAt),
+      cancelled: sale.status === 'cancelled',
+    };
+  }
+  return {
+    title: isTax ? labels.taxInvoice : labels.orderSummary,
+    number: `${labels.orderNo} ${order.orderNumber}`,
+    issuedAt: new Date(order.createdAt),
+    cancelled: false,
+  };
+}
+
 export class InvoiceService {
   /**
    * Generate HTML invoice for an order. Themed with the store's brand color
@@ -184,6 +272,7 @@ export class InvoiceService {
     if (!order) {
       throw new AppError(404, 'NOT_FOUND', 'Order not found');
     }
+    const docs = await loadInvoiceDocs(storeId, orderId);
 
     // Locale resolution: explicit param → order.locale → 'en'
     const resolvedLocale: InvoiceLocale =
@@ -203,7 +292,8 @@ export class InvoiceService {
     // A TAX invoice only when the order froze a verified seller TRN (ruling
     // TAX-2); otherwise an ordinary invoice with no VAT wording.
     const taxInfo = taxInvoiceInfo(order);
-    const docTitle = taxInfo ? labels.taxInvoice : labels.invoice;
+    const heading = documentHeading(order, docs, labels, !!taxInfo);
+    const docTitle = heading.title;
     const formatPrice = (minor: number) => emailMoney(minor, currency, 'en');
     const shippingAddr = order.shippingAddress as Record<string, string> | null;
     // Bill To should reflect the buyer info entered in checkout, not the
@@ -260,7 +350,7 @@ export class InvoiceService {
       otherDiscount > 0 ? discountRow(escapeHtml(labels.discount), otherDiscount) : '',
     ].join('');
 
-    const statusClass = invoiceStatus(order);
+    const statusClass = heading.cancelled ? 'cancelled' : invoiceStatus(order);
     const statusLabel = {
       paid: labels.statusPaid,
       unpaid: labels.statusUnpaid,
@@ -274,7 +364,7 @@ export class InvoiceService {
     // storefront default).
     // Western digits in both languages (Ruling NUMERALS-1): bare `ar-EG` is ٠-٩.
     const dateLocale = intlLocale(ar ? 'ar' : 'en');
-    const dateText = new Date(order.createdAt).toLocaleDateString(dateLocale, {
+    const dateText = heading.issuedAt.toLocaleDateString(dateLocale, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -368,7 +458,7 @@ export class InvoiceService {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>${escapeHtml(docTitle)} ${escapeHtml(order.orderNumber)} &middot; ${escapeHtml(order.store.name)}</title>
+  <title>${escapeHtml(docTitle)} ${escapeHtml(heading.number)} &middot; ${escapeHtml(order.store.name)}</title>
   ${arabicFontLink}
   <style>
     :root {
@@ -587,7 +677,8 @@ export class InvoiceService {
         </div>
         <div class="invoice-side">
           <div class="invoice-eyebrow">${escapeHtml(docTitle)}</div>
-          <div class="invoice-number">${escapeHtml(order.orderNumber)}</div>
+          <div class="invoice-number" dir="ltr">${escapeHtml(heading.number)}</div>
+          ${docs.sale?.number ? `<div class="invoice-date">${escapeHtml(labels.orderNo)} <span dir="ltr">${escapeHtml(order.orderNumber)}</span></div>` : ''}
           <div class="invoice-date">${escapeHtml(dateText)}</div>
           <span class="badge ${statusClass}">${escapeHtml(statusLabel)}</span>
         </div>
@@ -607,7 +698,7 @@ export class InvoiceService {
               return email ? `<div class="addr-line">${escapeHtml(email)}</div>` : '';
             })()
           }
-          ${billingAddr?.phone ? `<div class="addr-line">${escapeHtml(billingAddr.phone)}</div>` : ''}
+          ${billingAddr?.phone ? `<div class="addr-line" dir="ltr">${escapeHtml(billingAddr.phone)}</div>` : ''}
         </div>
         ${
           shippingAddr
@@ -615,10 +706,9 @@ export class InvoiceService {
         <div class="addr-card">
           <div class="addr-label">${escapeHtml(labels.shipTo)}</div>
           <div class="addr-name">${escapeHtml(shippingAddr.firstName)} ${escapeHtml(shippingAddr.lastName)}</div>
-          <div class="addr-line">${escapeHtml(shippingAddr.address1)}</div>
-          ${shippingAddr.address2 ? `<div class="addr-line">${escapeHtml(shippingAddr.address2)}</div>` : ''}
-          <div class="addr-line">${escapeHtml(shippingAddr.city)}${shippingAddr.state ? `, ${escapeHtml(shippingAddr.state)}` : ''}${shippingAddr.postalCode ? ` ${escapeHtml(shippingAddr.postalCode)}` : ''}</div>
-          <div class="addr-line">${escapeHtml(shippingAddr.country)}</div>
+          ${orderAddressLines(shippingAddr, ar ? 'ar' : 'en')
+            .map(l => `<div class="addr-line">${escapeHtml(l)}</div>`)
+            .join('')}
         </div>`
             : ''
         }
@@ -667,6 +757,9 @@ export class InvoiceService {
         <div class="totals">
           <div class="row"><span class="label">${escapeHtml(labels.subtotal)}</span><span class="val">${formatPrice(order.subtotal)}</span></div>
           ${discountRowsHtml}
+          <div class="row"><span class="label">${escapeHtml(labels.shipping)}</span><span class="val">${order.shipping === 0 ? escapeHtml(labels.free) : formatPrice(order.shipping)}</span></div>
+          ${order.codFee > 0 ? `<div class="row"><span class="label">${escapeHtml(labels.codFee)}</span><span class="val">${formatPrice(order.codFee)}</span></div>` : ''}
+          ${order.extraAmount > 0 ? `<div class="row"><span class="label">${escapeHtml(order.extraAmountNote || labels.extraCharge)}</span><span class="val">${formatPrice(order.extraAmount)}</span></div>` : ''}
           ${
             taxInfo
               ? `<div class="row taxable"><span class="label">${escapeHtml(labels.taxableAmount)}</span><span class="val">${formatPrice(taxInfo.taxableAmount)}</span></div>`
@@ -677,7 +770,6 @@ export class InvoiceService {
               ? `<div class="row"><span class="label">${escapeHtml(taxInfo ? labels.vat(taxInfo.ratePercent) : labels.tax)}</span><span class="val">${formatPrice(taxPlacement.taxRow ?? 0)}</span></div>`
               : ''
           }
-          <div class="row"><span class="label">${escapeHtml(labels.shipping)}</span><span class="val">${order.shipping === 0 ? escapeHtml(labels.free) : formatPrice(order.shipping)}</span></div>
           <div class="row grand"><span class="label">${escapeHtml(labels.grandTotal)}</span><span class="val">${formatPrice(order.total)}</span></div>
           ${
             // Inclusive VAT is already inside subtotal/total — a caption after
@@ -689,6 +781,20 @@ export class InvoiceService {
         </div>
       </section>
 
+      ${
+        docs.refunds.length > 0
+          ? `
+      <section class="notes">
+        <div class="label">${escapeHtml(labels.refundDocs)}</div>
+        ${docs.refunds
+          .map(
+            r =>
+              `<div class="body"><span dir="ltr">${escapeHtml(r.number)}</span> · ${escapeHtml(r.docType === 'credit_note' ? labels.creditNote : labels.refundReceipt)} · ${escapeHtml(new Date(r.issuedAt).toLocaleDateString(dateLocale, { year: 'numeric', month: 'short', day: 'numeric', timeZone: order.store.timezone || 'Africa/Cairo' }))} · −${formatPrice(r.totalAmount)}${r.vatAmount > 0 ? ` (${escapeHtml(labels.vat(null))} ${formatPrice(r.vatAmount)})` : ''}</div>`
+          )
+          .join('')}
+      </section>`
+          : ''
+      }
       ${
         order.notes
           ? `
@@ -749,7 +855,7 @@ export class InvoiceService {
     if (!order) {
       throw new AppError(404, 'NOT_FOUND', 'Order not found');
     }
-    return renderInvoiceEmailContent(order, locale);
+    return renderInvoiceEmailContent(order, locale, await loadInvoiceDocs(storeId, orderId));
   }
 }
 
@@ -761,7 +867,11 @@ function invoiceStatus(order: InvoiceOrder): 'paid' | 'unpaid' | 'cancelled' | '
 }
 
 /** Pure renderer behind `generateInvoiceEmail` (exported for tests). */
-export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string): string {
+export function renderInvoiceEmailContent(
+  order: InvoiceOrder,
+  locale?: string,
+  docs?: InvoiceDocs
+): string {
   const resolvedLocale: InvoiceLocale =
     (locale as InvoiceLocale) || ((order.locale as InvoiceLocale) ?? 'en');
   const ar = isArabic(resolvedLocale);
@@ -781,12 +891,13 @@ export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string):
     `<span dir="ltr" style="unicode-bidi:embed;white-space:nowrap;">${emailMoney(minor, currency, 'en')}</span>`;
   const taxPlacement = orderTaxPlacement(order);
   const taxInfo = taxInvoiceInfo(order);
-  const docTitle = taxInfo ? labels.taxInvoice : labels.invoice;
+  const heading = documentHeading(order, docs, labels, !!taxInfo);
+  const docTitle = heading.title;
   const shippingAddr = order.shippingAddress as Record<string, string> | null;
   const billingAddr = (order.billingAddress as Record<string, string> | null) ?? shippingAddr;
   const payment = order.payments?.[0];
 
-  const status = invoiceStatus(order);
+  const status = heading.cancelled ? 'cancelled' : invoiceStatus(order);
   const statusLabel = {
     paid: labels.statusPaid,
     unpaid: labels.statusUnpaid,
@@ -795,7 +906,7 @@ export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string):
   }[status];
   const tone = status === 'paid' ? 'success' : status === 'unpaid' ? 'warning' : 'danger';
 
-  const dateText = new Date(order.createdAt).toLocaleDateString(intlLocale(ar ? 'ar' : 'en'), {
+  const dateText = heading.issuedAt.toLocaleDateString(intlLocale(ar ? 'ar' : 'en'), {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -814,7 +925,11 @@ export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string):
     `<tr>
       <td align="${start}" style="text-align:${start};vertical-align:top;padding:0 0 16px;">
         <div style="font-size:11px;line-height:16px;font-weight:700;text-transform:uppercase;letter-spacing:0.16em;color:${brand};">${escapeHtml(docTitle)}</div>
-        <div dir="ltr" style="font-size:18px;line-height:24px;font-weight:800;color:${c.ink};text-align:${start};">${escapeHtml(order.orderNumber)}</div>
+        <div dir="ltr" style="font-size:18px;line-height:24px;font-weight:800;color:${c.ink};text-align:${start};">${escapeHtml(heading.number)}</div>${
+          docs?.sale?.number
+            ? `<div style="font-size:12px;line-height:18px;color:${c.inkSoft};">${escapeHtml(labels.orderNo)} <span dir="ltr">${escapeHtml(order.orderNumber)}</span></div>`
+            : ''
+        }
         <div style="font-size:12px;line-height:18px;color:${c.inkSoft};">${escapeHtml(dateText)}</div>${
           taxInfo
             ? `${taxInfo.sellerTaxLegalName ? `<div style="font-size:12px;line-height:18px;color:${c.inkSoft};">${escapeHtml(taxInfo.sellerTaxLegalName)}</div>` : ''}<div style="font-size:12px;line-height:18px;color:${c.inkSoft};">${escapeHtml(labels.sellerTrn)}: <span dir="ltr">${escapeHtml(taxInfo.sellerTaxRegistrationNumber)}</span></div>`
@@ -842,12 +957,9 @@ export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string):
         ? card(
             label(labels.shipTo) +
               `<div style="font-size:14px;line-height:20px;font-weight:600;color:${c.ink};">${escapeHtml(shippingAddr.firstName)} ${escapeHtml(shippingAddr.lastName)}</div>` +
-              line(escapeHtml(shippingAddr.address1)) +
-              (shippingAddr.address2 ? line(escapeHtml(shippingAddr.address2)) : '') +
-              line(
-                `${escapeHtml(shippingAddr.city)}${shippingAddr.state ? `, ${escapeHtml(shippingAddr.state)}` : ''}${shippingAddr.postalCode ? ` ${escapeHtml(shippingAddr.postalCode)}` : ''}`
-              ) +
-              line(escapeHtml(shippingAddr.country))
+              orderAddressLines(shippingAddr, ar ? 'ar' : 'en')
+                .map(l => line(escapeHtml(l)))
+                .join('')
           )
         : ''),
     'margin:16px 0 0;'
@@ -951,6 +1063,14 @@ export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string):
         )
       : '',
     other > 0 ? totalRow(escapeHtml(labels.discount), minus(other), c.success) : '',
+    totalRow(
+      escapeHtml(labels.shipping),
+      order.shipping === 0 ? escapeHtml(labels.free) : money(order.shipping)
+    ),
+    order.codFee > 0 ? totalRow(escapeHtml(labels.codFee), money(order.codFee)) : '',
+    order.extraAmount > 0
+      ? totalRow(escapeHtml(order.extraAmountNote || labels.extraCharge), money(order.extraAmount))
+      : '',
     taxInfo ? totalRow(escapeHtml(labels.taxableAmount), money(taxInfo.taxableAmount)) : '',
     (taxPlacement.taxRow ?? 0) > 0 || (taxInfo && !order.taxIncludedInPrice)
       ? totalRow(
@@ -958,10 +1078,6 @@ export function renderInvoiceEmailContent(order: InvoiceOrder, locale?: string):
           money(taxPlacement.taxRow ?? 0)
         )
       : '',
-    totalRow(
-      escapeHtml(labels.shipping),
-      order.shipping === 0 ? escapeHtml(labels.free) : money(order.shipping)
-    ),
     `<tr><td style="padding:12px 0 4px;text-align:${start};font-size:16px;line-height:22px;font-weight:800;color:${c.ink};border-top:2px solid ${c.line};">${escapeHtml(labels.grandTotal)}</td><td align="${end}" style="padding:12px 0 4px;text-align:${end};font-size:18px;line-height:22px;font-weight:800;color:${brand};border-top:2px solid ${c.line};">${money(order.total)}</td></tr>`,
     taxPlacement.includedTaxCaption !== null
       ? `<tr><td colspan="2" align="${end}" style="padding:2px 0 0;text-align:${end};font-size:12px;color:${c.inkSoft};">${escapeHtml(taxInfo ? labels.vatIncluded(taxInfo.ratePercent) : labels.taxIncluded)} ${money(taxPlacement.includedTaxCaption)}</td></tr>`

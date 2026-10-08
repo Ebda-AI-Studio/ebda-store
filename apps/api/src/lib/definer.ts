@@ -856,3 +856,99 @@ export async function deleteUserTokens(userId: string): Promise<number> {
     SELECT public.ebda_user_tokens_delete(${userId}) AS n`;
   return Number(rows[0]?.n ?? 0);
 }
+
+// ---------------------------------------------------------------------------
+// Tax archive (ruling MONEYB-4, migration 20261008120000). Super_admin only (the
+// functions check): the immutable fiscal documents of a store, including one
+// that has been deleted (no store scope can be opened for it any more).
+// ---------------------------------------------------------------------------
+
+export interface FiscalArchiveStoreRow {
+  storeId: string;
+  storeName: string | null;
+  documentCount: number;
+  lastIssuedAt: Date | null;
+  storeExists: boolean;
+}
+
+export async function fiscalArchiveStores(): Promise<FiscalArchiveStoreRow[]> {
+  const rows = await prisma.$queryRaw<
+    Array<{
+      store_id: string;
+      store_name: string | null;
+      document_count: bigint;
+      last_issued_at: Date | null;
+      store_exists: boolean;
+    }>
+  >`SELECT * FROM public.ebda_fiscal_archive_stores()`;
+  return rows.map(r => ({
+    storeId: r.store_id,
+    storeName: r.store_name,
+    documentCount: Number(r.document_count),
+    lastIssuedAt: r.last_issued_at,
+    storeExists: r.store_exists,
+  }));
+}
+
+export interface FiscalArchiveRow {
+  id: string;
+  storeId: string;
+  orderId: string | null;
+  docType: string;
+  number: string | null;
+  status: string;
+  issuedAt: Date;
+  cancelledAt: Date | null;
+  originalNumber: string | null;
+  currency: string;
+  netAmount: number;
+  vatAmount: number;
+  totalAmount: number;
+  vatRateBps: number | null;
+  sellerTrn: string | null;
+  payload: unknown;
+  retainUntil: Date;
+}
+
+export async function fiscalArchive(storeId: string): Promise<FiscalArchiveRow[]> {
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      store_id: string;
+      order_id: string | null;
+      doc_type: string;
+      number: string | null;
+      status: string;
+      issued_at: Date;
+      cancelled_at: Date | null;
+      original_number: string | null;
+      currency: string;
+      net_amount: number;
+      vat_amount: number;
+      total_amount: number;
+      vat_rate_bps: number | null;
+      seller_trn: string | null;
+      payload: unknown;
+      retain_until: Date;
+    }>
+  >`SELECT * FROM public.ebda_fiscal_archive(${storeId})`;
+  return rows.map(r => ({
+    id: r.id,
+    storeId: r.store_id,
+    orderId: r.order_id,
+    docType: r.doc_type,
+    number: r.number,
+    status: r.status,
+    issuedAt: r.issued_at,
+    cancelledAt: r.cancelled_at,
+    originalNumber: r.original_number,
+    currency: r.currency,
+    netAmount: r.net_amount,
+    vatAmount: r.vat_amount,
+    totalAmount: r.total_amount,
+    vatRateBps: r.vat_rate_bps,
+    sellerTrn: r.seller_trn,
+    payload: r.payload,
+    retainUntil: r.retain_until,
+  }));
+}

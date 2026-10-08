@@ -25,41 +25,43 @@ const checkoutClient = readFileSync(
 );
 const cartClient = readFileSync(join(R, 'apps/web/src/app/cart/CartClient.tsx'), 'utf8');
 
-describe('CheckoutClient — tax computed via the shared formula, excluded from total when included in price', () => {
-  it('imports computeOrderTax from @force/shared, not a private mirror', () => {
+describe("CheckoutClient — the order's own amounts function (rulings M3-6, MONEYB-2)", () => {
+  it('imports computeOrderAmounts from @force/shared, not a private mirror', () => {
     expect(checkoutClient).toMatch(
-      /import\s*\{[^}]*computeOrderTax[^}]*\}\s*from\s*'@force\/shared'/
+      /import\s*\{[^}]*computeOrderAmounts[^}]*\}\s*from\s*'@force\/shared'/
     );
   });
 
-  it('computes tax the same way order creation does: subtotal, discount, rate/100, and the includedInPrice flag', () => {
-    expect(checkoutClient).toMatch(
-      /computeOrderTax\(subtotal, discount, taxRatePercent \/ 100, taxIncludedInPrice\)/
+  it('passes subtotal, discount, shipping, the COD fee, the rate and the includedInPrice flag', () => {
+    const call = checkoutClient.slice(checkoutClient.indexOf('computeOrderAmounts({'));
+    expect(call).toMatch(
+      /^computeOrderAmounts\(\{\s*subtotal,\s*discount,\s*shipping,\s*codFee,\s*ratePercent: taxRatePercent,\s*includedInPrice: taxIncludedInPrice,\s*\}\)/
     );
   });
 
-  it('adds tax to total only when NOT already included in the price', () => {
-    expect(checkoutClient).toMatch(/taxIncludedInPrice \? 0 : tax/);
+  it('quotes the COD fee with the function the order freezes it with', () => {
+    expect(checkoutClient).toMatch(
+      /codFeeForOrder\(\{ subtotal, discount, shipping \}, codFeeConfig\)/
+    );
   });
 });
 
-describe('CartClient — same formula, same exclusion', () => {
-  it('imports computeOrderTax from @force/shared', () => {
-    expect(cartClient).toMatch(/import\s*\{[^}]*computeOrderTax[^}]*\}\s*from\s*'@force\/shared'/);
-  });
-
-  it('computes tax the same way order creation does, passing the includedInPrice flag', () => {
+describe('CartClient — same function, shipping in the base', () => {
+  it('imports computeOrderAmounts from @force/shared', () => {
     expect(cartClient).toMatch(
-      /computeOrderTax\(subtotal, discount, taxRatePercent \/ 100, taxIncludedInPrice\)/
+      /import\s*\{[^}]*computeOrderAmounts[^}]*\}\s*from\s*'@force\/shared'/
     );
   });
 
-  it('adds tax to total only when NOT already included in the price', () => {
-    expect(cartClient).toMatch(/taxIncludedInPrice \? 0 : tax/);
+  it('passes shipping and the includedInPrice flag', () => {
+    const call = cartClient.slice(cartClient.indexOf('computeOrderAmounts({'));
+    expect(call).toMatch(
+      /^computeOrderAmounts\(\{\s*subtotal,\s*discount,\s*shipping,\s*ratePercent: taxRatePercent,\s*includedInPrice: taxIncludedInPrice,\s*\}\)/
+    );
   });
 });
 
-describe('order.service.ts — the charge honours the SAME includedInPrice flag (P1 fix)', () => {
+describe('order.service.ts — the charge uses the SAME function at both call sites', () => {
   const orderService = readFileSync(join(R, 'apps/api/src/services/order.service.ts'), 'utf8');
 
   it('resolves the flag via resolveActiveTaxRate (gated — see order-tax.ts / ruling M3-9)', () => {
@@ -67,15 +69,16 @@ describe('order.service.ts — the charge honours the SAME includedInPrice flag 
     expect(occurrences.length).toBe(2); // storefront checkout + the admin manual-order path
   });
 
-  it('passes includedInPrice into computeOrderTax at both call sites', () => {
+  it('computes tax and total with computeOrderAmounts and the includedInPrice flag at both call sites', () => {
     const occurrences =
-      orderService.match(/computeOrderTax\([^)]*activeTax\.includedInPrice\)/g) ?? [];
+      orderService.match(
+        /computeOrderAmounts\(\{[^}]*includedInPrice: activeTax\.includedInPrice,\s*\}\)/g
+      ) ?? [];
     expect(occurrences.length).toBe(2);
   });
 
-  it('excludes tax from total at both call sites when the price already includes it', () => {
-    const occurrences = orderService.match(/activeTax\.includedInPrice \? 0 : tax/g) ?? [];
-    expect(occurrences.length).toBe(2);
+  it('freezes the VAT base next to the tax at both call sites', () => {
+    expect((orderService.match(/\n\s+taxableAmount,\n/g) ?? []).length).toBe(2);
   });
 });
 

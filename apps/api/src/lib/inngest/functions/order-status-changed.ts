@@ -176,6 +176,8 @@ export async function handleOrderStatusChanged(
             sellerTaxLegalName: order.sellerTaxLegalName,
             taxRateBps: order.taxRateBps,
             shipping: order.shipping,
+            codFee: order.codFee,
+            taxableAmount: order.taxableAmount,
             total: order.total,
             currency: order.currency,
             shippingAddress: shippingAddrFull,

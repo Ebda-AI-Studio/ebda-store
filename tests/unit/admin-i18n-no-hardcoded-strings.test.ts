@@ -186,9 +186,9 @@ const ALLOWLIST = new Set<string>([
   'https://… (paste R2 upload URL)',
   'e.g. 550e8400-e29b-41d4-a716-446655440000',
   'MAIN',
-  '29.3759',
-  '47.9774',
-  'e.g. 0.30700',
+  '30.0444',
+  '31.2357',
+  'e.g. 50.00',
 
   // --- currency code / brand-ish example values -----------------------
   'EGP',

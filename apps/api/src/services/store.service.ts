@@ -19,6 +19,7 @@ import {
   unlinkUserAuditLogs,
 } from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
+import { archiveFiscalRecords, assertNoMoneyInFlight } from './store-closure.service';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import {
   slugify,
@@ -669,6 +670,14 @@ export class StoreService {
         { storeId, ...(actorUserId ? { userId: actorUserId } : {}) },
         async () => {
           logger.info({ storeId }, '[STORE_DELETE] start (raw sql, store-scoped)');
+
+          // Ruling MONEYB-4: refuse while money is in flight, then copy every
+          // fiscal record the deletes below would cascade away (legacy orders
+          // without an issued document, Ebda's billing_events VAT ledger) into
+          // the immutable 6-year archive. Issued invoices / receipts / credit
+          // notes live there already (no FK to stores) and survive as they are.
+          await assertNoMoneyInFlight(tx, storeId);
+          await archiveFiscalRecords(tx, storeId);
 
           const reviewCount =
             await tx.$executeRaw`DELETE FROM public.reviews WHERE store_id = ${storeId}`;

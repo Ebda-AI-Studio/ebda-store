@@ -60,11 +60,17 @@ describe('order confirmation email totals', () => {
     expect(ar).not.toContain('الضريبة 2.38 ج.م الشحن');
   });
 
-  it('exclusive tax is a summed row; zero tax prints no row', () => {
+  it('exclusive tax is a summed row AFTER shipping (ruling MONEYB-2); zero tax prints no row', () => {
     expect(text(orderConfirmationTemplate.en(data({ tax: 250, total: 5750 }), 'S'))).toContain(
-      'Tax 2.50 EGP Shipping'
+      'Shipping 5 EGP Tax 2.50 EGP Total'
     );
     expect(text(orderConfirmationTemplate.en(data(), 'S'))).not.toContain('Tax');
+  });
+
+  it('the COD fee is its own row before VAT and inside the total (ruling MONEYB-3)', () => {
+    expect(
+      text(orderConfirmationTemplate.en(data({ codFee: 700, tax: 0, total: 6200 }), 'S'))
+    ).toContain('Shipping 5 EGP Cash on delivery fee 7 EGP Total 62 EGP');
   });
 
   it('splits coupon and loyalty points', () => {

@@ -10,6 +10,19 @@ import { EmailService } from '@api/services/email.service';
 import { socketService } from '@api/services/socket.service';
 
 // Mock dependencies
+// Money batch B: fiscal documents + the frozen COD fee are covered end-to-end
+// by tests/integration/fiscal-documents.test.ts; this unit suite stubs them.
+vi.mock('@api/services/fiscal-document.service', () => ({
+  FiscalDocumentService: {
+    issueSaleDocument: vi.fn().mockResolvedValue(null),
+    cancelSaleDocument: vi.fn().mockResolvedValue(null),
+    issueRefundDocument: vi.fn().mockResolvedValue(null),
+  },
+}));
+vi.mock('@api/services/payment-providers/cod.provider', async importOriginal => ({
+  ...(await importOriginal<typeof import('@api/services/payment-providers/cod.provider')>()),
+  loadCodFeeConfig: vi.fn().mockResolvedValue(null),
+}));
 vi.mock('@force/database', () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   scopeTransaction: (tx: any, _g: unknown, fn: any) => fn(tx),
@@ -1451,15 +1464,17 @@ describe('OrderService', () => {
         ).rejects.toThrow('Cannot transition from refunded to pending');
       });
 
-      it('should reject shipped -> cancelled', async () => {
+      // shipped -> cancelled is now VALID: it is the return-to-origin exit
+      // (ruling MONEYB-5). A delivered order still cannot be cancelled.
+      it('should reject delivered -> cancelled', async () => {
         vi.mocked(prisma.order.findFirst).mockResolvedValue({
           ...mockOrder,
-          status: 'shipped',
+          status: 'delivered',
         } as any);
 
         await expect(
           OrderService.updateStatus(mockStoreId, 'order-123', 'cancelled')
-        ).rejects.toThrow('Cannot transition from shipped to cancelled');
+        ).rejects.toThrow('Cannot transition from delivered to cancelled');
       });
     });
 

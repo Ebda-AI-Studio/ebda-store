@@ -50,7 +50,7 @@ Rules:
 - A base product with ≥1 variant row is flagged `hasVariants=true` automatically; variant `title` is the option values joined by `" / "`.
 - The variant's `parentSku` must resolve to a base product **in the same file** or **already in the store**.
 - `updateExisting=true` + an existing parent that already has variants → its options/variants are **deleted and rebuilt** from the file (same replace-semantics as categories/images). `updateExisting=false` + existing parent → the row fails.
-- **Prices are KWD in the XLSX path** (the converter ×1000 → fils). The raw-CSV `/bulk/import` path expects fils directly.
+- **Prices are EGP in both the XLSX and CSV paths** (2026-10: the converter ×100 → piastres; a third decimal is rejected as ambiguous). Legacy KWD-era note: this runbook predates the Ebda money change; convert any KWD sheet to EGP amounts before upload and use `/bulk/import-preview` to check it.
 - Backward compatible: a sheet without the variant columns imports exactly as before.
 
 Mapping OSOSS → these columns: `en_name→name`, `ar_name→nameAr`, `price→price`, `sku→sku` (generate from `barcode`/`id` when blank), `barcode→barcode`, `quantity_on_hand→inventory`, `en_main_category→categories`, `image→images`; for a child row set `parentSku=parent_sku`, `option1Name=Size`, `option1Value=<oa_*_size>`.

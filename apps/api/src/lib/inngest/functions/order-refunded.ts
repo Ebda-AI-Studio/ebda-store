@@ -8,6 +8,7 @@ import { LoyaltyService } from '../../../services/loyalty.service';
 import { WalletService } from '../../../services/wallet.service';
 import { WarehouseService } from '../../../services/warehouse.service';
 import { hasCapturedPayment } from '../../../services/order-refund-gating';
+import { FiscalDocumentService } from '../../../services/fiscal-document.service';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import { BACKORDER_CANCEL_MARKER } from '../../../services/accounting/posting/prior-reversed-qty';
 import { healBackorderStockDebt } from '../../../services/accounting/backorder-stock-heal';
@@ -197,6 +198,55 @@ export async function handleOrderRefunded(
       if (!row) throw new Error(`Order ${orderId} not found`);
       return row;
     })
+  );
+
+  // Fiscal documents (ruling MONEYB-1). A refund of a sale that took money gets
+  // its own CREDIT NOTE (tax invoice) / REFUND RECEIPT (receipt) with its own
+  // gap-free serial, naming the original number and date — full and partial
+  // alike. A sale cancelled before any money was taken keeps its number and is
+  // marked cancelled instead. Idempotent: keyed per refund event
+  // (`partial.refundKey`, or `order:<id>:full` for the whole order), so a
+  // retried or re-delivered event never issues a second document. Runs before
+  // the notifications so a failed send never skips it.
+  await step.run('fiscal-document', () =>
+    runInTenantContext(storeId, () =>
+      withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+        const reason =
+          typeof (order.payments[0]?.metadata as Record<string, unknown> | null)?.refundReason ===
+          'string'
+            ? ((order.payments[0]!.metadata as Record<string, unknown>).refundReason as string)
+            : null;
+        if (isPartial) {
+          const amount = partial?.refundAmount;
+          if (typeof amount !== 'number' || amount <= 0) return { skipped: 'no-amount' };
+          const doc = await FiscalDocumentService.issueRefundDocument(tx, storeId, orderId, {
+            refundRef: partial!.refundKey,
+            amount,
+            reason,
+          });
+          return { issued: doc?.number ?? null };
+        }
+        const moneyTaken =
+          hasCapturedPayment(order) ||
+          order.paymentStatus === 'refunded' ||
+          order.payments.some(
+            p =>
+              (p.refundedAmount ?? 0) > 0 ||
+              p.status === 'refunded' ||
+              p.status === 'partially_refunded'
+          );
+        if (!moneyTaken) {
+          const doc = await FiscalDocumentService.cancelSaleDocument(tx, storeId, orderId);
+          return { cancelled: doc?.number ?? null };
+        }
+        const doc = await FiscalDocumentService.issueRefundDocument(tx, storeId, orderId, {
+          refundRef: `order:${orderId}:full`,
+          amount: 'remaining',
+          reason,
+        });
+        return { issued: doc?.number ?? null };
+      })
+    )
   );
 
   // Restore physical stock reserved by this order. Guarded by the

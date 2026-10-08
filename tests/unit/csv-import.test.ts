@@ -18,11 +18,12 @@ const HEADER =
 const convert = (...lines: string[]) => importCsvToPlatformCsv([HEADER, ...lines].join('\n'));
 
 describe('importCsvToPlatformCsv — layout detection', () => {
-  it("passes Ebda's own template through untouched (piastres), BOM stripped", () => {
-    const csv = '﻿name,price,sku\nRing,485000,R1';
+  it("converts Ebda's own template (EGP) to internal piastres, BOM stripped", () => {
+    const csv = '﻿name,price,sku\nRing,4850,R1';
     const out = importCsvToPlatformCsv(csv);
     expect(out.format).toBe('platform');
-    expect(out.csv).toBe('name,price,sku\nRing,485000,R1');
+    expect(out.rowErrors).toEqual([]);
+    expect(out.csv).toBe('name,price,sku,_error,sourceRow\nRing,485000,R1,,2');
   });
 
   it('detects the Shopify layout from Handle + Title', () => {

@@ -82,8 +82,9 @@ export interface ShippingAddressShape {
 
 export function formatShippingAddress(addr: ShippingAddressShape | null): string {
   if (!addr) return '';
-  return [addr.address1, addr.address2, addr.area, addr.city, addr.country]
+  return [addr.address1, addr.address2, addr.area, addr.city, addr.governorate, addr.country]
     .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+    .filter((p, i, all) => all.indexOf(p) === i)
     .join(', ');
 }
 

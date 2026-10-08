@@ -109,7 +109,8 @@ describe.skipIf(!hasDb)('InstaPay over HTTP', () => {
     return s;
   }
 
-  async function mkOrder(s: { id: string; productId: string }) {
+  // `codFee`: a COD order is created with its fee frozen and inside total (MONEYB-3).
+  async function mkOrder(s: { id: string; productId: string }, codFee = 0) {
     orderSeq += 1;
     return owner.order.create({
       data: {
@@ -118,7 +119,8 @@ describe.skipIf(!hasDb)('InstaPay over HTTP', () => {
         status: 'pending',
         paymentStatus: 'unpaid',
         subtotal: TOTAL,
-        total: TOTAL,
+        codFee,
+        total: TOTAL + codFee,
         shippingAddress: { firstName: 'Mona', lastName: 'Adel', email: 'mona@example.com' },
         billingAddress: {},
         items: {
@@ -245,7 +247,7 @@ describe.skipIf(!hasDb)('InstaPay over HTTP', () => {
 
   it('COD is untouched: same fee, same payment row, order stays pending', async () => {
     const s = await mkStore('cod');
-    const o = await mkOrder(s);
+    const o = await mkOrder(s, 500);
     const res = await create(o.id, 'cod');
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({ provider: 'cod', cod: true, codFee: 500 });

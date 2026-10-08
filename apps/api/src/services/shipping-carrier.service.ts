@@ -9,9 +9,9 @@ import {
   prisma,
   Prisma,
   runInTenantContext,
+  withStore,
   runInStoreScope,
   withMoneyTx,
-  withStore,
 } from '@force/database';
 import { getShipmentStoreIdByTracking } from '../lib/definer';
 import { config as appConfig } from '../config';
@@ -23,7 +23,6 @@ import {
 import { sweepAcrossStores } from '../lib/cross-store';
 import { safeEqual } from '../lib/carrier-http';
 import { redis } from './redis.service';
-import { notificationDispatcher } from './notification-dispatcher.service';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
 
@@ -618,28 +617,9 @@ class ShippingCarrierService {
       ).catch(() => undefined);
     }
 
-    // Shipment notification fully fire-and-forget (called from the admin route and from the
-    // Inngest job; neither may wait on the notification provider).
-    void withStore(storeId, tx =>
-      tx.store.findUnique({ where: { id: storeId }, select: { name: true } })
-    )
-      .catch(() => null)
-      .then(store =>
-        notificationDispatcher
-          .dispatch(storeId, 'order_shipped', {
-            customerName:
-              `${order.customer?.firstName ?? ''} ${order.customer?.lastName ?? ''}`.trim() ||
-              'Customer',
-            customerPhone: shippingAddr.phone ?? undefined,
-            orderNumber: order.orderNumber,
-            total: order.total,
-            storeId,
-            storeName: store?.name ?? storeId,
-          })
-          .catch(err =>
-            logger.error({ err }, '[ShippingCarrierService] Notification dispatch failed')
-          )
-      );
+    // The customer is told by the order's shipped fan-out (email-shipped +
+    // dispatch-shipped) that the status change above triggers; a second
+    // dispatch from here told them twice (ruling MONEYB-5).
 
     logger.info(
       { shipmentId: shipment.id, trackingNumber: response.trackingNumber },
@@ -896,8 +876,42 @@ class ShippingCarrierService {
     };
   }
 
+  /**
+   * The order side of a return to origin. `restock` is the merchant's choice
+   * (manual carrier: the checkbox next to "Returned"); a carrier-reported
+   * return puts the goods back in stock.
+   */
+  async handleReturnToOrigin(storeId: string, orderId: string, restock?: boolean) {
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, storeId },
+      select: { status: true, payments: { select: { id: true, status: true, provider: true } } },
+    });
+    if (!order) return;
+    if (order.status === 'cancelled' || order.status === 'refunded') return;
+    // The merchant's choice on the manual flow; a carrier-reported return puts
+    // the goods back (they physically came back to the merchant).
+    const restoreInventory = restock ?? true;
+    // Cash on delivery that was never collected is not owed any more.
+    for (const p of order.payments) {
+      if (p.provider === 'cod' && p.status === 'cod_pending') {
+        await prisma.payment.update({ where: { id: p.id }, data: { status: 'cancelled' } });
+      }
+    }
+    if (order.status === 'delivered') {
+      // Delivered then returned is a customer return, not a return to origin:
+      // the returns flow owns it (refund, restock per line).
+      logger.warn({ storeId, orderId }, '[RTO] shipment returned after delivery — left to returns');
+      return;
+    }
+    await setOrderStatusGuarded(prisma, storeId, orderId, 'cancelled', { restoreInventory });
+  }
+
   /** Manual carrier: the merchant moves the shipment along (picked up, delivered, ...). */
-  async manualUpdateStatus(shipmentId: string, status: ShipmentStatus) {
+  async manualUpdateStatus(
+    shipmentId: string,
+    status: ShipmentStatus,
+    opts: { restock?: boolean } = {}
+  ) {
     const shipment = await prisma.shipment.findUnique({
       where: { id: shipmentId, storeId: currentStoreId() },
     });
@@ -908,7 +922,8 @@ class ShippingCarrierService {
     return this.applyTrackingEntries(
       shipment.id,
       [{ status, timestamp: new Date(), description: 'Updated by the merchant' }],
-      'merchant_manual'
+      'merchant_manual',
+      { restock: opts.restock }
     ).then(r => r.shipment);
   }
 
@@ -930,7 +945,7 @@ class ShippingCarrierService {
       description?: string;
     }>,
     source: 'carrier_poll' | 'carrier_webhook' | 'merchant_manual',
-    extra: { estimatedDelivery?: Date } = {}
+    extra: { estimatedDelivery?: Date; restock?: boolean } = {}
   ) {
     const shipment = await prisma.shipment.findUnique({
       where: { id: shipmentId, storeId: currentStoreId() },
@@ -985,27 +1000,19 @@ class ShippingCarrierService {
     }
 
     if (nextStatus === 'delivered' && prevStatus !== 'delivered') {
+      // The order's delivered fan-out sends the customer notification
+      // (dispatch-delivered); sending it here too told them twice.
       await setOrderStatusGuarded(prisma, shipment.storeId, shipment.orderId, 'delivered');
-      const store = await withStore(shipment.storeId, tx =>
-        tx.store.findUnique({ where: { id: shipment.storeId }, select: { name: true } })
-      ).catch(() => null);
-      const order = shipment.order;
-      const shippingAddr = order.shippingAddress as { phone?: string } | null;
-      notificationDispatcher
-        .dispatch(shipment.storeId, 'order_delivered', {
-          customerName:
-            `${order.customer?.firstName ?? ''} ${order.customer?.lastName ?? ''}`.trim() ||
-            order.customer?.email ||
-            'Customer',
-          customerPhone: shippingAddr?.phone ?? undefined,
-          orderNumber: order.orderNumber,
-          total: order.total,
-          storeId: shipment.storeId,
-          storeName: store?.name ?? shipment.storeId,
-        })
-        .catch(err =>
-          logger.error({ err }, '[ShippingCarrierService] Delivery notification failed')
-        );
+    }
+
+    // Return to origin (refused COD, failed delivery): the parcel is back with
+    // the merchant. The order leaves "shipped" — cancelled, COD no longer owed
+    // (nothing was collected), stock put back unless the merchant said not to
+    // (ruling MONEYB-5). A prepaid order is cancelled the same way and its
+    // refund is then owed (the cancel fan-out issues the credit note and tells
+    // the customer their refund is being processed).
+    if (nextStatus === 'returned' && prevStatus !== 'returned') {
+      await this.handleReturnToOrigin(shipment.storeId, shipment.orderId, extra.restock);
     }
 
     return { shipment: updated, applied: true };
@@ -1367,7 +1374,8 @@ async function setOrderStatusGuarded(
   client: Prisma.TransactionClient | typeof prisma,
   storeId: string,
   orderId: string,
-  to: OrderStatus
+  to: OrderStatus,
+  opts: { restoreInventory?: boolean } = {}
 ): Promise<void> {
   const current = await client.order.findFirst({
     where: { id: orderId, storeId },
@@ -1376,7 +1384,21 @@ async function setOrderStatusGuarded(
   if (!current) throw new AppError(404, 'NOT_FOUND', 'Order not found for this store');
   if (current.status === to) return;
   assertValidTransition(current.status, to);
-  await client.order.update({ where: { id: orderId, storeId }, data: { status: to } });
+  // The SAME transition every manual status change makes (ruling MONEYB-5):
+  // deliveredAt + the order/delivered review request, the shipped email and
+  // dispatch, loyalty earn and affiliate commission on delivery, the refund /
+  // cancel reversals, the status audit row and the fan-out's stuck-sweep
+  // bookkeeping. A bare `order.update` here skipped every one of them.
+  // Lazy: order.service pulls in the whole order graph (and imports this
+  // module's consumers back); loading it at call time keeps the carrier
+  // module light and cycle-free.
+  const { OrderService } = await import('./order.service.js');
+  await OrderService.updateStatus(
+    storeId,
+    orderId,
+    to as Parameters<typeof OrderService.updateStatus>[2],
+    opts
+  );
 }
 
 export const shippingCarrierService = new ShippingCarrierService();

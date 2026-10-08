@@ -149,6 +149,19 @@ const { mockPrisma, tx } = vi.hoisted(() => {
   };
 });
 
+// Money batch B: fiscal documents + the frozen COD fee are covered end-to-end
+// by tests/integration/fiscal-documents.test.ts; this unit suite stubs them.
+vi.mock('@api/services/fiscal-document.service', () => ({
+  FiscalDocumentService: {
+    issueSaleDocument: vi.fn().mockResolvedValue(null),
+    cancelSaleDocument: vi.fn().mockResolvedValue(null),
+    issueRefundDocument: vi.fn().mockResolvedValue(null),
+  },
+}));
+vi.mock('@api/services/payment-providers/cod.provider', async importOriginal => ({
+  ...(await importOriginal<typeof import('@api/services/payment-providers/cod.provider')>()),
+  loadCodFeeConfig: vi.fn().mockResolvedValue(null),
+}));
 vi.mock('@force/database', () => ({
   prisma: mockPrisma,
   Prisma: {},

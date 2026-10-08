@@ -28,6 +28,7 @@ import { resolve } from 'path';
 const findFirst = vi.fn();
 vi.mock('@force/database', () => ({
   prisma: {
+    fiscalDocument: { findMany: async () => [] }, // legacy order: no fiscal document (MONEYB-1)
     order: { findFirst: (...a: unknown[]) => findFirst(...a) },
     store: { findUnique: vi.fn() },
   },

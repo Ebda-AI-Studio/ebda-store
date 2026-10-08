@@ -8,7 +8,8 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { ShippingService } from '../services/shipping.service';
 import { prisma } from '@force/database';
-import { EGYPT_GOVERNORATES, minorToDecimalString, tryToMinor, REGION, BRAND } from '@force/shared';
+import { EGYPT_GOVERNORATES, minorToDecimalString, REGION, BRAND } from '@force/shared';
+import { parsePriceCell } from '../services/price-cell';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -537,16 +538,19 @@ interface RowError {
 }
 
 /**
- * Parse an EGP value (number | string like "12.50") into integer piastres.
- * STRICT (`tryToMinor`): more than 2 decimals ("12.505") is rejected, not rounded.
+ * Parse an EGP value (number | string like "12.50") into integer piastres —
+ * the SAME cell rule as the product import (`parsePriceCell`, ruling
+ * MONEYB-8): Arabic digits and thousands commas accepted, more than 2
+ * decimals rejected, and a Kuwaiti-style 3-decimal value ("12.500", which an
+ * Egyptian reads as twelve thousand five hundred) rejected as ambiguous.
  * Returns null for blank/invalid/negative so callers can flag an error.
  */
 export function parseMajorToMinor(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const str = String(value).trim();
   if (str === '') return null;
-  const minor = tryToMinor(str);
-  return minor !== null && minor >= 0 ? minor : null;
+  const r = parsePriceCell(str, { required: true, label: 'rate' });
+  return r.ok && r.minor !== null && r.minor >= 0 ? r.minor : null;
 }
 
 /** Parse a loose truthy/falsy import cell (Yes/No/true/1/blank) → boolean. */

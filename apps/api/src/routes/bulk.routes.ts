@@ -6,6 +6,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { BulkService } from '../services/bulk.service';
 import { xlsxBufferToImportCsv } from '../services/xlsx-import';
 import { importCsvToPlatformCsv } from '../services/csv-import';
+import { buildImportPreview } from '../services/import-preview';
 import { prisma, ProductStatus } from '@force/database';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { inngest } from '../lib/inngest/client';
@@ -249,6 +250,80 @@ router.get(
   }
 );
 
+// POST /stores/:storeId/bulk/import-preview - Dry run of an import. Runs the
+// SAME conversion as /import and /import-xlsx (EGP cells -> piastres, per-row
+// PRICE_* errors) and returns what would be written, with prices in piastres.
+// Nothing is persisted or queued. Send either { csvData } or { xlsxBase64,
+// options }; the admin formats the piastres as EGP and asks the merchant to
+// confirm before calling the real import.
+router.post(
+  '/:storeId/bulk/import-preview',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { csvData, xlsxBase64, options } = req.body ?? {};
+
+      let csv: string;
+      let format: string;
+      if (typeof xlsxBase64 === 'string' && xlsxBase64) {
+        const parsedOptions = xlsxImportOptionsSchema.parse(options || {});
+        const buffer = Buffer.from(xlsxBase64, 'base64');
+        if (buffer.byteLength === 0 || buffer.byteLength > MAX_XLSX_BYTES) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: 'INVALID_DATA',
+              message: `xlsx file must be between 1 byte and ${MAX_XLSX_BYTES} bytes`,
+            },
+          });
+          return;
+        }
+        csv = await xlsxBufferToImportCsv(buffer, {
+          skuPrefix: parsedOptions.skuPrefix,
+          defaultInventory: parsedOptions.defaultInventory,
+          defaultStatus: parsedOptions.defaultStatus,
+          trackInventory: parsedOptions.trackInventory,
+        });
+        format = 'xlsx';
+      } else if (typeof csvData === 'string' && csvData) {
+        const converted = importCsvToPlatformCsv(csvData);
+        csv = converted.csv;
+        format = `csv:${converted.format}`;
+      } else {
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_DATA', message: 'csvData or xlsxBase64 is required' },
+        });
+        return;
+      }
+
+      // The store's current prices feed the "looks like piastres" warning.
+      const existing = await prisma.product.findMany({
+        where: { storeId, deletedAt: null },
+        select: { price: true },
+        take: 5000,
+      });
+
+      res.json({
+        success: true,
+        data: {
+          format,
+          preview: buildImportPreview(
+            csv,
+            existing.map(p => p.price)
+          ),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // POST /stores/:storeId/bulk/import - Enqueue an async product import
 // from CSV. Returns immediately with a jobId; the admin polls
 // /import-jobs/:jobId for progress + final result.
@@ -274,10 +349,10 @@ router.post(
       const parsedOptions = importOptionsSchema.parse(options || {});
       const userId = req.user!.userId;
 
-      // One CSV entry point for both layouts: Ebda's own template passes
-      // through (BOM stripped); a Shopify product export is grouped by Handle
-      // and converted (EGP -> piastres, strict 2 decimals) into the same
-      // platform CSV. Either way the single BulkService importer does the work.
+      // One CSV entry point for both layouts: Ebda's own template
+      // converts EGP prices to piastres (strict 2 decimals, per-row PRICE_*
+      // errors); a Shopify product export is grouped by Handle and converted
+      // the same way into the same internal platform CSV. Either way the single BulkService importer does the work.
       const converted = importCsvToPlatformCsv(csvData);
 
       const job = await prisma.bulkImportJob.create({

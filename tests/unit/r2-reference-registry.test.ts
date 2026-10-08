@@ -79,6 +79,9 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'InstapayReceipt.extracted':
     'what the AI read off a transfer receipt (amounts, names, references), never a URL; the image is a private-bucket key, not a public R2 URL',
   'StoreTaxDocument.profileId': 'foreign key to store_tax_profiles, never a URL',
+  'FiscalDocument.originalDocumentId': 'id of the invoice a credit note adjusts, never a URL',
+  'FiscalDocument.payload':
+    'the issued document as data (seller, buyer, lines, totals), no media; immutable by trigger',
   'StoreTaxDocument.fileName': "the uploader's original file name (display only), never a URL",
   'Store.googleMapsUrl': 'Google Maps link typed by the merchant, never an upload',
   'StoreLocation.mapsUrl': 'Google Maps link, never an upload',

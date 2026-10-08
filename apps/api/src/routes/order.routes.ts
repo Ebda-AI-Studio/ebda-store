@@ -28,7 +28,8 @@ import {
 } from '@force/shared';
 import { COUPON_OVERRIDE_AUDIT_ACTION } from '../lib/coupon-override';
 import { InvoiceService } from '../services/invoice.service';
-import { requirePermission } from '../middleware/rbac';
+import { hasPermission, requirePermission, type Role } from '../middleware/rbac';
+import { hasCapturedPayment } from '../services/order-refund-gating';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
 import { prisma } from '@force/database';
@@ -493,6 +494,16 @@ const updateStatusSchema = z.object({
     'cancelled',
     'refunded',
   ]),
+  /**
+   * `refunded` only (ruling MONEYB-5): the merchant confirms they gave the
+   * money back outside a payment provider (cash, InstaPay, bank transfer). The
+   * server records that refund on the captured payment; without it — and with
+   * no provider refund on record — `refunded` is refused, because it would
+   * tell the customer "refund issued" for money that never moved.
+   */
+  refundRecorded: z.boolean().optional(),
+  refundMethod: z.enum(['cash', 'instapay', 'bank_transfer', 'store_credit', 'other']).optional(),
+  refundReference: z.string().trim().max(120).optional(),
 });
 
 // Helper to get session ID
@@ -658,10 +669,54 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const { status } = updateStatusSchema.parse(req.body);
+      const { status, refundRecorded, refundMethod, refundReference } = updateStatusSchema.parse(
+        req.body
+      );
+      const actor = getAuthUser(req);
 
       const previousOrder = await OrderService.getById(storeId, id);
+      // `refunded` is a money fact, not a workflow step (ruling MONEYB-5): the
+      // same `orders:refund` permission as refund-via-provider (staff lack it),
+      // a payment that was actually captured, and a refund on record — a
+      // provider refund, or the merchant's own confirmation recorded below.
+      let recordManualRefund = false;
+      if (status === 'refunded' && previousOrder.status !== 'refunded') {
+        if (!hasPermission(actor.role as Role, 'orders:refund')) {
+          throw new AppError(
+            403,
+            'FORBIDDEN',
+            'Recording a refund needs the orders:refund permission. Ask the store owner.'
+          );
+        }
+        if (!hasCapturedPayment(previousOrder)) {
+          throw new AppError(
+            400,
+            'ORDER_NOT_PAID',
+            'This order has no captured payment, so it cannot be marked refunded'
+          );
+        }
+        const providerRefundOnRecord = (previousOrder.payments ?? []).some(
+          p => (p.refundedAmount ?? 0) > 0 || p.status === 'refunded'
+        );
+        if (!providerRefundOnRecord) {
+          if (!refundRecorded) {
+            throw new AppError(
+              409,
+              'REFUND_NOT_RECORDED',
+              'Give the money back first, then confirm how you refunded it. Nothing was changed.'
+            );
+          }
+          recordManualRefund = true;
+        }
+      }
       const order = await OrderService.updateStatus(storeId, id, status);
+      if (recordManualRefund) {
+        await OrderService.recordManualRefund(storeId, id, {
+          method: refundMethod ?? 'other',
+          reference: refundReference ?? null,
+          actorId: actor.userId,
+        });
+      }
 
       // Audit log
       await auditLog({
@@ -828,6 +883,19 @@ router.post(
         res.status(400).json({
           success: false,
           error: { code: 'ALREADY_PAID', message: 'Order is already marked as paid' },
+        });
+        return;
+      }
+      // A cancelled / refunded order (incl. a returned-to-origin COD parcel)
+      // collected nothing: marking it paid would book a sale that never
+      // happened (sense audit O8).
+      if (order.status === 'cancelled' || order.status === 'refunded') {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'ORDER_NOT_PAYABLE',
+            message: 'A cancelled or refunded order cannot be marked paid',
+          },
         });
         return;
       }
