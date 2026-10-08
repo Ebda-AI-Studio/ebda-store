@@ -199,6 +199,8 @@ export interface WebhookPayload {
     amount?: number;
   };
   rawPayload: unknown;
+  /** The typed v2 event this payload was built from (v2 adapters only; never serialised). */
+  v2Event?: WebhookEventV2;
 }
 
 export interface PaymentProviderConfig {
@@ -255,6 +257,15 @@ export interface IPaymentProvider {
    * of `verifyWebhook` + `parseWebhook`.
    */
   verifyAndParseWebhook?(rawBody: string, signature: string): WebhookPayload;
+
+  /**
+   * Server-to-server confirmation of a verified webhook (v2 adapters that implement
+   * `confirmWebhookEvent`). Absent = the signature covers every money-deciding field.
+   * Resolves to the payload to APPLY; rejects when the state could not be confirmed.
+   */
+  confirmWebhook?(
+    payload: WebhookPayload
+  ): Promise<{ payload: WebhookPayload; confirmation: WebhookConfirmation }>;
 
   /**
    * Parse webhook payload
@@ -421,6 +432,8 @@ export type WebhookEventV2 =
       currency: 'EGP';
       method?: string;
       paidAt?: Date;
+      /** The gateway's id of THIS transaction, when it differs from `providerRef` (Kashier `TX-…`). */
+      transactionRef?: string;
       rawPayload: unknown;
     }
   | {
@@ -541,4 +554,28 @@ export interface PaymentProviderV2 {
    * `REFUND_NOT_SUPPORTED` when `capabilities.partialRefunds` is false.
    */
   partialRefund(req: PartialRefundV2Request, creds: ProviderCredentials): Promise<RefundV2Result>;
+
+  /**
+   * Confirm a VERIFIED webhook server-to-server before it is applied. Implemented by a gateway
+   * whose signature leaves a money-deciding field unsigned (Kashier: `event`, i.e. refund vs
+   * payment). Returns the event as the gateway's own query reports it: the CONFIRMED kind and
+   * status replace the delivery's, the signed amount and references are kept. Throws
+   * `PaymentProviderError` when the gateway cannot be asked or does not answer clearly; the
+   * caller must then NOT apply the event (it retries through the webhook queue).
+   */
+  confirmWebhookEvent?(
+    ev: WebhookEventV2,
+    creds: ProviderCredentials
+  ): Promise<WebhookConfirmation>;
+}
+
+/** What `confirmWebhookEvent` found: the event to apply, and how it compares to the delivery. */
+export interface WebhookConfirmation {
+  event: WebhookEventV2;
+  claimed: { kind: WebhookEventV2['kind']; status: string };
+  confirmed: { kind: WebhookEventV2['kind']; status: string };
+  /** The delivery's kind or status disagreed with the gateway's own record. */
+  mismatch: boolean;
+  /** The gateway call that answered (for the audit row), e.g. `kashier GET /v2/aggregator/transactions/:id`. */
+  source: string;
 }

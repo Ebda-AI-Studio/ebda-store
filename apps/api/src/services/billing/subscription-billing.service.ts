@@ -1369,7 +1369,51 @@ export async function handleBillingWebhook(
 ): Promise<WebhookResult> {
   const provider = getBillingProviderByName(providerName);
   if (!provider) throw new AppError(404, 'UNKNOWN_PROVIDER', 'Unknown billing provider');
-  const event = provider.verifyWebhook(rawBody, headers);
+  let event = provider.verifyWebhook(rawBody, headers);
+  // PROVIDERS-17 confirm-before-apply: only the gateway's own record of the transaction is
+  // applied. Failure throws (500, the gateway redelivers, the dedupe row is never written).
+  if (provider.confirmWebhookEvent && event.kind !== 'ignored') {
+    let confirmation;
+    try {
+      confirmation = await provider.confirmWebhookEvent(event);
+    } catch (err) {
+      await auditLog({
+        action: 'BILLING_WEBHOOK_UNCONFIRMED',
+        resourceType: 'billing',
+        resourceId: event.merchantOrderId ?? undefined,
+        details: {
+          provider: provider.name,
+          eventId: event.eventId,
+          claimed: event.kind,
+          reason: (err as Error).message.slice(0, 300),
+        },
+      });
+      throw err;
+    }
+    await auditLog({
+      action: confirmation.mismatch ? 'BILLING_WEBHOOK_CORRECTED' : 'BILLING_WEBHOOK_CONFIRMED',
+      resourceType: 'billing',
+      resourceId: event.merchantOrderId ?? undefined,
+      details: {
+        provider: provider.name,
+        eventId: event.eventId,
+        claimed: confirmation.claimed,
+        confirmed: confirmation.confirmed,
+        source: confirmation.source,
+      },
+    });
+    if (confirmation.mismatch) {
+      logger.error(
+        {
+          provider: provider.name,
+          claimed: confirmation.claimed,
+          confirmed: confirmation.confirmed,
+        },
+        '[billing-webhook] delivery label disagreed with the gateway record — applying the record'
+      );
+    }
+    event = confirmation.event;
+  }
   return applyWebhookEvent(provider.name, event);
 }
 

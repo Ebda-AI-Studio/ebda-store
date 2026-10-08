@@ -405,6 +405,100 @@ describe.skipIf(!hasDb)('Egyptian gateway webhooks: route, inbox, definer, handl
     expect((await state(order.id)).payment.status).toBe('completed');
   });
 
+  // ── PROVIDERS-17: Kashier confirm-before-apply. `event` is not covered by the signature, so
+  // a genuine delivery can be relabelled; only Kashier's own transaction record is applied.
+  const confirmationRows = (orderId: string, eventType: string) =>
+    owner.paymentEvent.count({ where: { orderId, eventType } });
+
+  it('Kashier: a genuine PAYMENT delivery relabelled as a REFUND is applied as the payment Kashier records', async () => {
+    const s = await mkStore('ks-relabel');
+    const { order, payment } = await startPayment(s, 'kashier');
+    stubs.kashier.capture(payment.transactionId!);
+    const txn = stubs.kashier.sessions.get(payment.transactionId!)!.transactionId!;
+    // The attacker replays the genuine signed `pay` delivery with `event: "refund"` (unsigned).
+    const relabelled = stubs.kashier.webhookFor(payment.transactionId!, {
+      status: 'SUCCESS',
+      amount: (TOTAL / 100).toFixed(2),
+      transactionId: txn,
+      event: 'refund',
+    });
+    const before = stubs.kashier.requests.length;
+    const res = await send('kashier', relabelled);
+    expect(res.status).toBe(200);
+    // Kashier was asked about exactly this transaction.
+    expect(
+      stubs.kashier.requests
+        .slice(before)
+        .some(r => r.method === 'GET' && r.path === `/v2/aggregator/transactions/${txn}`)
+    ).toBe(true);
+    const st = await state(order.id);
+    expect(st.payment.status).toBe('completed');
+    expect(st.payment.refundedAmount ?? 0).toBe(0);
+    expect(st.order.paymentStatus).toBe('paid');
+    expect(await confirmationRows(order.id, 'webhook_corrected')).toBe(1);
+  });
+
+  it('Kashier: a refund delivery is applied only as the refund Kashier records', async () => {
+    const s = await mkStore('ks-refund');
+    const { order, payment } = await startPayment(s, 'kashier');
+    expect((await send('kashier', deliveryFor('kashier', payment.transactionId!))).status).toBe(
+      200
+    );
+    expect((await state(order.id)).payment.status).toBe('completed');
+    // An out-of-band partial refund in Kashier's dashboard: Kashier records a refund transaction.
+    stubs.kashier.transactions.set('TX-oob-refund-1', {
+      order: payment.transactionId!,
+      operation: 'refund',
+      status: 'SUCCESS',
+    });
+    const refund = stubs.kashier.webhookFor(payment.transactionId!, {
+      status: 'SUCCESS',
+      amount: '10.00',
+      transactionId: 'TX-oob-refund-1',
+      event: 'refund',
+    });
+    expect((await send('kashier', refund)).status).toBe(200);
+    const st = await state(order.id);
+    expect(st.payment.refundedAmount).toBe(1000);
+    expect(st.payment.status).toBe('partially_refunded');
+    expect(await confirmationRows(order.id, 'webhook_confirmed')).toBe(2);
+  });
+
+  it('Kashier: when the transaction cannot be confirmed NOTHING is applied; the retry applies it once Kashier answers', async () => {
+    const s = await mkStore('ks-down');
+    const { order, payment } = await startPayment(s, 'kashier');
+    const w = deliveryFor('kashier', payment.transactionId!);
+    // Kashier's details API is down: the signed, valid delivery must not move money.
+    stubs.kashier.faults.down = 'unavailable';
+    try {
+      const res = await send('kashier', w);
+      expect(res.status).toBeGreaterThanOrEqual(500);
+    } finally {
+      stubs.kashier.faults.down = null;
+    }
+    const mid = await state(order.id);
+    expect(mid.payment.status).toBe('pending');
+    expect(mid.order.paymentStatus).toBe('unpaid');
+    expect(await owner.paymentEvent.count({ where: { orderId: order.id } })).toBe(
+      await owner.paymentEvent.count({ where: { orderId: order.id, eventType: 'created' } })
+    );
+    // Why it was not applied is on the durable inbox row (super-admin /webhook-events).
+    const inbox = await owner.webhookEvent.findFirstOrThrow({
+      where: { storeId: s.id, provider: 'kashier' },
+      orderBy: { receivedAt: 'desc' },
+    });
+    expect(inbox.status).toBe('failed');
+    expect(inbox.lastError).toContain('could not confirm');
+
+    // Kashier retries the same delivery (the inbox row was left retriable): now it is confirmed.
+    const retry = await send('kashier', w);
+    expect(retry.status).toBe(200);
+    const after = await state(order.id);
+    expect(after.payment.status).toBe('completed');
+    expect(after.order.paymentStatus).toBe('paid');
+    expect(await confirmationRows(order.id, 'webhook_confirmed')).toBe(1);
+  });
+
   it('Kashier: a payload that signs only the order id (not the amount) is refused even though its signature is valid', async () => {
     const s = await mkStore('ks-keys');
     const { order, payment } = await startPayment(s, 'kashier');

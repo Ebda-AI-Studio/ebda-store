@@ -33,6 +33,7 @@ import { toProviderCredentials } from './credentials';
 import { isProviderUsable } from './provider-gate';
 import { V2ProviderBridge } from './v2-bridge';
 import { PaymentProviderError, type WebhookPayload } from './types';
+import type { PaymentStatus as DbPaymentStatus } from '@force/database';
 import {
   resolveRefundSettlement,
   readAccountedRefundEventIds,
@@ -390,6 +391,95 @@ const factory = new PaymentFactory();
  * failure is swallowed — an alerting hiccup must never fail webhook
  * processing.
  */
+/**
+ * PROVIDERS-17: ask the gateway what a verified delivery really is, audit-log the answer, and
+ * return the payload to APPLY (the confirmed one). Read-only at the gateway, so a redelivery or
+ * a retry simply asks again: idempotent. Any failure throws a retriable 503 and applies nothing.
+ */
+export async function confirmBeforeApply(
+  p: IPaymentProvider,
+  webhookData: WebhookPayload,
+  ctx: {
+    provider: PaymentProvider;
+    paymentId: string;
+    paymentStatus: DbPaymentStatus;
+    orderId: string;
+    storeId: string;
+  }
+): Promise<WebhookPayload> {
+  let out: Awaited<ReturnType<NonNullable<IPaymentProvider['confirmWebhook']>>>;
+  try {
+    out = await p.confirmWebhook!(webhookData);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    logger.warn(
+      {
+        provider: ctx.provider,
+        paymentId: ctx.paymentId,
+        claimed: webhookData.refund ? `refund/${webhookData.refund.status}` : webhookData.status,
+        reason,
+      },
+      '[PAYMENT WEBHOOK] could not confirm the delivery with the gateway — not applied, will retry'
+    );
+    // No payment-event row here: this throw rolls the tenant transaction back, so it would never
+    // persist. The reason is kept on the durable inbox row instead (`lastError`, written by the
+    // Inngest consumer or the inline fallback) and in this log line.
+    throw new AppError(
+      503,
+      'WEBHOOK_UNCONFIRMED',
+      `The gateway could not confirm this webhook; it was not applied and will be retried (${reason.slice(0, 200)})`
+    );
+  }
+  const { confirmation } = out;
+  await recordPaymentEvent({
+    paymentId: ctx.paymentId,
+    storeId: ctx.storeId,
+    orderId: ctx.orderId,
+    eventType: confirmation.mismatch ? 'webhook_corrected' : 'webhook_confirmed',
+    fromStatus: ctx.paymentStatus,
+    toStatus: null,
+    provider: ctx.provider,
+    details: {
+      claimed: confirmation.claimed,
+      confirmed: confirmation.confirmed,
+      reason: confirmation.mismatch
+        ? `delivery said ${confirmation.claimed.kind} ${confirmation.claimed.status}; gateway record ${confirmation.confirmed.kind} ${confirmation.confirmed.status} applied`
+        : `gateway record ${confirmation.confirmed.kind} ${confirmation.confirmed.status}`,
+      source: confirmation.source,
+    },
+  });
+  if (confirmation.mismatch) {
+    logger.error(
+      {
+        provider: ctx.provider,
+        paymentId: ctx.paymentId,
+        claimed: confirmation.claimed,
+        confirmed: confirmation.confirmed,
+      },
+      '[PAYMENT WEBHOOK] delivery disagreed with the gateway record — applying the gateway record'
+    );
+    await sendAlert({
+      level: 'p1',
+      scope: 'store',
+      store: { id: ctx.storeId, name: ctx.storeId },
+      source: 'payment.webhook.unconfirmed_label',
+      title: `${ctx.provider} webhook label disagreed with the gateway — payment ${ctx.paymentId}`,
+      body:
+        `A signed ${ctx.provider} delivery claimed ${confirmation.claimed.kind}/${confirmation.claimed.status}, ` +
+        `but the gateway's own record says ${confirmation.confirmed.kind}/${confirmation.confirmed.status}. ` +
+        'Only the gateway record was applied. A relabelled delivery is a sign of a replayed or tampered webhook.',
+      context: {
+        provider: ctx.provider,
+        storeId: ctx.storeId,
+        paymentId: ctx.paymentId,
+        claimed: confirmation.claimed,
+        confirmed: confirmation.confirmed,
+      },
+    }).catch(() => undefined);
+  }
+  return out.payload;
+}
+
 export async function alertIfDuplicateCapture(
   paymentId: string,
   orderId: string,
@@ -1577,6 +1667,21 @@ export class PaymentService {
         '[PAYMENT WEBHOOK] storeId mismatch between resolver and payment.order — refusing to process'
       );
       throw new AppError(400, 'STORE_MISMATCH', 'Webhook payload does not match resolved store');
+    }
+
+    // Confirm-before-apply (Ruling PROVIDERS-17). A gateway whose signature leaves a
+    // money-deciding field unsigned (Kashier: `event`, refund vs payment) is asked
+    // server-to-server what this transaction really is, and ONLY that answer is applied below.
+    // No answer = nothing applied: the error is a 5xx, so the webhook queue retries it and,
+    // once retries are spent, dead-letters it into the P0 path with the inbox row replayable.
+    if (p.confirmWebhook) {
+      webhookData = await confirmBeforeApply(p, webhookData, {
+        provider,
+        paymentId: payment.id,
+        paymentStatus: payment.status,
+        orderId: payment.orderId,
+        storeId: payment.order?.storeId ?? storeId ?? '',
+      });
     }
 
     // Refund webhook short-circuit. A gateway delivers a refund event when it

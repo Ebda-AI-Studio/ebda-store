@@ -26,6 +26,8 @@ import {
   type ProviderCredentials,
   type RefundRequest,
   type RefundResponse,
+  type WebhookConfirmation,
+  type WebhookEventV2,
   type WebhookPayload,
 } from './types';
 
@@ -154,35 +156,28 @@ export class V2ProviderBridge implements IPaymentProvider {
       signatureToHeaders(this.name, signature),
       this.creds
     );
-    if (ev.kind === 'refund') {
-      return {
-        provider: this.name,
-        event: `refund.${ev.status}`,
-        transactionId: ev.providerRef,
-        invoiceId: ev.providerRef,
-        status: 'refunded',
-        amount: ev.amountMinor,
-        currency: ev.currency,
-        refund: {
-          refundId: ev.refundRef,
-          status: ev.status,
-          // 0 = the gateway did not say how much: the pipeline then holds the balance for a human.
-          amount: ev.amountMinor > 0 ? ev.amountMinor : undefined,
-        },
-        rawPayload: ev.rawPayload,
-      };
-    }
-    return {
-      provider: this.name,
-      event: ev.eventId,
-      transactionId: ev.providerRef,
-      invoiceId: ev.providerRef,
-      status: ev.status,
-      amount: ev.amountMinor,
-      currency: ev.currency,
-      paymentMethod: ev.method,
-      paidAt: ev.paidAt,
-      rawPayload: ev.rawPayload,
+    return toWebhookPayload(this.name, ev);
+  }
+
+  /**
+   * Present only when the adapter confirms deliveries server-to-server (Kashier). The
+   * payload returned is built from the CONFIRMED event, so an unsigned label the delivery
+   * carried (refund vs payment, authorize vs pay) never reaches the money pipeline.
+   */
+  get confirmWebhook():
+    | ((
+        payload: WebhookPayload
+      ) => Promise<{ payload: WebhookPayload; confirmation: WebhookConfirmation }>)
+    | undefined {
+    const confirm = this.adapter.confirmWebhookEvent?.bind(this.adapter);
+    if (!confirm) return undefined;
+    return async (payload: WebhookPayload) => {
+      if (!payload.v2Event) {
+        // Every payload this bridge builds carries its event; one without it was not built here.
+        throw new PaymentProviderError('WEBHOOK_MALFORMED', 'payload has no verified event');
+      }
+      const confirmation = await confirm(payload.v2Event, this.creds);
+      return { payload: toWebhookPayload(this.name, confirmation.event), confirmation };
     };
   }
 
@@ -201,4 +196,40 @@ export class V2ProviderBridge implements IPaymentProvider {
       nameAr: METHOD_LABELS[code]?.nameAr,
     }));
   }
+}
+
+/** The legacy pipeline's view of a verified v2 event. */
+export function toWebhookPayload(name: PaymentProvider, ev: WebhookEventV2): WebhookPayload {
+  if (ev.kind === 'refund') {
+    return {
+      provider: name,
+      event: `refund.${ev.status}`,
+      transactionId: ev.providerRef,
+      invoiceId: ev.providerRef,
+      status: 'refunded',
+      amount: ev.amountMinor,
+      currency: ev.currency,
+      refund: {
+        refundId: ev.refundRef,
+        status: ev.status,
+        // 0 = the gateway did not say how much: the pipeline then holds the balance for a human.
+        amount: ev.amountMinor > 0 ? ev.amountMinor : undefined,
+      },
+      rawPayload: ev.rawPayload,
+      v2Event: ev,
+    };
+  }
+  return {
+    provider: name,
+    event: ev.eventId,
+    transactionId: ev.providerRef,
+    invoiceId: ev.providerRef,
+    status: ev.status,
+    amount: ev.amountMinor,
+    currency: ev.currency,
+    paymentMethod: ev.method,
+    paidAt: ev.paidAt,
+    rawPayload: ev.rawPayload,
+    v2Event: ev,
+  };
 }
