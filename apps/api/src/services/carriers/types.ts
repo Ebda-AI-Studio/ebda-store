@@ -161,6 +161,51 @@ export interface CarrierCapabilities {
   polling: boolean;
   /** Can the carrier collect cash on delivery in EGP? `'unconfirmed'` = refused until verified. */
   cod: boolean | 'unconfirmed';
+  /**
+   * Courier pickups (PROVIDERS-18): `request` = the merchant asks for one (`schedulePickup`);
+   * `automatic` = booking requests it (ShipBlu); `none` = no pickup API (manual).
+   */
+  pickup: 'request' | 'automatic' | 'none';
+  /**
+   * How a pickup time is chosen: `none` = the carrier assigns the slot (Bosta), `times` = the
+   * merchant gives a from/to window (Aramex), `carrier_slots` = one of the carrier's own slots,
+   * listed by `pickupWindows` (Mylerz).
+   */
+  pickupWindow: 'none' | 'times' | 'carrier_slots';
+  /** A requested pickup can be cancelled through the API (`cancelPickup`). */
+  pickupCancel: boolean;
+}
+
+/** A pickup the merchant asks for. Dates and times are Africa/Cairo wall-clock. */
+export interface CarrierPickupRequest {
+  /** YYYY-MM-DD */
+  date: string;
+  /** HH:MM, HH:MM (pickupWindow `times`). */
+  window?: { from: string; to: string };
+  /** A carrier slot id (pickupWindow `carrier_slots`). */
+  windowId?: string;
+  /** The store's pickup location (the carrier settings' pickup address). */
+  address: ShipmentAddress;
+  /** Parcels to collect: the shipment's tracking numbers / barcodes. */
+  trackingNumbers: string[];
+  /** Our pickup row id: a carrier that takes a reference gets it. */
+  reference: string;
+  weightKg?: number;
+}
+
+export interface CarrierPickupResult {
+  /** What cancel / lookup take. */
+  carrierPickupId: string;
+  /** The number a human quotes to the carrier, when it differs. */
+  carrierReference?: string;
+  /** A slot the carrier assigned ("10:00 to 13:00"). */
+  timeSlot?: string;
+}
+
+export interface CarrierPickupWindow {
+  id: string;
+  label: string;
+  isDefault?: boolean;
 }
 
 export interface CarrierWebhookResult {
@@ -229,6 +274,23 @@ export interface ShippingCarrierProvider {
     data: CarrierQuoteRequest,
     ctx?: CarrierCallContext
   ): Promise<CarrierQuote>;
+
+  /** Ask the carrier to collect parcels (capabilities.pickup === 'request'). */
+  schedulePickup?(
+    credentials: any,
+    req: CarrierPickupRequest,
+    ctx?: CarrierCallContext
+  ): Promise<CarrierPickupResult>;
+
+  /** Cancel a requested pickup (capabilities.pickupCancel). */
+  cancelPickup?(
+    credentials: any,
+    pickup: { carrierPickupId: string; carrierReference?: string | null },
+    ctx?: CarrierCallContext
+  ): Promise<CarrierCancelResult>;
+
+  /** The carrier's own pickup slots (capabilities.pickupWindow === 'carrier_slots'). */
+  pickupWindows?(credentials: any, ctx?: CarrierCallContext): Promise<CarrierPickupWindow[]>;
 
   /**
    * Parse an incoming carrier webhook payload into a normalized result.

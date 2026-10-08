@@ -1370,7 +1370,42 @@
         "confirmCancelDescription": "The carrier is asked to cancel the parcel and the order goes back to processing.",
         "forceCancelTitle": "The carrier did not cancel it",
         "forceCancelDescription": "The courier may already have the parcel. You can stop tracking it here anyway, but the parcel may still be delivered.",
-        "forceCancel": "Cancel here anyway"
+        "forceCancel": "Cancel here anyway",
+        "pickup": {
+          "title": "Courier pickup",
+          "request": "Request pickup",
+          "submit": "Send pickup request",
+          "close": "Close",
+          "date": "Pickup date",
+          "from": "From",
+          "to": "To",
+          "slot": "Time slot",
+          "slotsLoading": "Loading the carrier's time slots…",
+          "slotDefault": "The carrier's default slot",
+          "slotsFailed": "Could not load the carrier's time slots. The default slot will be used.",
+          "carrierAssigns": "{carrier} assigns the pickup time slot and shows it after the request.",
+          "addressHint": "The courier comes to the pickup address saved in this carrier's settings (Cairo time).",
+          "requested": "Pickup requested",
+          "cancelled": "Pickup cancelled",
+          "errorTitle": "Error",
+          "failed": "Something went wrong. Please try again.",
+          "notAvailable": "A pickup can be requested once the shipment is booked and until the courier collects it.",
+          "automatic": "{carrier} requests the pickup automatically when the shipment is booked.",
+          "automaticFailed": "{carrier} did not accept the automatic pickup request. Request the pickup in your {carrier} dashboard.",
+          "carrierSlot": "slot {slot}",
+          "reference": "Ref. {ref}",
+          "cancel": "Cancel pickup",
+          "keep": "Keep",
+          "cancelInPortal": "{carrier} does not offer cancelling a pickup through its API. Cancel it in your {carrier} dashboard.",
+          "confirmCancelTitle": "Cancel this pickup?",
+          "confirmCancelDescription": "The carrier is asked to cancel the courier visit. The shipment itself stays booked.",
+          "statuses": {
+            "requesting": "Sending…",
+            "requested": "Requested",
+            "failed": "Failed",
+            "cancelled": "Cancelled"
+          }
+        }
       }
     },
     "layout": {
@@ -6048,6 +6083,8 @@
         "refund_failed": "Refund failed",
         "refund_indeterminate": "Refund unconfirmed — check the provider",
         "refund_reconciled": "Refund settled by merchant",
+        "webhook_confirmed": "Webhook confirmed with the provider",
+        "webhook_corrected": "Webhook corrected — the provider's record was applied",
         "retry": "Retry attempt",
         "expired": "Payment expired",
         "cancelled": "Payment cancelled",

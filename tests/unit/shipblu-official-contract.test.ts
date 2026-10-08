@@ -382,6 +382,10 @@ describe('shipblu: cancel and webhooks (undocumented: safe, no network)', () => 
       webhooks: false,
       polling: true,
       cod: true,
+      // PROVIDERS-18: booking requests the pickup; there is nothing for the merchant to ask.
+      pickup: 'automatic',
+      pickupWindow: 'none',
+      pickupCancel: false,
     });
     for (const p of [null, {}, { tracking_number: 'T', status: 'delivered' }, 'x']) {
       expect(carrier.processWebhook(p, {})).toBeNull();

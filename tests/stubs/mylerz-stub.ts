@@ -259,6 +259,13 @@ export class MylerzStub {
       return ok({ CODValue: 0, ShippingFees: this.fee, VAT: 0, TotalTransfer: this.fee });
     }
 
+    // PickupTimeWindowDto: { Id, SlotTime, IsDefault } (SlotTime text is UNVERIFIED: none published).
+    if (method === 'GET' && path === '/api/Lookup/GetAllPickupTimeWindow') {
+      return ok([
+        { Id: 1, SlotTime: '09:00 - 13:00', IsDefault: true },
+        { Id: 2, SlotTime: '13:00 - 17:00', IsDefault: false },
+      ]);
+    }
     if (method === 'POST' && path === '/api/PickupOrder/CreatePickupOrder') {
       return ok([
         { PickupOrderCode: 'PU1', WarehouseName: MYLERZ_STUB.warehouseName, PickupPackages: [] },

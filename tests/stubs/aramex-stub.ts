@@ -78,6 +78,8 @@ export const ARAMEX_SCHEMA: Record<string, Record<string, string>> = {
       'ProductGroup* ProductType* NumberOfShipments* PackageType* Payment* ShipmentWeight*:Weight ShipmentVolume*:Volume NumberOfPieces* CashAmount*:Money ExtraCharges*:Money ShipmentDimensions*:Dimensions Comments*',
     Volume: 'Unit* Value*',
     ArrayOfExistingShipment: 'ExistingShipment:ExistingShipment',
+    // Shipping WSDL: PickupCancelationRequest (ClientInfo, Transaction, PickupGUID, Comments).
+    PickupCancelationRequest: 'ClientInfo:ClientInfo Transaction:Transaction PickupGUID Comments',
     ExistingShipment: 'Number* OriginEntity* ProductGroup*',
   },
   RateCalculator: {
@@ -206,6 +208,7 @@ const OPERATION_OF: Record<string, [string, string]> = {
   ShipmentCreationRequest: ['Shipping', 'CreateShipments'],
   LabelPrintingRequest: ['Shipping', 'PrintLabel'],
   PickupCreationRequest: ['Shipping', 'CreatePickup'],
+  PickupCancelationRequest: ['Shipping', 'CancelPickup'],
   RateCalculatorRequest: ['RateCalculator', 'CalculateRate'],
   ShipmentTrackingRequest: ['Tracking', 'TrackShipments'],
   CountriesFetchingRequest: ['Location', 'FetchCountries'],
@@ -269,6 +272,8 @@ export class AramexStub {
   /** Answer the next call with a response-level HasErrors + this notification message. */
   errorNext: string | null = null;
   pickups = 0;
+  /** GUIDs of pickups CancelPickup has cancelled (a second cancel is refused). */
+  readonly cancelledPickups = new Set<string>();
   // Carrier events must be NEWER than the shipment's own `created` history entry (stamped at
   // booking, i.e. now) or mergeTracking ignores them as stale. Start ahead of "now" instead.
   private clock = Date.now() + 6 * 3_600_000;
@@ -392,6 +397,17 @@ export class AramexStub {
           'PickupCreationResponse',
           `<ProcessedPickup><ID>PU${this.pickups}</ID><GUID>00000000-0000-4000-8000-${String(this.pickups).padStart(12, '0')}</GUID><Reference1/><Reference2/><ProcessedShipments/></ProcessedPickup>`
         );
+      case 'CancelPickup': {
+        const guid = txt(wrapper, 'PickupGUID');
+        const known = /^00000000-0000-4000-8000-(\d{12})$/.exec(guid);
+        if (!known || Number(known[1]) > this.pickups || this.cancelledPickups.has(guid)) {
+          return this.reply('PickupCancelationResponse', '<Message/>', [
+            ['ERR52', 'Pickup cannot be cancelled'],
+          ]);
+        }
+        this.cancelledPickups.add(guid);
+        return this.reply('PickupCancelationResponse', '<Message>Pickup cancelled</Message>');
+      }
       case 'TrackShipments': {
         const w = wrapper.getElementsByTagNameNS(ARAMEX_ARR_NS, 'string')[0]?.textContent ?? '';
         const p = this.parcels.get(w);

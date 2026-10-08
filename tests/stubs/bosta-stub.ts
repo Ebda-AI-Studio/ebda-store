@@ -260,7 +260,9 @@ export class BostaStub {
         return fail(400, 'businessLocationId and scheduledDate are required', 1010);
       }
       const puid = String(7_878_000 + this.pickups.length + 1);
-      this.pickups.push({ ...body, puid });
+      // The docs' create answer carries both `puid` and the document `_id` ('070000002519').
+      const _id = `07000000${String(2_500 + this.pickups.length + 1).padStart(4, '0')}`;
+      this.pickups.push({ ...body, puid, _id, state: 'Requested' });
       return ok(
         {
           type: 'Business Pickup',
@@ -268,12 +270,22 @@ export class BostaStub {
           scheduledTimeSlot: '10:00 to 13:00',
           state: 'Requested',
           puid,
+          _id,
           businessLocationId: body.businessLocationId,
           contactPerson: body.contactPerson,
           deliveries: [],
         },
         'Pickup Request Created Successfully.'
       );
+    }
+    // DELETE /pickups/{id} ("Deletes a pickup by ID"; 200 with no documented body, 400 Bad Request).
+    // STUB-CHOICE: a pickup already picked up (state not Requested) answers 400.
+    const del = method === 'DELETE' ? /^\/pickups\/([^/]+)$/.exec(path) : null;
+    if (del) {
+      const pu = this.pickups.find(x => x._id === decodeURIComponent(del[1]));
+      if (!pu || pu.state !== 'Requested') return fail(400, 'Pickup cannot be cancelled', 1011);
+      pu.state = 'Canceled';
+      return ok({}, 'Done successfully.');
     }
     // STUB-CHOICE: the pricing response body is undocumented; `data.priceAfterVat` is one shape the adapter reads.
     if (method === 'GET' && path === '/pricing/shipment/calculator') {

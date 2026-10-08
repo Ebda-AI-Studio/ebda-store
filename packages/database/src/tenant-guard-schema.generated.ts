@@ -111,6 +111,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       aiRecommendations: 'AiRecommendation',
       shippingCarrierConfigs: 'ShippingCarrierConfig',
       shipments: 'Shipment',
+      shipmentPickups: 'ShipmentPickup',
       codRemittances: 'CodRemittance',
       pageRevisions: 'StorePageRevision',
       productModels: 'ProductModel',
@@ -674,6 +675,16 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       store: 'Store',
       order: 'Order',
       codRemittances: 'CodRemittance',
+      pickups: 'ShipmentPickup',
+    },
+  },
+  {
+    name: 'ShipmentPickup',
+    table: 'shipment_pickups',
+    storeId: true,
+    relations: {
+      store: 'Store',
+      shipment: 'Shipment',
     },
   },
   {

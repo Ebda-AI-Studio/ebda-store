@@ -146,6 +146,10 @@ export class ShipbluCarrier implements ShippingCarrierProvider {
     webhooks: false, // ShipBlu documents no webhooks / callbacks anywhere
     polling: true,
     cod: true,
+    // Booking requests the pickup itself (autoPickup below); the endpoint takes no date/window.
+    pickup: 'automatic',
+    pickupWindow: 'none',
+    pickupCancel: false,
   };
 
   /**

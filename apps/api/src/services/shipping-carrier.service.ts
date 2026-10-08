@@ -1274,7 +1274,7 @@ class ShippingCarrierService {
     return firstEnabled ? (firstEnabled.carrier as CarrierCode) : null;
   }
 
-  private buildPickupAddress(storeId: string, settings: Record<string, any>): ShipmentAddress {
+  buildPickupAddress(storeId: string, settings: Record<string, any>): ShipmentAddress {
     return {
       name: settings.pickupName ?? 'Store',
       phone: settings.pickupPhone ?? '',
