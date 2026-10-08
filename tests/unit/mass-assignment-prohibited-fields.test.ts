@@ -537,6 +537,13 @@ const ROUTE_INVENTORY: Record<string, Coverage> = {
   "order.routes.ts POST '/:orderId/confirm-instapay'": {
     exempt: 'reads no request body — orderId/storeId come from the URL params',
   },
+  "order.routes.ts POST '/:orderId/instapay-receipts/:receiptId/reject'": {
+    exempt: 'body schema is `{ note }` (strict) only; order/receipt ids from the URL params',
+  },
+  "order.routes.ts POST '/:orderId/instapay-refund'": {
+    exempt:
+      'instapayRefundRecordSchema (strict): reference/date/recipient/amount/note only; ids from the URL params',
+  },
   "order.routes.ts POST '/bulk-mark-paid'": {
     exempt: 'body is `{ orderIds: string[] }` only, validated inline; storeId from the URL param',
   },

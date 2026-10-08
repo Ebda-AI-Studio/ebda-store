@@ -4,13 +4,20 @@ export type SubscriptionBillingNoticeKind =
   | 'payment_failed'
   | 'downgraded'
   | 'payment_due'
-  | 'store_suspended';
+  | 'store_suspended'
+  | 'payment_confirmed'
+  | 'payment_rejected'
+  | 'store_restored';
 
 export interface SubscriptionBillingNoticeData {
   kind: SubscriptionBillingNoticeKind;
   storeName: string;
   planName: string;
   amountMinor: number;
+  /** payment_confirmed: the date the paid period ends (ISO date text). */
+  paidUntil?: string;
+  /** payment_rejected: the reviewer's reason. */
+  reason?: string;
   /** payment_failed: when the next automatic retry happens (ISO date text). */
   retryOn?: string;
   billingUrl: string;
@@ -95,6 +102,65 @@ function dueText(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): string {
     : `${amount} for the <strong>${plan}</strong> plan is due on ${on}.`;
 }
 
+/** Money batch A notices: the review outcome of an InstaPay payment, and the store coming back. */
+function reviewNotice(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): string | null {
+  const store = escapeHtml(d.storeName);
+  const link = escapeHtml(d.billingUrl);
+  if (lang === 'ar') {
+    if (d.kind === 'payment_confirmed')
+      return `
+    <h2 dir="rtl">تم تأكيد دفعتك</h2>
+    <p dir="rtl">فريق ابدأ راجع تحويل إنستاباي الخاص بمتجر <strong>${store}</strong> وأكّده. باقة <strong>${escapeHtml(d.planName)}</strong> مدفوعة حتى ${escapeHtml(d.paidUntil ?? '')}.</p>
+    <p dir="rtl"><a href="${link}">افتح صفحة الاشتراك</a></p>`;
+    if (d.kind === 'payment_rejected')
+      return `
+    <h2 dir="rtl">لم نقبل إيصال التحويل</h2>
+    <p dir="rtl">فريق ابدأ راجع الإيصال الخاص بمتجر <strong>${store}</strong> ولم يقبله. السبب: ${escapeHtml(d.reason ?? '')}</p>
+    <p dir="rtl">افتح صفحة الاشتراك وارفع إيصال التحويل الصحيح، أو كلّمنا.</p>
+    <p dir="rtl"><a href="${link}">افتح صفحة الاشتراك</a></p>
+    ${whatsappLine(d, 'ar')}`;
+    if (d.kind === 'store_restored')
+      return `
+    <h2 dir="rtl">متجرك رجع يشتغل</h2>
+    <p dir="rtl">واجهة متجر <strong>${store}</strong> متاحة للعملاء من جديد وتستقبل الطلبات.</p>
+    <p dir="rtl"><a href="${link}">افتح صفحة الاشتراك</a></p>`;
+    return null;
+  }
+  if (d.kind === 'payment_confirmed')
+    return `
+    <h2>Your payment is confirmed</h2>
+    <p>The Ebda team checked the InstaPay transfer for <strong>${store}</strong> and confirmed it. The <strong>${escapeHtml(d.planName)}</strong> plan is paid until ${escapeHtml(d.paidUntil ?? '')}.</p>
+    <p><a href="${link}">Open billing</a></p>`;
+  if (d.kind === 'payment_rejected')
+    return `
+    <h2>We could not accept your transfer receipt</h2>
+    <p>The Ebda team checked the receipt for <strong>${store}</strong> and could not accept it. Reason: ${escapeHtml(d.reason ?? '')}</p>
+    <p>Open billing and upload the right transfer receipt, or contact us.</p>
+    <p><a href="${link}">Open billing</a></p>
+    ${whatsappLine(d, 'en')}`;
+  if (d.kind === 'store_restored')
+    return `
+    <h2>Your store is back</h2>
+    <p>The storefront of <strong>${store}</strong> is open to shoppers again and takes orders.</p>
+    <p><a href="${link}">Open billing</a></p>`;
+  return null;
+}
+
+const reviewSubject = (d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): string | null =>
+  d.kind === 'payment_confirmed'
+    ? lang === 'ar'
+      ? `${d.storeName}: تم تأكيد دفعتك`
+      : `${d.storeName}: your payment is confirmed`
+    : d.kind === 'payment_rejected'
+      ? lang === 'ar'
+        ? `${d.storeName}: لم نقبل إيصال التحويل`
+        : `${d.storeName}: we could not accept your transfer receipt`
+      : d.kind === 'store_restored'
+        ? lang === 'ar'
+          ? `${d.storeName}: متجرك رجع يشتغل`
+          : `${d.storeName}: your store is back`
+        : null;
+
 /**
  * Merchant notices from the subscription dunning cycle (SP5 task 3): a failed
  * renewal (a retry is scheduled) and the final downgrade to the free plan.
@@ -103,24 +169,27 @@ function dueText(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): string {
 export const subscriptionBillingTemplate = {
   subject: {
     en: (d: SubscriptionBillingNoticeData) =>
-      d.kind === 'payment_due'
+      reviewSubject(d, 'en') ??
+      (d.kind === 'payment_due'
         ? `${d.storeName}: your ${d.planName} payment is due ${d.daysLeft === 0 ? 'today' : `in ${d.daysLeft} day${d.daysLeft === 1 ? '' : 's'}`}`
         : d.kind === 'store_suspended'
           ? `${d.storeName}: your store is paused until payment`
           : d.kind === 'payment_failed'
             ? `${d.storeName}: we could not renew your ${d.planName} plan`
-            : `${d.storeName}: your plan was moved to Free`,
+            : `${d.storeName}: new orders are paused`),
     ar: (d: SubscriptionBillingNoticeData) =>
-      d.kind === 'payment_due'
+      reviewSubject(d, 'ar') ??
+      (d.kind === 'payment_due'
         ? `${d.storeName}: ${d.daysLeft === 0 ? 'دفعة باقة ' + d.planName + ' مستحقة اليوم' : 'دفعة باقة ' + d.planName + ' مستحقة خلال ' + d.daysLeft + ' يوم'}`
         : d.kind === 'store_suspended'
           ? `${d.storeName}: تم إيقاف متجرك مؤقتًا لحين الدفع`
           : d.kind === 'payment_failed'
             ? `${d.storeName}: تعذّر تجديد باقة ${d.planName}`
-            : `${d.storeName}: تم نقل باقتك إلى المجانية`,
+            : `${d.storeName}: الطلبات الجديدة متوقفة`),
   },
   en: (d: SubscriptionBillingNoticeData) =>
-    d.kind === 'payment_due'
+    reviewNotice(d, 'en') ??
+    (d.kind === 'payment_due'
       ? `
     <h2>Payment reminder</h2>
     <p>${dueText(d, 'en')}</p>
@@ -144,12 +213,13 @@ export const subscriptionBillingTemplate = {
     We will try your card again on ${escapeHtml(d.retryOn ?? 'the next retry date')}. Your store keeps working meanwhile.</p>
     <p><a href="${escapeHtml(d.billingUrl)}">Update your payment method</a></p>`
           : `
-    <h2>Your plan was moved to Free</h2>
-    <p>We could not collect the payment for <strong>${escapeHtml(d.storeName)}</strong> after several attempts, so the store
-    is now on the Free plan. Nothing was deleted — your products, orders and settings are kept, and the Free plan limits apply.</p>
-    <p><a href="${escapeHtml(d.billingUrl)}">Choose a plan to upgrade again</a></p>`,
+    <h2>New orders are paused</h2>
+    <p>The subscription of <strong>${escapeHtml(d.storeName)}</strong> ended without a payment, so the store takes no new
+    orders. Nothing was deleted — your products, orders and settings are kept.</p>
+    <p><a href="${escapeHtml(d.billingUrl)}">Choose a plan and pay to bring it back</a></p>`),
   ar: (d: SubscriptionBillingNoticeData) =>
-    d.kind === 'payment_due'
+    reviewNotice(d, 'ar') ??
+    (d.kind === 'payment_due'
       ? `
     <h2 dir="rtl">تذكير بالدفع</h2>
     <p dir="rtl">${dueText(d, 'ar')}</p>
@@ -173,8 +243,8 @@ export const subscriptionBillingTemplate = {
     سنحاول خصم المبلغ من بطاقتك مرة أخرى في ${escapeHtml(d.retryOn ?? 'موعد المحاولة التالية')}. يستمر متجرك في العمل خلال ذلك.</p>
     <p dir="rtl"><a href="${escapeHtml(d.billingUrl)}">حدّث وسيلة الدفع</a></p>`
           : `
-    <h2 dir="rtl">تم نقل باقتك إلى المجانية</h2>
-    <p dir="rtl">لم نتمكن من تحصيل الدفعة لمتجر <strong>${escapeHtml(d.storeName)}</strong> بعد عدة محاولات، لذلك أصبح المتجر على الباقة المجانية.
-    لم يُحذف أي شيء — منتجاتك وطلباتك وإعداداتك محفوظة، وتسري حدود الباقة المجانية.</p>
-    <p dir="rtl"><a href="${escapeHtml(d.billingUrl)}">اختر باقة للترقية من جديد</a></p>`,
+    <h2 dir="rtl">الطلبات الجديدة متوقفة</h2>
+    <p dir="rtl">اشتراك متجر <strong>${escapeHtml(d.storeName)}</strong> انتهى من غير دفع، فالمتجر مش هيستقبل طلبات جديدة.
+    لم يُحذف أي شيء — منتجاتك وطلباتك وإعداداتك محفوظة.</p>
+    <p dir="rtl"><a href="${escapeHtml(d.billingUrl)}">اختار باقة وادفع عشان المتجر يرجع</a></p>`),
 };

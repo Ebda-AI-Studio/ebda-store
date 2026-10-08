@@ -82,6 +82,8 @@ export type AccountingAiFeature =
   | 'reorder-scan'
   | 'deadstock-scan'
   | 'expense-ocr'
+  // InstaPay transfer receipts (money batch A): pre-fills the payer's proof form.
+  | 'instapay-receipt'
   | 'profit-anomaly'
   | 'insights-narration-cohort'
   | 'insights-narration-funnel'

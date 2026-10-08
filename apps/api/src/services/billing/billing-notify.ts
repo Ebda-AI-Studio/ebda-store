@@ -28,6 +28,12 @@ export type BillingEffect =
       nextRetryAt: Date;
       planCode: string;
     }
+  /** The super-admin approved an InstaPay payment (audit #11). */
+  | { kind: 'payment_confirmed'; storeId: string; planCode: string; periodEnd: Date }
+  /** The super-admin rejected an InstaPay payment, with the reason. */
+  | { kind: 'payment_rejected'; storeId: string; note: string }
+  /** A billing suspension was lifted: the store is back. */
+  | { kind: 'store_restored'; storeId: string; reason: 'unpaid' | 'over_store_limit' }
   | {
       kind: 'downgraded';
       storeId: string;
@@ -89,9 +95,78 @@ async function runOne(effect: BillingEffect): Promise<void> {
     (store.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar' ? 'ar' : 'en';
   const url = `/stores/${effect.storeId}/billing`;
   const planRow = ctx.plans.find(
-    p => p.code === (effect.kind === 'payment_failed' ? effect.planCode : ctx.planCode)
+    p =>
+      p.code ===
+      (effect.kind === 'payment_failed' || effect.kind === 'payment_confirmed'
+        ? effect.planCode
+        : ctx.planCode)
   );
   const planName = planRow ? (lang === 'ar' ? planRow.nameAr : planRow.nameEn) : '';
+
+  if (
+    effect.kind === 'payment_confirmed' ||
+    effect.kind === 'payment_rejected' ||
+    effect.kind === 'store_restored'
+  ) {
+    const until =
+      effect.kind === 'payment_confirmed' ? effect.periodEnd.toISOString().slice(0, 10) : '';
+    const copy =
+      effect.kind === 'payment_confirmed'
+        ? {
+            type: 'billing_payment_confirmed',
+            title: lang === 'ar' ? 'تم تأكيد دفعتك' : 'Your payment is confirmed',
+            message:
+              lang === 'ar'
+                ? `باقة ${planName} مدفوعة حتى ${until}. شكرًا لك.`
+                : `${planName} is paid until ${until}. Thank you.`,
+          }
+        : effect.kind === 'payment_rejected'
+          ? {
+              type: 'billing_payment_rejected',
+              title:
+                lang === 'ar'
+                  ? 'لم نقبل إيصال التحويل'
+                  : 'We could not accept your transfer receipt',
+              message:
+                lang === 'ar'
+                  ? `السبب: ${effect.note}. افتح صفحة الاشتراك وارفع الإيصال الصحيح.`
+                  : `Reason: ${effect.note}. Open billing and upload the right receipt.`,
+            }
+          : {
+              type: 'billing_store_restored',
+              title: lang === 'ar' ? 'متجرك رجع يشتغل' : 'Your store is back',
+              message:
+                lang === 'ar'
+                  ? 'واجهة المتجر متاحة للعملاء من جديد وتستقبل الطلبات.'
+                  : 'Your storefront is open to shoppers again and takes orders.',
+            };
+    socketService.notifyStore(effect.storeId, {
+      type: copy.type,
+      title: copy.title,
+      message: copy.message,
+      data: { storeId: effect.storeId, url },
+      createdAt: new Date(),
+    });
+    if (store.owner?.email) {
+      await EmailService.sendSubscriptionBillingNotice(
+        effect.storeId,
+        {
+          kind: effect.kind,
+          to: store.owner.email,
+          storeName: store.name,
+          planName,
+          amountMinor: 0,
+          billingUrl: `${config.adminUrl ?? ''}${url}`,
+          paidUntil: until || undefined,
+          reason: effect.kind === 'payment_rejected' ? effect.note : undefined,
+          whatsappUrl: supportContact(store.name).whatsappUrl,
+          supportEmail: supportContact(store.name).email,
+        },
+        lang
+      );
+    }
+    return;
+  }
 
   if (effect.kind === 'store_suspended') {
     if (!effect.applied) return;
@@ -162,11 +237,13 @@ async function runOne(effect: BillingEffect): Promise<void> {
   // downgraded
   socketService.notifyStore(effect.storeId, {
     type: 'billing_downgraded',
-    title: lang === 'ar' ? 'تم نقل متجرك إلى الباقة المجانية' : 'Your store moved to the Free plan',
+    // A canceled store takes NO new orders (plan-limit `SUBSCRIPTION_REQUIRED`): say so
+    // (audit #1 / B2) — never "Free plan limits apply", which promised orders.
+    title: lang === 'ar' ? 'الطلبات الجديدة متوقفة' : 'New orders are paused',
     message:
       lang === 'ar'
-        ? 'بياناتك محفوظة وتسري حدود الباقة المجانية.'
-        : 'Your data is kept; Free plan limits now apply.',
+        ? 'اشتراكك انتهى، فالمتجر مش هيستقبل طلبات جديدة. بياناتك محفوظة. اختار باقة وادفع عشان يرجع يشتغل.'
+        : 'Your subscription ended, so the store takes no new orders. Your data is kept. Choose a plan and pay to bring it back.',
     data: { storeId: effect.storeId, url, reason: effect.reason },
     createdAt: new Date(),
   });

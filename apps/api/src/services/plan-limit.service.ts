@@ -194,14 +194,30 @@ export async function assertWithinLimit(
   if (used + delta > limit) throw limitError(e, limitKey, limit, used, delta);
 }
 
+/**
+ * Does the subscription state accept shopper orders AT THIS MOMENT? Evaluated at
+ * order time (audit #3): the daily billing job runs at 04:00 UTC, so reading only the
+ * row's status refused every order from the trial's last minute until the job, up to
+ * ~24 h, even for a store whose card is about to be charged or whose InstaPay grace
+ * (INSTAPAY_GRACE_DAYS) has not started. A trial that ended is treated as what the job
+ * WILL make of it: a saved card or InstaPay = still open (charge pending / grace, like
+ * `past_due`), no payment method = closed (the job moves it to canceled).
+ */
+export function ordersOpenFor(
+  e: Pick<Entitlements, 'status' | 'trialEndsAt' | 'billingMethod' | 'hasSavedCard'>,
+  now: Date
+): boolean {
+  if (e.status === 'canceled') return false;
+  if (e.status !== 'trialing') return true;
+  if (e.trialEndsAt && e.trialEndsAt.getTime() > now.getTime()) return true;
+  return e.billingMethod === 'instapay' || e.hasSavedCard;
+}
+
 /** Gate orders before inventory, payment, or notification side effects. */
 export async function assertOrderAllowed(storeId: string): Promise<void> {
   const e = await getEntitlements(storeId);
   if (!e) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
-  if (
-    e.status === 'canceled' ||
-    (e.status === 'trialing' && (!e.trialEndsAt || e.trialEndsAt.getTime() <= Date.now()))
-  ) {
+  if (!ordersOpenFor(e, new Date())) {
     throw new AppError(402, 'SUBSCRIPTION_REQUIRED', 'Choose a paid plan to accept new orders', {
       messageEn: 'Choose a paid plan to accept new orders',
       messageAr: 'اختر باقة مدفوعة لاستقبال طلبات جديدة',

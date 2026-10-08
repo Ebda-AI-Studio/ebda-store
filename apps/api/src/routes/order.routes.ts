@@ -37,6 +37,9 @@ import logger from '../lib/logger';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { recordPaymentEvent } from '../services/payment-event.service';
 import { InstapayService } from '../services/payment-providers/instapay.service';
+import { InstapayReceiptService } from '../services/payment-providers/instapay-receipt.service';
+import multer from 'multer';
+import { INSTAPAY_RECEIPT_MAX_BYTES, instapayRefundRecordSchema } from '@force/shared';
 import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
 import { runInTenantContext } from '@force/database';
 import { config } from '../config';
@@ -908,13 +911,18 @@ router.post(
  * InstaPay account. Confirms the order ONCE (awaiting_payment_confirmation ->
  * confirmed, payment recorded, post-payment fan-out). A repeat is an idempotent
  * 200 with `changed:false`; confirming an order whose window expired (and was
- * cancelled) is a 409. Same permission as marking a COD order paid.
+ * cancelled) is a 409. This IS the approval of the shopper's receipt.
+ *
+ * WHO (Ahmad, money batch A, Ruling EBDA-MONEYA-4): the store's own owner, or its
+ * staff with `orders:manage` — scoped to their store. Ebda's super-admin may NOT
+ * approve a store's order payment (the money went to the merchant, not to Ebda).
  */
 router.post(
   '/:orderId/confirm-instapay',
   authenticate,
-  authorize('store_admin', 'super_admin', 'staff'),
+  authorize('store_admin', 'staff'),
   requireStoreAccess,
+  requirePermission('orders:manage'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -935,6 +943,151 @@ router.post(
         userAgent: req.headers['user-agent'],
       });
       res.json({ success: true, data: outcome });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// InstaPay receipts on a store order: the merchant reviews (never Ebda's super-admin).
+const orderPaymentReviewer = [
+  authenticate,
+  authorize('store_admin', 'staff'),
+  requireStoreAccess,
+] as const;
+
+/** GET /stores/:storeId/orders/:orderId/instapay-receipts — the shopper's submitted receipts. */
+router.get(
+  '/:orderId/instapay-receipts',
+  ...orderPaymentReviewer,
+  requirePermission('orders:read'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const orderId = z.string().uuid().parse(req.params.orderId);
+      res.json({
+        success: true,
+        data: { receipts: await InstapayReceiptService.listForOrder(storeId, orderId) },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** GET .../instapay-receipts/:receiptId/image — the screenshot bytes (private bucket, no URL). */
+router.get(
+  '/:orderId/instapay-receipts/:receiptId/image',
+  ...orderPaymentReviewer,
+  requirePermission('orders:read'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const orderId = z.string().uuid().parse(req.params.orderId);
+      const receiptId = z.string().uuid().parse(req.params.receiptId);
+      const img = await InstapayReceiptService.readImage(storeId, receiptId, {
+        kind: 'order',
+        orderId,
+      });
+      res.setHeader('Content-Type', img.mimeType);
+      res.setHeader('Content-Disposition', 'inline; filename="instapay-receipt"');
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.send(img.body);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST .../instapay-receipts/:receiptId/reject — the merchant rejects the shopper's
+ * receipt with a reason. The order keeps waiting (hold restarts) so the shopper can
+ * send the right one.
+ */
+router.post(
+  '/:orderId/instapay-receipts/:receiptId/reject',
+  ...orderPaymentReviewer,
+  requirePermission('orders:manage'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const orderId = z.string().uuid().parse(req.params.orderId);
+      const receiptId = z.string().uuid().parse(req.params.receiptId);
+      const { note } = z
+        .object({ note: z.string().trim().min(3).max(500) })
+        .strict()
+        .parse(req.body);
+      const user = getAuthUser(req);
+      const out = await InstapayService.rejectReceipt({
+        storeId,
+        orderId,
+        receiptId,
+        note,
+        actorUserId: user.userId,
+      });
+      await auditLog({
+        action: 'order.instapay_receipt_rejected',
+        userId: user.userId,
+        storeId,
+        resourceType: 'order',
+        resourceId: orderId,
+        details: { receiptId, note },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: out });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+const refundShot = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: INSTAPAY_RECEIPT_MAX_BYTES, files: 1 },
+});
+
+/**
+ * POST /stores/:storeId/orders/:orderId/instapay-refund — RECORD an InstaPay refund the
+ * merchant already sent outside Ebda (reference, date, recipient AS SHOWN, amount,
+ * optional screenshot `file`). Idempotent on the refund reference. Needs
+ * `orders:refund` (owner; staff do not have it).
+ */
+router.post(
+  '/:orderId/instapay-refund',
+  ...orderPaymentReviewer,
+  requirePermission('orders:refund'),
+  writeLimiter,
+  refundShot.single('file'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const orderId = z.string().uuid().parse(req.params.orderId);
+      const body = { ...(req.body ?? {}) } as Record<string, unknown>;
+      if (typeof body.amountMinor === 'string') body.amountMinor = Number(body.amountMinor);
+      if (body.note === '') delete body.note;
+      const input = instapayRefundRecordSchema.parse(body);
+      const user = getAuthUser(req);
+      const out = await InstapayService.recordRefund({
+        storeId,
+        orderId,
+        input,
+        screenshot: req.file?.buffer ?? null,
+        actorUserId: user.userId,
+      });
+      await auditLog({
+        action: out.duplicate ? 'order.instapay_refund_replayed' : 'order.instapay_refund_recorded',
+        userId: user.userId,
+        storeId,
+        resourceType: 'order',
+        resourceId: orderId,
+        details: { amountMinor: input.amountMinor, reference: input.reference, status: out.status },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.status(out.duplicate ? 200 : 201).json({ success: true, data: out });
     } catch (error) {
       next(error);
     }

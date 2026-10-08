@@ -23,7 +23,15 @@
  *    no-op (`changed:false`), and a confirm of an expired or cancelled order is
  *    refused (409).
  *
- * No external call happens here: the only I/O is Postgres. Notifications and the
+ *  - PROOF (money batch A, Rulings EBDA-MONEYA-1/5): the shopper uploads the transfer
+ *    receipt screenshot (`instapay-receipt.service`), the AI pre-fills it, the shopper
+ *    submits it. Submitting FREEZES the hold (`payment_confirmation_expires_at = NULL`):
+ *    an order whose shopper already sent proof is never auto-cancelled while it waits
+ *    for the merchant, and the merchant can still confirm it. The merchant (the store's
+ *    owner/staff — never Ebda's super-admin) approves (= `confirm`) or rejects with a
+ *    reason (the hold restarts: max(original deadline, now + 24 h)).
+ *
+ * No external call happens here: the only I/O is Postgres (and the private bucket). Notifications and the
  * `order/created` fan-out are deferred until after the tenant transaction commits.
  */
 import {
@@ -36,8 +44,12 @@ import {
 import {
   AWAITING_PAYMENT_CONFIRMATION,
   INSTAPAY_DEFAULT_EXPIRY_HOURS,
-  instapayReferenceSchema,
+  REGION,
+  normalizeInstapayReference,
+  zonedLocalToUtc,
   type InstapayInstructions,
+  type InstapayReceiptFields,
+  type InstapayRefundRecord,
 } from '@force/shared';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
@@ -50,6 +62,12 @@ import { socketService } from '../socket.service';
 import { recordPaymentEvent } from '../payment-event.service';
 import { toProviderCredentials } from './credentials';
 import { instapayProvider, parseInstapaySettings } from './instapay.provider';
+import {
+  InstapayReceiptService,
+  sniffReceiptMime,
+  toReceiptView,
+} from './instapay-receipt.service';
+import { StorageService } from '../storage.service';
 
 const HOUR_MS = 3_600_000;
 
@@ -324,9 +342,24 @@ export class InstapayService {
       const payment = order?.payments[0];
       if (!order || !payment)
         throw new AppError(404, 'NOT_FOUND', 'No InstaPay payment for this order');
+      const latest = await prisma.instapayReceipt.findFirst({
+        where: { storeId, kind: 'order', orderId, status: { not: 'draft' } },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, status: true, reviewNote: true, submittedAt: true, reviewedAt: true },
+      });
       return {
         orderStatus: order.status,
         paymentStatus: order.paymentStatus,
+        /** The shopper's latest submitted receipt and the store's decision (null = none yet). */
+        proof: latest
+          ? {
+              receiptId: latest.id,
+              status: latest.status,
+              reviewNote: latest.reviewNote,
+              submittedAt: latest.submittedAt?.toISOString() ?? null,
+              reviewedAt: latest.reviewedAt?.toISOString() ?? null,
+            }
+          : null,
         instructions: this.instructionsFor({
           order,
           amountMinor: payment.amount,
@@ -334,48 +367,6 @@ export class InstapayService {
           expiresAt: order.paymentConfirmationExpiresAt ?? new Date(0),
         }),
       };
-    });
-  }
-
-  /** The customer enters / uploads the transfer reference. Only while the order is still awaiting. */
-  static async submitReference(storeId: string, orderId: string, rawReference: string) {
-    const reference = instapayReferenceSchema.parse(rawReference);
-    return withStore(storeId, async tx => {
-      const locked = await lockOrder(tx as unknown as Prisma.TransactionClient, storeId, orderId);
-      if (!locked) throw new AppError(404, 'NOT_FOUND', 'Order not found');
-      if (locked.status !== AWAITING_PAYMENT_CONFIRMATION) {
-        throw new AppError(
-          409,
-          'INSTAPAY_NOT_AWAITING',
-          'This order is not waiting for a transfer'
-        );
-      }
-      const payment = await prisma.payment.findFirst({
-        where: { orderId, provider: 'instapay', status: 'pending' },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (!payment) throw new AppError(404, 'NOT_FOUND', 'No InstaPay payment for this order');
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          metadata: {
-            ...metaOf(payment.metadata),
-            customerReference: reference,
-            customerReferenceAt: new Date().toISOString(),
-          } as Prisma.InputJsonValue,
-        },
-      });
-      await recordPaymentEvent({
-        paymentId: payment.id,
-        storeId,
-        orderId,
-        eventType: 'status_change',
-        fromStatus: 'pending',
-        toStatus: 'pending',
-        provider: 'instapay',
-        details: { reason: 'customer_reference_submitted', reference },
-      });
-      return { reference };
     });
   }
 
@@ -423,20 +414,26 @@ export class InstapayService {
         );
       }
 
+      const payment = await prisma.payment.findFirst({
+        where: { orderId, provider: 'instapay', status: 'pending' },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!payment) throw new AppError(409, 'INSTAPAY_NOT_AWAITING', 'No pending InstaPay payment');
+
+      // A shopper who already sent proof keeps the order confirmable past the window
+      // (audit O1): the merchant was the one who had not looked yet.
       const expiresAt = locked.payment_confirmation_expires_at;
-      if (expiresAt && expiresAt.getTime() <= now.getTime()) {
+      if (
+        expiresAt &&
+        expiresAt.getTime() <= now.getTime() &&
+        !(await InstapayService.proofSubmitted(storeId, orderId, payment.metadata))
+      ) {
         throw new AppError(
           409,
           'INSTAPAY_CONFIRMATION_EXPIRED',
           'The confirmation window for this order has expired'
         );
       }
-
-      const payment = await prisma.payment.findFirst({
-        where: { orderId, provider: 'instapay', status: 'pending' },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (!payment) throw new AppError(409, 'INSTAPAY_NOT_AWAITING', 'No pending InstaPay payment');
 
       const claimed = await prisma.order.updateMany({
         where: { id: orderId, storeId, status: AWAITING_PAYMENT_CONFIRMATION },
@@ -458,6 +455,11 @@ export class InstapayService {
             confirmedAt: now.toISOString(),
           } as Prisma.InputJsonValue,
         },
+      });
+      // The merchant's confirm IS the approval of the shopper's submitted receipt(s).
+      await prisma.instapayReceipt.updateMany({
+        where: { storeId, kind: 'order', orderId, status: 'submitted' },
+        data: { status: 'approved', reviewedBy: args.actorUserId, reviewedAt: now },
       });
       await prisma.orderEvent.create({
         data: {
@@ -540,6 +542,17 @@ export class InstapayService {
       ) {
         return 'skipped';
       }
+      // Never cancel an order whose shopper already sent proof (audit O1): it waits for
+      // the merchant's review. (A submitted receipt also clears the deadline; this catches
+      // orders whose reference was sent before receipts existed.)
+      const pendingPayment = await prisma.payment.findFirst({
+        where: { orderId, provider: 'instapay', status: 'pending' },
+        orderBy: { createdAt: 'desc' },
+        select: { metadata: true },
+      });
+      if (await InstapayService.proofSubmitted(storeId, orderId, pendingPayment?.metadata)) {
+        return 'skipped';
+      }
       const before = await prisma.order.findFirst({
         where: { id: orderId, storeId },
         select: { notes: true },
@@ -605,6 +618,354 @@ export class InstapayService {
     return { storeId, scanned: due.length, expired, failed };
   }
 
+  /** The shopper sent proof that is waiting for the merchant: a submitted receipt, or a legacy reference. */
+  static async proofSubmitted(
+    storeId: string,
+    orderId: string,
+    paymentMetadata: unknown
+  ): Promise<boolean> {
+    if (typeof metaOf(paymentMetadata).customerReference === 'string') return true;
+    const n = await prisma.instapayReceipt.count({
+      where: { storeId, kind: 'order', orderId, status: 'submitted' },
+    });
+    return n > 0;
+  }
+
+  /** The order + its pending InstaPay payment, for the receipt endpoints (public by order id). */
+  private static async awaitingOrder(storeId: string, orderId: string) {
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, storeId, deletedAt: null },
+      select: { id: true, status: true, createdAt: true },
+    });
+    if (!order) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+    if (order.status !== AWAITING_PAYMENT_CONFIRMATION) {
+      throw new AppError(409, 'INSTAPAY_NOT_AWAITING', 'This order is not waiting for a transfer');
+    }
+    const payment = await prisma.payment.findFirst({
+      where: { orderId, provider: 'instapay', status: 'pending' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!payment) throw new AppError(404, 'NOT_FOUND', 'No InstaPay payment for this order');
+    return { order, payment };
+  }
+
+  /** Shopper: upload the transfer screenshot (the AI read is queued). */
+  static async uploadReceipt(storeId: string, orderId: string, file: Buffer) {
+    const { payment } = await withStore(storeId, () => this.awaitingOrder(storeId, orderId));
+    return InstapayReceiptService.upload({
+      storeId,
+      kind: 'order',
+      orderId,
+      paymentId: payment.id,
+      file,
+    });
+  }
+
+  /** Shopper: poll the AI read of one of this order's receipts. */
+  static async getReceipt(storeId: string, orderId: string, receiptId: string) {
+    return toReceiptView(
+      await InstapayReceiptService.get(storeId, receiptId, { kind: 'order', orderId })
+    );
+  }
+
+  /**
+   * Shopper: submit the (corrected) receipt fields. Duplicate reference anywhere = 409;
+   * every other check is a flag for the merchant. Freezes the hold so the order is not
+   * auto-cancelled while the merchant reviews (audit O1), and tells the merchant.
+   */
+  static async submitReceipt(args: {
+    storeId: string;
+    orderId: string;
+    receiptId: string;
+    fields: InstapayReceiptFields;
+    now?: Date;
+  }) {
+    const { storeId, orderId } = args;
+    const now = args.now ?? new Date();
+    return withStoreAfterCommit(storeId, async after => {
+      const locked = await lockOrder(
+        prisma as unknown as Prisma.TransactionClient,
+        storeId,
+        orderId
+      );
+      if (!locked) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+      const { order, payment } = await this.awaitingOrder(storeId, orderId);
+      const live = await prisma.instapayReceipt.count({
+        where: { storeId, kind: 'order', orderId, status: 'submitted' },
+      });
+      if (live > 0) {
+        throw new AppError(
+          409,
+          'PROOF_PENDING_REVIEW',
+          'Your receipt is already waiting for the store'
+        );
+      }
+      const m = metaOf(payment.metadata);
+      const receipt = await InstapayReceiptService.submit({
+        storeId,
+        receiptId: args.receiptId,
+        scope: { kind: 'order', orderId },
+        fields: args.fields,
+        expectedAmountMinor: payment.amount,
+        expectedReceivers: [m.handle, m.phone].filter((v): v is string => typeof v === 'string'),
+        notBefore: new Date(order.createdAt.getTime() - 5 * 60_000),
+        now,
+      });
+      await prisma.order.updateMany({
+        where: { id: orderId, storeId, status: AWAITING_PAYMENT_CONFIRMATION },
+        data: { paymentConfirmationExpiresAt: null },
+      });
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          metadata: {
+            ...m,
+            customerReference: receipt.reference,
+            customerReferenceAt: now.toISOString(),
+            receiptId: receipt.id,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      await recordPaymentEvent({
+        paymentId: payment.id,
+        storeId,
+        orderId,
+        eventType: 'status_change',
+        fromStatus: 'pending',
+        toStatus: 'pending',
+        provider: 'instapay',
+        details: {
+          reason: 'customer_receipt_submitted',
+          receiptId: receipt.id,
+          flags: receipt.flags,
+        },
+      });
+      after('instapay.proof.notify', () =>
+        InstapayService.notifyMerchant(storeId, orderId, 'proof_submitted')
+      );
+      return toReceiptView(receipt);
+    });
+  }
+
+  /**
+   * Merchant: reject the shopper's receipt with a reason. The order stays awaiting; the
+   * hold restarts at max(original deadline, now + 24 h) so the shopper can send the
+   * right receipt; the reference is freed.
+   */
+  static async rejectReceipt(args: {
+    storeId: string;
+    orderId: string;
+    receiptId: string;
+    note: string;
+    actorUserId: string;
+    now?: Date;
+  }) {
+    const { storeId, orderId } = args;
+    const now = args.now ?? new Date();
+    const note = args.note.trim();
+    if (note.length < 3)
+      throw new AppError(400, 'REASON_REQUIRED', 'Write why the receipt is rejected');
+    return withStoreAfterCommit(storeId, async () => {
+      const locked = await lockOrder(
+        prisma as unknown as Prisma.TransactionClient,
+        storeId,
+        orderId
+      );
+      if (!locked) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+      if (locked.status !== AWAITING_PAYMENT_CONFIRMATION) {
+        throw new AppError(
+          409,
+          'INSTAPAY_NOT_AWAITING',
+          'This order is not waiting for a transfer'
+        );
+      }
+      await InstapayReceiptService.get(storeId, args.receiptId, { kind: 'order', orderId });
+      const n = await InstapayReceiptService.markReviewed(
+        storeId,
+        args.receiptId,
+        { status: 'rejected', note },
+        args.actorUserId,
+        now
+      );
+      if (n === 0)
+        throw new AppError(409, 'RECEIPT_NOT_PENDING', 'This receipt is not waiting for review');
+      const payment = await prisma.payment.findFirst({
+        where: { orderId, provider: 'instapay', status: 'pending' },
+        orderBy: { createdAt: 'desc' },
+      });
+      const m = metaOf(payment?.metadata);
+      const original = typeof m.expiresAt === 'string' ? new Date(m.expiresAt).getTime() : 0;
+      const expiresAt = new Date(Math.max(original, now.getTime() + 24 * HOUR_MS));
+      await prisma.order.updateMany({
+        where: { id: orderId, storeId, status: AWAITING_PAYMENT_CONFIRMATION },
+        data: { paymentConfirmationExpiresAt: expiresAt },
+      });
+      if (payment) {
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            metadata: {
+              ...m,
+              customerReference: null,
+              receiptRejectedAt: now.toISOString(),
+            } as Prisma.InputJsonValue,
+          },
+        });
+        await recordPaymentEvent({
+          paymentId: payment.id,
+          storeId,
+          orderId,
+          eventType: 'admin_action',
+          fromStatus: 'pending',
+          toStatus: 'pending',
+          provider: 'instapay',
+          triggeredByUserId: args.actorUserId,
+          details: { reason: 'merchant_rejected_receipt', receiptId: args.receiptId, note },
+        });
+      }
+      return {
+        receiptId: args.receiptId,
+        status: 'rejected' as const,
+        expiresAt: expiresAt.toISOString(),
+      };
+    });
+  }
+
+  /**
+   * Merchant: RECORD an InstaPay refund that was made outside Ebda (audit M1 twin for
+   * orders). Idempotent on the refund reference. The full amount moves the order to
+   * `refunded` through the normal status path (stock, coupon, loyalty reversal and the
+   * customer's refund notice — true now: the money went back); a part is recorded on
+   * the payment (partially_refunded) without touching stock.
+   */
+  static async recordRefund(args: {
+    storeId: string;
+    orderId: string;
+    input: InstapayRefundRecord;
+    screenshot?: Buffer | null;
+    actorUserId: string;
+    now?: Date;
+  }) {
+    const { storeId, orderId, input } = args;
+    const now = args.now ?? new Date();
+    const refundRef = normalizeInstapayReference(input.reference);
+    if (!refundRef)
+      throw new AppError(400, 'INVALID_REFERENCE', 'The refund reference is 8 to 20 digits');
+    const refundedAt = zonedLocalToUtc(input.refundDate, input.refundTime, REGION.timezone);
+    if (!refundedAt) throw new AppError(400, 'INVALID_DATE', 'The refund date is not valid');
+    if (refundedAt.getTime() > now.getTime() + 10 * 60_000) {
+      throw new AppError(400, 'DATE_IN_FUTURE', 'The refund date is in the future');
+    }
+    let screenshotKey: string | null = null;
+    if (args.screenshot?.length) {
+      const mime = sniffReceiptMime(args.screenshot);
+      if (!mime)
+        throw new AppError(400, 'INVALID_FILE_TYPE', 'Upload a JPG, PNG or WebP screenshot');
+      screenshotKey = (
+        await StorageService.putPrivate(args.screenshot, {
+          storeId,
+          folder: 'instapay-refunds',
+          ext: mime === 'image/png' ? '.png' : mime === 'image/webp' ? '.webp' : '.jpg',
+          contentType: mime,
+        })
+      ).key;
+    }
+    try {
+      return await withStore(storeId, async () => {
+        const order = await prisma.order.findFirst({
+          where: { id: orderId, storeId, deletedAt: null },
+          select: { id: true, status: true, paymentStatus: true },
+        });
+        if (!order) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+        const payment = await prisma.payment.findFirst({
+          where: {
+            orderId,
+            provider: 'instapay',
+            status: { in: ['completed', 'partially_refunded', 'refunded'] },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (!payment) {
+          throw new AppError(
+            409,
+            'NO_INSTAPAY_PAYMENT',
+            'This order has no confirmed InstaPay payment'
+          );
+        }
+        const m = metaOf(payment.metadata);
+        const refunds = Array.isArray(m.refunds)
+          ? (m.refunds as Array<Record<string, unknown>>)
+          : [];
+        const dup = refunds.find(r => r.referenceKey === refundRef);
+        if (dup)
+          return {
+            duplicate: true,
+            refundedAmount: payment.refundedAmount,
+            status: payment.status,
+          };
+        const remaining = payment.amount - payment.refundedAmount;
+        if (remaining <= 0)
+          throw new AppError(409, 'ALREADY_REFUNDED', 'This payment is fully refunded');
+        if (input.amountMinor > remaining) {
+          throw new AppError(
+            400,
+            'INVALID_REFUND_AMOUNT',
+            `Refund must be between 1 and ${remaining} piastres`
+          );
+        }
+        const full = input.amountMinor === remaining;
+        const record = {
+          referenceKey: refundRef,
+          reference: input.reference.trim(),
+          refundedAt: refundedAt.toISOString(),
+          recipientName: input.recipientName.trim(),
+          amountMinor: input.amountMinor,
+          note: input.note?.trim() || null,
+          screenshotKey,
+          recordedBy: args.actorUserId,
+          recordedAt: now.toISOString(),
+        };
+        if (full && order.status !== 'refunded') {
+          // Before the payment flip: the refund effects key off the PRE-transition snapshot.
+          await OrderService.updateStatus(storeId, orderId, 'refunded');
+        }
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: full ? 'refunded' : 'partially_refunded',
+            refundedAmount: { increment: input.amountMinor },
+            metadata: { ...m, refunds: [...refunds, record] } as Prisma.InputJsonValue,
+          },
+        });
+        if (full) {
+          await prisma.order.updateMany({
+            where: { id: orderId, storeId },
+            data: { paymentStatus: 'refunded' },
+          });
+        }
+        await recordPaymentEvent({
+          paymentId: payment.id,
+          storeId,
+          orderId,
+          eventType: 'refund',
+          fromStatus: payment.status,
+          toStatus: full ? 'refunded' : 'partially_refunded',
+          provider: 'instapay',
+          triggeredByUserId: args.actorUserId,
+          details: { reason: 'merchant_recorded_instapay_refund', ...record },
+        });
+        return {
+          duplicate: false,
+          refundedAmount: payment.refundedAmount + input.amountMinor,
+          status: full ? 'refunded' : 'partially_refunded',
+        };
+      });
+    } catch (err) {
+      if (screenshotKey) await StorageService.deletePrivate(screenshotKey).catch(() => undefined);
+      throw err;
+    }
+  }
+
   static async notifyMerchantAwaiting(storeId: string, orderId: string): Promise<void> {
     await this.notifyMerchant(storeId, orderId, 'awaiting');
   }
@@ -613,10 +974,10 @@ export class InstapayService {
     await this.notifyMerchant(storeId, orderId, 'expired');
   }
 
-  private static async notifyMerchant(
+  static async notifyMerchant(
     storeId: string,
     orderId: string,
-    kind: 'awaiting' | 'expired'
+    kind: 'awaiting' | 'expired' | 'proof_submitted'
   ): Promise<void> {
     const order = await prisma.order.findFirst({
       where: { id: orderId, storeId },

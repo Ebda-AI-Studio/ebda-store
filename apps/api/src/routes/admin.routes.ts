@@ -22,8 +22,13 @@ import {
 import {
   listClaimsForAdmin,
   recordManualPayment,
+  recordManualRefund,
   rejectClaim,
+  suggestManualPeriod,
 } from '../services/billing/account.service';
+import multer from 'multer';
+import { INSTAPAY_RECEIPT_MAX_BYTES, REGION, zonedLocalToUtc } from '@force/shared';
+import { InstapayReceiptService } from '../services/payment-providers/instapay-receipt.service';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { inngest } from '../lib/inngest/client';
@@ -429,13 +434,49 @@ router.get(
   }
 );
 
+/**
+ * GET /admin/billing/claims/:id/receipt?storeId= — the merchant's InstaPay receipt
+ * screenshot for a subscription claim (bytes, never a URL; private bucket). Super-admin
+ * only: Ebda's team is the ONLY reviewer of subscription payments.
+ */
+router.get(
+  '/billing/claims/:id/receipt',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = z.object({ storeId: z.string().uuid() }).parse(req.query);
+      const claimId = z.string().uuid().parse(req.params.id);
+      const row = await withStore(storeId, tx =>
+        tx.instapayReceipt.findFirst({
+          where: { storeId, claimId, kind: 'subscription' },
+          select: { id: true },
+        })
+      );
+      if (!row) {
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'No receipt' } });
+        return;
+      }
+      const img = await InstapayReceiptService.readImage(storeId, row.id, { kind: 'subscription' });
+      res.setHeader('Content-Type', img.mimeType);
+      res.setHeader('Content-Disposition', 'inline; filename="instapay-receipt"');
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.send(img.body);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 router.post(
   '/billing/claims/:id/reject',
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, note } = z
-        .object({ storeId: z.string().uuid(), note: z.string().trim().min(1).max(500) })
+        .object({ storeId: z.string().uuid(), note: z.string().trim().min(3).max(500) })
         .parse(req.body);
       await rejectClaim({ storeId, claimId: req.params.id, note, actorId: req.user!.userId });
       await auditLog({
@@ -473,8 +514,9 @@ router.post(
           method: z.enum(['instapay', 'bank', 'cash']),
           reference: z.string().trim().min(3).max(100),
           paidAt: z.coerce.date(),
-          periodStart: z.coerce.date(),
-          periodEnd: z.coerce.date(),
+          // Omitted = the period rule (never burns paid days, audit M2); both = override.
+          periodStart: z.coerce.date().optional().nullable(),
+          periodEnd: z.coerce.date().optional().nullable(),
           claimId: z.string().uuid().optional(),
         })
         .strict()
@@ -498,8 +540,109 @@ router.post(
           amountMinor: input.amountMinor,
           method: input.method,
           reference: input.reference,
-          periodStart: input.periodStart.toISOString(),
-          periodEnd: input.periodEnd.toISOString(),
+          periodStart: (out.periodStart ?? input.periodStart)?.toISOString() ?? null,
+          periodEnd: (out.periodEnd ?? input.periodEnd)?.toISOString() ?? null,
+          periodOverride: !!input.periodStart,
+          claimId: input.claimId ?? null,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.status(out.duplicate ? 200 : 201).json({ success: true, data: out });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/** GET /admin/stores/:id/manual-payment/suggest?interval= — the period an approval would record. */
+router.get(
+  '/stores/:id/manual-payment/suggest',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { interval } = z
+        .object({ interval: z.enum(['monthly', 'yearly']).default('monthly') })
+        .parse(req.query);
+      const storeId = z.string().uuid().parse(req.params.id);
+      res.json({ success: true, data: await suggestManualPeriod(storeId, interval) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+const refundShot = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: INSTAPAY_RECEIPT_MAX_BYTES, files: 1 },
+});
+
+/**
+ * POST /admin/billing/events/:id/manual-refund — record a refund made OUTSIDE Ebda, or
+ * void a payment recorded in error, for a manual (InstaPay) subscription payment
+ * (audit M1). Multipart (optional `file` = the refund screenshot) or JSON. Idempotent
+ * on the refund reference (void: once per payment); adjusts the paid period.
+ * Super-admin only — subscription money is Ebda's to record, never the merchant's.
+ */
+router.post(
+  '/billing/events/:id/manual-refund',
+  requireRole('super_admin'),
+  refundShot.single('file'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const num = (v: unknown) =>
+        v === undefined || v === '' || v === null ? undefined : Number(v);
+      const input = z
+        .object({
+          kind: z.enum(['refund', 'void']),
+          reference: z.string().trim().max(40).optional().nullable(),
+          refundDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          refundTime: z
+            .string()
+            .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+            .default('12:00'),
+          recipientName: z.string().trim().max(120).optional().nullable(),
+          amountMinor: z.preprocess(num, z.number().int().positive().optional()),
+          note: z.string().trim().min(3).max(500),
+          newPeriodEnd: z.coerce.date().optional().nullable(),
+        })
+        .strict()
+        .parse(req.body ?? {});
+      const refundedAt = zonedLocalToUtc(input.refundDate, input.refundTime, REGION.timezone);
+      if (!refundedAt) {
+        res
+          .status(400)
+          .json({ success: false, error: { code: 'INVALID_DATE', message: 'Invalid date' } });
+        return;
+      }
+      const out = await recordManualRefund({
+        eventId: z.string().uuid().parse(req.params.id),
+        kind: input.kind,
+        reference: input.reference,
+        refundedAt,
+        recipientName: input.recipientName,
+        amountMinor: input.amountMinor,
+        note: input.note,
+        newPeriodEnd: input.newPeriodEnd,
+        screenshot: req.file?.buffer ?? null,
+        actorId: req.user!.userId,
+      });
+      await auditLog({
+        action: out.duplicate
+          ? 'billing.manual_refund_replayed'
+          : input.kind === 'void'
+            ? 'billing.manual_payment_voided'
+            : 'billing.manual_refund_recorded',
+        userId: req.user!.userId,
+        storeId: out.storeId,
+        resourceType: 'billing_event',
+        resourceId: req.params.id,
+        details: {
+          kind: input.kind,
+          refundEventId: out.refundEventId,
+          amountMinor: input.amountMinor ?? null,
+          reference: input.reference ?? null,
+          newPeriodEnd: out.periodEnd?.toISOString() ?? null,
         },
         ip: req.ip,
         userAgent: req.headers['user-agent'],

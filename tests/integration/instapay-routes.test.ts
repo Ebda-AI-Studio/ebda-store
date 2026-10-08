@@ -209,25 +209,17 @@ describe.skipIf(!hasDb)('InstaPay over HTTP', () => {
     expect(view.body.data.instructions.amountMinor).toBe(TOTAL);
   });
 
-  it('the customer can enter the transfer reference; a malformed one is refused', async () => {
-    vi.spyOn(OneSignalService, 'notifyAdminsOfInstapay').mockResolvedValue();
+  it('the typed transfer reference is retired: 410 RECEIPT_REQUIRED (the screenshot is the proof)', async () => {
     const s = await mkStore('ref');
     const o = await mkOrder(s);
     await create(o.id, 'instapay');
-    const bad = await asApp(async () =>
-      http()
-        .post(`/api/v1/payments/instapay/${o.id}/reference`)
-        .send({ reference: '<img onerror=x>' })
-    );
-    expect(bad.status).toBeGreaterThanOrEqual(400);
-    const ok = await asApp(async () =>
+    const res = await asApp(async () =>
       http()
         .post(`/api/v1/payments/instapay/${o.id}/reference`)
         .send({ reference: 'IPN-20261004-77' })
     );
-    expect(ok.status).toBe(200);
-    const view = await asApp(async () => http().get(`/api/v1/payments/instapay/${o.id}`));
-    expect(view.body.data.instructions.customerReference).toBe('IPN-20261004-77');
+    expect(res.status).toBe(410);
+    expect(res.body.error.code).toBe('RECEIPT_REQUIRED');
   });
 
   it('GET /payments/config offers InstaPay (name and window only: the handle is not shown to every visitor) next to COD', async () => {
