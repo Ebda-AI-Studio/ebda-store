@@ -261,10 +261,10 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     name: { en: 'Kashier', ar: 'كاشير' },
     logo: { monogram: 'K', color: '#00A19A' },
     manual: false,
-    verified: false,
+    verified: true,
     verification: {
-      sandboxVerifiedAt: null,
-      note: 'Built from developers.kashier.io (llms-full.txt + openapi.yaml); not yet run against a Kashier test account (scripts/provider-sandbox-check.mjs kashier).',
+      sandboxVerifiedAt: '2026-10-08',
+      note: 'Verified 2026-10-08 against a real Kashier test account: test connection, guest payment session, paid status, partial + full refund, and a real signed webhook delivery (tampered body rejected). Order-search status does not report refunds; refund state comes from the refund response and the webhook.',
     },
     capabilities: {
       methods: ['card', 'wallet', 'bnpl'],
