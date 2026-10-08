@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ShopChrome } from '../../components';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { faqReturnAnswer } from '../../lib/return-policy-text';
 
 // Generic fallback FAQs — shown only when the store hasn't authored any
 // store-specific FAQs via the admin FAQ manager.
@@ -122,7 +123,11 @@ export default function FAQClient({ storeFaqs = [], storeHowtos = [] }: FAQClien
         }))
       : GENERIC_FAQS.map(f => ({
           question: t(f.question, f.questionAr),
-          answer: t(f.answer, f.answerAr),
+          // The return answer follows the store's published window instead of a hard-coded 30 days.
+          answer:
+            f.question === 'What is your return policy?'
+              ? faqReturnAnswer(store.returnWindowDays, language)
+              : t(f.answer, f.answerAr),
         }));
 
   const howtos: Array<{ title: string; description: string; steps: StoreHowtoStep[] }> =

@@ -9,6 +9,7 @@ import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatDate as formatStoreDate } from '@/lib/format-date';
 import { groupOrderLinesForDisplay, storeNumerals } from '@force/shared';
+import { orderStatusLabel } from '@/lib/order-labels';
 
 export default function OrdersClient() {
   const storeUrl = useStoreUrl();
@@ -65,17 +66,9 @@ export default function OrdersClient() {
     shipped: 'bg-info/10 text-info-ink',
     delivered: 'bg-success/20 text-success-ink',
     cancelled: 'bg-destructive/20 text-destructive-ink',
-  };
-
-  const statusLabels: Record<string, [string, string]> = {
-    pending: ['Pending', '\u0642\u064a\u062f \u0627\u0644\u0627\u0646\u062a\u0638\u0627\u0631'],
-    processing: [
-      'Processing',
-      '\u0642\u064a\u062f \u0627\u0644\u0645\u0639\u0627\u0644\u062c\u0629',
-    ],
-    shipped: ['Shipped', '\u062a\u0645 \u0627\u0644\u0634\u062d\u0646'],
-    delivered: ['Delivered', '\u062a\u0645 \u0627\u0644\u062a\u0648\u0635\u064a\u0644'],
-    cancelled: ['Cancelled', '\u0645\u0644\u063a\u064a'],
+    awaiting_payment_confirmation: 'bg-warning/20 text-warning-ink',
+    confirmed: 'bg-info/20 text-info-ink',
+    refunded: 'bg-muted text-foreground',
   };
 
   if (isLoading) {
@@ -172,9 +165,7 @@ export default function OrdersClient() {
                 <span
                   className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${statusColors[order.status] || 'bg-muted text-foreground'}`}
                 >
-                  {statusLabels[order.status]
-                    ? t(statusLabels[order.status][0], statusLabels[order.status][1])
-                    : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                  {orderStatusLabel(order.status, language)}
                 </span>
               </div>
 

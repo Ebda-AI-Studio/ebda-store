@@ -13,11 +13,19 @@ import {
   formatDateTime as formatStoreDateTime,
 } from '@/lib/format-date';
 import {
+  orderAddressLines,
   groupOrderLinesForDisplay,
   orderTaxPlacement,
   storeNumerals,
   intlLocale,
 } from '@force/shared';
+import {
+  orderStatusLabel,
+  orderPaymentStatusLabel,
+  paymentStatusLabel,
+  paymentProviderLabel,
+  paymentMethodLabel,
+} from '@/lib/order-labels';
 import { WaMeOrderQuestionButton } from '../../../../templates/shared/WaMeButtons';
 
 interface OrderDetail {
@@ -31,6 +39,8 @@ interface OrderDetail {
   /** Frozen at sale time (Ruling M3-8): `tax` is already inside subtotal/total. */
   taxIncludedInPrice?: boolean;
   shipping: number;
+  /** COD fee frozen at creation, inside `total` (ruling MONEYB-3). */
+  codFee?: number;
   discount: number;
   total: number;
   currency: string;
@@ -64,6 +74,10 @@ interface OrderDetail {
     postalCode?: string;
     country?: string;
     phone?: string;
+    area?: string;
+    areaAr?: string;
+    governorate?: string;
+    governorateAr?: string;
   };
   billingAddress?: {
     firstName?: string;
@@ -234,10 +248,6 @@ export default function OrderDetailClient() {
     failed: 'bg-destructive/20 text-destructive-ink',
   };
 
-  function formatLabel(value: string) {
-    return value.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  }
-
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -379,12 +389,12 @@ export default function OrderDetailClient() {
           <span
             className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${orderStatusColors[order.status] || 'bg-muted text-foreground'}`}
           >
-            {formatLabel(order.status)}
+            {orderStatusLabel(order.status, language)}
           </span>
           <span
             className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${paymentStatusColors[order.paymentStatus] || 'bg-muted text-foreground'}`}
           >
-            {formatLabel(order.paymentStatus)}
+            {orderPaymentStatusLabel(order.paymentStatus, language)}
           </span>
         </div>
       </div>
@@ -598,25 +608,6 @@ export default function OrderDetailClient() {
               </span>
               <span className="text-foreground">{formatPrice(order.subtotal)}</span>
             </div>
-            {/* Exclusive tax is a summed row; inclusive tax is already inside
-                subtotal/total and renders as a caption after Total instead
-                (orderTaxPlacement, issue 2210). */}
-            {(taxPlacement.taxRow ?? 0) > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {t('Tax', '\u0627\u0644\u0636\u0631\u064a\u0628\u0629')}
-                </span>
-                <span className="text-foreground">{formatPrice(taxPlacement.taxRow ?? 0)}</span>
-              </div>
-            )}
-            {order.shipping > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {t('Shipping', '\u0627\u0644\u0634\u062d\u0646')}
-                </span>
-                <span className="text-foreground">{formatPrice(order.shipping)}</span>
-              </div>
-            )}
             {(() => {
               // Break the total discount into its levers \u2014 coupon, automatic
               // promotion, loyalty-points redemption, and any remainder \u2014
@@ -687,6 +678,34 @@ export default function OrderDetailClient() {
                 </>
               );
             })()}
+            {/* subtotal → discounts → shipping → COD fee → VAT → total (ruling MONEYB-2). */}
+            {order.shipping > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {t('Shipping', '\u0627\u0644\u0634\u062d\u0646')}
+                </span>
+                <span className="text-foreground">{formatPrice(order.shipping)}</span>
+              </div>
+            )}
+            {(order.codFee ?? 0) > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {t('Cash on delivery fee', 'رسوم الدفع عند الاستلام')}
+                </span>
+                <span className="text-foreground">{formatPrice(order.codFee ?? 0)}</span>
+              </div>
+            )}
+            {/* Exclusive tax is a summed row; inclusive tax is already inside
+                subtotal/total and renders as a caption after Total instead
+                (orderTaxPlacement, issue 2210). */}
+            {(taxPlacement.taxRow ?? 0) > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {t('Tax', '\u0627\u0644\u0636\u0631\u064a\u0628\u0629')}
+                </span>
+                <span className="text-foreground">{formatPrice(taxPlacement.taxRow ?? 0)}</span>
+              </div>
+            )}
             <div className="border-t pt-3 flex justify-between">
               <span className="font-semibold text-foreground">
                 {t('Total', '\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a')}
@@ -737,16 +756,11 @@ export default function OrderDetailClient() {
               </p>
             )}
             {shippingAddr.company && <p>{shippingAddr.company}</p>}
-            {shippingAddr.address1 && <p>{shippingAddr.address1}</p>}
-            {shippingAddr.address2 && <p>{shippingAddr.address2}</p>}
-            {(shippingAddr.city || shippingAddr.state || shippingAddr.postalCode) && (
-              <p>
-                {[shippingAddr.city, shippingAddr.state, shippingAddr.postalCode]
-                  .filter(Boolean)
-                  .join(', ')}
-              </p>
+            {orderAddressLines(shippingAddr as unknown as Record<string, unknown>, language).map(
+              (line, i) => (
+                <p key={i}>{line}</p>
+              )
             )}
-            {shippingAddr.country && <p>{shippingAddr.country}</p>}
             {shippingAddr.phone && (
               <p className="pt-2 text-muted-foreground">
                 {t('Phone', '\u0627\u0644\u0647\u0627\u062a\u0641')}: {shippingAddr.phone}
@@ -777,11 +791,11 @@ export default function OrderDetailClient() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-foreground">
-                        {formatLabel(payment.provider)}
+                        {paymentProviderLabel(payment.provider, language)}
                       </span>
                       {payment.method && (
                         <span className="text-muted-foreground">
-                          ({formatLabel(payment.method)})
+                          ({paymentMethodLabel(payment.method, language)})
                         </span>
                       )}
                       <span
@@ -793,7 +807,7 @@ export default function OrderDetailClient() {
                               : 'bg-destructive/20 text-destructive-ink'
                         }`}
                       >
-                        {formatLabel(payment.status)}
+                        {paymentStatusLabel(payment.status, language)}
                       </span>
                     </div>
                     {payment.transactionId && (

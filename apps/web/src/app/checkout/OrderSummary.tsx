@@ -68,6 +68,9 @@ interface OrderSummaryProps {
    *  at order creation. */
   promotionDiscount?: number;
   shipping: number;
+  /** Cash-on-delivery fee quoted for this order (0 = none / not COD). Shown
+   *  as its own row and already inside `total` (ruling MONEYB-3). */
+  codFee?: number;
   /** VAT amount in piastres, computed via `computeOrderTax` (same formula the
    *  API charges at order creation — ruling M3-3 in docs/RULINGS.md). 0
    *  for a store with no active tax rate — renders nothing. */
@@ -103,6 +106,7 @@ export function OrderSummary({
   discount,
   promotionDiscount = 0,
   shipping,
+  codFee = 0,
   tax,
   taxRatePercent,
   taxIncludedInPrice,
@@ -451,6 +455,19 @@ export function OrderSummary({
                     )}
             </span>
           </div>
+          {codFee > 0 && (
+            <div className="flex justify-between text-sm" data-testid="summary-cod-fee">
+              <span
+                className={`${summaryFontWeight} text-muted-foreground`}
+                style={{ ...typography?.label, ...labelColorStyle }}
+              >
+                {t('Cash on delivery fee', 'رسوم الدفع عند الاستلام')}
+              </span>
+              <span className="font-medium tabular-nums" style={typography?.price}>
+                {formatPrice(codFee)}
+              </span>
+            </div>
+          )}
           {tax > 0 && taxLabel && !taxIncludedInPrice && (
             <div className="flex justify-between text-sm">
               <span

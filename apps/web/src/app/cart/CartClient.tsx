@@ -27,7 +27,7 @@ import {
 import { useLastListing } from '../../hooks/useLastListing';
 import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
-import { resolveColor, checkMinimumOrder, computeOrderTax } from '@force/shared';
+import { resolveColor, checkMinimumOrder, computeOrderAmounts } from '@force/shared';
 
 export default function CartClient() {
   const {
@@ -361,14 +361,20 @@ export default function CartClient() {
     : 0;
   // VAT — same formula the API charges at order creation (computeOrderTax,
   // ruling M3-6 in docs/RULINGS.md): the taxable base is subtotal net of
-  // discount. `taxRatePercent` is already zeroed by the API for a disabled
+  // discount plus shipping (MONEYB-2). `taxRatePercent` is already zeroed by the API for a disabled
   // store, so `tax = 0` and the summary renders byte-identically to before.
   // `includedInPrice` selects the same extraction branch order creation
   // uses, and that amount is informational only — NOT added to `total`.
   const taxRatePercent = store.taxRatePercent ?? 0;
   const taxIncludedInPrice = !!store.taxIncludedInPrice;
-  const tax = computeOrderTax(subtotal, discount, taxRatePercent / 100, taxIncludedInPrice);
-  const total = subtotal - discount + shipping + (taxIncludedInPrice ? 0 : tax);
+  // Shipping is in the VAT base (ruling MONEYB-2) — the order's own formula.
+  const { tax, total } = computeOrderAmounts({
+    subtotal,
+    discount,
+    shipping,
+    ratePercent: taxRatePercent,
+    includedInPrice: taxIncludedInPrice,
+  });
   // Label for the fallback (non-themed) summary below — the themed
   // `T.OrderSummary` computes its own copy of this via useOrderSummaryBase.
   const taxLabel = formatTaxRowLabel(

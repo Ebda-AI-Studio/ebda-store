@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ShopChrome } from '../../components';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { formatEstimatedDays } from '../../lib/delivery-estimate';
 
 interface ShippingZone {
   id: string;
@@ -18,17 +19,6 @@ interface ShippingZone {
   estimatedDays?: number | null;
   estimatedDaysMin?: number | null;
   estimatedDaysMax?: number | null;
-}
-
-/** Format a delivery time range into a human-readable string. */
-function formatEstimatedDays(zone: ShippingZone): string {
-  if (zone.estimatedDaysMin && zone.estimatedDaysMax) {
-    return `${zone.estimatedDaysMin}\u2013${zone.estimatedDaysMax} business days`;
-  }
-  if (zone.estimatedDays) {
-    return `${zone.estimatedDays} business day${zone.estimatedDays !== 1 ? 's' : ''}`;
-  }
-  return 'Delivery time varies';
 }
 
 export default function ShippingClient() {
@@ -117,7 +107,9 @@ export default function ShippingClient() {
                             : zone.areas.join(', ')}
                         </p>
                       )}
-                      <p className="text-sm text-muted-foreground">{formatEstimatedDays(zone)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatEstimatedDays(zone, language)}
+                      </p>
                       {zone.deliveryFee === 0 ? (
                         <p className="mt-1 text-sm font-medium text-primary">
                           {t('Free Shipping', '\u0634\u062d\u0646 \u0645\u062c\u0627\u0646\u064a')}
