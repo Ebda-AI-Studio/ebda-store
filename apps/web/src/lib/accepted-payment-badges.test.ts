@@ -4,7 +4,8 @@
  * fell back to a hardcoded `['Visa', 'Mastercard', 'Meeza', 'Fawry']` list
  * whenever the merchant hadn't set `acceptedPaymentMethods` — true for most
  * stores. `deriveAcceptedPaymentBadges` replaces that guess with the real
- * `/payments/config` response.
+ * `/payments/config` response, reading the SPECIFIC enabled method codes
+ * (`config.methods`) rather than just which providers are turned on.
  */
 import { describe, it, expect } from 'vitest';
 import { deriveAcceptedPaymentBadges } from './accepted-payment-badges';
@@ -12,7 +13,7 @@ import { deriveAcceptedPaymentBadges } from './accepted-payment-badges';
 describe('deriveAcceptedPaymentBadges', () => {
   it('a COD-only store (no online providers) shows ONLY Cash on Delivery — no card marks', () => {
     const badges = deriveAcceptedPaymentBadges({
-      providers: [],
+      methods: {},
       cod: { displayName: 'Cash on Delivery', displayNameAr: 'الدفع عند الاستلام' },
     });
     expect(badges).toEqual([{ label: 'Cash on Delivery', labelAr: 'الدفع عند الاستلام' }]);
@@ -20,7 +21,7 @@ describe('deriveAcceptedPaymentBadges', () => {
 
   it('a COD + InstaPay store (still no card gateway) shows neither Visa nor Mastercard', () => {
     const badges = deriveAcceptedPaymentBadges({
-      providers: [],
+      methods: {},
       cod: { displayName: 'Cash on Delivery', displayNameAr: 'الدفع عند الاستلام' },
       instapay: { displayName: 'InstaPay', displayNameAr: 'إنستاباي' },
     });
@@ -28,30 +29,49 @@ describe('deriveAcceptedPaymentBadges', () => {
     expect(badges.some(b => /visa|mastercard|meeza/i.test(b.label))).toBe(false);
   });
 
-  it('a store with Paymob configured shows a Card badge', () => {
+  it('Paymob with ONLY the Meeza method enabled shows a Meeza badge, not a generic Card badge', () => {
     const badges = deriveAcceptedPaymentBadges({
-      providers: ['paymob'],
+      methods: { paymob: [{ code: 'meeza', name: 'Meeza', nameAr: 'ميزة' }] },
+    });
+    expect(badges.map(b => b.label)).toEqual(['Meeza']);
+  });
+
+  it('Paymob with the card method enabled shows a Card badge', () => {
+    const badges = deriveAcceptedPaymentBadges({
+      methods: { paymob: [{ code: 'card', name: 'Card', nameAr: 'بطاقة' }] },
       cod: { displayName: 'Cash on Delivery' },
     });
     expect(badges.map(b => b.label)).toEqual(['Card', 'Cash on Delivery']);
   });
 
-  it('a store with Kashier configured shows a Card badge too', () => {
-    const badges = deriveAcceptedPaymentBadges({ providers: ['kashier'] });
-    expect(badges.map(b => b.label)).toEqual(['Card']);
-  });
-
-  it('Fawry gets its own "Pay at Fawry" badge, distinct from a card gateway', () => {
-    const badges = deriveAcceptedPaymentBadges({ providers: ['fawry'] });
+  it('Fawry gets its own "Pay at Fawry" badge from the payatfawry method code', () => {
+    const badges = deriveAcceptedPaymentBadges({
+      methods: { fawry: [{ code: 'payatfawry' }] },
+    });
     expect(badges.map(b => b.label)).toEqual(['Pay at Fawry']);
   });
 
-  it('no providers and no cod/instapay configured yields an empty list (never a guess)', () => {
-    expect(deriveAcceptedPaymentBadges({ providers: [] })).toEqual([]);
+  it('the same method code enabled on two providers only shows once', () => {
+    const badges = deriveAcceptedPaymentBadges({
+      methods: { paymob: [{ code: 'card' }], kashier: [{ code: 'card' }] },
+    });
+    expect(badges.map(b => b.label)).toEqual(['Card']);
+  });
+
+  it('an unrecognised future method code is never shown with a guessed label', () => {
+    const badges = deriveAcceptedPaymentBadges({
+      methods: { paymob: [{ code: 'some_new_method' }] },
+    });
+    expect(badges).toEqual([]);
+  });
+
+  it('no methods and no cod/instapay configured yields an empty list (never a guess)', () => {
+    expect(deriveAcceptedPaymentBadges({ methods: {} })).toEqual([]);
     expect(deriveAcceptedPaymentBadges({})).toEqual([]);
   });
 
-  it('tolerates a malformed providers field instead of throwing', () => {
-    expect(deriveAcceptedPaymentBadges({ providers: 'paymob' as never })).toEqual([]);
+  it('tolerates a malformed methods field instead of throwing', () => {
+    expect(deriveAcceptedPaymentBadges({ methods: 'paymob' as never })).toEqual([]);
+    expect(deriveAcceptedPaymentBadges({ methods: { paymob: 'card' as never } })).toEqual([]);
   });
 });

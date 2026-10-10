@@ -362,21 +362,31 @@ export default function CartClient() {
   // Fetch the REAL configured payment methods for the "We Accept" badges —
   // same `/payments/config` endpoint the checkout PaymentStep already uses
   // as its only source of truth, so a COD-only store never implies a card
-  // capability it doesn't have.
+  // capability it doesn't have. One retry (an ad-blocker or a transient 500
+  // on a URL containing "payment" is common) before giving up for this page
+  // load — the render side gates on `methods.length > 0` either way, so a
+  // permanent failure shows no badges rather than an empty box.
   useEffect(() => {
-    async function fetchPaymentMethods() {
+    if (!store.id) return;
+    let cancelled = false;
+    async function attempt(): Promise<boolean> {
       try {
         const result = await api.get<PaymentConfigResponse>('/payments/config');
-        if (!result.success || !result.data) return;
-        setAcceptedMethods(deriveAcceptedPaymentBadges(result.data));
+        if (!result.success || !result.data) return false;
+        if (!cancelled) setAcceptedMethods(deriveAcceptedPaymentBadges(result.data));
+        return true;
       } catch {
-        // Leave acceptedMethods null — the badge block renders nothing
-        // rather than guessing at unconfigured capabilities.
+        return false;
       }
     }
-    if (store.id) {
-      fetchPaymentMethods();
-    }
+    (async () => {
+      if (await attempt()) return;
+      await new Promise(r => setTimeout(r, 1500));
+      if (!cancelled) await attempt();
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [store.id]);
 
   // All amounts are in piastres (1 EGP = 100 piastres) so they can be passed directly to formatPrice
@@ -1194,43 +1204,50 @@ export default function CartClient() {
                       </>
                     )}
 
-                    {/* Payment Methods */}
-                    <div className="rounded-2xl border border-border bg-card p-4">
-                      <p className="mb-3 text-center text-xs font-medium text-muted-foreground">
-                        {t(
-                          'We Accept',
-                          '\u0646\u0642\u0628\u0644 \u0627\u0644\u062f\u0641\u0639 \u0639\u0628\u0631'
-                        )}
-                      </p>
-                      <div className="flex flex-wrap items-center justify-center gap-3">
-                        {(() => {
-                          // Customer-facing payment METHODS (not gateways). A
-                          // merchant override always wins; otherwise this
-                          // reflects what `/payments/config` actually reports
-                          // for THIS store — never a guessed card-brand list
-                          // (bug: a COD-only store showed Visa/Mastercard
-                          // regardless of configuration).
-                          const configured = Array.isArray(
-                            (store?.settings as Record<string, unknown>)?.acceptedPaymentMethods
-                          )
-                            ? ((store!.settings as Record<string, unknown>)
-                                .acceptedPaymentMethods as string[])
-                            : null;
-                          const methods: { label: string; labelAr: string }[] =
-                            configured && configured.length
-                              ? configured.map(m => ({ label: m, labelAr: m }))
-                              : (acceptedMethods ?? []);
-                          return methods.map(method => (
-                            <div
-                              key={method.label}
-                              className="flex h-8 items-center rounded-md bg-muted px-3 text-xs font-medium text-muted-foreground"
-                            >
-                              {t(method.label, method.labelAr)}
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    </div>
+                    {/* Payment Methods — gated on having something REAL to
+                        show: before the fetch resolves, after it fails both
+                        attempts, or for a store with nothing configured yet,
+                        `acceptedMethods` is `[]`/`null` and this renders
+                        NOTHING rather than an empty "We Accept" shell. */}
+                    {(() => {
+                      // Customer-facing payment METHODS (not gateways). A
+                      // merchant override always wins; otherwise this
+                      // reflects what `/payments/config` actually reports
+                      // for THIS store — never a guessed card-brand list
+                      // (bug: a COD-only store showed Visa/Mastercard
+                      // regardless of configuration).
+                      const configured = Array.isArray(
+                        (store?.settings as Record<string, unknown>)?.acceptedPaymentMethods
+                      )
+                        ? ((store!.settings as Record<string, unknown>)
+                            .acceptedPaymentMethods as string[])
+                        : null;
+                      const methods: { label: string; labelAr: string }[] =
+                        configured && configured.length
+                          ? configured.map(m => ({ label: m, labelAr: m }))
+                          : (acceptedMethods ?? []);
+                      if (methods.length === 0) return null;
+                      return (
+                        <div className="rounded-2xl border border-border bg-card p-4">
+                          <p className="mb-3 text-center text-xs font-medium text-muted-foreground">
+                            {t(
+                              'We Accept',
+                              '\u0646\u0642\u0628\u0644 \u0627\u0644\u062f\u0641\u0639 \u0639\u0628\u0631'
+                            )}
+                          </p>
+                          <div className="flex flex-wrap items-center justify-center gap-3">
+                            {methods.map(method => (
+                              <div
+                                key={method.label}
+                                className="flex h-8 items-center rounded-md bg-muted px-3 text-xs font-medium text-muted-foreground"
+                              >
+                                {t(method.label, method.labelAr)}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Help */}
                     <div className="rounded-2xl border border-border bg-card p-4">
