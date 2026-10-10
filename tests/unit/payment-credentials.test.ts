@@ -98,7 +98,7 @@ describe('normalizeProviderSettings', () => {
       normalizeProviderSettings('instapay', { handle: 'amelia@instapay' }, true)
     ).toMatchObject({
       handle: 'amelia@instapay',
-      expiryHours: 48,
+      expiryHours: 24,
     });
   });
 

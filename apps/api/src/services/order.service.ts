@@ -599,8 +599,24 @@ export class OrderService {
     await assertOrderAllowed(storeId);
     // One stored phone form (ruling MONEYB-7): E.164 for an Egyptian mobile,
     // ASCII digits otherwise — whatever keyboard the shopper typed on.
+    //
+    // paymentMethod is canonicalized here too (trim + lowercase). The HTTP
+    // schemas accept it as a bare `z.string()` (not an enum — unlike
+    // /payments/create's `provider`, which IS a strict lowercase enum), so
+    // without this every `=== 'cod'` / `=== 'instapay'` exact-match below —
+    // the stock-hold cap, the COD-fee calc, and the COD notification trigger
+    // — silently no-ops for a client that sends `'COD'`/`'Cod'`/`'InstaPay'`.
+    // For the stock-hold cap specifically that is a straight bypass: the cap
+    // check would skip (treating the order as an uncapped method), stock
+    // still gets reserved, and a follow-up `POST /payments/create` with the
+    // PROPERLY-cased, strictly-enum-validated `provider: 'cod'` then attaches
+    // a real COD payment row — which IS what excludes the order from the
+    // 2-day auto-cancel sweep (keyed on `Payment.provider`, not this field)
+    // — leaving an uncapped, unbounded hold from one casing trick on the
+    // very first request.
     data = {
       ...data,
+      paymentMethod: data.paymentMethod.trim().toLowerCase(),
       shippingAddress: {
         ...data.shippingAddress,
         phone: normalizePhoneForStorage(data.shippingAddress.phone),

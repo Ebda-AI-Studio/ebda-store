@@ -1604,9 +1604,21 @@ model Order {
   @@index([storeId, paymentGatewayAbandonedAt])
   // InstaPay expiry sweep: the awaiting orders whose hold has run out.
   @@index([paymentConfirmationExpiresAt])
-  // Open-unpaid-hold cap (lib/stock-hold-cap.ts): counts a store's open
-  // pending/awaiting-confirmation unpaid orders by checkout IP.
-  @@index([storeId, checkoutIp])
+  // Open-unpaid-hold cap (lib/stock-hold-cap.ts) runs an OR across phone/
+  // email/checkout-IP on EVERY cod/instapay checkout, so it needs real
+  // indexes, not this one: for a COD-heavy store (COD orders never
+  // auto-cancel, ruling MONEYB-7) `storeId + status` is not selective —
+  // nearly every row IS an open hold — so a plain composite index here still
+  // forces a sequential scan (measured: 50k open orders on one store, 30ms).
+  // Three PARTIAL expression indexes (`orders_open_hold_{phone,email,ip}_idx`,
+  // scoped to WHERE status IN (pending, awaiting_payment_confirmation) AND
+  // payment_status = 'unpaid' AND deleted_at IS NULL — same shape as the
+  // trgm index below) let Postgres answer with a BitmapOr instead (measured:
+  // 1.4ms on the same 50k rows) and, being partial, stay small regardless of
+  // how large the store's RESOLVED order history grows. Prisma's schema DSL
+  // has no partial/expression `@@index`, so — same precedent as the trgm
+  // index below — they live in raw SQL only
+  // (20261010000000_order_checkout_ip/migration.sql), not declared here.
   // FK-only index for the Promotion delete RI trigger, which filters on
   // `applied_promotion_id` alone. `orders` is the largest table in the schema,
   // so the unindexed variant of this scan is the worst of the five.

@@ -469,6 +469,42 @@ describe('OrderService', () => {
       });
     });
 
+    // Stock-hold cap bypass regression: /orders and /public/orders accept
+    // paymentMethod as a bare `z.string()` (not an enum, unlike
+    // /payments/create's `provider`), so a client sending mixed case must
+    // not silently skip the cap check (lib/stock-hold-cap.ts) by failing the
+    // exact 'cod'/'instapay' Set lookup. `create()` must canonicalize
+    // (trim+lowercase) BEFORE that check runs.
+    describe('paymentMethod casing — stock-hold cap must not be bypassable by case', () => {
+      it.each(['COD', 'Cod', ' cod '])(
+        'treats paymentMethod %j the same as "cod" for the cap',
+        async casedMethod => {
+          vi.mocked(prisma.order.count).mockResolvedValue(2); // already at the default cap
+          await expect(
+            OrderService.create(mockStoreId, undefined, mockSessionId, {
+              ...createOrderData,
+              shippingAddress: { ...createOrderData.shippingAddress, phone: '+201000000000' },
+              paymentMethod: casedMethod,
+            })
+          ).rejects.toMatchObject({ statusCode: 429, code: 'TOO_MANY_OPEN_HOLDS' });
+        }
+      );
+
+      it.each(['INSTAPAY', 'InstaPay'])(
+        'treats paymentMethod %j the same as "instapay" for the cap',
+        async casedMethod => {
+          vi.mocked(prisma.order.count).mockResolvedValue(2);
+          await expect(
+            OrderService.create(mockStoreId, undefined, mockSessionId, {
+              ...createOrderData,
+              shippingAddress: { ...createOrderData.shippingAddress, phone: '+201000000000' },
+              paymentMethod: casedMethod,
+            })
+          ).rejects.toMatchObject({ statusCode: 429, code: 'TOO_MANY_OPEN_HOLDS' });
+        }
+      );
+    });
+
     it('should create order from cart', async () => {
       const result = await OrderService.create(
         mockStoreId,
