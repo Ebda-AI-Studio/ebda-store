@@ -504,6 +504,20 @@ export async function rollbackToRevision(args: {
       message: 'That revision no longer validates',
       errors: v.errors,
     };
+  // This is a THIRD publish path (alongside publishDraft and
+  // publishLegacyLayout) — a revision from before validatePublishReadiness
+  // existed (or any archived one) can still hold a hero slide with no
+  // image. Without this check, rolling back to it republishes it live and
+  // reintroduces the exact defect those two paths were gated against.
+  const readinessErrors = validatePublishReadiness(v.definition);
+  if (readinessErrors.length > 0)
+    return {
+      ok: false,
+      status: 422,
+      code: 'INVALID_DEFINITION',
+      message: 'That revision is not ready to publish',
+      errors: readinessErrors,
+    };
   const outcome = await publishNewRevision({
     storeId,
     pageKey,

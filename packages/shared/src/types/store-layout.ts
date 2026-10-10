@@ -79,7 +79,11 @@ export interface HeroSlide {
    * full-bleed hero looks cinematic on widescreens without croppingthe
    * subject too tightly.
    */
-  image: string;
+  // Optional to match `heroSlideSchema` (a draft may hold a just-added slide
+  // with no image chosen yet — bug: "hero slide with no image blocks ALL
+  // autosave"). A PUBLISHED document always has one: `validatePublishReadiness`
+  // refuses to publish any visible slide without it.
+  image?: string;
   imageAr?: string;
   /**
    * Mobile image — R2 URL. Optional. Recommended 1080×394 landscape

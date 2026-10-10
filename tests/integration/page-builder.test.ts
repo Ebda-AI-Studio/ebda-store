@@ -601,6 +601,64 @@ describe(
         0
       );
     });
+
+    it('rollback refuses to republish an ARCHIVED revision that predates this gate (code-review catch: a third publish path)', async () => {
+      const storeId = await freshStore('noimg-rollback');
+      const good = docFor({});
+
+      // Simulate a pre-existing ARCHIVED revision with an imageless slide —
+      // the shape `validatePublishReadiness` didn't exist to refuse when it
+      // was first written (owner role bypasses the app-level guard, exactly
+      // like a direct DB row from before this PR). Inserted FIRST, at rev 1,
+      // so `head` (MAX(rev) across every status) accounts for it before the
+      // real draft/publish flow below claims the next rev numbers.
+      const bad: PageDefinition = {
+        ...good,
+        sections: good.sections.map(s =>
+          s.type === 'hero'
+            ? {
+                ...s,
+                blocks: [...(s.blocks ?? []), { id: 'slide-bad', type: 'slide', settings: {} }],
+              }
+            : s
+        ),
+      };
+      const badRev = await owner.storePageRevision.create({
+        data: {
+          storeId,
+          pageKey: HOME,
+          rev: 1,
+          status: 'archived',
+          schemaVersion: good.schemaVersion,
+          document: bad as unknown as object,
+          docBytes: Buffer.byteLength(JSON.stringify(bad)),
+          baseRev: 0,
+        },
+      });
+
+      await inStore(storeId, () =>
+        saveDraft({ storeId, pageKey: HOME, baseRev: 1, definition: good, userId: null })
+      );
+      await inStore(storeId, () => publishDraft({ storeId, pageKey: HOME, baseRev: 2 }));
+
+      const result = await inStore(storeId, () =>
+        rollbackToRevision({
+          storeId,
+          pageKey: HOME,
+          targetRev: badRev.rev,
+          baseRev: 2,
+          userId: null,
+        })
+      );
+      expect(result).toMatchObject({ ok: false, status: 422, code: 'INVALID_DEFINITION' });
+      expect(
+        (result as { errors: Array<{ code: string }> }).errors.some(e => e.code === 'MISSING_IMAGE')
+      ).toBe(true);
+      // Still just the one published revision from the original publish — rollback never ran.
+      expect(await owner.storePageRevision.count({ where: { storeId, status: 'published' } })).toBe(
+        1
+      );
+    });
   }
 );
 

@@ -236,6 +236,14 @@ export function useBuilderDocument(storeId: string) {
         }
         // Nothing to publish: the draft equals what is live.
         if (res.error.code === 'NO_DRAFT') return 'ok';
+        // e.g. INVALID_DEFINITION / MISSING_IMAGE: the draft saved fine (it's
+        // allowed to be incomplete) but isn't publish-ready. Surface the same
+        // field-level errors saveNow's own 422 path sets, so SettingsPanel
+        // highlights the exact slide/field instead of a bare "publish failed"
+        // toast with no indication of what to fix.
+        const errs = (res.error.details as { errors?: BuilderIssue[] } | undefined)?.errors ?? [];
+        if (errs.length > 0) setErrors(errs);
+        setSaveState('error');
         return 'failed';
       }
       setPublishedRev(res.data!.rev);
