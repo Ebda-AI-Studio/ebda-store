@@ -109,6 +109,7 @@ export const platformVatSchema = z
   })
   .strict()
   .refine(v => !v.enabled || (v.trn !== null && v.legalName !== null), {
-    message: "Ebda's tax registration number and legal name are required before enabling VAT",
+    message:
+      "Ebda AI Studio's tax registration number and legal name are required before enabling VAT",
     path: ['enabled'],
   });

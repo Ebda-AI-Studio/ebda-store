@@ -136,6 +136,21 @@ describe('billing notice email', () => {
     paymentReference: 'EBD-7K2Q',
   };
   for (const lang of ['en', 'ar'] as const) {
+    it.each(['payment_confirmed', 'payment_rejected'] as const)(
+      'review notice names the full company (%s)',
+      kind => {
+        const html = subscriptionBillingTemplate[lang]({
+          ...base,
+          kind,
+          reason: 'receipt mismatch',
+        });
+        expect(html).toContain(
+          lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn
+        );
+        expect(html).not.toMatch(/The Ebda team|فريق ابدأ راجع/);
+      }
+    );
+
     for (const kind of ['payment_due', 'store_suspended'] as const) {
       it(`${kind} (${lang}): no WhatsApp -> mailto, never an empty wa.me link`, () => {
         const html = subscriptionBillingTemplate[lang]({

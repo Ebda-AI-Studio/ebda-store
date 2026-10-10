@@ -304,7 +304,10 @@ export function FlickeringFooter() {
       title: t('Get in touch', 'تواصل معنا'),
       links: [
         { label: t('Email', 'البريد'), href: `mailto:${BRAND.supportEmail}` },
-        { label: t('Ebda', 'ابدأ'), href: BRAND_MARKETING_URL },
+        {
+          label: t(BRAND.company.shortNameEn, BRAND.company.shortNameAr),
+          href: BRAND_MARKETING_URL,
+        },
       ],
     },
   ];
@@ -399,7 +402,8 @@ export function FlickeringFooter() {
       <div className="relative z-10 border-t border-border/20 px-6 py-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <p className="text-xs text-muted-foreground/60">
-            &copy; {new Date().getFullYear()} Ebda.{' '}
+            &copy; {new Date().getFullYear()}{' '}
+            {t(BRAND.company.shortNameEn, BRAND.company.shortNameAr)}.{' '}
             {t('All rights reserved.', 'جميع الحقوق محفوظة.')}
           </p>
           <div className="flex items-center gap-4">

@@ -1305,7 +1305,7 @@ router.put(
           success: false,
           error: {
             code: 'DOMAIN_INVALID',
-            message: 'Enter your own domain (for example mystore.com), not an Ebda address.',
+            message: 'Enter your own domain (for example mystore.com), not an Ebda Store address.',
           },
         });
         return;

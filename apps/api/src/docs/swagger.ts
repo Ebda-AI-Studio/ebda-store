@@ -410,7 +410,7 @@ All errors follow this format:
       { name: 'Analytics', description: 'Store analytics endpoints' },
       { name: 'Payments', description: 'Payment processing endpoints' },
       { name: 'Uploads', description: 'File upload endpoints' },
-      { name: 'AI', description: 'Ebda assistant endpoints' },
+      { name: 'AI', description: 'Ebda Store assistant endpoints' },
       { name: 'Admin', description: 'Super admin management endpoints' },
     ],
   },

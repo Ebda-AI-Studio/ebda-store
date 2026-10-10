@@ -87,8 +87,8 @@ function headline(locale: Locale, l: PlanLimits): string[] {
       : 'API and MCP access'
     : l.brandingRemoval
       ? ar
-        ? 'شيل «مدعوم من ابدأ»'
-        : 'Remove “Powered by Ebda”'
+        ? 'شيل «مدعوم من ابدأ ستور»'
+        : 'Remove “Powered by Ebda Store”'
       : ar
         ? 'دومين خاص بيك'
         : 'Your own domain';
@@ -152,7 +152,10 @@ export function comparisonRows(locale: Locale): { label: string; cells: Cell[] }
       ar ? 'استرجاع السلات المتروكة' : 'Abandoned cart recovery',
       p => p.limits.abandonedCartAutomation
     ),
-    row(ar ? 'شيل «مدعوم من ابدأ»' : 'Remove “Powered by Ebda”', p => p.limits.brandingRemoval),
+    row(
+      ar ? 'شيل «مدعوم من ابدأ ستور»' : 'Remove “Powered by Ebda Store”',
+      p => p.limits.brandingRemoval
+    ),
     row(ar ? 'ربط API وMCP' : 'API and MCP access', p => p.limits.apiAccess),
     // Not a plan limit: every plan includes it (Ahmad 2026-10-07; R-EBDA-COPY-12).
     row(ar ? 'موديلات 3D للمنتجات' : '3D product models', () => true),

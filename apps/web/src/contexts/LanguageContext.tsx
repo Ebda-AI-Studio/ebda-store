@@ -280,7 +280,7 @@ export const translations = {
   'This page doesn’t exist': 'هذه الصفحة غير موجودة',
   'The store you’re looking for may have moved, or the link may be wrong.':
     'ربما انتقل المتجر الذي تبحث عنه، أو قد يكون الرابط غير صحيح.',
-  'Go to Ebda': `الانتقال إلى ${BRAND.product.nameAr}`,
+  'Go to Ebda': `الانتقال إلى ${BRAND.company.shortNameAr}`,
 
   // Visual builder newsletter section (Phase 2). The consent line is platform
   // copy, not merchant-editable, so every signup form carries it.

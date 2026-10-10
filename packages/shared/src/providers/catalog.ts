@@ -164,8 +164,8 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
         key: 'secretKey',
         label: { en: 'Secret key', ar: 'المفتاح السري (Secret key)' },
         help: {
-          en: 'Authorises Ebda to create payments and refunds on your Paymob account.',
-          ar: 'بيسمح لإبدأ تعمل عمليات دفع واسترداد على حساب باي موب بتاعك.',
+          en: 'Authorises Ebda Store to create payments and refunds on your Paymob account.',
+          ar: 'بيسمح لابدأ ستور تعمل عمليات دفع واسترداد على حساب باي موب بتاعك.',
         },
         whereToFind: {
           en: 'Paymob Accept dashboard > Settings > API Keys (under Developers) > View next to "Secret Key". Starts with sk_test_ in test mode and sk_live_ in live mode.',
@@ -336,8 +336,8 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
       signature:
         'HMAC-SHA256 (hex) of the sorted signatureKeys as k=v&k=v (values RFC 3986-encoded), header x-kashier-signature, keyed with the Payment API key',
       setupHelp: {
-        en: 'Nothing to paste: Ebda sends this URL with every payment session ("serverWebhook").',
-        ar: 'مش محتاج تلزق حاجة: إبدأ بيبعت الرابط ده مع كل جلسة دفع.',
+        en: 'Nothing to paste: Ebda Store sends this URL with every payment session ("serverWebhook").',
+        ar: 'مش محتاج تلزق حاجة: ابدأ ستور بيبعت الرابط ده مع كل جلسة دفع.',
       },
     },
   },
@@ -404,8 +404,8 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
       signature:
         'SHA-256 of fawryRefNumber + merchantRefNumber + paymentAmount + orderAmount + orderStatus + paymentMethod + paymentRefrenceNumber + secureKey, in the body field messageSignature',
       setupHelp: {
-        en: 'Send this URL to the FawryPay team as your "server notification" (callback) URL; FawryPay configures it on your account. Ebda also sends it with each order.',
-        ar: 'ابعت الرابط ده لفريق فوري باي على إنه رابط الإشعارات (callback) بتاعك، وهما بيضبطوه على حسابك. وإبدأ كمان بيبعته مع كل طلب.',
+        en: 'Send this URL to the FawryPay team as your "server notification" (callback) URL; FawryPay configures it on your account. Ebda Store also sends it with each order.',
+        ar: 'ابعت الرابط ده لفريق فوري باي على إنه رابط الإشعارات (callback) بتاعك، وهما بيضبطوه على حسابك. وابدأ ستور كمان بيبعته مع كل طلب.',
       },
     },
   },
@@ -462,8 +462,8 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
         key: 'apiKey',
         label: { en: 'API key', ar: 'مفتاح الـ API' },
         help: {
-          en: 'Lets Ebda create deliveries, print labels and read tracking on your Bosta account. Give it Read/Write access, or Full access if you want Ebda to cancel deliveries.',
-          ar: 'بيسمح لإبدأ تعمل شحنات وتطبع بوالص وتتابع التتبع على حسابك في بوسطة. اديله صلاحية Read/Write، أو Full لو عايز إبدأ تلغي الشحنات.',
+          en: 'Lets Ebda Store create deliveries, print labels and read tracking on your Bosta account. Give it Read/Write access, or Full access if you want Ebda Store to cancel deliveries.',
+          ar: 'بيسمح لابدأ ستور تعمل شحنات وتطبع بوالص وتتابع التتبع على حسابك في بوسطة. اديله صلاحية Read/Write، أو Full لو عايز ابدأ ستور تلغي الشحنات.',
         },
         whereToFind: {
           en: 'Bosta dashboard > Settings > API Integration > Request OTP > Create API key. Bosta shows the key once: copy it straight away.',
@@ -503,10 +503,10 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
       // Bosta takes a per-delivery webhookUrl + webhookCustomHeaders on create: nothing to paste.
       delivery: 'per-request',
       signature:
-        'No HMAC (Bosta signs nothing). Ebda sends a per-store secret in the callback URL path AND a derived secret in a custom header (webhookCustomHeaders) on every delivery; both are required, constant-time compared',
+        'No HMAC (Bosta signs nothing). Ebda Store sends a per-store secret in the callback URL path AND a derived secret in a custom header (webhookCustomHeaders) on every delivery; both are required, constant-time compared',
       setupHelp: {
-        en: 'Nothing to paste: Ebda gives Bosta the callback URL and a secret header with every delivery. Bosta calls it from 34.89.199.241 and 35.246.223.19.',
-        ar: 'مش محتاج تلزق حاجة: إبدأ بيدي بوسطة رابط الإشعارات وهيدر سري مع كل شحنة. بوسطة بتتصل من 34.89.199.241 و 35.246.223.19.',
+        en: 'Nothing to paste: Ebda Store gives Bosta the callback URL and a secret header with every delivery. Bosta calls it from 34.89.199.241 and 35.246.223.19.',
+        ar: 'مش محتاج تلزق حاجة: ابدأ ستور بيدي بوسطة رابط الإشعارات وهيدر سري مع كل شحنة. بوسطة بتتصل من 34.89.199.241 و 35.246.223.19.',
       },
     },
   },
@@ -532,8 +532,8 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
         key: 'apiKey',
         label: { en: 'API key', ar: 'مفتاح الـ API' },
         help: {
-          en: 'Lets Ebda book parcels, print labels and read tracking on your ShipBlu account.',
-          ar: 'بيسمح لإبدأ تحجز الشحنات وتطبع البوالص وتتابع التتبع على حسابك في شيب بلو.',
+          en: 'Lets Ebda Store book parcels, print labels and read tracking on your ShipBlu account.',
+          ar: 'بيسمح لابدأ ستور تحجز الشحنات وتطبع البوالص وتتابع التتبع على حسابك في شيب بلو.',
         },
         whereToFind: {
           en: 'ShipBlu merchant dashboard (shipblu.com) > Integrations tab > the (+) button at the top right. The sandbox key is separate: email tech@shipblu.com with your business account name to get a staging account.',
@@ -809,7 +809,7 @@ export const ACTIVATION_HOURS = 5;
 export function providerRequestMailto(supportEmail: string, kind: ProviderKind): string {
   const subject =
     kind === 'payments'
-      ? 'Ebda: request a payment provider / طلب شركة دفع'
-      : 'Ebda: request a shipping provider / طلب شركة شحن';
+      ? 'Ebda Store: request a payment provider / طلب شركة دفع'
+      : 'Ebda Store: request a shipping provider / طلب شركة شحن';
   return `mailto:${supportEmail}?subject=${encodeURIComponent(subject)}`;
 }

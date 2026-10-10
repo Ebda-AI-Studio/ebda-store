@@ -69,7 +69,7 @@ const REF = {
   section: 'Reference',
   order: 40,
   description:
-    'Endpoint reference generated at build time from the OpenAPI annotations in the Ebda API source.',
+    'Endpoint reference generated at build time from the OpenAPI annotations in the Ebda Store API source.',
 };
 
 const allNav = [
@@ -228,7 +228,7 @@ writePage(
   renderPage({
     lang: 'en',
     title: `Search | ${BRAND.product.nameEn} Docs`,
-    description: 'Search the Ebda developer documentation.',
+    description: 'Search the Ebda Store developer documentation.',
     canonical: ORIGIN + '/search/',
     siteLabel: EN.site,
     homeHref: '/',

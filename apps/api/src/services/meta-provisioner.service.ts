@@ -51,7 +51,7 @@ function getCredentials(): { bmId: string; adminToken: string } {
   if (!bmId || !adminToken) {
     throw new MetaProvisionerError(
       'Meta auto-provisioning is not configured. Set FORCE_AI_META_BM_ID + ' +
-        'FORCE_AI_META_ADMIN_TOKEN on Railway (one-time Ebda setup).',
+        'FORCE_AI_META_ADMIN_TOKEN on Railway (one-time Ebda AI Studio setup).',
       'config'
     );
   }

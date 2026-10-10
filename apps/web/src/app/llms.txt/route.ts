@@ -222,7 +222,7 @@ async function fetchProducts(storeId: string): Promise<PublicProduct[] | null> {
 export function buildPlatformBody(stores: PublicStore[]): string {
   const storeLines = stores
     .map(s => {
-      const desc = s.description?.trim() || 'Egypt-based merchant on Ebda.';
+      const desc = s.description?.trim() || 'Egypt-based merchant on Ebda Store.';
       return `- [${s.name}](${storeOrigin(s.slug)}): ${desc}`;
     })
     .join('\n');
@@ -287,7 +287,7 @@ export function buildPerStoreBody(
   const contactLines = storeContactLines(store, base);
 
   const storeTitle = store.nameAr ? `${store.name} (${store.nameAr})` : store.name;
-  const storeDesc = store.description || `${store.name} on Ebda — Egypt-based merchant.`;
+  const storeDesc = store.description || `${store.name} on Ebda Store — Egypt-based merchant.`;
 
   return `# ${storeTitle}
 
@@ -314,7 +314,7 @@ ${prodLines || '_No active products._'}${buildAgentSections(store, base)}
 
 ## Platform
 
-This store is hosted on Ebda, a multi-tenant e-commerce platform by
+This store is hosted on Ebda Store, a multi-tenant e-commerce platform by
 Ebda AI Studio. See https://ebda.app/llms.txt for the
 platform-wide index.
 `;

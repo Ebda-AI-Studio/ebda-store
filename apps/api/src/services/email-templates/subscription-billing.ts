@@ -1,3 +1,4 @@
+import { BRAND } from '@force/shared';
 import { escapeHtml, emailMoney } from './_util';
 
 export type SubscriptionBillingNoticeKind =
@@ -110,12 +111,12 @@ function reviewNotice(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): stri
     if (d.kind === 'payment_confirmed')
       return `
     <h2 dir="rtl">تم تأكيد دفعتك</h2>
-    <p dir="rtl">فريق ابدأ راجع تحويل إنستاباي الخاص بمتجر <strong>${store}</strong> وأكّده. باقة <strong>${escapeHtml(d.planName)}</strong> مدفوعة حتى ${escapeHtml(d.paidUntil ?? '')}.</p>
+    <p dir="rtl">فريق ${BRAND.company.shortNameAr} راجع تحويل إنستاباي الخاص بمتجر <strong>${store}</strong> وأكّده. باقة <strong>${escapeHtml(d.planName)}</strong> مدفوعة حتى ${escapeHtml(d.paidUntil ?? '')}.</p>
     <p dir="rtl"><a href="${link}">افتح صفحة الاشتراك</a></p>`;
     if (d.kind === 'payment_rejected')
       return `
     <h2 dir="rtl">لم نقبل إيصال التحويل</h2>
-    <p dir="rtl">فريق ابدأ راجع الإيصال الخاص بمتجر <strong>${store}</strong> ولم يقبله. السبب: ${escapeHtml(d.reason ?? '')}</p>
+    <p dir="rtl">فريق ${BRAND.company.shortNameAr} راجع الإيصال الخاص بمتجر <strong>${store}</strong> ولم يقبله. السبب: ${escapeHtml(d.reason ?? '')}</p>
     <p dir="rtl">افتح صفحة الاشتراك وارفع إيصال التحويل الصحيح، أو كلّمنا.</p>
     <p dir="rtl"><a href="${link}">افتح صفحة الاشتراك</a></p>
     ${whatsappLine(d, 'ar')}`;
@@ -129,12 +130,12 @@ function reviewNotice(d: SubscriptionBillingNoticeData, lang: 'en' | 'ar'): stri
   if (d.kind === 'payment_confirmed')
     return `
     <h2>Your payment is confirmed</h2>
-    <p>The Ebda team checked the InstaPay transfer for <strong>${store}</strong> and confirmed it. The <strong>${escapeHtml(d.planName)}</strong> plan is paid until ${escapeHtml(d.paidUntil ?? '')}.</p>
+    <p>The ${BRAND.company.shortNameEn} team checked the InstaPay transfer for <strong>${store}</strong> and confirmed it. The <strong>${escapeHtml(d.planName)}</strong> plan is paid until ${escapeHtml(d.paidUntil ?? '')}.</p>
     <p><a href="${link}">Open billing</a></p>`;
   if (d.kind === 'payment_rejected')
     return `
     <h2>We could not accept your transfer receipt</h2>
-    <p>The Ebda team checked the receipt for <strong>${store}</strong> and could not accept it. Reason: ${escapeHtml(d.reason ?? '')}</p>
+    <p>The ${BRAND.company.shortNameEn} team checked the receipt for <strong>${store}</strong> and could not accept it. Reason: ${escapeHtml(d.reason ?? '')}</p>
     <p>Open billing and upload the right transfer receipt, or contact us.</p>
     <p><a href="${link}">Open billing</a></p>
     ${whatsappLine(d, 'en')}`;

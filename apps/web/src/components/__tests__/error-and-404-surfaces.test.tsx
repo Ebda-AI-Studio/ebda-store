@@ -77,7 +77,7 @@ describe('PlatformNotFound', () => {
   it('keeps the English copy for an English visitor', () => {
     const { container } = render(<PlatformNotFound />);
     expect(container.textContent).toContain('This page doesn’t exist');
-    expect(container.textContent).toContain('Go to Ebda');
+    expect(container.textContent).toContain('Go to Ebda AI Studio');
   });
 
   // #1541 — the colour pairs that failed WCAG AA 4.5:1 are gone.

@@ -7,7 +7,7 @@ Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billi
 ## Pages
 - [Home (Arabic, Egyptian colloquial)](https://ebda.app/): store story, one real store on every screen, features, payments and shipping, pricing and plan comparison, FAQ
 - [Home (English)](https://ebda.app/en/): the same in English
-- [About Ebda](https://ebda.app/about/) ([English](https://ebda.app/en/about/)): the company behind Ebda, the Ebda story, contact
+- [About Ebda AI Studio](https://ebda.app/about/) ([English](https://ebda.app/en/about/)): the company behind Ebda Store, the Ebda AI Studio story, contact
 - [Legal notice](https://ebda.app/legal/)
 - [Privacy policy](https://ebda.app/privacy/)
 - [Terms of service](https://ebda.app/terms/)
