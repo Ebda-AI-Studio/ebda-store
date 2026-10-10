@@ -15,10 +15,26 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { withStore } from '@force/database';
 import { wbsBridgeKeys } from '../lib/definer';
 import { encryption } from '../services/encryption.service';
 import logger from '../lib/logger';
+
+/**
+ * Constant-time compare for two secrets of arbitrary (and possibly
+ * unequal) length. `timingSafeEqual` itself throws on a length mismatch,
+ * which would leak length via early rejection if used directly on the raw
+ * strings here — every connected store's key is a different length, and
+ * this runs once per candidate in a loop. Hashing both sides to a
+ * fixed-length SHA-256 digest first removes the length signal entirely,
+ * then `timingSafeEqual` removes the content signal.
+ */
+export function secretsMatch(a: string, b: string): boolean {
+  const ad = createHash('sha256').update(a).digest();
+  const bd = createHash('sha256').update(b).digest();
+  return timingSafeEqual(ad, bd);
+}
 
 export interface BridgeStore {
   id: string;
@@ -51,7 +67,7 @@ export async function waBridgeAuth(req: Request, res: Response, next: NextFuncti
     const match = candidates.find(c => {
       if (!c.wbsApiKey) return false;
       try {
-        return encryption.decrypt(c.wbsApiKey) === apiKey;
+        return secretsMatch(encryption.decrypt(c.wbsApiKey), apiKey);
       } catch {
         return false;
       }
