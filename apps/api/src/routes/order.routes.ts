@@ -665,7 +665,9 @@ router.post(
 router.put(
   '/:id/status',
   authenticate,
-  authorize('store_admin', 'super_admin', 'staff'),
+  // A store's order workflow (confirm/ship/cancel/refund) is the merchant's to run:
+  // Ebda's super-admin approves subscriptions, never a store's own orders (ruling ORDER-MONEY-SUPERADMIN).
+  authorize('store_admin', 'staff'),
   requireStoreAccess,
   requirePermission('orders:manage'),
   writeLimiter,
