@@ -222,7 +222,7 @@ export async function sendMerchantPasswordResetEmail(
  */
 export async function sendStaffInviteEmail(data: StaffInviteData, language?: Lang): Promise<void> {
   const lang: Lang = language ?? resolveDefaultLanguage(undefined);
-  const content = staffInviteTemplate[lang](data);
+  const content = staffInviteTemplate[lang](data, '');
   const html = renderBrandedShell(content, {
     name: BRAND.product.nameEn,
     nameAr: null,
@@ -236,7 +236,7 @@ export async function sendStaffInviteEmail(data: StaffInviteData, language?: Lan
   await deliver(
     {
       to: data.email,
-      subject: staffInviteTemplate.subject[lang](data),
+      subject: staffInviteTemplate.subject[lang](data, ''),
       html,
       replyTo: BRAND.supportEmail,
     },

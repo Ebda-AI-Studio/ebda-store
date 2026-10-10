@@ -12,11 +12,11 @@ export interface StaffInviteData {
 
 export const staffInviteTemplate = {
   subject: {
-    en: (d: StaffInviteData) => `You've been added as staff for ${d.storeName}`,
-    ar: (d: StaffInviteData) => `تمت إضافتك كموظف في ${d.storeName}`,
+    en: (d: StaffInviteData, _storeName: string) => `You've been added as staff for ${d.storeName}`,
+    ar: (d: StaffInviteData, _storeName: string) => `تمت إضافتك كموظف في ${d.storeName}`,
   },
 
-  en: (d: StaffInviteData) => `
+  en: (d: StaffInviteData, _storeName: string) => `
     <h2>You've been added as staff</h2>
     <p>Hi ${escapeHtml(d.name)},</p>
     <p>You've been added as a staff member for <strong>${escapeHtml(d.storeName)}</strong>.</p>
@@ -39,7 +39,7 @@ export const staffInviteTemplate = {
     <p>If you weren't expecting this, contact the store owner.</p>
   `,
 
-  ar: (d: StaffInviteData) => `
+  ar: (d: StaffInviteData, _storeName: string) => `
     <h2>تمت إضافتك كموظف</h2>
     <p>مرحباً ${escapeHtml(d.name)}،</p>
     <p>تمت إضافتك كموظف في متجر <strong>${escapeHtml(d.storeName)}</strong>.</p>
