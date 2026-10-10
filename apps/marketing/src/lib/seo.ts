@@ -18,7 +18,7 @@ const OG_IMAGE = {
   url: '/og.png',
   width: 1200,
   height: 630,
-  alt: 'ابدأ ستوديو Ebda AI Studio — بابك لبدء مشروعك. Your doorway to business.',
+  alt: 'ابدأ ستوديو للذكاء الاصطناعي Ebda AI Studio — بابك لبدء مشروعك. Your doorway to business.',
 };
 
 /** Metadata for a page in a locale, incl. canonical + hreflang alternates. */
@@ -87,7 +87,7 @@ export function jsonLd(locale: Locale) {
         '@type': 'WebSite',
         '@id': site,
         url: absoluteUrl(HOME[locale]),
-        name: BRAND.product.nameEn,
+        name: BRAND.company.shortNameEn,
         inLanguage: locale,
         publisher: { '@id': org },
       },

@@ -8,6 +8,8 @@ Ruling NAMING-MFA-2 — New MFA enrollments use Ebda Store as issuer; existing e
 
 Ruling NAMING-FOOTER-1 — Footers select explicit localized company fields instead of interpolating the company object. Evidence: seven object interpolation paths found in docs/help/status; rendered-shell tests cover visible company identity. Cost if wrong: operator attribution could display incorrectly in one locale.
 
-Ruling NAMING-GRAPH-1 — Commit the AST graph/report update; retain existing HTML because graphify's size guard skips generating the enlarged graph. Evidence: update generated 35,721 nodes and 65,320 edges. Cost if wrong: the optional interactive HTML remains older than the report and JSON.
+Ruling NAMING-GRAPH-1 — Commit the AST graph/report update; retain existing HTML because graphify's size guard skips generating the enlarged graph. Evidence: update generated 35,726 nodes and 65,330 edges. Cost if wrong: the optional interactive HTML remains older than the report and JSON.
 
 Verification: affected brand/render/MFA/manifest tests (81), monorepo typecheck, lint and all affected app builds pass. Foundation resolver tests: 18 pass. All 23 worktree registrations, branches and dirty statuses survived the folder move. Repo remains private under Whisky-11 with main as default branch. Live rollout is recorded in handoff.md after deployment.
+
+Ruling NAMING-AR-2 — Company Arabic name is ابدأ ستوديو للذكاء الاصطناعي everywhere; marketing uses Ebda AI Studio, including page titles and site metadata. Evidence: Ahmad explicitly corrected marketing naming and requested AI in Arabic everywhere on 2026-10-10. Product remains Ebda Store / ابدأ ستور. Cost if wrong: the longer Arabic name requires more header space, so verify mobile layout.

@@ -221,10 +221,13 @@ ol {
   }
   .header-row {
     gap: 8px;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+  }
+  .wordmark {
+    flex-basis: 100%;
   }
   .nav {
-    flex: 0 0 auto;
+    flex: 1;
   }
   .wm-lockup {
     height: 30px;

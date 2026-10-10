@@ -14,11 +14,11 @@ import {
 describe('BRAND', () => {
   it('carries the Ebda identity from the brief', () => {
     expect(BRAND.name).toBe('Ebda AI Studio');
-    expect(BRAND.nameAr).toBe('ابدأ ستوديو');
+    expect(BRAND.nameAr).toBe('ابدأ ستوديو للذكاء الاصطناعي');
     expect(BRAND.company).toEqual({
       legalNameAr: 'ابدأ ستوديو للذكاء الاصطناعي والبرمجيات والتسويق الرقمي',
       legalNameEn: 'Ebda AI Studio for Artificial Intelligence, Software and Digital Marketing',
-      shortNameAr: 'ابدأ ستوديو',
+      shortNameAr: 'ابدأ ستوديو للذكاء الاصطناعي',
       shortNameEn: 'Ebda AI Studio',
       url: 'https://ebda.app',
     });
@@ -52,7 +52,7 @@ describe('brand helpers', () => {
   });
 
   it('localises the name, sender and footer', () => {
-    expect(brandName('ar-EG')).toBe('ابدأ ستوديو');
+    expect(brandName('ar-EG')).toBe('ابدأ ستوديو للذكاء الاصطناعي');
     expect(brandName('en')).toBe('Ebda AI Studio');
     expect(productName('en')).toBe('Ebda Store');
     expect(productName('ar-EG')).toBe('ابدأ ستور');
@@ -67,7 +67,7 @@ describe('product name (PRODUCT-NAME-1)', () => {
   it('names the product Ebda Store while the company is Ebda AI Studio', () => {
     expect(BRAND.product).toEqual({ nameEn: 'Ebda Store', nameAr: 'ابدأ ستور' });
     expect(BRAND.name).toBe('Ebda AI Studio');
-    expect(BRAND.nameAr).toBe('ابدأ ستوديو');
+    expect(BRAND.nameAr).toBe('ابدأ ستوديو للذكاء الاصطناعي');
   });
 
   it('derives the sender display name, JSON-LD and legal Service name from BRAND.product', async () => {

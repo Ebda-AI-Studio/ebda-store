@@ -33,7 +33,7 @@ export function Header({
       <div className="wrap header-row">
         <Link href={home} className="wordmark" aria-label={`${BRAND.name} ${BRAND.nameAr}`}>
           <img src="/icon.svg" alt="" width={28} height={28} />
-          <span className="wm-latin">
+          <span className={locale === 'ar' ? 'wm-ar' : 'wm-latin'}>
             {locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn}
           </span>
         </Link>
