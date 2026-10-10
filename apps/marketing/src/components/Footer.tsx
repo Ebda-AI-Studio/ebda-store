@@ -12,12 +12,13 @@ export function Footer({ locale }: { locale: Locale }) {
         <div>
           <p className="footer-brand">
             <img
-              src="/lockup-dark.svg"
+              src="/icon.svg"
               alt={`${BRAND.name} ${BRAND.nameAr}`}
               className="footer-mark"
-              width={72}
-              height={24}
+              width={28}
+              height={28}
             />
+            <span>{locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn}</span>
           </p>
           <p className="footer-h">{k.title}</p>
           <dl className="footer-contact">

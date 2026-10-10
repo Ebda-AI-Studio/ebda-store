@@ -6,7 +6,7 @@ export const dynamic = 'force-static';
 /** Web app manifest for ebda.app (icons, theme colour, Arabic-first). */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: `${BRAND.product.nameAr} ${BRAND.product.nameEn}`,
+    name: `${BRAND.company.shortNameAr} ${BRAND.company.shortNameEn}`,
     short_name: BRAND.nameAr,
     description: 'اعمل متجرك أونلاين في دقايق.',
     start_url: '/',

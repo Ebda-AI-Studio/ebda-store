@@ -2392,7 +2392,7 @@
       },
       "whatsappBridge": {
         "title": "WhatsApp Business",
-        "description": "Connect Ebda to Ebda WhatsApp Business Platform — paste your API key + configure templates"
+        "description": "Connect Ebda Store to Ebda WhatsApp Business Platform — paste your API key + configure templates"
       },
       "whatsappTemplates": {
         "title": "WhatsApp Templates",
@@ -2428,8 +2428,8 @@
       }
     },
     "metaCatalogCard": {
-      "provisionLabel": "Provision automatically · Ebda assisted",
-      "provisionDescription": "Creates a new Commerce Catalog under the Ebda parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
+      "provisionLabel": "Provision automatically · Ebda Store assisted",
+      "provisionDescription": "Creates a new Commerce Catalog under the Ebda Store parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
       "provisionButton": "Provision automatically",
       "provisioningButton": "Provisioning…"
     },
@@ -5964,7 +5964,7 @@
       "viewStore": "View Store",
       "forcePlatformBrand": "Platform",
       "forceAdminBrand": "Store",
-      "forceBrandPrefix": "Ebda",
+      "forceBrandPrefix": "Ebda Store",
       "languageLabel": "Language",
       "focusMode": {
         "enterFocusMode": "Focus mode",
@@ -5996,8 +5996,8 @@
       "nativeAr": "العربية"
     },
     "brand": {
-      "forceMediaAlt": "Ebda",
-      "brandAlt": "Ebda"
+      "forceMediaAlt": "Ebda Store",
+      "brandAlt": "Ebda Store"
     },
     "aiUsageSummaryCard": {
       "loading": "Loading AI quota…",
@@ -7639,7 +7639,7 @@
       "topQueriesTitle": "Top queries (latest day)",
       "noTopQueries": "No query data yet.",
       "notConnectedTitle": "Google Search Console not connected",
-      "notConnectedBody": "Once Ebda's Search Console access is set up for your store's domain, search impressions, clicks, and top queries will appear here automatically — no action needed on your end."
+      "notConnectedBody": "Once Ebda Store's Search Console access is set up for your store's domain, search impressions, clicks, and top queries will appear here automatically — no action needed on your end."
     }
   },
   "paymentAbandonments": {
@@ -7689,7 +7689,7 @@
       "connectTitle": "Connect Ebda WhatsApp",
       "connectDescription": "Paste the API key generated in your Ebda WhatsApp Business Platform admin to link this store.",
       "apiKeyLabel": "Ebda WhatsApp API Key",
-      "apiKeyHint": "Generate the key in WBS admin → Clients → Ebda Bridge icon. Paste it here — the key is verified immediately.",
+      "apiKeyHint": "Generate the key in WBS admin → Clients → Ebda Store Bridge icon. Paste it here — the key is verified immediately.",
       "connecting": "Connecting...",
       "connect": "Connect",
       "finishTitle": "Finish connecting Ebda WhatsApp",
@@ -7737,7 +7737,7 @@
       "toastWaOnBody": "Customers can now order directly via WhatsApp DM.",
       "toastWaOffBody": "WhatsApp DM ordering has been turned off.",
       "toastWaSaveFailedBody": "Could not update WA ordering setting",
-      "apiKeyPlaceholder": "Paste key from WBS admin → Client → Ebda Bridge"
+      "apiKeyPlaceholder": "Paste key from WBS admin → Client → Ebda Store Bridge"
     },
     "templates": {
       "generating": "Generating…",
@@ -7751,7 +7751,7 @@
       "refresh": "Refresh",
       "loading": "Loading templates…",
       "noTemplates": "No templates set up yet.",
-      "noTemplatesHint": "Click Generate defaults to add the 12 canonical Ebda templates as drafts.",
+      "noTemplatesHint": "Click Generate defaults to add the 12 canonical Ebda Store templates as drafts.",
       "howItWorks": "How it works: Click Generate defaults to create the canonical templates as drafts. Click Sync to Meta to submit them. Meta reviews each template; approval typically takes 10 minutes to 24 hours.",
       "logoLabel": "Use my store logo as the WhatsApp message header",
       "logoHint": "Customers see your store logo at the top of every order-update message. Applied when you next generate or sync templates.",
@@ -7812,7 +7812,7 @@
       "bothOff": "Both off — event will be silent",
       "saving": "Saving…",
       "saveChanges": "Save changes",
-      "howItWorks": "How it works: when a customer's order transitions to one of these states, the Ebda API fires the corresponding WhatsApp template via your Ebda WhatsApp Business Platform integration. Use the channel checkboxes to control which notification methods are active per event.",
+      "howItWorks": "How it works: when a customer's order transitions to one of these states, the Ebda Store API fires the corresponding WhatsApp template via your Ebda WhatsApp Business Platform integration. Use the channel checkboxes to control which notification methods are active per event.",
       "events": {
         "orderPaid": {
           "label": "Order paid",
@@ -7962,8 +7962,8 @@
       "accessTokenPlaceholderRotate": "Type a new token to rotate it",
       "accessTokenPlaceholderNew": "Paste your System User token",
       "accessTokenHint": "Create a System User in Meta Business Manager → grant <code>catalog_management</code> permission. Token is encrypted at rest and never shown again after saving.",
-      "provisionTitle": "Provision automatically · Ebda assisted",
-      "provisionDescription": "Creates a new Commerce Catalog under the Ebda parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
+      "provisionTitle": "Provision automatically · Ebda Store assisted",
+      "provisionDescription": "Creates a new Commerce Catalog under the Ebda Store parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
       "provisioning": "Provisioning…",
       "provisionButton": "Provision automatically",
       "saving": "Saving…",
@@ -7973,7 +7973,7 @@
       "provisionError": "Meta auto-provisioning failed",
       "provisionSuccess": "Meta catalog provisioned — submit it for Meta review next.",
       "confirmAlready": "A catalog id is already filled in. Clear it first if you really want to provision a new one. Continue anyway?",
-      "confirmNew": "This will call Meta Graph API to create a brand-new Commerce Catalog under the Ebda parent Business Manager and assign it to this store. Continue?",
+      "confirmNew": "This will call Meta Graph API to create a brand-new Commerce Catalog under the Ebda Store parent Business Manager and assign it to this store. Continue?",
       "catalogIdPlaceholder": "e.g. 123456789012345",
       "businessIdPlaceholder": "e.g. 987654321098765"
     },
@@ -8381,7 +8381,7 @@
     },
     "premiumSubtitle": "Premium add-on",
     "featureNotEnabledTitle": "Feature not enabled",
-    "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Ebda to request access.",
+    "featureNotEnabledBody": "Floating widget is a premium add-on. A super admin must enable it for this store before you can configure it. Contact Ebda Store to request access.",
     "mainSubtitle": "Sticky button group your customers see on every page",
     "showWidgetLabel": "Show widget on storefront",
     "showWidgetHint": "When off, no widget renders even though the feature is enabled.",
@@ -8534,7 +8534,7 @@
     "walletsWithBalance": "Customers with a balance",
     "checkoutTitle": "Pay with wallet at checkout",
     "checkoutOn": "On — signed-in customers can pay part or all of an order from their balance.",
-    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Contact Ebda support to turn it on.",
+    "checkoutOff": "Off — customers see their balance in their account but cannot spend it at checkout yet. Contact Ebda Store support to turn it on.",
     "checkoutAccounting": "Unavailable while accounting is on — the ledger does not yet record store credit as a liability, so wallet payments would be booked as cash.",
     "colCustomer": "Customer",
     "colContact": "Contact",
@@ -8611,7 +8611,7 @@
       "abandonedCartAutomation": "Abandoned-cart recovery",
       "whatsappAutomation": "WhatsApp automation",
       "maxStores": "Stores per owner",
-      "brandingRemoval": "Remove \"Powered by Ebda\"",
+      "brandingRemoval": "Remove \"Powered by Ebda Store\"",
       "apiAccess": "API access",
       "analyticsTier": "Analytics tier",
       "supportTier": "Support tier"
@@ -8770,10 +8770,10 @@
       "reference": "Your reference",
       "copy": "Copy",
       "copied": "Copied",
-      "claimSent": "Thanks. The Ebda team will review your transfer and activate your plan once it is confirmed.",
+      "claimSent": "Thanks. The Ebda Store team will review your transfer and activate your plan once it is confirmed.",
       "instapayUnavailable": "InstaPay is not available right now",
       "instapayFailed": "We could not set up InstaPay",
-      "reviewerNote": "The Ebda team will review your transfer. Nothing changes until it is confirmed."
+      "reviewerNote": "The Ebda Store team will review your transfer. Nothing changes until it is confirmed."
     },
     "claims": {
       "title": "Payment confirmations",
@@ -8810,7 +8810,7 @@
     },
     "subscribeBodyInstapay": "Prices in EGP. You pay by InstaPay transfer; your plan is activated as soon as we confirm the payment.",
     "invoiceVat": "incl. VAT {rate}% {vat}",
-    "invoiceTrn": "Ebda TRN {trn}",
+    "invoiceTrn": "Ebda Store TRN {trn}",
     "taxInvoiceSeller": "Tax invoices issued by {name}, tax registration number {trn}.",
     "instapay": {
       "handle": "InstaPay address",
@@ -8822,7 +8822,7 @@
       "phoneStep1": "Copy the InstaPay address below.",
       "phoneStep2": "Open the InstaPay app, tap Send money and paste the address.",
       "phoneStep3": "Enter the exact amount and paste your reference in the note.",
-      "qrAlt": "Ebda InstaPay QR code",
+      "qrAlt": "Ebda Store InstaPay QR code",
       "qrHint": "Scan with InstaPay on another phone",
       "vatLine": "Includes VAT {rate}% ({vat}) on {net}.",
       "seller": "{name}, tax registration number {trn}."
@@ -8831,7 +8831,7 @@
     "payOnStoreBody": "This store is paused because your plan allows fewer stores. Upgrade your main store to bring it back.",
     "payOnStoreLink": "Go to the main store billing",
     "chooseThisPlan": "Choose this plan",
-    "instapayPlanNote": "The new plan applies when Ebda confirms your payment.",
+    "instapayPlanNote": "The new plan applies when Ebda Store confirms your payment.",
     "instapayPlanFailed": "We could not start the InstaPay payment for this plan.",
     "instapayQuoteTitle": "Pay for {plan} ({interval})"
   },
@@ -8844,7 +8844,7 @@
     "abandonedCartAutomation": "Abandoned-cart recovery is not included in your plan. Upgrade to turn it on.",
     "whatsappAutomation": "WhatsApp automation is not included in your plan. Upgrade to turn it on.",
     "maxStores": "Your plan allows up to {limit} store(s). Upgrade to add more.",
-    "brandingRemoval": "Removing the \"Powered by Ebda\" footer is not included in your plan. Upgrade to turn it off.",
+    "brandingRemoval": "Removing the \"Powered by Ebda Store\" footer is not included in your plan. Upgrade to turn it off.",
     "apiAccess": "API access is not included in your plan. Upgrade to Business to use it.",
     "analyticsTier": "This analytics view is not included in your plan. Upgrade to unlock it."
   },
@@ -9134,7 +9134,7 @@
       "privacy": "Privacy",
       "support": "Need help?",
       "footer": "Your store. Your brand.",
-      "back": "Back to Ebda"
+      "back": "Back to Ebda Store"
     }
   },
   "billingEvents": {
@@ -9319,7 +9319,7 @@
     "recordRefund": "Record refund / void",
     "manualRefund": {
       "title": "Record refund or void for {store}",
-      "intro": "Refund = money was sent back outside Ebda. Void = the payment was recorded by mistake (wrong store or it never arrived); this frees the reference.",
+      "intro": "Refund = money was sent back outside Ebda Store. Void = the payment was recorded by mistake (wrong store or it never arrived); this frees the reference.",
       "kind": "What happened",
       "kinds": {
         "refund": "Refund (money sent back)",
@@ -9412,11 +9412,11 @@
   },
   "taxVerification": {
     "title": "VAT registration",
-    "subtitle": "Only businesses registered for VAT may charge it. Ebda reviews your registration before you can turn VAT on.",
+    "subtitle": "Only businesses registered for VAT may charge it. Ebda Store reviews your registration before you can turn VAT on.",
     "loading": "Loading…",
     "loadFailed": "Could not load your VAT registration. Please try again.",
     "status": {
-      "none": "Not registered with Ebda for VAT",
+      "none": "Not registered with Ebda Store for VAT",
       "pending": "Under review",
       "verified": "Verified",
       "rejected": "Rejected",
@@ -9429,7 +9429,7 @@
       "rejected": "Your submission was rejected: {reason}. Fix the details and submit again.",
       "revoked": "Your VAT verification was revoked: {reason}. VAT is switched off until you are verified again."
     },
-    "verifiedNote": "To change these details, contact Ebda support.",
+    "verifiedNote": "To change these details, contact Ebda Store support.",
     "form": {
       "trn": "Tax registration number",
       "trnHint": "9 digits, as printed on your tax card. Spaces and dashes are fine.",
@@ -9472,7 +9472,7 @@
       "submitting": "Submitting…",
       "submitted": "Submitted for review",
       "incomplete": "Add your tax registration number, legal name and at least one document first.",
-      "disclaimer": "Ebda does not file taxes or issue e-receipts on your behalf. You stay responsible for your own VAT filings."
+      "disclaimer": "Ebda Store does not file taxes or issue e-receipts on your behalf. You stay responsible for your own VAT filings."
     },
     "error": "Something went wrong. Please try again."
   },
@@ -9606,19 +9606,19 @@
   },
   "platformSettings": {
     "title": "Platform settings",
-    "subtitle": "Settings that apply to the whole Ebda platform.",
+    "subtitle": "Settings that apply to the whole Ebda Store platform.",
     "loading": "Loading…",
     "loadFailed": "Could not load platform settings.",
     "vat": {
-      "title": "Ebda VAT",
-      "explain": "Off means Ebda subscription invoices carry no VAT. Turn this on only after Ebda itself is registered for VAT.",
+      "title": "Ebda AI Studio VAT",
+      "explain": "Off means Ebda Store subscription invoices carry no VAT. Turn this on only after Ebda AI Studio is registered for VAT.",
       "enabled": "Charge VAT on subscriptions",
       "rate": "VAT rate (%)",
       "mode": "Pricing mode",
       "modeExclusive": "VAT is added on top of the plan price",
       "modeInclusive": "The plan price already includes VAT",
-      "trn": "Ebda tax registration number",
-      "legalName": "Ebda legal name",
+      "trn": "Ebda AI Studio tax registration number",
+      "legalName": "Ebda AI Studio legal name",
       "requiredToEnable": "Enter the tax registration number and legal name before enabling VAT.",
       "invalidTrn": "Enter a 9-digit tax registration number.",
       "invalidRate": "Enter a rate above 0 and up to 100.",
@@ -9876,7 +9876,7 @@
       "refund": {
         "button": "Record refund",
         "title": "Record an InstaPay refund",
-        "intro": "Use this after you sent the money back to the customer by InstaPay yourself. Ebda does not move money; it only records the refund.",
+        "intro": "Use this after you sent the money back to the customer by InstaPay yourself. Ebda Store does not move money; it only records the refund.",
         "reference": "Refund transfer reference",
         "refundDate": "Refund date",
         "refundTime": "Refund time",

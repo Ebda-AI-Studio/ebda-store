@@ -45,7 +45,7 @@ export function PlatformNotFound() {
         href={PLATFORM_MARKETING_URL}
         className="mt-8 inline-flex items-center rounded-sm bg-[#C04E00] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#A34200] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
       >
-        {t(`Go to ${BRAND.name}`, translations['Go to Ebda'])}
+        {t(`Go to ${BRAND.product.nameEn}`, translations['Go to Ebda'])}
       </a>
     </main>
   );

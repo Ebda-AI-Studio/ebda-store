@@ -5,7 +5,7 @@ section: Concepts
 order: 7
 ---
 
-Ebda receives webhooks from payment and billing gateways. Verification always runs over the **exact raw bytes** the gateway sent, so the routes are mounted before the JSON body parser.
+Ebda Store receives webhooks from payment and billing gateways. Verification always runs over the **exact raw bytes** the gateway sent, so the routes are mounted before the JSON body parser.
 
 ## Subscription billing webhooks
 
@@ -48,7 +48,7 @@ The payment is matched to its store by the provider's own reference (an exact ma
 
 ## Receiving your own events
 
-Ebda does not yet send outbound webhooks to merchants. If you need order events, use the [merchant API](/merchant-api/) or ask support.
+Ebda Store does not yet send outbound webhooks to merchants. If you need order events, use the [merchant API](/merchant-api/) or ask support.
 
 ## Implementing a verifier (your own endpoint)
 

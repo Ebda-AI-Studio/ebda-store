@@ -110,7 +110,7 @@ export function addFiltersSheet(wb: ExcelJS.Workbook, filters: ExportFilterSumma
  */
 export async function streamXlsxResponse(res: Response, opts: StreamXlsxOpts): Promise<void> {
   const wb = new (await loadExcelJS()).Workbook();
-  wb.creator = BRAND.name;
+  wb.creator = BRAND.product.nameEn;
   wb.created = new Date();
 
   const ws = wb.addWorksheet(opts.sheetName || 'Sheet1');

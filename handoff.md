@@ -4,6 +4,8 @@
 Assess launch readiness, remove exposed Ebda naming, improve UI and fix wiring/errors; prove backend operation in Cloudflare workerd. Mobile is mandatory end-to-end.
 
 ## Current state
+Naming task (2026-10-10): approved plan `docs/plans/2026-10-10-ebda-store-naming.md`; branch `chore/ebda-store-naming`. Product = Ebda Store; company = Ebda AI Studio. Explicit brand contract passed 11 tests after 3 observed failures. Repo/folder move and production verification are in progress. Existing historical handoff below is preserved.
+
 Branch `codex/ebda-ui-ux`, worktree `/private/tmp/ebda-ui-20261005`, baseline `89461087`. Root `plan` and unrelated `.handoff/` preserved. PR #3: https://github.com/Whisky-11/ebda/pull/3. Initial UI commits `9d047026`/`0a91f0ce`; expanded launch fixes `23acd07b` committed for PR #3. PR #3 merged the earlier UI head only. PR #4 carries subsequent backend fixes; authorized merge in progress, no deploy. Local built Worker preview: http://localhost:8788/signup.
 
 ## Done

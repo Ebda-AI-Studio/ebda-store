@@ -4,13 +4,13 @@ import { Providers } from './providers';
 import { BRAND } from '@force/shared';
 
 export const metadata: Metadata = {
-  title: `${BRAND.name} Orders`,
-  description: `Focused order management for your ${BRAND.name} store.`,
+  title: `${BRAND.product.nameEn} Orders`,
+  description: `Focused order management for your ${BRAND.product.nameEn} store.`,
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: `${BRAND.name} Orders`,
+    title: `${BRAND.product.nameEn} Orders`,
   },
   robots: { index: false, follow: false },
   icons: {

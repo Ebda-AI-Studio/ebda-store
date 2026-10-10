@@ -118,7 +118,7 @@ export default function LoginPage() {
             </div>
             <DocumentTitle title={t('title')} />
             <div className="text-center">
-              <div className="flex justify-center">
+              <div className="flex items-center justify-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
@@ -241,21 +241,22 @@ export default function LoginPage() {
           <div className="text-center">
             <div className="flex justify-center">
               <Image
-                src="/lockup-light.svg"
+                src="/logo-on-light.svg"
                 alt={tb('brandAlt')}
-                width={180}
+                width={60}
                 height={60}
                 className="dark:hidden"
                 unoptimized
               />
               <Image
-                src="/lockup-dark.svg"
+                src="/logo.svg"
                 alt={tb('brandAlt')}
-                width={180}
+                width={60}
                 height={60}
                 className="hidden dark:block"
                 unoptimized
               />
+              <span className="text-xl font-semibold">{tb('brandAlt')}</span>
             </div>
             <h2 className="mt-6 text-3xl font-bold text-foreground">{t('title')}</h2>
             <p className="mt-2 text-sm text-muted-foreground">{t('subtitle')}</p>

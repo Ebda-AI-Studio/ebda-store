@@ -18,7 +18,7 @@ keywords: cards wallets provider paymob fawry fawrypay kashier connect api keys 
 
 ## How connecting works
 
-You use your OWN account with the payment company: the money goes to you, not to Ebda. Connecting is
+You use your OWN account with the payment company: the money goes to you, not to Ebda Store. Connecting is
 only a credentials step in **Settings > Payments**:
 
 1. Open the provider's card and pick **Sandbox** (test) or **Live**. Each mode keeps its own keys, so
@@ -26,7 +26,7 @@ only a credentials step in **Settings > Payments**:
 2. Paste each value. Every field has a **Where do I find this?** link that opens the exact page in the
    provider's dashboard. Secret keys are saved encrypted and are never shown again: the page only
    shows "Saved ••••" and the last 4 characters.
-3. Press **Test connection**. Ebda makes one harmless call to the provider with your keys; nothing is
+3. Press **Test connection**. Ebda Store makes one harmless call to the provider with your keys; nothing is
    charged.
 4. Once the test passes, switch the provider **on**. Changing a key later turns it off until you test
    again.
@@ -54,10 +54,10 @@ only a credentials step in **Settings > Payments**:
 - **Payment API key** and **Secret key:** Kashier dashboard > Integrations. Switch "It's live data" on
   to see the live keys; test keys only work in Sandbox.
 - The Kashier user who created the secret key needs the refund permission for refunds to work.
-- **Webhook:** nothing to paste. Ebda sends the URL with every payment.
+- **Webhook:** nothing to paste. Ebda Store sends the URL with every payment.
 - **Every Kashier notification is double-checked.** Before a Kashier notification marks an order paid or
-  records a refund, Ebda asks Kashier directly what that transaction really is, and only Kashier's answer
-  is used. If Kashier cannot be reached, nothing changes yet and Ebda tries again a little later; the
+  records a refund, Ebda Store asks Kashier directly what that transaction really is, and only Kashier's answer
+  is used. If Kashier cannot be reached, nothing changes yet and Ebda Store tries again a little later; the
   order page's payment events show each check.
 
 ## FawryPay
@@ -69,5 +69,5 @@ only a credentials step in **Settings > Payments**:
 
 ## Need another provider?
 
-Ebda supports Paymob, Kashier and FawryPay, plus cash on delivery and InstaPay. If you need another
+Ebda Store supports Paymob, Kashier and FawryPay, plus cash on delivery and InstaPay. If you need another
 payment or shipping company, use the **Tell us** link at the bottom of the Payments page.

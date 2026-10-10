@@ -135,7 +135,7 @@ router.get(
           : aggregated.orders.filter(o => exportedIds.has(customerKeyOf(o) ?? `guest:${o.id}`));
 
       const workbook = new (await loadExcelJS()).Workbook();
-      workbook.creator = BRAND.name;
+      workbook.creator = BRAND.product.nameEn;
       workbook.created = new Date();
       const sheet = workbook.addWorksheet('Customers');
 

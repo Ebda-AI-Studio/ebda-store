@@ -8,7 +8,7 @@ import { BRAND } from '@force/shared';
  * competes with the canonical root for indexing.
  */
 export const metadata: Metadata = {
-  title: `${BRAND.name} — Landing Preview`,
+  title: `${BRAND.product.nameEn} — Landing Preview`,
   robots: { index: false, follow: false },
 };
 

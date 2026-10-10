@@ -44,3 +44,29 @@ describe('site-kit MDX', () => {
     expect(html).toContain('callout');
   });
 });
+
+describe('site-kit company identity', () => {
+  it('renders the company name as visible text in both locales', async () => {
+    const { renderPage } = await import('../../packages/site-kit/src/build/shell.mjs');
+    for (const [lang, company] of [
+      ['en', 'Ebda AI Studio'],
+      ['ar', 'ابدأ ستوديو'],
+    ]) {
+      const html = renderPage({
+        lang,
+        title: 'Docs',
+        description: 'Docs',
+        canonical: 'https://example.test/',
+        siteLabel: 'Docs',
+        homeHref: '/',
+        nav: [],
+        search: { action: '/search/', label: 'Search', placeholder: 'Search' },
+        main: '<main id="main"></main>',
+        footer: '',
+        skipLabel: 'Skip',
+      });
+      const visible = html.slice(html.indexOf('<body>')).replace(/<[^>]*>/g, '');
+      expect(visible).toContain(company);
+    }
+  });
+});

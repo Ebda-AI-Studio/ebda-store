@@ -38,7 +38,7 @@ export function HeroSection() {
 
           <h1 className="mb-6 text-4xl font-extrabold leading-[1.03] tracking-tight text-white md:text-6xl">
             {t('Build your store with', 'ابنِ متجرك مع')}{' '}
-            <span className="text-primary">{BRAND.name}</span>
+            <span className="text-primary">{BRAND.product.nameEn}</span>
           </h1>
 
           <p className="mx-auto mb-9 max-w-xl text-base leading-relaxed text-white/60 md:mx-0 md:text-lg">
@@ -79,7 +79,7 @@ export function HeroSection() {
             </span>
             <span className="text-xs leading-tight text-white/60">
               <b className="block text-white">{t('Live in days', 'انطلق في أيام')}</b>
-              {t(`Built on ${BRAND.name}`, `مبني على ${BRAND.nameAr}`)}
+              {t(`Built on ${BRAND.product.nameEn}`, `مبني على ${BRAND.product.nameAr}`)}
             </span>
           </div>
         </div>

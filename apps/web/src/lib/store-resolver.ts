@@ -215,8 +215,8 @@ export interface ResolvedStore {
  */
 const DEFAULT_STORE: ResolvedStore = {
   id: 'demo',
-  name: BRAND.name,
-  nameAr: BRAND.nameAr,
+  name: BRAND.product.nameEn,
+  nameAr: BRAND.product.nameAr,
   slug: 'demo',
   status: 'active',
   currency: REGION.currency,

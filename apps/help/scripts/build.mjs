@@ -28,7 +28,7 @@ const L = {
     prefix: '',
     site: 'مركز المساعدة',
     skip: 'تخطَّ إلى المحتوى',
-    homeTitle: `مركز مساعدة ${BRAND.nameAr}`,
+    homeTitle: `مركز مساعدة ${BRAND.product.nameAr}`,
     homeIntro:
       'إجابات واضحة وصادقة عن إنشاء متجرك وإدارته. اللي لسه مش جاهز في المنصة مكتوب عليه «قريباً».',
     homeCta: 'أنشئ متجرك',
@@ -40,11 +40,11 @@ const L = {
     search: { action: '/search/', label: 'بحث', placeholder: 'ابحث في المساعدة' },
     switch: { label: 'English', lang: 'en' },
     nav: [
-      { href: BRAND_MARKETING_URL, label: BRAND.nameAr },
+      { href: BRAND_MARKETING_URL, label: BRAND.company.shortNameAr },
       { href: BRAND_STORE_APP_URL, label: 'لوحة التحكم' },
       { href: `https://${BRAND.domains.status}`, label: 'حالة الخدمة' },
     ],
-    footer: `© ${new Date().getUTCFullYear()} ${BRAND.company}. تحتاج مساعدة إضافية؟ راسلنا.`,
+    footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameAr}. تحتاج مساعدة إضافية؟ راسلنا.`,
     searchMsgs: {
       loading: 'جارٍ تحميل فهرس البحث…',
       none: 'لا توجد نتائج.',
@@ -73,11 +73,11 @@ const L = {
     search: { action: '/en/search/', label: 'Search', placeholder: 'Search help' },
     switch: { label: 'العربية', lang: 'ar' },
     nav: [
-      { href: BRAND_MARKETING_URL + '/en/', label: BRAND.name },
+      { href: BRAND_MARKETING_URL + '/en/', label: BRAND.company.shortNameEn },
       { href: BRAND_STORE_APP_URL, label: 'Dashboard' },
       { href: `https://${BRAND.domains.status}/en`, label: 'Status' },
     ],
-    footer: `© ${new Date().getUTCFullYear()} ${BRAND.company}. Need more help? Email us.`,
+    footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameEn}. Need more help? Email us.`,
     searchMsgs: {
       loading: 'Loading the search index…',
       none: 'No results.',

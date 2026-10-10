@@ -31,7 +31,7 @@ function colorWithOpacity(
 // ---------------------------------------------------------------------------
 
 export const siteConfig = {
-  name: BRAND.name,
+  name: BRAND.product.nameEn,
   hero: {
     description: 'The AI-powered commerce platform built for Egyptian businesses.',
   },
@@ -283,7 +283,7 @@ export function FlickeringFooter() {
   const { t } = useLanguage();
 
   // Big text: "Ebda" on desktop, "Force" on tablet, nothing on mobile
-  const bigText = isDesktop ? BRAND.name : isTablet ? BRAND.name : null;
+  const bigText = isDesktop ? BRAND.product.nameEn : isTablet ? BRAND.product.nameEn : null;
 
   // Translated footer link columns — column titles + link labels
   // Real destinations only — landing section anchors + live contact channels.
@@ -321,7 +321,7 @@ export function FlickeringFooter() {
             <div className="flex items-center gap-2.5">
               <img
                 src="/lockup-dark.svg"
-                alt={BRAND.name}
+                alt={BRAND.product.nameEn}
                 className="h-10 w-auto"
                 width={120}
                 height={40}

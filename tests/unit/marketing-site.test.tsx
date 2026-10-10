@@ -169,8 +169,8 @@ describe('marketing honesty', () => {
     expect(s).toContain('EGP 89,910');
   });
   it('brand line, footer ownership line and Western digits everywhere', () => {
-    expect(ar).toContain('ابدأ — بابك لبدء مشروعك.');
-    expect(en).toContain('Ebda — Your doorway to business.');
+    expect(ar).toContain('ابدأ ستوديو — بابك لبدء مشروعك.');
+    expect(en).toContain('Ebda AI Studio — Your doorway to business.');
     expect(en).toContain(
       'Ebda Store is a product of Ebda AI Studio. © 2026 Ebda AI Studio. All rights reserved.'
     );

@@ -19,7 +19,7 @@ export function LandingHeader() {
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
           <img
             src="/lockup-dark.svg"
-            alt={BRAND.name}
+            alt={BRAND.product.nameEn}
             className="h-9 w-auto"
             width={108}
             height={36}

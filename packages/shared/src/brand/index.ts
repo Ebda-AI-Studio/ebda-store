@@ -10,11 +10,10 @@
  */
 
 export const BRAND = {
-  name: 'Ebda',
-  nameAr: 'ابدأ',
+  name: 'Ebda AI Studio',
+  nameAr: 'ابدأ ستوديو',
   /**
-   * The PRODUCT (the store builder). `name`/`nameAr` above stay the master
-   * brand (logo, brand line); anything that names the product or the Service
+   * The PRODUCT (the store builder). `name`/`nameAr` above name the company; anything naming the product or the Service
    * reads this (ruling PRODUCT-NAME-1). Future products: Ebda WhatsApp / CRM / ERP.
    */
   product: {
@@ -85,6 +84,11 @@ export function brandName(locale?: string | null): string {
   return locale && locale.toLowerCase().startsWith('ar') ? BRAND.nameAr : BRAND.name;
 }
 
+/** Product name for merchant/store surfaces, separate from the company identity. */
+export function productName(locale?: string | null): string {
+  return locale?.toLowerCase().startsWith('ar') ? BRAND.product.nameAr : BRAND.product.nameEn;
+}
+
 /** `https://<host>` for a bare hostname. */
 export function brandUrl(host: string): string {
   return `https://${host}`;
@@ -142,9 +146,9 @@ export function brandFrom(displayName: string = BRAND.product.nameEn): string {
   return `${displayName} <${BRAND.noReplyEmail}>`;
 }
 
-/** Footer line for transactional email / storefront: "Powered by Ebda". */
+/** Footer line for transactional email / storefront: "Powered by Ebda Store". */
 export function poweredByBrand(locale?: string | null): string {
   return locale && locale.toLowerCase().startsWith('ar')
-    ? `مدعوم من ${BRAND.nameAr}`
-    : `Powered by ${BRAND.name}`;
+    ? `مدعوم من ${BRAND.product.nameAr}`
+    : `Powered by ${BRAND.product.nameEn}`;
 }

@@ -50,7 +50,10 @@ export function StoreMaintenance() {
     'يخضع حالياً لأعمال الصيانة. يرجى المحاولة مرة أخرى لاحقاً.'
   );
   const contactHeading = t('Need to reach us?', 'تحتاج للتواصل معنا؟');
-  const poweredByLabel = t(`Powered by ${BRAND.name}`, `مدعوم من ${BRAND.nameAr}`);
+  const poweredByLabel = t(
+    `Powered by ${BRAND.product.nameEn}`,
+    `مدعوم من ${BRAND.product.nameAr}`
+  );
 
   // Normalize the WhatsApp number to digits so wa.me works regardless of the
   // format the merchant typed (the admin form accepts "+20 101 234 5678",

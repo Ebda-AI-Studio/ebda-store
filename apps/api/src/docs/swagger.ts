@@ -9,10 +9,10 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: `${BRAND.name} API`,
+      title: `${BRAND.product.nameEn} API`,
       version: '1.0.0',
       description: `
-# ${BRAND.name} API Documentation
+# ${BRAND.product.nameEn} API Documentation
 
 Multi-tenant e-commerce platform API for managing stores, products, orders, and more.
 
@@ -53,7 +53,7 @@ All errors follow this format:
 | RATE_LIMITED | 429 | Too many requests |
       `,
       contact: {
-        name: BRAND.name,
+        name: BRAND.product.nameEn,
         email: BRAND.supportEmail,
         url: BRAND_MARKETING_URL,
       },
@@ -440,7 +440,7 @@ export function setupSwagger(app: Express) {
         .swagger-ui .info { margin-bottom: 30px }
         .swagger-ui .info .title { color: #f97316 }
       `,
-      customSiteTitle: `${BRAND.name} API Documentation`,
+      customSiteTitle: `${BRAND.product.nameEn} API Documentation`,
       customfavIcon: '/favicon.ico',
       swaggerOptions: {
         persistAuthorization: true,

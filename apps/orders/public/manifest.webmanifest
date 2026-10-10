@@ -1,7 +1,7 @@
 {
-  "name": "Ebda Orders",
+  "name": "Ebda Store Orders",
   "short_name": "Orders",
-  "description": "Focused order management for your Ebda.",
+  "description": "Focused order management for your Ebda Store.",
   "start_url": "/orders",
   "scope": "/",
   "display": "standalone",
