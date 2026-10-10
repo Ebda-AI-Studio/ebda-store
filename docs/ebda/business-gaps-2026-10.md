@@ -10,17 +10,17 @@
 
 **Fixed inputs**
 
-| Input                             | Value                                                                                                                                                                                                                                                 | Label                                                                                                    |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Plans (monthly, EGP)              | Basic 1,490 / Growth 3,490 / Business 9,990                                                                                                                                                                                                           | MEASURED — `docs/plans/2026-10-05-pricing-decisions.md`                                                  |
-| Annual                            | 9 months prepaid (25% off): 13,410 / 31,410 / 89,910 → Basic effective 1,117.50/month                                                                                                                                                                 | MEASURED, same file                                                                                      |
-| Platform commission               | 0 bps, COD never cut, no public free plan, 14-day trial on Growth                                                                                                                                                                                     | MEASURED, same file                                                                                      |
-| Basic order cap                   | 300 orders/month, soft then hard after 7 days                                                                                                                                                                                                         | MEASURED, same file + `packages/shared/src/schemas/plan-limits.ts`                                       |
-| AI on Basic                       | Every AI capability is in every paid baseline (AI-first policy 2026-07-21)                                                                                                                                                                            | MEASURED — `packages/shared/src/plan-baselines.ts` (`STARTER_CORE`; Basic maps to the `starter` feature tier) |
-| WhatsApp on every plan            | `wa.me` link only, no Meta API calls → Meta cost 0                                                                                                                                                                                                    | MEASURED — pricing decisions + STATUS SP8                                                                |
-| FX                                | 1 USD = 52.24 EGP (mid-market 2026-10-03)                                                                                                                                                                                                             | MEASURED from `docs/ebda/research/pricing-and-packaging.md` (source: Wise/XE search summary)             |
-| Production is live                | `ebda.app`, `store.ebda.app` 200; `api.ebda.app/health` → `commit 430cf318…` = tip of `main`, `server: cloudflare`                                                                                                                                    | MEASURED — curl, 2026-10-10 02:43 UTC                                                                    |
-| Paying merchants today            | Unknown. Merchant #1 (Amelia Aurum) is on hidden `founding_free` (pays 0). I did not query production (no read-only prod SQL path was used in this session)                                                                                         | NOT MEASURED                                                                                             |
+| Input                  | Value                                                                                                                                                       | Label                                                                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Plans (monthly, EGP)   | Basic 1,490 / Growth 3,490 / Business 9,990                                                                                                                 | MEASURED — `docs/plans/2026-10-05-pricing-decisions.md`                                                       |
+| Annual                 | 9 months prepaid (25% off): 13,410 / 31,410 / 89,910 → Basic effective 1,117.50/month                                                                       | MEASURED, same file                                                                                           |
+| Platform commission    | 0 bps, COD never cut, no public free plan, 14-day trial on Growth                                                                                           | MEASURED, same file                                                                                           |
+| Basic order cap        | 300 orders/month, soft then hard after 7 days                                                                                                               | MEASURED, same file + `packages/shared/src/schemas/plan-limits.ts`                                            |
+| AI on Basic            | Every AI capability is in every paid baseline (AI-first policy 2026-07-21)                                                                                  | MEASURED — `packages/shared/src/plan-baselines.ts` (`STARTER_CORE`; Basic maps to the `starter` feature tier) |
+| WhatsApp on every plan | `wa.me` link only, no Meta API calls → Meta cost 0                                                                                                          | MEASURED — pricing decisions + STATUS SP8                                                                     |
+| FX                     | 1 USD = 52.24 EGP (mid-market 2026-10-03)                                                                                                                   | MEASURED from `docs/ebda/research/pricing-and-packaging.md` (source: Wise/XE search summary)                  |
+| Production is live     | `ebda.app`, `store.ebda.app` 200; `api.ebda.app/health` → `commit 430cf318…` = tip of `main`, `server: cloudflare`                                          | MEASURED — curl, 2026-10-10 02:43 UTC                                                                         |
+| Paying merchants today | Unknown. Merchant #1 (Amelia Aurum) is on hidden `founding_free` (pays 0). I did not query production (no read-only prod SQL path was used in this session) | NOT MEASURED                                                                                                  |
 
 ---
 
@@ -30,11 +30,11 @@
 
 ### Owner options
 
-| Option                                          | For                                                                                                                                                      | Against                                                                                                   |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| **A. Ahmad, founder-led (recommended first 8 weeks)** | Zero cash; he hears the objections himself (pillar 1 says his feedback IS the market signal); the first 10 payers need hand-holding anyway               | His hours are shared with Force AI + Whisky 11; caps volume (see math below)                              |
-| B. Part-time Egyptian growth/community hire     | Scales the outreach; Arabic-native in merchant groups                                                                                                    | Costs cash before conversion rates are known; needs a playbook that does not exist yet                   |
-| C. Channel partner (Bosta, Paymob, Kashier)     | They already hold Egyptian merchant relationships; Ebda already integrates all three (BYO keys)                                                          | No commercial relationship exists; partner merchant-base sizes are **unverified**; months, not weeks     |
+| Option                                                | For                                                                                                                                        | Against                                                                                              |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| **A. Ahmad, founder-led (recommended first 8 weeks)** | Zero cash; he hears the objections himself (pillar 1 says his feedback IS the market signal); the first 10 payers need hand-holding anyway | His hours are shared with Force AI + Whisky 11; caps volume (see math below)                         |
+| B. Part-time Egyptian growth/community hire           | Scales the outreach; Arabic-native in merchant groups                                                                                      | Costs cash before conversion rates are known; needs a playbook that does not exist yet               |
+| C. Channel partner (Bosta, Paymob, Kashier)           | They already hold Egyptian merchant relationships; Ebda already integrates all three (BYO keys)                                            | No commercial relationship exists; partner merchant-base sizes are **unverified**; months, not weeks |
 
 The Force AI / Whisky 11 network is **not** a fit as the first channel: it is Kuwait/GCC, and Ebda is EGP-only and Egypt-registered (Ruling OPERATOR-1, `docs/ebda/brand/operator.md`). Useful only for warm intros to Egyptian contacts.
 
@@ -57,13 +57,13 @@ Paid Meta ads are option 2, only after week 4 produces an activation rate. If Ah
 
 ### How it gets measured (data already exists)
 
-| Funnel step   | Definition                                                                                          | Source                                                                                   |
-| ------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Sign-up       | Store created                                                                                       | `stores.created_at`                                                                      |
-| Activation    | All required setup-guide items done (`add_product`, `brand`, `shipping`, `payment`, `test_order`) — or stricter: first non-test order within the trial | `packages/shared/src/setup-guide.ts` computes `done` from real data (MEASURED: exists)  |
-| Paid          | Subscription `trialing` → `active`                                                                  | `apps/api/src/services/billing/account.service.ts` statuses                              |
-| Renewed       | Second successful billing period                                                                    | billing events / subscription period                                                    |
-| Channel       | **Missing:** no `acquisition_source` is recorded at sign-up. Minimal fix: a UTM / "how did you hear about us" field on signup, shown on the super-admin store list | NOT MEASURABLE YET                                                                       |
+| Funnel step | Definition                                                                                                                                                         | Source                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| Sign-up     | Store created                                                                                                                                                      | `stores.created_at`                                                                    |
+| Activation  | All required setup-guide items done (`add_product`, `brand`, `shipping`, `payment`, `test_order`) — or stricter: first non-test order within the trial             | `packages/shared/src/setup-guide.ts` computes `done` from real data (MEASURED: exists) |
+| Paid        | Subscription `trialing` → `active`                                                                                                                                 | `apps/api/src/services/billing/account.service.ts` statuses                            |
+| Renewed     | Second successful billing period                                                                                                                                   | billing events / subscription period                                                   |
+| Channel     | **Missing:** no `acquisition_source` is recorded at sign-up. Minimal fix: a UTM / "how did you hear about us" field on signup, shown on the super-admin store list | NOT MEASURABLE YET                                                                     |
 
 **Needs Ahmad:** pick the owner (A/B/C), confirm or replace the 5 h/week and 5 sign-ups/week assumptions.
 
@@ -121,9 +121,9 @@ Context (MEASURED):
 
 **Next unblock step:** a real inbox Ahmad controls (or an inbound test mailbox) for the walkthrough, plus confirmation that the Resend sender for `ebda.app` is verified in production. Then drive the journey live and record one number: **minutes from landing page to first test order** (target <10, STATUS item 7). The shared-account half stays NOT VERIFIABLE until a second Ebda product exists.
 
-| Owner option                                                        | Measured number                                   |
-| ------------------------------------------------------------------- | ------------------------------------------------- |
-| Ahmad provides the inbox + Resend confirmation; agent drives the run | Wall-clock minutes, sign-up → first test order    |
+| Owner option                                                         | Measured number                                |
+| -------------------------------------------------------------------- | ---------------------------------------------- |
+| Ahmad provides the inbox + Resend confirmation; agent drives the run | Wall-clock minutes, sign-up → first test order |
 
 ---
 
@@ -133,16 +133,16 @@ Context (MEASURED):
 
 What already exists and is countable today (MEASURED — these give exception COUNTS, not minutes):
 
-| Exception class                      | Existing signal / surface                                                                                                                       |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Failed subscription payment          | Dunning (`dunningAttempts`, `nextRetryAt`, `past_due`) in `apps/api/src/services/billing/`                                                        |
-| **Manual subscription payment**      | InstaPay / bank / cash renewals are **recorded by a super-admin by hand**, 3-day grace (`account.service.ts`, `period.ts`) — one human action per renewal per non-card merchant |
-| Failed transactional email           | Super-admin `/email-queue` (exhausted retries, replayable)                                                                                      |
-| Failed SMS                           | Super-admin `/sms-queue`                                                                                                                        |
-| Payment-webhook failures             | Super-admin `/webhook-events` (replay)                                                                                                          |
-| Onboarding stuck                     | Setup-guide `done` per item (`packages/shared/src/setup-guide.ts`) — shows WHERE a merchant stalls                                             |
-| Refunds                              | Order/refund records (merchant-side; Ebda carries no money for card sales, BYO keys)                                                            |
-| WhatsApp connection problems         | Today only a `wa.me` link (no API connection to fail); the inherited WABA admin is in every baseline but needs per-tenant config                |
+| Exception class                 | Existing signal / surface                                                                                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Failed subscription payment     | Dunning (`dunningAttempts`, `nextRetryAt`, `past_due`) in `apps/api/src/services/billing/`                                                                                      |
+| **Manual subscription payment** | InstaPay / bank / cash renewals are **recorded by a super-admin by hand**, 3-day grace (`account.service.ts`, `period.ts`) — one human action per renewal per non-card merchant |
+| Failed transactional email      | Super-admin `/email-queue` (exhausted retries, replayable)                                                                                                                      |
+| Failed SMS                      | Super-admin `/sms-queue`                                                                                                                                                        |
+| Payment-webhook failures        | Super-admin `/webhook-events` (replay)                                                                                                                                          |
+| Onboarding stuck                | Setup-guide `done` per item (`packages/shared/src/setup-guide.ts`) — shows WHERE a merchant stalls                                                                              |
+| Refunds                         | Order/refund records (merchant-side; Ebda carries no money for card sales, BYO keys)                                                                                            |
+| WhatsApp connection problems    | Today only a `wa.me` link (no API connection to fail); the inherited WABA admin is in every baseline but needs per-tenant config                                                |
 
 The single biggest "little intervention" risk visible in code is the **manual renewal path**: every merchant who pays by InstaPay/bank instead of card costs a human action every month. Kashier card recurring is the automatic path, and recurring-agreement enablement on Ebda's account still needs written confirmation from Kashier (research brief + STATUS item 9; the latest Kashier commit #54 is a **sandbox** run).
 
@@ -152,9 +152,9 @@ The single biggest "little intervention" risk visible in code is the **manual re
 2. **A timer**: each contact logged with merchant, tag, start/stop minutes. Cheapest version for the first ~20 merchants is a support-inbox label set + a one-row-per-contact log. The durable version is a `support_events` table with a super-admin page (per the every-data-has-a-UI rule) that also auto-records the countable signals above (dunning attempt, manual renewal recorded, email-queue failure for that store).
 3. **Two derived numbers**, weekly: **support minutes per active merchant per month**, and **% of renewals needing a human** (manual renewals ÷ all renewals). The second one is Ahmad's "little intervention" number directly.
 
-| Owner option                                                            | Measured number                                                        |
-| ----------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Ahmad (he is the support desk until merchant ~20) — or the hire from §1 B | Support minutes / merchant / month; % of renewals needing a human       |
+| Owner option                                                              | Measured number                                                   |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Ahmad (he is the support desk until merchant ~20) — or the hire from §1 B | Support minutes / merchant / month; % of renewals needing a human |
 
 ---
 
@@ -164,13 +164,13 @@ Zero commission means Ebda's ONLY revenue is the subscription; merchants' gatewa
 
 ### 5.1 AI (Gemini `gemini-flash-lite-latest`)
 
-| Fact                                                | Value                                                                                         | Label                                                                    |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Per-store daily token budget                        | 200,000 tokens/day (in + out) → ceiling **6,000,000 tokens/month**                            | MEASURED — `apps/api/src/config/index.ts` `AI_DAILY_TOKEN_BUDGET_PER_STORE` default |
-| Per-store daily request cap                         | 150 non-cached requests/day                                                                   | MEASURED — `apps/api/src/lib/ai-quota.ts`                                |
-| Platform caps                                       | 450/day × key count; **20,000/month across ALL stores**                                       | MEASURED, same file                                                      |
-| Price                                               | $0.10 / M input, $0.40 / M output                                                             | ASSUMED (the example in `docs/ENVIRONMENT.md`; the `-latest` alias can move to a model with different pricing) |
-| Cost tracking                                       | `ai_usage.cost_micros` is NULL unless `AI_MODEL_RATES` is set; whether it is set in production: NOT VERIFIED | MEASURED (code)                                                          |
+| Fact                         | Value                                                                                                        | Label                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| Per-store daily token budget | 200,000 tokens/day (in + out) → ceiling **6,000,000 tokens/month**                                           | MEASURED — `apps/api/src/config/index.ts` `AI_DAILY_TOKEN_BUDGET_PER_STORE` default                            |
+| Per-store daily request cap  | 150 non-cached requests/day                                                                                  | MEASURED — `apps/api/src/lib/ai-quota.ts`                                                                      |
+| Platform caps                | 450/day × key count; **20,000/month across ALL stores**                                                      | MEASURED, same file                                                                                            |
+| Price                        | $0.10 / M input, $0.40 / M output                                                                            | ASSUMED (the example in `docs/ENVIRONMENT.md`; the `-latest` alias can move to a model with different pricing) |
+| Cost tracking                | `ai_usage.cost_micros` is NULL unless `AI_MODEL_RATES` is set; whether it is set in production: NOT VERIFIED | MEASURED (code)                                                                                                |
 
 - **Ceiling per merchant:** 6M tokens at 80/20 in/out = $0.96 = **~50 EGP**; all-output worst case $2.40 = **~125 EGP**. Holds only on paths that call the budget check — that every Gemini path does is NOT VERIFIED.
 - **Typical (ASSUMED 5–15% of ceiling): ~3–20 EGP/merchant/month.**
@@ -181,17 +181,17 @@ Zero commission means Ebda's ONLY revenue is the subscription; merchants' gatewa
 
 Stack per Ruling LEGAL-3 (`docs/RULINGS.md`): Cloudflare Workers/KV/Queues/R2, Neon, Resend, Sentry, Inngest, Gemini, PostHog, OneSignal — "Railway and Redis are not used". (Note: the project `CLAUDE.md` still describes the API on Railway; the live `/health` response carries no Railway headers, `server: cloudflare`. INFERRED that Workers serves it; reconcile the docs separately.) Usage shapes borrowed from `docs/audits/_slices/06-cost-forecast.md` (written for FWB, so ASSUMED transferable).
 
-| Line                                  | 10 merchants | 100 merchants | 1,000 merchants | Basis (ASSUMED unless noted)                                        |
-| ------------------------------------- | ------------ | ------------- | --------------- | ------------------------------------------------------------------- |
-| Cloudflare Workers (paid plan + usage) | $5           | $5–15         | $30–80          | $5 base, 10M requests included                                      |
-| Neon (Launch, usage)                  | $5–15        | $30–60        | $100–300        | ~$0.14/CU-h (forecast doc used $0.106) + $0.35/GB-mo                |
-| Resend                                | $0–20        | $20–30        | $100–515        | free 100/day breaks at ~5 active stores (forecast); FWB 1k-store figure $515 |
-| Inngest                               | $0           | $0–75         | $75–150         | free 50k steps; ~300k steps at 100 stores (forecast)                |
-| Sentry / PostHog / OneSignal          | $0           | $0–26         | $26–260         | free tiers → paid at scale                                          |
-| CF for SaaS custom hostnames          | $0           | $0            | $0–90           | first 100 free, then ~$0.10 each (if all 1,000 use a custom domain) |
-| R2                                    | $0           | $0            | $1–10           | zero egress                                                         |
-| **Total USD**                         | **$10–40**   | **$55–206**   | **$332–1,405**  |                                                                     |
-| **Per merchant (EGP @52.24)**         | **52–209**   | **29–108**    | **17–73**       |                                                                     |
+| Line                                   | 10 merchants | 100 merchants | 1,000 merchants | Basis (ASSUMED unless noted)                                                 |
+| -------------------------------------- | ------------ | ------------- | --------------- | ---------------------------------------------------------------------------- |
+| Cloudflare Workers (paid plan + usage) | $5           | $5–15         | $30–80          | $5 base, 10M requests included                                               |
+| Neon (Launch, usage)                   | $5–15        | $30–60        | $100–300        | ~$0.14/CU-h (forecast doc used $0.106) + $0.35/GB-mo                         |
+| Resend                                 | $0–20        | $20–30        | $100–515        | free 100/day breaks at ~5 active stores (forecast); FWB 1k-store figure $515 |
+| Inngest                                | $0           | $0–75         | $75–150         | free 50k steps; ~300k steps at 100 stores (forecast)                         |
+| Sentry / PostHog / OneSignal           | $0           | $0–26         | $26–260         | free tiers → paid at scale                                                   |
+| CF for SaaS custom hostnames           | $0           | $0            | $0–90           | first 100 free, then ~$0.10 each (if all 1,000 use a custom domain)          |
+| R2                                     | $0           | $0            | $1–10           | zero egress                                                                  |
+| **Total USD**                          | **$10–40**   | **$55–206**   | **$332–1,405**  |                                                                              |
+| **Per merchant (EGP @52.24)**          | **52–209**   | **29–108**    | **17–73**       |                                                                              |
 
 Excluded as company opex, not cost-to-serve: Claude Max, GitHub Team, domains (already-paid base plans).
 
@@ -215,11 +215,11 @@ NOT MEASURED (§4). Band used below, every input ASSUMED: Cairo support agent 15
 
 ### 5.5 Gross margin on Basic (1,490 EGP, monthly card billing)
 
-| Merchants | Infra  | AI (Gemini) | Answer-engine ceiling share | Billing fee | Support | **Cost/merchant (low–high)** | **Gross margin (low–high cost)** | Central estimate        |
-| --------- | ------ | ----------- | --------------------------- | ----------- | ------- | ---------------------------- | -------------------------------- | ----------------------- |
-| 10        | 52–209 | 3–125       | 0–627                       | 50          | 120–612 | **225–1,623**                | **85% … −9%**                    | ~650 EGP → **~56%**     |
-| 100       | 29–108 | 3–125       | 0–63                        | 50          | 60–306  | **142–652**                  | **90% … 56%**                    | ~295 EGP → **~80%**     |
-| 1,000     | 17–73  | 3–125       | 0–6                         | 50          | 30–153  | **100–407**                  | **93% … 73%**                    | ~185 EGP → **~88%**     |
+| Merchants | Infra  | AI (Gemini) | Answer-engine ceiling share | Billing fee | Support | **Cost/merchant (low–high)** | **Gross margin (low–high cost)** | Central estimate    |
+| --------- | ------ | ----------- | --------------------------- | ----------- | ------- | ---------------------------- | -------------------------------- | ------------------- |
+| 10        | 52–209 | 3–125       | 0–627                       | 50          | 120–612 | **225–1,623**                | **85% … −9%**                    | ~650 EGP → **~56%** |
+| 100       | 29–108 | 3–125       | 0–63                        | 50          | 60–306  | **142–652**                  | **90% … 56%**                    | ~295 EGP → **~80%** |
+| 1,000     | 17–73  | 3–125       | 0–6                         | 50          | 30–153  | **100–407**                  | **93% … 73%**                    | ~185 EGP → **~88%** |
 
 Reading it:
 
