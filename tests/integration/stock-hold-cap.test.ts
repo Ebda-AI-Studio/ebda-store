@@ -75,6 +75,7 @@ async function placeOrder(
 describe.skipIf(!hasDb)('stock-hold abuse fix (open unpaid order cap)', () => {
   afterEach(() => {
     delete process.env.OPEN_UNPAID_HOLD_CAP;
+    delete process.env.OPEN_UNPAID_HOLD_IP_CAP;
   });
 
   async function setUp(suffix: string) {
@@ -115,7 +116,12 @@ describe.skipIf(!hasDb)('stock-hold abuse fix (open unpaid order cap)', () => {
     ).rejects.toBeInstanceOf(AppError);
   });
 
-  it('rejects the 3rd open COD hold from the SAME checkout IP even with no phone/email and a varying one otherwise', async () => {
+  it('rejects the 3rd open COD hold from the SAME checkout IP once the (lower, configured-for-this-test) IP cap is reached, with no phone/email', async () => {
+    // IP gets a separately-configurable, normally MUCH looser cap than
+    // phone/email (CGNAT tolerance — see lib/stock-hold-cap.ts). Pin it down
+    // to the identity cap here so this test still proves the IP branch works
+    // without placing 9 real orders.
+    process.env.OPEN_UNPAID_HOLD_IP_CAP = '2';
     const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
     const { store, productId } = await setUp(suffix);
     const ip = '203.0.113.7';
@@ -136,6 +142,28 @@ describe.skipIf(!hasDb)('stock-hold abuse fix (open unpaid order cap)', () => {
     await expect(
       placeOrder(store.storeId, productId, { paymentMethod: 'cod', phone: null, email: null, ip })
     ).rejects.toMatchObject({ statusCode: 429, code: 'TOO_MANY_OPEN_HOLDS' });
+  });
+
+  it('does NOT block a 3rd unrelated shopper sharing one carrier-NAT IP at the default (looser) IP cap — CGNAT tolerance', async () => {
+    const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+    const { store, productId } = await setUp(suffix);
+    const ip = '203.0.113.8';
+
+    // Two unrelated shoppers, same shared IP, different phones — well under
+    // the default IP cap (8).
+    await placeOrder(store.storeId, productId, {
+      paymentMethod: 'cod',
+      phone: `+2014${suffix.replace(/\D/g, '').slice(0, 8).padEnd(8, '5')}`,
+      email: null,
+      ip,
+    });
+    const third = await placeOrder(store.storeId, productId, {
+      paymentMethod: 'cod',
+      phone: `+2015${suffix.replace(/\D/g, '').slice(0, 8).padEnd(8, '6')}`,
+      email: null,
+      ip,
+    });
+    expect(third.id).toBeTruthy();
   });
 
   it('a normal customer placing one or two legitimate COD orders is never blocked', async () => {

@@ -118,7 +118,11 @@ vi.mock('@force/database', () => ({
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     $transaction: vi.fn(),
-    $queryRaw: vi.fn(),
+    // Default: no existing open holds, so assertStockHoldCapNotExceeded's
+    // pre-transaction raw-SQL count (lib/stock-hold-cap.ts) never fires
+    // unless a test explicitly overrides this to simulate an abuser already
+    // at/over the cap.
+    $queryRaw: vi.fn().mockResolvedValue([{ phone_or_email_count: 0n, ip_count: 0n }]),
   },
   Prisma: {},
   OrderStatus: {},
@@ -479,7 +483,10 @@ describe('OrderService', () => {
       it.each(['COD', 'Cod', ' cod '])(
         'treats paymentMethod %j the same as "cod" for the cap',
         async casedMethod => {
-          vi.mocked(prisma.order.count).mockResolvedValue(2); // already at the default cap
+          // already at the default cap (2 open phone/email-matched holds)
+          vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([
+            { phone_or_email_count: 2n, ip_count: 0n },
+          ]);
           await expect(
             OrderService.create(mockStoreId, undefined, mockSessionId, {
               ...createOrderData,
@@ -493,7 +500,9 @@ describe('OrderService', () => {
       it.each(['INSTAPAY', 'InstaPay'])(
         'treats paymentMethod %j the same as "instapay" for the cap',
         async casedMethod => {
-          vi.mocked(prisma.order.count).mockResolvedValue(2);
+          vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([
+            { phone_or_email_count: 2n, ip_count: 0n },
+          ]);
           await expect(
             OrderService.create(mockStoreId, undefined, mockSessionId, {
               ...createOrderData,
