@@ -1,3 +1,5 @@
+> **RETIRED, HISTORICAL — 2026-10-10.** Superseded by `docs/ebda/evidence-hierarchy.md` (Ahmad's binding decision, FIX-016). Several claims below are now factually wrong — most importantly "this is not yet a verified live deployment": the API, admin, web and orders are now confirmed live on Cloudflare Workers (see `docs/ebda/truth-table-2026-10.md` §5). Kept only as a record of what the 2026-10-05 snapshot believed. Do not cite this file for a readiness claim, and make NO public launch claim from any document until an unaided merchant completes the full journey (see evidence-hierarchy.md §0).
+
 # Ebda launch readiness — 2026-10-05
 
 Core backend wiring runs in local Cloudflare workerd. This is not yet a verified live deployment.
