@@ -1,6 +1,8 @@
-# Production rollback — Force Website Builder
+# Production rollback — Ebda
 
-This monorepo deploys **web / admin / orders to Cloudflare Workers** (GitHub Actions `.github/workflows/cf-deploy.yml` → OpenNext build → `wrangler deploy`, workers `ebda-web` / `ebda-admin` / `ebda-orders`) + the **API to Railway** (git auto-deploy from `main`). Plus **Neon Postgres** (83 models, RLS via AsyncLocalStorage) and **Cloudflare R2** for assets.
+> **Corrected 2026-10-10**: this doc was inherited from `force-website-builder` and had never been adapted — it described a Railway-hosted API and pointed every Neon recovery command at **FWB's own Neon project** (`crimson-king-40424588` / org `org-lingering-river-25973882`), not Ebda's. Running the old commands as written during a real Ebda incident would have operated on a different company's database. Fixed below: every deploy/rollback claim and every `neonctl` invocation now reflects Ebda's real topology.
+
+This monorepo deploys **web / admin / orders / marketing to Cloudflare Workers** (one standalone, path-filtered GitHub Actions workflow per app — `cf-{web,admin,orders,marketing}-deploy.yml`, each `push:main` + `workflow_dispatch` → OpenNext build → `wrangler deploy`, workers `ebda-web` / `ebda-admin` / `ebda-orders` / `ebda-marketing`) + the **API, also Cloudflare Workers** (`cf-api-deploy.yml`, `ebda-api` — **`workflow_dispatch`-ONLY**, so a push to `main` does NOT redeploy it; see `docs/migration/railway-actions-deploy.md` for the cutover history — Railway is retired for this app). Plus **Neon Postgres** (project `ebda` = `lucky-truth-54548746`, org `org-proud-silence-64969971` — a SEPARATE Neon org from Ahmad's other projects, since this repo sits in the `Whisky-11` GitHub org; RLS via AsyncLocalStorage, `middleware/tenant-context.ts`) and **Cloudflare R2** for assets.
 
 ## Three rollback paths
 
@@ -8,7 +10,7 @@ This monorepo deploys **web / admin / orders to Cloudflare Workers** (GitHub Act
 
 Use when one Worker (or the API) is broken but the others + DB are fine. There is **NO one-click dashboard "Promote to Production"** like Vercel had — you roll back with the CLI.
 
-Cloudflare Worker (admin / web / orders), from the app dir (e.g. `apps/web`):
+Cloudflare Worker (admin / web / orders / marketing), from the app dir (e.g. `apps/web`):
 
 ```bash
 # roll back to the immediately-previous version (fastest — instant, no rebuild)
@@ -19,21 +21,22 @@ npx wrangler versions list          # find the good version id
 npx wrangler versions deploy <version-id>@100
 ```
 
-> ⚠️ **A `wrangler rollback` / `wrangler versions deploy` is invisible to `cf-deploy.yml`**
-> (issue 2241). Per-app detection diffs from the last SUCCESSFUL run's sha and assumes every
-> worker is current as of it, so the rolled-back worker stays pinned to the old version until
-> some later commit happens to touch its paths — with every run green. Once `main` is fixed,
-> redeploy explicitly with `gh workflow run cf-deploy.yml` (dispatch deploys all three);
-> never rely on the next push.
+> ⚠️ **A `wrangler rollback` / `wrangler versions deploy` is invisible to each `cf-{app}-deploy.yml`.**
+> Its own per-app change-detection diffs from the sha of its last SUCCESSFUL run and assumes
+> the worker is current as of it, so the rolled-back worker stays pinned to the old version
+> until some later commit happens to touch its paths — with every run green. Once `main` is
+> fixed, redeploy explicitly: `gh workflow run cf-{web,admin,orders,marketing,api}-deploy.yml`
+> for whichever app you rolled back; never rely on the next push to catch it.
 
-Railway API fast-path:
+API fast-path (same mechanism, same worker type — `ebda-api` is a Worker, not a Railway service):
 
 ```bash
-railway rollback                    # roll the API service back to the previous deployment
-# or: Railway dashboard → api service → Deployments → redeploy a prior good deploy
+cd apps/api && npx wrangler rollback
+# or pin a specific earlier version:
+npx wrangler versions list && npx wrangler versions deploy <version-id>@100
 ```
 
-⚠️ The admin and storefront often need to be in lock-step (shared API contracts via `@force/shared`). Rolling one Worker back without the other can break SSR fetches. If in doubt, prefer path B (revert the code so all surfaces rebuild from the same commit).
+⚠️ Admin, storefront, orders and the API often need to be in lock-step (shared API contracts via `@force/shared`). Rolling one Worker back without the others can break SSR fetches or API calls. If in doubt, prefer path B (revert the code so all surfaces rebuild from the same commit).
 
 ### B. Git revert + push (~2–5 minutes, all platforms)
 
@@ -52,9 +55,9 @@ git push
 
 Effect:
 
-- `cf-deploy.yml` re-runs on the push and `wrangler deploy`s the reverted web / admin / orders Workers (~3–5 min, only the apps whose paths changed since the last successful `cf-deploy` run)
-- Railway API auto-redeploys from `main` (~2–3 min)
-- Inngest functions auto-redeploy on next API boot
+- `cf-{web,admin,orders,marketing}-deploy.yml` each re-run on the push and `wrangler deploy` the reverted Worker (~3–5 min, only the apps whose paths changed since that workflow's last successful run)
+- the API does **NOT** auto-redeploy (`cf-api-deploy.yml` is `workflow_dispatch`-only) — `scripts/rollback.sh` dispatches it explicitly; a manual `git revert && git push` must also run `gh workflow run cf-api-deploy.yml`, or the API stays on the old commit while the frontends roll back
+- Inngest functions auto-redeploy on next API Worker boot
 - OneSignal apps unchanged (no rebuild)
 
 ### C. Data rollback (PITR first, dump restore as fallback)
@@ -68,52 +71,40 @@ Effect:
 > and cut over — no data-since-backup loss, production untouched while you verify:
 >
 > ```bash
-> ORG=org-lingering-river-25973882; PID=crimson-king-40424588   # fwb-eu
+> ORG=org-proud-silence-64969971; PID=lucky-truth-54548746   # ebda (Whisky-11 Neon org — NOT Ahmad's default org)
 > TS=$(date -u -v-15M +%Y-%m-%dT%H:%M:%SZ)
 > neonctl branches create --project-id "$PID" --org-id "$ORG" --name recover --parent main --timestamp "$TS"
 > # verify, then promote `recover` to primary in the Neon console (or repoint DATABASE_URL). See DB-BACKUP-RESTORE.md.
 > ```
 
-> **DR policy (2026-06-08):** Per-commit Neon snapshot branches (`neon-snapshot.yml`) are **retired** — they were accumulating branch cost without auto-pruning. The dump layer is a daily local `pg_dump` on the developer Mac (launchd `com.forceai.neon-backup`, 3:30am daily, 30-day retention at `~/Desktop/projects/_backups/force-website-builder/`) + a daily encrypted copy to R2. The `neon-snapshot.yml` workflow is disabled. Neon PITR (7-day window, raised 2026-07-06) is the primary recovery mechanism.
+> **DR policy:** the dump layer is a daily local `pg_dump` on the developer Mac (launchd `com.forceai.neon-backup` → `~/.claude/scripts/backup-all-neon.sh`, 3:30am daily, 30-day retention at `~/Desktop/projects/_backups/ebda/`, entry registered in `~/.claude/scripts/lib/backup-projects.sh`) + a daily encrypted copy to R2. Per-commit Neon snapshot branches are NOT used for Ebda. Neon PITR (7-day window) is the primary recovery mechanism; the local dump is belt-and-suspenders for a restore window beyond 7 days or if PITR itself is unavailable.
 
-FWB uses **hand-written migrations** at `packages/database/prisma/migrations/<TS>_<name>/migration.sql`. Since commit `decd870` (2026-05-12), migrations apply automatically via Railway's `preDeployCommand` on every deploy — see "Migration auto-apply check" below. So by the time you notice an issue, the migration is already live.
+Ebda uses **hand-written migrations** at `packages/database/prisma/migrations/<TS>_<name>/migration.sql`. They apply via the normal CI/deploy path, not a Railway `preDeployCommand` (that mechanism belongs to a different, Railway-hosted project and never applied here) — confirm a migration landed by checking `_prisma_migrations` directly:
 
-> ⚠️ **Migration auto-apply check** — verify after EVERY migration-bearing push
->
-> Railway's `railway.json:startCommand` for Dockerfile deploys runs in **exec form**, not shell form. The previous setup (`"startCommand": "npx prisma migrate deploy && node apps/api/dist/index.js"`) was silently broken: `&&` was parsed as a literal argument, so `prisma migrate deploy` ran fine but `node` was never invoked. Three deploys in a row (1066ea5, 44b6462, plus one before) failed health checks this way. The old container kept serving so the failure was invisible until someone watched deploy logs.
->
-> **Current setup** uses `preDeployCommand` (runs migration on a one-off container before the new replica is promoted) + `startCommand` as plain `node apps/api/dist/index.js`.
->
-> After pushing a migration-bearing commit, **watch the Railway deploy logs for the `preDeploy` phase**. You should see:
->
-> ```
-> [preDeploy] npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
-> [preDeploy] Applying migration `<TS>_<name>`
-> ```
->
-> If the preDeploy phase is silent OR shows "No pending migrations to apply." right after a commit that introduces a new migration, the schema-vs-code mismatch will manifest as Prisma `P2022 column does not exist` errors at runtime. Recover with:
->
-> ```bash
-> # apply manually against prod Neon from your local machine
-> cd packages/database && npx prisma migrate deploy --schema=prisma/schema.prisma
-> # DATABASE_URL must point at prod Neon (check apps/api/.env)
-> ```
->
-> See [`feedback-railway-startcommand-exec-form.md`](~/.claude/projects/-Users-ahmadsharaf/memory/feedback-railway-startcommand-exec-form.md) for the full trap explanation.
+```bash
+DATABASE_URL="$(neonctl connection-string main --project-id lucky-truth-54548746 --org-id org-proud-silence-64969971 --role-name neondb_owner --database-name neondb)"
+psql "$DATABASE_URL" -c "select migration_name, finished_at from _prisma_migrations order by finished_at desc limit 5;"
+```
+
+If a migration-bearing commit is live (per `/health`'s `commit`) but its migration is missing from this list, apply it directly:
+
+```bash
+cd packages/database && DATABASE_URL="$DATABASE_URL" DIRECT_URL="$DATABASE_URL" npx prisma migrate deploy --schema=prisma/schema.prisma
+```
 
 ---
 
-Per existing project memory, the project uses `force_app` role for prod (RLS enforced) + `neondb_owner` for migrations (RLS bypass). This doesn't affect rollback mechanics; just be aware which role is touching what.
+Per `docs/ebda/...` and the strict-RLS migration, the project uses `ebda_app` (NOBYPASSRLS, enforced) for prod and `neondb_owner` for migrations/ops (RLS bypass, named hatches only — `withOwnerTx`/`createPrismaClient({ role: 'owner' })`). This doesn't affect rollback mechanics; just be aware which role is touching what.
 
 #### Find the right backup
 
-Backups are stored at `~/Desktop/projects/_backups/force-website-builder/` on the developer Mac, one dump per day, 30-day rotation. Find the dump from before the bad commit:
+Backups are stored at `~/Desktop/projects/_backups/ebda/` on the developer Mac, one dump per day, 30-day rotation. Find the dump from before the bad commit:
 
 ```bash
 # GLOBBED to *.sql.gz — an unglobbed `ls` also lists `.sql.gz.SUSPECT` files
 # (a dump that failed verify-dump.sh, parked by scripts/backup-db.sh), and a
 # fresh one sorts to the top as if it were the most recent good backup.
-ls -lt ~/Desktop/projects/_backups/force-website-builder/*.sql.gz
+ls -lt ~/Desktop/projects/_backups/ebda/*.sql.gz
 # pick the dump timestamped before the bad deploy, then verify it BEFORE
 # trusting it — present + correctly-named is not the same as restorable:
 bash scripts/verify-dump.sh <chosen>.sql.gz
@@ -126,7 +117,7 @@ schema first, then `psql` the dump in a single transaction. (Full walkthrough +
 decrypt-from-R2 variant in [`docs/DB-BACKUP-RESTORE.md`](./DB-BACKUP-RESTORE.md).)
 
 ```bash
-ORG=org-lingering-river-25973882; PID=crimson-king-40424588   # fwb-eu
+ORG=org-proud-silence-64969971; PID=lucky-truth-54548746   # ebda
 export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
 
 # 1. Create a restore-target branch off production (branch name is `main`, not `production`)
@@ -136,7 +127,7 @@ URL=$(neonctl connection-string restore-candidate --project-id "$PID" --org-id "
 
 # 2. Reset schema on the isolated branch, then restore
 psql "$URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-zcat < ~/Desktop/projects/_backups/force-website-builder/<chosen>.sql.gz \
+zcat < ~/Desktop/projects/_backups/ebda/<chosen>.sql.gz \
   | psql "$URL" --single-transaction -v ON_ERROR_STOP=1
 
 # 3. Catch the branch up to head. Both DATABASE_URL and DIRECT_URL must point
@@ -181,7 +172,7 @@ done
 # most of these files — most have no `DROP POLICY IF EXISTS`).
 ```
 
-⚠️ **Restore is destructive to writes since the backup:** orders placed, products edited, store settings changed, R2 uploads referenced from new schema rows — all lost on restore. For FWB this means **per-tenant data loss across multiple stores**. Coordinate with the Force team before doing this.
+⚠️ **Restore is destructive to writes since the backup:** orders placed, products edited, store settings changed, R2 uploads referenced from new schema rows — all lost on restore. For Ebda this means **per-tenant data loss across every merchant's store**, not just one. Coordinate with Ahmad before doing this.
 
 If write data since the backup must be preserved:
 
@@ -194,8 +185,11 @@ If write data since the backup must be preserved:
 If the bad migration referenced new R2 keys (per-tenant uploads to `stores/<storeId>/...`), the R2 objects survive the DB rollback. Run the orphan audit after restore — **dry run first**, review the orphan list it writes, and only then re-run with `--apply` (deletes are irreversible; the audit's idea of "referenced" is only as complete as the `R2_REFERENCE_COLUMNS` registry in `apps/api/src/lib/r2-references.ts`):
 
 ```bash
-railway run --service api -- npx tsx ../../scripts/r2-orphan-audit.ts          # dry run: review /tmp/r2-orphans-*.txt
-railway run --service api -- npx tsx ../../scripts/r2-orphan-audit.ts --apply  # only after the review
+# The API is a Worker now (no Railway exec shell) — run it locally against prod,
+# with prod's R2 + DATABASE_URL env vars exported (see scripts/r2-orphan-audit.ts's
+# header for the exact variable names):
+npx tsx scripts/r2-orphan-audit.ts          # dry run: review /tmp/r2-orphans-*.txt
+npx tsx scripts/r2-orphan-audit.ts --apply  # only after the review
 ```
 
 #### Then revert the code
