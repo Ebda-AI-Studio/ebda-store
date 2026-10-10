@@ -34,7 +34,20 @@ import { DEFAULT_TRIAL_CHOICE, type TrialChoice } from './billing/trial';
 /** A self-serve owner may hold this many stores (abuse bound; raise with plans). */
 export const MAX_SELF_SERVE_STORES_PER_OWNER = 3;
 
-export const SELF_SERVE_TEMPLATES = ['modern', 'classic', 'minimal', 'bold', 'elegant'] as const;
+// Bug 8 (editor P1s): kept in sync with the onboarding TemplateStep's
+// TEMPLATE_IDS and the platform-wide TemplateId union (`@force/shared`) —
+// this was missing `dahab`, which would have 400'd the very first caller to
+// wire a `template` query param (e.g. a marketing deep link) into
+// `POST /onboarding/store` even though the wizard's own template step
+// already offers Dahab.
+export const SELF_SERVE_TEMPLATES = [
+  'modern',
+  'classic',
+  'minimal',
+  'bold',
+  'elegant',
+  'dahab',
+] as const;
 export type SelfServeTemplate = (typeof SELF_SERVE_TEMPLATES)[number];
 
 export type SlugAvailability =

@@ -13,6 +13,10 @@ const PREVIEW: Record<TemplateId, string> = {
   minimal: 'rounded-sm',
   bold: 'rounded-lg',
   elegant: 'rounded-t-xl',
+  // Gold-on-night preview frame; the real palette arrives with the Dahab
+  // family preset (Ruling DAHAB-3) — this is the same illustrative swatch
+  // treatment as every other template, not a palette commitment.
+  dahab: 'rounded-t-xl border-[#C9A35E]/60',
 };
 
 export function TemplateStep({

@@ -12,7 +12,7 @@ export const STEP_ORDER: readonly StepKey[] = [
   'live',
 ];
 
-export type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
+export type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' | 'dahab';
 
 export const TEMPLATE_IDS: readonly TemplateId[] = [
   'modern',
@@ -20,6 +20,7 @@ export const TEMPLATE_IDS: readonly TemplateId[] = [
   'minimal',
   'bold',
   'elegant',
+  'dahab',
 ];
 
 export interface OnboardingStore {
