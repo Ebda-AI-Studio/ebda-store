@@ -28,6 +28,10 @@ import { useLastListing } from '../../hooks/useLastListing';
 import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
 import { resolveColor, checkMinimumOrder, computeOrderAmounts } from '@force/shared';
+import {
+  deriveAcceptedPaymentBadges,
+  type PaymentConfigResponse,
+} from '@/lib/accepted-payment-badges';
 
 export default function CartClient() {
   const {
@@ -145,6 +149,14 @@ export default function CartClient() {
   const [shippingFee, setShippingFee] = useState(0);
   const [freeShippingThreshold, setFreeShippingThreshold] = useState(0);
   const [shippingLoaded, setShippingLoaded] = useState(false);
+  // Real "We Accept" badges (bug: a COD-only store showed Visa/Mastercard/
+  // Meeza/Fawry regardless of what was actually configured — a hardcoded
+  // fallback list, same class of bug `PaymentStep` already avoids for the
+  // checkout's own provider picker: "never fall back to a visual mock that
+  // the backend would 400 on"). `null` = not loaded yet (render nothing).
+  const [acceptedMethods, setAcceptedMethods] = useState<
+    { label: string; labelAr: string }[] | null
+  >(null);
   const { info, success, error: errorToast } = useToast();
 
   // Cart mutations optimistically update, reconcile via refetch, then re-throw
@@ -344,6 +356,26 @@ export default function CartClient() {
     }
     if (store.id) {
       fetchShipping();
+    }
+  }, [store.id]);
+
+  // Fetch the REAL configured payment methods for the "We Accept" badges —
+  // same `/payments/config` endpoint the checkout PaymentStep already uses
+  // as its only source of truth, so a COD-only store never implies a card
+  // capability it doesn't have.
+  useEffect(() => {
+    async function fetchPaymentMethods() {
+      try {
+        const result = await api.get<PaymentConfigResponse>('/payments/config');
+        if (!result.success || !result.data) return;
+        setAcceptedMethods(deriveAcceptedPaymentBadges(result.data));
+      } catch {
+        // Leave acceptedMethods null — the badge block renders nothing
+        // rather than guessing at unconfigured capabilities.
+      }
+    }
+    if (store.id) {
+      fetchPaymentMethods();
     }
   }, [store.id]);
 
@@ -1172,25 +1204,28 @@ export default function CartClient() {
                       </p>
                       <div className="flex flex-wrap items-center justify-center gap-3">
                         {(() => {
-                          // Customer-facing payment METHODS (not gateways). The
-                          // Egypt default is correct for most stores; a merchant
-                          // can override via settings.acceptedPaymentMethods.
+                          // Customer-facing payment METHODS (not gateways). A
+                          // merchant override always wins; otherwise this
+                          // reflects what `/payments/config` actually reports
+                          // for THIS store — never a guessed card-brand list
+                          // (bug: a COD-only store showed Visa/Mastercard
+                          // regardless of configuration).
                           const configured = Array.isArray(
                             (store?.settings as Record<string, unknown>)?.acceptedPaymentMethods
                           )
                             ? ((store!.settings as Record<string, unknown>)
                                 .acceptedPaymentMethods as string[])
                             : null;
-                          const methods =
+                          const methods: { label: string; labelAr: string }[] =
                             configured && configured.length
-                              ? configured
-                              : ['Visa', 'Mastercard', 'Meeza', 'Fawry'];
+                              ? configured.map(m => ({ label: m, labelAr: m }))
+                              : (acceptedMethods ?? []);
                           return methods.map(method => (
                             <div
-                              key={method}
+                              key={method.label}
                               className="flex h-8 items-center rounded-md bg-muted px-3 text-xs font-medium text-muted-foreground"
                             >
-                              {method}
+                              {t(method.label, method.labelAr)}
                             </div>
                           ));
                         })()}
