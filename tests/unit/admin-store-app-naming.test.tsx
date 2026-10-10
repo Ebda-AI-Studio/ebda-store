@@ -46,6 +46,7 @@ vi.mock('../../apps/admin/src/app/providers', () => ({ Providers: () => null }))
 vi.mock('../../apps/admin/src/styles/globals.css', () => ({}));
 
 import { productName, pageTitle } from '../../apps/admin/src/lib/product-name';
+import { SidebarHeader } from '../../apps/admin/src/components/admin-layout/SidebarHeader';
 import { DocumentTitle } from '../../apps/admin/src/components/DocumentTitle';
 import AdminLanguageSwitcher from '../../apps/admin/src/components/AdminLanguageSwitcher';
 import manifest from '../../apps/admin/src/app/manifest';
@@ -99,9 +100,12 @@ describe.each(LOCALES)('%s surfaces', loc => {
     expect(document.title).toBe(`Orders · ${NAME[loc]}`);
   });
 
-  it('sidebar product label (prefix + brand) spells the product name', () => {
-    const c = (loc === 'en' ? en : ar).components.adminLayout;
-    expect(`${c.forceBrandPrefix} ${c.forceAdminBrand}`).toBe(NAME[loc]);
+  it('sidebar renders the product name once', () => {
+    const { container } = render(
+      <SidebarHeader mode="store_admin" isStoreAdminWithBranding={false} />
+    );
+    expect(screen.getByText(NAME[loc])).toBeTruthy();
+    expect(container.textContent).not.toMatch(/Store Store|ستور ستور/);
   });
 
   it('product-naming copy carries no "Admin"', () => {
