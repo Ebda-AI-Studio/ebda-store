@@ -90,8 +90,7 @@ export function useBuilderDocument(storeId: string) {
   const [dataEpoch, setDataEpoch] = useState(0);
   const savedRef = useRef<PageDefinition | null>(null);
   const revRef = useRef(0);
-  // The tail of every save requested so far (autosave AND flush/publish):
-  // the single-flight queue bug fix below (REV_CONFLICT false positive).
+  // One queue owns draft saves AND publication so our own writes never race.
   const pendingSave = useRef<Promise<boolean> | null>(null);
   const pendingReload = useRef(false);
   const saveStateRef = useRef<SaveState>('loading');
@@ -179,79 +178,85 @@ export function useBuilderDocument(storeId: string) {
     [base]
   );
 
-  // Single-flight save queue: EVERY save request (autosave timer AND
-  // flush/publish) chains onto the SAME `pendingSave` tail instead of ever
-  // firing concurrently. Two concurrent `PUT …/draft` calls would both read
-  // the SAME stale `revRef.current` as their `baseRev` (the first hasn't
-  // resolved yet to bump it), so the second always loses to the first with a
-  // 409 REV_CONFLICT — a false "another editor changed this page" on a slow
-  // network, caused entirely by the client's own un-sequenced saves.
-  // Chaining with `.then(run, run)` defers reading `revRef.current` until
-  // the queued save actually runs, by which point the save ahead of it has
-  // already updated it (`saveNow` sets `revRef.current` synchronously before
-  // resolving) — so the queued save's `baseRev` is always fresh.
-  const enqueueSave = useCallback(
-    (definition: PageDefinition): Promise<boolean> => {
-      const run = (): Promise<boolean> =>
-        saveStateRef.current === 'conflict'
-          ? Promise.resolve(false)
-          : saveNow(definition, revRef.current);
-      const next = (pendingSave.current ?? Promise.resolve(true)).then(run, run);
-      pendingSave.current = next;
-      void next.finally(() => {
-        if (pendingSave.current === next) pendingSave.current = null;
-      });
-      return next;
-    },
-    [saveNow]
-  );
+  const enqueueWrite = useCallback((run: () => Promise<boolean>): Promise<boolean> => {
+    const next = (pendingSave.current ?? Promise.resolve(true)).then(run, run);
+    pendingSave.current = next;
+    const clear = () => {
+      if (pendingSave.current === next) pendingSave.current = null;
+    };
+    void next.then(clear, clear);
+    return next;
+  }, []);
+
+  // Read the current history when the queued write executes, not when it
+  // was requested. Edits made during a slow save must never be overwritten
+  // by an older captured snapshot. Keep saving until publication can use
+  // the latest document; later autosaves wait behind the publish request.
+  const saveLatest = useCallback(async (): Promise<boolean> => {
+    if (saveStateRef.current === 'conflict') return false;
+    let ok = saveStateRef.current !== 'error';
+    let current = historyRef.current?.present;
+    while (current && current !== savedRef.current) {
+      if (!(await saveNow(current, revRef.current))) return false;
+      ok = true;
+      current = historyRef.current?.present;
+    }
+    return ok;
+  }, [saveNow]);
+
+  const enqueueSave = useCallback(() => enqueueWrite(saveLatest), [enqueueWrite, saveLatest]);
 
   // Autosave: debounce after the last edit; never while a conflict is open.
   useEffect(() => {
     if (!doc || doc === savedRef.current) return;
     if (saveState === 'conflict' || saveState === 'loading') return;
     setSaveState(s => (s === 'saving' ? s : 'dirty'));
-    const timer = window.setTimeout(() => void enqueueSave(doc), AUTOSAVE_MS);
+    const timer = window.setTimeout(() => void enqueueSave(), AUTOSAVE_MS);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- saveState transitions must not re-arm the timer
-  }, [doc, enqueueSave]);
-
-  const flush = useCallback(async (): Promise<boolean> => {
-    if (pendingSave.current) await pendingSave.current;
-    if (doc && doc !== savedRef.current && saveStateRef.current !== 'conflict')
-      return enqueueSave(doc);
-    return saveStateRef.current !== 'conflict' && saveStateRef.current !== 'error';
   }, [doc, enqueueSave]);
 
   const publish = useCallback(async (): Promise<'ok' | 'failed' | 'conflict'> => {
     setPublishing(true);
     try {
-      if (!(await flush())) return saveStateRef.current === 'conflict' ? 'conflict' : 'failed';
-      const res = await apiPost<{ rev: number }>(`${base}/publish`, { baseRev: revRef.current });
-      if (res.error) {
-        if (res.error.code === 'REV_CONFLICT') {
-          setConflict((res.error.details as { latest?: PageState } | undefined)?.latest ?? null);
-          setSaveState('conflict');
-          return 'conflict';
+      let outcome: 'ok' | 'failed' | 'conflict' = 'failed';
+      await enqueueWrite(async () => {
+        if (!(await saveLatest())) {
+          outcome = saveStateRef.current === 'conflict' ? 'conflict' : 'failed';
+          return false;
         }
-        // Nothing to publish: the draft equals what is live.
-        if (res.error.code === 'NO_DRAFT') return 'ok';
-        // e.g. INVALID_DEFINITION / MISSING_IMAGE: the draft saved fine (it's
-        // allowed to be incomplete) but isn't publish-ready. Surface the same
-        // field-level errors saveNow's own 422 path sets, so SettingsPanel
-        // highlights the exact slide/field instead of a bare "publish failed"
-        // toast with no indication of what to fix.
-        const errs = (res.error.details as { errors?: BuilderIssue[] } | undefined)?.errors ?? [];
-        if (errs.length > 0) setErrors(errs);
-        setSaveState('error');
-        return 'failed';
-      }
-      setPublishedRev(res.data!.rev);
-      return 'ok';
+        const res = await apiPost<{ rev: number }>(`${base}/publish`, { baseRev: revRef.current });
+        if (res.error) {
+          if (res.error.code === 'REV_CONFLICT') {
+            setConflict((res.error.details as { latest?: PageState } | undefined)?.latest ?? null);
+            setSaveState('conflict');
+            outcome = 'conflict';
+            return false;
+          }
+          // Nothing to publish: the draft equals what is live.
+          if (res.error.code === 'NO_DRAFT') {
+            outcome = 'ok';
+            return true;
+          }
+          // e.g. INVALID_DEFINITION / MISSING_IMAGE: the draft saved fine (it's
+          // allowed to be incomplete) but isn't publish-ready. Surface the same
+          // field-level errors saveNow's own 422 path sets, so SettingsPanel
+          // highlights the exact slide/field instead of a bare "publish failed"
+          // toast with no indication of what to fix.
+          const errs = (res.error.details as { errors?: BuilderIssue[] } | undefined)?.errors ?? [];
+          if (errs.length > 0) setErrors(errs);
+          setSaveState('error');
+          return false;
+        }
+        setPublishedRev(res.data!.rev);
+        outcome = 'ok';
+        return true;
+      });
+      return outcome;
     } finally {
       setPublishing(false);
     }
-  }, [base, flush]);
+  }, [base, enqueueWrite, saveLatest]);
 
   /** Conflict choice 1: drop my edits, open the server's latest. */
   const takeTheirs = useCallback(() => {
@@ -268,10 +273,12 @@ export function useBuilderDocument(storeId: string) {
     if (!conflict || !doc) return;
     const latestRev = conflict.rev;
     setConflict(null);
-    setRev(latestRev);
-    revRef.current = latestRev;
-    await saveNow(doc, latestRev);
-  }, [conflict, doc, saveNow]);
+    await enqueueWrite(async () => {
+      setRev(latestRev);
+      revRef.current = latestRev;
+      return saveNow(historyRef.current?.present ?? doc, latestRev);
+    });
+  }, [conflict, doc, enqueueWrite, saveNow]);
 
   const dirty = !!doc && doc !== savedRef.current;
 
