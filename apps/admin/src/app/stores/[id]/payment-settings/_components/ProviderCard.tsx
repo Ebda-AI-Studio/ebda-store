@@ -3,7 +3,7 @@
 import { Alert } from '../../../../../components/Alert';
 import { useT } from '@/i18n/useT';
 
-import { minorToDecimalString, roundToMinor } from '@force/shared';
+import { INSTAPAY_DEFAULT_EXPIRY_HOURS, minorToDecimalString, roundToMinor } from '@force/shared';
 
 export interface StorePaymentConfig {
   id?: string;
@@ -333,11 +333,14 @@ function InstapayFields({
             type="number"
             min={1}
             max={336}
-            value={settingNumber(form, 'expiryHours') || 48}
+            value={settingNumber(form, 'expiryHours') || INSTAPAY_DEFAULT_EXPIRY_HOURS}
             onChange={e =>
               setSetting(
                 'expiryHours',
-                Math.min(336, Math.max(1, Math.floor(Number(e.target.value) || 48)))
+                Math.min(
+                  336,
+                  Math.max(1, Math.floor(Number(e.target.value) || INSTAPAY_DEFAULT_EXPIRY_HOURS))
+                )
               )
             }
             className="w-32 rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"

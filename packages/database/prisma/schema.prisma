@@ -1566,6 +1566,16 @@ model Order {
 
   source String? @default("web") // provenance: 'web' | 'agent' — audit only
 
+  // Normalized client IP captured at order-creation time (never from client
+  // input — the server's own view of the connection, mirroring the
+  // `ipKeyGenerator(req.ip)` convention already used by every rate limiter in
+  // `middleware/security.ts`). NULL for orders created before this column and
+  // for non-HTTP paths with no request (admin manual orders, scripts). Used
+  // ONLY by the open-unpaid-hold cap (`lib/stock-hold-cap.ts`) to catch an
+  // abuser who varies phone/email across a guest-checkout run — never shown
+  // to a merchant or customer, never used for anything else.
+  checkoutIp String? @map("checkout_ip")
+
   // Relations
   store               Store                @relation(fields: [storeId], references: [id], onDelete: Restrict)
   customer            User?                @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -1594,6 +1604,9 @@ model Order {
   @@index([storeId, paymentGatewayAbandonedAt])
   // InstaPay expiry sweep: the awaiting orders whose hold has run out.
   @@index([paymentConfirmationExpiresAt])
+  // Open-unpaid-hold cap (lib/stock-hold-cap.ts): counts a store's open
+  // pending/awaiting-confirmation unpaid orders by checkout IP.
+  @@index([storeId, checkoutIp])
   // FK-only index for the Promotion delete RI trigger, which filters on
   // `applied_promotion_id` alone. `orders` is the largest table in the schema,
   // so the unindexed variant of this scan is the worst of the five.

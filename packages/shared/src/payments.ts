@@ -28,8 +28,16 @@ export function isAwaitingPaymentConfirmation(status: string | null | undefined)
   return status === AWAITING_PAYMENT_CONFIRMATION;
 }
 
-/** How long an InstaPay order waits for the merchant's confirmation before it expires. */
-export const INSTAPAY_DEFAULT_EXPIRY_HOURS = 48;
+/**
+ * How long an InstaPay order waits for the merchant's confirmation before it
+ * expires. Shortened 48h -> 24h (stock-hold abuse fix): a manual-transfer hold
+ * has no payment captured and no cap-independent bound on its own, so the
+ * default window itself is tightened alongside the open-hold cap in
+ * `apps/api/src/lib/stock-hold-cap.ts`. Still a per-store override
+ * (`expiryHours` in `instapaySettingsBaseSchema`), not a hardcoded constant a
+ * merchant cannot change.
+ */
+export const INSTAPAY_DEFAULT_EXPIRY_HOURS = 24;
 export const INSTAPAY_MIN_EXPIRY_HOURS = 1;
 /** Two weeks: a longer hold would pin stock for a transfer that is almost surely never coming. */
 export const INSTAPAY_MAX_EXPIRY_HOURS = 24 * 14;

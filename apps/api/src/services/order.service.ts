@@ -69,6 +69,7 @@ import { amountOnlyRefundKey } from '../lib/refund-methods';
 import { lineUnitCost } from '../lib/order-line-cost';
 import { customerKeyOf } from '../lib/customer-key';
 import { SmsConsentService } from './sms-consent.service';
+import { assertStockHoldCapNotExceeded } from '../lib/stock-hold-cap';
 
 /**
  * Bust the storefront product caches (list / detail / suggest — all carry
@@ -584,7 +585,16 @@ export class OrderService {
     customerId: string | undefined,
     sessionId: string,
     data: CreateOrderData,
-    referralCode?: string
+    referralCode?: string,
+    /**
+     * Server-observed client IP, never client-supplied — threaded through
+     * from the route (`ipKeyGenerator(req.ip)`, same normalisation every
+     * rate limiter in `middleware/security.ts` already uses). Optional:
+     * non-HTTP callers (admin manual orders use `createAdminOrder`, not this
+     * method; a future script) simply get no IP signal in the stock-hold cap
+     * below.
+     */
+    requestContext?: { checkoutIp?: string | null }
   ) {
     await assertOrderAllowed(storeId);
     // One stored phone form (ruling MONEYB-7): E.164 for an Egyptian mobile,
@@ -604,6 +614,18 @@ export class OrderService {
           }
         : {}),
     };
+
+    // Stock-hold abuse fix: for COD/InstaPay (no synchronous payment capture)
+    // reject a NEW order once the caller already has too many open unpaid
+    // holds on this store by phone, email OR IP. Runs before any cart/stock
+    // read so an abusive run never reaches inventory. See stock-hold-cap.ts
+    // for why only these two methods are capped and why no identity → no-op.
+    await assertStockHoldCapNotExceeded(prisma, storeId, data.paymentMethod, {
+      phone: data.shippingAddress.phone,
+      email: typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null,
+      ip: requestContext?.checkoutIp ?? null,
+    });
+
     // Get cart
     const cart = await CartService.getOrCreate(storeId, sessionId, customerId);
     // Raw CartBundle rows ({ id, bundleId, quantity } — one per BOX type in
@@ -1481,6 +1503,9 @@ export class OrderService {
             locale: data.locale ?? null,
             smsOptIn: data.smsOptIn ?? false,
             source: data.source ?? 'web',
+            // Stock-hold cap signal (lib/stock-hold-cap.ts) — never read for
+            // anything else. NULL when the caller passed none.
+            checkoutIp: requestContext?.checkoutIp ?? null,
             shippingAddress: data.shippingAddress,
             billingAddress: data.billingAddress || data.shippingAddress,
             notes: data.notes,

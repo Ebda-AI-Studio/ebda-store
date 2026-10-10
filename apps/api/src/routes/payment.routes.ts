@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { storefrontOrigin } from '@force/shared';
+import { INSTAPAY_DEFAULT_EXPIRY_HOURS, storefrontOrigin } from '@force/shared';
 import { z } from 'zod';
 import { CardTestingGuard } from '../services/card-testing-guard.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
@@ -207,7 +207,7 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
       instapayConfig = {
         displayName: ip.displayName || 'InstaPay',
         displayNameAr: ip.displayNameAr ?? 'إنستاباي',
-        expiryHours: Number.isFinite(hours) && hours > 0 ? hours : 48,
+        expiryHours: Number.isFinite(hours) && hours > 0 ? hours : INSTAPAY_DEFAULT_EXPIRY_HOURS,
       };
     }
   }
