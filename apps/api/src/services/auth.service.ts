@@ -1558,6 +1558,42 @@ export class AuthService {
   }
 
   /**
+   * Create a single-use password-set/reset token for a known account and store
+   * its hash as a `reset:<hash>` RefreshToken row (redeemed by `resetPassword`,
+   * same as a self-service "forgot password"). Only the SHA-256 is stored; the
+   * plaintext is returned here for the caller to put in an email and nowhere
+   * else. Shared by `requestPasswordReset` (self-service) and the staff-invite
+   * flow (owner-initiated) — both end up on the exact same redemption path.
+   */
+  private static async issuePasswordSetToken(userId: string): Promise<string> {
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const resetExpires = new Date(Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000);
+
+    await withUser(userId, tx =>
+      tx.refreshToken.create({
+        data: {
+          token: `reset:${resetTokenHash}`,
+          userId,
+          expiresAt: resetExpires,
+        },
+      })
+    );
+    return resetToken;
+  }
+
+  /**
+   * Issue a password-set link for a brand-new staff account (lens-2 "staff
+   * invite consent", 2026-09-22 security audit): until this, a staff account
+   * created without an owner-supplied password got one nobody — not even the
+   * invitee — knew, with no invite-token flow to discover it existed. Reuses
+   * the exact same token + redemption path as a self-service password reset.
+   */
+  static async issueStaffInviteToken(userId: string): Promise<string> {
+    return this.issuePasswordSetToken(userId);
+  }
+
+  /**
    * Issue a password-reset link. Returns the account id when one was found (for
    * the caller's audit row only; the HTTP answer never depends on it).
    *
@@ -1594,22 +1630,7 @@ export class AuthService {
       return null;
     }
 
-    // Generate reset token. Only its SHA-256 is stored; the plaintext exists
-    // in the mail alone.
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
-    const resetExpires = new Date(Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000);
-
-    // Store reset token as a special refresh token
-    await withUser(user.id, tx =>
-      tx.refreshToken.create({
-        data: {
-          token: `reset:${resetTokenHash}`,
-          userId: user.id,
-          expiresAt: resetExpires,
-        },
-      })
-    );
+    const resetToken = await this.issuePasswordSetToken(user.id);
 
     const name = `${user.firstName} ${user.lastName}`.trim() || user.email;
     const language = (user.language as 'en' | 'ar' | undefined) ?? undefined;

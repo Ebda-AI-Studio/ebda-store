@@ -21,6 +21,7 @@ import { ResendService } from './resend.service';
 import { EmailService, renderBrandedShell } from './email.service';
 import { emailVerificationTemplate } from './email-templates/email-verification';
 import { passwordResetTemplate } from './email-templates/password-reset';
+import { staffInviteTemplate, type StaffInviteData } from './email-templates/staff-invite';
 import { escapeHtml } from './email-templates/_util';
 
 export interface CapturedMail {
@@ -203,6 +204,39 @@ export async function sendMerchantPasswordResetEmail(
     {
       to: data.email,
       subject: passwordResetTemplate.subject[lang](data, ''),
+      html,
+      replyTo: BRAND.supportEmail,
+    },
+    { redactLinkInLog: true }
+  );
+}
+
+/**
+ * Sent whenever a store owner adds someone as staff (R-EBDA lens-2 "staff
+ * invite consent", 2026-09-22 security audit: there was no invite-token flow
+ * at all — a staff account could be created with a password nobody but the
+ * owner knew, with no way for the invitee to discover they had an account
+ * except guessing "forgot password"). Always notified now; carries a working
+ * set-password link for a brand-new account, or none when the account already
+ * has a password (added to a second store).
+ */
+export async function sendStaffInviteEmail(data: StaffInviteData, language?: Lang): Promise<void> {
+  const lang: Lang = language ?? resolveDefaultLanguage(undefined);
+  const content = staffInviteTemplate[lang](data);
+  const html = renderBrandedShell(content, {
+    name: BRAND.product.nameEn,
+    nameAr: null,
+    logo: BRAND_EMAIL_LOGO_URL,
+    theme: null,
+    email: null,
+    phone: null,
+    address: null,
+    defaultLanguage: lang,
+  });
+  await deliver(
+    {
+      to: data.email,
+      subject: staffInviteTemplate.subject[lang](data),
       html,
       replyTo: BRAND.supportEmail,
     },
