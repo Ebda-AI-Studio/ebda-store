@@ -90,9 +90,13 @@ export function useBuilderDocument(storeId: string) {
   const [dataEpoch, setDataEpoch] = useState(0);
   const savedRef = useRef<PageDefinition | null>(null);
   const revRef = useRef(0);
-  const inFlight = useRef<Promise<boolean> | null>(null);
+  // The tail of every save requested so far (autosave AND flush/publish):
+  // the single-flight queue bug fix below (REV_CONFLICT false positive).
+  const pendingSave = useRef<Promise<boolean> | null>(null);
   const pendingReload = useRef(false);
+  const saveStateRef = useRef<SaveState>('loading');
   revRef.current = rev;
+  saveStateRef.current = saveState;
 
   const load = useCallback(async () => {
     setSaveState('loading');
@@ -175,33 +179,54 @@ export function useBuilderDocument(storeId: string) {
     [base]
   );
 
+  // Single-flight save queue: EVERY save request (autosave timer AND
+  // flush/publish) chains onto the SAME `pendingSave` tail instead of ever
+  // firing concurrently. Two concurrent `PUT …/draft` calls would both read
+  // the SAME stale `revRef.current` as their `baseRev` (the first hasn't
+  // resolved yet to bump it), so the second always loses to the first with a
+  // 409 REV_CONFLICT — a false "another editor changed this page" on a slow
+  // network, caused entirely by the client's own un-sequenced saves.
+  // Chaining with `.then(run, run)` defers reading `revRef.current` until
+  // the queued save actually runs, by which point the save ahead of it has
+  // already updated it (`saveNow` sets `revRef.current` synchronously before
+  // resolving) — so the queued save's `baseRev` is always fresh.
+  const enqueueSave = useCallback(
+    (definition: PageDefinition): Promise<boolean> => {
+      const run = (): Promise<boolean> =>
+        saveStateRef.current === 'conflict'
+          ? Promise.resolve(false)
+          : saveNow(definition, revRef.current);
+      const next = (pendingSave.current ?? Promise.resolve(true)).then(run, run);
+      pendingSave.current = next;
+      void next.finally(() => {
+        if (pendingSave.current === next) pendingSave.current = null;
+      });
+      return next;
+    },
+    [saveNow]
+  );
+
   // Autosave: debounce after the last edit; never while a conflict is open.
   useEffect(() => {
     if (!doc || doc === savedRef.current) return;
     if (saveState === 'conflict' || saveState === 'loading') return;
     setSaveState(s => (s === 'saving' ? s : 'dirty'));
-    const timer = window.setTimeout(() => {
-      const p = saveNow(doc, revRef.current);
-      inFlight.current = p;
-      void p.finally(() => {
-        if (inFlight.current === p) inFlight.current = null;
-      });
-    }, AUTOSAVE_MS);
+    const timer = window.setTimeout(() => void enqueueSave(doc), AUTOSAVE_MS);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- saveState transitions must not re-arm the timer
-  }, [doc, saveNow]);
+  }, [doc, enqueueSave]);
 
   const flush = useCallback(async (): Promise<boolean> => {
-    if (inFlight.current) await inFlight.current;
-    if (doc && doc !== savedRef.current && saveState !== 'conflict')
-      return saveNow(doc, revRef.current);
-    return saveState !== 'conflict' && saveState !== 'error';
-  }, [doc, saveNow, saveState]);
+    if (pendingSave.current) await pendingSave.current;
+    if (doc && doc !== savedRef.current && saveStateRef.current !== 'conflict')
+      return enqueueSave(doc);
+    return saveStateRef.current !== 'conflict' && saveStateRef.current !== 'error';
+  }, [doc, enqueueSave]);
 
   const publish = useCallback(async (): Promise<'ok' | 'failed' | 'conflict'> => {
     setPublishing(true);
     try {
-      if (!(await flush())) return saveState === 'conflict' ? 'conflict' : 'failed';
+      if (!(await flush())) return saveStateRef.current === 'conflict' ? 'conflict' : 'failed';
       const res = await apiPost<{ rev: number }>(`${base}/publish`, { baseRev: revRef.current });
       if (res.error) {
         if (res.error.code === 'REV_CONFLICT') {
@@ -218,7 +243,7 @@ export function useBuilderDocument(storeId: string) {
     } finally {
       setPublishing(false);
     }
-  }, [base, flush, saveState]);
+  }, [base, flush]);
 
   /** Conflict choice 1: drop my edits, open the server's latest. */
   const takeTheirs = useCallback(() => {

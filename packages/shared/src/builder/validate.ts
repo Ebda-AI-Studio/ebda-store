@@ -40,7 +40,8 @@ export interface BuilderIssue {
     | 'BLOCK_NOT_SUPPORTED'
     | 'GROUP_MISMATCH'
     | 'PROPS_INVALID'
-    | 'REF_NOT_FOUND';
+    | 'REF_NOT_FOUND'
+    | 'MISSING_IMAGE';
   path: string;
   messageEn: string;
   messageAr: string;
@@ -303,6 +304,42 @@ export function validateDefinitionSync(input: unknown): ValidationResult {
   scanValue(def.siteSettings, '/siteSettings', '', errors);
 
   return { ok: errors.length === 0, definition: def, errors, warnings };
+}
+
+/**
+ * Publish-only readiness checks beyond structural validity. Some things are
+ * fine to leave incomplete in a DRAFT (a hero slide added but not yet given
+ * an image — `heroSlideSchema.image` is optional precisely so autosave can
+ * persist that in-progress state) but must never reach the live storefront.
+ * Kept separate from `validateDefinition`/`validateDefinitionSync` so
+ * autosave never blocks on an edit still in progress; callers run this
+ * ADDITIONALLY, only at publish time.
+ */
+export function validatePublishReadiness(def: PageDefinition): BuilderIssue[] {
+  const errors: BuilderIssue[] = [];
+  const visit = (nodes: SectionNode[], base: string) => {
+    nodes.forEach((n, i) => {
+      if (n.hidden || n.type !== 'hero') return;
+      (n.blocks ?? []).forEach((b, j) => {
+        if (b.hidden || b.type !== 'slide') return;
+        const image = (b.settings as Record<string, unknown>).image;
+        if (typeof image !== 'string' || image.trim() === '') {
+          errors.push(
+            issue(
+              'MISSING_IMAGE',
+              `${base}/${i}/blocks/${j}/settings/image`,
+              'Add an image to this hero slide before publishing.',
+              'أضف صورة لهذه الشريحة قبل النشر.'
+            )
+          );
+        }
+      });
+    });
+  };
+  visit(def.sectionGroups.header, '/sectionGroups/header');
+  visit(def.sections, '/sections');
+  visit(def.sectionGroups.footer, '/sectionGroups/footer');
+  return errors;
 }
 
 /** Section types whose settings hold catalogue refs (`categorySlug` / `manualProductIds`). */

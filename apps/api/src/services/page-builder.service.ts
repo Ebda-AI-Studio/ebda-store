@@ -41,6 +41,7 @@ import {
   publishedDocumentAgrees,
   resolveLayoutSettings,
   validateDefinition,
+  validatePublishReadiness,
   type BuilderIssue,
   type PageDefinition,
   type StoreLayoutSettings,
@@ -393,6 +394,17 @@ export async function publishDraft(args: {
       message: 'The draft is invalid',
       errors: v.errors,
     };
+  // Structurally valid is not publish-ready: a draft may still hold a hero
+  // slide with no image chosen yet (allowed so autosave can persist it).
+  const readinessErrors = validatePublishReadiness(v.definition);
+  if (readinessErrors.length > 0)
+    return {
+      ok: false,
+      status: 422,
+      code: 'INVALID_DEFINITION',
+      message: 'The draft is not ready to publish',
+      errors: readinessErrors,
+    };
 
   const outcome = await promote(storeId, pageKey, async () => {
     const { count } = await prisma.storePageRevision.updateMany({
@@ -512,13 +524,16 @@ export async function rollbackToRevision(args: {
  * The legacy `PUT /admin/stores/:id/layout` path. It keeps its contract
  * (patch merge, no rev) but its write becomes a published revision, so the
  * revision history and `layout_settings` never diverge. Returns 'conflict'
- * only when it lost a race with a concurrent publish (the caller answers 409).
+ * only when it lost a race with a concurrent publish (the caller answers 409),
+ * or 'invalid' when the merged document isn't publish-ready (e.g. a hero
+ * slide with no image — this path has no separate draft state, so it must
+ * refuse rather than publish an incomplete slide; the caller answers 422).
  */
 export async function publishLegacyLayout(args: {
   storeId: string;
   layout: StoreLayoutSettings;
   userId: string | null;
-}): Promise<'ok' | 'conflict'> {
+}): Promise<'ok' | 'conflict' | { invalid: BuilderIssue[] }> {
   const { storeId, layout } = args;
   const { head, draft, published } = await loadRows(storeId, HOME_PAGE_KEY);
   // The layout knows nothing about document-only sections (image-text,
@@ -526,6 +541,8 @@ export async function publishLegacyLayout(args: {
   // would delete them.
   const previous = (draft ?? published)?.document as PageDefinition | undefined;
   const definition = mergeDocumentOnlySections(layoutToDefinition(layout, HOME_PAGE_KEY), previous);
+  const readinessErrors = validatePublishReadiness(definition);
+  if (readinessErrors.length > 0) return { invalid: readinessErrors };
   return publishNewRevision({
     storeId,
     pageKey: HOME_PAGE_KEY,

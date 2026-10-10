@@ -20,7 +20,13 @@ import { LEGACY_HOME_SECTION_KEYS } from './section-keys';
 // can assert the `link` / `ctaHref` scheme-allowlist behavior directly,
 // mirroring how `layoutSchema` is exported below for its parity test.
 export const heroSlideSchema = z.object({
-  image: z.string().url().or(z.string().min(1)),
+  // Optional (and empty string allowed) so a DRAFT may hold a just-added
+  // slide with no image chosen yet, or an explicitly cleared one (autosave
+  // must not reject the whole page over one in-progress slide — bug: "hero
+  // slide with no image blocks ALL autosave"). Publishing is still gated:
+  // `validatePublishReadiness` rejects any visible slide with no image
+  // before it can go live.
+  image: z.string().optional(),
   imageAr: z.string().optional(),
   // Mobile-specific images — without these listed in the Zod schema, the
   // parse step silently strips them and saves succeed with the field

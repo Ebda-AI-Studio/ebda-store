@@ -513,6 +513,98 @@ describe('document-only sections survive the legacy save paths', { retry: 0 }, (
 });
 
 /**
+ * Bug: "A hero slide's autosave is blocked when it has no image." A freshly
+ * added slide has no `image` yet — the draft schema allows that (so autosave
+ * persists the in-progress edit) but publish must still refuse it, on BOTH
+ * publish paths (the new builder's `publishDraft` and the classic editor's
+ * `publishLegacyLayout`, which has no separate draft state at all).
+ */
+describe(
+  'publish readiness: an imageless hero slide saves as a draft but cannot publish',
+  { retry: 0 },
+  () => {
+    it('saveDraft accepts a hero slide with no image (autosave must not block)', async () => {
+      const storeId = await freshStore('noimg-draft');
+      const doc = reduceDocument(docFor({}), {
+        type: 'addBlock',
+        sectionId: 'hero',
+        blockType: 'slide',
+      }).doc;
+      const r = await inStore(storeId, () =>
+        saveDraft({ storeId, pageKey: HOME, baseRev: 0, definition: doc, userId: null })
+      );
+      expect(r).toMatchObject({ ok: true, value: { rev: 1 } });
+    });
+
+    it('publishDraft refuses to publish it (422 MISSING_IMAGE), then succeeds once an image is added', async () => {
+      const storeId = await freshStore('noimg-publish');
+      const doc = reduceDocument(docFor({}), {
+        type: 'addBlock',
+        sectionId: 'hero',
+        blockType: 'slide',
+      }).doc;
+      await inStore(storeId, () =>
+        saveDraft({ storeId, pageKey: HOME, baseRev: 0, definition: doc, userId: null })
+      );
+      const blocked = await inStore(storeId, () =>
+        publishDraft({ storeId, pageKey: HOME, baseRev: 1 })
+      );
+      expect(blocked).toMatchObject({ ok: false, status: 422, code: 'INVALID_DEFINITION' });
+      expect(
+        (blocked as { errors: Array<{ code: string }> }).errors.some(
+          e => e.code === 'MISSING_IMAGE'
+        )
+      ).toBe(true);
+      expect(await owner.storePageRevision.count({ where: { storeId, status: 'published' } })).toBe(
+        0
+      );
+
+      // Give the slide an image and retry — same rev, now publish-ready.
+      const fixed: PageDefinition = {
+        ...doc,
+        sections: doc.sections.map(s =>
+          s.type === 'hero'
+            ? {
+                ...s,
+                blocks: (s.blocks ?? []).map(b => ({
+                  ...b,
+                  settings: { ...b.settings, image: '/fixed-slide.jpg' },
+                })),
+              }
+            : s
+        ),
+      };
+      await inStore(storeId, () =>
+        saveDraft({ storeId, pageKey: HOME, baseRev: 1, definition: fixed, userId: null })
+      );
+      const ok = await inStore(storeId, () => publishDraft({ storeId, pageKey: HOME, baseRev: 2 }));
+      expect(ok).toMatchObject({ ok: true, value: { rev: 2 } });
+    });
+
+    it('the legacy layout PUT path (no separate draft state) also refuses an imageless slide', async () => {
+      const storeId = await freshStore('noimg-legacy');
+      const legacy = resolveLayoutSettings(
+        { hero: { enabled: true, mode: 'single', autoplayMs: 5000, slides: [{ image: '' }] } },
+        'modern'
+      );
+      const outcome = await inStore(storeId, () =>
+        publishLegacyLayout({ storeId, layout: legacy, userId: null })
+      );
+      expect(outcome).not.toBe('ok');
+      expect(outcome).not.toBe('conflict');
+      expect(
+        (outcome as { invalid: Array<{ code: string }> }).invalid.some(
+          e => e.code === 'MISSING_IMAGE'
+        )
+      ).toBe(true);
+      expect(await owner.storePageRevision.count({ where: { storeId, status: 'published' } })).toBe(
+        0
+      );
+    });
+  }
+);
+
+/**
  * Ruling BUILDER-PUBLISH-1 regression: builder publish -> the PUBLIC layout
  * route (the storefront's only source) must serve the published document,
  * never the layout-derived fallback. Before the fix every template family

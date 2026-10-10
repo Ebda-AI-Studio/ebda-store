@@ -110,6 +110,17 @@ router.put(
         });
         return;
       }
+      if (outcome !== 'ok') {
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'INVALID_DEFINITION',
+            message: 'The page is not ready to publish',
+            errors: outcome.invalid,
+          },
+        });
+        return;
+      }
 
       await prisma.store.update({
         where: { id: storeId },
