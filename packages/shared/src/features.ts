@@ -616,13 +616,13 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
   },
   remove_branding: {
     key: 'remove_branding',
-    name: 'Remove "Powered by Ebda"',
-    nameAr: 'إزالة «مدعوم من ابدأ»',
+    name: 'Remove "Powered by Ebda Store"',
+    nameAr: 'إزالة «مدعوم من ابدأ ستور»',
     description:
-      'Hides the "Powered by Ebda" attribution in the storefront footer. Included in Growth ' +
+      'Hides the "Powered by Ebda Store" attribution in the storefront footer. Included in Growth ' +
       'and Business; granted per store by a super-admin override otherwise.',
     descriptionAr:
-      'يخفي عبارة «مدعوم من ابدأ» من تذييل المتجر. مضمّن في باقتي النمو والأعمال، ' +
+      'يخفي عبارة «مدعوم من ابدأ ستور» من تذييل المتجر. مضمّن في باقتي النمو والأعمال، ' +
       'ويُمنح لمتجر بعينه عبر تجاوز من المشرف العام.',
     category: 'storefront',
     tier: 'addon',

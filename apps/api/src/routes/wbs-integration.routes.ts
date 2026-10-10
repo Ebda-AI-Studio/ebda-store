@@ -751,7 +751,7 @@ router.post(
             code: 'PROVISIONER_NOT_CONFIGURED',
             message:
               'Meta auto-provisioning is not configured. Set FORCE_AI_META_BM_ID + ' +
-              'FORCE_AI_META_ADMIN_TOKEN on Railway (one-time Ebda setup).',
+              'FORCE_AI_META_ADMIN_TOKEN on Railway (one-time Ebda AI Studio setup).',
           },
         });
         return;
@@ -852,7 +852,7 @@ router.post(
         store: { id: storeId, name: updated.name, slug: updated.slug },
         title: 'Meta Commerce catalog auto-provisioned',
         body:
-          `New Meta catalog ${result.catalogId} created under Ebda BM ${result.businessId}. ` +
+          `New Meta catalog ${result.catalogId} created under Ebda AI Studio BM ${result.businessId}. ` +
           `Submit it for Meta review before flipping bot_mode to a native_catalog variant.`,
       }).catch(err => {
         logger.warn({ err }, 'sendAlert failed (non-blocking)');

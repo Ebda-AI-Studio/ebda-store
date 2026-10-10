@@ -3,6 +3,7 @@ import {
   BRAND,
   brandFrom,
   brandName,
+  productName,
   brandUrl,
   isBrandHost,
   poweredByBrand,
@@ -12,12 +13,12 @@ import {
 
 describe('BRAND', () => {
   it('carries the Ebda identity from the brief', () => {
-    expect(BRAND.name).toBe('Ebda');
-    expect(BRAND.nameAr).toBe('ابدأ');
+    expect(BRAND.name).toBe('Ebda AI Studio');
+    expect(BRAND.nameAr).toBe('ابدأ ستوديو للذكاء الاصطناعي');
     expect(BRAND.company).toEqual({
       legalNameAr: 'ابدأ ستوديو للذكاء الاصطناعي والبرمجيات والتسويق الرقمي',
       legalNameEn: 'Ebda AI Studio for Artificial Intelligence, Software and Digital Marketing',
-      shortNameAr: 'ابدأ ستوديو',
+      shortNameAr: 'ابدأ ستوديو للذكاء الاصطناعي',
       shortNameEn: 'Ebda AI Studio',
       url: 'https://ebda.app',
     });
@@ -51,20 +52,22 @@ describe('brand helpers', () => {
   });
 
   it('localises the name, sender and footer', () => {
-    expect(brandName('ar-EG')).toBe('ابدأ');
-    expect(brandName('en')).toBe('Ebda');
+    expect(brandName('ar-EG')).toBe('ابدأ ستوديو للذكاء الاصطناعي');
+    expect(brandName('en')).toBe('Ebda AI Studio');
+    expect(productName('en')).toBe('Ebda Store');
+    expect(productName('ar-EG')).toBe('ابدأ ستور');
     expect(brandFrom()).toBe('Ebda Store <no-reply@ebda.app>');
-    expect(poweredByBrand()).toBe('Powered by Ebda');
-    expect(poweredByBrand('ar')).toBe('مدعوم من ابدأ');
+    expect(poweredByBrand()).toBe('Powered by Ebda Store');
+    expect(poweredByBrand('ar')).toBe('مدعوم من ابدأ ستور');
     expect(brandUrl(BRAND.domains.storeApp)).toBe('https://store.ebda.app');
   });
 });
 
 describe('product name (PRODUCT-NAME-1)', () => {
-  it('names the product Ebda Store while the master brand stays Ebda', () => {
+  it('names the product Ebda Store while the company is Ebda AI Studio', () => {
     expect(BRAND.product).toEqual({ nameEn: 'Ebda Store', nameAr: 'ابدأ ستور' });
-    expect(BRAND.name).toBe('Ebda');
-    expect(BRAND.nameAr).toBe('ابدأ');
+    expect(BRAND.name).toBe('Ebda AI Studio');
+    expect(BRAND.nameAr).toBe('ابدأ ستوديو للذكاء الاصطناعي');
   });
 
   it('derives the sender display name, JSON-LD and legal Service name from BRAND.product', async () => {

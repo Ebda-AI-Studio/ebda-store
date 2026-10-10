@@ -72,11 +72,10 @@ export function SidebarHeader({
             </div>
             <div>
               <span className="text-lg font-bold tracking-tight">
-                <span className="text-primary">{t('forceBrandPrefix')}</span>
-                <span className="text-foreground">
-                  {' '}
-                  {mode === 'super_admin' ? t('forcePlatformBrand') : t('forceAdminBrand')}
-                </span>
+                <span className="text-primary">{tb('brandAlt')}</span>
+                {mode === 'super_admin' && (
+                  <span className="text-foreground"> {t('forcePlatformBrand')}</span>
+                )}
               </span>
             </div>
           </>

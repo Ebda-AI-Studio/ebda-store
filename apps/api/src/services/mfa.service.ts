@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { BRAND } from '@force/shared';
 
-const ISSUER: string = BRAND.name;
+const ISSUER: string = BRAND.product.nameEn;
 
 export class MfaService {
   static generateEnrollment(accountLabel: string): { secret: string; otpauthUrl: string } {

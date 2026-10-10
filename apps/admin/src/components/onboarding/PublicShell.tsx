@@ -28,21 +28,22 @@ export function PublicShell({
         <header className="flex items-center justify-between gap-4 border-b border-border pb-4">
           <a href={BRAND_MARKETING_URL} aria-label={t('back')} className="flex items-center gap-3">
             <Image
-              src="/lockup-light.svg"
+              src="/logo-on-light.svg"
               alt={tb('forceMediaAlt')}
-              width={108}
+              width={36}
               height={36}
               className="dark:hidden"
               unoptimized
             />
             <Image
-              src="/lockup-dark.svg"
+              src="/logo.svg"
               alt={tb('forceMediaAlt')}
-              width={108}
+              width={36}
               height={36}
               className="hidden dark:block"
               unoptimized
             />
+            <span className="text-sm font-semibold">{tb('brandAlt')}</span>
           </a>
           <AdminLanguageSwitcher />
         </header>

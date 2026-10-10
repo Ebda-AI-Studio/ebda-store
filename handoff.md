@@ -3,7 +3,19 @@
 ## Goal
 Assess launch readiness, remove exposed Ebda naming, improve UI and fix wiring/errors; prove backend operation in Cloudflare workerd. Mobile is mandatory end-to-end.
 
+## Ebda naming — 2026-10-10
+
+- Goal: product Ebda Store (ابدأ ستور), company Ebda AI Studio (ابدأ ستوديو للذكاء الاصطناعي), approved across folders/repo/app branding.
+- Done: private repo renamed to Whisky-11/ebda-store; product root `Ebda-AI-Studio/internal-projects/ebda-store`; local business papers `Ebda-AI-Studio/business/ebda-ai-studio`. All 23 worktree registrations/statuses preserved. Foundation PR227 merged and resolver installed; canonical name and legacy alias resolve correctly (18 tests).
+- Validation: 113 affected branding and sibling tests pass; final full unit run 8,376 passed. Monorepo typecheck, lint, formatting and affected app builds pass. All-email scope reviewed: 328 targeted tests plus full-unit coverage; localized platform names/attribution, company team copy, merchant branding preserved. CI browser dependency failure repaired in both unit jobs (missing libatk). AR/EN marketing checked at 390/820/1280px and merchant login at 390px with no overflow.
+- Blast-radius: current app/config/workflow/scripts, installed scripts and launchd jobs swept; stale audit fallback paths and two current audit-document links fixed. Two dated historical records keep old repo URLs; approved naming plan retains its baseline and move instructions. Domains/resources unchanged.
+- In progress: PR72 CI and guarded live rollout. This section is predeployment evidence, not a claim that production has changed.
+- Left to do: confirm landed revision and rendered branding after deployment. Docs/help/status hosts returned404 before this change and lack current publishing wiring; their source builds are updated. Codex's saved project entry is stale; computer-use access to Codex was denied by the tool, so refresh requires supported app UI access.
+- Rulings: `docs/decisions/2026-10-10-product-company-naming.md` records identity, MFA compatibility, footer and graph output decisions.
+
 ## Current state
+Naming task (2026-10-10): approved plan `docs/plans/2026-10-10-ebda-store-naming.md`; branch `chore/ebda-store-naming`. Product = Ebda Store; company = Ebda AI Studio. Explicit brand contract passed 11 tests after 3 observed failures. Repo/folder move and production verification are in progress. Existing historical handoff below is preserved.
+
 Branch `codex/ebda-ui-ux`, worktree `/private/tmp/ebda-ui-20261005`, baseline `89461087`. Root `plan` and unrelated `.handoff/` preserved. PR #3: https://github.com/Whisky-11/ebda/pull/3. Initial UI commits `9d047026`/`0a91f0ce`; expanded launch fixes `23acd07b` committed for PR #3. PR #3 merged the earlier UI head only. PR #4 carries subsequent backend fixes; authorized merge in progress, no deploy. Local built Worker preview: http://localhost:8788/signup.
 
 ## Done

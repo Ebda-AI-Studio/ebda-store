@@ -271,6 +271,10 @@ jobs:
       - name: Build shared package
         run: npm run build -w packages/shared
 
+      - name: Install Chromium and its system dependencies
+        # The unit suite measures chart layout in a real browser, including on Umbra.
+        run: npx playwright install --with-deps chromium
+
       - name: Run unit tests (affected paths)
         env:
           UNIT_PATHS: ${{ needs.changes.outputs.unit }}
@@ -502,6 +506,10 @@ jobs:
 
       - name: Build shared package
         run: npm run build -w packages/shared
+
+      - name: Install Chromium and its system dependencies
+        # The unit suite measures chart layout in a real browser, including on Umbra.
+        run: npx playwright install --with-deps chromium
 
       - name: Run unit tests with coverage
         # Globs BEYOND tests/unit are load-bearing, not tidiness. vitest.config.ts

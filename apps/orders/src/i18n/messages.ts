@@ -241,9 +241,9 @@ export interface Messages {
 
 export const MESSAGES: Record<Locale, Messages> = {
   en: {
-    appName: `${BRAND.name} Orders`,
+    appName: `${BRAND.product.nameEn} Orders`,
     login: {
-      title: `${BRAND.name} Orders`,
+      title: `${BRAND.product.nameEn} Orders`,
       subtitle: 'Sign in to manage your orders.',
       email: 'Email',
       password: 'Password',
@@ -502,9 +502,9 @@ export const MESSAGES: Record<Locale, Messages> = {
     },
   },
   ar: {
-    appName: `طلبات متجر ${BRAND.nameAr}`,
+    appName: `طلبات متجر ${BRAND.product.nameAr}`,
     login: {
-      title: `طلبات متجر ${BRAND.nameAr}`,
+      title: `طلبات متجر ${BRAND.product.nameAr}`,
       subtitle: 'سجّل الدخول لإدارة طلباتك.',
       email: 'البريد الإلكتروني',
       password: 'كلمة المرور',

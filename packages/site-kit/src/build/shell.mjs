@@ -76,7 +76,7 @@ export function renderPage(p) {
 <a class="skip" href="#main">${esc(p.skipLabel)}</a>
 <header class="site-header">
   <div class="wrap header-row">
-    <a class="wordmark" href="${esc(p.homeHref)}"><img class="wm-lockup" src="/lockup-dark.svg" alt="${BRAND.name.toLowerCase()} ${BRAND.nameAr}" width="84" height="28"><span class="wm-site">${esc(p.siteLabel)}</span></a>
+    <a class="wordmark" href="${esc(p.homeHref)}"><img src="/icon.svg" alt="" width="28" height="28"><span>${esc(p.lang === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn)}</span><span class="wm-site">${esc(p.siteLabel)}</span></a>
     <nav class="top-nav" aria-label="${esc(p.siteLabel)}"><ul>${nav}</ul></nav>
     <form class="search" role="search" action="${esc(p.search.action)}" method="get">
       <label class="sr-only" for="q">${esc(p.search.label)}</label>

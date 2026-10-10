@@ -69,7 +69,7 @@ describe('platform root redirect', () => {
     // making a promise the page had stopped making.
     const src = web('app/layout.tsx');
     expect(src).toMatch(/if \(store\.id === 'demo'\) \{/);
-    expect(src).toMatch(/title: `Page not found — \$\{BRAND\.name\}`/);
+    expect(src).toMatch(/title: `Page not found — \$\{BRAND\.product\.nameEn\}`/);
     expect(src).toMatch(/robots: \{ index: false, follow: false \}/);
     // It must short-circuit BEFORE the storefront builder, not after.
     const sentinel = src.indexOf("store.id === 'demo'");

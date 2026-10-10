@@ -117,8 +117,8 @@ export async function generateMetadata(): Promise<Metadata> {
   // the body is a 404 — the title kept making a promise the page no longer did.
   if (store.id === 'demo') {
     return {
-      title: `Page not found — ${BRAND.name}`,
-      description: `This page does not exist. ${BRAND.name} builds online stores for merchants.`,
+      title: `Page not found — ${BRAND.product.nameEn}`,
+      description: `This page does not exist. ${BRAND.product.nameEn} builds online stores for merchants.`,
       robots: { index: false, follow: false },
     };
   }

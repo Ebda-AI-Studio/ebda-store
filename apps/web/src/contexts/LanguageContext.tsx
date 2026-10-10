@@ -244,7 +244,7 @@ export const translations = {
   'is currently undergoing maintenance. Please check back later.':
     'يخضع حالياً لأعمال الصيانة. يرجى المحاولة مرة أخرى لاحقاً.',
   'Need to reach us?': 'تحتاج للتواصل معنا؟',
-  'Powered by Ebda': `مدعوم من ${BRAND.nameAr}`,
+  'Powered by Ebda': `مدعوم من ${BRAND.product.nameAr}`,
 
   // Campaign unsubscribe page (/unsubscribe, D2 email campaigns).
   'Email preferences': 'تفضيلات البريد الإلكتروني',
@@ -280,7 +280,7 @@ export const translations = {
   'This page doesn’t exist': 'هذه الصفحة غير موجودة',
   'The store you’re looking for may have moved, or the link may be wrong.':
     'ربما انتقل المتجر الذي تبحث عنه، أو قد يكون الرابط غير صحيح.',
-  'Go to Ebda': `الانتقال إلى ${BRAND.nameAr}`,
+  'Go to Ebda': `الانتقال إلى ${BRAND.company.shortNameAr}`,
 
   // Visual builder newsletter section (Phase 2). The consent line is platform
   // copy, not merchant-editable, so every signup form carries it.

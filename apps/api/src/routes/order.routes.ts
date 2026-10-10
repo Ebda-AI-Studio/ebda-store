@@ -227,7 +227,7 @@ router.get(
 
       // ---- Build workbook ----
       const workbook = new (await loadExcelJS()).Workbook();
-      workbook.creator = BRAND.name;
+      workbook.creator = BRAND.product.nameEn;
       workbook.created = new Date();
 
       const headerStyle: Partial<ExcelJS.Style> = {

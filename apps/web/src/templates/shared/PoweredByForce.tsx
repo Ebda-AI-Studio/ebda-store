@@ -38,7 +38,10 @@ export function PoweredByForce({ hidden = false }: { hidden?: boolean }) {
         href={BRAND_MARKETING_URL}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label={t(`Powered by ${BRAND.name}`, `مدعوم من ${BRAND.nameAr}`)}
+        aria-label={t(
+          `Powered by ${t(BRAND.product.nameEn, BRAND.product.nameAr)}`,
+          `مدعوم من ${BRAND.product.nameAr}`
+        )}
         className="inline-flex items-center gap-1 align-middle hover:opacity-80 transition-opacity"
       >
         {/* "Powered by Ebda" as a text wordmark — the raw /logo.svg mark read
@@ -47,7 +50,7 @@ export function PoweredByForce({ hidden = false }: { hidden?: boolean }) {
             "Powered by" stays muted (inherited) so it reads as attribution. */}
         <span>{t('Powered by', 'مدعوم من')}</span>
         <span className="font-semibold" style={{ color: BRAND.colors.gold }}>
-          {BRAND.name}
+          {t(BRAND.product.nameEn, BRAND.product.nameAr)}
         </span>
       </a>
     </div>

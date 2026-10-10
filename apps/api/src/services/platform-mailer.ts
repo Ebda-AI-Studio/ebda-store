@@ -13,7 +13,7 @@
  * The outbox is process-local on purpose: it is not a queue and is never
  * exposed over HTTP.
  */
-import { BRAND, BRAND_EMAIL_LOGO_URL, resolveDefaultLanguage } from '@force/shared';
+import { BRAND, BRAND_EMAIL_LOGO_URL, productName, resolveDefaultLanguage } from '@force/shared';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
@@ -125,10 +125,10 @@ export async function sendMerchantVerificationEmail(
   language?: Lang
 ): Promise<void> {
   const lang: Lang = language ?? resolveDefaultLanguage(undefined);
-  const content = emailVerificationTemplate[lang](data, BRAND.product.nameEn);
+  const content = emailVerificationTemplate[lang](data, productName(lang));
   const html = renderBrandedShell(content, {
     name: BRAND.product.nameEn,
-    nameAr: null,
+    nameAr: BRAND.product.nameAr,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,
@@ -161,7 +161,7 @@ export async function sendMerchantDuplicateSignupNotice(
       : `<h2>You already have an account</h2><p>Hi ${name},</p><p>Someone (possibly you) just tried to start a new store with this email, but an account already exists. If it was you, just sign in.</p><p style="text-align:center;margin:24px 0;"><a href="${loginUrl}" class="button">Sign in</a></p><p style="font-size:14px;color:#666;">If this wasn't you, ignore this email; nothing changed on your account.</p>`;
   const html = renderBrandedShell(content, {
     name: BRAND.product.nameEn,
-    nameAr: null,
+    nameAr: BRAND.product.nameAr,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,
@@ -188,10 +188,10 @@ export async function sendMerchantPasswordResetEmail(
   language?: Lang
 ): Promise<void> {
   const lang: Lang = language ?? resolveDefaultLanguage(undefined);
-  const content = passwordResetTemplate[lang](data, BRAND.product.nameEn);
+  const content = passwordResetTemplate[lang](data, productName(lang));
   const html = renderBrandedShell(content, {
     name: BRAND.product.nameEn,
-    nameAr: null,
+    nameAr: BRAND.product.nameAr,
     logo: BRAND_EMAIL_LOGO_URL,
     theme: null,
     email: null,

@@ -289,7 +289,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
           aria-label={t('back')}
         >
           {}
-          <img src="/logo.svg" alt={BRAND.name} width={28} height={28} />
+          <img src="/logo.svg" alt={BRAND.product.nameEn} width={28} height={28} />
         </Link>
         <span className="hidden truncate text-sm font-semibold sm:inline">{storeName}</span>
         <div className="ms-2 flex lg:hidden">

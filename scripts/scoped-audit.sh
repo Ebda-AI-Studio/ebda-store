@@ -50,7 +50,7 @@ else
   else
     # Search well-known project roots
     for _p in \
-      "$HOME/Desktop/projects/Whisky-11/business/ebda/ebda"; do
+      "$HOME/Desktop/projects/Ebda-AI-Studio/internal-projects/ebda-store"; do
       if [[ "$_p" == *"$REPO_SLUG"* ]] && [ -f "$_p/graphify-out/graph.json" ]; then
         GRAPH_JSON="$_p/graphify-out/graph.json"
         break

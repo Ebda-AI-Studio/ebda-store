@@ -27,3 +27,14 @@ describe('Ebda merchant identity', () => {
     expect(shell).toContain('id="admin-main-content"');
   });
 });
+
+describe('product and operator names in merchant translations', () => {
+  it('names both login wordmarks and identifies the VAT operator', () => {
+    const en = JSON.parse(readFileSync('apps/admin/src/i18n/messages/en.json', 'utf8'));
+    const ar = JSON.parse(readFileSync('apps/admin/src/i18n/messages/ar.json', 'utf8'));
+    expect(en.components.brand.brandAlt).toBe(BRAND.product.nameEn);
+    expect(ar.components.brand.brandAlt).toBe(BRAND.product.nameAr);
+    expect(JSON.stringify(ar)).not.toContain('ستور ستور');
+    expect(en.platformSettings.vat.legalName).toContain(BRAND.company.shortNameEn);
+  });
+});

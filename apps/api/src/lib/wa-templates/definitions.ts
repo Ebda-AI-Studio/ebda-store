@@ -330,7 +330,7 @@ export const TEMPLATES: TemplateDefinition[] = [
       },
       {
         type: 'FOOTER',
-        text: `Powered by ${BRAND.name}`,
+        text: `Powered by ${BRAND.product.nameEn}`,
       },
     ],
   },
@@ -361,7 +361,7 @@ export const TEMPLATES: TemplateDefinition[] = [
       },
       {
         type: 'FOOTER',
-        text: `مدعوم بواسطة ${BRAND.nameAr}`,
+        text: `مدعوم بواسطة ${BRAND.product.nameAr}`,
       },
     ],
   },

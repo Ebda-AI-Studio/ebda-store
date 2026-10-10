@@ -1,17 +1,17 @@
 {
-  "name": "ebda",
+  "name": "ebda-store",
   "version": "1.0.0",
   "private": true,
-  "description": "Ebda E-Commerce Website Builder Platform - A multi-tenant SaaS e-commerce solution",
-  "author": "Ebda <contact@ebda.app>",
+  "description": "Ebda Store by Ebda AI Studio — self-serve e-commerce platform for Egypt",
+  "author": "Ebda AI Studio <ahlan@ebda.app>",
   "license": "UNLICENSED",
-  "homepage": "https://github.com/Whisky-11/ebda",
+  "homepage": "https://github.com/Whisky-11/ebda-store",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Whisky-11/ebda.git"
+    "url": "https://github.com/Whisky-11/ebda-store.git"
   },
   "bugs": {
-    "url": "https://github.com/Whisky-11/ebda/issues"
+    "url": "https://github.com/Whisky-11/ebda-store/issues"
   },
   "engines": {
     "node": ">=20.0.0",

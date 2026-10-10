@@ -9,8 +9,8 @@ keywords: shipping carrier bosta shipblu mylerz aramex connect api key cod cash 
 ---
 
 <Callout type="soon" title="Coming soon">
-  Bosta, ShipBlu, Mylerz and Aramex show as "Coming soon" until we finish testing each one against its
-  own test environment. You can read how connecting works below; the steps will not change.
+  Bosta, ShipBlu, Mylerz and Aramex show as "Coming soon" until we finish testing each one against
+  its own test environment. You can read how connecting works below; the steps will not change.
 </Callout>
 
 ## What works today
@@ -22,7 +22,7 @@ they gave you, then move the order along yourself. See [Shipping](/en/shipping/)
 ## How connecting works
 
 You use your OWN account with the carrier: the parcels, the courier fees and the cash collected on
-delivery are between you and the carrier, not Ebda. Connecting is only a credentials step in
+delivery are between you and the carrier, not Ebda Store. Connecting is only a credentials step in
 **Settings > Shipping carriers**:
 
 1. Open the carrier's card and pick **Sandbox** (test) or **Live**. Each mode keeps its own keys, so
@@ -30,7 +30,7 @@ delivery are between you and the carrier, not Ebda. Connecting is only a credent
 2. Paste each value. Every field has a **Where do I find this?** note that names the exact place in the
    carrier's dashboard. Secrets are saved encrypted and are never shown again: the page only shows
    "Saved ••••" and the last 4 characters.
-3. Press **Test connection**. Ebda makes one harmless call to the carrier with your keys. Nothing is
+3. Press **Test connection**. Ebda Store makes one harmless call to the carrier with your keys. Nothing is
    booked.
 4. Once the test passes, switch the carrier **on** and, if you use several, choose your **default**.
    Changing a key later turns the carrier off until you test again.
@@ -60,10 +60,10 @@ Mylerz portal. ShipBlu requests the pickup itself when the parcel is booked, so 
 ## Bosta
 
 - **API key:** Bosta dashboard > Settings > API Integration > Request OTP > Create API key. Bosta shows
-  the key once. Give it **Read/Write** access, or **Full** access if you want Ebda to cancel deliveries.
+  the key once. Give it **Read/Write** access, or **Full** access if you want Ebda Store to cancel deliveries.
 - **Pickup location ID:** Settings > Pickup locations. Empty uses your default location for parcels;
   **Request pickup** needs it filled in.
-- **Tracking:** Bosta pushes every status change to Ebda automatically. Nothing to paste: Ebda gives
+- **Tracking:** Bosta pushes every status change to Ebda Store automatically. Nothing to paste: Ebda Store gives
   Bosta the callback address and a secret header with each delivery. If you use a firewall, Bosta calls
   from 34.89.199.241 and 35.246.223.19.
 - Cash on delivery up to 30,000 EGP per parcel. The customer's governorate and area must be one Bosta
@@ -74,13 +74,13 @@ Mylerz portal. ShipBlu requests the pickup itself when the parcel is booked, so 
 - **API key:** ShipBlu merchant dashboard > Integrations tab > the (+) button. For a sandbox key, email
   tech@shipblu.com with your business account name.
 - **Parcel size:** pick Small, Medium, Large or Extra large in the card; ShipBlu prices by size, not weight.
-- **Pickup:** ShipBlu keeps a new order on hold until a pickup is requested, so Ebda requests it as soon as
+- **Pickup:** ShipBlu keeps a new order on hold until a pickup is requested, so Ebda Store requests it as soon as
   the parcel is booked. If ShipBlu refuses, the order shows a note: request the pickup in your ShipBlu
   dashboard.
-- **Tracking:** ShipBlu has no push notifications, so Ebda checks your open parcels about every 30
+- **Tracking:** ShipBlu has no push notifications, so Ebda Store checks your open parcels about every 30
   minutes.
 - **Cancel:** ShipBlu does not document a cancel call. Cancel the order in your ShipBlu dashboard, then
-  use **Force cancel** on the Ebda order to stop tracking it.
+  use **Force cancel** on the Ebda Store order to stop tracking it.
 
 ## Mylerz
 
@@ -100,11 +100,11 @@ Mylerz portal. ShipBlu requests the pickup itself when the parcel is booked, so 
 - **Product type:** Aramex wants a domestic product for your account. Ask Aramex which one, then enter it
   in the card's settings.
 - **Cash on delivery in EGP:** tick the box on the card only after Aramex confirms in writing that your
-  account collects cash on delivery in Egyptian pounds. Until then Ebda books prepaid parcels only and
+  account collects cash on delivery in Egyptian pounds. Until then Ebda Store books prepaid parcels only and
   tells you when an order needs cash collected.
 - **Tracking:** polled about every 30 minutes.
 - **Cancel:** Aramex's API has no "cancel shipment" call. Ask Aramex support (or use your Aramex portal)
-  to cancel, then use **Force cancel** on the Ebda order.
+  to cancel, then use **Force cancel** on the Ebda Store order.
 
 ## If something goes wrong
 
@@ -115,5 +115,5 @@ Mylerz portal. ShipBlu requests the pickup itself when the parcel is booked, so 
 
 ## Need another carrier?
 
-Ebda supports Bosta, ShipBlu, Mylerz and Aramex, plus manual delivery. If you use another courier, use
+Ebda Store supports Bosta, ShipBlu, Mylerz and Aramex, plus manual delivery. If you use another courier, use
 manual delivery, or use the **Tell us** link at the bottom of the Shipping carriers page.

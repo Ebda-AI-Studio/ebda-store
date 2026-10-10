@@ -1,3 +1,4 @@
+import { BRAND, BRAND_EMAIL_LOGO_URL } from '@force/shared';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // email.service now imports @force/database at the module level;
@@ -49,6 +50,24 @@ const baseStore = (overrides: Partial<EmailStoreContext> = {}): EmailStoreContex
 });
 
 describe('renderBrandedShell', () => {
+  it.each(['en', 'ar'] as const)(
+    'platform mail shows its full product name and localized attribution (%s)',
+    language => {
+      const html = renderBrandedShell(
+        '<p>message</p>',
+        baseStore({
+          name: BRAND.product.nameEn,
+          nameAr: BRAND.product.nameAr,
+          logo: BRAND_EMAIL_LOGO_URL,
+          defaultLanguage: language,
+        })
+      );
+      const name = language === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn;
+      expect(html).toMatch(new RegExp(`<div class="store-name"[^>]*>${name}</div>`));
+      expect(html).toContain(language === 'ar' ? `مدعوم من ${name}` : `Powered by ${name}`);
+    }
+  );
+
   it('uses store name in header when no logo', () => {
     const html = renderBrandedShell('<p>hi</p>', baseStore());
     expect(html).toMatch(/<div class="store-name"[^>]*>Demo Shop<\/div>/);

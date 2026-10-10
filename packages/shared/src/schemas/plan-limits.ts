@@ -393,7 +393,7 @@ export function planLimitMessage(
     maxStorageMb: `Your plan allows up to ${n} MB of storage. Upgrade to add more.`,
     maxStores: `Your plan allows up to ${n} store${n === '1' ? '' : 's'}. Upgrade to add more.`,
     brandingRemoval:
-      'Removing the "Powered by Ebda" footer is not included in your plan. Upgrade to turn it off.',
+      'Removing the "Powered by Ebda Store" footer is not included in your plan. Upgrade to turn it off.',
     apiAccess: 'API access is not included in your plan. Upgrade to Business to use it.',
     customDomain:
       'Custom domains are not included in your plan. Upgrade to connect your own domain.',
@@ -407,7 +407,7 @@ export function planLimitMessage(
     maxOrdersPerMonth: `باقتك تسمح بحد أقصى ${n} طلب شهرياً. قم بالترقية لمواصلة النمو.`,
     maxStorageMb: `باقتك تسمح بمساحة تخزين حتى ${n} ميجابايت. قم بالترقية لإضافة المزيد.`,
     maxStores: `باقتك تسمح بحد أقصى ${n} متجر. قم بالترقية لإضافة المزيد.`,
-    brandingRemoval: 'إزالة شعار «مدعوم من ابدأ» غير متاحة في باقتك. قم بالترقية لإخفائه.',
+    brandingRemoval: 'إزالة شعار «مدعوم من ابدأ ستور» غير متاحة في باقتك. قم بالترقية لإخفائه.',
     apiAccess: 'الوصول عبر API غير متاح في باقتك. قم بالترقية إلى باقة الأعمال لاستخدامه.',
     customDomain: 'النطاق المخصص غير متاح في باقتك. قم بالترقية لربط نطاقك الخاص.',
     abandonedCartAutomation: 'استرداد السلات المتروكة غير متاح في باقتك. قم بالترقية لتفعيله.',

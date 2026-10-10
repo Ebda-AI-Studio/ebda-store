@@ -54,7 +54,7 @@ command -v python3 >/dev/null || { echo "blast-radius: python3 missing" >&2; exi
 # Locate the repo root (for graph.json lookup)
 # ---------------------------------------------------------------------------
 KNOWN_ROOTS=(
-  "$HOME/Desktop/projects/Whisky-11/business/ebda/ebda"
+  "$HOME/Desktop/projects/Ebda-AI-Studio/internal-projects/ebda-store"
 )
 
 find_graph_json() {

@@ -120,9 +120,9 @@ export interface Copy {
 export const COPY: Record<Locale, Copy> = {
   ar: {
     meta: {
-      title: 'ابدأ ستور — اعمل متجرك أونلاين في دقايق',
+      title: 'ابدأ ستوديو للذكاء الاصطناعي — اعمل متجرك أونلاين في دقايق',
       description:
-        'ابدأ ستور من ابدأ — بابك لبدء مشروعك. اعمل متجرك أونلاين في دقايق: لينك باسمك، دفع أونلاين وكاش وإنستا باي، وشحن مع بوسطة وأرامكس.',
+        'ابدأ ستور من ابدأ ستوديو للذكاء الاصطناعي — بابك لبدء مشروعك. اعمل متجرك أونلاين في دقايق: لينك باسمك، دفع أونلاين وكاش وإنستا باي، وشحن مع بوسطة وأرامكس.',
     },
     skip: 'روح للمحتوى',
     nav: {
@@ -138,7 +138,7 @@ export const COPY: Record<Locale, Copy> = {
       switchLabel: 'Switch to English',
     },
     hero: {
-      brand: 'ابدأ — بابك لبدء مشروعك.',
+      brand: 'ابدأ ستوديو للذكاء الاصطناعي — بابك لبدء مشروعك.',
       h1: 'ابدأ متجرك أونلاين في دقايق.',
       sub: 'لينك باسمك، منتجاتك، وطلباتك. كله من موبايلك.',
       cta: 'ابدأ دلوقتي',
@@ -181,7 +181,7 @@ export const COPY: Record<Locale, Copy> = {
     templates: {
       title: 'متجر واحد، على كل الشاشات.',
       lead: 'نفس المتجر على الموبايل والتابلت واللابتوب.',
-      devicesLabel: 'متجر مجوهرات حقيقي على ابدأ، على لابتوب وتابلت وموبايل',
+      devicesLabel: 'متجر مجوهرات حقيقي على ابدأ ستور، على لابتوب وتابلت وموبايل',
     },
     features: {
       title: 'كل اللي محتاجه عشان تبيع.',
@@ -265,21 +265,21 @@ export const COPY: Record<Locale, Copy> = {
       ],
     },
     aboutPage: {
-      title: 'عن ابدأ',
-      desc: 'ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، من ابدأ ستوديو.',
+      title: 'عن ابدأ ستوديو للذكاء الاصطناعي',
+      desc: 'ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، من ابدأ ستوديو للذكاء الاصطناعي.',
       company: `ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، مملوكة ل${CO.shortNameAr} وتديرها.`,
-      storyH: 'حكاية ابدأ',
+      storyH: 'حكاية ابدأ ستوديو للذكاء الاصطناعي',
       contactH: 'تواصل معنا',
     },
     about: {
-      title: 'حكاية ابدأ',
+      title: 'حكاية ابدأ ستوديو للذكاء الاصطناعي',
       paras: [
         'كل مشروع بيبدأ قبل ما يبقى مشروع، بيبدأ بجملة: «عندي فكرة».',
         'وبين الفكرة وأول عميل فيه أبواب كتير: موقع، وطلبات، وكلام مع العملاء، ومنتجات، ودفع، وتوصيل، وتكنولوجيا.',
-        'ابدأ موجودة علشان تسهّل أول باب. علشان كده اللوجو باب، واللي جوّاه هو صاحب الفكرة، واقف على العتبة. مش محتاج يفهم في منصات التجارة الإلكترونية ولا الـ API ولا البنية التحتية ولا ربط واتساب. محتاج بس ياخد أول خطوة.',
+        'ابدأ ستوديو للذكاء الاصطناعي موجودة علشان تسهّل أول باب. علشان كده اللوجو باب، واللي جوّاه هو صاحب الفكرة، واقف على العتبة. مش محتاج يفهم في منصات التجارة الإلكترونية ولا الـ API ولا البنية التحتية ولا ربط واتساب. محتاج بس ياخد أول خطوة.',
       ],
       close: 'ابدأ.',
-      markLabel: 'لوجو ابدأ: باب مفتوح، وصاحب الفكرة بيعدّي منه',
+      markLabel: 'لوجو ابدأ ستوديو للذكاء الاصطناعي: باب مفتوح، وصاحب الفكرة بيعدّي منه',
     },
     contact: {
       title: 'تواصل معانا',
@@ -303,16 +303,16 @@ export const COPY: Record<Locale, Copy> = {
       acceptableUse: 'الاستخدام المقبول',
       contact: 'تواصل: ahlan@ebda.app',
       legalVersion: 'الإصدار 1.0 من الوثائق القانونية · 2026-10-07.',
-      about: 'عن ابدأ',
+      about: 'عن ابدأ ستوديو للذكاء الاصطناعي',
       ownership: `ابدأ ستور منتج من ${CO.shortNameAr}. © 2026 ${CO.shortNameAr}. جميع الحقوق محفوظة.`,
     },
     legalPages: LEGAL_AR,
   },
   en: {
     meta: {
-      title: 'Ebda Store — Open your store online in minutes',
+      title: 'Ebda AI Studio — Open your store online in minutes',
       description:
-        'Ebda Store, from Ebda — Your doorway to business. Open your online store in minutes: your own link, online payments, cash and InstaPay, shipping with Bosta and Aramex.',
+        'Ebda Store, from Ebda AI Studio — Your doorway to business. Open your online store in minutes: your own link, online payments, cash and InstaPay, shipping with Bosta and Aramex.',
     },
     skip: 'Skip to content',
     nav: {
@@ -328,7 +328,7 @@ export const COPY: Record<Locale, Copy> = {
       switchLabel: 'التبديل إلى العربية',
     },
     hero: {
-      brand: 'Ebda — Your doorway to business.',
+      brand: 'Ebda AI Studio — Your doorway to business.',
       h1: 'Open your online store in minutes.',
       sub: 'Your own link, products and orders. All from your phone.',
       cta: 'Start now',
@@ -377,7 +377,7 @@ export const COPY: Record<Locale, Copy> = {
     templates: {
       title: 'One store, on every screen.',
       lead: 'The same store on phone, tablet and laptop.',
-      devicesLabel: 'A real jewellery store on Ebda, on a laptop, tablet and phone',
+      devicesLabel: 'A real jewellery store on Ebda Store, on a laptop, tablet and phone',
     },
     features: {
       title: 'Everything you need to sell.',
@@ -467,21 +467,22 @@ export const COPY: Record<Locale, Copy> = {
       ],
     },
     aboutPage: {
-      title: 'About Ebda',
+      title: 'About Ebda AI Studio',
       desc: 'Ebda Store is an online store builder for merchants in Egypt, a product of Ebda AI Studio.',
       company: `Ebda Store is an online store builder for merchants in Egypt, a technology platform owned and operated by ${CO.shortNameEn}.`,
-      storyH: 'The Ebda story',
+      storyH: 'The Ebda AI Studio story',
       contactH: 'Contact',
     },
     about: {
-      title: 'The Ebda story',
+      title: 'The Ebda AI Studio story',
       paras: [
         'Every business starts before it becomes a business. It starts with “I have an idea.”',
         'Between the idea and the first customer there are too many doors: a website, orders, talking to customers, products, payments, delivery, technology.',
-        'Ebda exists to make the first door simple. That’s why the logo is a doorway, and the shape inside is the person with the idea, standing at the entrance. They don’t need to know e-commerce platforms, APIs, infrastructure or WhatsApp integrations. They just take the first step.',
+        'Ebda AI Studio exists to make the first door simple. That’s why the logo is a doorway, and the shape inside is the person with the idea, standing at the entrance. They don’t need to know e-commerce platforms, APIs, infrastructure or WhatsApp integrations. They just take the first step.',
       ],
       close: 'ابدأ.',
-      markLabel: 'The Ebda mark: an open doorway, with the person with the idea stepping through',
+      markLabel:
+        'The Ebda AI Studio mark: an open doorway, with the person with the idea stepping through',
     },
     contact: {
       title: 'Contact us',
@@ -505,7 +506,7 @@ export const COPY: Record<Locale, Copy> = {
       acceptableUse: 'Acceptable use',
       contact: 'Contact: ahlan@ebda.app',
       legalVersion: 'Legal documents version 1.0 · 2026-10-07.',
-      about: 'About Ebda',
+      about: 'About Ebda AI Studio',
       ownership: `Ebda Store is a product of ${CO.shortNameEn}. © 2026 ${CO.shortNameEn}. All rights reserved.`,
     },
     legalPages: LEGAL_EN,

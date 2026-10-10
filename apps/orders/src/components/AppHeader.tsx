@@ -20,7 +20,7 @@ export function AppHeader() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-on-light.svg"
-            alt={BRAND.name}
+            alt={BRAND.product.nameEn}
             className="h-8 w-8 dark:hidden"
             width={32}
             height={32}
@@ -28,7 +28,7 @@ export function AppHeader() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.svg"
-            alt={BRAND.name}
+            alt={BRAND.product.nameEn}
             className="hidden h-8 w-8 dark:block"
             width={32}
             height={32}

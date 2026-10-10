@@ -147,18 +147,23 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
   const brand = emailColor(rawBrand);
   const brandSoft = emailTint(brand, 0.06);
   const font = isArabic ? EMAIL_FONT_AR : EMAIL_FONT;
-  const storeName = escapeHtml(store.name);
-  // Logo OR name — never both. When a logo is set it's the brand mark;
-  // rendering the name underneath duplicates the visual identity.
+  const displayName = isArabic && store.nameAr ? store.nameAr : store.name;
+  const storeName = escapeHtml(displayName);
+  const platformMark = store.logo === BRAND_EMAIL_LOGO_URL;
+  // Merchant logos retain their own identity. The platform mark is abbreviated,
+  // so it also displays the full localized product name.
   const header = store.logo
     ? emailImage({
         src: store.logo,
-        alt: store.name,
+        alt: displayName,
         width: EMAIL_LOGO_WIDTH,
         maxHeight: EMAIL_LOGO_MAX_HEIGHT,
         align: 'center',
       })
     : `<div class="store-name" style="font-size:22px;line-height:28px;font-weight:700;color:${c.ink};">${storeName}</div>`;
+  const brandedHeader = platformMark
+    ? `${header}<div class="store-name" style="font-size:22px;line-height:28px;font-weight:700;color:${c.ink};">${storeName}</div>`
+    : header;
   const year = new Date().getFullYear();
   const footerLines: string[] = [];
   if (store.address) footerLines.push(escapeHtml(store.address));
@@ -201,7 +206,7 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
             <td height="6" bgcolor="${brand}" style="height:6px;line-height:6px;font-size:0;background-color:${brand};border-radius:16px 16px 0 0;">&nbsp;</td>
           </tr>
           <tr>
-            <td class="header" align="center" bgcolor="${brandSoft}" style="padding:20px 24px 18px;text-align:center;background-color:${brandSoft};border-bottom:1px solid ${c.lineSoft};">${header}</td>
+            <td class="header" align="center" bgcolor="${brandSoft}" style="padding:20px 24px 18px;text-align:center;background-color:${brandSoft};border-bottom:1px solid ${c.lineSoft};">${brandedHeader}</td>
           </tr>
           <tr>
             <td class="content" dir="${dir}" align="${start}" style="padding:24px 24px 8px;text-align:${start};color:${c.ink};font-family:${font};font-size:14px;line-height:1.5;">${inlineEmailStyles(
@@ -214,7 +219,7 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
               ${contactBlock}
               <p class="copyright" style="${footerP}color:${c.inkSoft};font-weight:500;">© ${year} ${storeName}</p>
               ${footerLines.map(l => `<p style="${footerP}">${l}</p>`).join('\n              ')}
-              ${store.hidePoweredBy ? '' : `<p class="powered" style="margin:14px 0 0;font-size:11px;color:${c.inkMute};">${poweredByBrand()}</p>`}
+              ${store.hidePoweredBy ? '' : `<p class="powered" style="margin:14px 0 0;font-size:11px;color:${c.inkMute};">${poweredByBrand(isArabic ? 'ar' : 'en')}</p>`}
             </td>
           </tr>
         </table>
@@ -406,7 +411,7 @@ export class EmailService {
   ): Promise<void> {
     const html = renderBrandedShell(args.content, {
       name: BRAND.product.nameEn,
-      nameAr: null,
+      nameAr: BRAND.product.nameAr,
       logo: BRAND_EMAIL_LOGO_URL,
       theme: null,
       email: null,
@@ -1080,7 +1085,7 @@ export class EmailService {
       text: this.htmlToText(
         renderBrandedShell(content, {
           name: BRAND.product.nameEn,
-          nameAr: null,
+          nameAr: BRAND.product.nameAr,
           logo: BRAND_EMAIL_LOGO_URL,
           theme: null,
           email: null,

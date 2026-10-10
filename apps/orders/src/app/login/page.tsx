@@ -108,23 +108,24 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center px-4 pb-16">
         <div className="w-full max-w-sm">
           <div className="mb-8 text-center">
-            <div className="mx-auto mb-4 flex items-center justify-center">
+            <div className="mx-auto mb-4 flex items-center justify-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/lockup-light.svg"
-                alt={BRAND.name}
+                src="/logo-on-light.svg"
+                alt={BRAND.product.nameEn}
                 className="h-16 w-auto dark:hidden"
-                width={192}
+                width={64}
                 height={64}
               />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/lockup-dark.svg"
-                alt={BRAND.name}
+                src="/logo.svg"
+                alt={BRAND.product.nameEn}
                 className="hidden h-16 w-auto dark:block"
-                width={192}
+                width={64}
                 height={64}
               />
+              <span className="text-lg font-semibold">{t.orders.title}</span>
             </div>
             <h1 className="text-xl font-bold text-foreground">
               {mfaChallengeToken ? t.login.mfaTitle : t.login.title}

@@ -21,7 +21,7 @@ export const LEGAL_EN: LegalPages = {
         p: [
           '"Ebda Store" («ابدأ ستور»), available at ebda.app, is an online store builder for merchants in Egypt (the "Service"). The Service is a technology platform owned and operated by ' +
             OP +
-            ' ("we", "us"). Ebda is our master brand.',
+            ' ("we", "us"). Ebda AI Studio is our company brand.',
         ],
       },
       {
@@ -45,7 +45,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: 'Intellectual property',
         p: [
-          'The Ebda name, logo, website and software belong to us or our licensors. Content in a store belongs to the merchant who published it. If you believe content in a store infringes your rights, write to ahlan@ebda.app with the store address, the content concerned, and proof of your rights; we will review it and may remove or disable the content.',
+          'The Ebda AI Studio and Ebda Store names, logos, website and software belong to us or our licensors. Content in a store belongs to the merchant who published it. If you believe content in a store infringes your rights, write to ahlan@ebda.app with the store address, the content concerned, and proof of your rights; we will review it and may remove or disable the content.',
         ],
       },
       {

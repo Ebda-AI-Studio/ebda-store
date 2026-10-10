@@ -42,7 +42,7 @@ const T = {
     bars: 'كل شريط يوم واحد (بالتوقيت العالمي)، من الأقدم إلى الأحدث.',
     days: 'الأيام',
     otherLang: { href: '/en', label: 'English', lang: 'en' },
-    footer: `© ${new Date().getUTCFullYear()} ${BRAND.company}`,
+    footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameAr}`,
   },
   en: {
     title: `${BRAND.name} service status`,
@@ -80,7 +80,7 @@ const T = {
     bars: 'Each bar is one UTC day, oldest to newest.',
     days: 'days',
     otherLang: { href: '/', label: 'العربية', lang: 'ar' },
-    footer: `© ${new Date().getUTCFullYear()} ${BRAND.company}`,
+    footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameEn}`,
   },
 } as const;
 

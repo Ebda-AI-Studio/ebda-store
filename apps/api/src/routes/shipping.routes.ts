@@ -118,7 +118,7 @@ router.get(
       });
 
       const workbook = new (await loadExcelJS()).Workbook();
-      workbook.creator = BRAND.name;
+      workbook.creator = BRAND.product.nameEn;
       workbook.created = new Date();
       const sheet = workbook.addWorksheet('Area Rates');
 

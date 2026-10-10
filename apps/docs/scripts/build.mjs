@@ -29,13 +29,13 @@ const EN = {
   site: 'Docs',
   skip: 'Skip to content',
   nav: [
-    { href: BRAND_MARKETING_URL, label: BRAND.name },
+    { href: BRAND_MARKETING_URL, label: BRAND.company.shortNameEn },
     { href: BRAND_STORE_APP_URL, label: 'Dashboard' },
     { href: `https://${BRAND.domains.help}`, label: 'Help centre' },
     { href: `https://${BRAND.domains.status}`, label: 'Status' },
   ],
   search: { action: '/search/', label: 'Search', placeholder: 'Search the docs' },
-  footer: `© ${new Date().getUTCFullYear()} ${BRAND.company}. ${BRAND.name} developer documentation.`,
+  footer: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameEn}. ${BRAND.product.nameEn} developer documentation.`,
   sidebarLabel: 'Documentation',
   tocLabel: 'On this page',
   openapi: {
@@ -69,7 +69,7 @@ const REF = {
   section: 'Reference',
   order: 40,
   description:
-    'Endpoint reference generated at build time from the OpenAPI annotations in the Ebda API source.',
+    'Endpoint reference generated at build time from the OpenAPI annotations in the Ebda Store API source.',
 };
 
 const allNav = [
@@ -109,7 +109,10 @@ const urls = ['/', '/ar/', '/search/'];
 function enPage({ slug, title, description, section, main, headings, bodyHtml }) {
   const html = renderPage({
     lang: 'en',
-    title: slug === 'index' ? `${BRAND.name} developer docs` : `${title} | ${BRAND.name} Docs`,
+    title:
+      slug === 'index'
+        ? `${BRAND.product.nameEn} developer docs`
+        : `${title} | ${BRAND.product.nameEn} Docs`,
     description,
     canonical: ORIGIN + url(slug),
     alternates: [
@@ -191,7 +194,7 @@ for (const p of pages) {
     .join('')}</ul>`;
   const page = renderPage({
     lang: 'ar',
-    title: `وثائق المطوّرين | ${BRAND.nameAr}`,
+    title: `وثائق المطوّرين | ${BRAND.product.nameAr}`,
     description: arIndex.data.description,
     canonical: ORIGIN + '/ar/',
     alternates: [
@@ -201,7 +204,7 @@ for (const p of pages) {
     siteLabel: 'وثائق المطوّرين',
     homeHref: '/ar/',
     nav: [
-      { href: BRAND_MARKETING_URL, label: BRAND.nameAr },
+      { href: BRAND_MARKETING_URL, label: BRAND.company.shortNameAr },
       { href: BRAND_STORE_APP_URL, label: 'لوحة التحكم' },
       { href: `https://${BRAND.domains.help}`, label: 'مركز المساعدة' },
       { href: `https://${BRAND.domains.status}`, label: 'حالة الخدمة' },
@@ -210,7 +213,7 @@ for (const p of pages) {
     search: { action: '/search/', label: 'بحث', placeholder: 'ابحث في الوثائق (بالإنجليزية)' },
     main: `<article class="prose"><h1>${esc(arIndex.data.title)}</h1>${html}${cards}</article>`,
     footer: renderFooter({
-      copy: `© ${new Date().getUTCFullYear()} ${BRAND.company}.`,
+      copy: `© ${new Date().getUTCFullYear()} ${BRAND.company.shortNameAr}.`,
       links: [{ href: `mailto:${BRAND.supportEmail}`, label: BRAND.supportEmail }],
     }),
     skipLabel: 'تخطَّ إلى المحتوى',
@@ -224,8 +227,8 @@ writePage(
   '/search/',
   renderPage({
     lang: 'en',
-    title: `Search | ${BRAND.name} Docs`,
-    description: 'Search the Ebda developer documentation.',
+    title: `Search | ${BRAND.product.nameEn} Docs`,
+    description: 'Search the Ebda Store developer documentation.',
     canonical: ORIGIN + '/search/',
     siteLabel: EN.site,
     homeHref: '/',
@@ -258,7 +261,7 @@ writeFileSync(
   path.join(out, '404.html'),
   renderPage({
     lang: 'en',
-    title: `Not found | ${BRAND.name} Docs`,
+    title: `Not found | ${BRAND.product.nameEn} Docs`,
     description: 'Page not found.',
     canonical: ORIGIN + '/',
     siteLabel: EN.site,
@@ -272,7 +275,7 @@ writeFileSync(
 );
 writeFileSync(
   path.join(out, 'llms.txt'),
-  `# ${BRAND.name} developer docs\n\n> API and developer documentation for ${BRAND.name} (${BRAND.company}).\n\n${pages
+  `# ${BRAND.product.nameEn} developer docs\n\n> API and developer documentation for ${BRAND.product.nameEn} (${BRAND.company.shortNameEn}).\n\n${pages
     .map(p => `- [${p.data.title}](${ORIGIN}${url(p.slug)}): ${p.data.description}`)
     .join('\n')}\n- [OpenAPI document](${ORIGIN}/openapi.json)\n`
 );
