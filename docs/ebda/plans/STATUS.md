@@ -1,3 +1,5 @@
+> **RETIRED, HISTORICAL — 2026-10-10.** Superseded by `docs/ebda/evidence-hierarchy.md` (Ahmad's binding decision, FIX-016). Several claims below are now factually wrong (see `docs/ebda/truth-table-2026-10.md` §4 for the line-by-line diff) — kept only as a record of what the 2026-10-04 snapshot believed, not as a current source of truth. Do not cite this file for a readiness claim.
+
 # Ebda — status (updated 2026-10-04, all sub-projects built; remaining items need Ahmad)
 
 Spend is an ESTIMATE from sub-agent token counts (the cloud session exposes no dollar meter). All SPs are inside their allocation so far.
