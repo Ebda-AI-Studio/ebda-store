@@ -29,7 +29,8 @@ export function pageMetadata(
   description?: string
 ): Metadata {
   const c = COPY[locale];
-  const t = title ?? c.meta.title;
+  const name = locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn;
+  const t = title ? (title.includes(name) ? title : `${title} | ${name}`) : c.meta.title;
   const d = description ?? c.meta.description;
   const languages: Record<string, string> = {
     ar: pagePath('ar', page),
@@ -43,7 +44,7 @@ export function pageMetadata(
     alternates: { canonical: pagePath(locale, page), languages },
     openGraph: {
       type: 'website',
-      siteName: `${BRAND.product.nameEn} · ${BRAND.product.nameAr}`,
+      siteName: name,
       title: t,
       description: d,
       url: pagePath(locale, page),
@@ -87,7 +88,8 @@ export function jsonLd(locale: Locale) {
         '@type': 'WebSite',
         '@id': site,
         url: absoluteUrl(HOME[locale]),
-        name: BRAND.company.shortNameEn,
+        name: locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn,
+        alternateName: locale === 'ar' ? BRAND.company.shortNameEn : BRAND.company.shortNameAr,
         inLanguage: locale,
         publisher: { '@id': org },
       },

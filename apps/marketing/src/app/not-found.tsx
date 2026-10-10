@@ -5,7 +5,7 @@ import { RootShell } from '@/components/RootShell';
 import { HOME } from '@/lib/site';
 
 export const metadata: Metadata = {
-  title: 'الصفحة مش موجودة | ابدأ',
+  title: 'الصفحة مش موجودة | ابدأ ستوديو للذكاء الاصطناعي',
   robots: { index: false, follow: true },
   icons: { icon: '/icon.svg', apple: '/apple-touch-icon.png' },
 };
