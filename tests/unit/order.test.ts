@@ -417,14 +417,16 @@ describe('OrderService', () => {
       txOrderCount.mockReset().mockResolvedValue(0);
       txCouponUpdateMany.mockReset().mockResolvedValue({ count: 1 });
       // Stock-hold cap (lib/stock-hold-cap.ts): `OrderService.create` now
-      // calls the OUTER `prisma.order.count` (never `tx.order.count`, which
+      // calls the OUTER `prisma.$queryRaw` (never `tx.order.count`, which
       // `txOrderCount` above backs) before opening the order transaction, for
       // every cod/instapay order whose shippingAddress carries a phone or
-      // email. Reset it to 0 (well under the default cap) so it doesn't
-      // inherit a stale `.mockResolvedValue(...)` left behind by an earlier
-      // describe block in this file (`list`, around line 331) — a test that
-      // means to exercise the cap itself overrides this explicitly.
-      vi.mocked(prisma.order.count).mockReset().mockResolvedValue(0);
+      // email. Reset it to an under-cap row so it doesn't inherit a stale
+      // `.mockResolvedValue(...)` left behind by an earlier describe block in
+      // this file (`list`, around line 331) — a test that means to exercise
+      // the cap itself overrides this explicitly.
+      vi.mocked(prisma.$queryRaw)
+        .mockReset()
+        .mockResolvedValue([{ phone_or_email_count: 0n, ip_count: 0n }]);
       vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
         if (typeof fn === 'function') {
           return fn({
