@@ -169,6 +169,32 @@ export function SettingsPanel({
             })}
           </fieldset>
         )}
+        {!block && mode === 'content' && defs.length === 0 && node.type === 'header' && (
+          <div
+            data-testid="header-content-elsewhere"
+            className="rounded-lg border border-dashed border-border p-2 text-xs text-muted-foreground"
+          >
+            {t('headerContentEmpty')}{' '}
+            <a href={`/stores/${storeId}/page-builder`} className="text-primary hover:underline">
+              {t('editInClassic')}
+            </a>
+            {' · '}
+            <a href={`/stores/${storeId}/branding`} className="text-primary hover:underline">
+              {t('editInBranding')}
+            </a>
+          </div>
+        )}
+        {!block && mode === 'content' && defs.length === 0 && node.type === 'footer' && (
+          <div
+            data-testid="footer-content-elsewhere"
+            className="rounded-lg border border-dashed border-border p-2 text-xs text-muted-foreground"
+          >
+            {t('footerContentEmpty')}{' '}
+            <a href={`/stores/${storeId}/page-builder`} className="text-primary hover:underline">
+              {t('editInClassic')}
+            </a>
+          </div>
+        )}
         {defs.map(s => (
           <Field
             key={s.id}
