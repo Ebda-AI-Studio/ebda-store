@@ -12,6 +12,29 @@ import { heroSlideSchema } from '../../apps/api/src/routes/store-layout.routes';
 
 const baseSlide = { image: '/hero.jpg' };
 
+describe('heroSlideSchema — optional image (draft autosave must not block)', () => {
+  // Bug: "A hero slide's autosave is blocked when it has no image." A newly
+  // added slide starts with `settings: {}` (no `image` key at all) — the
+  // whole-document draft validation must accept that so autosave can
+  // persist the in-progress edit. Publish readiness is a SEPARATE, later
+  // gate (`validatePublishReadiness`).
+  it('accepts a slide with no image at all (field omitted — a freshly added slide)', () => {
+    const result = heroSlideSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an explicit empty-string image', () => {
+    const result = heroSlideSchema.safeParse({ image: '' });
+    expect(result.success).toBe(true);
+  });
+
+  it('still accepts a real image value', () => {
+    const result = heroSlideSchema.safeParse(baseSlide);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.image).toBe('/hero.jpg');
+  });
+});
+
 describe('heroSlideSchema — link (banner link)', () => {
   it('accepts a slide with no link at all (field omitted)', () => {
     const result = heroSlideSchema.safeParse(baseSlide);

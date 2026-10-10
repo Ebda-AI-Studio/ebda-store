@@ -94,6 +94,19 @@ export interface PageRendererProps {
   editorMode?: boolean;
 }
 
+/**
+ * `HeroSlide.image` is optional on the TYPE only so a draft can hold a
+ * just-added slide with no image chosen yet (`validatePublishReadiness`
+ * refuses to publish any visible slide without one, so a live render should
+ * never actually see this filter remove anything — it's defense in depth
+ * against a document published before that gate existed).
+ */
+function heroSlidesWithImage<T extends { image?: string }>(
+  slides: readonly T[]
+): Array<T & { image: string }> {
+  return slides.filter((s): s is T & { image: string } => !!s.image);
+}
+
 export function PageRenderer({
   definition,
   editorMode = false,
@@ -374,7 +387,12 @@ export function PageRenderer({
           >
             {layout.hero.enabled && sliderEligible && T.HeroSlider && (
               <T.HeroSlider
-                slides={layout.hero.slides}
+                // `image` is optional on HeroSlide only so a DRAFT can hold a
+                // just-added slide with no image yet; `validatePublishReadiness`
+                // refuses to publish one without it, so every slide reaching a
+                // live render is guaranteed to have one — filter is defense in
+                // depth against a document from before that gate existed.
+                slides={heroSlidesWithImage(layout.hero.slides)}
                 autoplayMs={layout.hero.autoplayMs}
                 isRtl={isRtl}
                 pack={templateId}
@@ -383,16 +401,19 @@ export function PageRenderer({
                 urlPrefix={storeUrl('')}
               />
             )}
-            {layout.hero.enabled && bannerEligible && T.HeroBanner && (
-              <T.HeroBanner
-                {...layout.hero.slides[0]}
-                isRtl={isRtl}
-                pack={templateId}
-                presentation={layout.hero.presentation}
-                headingZone={heroHeadingZone}
-                urlPrefix={storeUrl('')}
-              />
-            )}
+            {layout.hero.enabled &&
+              bannerEligible &&
+              T.HeroBanner &&
+              heroSlidesWithImage(layout.hero.slides)[0] && (
+                <T.HeroBanner
+                  {...heroSlidesWithImage(layout.hero.slides)[0]}
+                  isRtl={isRtl}
+                  pack={templateId}
+                  presentation={layout.hero.presentation}
+                  headingZone={heroHeadingZone}
+                  urlPrefix={storeUrl('')}
+                />
+              )}
             {layout.hero.enabled && !sliderEligible && !bannerEligible && legacyHeroHasContent && (
               <T.Hero
                 title={heroTitleEn}

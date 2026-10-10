@@ -214,6 +214,94 @@ test('publish flushes the draft and publishes it', async ({ page }) => {
   expect(s.draft).toBeNull();
 });
 
+test('publish keeps the latest edit made while an earlier autosave is pending', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  await structure(page);
+  await page.getByTestId('tree-select-categories').click();
+  await settings(page);
+  const title = page.getByTestId('field-title');
+  let releaseFirst!: () => void;
+  const held = new Promise<void>(resolve => {
+    releaseFirst = resolve;
+  });
+  let firstStarted!: () => void;
+  const started = new Promise<void>(resolve => {
+    firstStarted = resolve;
+  });
+  let requests = 0;
+  await page.route(`${API}/admin/stores/${STORE_ID}/builder/pages/home/draft`, async route => {
+    if (route.request().method() === 'PUT' && ++requests === 1) {
+      firstStarted();
+      await held;
+    }
+    await route.continue();
+  });
+  try {
+    await title.fill('First catalogue');
+    await started;
+    await title.fill('Second catalogue');
+    await page.getByTestId('publish').click();
+    await title.fill('Latest catalogue');
+    // Let the latest edit debounce while the first HTTP response stays held.
+    await page.waitForTimeout(1400);
+    releaseFirst();
+    await expect.poll(async () => (await state(page)).publishes).toBe(1);
+    const published = (await state(page)).published as State['draft'];
+    expect(published?.definition.sections.find(x => x.id === 'categories')?.settings.title).toBe(
+      'Latest catalogue'
+    );
+    await expect(title).toHaveValue('Latest catalogue');
+  } finally {
+    releaseFirst();
+  }
+});
+
+test('autosave waits for an in-flight publish and keeps later edits as a draft', async ({
+  page,
+}) => {
+  await openBuilder(page);
+  await structure(page);
+  await page.getByTestId('tree-select-categories').click();
+  await settings(page);
+  const title = page.getByTestId('field-title');
+  await title.fill('Published catalogue');
+  await waitSaved(page);
+  let releasePublish!: () => void;
+  const held = new Promise<void>(resolve => {
+    releasePublish = resolve;
+  });
+  let publishStarted!: () => void;
+  const started = new Promise<void>(resolve => {
+    publishStarted = resolve;
+  });
+  await page.route(`${API}/admin/stores/${STORE_ID}/builder/pages/home/publish`, async route => {
+    publishStarted();
+    await held;
+    await route.continue();
+  });
+  try {
+    await page.getByTestId('publish').click();
+    await started;
+    await title.fill('Next draft catalogue');
+    await page.waitForTimeout(1400);
+    releasePublish();
+    await expect.poll(async () => (await state(page)).publishes).toBe(1);
+    await waitSaved(page);
+    const s = await state(page);
+    const published = s.published as State['draft'];
+    expect(published?.definition.sections.find(x => x.id === 'categories')?.settings.title).toBe(
+      'Published catalogue'
+    );
+    expect(s.draft?.definition.sections.find(x => x.id === 'categories')?.settings.title).toBe(
+      'Next draft catalogue'
+    );
+  } finally {
+    releasePublish();
+  }
+});
+
 test('a concurrent edit shows the conflict choice; "keep mine" saves over it explicitly', async ({
   page,
 }) => {
