@@ -162,17 +162,17 @@
       "postcss": "^8.5.23"
     },
     "@lhci/cli": {
-      "uuid": "^11.1.1",
-      "tmp": "0.2.7",
-      "inquirer": ">=9.3.7",
-      "external-editor": ">=3.1.0",
-      "typed-rest-client": ">=2.1.0"
+      "lighthouse": "13.5.0"
     },
     "minimatch": "^10.0.3",
     "deepmerge-ts": "^8.0.0",
     "qs": "6.16.0",
     "wrangler": "4.116.0",
-    "basic-ftp": "6.2.2"
+    "basic-ftp": "6.2.2",
+    "postcss-selector-parser": "7.1.6",
+    "@lhci/utils": {
+      "lighthouse": "13.5.0"
+    }
   },
   "dependencies": {
     "@emnapi/core": "^1.10.0",
