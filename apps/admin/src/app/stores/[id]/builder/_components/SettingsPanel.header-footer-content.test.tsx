@@ -1,14 +1,22 @@
 // @vitest-environment jsdom
 /**
  * Bug: "The visual (Page Builder) editor can't edit menu/logo/footer at
- * all." Confirmed live: the header and footer sections have ZERO `group:
- * 'content'` settings (menu/logo/footer-links are deliberately global store
- * data, edited elsewhere — Ruling BUILDER2-ADVANCED-1 already does this for
+ * all." Confirmed live: header and footer have ZERO `group: 'content'`
+ * settings (menu/logo/footer-links are deliberately global store data,
+ * edited elsewhere — Ruling BUILDER2-ADVANCED-1 already does this for
  * typography/dividers), so their Content tab rendered a dead-empty panel
  * with no indication anything was wrong or where to go instead.
  *
- * This doesn't port nav/logo/footer-link editing into the new builder (a
- * bigger product decision — see the triage report); it closes the narrower,
+ * A code-review pass on the first version of this fix (which special-cased
+ * only `header`/`footer`) found the SAME zero-content-settings registry
+ * shape on three more section types — `announcement`, `brand-story`,
+ * `trust-strip` (all `styleSettings()`-only in the registry) — left with
+ * the identical blank panel. `ContentElsewhereNotice` now covers all five
+ * from one data-driven condition (`defs.length === 0`) instead of two
+ * hardcoded cases.
+ *
+ * This doesn't port that content editing into the new builder (a bigger
+ * product decision — see the triage report); it closes the narrower,
  * unambiguous gap: the Content tab must say SOMETHING and point the
  * merchant to where that content actually lives, matching the existing
  * typography/dividers "Edit in classic" affordance.
@@ -17,18 +25,31 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import type { PageDefinition } from '@force/shared';
 
-vi.mock('next-intl', () => {
+const localeState = vi.hoisted(() => ({ value: 'en' }));
+
+vi.mock('next-intl', async () => {
+  const ar = (await import('@/i18n/messages/ar.json')).default.builder.settings;
   const messages: Record<string, string> = {
     content: 'Content',
     design: 'Design',
     modeLabel: 'Editing mode',
     headerContentEmpty: 'The menu and logo live elsewhere for now.',
     footerContentEmpty: 'Footer links live elsewhere for now.',
+    announcementContentEmpty: "This bar's text lives elsewhere for now.",
+    brandStoryContentEmpty: "This section's text and image live elsewhere for now.",
+    trustStripContentEmpty: "This strip's items live elsewhere for now.",
     editInClassic: 'Edit in the classic page builder',
+    editAnnouncement: 'Edit announcement text',
+    editStoreDescription: 'Edit store description',
+    editTrustStripStyle: 'Edit strip style',
     editInBranding: 'Edit the logo in Branding',
   };
-  const t = Object.assign((key: string) => messages[key] ?? key, { has: () => true });
-  return { useTranslations: () => t, useLocale: () => 'en' };
+  const t = Object.assign(
+    (key: string) =>
+      (localeState.value === 'ar' ? (ar as Record<string, unknown>)[key] : messages[key]) ?? key,
+    { has: () => true }
+  );
+  return { useTranslations: () => t, useLocale: () => localeState.value };
 });
 
 import { SettingsPanel } from './SettingsPanel';
@@ -40,11 +61,16 @@ const docWith = (type: string): PageDefinition => ({
     header: type === 'header' ? [{ id: 'header', type: 'header', settings: {} }] : [],
     footer: type === 'footer' ? [{ id: 'footer', type: 'footer', settings: {} }] : [],
   },
-  sections: type === 'hero' ? [{ id: 'hero', type: 'hero', settings: {} }] : [],
+  sections: ['hero', 'announcement', 'brand-story', 'trust-strip'].includes(type)
+    ? [{ id: type, type, settings: {} }]
+    : [],
   siteSettings: {},
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localeState.value = 'en';
+});
 
 function renderPanel(type: string, sectionId: string) {
   return render(
@@ -83,5 +109,32 @@ describe('SettingsPanel — header/footer Content tab points elsewhere instead o
     renderPanel('hero', 'hero');
     expect(screen.queryByTestId('header-content-elsewhere')).toBeNull();
     expect(screen.queryByTestId('footer-content-elsewhere')).toBeNull();
+  });
+
+  it.each([
+    ['announcement', 'Edit announcement text', '/stores/store-1/announcement'],
+    ['brand-story', 'Edit store description', '/stores/store-1/branding'],
+    ['trust-strip', 'Edit strip style', '/stores/store-1/page-builder'],
+  ])(
+    '%s: points to the actual editor without claiming fixed content is editable',
+    (type, label, href) => {
+      renderPanel(type, type);
+      const panel = screen.getByTestId(`${type}-content-elsewhere`);
+      expect(panel.querySelector('a')?.textContent).toBe(label);
+      expect(panel.querySelector('a')?.getAttribute('href')).toBe(href);
+      expect(screen.queryByText('Edit the logo in Branding')).toBeNull();
+    }
+  );
+  it.each([
+    ['announcement', 'تعديل نص الإعلان', '/stores/store-1/announcement'],
+    ['brand-story', 'تعديل وصف المتجر', '/stores/store-1/branding'],
+    ['trust-strip', 'تعديل تنسيق الشريط', '/stores/store-1/page-builder'],
+  ])('%s: Arabic uses the same verified destination', (type, label, href) => {
+    localeState.value = 'ar';
+    renderPanel(type, type);
+    const panel = screen.getByTestId(`${type}-content-elsewhere`);
+    expect(panel.querySelector('a')?.textContent).toBe(label);
+    expect(panel.querySelector('a')?.getAttribute('href')).toBe(href);
+    if (type === 'trust-strip') expect(panel.textContent).toContain('عناصر هذا الشريط ثابتة');
   });
 });
