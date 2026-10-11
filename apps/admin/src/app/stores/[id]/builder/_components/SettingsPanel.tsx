@@ -169,6 +169,9 @@ export function SettingsPanel({
             })}
           </fieldset>
         )}
+        {!block && mode === 'content' && defs.length === 0 && (
+          <ContentElsewhereNotice sectionType={node.type} storeId={storeId} t={t} />
+        )}
         {defs.map(s => (
           <Field
             key={s.id}
@@ -193,6 +196,60 @@ export function SettingsPanel({
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+// These sections have no local content fields. Point to the verified source
+// editor; the trust strip has fixed items and only offers style controls.
+const CONTENT_ELSEWHERE: Record<string, { messageKey: string; route: string; labelKey: string }> = {
+  header: { messageKey: 'headerContentEmpty', route: 'page-builder', labelKey: 'editInClassic' },
+  footer: { messageKey: 'footerContentEmpty', route: 'page-builder', labelKey: 'editInClassic' },
+  announcement: {
+    messageKey: 'announcementContentEmpty',
+    route: 'announcement',
+    labelKey: 'editAnnouncement',
+  },
+  'brand-story': {
+    messageKey: 'brandStoryContentEmpty',
+    route: 'branding',
+    labelKey: 'editStoreDescription',
+  },
+  'trust-strip': {
+    messageKey: 'trustStripContentEmpty',
+    route: 'page-builder',
+    labelKey: 'editTrustStripStyle',
+  },
+};
+
+function ContentElsewhereNotice({
+  sectionType,
+  storeId,
+  t,
+}: {
+  sectionType: string;
+  storeId: string;
+  t: (key: string) => string;
+}) {
+  const notice = CONTENT_ELSEWHERE[sectionType];
+  if (!notice) return null;
+  return (
+    <div
+      data-testid={`${sectionType}-content-elsewhere`}
+      className="rounded-lg border border-dashed border-border p-2 text-xs text-muted-foreground"
+    >
+      {t(notice.messageKey)}{' '}
+      <a href={`/stores/${storeId}/${notice.route}`} className="text-primary hover:underline">
+        {t(notice.labelKey)}
+      </a>
+      {sectionType === 'header' && (
+        <>
+          {' · '}
+          <a href={`/stores/${storeId}/branding`} className="text-primary hover:underline">
+            {t('editInBranding')}
+          </a>
+        </>
+      )}
     </div>
   );
 }
