@@ -107,3 +107,9 @@ Deleting a Worker removes its custom domain and zone route; verify afterwards th
 - `tests/integration/public-testimonials-rls.test.ts` — the testimonials route under strict RLS (bug found by this pilot).
 - `tests/dahab/dahab-storefront.spec.ts` (`npx playwright test -c playwright.dahab.config.ts`) — home / collection / product / cart, ar + en, at 390 / 820 / 1440: direction, no horizontal scroll, Western digits, axe WCAG 2.1 AA (no serious/critical), drawers open from the correct side. Needs a seeded store; not in CI.
 - Homepage characterization snapshots (5 legacy templates) are unchanged.
+
+## Accepted payments
+
+The footer and order summary share the cart's `AcceptedPaymentBadges` renderer. It reads fresh store-scoped `/payments/config` on mount/store changes; the stored `acceptedPaymentMethods` display override cannot enable a badge. Unknown, loading, failed or malformed configuration renders no payment claim. Only enabled method codes and configured COD/InstaPay appear, with Arabic/English labels. Checkout independently revalidates availability. No payment credentials or settings are changed by this display fix.
+
+Regression evidence: `tests/unit/storefront-payment-badges.test.tsx` drives the real cart, Dahab footer and order summary, including stale card overrides, loading, network failure/retry, malformed config, method-specific labels and tenant switches/late responses. Initial15cases failed against the old renderers before correction.

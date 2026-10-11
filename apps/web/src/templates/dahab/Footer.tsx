@@ -9,6 +9,7 @@
  * `newsletter`), so the footer does not repeat it.
  */
 import Link from 'next/link';
+import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { PoweredByForce } from '../shared/PoweredByForce';
@@ -25,50 +26,8 @@ const LINK =
   'inline-flex min-h-[40px] items-center text-sm text-foreground/70 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm';
 const HEAD = 'font-display mb-4 text-lg text-foreground rtl:text-xl';
 
-function Mark({ children, label }: { children: React.ReactNode; label: string }) {
-  return (
-    <li
-      aria-label={label}
-      className="flex h-7 items-center rounded-[3px] border border-foreground/20 px-2.5 text-[11px] font-medium text-foreground/70"
-    >
-      {children}
-    </li>
-  );
-}
-
 export function DahabPaymentMarks({ className }: { className?: string }) {
-  const { t } = useLanguage();
-  return (
-    <ul
-      className={cx('flex flex-wrap items-center gap-2', className)}
-      aria-label={t('Ways to pay', 'طرق الدفع')}
-    >
-      <Mark label="Visa">
-        <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-8" aria-hidden="true">
-          <path d="M9.112 8.262 5.97 15.758H3.92L2.374 9.775c-.094-.368-.175-.503-.461-.658C1.447 8.864.677 8.627 0 8.479l.046-.217h3.3a.904.904 0 0 1 .894.764l.817 4.338 2.018-5.102h2.037Zm8.033 5.049c.008-1.979-2.736-2.088-2.717-2.972.006-.269.262-.555.822-.628a3.66 3.66 0 0 1 1.913.336l.34-1.59a5.207 5.207 0 0 0-1.814-.333c-1.917 0-3.266 1.02-3.278 2.479-.013 1.08.963 1.683 1.7 2.042.757.367 1.011.603 1.007.931-.005.503-.603.726-1.161.734-.976.015-1.541-.264-1.994-.474l-.352 1.645c.454.208 1.29.39 2.156.398 2.037 0 3.37-1.006 3.378-2.568Zm5.061 2.447H24l-1.565-7.496h-1.656a.883.883 0 0 0-.826.55l-2.909 6.946h2.036l.405-1.12h2.488l.233 1.12Zm-2.166-2.656 1.02-2.815.588 2.815h-1.608Zm-8.16-4.84-1.603 7.496H8.34l1.605-7.496h1.935Z" />
-        </svg>
-      </Mark>
-      <Mark label="Mastercard">
-        <svg
-          viewBox="0 0 30 18"
-          className="h-4 w-7"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          aria-hidden="true"
-        >
-          <circle cx="11" cy="9" r="7" />
-          <circle cx="19" cy="9" r="7" />
-        </svg>
-      </Mark>
-      <Mark label="Meeza">Meeza</Mark>
-      <Mark label="InstaPay">InstaPay</Mark>
-      <Mark label="Fawry">Fawry</Mark>
-      <Mark label={t('Cash on delivery', 'الدفع عند الاستلام')}>
-        {t('Cash on delivery', 'الدفع عند الاستلام')}
-      </Mark>
-    </ul>
-  );
+  return <AcceptedPaymentBadges variant="dahab" className={className} />;
 }
 
 export default function DahabFooter({

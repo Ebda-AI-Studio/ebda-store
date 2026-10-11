@@ -26,8 +26,8 @@ export interface PaymentMethodEntry {
 
 export interface PaymentConfigResponse {
   methods?: Record<string, PaymentMethodEntry[]>;
-  cod?: { displayName?: string; displayNameAr?: string } | null;
-  instapay?: { displayName?: string; displayNameAr?: string } | null;
+  cod?: { displayName?: string | null; displayNameAr?: string | null } | null;
+  instapay?: { displayName?: string | null; displayNameAr?: string | null } | null;
 }
 
 export interface PaymentBadge {
@@ -55,7 +55,9 @@ export function deriveAcceptedPaymentBadges(config: PaymentConfigResponse): Paym
     for (const entry of entries) {
       const code = entry?.code;
       if (typeof code !== 'string' || seen.has(code)) continue;
-      const badge = METHOD_BADGES[code];
+      const badge = Object.prototype.hasOwnProperty.call(METHOD_BADGES, code)
+        ? METHOD_BADGES[code]
+        : undefined;
       if (!badge) continue; // unknown/future code — never guess a label
       seen.add(code);
       badges.push(badge);
