@@ -44,7 +44,7 @@ fi
 
 # Catch lockfile drift before Railway hits the same trap on `npm ci`.
 # Standing emnapi trap — see feedback-emnapi-lockfile-desync-after-add.md.
-npm ci --dry-run 2>&1 | grep -E "^npm error" && exit 1 || true
+npm ci --dry-run
 
 # Generate Prisma client before typecheck. Without this, apps/api typecheck
 # reports ~396 phantom errors (all "any" / "unknown" types from missing
