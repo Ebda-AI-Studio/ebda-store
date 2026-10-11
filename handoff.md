@@ -76,3 +76,22 @@ Left: sandbox proof per provider (all still unverified); full defence-mutation r
 Goal: store-order money correctness for Egypt — gap-free tax invoices/receipts + credit notes, VAT base incl. shipping/COD fee, COD fee shown before ordering, 6-year tax archive surviving store deletion, shipping lifecycle through the status fan-out (+ return to origin), CSV prices in EGP, Egypt addresses/phones/copy. Rulings MONEYB-1..8 in docs/RULINGS.md; help `invoices-and-credit-notes` (new), `orders-and-cod`, `vat-registration`, `products-and-csv-import` (ar/en).
 Done: migration `20261008160000_fiscal_documents_expand` (expand-only: `orders.cod_fee`, `orders.taxable_amount`, `fiscal_documents` + counters, immutability trigger, strict RLS, archive definers); merchant `/stores/[id]/invoices`, order Documents card, super-admin `/tax-archive`; manual refund requires a recorded method (`orders:refund`); unit + integration (local PG) green, mutation checks recorded in MONEYB rulings.
 Left: rebase onto batch A when it merges (its migration `20261008130000_instapay_receipts` sorts after ours — rename ours past it if A lands first); after deploy check `/health` commit and the invoices page on a store; no purge job for `retain_until` (nothing expires before 2032-10). Local containers `ebda-moneyb-pg` / `ebda-moneyb-redis` (Apple `container`) can be removed.
+
+## PR65 stock-hold admission correction — 2026-10-11
+
+### Goal
+Enforce COD/InstaPay unpaid-hold admission atomically; prevent gateway-to-manual bypass; exempt fully wallet-paid orders.
+
+### Current state
+Independent review has no remaining blockers. Normal local gate passes563files8426unit tests, typecheck/lint/format. Local PostgreSQL17:29checkout/wallet tests and8strict-app-role/payment-route tests pass; app-role has neither SUPERUSER nor BYPASSRLS. Original concurrency, email-casing and full-wallet defects reproduced before fixes.
+
+### Done
+Sorted tenant identity advisory locks/count/order insertion share the money transaction. Canonical email comparison/index covers legacy whitespace/case. Server-owned manualHoldAdmitted persists admission; new manual attachment refuses unadmitted orders while existing live same-provider retries remain supported. CGNAT test actually permits8contacts and rejects9th. Checkout renders actionable AR/EN refusal copy. Configuration docs and rulings updated.
+
+### In progress
+Rebase on merged PR67, exact-head CI and deploy preparation. Production migration intentionally unapplied, as required by saved plan.
+
+### Left to do
+Obtain Ahmad's explicit approval for production migration adding checkout_ip/manual_hold_admitted plus3partial indexes; apply via guarded schema-first API deployment only after CI. Verify production revision and actual changed paths; do not create a real order/payment or notify merchants. No active live storefront exists (owner read-only count verified with RLS inactive), so public badge interaction is test-proven only until QA preview/activation is addressed. Remaining overall handoff includes68–71,Dahab,saved editor/MCP patches,AR,templates,readiness and live merchant walk.
+
+Blast-radius: swept admission/marker/error/config consumers across API,web,MCP,payment factory,retries,wallet,migrations,tests,docs andCI. MCP COD creates through OrderService; gateway factory excludes manual providers. No remaining bypass found.

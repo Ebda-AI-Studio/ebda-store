@@ -103,7 +103,12 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
     return agg._sum.amount ?? 0;
   }
 
-  async function checkout(customerId: string, items: Array<[string, number]>, useWallet: boolean) {
+  async function checkout(
+    customerId: string,
+    items: Array<[string, number]>,
+    useWallet: boolean,
+    paymentMethod = 'paymob'
+  ) {
     const sessionId = cartSessionId('wallet');
     const cart = await CartService.getOrCreate(storeId, sessionId, customerId);
     for (const [productId, quantity] of items) {
@@ -111,10 +116,39 @@ describe.skipIf(!hasDb)('customer wallet — integration', () => {
     }
     const order = await OrderService.create(storeId, customerId, sessionId, {
       ...baseOrderData,
+      paymentMethod,
       useWallet,
     });
     return { order, sessionId };
   }
+
+  it('full-wallet COD is exempt at the hold cap; partial-wallet COD is refused without a debit', async () => {
+    const customer = await newCustomer();
+    await fund(customer, 20000);
+    await checkout(customer, [[productA, 1]], false, 'cod');
+    await checkout(customer, [[productA, 1]], false, 'cod');
+    const full = await checkout(customer, [[productA, 1]], true, 'cod');
+    expect(full.order.paymentStatus).toBe('paid');
+    expect(full.order.manualHoldAdmitted).toBe(false);
+    const remaining = await balanceOf(customer);
+    await WalletService.applyEntry({
+      storeId,
+      customerId: customer,
+      amount: -(remaining - 1000),
+      type: 'admin_adjust',
+      idempotencyKey: uid('reduce'),
+      note: 'partial wallet fixture',
+    });
+    const before = await balanceOf(customer);
+    const stock = (await prisma.product.findUniqueOrThrow({ where: { id: productA } })).inventory;
+    await expect(checkout(customer, [[productA, 1]], true, 'cod')).rejects.toMatchObject({
+      code: 'TOO_MANY_OPEN_HOLDS',
+    });
+    expect(await balanceOf(customer)).toBe(before);
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: productA } })).inventory).toBe(
+      stock
+    );
+  });
 
   beforeAll(async () => {
     const owner = await prisma.user.create({

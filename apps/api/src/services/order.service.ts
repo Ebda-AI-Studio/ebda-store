@@ -69,7 +69,7 @@ import { amountOnlyRefundKey } from '../lib/refund-methods';
 import { lineUnitCost } from '../lib/order-line-cost';
 import { customerKeyOf } from '../lib/customer-key';
 import { SmsConsentService } from './sms-consent.service';
-import { assertStockHoldCapNotExceeded } from '../lib/stock-hold-cap';
+import { assertStockHoldCapNotExceeded, HOLD_CAPPED_PAYMENT_METHODS } from '../lib/stock-hold-cap';
 
 /**
  * Bust the storefront product caches (list / detail / suggest — all carry
@@ -620,6 +620,9 @@ export class OrderService {
       shippingAddress: {
         ...data.shippingAddress,
         phone: normalizePhoneForStorage(data.shippingAddress.phone),
+        ...(typeof data.shippingAddress.email === 'string'
+          ? { email: data.shippingAddress.email.trim().toLowerCase() }
+          : {}),
       },
       ...(data.billingAddress
         ? {
@@ -630,17 +633,6 @@ export class OrderService {
           }
         : {}),
     };
-
-    // Stock-hold abuse fix: for COD/InstaPay (no synchronous payment capture)
-    // reject a NEW order once the caller already has too many open unpaid
-    // holds on this store by phone, email OR IP. Runs before any cart/stock
-    // read so an abusive run never reaches inventory. See stock-hold-cap.ts
-    // for why only these two methods are capped and why no identity → no-op.
-    await assertStockHoldCapNotExceeded(prisma, storeId, data.paymentMethod, {
-      phone: data.shippingAddress.phone,
-      email: typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null,
-      ip: requestContext?.checkoutIp ?? null,
-    });
 
     // Get cart
     const cart = await CartService.getOrCreate(storeId, sessionId, customerId);
@@ -1146,6 +1138,18 @@ export class OrderService {
       // the ambient tenant transaction, so the code-level tenant guard (R-EBDA-003) and the
       // `prisma` proxy both see the store.
       scopeTransaction(moneyTx, { storeId }, async (tx: Prisma.TransactionClient) => {
+        // Admission and stock reservation share one transaction. Full-wallet
+        // orders are already paid; a failed wallet debit below rolls back all work.
+        const manualHoldAdmitted =
+          !paidInFullByWallet && HOLD_CAPPED_PAYMENT_METHODS.has(data.paymentMethod);
+        if (manualHoldAdmitted) {
+          await assertStockHoldCapNotExceeded(tx, storeId, data.paymentMethod, {
+            phone: data.shippingAddress.phone,
+            email:
+              typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null,
+            ip: requestContext?.checkoutIp ?? null,
+          });
+        }
         // The public checkout (`POST /public/orders`) and the MCP `place_order`
         // tool reach this with NO tenant context, and `backorder_lines` (written
         // below for backordered lines) has a STRICT RLS policy: under `ebda_app`
@@ -1522,6 +1526,7 @@ export class OrderService {
             // Stock-hold cap signal (lib/stock-hold-cap.ts) — never read for
             // anything else. NULL when the caller passed none.
             checkoutIp: requestContext?.checkoutIp ?? null,
+            manualHoldAdmitted,
             shippingAddress: data.shippingAddress,
             billingAddress: data.billingAddress || data.shippingAddress,
             notes: data.notes,

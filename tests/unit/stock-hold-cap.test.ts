@@ -1,6 +1,6 @@
 /**
  * Stock-hold abuse fix: `assertStockHoldCapNotExceeded` is the shared guard
- * `OrderService.create` calls before reserving stock for a NEW order on a
+ * `OrderService.create` calls inside the transaction before reserving stock for a NEW order on a
  * payment method that never captures synchronously (COD, InstaPay). Without
  * it, a guest checkout could accumulate an unbounded number of open
  * pending/awaiting-confirmation unpaid orders against the same phone, email
@@ -55,6 +55,7 @@ describe('stock-hold-cap', () => {
   describe('assertStockHoldCapNotExceeded', () => {
     function tx(phoneOrEmailCount: number, ipCount = 0) {
       return {
+        $executeRaw: vi.fn().mockResolvedValue(1),
         $queryRaw: vi
           .fn()
           .mockResolvedValue([
@@ -133,6 +134,23 @@ describe('stock-hold-cap', () => {
         assertStockHoldCapNotExceeded(t, 'store1', 'cod', { ip: '1.2.3.4' })
       ).rejects.toMatchObject({ statusCode: 429 });
       delete process.env.OPEN_UNPAID_HOLD_IP_CAP;
+    });
+
+    it('locks canonical tenant identity keys before counting, in stable order', async () => {
+      const t = tx(0);
+      await assertStockHoldCapNotExceeded(t, 'store1', 'cod', {
+        phone: '+201000000000',
+        email: ' Buyer@Example.com ',
+        ip: '203.0.113.8',
+      });
+      const keys = t.$executeRaw.mock.calls.map(call => call[1]);
+      expect(keys).toHaveLength(3);
+      expect(keys).toEqual([...keys].sort());
+      expect(keys.some(key => String(key).includes('buyer@example.com'))).toBe(true);
+      expect(t.$executeRaw.mock.invocationCallOrder.at(-1)).toBeLessThan(
+        t.$queryRaw.mock.invocationCallOrder[0]
+      );
+      expect(t.$queryRaw.mock.calls[0].slice(1)).toContain('buyer@example.com');
     });
 
     it('queries with the identity values as raw-SQL parameters', async () => {

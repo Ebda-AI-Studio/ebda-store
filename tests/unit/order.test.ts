@@ -119,9 +119,10 @@ vi.mock('@force/database', () => ({
     },
     $transaction: vi.fn(),
     // Default: no existing open holds, so assertStockHoldCapNotExceeded's
-    // pre-transaction raw-SQL count (lib/stock-hold-cap.ts) never fires
+    // transaction raw-SQL count (lib/stock-hold-cap.ts) never fires
     // unless a test explicitly overrides this to simulate an abuser already
     // at/over the cap.
+    $executeRaw: vi.fn().mockResolvedValue(1),
     $queryRaw: vi.fn().mockResolvedValue([{ phone_or_email_count: 0n, ip_count: 0n }]),
   },
   Prisma: {},
@@ -416,14 +417,8 @@ describe('OrderService', () => {
       vi.mocked(prisma.taxRate.findMany).mockResolvedValue([]);
       txOrderCount.mockReset().mockResolvedValue(0);
       txCouponUpdateMany.mockReset().mockResolvedValue({ count: 1 });
-      // Stock-hold cap (lib/stock-hold-cap.ts): `OrderService.create` now
-      // calls the OUTER `prisma.$queryRaw` (never `tx.order.count`, which
-      // `txOrderCount` above backs) before opening the order transaction, for
-      // every cod/instapay order whose shippingAddress carries a phone or
-      // email. Reset it to an under-cap row so it doesn't inherit a stale
-      // `.mockResolvedValue(...)` left behind by an earlier describe block in
-      // this file (`list`, around line 331) — a test that means to exercise
-      // the cap itself overrides this explicitly.
+      // The transaction's cap read delegates to this isolated mock; inventory
+      // reads use their own response. Reset admission counts for every test.
       vi.mocked(prisma.$queryRaw)
         .mockReset()
         .mockResolvedValue([{ phone_or_email_count: 0n, ip_count: 0n }]);
@@ -468,7 +463,12 @@ describe('OrderService', () => {
               findFirst: vi.fn().mockResolvedValue(null),
               create: vi.fn().mockResolvedValue({}),
             },
-            $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
+            $executeRaw: vi.fn().mockResolvedValue(1),
+            $queryRaw: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) =>
+              strings.join('').includes('phone_or_email_count')
+                ? prisma.$queryRaw(strings, ...values)
+                : Promise.resolve([{ inventory: 50 }])
+            ),
           } as any);
         }
         return fn;
@@ -611,6 +611,7 @@ describe('OrderService', () => {
             cartBundle: { deleteMany: vi.fn() },
             inventoryHistory: { create: vi.fn() },
             orderEvent: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
+            $executeRaw: vi.fn().mockResolvedValue(1),
             $queryRaw: vi.fn().mockResolvedValue([]),
           } as any);
         }
@@ -716,6 +717,7 @@ describe('OrderService', () => {
               findFirst: vi.fn().mockResolvedValue(null),
               create: vi.fn().mockResolvedValue({}),
             },
+            $executeRaw: vi.fn().mockResolvedValue(1),
             $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
           })
         );
@@ -954,6 +956,7 @@ describe('OrderService', () => {
                 findFirst: vi.fn().mockResolvedValue(null),
                 create: vi.fn().mockResolvedValue({}),
               },
+              $executeRaw: vi.fn().mockResolvedValue(1),
               $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
             } as any);
           }
@@ -1059,6 +1062,7 @@ describe('OrderService', () => {
                 findFirst: vi.fn().mockResolvedValue(null),
                 create: vi.fn().mockResolvedValue({}),
               },
+              $executeRaw: vi.fn().mockResolvedValue(1),
               $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
             } as any);
           }
@@ -1150,6 +1154,7 @@ describe('OrderService', () => {
               findFirst: vi.fn().mockResolvedValue(null),
               create: vi.fn().mockResolvedValue({}),
             },
+            $executeRaw: vi.fn().mockResolvedValue(1),
             $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50, track_inventory: true }]),
           } as any);
         }
@@ -1211,6 +1216,7 @@ describe('OrderService', () => {
         fn({
           order: { create, count: txOrderCount },
           coupon: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+          $executeRaw: vi.fn().mockResolvedValue(1),
           $queryRaw: vi.fn().mockResolvedValue([]),
         } as any)
       );

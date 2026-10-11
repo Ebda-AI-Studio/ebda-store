@@ -108,7 +108,7 @@ async function mkStore(opts: { vat: boolean; cod: { fixedFee: number; percentBps
 
 /**
  * Each call is a DIFFERENT customer by default (stock-hold cap,
- * lib/stock-hold-cap.ts: max 2 open COD/InstaPay holds per phone/email/IP) —
+ * lib/stock-hold-cap.ts: default2 per phone/email and8 per server-observed IP) —
  * this suite places many sequential COD orders against the same
  * `beforeAll`-shared store across many `it` blocks, none of which ever pay or
  * cancel a prior one, so reusing one literal contact for every call would

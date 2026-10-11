@@ -437,6 +437,21 @@ router.post(
         return;
       }
 
+      // The order-creation transaction alone owns manual-hold admission.
+      // A gateway order cannot opt into an indefinite COD hold after bypassing
+      // that transaction's cap. Existing same-provider live retries returned
+      // above remain compatible for legacy orders without the marker.
+      if ((data.provider === 'cod' || data.provider === 'instapay') && !order.manualHoldAdmitted) {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'MANUAL_HOLD_NOT_ADMITTED',
+            message: 'Go back to checkout and choose this payment method when placing a new order.',
+          },
+        });
+        return;
+      }
+
       // Set rollback context for the catch block. We only roll back if there's
       // no payment yet — paid orders don't get auto-cancelled by retry attempts.
       const sessionIdHeader = (req.headers['x-session-id'] as string | undefined) ?? '';

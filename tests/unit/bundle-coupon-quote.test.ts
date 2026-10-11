@@ -155,7 +155,10 @@ const { mockPrisma, capturedOrderCreate } = vi.hoisted(() => {
         createMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
       backorderLine: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
-      $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
+      $executeRaw: vi.fn().mockResolvedValue(1),
+      $queryRaw: vi
+        .fn()
+        .mockResolvedValue([{ inventory: 50, phone_or_email_count: 0n, ip_count: 0n }]),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       $transaction: vi.fn(async (fn: any) => {
         if (typeof fn !== 'function') return fn;
@@ -184,7 +187,10 @@ const { mockPrisma, capturedOrderCreate } = vi.hoisted(() => {
             createMany: vi.fn().mockResolvedValue({ count: 0 }),
           },
           orderEvent: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
-          $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
+          $executeRaw: vi.fn().mockResolvedValue(1),
+          $queryRaw: vi
+            .fn()
+            .mockResolvedValue([{ inventory: 50, phone_or_email_count: 0n, ip_count: 0n }]),
         });
       }),
     },

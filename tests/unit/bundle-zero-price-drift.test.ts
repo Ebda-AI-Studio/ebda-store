@@ -124,7 +124,10 @@ const { mockPrisma } = vi.hoisted(() => ({
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     backorderLine: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
-    $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
+    $executeRaw: vi.fn().mockResolvedValue(1),
+    $queryRaw: vi
+      .fn()
+      .mockResolvedValue([{ inventory: 50, phone_or_email_count: 0n, ip_count: 0n }]),
     // `hasTenantContext` is mocked `true` below, so CartService.addBundle takes
     // the ambient-transaction path and brackets its write in a Postgres
     // SAVEPOINT (apps/api/src/lib/savepoint.ts). Without this the mock throws
@@ -160,7 +163,10 @@ const { mockPrisma } = vi.hoisted(() => ({
           createMany: vi.fn().mockResolvedValue({ count: 0 }),
         },
         orderEvent: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
-        $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
+        $executeRaw: vi.fn().mockResolvedValue(1),
+        $queryRaw: vi
+          .fn()
+          .mockResolvedValue([{ inventory: 50, phone_or_email_count: 0n, ip_count: 0n }]),
       });
     }),
   },

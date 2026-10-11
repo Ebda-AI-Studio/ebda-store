@@ -1,5 +1,5 @@
--- Stock-hold abuse fix (open unpaid order cap). EXPAND ONLY: one new nullable
--- column + supporting indexes, nothing existing is altered or dropped.
+-- Stock-hold abuse fix (open unpaid order cap). EXPAND ONLY: two new
+-- columns + supporting indexes, nothing existing is altered or dropped.
 --
 -- `orders.checkout_ip` records the server-observed client IP at order-creation
 -- time (never client-supplied). It backs `lib/stock-hold-cap.ts`, which rejects
@@ -12,25 +12,15 @@
 -- manual orders, scripts) — the cap check treats a NULL ip as "no ip signal",
 -- same as it already does for a guest with no phone/email.
 ALTER TABLE "orders" ADD COLUMN "checkout_ip" TEXT;
+-- Legacy orders were not admitted atomically. Existing same-provider payment
+-- retries remain supported; first manual attachment requires a fresh checkout.
+ALTER TABLE "orders" ADD COLUMN "manual_hold_admitted" BOOLEAN NOT NULL DEFAULT false;
 
--- The cap check's count query ORs across phone/email/checkout_ip and runs on
--- EVERY cod/instapay checkout — unlike the similarly-shaped (and similarly
--- unindexed) per-user coupon-limit check elsewhere in this file, which only
--- runs when a coupon with usageLimitPerUser is actually applied. For a
--- COD-heavy store, `store_id + status` is NOT selective: COD orders never
--- auto-cancel (ruling MONEYB-7), so "open COD orders" can be most of the
--- store's history. Measured on 50k open orders for one store: a plain
--- `(store_id, checkout_ip)` index still forced a sequential scan (~30ms,
--- because the JSON-path phone/email branches of the OR have no index at
--- all) — these three PARTIAL expression indexes, scoped to exactly the "open
--- hold" predicate the app query uses, let the planner answer with a
--- BitmapOr instead (~1.4ms on the same data) and stay small regardless of
--- how large the store's RESOLVED order history grows, because a row drops
--- out of each index the moment it leaves this predicate (paid/cancelled/
--- refunded). Prisma's schema DSL has no partial/expression `@@index`, so —
--- same precedent as `orders_order_number_trgm_idx`
--- (20261002090000_order_search_trgm_and_fk_indexes) — these live in raw SQL
--- only; not declared in schema.prisma.
+-- The transaction's two scalar counts filter contact identity (phone OR
+-- canonical email) separately from checkout IP. These partial indexes match
+-- each count's WHERE expression and open-hold predicate, so unrelated open
+-- orders need not be scanned. They shrink as holds become paid/cancelled.
+-- Prisma's DSL cannot express partial/expression indexes; keep them in SQL.
 CREATE INDEX IF NOT EXISTS "orders_open_hold_phone_idx"
   ON "orders" ("store_id", (shipping_address #>> '{phone}'))
   WHERE "status" IN ('pending', 'awaiting_payment_confirmation')
@@ -38,7 +28,7 @@ CREATE INDEX IF NOT EXISTS "orders_open_hold_phone_idx"
     AND "deleted_at" IS NULL;
 
 CREATE INDEX IF NOT EXISTS "orders_open_hold_email_idx"
-  ON "orders" ("store_id", (shipping_address #>> '{email}'))
+  ON "orders" ("store_id", (lower(btrim(shipping_address #>> '{email}'))))
   WHERE "status" IN ('pending', 'awaiting_payment_confirmation')
     AND "payment_status" = 'unpaid'
     AND "deleted_at" IS NULL;

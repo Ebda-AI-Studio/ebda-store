@@ -12,12 +12,12 @@
  *   - InstaPay sets its own confirmation window with no check against the
  *     caller's OTHER open holds before accepting a new one.
  *
- * `lib/stock-hold-cap.ts` closes both: `assertStockHoldCapNotExceeded` runs
- * inside `OrderService.create` before any cart/stock read, rejecting a NEW
- * cod/instapay order once the same phone, email OR checkout IP already has
- * `OPEN_UNPAID_HOLD_CAP` (default 2) open (pending/awaiting-confirmation,
- * unpaid) holds on the store. A real-time gateway (paymob/kashier, captured
- * synchronously) is explicitly NOT capped.
+ * `lib/stock-hold-cap.ts` checks inside the stock-reserving money transaction,
+ * after acquiring sorted tenant identity locks. Phone/email default to two
+ * open unpaid holds; IP independently defaults to eight, even with contacts.
+ * Fully wallet-paid orders are exempt, and rejected partial-wallet holds
+ * never debit the wallet. Gateway creation remains uncapped; manual payment
+ * attachment requires the server-owned admission marker.
  *
  * Same fixtures + "real Postgres, no DB bypass" convention as
  * `tests/integration/soft-deleted-product-checkout-block.test.ts`.
@@ -144,26 +144,78 @@ describe.skipIf(!hasDb)('stock-hold abuse fix (open unpaid order cap)', () => {
     ).rejects.toMatchObject({ statusCode: 429, code: 'TOO_MANY_OPEN_HOLDS' });
   });
 
-  it('does NOT block a 3rd unrelated shopper sharing one carrier-NAT IP at the default (looser) IP cap — CGNAT tolerance', async () => {
+  it('allows eight distinct contacts on one CGNAT IP, then rejects the ninth', async () => {
     const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
     const { store, productId } = await setUp(suffix);
     const ip = '203.0.113.8';
+    for (let i = 0; i < 8; i++) {
+      const order = await placeOrder(store.storeId, productId, {
+        paymentMethod: 'cod',
+        phone: `+20100000000${i}`,
+        email: `cgnat-${i}@example.com`,
+        ip,
+      });
+      expect(order.id).toBeTruthy();
+    }
+    await expect(
+      placeOrder(store.storeId, productId, {
+        paymentMethod: 'cod',
+        phone: '+201000000008',
+        email: 'cgnat-8@example.com',
+        ip,
+      })
+    ).rejects.toMatchObject({ code: 'TOO_MANY_OPEN_HOLDS' });
+    expect(await prisma.order.count({ where: { storeId: store.storeId } })).toBe(8);
+  });
 
-    // Two unrelated shoppers, same shared IP, different phones — well under
-    // the default IP cap (8).
+  it('serializes simultaneous holds and rolls rejected attempts back without consuming inventory', async () => {
+    const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+    const { store, productId } = await setUp(suffix);
+    const results = await Promise.allSettled(
+      Array.from({ length: 6 }, () =>
+        placeOrder(store.storeId, productId, { paymentMethod: 'cod', phone: '+201011111111' })
+      )
+    );
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(2);
+    for (const result of results) {
+      if (result.status === 'rejected') expect(result.reason.code).toBe('TOO_MANY_OPEN_HOLDS');
+    }
+    expect(await prisma.order.count({ where: { storeId: store.storeId } })).toBe(2);
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: productId } })).inventory).toBe(
+      98
+    );
+  });
+
+  it('matches differently cased and padded email identities, including legacy rows', async () => {
+    const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+    const { store, productId } = await setUp(suffix);
+    const first = await placeOrder(store.storeId, productId, {
+      paymentMethod: 'instapay',
+      phone: null,
+      email: 'Buyer@example.com',
+    });
+    await prisma.order.update({
+      where: { id: first.id },
+      data: {
+        shippingAddress: {
+          ...DEFAULT_TEST_SHIPPING_ADDRESS,
+          phone: null,
+          email: ' Buyer@Example.com ',
+        },
+      },
+    });
     await placeOrder(store.storeId, productId, {
-      paymentMethod: 'cod',
-      phone: `+2014${suffix.replace(/\D/g, '').slice(0, 8).padEnd(8, '5')}`,
-      email: null,
-      ip,
+      paymentMethod: 'instapay',
+      phone: null,
+      email: 'buyer@example.com',
     });
-    const third = await placeOrder(store.storeId, productId, {
-      paymentMethod: 'cod',
-      phone: `+2015${suffix.replace(/\D/g, '').slice(0, 8).padEnd(8, '6')}`,
-      email: null,
-      ip,
-    });
-    expect(third.id).toBeTruthy();
+    await expect(
+      placeOrder(store.storeId, productId, {
+        paymentMethod: 'instapay',
+        phone: null,
+        email: 'BUYER@EXAMPLE.COM',
+      })
+    ).rejects.toMatchObject({ code: 'TOO_MANY_OPEN_HOLDS' });
   });
 
   it('a normal customer placing one or two legitimate COD orders is never blocked', async () => {

@@ -21,7 +21,7 @@
  *
  * Neither path has ever capped the COUNT of concurrent open holds — only how
  * long one lives. This module adds that cap without touching either expiry
- * mechanism: it is a pure "how many right now", checked once up front.
+ * mechanism: it checks "how many right now" inside the stock-reserving transaction.
  *
  * SCOPE
  * -----
@@ -47,8 +47,8 @@ const DEFAULT_OPEN_UNPAID_HOLD_CAP = 2;
  * out from the same egress IP at once. Blocking on raw IP at the SAME
  * threshold as phone/email would 429 a genuine third shopper the moment two
  * strangers on the same carrier happen to have open orders. IP still bounds a
- * single abuser who omits phone/email entirely (the only case it fires for —
- * see the OR below), just at a looser threshold than the identity-based cap.
+ * single abuser who varies or omits contact identity. It applies alongside
+ * phone/email, at a looser threshold than the identity-based cap.
  */
 const DEFAULT_OPEN_UNPAID_HOLD_IP_MULTIPLIER = 4;
 
@@ -77,6 +77,7 @@ export function openUnpaidHoldIpCap(): number {
  * migration's indexes were built for.
  */
 export interface HoldCapTx {
+  $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number>;
   $queryRaw<T = unknown>(query: TemplateStringsArray, ...values: unknown[]): Promise<T>;
 }
 
@@ -88,8 +89,7 @@ interface OpenHoldCountRow {
 export interface HoldCapIdentity {
   /** Already-normalized phone (same form `normalizePhoneForStorage` writes). */
   phone?: string | null;
-  /** Lowercased or as-typed — matched verbatim against the stored JSON value,
-   *  same convention as the existing per-user coupon-limit check. */
+  /** Canonicalized with trim/lowercase; legacy stored values are normalized in SQL. */
   email?: string | null;
   /** Server-observed client IP, normalized via `ipKeyGenerator` — never
    *  client-supplied. */
@@ -100,16 +100,16 @@ export interface HoldCapIdentity {
  * Reject a new order (429) once the caller already has too many open holds
  * on this store for a capped payment method: `openUnpaidHoldCap()` matched by
  * phone OR email, or the separately-tolerant `openUnpaidHoldIpCap()` matched
- * by IP alone (see the CGNAT note above `openUnpaidHoldIpCap`). A no-op for
+ * by IP, including when contact identity is present. A no-op for
  * every other payment method, and a no-op when the caller supplied NEITHER a
  * phone NOR an email NOR an IP — a false block on an unidentifiable guest is
  * worse than the narrow loophole (same tradeoff the per-user coupon-limit
  * check ahead of it in `OrderService.create` already makes).
  *
- * Call BEFORE the stock-reserving transaction: this is an anti-abuse gate,
- * not a money invariant, so it deliberately does not need the same
- * transactional atomicity as the inventory decrement — a rare race between
- * two concurrent requests from the same abuser is an acceptable residual.
+ * Call inside the stock-reserving transaction. Transaction-scoped advisory
+ * locks serialize overlapping tenant identity signals; the following count
+ * sees prior committed admissions under PostgreSQL READ COMMITTED. Keep these
+ * locks until the order insert commits or the whole transaction rolls back.
  */
 export async function assertStockHoldCapNotExceeded(
   tx: HoldCapTx,
@@ -120,30 +120,40 @@ export async function assertStockHoldCapNotExceeded(
   if (!HOLD_CAPPED_PAYMENT_METHODS.has(paymentMethod)) return;
   if (!identity.phone && !identity.email && !identity.ip) return;
 
-  const phone = identity.phone ?? null;
-  const email = identity.email ?? null;
-  const ip = identity.ip ?? null;
+  const phone = identity.phone || null;
+  const email = identity.email?.trim().toLowerCase() || null;
+  const ip = identity.ip || null;
+  // Include the signal kind and tenant in an unambiguous key. Sorting every
+  // signal prevents deadlocks when two requests overlap on multiple signals.
+  const keys = [
+    phone ? JSON.stringify(['stock-hold', storeId, 'phone', phone]) : null,
+    email ? JSON.stringify(['stock-hold', storeId, 'email', email]) : null,
+    ip ? JSON.stringify(['stock-hold', storeId, 'ip', ip]) : null,
+  ]
+    .filter((key): key is string => key !== null)
+    .sort();
+  for (const key of keys) {
+    // executeRaw avoids decoding PostgreSQL's void return type.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+  }
 
-  // Raw SQL (see HoldCapTx doc) with the SAME predicate the three partial
-  // indexes in migration 20261010000000_order_checkout_ip were built for —
-  // store_id, the open-hold status set, unpaid, not soft-deleted — so this
-  // query hits them instead of a sequential scan as a store's order history
-  // grows. The `$1::text IS NOT NULL` guards make each FILTER a no-op for an
-  // absent identity field without branching the SQL itself.
+  // Identity predicates belong in WHERE, so the partial expression indexes
+  // can answer the count without scanning every open order in a busy store.
   const rows = await tx.$queryRaw<OpenHoldCountRow[]>`
     SELECT
-      COUNT(*) FILTER (
-        WHERE (${phone}::text IS NOT NULL AND "shipping_address" #>> '{phone}' = ${phone})
-           OR (${email}::text IS NOT NULL AND "shipping_address" #>> '{email}' = ${email})
+      (SELECT COUNT(*) FROM "orders"
+       WHERE "store_id" = ${storeId}
+         AND "status" IN ('pending', 'awaiting_payment_confirmation')
+         AND "payment_status" = 'unpaid' AND "deleted_at" IS NULL
+         AND ((${phone}::text IS NOT NULL AND "shipping_address" #>> '{phone}' = ${phone})
+           OR (${email}::text IS NOT NULL AND lower(btrim("shipping_address" #>> '{email}')) = ${email}))
       ) AS phone_or_email_count,
-      COUNT(*) FILTER (
-        WHERE ${ip}::text IS NOT NULL AND "checkout_ip" = ${ip}
+      (SELECT COUNT(*) FROM "orders"
+       WHERE "store_id" = ${storeId}
+         AND "status" IN ('pending', 'awaiting_payment_confirmation')
+         AND "payment_status" = 'unpaid' AND "deleted_at" IS NULL
+         AND ${ip}::text IS NOT NULL AND "checkout_ip" = ${ip}
       ) AS ip_count
-    FROM "orders"
-    WHERE "store_id" = ${storeId}
-      AND "status" IN ('pending', 'awaiting_payment_confirmation')
-      AND "payment_status" = 'unpaid'
-      AND "deleted_at" IS NULL
   `;
   const { phone_or_email_count, ip_count } = rows[0] ?? {
     phone_or_email_count: 0n,

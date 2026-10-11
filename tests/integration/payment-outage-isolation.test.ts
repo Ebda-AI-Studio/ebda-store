@@ -155,7 +155,11 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
   }
 
   // `codFee`: a COD order is created with its fee frozen and inside total (MONEYB-3).
-  async function mkOrder(s: { id: string; productId: string }, codFee = 0) {
+  async function mkOrder(
+    s: { id: string; productId: string },
+    codFee = 0,
+    manualHoldAdmitted = false
+  ) {
     seq += 1;
     return owner.order.create({
       data: {
@@ -165,6 +169,7 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
         paymentStatus: 'unpaid',
         subtotal: TOTAL,
         codFee,
+        manualHoldAdmitted,
         total: TOTAL + codFee,
         shippingAddress: { firstName: 'Mona', lastName: 'Adel', email: 'mona@example.com' },
         billingAddress: {},
@@ -322,11 +327,11 @@ describe.skipIf(!hasDb)('provider outage isolation', () => {
     const k = await create(kOrder.id, 'kashier');
     expect(k.status).toBe(200);
     expect(k.body.data.paymentUrl).toContain('payments.kashier.stub/session/');
-    const codOrder = await mkOrder(a, 500);
+    const codOrder = await mkOrder(a, 500, true);
     const cod = await create(codOrder.id, 'cod');
     expect(cod.status).toBe(200);
     expect(cod.body.data).toMatchObject({ cod: true, codFee: 500 });
-    const ipOrder = await mkOrder(a);
+    const ipOrder = await mkOrder(a, 0, true);
     const ip = await create(ipOrder.id, 'instapay');
     expect(ip.status).toBe(200);
     expect(ip.body.data.instapay).toMatchObject({ handle: 'out@instapay', amountMinor: TOTAL });
