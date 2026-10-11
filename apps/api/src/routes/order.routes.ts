@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod';
 import type ExcelJS from 'exceljs';
 import { loadExcelJS } from '../lib/lazy-modules';
@@ -646,7 +647,9 @@ router.post(
         (req.headers['x-affiliate-ref'] as string | undefined) ||
         undefined;
 
-      const order = await OrderService.create(storeId, customerId, sessionId, data, referralCode);
+      const order = await OrderService.create(storeId, customerId, sessionId, data, referralCode, {
+        checkoutIp: ipKeyGenerator(req.ip ?? '') || null,
+      });
 
       res.status(201).json({
         success: true,

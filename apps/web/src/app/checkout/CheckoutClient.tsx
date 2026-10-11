@@ -1535,6 +1535,18 @@ export default function CheckoutClient() {
 
       let friendly: string;
       switch (code) {
+        case 'MANUAL_HOLD_NOT_ADMITTED':
+          friendly = t(
+            'To use cash on delivery or InstaPay, return to checkout and choose that method when placing a new order.',
+            'للدفع عند الاستلام أو عبر إنستاباي، ارجع إلى إتمام الطلب واختر طريقة الدفع عند إنشاء طلب جديد.'
+          );
+          break;
+        case 'TOO_MANY_OPEN_HOLDS':
+          friendly = t(
+            'You have too many orders awaiting payment. Complete or cancel an existing order before placing another.',
+            'لديك طلبات كثيرة بانتظار الدفع. أكمل طلباً حالياً أو ألغِه قبل إنشاء طلب آخر.'
+          );
+          break;
         case 'COD_NOT_AVAILABLE':
           friendly = t(
             'Cash on delivery is currently unavailable. Please choose another payment method.',

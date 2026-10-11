@@ -92,6 +92,7 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
             // Ruling MONEYB-3: a COD order is created with its fee frozen in
             // `codFee` and already inside `total` (quoted at checkout).
             codFee,
+            manualHoldAdmitted: true,
             total: ORDER_TOTAL + codFee,
             shippingAddress: {},
             billingAddress: {},
@@ -100,6 +101,7 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
       codOrderId = (await mkOrder('COD', COD_FEE)).id;
       unquotedOrderId = (await mkOrder('UNQ')).id;
       onlineOrderId = (await mkOrder('ONL')).id;
+      await tx.order.update({ where: { id: onlineOrderId }, data: { manualHoldAdmitted: false } });
       paidOrderId = (await mkOrder('PAID')).id;
 
       // Pre-existing pending online payment with a live invoice URL.
@@ -189,6 +191,22 @@ describe.skipIf(!hasDb)('POST /payments/create idempotency', () => {
     );
     expect(codPayments).toHaveLength(1);
   });
+
+  it.each(['cod', 'instapay'])(
+    'refuses a gateway order switching to %s without manual admission',
+    async provider => {
+      const res = await request(app)
+        .post('/api/v1/payments/create')
+        .send({ orderId: onlineOrderId, provider });
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('MANUAL_HOLD_NOT_ADMITTED');
+      const payments = await withRlsBypass(tx =>
+        tx.payment.findMany({ where: { orderId: onlineOrderId } })
+      );
+      expect(payments).toHaveLength(1);
+      expect(payments[0].provider).toBe('paymob');
+    }
+  );
 
   it('online create with a live pending payment returns the EXISTING paymentUrl', async () => {
     const res = await request(app)

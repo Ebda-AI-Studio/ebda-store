@@ -40,7 +40,7 @@ describe('applyOnboardingInstapay', () => {
       isEnabled: true,
       testMode: false,
       supportedCurrencies: ['EGP'],
-      settings: { handle: 'amelia@instapay', expiryHours: 48 },
+      settings: { handle: 'amelia@instapay', expiryHours: 24 },
     });
     expect(clearCache).toHaveBeenCalledWith(STORE);
   });

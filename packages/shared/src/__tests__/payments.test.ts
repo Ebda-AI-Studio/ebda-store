@@ -29,11 +29,11 @@ describe('revenue and fulfilment status sets (SP6a, Review Focus 3)', () => {
 });
 
 describe('InstaPay settings', () => {
-  it('needs a handle or a phone once enabled, and defaults the hold to 48 hours', () => {
+  it('needs a handle or a phone once enabled, and defaults the hold to 24 hours (stock-hold abuse fix)', () => {
     expect(instapaySettingsSchema.safeParse({}).success).toBe(false);
     const ok = instapaySettingsSchema.parse({ handle: 'amelia@instapay' });
     expect(ok.expiryHours).toBe(INSTAPAY_DEFAULT_EXPIRY_HOURS);
-    expect(INSTAPAY_DEFAULT_EXPIRY_HOURS).toBe(48);
+    expect(INSTAPAY_DEFAULT_EXPIRY_HOURS).toBe(24);
     expect(instapaySettingsSchema.safeParse({ phone: '01012345678' }).success).toBe(true);
   });
 

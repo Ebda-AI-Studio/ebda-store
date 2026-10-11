@@ -69,6 +69,7 @@ import { amountOnlyRefundKey } from '../lib/refund-methods';
 import { lineUnitCost } from '../lib/order-line-cost';
 import { customerKeyOf } from '../lib/customer-key';
 import { SmsConsentService } from './sms-consent.service';
+import { assertStockHoldCapNotExceeded, HOLD_CAPPED_PAYMENT_METHODS } from '../lib/stock-hold-cap';
 
 /**
  * Bust the storefront product caches (list / detail / suggest — all carry
@@ -584,16 +585,44 @@ export class OrderService {
     customerId: string | undefined,
     sessionId: string,
     data: CreateOrderData,
-    referralCode?: string
+    referralCode?: string,
+    /**
+     * Server-observed client IP, never client-supplied — threaded through
+     * from the route (`ipKeyGenerator(req.ip)`, same normalisation every
+     * rate limiter in `middleware/security.ts` already uses). Optional:
+     * non-HTTP callers (admin manual orders use `createAdminOrder`, not this
+     * method; a future script) simply get no IP signal in the stock-hold cap
+     * below.
+     */
+    requestContext?: { checkoutIp?: string | null }
   ) {
     await assertOrderAllowed(storeId);
     // One stored phone form (ruling MONEYB-7): E.164 for an Egyptian mobile,
     // ASCII digits otherwise — whatever keyboard the shopper typed on.
+    //
+    // paymentMethod is canonicalized here too (trim + lowercase). The HTTP
+    // schemas accept it as a bare `z.string()` (not an enum — unlike
+    // /payments/create's `provider`, which IS a strict lowercase enum), so
+    // without this every `=== 'cod'` / `=== 'instapay'` exact-match below —
+    // the stock-hold cap, the COD-fee calc, and the COD notification trigger
+    // — silently no-ops for a client that sends `'COD'`/`'Cod'`/`'InstaPay'`.
+    // For the stock-hold cap specifically that is a straight bypass: the cap
+    // check would skip (treating the order as an uncapped method), stock
+    // still gets reserved, and a follow-up `POST /payments/create` with the
+    // PROPERLY-cased, strictly-enum-validated `provider: 'cod'` then attaches
+    // a real COD payment row — which IS what excludes the order from the
+    // 2-day auto-cancel sweep (keyed on `Payment.provider`, not this field)
+    // — leaving an uncapped, unbounded hold from one casing trick on the
+    // very first request.
     data = {
       ...data,
+      paymentMethod: data.paymentMethod.trim().toLowerCase(),
       shippingAddress: {
         ...data.shippingAddress,
         phone: normalizePhoneForStorage(data.shippingAddress.phone),
+        ...(typeof data.shippingAddress.email === 'string'
+          ? { email: data.shippingAddress.email.trim().toLowerCase() }
+          : {}),
       },
       ...(data.billingAddress
         ? {
@@ -604,6 +633,7 @@ export class OrderService {
           }
         : {}),
     };
+
     // Get cart
     const cart = await CartService.getOrCreate(storeId, sessionId, customerId);
     // Raw CartBundle rows ({ id, bundleId, quantity } — one per BOX type in
@@ -1108,6 +1138,18 @@ export class OrderService {
       // the ambient tenant transaction, so the code-level tenant guard (R-EBDA-003) and the
       // `prisma` proxy both see the store.
       scopeTransaction(moneyTx, { storeId }, async (tx: Prisma.TransactionClient) => {
+        // Admission and stock reservation share one transaction. Full-wallet
+        // orders are already paid; a failed wallet debit below rolls back all work.
+        const manualHoldAdmitted =
+          !paidInFullByWallet && HOLD_CAPPED_PAYMENT_METHODS.has(data.paymentMethod);
+        if (manualHoldAdmitted) {
+          await assertStockHoldCapNotExceeded(tx, storeId, data.paymentMethod, {
+            phone: data.shippingAddress.phone,
+            email:
+              typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null,
+            ip: requestContext?.checkoutIp ?? null,
+          });
+        }
         // The public checkout (`POST /public/orders`) and the MCP `place_order`
         // tool reach this with NO tenant context, and `backorder_lines` (written
         // below for backordered lines) has a STRICT RLS policy: under `ebda_app`
@@ -1481,6 +1523,10 @@ export class OrderService {
             locale: data.locale ?? null,
             smsOptIn: data.smsOptIn ?? false,
             source: data.source ?? 'web',
+            // Stock-hold cap signal (lib/stock-hold-cap.ts) — never read for
+            // anything else. NULL when the caller passed none.
+            checkoutIp: requestContext?.checkoutIp ?? null,
+            manualHoldAdmitted,
             shippingAddress: data.shippingAddress,
             billingAddress: data.billingAddress || data.shippingAddress,
             notes: data.notes,

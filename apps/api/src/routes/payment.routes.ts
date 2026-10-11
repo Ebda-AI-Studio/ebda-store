@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { storefrontOrigin } from '@force/shared';
+import { INSTAPAY_DEFAULT_EXPIRY_HOURS, storefrontOrigin } from '@force/shared';
 import { z } from 'zod';
 import { CardTestingGuard } from '../services/card-testing-guard.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
@@ -207,7 +207,7 @@ async function loadCheckoutPaymentConfig(storeId: string | undefined) {
       instapayConfig = {
         displayName: ip.displayName || 'InstaPay',
         displayNameAr: ip.displayNameAr ?? 'إنستاباي',
-        expiryHours: Number.isFinite(hours) && hours > 0 ? hours : 48,
+        expiryHours: Number.isFinite(hours) && hours > 0 ? hours : INSTAPAY_DEFAULT_EXPIRY_HOURS,
       };
     }
   }
@@ -432,6 +432,21 @@ router.post(
           error: {
             code: 'ORDER_ALREADY_PAID',
             message: 'This order was paid in full from the customer wallet',
+          },
+        });
+        return;
+      }
+
+      // The order-creation transaction alone owns manual-hold admission.
+      // A gateway order cannot opt into an indefinite COD hold after bypassing
+      // that transaction's cap. Existing same-provider live retries returned
+      // above remain compatible for legacy orders without the marker.
+      if ((data.provider === 'cod' || data.provider === 'instapay') && !order.manualHoldAdmitted) {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'MANUAL_HOLD_NOT_ADMITTED',
+            message: 'Go back to checkout and choose this payment method when placing a new order.',
           },
         });
         return;

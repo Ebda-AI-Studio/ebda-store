@@ -10,7 +10,7 @@ import { InstapayService } from '../../../services/payment-providers/instapay.se
  * InstaPay hold expiry (SP6a, Review Focus 3) — every 15 minutes.
  *
  * An InstaPay order waits in `awaiting_payment_confirmation` for the merchant to
- * confirm the transfer. Past `payment_confirmation_expires_at` (default 48h, per
+ * confirm the transfer. Past `payment_confirmation_expires_at` (default 24h, per
  * store) the money is not coming: the order is cancelled, its stock released
  * through the normal cancel path, and the merchant (push) and customer
  * (cancellation notice) are told. A confirm that wins the row lock first keeps

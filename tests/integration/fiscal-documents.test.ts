@@ -33,7 +33,7 @@ let seq = 0;
 const uid = (label: string) => `${TAG}-${label}-${++seq}`;
 
 const PRICE = 10_000; // 100 EGP
-const address = (phone = '٠١٠١٢٣٤٥٦٧٨') => ({
+const address = (phone = '٠١٠١٢٣٤٥٦٧٨', email = 'mona@example.test') => ({
   firstName: 'Mona',
   lastName: 'Adel',
   address1: 'شارع النصر، مبنى 5',
@@ -47,7 +47,7 @@ const address = (phone = '٠١٠١٢٣٤٥٦٧٨') => ({
   area: 'Nasr City',
   areaAr: 'مدينة نصر',
   phone,
-  email: 'mona@example.test',
+  email,
 });
 
 async function mkStore(opts: { vat: boolean; cod: { fixedFee: number; percentBps: number } }) {
@@ -106,16 +106,30 @@ async function mkStore(opts: { vat: boolean; cod: { fixedFee: number; percentBps
   return { storeId: store.id, ownerId: owner.id, productId: product.id };
 }
 
+/**
+ * Each call is a DIFFERENT customer by default (stock-hold cap,
+ * lib/stock-hold-cap.ts: default2 per phone/email and8 per server-observed IP) —
+ * this suite places many sequential COD orders against the same
+ * `beforeAll`-shared store across many `it` blocks, none of which ever pay or
+ * cancel a prior one, so reusing one literal contact for every call would
+ * read as the SAME shopper accumulating unlimited open holds. Pass an
+ * explicit `phone`/`email` only for a test that specifically needs to share
+ * identity with another call (none here do).
+ */
 async function checkout(
   s: { storeId: string; productId: string },
   paymentMethod = 'cod',
-  phone?: string
+  phone?: string,
+  email?: string
 ) {
   const sessionId = cartSessionId('fiscal');
   const cart = await CartService.getOrCreate(s.storeId, sessionId, undefined);
   await prisma.cartItem.create({ data: { cartId: cart.id, productId: s.productId, quantity: 1 } });
   return OrderService.create(s.storeId, undefined, sessionId, {
-    shippingAddress: address(phone),
+    shippingAddress: address(
+      phone ?? `+2010${(1_000_000 + ++seq).toString().slice(-7)}`,
+      email ?? `${uid('mona')}@example.test`
+    ),
     paymentMethod,
   });
 }
@@ -215,7 +229,14 @@ describe.skipIf(!hasDb)('fiscal documents — integration', () => {
       )
     ).rejects.toThrow('boom after allocation');
 
-    const orders = await Promise.all(Array.from({ length: 6 }, () => checkout(vatStore)));
+    // Six DIFFERENT customers checking out concurrently (proving invoice
+    // serials never collide/skip under concurrency) — distinct phones so the
+    // stock-hold cap (lib/stock-hold-cap.ts, max 2 open COD holds per
+    // identity) sees six separate shoppers rather than one shopper racing
+    // six holds against themselves.
+    const orders = await Promise.all(
+      Array.from({ length: 6 }, (_, i) => checkout(vatStore, 'cod', `+2010${2000000 + i}`))
+    );
     const docs = await prisma.fiscalDocument.findMany({
       where: { storeId: vatStore.storeId, orderId: { in: orders.map(o => o.id) } },
       select: { serial: true, number: true },

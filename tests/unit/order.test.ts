@@ -118,7 +118,12 @@ vi.mock('@force/database', () => ({
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     $transaction: vi.fn(),
-    $queryRaw: vi.fn(),
+    // Default: no existing open holds, so assertStockHoldCapNotExceeded's
+    // transaction raw-SQL count (lib/stock-hold-cap.ts) never fires
+    // unless a test explicitly overrides this to simulate an abuser already
+    // at/over the cap.
+    $executeRaw: vi.fn().mockResolvedValue(1),
+    $queryRaw: vi.fn().mockResolvedValue([{ phone_or_email_count: 0n, ip_count: 0n }]),
   },
   Prisma: {},
   OrderStatus: {},
@@ -412,6 +417,11 @@ describe('OrderService', () => {
       vi.mocked(prisma.taxRate.findMany).mockResolvedValue([]);
       txOrderCount.mockReset().mockResolvedValue(0);
       txCouponUpdateMany.mockReset().mockResolvedValue({ count: 1 });
+      // The transaction's cap read delegates to this isolated mock; inventory
+      // reads use their own response. Reset admission counts for every test.
+      vi.mocked(prisma.$queryRaw)
+        .mockReset()
+        .mockResolvedValue([{ phone_or_email_count: 0n, ip_count: 0n }]);
       vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
         if (typeof fn === 'function') {
           return fn({
@@ -453,11 +463,57 @@ describe('OrderService', () => {
               findFirst: vi.fn().mockResolvedValue(null),
               create: vi.fn().mockResolvedValue({}),
             },
-            $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
+            $executeRaw: vi.fn().mockResolvedValue(1),
+            $queryRaw: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) =>
+              strings.join('').includes('phone_or_email_count')
+                ? prisma.$queryRaw(strings, ...values)
+                : Promise.resolve([{ inventory: 50 }])
+            ),
           } as any);
         }
         return fn;
       });
+    });
+
+    // Stock-hold cap bypass regression: /orders and /public/orders accept
+    // paymentMethod as a bare `z.string()` (not an enum, unlike
+    // /payments/create's `provider`), so a client sending mixed case must
+    // not silently skip the cap check (lib/stock-hold-cap.ts) by failing the
+    // exact 'cod'/'instapay' Set lookup. `create()` must canonicalize
+    // (trim+lowercase) BEFORE that check runs.
+    describe('paymentMethod casing — stock-hold cap must not be bypassable by case', () => {
+      it.each(['COD', 'Cod', ' cod '])(
+        'treats paymentMethod %j the same as "cod" for the cap',
+        async casedMethod => {
+          // already at the default cap (2 open phone/email-matched holds)
+          vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([
+            { phone_or_email_count: 2n, ip_count: 0n },
+          ]);
+          await expect(
+            OrderService.create(mockStoreId, undefined, mockSessionId, {
+              ...createOrderData,
+              shippingAddress: { ...createOrderData.shippingAddress, phone: '+201000000000' },
+              paymentMethod: casedMethod,
+            })
+          ).rejects.toMatchObject({ statusCode: 429, code: 'TOO_MANY_OPEN_HOLDS' });
+        }
+      );
+
+      it.each(['INSTAPAY', 'InstaPay'])(
+        'treats paymentMethod %j the same as "instapay" for the cap',
+        async casedMethod => {
+          vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([
+            { phone_or_email_count: 2n, ip_count: 0n },
+          ]);
+          await expect(
+            OrderService.create(mockStoreId, undefined, mockSessionId, {
+              ...createOrderData,
+              shippingAddress: { ...createOrderData.shippingAddress, phone: '+201000000000' },
+              paymentMethod: casedMethod,
+            })
+          ).rejects.toMatchObject({ statusCode: 429, code: 'TOO_MANY_OPEN_HOLDS' });
+        }
+      );
     });
 
     it('should create order from cart', async () => {
@@ -555,6 +611,7 @@ describe('OrderService', () => {
             cartBundle: { deleteMany: vi.fn() },
             inventoryHistory: { create: vi.fn() },
             orderEvent: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
+            $executeRaw: vi.fn().mockResolvedValue(1),
             $queryRaw: vi.fn().mockResolvedValue([]),
           } as any);
         }
@@ -660,6 +717,7 @@ describe('OrderService', () => {
               findFirst: vi.fn().mockResolvedValue(null),
               create: vi.fn().mockResolvedValue({}),
             },
+            $executeRaw: vi.fn().mockResolvedValue(1),
             $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
           })
         );
@@ -898,6 +956,7 @@ describe('OrderService', () => {
                 findFirst: vi.fn().mockResolvedValue(null),
                 create: vi.fn().mockResolvedValue({}),
               },
+              $executeRaw: vi.fn().mockResolvedValue(1),
               $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
             } as any);
           }
@@ -1003,6 +1062,7 @@ describe('OrderService', () => {
                 findFirst: vi.fn().mockResolvedValue(null),
                 create: vi.fn().mockResolvedValue({}),
               },
+              $executeRaw: vi.fn().mockResolvedValue(1),
               $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
             } as any);
           }
@@ -1094,6 +1154,7 @@ describe('OrderService', () => {
               findFirst: vi.fn().mockResolvedValue(null),
               create: vi.fn().mockResolvedValue({}),
             },
+            $executeRaw: vi.fn().mockResolvedValue(1),
             $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50, track_inventory: true }]),
           } as any);
         }
@@ -1155,6 +1216,7 @@ describe('OrderService', () => {
         fn({
           order: { create, count: txOrderCount },
           coupon: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+          $executeRaw: vi.fn().mockResolvedValue(1),
           $queryRaw: vi.fn().mockResolvedValue([]),
         } as any)
       );

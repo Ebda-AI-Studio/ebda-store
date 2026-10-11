@@ -113,6 +113,7 @@ beforeEach(() => {
     status: 'pending',
     total: 5000,
     walletAmount: 0,
+    manualHoldAdmitted: true,
     currency: 'EGP',
     items: [],
     customer: null,
@@ -136,6 +137,31 @@ const create = (provider: string) =>
     .send({ orderId: ORDER_ID, provider });
 
 describe('POST /payments/create — rollback survives a failed COMMIT (issue 2306)', () => {
+  it.each(['cod', 'instapay'])(
+    'refuses uncapped gateway-to-%s conversion before creating a payment',
+    async provider => {
+      h.orderFindFirst.mockResolvedValueOnce({
+        id: ORDER_ID,
+        storeId: 'store-1',
+        orderNumber: 'ORD-1',
+        status: 'pending',
+        total: 5000,
+        walletAmount: 0,
+        currency: 'EGP',
+        manualHoldAdmitted: false,
+        items: [],
+        customer: null,
+        shippingAddress: {},
+        store: { domain: null, slug: 'demo' },
+      });
+      const res = await create(provider);
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('MANUAL_HOLD_NOT_ADMITTED');
+      expect(h.paymentCreate).not.toHaveBeenCalled();
+      expect(h.createPayment).not.toHaveBeenCalled();
+    }
+  );
+
   it('online: provider accepted, COMMIT fails → the order is rolled back', async () => {
     h.commitFails = true;
     const res = await create('paymob');

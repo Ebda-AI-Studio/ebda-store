@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod';
 import { ProductService } from '../services/product.service';
 import { CartService } from '../services/cart.service';
@@ -811,7 +812,14 @@ router.post(
       // throws when it points at an admin instead. Mirror is in
       // apps/web/src/contexts/AuthContext.tsx (refreshUser).
       const orderCustomerId = req.user?.role === 'customer' ? req.user.userId : undefined;
-      const order = await OrderService.create(storeId, orderCustomerId, sessionId, orderData);
+      const order = await OrderService.create(
+        storeId,
+        orderCustomerId,
+        sessionId,
+        orderData,
+        undefined,
+        { checkoutIp: ipKeyGenerator(req.ip ?? '') || null }
+      );
 
       res.status(201).json({
         success: true,
