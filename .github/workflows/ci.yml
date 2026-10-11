@@ -1143,15 +1143,11 @@ jobs:
 
       - name: Run npm audit
         # Zero-vulns policy for PRODUCTION deps (gated at low — any vuln fails).
-        # Dev-only deps: @lhci/cli@0.15.1 (latest) ships transitive
-        # tmp@0.1.0 + uuid@8.3.2 + inquirer + qs whose CVEs are now tracked
-        # in the advisory DB but cannot be resolved because npm nested overrides
-        # do not propagate into workspace-hoisted dev dep trees (verified
-        # 2026-05-25). All known HIGH/CRIT advisories are bounded to Lighthouse
-        # CI tooling and never reach the production bundle. Both checks omit
-        # dev deps — the first check (low) already covers all production deps at
-        # every severity, making the second check dev-dep-free for symmetry.
-        # Re-evaluate when @lhci/cli ships a refresh.
+        # Development-only residual: eight high findings currently derive from
+        # braces, which has no patched upstream release. Lighthouse overrides
+        # remove its previous extract-zip dependency; see the exact baseline
+        # and exception in docs/ebda/dependency-security-baseline.md.
+        # This gate still checks production dependencies at every severity.
         run: |
           set -e
           # Zero-tolerance for production deps, with a NARROW documented

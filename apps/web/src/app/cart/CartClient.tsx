@@ -28,6 +28,7 @@ import { useLastListing } from '../../hooks/useLastListing';
 import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
 import { resolveColor, checkMinimumOrder, computeOrderAmounts } from '@force/shared';
+import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 
 export default function CartClient() {
   const {
@@ -1162,40 +1163,7 @@ export default function CartClient() {
                       </>
                     )}
 
-                    {/* Payment Methods */}
-                    <div className="rounded-2xl border border-border bg-card p-4">
-                      <p className="mb-3 text-center text-xs font-medium text-muted-foreground">
-                        {t(
-                          'We Accept',
-                          '\u0646\u0642\u0628\u0644 \u0627\u0644\u062f\u0641\u0639 \u0639\u0628\u0631'
-                        )}
-                      </p>
-                      <div className="flex flex-wrap items-center justify-center gap-3">
-                        {(() => {
-                          // Customer-facing payment METHODS (not gateways). The
-                          // Egypt default is correct for most stores; a merchant
-                          // can override via settings.acceptedPaymentMethods.
-                          const configured = Array.isArray(
-                            (store?.settings as Record<string, unknown>)?.acceptedPaymentMethods
-                          )
-                            ? ((store!.settings as Record<string, unknown>)
-                                .acceptedPaymentMethods as string[])
-                            : null;
-                          const methods =
-                            configured && configured.length
-                              ? configured
-                              : ['Visa', 'Mastercard', 'Meeza', 'Fawry'];
-                          return methods.map(method => (
-                            <div
-                              key={method}
-                              className="flex h-8 items-center rounded-md bg-muted px-3 text-xs font-medium text-muted-foreground"
-                            >
-                              {method}
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    </div>
+                    <AcceptedPaymentBadges />
 
                     {/* Help */}
                     <div className="rounded-2xl border border-border bg-card p-4">

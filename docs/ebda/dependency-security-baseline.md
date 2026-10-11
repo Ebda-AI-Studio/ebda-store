@@ -1,0 +1,9 @@
+# Dependency security baseline
+
+The PR66 validation audit found26affected packages:15high/11moderate, zero critical/low. Existing dependency fixes: MCP SDK1.29.0→1.32.1; OpenTelemetry auto-instrumentations0.77→0.81; leaf selector-parser7.1.6; Lighthouse13.5 in site-kit and both LHCI dependency paths. Lighthouse requires Node22.19+, compatible with the existing Node22 CI toolchain. No new direct dependency was added.
+
+After resolution, `npm audit --omit=dev --json` reports0 vulnerabilities. The full `npm audit --json` reports8high affected development-tool packages: braces, micromatch, fast-glob, globby, chokidar, tailwindcss, @next/eslint-plugin-next and tsc-alias. These are one upstream defect propagated through the graph, not eight independently patched issues. The lockfile classifies these paths as development dependencies; the runtime audit is not proof about every possible built artifact.
+
+[GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) lists braces≤3.0.3 as affected and no patched version. `npm view braces version` confirmed3.0.3. Deeply nested untrusted glob patterns can exhaust the stack. Build/lint/type-alias tooling must consume trusted repository configuration; an untrusted PR can still affect CI availability. A verified patched release or compatible replacement is required to make the full audit zero. No fabricated version, advisory suppression, audit-force downgrade, or security-gate removal is used.
+
+The existing selector-parser vulnerability has a published fix, and actual storefront CSS compilation is checked with7.1.6. The archive-extractor findings are removed by Lighthouse13.5, including LHCI's direct and utility imports. Existing SDK/MCP tests, all unit tests, API/storefront typechecks and actual Lighthouse execution must pass before merge. Live native merchant flows and future upstream releases remain separate evidence.
