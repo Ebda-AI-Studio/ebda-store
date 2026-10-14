@@ -7,9 +7,12 @@ import {
   type TemplateId,
   minorToDecimalString,
   roundToMinor,
+  DEFAULT_THEME,
+  resolveColor,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { ImageUpload } from '@/components/ImageUpload';
+import { ColorField } from '@/components/ColorField';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../../../lib/api';
 import type { Option, Variant, ProductInfo } from './types';
 
@@ -45,6 +48,9 @@ interface Row {
   /** The option value (e.g. "4 liters"). Locked when multi-axis. */
   value: string;
   valueAr: string;
+  /** Swatch for the option value (single-axis only). '' = none. */
+  swatchHex: string;
+  swatchImageUrl: string;
   priceMajor: string;
   compareAtMajor: string;
   costMajor: string;
@@ -60,7 +66,8 @@ function minorToMajor(piastres: number | null): string {
   return piastres !== null ? minorToDecimalString(piastres) : '';
 }
 
-function rowFromVariant(variant: Variant, primaryOptionId: string | null, multiAxis: boolean): Row {
+function rowFromVariant(variant: Variant, primaryOption: Option | null, multiAxis: boolean): Row {
+  const primaryOptionId = primaryOption?.id ?? null;
   const ov = primaryOptionId
     ? variant.optionValues.find(v => v.optionId === primaryOptionId)
     : variant.optionValues[0];
@@ -70,11 +77,14 @@ function rowFromVariant(variant: Variant, primaryOptionId: string | null, multiA
   // single-axis Arabic equivalent for a multi-axis combo).
   const value = multiAxis ? variant.title : (ov?.value ?? '');
   const valueAr = multiAxis ? (variant.titleAr ?? '') : (ov?.valueAr ?? '');
+  const stored = ov ? primaryOption?.values.find(v => v.id === ov.valueId) : undefined;
   return {
     rowId: variant.id,
     variantId: variant.id,
     value,
     valueAr,
+    swatchHex: multiAxis ? '' : (stored?.swatchHex ?? ''),
+    swatchImageUrl: multiAxis ? '' : (stored?.swatchImageUrl ?? ''),
     priceMajor: minorToMajor(variant.price),
     compareAtMajor: minorToMajor(variant.compareAtPrice),
     costMajor: minorToMajor(variant.costPrice),
@@ -88,6 +98,8 @@ function emptyRow(): Row {
     rowId: newRowId(),
     value: '',
     valueAr: '',
+    swatchHex: '',
+    swatchImageUrl: '',
     priceMajor: '',
     compareAtMajor: '',
     costMajor: '',
@@ -124,7 +136,7 @@ export function SimpleVariantsForm({
     if (variants.length === 0) {
       return [emptyRow(), emptyRow()];
     }
-    return variants.map(v => rowFromVariant(v, primaryOption?.id ?? null, multiAxis));
+    return variants.map(v => rowFromVariant(v, primaryOption, multiAxis));
   });
   const [saving, setSaving] = useState(false);
   /** Template of the store — used to show per-theme recommended upload sizes. */
@@ -156,8 +168,7 @@ export function SimpleVariantsForm({
         prev.filter(r => r.variantId).map(r => [r.variantId!, r] as const)
       );
       return variants.map(
-        v =>
-          existingByVariantId.get(v.id) ?? rowFromVariant(v, primaryOption?.id ?? null, multiAxis)
+        v => existingByVariantId.get(v.id) ?? rowFromVariant(v, primaryOption, multiAxis)
       );
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -296,6 +307,8 @@ export function SimpleVariantsForm({
           values: populated.map(r => ({
             value: r.value.trim(),
             valueAr: r.valueAr.trim() || undefined,
+            swatchHex: r.swatchHex || undefined,
+            swatchImageUrl: r.swatchImageUrl || undefined,
           })),
         });
         if (optionErr || !optionRes?.option?.id) {
@@ -316,8 +329,28 @@ export function SimpleVariantsForm({
           if (!existingValues.has(key)) {
             await apiPost(
               `/api/v1/stores/${storeId}/products/${productId}/options/${optionId}/values`,
-              { value: r.value.trim(), valueAr: r.valueAr.trim() || undefined }
+              {
+                value: r.value.trim(),
+                valueAr: r.valueAr.trim() || undefined,
+                swatchHex: r.swatchHex || undefined,
+                swatchImageUrl: r.swatchImageUrl || undefined,
+              }
             );
+          } else {
+            // Existing value: PUT only when its swatch changed (null clears).
+            const stored = existingValues.get(key)!;
+            if (
+              (stored.swatchHex ?? '') !== r.swatchHex ||
+              (stored.swatchImageUrl ?? '') !== r.swatchImageUrl
+            ) {
+              await apiPut(
+                `/api/v1/stores/${storeId}/products/${productId}/option-values/${stored.id}`,
+                {
+                  swatchHex: r.swatchHex || null,
+                  swatchImageUrl: r.swatchImageUrl || null,
+                }
+              );
+            }
           }
         }
         for (const [key, v] of existingValues) {
@@ -426,6 +459,34 @@ export function SimpleVariantsForm({
                   />
                 </div>
               </div>
+
+              {!multiAxis && (
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <ColorField
+                    label={t('colSwatchColor')}
+                    value={row.swatchHex || undefined}
+                    theme={DEFAULT_THEME}
+                    showContrastPreview={false}
+                    onChange={c => {
+                      // A swatch is a concrete hex, never a theme token.
+                      const hex = c.startsWith('#') ? c : resolveColor(c, DEFAULT_THEME);
+                      if (!c) updateRow(row.rowId, { swatchHex: '' });
+                      else if (hex && /^#[0-9a-fA-F]{6}$/.test(hex))
+                        updateRow(row.rowId, { swatchHex: hex.toLowerCase() });
+                    }}
+                  />
+                  <div>
+                    <span className={labelClass}>{t('colSwatchImage')}</span>
+                    <ImageUpload
+                      value={row.swatchImageUrl || undefined}
+                      onUpload={url => updateRow(row.rowId, { swatchImageUrl: url })}
+                      onRemove={() => updateRow(row.rowId, { swatchImageUrl: '' })}
+                      folder="products"
+                      storeId={storeId}
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr_120px_auto]">
                 <div>

@@ -38,3 +38,4 @@ export * from './providers/credential-fields';
 export * from './model3d';
 export * from './tracking';
 export * from './looks';
+export * from './commerce';

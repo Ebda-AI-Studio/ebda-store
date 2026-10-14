@@ -9,7 +9,12 @@ import { withSavepoint } from '../lib/savepoint';
 interface CreateOptionInput {
   name: string;
   nameAr?: string;
-  values: Array<{ value: string; valueAr?: string }>;
+  values: Array<{
+    value: string;
+    valueAr?: string;
+    swatchHex?: string | null;
+    swatchImageUrl?: string | null;
+  }>;
 }
 
 interface CreateVariantInput {
@@ -145,6 +150,8 @@ export class VariantService {
           create: input.values.map((v, index) => ({
             value: v.value,
             valueAr: v.valueAr,
+            swatchHex: v.swatchHex,
+            swatchImageUrl: v.swatchImageUrl,
             position: index,
           })),
         },
@@ -161,6 +168,9 @@ export class VariantService {
         data: { hasVariants: true },
       });
     }
+
+    // Public PDP/list payloads are cached and now carry option values.
+    await invalidateStoreProductCaches(storeId);
 
     return option;
   }
@@ -268,7 +278,12 @@ export class VariantService {
     storeId: string,
     productId: string,
     optionId: string,
-    input: { value: string; valueAr?: string }
+    input: {
+      value: string;
+      valueAr?: string;
+      swatchHex?: string | null;
+      swatchImageUrl?: string | null;
+    }
   ) {
     const option = await prisma.productOption.findFirst({
       where: {
@@ -288,14 +303,18 @@ export class VariantService {
       throw new AppError(400, 'DUPLICATE_VALUE', `Value "${input.value}" already exists`);
     }
 
-    return prisma.productOptionValue.create({
+    const created = await prisma.productOptionValue.create({
       data: {
         optionId,
         value: input.value,
         valueAr: input.valueAr,
+        swatchHex: input.swatchHex,
+        swatchImageUrl: input.swatchImageUrl,
         position: option.values.length,
       },
     });
+    await invalidateStoreProductCaches(storeId);
+    return created;
   }
 
   /**
@@ -305,7 +324,12 @@ export class VariantService {
     storeId: string,
     productId: string,
     valueId: string,
-    input: { value?: string; valueAr?: string | null }
+    input: {
+      value?: string;
+      valueAr?: string | null;
+      swatchHex?: string | null;
+      swatchImageUrl?: string | null;
+    }
   ) {
     const optionValue = await prisma.productOptionValue.findFirst({
       where: {
@@ -320,13 +344,17 @@ export class VariantService {
       throw new AppError(404, 'NOT_FOUND', 'Option value not found');
     }
 
-    return prisma.productOptionValue.update({
+    const updated = await prisma.productOptionValue.update({
       where: { id: valueId },
       data: {
         value: input.value,
         valueAr: input.valueAr,
+        swatchHex: input.swatchHex,
+        swatchImageUrl: input.swatchImageUrl,
       },
     });
+    await invalidateStoreProductCaches(storeId);
+    return updated;
   }
 
   /**

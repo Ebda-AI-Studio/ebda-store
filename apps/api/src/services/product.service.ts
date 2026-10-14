@@ -1721,7 +1721,13 @@ export class ProductService {
         id: string;
         name: string;
         nameAr: string | null;
-        values: Array<{ value: string; valueAr: string | null }>;
+        values: Array<{
+          id: string;
+          value: string;
+          valueAr: string | null;
+          swatchHex: string | null;
+          swatchImageUrl: string | null;
+        }>;
       }>;
       variants?: Array<{
         id: string;
@@ -1749,7 +1755,13 @@ export class ProductService {
       id: o.id,
       name: o.name,
       nameAr: o.nameAr,
-      values: o.values.map(v => ({ value: v.value, valueAr: v.valueAr ?? undefined })),
+      values: o.values.map(v => ({
+        id: v.id,
+        value: v.value,
+        valueAr: v.valueAr ?? undefined,
+        swatchHex: v.swatchHex,
+        swatchImageUrl: v.swatchImageUrl,
+      })),
     }));
 
     const reshapedVariants = (

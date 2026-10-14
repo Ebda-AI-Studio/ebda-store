@@ -2,6 +2,8 @@ export interface OptionValue {
   id: string;
   value: string;
   valueAr: string | null;
+  swatchHex?: string | null;
+  swatchImageUrl?: string | null;
   position: number;
 }
 

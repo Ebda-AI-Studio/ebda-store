@@ -842,6 +842,8 @@
         "colCost": "التكلفة (ج.م)",
         "colStock": "المخزون",
         "colImage": "الصورة",
+        "colSwatchColor": "لون العينة",
+        "colSwatchImage": "صورة العينة",
         "namePlaceholder": "مثلاً Medium",
         "nameArPlaceholder": "مثلاً متوسط",
         "addRow": "أضف متغيراً آخر",

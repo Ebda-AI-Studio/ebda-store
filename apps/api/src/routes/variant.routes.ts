@@ -4,6 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { VariantService } from '../services/variant.service';
 import { tenantContext } from '../middleware/tenant-context';
+import { optionValueSwatchSchema } from '@ebda/shared';
 
 const router = Router();
 
@@ -20,10 +21,12 @@ const createOptionSchema = z.object({
   nameAr: z.string().max(100).optional(),
   values: z
     .array(
-      z.object({
-        value: z.string().min(1).max(100),
-        valueAr: z.string().max(100).optional(),
-      })
+      z
+        .object({
+          value: z.string().min(1).max(100),
+          valueAr: z.string().max(100).optional(),
+        })
+        .merge(optionValueSwatchSchema)
     )
     .min(1)
     .max(50),
@@ -34,15 +37,19 @@ const updateOptionSchema = z.object({
   nameAr: z.string().max(100).optional().nullable(),
 });
 
-const createOptionValueSchema = z.object({
-  value: z.string().min(1).max(100),
-  valueAr: z.string().max(100).optional(),
-});
+const createOptionValueSchema = z
+  .object({
+    value: z.string().min(1).max(100),
+    valueAr: z.string().max(100).optional(),
+  })
+  .merge(optionValueSwatchSchema);
 
-const updateOptionValueSchema = z.object({
-  value: z.string().min(1).max(100).optional(),
-  valueAr: z.string().max(100).optional().nullable(),
-});
+const updateOptionValueSchema = z
+  .object({
+    value: z.string().min(1).max(100).optional(),
+    valueAr: z.string().max(100).optional().nullable(),
+  })
+  .merge(optionValueSwatchSchema);
 
 const createVariantSchema = z.object({
   sku: z.string().max(100).optional(),
@@ -240,6 +247,8 @@ router.put(
       const value = await VariantService.updateOptionValue(storeId, productId, valueId, {
         value: data.value,
         valueAr: data.valueAr,
+        swatchHex: data.swatchHex,
+        swatchImageUrl: data.swatchImageUrl,
       });
 
       res.json({

@@ -842,6 +842,8 @@
         "colCost": "Cost (EGP)",
         "colStock": "Stock",
         "colImage": "Image",
+        "colSwatchColor": "Swatch colour",
+        "colSwatchImage": "Swatch photo",
         "namePlaceholder": "e.g. Medium",
         "nameArPlaceholder": "مثلاً متوسط",
         "addRow": "Add another variant",
