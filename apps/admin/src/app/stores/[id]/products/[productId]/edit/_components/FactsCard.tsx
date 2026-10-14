@@ -194,7 +194,9 @@ export function FactsCard({ storeId, facts, onChange }: Props) {
                   type="button"
                   className={iconBtn}
                   onClick={() => move(i, -1)}
-                  disabled={i === 0}
+                  // A translation in flight writes back BY INDEX: reordering or removing a
+                  // row meanwhile would land it on the wrong fact.
+                  disabled={busy !== null || i === 0}
                   aria-label={t('moveUp')}
                 >
                   ↑
@@ -203,7 +205,7 @@ export function FactsCard({ storeId, facts, onChange }: Props) {
                   type="button"
                   className={iconBtn}
                   onClick={() => move(i, 1)}
-                  disabled={i === facts.length - 1}
+                  disabled={busy !== null || i === facts.length - 1}
                   aria-label={t('moveDown')}
                 >
                   ↓
@@ -212,6 +214,7 @@ export function FactsCard({ storeId, facts, onChange }: Props) {
                   type="button"
                   className={iconBtn}
                   onClick={() => onChange(facts.filter((_, idx) => idx !== i))}
+                  disabled={busy !== null}
                   aria-label={t('remove')}
                 >
                   ×

@@ -7,7 +7,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { useAuth } from '@/lib/auth';
 import { apiGet, apiPost } from '@/lib/api';
-import { useToast } from '@ebda/ui';
+import { VariantText, useToast } from '@ebda/ui';
 import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -131,7 +131,7 @@ function SuggestionCard({
           {variantName && (
             <p className="text-xs text-foreground truncate">
               <span className="text-muted-foreground">{t('card.variantLabel')}: </span>
-              {variantName}
+              <VariantText title={variantName} />
             </p>
           )}
           {sku && <p className="text-xs text-muted-foreground font-mono">{sku}</p>}

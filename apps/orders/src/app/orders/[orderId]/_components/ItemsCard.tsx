@@ -2,7 +2,12 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { groupOrderLinesForDisplay, type OrderDisplayLine } from '@ebda/shared';
+import {
+  groupOrderLinesForDisplay,
+  orderLineVariantTitle,
+  variantTitleSegments,
+  type OrderDisplayLine,
+} from '@ebda/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMoney, fmt } from '@/lib/format';
 import type { OrderDetail, OrderLineItem } from '@/lib/orders';
@@ -182,6 +187,8 @@ function ItemRow({ item, currency }: { item: OrderLineItem; currency?: string })
   // order_items only snapshots the English productName; in Arabic, prefer the
   // live product's name_ar (falls back to the snapshot when absent / deleted).
   const displayName = locale === 'ar' ? item.product?.nameAr || item.productName : item.productName;
+  // Per the app locale, with fallback (Ruling B0-41); one <bdi> per option value (F8).
+  const variantName = orderLineVariantTitle(item, locale === 'ar');
 
   return (
     <li className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
@@ -215,8 +222,17 @@ function ItemRow({ item, currency }: { item: OrderLineItem; currency?: string })
           </p>
         </div>
         <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-          {item.variantName && <span>{item.variantName}</span>}
-          {item.variantName && <span aria-hidden>·</span>}
+          {variantName && (
+            <span>
+              {variantTitleSegments(variantName).map((part, i) => (
+                <span key={i}>
+                  {i > 0 && ' · '}
+                  <bdi>{part}</bdi>
+                </span>
+              ))}
+            </span>
+          )}
+          {variantName && <span aria-hidden>·</span>}
           <span>
             {t.detail.qty}: {item.quantity}
             {item.price != null && <> × {formatMoney(item.price, currency)}</>}

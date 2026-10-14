@@ -5,6 +5,7 @@
  * clears the value.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { renderToString } from 'react-dom/server';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const uploadVideo = vi.hoisted(() => vi.fn(async () => 'https://media.test/x.mp4'));
@@ -31,9 +32,11 @@ const file = (size: number, type: string) => {
   return f;
 };
 
+const realMatchMedia = window.matchMedia;
 afterEach(() => {
   cleanup();
   uploadVideo.mockClear();
+  window.matchMedia = realMatchMedia;
 });
 
 function mockMotion(reduce: boolean) {
@@ -52,6 +55,16 @@ describe('VideoField', () => {
     const v = screen.getByTestId('video-preview') as HTMLVideoElement;
     expect(v.autoplay).toBe(true);
     expect(v.controls).toBe(false);
+  });
+
+  it('reduced motion is known on the FIRST render: the preview never paints with autoplay', () => {
+    mockMotion(true);
+    // renderToString runs no effects: it is exactly the first render's markup.
+    const html = renderToString(
+      <VideoField storeId="s1" tag="" value="https://media.test/x.mp4" onChange={vi.fn()} />
+    );
+    expect(html).toContain('<video');
+    expect(html).not.toMatch(/<video[^>]*autoplay/i);
   });
 
   it('under prefers-reduced-motion: no autoplay, controls shown', () => {

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { useLocale } from 'next-intl';
+import { orderLineVariantTitle } from '@ebda/shared';
+import { VariantText } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { formatMoney } from './format';
 import type { OrderDetail, OrderItemDetail } from './types';
@@ -194,6 +196,8 @@ function ItemRow({ item, currency }: { item: OrderItemDetail; currency: string }
   // order_items only snapshots the English productName; in Arabic, prefer the
   // live product's name_ar (falls back to the snapshot when absent / deleted).
   const displayName = locale === 'ar' ? item.product?.nameAr || item.productName : item.productName;
+  // Per the admin locale, with fallback (Ruling B0-41); one <bdi> per option value (F8).
+  const variantName = orderLineVariantTitle(item, locale === 'ar');
 
   return (
     <li className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
@@ -227,8 +231,12 @@ function ItemRow({ item, currency }: { item: OrderItemDetail; currency: string }
           </p>
         </div>
         <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-          {item.variantName && <span>{item.variantName}</span>}
-          {item.variantName && <span aria-hidden>·</span>}
+          {variantName && (
+            <span>
+              <VariantText title={variantName} />
+            </span>
+          )}
+          {variantName && <span aria-hidden>·</span>}
           <span>
             {t('qty')}: {item.quantity} × {formatMoney(item.price, currency)}
           </span>

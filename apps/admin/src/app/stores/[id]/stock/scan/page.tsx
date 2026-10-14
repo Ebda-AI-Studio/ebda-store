@@ -19,8 +19,10 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
+import { VariantText } from '@ebda/ui';
 import { apiGet, apiPost } from '@/lib/api';
-import { withNumerals } from '@ebda/shared';
+import { orderLineVariantTitle, withNumerals } from '@ebda/shared';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -55,6 +57,7 @@ interface OrderItem {
   variantId: string | null;
   productName: string;
   variantName: string | null;
+  variantNameAr?: string | null;
   personalisation: string | null;
   quantity: number;
   pickedQty: number;
@@ -384,7 +387,9 @@ function ReceiveMode({ storeId }: { storeId: string }) {
           <div>
             <p className="font-semibold text-sm">{lookup.productName}</p>
             {lookup.variantTitle && (
-              <p className="text-xs text-muted-foreground">{lookup.variantTitle}</p>
+              <p className="text-xs text-muted-foreground">
+                <VariantText title={lookup.variantTitle} />
+              </p>
             )}
             <p className="text-xs text-muted-foreground mt-0.5">
               {lookup.sku ? `SKU: ${lookup.sku}` : ''}
@@ -435,6 +440,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
 // ─────────────────────────────────────────────────────────────────────────────
 function PickMode({ storeId }: { storeId: string }) {
   const t = useT('stock.scan');
+  const locale = useLocale();
   const cameraSupported = useBarcodeDetectorSupported();
   const [orderInput, setOrderInput] = useState('');
   const [order, setOrder] = useState<OrderPickProgress | null>(null);
@@ -575,8 +581,10 @@ function PickMode({ storeId }: { storeId: string }) {
                   return (
                     <div className={done ? 'opacity-60' : ''}>
                       <p className="font-medium">{item.productName}</p>
-                      {item.variantName && (
-                        <p className="text-xs text-muted-foreground">{item.variantName}</p>
+                      {orderLineVariantTitle(item, locale === 'ar') && (
+                        <p className="text-xs text-muted-foreground">
+                          <VariantText title={orderLineVariantTitle(item, locale === 'ar')!} />
+                        </p>
                       )}
                       {item.personalisation && (
                         <p className="text-xs font-medium text-foreground">
@@ -909,7 +917,9 @@ function CountMode({ storeId }: { storeId: string }) {
               <div>
                 <p className="font-semibold text-sm">{lookupResult.productName}</p>
                 {lookupResult.variantTitle && (
-                  <p className="text-xs text-muted-foreground">{lookupResult.variantTitle}</p>
+                  <p className="text-xs text-muted-foreground">
+                    <VariantText title={lookupResult.variantTitle} />
+                  </p>
                 )}
                 <p className="text-xs text-muted-foreground">
                   System qty: {lookupResult.inventory}
@@ -950,7 +960,9 @@ function CountMode({ storeId }: { storeId: string }) {
                 <>
                   <p className="font-medium text-xs">{line.productName}</p>
                   {line.variantTitle && (
-                    <p className="text-xs text-muted-foreground">{line.variantTitle}</p>
+                    <p className="text-xs text-muted-foreground">
+                      <VariantText title={line.variantTitle} />
+                    </p>
                   )}
                 </>
               ),

@@ -886,6 +886,7 @@
         "swatchesHint": "نقطة لون و/أو صورة لكل قيمة (مثل كل لون).",
         "swatchesSave": "حفظ العينات",
         "swatchesSaved": "تم حفظ العينات",
+        "swatchesFailed": "تعذر حفظ العينة لـ: {values}",
         "namePlaceholder": "مثلاً Medium",
         "nameArPlaceholder": "مثلاً متوسط",
         "addRow": "أضف متغيراً آخر",

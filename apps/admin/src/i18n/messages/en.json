@@ -886,6 +886,7 @@
         "swatchesHint": "A colour dot and/or a photo for each option value (e.g. each colour).",
         "swatchesSave": "Save swatches",
         "swatchesSaved": "Swatches saved",
+        "swatchesFailed": "Could not save the swatch for: {values}",
         "namePlaceholder": "e.g. Medium",
         "nameArPlaceholder": "مثلاً متوسط",
         "addRow": "Add another variant",

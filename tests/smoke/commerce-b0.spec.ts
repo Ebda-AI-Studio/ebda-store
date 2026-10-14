@@ -218,14 +218,29 @@ test.describe('commerce b0 flow @local-stack', () => {
           sizeChartId: originalProduct.sizeChartId,
         });
       }
-      if (orderId) {
-        // An open unpaid COD order counts toward the per-IP stock-hold cap and holds stock;
-        // cancel it so repeated runs do not exhaust the cap (429 TOO_MANY_OPEN_HOLDS).
-        // Only this run's own order: re-read it and cancel only if its buyer email is ours.
-        const mine = await adminFetch(request, 'get', `/stores/${storeId}/orders/${orderId}`);
+      // An open unpaid COD order counts toward the per-IP stock-hold cap and holds stock;
+      // cancel it so repeated runs do not exhaust the cap (429 TOO_MANY_OPEN_HOLDS).
+      // Only this run's own order: when step 8 never matched it (the run failed between
+      // placing the order and the admin read), look it up by this run's unique buyer email.
+      // Every candidate is re-read and cancelled only if its buyer email is exactly ours.
+      const ids = orderId
+        ? [orderId]
+        : (
+            ((
+              await adminFetch(
+                request,
+                'get',
+                `/stores/${storeId}/orders?search=${encodeURIComponent(RUN_EMAIL)}`
+              )
+            ).body.data?.orders ?? []) as Json[]
+          )
+            .map(r => r?.id as string)
+            .filter(Boolean);
+      for (const id of ids) {
+        const mine = await adminFetch(request, 'get', `/stores/${storeId}/orders/${id}`);
         const body = (mine.body.data?.order ?? mine.body.data) as Json;
         if (mine.status === 200 && orderBelongsToRun(body, RUN_EMAIL)) {
-          await adminFetch(request, 'put', `/stores/${storeId}/orders/${orderId}/status`, {
+          await adminFetch(request, 'put', `/stores/${storeId}/orders/${id}/status`, {
             status: 'cancelled',
           });
         }
@@ -318,15 +333,15 @@ test.describe('commerce b0 flow @local-stack', () => {
     await pick(rose);
     await pick(page.getByRole('button', { name: '54 سم' }));
 
-    // 3. Required personalisation: the button is disabled and the message is shown.
+    // 3. Required personalisation: no warning before intent; the button stays enabled and a
+    //    tap with the field empty focuses the field and shows the hint instead of adding.
     const field = page.locator('input[maxlength="12"]');
-    // The buy row's primary button is the sibling just before the wishlist toggle.
-    const mainAdd = page
-      .getByRole('button', { name: 'Add to wishlist' })
-      .first()
-      .locator('xpath=preceding-sibling::button[1]');
+    const mainAdd = page.getByTestId('pdp-add');
     await expect(field).toBeVisible();
-    await expect(mainAdd).toBeDisabled();
+    await expect(page.getByText('اكتب الاسم للتطريز الأول')).toBeHidden();
+    await expect(mainAdd).toBeEnabled();
+    await mainAdd.click();
+    await expect(field).toBeFocused();
     await expect(page.getByText('اكتب الاسم للتطريز الأول')).toBeVisible();
 
     // 4. Type Sara and add; then the sticky bar adds Omar.
@@ -352,6 +367,10 @@ test.describe('commerce b0 flow @local-stack', () => {
     await expect(noteLine('Omar')).toContainText('✎');
     await expect(page.locator('p:has(> span[aria-hidden="true"]:text-is("✎ "))')).toHaveCount(2);
     await expect(page.getByTestId('sticky-cart-total')).toBeVisible();
+    // F1: the bar repeats the summary's Subtotal, never subtotal + a pending shipping fee.
+    const barValue = (await page.getByTestId('sticky-cart-total-value').innerText()).trim();
+    await expect(page.getByTestId('sticky-cart-total')).toContainText('المجموع الفرعي');
+    await expect(page.locator('aside[aria-label="ملخص الطلب"]')).toContainText(barValue);
 
     // 6. COD checkout.
     await page.getByTestId('sticky-cart-total').getByRole('link').click();
@@ -381,7 +400,7 @@ test.describe('commerce b0 flow @local-stack', () => {
     // 8. The admin order (API the admin order page calls; the admin UI is not driven here).
     // Never trust an id that is not provably this run's: verify the buyer email before using it,
     // and before afterAll may cancel it. Nothing is cancelled unless this passes.
-    const num = (await page.getByTestId('receipt-order-number').innerText()).replace('#', '');
+    const num = (await page.getByTestId('receipt-barcode-caption').innerText()).replace('#', '');
     const candidates: string[] = [];
     if (urlOrderId) candidates.push(urlOrderId);
     const list = await adminFetch(
@@ -409,8 +428,10 @@ test.describe('commerce b0 flow @local-stack', () => {
     const items = (o!.items as Json[]).filter(i => i.personalisation);
     expect(items.map(i => i.personalisation).sort()).toEqual(['Omar', 'Sara']);
     for (const i of items) {
+      // Ruling B0-41: variantName stays canonical (EN), variantNameAr carries the Arabic.
       expect(i.variantName, 'variantName snapshot').toBeTruthy();
-      expect(String(i.variantName)).toContain('وردي');
+      expect(String(i.variantName)).not.toContain('وردي');
+      expect(String(i.variantNameAr)).toContain('وردي');
     }
   });
 });

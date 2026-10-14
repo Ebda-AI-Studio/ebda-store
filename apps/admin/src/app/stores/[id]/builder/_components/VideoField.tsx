@@ -28,12 +28,19 @@ export function VideoField({
   const inputRef = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [bytes, setBytes] = useState<number | null>(null);
-  // Reduced motion: no autoplay, show the first frame with controls instead.
-  const [reduceMotion, setReduceMotion] = useState(false);
+  // Reduced motion: no autoplay, show the first frame with controls instead. Read on the
+  // FIRST render (lazy init), not in an effect: an effect runs after paint, so the preview
+  // painted once with autoplay on before switching it off.
+  const [reduceMotion, setReduceMotion] = useState(() => {
+    try {
+      return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+    } catch {
+      return false;
+    }
+  });
   useEffect(() => {
     const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     if (!mq) return;
-    setReduceMotion(mq.matches);
     const on = (e: MediaQueryListEvent) => setReduceMotion(e.matches);
     mq.addEventListener?.('change', on);
     return () => mq.removeEventListener?.('change', on);

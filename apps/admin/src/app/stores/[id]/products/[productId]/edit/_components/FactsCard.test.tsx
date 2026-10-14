@@ -48,4 +48,25 @@ describe('FactsCard translate', () => {
     await waitFor(() => expect(latest[0].keyAr).toBe('مترجم'));
     expect(latest[1].value).toBe('Hand wash');
   });
+
+  it('locks move up / move down / remove while a translation is in flight (it writes back by index)', async () => {
+    render(<Host />);
+    const locked = () =>
+      [
+        ...screen.getAllByLabelText('moveUp'),
+        ...screen.getAllByLabelText('moveDown'),
+        ...screen.getAllByLabelText('remove'),
+      ] as HTMLButtonElement[];
+    // idle: row 2 can move up, row 1 can move down, both removable
+    expect(screen.getAllByLabelText('moveUp')[1]).toHaveProperty('disabled', false);
+    expect(screen.getAllByLabelText('moveDown')[0]).toHaveProperty('disabled', false);
+    fireEvent.click(screen.getAllByText('translate')[0]);
+    expect(locked().every(b => b.disabled)).toBe(true);
+    fireEvent.click(screen.getAllByLabelText('remove')[0]);
+    expect(latest).toHaveLength(2);
+    await act(async () => resolveTranslate({ data: { translation: 'مترجم' } }));
+    await waitFor(() => expect(latest[0].keyAr).toBe('مترجم'));
+    expect(screen.getAllByLabelText('moveUp')[1]).toHaveProperty('disabled', false);
+    expect(screen.getAllByLabelText('remove')[0]).toHaveProperty('disabled', false);
+  });
 });

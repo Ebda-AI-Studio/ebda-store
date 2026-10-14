@@ -33,12 +33,21 @@ export function OptionSwatchesEditor({ storeId, productId, options, onSaved }: P
   const { success: toastSuccess, error: toastError } = useToast();
   const [saving, setSaving] = useState(false);
   const [storeTheme, setStoreTheme] = useState<StoreTheme | undefined>();
+  // The admin StoreContext carries no theme (id + name only), so the picker's theme
+  // tokens come from one read here. Guarded: an unmount (or a store switch) before it
+  // resolves must not set state on a stale editor.
   useEffect(() => {
+    let live = true;
     apiGet<{ store: { theme?: StoreTheme } }>(`/api/v1/admin/stores/${storeId}`)
-      .then(({ data }) => setStoreTheme(data?.store?.theme))
+      .then(({ data }) => {
+        if (live) setStoreTheme(data?.store?.theme);
+      })
       .catch(() => {
         // non-critical: falls back to the default theme for the picker
       });
+    return () => {
+      live = false;
+    };
   }, [storeId]);
   const theme = storeTheme ?? FALLBACK_THEME;
   const [drafts, setDrafts] = useState<Record<string, Draft>>(() => {
@@ -56,7 +65,8 @@ export function OptionSwatchesEditor({ storeId, productId, options, onSaved }: P
   async function save() {
     setSaving(true);
     try {
-      let failed = 0;
+      // Name WHICH values failed ("Color: Rose"), not just how many.
+      const failed: string[] = [];
       for (const o of options) {
         for (const v of o.values) {
           const d = drafts[v.id];
@@ -65,11 +75,11 @@ export function OptionSwatchesEditor({ storeId, productId, options, onSaved }: P
             `/api/v1/stores/${storeId}/products/${productId}/option-values/${v.id}`,
             { swatchHex: d.hex || null, swatchImageUrl: d.img || null }
           );
-          if (error) failed++;
+          if (error) failed.push(`${o.name}: ${v.value}`);
         }
       }
-      if (failed === 0) toastSuccess(t('swatchesSaved'));
-      else toastError(t('saveFailedTitle'), String(failed));
+      if (failed.length === 0) toastSuccess(t('swatchesSaved'));
+      else toastError(t('saveFailedTitle'), t('swatchesFailed', { values: failed.join(' · ') }));
       onSaved();
     } finally {
       setSaving(false);
