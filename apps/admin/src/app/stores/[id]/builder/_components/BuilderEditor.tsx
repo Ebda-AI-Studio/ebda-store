@@ -22,6 +22,7 @@ import {
   TEMPLATE_FAMILIES,
   applyTemplateFamily,
   effectiveTheme,
+  getLook,
   type ChildToParent,
   type DraftTheme,
   type DocumentAction,
@@ -47,6 +48,7 @@ interface StoreInfo {
   slug: string;
   domain?: string | null;
   theme?: StoreTheme;
+  look?: string | null;
 }
 
 type StartTab = 'sections' | 'theme' | 'history';
@@ -268,6 +270,12 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         )}
         {tab === 'theme' && (
           <ThemeSettingsPanel
+            storeId={storeId}
+            look={getLook(store.look) ?? null}
+            onThemeReset={() => {
+              // A reset changes the LIVE theme: re-read it, then repaint the canvas from it.
+              void refreshStore().then(() => setReloadKey(k => k + 1));
+            }}
             theme={effectiveTheme(store.theme, b.doc.theme)}
             onSave={patch => {
               // Draft only: the edit rides the document (autosave API), the
