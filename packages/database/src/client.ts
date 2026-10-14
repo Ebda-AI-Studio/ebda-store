@@ -53,6 +53,9 @@ const prismaOptions = {
       passwordHash: true,
       mfaSecret: true,
       mfaBackupCodes: true,
+      // Ebda's own ads attribution (ip, user agent, Meta ids): never in a full-row
+      // read; only the CAPI job and the super-admin store page name it in a select.
+      acquisition: true,
     },
     storeCredential: {
       wbsApiKey: true,
