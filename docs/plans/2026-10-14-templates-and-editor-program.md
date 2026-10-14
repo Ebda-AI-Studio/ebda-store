@@ -21,6 +21,8 @@ Consequences:
 
 **Ruling TPL-2 — Dahab is redesigned as 3 new looks (Worn / Workshop / Gift box); the night+gold+arch skin is retired.** Ahmad, 2026-10-14: "it was designed wrong, not like those". The existing skin's commerce wiring (ProductDetail, drawers, 3D slot, contrast test) is reused; its visual language is not. The live preview store moves to a new look before the old skin is deleted. Cost if wrong: Dahab's approved-for-review work is discarded visually and the pilot timeline restarts.
 
+Approved by Ahmad 2026-10-14 ("approve the 3 as options under the template itself as the rest"): Dahab ships Worn / Workshop / Gift box as its 3 looks.
+
 **Ruling TPL-3 — the illustrative photos are marketing assets.** Ahmad, 2026-10-14: the generated in-palette photos from the directions gallery are used on the marketing site (ebda.app) to show the templates and their looks. They are labelled illustrative (AI-generated sample products, not a real merchant's catalogue), stored in R2 at web sizes, and re-shot per look once each look's final palette is locked. Cost if wrong: a shopper or merchant reads a sample as a real store; the label is what prevents that.
 
 - Known fix before build: the Qamar C hero photo has garbled "ZAS" text; regenerate.
