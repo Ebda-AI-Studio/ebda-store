@@ -5,6 +5,7 @@ import { Button } from '@force/ui';
 import { getPaymentIcon, DEFAULT_PAYMENT_PROVIDERS } from '../../components/PaymentIcons';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import type { PaymentProvider } from './types';
+import { DemoCheckoutNotice } from '../../components/demo/DemoCheckoutNotice';
 
 interface FormData {
   email: string;
@@ -45,6 +46,8 @@ interface PaymentStepProps {
    * could). Disables the Pay button; `checkoutError` carries the message.
    */
   belowMinimumOrder?: boolean;
+  /** Demo store: the pay action is replaced by a notice (the API refuses the order too). */
+  isDemo?: boolean;
 }
 
 export default function PaymentStep({
@@ -60,6 +63,7 @@ export default function PaymentStep({
   formatPrice,
   deliverySection,
   belowMinimumOrder = false,
+  isDemo = false,
 }: PaymentStepProps) {
   const { language, t } = useLanguage();
 
@@ -214,18 +218,22 @@ export default function PaymentStep({
         >
           {language === 'ar' ? 'العودة إلى الشحن →' : '← Return to shipping'}
         </button>
-        <Button
-          type="submit"
-          size="lg"
-          isLoading={isProcessing}
-          disabled={!selectedProvider || isProcessing || belowMinimumOrder}
-        >
-          {isProcessing
-            ? t('Processing...', 'جاري المعالجة...')
-            : selectedProvider === 'cod'
-              ? t('Place Order', translations['Place Order'])
-              : `${t('Pay', 'ادفع')} ${formatPrice(total)}`}
-        </Button>
+        {isDemo ? (
+          <DemoCheckoutNotice />
+        ) : (
+          <Button
+            type="submit"
+            size="lg"
+            isLoading={isProcessing}
+            disabled={!selectedProvider || isProcessing || belowMinimumOrder}
+          >
+            {isProcessing
+              ? t('Processing...', 'جاري المعالجة...')
+              : selectedProvider === 'cod'
+                ? t('Place Order', translations['Place Order'])
+                : `${t('Pay', 'ادفع')} ${formatPrice(total)}`}
+          </Button>
+        )}
       </div>
     </div>
   );

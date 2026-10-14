@@ -7,6 +7,7 @@ import { parseStoreHost, storeHost, type ParsedStoreHost, type PlatformApp } fro
 // global alias would be ambiguous across apps/{web,admin,api,orders}).
 // Zero behavior change — Next.js resolves both forms identically.
 import { devSuffixesAllowed } from './src/lib/platform-host';
+import { DEMO_LOOK_HEADER, parseDemoLook } from './src/lib/demo-look-param';
 
 /**
  * HOST ROUTING (program plan §1, design cloudflare-backend §4).
@@ -349,6 +350,20 @@ function handleStoreHost(
   // case where StoreProvider's client-side host detection should run (#2091).
   requestHeaders.set('x-is-platform', 'false');
 
+  // Demo-showroom look preview: a well-formed `?look=<id>` is forwarded as a REQUEST header (the
+  // client-sent one was stripped in `middleware`), for the resolver to apply to an `isDemo` store
+  // only. Such a request is per-visitor by construction: it never takes the shared tenant-tree
+  // (full-route-cache) rewrite and its response is `private, no-store`, so a previewed look can
+  // never be cached and served to another visitor or another store. Middleware is synchronous and
+  // cannot ask whether the store is a demo, so the guard covers every store host; the page for a
+  // non-demo store is identical to the one without the param.
+  const demoLook = parseDemoLook(request.nextUrl.searchParams.get('look'));
+  if (demoLook) requestHeaders.set(DEMO_LOOK_HEADER, demoLook);
+  const uncacheableForDemoLook = (response: NextResponse): NextResponse => {
+    if (demoLook) response.headers.set('Cache-Control', 'private, no-store');
+    return response;
+  };
+
   // /favicon.ico → dynamic per-store favicon (falling back to the neutral
   // platform default when the store has none). The `sf=1` marker is set by the
   // route handler's own fallback redirect, so this cannot loop.
@@ -358,7 +373,7 @@ function handleStoreHost(
     return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   }
 
-  if (isTenantTreeEligible(request.nextUrl.pathname, isPreviewIframe, storeKey)) {
+  if (!demoLook && isTenantTreeEligible(request.nextUrl.pathname, isPreviewIframe, storeKey)) {
     const storeTreeUrl = buildStoreTreeUrl(request, host, request.nextUrl.pathname, storeKey);
     const response = NextResponse.rewrite(storeTreeUrl, {
       request: { headers: requestHeaders },
@@ -369,7 +384,7 @@ function handleStoreHost(
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set('x-store-domain', host);
-  return response;
+  return uncacheableForDemoLook(response);
 }
 
 /** Platform apps this Worker serves directly (the rest are other Workers/sites). */
@@ -417,6 +432,8 @@ export const MIDDLEWARE_ASSERTED_HEADERS = [
   'x-preview-draft',
   'x-builder-preview-token',
   'x-original-host',
+  // Demo-showroom look preview; re-set below only from a validated `?look=`.
+  'x-demo-look',
 ] as const;
 
 export function middleware(request: NextRequest) {

@@ -125,6 +125,8 @@ export interface StoreData {
   template: TemplateId;
   /** Look id; null/absent = legacy store. */
   look?: string | null;
+  /** The looks showroom: the layout shows the look bar and checkout shows a notice instead of Pay. */
+  isDemo?: boolean;
   theme: StoreTheme;
   socialLinks: StoreSocialLinks;
   email?: string;

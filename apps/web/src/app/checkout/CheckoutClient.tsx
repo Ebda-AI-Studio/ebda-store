@@ -2321,6 +2321,7 @@ export default function CheckoutClient() {
                     total={total}
                     formatPrice={formatPrice}
                     belowMinimumOrder={belowMinimumOrder}
+                    isDemo={store.isDemo === true}
                     deliverySection={
                       checkoutDelivery ? (
                         <div data-error={!!deliveryWindowError}>

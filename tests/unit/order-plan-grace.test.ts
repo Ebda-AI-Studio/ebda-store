@@ -1,9 +1,18 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-const m = vi.hoisted(() => ({ entitlements: vi.fn(), count: vi.fn(), sub: vi.fn() }));
+const m = vi.hoisted(() => ({
+  entitlements: vi.fn(),
+  count: vi.fn(),
+  sub: vi.fn(),
+  store: vi.fn(),
+}));
 vi.mock('@force/database', () => ({
   prisma: {},
   withStore: (_id: string, fn: Function) =>
-    fn({ order: { count: m.count }, storeSubscription: { findUnique: m.sub } }),
+    fn({
+      order: { count: m.count },
+      storeSubscription: { findUnique: m.sub },
+      store: { findUnique: m.store },
+    }),
 }));
 vi.mock('../../apps/api/src/services/plan-entitlements', () => ({
   getEntitlements: m.entitlements,
@@ -17,6 +26,7 @@ import { assertOrderAllowed } from '../../apps/api/src/services/plan-limit.servi
 
 describe('order grace', () => {
   beforeEach(() => {
+    m.store.mockResolvedValue({ isDemo: false });
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-20T12:00:00Z'));
     m.entitlements.mockResolvedValue({
@@ -50,5 +60,17 @@ describe('order grace', () => {
       limits: { maxOrdersPerMonth: 3000 },
     });
     await expect(assertOrderAllowed('s')).rejects.toMatchObject({ statusCode: 402 });
+  });
+});
+
+describe('demo store gate', () => {
+  it('refuses a demo store before reading entitlements', async () => {
+    m.store.mockResolvedValue({ isDemo: true });
+    m.entitlements.mockClear();
+    await expect(assertOrderAllowed('s')).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'DEMO_STORE',
+    });
+    expect(m.entitlements).not.toHaveBeenCalled();
   });
 });

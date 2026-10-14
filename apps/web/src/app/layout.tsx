@@ -30,6 +30,7 @@ import { CookiePreferencesLink } from '../components/CookiePreferencesLink';
 import { type MarketingPixels, BRAND, resolveDefaultLanguage } from '@force/shared';
 import { buildThemeStyleTag } from '../lib/theme-css';
 import { lookHead } from '../lib/look-head';
+import { DemoLookBar } from '../components/demo/DemoLookBar';
 import { jsonLdScriptContent } from '../lib/json-ld-script';
 import '../styles/globals.css';
 
@@ -596,6 +597,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     <AuthProvider>
                       <ToastProvider>
                         <CartProvider>
+                          {store.isDemo && <DemoLookBar activeLook={store.look} />}
                           <div id="main-content">{children}</div>
                           <PushNotificationPrompt />
                           <OneSignalStorefrontInit />

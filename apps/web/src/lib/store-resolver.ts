@@ -18,6 +18,7 @@ import { devSuffixesAllowed } from './platform-host';
 import { API_URL } from './api';
 import { decodeRouteParam } from './route-params';
 import { StoreTemporarilyUnavailableError } from './store-unavailable';
+import { applyDemoLook, DEMO_LOOK_HEADER } from './demo-look';
 
 // Re-exported so server callers have one import site for the resolver and the
 // failure it can raise. The declaration itself lives in a client-safe module
@@ -54,6 +55,8 @@ export interface ResolvedStore {
   template: TemplateId;
   /** Look id (e.g. 'qamar.atelier'); null/absent = legacy store, rendered exactly as before. */
   look?: string | null;
+  /** The looks showroom (`stores.is_demo`): previews `?look=` and refuses checkout. */
+  isDemo?: boolean;
   theme: StoreTheme;
   // Per-store typography overrides (font family, size, color per zone
   // + a library of Google Fonts URLs / merchant-uploaded font files).
@@ -270,6 +273,18 @@ export async function getBuilderPreviewToken(): Promise<string | null> {
 }
 
 /**
+ * The demo-showroom look preview for THIS request: the base store, or (only for `isDemo` stores
+ * and only for a built look) the same store wearing the `?look=` look. Middleware sets
+ * `x-demo-look` from a validated `?look=` only (any client-sent value is stripped first); this
+ * applies it AFTER the cached fetch, per request, so the cached base store is never mutated.
+ */
+async function withDemoLookPreview(store: ResolvedStore): Promise<ResolvedStore> {
+  if (!store.isDemo) return store;
+  const raw = (await headers()).get(DEMO_LOOK_HEADER);
+  return raw ? applyDemoLook(store, raw) : store;
+}
+
+/**
  * Check if running on platform domain
  */
 export async function isPlatformDomain(): Promise<boolean> {
@@ -400,6 +415,7 @@ async function fetchStoreByDomain(
       timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
       look: storeData.look ?? null,
+      isDemo: storeData.isDemo === true,
       theme: composeStoreTheme({
         template: storeData.template || 'modern',
         look: storeData.look,
@@ -574,6 +590,7 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
       look: storeData.look ?? null,
+      isDemo: storeData.isDemo === true,
       theme: composeStoreTheme({
         template: storeData.template || 'modern',
         look: storeData.look,
@@ -713,7 +730,7 @@ export async function getStore(): Promise<ResolvedStore> {
     const { store, transient } = await lenientResolve(() =>
       resolveStoreByDomain(domain, builderToken)
     );
-    if (store) return store;
+    if (store) return withDemoLookPreview(store);
     return transient ? TRANSIENTLY_UNRESOLVED_STORE : DEFAULT_STORE;
   }
 
@@ -793,7 +810,7 @@ export async function getStoreOrNotFound(): Promise<ResolvedStore> {
   if (domain) {
     const store = await resolveStoreByDomain(domain, await getBuilderPreviewToken());
     if (!store) notFound();
-    return store;
+    return withDemoLookPreview(store);
   }
 
   // No store identifier: a platform host (the apex, a preview host). A platform
@@ -912,6 +929,7 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
       look: storeData.look ?? null,
+      isDemo: storeData.isDemo === true,
       theme: composeStoreTheme({
         template: storeData.template || 'modern',
         look: storeData.look,

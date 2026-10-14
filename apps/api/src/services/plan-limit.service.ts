@@ -214,8 +214,25 @@ export function ordersOpenFor(
   return e.billingMethod === 'instapay' || e.hasSavedCard;
 }
 
-/** Gate orders before inventory, payment, or notification side effects. */
+/**
+ * Gate orders before inventory, payment, or notification side effects.
+ *
+ * A demo store (`stores.is_demo`, the looks showroom) never takes an order: refused first, before
+ * the entitlement read, on EVERY order-creating path (this gate is the shared one:
+ * `OrderService.create`, `createAdminOrder`, the WhatsApp payment link). The read goes through
+ * `withStore`, so it runs under the caller's tenant guard + RLS like any other store read.
+ */
 export async function assertOrderAllowed(storeId: string): Promise<void> {
+  const row = await withStore(storeId, tx =>
+    tx.store.findUnique({ where: { id: storeId }, select: { isDemo: true } })
+  );
+  if (!row) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+  if (row.isDemo) {
+    throw new AppError(403, 'DEMO_STORE', 'This is a demo store; orders are disabled', {
+      messageEn: 'This is a demo store: ordering is disabled',
+      messageAr: 'ده متجر تجريبي — الطلب مقفول',
+    });
+  }
   const e = await getEntitlements(storeId);
   if (!e) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
   if (!ordersOpenFor(e, new Date())) {
