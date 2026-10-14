@@ -392,6 +392,9 @@ interface CreateOrderData {
   /** Explicit "Send me offers by SMS" tick (issue 206). Sent only when the
    *  box was rendered AND ticked; never a withdrawal. */
   smsOptIn?: boolean;
+  /** The shopper's storefront language. Snapshots Arabic variant titles on the
+   *  order lines and picks the transactional-email language. */
+  locale?: 'en' | 'ar';
 }
 
 /**

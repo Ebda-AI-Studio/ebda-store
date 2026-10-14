@@ -43,20 +43,25 @@ function WaLink({
   prominent,
   className = '',
   testId,
+  disabled,
 }: {
   href: string;
   label: string;
   prominent?: boolean;
   className?: string;
   testId: string;
+  /** Rendered but not followable (no href), e.g. a required personalisation is empty. */
+  disabled?: boolean;
 }) {
   return (
     <a
-      href={href}
+      href={disabled ? undefined : href}
       target="_blank"
       rel="noopener noreferrer"
       data-testid={testId}
+      aria-disabled={disabled || undefined}
       className={
+        (disabled ? 'pointer-events-none opacity-50 ' : '') +
         (prominent
           ? 'inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-5 py-3 text-base font-semibold text-white shadow-sm hover:brightness-95'
           : 'inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted') +
@@ -76,10 +81,16 @@ export function WaMeProductButton({
   product,
   priceMinor,
   className = '',
+  personalisation,
+  disabled,
 }: {
   product: { slug: string; name: string; nameAr?: string | null };
   priceMinor?: number | null;
   className?: string;
+  /** The customer's typed text, carried into the WhatsApp message. */
+  personalisation?: { label: string; note: string } | null;
+  /** Same gate as add-to-cart's required-personalisation rule. */
+  disabled?: boolean;
 }) {
   const { store, locale, t, visibility } = useWaMe();
   if (!visibility.productShare) return null;
@@ -88,6 +99,7 @@ export function WaMeProductButton({
     productName: locale === 'ar' && product.nameAr ? product.nameAr : product.name,
     priceMinor,
     url: productUrl(store, product.slug),
+    personalisation,
   });
   const href = waMeLink(store.whatsapp, text);
   if (!href) return null;
@@ -96,6 +108,7 @@ export function WaMeProductButton({
       href={href}
       testId="wa-me-product"
       className={className}
+      disabled={disabled}
       label={t('Ask or share on WhatsApp', 'اسأل أو شارك على واتساب')}
     />
   );

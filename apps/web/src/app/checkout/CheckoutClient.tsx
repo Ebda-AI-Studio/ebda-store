@@ -13,7 +13,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
 import { CheckoutErrorAlert } from './CheckoutErrorAlert';
-import { subscriptionRequiredCopy } from './_lib/checkoutErrors';
+import {
+  orderLocale,
+  personalisationRequiredCopy,
+  subscriptionRequiredCopy,
+} from './_lib/checkoutErrors';
 import { checkoutBundleErrorCopy } from '../../lib/checkout-bundle-errors';
 import {
   PRODUCT_NO_LONGER_AVAILABLE,
@@ -560,6 +564,8 @@ export default function CheckoutClient() {
 
   // Checkout error state
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  // True when the current error needs a way back to the cart (personalisation missing).
+  const [checkoutErrorCartLink, setCheckoutErrorCartLink] = useState(false);
 
   // Fetch initial data (shipping zones and payment config)
   useEffect(() => {
@@ -1244,6 +1250,7 @@ export default function CheckoutClient() {
 
     setIsProcessing(true);
     setCheckoutError(null);
+    setCheckoutErrorCartLink(false);
 
     // Persist or clear saved info based on the saveInfo checkbox.
     if (store?.id) {
@@ -1365,6 +1372,8 @@ export default function CheckoutClient() {
         useWallet: walletApplied > 0 ? true : undefined,
         // Only an explicit tick on a rendered box is sent; omitted otherwise.
         smsOptIn: showSmsOptIn && smsOptIn ? true : undefined,
+        // Arabic variant titles + email language follow the shopper's language.
+        locale: orderLocale(language),
       });
 
       if (!orderResult.success || !orderResult.data?.order) {
@@ -1531,6 +1540,17 @@ export default function CheckoutClient() {
       const bundleFriendly = checkoutBundleErrorCopy(code, raw, t);
       if (bundleFriendly) {
         setCheckoutError(bundleFriendly);
+        setIsProcessing(false);
+        return;
+      }
+
+      // A line is missing its required personalisation: name the item + field
+      // and link back to the cart (the text is typed on the product page).
+      const personalisationFriendly = personalisationRequiredCopy(code, details, t, language);
+      if (personalisationFriendly) {
+        setCheckoutError(personalisationFriendly);
+        setCheckoutErrorCartLink(true);
+        setStep(1);
         setIsProcessing(false);
         return;
       }
@@ -1923,7 +1943,15 @@ export default function CheckoutClient() {
                 )}
                 <CheckoutErrorAlert
                   message={checkoutError}
-                  onClear={() => setCheckoutError(null)}
+                  onClear={() => {
+                    setCheckoutError(null);
+                    setCheckoutErrorCartLink(false);
+                  }}
+                  action={
+                    checkoutErrorCartLink
+                      ? { href: storeUrl('/cart'), label: t('Go to cart', 'الذهاب إلى السلة') }
+                      : undefined
+                  }
                 />
                 {step === 1 && (
                   <div className="rounded-xl border bg-card p-6 shadow-sm">

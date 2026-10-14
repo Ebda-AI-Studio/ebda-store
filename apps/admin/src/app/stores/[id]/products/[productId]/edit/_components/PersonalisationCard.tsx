@@ -13,6 +13,7 @@
 import { Input } from '@ebda/ui';
 import { PERSONALISATION_NOTE_MAX, type PersonalisationConfig } from '@ebda/shared';
 import { Toggle } from '@/components/Toggle';
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 
 export const PERSONALISATION_DEFAULT_MAX = 20;
@@ -60,9 +61,21 @@ export function personalisationPayload(
   const labelAr = f.labelAr.trim();
   if (!f.enabled && !label && !labelAr) return { value: null };
   const max = Number(f.maxLength.trim() || PERSONALISATION_DEFAULT_MAX);
-  if (!Number.isInteger(max) || max < 1 || max > PERSONALISATION_NOTE_MAX) {
-    return { error: 'invalidMax' };
+  const maxValid = Number.isInteger(max) && max >= 1 && max <= PERSONALISATION_NOTE_MAX;
+  // Off: the field is hidden, so a half-typed max length must not block the
+  // product save. Keep the labels and fall back to the default.
+  if (!f.enabled) {
+    return {
+      value: {
+        enabled: false,
+        label,
+        labelAr,
+        maxLength: maxValid ? max : PERSONALISATION_DEFAULT_MAX,
+        required: f.required,
+      },
+    };
   }
+  if (!maxValid) return { error: 'invalidMax' };
   if (f.enabled && !label && !labelAr) return { error: 'needLabel' };
   return { value: { enabled: f.enabled, label, labelAr, maxLength: max, required: f.required } };
 }
@@ -80,6 +93,7 @@ interface Props {
 
 export function PersonalisationCard({ value, onChange }: Props) {
   const t = useT('products.edit.personalisation');
+  const isAr = useLocale() === 'ar';
   const set = (patch: Partial<PersonalisationForm>) => onChange({ ...value, ...patch });
 
   return (
@@ -113,7 +127,7 @@ export function PersonalisationCard({ value, onChange }: Props) {
                         : 'border-border text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    {p.labelAr}
+                    {isAr ? p.labelAr : p.label}
                   </button>
                 );
               })}

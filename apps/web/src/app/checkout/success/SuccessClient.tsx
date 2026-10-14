@@ -313,6 +313,9 @@ function SuccessContent() {
                         <p className="font-medium text-foreground">
                           {row.item.product?.name || 'Product'}
                         </p>
+                        {row.item.variantName && (
+                          <p className="text-sm text-muted-foreground">{row.item.variantName}</p>
+                        )}
                         <CartLineNote
                           note={row.item.personalisation}
                           className="text-sm text-muted-foreground"

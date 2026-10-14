@@ -15,15 +15,26 @@ export const personalisationConfigSchema = z
 
 export type PersonalisationConfig = z.infer<typeof personalisationConfigSchema>;
 
-// C0/C1 controls + bidi embedding/override/isolate chars (log/display spoofing).
-// eslint-disable-next-line no-control-regex
-const STRIP = /[\u0000-\u001F\u007F-\u009F‪-‮⁦-⁩]/g;
+// Invisible / direction-changing characters that a workshop cannot see but that
+// change what a name looks like (display + log spoofing):
+//   C0/C1 controls, ALM (U+061C), zero-width space/joiners (U+200B-U+200D),
+//   LRM/RLM (U+200E/F), line/paragraph separators (U+2028/9), bidi
+//   embeddings/overrides (U+202A-U+202E), isolates (U+2066-U+2069), BOM (U+FEFF).
+const STRIP =
+  // eslint-disable-next-line no-control-regex, no-misleading-character-class
+  /[\u0000-\u001F\u007F-\u009F\u061C\u200B-\u200F\u2028\u2029\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+
+/** Customer note with invisible characters stripped and trimmed, NOT capped; empty → null. */
+export function stripNote(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const s = raw.replace(STRIP, '').trim();
+  return s ? s : null;
+}
 
 /** Customer note → stored text: stripped, trimmed, capped at 200; empty → null. */
 export function cleanNote(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null;
-  const s = raw.replace(STRIP, '').trim().slice(0, PERSONALISATION_NOTE_MAX);
-  return s ? s : null;
+  const s = stripNote(raw);
+  return s ? s.slice(0, PERSONALISATION_NOTE_MAX) : null;
 }
 
 /** Active-language field label; falls back to the other language, never blank. */

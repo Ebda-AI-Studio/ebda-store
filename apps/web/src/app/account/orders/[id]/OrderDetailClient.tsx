@@ -514,6 +514,9 @@ export default function OrderDetailClient() {
                               </span>
                             )}
                           </span>
+                          {row.kind === 'item' && row.item.variantName && (
+                            <p className="text-xs text-muted-foreground">{row.item.variantName}</p>
+                          )}
                           {row.kind === 'item' && <CartLineNote note={row.item.personalisation} />}
                         </div>
                       </div>
@@ -583,6 +586,9 @@ export default function OrderDetailClient() {
                       </span>
                     )}
                   </p>
+                  {row.kind === 'item' && row.item.variantName && (
+                    <p className="text-xs text-muted-foreground">{row.item.variantName}</p>
+                  )}
                   {row.kind === 'item' && <CartLineNote note={row.item.personalisation} />}
                   <p className="text-sm text-muted-foreground">
                     {row.kind === 'bundle'

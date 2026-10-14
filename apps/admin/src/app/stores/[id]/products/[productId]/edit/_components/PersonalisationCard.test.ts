@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@/i18n/useT', () => ({ useT: () => (k: string) => k }));
+vi.mock('next-intl', () => ({ useLocale: () => 'en' }));
 
 import {
   EMPTY_PERSONALISATION,
@@ -41,6 +42,14 @@ describe('personalisationPayload (the page sends this on PUT)', () => {
         })
       ).toEqual({ error: 'invalidMax' });
     }
+  });
+
+  it('off never blocks the save on a bad max length (falls back to 20)', () => {
+    expect(
+      personalisationPayload({ ...EMPTY_PERSONALISATION, label: 'Name', maxLength: '0' })
+    ).toEqual({
+      value: { enabled: false, label: 'Name', labelAr: '', maxLength: 20, required: false },
+    });
   });
 
   it('off with labels keeps them (enabled:false) for re-enabling', () => {

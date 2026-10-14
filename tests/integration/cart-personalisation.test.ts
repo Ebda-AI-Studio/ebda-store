@@ -44,6 +44,7 @@ describe.skipIf(!hasDb)('cart personalisation (line identity, enforcement, order
   let variantId: string;
   let requiredId: string; // required, maxLength 10
   let plainId: string; // personalisation off
+  let noVariantId: string; // optional personalisation, NO variants
 
   const setPersonalisation = (id: string, value: object) =>
     withRlsBypass(tx => tx.product.update({ where: { id }, data: { personalisation: value } }));
@@ -56,6 +57,10 @@ describe.skipIf(!hasDb)('cart personalisation (line identity, enforcement, order
     productId = await seedProduct(store.storeId, `${suffix}-abaya`, { price: 5000, inventory: 0 });
     requiredId = await seedProduct(store.storeId, `${suffix}-ring`, { price: 3000, inventory: 50 });
     plainId = await seedProduct(store.storeId, `${suffix}-plain`, { price: 1000, inventory: 50 });
+    noVariantId = await seedProduct(store.storeId, `${suffix}-scarf`, {
+      price: 800,
+      inventory: 50,
+    });
     variantId = await withRlsBypass(async tx => {
       const v = await tx.productVariant.create({
         data: { productId, title: 'M / Sand', titleAr: 'وسط / رملي', inventory: 50, price: 5200 },
@@ -67,6 +72,13 @@ describe.skipIf(!hasDb)('cart personalisation (line identity, enforcement, order
       label: 'Name to embroider',
       labelAr: 'الاسم للتطريز',
       maxLength: 12,
+      required: false,
+    });
+    await setPersonalisation(noVariantId, {
+      enabled: true,
+      label: 'Initials',
+      labelAr: 'الحروف',
+      maxLength: 6,
       required: false,
     });
     await setPersonalisation(requiredId, {
@@ -248,5 +260,29 @@ describe.skipIf(!hasDb)('cart personalisation (line identity, enforcement, order
     await withRlsBypass(tx =>
       tx.cartItem.create({ data: { cartId, productId, variantId, note: 'Omar', quantity: 1 } })
     );
+  });
+
+  it('no-variant lines: different notes are separate lines, two null-note adds merge', async () => {
+    const cart = cartClientFor(app, store.storeId, cartSessionId('perso-novariant'));
+    await cart.addToCart({ productId: noVariantId, quantity: 1, note: 'S.A' }).expect(201);
+    await cart.addToCart({ productId: noVariantId, quantity: 1, note: 'O.M' }).expect(201);
+    await cart.addToCart({ productId: noVariantId, quantity: 1 }).expect(201);
+    await cart.addToCart({ productId: noVariantId, quantity: 2 }).expect(201);
+    const got = await cart.getCart().expect(200);
+    expect(linesOf(got.body.data.cart, noVariantId)).toEqual([
+      [null, 3],
+      ['O.M', 1],
+      ['S.A', 1],
+    ]);
+
+    // And the no-variant partial index itself enforces it, for a note and for null.
+    const cartId = got.body.data.cart.id as string;
+    for (const note of ['S.A', null]) {
+      await expect(
+        withRlsBypass(tx =>
+          tx.cartItem.create({ data: { cartId, productId: noVariantId, note, quantity: 1 } })
+        )
+      ).rejects.toMatchObject({ code: 'P2002' });
+    }
   });
 });

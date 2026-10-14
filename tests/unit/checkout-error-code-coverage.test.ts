@@ -136,7 +136,22 @@ function codesMappedInCheckout(): Set<string> {
   const callsBundleHandler = /checkoutBundleErrorCopy\(/.test(src);
   const bundleCodes = callsBundleHandler ? unconditionallyAnsweredBundleCodes(bundleSrc) : [];
 
-  return new Set([...cases, ...viaConstant, ...bundleCodes]);
+  // Pre-switch handlers in checkout/_lib/checkoutErrors.ts that own one code
+  // (`if (code !== 'X') return null;` and copy for every other path), counted
+  // only when CheckoutClient actually calls them.
+  const libSrc = fs.readFileSync(
+    path.resolve(path.dirname(CHECKOUT), '_lib/checkoutErrors.ts'),
+    'utf-8'
+  );
+  const libCodes = [
+    ...libSrc.matchAll(
+      /export function (\w+)\([^)]*\)[^{]*\{\s*if \(code !== '([A-Z_]+)'\) return null;/g
+    ),
+  ]
+    .filter(m => src.includes(`${m[1]}(`))
+    .map(m => m[2]);
+
+  return new Set([...cases, ...viaConstant, ...bundleCodes, ...libCodes]);
 }
 
 /**
@@ -231,6 +246,8 @@ describe('checkout answers every code order creation can throw', () => {
     const mapped = codesMappedInCheckout();
     expect(mapped.has('PRODUCT_NO_LONGER_AVAILABLE')).toBe(true);
     expect(mapped.has('COUPON_NOT_ELIGIBLE')).toBe(true);
+    // B0 Task 5: answered by the pre-switch personalisationRequiredCopy handler.
+    expect(mapped.has('PERSONALISATION_REQUIRED')).toBe(true);
   });
 
   it('actually finds codes in the service — the extractor is not silently empty', () => {

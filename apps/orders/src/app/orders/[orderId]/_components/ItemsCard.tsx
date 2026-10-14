@@ -222,16 +222,15 @@ function ItemRow({ item, currency }: { item: OrderLineItem; currency?: string })
             {item.price != null && <> × {formatMoney(item.price, currency)}</>}
           </span>
         </div>
-        {item.personalisation && (
-          <PersonalisationRow text={item.personalisation} ar={locale === 'ar'} />
-        )}
+        {item.personalisation && <PersonalisationRow text={item.personalisation} />}
       </div>
     </li>
   );
 }
 
 /** The customer's personalisation text, highlighted for the workshop, with copy. */
-function PersonalisationRow({ text, ar }: { text: string; ar: boolean }) {
+function PersonalisationRow({ text }: { text: string }) {
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -247,7 +246,7 @@ function PersonalisationRow({ text, ar }: { text: string; ar: boolean }) {
       <span aria-hidden className="text-muted-foreground">
         ✎
       </span>
-      <span className="sr-only">{ar ? 'التخصيص' : 'Personalisation'}: </span>
+      <span className="sr-only">{t.detail.personalisation}: </span>
       <bdi className="min-w-0 flex-1 select-all break-words font-medium text-foreground">
         {text}
       </bdi>
@@ -256,7 +255,7 @@ function PersonalisationRow({ text, ar }: { text: string; ar: boolean }) {
         onClick={copy}
         className="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        {copied ? (ar ? 'اتنسخ' : 'Copied') : ar ? 'انسخ' : 'Copy'}
+        {copied ? t.detail.copied : t.detail.copy}
       </button>
     </div>
   );

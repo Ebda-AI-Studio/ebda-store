@@ -55,7 +55,7 @@ interface OrderItem {
   variantId: string | null;
   productName: string;
   variantName: string | null;
-  personalisation?: string | null;
+  personalisation: string | null;
   quantity: number;
   pickedQty: number;
   pickedAt: string | null;

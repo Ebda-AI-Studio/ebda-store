@@ -141,6 +141,9 @@ export interface Messages {
     paidMarked: string;
     readOnly: string;
     qty: string;
+    personalisation: string;
+    copy: string;
+    copied: string;
     timeline: string;
     timelineEmpty: string;
     timelineBy: string;
@@ -386,6 +389,9 @@ export const MESSAGES: Record<Locale, Messages> = {
       paidMarked: 'Order marked as paid',
       readOnly: 'You have read-only access to orders.',
       qty: 'Qty',
+      personalisation: 'Personalisation',
+      copy: 'Copy',
+      copied: 'Copied',
       timeline: 'Order timeline',
       timelineEmpty: 'No timeline events yet.',
       timelineBy: 'by {name}',
@@ -647,6 +653,9 @@ export const MESSAGES: Record<Locale, Messages> = {
       paidMarked: 'تم تعليم الطلب كمدفوع',
       readOnly: 'لديك صلاحية عرض الطلبات فقط.',
       qty: 'الكمية',
+      personalisation: 'التخصيص',
+      copy: 'انسخ',
+      copied: 'اتنسخ',
       timeline: 'مسار الطلب',
       timelineEmpty: 'لا توجد أحداث حتى الآن.',
       timelineBy: 'بواسطة {name}',

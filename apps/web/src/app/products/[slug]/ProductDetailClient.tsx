@@ -54,7 +54,7 @@ import {
   PersonalisationField,
   personalisationMissing,
 } from '../../../components/commerce/PersonalisationField';
-import { cleanNote } from '@ebda/shared';
+import { activePersonalisation, cleanNote, personalisationLabel } from '@ebda/shared';
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
 const FrequentlyBoughtTogether = dynamic(() =>
@@ -571,10 +571,19 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // THE add-to-cart disabled rule. Every buy button on this page (default button,
   // Dahab main + pinned bar, any sticky bar) reads this one value, so a required
   // personalisation can never be skipped by a second button.
-  const addDisabled =
-    (outOfStock && !canBackorder) ||
-    variantRequired ||
-    personalisationMissing(product.personalisation, note);
+  const noteMissing = personalisationMissing(product.personalisation, note);
+  const addDisabled = (outOfStock && !canBackorder) || variantRequired || noteMissing;
+  // The WhatsApp order/ask button carries the typed note and follows the SAME
+  // required-personalisation gate as add-to-cart.
+  const personalisationCfg = activePersonalisation(product.personalisation);
+  const typedNote = cleanNote(note);
+  const waPersonalisation =
+    personalisationCfg && typedNote
+      ? {
+          label: personalisationLabel(personalisationCfg, language === 'ar' ? 'ar' : 'en'),
+          note: typedNote,
+        }
+      : null;
 
   // Custom (merchant-authored) badge on the PDP. A badge that shows on the
   // card and then vanishes on the product's own page is the same defect as
@@ -712,7 +721,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             }
             extras={
               <>
-                <WaMeProductButton product={product} priceMinor={displayPrice} className="w-full" />
+                <WaMeProductButton
+                  product={product}
+                  priceMinor={displayPrice}
+                  className="w-full"
+                  personalisation={waPersonalisation}
+                  disabled={noteMissing}
+                />
                 <ShareProductRow
                   productName={displayName}
                   url={typeof window !== 'undefined' ? window.location.href : ''}
@@ -1139,6 +1154,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 product={product}
                 priceMinor={displayPrice}
                 className="mt-6 w-full sm:w-auto"
+                personalisation={waPersonalisation}
+                disabled={noteMissing}
               />
               <ShareProductRow
                 productName={language === 'ar' && product.nameAr ? product.nameAr : product.name}

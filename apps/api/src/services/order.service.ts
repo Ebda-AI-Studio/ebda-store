@@ -15,6 +15,7 @@ import {
   fromMinor,
   minorToDecimalString,
   normalizePhoneForStorage,
+  activePersonalisation,
   REGION,
 } from '@ebda/shared';
 import { FiscalDocumentService } from './fiscal-document.service';
@@ -718,6 +719,38 @@ export class OrderService {
         'PRODUCT_NO_LONGER_AVAILABLE',
         'A product in your cart is no longer available. Remove it and try again.',
         { productIds: missingProductIds }
+      );
+    }
+
+    // A required personalisation is re-checked HERE, not only at add-to-cart:
+    // a line added before the merchant made the field required (or merged in
+    // from a guest cart) carries no note, and the workshop cannot make it.
+    // Names + labels travel in `details` so the checkout can say which item
+    // and what to write, in the shopper's language.
+    const missingPersonalisation = cart.items.flatMap(item => {
+      const cfg = activePersonalisation(item.product.personalisation);
+      const note = (item as { note?: string | null }).note;
+      return cfg?.required && !note
+        ? [
+            {
+              productId: item.productId,
+              name: item.product.name,
+              nameAr: item.product.nameAr ?? null,
+              label: cfg.label,
+              labelAr: cfg.labelAr,
+            },
+          ]
+        : [];
+    });
+    if (missingPersonalisation.length > 0) {
+      throw new AppError(
+        400,
+        'PERSONALISATION_REQUIRED',
+        `Personalisation is required for: ${missingPersonalisation.map(m => m.name).join(', ')}`,
+        {
+          productIds: missingPersonalisation.map(m => m.productId),
+          products: missingPersonalisation,
+        }
       );
     }
 

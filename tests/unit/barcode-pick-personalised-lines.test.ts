@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type Line = { id: string; quantity: number; pickedQty: number; personalisation: string | null };
 let lines: Line[] = [];
+let selectSeen: Record<string, boolean> = {};
 const update = vi.fn(
   async ({ where, data }: { where: { id: string }; data: { pickedQty: number } }) => {
     const l = lines.find(x => x.id === where.id)!;
@@ -34,6 +35,24 @@ vi.mock('@ebda/database', () => ({
         product: { name: 'Abaya', nameAr: null },
       }),
     },
+    order: {
+      findFirst: async (args: { select: { items: { select: Record<string, boolean> } } }) => {
+        selectSeen = args.select.items.select;
+        return {
+          id: 'o1',
+          orderNumber: 'N-1',
+          status: 'processing',
+          items: lines.map(l => ({
+            ...l,
+            productId: 'p1',
+            variantId: 'v1',
+            productName: 'Abaya',
+            variantName: 'M',
+            pickedAt: null,
+          })),
+        };
+      },
+    },
     orderItem: {
       findMany: async () =>
         lines.map(l => ({
@@ -53,7 +72,7 @@ vi.mock('@ebda/database', () => ({
   Prisma: { sql: () => ({}), join: () => ({}), empty: {} },
 }));
 
-import { pickOrderItemByBarcode } from '@api/services/barcode-scan.service';
+import { getOrderPickProgress, pickOrderItemByBarcode } from '@api/services/barcode-scan.service';
 
 beforeEach(() => {
   lines = [
@@ -71,5 +90,13 @@ describe('pickOrderItemByBarcode with personalised lines', () => {
     const second = await pickOrderItemByBarcode('s1', 'o1', 'B1');
     expect(second.personalisation).toBe('Omar');
     expect(second.orderFullyPicked).toBe(true);
+  });
+});
+
+describe('getOrderPickProgress', () => {
+  it("selects and returns each line's personalisation for the scan-to-pick screen", async () => {
+    const progress = await getOrderPickProgress('s1', 'o1');
+    expect(selectSeen.personalisation).toBe(true);
+    expect(progress.items.map(i => i.personalisation)).toEqual(['Sara', 'Omar']);
   });
 });

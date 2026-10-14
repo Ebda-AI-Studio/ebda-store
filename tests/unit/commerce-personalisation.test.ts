@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   activePersonalisation,
   cleanNote,
+  stripNote,
   personalisationConfigSchema,
   personalisationLabel,
 } from '@ebda/shared';
@@ -16,6 +17,20 @@ describe('personalisation', () => {
     expect(cleanNote('   ')).toBeNull();
     expect(cleanNote(42)).toBeNull();
     expect(cleanNote(null)).toBeNull();
+    expect(cleanNote('x'.repeat(250))).toHaveLength(200);
+  });
+
+  it('strips LRM/RLM, ALM, zero-width chars, BOM and line separators', () => {
+    expect(cleanNote('‎Sa‏ra؜')).toBe('Sara');
+    expect(cleanNote('​O‌m‍a﻿r')).toBe('Omar');
+    expect(cleanNote('Sa ra ')).toBe('Sara');
+    expect(cleanNote('​‎﻿')).toBeNull();
+    // Arabic letters and ordinary punctuation survive.
+    expect(cleanNote('سارة & عمر')).toBe('سارة & عمر');
+  });
+
+  it('stripNote does not cap; cleanNote caps at 200', () => {
+    expect(stripNote('x'.repeat(250))).toHaveLength(250);
     expect(cleanNote('x'.repeat(250))).toHaveLength(200);
   });
 

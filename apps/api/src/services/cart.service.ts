@@ -24,7 +24,7 @@ import { withSavepoint } from '../lib/savepoint';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
 import { resolveBundle, type ResolvedBundle } from './bundle.service';
-import { activePersonalisation, cleanNote } from '@ebda/shared';
+import { activePersonalisation, cleanNote, stripNote } from '@ebda/shared';
 
 /**
  * Resolve a customer's personalisation note against the product's config.
@@ -39,10 +39,13 @@ export function resolveLineNote(
 ): { note: string | null } | { error: 'PERSONALISATION_REQUIRED' | 'PERSONALISATION_TOO_LONG' } {
   const cfg = activePersonalisation(personalisation);
   if (!cfg) return { note: null };
-  const note = cleanNote(raw);
-  if (!note) return cfg.required ? { error: 'PERSONALISATION_REQUIRED' } : { note: null };
-  if (note.length > cfg.maxLength) return { error: 'PERSONALISATION_TOO_LONG' };
-  return { note };
+  // Length is checked on the full (stripped, trimmed) text BEFORE the 200 cap:
+  // capping first silently cut a 250-char note to 200 and accepted it when
+  // maxLength was 200.
+  const full = stripNote(raw);
+  if (!full) return cfg.required ? { error: 'PERSONALISATION_REQUIRED' } : { note: null };
+  if (full.length > cfg.maxLength) return { error: 'PERSONALISATION_TOO_LONG' };
+  return { note: cleanNote(full) };
 }
 
 /**
