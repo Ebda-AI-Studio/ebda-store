@@ -8,7 +8,7 @@
  * Storefront shows these as a table under the buy box, up to 2 as card chips.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button, Input } from '@ebda/ui';
 import { useLocale } from 'next-intl';
 import { PRODUCT_FACTS_MAX, PRODUCT_FACTS_ON_CARD_MAX, type ProductFact } from '@ebda/shared';
@@ -37,6 +37,10 @@ export function FactsCard({ storeId, facts, onChange }: Props) {
   const locale = useLocale();
   const [busy, setBusy] = useState<number | null>(null);
   const [rowError, setRowError] = useState<{ index: number; message: string } | null>(null);
+
+  // Latest facts, so an async translate patches current state, not the render it started in.
+  const factsRef = useRef(facts);
+  factsRef.current = facts;
 
   const onCardCount = facts.filter(f => f.onCard).length;
   const patch = (i: number, p: Partial<ProductFact>) =>
@@ -84,9 +88,16 @@ export function FactsCard({ storeId, facts, onChange }: Props) {
       next[hasEn ? ar : en] = data.translation;
     }
     setBusy(null);
-    // `facts` may have changed while awaiting; patch against the latest by index.
-    if (Object.keys(next).length)
-      onChange(facts.map((f, idx) => (idx === i ? { ...f, ...next } : f)));
+    // Patch against the LATEST facts; only fill sides still empty (never overwrite edits).
+    const latest = factsRef.current;
+    const cur = latest[i];
+    if (!cur) return;
+    const fill: Partial<ProductFact> = {};
+    for (const [k, v] of Object.entries(next) as Array<[Field, string]>) {
+      if (!cur[k].trim()) fill[k] = v;
+    }
+    if (Object.keys(fill).length)
+      onChange(latest.map((f, idx) => (idx === i ? { ...f, ...fill } : f)));
   }
 
   const canTranslate = (f: ProductFact) =>

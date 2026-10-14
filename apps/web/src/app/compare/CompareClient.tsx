@@ -10,7 +10,8 @@ import { useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { compareStorageKey } from '../../lib/compare';
-import { factText, type ProductFact } from '@ebda/shared';
+import type { ProductFact } from '@ebda/shared';
+import { compareFactRows } from '../../lib/compare-facts';
 
 interface CompareProduct {
   id: string;
@@ -144,25 +145,8 @@ export default function CompareClient() {
     }
   });
 
-  // One row per distinct fact name across the compared products (first-seen
-  // order). A fact matches a row by its English OR Arabic name, so products that
-  // name the same fact in different languages still share a row. "—" where a
-  // product lacks the key.
-  const lang = language === 'ar' ? 'ar' : 'en';
-  const names = (f: ProductFact) =>
-    [f.key, f.keyAr].map(k => k.trim().toLowerCase()).filter(Boolean);
-  const factRows: Array<{ names: Set<string>; label: string }> = [];
-  products.forEach(p =>
-    (p.facts ?? []).forEach(f => {
-      const row = factRows.find(r => names(f).some(n => r.names.has(n)));
-      if (row) names(f).forEach(n => row.names.add(n));
-      else factRows.push({ names: new Set(names(f)), label: factText(f, lang).key });
-    })
-  );
-  const factValue = (p: CompareProduct, rowNames: Set<string>) => {
-    const f = p.facts?.find(x => names(x).some(n => rowNames.has(n)));
-    return f ? factText(f, lang).value : '';
-  };
+  // One row per distinct (EN, AR) fact name pair; "—" where a product lacks it.
+  const factRows = compareFactRows(products, language === 'ar' ? 'ar' : 'en');
 
   return (
     <ShopChrome>
@@ -294,11 +278,11 @@ export default function CompareClient() {
                 </tr>
               ))}
               {factRows.map(row => (
-                <tr key={`fact-${row.label}`} className="border-t">
+                <tr key={`fact-${row.id}`} className="border-t">
                   <td className="p-4 font-medium text-muted-foreground">{row.label}</td>
                   {products.map(product => (
                     <td key={product.id} className="p-4 text-center text-sm">
-                      {factValue(product, row.names) || (
+                      {row.values[product.id] || (
                         <span className="text-muted-foreground/70">&mdash;</span>
                       )}
                     </td>
