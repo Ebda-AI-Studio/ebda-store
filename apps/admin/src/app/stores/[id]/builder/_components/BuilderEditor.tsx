@@ -272,9 +272,22 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
           <ThemeSettingsPanel
             storeId={storeId}
             look={getLook(store.look) ?? null}
+            liveTheme={(store.theme ?? null) as Record<string, unknown> | null}
+            flushDraft={b.saveDraftNow}
+            removeDraftKey={key => {
+              b.patchDocument(d => {
+                const rest = { ...(d.theme ?? {}) } as DraftTheme;
+                delete rest[key];
+                const next = { ...d } as typeof d & { theme?: unknown };
+                if (Object.keys(rest).length > 0) next.theme = rest;
+                else delete next.theme;
+                return next as typeof d;
+              });
+              return b.saveDraftNow();
+            }}
             onThemeReset={() => {
-              // A reset changes the LIVE theme: re-read it, then repaint the canvas from it.
-              void refreshStore().then(() => setReloadKey(k => k + 1));
+              // Both the draft and the LIVE theme may have changed: re-read each, repaint the canvas.
+              void Promise.all([refreshStore(), b.reload()]).then(() => setReloadKey(k => k + 1));
             }}
             theme={effectiveTheme(store.theme, b.doc.theme)}
             onSave={patch => {

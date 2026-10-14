@@ -30,6 +30,9 @@ export function ThemeSettingsPanel({
   storeId,
   look = null,
   onThemeReset,
+  liveTheme,
+  flushDraft,
+  removeDraftKey,
 }: {
   theme: StoreTheme | undefined;
   storeId?: string;
@@ -37,6 +40,12 @@ export function ThemeSettingsPanel({
   look?: LookDefinition | null;
   /** Called after a single override was reset, so the caller re-reads the live theme. */
   onThemeReset?: () => void;
+  /** The LIVE store theme (without the draft patch): decides whether a live PUT is needed. */
+  liveTheme?: Record<string, unknown> | null;
+  /** Resolves true once every pending/in-flight draft save has landed. */
+  flushDraft?: () => Promise<boolean>;
+  /** Omits the key from the draft document's theme and saves the draft; true when saved. */
+  removeDraftKey?: (key: string) => Promise<boolean>;
   /** Writes the patch into the draft and resolves true once the draft is saved. */
   onSave: (patch: Partial<StoreTheme>) => Promise<boolean>;
 }) {
@@ -50,15 +59,20 @@ export function ThemeSettingsPanel({
   const overridden = new Set<string>(
     look && theme ? overriddenLookKeys(theme as unknown as Record<string, unknown>, look) : []
   );
-  // This panel is the single writer of a reset: a null value deletes the stored key (the look's
-  // value shows through again). It goes straight to the live theme, like the key it removes.
+  // This panel is the single writer of a reset, draft first: (1) flush any pending or in-flight
+  // draft save so it cannot re-introduce the key, (2) omit the key from the draft theme, (3) only
+  // if the LIVE theme holds it, PUT null (deletes the stored key), (4) let the caller re-read both.
   const resetOne = async (key: string) => {
     if (!storeId) return;
     setResetting(key);
     setResetFailed(false);
     try {
-      const { error } = await apiPut(`/api/v1/stores/${storeId}/theme`, { [key]: null });
-      if (error) return setResetFailed(true);
+      if (flushDraft && !(await flushDraft())) return setResetFailed(true);
+      if (removeDraftKey && !(await removeDraftKey(key))) return setResetFailed(true);
+      if (!liveTheme || liveTheme[key] !== undefined) {
+        const { error } = await apiPut(`/api/v1/stores/${storeId}/theme`, { [key]: null });
+        if (error) return setResetFailed(true);
+      }
       setPatch(p => {
         const rest = { ...p };
         delete rest[key as keyof StoreTheme];

@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { AdminSkeletonDetail } from '../../../../components/AdminSkeleton';
 import { apiGet, apiPut } from '../../../../lib/api';
-import { useToast } from '@force/ui';
 import { useLocale } from 'next-intl';
 import { getLook, type LookId } from '@force/shared';
 import { useT } from '@/i18n/useT';
@@ -16,12 +15,14 @@ import {
   type LookDesignChoice,
 } from '../../../../components/looks/LookSwitchDialog';
 
+const SKIN_IDS = ['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab'];
+
 export default function StoreTemplatePage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('template.page');
-  const toast = useToast();
 
+  const skinName = (id: string) => (SKIN_IDS.includes(id) ? t(`skins.${id}`) : id);
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const [store, setStore] = useState<{
     name: string;
@@ -32,7 +33,7 @@ export default function StoreTemplatePage() {
   const [result, setResult] = useState<'draft' | 'published' | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
+  const [saveFailed, setSaveFailed] = useState<'invalid' | 'generic' | null>(null);
 
   // Cancellation flag prevents setState after unmount if the user navigates away mid-request.
   useEffect(() => {
@@ -65,7 +66,7 @@ export default function StoreTemplatePage() {
   async function handleConfirm(design: LookDesignChoice) {
     if (!pending) return;
     setIsSaving(true);
-    setSaveFailed(false);
+    setSaveFailed(null);
     try {
       const { data, error } = await apiPut<{
         look: LookId;
@@ -73,8 +74,7 @@ export default function StoreTemplatePage() {
         builder: 'published' | 'draft';
       }>(`/api/v1/stores/${storeId}/look`, { lookId: pending, design });
       if (error || !data) {
-        setSaveFailed(true);
-        toast.error(t('saveError'), error?.message);
+        setSaveFailed(error?.code === 'INVALID_LOOK' ? 'invalid' : 'generic');
         return;
       }
       setStore(prev => (prev ? { ...prev, look: data.look, template: data.template } : prev));
@@ -82,8 +82,7 @@ export default function StoreTemplatePage() {
       setPending(null);
     } catch (err) {
       console.error('Failed to switch look:', err);
-      setSaveFailed(true);
-      toast.error(t('saveError'));
+      setSaveFailed('generic');
     } finally {
       setIsSaving(false);
     }
@@ -127,7 +126,7 @@ export default function StoreTemplatePage() {
         {!store.look && (
           <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm" role="note">
             <p data-testid="legacy-skin" className="font-medium text-foreground">
-              {t('legacySkin', { skin: store.template })}
+              {t('legacySkin', { skin: skinName(store.template) })}
             </p>
             <p className="mt-1 text-muted-foreground">{t('legacyNote')}</p>
           </div>
@@ -154,7 +153,7 @@ export default function StoreTemplatePage() {
 
         {saveFailed && (
           <p role="alert" className="text-sm text-destructive">
-            {t('saveError')}
+            {saveFailed === 'invalid' ? t('invalidLook') : t('saveError')}
           </p>
         )}
 
@@ -162,7 +161,7 @@ export default function StoreTemplatePage() {
           value={store.look}
           locale={locale}
           onChange={id => {
-            setSaveFailed(false);
+            setSaveFailed(null);
             setResult(null);
             setPending(id);
           }}

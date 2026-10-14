@@ -53,7 +53,7 @@ describe('template page (looks)', () => {
     render(<StoreTemplatePage />);
     await screen.findAllByRole('tab');
     expect(screen.queryByText('Elegant')).toBeNull();
-    expect(screen.getByTestId('legacy-skin').textContent).toContain('classic');
+    expect(screen.getByTestId('legacy-skin').textContent).toContain('skins.classic');
     expect(screen.getByText('legacyNote')).toBeTruthy();
   });
 
@@ -119,11 +119,21 @@ describe('template page (looks)', () => {
 
   it('keeps the dialog open and shows an error when the save fails', async () => {
     storeWith(null);
-    apiPut.mockResolvedValue({ error: { message: 'boom' } });
+    apiPut.mockResolvedValue({ error: { code: 'NETWORK', message: 'boom' } });
     render(<StoreTemplatePage />);
     await pickTarget();
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
-    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect((await screen.findByRole('alert')).textContent).toBe('saveError');
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
     expect(screen.queryByRole('dialog')).toBeTruthy();
+  });
+
+  it('maps INVALID_LOOK to its own message', async () => {
+    storeWith(null);
+    apiPut.mockResolvedValue({ error: { code: 'INVALID_LOOK', message: 'bad' } });
+    render(<StoreTemplatePage />);
+    await pickTarget();
+    fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('invalidLook');
   });
 });

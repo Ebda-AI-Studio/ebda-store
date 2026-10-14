@@ -5233,7 +5233,16 @@
       "draftReady": "Your new home page is ready as a draft in the editor.",
       "openBuilder": "Open the editor",
       "published": "Your new look is live.",
-      "lookTitle": "Choose a look"
+      "lookTitle": "Choose a look",
+      "invalidLook": "That look is not available any more. Pick another one.",
+      "skins": {
+        "modern": "Modern",
+        "classic": "Classic",
+        "minimal": "Minimal",
+        "bold": "Bold",
+        "elegant": "Elegant",
+        "dahab": "Dahab"
+      }
     }
   },
   "seo": {
