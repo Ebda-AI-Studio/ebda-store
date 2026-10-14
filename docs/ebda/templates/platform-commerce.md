@@ -5,11 +5,12 @@ Eleven things shipped on `feat/phase-b-qamar` before any Qamar work: swatches, a
 Rules that apply to all of them:
 
 - **Platform code, never per store.** Every feature is data-driven and renders nothing until a merchant enters data (no empty states, no placeholders). No new `StoreTheme` toggle was added (the ThemeTab ceiling is 7).
-- **Bilingual.** Each merchant field has an `Ar` twin. The active language wins; the other is the fallback, never a blank.
+- **Bilingual.** Each merchant field has an `Ar` twin. The active language wins; the other is the fallback, never a blank. Exception: a CONTROL label (the personalisation field's label, and the same label inside the checkout's "add your personalisation" error) never borrows the other language; an empty active-language label reads as the platform default "Personalisation" / "التخصيص" (F4: "الاسم للتطريز" inside an English sentence, with bidi-flipped quotes).
 - **Taste bar (B0-4).** On a card: at most 5 swatch dots (then `+N`) and at most 2 fact chips, below the price, and nothing else. One accent colour (the primary action). Motion in exactly three places: the receipt print, the sticky bar slide-in, the swatch crossfade, each with a reduced-motion end state.
 - **Two PDP paths.** `apps/web/src/app/products/[slug]/ProductDetailClient.tsx` (default skins) and `apps/web/src/templates/dahab/ProductDetail.tsx`. **Card paths = the 8 card paths + Dahab (`ProductCard` + `ProductCarousel`) + the 4 hand-built mappers.** The 8: `PecannbeeProductCard`, the five `templates/{modern,elegant,classic,minimal,bold}/ProductCard.tsx`, `shared/ProductCarousel.tsx`, `app/products/ProductListItem.tsx`. Dahab: `templates/dahab/ProductCard.tsx` (which `dahab/ProductCarousel.tsx` renders). The 4 hand-built mappers build their own `TemplateProduct` and are card paths too: `YouMightAlsoLike`, `CartRecommendations`, `FrequentlyBoughtTogether`, `WishlistClient`.
 - **Cache class.** Every one of these reads rides the public product caches and is BOUNDED-stale (the PDP revalidates in 60 s, listings and recommendations in at most 5 minutes). Every write goes through `invalidateStoreProductCaches`, so a save shows within seconds on the storefront.
-- **Migrations** (all additive): `20261016000100_option_value_swatches`, `20261016000300_product_facts`, `20261016000400_product_lead_time`, `20261016000500_personalisation`, `20261016000900_size_charts`. Video, hero video, the sticky bars, the receipt and `deliveryDays` need none.
+- **Migrations** (all additive): `20261016000100_option_value_swatches`, `20261016000300_product_facts`, `20261016000400_product_lead_time`, `20261016000500_personalisation`, `20261016000900_size_charts`, `20261016001000_order_item_variant_name_ar`. Video, hero video, the sticky bars, the receipt and `deliveryDays` need none. `20261016000500_personalisation` swaps the `cart_items` unique indexes (ACCESS EXCLUSIVE on `cart_items`), so it opens with `SET lock_timeout = '5s'`: behind a long cart/order transaction it aborts (the deploy fails and is re-run) instead of queueing every storefront request behind it. `SET` is session-level, so the later migrations in the same deploy run inherit the 5 s cap too (all of them are additive `ADD COLUMN` / `CREATE TABLE`); `20261016001000` sets it as well.
+- **PDP fold (390 px phone).** The taste bar's fold is gallery, title, price, selectors, personalisation, add to cart, delivery chip. The default PDP's category chip and description sit BELOW the buy block (with the facts), and the merchant badge row renders only when a badge exists. Dahab caps its phone gallery at `max-h-[52svh]` (B0-40; `object-cover` crops as before, desktop unchanged). Measured on the seeded Linen Abaya (3 option axes + a required personalisation): the add-to-cart button's top sits at y=1090 (Minimal) and y=1139 (Dahab) on an 844 px viewport, so the fold limit is still NOT met on that fixture; see the B0 final-wave report.
 
 ## 1. Swatches (colour dots and photos on option values)
 
@@ -17,11 +18,12 @@ Rules that apply to all of them:
 
 **Where the merchant edits it.**
 
-- Admin → Products → a product → **Variants** (`/stores/[id]/products/[productId]/variants`). One option: per-row colour (`ColorField`) and photo on `SimpleVariantsForm`. Two or more options: the **Swatches** editor (`OptionSwatchesEditor`), with every value of every option and its own Save. Clearing a field sends `null`.
+- Admin → Products → a product → **Variants** (`/stores/[id]/products/[productId]/variants`). One option: per-row colour (`ColorField`) and photo on `SimpleVariantsForm`. Two or more options: the **Swatches** editor (`OptionSwatchesEditor`), with every value of every option and its own Save. Clearing a field sends `null`. A failed save names which values failed ("Color: Rose"), not a count.
 - API: `PUT /stores/:storeId/products/:productId/option-values/:valueId`, and the option and option-value create routes (`POST .../options`, `POST .../options/:optionId/values`), accept `swatchHex` and `swatchImageUrl` (`createOptionSchema`, `createOptionValueSchema`, `updateOptionValueSchema`).
 
 **Where it renders.**
 
+- Edges: a card dot carries `border-foreground/35` and an unpicked PDP circle `ring-foreground/35`, so a black swatch stays visible on an ink skin like Dahab (F7, WCAG 1.4.11 non-text contrast).
 - PDP, both paths: the selector in `components/VariantSelector.tsx` (32 px round button, 44 px hit area, ring on the picked one, the picked value named beside the axis label, the localised name as `aria-label`). A colour tap crossfades the gallery image over 200 ms (ease-out-quint, reduced motion: instant, never on first paint).
 - Cards: `SwatchDots` on the 8 card paths + Dahab + the 4 hand-built mappers. Decorative (`aria-hidden`), at most 5 dots and then `+N`. `N` counts every swatch value, not only the shipped ones (`_count.values`).
 - Dahab's own `appearance='swatch'` / `swatchColor` is untouched; a product that has swatch values uses the round swatch even under Dahab.
@@ -48,11 +50,11 @@ Rules that apply to all of them:
 
 **What.** Bilingual name/value rows ("Fabric: Linen", "Care: Hand wash") a merchant can add to a product. Up to two can be pinned to the product card; all of them show in a table on the PDP and in the compare page.
 
-**Where the merchant edits it.** Admin → Products → a product → **Edit** (`/stores/[id]/products/[productId]/edit`) → the **Product details** card (`FactsCard`, after the inventory block). Rows can be added, reordered and deleted; a per-row translate button fills an empty language side through `/ai/translate`. The new-product form has no facts card (edit only).
+**Where the merchant edits it.** Admin → Products → a product → **Edit** (`/stores/[id]/products/[productId]/edit`) → the **Product details** card (`FactsCard`, after the inventory block). Rows can be added, reordered and deleted; a per-row translate button fills an empty language side through `/ai/translate`. While a translation is in flight, move up / move down / remove are locked (the result is written back by row index). The new-product form has no facts card (edit only).
 
 **Where it renders.**
 
-- Cards: `FactChips` under the price (value only, no key) on the 8 card paths + Dahab + the 4 hand-built mappers.
+- Cards: `FactChips` under the price (value only, no key, `text-xs`: nothing under 12 px, F5) on the 8 card paths + Dahab + the 4 hand-built mappers. `tests/unit/commerce-no-arbitrary-text.test.ts` keeps every `components/commerce/*.tsx` free of arbitrary `text-[…]` utilities.
 - PDP: `FactsTable`, below the buy box on the default PDP (after SKU, to keep the 390 px fold), and as a closed "تفاصيل المنتج / Product details" accordion on Dahab.
 - Compare: `lib/compare-facts.ts` merges rows by the exact (English, Arabic) name pair; `CompareClient` renders them. A compare list saved before B0 shows no fact rows until the product is re-added (B0-14).
 
@@ -86,8 +88,9 @@ Rules that apply to all of them:
 
 **Where it renders.**
 
-- PDP, both paths: `PersonalisationField` above add-to-cart (one label, one input, one hint line plus a counter). When required and empty, the add button (main and sticky) is disabled and the hint reads "اكتب الاسم للتطريز الأول". The WhatsApp product button is gated only on that (B0-20).
+- PDP, both paths: `PersonalisationField` above add-to-cart (one label, one input, one helper line). The helper line shows only the counter until intent: the "اكتب الاسم للتطريز الأول" hint appears after the empty field is blurred or after a blocked add (F6). When required and empty, every add button (main, sticky, Dahab main and pinned) stays enabled-looking; a tap scrolls to and focuses the field and reveals the hint, and adds nothing (`noteMissing`, separate from the one `addDisabled`). The label is the merchant's label in the active language, else "Personalisation" / "التخصيص". The input is `md:max-w-sm` (F14). The WhatsApp product button is gated only on the missing note (B0-20).
 - Line display (`CartLineNote`, "✎ Sara"): the cart page and the six `CartTable`s, the Dahab `CartDrawer`, checkout `OrderSummary`, the success-page receipt, the account order detail.
+- Variant line (every surface that prints one): each option value in its own `<bdi>`, joined " · " (`VariantText` in `@ebda/ui`, `variantTitleSegments` in `@ebda/shared`), so "وردي / M / 54 سم" never reorders to "وردي / 54 / M سم" (F8): the cart page, the six `CartTable`s, the Dahab `CartDrawer`, the receipt, the account order detail, the admin `ItemsCard`, the orders PWA and the scan-to-pick list, and the order-confirmation email.
 - Admin: the order `ItemsCard` (highlighted row with a copy button), the scan-to-pick screen (`stock/scan`), the orders PWA (`apps/orders`). Invoice (`invoice.service.ts`) and the order-confirmation email carry `✎ <bdi>note</bdi>`, escaped. The WhatsApp order message adds a "✎ label: note" line. MCP `add_to_cart` accepts `note`; `view_cart` shows it.
 - Quick-add on a card or wishlist "move to cart" for a required product sends the shopper to the PDP instead.
 
@@ -95,7 +98,7 @@ Rules that apply to all of them:
 
 - `Product.personalisation` JSONB `{ enabled, label, labelAr, maxLength, required }`.
 - `CartItem.note` TEXT; line identity is `(cart, product, variant, COALESCE(note,''))`, two unique indexes `cart_items_line_no_variant` and `cart_items_line_with_variant` that replace the old `cart_items_cart_id_product_id_*` pair.
-- `OrderItem.personalisation` TEXT, plus a localised `variantName` snapshot (the Arabic title for an `ar` order). Checkout sends `locale`.
+- `OrderItem.personalisation` TEXT, plus the variant title snapshot in BOTH languages (B0-41): `variantName` = the variant's canonical `title` (as before B0, whatever the buyer's language), `variantNameAr` = its `titleAr` (`order_items.variant_name_ar`, nullable; null on older orders). The storefront (receipt, account order detail) and the confirmation email render `variantNameAr` in Arabic, falling back to `variantName` (`orderLineVariantTitle`); the admin `ItemsCard`, the orders PWA and the pick list render per the admin locale with the same fallback. Fiscal documents, the invoice and the CSV exports keep `variantName` exactly as before. Admin manual orders snapshot both too. Checkout still sends `locale`.
 
 **Limits.** `maxLength` 1-200 (default 20); a hard cap of 200 characters whatever the merchant sets (`PERSONALISATION_NOTE_MAX`); a request note is at most 400 characters. Invisible and direction-changing characters (controls, zero-width, bidi marks and embeddings, BOM) are stripped before the length is measured; the length is checked before truncation. Errors: 400 `PERSONALISATION_REQUIRED` and `PERSONALISATION_TOO_LONG`, raised on add and re-checked at order create (a rule tightened after the add refuses the order and the checkout sends the shopper to the cart). The bulk guest-cart sync skips a rule-breaking line instead of failing (T5-1).
 
@@ -103,19 +106,19 @@ Rules that apply to all of them:
 
 ## 6. Sticky add-to-cart and cart-total bars
 
-**What.** On a phone, a bar fixed above the tab bar: on the PDP it carries the product title, price and the add-to-cart button once the main button has scrolled out of view; on the cart it carries the item count, total and a checkout button.
+**What.** On a phone, a bar fixed above the tab bar: on the PDP it carries the product title, price and the add-to-cart button once the main button has scrolled out of view; on the cart it carries the summary's Subtotal (label, value and money format, verbatim: shipping is "calculated at checkout" on the cart, so the cart total carries no zone fee, F1), the item count and a checkout button.
 
 **Where the merchant edits it.** Nowhere: it is platform behaviour. No toggle (B0-4).
 
 **Where it renders.** `StickyAddToCart` on the default PDP (`md:hidden`). Dahab keeps its existing pinned bar; B0 fixed its overlap with the tab bar and made it set the same body flag. `StickyCartTotal` on `CartClient`; when checkout is blocked (below the minimum order, an unavailable line) it shows the existing `checkoutBlockedMessage` and the button is disabled. The sticky add button takes `addDisabled` and the label from the main button (one value, never recomputed), pinned by `tests/unit/pdp-sticky-parity.test.tsx`.
 
-**Body flags and lift.** `body[data-sticky-atc="1"]`, `body[data-sticky-cart="1"]` and `body[data-sticky-cart="blocked"]` reserve page space (8rem + 4.25rem, plus 1.5rem when blocked) and lift the floating widget (see `docs/architecture/store-theme-flags.md`). The bar uses the existing 56 px tab-bar lift (B0-6). It slides in over 300 ms (ease-out-quint); reduced motion shows it at once.
+**Body flags and lift.** `body[data-sticky-atc="1"]`, `body[data-sticky-cart="1"]` and `body[data-sticky-cart="blocked"]` reserve page space (8rem + 4.25rem, plus 1.5rem when blocked) and lift the floating widget AND the toast region (`data-toast-region`, F2; see `docs/architecture/store-theme-flags.md`). The bar uses the existing 56 px tab-bar lift (B0-6). It slides in over 300 ms (ease-out-quint, Dahab's pinned bar too, on a solid background, F10); reduced motion shows it at once. The cookie banner (z-100) may cover a bar until it is answered (B0-42).
 
 **Data.** None.
 
 **Limits.** Phones only. The PDP bar appears only after the main button leaves the top of the viewport, never on first paint (B0-21: it attaches once).
 
-**Rulings.** B0-6, B0-21.
+**Rulings.** B0-6, B0-21, B0-42.
 
 ## 7. Video upload and the `video` setting kind
 
@@ -125,7 +128,7 @@ Rules that apply to all of them:
 
 **Where it renders.** Wherever a block reads that setting; today `HeroBanner` and `dahab/Hero` (section 8).
 
-**Data and route.** `POST /uploads/video?folder=hero|builder` (admin, `products:write`, the upload and daily-upload limiters, audit-logged). MP4 or WebM, verified by content (`lib/video-sniff.ts`: `ftyp` with an allowed major brand for MP4, an EBML header with a `webm` DocType for WebM) and the declared mime must match; the stored extension comes from the sniffed type. Stored on R2 with `Cache-Control: public, max-age=31536000, immutable`. The URL lives inside `layoutSettings` or `StorePageRevision.document` JSON, both scanned by the R2 orphan sweep, so no registry entry was needed. The Workers multer stub (`cf/stubs/multer-formdata.ts`) now caps the body by `Content-Length` and a byte-counting stream before buffering, for every upload route. Web and admin CSP gain `media-src 'self' https://*.r2.dev https://media.ebda.app blob:` (B0-22).
+**Data and route.** `POST /uploads/video?folder=hero|builder` (admin, `products:write`, the upload and daily-upload limiters, audit-logged). MP4 or WebM, verified by content (`lib/video-sniff.ts`: `ftyp` with an allowed major brand for MP4, an EBML header with a `webm` DocType for WebM) and the declared mime must match; the stored extension comes from the sniffed type. Stored on R2 with `Cache-Control: public, max-age=31536000, immutable`. The URL lives inside `layoutSettings` or `StorePageRevision.document` JSON, both scanned by the R2 orphan sweep, so no registry entry was needed. The Workers multer stub (`cf/stubs/multer-formdata.ts`) now caps the body by `Content-Length` and a byte-counting stream before buffering, for every upload route; when the counter trips, the stub raises `MulterError('LIMIT_FILE_SIZE')` (so a 413) even if `formData()` reports the abort as its own TypeError (workerd), and an `.array(name, max)` with no `limits.files` is capped at `max` files, not one. Web and admin CSP gain `media-src 'self' https://*.r2.dev https://media.ebda.app blob:` (B0-22).
 
 **Limits.** 6 MB (B0-2), folders `hero` and `builder` only, an HTTP 413 above the cap, 400 for the wrong type. The `video` kind is in `packages/shared/src/builder/settings-schema.ts` (`s.video`).
 
@@ -166,7 +169,7 @@ Rules that apply to all of them:
 
 ## 10. Receipt-printer success page
 
-**What.** The order-success page shows the order as a thermal receipt that prints out of a small printer, for every skin. Lines (with variant and the personalisation note), totals, payment method, date and a decorative barcode with the real order number.
+**What.** The order-success page shows the order as a thermal receipt that prints out of a small printer, for every skin. Lines (with the variant in the shopper's language, each option value in its own `<bdi>`, and the personalisation note), totals, payment method, date ("15 Oct 2026" / "15 أكتوبر 2026": day, short month, year, in the store's time zone and numerals, never the month-first "10/15/2026", F13) and a decorative barcode with the real order number, printed once under it (the duplicate "رقم الطلب" row is gone, F12).
 
 **Where the merchant edits it.** Nowhere: it reads the order. It follows each skin's tokens (screen, bezel and slit mixed from foreground and background; the paper is always white with dark ink).
 
@@ -180,7 +183,7 @@ Rules that apply to all of them:
 
 **Limits.** A residual 68 px load jump on a three-line order (B0-35).
 
-**Rulings.** B0-3, B0-32, B0-33, B0-34, B0-35.
+**Rulings.** B0-3, B0-32, B0-33, B0-34, B0-35, B0-41.
 
 ## 11. Store-wide `settings.deliveryDays` fallback
 
@@ -190,7 +193,7 @@ Rules that apply to all of them:
 
 **Where it renders.** Only through `DeliveryChip` on both PDPs.
 
-**Data.** `Store.settings.deliveryDays` (`{ min, max }`, integers 0-30, `min <= max`). No migration. The settings merge is shallow, so Clear sends an explicit `null`. Whitelisted for the storefront in `lib/public-store-settings.ts`. Validated on every writer: `POST /stores` and `PUT /stores/:id` (the same `addDeliveryDaysIssues`); the two `store.service` splices cannot write the key.
+**Data.** `Store.settings.deliveryDays` (`{ min, max }`, integers 0-30, `min <= max`). No migration. The settings merge is shallow, so Clear sends an explicit `null`. Whitelisted for the storefront in `lib/public-store-settings.ts`. Validated on every writer: `POST /stores` and `PUT /stores/:id` run the same `addSettingsIssues` (this `deliveryDays` check, plus the `contact.addressUrl` and floating-widget link scheme checks, which used to run on the update only and left store creation as the bypass; `tests/unit/store-create-settings-links.test.ts`); the two `store.service` splices cannot write the key.
 
 **Limits.** 0-30 business days. A malformed stored value hides the chip.
 
