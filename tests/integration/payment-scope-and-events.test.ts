@@ -54,8 +54,9 @@ const asApp = <T>(fn: () => Promise<T>) =>
   runWithRequestDb(() => createPrismaClient({ connectionString: appUrl(), max: 3 }), fn, {
     beforeDisconnect: () => awaitDeferredWork(5000),
   });
-const token = (userId: string, role: string) =>
-  jwt.sign({ userId, email: `${userId}@example.test`, role, tv: 0 }, config.jwtSecret, {
+// A customer token is bound to its store (F-01, Ruling S11-1).
+const token = (userId: string, role: string, storeId?: string) =>
+  jwt.sign({ userId, email: `${userId}@example.test`, role, tv: 0, storeId }, config.jwtSecret, {
     expiresIn: '30m',
     issuer: 'force-api',
     audience: 'force-app',
@@ -272,7 +273,7 @@ describe.skipIf(!hasDb)('payment scope: link/retry outside a tx, events definer'
     const res = await asApp(async () =>
       http()
         .post(`/api/v1/payments/retry/${payment.id}`)
-        .set('Authorization', `Bearer ${token(customer.id, 'customer')}`)
+        .set('Authorization', `Bearer ${token(customer.id, 'customer', s.id)}`)
         .send({})
     );
     expect(res.status, JSON.stringify(res.body)).toBe(200);

@@ -178,7 +178,9 @@ describe('S3-1: suspended/inactive users are rejected', () => {
     // whose session must die. This exercises the PUT /admin/users/:id ->
     // revokeAllSessions wiring end to end, not just AuthService in isolation.
     const actor = await createUser({ role: 'super_admin' });
-    const target = await createUser({ role: 'customer' });
+    // store_admin, not customer: a customer token is bound to a store (F-01,
+    // Ruling S11-1) and this fixture user has none; the revocation path is role-agnostic.
+    const target = await createUser({ role: 'store_admin' });
     const actorToken = await sessionForActor(actor);
     const { token: targetToken } = await login(target.email);
 

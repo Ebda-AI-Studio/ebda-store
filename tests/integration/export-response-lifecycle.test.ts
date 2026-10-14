@@ -256,7 +256,7 @@ describe.skipIf(!hasDb)('orders, payments and the admin streaming export', () =>
     await addItemToCart(storeId, session, productId, 1);
     const res = await request(app)
       .post(`/api/v1/stores/${storeId}/orders`)
-      .set('Authorization', `Bearer ${customerAccessTokenFor(customerId)}`)
+      .set('Authorization', `Bearer ${customerAccessTokenFor(customerId, storeId)}`)
       .set('x-session-id', session)
       .send({ shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS, paymentMethod: 'cod' });
     expect(res.status).toBe(201);
@@ -307,7 +307,7 @@ describe.skipIf(!hasDb)('orders, payments and the admin streaming export', () =>
 
     const res = await request(app)
       .post('/api/v1/payments/create')
-      .set('Authorization', `Bearer ${customerAccessTokenFor(customerId)}`)
+      .set('Authorization', `Bearer ${customerAccessTokenFor(customerId, storeId)}`)
       .send({ orderId, provider: 'cod' });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);

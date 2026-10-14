@@ -58,7 +58,7 @@ const USER_ID = 'user-1';
 
 function tokenWithTv(tv: number): string {
   return jwt.sign(
-    { userId: USER_ID, email: 'u@example.test', role: 'customer', tv },
+    { userId: USER_ID, email: 'u@example.test', role: 'customer', tv, storeId: 'store-1' },
     config.jwtSecret,
     {
       algorithm: 'HS256',

@@ -534,9 +534,11 @@ export function buildReturnTestApp(): Express {
  * freshly-seeded customer is `0`, matching `tv: 0` here) — the token's
  * `email` claim need not match the DB row.
  */
-export function customerAccessTokenFor(userId: string): string {
+export function customerAccessTokenFor(userId: string, storeId?: string): string {
+  // A customer token is bound to the store it was issued for (F-01, Ruling S11-1);
+  // `authenticate` rejects one without it. Pass the store the customer belongs to.
   return jwt.sign(
-    { userId, email: `${userId}@example.test`, role: 'customer', tv: 0 },
+    { userId, email: `${userId}@example.test`, role: 'customer', tv: 0, storeId },
     config.jwtSecret,
     { expiresIn: '30m', issuer: 'force-api', audience: 'force-app' }
   );
@@ -544,7 +546,7 @@ export function customerAccessTokenFor(userId: string): string {
 
 /** Bound HTTP client for one customer's returns, against `buildReturnTestApp()`. */
 export function returnsClientFor(app: Express, storeId: string, customerId: string) {
-  const token = customerAccessTokenFor(customerId);
+  const token = customerAccessTokenFor(customerId, storeId);
   const base = `/api/v1/stores/${storeId}/returns`;
   return {
     create: (body: unknown) =>

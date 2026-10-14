@@ -710,7 +710,7 @@ describe.skipIf(!hasDb)('connect a carrier: credentials, Test connection, enable
       const noAuth = await asApp(async () => request(app).get(listUrl(s)));
       expect(noAuth.status).toBe(401);
       const customer = jwt.sign(
-        { userId: s.userId, email: 'c@example.test', role: 'customer', tv: 0 },
+        { userId: s.userId, email: 'c@example.test', role: 'customer', tv: 0, storeId: s.id },
         config.jwtSecret,
         { expiresIn: '5m', issuer: 'force-api', audience: 'force-app' }
       );
