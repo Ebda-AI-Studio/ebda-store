@@ -275,6 +275,16 @@ interface Order {
   /** Part of `total` paid from the customer wallet (D1), in piastres. The
    *  gateway charges `total - walletAmount`. 0 when the wallet was not used. */
   walletAmount?: number;
+  /** Money breakdown (minor units), as `GET /public/orders/:id` returns the
+   *  order row. Optional: older callers and fixtures omit them. */
+  subtotal?: number;
+  shipping?: number;
+  discount?: number;
+  codFee?: number;
+  tax?: number;
+  taxIncludedInPrice?: boolean;
+  /** Payment rows (`ORDER_PAYMENT_SELECT`); the receipt names the method. */
+  payments?: Array<{ provider: string; method?: string | null }>;
   items: Array<{
     id: string;
     productId: string;

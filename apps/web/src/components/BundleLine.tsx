@@ -95,13 +95,13 @@ export interface BundleLineProps {
  * and the checkout `OrderSummary.tsx` (`variant="row"`) — both list a small,
  * homogeneous set of lines where a shared row component is the natural fit.
  *
- * It is deliberately NOT used on the order-confirmation
- * (`checkout/success/SuccessClient.tsx`) or order-detail
+ * It is deliberately NOT used on the order-confirmation receipt
+ * (`components/commerce/ReceiptPrinter.tsx`) or order-detail
  * (`account/orders/[id]/OrderDetailClient.tsx`) views. Those hand-roll their
  * own equivalent bundle-row markup instead, because their SHAPE differs from
  * a simple row list: order-detail renders a `<table>` (desktop) and a
  * separate mobile list, each with different columns/classes per row-kind,
- * and the confirmation view's rows sit inside a bare `divide-y` block with
+ * and the confirmation receipt's rows are thermal-paper text lines with
  * no image at all. All four surfaces still collapse a box to ONE row via
  * the same `groupOrderLinesForDisplay` function and never show a
  * per-component allocated price — that invariant lives in the shared
