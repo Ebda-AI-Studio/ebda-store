@@ -1,4 +1,4 @@
-import type { CheckoutDeliverySettings } from '@ebda/shared';
+import { deliveryDaysSchema, type CheckoutDeliverySettings, type DeliveryDays } from '@ebda/shared';
 import { textFieldValue } from './form-text';
 
 import { roundToMinor } from '@ebda/shared';
@@ -33,6 +33,23 @@ export function majorInputToMinor(major: string): number {
   return roundToMinor(parsed);
 }
 
+/**
+ * Parse the two "delivery time (business days)" inputs. Both empty = cleared (`null`, which
+ * the page sends explicitly: the server's settings merge is shallow, so an omitted key would
+ * resurrect the old value). Anything else must be two whole days 0..30 with min <= max.
+ */
+export function parseDeliveryDaysInput(
+  min: string,
+  max: string
+): { ok: true; value: DeliveryDays | null } | { ok: false } {
+  const a = min.trim();
+  const b = max.trim();
+  if (a === '' && b === '') return { ok: true, value: null };
+  if (a === '' || b === '') return { ok: false };
+  const parsed = deliveryDaysSchema.safeParse({ min: Number(a), max: Number(b) });
+  return parsed.success ? { ok: true, value: parsed.data } : { ok: false };
+}
+
 export interface CheckoutDeliveryForm {
   /** The store's current `settings` JSON, spread through untouched. */
   existingSettings: Record<string, unknown>;
@@ -41,6 +58,8 @@ export interface CheckoutDeliveryForm {
   minimumOrderMajor: string;
   /** Raw (untrimmed) order-invoice address; empty = feature off. */
   orderInvoiceEmail: string;
+  /** Store-wide delivery estimate; `null` clears it, `undefined` leaves the stored value. */
+  deliveryDays?: DeliveryDays | null;
 }
 
 export function buildCheckoutDeliverySettings(form: CheckoutDeliveryForm): Record<string, unknown> {
@@ -52,5 +71,7 @@ export function buildCheckoutDeliverySettings(form: CheckoutDeliveryForm): Recor
     // address must send an explicit null that survives JSON.stringify and
     // overwrites the stored value on the server's shallow merge.
     orderInvoiceEmail: textFieldValue(form.orderInvoiceEmail.trim(), 'update'),
+    // null is the cleared form (see orderInvoiceEmail); undefined keeps the spread-through value.
+    ...(form.deliveryDays !== undefined ? { deliveryDays: form.deliveryDays } : {}),
   };
 }

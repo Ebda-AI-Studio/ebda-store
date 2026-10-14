@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildCheckoutDeliverySettings,
   majorInputToMinor,
+  parseDeliveryDaysInput,
   type CheckoutDeliveryForm,
 } from '../checkout-delivery-payload';
 
@@ -115,5 +116,46 @@ describe('majorInputToMinor', () => {
     expect(majorInputToMinor('abc')).toBe(0);
     expect(majorInputToMinor('-3')).toBe(0);
     expect(majorInputToMinor('0')).toBe(0);
+  });
+});
+
+describe('store-wide deliveryDays (business days)', () => {
+  const base = { config: CONFIG, minimumOrderMajor: '', orderInvoiceEmail: '' };
+
+  it('serializes an explicit null when cleared, so the shallow merge drops the stored value', () => {
+    const stored = { ...STORED, deliveryDays: { min: 2, max: 4 } };
+    const body = serialize({ ...base, existingSettings: stored, deliveryDays: null });
+    expect(body).toHaveProperty('deliveryDays', null);
+    expect(serverMerge(stored, body).deliveryDays).toBeNull();
+  });
+
+  it('sends the range when set and leaves the stored value alone when undefined', () => {
+    expect(
+      serialize({ ...base, existingSettings: STORED, deliveryDays: { min: 1, max: 3 } })
+        .deliveryDays
+    ).toEqual({ min: 1, max: 3 });
+    const keep = { ...STORED, deliveryDays: { min: 2, max: 4 } };
+    expect(serialize({ ...base, existingSettings: keep }).deliveryDays).toEqual({ min: 2, max: 4 });
+  });
+});
+
+describe('parseDeliveryDaysInput', () => {
+  it('both empty clears, a valid pair parses', () => {
+    expect(parseDeliveryDaysInput('', ' ')).toEqual({ ok: true, value: null });
+    expect(parseDeliveryDaysInput('2', '4')).toEqual({ ok: true, value: { min: 2, max: 4 } });
+    expect(parseDeliveryDaysInput('0', '0')).toEqual({ ok: true, value: { min: 0, max: 0 } });
+  });
+  it('rejects half-filled, reversed, fractional and out-of-range input', () => {
+    for (const [a, b] of [
+      ['2', ''],
+      ['', '3'],
+      ['5', '2'],
+      ['1.5', '2'],
+      ['-1', '2'],
+      ['1', '31'],
+      ['x', '2'],
+    ]) {
+      expect(parseDeliveryDaysInput(a, b)).toEqual({ ok: false });
+    }
   });
 });

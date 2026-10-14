@@ -16,7 +16,7 @@
  */
 import { intlLocale, type Numerals } from '@ebda/shared';
 
-export type FormatDateStyle = 'short' | 'long' | 'datetime';
+export type FormatDateStyle = 'short' | 'long' | 'datetime' | 'day';
 
 export interface FormatDateOptions {
   /** Store IANA timezone (e.g. 'Africa/Cairo'). Falls back to Africa/Cairo. */
@@ -49,6 +49,9 @@ function presetOptions(style: FormatDateStyle): Intl.DateTimeFormatOptions {
   switch (style) {
     case 'short':
       return { year: 'numeric', month: 'numeric', day: 'numeric' };
+    case 'day':
+      // No year: "Sun, Oct 19" / "الأحد ١٩ أكتوبر" — for near-term dates like a delivery window.
+      return { weekday: 'short', day: 'numeric', month: 'short' };
     case 'datetime':
       return {
         year: 'numeric',

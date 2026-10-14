@@ -32,6 +32,7 @@ import { ProductFaqSection, type ProductFaqSectionHandle } from './_components/P
 import { AiFieldBadge } from './_components/AiFieldBadge';
 import { BalanceDescriptionButton } from './_components/BalanceDescriptionButton';
 import { FactsCard } from './_components/FactsCard';
+import { FulfilmentCard, LEAD_TIME_MAX } from './_components/FulfilmentCard';
 
 interface Product {
   id: string;
@@ -52,6 +53,8 @@ interface Product {
   sku?: string;
   inventory: number;
   lowStockThreshold?: number;
+  /** Made-to-order business days; null = ready to ship. */
+  leadTimeDays?: number | null;
   status: string;
   isFeatured: boolean;
   isNew: boolean;
@@ -85,6 +88,7 @@ export default function EditProductPage() {
   const tSections = useT('products.edit.sections');
   const tFields = useT('products.edit.fields');
   const tFacts = useT('products.edit.facts');
+  const tFulfil = useT('products.edit.fulfilment');
   const tStatusOptions = useT('products.edit.statusOptions');
   const tSeo = useT('products.edit.seoSection');
   const locale = useLocale();
@@ -134,6 +138,8 @@ export default function EditProductPage() {
     inventory: '',
     // Per-product low-stock threshold — drives the LOW STOCK badge + alerts.
     lowStockThreshold: '',
+    // Made-to-order business days as the raw input string; '' = ready to ship (sent as null).
+    leadTimeDays: '',
     status: 'draft',
     isFeatured: false,
     isNew: false,
@@ -249,6 +255,8 @@ export default function EditProductPage() {
             p.lowStockThreshold === undefined || p.lowStockThreshold === null
               ? ''
               : String(p.lowStockThreshold),
+          leadTimeDays:
+            p.leadTimeDays === undefined || p.leadTimeDays === null ? '' : String(p.leadTimeDays),
           status: p.status || 'draft',
           isFeatured: p.isFeatured || false,
           isNew: p.isNew || false,
@@ -477,6 +485,17 @@ export default function EditProductPage() {
         return;
       }
 
+      // Whole days 0..60, or empty (= ready to ship, sent as null so a stored value clears).
+      const leadRaw = formData.leadTimeDays.trim();
+      const leadTimeDays = leadRaw === '' ? null : Number(leadRaw);
+      if (
+        leadTimeDays !== null &&
+        (!Number.isInteger(leadTimeDays) || leadTimeDays < 0 || leadTimeDays > LEAD_TIME_MAX)
+      ) {
+        setError(tFulfil('invalid', { max: LEAD_TIME_MAX }));
+        return;
+      }
+
       const body: Record<string, unknown> = {
         name: formData.name,
         // Clearable free text (nameAr / description / descriptionAr / sku).
@@ -512,6 +531,7 @@ export default function EditProductPage() {
         metaDescriptionAeoAr: formData.metaDescriptionAeoAr || null,
         images: images.map((url, i) => ({ url, position: i })),
         facts: factsPayload,
+        leadTimeDays,
       };
 
       if (formData.category) {
@@ -969,6 +989,11 @@ export default function EditProductPage() {
                 />
               </div>
             </div>
+
+            <FulfilmentCard
+              value={formData.leadTimeDays}
+              onChange={v => updateField('leadTimeDays', v)}
+            />
 
             {/* SEO meta — what shows up on Google + social shares.
                 "Generate with AI" now fills SEO + AEO meta AND drafts FAQs

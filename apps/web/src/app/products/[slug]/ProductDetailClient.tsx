@@ -49,6 +49,7 @@ import { captureEvent } from '../../../components/PostHogProvider';
 import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
 import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
+import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
 const FrequentlyBoughtTogether = dynamic(() =>
@@ -677,6 +678,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             onToggleWishlist={handleToggleWishlist}
             sku={product.sku}
             facts={product.facts}
+            leadTimeDays={product.leadTimeDays}
             specs={
               (product as { specifications?: unknown }).specifications ? (
                 <SpecTable
@@ -1094,6 +1096,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     </svg>
                   </Button>
                 </div>
+                <DeliveryChip leadTimeDays={product.leadTimeDays} />
               </div>
 
               {/* SKU */}

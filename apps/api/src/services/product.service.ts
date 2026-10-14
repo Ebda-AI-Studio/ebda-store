@@ -284,6 +284,8 @@ interface CreateProductData {
   badgeLabelAr?: string | null;
   /** Whole-array replace; `undefined` leaves the stored facts alone. */
   facts?: ProductFact[];
+  /** Made-to-order business days; `null` clears, `undefined` leaves alone. */
+  leadTimeDays?: number | null;
   categories?: string[];
   images?: { url: string; alt?: string }[];
   /** SEO meta — set per-product or via the AI sweep. `null` clears. */
@@ -492,6 +494,9 @@ export const STOREFRONT_PRODUCT_SELECT = {
   // rides the listing/PDP caches (busted by invalidateStoreProductCache on update;
   // recommendation lists add their own 5-minute TTL).
   facts: true,
+  // Made-to-order days for the PDP delivers-by chip. CACHE CLASS: BOUNDED-stale, rides the
+  // PDP cache; invalidateStoreProductCache (called on every product update) busts it.
+  leadTimeDays: true,
   updatedAt: true,
   createdAt: true,
 } as const satisfies Prisma.ProductSelect;
@@ -784,6 +789,7 @@ export class ProductService {
         badgeLabel: data.badgeLabel ?? null,
         badgeLabelAr: data.badgeLabelAr ?? null,
         ...(data.facts !== undefined ? { facts: data.facts } : {}),
+        ...(data.leadTimeDays !== undefined ? { leadTimeDays: data.leadTimeDays } : {}),
         images: data.images
           ? {
               create: data.images.map((img, index) => ({
@@ -979,6 +985,7 @@ export class ProductService {
           ...(data.badgeLabel !== undefined ? { badgeLabel: data.badgeLabel } : {}),
           ...(data.badgeLabelAr !== undefined ? { badgeLabelAr: data.badgeLabelAr } : {}),
           ...(data.facts !== undefined ? { facts: data.facts } : {}),
+          ...(data.leadTimeDays !== undefined ? { leadTimeDays: data.leadTimeDays } : {}),
           inventory: data.inventory,
           ...(data.lowStockThreshold !== undefined
             ? { lowStockThreshold: data.lowStockThreshold }

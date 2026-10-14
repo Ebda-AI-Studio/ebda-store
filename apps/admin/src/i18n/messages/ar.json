@@ -770,6 +770,13 @@
         "moveDown": "تحريك لأسفل",
         "remove": "حذف",
         "needBoth": "كل تفصيلة لازم يكون ليها اسم وقيمة."
+      },
+      "fulfilment": {
+        "title": "التجهيز",
+        "hint": "يظهر للعميل: يوصلك بين … و … سيبه فاضي لو المنتج بيتشحن على طول.",
+        "leadTime": "مدة التجهيز (أيام)",
+        "placeholder": "جاهز للشحن",
+        "invalid": "مدة التجهيز لازم تكون رقم صحيح من 0 لـ {max}."
       }
     },
     "recommendations": {
@@ -8235,7 +8242,13 @@
       "invoiceEmailSectionTitle": "بريد فاتورة الطلب",
       "invoiceEmailSectionHint": "يتم إرسال فاتورة كل طلب في هذا المتجر إلى هذا البريد أيضًا (مثل صاحب المتجر). اتركه فارغًا للتعطيل.",
       "invoiceEmailLabel": "بريد مستلم الفاتورة",
-      "invoiceEmailPlaceholder": "owner@example.com"
+      "invoiceEmailPlaceholder": "owner@example.com",
+      "deliveryDaysTitle": "مدة التوصيل (أيام عمل)",
+      "deliveryDaysHint": "تظهر في صفحة المنتج: يوصلك بين … و … لو مناطق الشحن مفيهاش مدة. الجمعة مش بتتحسب. سيبها فاضية عشان تتخفي.",
+      "deliveryDaysMin": "من (أيام)",
+      "deliveryDaysMax": "إلى (أيام)",
+      "deliveryDaysClear": "مسح",
+      "deliveryDaysInvalid": "اكتب الرقمين كأيام صحيحة من 0 لـ 30، و«من» مش أكبر من «إلى»."
     }
   },
   "customerGroups": {

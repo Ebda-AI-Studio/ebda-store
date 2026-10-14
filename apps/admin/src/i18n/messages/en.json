@@ -770,6 +770,13 @@
         "moveDown": "Move down",
         "remove": "Remove",
         "needBoth": "Each detail needs a name and a value."
+      },
+      "fulfilment": {
+        "title": "Fulfilment",
+        "hint": "Shows customers: arrives between … and … Leave empty if it ships right away.",
+        "leadTime": "Made-to-order days",
+        "placeholder": "Ready to ship",
+        "invalid": "Made-to-order days must be a whole number from 0 to {max}."
       }
     },
     "recommendations": {
@@ -8235,7 +8242,13 @@
       "invoiceEmailSectionTitle": "Order invoice email",
       "invoiceEmailSectionHint": "Every order in this store also emails the invoice to this address (e.g. the store owner). Leave empty to disable.",
       "invoiceEmailLabel": "Invoice recipient email",
-      "invoiceEmailPlaceholder": "owner@example.com"
+      "invoiceEmailPlaceholder": "owner@example.com",
+      "deliveryDaysTitle": "Delivery time (business days)",
+      "deliveryDaysHint": "Shown on product pages as \"Arrives between … and …\" when your shipping zones carry no day estimate. Fridays are skipped. Leave empty to hide.",
+      "deliveryDaysMin": "From (days)",
+      "deliveryDaysMax": "To (days)",
+      "deliveryDaysClear": "Clear",
+      "deliveryDaysInvalid": "Enter both numbers as whole days from 0 to 30, with From no larger than To."
     }
   },
   "customerGroups": {

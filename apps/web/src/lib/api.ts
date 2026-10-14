@@ -128,6 +128,8 @@ interface Product {
   badgeLabelAr?: string | null;
   /** Merchant spec rows (fabric, karat...): PDP table, card chips, compare rows. */
   facts?: ProductFact[];
+  /** Made-to-order business days; null/absent = ready to ship. Feeds the PDP delivers-by chip. */
+  leadTimeDays?: number | null;
   inventory?: number;
   /** Server-computed: inventory <= 0 && allowBackorder. Keeps Add-to-Cart
    *  enabled for out-of-stock backorderable products (the cart/order API

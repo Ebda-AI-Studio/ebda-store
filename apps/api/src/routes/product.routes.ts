@@ -92,6 +92,8 @@ const createProductSchema = z.object({
   badgeLabelAr: badgeLabelSchema,
   // Spec rows (fabric, karat, ingredients...). Whole-array replace; omitted = untouched.
   facts: productFactsSchema.optional(),
+  // Made-to-order business days (0-60). null = ready to ship (clears); undefined leaves alone.
+  leadTimeDays: z.number().int().min(0).max(60).nullable().optional(),
   // SEO meta — null clears, undefined leaves alone (Prisma convention).
   metaTitle: z.string().max(180).optional().nullable(),
   metaTitleAr: z.string().max(180).optional().nullable(),

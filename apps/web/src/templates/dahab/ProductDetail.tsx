@@ -25,6 +25,7 @@ import { VariantSelector } from '../../components/VariantSelector';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import type { ProductFact } from '@ebda/shared';
 import { FactsTable } from '../../components/commerce/FactsTable';
+import { DeliveryChip } from '../../components/commerce/DeliveryChip';
 import {
   CloseIcon,
   DAHAB_BTN_PRIMARY,
@@ -67,6 +68,8 @@ export interface DahabProductDetailProps {
   sku?: string | null;
   /** Merchant spec rows, one tap away in an accordion. */
   facts?: ProductFact[];
+  /** Made-to-order business days; feeds the delivers-by chip under the buy button. */
+  leadTimeDays?: number | null;
   /** Spec table, WhatsApp order button, share row — platform components. */
   specs?: ReactNode;
   extras?: ReactNode;
@@ -438,6 +441,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 <HeartIcon className="h-5 w-5" filled={p.isWishlisted} />
               </button>
             </div>
+            <DeliveryChip leadTimeDays={p.leadTimeDays} />
             {p.stockText && <p className="mt-3 text-[13px] text-muted-foreground">{p.stockText}</p>}
 
             <div className="mt-8 border-t border-border">

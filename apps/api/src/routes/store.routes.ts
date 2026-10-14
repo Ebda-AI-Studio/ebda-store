@@ -29,6 +29,7 @@ import {
   LOOK_DENSITIES,
   LOOK_IMAGE_RATIOS,
   LOOK_MOTIONS,
+  deliveryDaysSchema,
 } from '@ebda/shared';
 import {
   maskMarketingPixelSecrets,
@@ -138,6 +139,19 @@ export const updateStoreSchema = createStoreSchema.partial().extend({
               path: ['contact', 'addressUrl'],
               message:
                 'Link must be a relative path or use http(s)/mailto/tel — javascript: is not allowed',
+            });
+          }
+        }
+      }
+      // Store-wide delivery estimate (business days). null clears; anything else must be a valid range.
+      if (settings?.deliveryDays !== undefined && settings.deliveryDays !== null) {
+        const parsed = deliveryDaysSchema.safeParse(settings.deliveryDays);
+        if (!parsed.success) {
+          for (const issue of parsed.error.issues) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['deliveryDays', ...issue.path],
+              message: issue.message,
             });
           }
         }

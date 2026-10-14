@@ -6,7 +6,10 @@ import Link from 'next/link';
 import { Button } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
-import { buildCheckoutDeliverySettings } from '../../../../lib/checkout-delivery-payload';
+import {
+  buildCheckoutDeliverySettings,
+  parseDeliveryDaysInput,
+} from '../../../../lib/checkout-delivery-payload';
 import { useT } from '@/i18n/useT';
 import type { CheckoutDeliverySettings, CheckoutDeliveryWindow } from '@ebda/shared';
 
@@ -43,6 +46,10 @@ export default function CheckoutDeliveryPage() {
   // Per-store, opt-in owner order-invoice email. Every order in this store
   // auto-emails the rendered invoice to this address. Empty = disabled.
   const [orderInvoiceEmail, setOrderInvoiceEmail] = useState('');
+  // Store-wide delivery estimate in business days, as the raw strings typed.
+  // Both empty = none; saving sends an explicit null to clear a stored value.
+  const [deliveryDaysMin, setDeliveryDaysMin] = useState('');
+  const [deliveryDaysMax, setDeliveryDaysMax] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -73,6 +80,9 @@ export default function CheckoutDeliveryPage() {
       setOrderInvoiceEmail(
         typeof settings.orderInvoiceEmail === 'string' ? settings.orderInvoiceEmail : ''
       );
+      const dd = settings.deliveryDays as { min?: unknown; max?: unknown } | null | undefined;
+      setDeliveryDaysMin(typeof dd?.min === 'number' ? String(dd.min) : '');
+      setDeliveryDaysMax(typeof dd?.max === 'number' ? String(dd.max) : '');
     } catch (err) {
       console.error('Failed to fetch checkout delivery settings:', err);
     } finally {
@@ -85,6 +95,11 @@ export default function CheckoutDeliveryPage() {
   }, [fetchSettings]);
 
   const handleSave = useCallback(async () => {
+    const days = parseDeliveryDaysInput(deliveryDaysMin, deliveryDaysMax);
+    if (!days.ok) {
+      setMessage({ type: 'error', text: t('deliveryDaysInvalid') });
+      return;
+    }
     setIsSaving(true);
     setMessage(null);
     try {
@@ -94,6 +109,7 @@ export default function CheckoutDeliveryPage() {
           config,
           minimumOrderMajor,
           orderInvoiceEmail,
+          deliveryDays: days.value,
         }),
       });
       if (!error) {
@@ -106,7 +122,16 @@ export default function CheckoutDeliveryPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [storeId, existingSettings, config, minimumOrderMajor, orderInvoiceEmail, t]);
+  }, [
+    storeId,
+    existingSettings,
+    config,
+    minimumOrderMajor,
+    orderInvoiceEmail,
+    deliveryDaysMin,
+    deliveryDaysMax,
+    t,
+  ]);
 
   const patchNote = (next: Partial<CheckoutDeliverySettings['note']>) =>
     setConfig(prev => ({ ...prev, note: { ...prev.note, ...next } }));
@@ -335,6 +360,59 @@ export default function CheckoutDeliveryPage() {
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
             />
           </label>
+        </section>
+
+        {/* Store-wide delivery estimate (business days): the storefront "arrives between"
+            line falls back to it when no shipping zone carries a day estimate (area-rate
+            stores). Both empty = hidden. */}
+        <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">{t('deliveryDaysTitle')}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t('deliveryDaysHint')}</p>
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex w-28 flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                {t('deliveryDaysMin')}
+              </span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={30}
+                step={1}
+                value={deliveryDaysMin}
+                onChange={e => setDeliveryDaysMin(e.target.value)}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="flex w-28 flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                {t('deliveryDaysMax')}
+              </span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={30}
+                step={1}
+                value={deliveryDaysMax}
+                onChange={e => setDeliveryDaysMax(e.target.value)}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setDeliveryDaysMin('');
+                setDeliveryDaysMax('');
+              }}
+              disabled={deliveryDaysMin === '' && deliveryDaysMax === ''}
+              className="rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-40"
+            >
+              {t('deliveryDaysClear')}
+            </button>
+          </div>
         </section>
 
         {/* Owner order-invoice email — opt-in per-store. Every order in this

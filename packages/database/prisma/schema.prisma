@@ -926,6 +926,8 @@ model Product {
   viewCount            Int           @default(0) @map("view_count")
   // Ordered ProductFact[] (@ebda/shared productFactsSchema): spec rows shown as the PDP table, up to 2 card chips and compare rows. [] renders nothing.
   facts                Json          @default("[]")
+  // Made-to-order business days added to the delivery estimate (PDP "delivers by" chip). null = ready to ship. CHECK 0..60.
+  leadTimeDays         Int?          @map("lead_time_days")
   // Short 1-2 sentence blurb, distinct from the full `description`. Written
   // by the bulk-ai-excerpt sweep (or manually) — surfaced anywhere a compact
   // summary is useful (search results, share cards). Bilingual EN+AR.
