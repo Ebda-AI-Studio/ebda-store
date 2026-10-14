@@ -2,7 +2,7 @@ import { getLook, lookFontsHref } from '@force/shared';
 
 /**
  * Head/body hooks for a store's look. Everything is null for a legacy store
- * (no/unknown look), so legacy markup is unchanged (Ruling R1).
+ * (no/unknown look), so legacy markup is unchanged (Ruling R1; sole exception: the inert mobile-menu fix, Ruling LOOKS-17).
  */
 export function lookHead(
   lookId: string | null | undefined,
