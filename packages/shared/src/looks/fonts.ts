@@ -36,9 +36,41 @@ export const LOOK_FONT_SPECS: Record<string, string> = {
   Italiana: '',
 };
 
-/** One Google Fonts css2 URL carrying exactly this look's families. */
-export function lookFontsHref(look: LookDefinition): string {
-  const fams = [...new Set(Object.values(look.tokens.fonts))];
+/** True for a family the looks system can load (it has an entry in `LOOK_FONT_SPECS`). */
+export function isLookFont(family: unknown): family is string {
+  return (
+    typeof family === 'string' && Object.prototype.hasOwnProperty.call(LOOK_FONT_SPECS, family)
+  );
+}
+
+/**
+ * The faces a look store actually paints, merchant first (Ruling LOOKS-3): a stored
+ * `headingFont` / `bodyFont` wins over the look's, but ONLY when it is a family in
+ * `LOOK_FONT_SPECS` — anything else (a legacy store's old font kept through a "keep" switch,
+ * a typo) is ignored here so the CSS never names a family nothing loads. `latin` follows a
+ * merchant heading override (an English heading in the merchant's face, not the look's Latin
+ * face); without one it is the look's Latin display family (Ruling LOOKS-7).
+ */
+export function resolveLookFonts(
+  look: LookDefinition,
+  theme: { headingFont?: unknown; bodyFont?: unknown } = {}
+): { display: string; body: string; latin: string } {
+  const { fonts } = look.tokens;
+  const display = isLookFont(theme.headingFont) ? theme.headingFont : fonts.display;
+  const body = isLookFont(theme.bodyFont) ? theme.bodyFont : fonts.body;
+  const latin = display === fonts.display ? fonts.latin : display;
+  return { display, body, latin };
+}
+
+/**
+ * One Google Fonts css2 URL carrying exactly the families this look store paints
+ * (`resolveLookFonts`): the look's own, or a merchant override that replaced one.
+ */
+export function lookFontsHref(
+  look: LookDefinition,
+  theme: { headingFont?: unknown; bodyFont?: unknown } = {}
+): string {
+  const fams = [...new Set(Object.values(resolveLookFonts(look, theme)))];
   const q = fams.map(f => {
     const spec = LOOK_FONT_SPECS[f];
     if (spec === undefined) throw new Error(`no font spec for ${f}`);

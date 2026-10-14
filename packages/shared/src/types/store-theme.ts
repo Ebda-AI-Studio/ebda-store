@@ -8,6 +8,7 @@ import { statusInkVars } from '../utils/status-ink';
 import { colorToHslTriplet } from '../utils/color';
 import type { Density, ImageRatio, Motion } from '../looks/types';
 import { getLook } from '../looks/registry';
+import { resolveLookFonts } from '../looks/fonts';
 
 /**
  * Available store templates
@@ -942,13 +943,13 @@ export function lookCssVars(
   const look = getLook(lookId);
   if (!look) return {};
   const v: Record<string, string> = {};
-  const display = theme.headingFont ?? look.tokens.fonts.display;
-  const body = theme.bodyFont ?? look.tokens.fonts.body;
+  // Merchant font wins when it is loadable; `latin` follows a merchant heading (resolveLookFonts).
+  const { display, body, latin } = resolveLookFonts(look, theme);
   v['--font-display'] = `"${display}", var(--font-arabic), var(--font-sans)`;
   // Same value under a name no skin rule redefines (dahab sets --font-display on <body>).
   v['--look-font-display'] = v['--font-display'];
   v['--font-body'] = `"${body}", var(--font-arabic), var(--font-sans)`;
-  v['--font-latin'] = `"${look.tokens.fonts.latin}", var(--font-sans)`;
+  v['--font-latin'] = `"${latin}", var(--font-sans)`;
   if (theme.density) v['--space-unit'] = LOOK_SPACE_UNIT[theme.density];
   if (theme.imageRatio) v['--image-ratio'] = theme.imageRatio.replace('/', ' / ');
   if (theme.motion) v['--motion-duration'] = LOOK_MOTION_DURATION[theme.motion];

@@ -79,6 +79,22 @@ describe('RootLayout: look hooks', () => {
     );
     expect(out).toContain('--space-unit: 1.25');
   });
+  it('look store with a loadable merchant heading font: the link loads it and the vars use it', async () => {
+    current = {
+      ...base,
+      look: 'qamar.atelier',
+      template: 'minimal',
+      theme: composeStoreTheme({
+        template: 'minimal',
+        look: 'qamar.atelier',
+        theme: { headingFont: 'Cairo' },
+      }),
+    };
+    const out = renderToStaticMarkup(await RootLayout({ children: <main>x</main> }));
+    expect(out).toMatch(/fonts\.googleapis\.com\/css2\?[^"]*family=Cairo/);
+    expect(out).toContain('--font-display: "Cairo"');
+    expect(out).toContain('--font-latin: "Cairo"');
+  });
   it('look on the dahab skin: data-pack and data-look both set, look display var emitted', async () => {
     const out = await html('dahab.worn', 'dahab');
     expect(out).toContain('data-pack="dahab"');

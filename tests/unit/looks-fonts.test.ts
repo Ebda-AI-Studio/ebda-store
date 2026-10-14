@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { LOOKS, lookFontsHref, composeStoreTheme } from '@force/shared';
-import { buildThemeStyleTag } from '../../apps/web/src/lib/theme-css';
+import {
+  LOOKS,
+  LOOK_FONT_SPECS,
+  getLook,
+  lookFontsHref,
+  composeStoreTheme,
+  type StoreTheme,
+} from '@force/shared';
+import { buildThemeStyleTag, LOOK_VAR_PATTERNS } from '../../apps/web/src/lib/theme-css';
+import { lookHead } from '../../apps/web/src/lib/look-head';
 
 describe('look fonts', () => {
   it('one Google Fonts css2 URL per look with exactly its families, display=swap', () => {
@@ -96,5 +104,85 @@ describe('globals.css look rules', () => {
   it('every look rule is scoped under [data-look]', () => {
     const rules = looksCss.replace(/\/\*[\s\S]*?\*\//g, '').match(/^[^@\s}][^{]*\{/gm) ?? [];
     for (const r of rules) expect(r, r).toMatch(/data-look/);
+  });
+});
+
+describe('merchant font override on a look store (LOOKS-3: merchant wins)', () => {
+  const atelier = getLook('qamar.atelier')!;
+  const families = (href: string) => new URL(href).searchParams.getAll('family');
+  const styleFor = (theme: Partial<StoreTheme>) =>
+    buildThemeStyleTag(
+      composeStoreTheme({ template: 'minimal', look: 'qamar.atelier', theme }),
+      'qamar.atelier'
+    );
+
+  it('a loadable override joins the Google Fonts link and replaces the look face', () => {
+    const theme = composeStoreTheme({
+      template: 'minimal',
+      look: 'qamar.atelier',
+      theme: { headingFont: 'Cairo', bodyFont: 'Tajawal' },
+    });
+    const fams = families(lookHead('qamar.atelier', theme)!.fontsHref);
+    expect(fams).toContain('Cairo:wght@400;600;700');
+    expect(fams).toContain('Tajawal:wght@400;500;700');
+    // the look's own display + body faces are no longer painted, so not loaded
+    expect(fams.some(f => f.startsWith(atelier.tokens.fonts.display))).toBe(false);
+    expect(fams.some(f => f.startsWith(atelier.tokens.fonts.body))).toBe(false);
+  });
+
+  it('a non-loadable override is ignored for CSS and for the link (no unloadable family)', () => {
+    const theme = { headingFont: 'Poppins', bodyFont: 'Comic Sans' };
+    expect(families(lookFontsHref(atelier, theme))).toEqual(families(lookFontsHref(atelier)));
+    const css = styleFor(theme);
+    expect(css).toContain(`--font-display: "${atelier.tokens.fonts.display}"`);
+    expect(css).toContain(`--font-body: "${atelier.tokens.fonts.body}"`);
+    expect(css).not.toContain('Poppins');
+    expect(css).not.toContain('Comic Sans');
+  });
+
+  it('--font-latin yields to a merchant heading font that differs from the look', () => {
+    const css = styleFor({ headingFont: 'Cairo' });
+    expect(css).toContain('--font-display: "Cairo", var(--font-arabic), var(--font-sans)');
+    expect(css).toContain('--font-latin: "Cairo", var(--font-sans)');
+  });
+
+  it("--font-latin stays the look's Latin face when the heading font is the look's own", () => {
+    const css = styleFor({ headingFont: atelier.tokens.fonts.display });
+    expect(css).toContain(`--font-latin: "${atelier.tokens.fonts.latin}", var(--font-sans)`);
+  });
+
+  it('a legacy store switched with "keep" carrying an old headingFont', () => {
+    // An old non-look font: ignored, the look's faces paint and load.
+    const old = styleFor({ headingFont: 'Inter', bodyFont: 'Inter' });
+    expect(old).toContain(`--font-display: "${atelier.tokens.fonts.display}"`);
+    expect(old).toContain(`--font-latin: "${atelier.tokens.fonts.latin}"`);
+    expect(old).not.toContain('Inter"');
+    // An old font that happens to be loadable: the merchant's choice wins and is loaded.
+    const kept = composeStoreTheme({
+      template: 'minimal',
+      look: 'qamar.atelier',
+      theme: { headingFont: 'Amiri' },
+    });
+    expect(buildThemeStyleTag(kept, 'qamar.atelier')).toContain('--font-display: "Amiri"');
+    expect(lookHead('qamar.atelier', kept)!.fontsHref).toContain('family=Amiri');
+  });
+});
+
+describe('LOOK_VAR_PATTERNS font families', () => {
+  const stack = (f: string) => `"${f}", var(--font-arabic), var(--font-sans)`;
+  it('every family in LOOK_FONT_SPECS passes every font pattern', () => {
+    for (const f of Object.keys(LOOK_FONT_SPECS)) {
+      expect(LOOK_VAR_PATTERNS['--font-display'].test(stack(f)), f).toBe(true);
+      expect(LOOK_VAR_PATTERNS['--font-body'].test(stack(f)), f).toBe(true);
+      expect(LOOK_VAR_PATTERNS['--font-latin'].test(`"${f}", var(--font-sans)`), f).toBe(true);
+    }
+  });
+  it('accepts real names with hyphens, apostrophes and spaces', () => {
+    for (const f of ['M PLUS Rounded 1c', 'Zen Kaku Gothic New', "Rock 'n Roll One", 'Noto-Serif'])
+      expect(LOOK_VAR_PATTERNS['--font-display'].test(stack(f)), f).toBe(true);
+  });
+  it('refuses CSS-breaking characters', () => {
+    for (const f of ['A"; } body { x', 'A\\22', 'A;B', 'A{B', 'A}B', 'A<B', 'A)B', 'A(B'])
+      expect(LOOK_VAR_PATTERNS['--font-display'].test(stack(f)), f).toBe(false);
   });
 });

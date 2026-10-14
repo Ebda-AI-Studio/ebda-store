@@ -501,7 +501,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // duplicate <style> blocks. All inputs above pass through
   // sanitizeFontValue/sanitizeUrl to prevent CSS-injection escapes.
   const typographyCss = [...fontFaceRules, ...zoneRules].join('\n');
-  const look = lookHead(store.look);
+  const look = lookHead(
+    store.look,
+    effectiveTheme as { headingFont?: unknown; bodyFont?: unknown } | null
+  );
   const combinedStyleTag = [themeStyleTag, typographyCss].filter(Boolean).join('\n');
 
   return (

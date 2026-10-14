@@ -69,12 +69,16 @@ export function sanitizeCssValue(value: string, fallback = '0'): string {
 
 const NON_COLOR_VARS = new Set(['--radius', '--font-family']);
 
+// A font family name: letters, digits, spaces, hyphens and apostrophes (real Google Fonts
+// names, e.g. "Baloo Bhaijaan 2"). Quotes, backslashes, semicolons, braces, angle brackets and
+// parentheses are refused: they could close the string or the declaration.
+const FAMILY = `"[A-Za-z0-9 '\\-]{1,60}"`;
 /** Look (Phase S) variables: non-colour, each with its own strict allow-list. */
-const LOOK_VAR_PATTERNS: Record<string, RegExp> = {
-  '--font-display': /^"[A-Za-z0-9 ]{1,60}", var\(--font-arabic\), var\(--font-sans\)$/,
-  '--look-font-display': /^"[A-Za-z0-9 ]{1,60}", var\(--font-arabic\), var\(--font-sans\)$/,
-  '--font-latin': /^"[A-Za-z0-9 ]{1,60}", var\(--font-sans\)$/,
-  '--font-body': /^"[A-Za-z0-9 ]{1,60}", var\(--font-arabic\), var\(--font-sans\)$/,
+export const LOOK_VAR_PATTERNS: Record<string, RegExp> = {
+  '--font-display': new RegExp(`^${FAMILY}, var\\(--font-arabic\\), var\\(--font-sans\\)$`),
+  '--look-font-display': new RegExp(`^${FAMILY}, var\\(--font-arabic\\), var\\(--font-sans\\)$`),
+  '--font-latin': new RegExp(`^${FAMILY}, var\\(--font-sans\\)$`),
+  '--font-body': new RegExp(`^${FAMILY}, var\\(--font-arabic\\), var\\(--font-sans\\)$`),
   '--space-unit': /^\d+(?:\.\d+)?$/,
   '--image-ratio': /^\d+ \/ \d+$/,
   '--motion-duration': /^\d+ms$/,
