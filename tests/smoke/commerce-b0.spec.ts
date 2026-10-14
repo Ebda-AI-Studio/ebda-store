@@ -1,4 +1,5 @@
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
+import { assertLocalOnly, orderBelongsToRun } from './commerce-b0.guards';
 /**
  * Phase B0 commerce flow, driven against the LOCAL seeded stack (never production):
  *   PDP (swatches, struck combo, facts, delivery chip, size guide, required personalisation)
@@ -9,8 +10,12 @@ import { test, expect, type APIRequestContext, type Page } from '@playwright/tes
  * host-shim proxy :3100, store `b0-minimal`, the "Linen Abaya" fixture). This is a MANUAL local
  * gate, not a CI gate. Without `B0_REQUIRE_STACK=1`, an unreachable stack or missing credentials
  * SKIPS the file (so a smoke run against a deployed environment is unaffected); with
- * `B0_REQUIRE_STACK=1` it FAILS loudly instead, so a gate run can never pass by skipping. It mutates the local DB only: it creates one size chart, edits the
- * Linen Abaya through the admin API, places one COD order, and restores the product afterwards.
+ * `B0_REQUIRE_STACK=1` it FAILS loudly instead, so a gate run can never pass by skipping.
+ *
+ * It WRITES, so it refuses to load unless both URLs are localhost / 127.0.0.1 / [::1] / *.localhost
+ * (`commerce-b0.guards.ts`, no override). It creates one size chart, edits the Linen Abaya through
+ * the admin API, places one COD order and cancels only that order (matched by this run's unique
+ * buyer email), and restores the product afterwards.
  *
  * Env:
  *   B0_REQUIRE_STACK=1                          fail instead of skip when the stack/credentials are missing
@@ -26,6 +31,10 @@ import { test, expect, type APIRequestContext, type Page } from '@playwright/tes
 
 const WEB = process.env.B0_WEB_URL ?? 'http://b0-minimal.localhost:3100';
 const API = process.env.B0_API_URL ?? 'http://127.0.0.1:4100/api/v1';
+// Before ANY request (module load): this spec writes, so it only ever runs against a local stack.
+assertLocalOnly({ B0_WEB_URL: WEB, B0_API_URL: API });
+// Unique per run: the only order this spec may read back or cancel is the one placed with it.
+const RUN_EMAIL = `b0-e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`;
 const STORE_SLUG = process.env.B0_STORE_SLUG ?? 'b0-minimal';
 const PRODUCT_SLUG = process.env.B0_PRODUCT_SLUG ?? 'linen-abaya';
 const REQUIRE_STACK = process.env.B0_REQUIRE_STACK === '1';
@@ -212,9 +221,14 @@ test.describe('commerce b0 flow @local-stack', () => {
       if (orderId) {
         // An open unpaid COD order counts toward the per-IP stock-hold cap and holds stock;
         // cancel it so repeated runs do not exhaust the cap (429 TOO_MANY_OPEN_HOLDS).
-        await adminFetch(request, 'put', `/stores/${storeId}/orders/${orderId}/status`, {
-          status: 'cancelled',
-        });
+        // Only this run's own order: re-read it and cancel only if its buyer email is ours.
+        const mine = await adminFetch(request, 'get', `/stores/${storeId}/orders/${orderId}`);
+        const body = (mine.body.data?.order ?? mine.body.data) as Json;
+        if (mine.status === 200 && orderBelongsToRun(body, RUN_EMAIL)) {
+          await adminFetch(request, 'put', `/stores/${storeId}/orders/${orderId}/status`, {
+            status: 'cancelled',
+          });
+        }
       }
       if (createdChartId) {
         await adminFetch(request, 'delete', `/stores/${storeId}/size-charts/${createdChartId}`);
@@ -264,14 +278,12 @@ test.describe('commerce b0 flow @local-stack', () => {
       await page.goto(`/products/${PRODUCT_SLUG}`, { waitUntil: 'domcontentloaded' });
       // Local dev stack: wait for hydration before clicking (buttons are inert until then).
       await settle(page);
-      await page.getByRole('button', { name: 'وردي' }).click();
-      await page.getByRole('button', { name: 'M', exact: true }).click();
+      await pick(page.getByRole('button', { name: 'وردي' }));
+      await pick(page.getByRole('button', { name: 'M', exact: true }));
       if (await page.getByRole('button', { name: '54 سم' }).isEnabled()) break;
       expect(attempt, 'Rose / M / 54 stayed sold out (stale cache or no stock)').toBeLessThan(18);
       await page.waitForTimeout(5_000);
     }
-    await page.goto(`/products/${PRODUCT_SLUG}`, { waitUntil: 'domcontentloaded' });
-    await settle(page);
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
 
     // 2. Swatches, the struck sold-out combo, facts, delivery chip, size guide.
@@ -281,8 +293,8 @@ test.describe('commerce b0 flow @local-stack', () => {
     await expect(rose).toBeVisible();
     await expect(page.getByRole('button', { name: 'أسود' })).toBeVisible();
 
-    await teal.click();
-    await page.getByRole('button', { name: 'M', exact: true }).click();
+    await pick(teal);
+    await pick(page.getByRole('button', { name: 'M', exact: true }));
     const struck = page.getByRole('button', { name: '56 سم' });
     await expect(struck).toBeDisabled();
     await expect(struck).toHaveClass(/line-through/);
@@ -303,8 +315,8 @@ test.describe('commerce b0 flow @local-stack', () => {
     await expect(dialog).toBeHidden();
 
     // Pick a purchasable combination: Rose / M / 54.
-    await rose.click();
-    await page.getByRole('button', { name: '54 سم' }).click();
+    await pick(rose);
+    await pick(page.getByRole('button', { name: '54 سم' }));
 
     // 3. Required personalisation: the button is disabled and the message is shown.
     const field = page.locator('input[maxlength="12"]');
@@ -344,7 +356,7 @@ test.describe('commerce b0 flow @local-stack', () => {
     // 6. COD checkout.
     await page.getByTestId('sticky-cart-total').getByRole('link').click();
     await page.waitForURL(/\/checkout/, { waitUntil: 'domcontentloaded' });
-    await fillCheckout(page);
+    await fillCheckout(page, RUN_EMAIL);
     await page.getByRole('button', { name: 'المتابعة للدفع' }).click();
     await page.getByText('الدفع عند الاستلام').first().click();
     await page
@@ -355,7 +367,7 @@ test.describe('commerce b0 flow @local-stack', () => {
       timeout: 60_000,
       waitUntil: 'domcontentloaded',
     });
-    orderId = new URL(page.url()).searchParams.get('orderId') ?? '';
+    const urlOrderId = new URL(page.url()).searchParams.get('orderId') ?? '';
 
     // 7. The receipt: both notes, cash on delivery, never "paid".
     const paper = page.getByTestId('receipt-paper');
@@ -367,16 +379,34 @@ test.describe('commerce b0 flow @local-stack', () => {
     await expect(page.locator('main')).not.toContainText('المدفوع');
 
     // 8. The admin order (API the admin order page calls; the admin UI is not driven here).
-    if (!orderId) {
-      const num = (await page.getByTestId('receipt-order-number').innerText()).replace('#', '');
-      const list = await adminFetch(request, 'get', `/stores/${storeId}/orders?search=${num}`);
-      orderId = (list.body.data.orders ?? list.body.data)[0]?.id;
+    // Never trust an id that is not provably this run's: verify the buyer email before using it,
+    // and before afterAll may cancel it. Nothing is cancelled unless this passes.
+    const num = (await page.getByTestId('receipt-order-number').innerText()).replace('#', '');
+    const candidates: string[] = [];
+    if (urlOrderId) candidates.push(urlOrderId);
+    const list = await adminFetch(
+      request,
+      'get',
+      `/stores/${storeId}/orders?search=${encodeURIComponent(RUN_EMAIL)}`
+    );
+    for (const row of (list.body.data?.orders ?? list.body.data ?? []) as Json[]) {
+      if (row?.id && !candidates.includes(row.id)) candidates.push(row.id);
     }
-    expect(orderId, 'order id from the success URL or the order list').toBeTruthy();
-    const order = await adminFetch(request, 'get', `/stores/${storeId}/orders/${orderId}`);
-    expect(order.status).toBe(200);
-    const o = (order.body.data.order ?? order.body.data) as Json;
-    const items = (o.items as Json[]).filter(i => i.personalisation);
+    let o: Json | null = null;
+    for (const id of candidates) {
+      const got = await adminFetch(request, 'get', `/stores/${storeId}/orders/${id}`);
+      const body = (got.body.data?.order ?? got.body.data) as Json;
+      if (got.status === 200 && orderBelongsToRun(body, RUN_EMAIL)) {
+        orderId = id;
+        o = body;
+        break;
+      }
+    }
+    expect(
+      o,
+      `no order with this run's buyer email (${RUN_EMAIL}); receipt shows ${num}`
+    ).toBeTruthy();
+    const items = (o!.items as Json[]).filter(i => i.personalisation);
     expect(items.map(i => i.personalisation).sort()).toEqual(['Omar', 'Sara']);
     for (const i of items) {
       expect(i.variantName, 'variantName snapshot').toBeTruthy();
@@ -385,12 +415,17 @@ test.describe('commerce b0 flow @local-stack', () => {
   });
 });
 
+/** Select an option chip only if it is not already selected (chips toggle on click). */
+async function pick(chip: Locator) {
+  if ((await chip.getAttribute('aria-pressed')) !== 'true') await chip.click();
+}
+
 /** Wait for the dev server to go quiet (hydration), but never fail on a chatty HMR socket. */
 async function settle(page: Page) {
   await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
 }
 
-async function fillCheckout(page: Page) {
+async function fillCheckout(page: Page, email: string) {
   await page.locator('input[autocomplete="given-name"]').fill('Test');
   await page.locator('input[autocomplete="family-name"]').fill('Buyer');
   await page.locator('input[autocomplete="tel"]').fill(
@@ -398,7 +433,7 @@ async function fillCheckout(page: Page) {
       .toString()
       .padStart(8, '0')}`
   );
-  await page.locator('input[autocomplete="email"]').fill(`b0-e2e-${Date.now()}@example.test`);
+  await page.locator('input[autocomplete="email"]').fill(email);
   await pickCombobox(page, 'المحافظة', 'القاهرة');
   await pickCombobox(page, 'المنطقة', undefined);
   await page.locator('input[autocomplete="address-line1"]').fill('Test Street');
