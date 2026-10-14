@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { LocationsService } from '../../apps/api/src/services/locations.service';
 
 const S = `loc-${Date.now()}`;

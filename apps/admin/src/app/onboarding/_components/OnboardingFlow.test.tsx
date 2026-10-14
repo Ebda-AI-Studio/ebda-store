@@ -7,7 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { getLook } from '@force/shared';
+import { getLook } from '@ebda/shared';
 
 const { apiGet, apiPost, apiPut, replace } = vi.hoisted(() => ({
   apiGet: vi.fn(),

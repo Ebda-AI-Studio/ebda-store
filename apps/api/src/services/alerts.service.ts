@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { redis } from './redis.service';

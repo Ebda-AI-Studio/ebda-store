@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
 import { authenticator } from 'otplib';
 import { encryption } from '../../apps/api/src/services/encryption.service';

@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMockRequest, createMockResponse, createMockNext, mockStore } from '../setup';
 
-// Feature registry — import from direct path since @force/shared points to dist/
+// Feature registry — import from direct path since @ebda/shared points to dist/
 import {
   FEATURE_KEYS_ARRAY,
   featureKeySchema,
@@ -26,7 +26,7 @@ vi.mock('../../apps/api/src/services/feature.service', () => ({
 // `mockStore` (imported from '../setup') cannot be referenced here — vi.mock
 // factories are hoisted above every import statement in the file — so its
 // id is duplicated as a literal instead.
-vi.mock('@force/database', () => ({ prisma: {} }));
+vi.mock('@ebda/database', () => ({ prisma: {} }));
 vi.mock('../../apps/api/src/lib/definer', () => ({
   lookupStore: vi.fn(async ({ id }: { id?: string }) =>
     id === 'test-store-id-789' ? { id: 'test-store-id-789', status: 'active' } : null

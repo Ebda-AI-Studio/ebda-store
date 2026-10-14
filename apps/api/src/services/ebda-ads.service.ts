@@ -23,7 +23,7 @@ import {
   normalizeEgyptianMobile,
   sanitizeAttribution,
   type EbdaAttribution,
-} from '@force/shared';
+} from '@ebda/shared';
 import logger from '../lib/logger';
 
 // ─── Stored shape ────────────────────────────────────────────────────────────

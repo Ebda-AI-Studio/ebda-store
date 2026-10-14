@@ -4,7 +4,7 @@ import { hasCapturedPayment, shouldApplyRefundEffects } from '../order-refund-ga
 // Mock dependencies transitively pulled in by order.service.ts. Mirrors the
 // mock shape in tests/unit/order.test.ts (kept minimal here — this file only
 // exercises `applyRefundEffects`, not the rest of OrderService).
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     order: {
       findFirst: vi.fn(),
@@ -69,7 +69,7 @@ vi.mock('../../lib/public-cache', () => ({
   invalidateCustomersCache: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { inngest } from '../../lib/inngest/client';
 import { affiliateService } from '../affiliate.service';
 import { LoyaltyService } from '../loyalty.service';

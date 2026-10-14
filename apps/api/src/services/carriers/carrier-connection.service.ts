@@ -16,7 +16,7 @@ import {
   missingRequiredFields,
   type CredentialMode,
   type ProviderCatalogEntry,
-} from '@force/shared';
+} from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
 import { isProviderUsable } from '../payment-providers/provider-gate';
 import { mergeCredentialFields } from '../payment-providers/provider-connection.service';

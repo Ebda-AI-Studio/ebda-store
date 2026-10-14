@@ -1,5 +1,5 @@
-import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@force/database';
-import { csvField, minorToDecimalString, slugifyWithFallback } from '@force/shared';
+import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@ebda/database';
+import { csvField, minorToDecimalString, slugifyWithFallback } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { recordSlugRedirect } from './slug-redirect.service';
 import { assertWithinLimit } from './plan-limit.service';
@@ -1295,7 +1295,7 @@ export class BulkService {
 
   // Helper methods
   // CSV field escaping (formula-injection safe) uses the shared `csvField` from
-  // @force/shared — single canonical implementation across every exporter.
+  // @ebda/shared — single canonical implementation across every exporter.
 
   /**
    * Split raw CSV text into records, honoring quoted fields that may span

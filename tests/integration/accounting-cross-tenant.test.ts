@@ -20,7 +20,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import { createAdjustment } from '../../apps/api/src/services/accounting/stock-adjustment.service';
 import { createPurchaseOrder } from '../../apps/api/src/services/accounting/purchase-order.service';
 

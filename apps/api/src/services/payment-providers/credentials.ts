@@ -7,7 +7,7 @@
  *
  *     { "sandbox": { "<catalog field key>": "<value>", ... }, "live": { ... } }
  *
- * The field keys are the catalog's (`PROVIDER_CATALOG` in @force/shared), so a provider with any
+ * The field keys are the catalog's (`PROVIDER_CATALOG` in @ebda/shared), so a provider with any
  * number of secrets fits, and sandbox and live keys are kept apart: switching mode never sends a
  * test key to a live host. `payment_configs.test_mode` picks the active set.
  *
@@ -23,7 +23,7 @@
  * secrets and stay in the `settings` JSON column; per-mode non-secret values (Paymob public key and
  * integration ids) live in the blob because they differ between sandbox and live.
  */
-import { getProviderEntry, type CredentialMode, type ProviderCatalogEntry } from '@force/shared';
+import { getProviderEntry, type CredentialMode, type ProviderCatalogEntry } from '@ebda/shared';
 import { encryption } from '../encryption.service';
 import type { ProviderCredentials, ProviderMode } from './types';
 

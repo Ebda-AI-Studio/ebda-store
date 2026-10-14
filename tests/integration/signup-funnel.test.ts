@@ -30,7 +30,7 @@ import {
   createPrismaClient,
   runWithRequestDb,
   runInStoreScope,
-} from '@force/database';
+} from '@ebda/database';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import {
   StubBillingProvider,

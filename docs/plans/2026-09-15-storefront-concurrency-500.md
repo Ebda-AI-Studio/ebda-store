@@ -21,7 +21,7 @@ FWB does not have that shape:
 
 | Surface                   | Runtime                                                      | Prisma?                                                           | Evidence                                                                                 |
 | ------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `store.force-ai.co` (web) | Cloudflare Worker `force-web-cf-preview`                     | **none**                                                          | `grep @force/database\|@prisma apps/web` → no imports; data comes over HTTP from the API |
+| `store.force-ai.co` (web) | Cloudflare Worker `force-web-cf-preview`                     | **none**                                                          | `grep @ebda/database\|@prisma apps/web` → no imports; data comes over HTTP from the API |
 | `api.force-ai.co`         | Railway, Node (`x-railway-*` headers, deployment `d65adc78`) | `prisma-client-js` 6.19 native engine, **module-scope singleton** | `packages/database/src/index.ts` (`globalForPrisma.prisma ?? new PrismaClient(...)`)     |
 
 API logs for 06:50–07:15Z hold **6 error lines, all one Axiom ingest error** (dataset column limit),

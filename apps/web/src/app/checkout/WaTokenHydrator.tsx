@@ -38,7 +38,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCart } from '../../contexts/CartContext';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
 import { classifyBundleCartError, bundleCartErrorCopy } from '../../lib/bundle-cart-errors';

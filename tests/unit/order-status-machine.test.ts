@@ -20,7 +20,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     order: {
       findMany: vi.fn(),

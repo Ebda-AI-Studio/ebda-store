@@ -4,7 +4,7 @@
  */
 
 import crypto from 'crypto';
-import { prisma, runInStoreScope } from '@force/database';
+import { prisma, runInStoreScope } from '@ebda/database';
 import { redis } from './redis.service';
 import { smsService, SmsConfig } from './sms.service';
 import { withCircuitBreaker, circuitBreaker } from './circuit-breaker.service';

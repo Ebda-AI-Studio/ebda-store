@@ -26,7 +26,7 @@
  * card tester.
  */
 import { ipKeyGenerator } from 'express-rate-limit';
-import { prisma, withStore } from '@force/database';
+import { prisma, withStore } from '@ebda/database';
 import { abuseConfig } from '../lib/abuse-config';
 import logger from '../lib/logger';
 import { AppError } from '../middleware/error-handler';

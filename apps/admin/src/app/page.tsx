@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { AdminLayout } from '../components/AdminLayout';
 import { apiGet } from '../lib/api';
 import { useStore } from '../contexts/StoreContext';

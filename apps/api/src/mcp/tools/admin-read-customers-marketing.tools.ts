@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { runInTenantContext, type RfmSegment } from '@force/database';
+import { runInTenantContext, type RfmSegment } from '@ebda/database';
 import type { McpStore } from '../resolve-store';
 import { assertScope, MERCHANT_SCOPES } from '../merchant-auth';
 import { ok } from './tool-result';

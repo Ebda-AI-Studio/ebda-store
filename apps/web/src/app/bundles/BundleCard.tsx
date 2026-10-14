@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import type { PublicBundle } from '@/lib/api';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { useCart } from '../../contexts/CartContext';
@@ -13,7 +13,7 @@ import { pickBundleName } from '@/lib/bundle-locale';
 import { trackAddToCart } from '../../components/MarketingPixels';
 import { BundlePlaceholderIcon } from '../../components/BundleLine';
 
-import { fromMinor, REGION } from '@force/shared';
+import { fromMinor, REGION } from '@ebda/shared';
 interface BundleCardProps {
   bundle: PublicBundle;
 }
@@ -105,7 +105,7 @@ export function BundleCard({ bundle }: BundleCardProps) {
             )}
           </div>
           {/* #2198: the positioned z-10 layer is this WRAPPER, not the Button.
-              While adding, @force/ui's Button is `disabled` and its base class
+              While adding, @ebda/ui's Button is `disabled` and its base class
               carries `disabled:pointer-events-none`, so a z-10 BUTTON became
               transparent to hit-testing and the tap fell through to the
               stretched title link's `::after` overlay — navigating mid-add, the

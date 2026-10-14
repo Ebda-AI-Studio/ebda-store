@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { orderActionVisibility, refundViaProviderRemaining } from '@force/shared';
+import { orderActionVisibility, refundViaProviderRemaining } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { statusOptionsForRole } from '../../_components/types';
 import { PaymentLinkButton } from './PaymentLinkButton';
@@ -71,7 +71,7 @@ export function ActionFooter({
   // offers for a delivered order — the same contradiction #1947 fixed for
   // `cancelled`.
   const isFinal = transitions.length === 0;
-  // Money-action gating lives in @force/shared's orderActionVisibility,
+  // Money-action gating lives in @ebda/shared's orderActionVisibility,
   // shared with the orders PWA so the two surfaces cannot drift (#1908):
   //   - showMarkPaid: promoted out of the overflow on mobile — the PWA flow
   //     drops the merchant here from a "mark paid" deep link.

@@ -11,7 +11,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@force/shared": ["../../packages/shared/src"]
+      "@ebda/shared": ["../../packages/shared/src"]
     },
     "plugins": [
       {

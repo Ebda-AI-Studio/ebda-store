@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { API_BASE } from '../helpers/api-base';
 
 // One knob (TEST_API_URL) points the whole suite at one API, so a run cannot

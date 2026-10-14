@@ -1,4 +1,4 @@
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 /** Product name for a locale: "Ebda Store" / «ابدأ ستور» (BRAND.product, ruling PRODUCT-NAME-1). */
 export function productName(locale: string): string {

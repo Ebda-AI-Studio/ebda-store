@@ -16,7 +16,7 @@ import {
   normalizePhoneForStorage,
   orderAddressLines,
   taxInvoiceInfo,
-} from '@force/shared';
+} from '@ebda/shared';
 import {
   buildSaleLines,
   documentBalance,

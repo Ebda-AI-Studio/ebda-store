@@ -4,7 +4,7 @@
  *   target, provider card-setup capability, and the over-limit read-only gate.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { upgradePlanFor } from '@force/shared';
+import { upgradePlanFor } from '@ebda/shared';
 import { goLiveVerdict } from '@api/services/billing/go-live-gate';
 import { resolveTrialCardMode } from '@api/services/billing';
 import { StubBillingProvider } from '@api/services/billing/stub.provider';
@@ -277,7 +277,7 @@ describe('manual payment config', () => {
 
 // ── over-limit store is read-only for the merchant (requireStoreAccess) ──
 const db = vi.hoisted(() => ({ store: vi.fn() }));
-vi.mock('@force/database', async importOriginal => {
+vi.mock('@ebda/database', async importOriginal => {
   const real = await importOriginal<Record<string, unknown>>();
   return {
     ...real,

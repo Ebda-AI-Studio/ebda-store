@@ -1,6 +1,6 @@
 import type { InngestFunction } from 'inngest';
-import { withStore, withUser } from '@force/database';
-import { REGION } from '@force/shared';
+import { withStore, withUser } from '@ebda/database';
+import { REGION } from '@ebda/shared';
 import logger from '../../logger';
 import { inngest } from '../client';
 import {

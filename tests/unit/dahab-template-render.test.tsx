@@ -24,7 +24,7 @@ import {
   validateDefinitionSync,
   type PageDefinition,
   type TemplateId,
-} from '@force/shared';
+} from '@ebda/shared';
 import { STORES, PRODUCTS, CATEGORIES, TESTIMONIALS } from '../fixtures/builder/homepage-data';
 
 const ctx = vi.hoisted(() => ({

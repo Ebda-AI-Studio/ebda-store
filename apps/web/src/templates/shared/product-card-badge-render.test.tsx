@@ -19,7 +19,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { StoreLayoutSettings } from '@force/shared';
+import type { StoreLayoutSettings } from '@ebda/shared';
 
 // ── Module mocks ────────────────────────────────────────────────────────────
 // The cards reach the store + language through two context modules and

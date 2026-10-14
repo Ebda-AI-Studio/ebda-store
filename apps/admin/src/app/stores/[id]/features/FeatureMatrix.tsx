@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Button, Modal, useToast } from '@force/ui';
+import { Button, Modal, useToast } from '@ebda/ui';
 import { useLocale } from 'next-intl';
 import { apiGet, apiPut, apiDelete, apiPatch } from '@/lib/api';
 import {
@@ -14,7 +14,7 @@ import {
   type FeatureKey,
   type FeatureCategory,
   type FeatureDefinition,
-} from '@force/shared';
+} from '@ebda/shared';
 import { ToggleSwitch } from './_components/ToggleSwitch';
 import { useT } from '@/i18n/useT';
 import { useFeatures } from '@/hooks/useFeatures';

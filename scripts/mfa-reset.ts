@@ -15,7 +15,7 @@
  * Pair with a Telegram/email notification to the user that they have been
  * signed out and must re-enroll 2FA after logging back in.
  */
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 (async () => {
   const email = process.argv[2];

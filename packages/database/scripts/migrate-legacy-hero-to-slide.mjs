@@ -19,7 +19,7 @@
 //     and can build a proper slide in the Page Builder.
 //   - mode is set to 'single' (one slide = a banner, not a carousel).
 //
-// FIELD MAP (legacy column → HeroSlide field, per @force/shared store-layout.ts):
+// FIELD MAP (legacy column → HeroSlide field, per @ebda/shared store-layout.ts):
 //   heroImage      → image       (required)
 //   heroTitle      → headline
 //   heroTitleAr    → headlineAr
@@ -31,7 +31,7 @@
 //
 //   run: railway run node packages/database/scripts/migrate-legacy-hero-to-slide.mjs
 //   (DO NOT run against a remote DB without an explicit go-ahead + a fresh backup.)
-import { createPrismaClient } from '@force/database';
+import { createPrismaClient } from '@ebda/database';
 
 const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '', role: 'owner' });
 

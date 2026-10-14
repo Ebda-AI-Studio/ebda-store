@@ -8,7 +8,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPatch } from '@/lib/api';
 import { numericFieldValue, textFieldValue } from '@/lib/form-text';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Supplier {

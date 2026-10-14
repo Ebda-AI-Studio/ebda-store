@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import * as db from '@force/database';
+import * as db from '@ebda/database';
 
-describe('@force/database exports', () => {
+describe('@ebda/database exports', () => {
   it('exports the accounting enums', () => {
     expect(db.AccountType).toBeDefined();
     expect(db.JournalEntrySource).toBeDefined();

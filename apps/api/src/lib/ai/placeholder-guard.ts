@@ -28,10 +28,10 @@
  * re-run or author it by hand) is strictly better than publishing garbage.
  */
 
-import { isPlaceholderCopy } from '@force/shared';
+import { isPlaceholderCopy } from '@ebda/shared';
 
 /**
- * Pattern set lives in `@force/shared` (`builder/placeholder-copy.ts`) so the
+ * Pattern set lives in `@ebda/shared` (`builder/placeholder-copy.ts`) so the
  * editor PUBLISH gate and these AI write paths share one definition. Here,
  * unlike at publish, a missing/blank value is also unacceptable AI output.
  */

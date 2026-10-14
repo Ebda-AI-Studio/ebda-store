@@ -14,7 +14,7 @@ import {
   resolveLayoutSettings,
   validatePublishReadiness,
   type PageDefinition,
-} from '@force/shared';
+} from '@ebda/shared';
 import { isPlaceholderText } from '../../apps/api/src/lib/ai/placeholder-guard';
 
 describe('isPlaceholderCopy: true positives', () => {

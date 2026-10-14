@@ -20,7 +20,7 @@
  * deploys without the env var still build and run cleanly.
  */
 import * as Sentry from '@sentry/nextjs';
-import { isHostInjectedScriptEvent } from '@force/shared';
+import { isHostInjectedScriptEvent } from '@ebda/shared';
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN_ORDERS;
 
@@ -38,7 +38,7 @@ if (dsn) {
     ],
     environment: process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.NODE_ENV || 'development',
     // Errors thrown inside a script the host app injected (Chrome for iOS),
-    // not by our bundle — see @force/shared sentry-host-injected-filter.
+    // not by our bundle — see @ebda/shared sentry-host-injected-filter.
     beforeSend(event) {
       const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
       return isHostInjectedScriptEvent(event, ua) ? null : event;

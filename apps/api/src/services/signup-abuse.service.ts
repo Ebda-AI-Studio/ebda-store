@@ -10,7 +10,7 @@
  *                  `SIGNUP_MIN_FILL_MS`, with a missing / forged / expired /
  *                  already-used token is refused. The client cannot forge the
  *                  fill time because the server signs it.
- *   3. disposable domain - throwaway-mail blocklist (@force/shared), subdomains
+ *   3. disposable domain - throwaway-mail blocklist (@ebda/shared), subdomains
  *                  included.
  *   4. per-domain daily cap - brute-force farming through one custom domain.
  *                  Large consumer providers are exempt (per-IP limits cover them).
@@ -19,7 +19,7 @@
  * depends only on the request, never on the user table.
  */
 import crypto from 'crypto';
-import { emailDomain, isDisposableEmail } from '@force/shared';
+import { emailDomain, isDisposableEmail } from '@ebda/shared';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { abuseConfig } from '../lib/abuse-config';

@@ -25,7 +25,7 @@ import {
   TEMPLATE_FAMILIES,
   type PageDefinition,
   type TemplateId,
-} from '@force/shared';
+} from '@ebda/shared';
 
 const TEMPLATES: TemplateId[] = ['modern', 'classic', 'minimal', 'bold', 'elegant'];
 

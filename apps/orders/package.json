@@ -1,5 +1,5 @@
 {
-  "name": "@force/orders",
+  "name": "@ebda/orders",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",
@@ -12,7 +12,7 @@
     "clean": "rm -rf .next node_modules"
   },
   "dependencies": {
-    "@force/shared": "*",
+    "@ebda/shared": "*",
     "@sentry/nextjs": "^10.53.1",
     "next": "^16.3.8",
     "posthog-js": "^1.373.4",

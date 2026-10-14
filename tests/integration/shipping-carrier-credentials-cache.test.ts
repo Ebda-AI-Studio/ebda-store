@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { redis } from '../../apps/api/src/services/redis.service';
 import { shippingCarrierService } from '../../apps/api/src/services/shipping-carrier.service';
 import { decryptCarrierBlob } from '../../apps/api/src/services/carriers/carrier-credentials';

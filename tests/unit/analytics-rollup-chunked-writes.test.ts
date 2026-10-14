@@ -18,7 +18,7 @@ vi.mock('@api/lib/savepoint', () => ({
     return fn();
   },
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {},
   RfmSegment: {},
   withRlsBypass: vi.fn(),

@@ -23,7 +23,7 @@ const h = vi.hoisted(() => ({
   role: { current: 'store_admin' as string },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { user: { findFirst: h.userFindFirst } },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
 }));

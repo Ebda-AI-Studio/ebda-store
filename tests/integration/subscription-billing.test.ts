@@ -23,8 +23,8 @@ import crypto from 'crypto';
 import http from 'http';
 import type { AddressInfo } from 'net';
 import express from 'express';
-import { prisma, withRlsBypass } from '@force/database';
-import { planLimitsSchema } from '@force/shared';
+import { prisma, withRlsBypass } from '@ebda/database';
+import { planLimitsSchema } from '@ebda/shared';
 import {
   StubBillingProvider,
   setBillingProviderForTests,

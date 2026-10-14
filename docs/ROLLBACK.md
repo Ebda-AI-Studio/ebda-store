@@ -36,7 +36,7 @@ cd apps/api && npx wrangler rollback
 npx wrangler versions list && npx wrangler versions deploy <version-id>@100
 ```
 
-⚠️ Admin, storefront, orders and the API often need to be in lock-step (shared API contracts via `@force/shared`). Rolling one Worker back without the others can break SSR fetches or API calls. If in doubt, prefer path B (revert the code so all surfaces rebuild from the same commit).
+⚠️ Admin, storefront, orders and the API often need to be in lock-step (shared API contracts via `@ebda/shared`). Rolling one Worker back without the others can break SSR fetches or API calls. If in doubt, prefer path B (revert the code so all surfaces rebuild from the same commit).
 
 ### B. Git revert + push (~2–5 minutes, all platforms)
 

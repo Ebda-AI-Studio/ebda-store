@@ -1,11 +1,11 @@
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { EmailService } from '../../../services/email.service';
 import { signReviewToken } from '../../review-token';
 import logger from '../../logger';
 import type { InngestFunction } from 'inngest';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
-import { storeOrigin } from '@force/shared';
+import { storeOrigin } from '@ebda/shared';
 
 /**
  * Post-purchase review request — fires when an order transitions to

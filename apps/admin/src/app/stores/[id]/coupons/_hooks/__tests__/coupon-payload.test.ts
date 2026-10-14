@@ -8,7 +8,7 @@
  * (and its percentage cap) with no server-side guard.
  */
 import { describe, it, expect } from 'vitest';
-import { fromMinor } from '@force/shared';
+import { fromMinor } from '@ebda/shared';
 import { buildCouponPayload } from '../useCoupons';
 import type { CouponFormData } from '../../_components/types';
 

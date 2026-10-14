@@ -4,7 +4,7 @@
 
 **Goal:** Ship two related improvements: (1) brand-token + hex color picker that auto-fixes section text contrast at render and warns the merchant in admin, (2) merge the `/layout` + `/typography` admin pages into one unified `/page-builder` URL where each storefront section bundles all its Layout + Typography controls in storefront order.
 
-**Architecture:** Phase 1 adds five pure helpers in `@force/shared` (`resolveColor`, `pickReadableForeground`, `contrastRatio`, `parseColorToRgb`, `relativeLuminance`), updates the Zod schema to accept `'token:<name>'` strings alongside hex, wires storefront sections to set a `--section-fg` CSS custom property the auto-fixed text color cascades into, and rewrites the admin `ColorField` as an extracted component with a brand-token dropdown + hex fallback + `ColorContrastPreview` band. Phase 2 renames the route, extracts a `<ZoneEditor>` from the current typography page, distributes zones under their owning section cards, and ships 301 redirects from the old URLs.
+**Architecture:** Phase 1 adds five pure helpers in `@ebda/shared` (`resolveColor`, `pickReadableForeground`, `contrastRatio`, `parseColorToRgb`, `relativeLuminance`), updates the Zod schema to accept `'token:<name>'` strings alongside hex, wires storefront sections to set a `--section-fg` CSS custom property the auto-fixed text color cascades into, and rewrites the admin `ColorField` as an extracted component with a brand-token dropdown + hex fallback + `ColorContrastPreview` band. Phase 2 renames the route, extracts a `<ZoneEditor>` from the current typography page, distributes zones under their owning section cards, and ships 301 redirects from the old URLs.
 
 **Tech Stack:** TypeScript, Zod, React (Next.js 16 App Router for `apps/admin` + `apps/web`), Tailwind CSS, Prisma JSONB column (no migration), Vitest for the new color helpers.
 
@@ -518,7 +518,7 @@ Expected: all 20+ tests PASS (5 parse + 5 resolve + 5 pickReadable + 4 contrast 
 
 ---
 
-## Task 7: Export the helpers from `@force/shared`
+## Task 7: Export the helpers from `@ebda/shared`
 
 **Files:**
 
@@ -570,8 +570,8 @@ Read the current file to see the existing signature. Then replace its body with:
 
 ```ts
 import type { CSSProperties } from 'react';
-import { resolveColor, pickReadableForeground } from '@force/shared';
-import type { StoreTheme } from '@force/shared';
+import { resolveColor, pickReadableForeground } from '@ebda/shared';
+import type { StoreTheme } from '@ebda/shared';
 
 /**
  * Map a per-section bgColor (hex OR token:<name>) to an inline style object that
@@ -709,8 +709,8 @@ git commit -m "feat(web): section-scoped auto-fix of heading text contrast"
 ```tsx
 'use client';
 
-import { resolveColor, pickReadableForeground, contrastRatio } from '@force/shared';
-import type { StoreTheme } from '@force/shared';
+import { resolveColor, pickReadableForeground, contrastRatio } from '@ebda/shared';
+import type { StoreTheme } from '@ebda/shared';
 
 interface ColorContrastPreviewProps {
   /** Current ColorField value — hex, 'token:<name>', or empty. */
@@ -795,8 +795,8 @@ Expected: no output (no errors).
 'use client';
 
 import { ColorContrastPreview } from './ColorContrastPreview';
-import { COLOR_TOKENS } from '@force/shared';
-import type { StoreTheme } from '@force/shared';
+import { COLOR_TOKENS } from '@ebda/shared';
+import type { StoreTheme } from '@ebda/shared';
 
 interface ColorFieldProps {
   label: string;
@@ -1061,7 +1061,7 @@ Extended props (beyond the original typography page's inline editor) to support 
 ```tsx
 // apps/admin/src/components/ZoneEditor.tsx
 'use client';
-import type { ZoneOverride, StoreTheme } from '@force/shared';
+import type { ZoneOverride, StoreTheme } from '@ebda/shared';
 import { ColorField } from './ColorField';
 
 interface ZoneEditorProps {
@@ -1192,8 +1192,8 @@ Then add `typography: sectionTypographyOverride` to each of: `heroSchema`, `cate
 
 ```ts
 // apps/web/src/templates/shared/section-typography.ts
-import { resolveColor } from '@force/shared';
-import type { ZoneOverride, StoreTheme } from '@force/shared';
+import { resolveColor } from '@ebda/shared';
+import type { ZoneOverride, StoreTheme } from '@ebda/shared';
 
 export interface ResolvedZone {
   fontFamily?: string;
@@ -1683,7 +1683,7 @@ npx vitest run packages/shared/src/utils/color.test.ts 2>&1 | tail -10
 
 Expected: 25 tests pass (19 original + 6 new).
 
-- [ ] **Step 6: Re-export from `@force/shared`**
+- [ ] **Step 6: Re-export from `@ebda/shared`**
 
 In `packages/shared/src/utils/index.ts`, append to the existing re-exports:
 
@@ -1720,8 +1720,8 @@ Lands AFTER Task 14 (route rename) so we edit the new path.
 'use client';
 
 import { useState } from 'react';
-import { generateSectionPalette, COLOR_TOKENS } from '@force/shared';
-import type { StoreTheme, SectionKey, PaletteSeeds, SectionPaletteEntry } from '@force/shared';
+import { generateSectionPalette, COLOR_TOKENS } from '@ebda/shared';
+import type { StoreTheme, SectionKey, PaletteSeeds, SectionPaletteEntry } from '@ebda/shared';
 import { ColorField } from './ColorField';
 import { ColorContrastPreview } from './ColorContrastPreview';
 
@@ -1929,7 +1929,7 @@ In `apps/admin/src/app/stores/[id]/page-builder/page.tsx`, import the extracted 
 
 ```tsx
 import { ZoneEditor } from '../../../../components/ZoneEditor';
-import type { SectionTypographyOverride, ZoneOverride } from '@force/shared';
+import type { SectionTypographyOverride, ZoneOverride } from '@ebda/shared';
 ```
 
 - [ ] **Step 2: Add ZoneEditor blocks inside each existing section card with per-section binding**

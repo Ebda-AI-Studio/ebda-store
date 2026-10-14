@@ -28,7 +28,7 @@ const mockPaymentConfigFindFirst = vi.fn();
 // `data` payload into the same flat shape `auditLog()` used to receive so
 // `rowFor()` below is unaffected. `failed`/`payment.created` still go through
 // the mocked `auditLog()` unchanged.
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     paymentConfig: { findFirst: (...a: unknown[]) => mockPaymentConfigFindFirst(...a) },
     auditLog: {
@@ -252,7 +252,7 @@ describe('place_order (cod) — writes after the order commits', () => {
   });
 
   it('rolls the committed order back when the cod_pending Payment write fails', async () => {
-    const db = await import('@force/database');
+    const db = await import('@ebda/database');
     vi.mocked(db.withTenantContext).mockRejectedValueOnce(new Error('P2028 tx closed'));
     const tools = harness(registerOrderTools);
 
@@ -274,7 +274,7 @@ describe('place_order (cod) — writes after the order commits', () => {
   // left outside a tenant wrap — under ebda_app it would read no rows and do
   // nothing, stranding a pending, stock-taken order.
   it('runs the COD payment-failure rollback INSIDE its own tenant wrap', async () => {
-    const db = await import('@force/database');
+    const db = await import('@ebda/database');
     vi.mocked(db.withTenantContext).mockRejectedValueOnce(new Error('P2028 tx closed'));
     let depth = 0;
     let rollbackDepth = -1;
@@ -304,7 +304,7 @@ describe('place_order (cod) — writes after the order commits', () => {
   });
 
   it('returns the committed order (never agent.write.failed) when post-commit bookkeeping rejects', async () => {
-    const db = await import('@force/database');
+    const db = await import('@ebda/database');
     // 1st wrap = the order-create (issue 2059 tenant-scopes it); the 2nd is
     // the post-commit bookkeeping this case makes reject.
     vi.mocked(db.runInTenantContext)

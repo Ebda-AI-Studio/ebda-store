@@ -12,7 +12,7 @@ import {
   withStore,
   runInStoreScope,
   withMoneyTx,
-} from '@force/database';
+} from '@ebda/database';
 import { getShipmentStoreIdByTracking } from '../lib/definer';
 import { config as appConfig } from '../config';
 import {

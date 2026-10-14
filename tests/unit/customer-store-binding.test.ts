@@ -41,7 +41,7 @@ vi.mock('../../apps/api/src/utils/store-helpers', () => ({
   },
   getAuthUser: (req: Request) => req.user,
 }));
-vi.mock('@force/database', () => ({ prisma: {} }));
+vi.mock('@ebda/database', () => ({ prisma: {} }));
 
 const { authenticate, optionalAuthenticate } = await import('../../apps/api/src/middleware/auth');
 const { clearOriginStoreCache } = await import('../../apps/api/src/lib/customer-store-binding');

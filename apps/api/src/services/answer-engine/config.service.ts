@@ -24,7 +24,7 @@
  * `encryption.decrypt` on these rows, at the moment a provider is actually
  * constructed for a check run.
  */
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { encryption } from '../encryption.service';
 
 // The only two engines that carry a config row. Gemini uses the platform

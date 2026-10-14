@@ -7,13 +7,13 @@
  * build for CSV — guarantees the two outputs stay in sync.
  *
  * Column `numFmt` examples:
- *   '#,##0.00'   → EGP two-decimal amounts (use `excelMoneyFormat` from @force/shared)
+ *   '#,##0.00'   → EGP two-decimal amounts (use `excelMoneyFormat` from @ebda/shared)
  *   '@'          → force text cell (prevents Excel from mangling phone numbers)
  */
 import type ExcelJS from 'exceljs';
 import { loadExcelJS } from '../lazy-modules';
 import type { Response } from 'express';
-import { neutralizeFormula, describeListFilters, type ReportRange, BRAND } from '@force/shared';
+import { neutralizeFormula, describeListFilters, type ReportRange, BRAND } from '@ebda/shared';
 
 /**
  * Formula-injection guard, cell/row level — for routes that build an ExcelJS

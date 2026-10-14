@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { withUser } from '@force/database';
-import { TAX_PROFILE_STATUSES, taxReviewDecisionSchema } from '@force/shared';
+import { withUser } from '@ebda/database';
+import { TAX_PROFILE_STATUSES, taxReviewDecisionSchema } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { TaxProfileService } from '../services/tax-profile.service';

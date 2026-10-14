@@ -1,6 +1,6 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext, type OrderStatus } from '@force/database';
-import { groupOrderLinesForDisplay } from '@force/shared';
+import { prisma, runInTenantContext, type OrderStatus } from '@ebda/database';
+import { groupOrderLinesForDisplay } from '@ebda/shared';
 import { EmailService } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
 import { LoyaltyService } from '../../../services/loyalty.service';

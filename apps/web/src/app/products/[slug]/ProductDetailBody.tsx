@@ -5,7 +5,7 @@ import { API_URL } from '../../../lib/api';
 import { publicLayoutUrl } from '../../../lib/preview-draft';
 import { fetchSlugRedirect, storeRedirectUrl } from '../../../lib/slug-redirect';
 import { fetchPublicShippingZones } from '../../../lib/shipping-public';
-import { resolveLayoutSettings, type StoreLayoutSettings, fromMinor, REGION } from '@force/shared';
+import { resolveLayoutSettings, type StoreLayoutSettings, fromMinor, REGION } from '@ebda/shared';
 import { pickMetaDescription } from '../../../lib/seo/meta-description';
 import { buildOgImages } from '../../../lib/seo/og-images';
 import type { StorefrontLocale } from '../../../lib/seo/resolve-locale';

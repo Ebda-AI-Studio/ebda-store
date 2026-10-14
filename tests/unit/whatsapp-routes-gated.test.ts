@@ -15,8 +15,8 @@ import request from 'supertest';
 
 const { mockIsFeatureEnabled } = vi.hoisted(() => ({ mockIsFeatureEnabled: vi.fn() }));
 
-vi.mock('@force/database', async importOriginal => ({
-  ...(await importOriginal<typeof import('@force/database')>()),
+vi.mock('@ebda/database', async importOriginal => ({
+  ...(await importOriginal<typeof import('@ebda/database')>()),
   prisma: {},
   withStore: (_id: string, fn: (tx: unknown) => unknown) => fn({}),
   withMoneyTx: (_p: unknown, fn: (tx: unknown) => unknown) => fn({}),

@@ -1,4 +1,4 @@
-import { withStore, type Prisma } from '@force/database';
+import { withStore, type Prisma } from '@ebda/database';
 import { getOrderStoreId } from '../../../lib/definer';
 
 /**

@@ -41,7 +41,7 @@ vi.mock('../../apps/api/src/services/redis.service', () => ({
   },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { user: { findUnique: (...a: unknown[]) => findUnique(...(a as [])) } },
 }));
 

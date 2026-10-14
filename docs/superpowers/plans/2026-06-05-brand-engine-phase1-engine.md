@@ -4,9 +4,9 @@
 
 **Goal:** Build the keystone of the Brand Engine — a pure `deriveBrandRoles(theme)` that emits the storefront CSS vars with **contrast-guaranteed foregrounds** (stored value wins → wadyaljuz unchanged; missing/unreadable → derived via `pickReadableForeground`), and wire it into the per-store CSS emitter.
 
-**Architecture:** A pure function in `@force/shared` consumes a `StoreTheme` and returns the `--*` CSS-var map. The web app's `themeToCssVars` (in `StoreContext`) delegates to it. Stored foregrounds are preserved verbatim (so wadyaljuz is pixel-identical); only _missing_ foregrounds are derived for contrast. This is the safe foundation; later plans add the baseline config, demo reset, and admin UI (and, if approved after visual review, luminance-based role reassignment).
+**Architecture:** A pure function in `@ebda/shared` consumes a `StoreTheme` and returns the `--*` CSS-var map. The web app's `themeToCssVars` (in `StoreContext`) delegates to it. Stored foregrounds are preserved verbatim (so wadyaljuz is pixel-identical); only _missing_ foregrounds are derived for contrast. This is the safe foundation; later plans add the baseline config, demo reset, and admin UI (and, if approved after visual review, luminance-based role reassignment).
 
-**Tech Stack:** TypeScript, `@force/shared` (`resolveColor`, `pickReadableForeground`, `contrastRatio`), vitest. The spec lives at `docs/superpowers/specs/2026-06-05-brand-engine-design.md` (§3, §4, §7).
+**Tech Stack:** TypeScript, `@ebda/shared` (`resolveColor`, `pickReadableForeground`, `contrastRatio`), vitest. The spec lives at `docs/superpowers/specs/2026-06-05-brand-engine-design.md` (§3, §4, §7).
 
 **Scope note:** This is Phase 1 of a multi-plan feature. Phase 1 = the engine + emitter integration. It is independently shippable and de-risks the hard constraint (wadyaljuz must not move). Subsequent plans: baseline `DEFAULT_LAYOUT_SETTINGS`, demo reset, admin Brand UI, optional luminance role reassignment.
 
@@ -203,10 +203,10 @@ git commit -m "feat(shared): export deriveBrandRoles"
 
 - [ ] **Step 1: Delegate the 4 color/foreground pairs to the engine**
 
-In `themeToCssVars`, import `deriveBrandRoles` from `@force/shared` and spread its output OVER the existing map, so the primary/secondary/accent/card pairs come from the engine while every other var (background, muted, border, popover, destructive, success, warning, radius, font, bg-page, bg-section-alt) stays exactly as-is:
+In `themeToCssVars`, import `deriveBrandRoles` from `@ebda/shared` and spread its output OVER the existing map, so the primary/secondary/accent/card pairs come from the engine while every other var (background, muted, border, popover, destructive, success, warning, radius, font, bg-page, bg-section-alt) stays exactly as-is:
 
 ```ts
-import { deriveBrandRoles } from '@force/shared';
+import { deriveBrandRoles } from '@ebda/shared';
 
 function themeToCssVars(theme: StoreTheme): Record<string, string> {
   const bg = resolveBackgroundPreset(theme);
@@ -248,7 +248,7 @@ function themeToCssVars(theme: StoreTheme): Record<string, string> {
 - [ ] **Step 2: Typecheck the web app**
 
 Run: `npx tsc --noEmit -p apps/web/tsconfig.json`
-Expected: no new errors (the file already imports from `@force/shared`).
+Expected: no new errors (the file already imports from `@ebda/shared`).
 
 - [ ] **Step 3: Commit**
 

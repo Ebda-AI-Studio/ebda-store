@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { loyaltyAutomationService } from '@api/services/loyalty-automation.service';
 import { abandonedCartService } from '@api/services/abandoned-cart.service';
 const ownerUrl = process.env.CRON_TEST_OWNER_DATABASE_URL;

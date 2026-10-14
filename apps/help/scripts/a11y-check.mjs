@@ -3,7 +3,7 @@
 import { readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runA11y } from '@force/site-kit/gates/a11y';
+import { runA11y } from '@ebda/site-kit/gates/a11y';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const slugs = readdirSync(path.join(root, 'content', 'en'))

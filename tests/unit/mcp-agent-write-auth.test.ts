@@ -24,7 +24,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockStoreFindUnique = vi.fn();
 const mockIsFeatureEnabled = vi.fn();
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   const prisma = {
     storeCredential: { findUnique: (...a: unknown[]) => mockStoreFindUnique(...a) },
   };

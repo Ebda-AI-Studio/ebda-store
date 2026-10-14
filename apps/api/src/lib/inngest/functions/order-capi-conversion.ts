@@ -27,8 +27,8 @@
  */
 
 import type { InngestFunction } from 'inngest';
-import { storefrontOrigin } from '@force/shared';
-import { prisma, runInTenantContext } from '@force/database';
+import { storefrontOrigin } from '@ebda/shared';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
 import {

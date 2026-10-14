@@ -298,7 +298,7 @@ they bypass any client-side sanitization and render as stored XSS on the storefr
 
 1. **Every `*Link` / `*Url` field in Zod schemas that is rendered in an `<a href>` on
    the storefront MUST validate the URL scheme** using a shared helper (e.g. `isAllowedUrl()`
-   from `@force/shared`).
+   from `@ebda/shared`).
 2. The validation must live on the **server** (API Zod schema), not only on the client.
    Client-side validation is defence-in-depth; the API is the trust boundary.
 3. **`heroCtaLink` was the first confirmed case** — it accepted `javascript:alert(1)` and

@@ -127,7 +127,7 @@ async function resetPrismaSingleton(): Promise<void> {
   if (process.env.DATABASE_URL) {
     // Imported here, not at module load: unit test files share this setup file and
     // must not load the real database package (many of them mock it).
-    const { createPrismaClient } = await import('@force/database');
+    const { createPrismaClient } = await import('@ebda/database');
     g.prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL, role: 'owner' });
   }
 }

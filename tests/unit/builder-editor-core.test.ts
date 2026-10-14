@@ -1,5 +1,5 @@
 /**
- * Visual builder Phase 2 — the pure editor core in @force/shared:
+ * Visual builder Phase 2 — the pure editor core in @ebda/shared:
  * document reducer (every action + registry invariants), undo/redo history
  * (cap, redo cleared, coalescing), the ebda-builder:v1 postMessage protocol
  * (origin/source/schema gate), the two document-only sections
@@ -28,7 +28,7 @@ import {
   TEMPLATE_FAMILIES,
   sectionFromPreset,
   type PageDefinition,
-} from '@force/shared';
+} from '@ebda/shared';
 import { loadLayoutFixture } from '../fixtures/builder/homepage-data';
 
 const base = (): PageDefinition =>

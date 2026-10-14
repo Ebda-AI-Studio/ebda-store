@@ -6,7 +6,7 @@
 
 **Architecture:** One generic per-store `SlugRedirect` table. A shared `recordSlugRedirect` helper (chain-collapse + reuse-guard) is called inside each slug-change chokepoint in the same transaction as the entity write. A `resolveSlugRedirect` helper + public endpoint is called by each storefront route only on a lookup miss, emitting `permanentRedirect` (308) on hit and `notFound()` (real 404) on miss — the latter also fixes the existing soft-404.
 
-**Tech Stack:** Prisma + Neon Postgres; Express+TS API (`apps/api`); Next.js 16 App Router web (`apps/web`); Zod (`@force/shared`); Jest.
+**Tech Stack:** Prisma + Neon Postgres; Express+TS API (`apps/api`); Next.js 16 App Router web (`apps/web`); Zod (`@ebda/shared`); Jest.
 
 ## Global Constraints
 
@@ -112,7 +112,7 @@ git commit -m "feat(db): add SlugRedirect table for renamed-handle 301s"
 - [ ] **Step 1: Write failing unit tests**
 
 ```ts
-import { PrismaClient, SlugEntityType } from '@force/database';
+import { PrismaClient, SlugEntityType } from '@ebda/database';
 import { recordSlugRedirect } from '../slug-redirect.service';
 
 // Uses the integration test DB per repo convention; adapt the harness import
@@ -189,7 +189,7 @@ Expected: FAIL — `recordSlugRedirect` not found.
 - [ ] **Step 3: Implement the helper**
 
 ```ts
-import { Prisma, SlugEntityType } from '@force/database';
+import { Prisma, SlugEntityType } from '@ebda/database';
 
 /**
  * Record a slug rename so the old URL 301s to the new one.

@@ -3,9 +3,9 @@
 import React from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import type { TrustStripSettings, TrustStripItem } from '@force/shared';
+import type { TrustStripSettings, TrustStripItem } from '@ebda/shared';
 import { BadgeGlyph } from '../dahab/ui';
-import { resolveColor, pickReadableForeground } from '@force/shared';
+import { resolveColor, pickReadableForeground } from '@ebda/shared';
 import { sectionSpacingClasses } from './section-spacing';
 import { sectionBgStyle } from './section-bg';
 

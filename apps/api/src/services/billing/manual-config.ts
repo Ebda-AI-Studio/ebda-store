@@ -3,7 +3,7 @@
  * (docs/ENVIRONMENT.md). Unset handle = the InstaPay option is not offered and
  * choosing it is refused (fail closed: never show a merchant an empty handle).
  */
-import { BRAND, normalizeEgyptianMobile } from '@force/shared';
+import { BRAND, normalizeEgyptianMobile } from '@ebda/shared';
 
 export function instapayHandle(
   env: Record<string, string | undefined> = process.env

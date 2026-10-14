@@ -18,7 +18,7 @@
  * Boots a minimal Express app mounting only `payment-abandonments.routes`
  * with the auth chain stubbed out, the same pattern as
  * `tests/unit/agent-credential-route.test.ts`. Only Prisma
- * (`@force/database`, including `runInTenantContext`), `authenticate`,
+ * (`@ebda/database`, including `runInTenantContext`), `authenticate`,
  * `authorize`, `requireStoreAccess` and `requireFeature` are mocked; the
  * masking helpers and response shaping run for real.
  */
@@ -39,7 +39,7 @@ const { mockPrisma, mockRequireFeatureState } = vi.hoisted(() => ({
   mockRequireFeatureState: { mode: 'enabled' as 'enabled' | 'disabled' | 'error' },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
 }));

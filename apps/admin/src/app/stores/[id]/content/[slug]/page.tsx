@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useToast } from '@force/ui';
-import { recommendedSizeText } from '@force/shared';
+import { useToast } from '@ebda/ui';
+import { recommendedSizeText } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { Toggle } from '../../../../../components/Toggle';

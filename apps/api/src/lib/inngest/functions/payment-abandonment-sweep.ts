@@ -1,12 +1,12 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
 import { OneSignalService } from '../../../services/onesignal.service';
 import { sweepAcrossStores } from '../../cross-store';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 /**
  * Payment-gateway abandonment sweep — runs every 30 min (Enterprise only).
  *

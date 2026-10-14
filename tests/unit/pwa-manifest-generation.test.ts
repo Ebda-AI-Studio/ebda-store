@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const findUniqueMock = vi.fn();
 const isFeatureEnabledMock = vi.fn();
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mod: Record<string, any> = {
     prisma: { store: { findUnique: findUniqueMock, update: vi.fn() } },

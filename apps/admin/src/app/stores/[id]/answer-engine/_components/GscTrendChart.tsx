@@ -2,7 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import { formatPercent, formatPosition, type GscTrendPoint } from './types';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 interface GscTrendChartProps {
   trend: GscTrendPoint[];

@@ -6,7 +6,7 @@
  * without builder routes yields `null` so Save falls back to the legacy PUT.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { layoutToDefinition, resolveLayoutSettings } from '@force/shared';
+import { layoutToDefinition, resolveLayoutSettings } from '@ebda/shared';
 
 const api = vi.hoisted(() => ({ apiGet: vi.fn(), apiPut: vi.fn(), apiPost: vi.fn() }));
 vi.mock('../../apps/admin/src/lib/api', () => api);
@@ -21,7 +21,7 @@ describe('admin page-builder save via draft + publish', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('keeps document-only sections (image-text) the new builder added', async () => {
-    const { reduceDocument } = await import('@force/shared');
+    const { reduceDocument } = await import('@ebda/shared');
     const withImage = reduceDocument(layoutToDefinition(LAYOUT), {
       type: 'addSection',
       list: 'template',

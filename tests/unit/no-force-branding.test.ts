@@ -202,7 +202,7 @@ describe('no inherited third-party branding in shipped sources', () => {
     }
     expect(
       offenders,
-      'Inherited branding found. Use BRAND from @force/shared (packages/shared/src/brand) and neutral demo data (EGP, +20).'
+      'Inherited branding found. Use BRAND from @ebda/shared (packages/shared/src/brand) and neutral demo data (EGP, +20).'
     ).toEqual([]);
   });
 

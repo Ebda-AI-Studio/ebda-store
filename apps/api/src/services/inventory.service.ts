@@ -1,11 +1,11 @@
-import { prisma, Prisma, InventoryChangeType, withStore } from '@force/database';
+import { prisma, Prisma, InventoryChangeType, withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { WarehouseService } from './warehouse.service';
 import { ON_HAND_SQL, STOCK_VALUE_SQL } from '../lib/effective-inventory-sql';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
-import { storefrontOrigin } from '@force/shared';
+import { storefrontOrigin } from '@ebda/shared';
 
 interface InventoryAdjustment {
   productId: string;

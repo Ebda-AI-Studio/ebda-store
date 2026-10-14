@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { composeStoreTheme } from '@force/shared';
+import { composeStoreTheme } from '@ebda/shared';
 
 // Render the real RootLayout against a look store and a legacy store.
 let current: Record<string, unknown>;
@@ -18,7 +18,7 @@ const { Pass, Null } = vi.hoisted(() => ({
   Pass: ({ children }: { children?: unknown }) => children ?? null,
   Null: () => null,
 }));
-vi.mock('@force/ui', () => ({ ToastProvider: Pass }));
+vi.mock('@ebda/ui', () => ({ ToastProvider: Pass }));
 vi.mock('../../apps/web/src/contexts/LanguageContext', () => ({ LanguageProvider: Pass }));
 vi.mock('../../apps/web/src/contexts/StoreContext', () => ({ StoreProvider: Pass }));
 vi.mock('../../apps/web/src/contexts/CartContext', () => ({ CartProvider: Pass }));

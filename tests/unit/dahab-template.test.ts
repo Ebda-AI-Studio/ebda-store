@@ -21,7 +21,7 @@ import {
   validateDefinition,
   validateDefinitionSync,
   type PageDefinition,
-} from '@force/shared';
+} from '@ebda/shared';
 
 const NEW_TYPES = ['featured-collection', 'collection-list', 'product-spotlight', 'trust-badges'];
 

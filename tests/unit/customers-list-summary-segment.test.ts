@@ -20,8 +20,8 @@ const h = vi.hoisted(() => ({
   caller: { role: 'store_admin' as string, userId: 'admin-a' },
 }));
 
-vi.mock('@force/database', async importOriginal => {
-  const actual = await importOriginal<typeof import('@force/database')>();
+vi.mock('@ebda/database', async importOriginal => {
+  const actual = await importOriginal<typeof import('@ebda/database')>();
   return {
     ...actual,
     prisma: {

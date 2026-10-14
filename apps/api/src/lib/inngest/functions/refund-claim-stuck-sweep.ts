@@ -1,4 +1,4 @@
-import { prisma, acrossStores } from '@force/database';
+import { prisma, acrossStores } from '@ebda/database';
 import logger from '../../logger';
 import { sendAlert } from '../../../services/alerts.service';
 import { redis } from '../../../services/redis.service';

@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@api/lib/runtime', () => ({ isWorkers: true }));
-vi.mock('@force/database', () => ({ prisma: {} }));
+vi.mock('@ebda/database', () => ({ prisma: {} }));
 vi.mock('@api/lib/definer', () => ({ getUserState: vi.fn() }));
 vi.mock('@api/services/redis.service', () => ({ redis: {} }));
 vi.mock('@api/lib/logger', () => ({

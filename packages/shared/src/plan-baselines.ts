@@ -17,7 +17,7 @@
 import type { FeatureKey } from './features';
 import type { StorePlan } from './types';
 
-// Re-export so callers can write `import { StorePlan } from '@force/shared/plan-baselines'`
+// Re-export so callers can write `import { StorePlan } from '@ebda/shared/plan-baselines'`
 // alongside PLAN_BASELINE in one line.
 export type { StorePlan };
 

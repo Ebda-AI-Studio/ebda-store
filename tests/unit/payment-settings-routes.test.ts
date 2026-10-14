@@ -63,7 +63,7 @@ const { mockPrisma, mockClearCache, mockAuditLog, currentUser, decryptSpy } = vi
   currentUser: { userId: 'admin-1', role: 'super_admin' as string, anonymous: false },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   // Type-only in the route file (`as PaymentProvider` / `: ProviderHealthStatus`
   // casts) — never dereferenced as a value at runtime, so undefined is fine.

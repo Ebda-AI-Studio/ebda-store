@@ -1,4 +1,4 @@
-import { validateStoreSlug, validateStoreSlugFormat } from '@force/shared';
+import { validateStoreSlug, validateStoreSlugFormat } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 
 /**

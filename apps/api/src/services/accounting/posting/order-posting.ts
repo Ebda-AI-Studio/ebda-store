@@ -1,4 +1,4 @@
-import { prisma, currentStoreId } from '@force/database';
+import { prisma, currentStoreId } from '@ebda/database';
 import type { Prisma } from '@prisma/client';
 import { getSystemAccountIdByCode } from '../account.service';
 import { postEntry } from '../journal.service';

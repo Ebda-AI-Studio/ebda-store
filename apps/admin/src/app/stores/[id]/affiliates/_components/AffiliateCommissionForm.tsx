@@ -4,7 +4,7 @@ import { useT } from '@/i18n/useT';
 import { minorToMajor } from '@/lib/format';
 import type { AffiliateConfig } from './types';
 
-import { roundToMinor } from '@force/shared';
+import { roundToMinor } from '@ebda/shared';
 interface AffiliateCommissionFormProps {
   config: AffiliateConfig;
   saving: boolean;

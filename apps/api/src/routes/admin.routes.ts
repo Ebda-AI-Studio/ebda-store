@@ -27,7 +27,7 @@ import {
   suggestManualPeriod,
 } from '../services/billing/account.service';
 import multer from 'multer';
-import { INSTAPAY_RECEIPT_MAX_BYTES, REGION, zonedLocalToUtc } from '@force/shared';
+import { INSTAPAY_RECEIPT_MAX_BYTES, REGION, zonedLocalToUtc } from '@ebda/shared';
 import { InstapayReceiptService } from '../services/payment-providers/instapay-receipt.service';
 import { config } from '../config';
 import logger from '../lib/logger';
@@ -50,7 +50,7 @@ import {
   ProductStatus,
   OrderStatus,
   OrderPaymentStatus,
-} from '@force/database';
+} from '@ebda/database';
 import {
   csvField,
   isValidTimeZone,
@@ -58,7 +58,7 @@ import {
   excelMoneyFormat,
   updatePlanSchema,
   assignSubscriptionSchema,
-} from '@force/shared';
+} from '@ebda/shared';
 import { userContext } from '../middleware/tenant-context';
 import { getEntityStoreId, lookupStore, platformAuditLogs, webhookInbox } from '../lib/definer';
 import { ownedStoreIds, pageAcrossStores } from '../lib/cross-store';
@@ -2063,7 +2063,7 @@ router.get(
 const EXPORT_CHUNK_SIZE = 250;
 
 // CSV field escaping (formula-injection safe) is the shared `csvField` from
-// @force/shared — single canonical implementation across every exporter.
+// @ebda/shared — single canonical implementation across every exporter.
 
 /**
  * GET /admin/export/orders

@@ -1,11 +1,11 @@
 import type { InngestFunction } from 'inngest';
-import { runInTenantContext, storeDirectory } from '@force/database';
+import { runInTenantContext, storeDirectory } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runProfitAnomalyScan } from '../../../services/accounting/profit-anomaly.service';
 import { featureService } from '../../../services/feature.service';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 /**
  * Daily profit anomaly scan — runs at 06:30 Egypt time (03:30 UTC).
  *

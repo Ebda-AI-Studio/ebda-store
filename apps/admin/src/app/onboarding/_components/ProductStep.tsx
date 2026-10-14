@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Input } from '@force/ui';
+import { Button, Input } from '@ebda/ui';
 import { ImageUpload } from '../../../components/ImageUpload';
 import { apiPost } from '../../../lib/api';
 import { egpToPiastres } from '../../../lib/onboarding-validation';

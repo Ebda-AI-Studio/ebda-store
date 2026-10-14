@@ -35,7 +35,7 @@
  *   npx tsx scripts/backfill-slug-redirects.ts --store <storeId|slug|domain> --apply
  */
 import { fileURLToPath } from 'node:url';
-import { prisma, SlugEntityType, withTenantContext } from '@force/database';
+import { prisma, SlugEntityType, withTenantContext } from '@ebda/database';
 import { BulkService } from '../apps/api/src/services/bulk.service';
 import { recordSlugRedirect } from '../apps/api/src/services/slug-redirect.service';
 

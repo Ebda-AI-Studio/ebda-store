@@ -1,11 +1,11 @@
-import { Prisma, prisma, type DbClient } from '@force/database';
+import { Prisma, prisma, type DbClient } from '@ebda/database';
 
 /**
  * SQL twin of `effectiveInventory` (lib/effective-inventory.ts), for queries
  * that must FILTER, SORT or AGGREGATE on stock rather than compute it in JS.
  *
  * Split from the TS helper on purpose: that module is imported by cart,
- * orders and several routes, and pulling `@force/database` into it forces
+ * orders and several routes, and pulling `@ebda/database` into it forces
  * every one of their unit-test mocks to stub `Prisma.sql`.
  *
  * Assumes the products table is aliased `p`. Keep this in lockstep with

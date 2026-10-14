@@ -104,7 +104,7 @@ bottom-nav focus shell, ≥44px touch targets, logical-property classes (`ms`/`m
 
 ### 8. Validation / security
 
-- Zod at every input edge (login form, status-update payload) — `@force/shared`
+- Zod at every input edge (login form, status-update payload) — `@ebda/shared`
   is available but to keep the PWA dependency surface minimal v1 validates the
   two inputs with small local Zod schemas.
 - No secret leakage: only `NEXT_PUBLIC_API_URL` (+ optional
@@ -117,7 +117,7 @@ bottom-nav focus shell, ≥44px touch targets, logical-property classes (`ms`/`m
 
 ```
 apps/orders/
-  package.json            # @force/orders, next dev -p 3002
+  package.json            # @ebda/orders, next dev -p 3002
   next.config.js          # standalone, headers/CSP, outputFileTracingRoot
   tailwind.config.js postcss.config.js tsconfig.json
   public/

@@ -22,7 +22,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { PageDefinition } from '@force/shared';
+import type { PageDefinition } from '@ebda/shared';
 
 const localeState = vi.hoisted(() => ({ value: 'en' }));
 

@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
-import { Badge } from '@force/ui';
+import { Badge } from '@ebda/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { DataTable, type DataTableColumn } from '../../components/mobile/DataTable';

@@ -28,7 +28,7 @@
  * cleanly when no real database is configured.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { CartService } from '@api/services/cart.service';
 import { OrderService } from '@api/services/order.service';
 import {

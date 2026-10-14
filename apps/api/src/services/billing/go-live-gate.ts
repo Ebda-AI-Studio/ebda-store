@@ -15,7 +15,7 @@
  *    that allows more than one store (Business) — that plan pays for it.
  * AND the store is within the owner's store allowance (oldest stores first).
  */
-import { withStore, withUser } from '@force/database';
+import { withStore, withUser } from '@ebda/database';
 import { AppError } from '../../middleware/error-handler';
 import { isGrantedPlan } from './period';
 import { resolveTrialCardMode, type TrialCardMode } from './index';

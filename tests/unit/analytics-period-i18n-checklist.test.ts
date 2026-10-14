@@ -10,7 +10,7 @@
  *
  * A parity check (en vs ar) would have passed: the keys were missing from
  * BOTH. So the checklist here is the ENUM (`ANALYTICS_PERIODS` from
- * @force/shared, the same list the API validates and the picker renders), and
+ * @ebda/shared, the same list the API validates and the picker renders), and
  * each id must resolve to a non-empty string in each locale. Same for the
  * sales-chart granularity labels (`analytics.chart.granularity.*`).
  *

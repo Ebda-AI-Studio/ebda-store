@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Modal, useToast } from '@force/ui';
+import { Button, Modal, useToast } from '@ebda/ui';
 import { apiPost } from '../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
-import { minorToDecimalString } from '@force/shared';
+import { minorToDecimalString } from '@ebda/shared';
 interface RefundButtonProps {
   storeId: string;
   orderId: string;

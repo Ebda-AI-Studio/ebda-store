@@ -20,7 +20,7 @@
  * session IDs and store IDs in headers.
  */
 
-import { isIosWebkit } from '@force/shared';
+import { isIosWebkit } from '@ebda/shared';
 
 export interface ApiResponse<T = unknown> {
   success: boolean;

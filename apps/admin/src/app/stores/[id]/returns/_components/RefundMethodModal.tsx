@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Modal } from '@force/ui';
+import { Button, Modal } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../lib/api';
 
-import { formatMoney } from '@force/shared';
+import { formatMoney } from '@ebda/shared';
 type RefundMethod = 'original' | 'store_credit' | 'bank_transfer' | 'manual';
 
 // 'manual' ("Already refunded — record only") is offered ONLY when a refund for

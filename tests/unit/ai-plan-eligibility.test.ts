@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PLAN_BASELINE, STORE_PLANS } from '@force/shared';
+import { PLAN_BASELINE, STORE_PLANS } from '@ebda/shared';
 import { isAiEligiblePlan } from '../../apps/api/src/lib/ai-plan-eligibility';
 
 describe('AI plan eligibility', () => {

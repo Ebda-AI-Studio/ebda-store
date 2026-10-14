@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { prisma, SlugEntityType } from '@force/database';
+import { prisma, SlugEntityType } from '@ebda/database';
 import {
   recordSlugRedirect,
   resolveSlugRedirect,

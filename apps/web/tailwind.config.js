@@ -2,7 +2,7 @@
 module.exports = {
   darkMode: 'class',
   content: ['./src/**/*.{js,ts,jsx,tsx,mdx}', '../../packages/ui/src/**/*.{js,ts,jsx,tsx}'],
-  // `text-gray-700` was emitted into this bundle only because @force/ui's Label
+  // `text-gray-700` was emitted into this bundle only because @ebda/ui's Label
   // used it (issue 2380 moved Label to `text-foreground`). Nothing in apps/web
   // renders Label, but merchant-authored HTML could carry the class, so it is
   // kept: the storefront stylesheet may only GROW from a shared-package change,
@@ -44,7 +44,7 @@ module.exports = {
           // Issue 2349 (owner option A, 2026-09-30) — readable message text. The
           // value is per store (`statusInkVars`, emitted with the theme); a store
           // with `theme.legacyBannerContrast` gets `var(--destructive)`, i.e. the
-          // SAME colour as DEFAULT, so its @force/ui form errors (`text-destructive-ink`,
+          // SAME colour as DEFAULT, so its @ebda/ui form errors (`text-destructive-ink`,
           // issue 2380) and message text stay pixel-identical.
           ink: 'hsl(var(--destructive-ink))',
         },

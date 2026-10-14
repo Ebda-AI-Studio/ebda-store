@@ -4,7 +4,7 @@ import { useT } from '@/i18n/useT';
 import { minorToMajor } from '@/lib/format';
 import type { AbandonedCartConfig } from './types';
 
-import { roundToMinor } from '@force/shared';
+import { roundToMinor } from '@ebda/shared';
 interface ToggleProps {
   checked: boolean;
   onChange: (val: boolean) => void;

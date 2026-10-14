@@ -19,7 +19,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import {
   resolveLayoutSettings,
@@ -35,7 +35,7 @@ import {
   type ZoneOverride,
   type SectionTypographyOverride,
   type ColorToken,
-} from '@force/shared';
+} from '@ebda/shared';
 
 // ---------------------------------------------------------------------------
 // Legacy color-format normalization
@@ -84,7 +84,7 @@ interface StoreInfo {
 }
 
 // Neutral fallback used by SectionPreview before the real theme loads from the
-// API. DEFAULT_THEME from @force/shared is the platform neutral; any token
+// API. DEFAULT_THEME from @ebda/shared is the platform neutral; any token
 // resolution will produce sensible greys + white until storeInfo arrives.
 const FALLBACK_THEME: StoreTheme = DEFAULT_THEME;
 
@@ -125,7 +125,7 @@ export default function StoreLayoutPage() {
   // Preview was made mobile-only by Ahmad 2026-06-22 ("remove the desktop
   // preview, only mobile is great"). SUPERSEDED by Ruling BUILDER-PREVIEW-1
   // (Ahmad 2026-10-07): the builder previews desktop + tablet + mobile
-  // (VIEWPORT_RANGES in @force/shared: 1280 / 820 / 390). The three-way switcher
+  // (VIEWPORT_RANGES in @ebda/shared: 1280 / 820 / 390). The three-way switcher
   // ships with the new editor (Phase 2); this legacy page keeps its look in
   // Phase 1, pinned to a true phone width (390px) so the mobile hero renders
   // un-cropped.
@@ -2174,7 +2174,7 @@ export default function StoreLayoutPage() {
                   onClick={() =>
                     setLayout(prev => {
                       if (!prev) return prev;
-                      const next: import('@force/shared').ExtraCarouselSettings = {
+                      const next: import('@ebda/shared').ExtraCarouselSettings = {
                         id:
                           typeof crypto !== 'undefined' && 'randomUUID' in crypto
                             ? crypto.randomUUID()
@@ -2375,7 +2375,7 @@ export default function StoreLayoutPage() {
                                       ...(prev.productCardDefaults ?? {}),
                                       cardImageAspect:
                                         (e.target
-                                          .value as import('@force/shared').CardImageAspect) ||
+                                          .value as import('@ebda/shared').CardImageAspect) ||
                                         undefined,
                                     },
                                   }
@@ -2409,7 +2409,7 @@ export default function StoreLayoutPage() {
                                       ...(prev.productCardDefaults ?? {}),
                                       cardImageRadius:
                                         (e.target
-                                          .value as import('@force/shared').CardImageRadius) ||
+                                          .value as import('@ebda/shared').CardImageRadius) ||
                                         undefined,
                                     },
                                   }
@@ -3878,7 +3878,7 @@ type KickerSubtitleValues = {
   /** @deprecated 2026-05-20 — use `dividers.subtitle.enabled`. Still read as fallback. */
   showSubtitleLines?: boolean;
   /** Per-section divider slots (above / kicker / title / subtitle / belowHeading). */
-  dividers?: import('@force/shared').SectionDividers;
+  dividers?: import('@ebda/shared').SectionDividers;
 };
 
 function KickerSubtitleControls({
@@ -3895,7 +3895,7 @@ function KickerSubtitleControls({
   /** Pass-through to the embedded SectionDividersBlock so its custom-color
    *  ColorField can resolve brand tokens. Optional — falls back to a hex-only
    *  picker when omitted. */
-  theme?: import('@force/shared').StoreTheme;
+  theme?: import('@ebda/shared').StoreTheme;
 }) {
   const t = useT('orders.layout');
   return (
@@ -3976,7 +3976,7 @@ function KickerSubtitleControls({
 // ---------------------------------------------------------------------------
 // All sections that participate in the homepage order. Hero is included so
 // merchants who want to anchor a banner at a non-default position can do so.
-// Stays in sync with the SectionOrder enum in @force/shared StoreLayoutSettings.
+// Stays in sync with the SectionOrder enum in @ebda/shared StoreLayoutSettings.
 type SectionKey =
   | 'hero'
   | 'categories'
@@ -4701,13 +4701,13 @@ function ExtraCarouselCard({
   theme,
 }: {
   storeId: string;
-  extra: import('@force/shared').ExtraCarouselSettings;
+  extra: import('@ebda/shared').ExtraCarouselSettings;
   index: number;
   total: number;
-  onPatch: (patch: Partial<import('@force/shared').ExtraCarouselSettings>) => void;
+  onPatch: (patch: Partial<import('@ebda/shared').ExtraCarouselSettings>) => void;
   onDelete: () => void;
   onMove: (delta: -1 | 1) => void;
-  theme: import('@force/shared').StoreTheme;
+  theme: import('@ebda/shared').StoreTheme;
 }) {
   const t = useT('orders.layout');
   const enabled = extra.enabled !== false;
@@ -4782,7 +4782,7 @@ function ExtraCarouselCard({
               value={extra.productSource}
               onChange={e =>
                 onPatch({
-                  productSource: e.target.value as import('@force/shared').ExtraCarouselSource,
+                  productSource: e.target.value as import('@ebda/shared').ExtraCarouselSource,
                 })
               }
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -4958,32 +4958,32 @@ function ExtraSectionCard({
   label: string;
   description: string;
   settings:
-    | import('@force/shared').BrandStorySettings
-    | import('@force/shared').TrustStripSettings
-    | import('@force/shared').BlogCarouselSettings
-    | import('@force/shared').AnnouncementSectionSettings
-    | import('@force/shared').HeaderSettings
-    | import('@force/shared').FooterSettings
+    | import('@ebda/shared').BrandStorySettings
+    | import('@ebda/shared').TrustStripSettings
+    | import('@ebda/shared').BlogCarouselSettings
+    | import('@ebda/shared').AnnouncementSectionSettings
+    | import('@ebda/shared').HeaderSettings
+    | import('@ebda/shared').FooterSettings
     | undefined;
   legacyEnabled: boolean;
   onPatch: (
     patch: Partial<
-      import('@force/shared').BrandStorySettings &
-        import('@force/shared').TrustStripSettings &
-        import('@force/shared').BlogCarouselSettings &
-        import('@force/shared').AnnouncementSectionSettings &
-        import('@force/shared').HeaderSettings &
-        import('@force/shared').FooterSettings
+      import('@ebda/shared').BrandStorySettings &
+        import('@ebda/shared').TrustStripSettings &
+        import('@ebda/shared').BlogCarouselSettings &
+        import('@ebda/shared').AnnouncementSectionSettings &
+        import('@ebda/shared').HeaderSettings &
+        import('@ebda/shared').FooterSettings
     >
   ) => void;
-  theme: import('@force/shared').StoreTheme;
+  theme: import('@ebda/shared').StoreTheme;
   /** Optional list of platform-wide typography zone keys to expose inside
    *  this card. Used by Header (['beforeHeader','header','storeName']) and
    *  Footer (['footer','afterFooter']) — replaces the deleted
    *  platform-wide Header+Footer Typography card 2026-05-20. */
   typographyZones?: string[];
-  globalZones?: Record<string, import('@force/shared').ZoneOverride>;
-  onZonePatch?: (zoneKey: string, next: Partial<import('@force/shared').ZoneOverride>) => void;
+  globalZones?: Record<string, import('@ebda/shared').ZoneOverride>;
+  onZonePatch?: (zoneKey: string, next: Partial<import('@ebda/shared').ZoneOverride>) => void;
   onZoneReset?: (zoneKey: string) => void;
   /** Extra content rendered at the bottom of the card body — used to fold the
    *  Footer links editor into the same Footer card (one card, one Save). */
@@ -5022,7 +5022,7 @@ function ExtraSectionCard({
               </span>
               <select
                 value={
-                  (settings as import('@force/shared').TrustStripSettings | undefined)?.layout ??
+                  (settings as import('@ebda/shared').TrustStripSettings | undefined)?.layout ??
                   'horizontal'
                 }
                 onChange={e => onPatch({ layout: e.target.value as 'horizontal' | 'vertical' })}
@@ -5038,7 +5038,7 @@ function ExtraSectionCard({
               </span>
               <select
                 value={
-                  (settings as import('@force/shared').TrustStripSettings | undefined)?.size ?? 'md'
+                  (settings as import('@ebda/shared').TrustStripSettings | undefined)?.size ?? 'md'
                 }
                 onChange={e => onPatch({ size: e.target.value as 'sm' | 'md' | 'lg' })}
                 className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -5051,7 +5051,7 @@ function ExtraSectionCard({
             <ColorField
               label={t('extraSection.iconColorLabel')}
               value={
-                (settings as import('@force/shared').TrustStripSettings | undefined)?.iconColor
+                (settings as import('@ebda/shared').TrustStripSettings | undefined)?.iconColor
               }
               onChange={v => onPatch({ iconColor: v })}
               theme={theme}
@@ -5059,7 +5059,7 @@ function ExtraSectionCard({
             <ColorField
               label={t('extraSection.iconBgColorLabel')}
               value={
-                (settings as import('@force/shared').TrustStripSettings | undefined)?.iconBgColor
+                (settings as import('@ebda/shared').TrustStripSettings | undefined)?.iconBgColor
               }
               onChange={v => onPatch({ iconBgColor: v })}
               theme={theme}
@@ -5067,7 +5067,7 @@ function ExtraSectionCard({
             <ColorField
               label={t('extraSection.textColorLabel')}
               value={
-                (settings as import('@force/shared').TrustStripSettings | undefined)?.textColor
+                (settings as import('@ebda/shared').TrustStripSettings | undefined)?.textColor
               }
               onChange={v => onPatch({ textColor: v })}
               theme={theme}
@@ -5084,7 +5084,7 @@ function ExtraSectionCard({
               min={1}
               max={20}
               value={
-                (settings as import('@force/shared').BlogCarouselSettings | undefined)?.limit ?? 6
+                (settings as import('@ebda/shared').BlogCarouselSettings | undefined)?.limit ?? 6
               }
               onChange={e => onPatch({ limit: Number(e.target.value) || 6 })}
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm w-32"
@@ -5175,8 +5175,8 @@ function SectionPaddingMaxWidthBlock({
   values,
   onPatch,
 }: {
-  values: import('@force/shared').SectionPaddingMaxWidthVisibility | undefined;
-  onPatch: (patch: Partial<import('@force/shared').SectionPaddingMaxWidthVisibility>) => void;
+  values: import('@ebda/shared').SectionPaddingMaxWidthVisibility | undefined;
+  onPatch: (patch: Partial<import('@ebda/shared').SectionPaddingMaxWidthVisibility>) => void;
 }) {
   const t = useT('orders.layout');
   return (
@@ -5256,7 +5256,7 @@ function SectionDividersBlock({
    *  so the brand-token dropdown can resolve primary/accent/etc + show the
    *  contrast preview. Optional (pre-existing callsites without theme still
    *  work, just without contrast preview). */
-  theme?: import('@force/shared').StoreTheme;
+  theme?: import('@ebda/shared').StoreTheme;
 }) {
   const t = useT('orders.layout');
   const dividers = values.dividers ?? {};
@@ -5280,7 +5280,7 @@ function SectionDividersBlock({
         dividers.subtitle ??
         dividers.belowHeading)
       : undefined;
-    const styleSeed: Partial<import('@force/shared').DividerSettings> = styleSrc
+    const styleSeed: Partial<import('@ebda/shared').DividerSettings> = styleSrc
       ? {
           style: styleSrc.style,
           thickness: styleSrc.thickness,
@@ -5312,7 +5312,7 @@ function SectionDividersBlock({
   // every enabled slot in this section. Reads from above slot's styling as
   // the canonical source (falls back to next enabled slot, then defaults).
   // Writing fans out the change to ALL enabled slots so they stay in sync.
-  const styleSource: Partial<import('@force/shared').DividerSettings> =
+  const styleSource: Partial<import('@ebda/shared').DividerSettings> =
     dividers.above ??
     dividers.kicker ??
     dividers.title ??
@@ -5326,7 +5326,7 @@ function SectionDividersBlock({
   const sharedCustomColor = styleSource.customColor ?? '#cccccc';
   const sharedSpacing = styleSource.spacing ?? 'normal';
 
-  function patchSharedStyle(patch: Partial<import('@force/shared').DividerSettings>) {
+  function patchSharedStyle(patch: Partial<import('@ebda/shared').DividerSettings>) {
     const slots = ['above', 'kicker', 'title', 'subtitle', 'belowHeading'] as const;
     const next: typeof dividers = { ...dividers };
     for (const slot of slots) {

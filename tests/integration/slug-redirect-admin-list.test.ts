@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { prisma, SlugEntityType } from '@force/database';
+import { prisma, SlugEntityType } from '@ebda/database';
 import { listSlugRedirects } from '../../apps/api/src/services/slug-redirect.service';
 
 const OWNER_ID = '00000000-0000-0000-0000-000000000903';

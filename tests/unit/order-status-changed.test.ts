@@ -25,7 +25,7 @@ const h = vi.hoisted(() => ({
   runInTenant: vi.fn((_s: string, fn: () => unknown) => fn()),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     order: { findUnique: h.orderFindUnique, updateMany: h.orderUpdateMany },
     store: { findUnique: h.storeFindUnique },

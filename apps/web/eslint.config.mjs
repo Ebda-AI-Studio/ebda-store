@@ -56,14 +56,14 @@ export default [
         // Block inline <input>/<select>/<textarea> with text-sm or text-xs in
         // their className — iOS Safari force-zooms the viewport on focus
         // whenever a form input has computed font-size <16px and does not
-        // auto-unzoom. Use the shared @force/ui components OR explicit
+        // auto-unzoom. Use the shared @ebda/ui components OR explicit
         // `text-base sm:text-sm` so mobile starts at 16px.
         // Documented in ~/.claude/projects/-Users-ahmadsharaf/memory/feedback-mobile-form-text-base.md.
         {
           selector:
             "JSXOpeningElement[name.name=/^(input|textarea|select)$/] JSXAttribute[name.name='className'] Literal[value=/(^|\\s)text-(xs|sm)(\\s|$)/]",
           message:
-            'Inline <input>/<select>/<textarea> with text-sm or text-xs causes iOS Safari to auto-zoom on focus. Use the shared @force/ui Input/Select/Textarea components, OR explicit `text-base sm:text-sm` so mobile starts at 16px. See feedback-mobile-form-text-base in global memory.',
+            'Inline <input>/<select>/<textarea> with text-sm or text-xs causes iOS Safari to auto-zoom on focus. Use the shared @ebda/ui Input/Select/Textarea components, OR explicit `text-base sm:text-sm` so mobile starts at 16px. See feedback-mobile-form-text-base in global memory.',
         },
       ],
     },

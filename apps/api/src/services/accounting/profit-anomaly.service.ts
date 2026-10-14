@@ -23,7 +23,7 @@
  * the same (storeId, metric) in the last 24 hours.
  */
 
-import { prisma, AnomalyScope, AnomalyMetric, AnomalySeverity, withStore } from '@force/database';
+import { prisma, AnomalyScope, AnomalyMetric, AnomalySeverity, withStore } from '@ebda/database';
 import logger from '../../lib/logger';
 import { profitAndLoss } from './reports.service';
 import { callGemini } from './gemini-ai.service';

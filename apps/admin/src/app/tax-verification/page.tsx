@@ -12,15 +12,15 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button, Modal, ModalBody, ModalFooter, useToast } from '@force/ui';
-import type { TaxProfileStatusValue } from '@force/shared';
+import { Badge, Button, Modal, ModalBody, ModalFooter, useToast } from '@ebda/ui';
+import type { TaxProfileStatusValue } from '@ebda/shared';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { DataTable, type DataTableColumn } from '../../components/mobile/DataTable';
 import { apiGet, apiPost } from '../../lib/api';
 import { openProtectedDocument } from '../../lib/open-document';
 import { useT } from '../../i18n/useT';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 type Tab = 'pending' | 'verified' | 'rejected' | 'revoked' | 'all';
 const TABS: Tab[] = ['pending', 'verified', 'rejected', 'revoked', 'all'];

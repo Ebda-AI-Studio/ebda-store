@@ -1,4 +1,4 @@
-import type { DbClient } from '@force/database';
+import type { DbClient } from '@ebda/database';
 
 /**
  * orderEvent.toStatus written by `cancelBackorder` in the SAME transaction

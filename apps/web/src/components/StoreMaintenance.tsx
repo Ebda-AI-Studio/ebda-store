@@ -3,9 +3,9 @@
 import Image from 'next/image';
 import { useStore } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { BRAND_MARKETING_URL, BRAND } from '@force/shared';
+import { BRAND_MARKETING_URL, BRAND } from '@ebda/shared';
 
-import { normalizeEgyptianMobile } from '@force/shared';
+import { normalizeEgyptianMobile } from '@ebda/shared';
 /**
  * Branded "we'll be back soon" page rendered when the resolved store has
  * `status === 'suspended'`. Replaces the normal storefront chrome on every

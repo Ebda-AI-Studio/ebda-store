@@ -3,10 +3,10 @@
 import ProductCard from './ProductCard';
 import type { ProductGridProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { cn } from '@force/ui';
+import { cn } from '@ebda/ui';
 import { NoProductsIcon } from '../shared/icons';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 /**
  * Modern Template - Product Grid
  *

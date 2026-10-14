@@ -908,7 +908,7 @@ jobs:
 
       - name: Build shared package
         # the proof now imports WalletService (erasure across stores), which
-        # pulls @force/shared; without its dist the test cannot even load
+        # pulls @ebda/shared; without its dist the test cannot even load
         run: npm run build -w packages/shared
 
       - name: Wait for PostgreSQL to be ready

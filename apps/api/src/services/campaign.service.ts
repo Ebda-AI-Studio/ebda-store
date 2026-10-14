@@ -1,5 +1,5 @@
-import { prisma } from '@force/database';
-import { isCampaignContentComplete, resolveDefaultLanguage, storefrontOrigin } from '@force/shared';
+import { prisma } from '@ebda/database';
+import { isCampaignContentComplete, resolveDefaultLanguage, storefrontOrigin } from '@ebda/shared';
 import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import { renderBrandedShell } from './email.service';
 import { storeBrandTheme } from '../lib/store-brand-theme';

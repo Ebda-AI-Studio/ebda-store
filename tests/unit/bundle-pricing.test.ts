@@ -5,7 +5,7 @@ import {
   isAllocatable,
   nearestAllocatablePrice,
   type BundleLine,
-} from '@force/shared';
+} from '@ebda/shared';
 
 // Ramadan Box: Dates 4.500 x1, Honey 6.000 x1, Nuts 2.000 x2 -> sum 14.500
 const BOX: BundleLine[] = [

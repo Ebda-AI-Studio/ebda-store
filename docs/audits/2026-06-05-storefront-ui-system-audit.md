@@ -136,7 +136,7 @@ Severity legend: **critical** = invisible/unreadable or brand-defining surface b
   - `bold/ProductCard.tsx:183` — name `text-base`
   - `modern/ProductCard.tsx:255` — name `text-sm`
 - **Wrong:** Each receives `cardSize` (line 44/45) but **none import or call** `getProductCardTextSizes`. They hardcode size, so the cardSize control does not scale them, and minimal/elegant ship 12px names — under the 16px floor. `PecannbeeProductCard` and `ProductCarousel` use the helper correctly, proving the platform standard.
-- **Fix (one batch, all 5 files):** import `getProductCardTextSizes` from `@force/shared`, call `const textSizes = getProductCardTextSizes(cardSize)`, and replace the hardcoded name size with `${textSizes.name}` (and price with `${textSizes.price}`). Keep each theme's flavor (weight/tracking/uppercase/family/color) untouched — only the size token moves to the helper. Example (classic): `className={\`font-serif ${textSizes.name} text-foreground mb-2 ...\`}`.
+- **Fix (one batch, all 5 files):** import `getProductCardTextSizes` from `@ebda/shared`, call `const textSizes = getProductCardTextSizes(cardSize)`, and replace the hardcoded name size with `${textSizes.name}` (and price with `${textSizes.price}`). Keep each theme's flavor (weight/tracking/uppercase/family/color) untouched — only the size token moves to the helper. Example (classic): `className={\`font-serif ${textSizes.name} text-foreground mb-2 ...\`}`.
 
 #### PC-2 — Theme ProductCards hardcode body padding instead of `textSizes.pad` · medium
 

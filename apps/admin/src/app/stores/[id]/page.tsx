@@ -2,8 +2,8 @@
 
 import { useCallback, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button, useToast } from '@force/ui';
-import { resolveDefaultLanguage } from '@force/shared';
+import { Button, useToast } from '@ebda/ui';
+import { resolveDefaultLanguage } from '@ebda/shared';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { useAuth } from '../../../lib/auth';
 import { apiDelete } from '../../../lib/api';

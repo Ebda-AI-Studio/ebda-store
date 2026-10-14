@@ -19,7 +19,7 @@ import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
 import { api } from '../../lib/api';
-import type { SectionPaddingMaxWidthVisibility } from '@force/shared';
+import type { SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 
 export interface NewsletterSettings extends SectionPaddingMaxWidthVisibility {
   heading?: string;

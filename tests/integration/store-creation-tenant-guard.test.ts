@@ -30,7 +30,7 @@ import crypto from 'crypto';
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import { prisma, withRlsBypass, createPrismaClient, runWithRequestDb } from '@force/database';
+import { prisma, withRlsBypass, createPrismaClient, runWithRequestDb } from '@ebda/database';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import merchantSignupRoutes from '@api/routes/merchant-signup.routes';
 import authRoutes from '@api/routes/auth.routes';

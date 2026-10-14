@@ -17,8 +17,8 @@ const h = vi.hoisted(() => ({
   caller: { userId: 'user-1', role: 'customer', impersonatedBy: undefined as string | undefined },
 }));
 
-vi.mock('@force/database', async importOriginal => {
-  const actual = await importOriginal<typeof import('@force/database')>();
+vi.mock('@ebda/database', async importOriginal => {
+  const actual = await importOriginal<typeof import('@ebda/database')>();
   return { ...actual, prisma: {} };
 });
 

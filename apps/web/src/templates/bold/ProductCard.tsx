@@ -24,9 +24,9 @@ import {
   fromMinor,
   REGION,
   storeNumerals,
-} from '@force/shared';
+} from '@ebda/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
-import { Price, ProductBadge, ProductBadgeGroup, cn } from '@force/ui';
+import { Price, ProductBadge, ProductBadgeGroup, cn } from '@ebda/ui';
 import { getDiscountBadgeText } from '../../lib/product-pricing';
 import { getDiscountBadgeColor } from '../shared/discount-badge';
 import {
@@ -43,7 +43,7 @@ import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/Product
  * Bold Template - Product Card
  *
  * High-energy streetwear aesthetic: dark borders, aggressive hover,
- * bright accent colors. Uses shared components from @force/ui.
+ * bright accent colors. Uses shared components from @ebda/ui.
  */
 function BoldProductCard({
   product,

@@ -7,8 +7,8 @@ import multer from 'multer';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { ShippingService } from '../services/shipping.service';
-import { prisma } from '@force/database';
-import { EGYPT_GOVERNORATES, minorToDecimalString, REGION, BRAND } from '@force/shared';
+import { prisma } from '@ebda/database';
+import { EGYPT_GOVERNORATES, minorToDecimalString, REGION, BRAND } from '@ebda/shared';
 import { parsePriceCell } from '../services/price-cell';
 import { tenantContext } from '../middleware/tenant-context';
 
@@ -563,7 +563,7 @@ function parseBool(value: unknown, fallback = true): boolean {
 }
 
 /**
- * Resolve a raw import row to a canonical area rate using the @force/shared
+ * Resolve a raw import row to a canonical area rate using the @ebda/shared
  * Egypt dataset. Matching is case-insensitive on the EN area name, and also
  * accepts the exact AR area name. If a `governorate` is supplied it must match
  * the resolved area's governorate (EN or AR, case-insensitive). Returns either

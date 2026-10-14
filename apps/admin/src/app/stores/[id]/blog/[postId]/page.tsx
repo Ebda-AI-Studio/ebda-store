@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { recommendedSizeText } from '@force/shared';
+import { recommendedSizeText } from '@ebda/shared';
 import { apiGet, apiPost, apiPut } from '../../../../../lib/api';
 import { ImageUpload } from '../../../../../components/ImageUpload';
 import { AdminLayout } from '../../../../../components/AdminLayout';

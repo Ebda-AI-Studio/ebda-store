@@ -18,7 +18,7 @@ import {
   overriddenLookKeys,
   type LookDefinition,
   type StoreTheme,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { ColorField } from '../../../../../components/ColorField';
 import { Toggle } from '../../../../../components/Toggle';

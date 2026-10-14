@@ -6,7 +6,7 @@ import { useOrderSummaryBase } from '../shared/useOrderSummaryBase';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { DahabPaymentMarks } from './Footer';
 import { DAHAB_BTN_PRIMARY, cx } from './ui';
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 
 export default function DahabOrderSummary({
   subtotal,

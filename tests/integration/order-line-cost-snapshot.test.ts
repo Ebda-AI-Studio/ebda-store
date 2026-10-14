@@ -11,7 +11,7 @@
  * Real Postgres; every fixture is per-test unique (retry-safe).
  */
 import { describe, it, expect } from 'vitest';
-import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
+import { prisma, runInTenantContext, withRlsBypass } from '@ebda/database';
 import { CartService } from '@api/services/cart.service';
 import { OrderService } from '@api/services/order.service';
 import { seedCoaForStore } from '@api/services/accounting/account.service';

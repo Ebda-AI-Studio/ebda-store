@@ -346,7 +346,7 @@ vi.mock('resend', () => ({
 
 const prismaUpdateMock = vi.fn();
 const prismaFindUniqueMock = vi.fn();
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     store: { update: prismaUpdateMock, findUnique: prismaFindUniqueMock },
   },
@@ -463,7 +463,7 @@ Create `apps/api/src/services/resend.service.ts`:
 
 ```ts
 import { Resend } from 'resend';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { config } from '../config';
 import logger from '../lib/logger';
 
@@ -1197,7 +1197,7 @@ Open `apps/api/src/services/email.service.ts`. The strategy: every public method
 Add at the top, near the imports:
 
 ```ts
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { ResendService } from './resend.service';
 ```
 

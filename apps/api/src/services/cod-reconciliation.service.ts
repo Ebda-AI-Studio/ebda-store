@@ -6,7 +6,7 @@
  * `lib/cod-reconciliation.ts`, so it can never go stale. Both methods run inside the caller's
  * store scope (the admin routes' tenant context).
  */
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import {
   parseSettlementCsv,

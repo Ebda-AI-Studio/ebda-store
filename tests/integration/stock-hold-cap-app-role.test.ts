@@ -1,7 +1,7 @@
 /** Atomic admission under the actual non-bypass runtime role, on local/CI Postgres. */
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createPrismaClient, prisma, runWithRequestDb, withStore } from '@force/database';
+import { createPrismaClient, prisma, runWithRequestDb, withStore } from '@ebda/database';
 import { assertStockHoldCapNotExceeded } from '@api/lib/stock-hold-cap';
 import { hasDb, seedBundleStore } from '../helpers/bundle-fixtures';
 

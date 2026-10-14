@@ -7,7 +7,7 @@
  * on the paths that call a carrier and would otherwise spend money before the
  * status machine is ever consulted.
  */
-import { UNFULFILLABLE_ORDER_STATUSES } from '@force/shared';
+import { UNFULFILLABLE_ORDER_STATUSES } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 
 export function isFulfillable(order: { status: string }): boolean {

@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mockStoreFindUniqueOrThrow = vi.fn();
 const mockBuildProductFeed = vi.fn(() => ({ products: [] }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     store: { findUniqueOrThrow: (...a: unknown[]) => mockStoreFindUniqueOrThrow(...a) },
   },

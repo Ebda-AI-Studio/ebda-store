@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Input, useToast } from '@force/ui';
+import { Button, Input, useToast } from '@ebda/ui';
 import { apiPut } from '../lib/api';
 import { useCurrentStore } from '../hooks/useCurrentStore';
 import { useT } from '@/i18n/useT';

@@ -2,7 +2,7 @@
 
 A **look** is a named design direction: colour roles, fonts, radius, density, image ratio and motion, plus a section mix for the home page. Every store has at most one (`stores.look`, nullable `TEXT`); a store with `look = null` is a legacy store and renders exactly as it did before looks existed (see "Legacy stores"). There are 15 looks, 3 per template (Rulings TPL-1, TPL-2, LOOKS-1..5 in `docs/RULINGS.md`).
 
-Looks are **data**, not code: they live in `@force/shared` (`packages/shared/src/looks/`) over the shared section registry and token set, and never fork commerce components (Ruling LOOKS-1).
+Looks are **data**, not code: they live in `@ebda/shared` (`packages/shared/src/looks/`) over the shared section registry and token set, and never fork commerce components (Ruling LOOKS-1).
 
 | File          | Owns                                                                                          |
 | ------------- | --------------------------------------------------------------------------------------------- |

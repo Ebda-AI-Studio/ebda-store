@@ -1,7 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
-import type { StoreTheme } from '@force/shared';
+import type { StoreTheme } from '@ebda/shared';
 import { ColorField } from '../../../../../components/ColorField';
 import { IOS_STATUS_OPTIONS, type PWASettings } from './types';
 

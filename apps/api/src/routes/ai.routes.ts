@@ -17,8 +17,8 @@ import { AppError } from '../middleware/error-handler';
 import { inngest } from '../lib/inngest/client';
 import { generateProductFaqs } from '../lib/ai/product-faq-generator';
 import { generateProductMetaAeo } from '../lib/ai/product-meta-aeo-generator';
-import { currentStoreId, prisma } from '@force/database';
-import { AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
+import { currentStoreId, prisma } from '@ebda/database';
+import { AI_AUTOFILL_FIELD_NAMES } from '@ebda/shared';
 import {
   fillProductFields,
   balanceProductLanguages,

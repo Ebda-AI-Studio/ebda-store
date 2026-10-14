@@ -22,7 +22,7 @@ const mockStore = {
   credentials: { metaAccessToken: 'encrypted-token-xyz' },
 };
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   // tests/setup-e2e.ts builds the owner-role fixture client from this export;
   // these suites never touch a database, so a stub is enough.
   createPrismaClient: vi.fn(),
@@ -55,7 +55,7 @@ vi.mock('@api/middleware/wa-bridge-auth', () => ({
 
 import express from 'express';
 import request from 'supertest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import wabridge from '@api/routes/wa-bridge.routes';
 
 const app = express();

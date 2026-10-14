@@ -22,7 +22,7 @@ vi.mock('../../lib/logger', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   const prisma = {
     store: {
       update: vi.fn().mockResolvedValue({

@@ -33,7 +33,7 @@ import {
   submitSubscriptionReceipt,
 } from '../services/billing/account.service';
 import multer from 'multer';
-import { INSTAPAY_RECEIPT_MAX_BYTES, instapayReceiptFieldsSchema } from '@force/shared';
+import { INSTAPAY_RECEIPT_MAX_BYTES, instapayReceiptFieldsSchema } from '@ebda/shared';
 import {
   InstapayReceiptService,
   toReceiptView,
@@ -42,7 +42,7 @@ import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
 import { auditLog } from '../middleware/security';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
-import { prisma, withStore } from '@force/database';
+import { prisma, withStore } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { getUsageSummary } from '../services/plan-limit.service';

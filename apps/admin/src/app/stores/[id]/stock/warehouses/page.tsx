@@ -7,7 +7,7 @@ import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
 import { textFieldValue, numericFieldValue } from '@/lib/form-text';
-import { Button, useToast } from '@force/ui';
+import { Button, useToast } from '@ebda/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

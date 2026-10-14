@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useT } from '@/i18n/useT';
-import { ANALYTICS_PERIOD_PRESETS } from '@force/shared';
+import { ANALYTICS_PERIOD_PRESETS } from '@ebda/shared';
 import type { Period, ResolvedDateRange } from '../app/stores/[id]/analytics/_components/types';
 import { resolveDateRange } from '../app/stores/[id]/analytics/_components/types';
 

@@ -1,12 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { INSTAPAY_DEFAULT_EXPIRY_HOURS, storefrontOrigin } from '@force/shared';
+import { INSTAPAY_DEFAULT_EXPIRY_HOURS, storefrontOrigin } from '@ebda/shared';
 import { z } from 'zod';
 import { CardTestingGuard } from '../services/card-testing-guard.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider, Currency } from '../services/payment-providers/types';
 import { authenticate, optionalAuthenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
-import { prisma, runInTenantContext, withStore } from '@force/database';
+import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import {
   paymentLimiter,
   auditLog,
@@ -35,7 +35,7 @@ import {
   REGION,
   codFeeForOrder,
   instapayReceiptFieldsSchema,
-} from '@force/shared';
+} from '@ebda/shared';
 import multer from 'multer';
 import { AppError } from '../middleware/error-handler';
 import { InstapayService, runPostCommit } from '../services/payment-providers/instapay.service';

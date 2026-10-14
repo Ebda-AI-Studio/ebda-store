@@ -1,5 +1,5 @@
 import { Fragment } from 'react';
-import { BRAND } from '@force/shared/brand';
+import { BRAND } from '@ebda/shared/brand';
 import { COPY, type Provider } from '../lib/content';
 import { egp } from '../lib/demo-stores';
 import { PLANS, PRICING_PLACEHOLDER, PRICING_PUBLISHED, comparisonRows } from '../lib/plans';

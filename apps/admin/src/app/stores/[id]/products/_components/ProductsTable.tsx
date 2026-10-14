@@ -3,7 +3,7 @@
 import { useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { formatPrice } from '../../../../../lib/format';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';

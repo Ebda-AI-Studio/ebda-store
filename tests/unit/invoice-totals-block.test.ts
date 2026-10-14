@@ -18,7 +18,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const findFirst = vi.fn();
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     fiscalDocument: { findMany: async () => [] }, // legacy order: no fiscal document (MONEYB-1)
     order: { findFirst: (...a: unknown[]) => findFirst(...a) },

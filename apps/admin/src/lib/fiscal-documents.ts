@@ -1,4 +1,4 @@
-import { minorToDecimalString, withNumerals } from '@force/shared';
+import { minorToDecimalString, withNumerals } from '@ebda/shared';
 
 /** Document kinds the fiscal-document API issues (rulings MONEYB-1, MONEYB-4). */
 export const FISCAL_DOC_TYPES = [

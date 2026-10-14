@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockUserFindFirst = vi.fn();
 const mockFindUserIdByEmail = vi.fn();
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     user: { findFirst: (...a: unknown[]) => mockUserFindFirst(...a) },
     refreshToken: { create: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },

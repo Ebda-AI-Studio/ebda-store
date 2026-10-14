@@ -1,4 +1,4 @@
-import { withStore } from '@force/database';
+import { withStore } from '@ebda/database';
 import { lookupStore } from '../lib/definer';
 import { AppError } from '../middleware/error-handler';
 

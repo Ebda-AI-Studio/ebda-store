@@ -11,10 +11,10 @@
  * returning null always reddens every "verified … tax invoice" case.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { taxInvoiceInfo } from '@force/shared';
+import { taxInvoiceInfo } from '@ebda/shared';
 
 const findFirst = vi.fn();
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     fiscalDocument: { findMany: async () => [] }, // legacy order: no fiscal document (MONEYB-1)
     order: { findFirst: (...a: unknown[]) => findFirst(...a) },

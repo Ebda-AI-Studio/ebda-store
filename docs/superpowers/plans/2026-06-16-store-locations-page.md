@@ -6,7 +6,7 @@
 
 **Architecture:** Mirror the existing **blog** vertical slice. New per-store `StoreLocation` Prisma model + hand-written migration with the standard tenant RLS policy (direct `store_id`) + FORCE RLS. `Store.locationsEnabled` column gates the feature (routes 404 when off — API-gated, default `false`). `LocationsService` + admin CRUD routes (`authenticate → authorize → requireStoreAccess → writeLimiter`) + a public list route gated by `locationsEnabled`. Admin page at `/stores/[id]/locations`. Storefront route `apps/web/src/app/locations/page.tsx` rendering country-grouped cards using theme tokens (`resolveColor` + `hsl(var(--…))`), `useLanguage().t()` for bilingual strings, and `isRtl` for direction. Default OFF platform-wide; enabled + seeded for pecannbee.
 
-**Tech Stack:** Prisma (Neon Postgres + RLS), Express + TypeScript (apps/api), Next.js 16 App Router (apps/admin + apps/web), `@force/shared` (Zod + `resolveColor`), Vitest. Brand inheritance via `StoreTheme` tokens + globals.css CSS vars.
+**Tech Stack:** Prisma (Neon Postgres + RLS), Express + TypeScript (apps/api), Next.js 16 App Router (apps/admin + apps/web), `@ebda/shared` (Zod + `resolveColor`), Vitest. Brand inheritance via `StoreTheme` tokens + globals.css CSS vars.
 
 ---
 
@@ -47,7 +47,7 @@ Without this, the storefront/admin reads return 0 rows under the tenant GUC (the
 
 **Brand-token rule (the whole point — platform-wide inheritance):**
 
-- Colors come from the theme, never hardcoded. On the storefront use Tailwind classes bound to globals.css CSS vars: `text-foreground`, `bg-card`, `border-border`, `text-primary`, `bg-primary`, `text-muted-foreground`, `bg-background`. For any merchant-saved `token:*` value use `resolveColor(value, theme)` from `@force/shared`, which MUST fall back to `hsl(var(--<key>))` (UI rule #15).
+- Colors come from the theme, never hardcoded. On the storefront use Tailwind classes bound to globals.css CSS vars: `text-foreground`, `bg-card`, `border-border`, `text-primary`, `bg-primary`, `text-muted-foreground`, `bg-background`. For any merchant-saved `token:*` value use `resolveColor(value, theme)` from `@ebda/shared`, which MUST fall back to `hsl(var(--<key>))` (UI rule #15).
 - Use Tailwind size classes (`text-sm`, `text-lg`…), NEVER arbitrary `text-[Npx]` (UI rule #7).
 - Fonts inherit automatically from the store's theme (`var(--font-arabic)` / `var(--font-sans)` are already wired by StoreContext).
 - RTL: wrap with `dir={isRtl ? 'rtl' : 'ltr'}`; bilingual strings via `const { t, isRtl } = useLanguage(); t('Locations','الفروع')`.
@@ -328,8 +328,8 @@ git commit -m "feat(shared): location Zod schema + maps url helper"
 - [ ] **Step 1: Implement the service** (uses the tenant-routed `prisma`; reads/writes happen under `runInTenantContext` set by the route middleware)
 
 ```typescript
-import { prisma, Prisma } from '@force/database';
-import type { LocationInput } from '@force/shared';
+import { prisma, Prisma } from '@ebda/database';
+import type { LocationInput } from '@ebda/shared';
 
 export class LocationsService {
   static list(storeId: string) {
@@ -384,11 +384,11 @@ git commit -m "feat(api): LocationsService (store-scoped CRUD)"
 
 ```typescript
 import { Router, Request, Response, NextFunction } from 'express';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { authenticate, authorize, requireStoreAccess } from '../middleware/auth';
 import { writeLimiter } from '../middleware/security';
 import { LocationsService } from '../services/locations.service';
-import { locationInputSchema } from '@force/shared';
+import { locationInputSchema } from '@ebda/shared';
 
 const router = Router();
 
@@ -530,7 +530,7 @@ Mirror `tests/integration/bulk-variant-import.test.ts` (non-destructive: own use
 
 ```typescript
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { LocationsService } from '../../apps/api/src/services/locations.service';
 
 const S = `loc-${Date.now()}`;
@@ -846,7 +846,7 @@ git commit -m "feat(admin): locations CRUD page + sidebar entry"
 - [ ] **Step 1: Write the seed** (reads the captured `locations.json`; idempotent upsert by `[storeId,name]`; sets `locationsEnabled=true`). Uses `withRlsBypass` or runs as `neondb_owner` (cross-tenant seed).
 
 ```typescript
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';

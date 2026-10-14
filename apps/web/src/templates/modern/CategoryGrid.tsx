@@ -4,7 +4,7 @@ import CategoryCard from './CategoryCard';
 import type { CategoryGridProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor } from '@force/shared';
+import { resolveColor } from '@ebda/shared';
 import {
   cardFrameClass,
   categorySizeClass,

@@ -1,7 +1,7 @@
 // Shared CORS domain cache — extracted to avoid circular imports between
 // index.ts (which sets up CORS) and store.routes.ts (which needs to bust the cache).
 import { BoundedMap } from './bounded-map';
-import { BRAND, brandUrl } from '@force/shared';
+import { BRAND, brandUrl } from '@ebda/shared';
 import { storeDomainWhere, storeLookupForHost } from './store-host';
 
 // Capped so a pathological stream of unknown domains (e.g. bot traffic

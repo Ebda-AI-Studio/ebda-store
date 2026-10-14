@@ -6,7 +6,7 @@
 
 **Architecture:** Phase 3 is admin-only — zero storefront changes and zero data-model changes. The data shape from Phase 2 (per-section `layout.<section>.typography.{heading,kicker,subtitle,body}` + global zones) is already correct; Phase 3 just rearranges the admin UI to make it obvious which control affects what. The "Default typography" card shrinks to truly-platform zones (header, footer, afterFooter, announcementBar, storeName). Each section card gains a live preview tile that renders an SVG-or-DOM mockup of the section with the current bgColor + cardFrameColor + cardFrameWidth + headingColor applied. Smart Palette v2 swaps its simple confirm() for an inline interactive preview where the merchant clicks each section's tile to inspect/adjust the proposed values, with a cardFrameWidth slider per section.
 
-**Tech Stack:** React (Next.js 16 App Router for apps/admin), Tailwind CSS, the existing `@force/shared` helpers (`generateSectionPalette`, `pickReadableForeground`, `resolveColor`).
+**Tech Stack:** React (Next.js 16 App Router for apps/admin), Tailwind CSS, the existing `@ebda/shared` helpers (`generateSectionPalette`, `pickReadableForeground`, `resolveColor`).
 
 **Spec reference:** The data model + storefront cascade are already shipped by Phase 2 (`docs/superpowers/plans/2026-05-18-smart-colors-and-page-builder.md`). Phase 3 only restructures the admin UI to match the merchant's mental model — no spec doc needed.
 
@@ -88,7 +88,7 @@ const ROLE_TO_GLOBAL_ZONE: Record<SectionTypographyRole, string> = {
 };
 ```
 
-The `SectionTypographyOverride` interface in `@force/shared` already supports arbitrary keys via partial typing — confirm via `grep -n "SectionTypographyOverride" packages/shared/src/types/store-layout.ts` and verify the type accepts these new roles. If `body` is the only currently-typed extra, extend the interface to include the new role keys explicitly:
+The `SectionTypographyOverride` interface in `@ebda/shared` already supports arbitrary keys via partial typing — confirm via `grep -n "SectionTypographyOverride" packages/shared/src/types/store-layout.ts` and verify the type accepts these new roles. If `body` is the only currently-typed extra, extend the interface to include the new role keys explicitly:
 
 ```ts
 export interface SectionTypographyOverride {
@@ -292,8 +292,8 @@ git commit -m "feat(admin): colorfield empty state shows inherited brand token (
 ```tsx
 'use client';
 
-import { resolveColor, pickReadableForeground } from '@force/shared';
-import type { StoreTheme, CardFrameWidth } from '@force/shared';
+import { resolveColor, pickReadableForeground } from '@ebda/shared';
+import type { StoreTheme, CardFrameWidth } from '@ebda/shared';
 
 interface SectionPreviewProps {
   /** Section name displayed inside the preview tile ("Hero" / "Categories" / etc). */
@@ -538,7 +538,7 @@ git commit -m "feat(admin,shared): smart palette v2 — distribution patterns + 
 
 **Placeholder scan:** No "TBD" / "implement later" / vague requirements. Every step has either real code or an exact grep recipe.
 
-**Type consistency:** `CardFrameWidth`, `ColorToken`, `SectionPreviewProps`, `PalettePattern`, `PaletteSeeds` spelled identically across all waves. `inheritFromToken` ColorField prop spelled consistently. `SectionTypographyOverride` interface extension is the only `@force/shared` change — additive, doesn't break existing data.
+**Type consistency:** `CardFrameWidth`, `ColorToken`, `SectionPreviewProps`, `PalettePattern`, `PaletteSeeds` spelled identically across all waves. `inheritFromToken` ColorField prop spelled consistently. `SectionTypographyOverride` interface extension is the only `@ebda/shared` change — additive, doesn't break existing data.
 
 **Estimated effort:** Wave 3A ~2h, Wave 3B ~1h, Wave 3C ~2h, Wave 3D ~3h, Wave 3E (verification) ~30min. Total ~8h subagent-driven. Bundled or split per Ahmad's call.
 

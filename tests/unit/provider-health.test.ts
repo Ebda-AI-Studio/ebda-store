@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const h = vi.hoisted(() => ({ updateMany: vi.fn().mockResolvedValue({ count: 1 }) }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { paymentConfig: { updateMany: (...a: unknown[]) => h.updateMany(...a) } },
   runInTenantContext: (_s: string, fn: () => Promise<unknown>) => fn(),
 }));

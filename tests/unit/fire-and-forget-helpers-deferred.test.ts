@@ -44,7 +44,7 @@ const { prismaMock, runInTenantContextMock, storageMock, loggerMock } = vi.hoist
   };
 });
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: prismaMock,
   // isStillReferenced lists the stores through the directory definer (`stores` is under RLS).
   storeDirectory: vi.fn().mockResolvedValue([{ id: 'store-1' }]),

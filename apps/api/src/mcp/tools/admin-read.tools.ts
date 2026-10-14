@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import type { McpStore } from '../resolve-store';
 import { ProductService } from '../../services/product.service';
 import { effectiveInventory } from '../../lib/effective-inventory';

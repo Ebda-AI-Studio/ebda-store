@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
-import { Prisma } from '@force/database';
+import { Prisma } from '@ebda/database';
 import { uniqueViolationTarget } from '../lib/prisma-errors';
 import logger from '../lib/logger';
 

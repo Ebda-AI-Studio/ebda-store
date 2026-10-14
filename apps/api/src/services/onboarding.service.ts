@@ -9,7 +9,7 @@
  * seed rows a super-admin-provisioned one does (VAT rate, default category,
  * COD payment config, subscription).
  */
-import { prisma, Prisma, withUser, withStore, runInStoreScope } from '@force/database';
+import { prisma, Prisma, withUser, withStore, runInStoreScope } from '@ebda/database';
 import {
   getLook,
   storeCreatedEventId,
@@ -17,7 +17,7 @@ import {
   storefrontOrigin,
   validateStoreSlug,
   type StoreSlugErrorCode,
-} from '@force/shared';
+} from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { ProvisioningService } from './provisioning.service';

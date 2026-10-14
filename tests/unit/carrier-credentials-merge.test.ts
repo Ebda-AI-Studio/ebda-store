@@ -24,7 +24,7 @@ const findMany = vi.fn();
 const queryRaw = vi.fn();
 const update = vi.fn();
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   // Declared INSIDE the factory: vi.mock is hoisted above module-scope consts.
   const client: Record<string, unknown> = {
     shippingCarrierConfig: {

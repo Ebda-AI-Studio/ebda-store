@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { ProductService } from '../../apps/api/src/services/product.service';
 
 const OWNER_ID = '00000000-0000-0000-0000-000000001371';

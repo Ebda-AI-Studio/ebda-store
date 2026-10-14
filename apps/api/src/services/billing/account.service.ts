@@ -14,7 +14,7 @@
  *    reference. A merchant's "I paid" claim never activates anything by itself.
  */
 import crypto from 'crypto';
-import { prisma, withStore, withUser, acrossStores, type Prisma } from '@force/database';
+import { prisma, withStore, withUser, acrossStores, type Prisma } from '@ebda/database';
 import { AppError } from '../../middleware/error-handler';
 import { auditLog } from '../../middleware/security';
 import logger from '../../lib/logger';
@@ -28,7 +28,7 @@ import {
   isInterval,
   type BillingInterval,
 } from './period';
-import { normalizeInstapayReference, type InstapayReceiptFields } from '@force/shared';
+import { normalizeInstapayReference, type InstapayReceiptFields } from '@ebda/shared';
 import {
   InstapayReceiptService,
   sniffReceiptMime,

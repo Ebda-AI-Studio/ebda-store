@@ -550,7 +550,7 @@ This is the load-bearing test. It uses the repo's integration DB (Postgres servi
 ```typescript
 // apps/api/tests/integration/bulk-variant-import.test.ts
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { BulkService } from '../../src/services/bulk.service';
 
 // --- prod guard (per global P0 lesson feedback-test-truncate-wiped-prod-db) ---

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Badge, Button } from '@force/ui';
+import { Badge, Button } from '@ebda/ui';
 import { formatDate } from '../../lib/format';
 import { useT } from '@/i18n/useT';
 import type { RecentStore } from './types';

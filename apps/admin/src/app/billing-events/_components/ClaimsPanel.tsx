@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button, Input, Modal } from '@force/ui';
-import { formatMoney, isSafeUrl, type InstapayReceiptView } from '@force/shared';
+import { Badge, Button, Input, Modal } from '@ebda/ui';
+import { formatMoney, isSafeUrl, type InstapayReceiptView } from '@ebda/shared';
 import { DataTable, type DataTableColumn } from '../../../components/mobile/DataTable';
 import { apiGet, apiPost } from '../../../lib/api';
 import { useT } from '../../../i18n/useT';

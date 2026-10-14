@@ -370,7 +370,7 @@ describe('the contrast detector (controls)', () => {
     ['2372 raw gray hover', `'text-muted-ink hover:bg-gray-100'`],
     ['2381 raw green on the themed card', `'border-green-200 bg-card text-green-800'`],
     ['2381 raw text on the page background', `'bg-background text-red-700'`],
-    ['2380 the old @force/ui Label', `'text-sm font-medium text-gray-700'`],
+    ['2380 the old @ebda/ui Label', `'text-sm font-medium text-gray-700'`],
   ])('flags %s', (_name, src) => {
     expect(problems(src).length).toBeGreaterThan(0);
   });
@@ -462,7 +462,7 @@ const importedFromUi = (root: string): Set<string> =>
     sourceFiles(root).flatMap(f =>
       [
         ...readFileSync(f, 'utf8').matchAll(
-          /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*'@force\/ui'/g
+          /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*'@ebda\/ui'/g
         ),
       ].flatMap(m =>
         m[1].split(',').map(n =>
@@ -482,7 +482,7 @@ for (const app of APPS.filter(a => a.css)) {
   const rendered = sourceFiles(UI.root).filter(f => uiExports(f).some(n => used.has(n)));
   describe(`${app.name}: the packages/ui components it renders (issue 2380)`, () => {
     // Control: admin imports Button and Label, so the scan cannot be vacuous
-    // there. Orders imports nothing from @force/ui today (0 files is correct).
+    // there. Orders imports nothing from @ebda/ui today (0 files is correct).
     it('finds the components it imports (control)', () => {
       if (app.name === 'admin') {
         expect(rendered.some(f => f.endsWith('Button.tsx'))).toBe(true);

@@ -12,8 +12,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button, Modal, ModalBody, ModalFooter, useToast } from '@force/ui';
-import { PROVIDER_CATALOG, withNumerals } from '@force/shared';
+import { Badge, Button, Modal, ModalBody, ModalFooter, useToast } from '@ebda/ui';
+import { PROVIDER_CATALOG, withNumerals } from '@ebda/shared';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { DataTable, type DataTableColumn } from '../../components/mobile/DataTable';

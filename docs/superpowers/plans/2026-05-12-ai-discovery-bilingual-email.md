@@ -647,7 +647,7 @@ Microdata is redundant with JSON-LD but Google reads both; cheap belt-and-suspen
 Create `apps/web/src/app/llms.txt/route.ts`:
 
 ```ts
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 export const revalidate = 3600; // 1h — new stores show up within an hour
 
@@ -725,7 +725,7 @@ https://store.forcemediakw.com/sitemap.xml
 Create `apps/web/src/app/[slug]/llms.txt/route.ts`:
 
 ```ts
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { notFound } from 'next/navigation';
 
 export const revalidate = 600; // 10 min — product/category churn is faster than store-list churn

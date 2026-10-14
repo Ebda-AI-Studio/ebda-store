@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { getPaymentIcon, DEFAULT_PAYMENT_PROVIDERS } from '../../components/PaymentIcons';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import type { PaymentProvider } from './types';

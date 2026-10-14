@@ -1,6 +1,6 @@
 'use client';
 
-import { orderTaxPlacement, withNumerals } from '@force/shared';
+import { orderTaxPlacement, withNumerals } from '@ebda/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMoney } from '@/lib/format';
 import type { OrderDetail } from '@/lib/orders';

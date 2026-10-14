@@ -25,7 +25,7 @@
 | `apps/orders/src/lib/push.ts` + `apps/orders/src/components/EnableNotifications.tsx` | Diagnose + harden the notification-enable failure (surface the real reason)                                                                           | A3         |
 | `apps/web/src/templates/shared/StoreLogo.tsx` (**new**)                              | Single shared logo component: auto-fit by measured aspect ratio within min/max thresholds + per-store size override                                   | A4         |
 | `apps/web/src/templates/{modern,elegant,classic,minimal,bold}/Header.tsx`            | Replace the hardcoded logo `<Image className="h-14 max-w-[150px]…">` with `<StoreLogo>`                                                               | A4         |
-| `apps/web/src/lib/store-resolver.ts` + `@force/shared` theme type                    | Carry `logoSize` (theme JSON: `'auto'                                                                                                                 | 'sm'       | 'md' | 'lg'`, default `'auto'`) through to the storefront | A4  |
+| `apps/web/src/lib/store-resolver.ts` + `@ebda/shared` theme type                    | Carry `logoSize` (theme JSON: `'auto'                                                                                                                 | 'sm'       | 'md' | 'lg'`, default `'auto'`) through to the storefront | A4  |
 | `apps/admin/src/components/.../BrandingTab` (logo area)                              | Add a "Logo size" control (Auto / S / M / L) writing `theme.logoSize`                                                                                 | A4         |
 | `packages/database/prisma/schema.prisma` (`Category`)                                | Add `showOnHomeStrip Boolean @default(true)` column                                                                                                   | A5         |
 | `apps/api/src/routes/category.routes.ts` + service                                   | Honor `showOnHomeStrip` on the public homepage-categories read; accept it on admin update                                                             | A5         |
@@ -73,11 +73,11 @@ Toast stack is `fixed inset-x-0 top-[calc(env(safe-area-inset-top,0px)+0.75rem)]
 
 ### Task A4: Logo auto-fit by aspect + per-store override
 
-**Files:** Create `apps/web/src/templates/shared/StoreLogo.tsx`; modify the 5 theme `Header.tsx`; add `logoSize` to the theme type in `@force/shared` + `store-resolver.ts`; add a control in admin Branding.
+**Files:** Create `apps/web/src/templates/shared/StoreLogo.tsx`; modify the 5 theme `Header.tsx`; add `logoSize` to the theme type in `@ebda/shared` + `store-resolver.ts`; add a control in admin Branding.
 
 Today every store shares one fixed box (`h-14 max-w-[150px] / md:h-20 max-w-[210px]`) → shrinking pecannbee shrank wady-aljuz. New model: **measure the logo's natural aspect ratio on load and pick a fit within safe min/max**, times a per-store multiplier.
 
-- [ ] **Step 1** — Define `logoSize: 'auto' | 'sm' | 'md' | 'lg'` (default `'auto'`) on the resolved store theme (`@force/shared` theme type + `store-resolver.ts` passthrough). It rides the `StoreTheme` JSON (theme-flag pattern → zero migration).
+- [ ] **Step 1** — Define `logoSize: 'auto' | 'sm' | 'md' | 'lg'` (default `'auto'`) on the resolved store theme (`@ebda/shared` theme type + `store-resolver.ts` passthrough). It rides the `StoreTheme` JSON (theme-flag pattern → zero migration).
 - [ ] **Step 2** — Build `StoreLogo.tsx` (client component): renders `next/image`, `onLoadingComplete` reads `naturalWidth/naturalHeight` → aspect. Map aspect → a height/width cap pair, all clamped to thresholds so the header row (`h-32 / md:h-44` container) never breaks:
   - wide wordmark (aspect ≥ ~2.5): cap by width (`max-w`), shorter height.
   - balanced (0.8–2.5): cap by height, moderate width.
@@ -122,7 +122,7 @@ The only CF "bugs" are the missing build-env that web already proved. No app-cod
 
 ### Task B1: Rebuild admin worker with build env → fixes "Load failed"
 
-- [ ] Add CF tooling locally to admin (`npm i -D @opennextjs/cloudflare@1.19.11 wrangler@^4.86.0 -w @force/admin` + recreate `wrangler.jsonc`/`open-next.config.ts`).
+- [ ] Add CF tooling locally to admin (`npm i -D @opennextjs/cloudflare@1.19.11 wrangler@^4.86.0 -w @ebda/admin` + recreate `wrangler.jsonc`/`open-next.config.ts`).
 - [ ] Build with the admin env inlined: `export NEXT_PUBLIC_API_URL=https://api-production-c058.up.railway.app/api/v1` (+ `NEXT_PUBLIC_ONESIGNAL_APP_ID` if push parity wanted) `&& bash scripts/cf-build.sh admin && (cd apps/admin && npx wrangler deploy)`. — **corrected 2026-09-02**: that raw Railway hostname 404s today; use `https://api.force-ai.co/api/v1`, the current live API host (matches `cf-deploy.yml`).
 - [ ] **Verify**: `force-admin-cf-preview.workers.dev/login` → no "Load failed"; the login form reaches the API (CSRF/login network calls 200).
 

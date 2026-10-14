@@ -3,7 +3,7 @@
 import { useT } from '@/i18n/useT';
 import type { LoyaltySettings } from './types';
 
-import { minorToDecimalString, roundToMinor } from '@force/shared';
+import { minorToDecimalString, roundToMinor } from '@ebda/shared';
 interface RedemptionFormProps {
   settings: LoyaltySettings;
   disabled: boolean;

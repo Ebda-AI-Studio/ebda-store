@@ -24,8 +24,8 @@ vi.mock('../../apps/api/src/lib/logger', () => ({
 
 // Provide a controlled withRlsBypass so tests can inject return values.
 const mockWithRlsBypass = vi.fn();
-vi.mock('@force/database', async importOriginal => {
-  const actual = await importOriginal<typeof import('@force/database')>();
+vi.mock('@ebda/database', async importOriginal => {
+  const actual = await importOriginal<typeof import('@ebda/database')>();
   return {
     ...actual,
     prisma: {

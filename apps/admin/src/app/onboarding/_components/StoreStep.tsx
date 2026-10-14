@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Button, Input } from '@force/ui';
-import { validateStoreSlug } from '@force/shared';
-import { storeCreatedEventId } from '@force/shared';
+import { Button, Input } from '@ebda/ui';
+import { validateStoreSlug } from '@ebda/shared';
+import { storeCreatedEventId } from '@ebda/shared';
 import { apiGet, apiPost } from '../../../lib/api';
 import { getEbdaTracker } from '../../../lib/ebda-tracker';
 import { suggestSlug } from '../../../lib/onboarding-validation';

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { BottomSheet } from '@/components/mobile/BottomSheet';
 import { apiPost } from '@/lib/api';

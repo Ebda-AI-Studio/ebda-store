@@ -7,8 +7,8 @@ import { HelpTip } from '@/components/HelpTip';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
-import { parseStockAdjustCsv, generateStockAdjustCsvTemplate } from '@force/shared';
-import type { StockAdjustParseResult, StockAdjustParsedRow } from '@force/shared';
+import { parseStockAdjustCsv, generateStockAdjustCsvTemplate } from '@ebda/shared';
+import type { StockAdjustParseResult, StockAdjustParsedRow } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

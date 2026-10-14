@@ -1,9 +1,9 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useLayoutEffect, ReactNode } from 'react';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
-import { resolveDefaultLanguage } from '@force/shared';
+import { resolveDefaultLanguage } from '@ebda/shared';
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 type Language = 'en' | 'ar';

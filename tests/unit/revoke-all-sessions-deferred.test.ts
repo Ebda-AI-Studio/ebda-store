@@ -74,7 +74,7 @@ vi.mock('@api/services/alerts.service', () => ({ sendAlert: sendAlertMock }));
 vi.mock('@api/services/redis.service', () => ({ redis: redisMock }));
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { send: sendMock } }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   Prisma: {},
   hasTenantContext: () => false,

@@ -15,7 +15,7 @@
  *      alone (Prisma's convention). A plain `badgeLabel: data.badgeLabel`
  *      would wipe the badge on every unrelated save.
  *
- * Everything is imported from SOURCE, never through `@force/shared` or a
+ * Everything is imported from SOURCE, never through `@ebda/shared` or a
  * built package — a schema test resolved to `packages/shared/dist` passes on
  * the last build instead of on the code under review.
  */
@@ -27,7 +27,7 @@ import request from 'supertest';
 // branch), and Vite resolves a bare directory import to the `.js` first — so
 // `@shared/src/types` silently hands back the OLD module and this constant
 // comes through as `undefined`, turning every length assertion into a
-// no-op that passes. Same trap as importing `@force/shared` (→ dist) in a
+// no-op that passes. Same trap as importing `@ebda/shared` (→ dist) in a
 // schema test, one directory deeper.
 import { PRODUCT_BADGE_LABEL_MAX_LENGTH } from '@shared/src/types/index.ts';
 
@@ -93,7 +93,7 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     product: { findFirst: findFirstMock, update: productUpdateMock, findMany: vi.fn() },
     category: { findMany: vi.fn().mockResolvedValue([]) },

@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { useLocale } from 'next-intl';
-import { SECTION_REGISTRY, type PageDefinition, type SectionList } from '@force/shared';
+import { SECTION_REGISTRY, type PageDefinition, type SectionList } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { SectionThumb } from './SectionThumb';
 

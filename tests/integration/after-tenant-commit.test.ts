@@ -35,7 +35,7 @@ import {
   withRlsBypass,
   onClosedTenantTxAccess,
   type ClosedTenantTxAccess,
-} from '@force/database';
+} from '@ebda/database';
 import { tenantContext } from '@api/middleware/tenant-context';
 import { deferAfterTenantCommit } from '@api/lib/after-tenant-commit';
 

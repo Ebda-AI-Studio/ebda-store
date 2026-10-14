@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import type { StoreTheme } from '@force/shared';
+import type { StoreTheme } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { AutoPopulateBanner } from './_components/AutoPopulateBanner';

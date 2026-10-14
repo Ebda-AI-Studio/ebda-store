@@ -4,7 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { invalidateCached } from '../lib/public-cache';
 import { deleteR2ObjectIfOrphan } from '../services/r2-cleanup.service';
 import logger from '../lib/logger';

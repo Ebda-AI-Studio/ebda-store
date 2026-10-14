@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import crypto from 'crypto';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import { hasDb, seedBundleStore } from '../helpers/bundle-fixtures';
 import { findVariantlessLines } from '../../scripts/list-variantless-po-lines';
 

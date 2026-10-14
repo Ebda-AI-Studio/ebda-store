@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 
 interface StoresEmptyProps {

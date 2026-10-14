@@ -9,7 +9,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice, minorToMajor } from '@/lib/format';
 
-import { minorToDecimalString, withNumerals } from '@force/shared';
+import { minorToDecimalString, withNumerals } from '@ebda/shared';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface POItem {

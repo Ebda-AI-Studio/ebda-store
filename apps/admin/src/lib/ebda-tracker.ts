@@ -1,5 +1,5 @@
-import { BRAND_MARKETING_URL } from '@force/shared';
-import { createTracker, type Tracker } from '@force/shared/tracking-browser';
+import { BRAND_MARKETING_URL } from '@ebda/shared';
+import { createTracker, type Tracker } from '@ebda/shared/tracking-browser';
 
 let instance: Tracker | null = null;
 

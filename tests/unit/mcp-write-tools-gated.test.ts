@@ -21,7 +21,7 @@ const { dbTouched } = vi.hoisted(() => {
   return { dbTouched };
 });
 
-vi.mock('@force/database', async importOriginal => {
+vi.mock('@ebda/database', async importOriginal => {
   const model = new Proxy({}, { get: () => dbTouched });
   return {
     ...(await importOriginal<Record<string, unknown>>()),

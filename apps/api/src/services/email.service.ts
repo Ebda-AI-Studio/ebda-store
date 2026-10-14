@@ -1,4 +1,4 @@
-import { withStore } from '@force/database';
+import { withStore } from '@ebda/database';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { storeBrandTheme } from '../lib/store-brand-theme';
@@ -50,9 +50,9 @@ import {
   subscriptionBillingTemplate,
   type SubscriptionBillingNoticeData,
 } from './email-templates/subscription-billing';
-import { BRAND, BRAND_EMAIL_LOGO_URL, brandFrom, poweredByBrand } from '@force/shared';
+import { BRAND, BRAND_EMAIL_LOGO_URL, brandFrom, poweredByBrand } from '@ebda/shared';
 
-import { resolveDefaultLanguage } from '@force/shared';
+import { resolveDefaultLanguage } from '@ebda/shared';
 // ==========================================
 // Email Service
 // Transactional email handling

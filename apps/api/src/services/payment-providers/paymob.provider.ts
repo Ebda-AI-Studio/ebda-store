@@ -35,7 +35,7 @@
  * checked in 6c against a real sandbox.
  */
 import crypto from 'node:crypto';
-import { paymobSettingsBaseSchema, PAYMOB_METHODS, type PaymobMethod } from '@force/shared';
+import { paymobSettingsBaseSchema, PAYMOB_METHODS, type PaymobMethod } from '@ebda/shared';
 import {
   credentialScope,
   gatewayRequest,

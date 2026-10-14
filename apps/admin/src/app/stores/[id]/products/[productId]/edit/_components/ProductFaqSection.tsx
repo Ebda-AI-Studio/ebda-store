@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { Button, Input, Textarea, useToast } from '@force/ui';
+import { Button, Input, Textarea, useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
 

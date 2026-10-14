@@ -1,6 +1,6 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
-import { AWAITING_PAYMENT_CONFIRMATION } from '@force/shared';
+import { prisma } from '@ebda/database';
+import { AWAITING_PAYMENT_CONFIRMATION } from '@ebda/shared';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sweepAcrossStores } from '../../cross-store';

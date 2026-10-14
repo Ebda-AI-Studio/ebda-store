@@ -18,7 +18,7 @@ import {
   orderTaxPlacement,
   storeNumerals,
   intlLocale,
-} from '@force/shared';
+} from '@ebda/shared';
 import {
   orderStatusLabel,
   orderPaymentStatusLabel,

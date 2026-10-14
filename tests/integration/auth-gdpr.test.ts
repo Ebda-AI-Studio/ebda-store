@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
 import { API_BASE } from '../helpers/api-base';
 import { AuthService } from '../../apps/api/src/services/auth.service';

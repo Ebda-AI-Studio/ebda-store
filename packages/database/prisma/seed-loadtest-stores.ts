@@ -20,7 +20,7 @@ import * as bcrypt from 'bcryptjs';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { roundToMinor, REGION } from '@force/shared';
+import { roundToMinor, REGION } from '@ebda/shared';
 const prisma = createPrismaClient({
   connectionString: process.env.DATABASE_URL ?? '',
   role: 'owner',

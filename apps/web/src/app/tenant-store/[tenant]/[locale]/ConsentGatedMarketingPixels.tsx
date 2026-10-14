@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { MarketingPixels } from '@force/shared';
+import type { MarketingPixels } from '@ebda/shared';
 import { MarketingPixelsProvider } from '@/components/MarketingPixels';
 import { readMarketingConsentFromCookie } from '@/lib/consent-cookie';
 

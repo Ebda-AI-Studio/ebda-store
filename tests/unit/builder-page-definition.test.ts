@@ -27,7 +27,7 @@ import {
   type PageDefinition,
   type StoreLayoutSettings,
   type TemplateId,
-} from '@force/shared';
+} from '@ebda/shared';
 import { LAYOUT_FIXTURES, TEMPLATES, loadLayoutFixture } from '../fixtures/builder/homepage-data';
 
 const asStorefront = (raw: unknown, t: TemplateId): StoreLayoutSettings =>

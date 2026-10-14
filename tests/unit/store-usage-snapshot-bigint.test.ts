@@ -14,7 +14,7 @@
  * every runtime code path actually reads).
  */
 import { describe, it, expect } from 'vitest';
-import { Prisma } from '@force/database';
+import { Prisma } from '@ebda/database';
 import fs from 'node:fs';
 import path from 'node:path';
 

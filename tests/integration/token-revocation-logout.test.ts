@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
 import { redis } from '../../apps/api/src/services/redis.service';
 import { API_BASE } from '../helpers/api-base';

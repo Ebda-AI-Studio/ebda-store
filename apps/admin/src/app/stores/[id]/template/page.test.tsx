@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { looksForTemplate } from '@force/shared';
+import { looksForTemplate } from '@ebda/shared';
 
 const { apiGet, apiPut } = vi.hoisted(() => ({ apiGet: vi.fn(), apiPut: vi.fn() }));
 
@@ -13,7 +13,7 @@ vi.mock('next/link', () => ({
   ),
 }));
 vi.mock('next-intl', () => ({ useLocale: () => 'en' }));
-vi.mock('@force/ui', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
+vi.mock('@ebda/ui', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
 vi.mock('@/i18n/useT', () => ({
   useT: () =>
     Object.assign(

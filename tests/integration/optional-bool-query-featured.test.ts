@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import request from 'supertest';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 
 vi.mock('@api/middleware/auth', async importOriginal => {
   const actual = await importOriginal<typeof import('@api/middleware/auth')>();

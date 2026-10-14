@@ -12,7 +12,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import { prisma, withRlsBypass, createPrismaClient, runWithRequestDb } from '@force/database';
+import { prisma, withRlsBypass, createPrismaClient, runWithRequestDb } from '@ebda/database';
 import paymentLinksRoutes from '@api/routes/payment-links.routes';
 import { storeScopeContext } from '@api/middleware/tenant-context';
 import { errorHandler } from '@api/middleware/error-handler';

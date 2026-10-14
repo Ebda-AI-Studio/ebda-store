@@ -13,7 +13,7 @@
  * The outbox is process-local on purpose: it is not a queue and is never
  * exposed over HTTP.
  */
-import { BRAND, BRAND_EMAIL_LOGO_URL, productName, resolveDefaultLanguage } from '@force/shared';
+import { BRAND, BRAND_EMAIL_LOGO_URL, productName, resolveDefaultLanguage } from '@ebda/shared';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';

@@ -24,9 +24,9 @@ import {
   fromMinor,
   REGION,
   storeNumerals,
-} from '@force/shared';
+} from '@ebda/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
-import { Price, ProductBadge, ProductBadgeGroup, cn } from '@force/ui';
+import { Price, ProductBadge, ProductBadgeGroup, cn } from '@ebda/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
@@ -43,7 +43,7 @@ import {
  * Elegant Template - Product Card
  *
  * Luxury fashion aesthetic: no borders, portrait aspect ratio, ultra-subtle
- * hover states. Uses shared components from @force/ui.
+ * hover states. Uses shared components from @ebda/ui.
  */
 function ElegantProductCard({
   product,

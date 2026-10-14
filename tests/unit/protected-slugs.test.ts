@@ -13,7 +13,7 @@ import {
   normalizeSlugForMatch,
   validateStoreSlug,
   isReservedSlug,
-} from '@force/shared';
+} from '@ebda/shared';
 
 describe('protected slug matching', () => {
   it.each([

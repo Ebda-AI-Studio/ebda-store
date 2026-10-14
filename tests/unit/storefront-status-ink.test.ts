@@ -34,7 +34,7 @@ import {
   STATUS_INK_ROLES,
   type StoreTheme,
   type TemplateId,
-} from '@force/shared';
+} from '@ebda/shared';
 import { buildThemeStyleTag } from '@web/lib/theme-css';
 import { pageSurfaceStyle } from '@web/lib/page-surface';
 

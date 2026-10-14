@@ -6,8 +6,8 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import crypto from 'crypto';
 import fs from 'fs';
-import { prisma, withRlsBypass } from '@force/database';
-import { DEFAULT_PLAN_SEEDS, planLimitsSchema } from '@force/shared';
+import { prisma, withRlsBypass } from '@ebda/database';
+import { DEFAULT_PLAN_SEEDS, planLimitsSchema } from '@ebda/shared';
 import {
   assertAnalyticsTier,
   assertOwnerMayCreateStore,

@@ -15,7 +15,7 @@ vi.mock('next-intl', () => {
 });
 
 const toast = { error: vi.fn(), success: vi.fn(), addToast: vi.fn() };
-vi.mock('@force/ui', () => ({ useToast: () => toast }));
+vi.mock('@ebda/ui', () => ({ useToast: () => toast }));
 
 const apiGet = vi.fn();
 const apiPost = vi.fn();

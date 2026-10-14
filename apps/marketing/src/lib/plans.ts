@@ -2,8 +2,8 @@ import {
   LOCKED_PUBLIC_PLANS,
   planIncludesMerchantMcp,
   type PlanLimits,
-} from '@force/shared/plan-limits';
-import { BRAND } from '@force/shared/brand';
+} from '@ebda/shared/plan-limits';
+import { BRAND } from '@ebda/shared/brand';
 import type { Locale } from './site';
 
 /**

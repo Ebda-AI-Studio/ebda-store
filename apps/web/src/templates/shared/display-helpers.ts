@@ -5,7 +5,7 @@
  * logic that was previously duplicated in every template.
  */
 
-import { sanitizeUrl, type StoreLocationPublic, type StoreTheme } from '@force/shared';
+import { sanitizeUrl, type StoreLocationPublic, type StoreTheme } from '@ebda/shared';
 import { translations } from '../../contexts/LanguageContext';
 import type {
   FooterBottomBarConfig,

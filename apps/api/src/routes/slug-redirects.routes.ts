@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
-import { runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@ebda/database';
 import { listSlugRedirects, deleteSlugRedirect } from '../services/slug-redirect.service';
 
 // #903: SlugRedirect had no admin UI surface at all — a merchant could not

@@ -1,4 +1,4 @@
-import { prisma, withStore } from '@force/database';
+import { prisma, withStore } from '@ebda/database';
 import { redis } from './redis.service';
 import { encryption } from './encryption.service';
 import { smsService } from './sms.service';

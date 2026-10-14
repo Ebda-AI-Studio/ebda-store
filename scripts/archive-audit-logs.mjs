@@ -6,7 +6,7 @@
 // the working set small by deleting rows older than --days (default
 // 90), with an optional --export to R2 first for compliance cover.
 //
-// Run from `apps/api/` so `@force/database` resolves and the
+// Run from `apps/api/` so `@ebda/database` resolves and the
 // STORAGE_* env vars are loaded.
 //
 // Usage:
@@ -18,7 +18,7 @@
 // Suggested cron: weekly, with --apply --export. Configure in Railway:
 //   railway run --service api -- node ../../scripts/archive-audit-logs.mjs --apply --export
 import 'dotenv/config';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 

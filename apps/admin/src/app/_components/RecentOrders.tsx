@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Badge } from '@force/ui';
+import { Badge } from '@ebda/ui';
 import { formatPrice } from '../../lib/format';
 import { useT } from '@/i18n/useT';
 import type { RecentOrder } from './types';

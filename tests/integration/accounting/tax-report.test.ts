@@ -9,7 +9,7 @@
  * Runs sequentially via vitest pool:forks + maxWorkers:1.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { seedCoaForStore } from '../../../apps/api/src/services/accounting/account.service';
 import { postOrderPaymentJournal as postOrderPaymentJournalRaw } from '../../../apps/api/src/services/accounting/posting/order-posting';
 import { generateTaxReport } from '../../../apps/api/src/services/accounting/tax-report.service';

@@ -34,7 +34,7 @@ vi.mock('@api/middleware/security', () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@api/middleware/tenant-context', () => ({ tenantContext: h.pass }));
-vi.mock('@force/database', () => ({ prisma: { store: { findUnique: h.storeFindUnique } } }));
+vi.mock('@ebda/database', () => ({ prisma: { store: { findUnique: h.storeFindUnique } } }));
 vi.mock('@api/services/r2-cleanup.service', () => ({ cleanupRemovedJsonUrls: h.cleanup }));
 vi.mock('@api/services/pwa.service', () => ({
   PWAService: { updateSettings: h.updateSettings },

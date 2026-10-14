@@ -1,5 +1,5 @@
 // Static OpenAPI renderer: spec object -> HTML string. No client JS, no runtime API calls.
-import { esc } from '@force/site-kit/build/shell';
+import { esc } from '@ebda/site-kit/build/shell';
 
 const refName = ref => ref.split('/').pop();
 

@@ -32,7 +32,7 @@ vi.mock('../../apps/api/src/services/ai.service', () => ({
 // Mock prisma product operations
 const mockFindFirst = vi.fn();
 const mockUpdate = vi.fn();
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     product: {
       findFirst: (...args: unknown[]) => mockFindFirst(...args),

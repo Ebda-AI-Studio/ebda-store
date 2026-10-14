@@ -8,7 +8,7 @@ import {
   TAX_DOCUMENT_MAX_BYTES,
   taxProfileDetailsSchema,
   taxProfileSubmitSchema,
-} from '@force/shared';
+} from '@ebda/shared';
 import { TaxService } from '../services/tax.service';
 import { TaxProfileService } from '../services/tax-profile.service';
 import { tenantContext } from '../middleware/tenant-context';

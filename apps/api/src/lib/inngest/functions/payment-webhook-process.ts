@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { webhookInbox } from '../../definer';
 import { PaymentService } from '../../../services/payment-providers/payment.factory';
 import type { PaymentProvider } from '../../../services/payment-providers/types';

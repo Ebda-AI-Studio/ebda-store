@@ -6,7 +6,7 @@
  * Ruling M3-3 (docs/RULINGS.md): the checkout summary previously showed no
  * tax line at all, and its total excluded tax — a store with tax added on
  * top of prices showed the shopper a total lower than what they were
- * actually charged. `computeOrderTax` (from `@force/shared`) is now called
+ * actually charged. `computeOrderTax` (from `@ebda/shared`) is now called
  * here with the SAME inputs order creation uses, so the amount this labels
  * always matches the charge.
  *

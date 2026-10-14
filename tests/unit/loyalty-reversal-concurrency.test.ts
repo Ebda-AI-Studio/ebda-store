@@ -62,7 +62,7 @@ const txClient = {
   },
 };
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mod: Record<string, any> = {
     prisma: {

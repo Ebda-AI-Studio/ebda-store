@@ -45,7 +45,7 @@ Create `tests/integration/cart-concurrent-add.int.test.ts`:
 
 ```ts
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { CartService } from '../../apps/api/src/services/cart.service';
 import { makeStore, makeProduct } from './helpers/factories'; // existing integration factories
 
@@ -135,7 +135,7 @@ Create `tests/integration/order-oversell.int.test.ts`:
 
 ```ts
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { placeOrderViaApi, seedStoreProductCart } from './helpers/order-flow'; // existing/created helper
 
 describe('order placement — no oversell under concurrency', () => {

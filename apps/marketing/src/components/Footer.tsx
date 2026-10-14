@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { BRAND } from '@force/shared/brand';
+import { BRAND } from '@ebda/shared/brand';
 import { COPY } from '../lib/content';
 import { CookieSettingsButton } from './CookieSettingsButton';
 import { SECURITY_EMAIL, pagePath, type Locale } from '../lib/site';

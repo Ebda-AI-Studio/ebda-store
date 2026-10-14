@@ -37,7 +37,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass } from '@ebda/database';
 import { OrderService } from '../../apps/api/src/services/order.service';
 import { handleOrderRefunded } from '../../apps/api/src/lib/inngest/functions/order-refunded';
 

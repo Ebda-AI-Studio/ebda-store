@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 const hasTenantContextMock = vi.fn();
 const execMock = vi.fn();
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { $executeRawUnsafe: (q: string) => execMock(q) },
   hasTenantContext: () => hasTenantContextMock(),
 }));

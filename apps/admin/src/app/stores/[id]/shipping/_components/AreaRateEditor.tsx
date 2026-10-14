@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useToast } from '@force/ui';
-import { EGYPT_GOVERNORATES, minorToDecimalString, REGION } from '@force/shared';
+import { useToast } from '@ebda/ui';
+import { EGYPT_GOVERNORATES, minorToDecimalString, REGION } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPut, apiDelete, apiFetch } from '../../../../../lib/api';
 import { majorToMinor, getIncompleteNewRows } from './areaRateValidation';

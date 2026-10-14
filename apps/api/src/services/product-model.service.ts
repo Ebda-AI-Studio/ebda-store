@@ -6,13 +6,13 @@
  * transaction or `runInTenantContext`); both tables are under strict RLS, so a
  * call without one reads nothing and writes nothing.
  */
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma } from '@ebda/database';
 import type {
   Model3dBindingInput,
   Model3dMaterial,
   Model3dStats,
   PublicModel3d,
-} from '@force/shared';
+} from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { withSavepoint } from '../lib/savepoint';
 

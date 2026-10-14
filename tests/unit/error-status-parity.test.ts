@@ -28,7 +28,7 @@ vi.mock('@sentry/node', () => ({
 }));
 vi.mock('@sentry/profiling-node', () => ({ nodeProfilingIntegration: vi.fn() }));
 
-import { Prisma } from '@force/database';
+import { Prisma } from '@ebda/database';
 import {
   AppError,
   clientErrorStatus,

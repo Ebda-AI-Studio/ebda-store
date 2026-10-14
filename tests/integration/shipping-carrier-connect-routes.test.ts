@@ -34,7 +34,7 @@ import {
   runInTenantContext,
   runWithRequestDb,
   type AppPrismaClient,
-} from '@force/database';
+} from '@ebda/database';
 import { config } from '@api/config';
 import { inngest } from '@api/lib/inngest/client';
 import shippingCarrierRoutes from '@api/routes/shipping-carrier.routes';

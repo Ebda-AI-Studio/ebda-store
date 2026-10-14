@@ -1,7 +1,7 @@
 import { z, type ZodRawShape } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { runInTenantContext, withStore } from '@force/database';
-import type { FeatureKey } from '@force/shared';
+import { runInTenantContext, withStore } from '@ebda/database';
+import type { FeatureKey } from '@ebda/shared';
 import { featureService } from '../services/feature.service';
 import { auditLog } from '../middleware/security';
 import { hasPermission, type Permission, type Role } from '../middleware/rbac';

@@ -50,7 +50,7 @@
  *   npx tsx scripts/backfill-store-pwa-icons.ts [--store <id|slug>] [--apply]
  */
 import { fileURLToPath } from 'url';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import {
   generatePwaIconSet,
   PWAService,

@@ -4,7 +4,7 @@ import './tracing';
 import { createServer } from 'http';
 import app, { lifecycle } from './app';
 import { config } from './config';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { redis } from './services/redis.service';
 import { socketService } from './services/socket.service';
 import { emailQueue } from './services/email-queue.service';

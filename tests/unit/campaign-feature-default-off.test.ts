@@ -4,7 +4,7 @@
  * baseline, so it resolves off until a super-admin StoreFeature override.
  */
 import { describe, it, expect } from 'vitest';
-import { FEATURE_REGISTRY, getVisibleFeatures, PLAN_BASELINE, STORE_PLANS } from '@force/shared';
+import { FEATURE_REGISTRY, getVisibleFeatures, PLAN_BASELINE, STORE_PLANS } from '@ebda/shared';
 
 describe('email_campaigns feature default', () => {
   it.each(STORE_PLANS)('is not in the %s plan baseline', plan => {

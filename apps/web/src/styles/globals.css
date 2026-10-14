@@ -49,7 +49,7 @@
     /* Status-message ink (issue 2349): the role hue dropped until it reads
        >= 4.5:1 bare and on every tint up to 30%. These are the fallback for a
        page with no store theme; a store's inks are derived from ITS palette by
-       statusInkVars (@force/shared) and emitted with the theme, and a store
+       statusInkVars (@ebda/shared) and emitted with the theme, and a store
        with theme.legacyBannerContrast gets var(--<role>) instead. Measured by
        tests/unit/admin-tint-ink-contrast.test.ts. */
     --success-ink: 142 76% 24%;

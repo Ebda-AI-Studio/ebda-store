@@ -11,8 +11,8 @@
  * the source of truth, the event log is the audit aid.
  */
 
-import type { PaymentStatus } from '@force/database';
-import { Prisma, prisma } from '@force/database';
+import type { PaymentStatus } from '@ebda/database';
+import { Prisma, prisma } from '@ebda/database';
 import logger from '../lib/logger';
 import { withSavepoint } from '../lib/savepoint';
 

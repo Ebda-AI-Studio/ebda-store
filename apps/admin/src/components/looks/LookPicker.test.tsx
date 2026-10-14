@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { cleanup, render, screen, fireEvent, within } from '@testing-library/react';
-import { LOOKS, LOOK_TEMPLATES, looksForTemplate, getLook } from '@force/shared';
+import { LOOKS, LOOK_TEMPLATES, looksForTemplate, getLook } from '@ebda/shared';
 import { LookPicker } from './LookPicker';
 
 vi.mock('../../i18n/useT', () => ({

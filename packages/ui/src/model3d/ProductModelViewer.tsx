@@ -16,7 +16,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { USDZExporter } from 'three/examples/jsm/exporters/USDZExporter.js';
-import type { ActiveModel3dLook } from '@force/shared';
+import type { ActiveModel3dLook } from '@ebda/shared';
 import { arPlatform, sceneViewerIntent, type ArPlatform } from './ar';
 
 export type ArSource = 'usdz' | 'generated' | 'scene-viewer';

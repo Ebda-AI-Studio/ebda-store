@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const hasTenantContextMock = vi.fn();
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     cart: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     // `findMany` for the bulk path (`addItems` re-reads existing lines inside
@@ -54,7 +54,7 @@ vi.mock('@api/services/feature.service', () => ({
 }));
 
 const { CartService } = await import('@api/services/cart.service');
-const { prisma } = await import('@force/database');
+const { prisma } = await import('@ebda/database');
 
 const CART = { id: 'cart-1', items: [], subtotal: 0 };
 

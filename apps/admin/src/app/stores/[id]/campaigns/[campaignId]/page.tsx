@@ -29,7 +29,7 @@ import {
   isCampaignSendable,
   type CampaignLocaleStrategy,
   type CampaignRecipientStatusValue,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { formatDateTime } from '@/lib/format';
 import { AdminLayout } from '../../../../../components/AdminLayout';

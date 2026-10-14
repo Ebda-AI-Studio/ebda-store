@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { OrderService } from '@api/services/order.service';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { EmailService } from '@api/services/email.service';
 import { socketService } from '@api/services/socket.service';
 
@@ -23,7 +23,7 @@ vi.mock('@api/services/payment-providers/cod.provider', async importOriginal => 
   ...(await importOriginal<typeof import('@api/services/payment-providers/cod.provider')>()),
   loadCodFeeConfig: vi.fn().mockResolvedValue(null),
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   scopeTransaction: (tx: any, _g: unknown, fn: any) => fn(tx),
   prisma: {
@@ -129,7 +129,7 @@ vi.mock('@force/database', () => ({
   OrderStatus: {},
   // Tenant-scoped reads (resolveActiveTaxRate etc.) run through withStore; pass the mocked client through.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  withStore: async (_storeId: string, fn: any) => fn((await import('@force/database')).prisma),
+  withStore: async (_storeId: string, fn: any) => fn((await import('@ebda/database')).prisma),
   hasTenantContext: () => true,
   // withMoneyTx (F6) wraps prisma.$transaction. Delegate to the mocked
   // $transaction so existing `expect(prisma.$transaction).toHaveBeenCalled()`

@@ -1,7 +1,7 @@
 'use client';
 
 import { useStoreNumerals } from '../../hooks/useNumerals';
-import { intlLocale } from '@force/shared';
+import { intlLocale } from '@ebda/shared';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';

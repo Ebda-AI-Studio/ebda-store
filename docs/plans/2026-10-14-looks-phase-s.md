@@ -4,7 +4,7 @@
 
 **Goal:** Every store has a _look_ (one of 15: 5 templates × 3), picked at onboarding or later, that sets its design tokens and section mix; switching looks never loses content, merchant design edits show as overrides with reset, and a demo store can preview any built look without saving.
 
-**Architecture:** Looks are data in `@force/shared` (`packages/shared/src/looks/`), never forked code. The storefront composes the theme as `DEFAULT_THEME < TEMPLATE_THEMES[skin] < look tokens < stores.theme` through ONE function, `composeStoreTheme`, used by every resolver site. The look id lives in a new nullable column `stores.look`; switching is one API call (`PUT /stores/:id/look`) that sets skin + look, optionally clears overridden token keys, and applies the look's section mix to the builder (publish for an empty store, draft otherwise). Skins per template arrive in Phase B; until then every look renders on the `minimal` skin with its own tokens.
+**Architecture:** Looks are data in `@ebda/shared` (`packages/shared/src/looks/`), never forked code. The storefront composes the theme as `DEFAULT_THEME < TEMPLATE_THEMES[skin] < look tokens < stores.theme` through ONE function, `composeStoreTheme`, used by every resolver site. The look id lives in a new nullable column `stores.look`; switching is one API call (`PUT /stores/:id/look`) that sets skin + look, optionally clears overridden token keys, and applies the look's section mix to the builder (publish for an empty store, draft otherwise). Skins per template arrive in Phase B; until then every look renders on the `minimal` skin with its own tokens.
 
 **Tech Stack:** TypeScript, Zod, Prisma (Neon, strict RLS + tenant guard), Express-on-Workers API, Next.js 16 storefront/admin, Vitest.
 
@@ -87,7 +87,7 @@
 ```ts
 // tests/unit/looks-registry.test.ts
 import { describe, it, expect } from 'vitest';
-import { LOOKS, LOOK_TEMPLATES, getLook, looksForTemplate, TEMPLATE_FAMILIES } from '@force/shared';
+import { LOOKS, LOOK_TEMPLATES, getLook, looksForTemplate, TEMPLATE_FAMILIES } from '@ebda/shared';
 
 describe('looks registry', () => {
   it('has exactly 3 looks per template, 15 total, unique ids', () => {
@@ -653,7 +653,7 @@ export function looksForTemplate(t: LookTemplate): LookDefinition[] {
 ```ts
 // tests/unit/looks-contrast.test.ts
 import { describe, it, expect } from 'vitest';
-import { LOOKS, contrastRatio } from '@force/shared';
+import { LOOKS, contrastRatio } from '@ebda/shared';
 
 const PAIRS: [string, (t: any) => [string, string]][] = [
   ['ink on page', t => [t.page, t.ink]],
@@ -727,7 +727,7 @@ import {
   overriddenLookKeys,
   hexToHsl,
   getTemplateTheme,
-} from '@force/shared';
+} from '@ebda/shared';
 
 describe('composeStoreTheme', () => {
   const atelier = getLook('qamar.atelier')!;
@@ -855,9 +855,9 @@ Before editing `bgPage`/`bgSectionAlt`: check their stored format in `store-them
 ```ts
 // tests/unit/looks-fonts.test.ts
 import { describe, it, expect } from 'vitest';
-import { LOOKS, lookFontsHref } from '@force/shared';
+import { LOOKS, lookFontsHref } from '@ebda/shared';
 import { buildThemeStyleTag } from '../../apps/web/src/lib/theme-css';
-import { composeStoreTheme } from '@force/shared';
+import { composeStoreTheme } from '@ebda/shared';
 
 describe('look fonts', () => {
   it('one Google Fonts css2 URL per look with exactly its 3 families, display=swap', () => {

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../lib/api';
 
-import { formatMoney, REGION } from '@force/shared';
+import { formatMoney, REGION } from '@ebda/shared';
 interface FinanceDashboard {
   thisMonth: { revenue: number; expenses: number; net: number };
   cash: Array<{ id: string; code: string; nameEn: string; balance: number }>;

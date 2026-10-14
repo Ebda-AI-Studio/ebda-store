@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@ebda/database';
 import { listOpenBackorders, cancelBackorder } from '../services/accounting/backorder.service';
 
 const router = Router();

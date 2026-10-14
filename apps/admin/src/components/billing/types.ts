@@ -4,7 +4,7 @@
  * merchant billing page and the store-wide banner cannot drift.
  */
 
-import type { InstapayReceiptView } from '@force/shared';
+import type { InstapayReceiptView } from '@ebda/shared';
 
 export type BillingInterval = 'monthly' | 'yearly';
 export type TrialPlanCode = 'basic' | 'growth' | 'business';

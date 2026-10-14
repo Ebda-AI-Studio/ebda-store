@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button, useToast } from '@force/ui';
-import { recommendedSizeTextForTemplate, type TemplateId } from '@force/shared';
+import { Button, useToast } from '@ebda/ui';
+import { recommendedSizeTextForTemplate, type TemplateId } from '@ebda/shared';
 import { arrayMove } from '@dnd-kit/sortable';
 import { type DragEndEvent } from '@dnd-kit/core';
 import { AdminLayout } from '../../../../components/AdminLayout';

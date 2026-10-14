@@ -27,8 +27,8 @@ WRANGLER="wrangler@4.116.0"
 for app in "${APPS[@]}"; do
   [ "${CF_SETUP_SKIP_DEPS:-}" = "1" ] && break
   [ -d "$ROOT/apps/$app" ] || { echo "skip deps: no apps/$app"; continue; }
-  echo "→ installing CF devDeps for @force/$app"
-  npm i -D "$CF_DEP" "$WRANGLER" -w "@force/$app" --no-audit --no-fund
+  echo "→ installing CF devDeps for @ebda/$app"
+  npm i -D "$CF_DEP" "$WRANGLER" -w "@ebda/$app" --no-audit --no-fund
 done
 
 # 2. per-app open-next.config.ts + wrangler.jsonc

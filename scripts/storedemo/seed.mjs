@@ -142,8 +142,8 @@ async function run() {
   }
   process.env.DIRECT_URL ??= url;
 
-  const { createPrismaClient } = await import('@force/database');
-  const { getLook } = await import('@force/shared');
+  const { createPrismaClient } = await import('@ebda/database');
+  const { getLook } = await import('@ebda/shared');
   const look = getLook(DEFAULT_LOOK);
   if (!look) throw new Error(`default look ${DEFAULT_LOOK} is not in the registry`);
 

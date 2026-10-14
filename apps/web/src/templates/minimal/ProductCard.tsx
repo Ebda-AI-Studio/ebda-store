@@ -24,9 +24,9 @@ import {
   fromMinor,
   REGION,
   storeNumerals,
-} from '@force/shared';
+} from '@ebda/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
-import { Price } from '@force/ui';
+import { Price } from '@ebda/ui';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing, getDiscountBadgeText } from '../../lib/product-pricing';
@@ -42,7 +42,7 @@ import {
   getCustomBadgeTextColor,
   resolveCardBadges,
 } from '../shared/custom-badge';
-import { cn } from '@force/ui';
+import { cn } from '@ebda/ui';
 
 /**
  * Minimal Template - Product Card

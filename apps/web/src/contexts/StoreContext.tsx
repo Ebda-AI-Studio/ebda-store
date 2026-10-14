@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { chromePreviewSettings, type DraftChrome } from '@force/shared';
+import { chromePreviewSettings, type DraftChrome } from '@ebda/shared';
 import { api, API_URL } from '../lib/api';
 import { isPlatformHost } from '../lib/platform-host';
 import { setCompareStoreId } from '../lib/compare';
@@ -28,12 +28,12 @@ import {
   statusInkVars,
   REGION,
   BRAND,
-} from '@force/shared';
+} from '@ebda/shared';
 
 /**
  * Convert theme to CSS custom properties
  * Defined locally to avoid module resolution issues. Mirrors the version
- * in @force/shared/src/types/store-theme.ts — keep in sync when adding
+ * in @ebda/shared/src/types/store-theme.ts — keep in sync when adding
  * tokens.
  */
 export function themeToCssVars(theme: StoreTheme, lookId?: string | null): Record<string, string> {
@@ -206,7 +206,7 @@ export interface StoreData {
    * does only when `locationsEnabled && theme.showBranchesInFooter`. See
    * `templates/shared/display-helpers.ts::resolveFooterBranches`.
    */
-  locations?: import('@force/shared').StoreLocationPublic[];
+  locations?: import('@ebda/shared').StoreLocationPublic[];
 }
 
 interface StoreContextValue {
@@ -222,7 +222,7 @@ interface StoreContextValue {
    * server-fetched layout via the ShopChrome `layout` prop — that wins over
    * this lazy fetch (no race between SSR-fetched-on-server vs lazy-on-client).
    */
-  layout: import('@force/shared').StoreLayoutSettings | null;
+  layout: import('@ebda/shared').StoreLayoutSettings | null;
   /**
    * Draft-only store.settings overrides (navMenu / footerLinks / utilityBar).
    * Present only when a preview-draft token is active AND the bundle includes
@@ -323,7 +323,7 @@ export function StoreProvider({
     setIsPlatform(isPlatformHost(window.location.hostname));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [layout, setLayout] = useState<import('@force/shared').StoreLayoutSettings | null>(null);
+  const [layout, setLayout] = useState<import('@ebda/shared').StoreLayoutSettings | null>(null);
   // Draft-only settings (navMenu / footerLinks / utilityBar). Populated from
   // the layout-draft bundle when a preview token is active; null otherwise so
   // the live path (no draft) is completely unchanged.
@@ -356,7 +356,7 @@ export function StoreProvider({
         if (!res.ok) return;
         const data = (await res.json()) as {
           data?: {
-            layout?: import('@force/shared').StoreLayoutSettings;
+            layout?: import('@ebda/shared').StoreLayoutSettings;
             settings?: Record<string, unknown>;
             theme?: Record<string, unknown>;
             isDraft?: boolean;

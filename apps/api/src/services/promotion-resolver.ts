@@ -5,7 +5,7 @@
  * discount math itself lives in the pure `promotion-targeting` module; this
  * layer only queries Prisma and feeds it a fully-resolved context.
  */
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-targeting';
 
 /**

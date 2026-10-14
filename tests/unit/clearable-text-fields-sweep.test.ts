@@ -18,7 +18,7 @@ import path from 'node:path';
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
-// Imported from SOURCE, not from the package entry point: `@force/shared`
+// Imported from SOURCE, not from the package entry point: `@ebda/shared`
 // resolves to packages/shared/DIST, so a schema test written against it
 // passes on the last build instead of on the code under review.
 import { locationInputSchema } from '@shared/src/schemas/location';
@@ -31,7 +31,7 @@ const { mockPrisma } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
 }));

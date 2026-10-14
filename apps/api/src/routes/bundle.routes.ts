@@ -10,20 +10,20 @@
  * inside (see tenant-context.ts). Do NOT call `runInTenantContext` or
  * `prisma.$transaction` again inside a handler — the ambient transaction
  * already covers the whole request, and `$transaction` is not proxied to it
- * (see @force/database's `hasTenantContext` doc comment).
+ * (see @ebda/database's `hasTenantContext` doc comment).
  *
  * Every route (including the public one) is gated on the `bundles` feature,
  * which is in NO plan baseline (see plan-baselines.ts) — a store only gets
  * it via a super-admin StoreFeature override.
  *
- * Pricing/allocation math lives in `@force/shared` (Task 2); the resolved,
+ * Pricing/allocation math lives in `@ebda/shared` (Task 2); the resolved,
  * priced bundle shape (componentSum/price/available/isPurchasable) lives in
  * `services/bundle.service.ts` (Task 3) via `resolveBundle`. This file is
  * persistence + admin-time validation only.
  */
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import logger from '../lib/logger';
 import {
   computeBundlePrice,
@@ -31,7 +31,7 @@ import {
   nearestAllocatablePrice,
   type BundleLine,
   type BundlePricingType,
-} from '@force/shared';
+} from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -82,7 +82,7 @@ const bundleItemSchema = z.object({
   // Task 2 — that constraint exists because a quantity < 1 made
   // `allocateBundlePrice` hang and a huge one burned CPU. Validating here is
   // the FIRST of three defences (this schema, the DB CHECK, and
-  // `assertValidLines` inside `@force/shared`), not the only one.
+  // `assertValidLines` inside `@ebda/shared`), not the only one.
   quantity: z.number().int().min(1).max(1000),
 });
 

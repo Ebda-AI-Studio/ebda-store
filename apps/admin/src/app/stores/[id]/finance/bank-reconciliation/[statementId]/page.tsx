@@ -8,7 +8,7 @@ import { apiGet, apiGetPage, apiPost, apiPatch, type PageMeta } from '@/lib/api'
 import { PageControls } from '@/components/PageControls';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { minorToMajor } from '@/lib/format';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

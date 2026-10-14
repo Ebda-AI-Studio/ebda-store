@@ -3,7 +3,7 @@ import swaggerUi from 'swagger-ui-express';
 import { Express } from 'express';
 import { config } from '../config';
 import { isWorkers } from '../lib/runtime';
-import { BRAND, BRAND_MARKETING_URL, BRAND_API_URL } from '@force/shared';
+import { BRAND, BRAND_MARKETING_URL, BRAND_API_URL } from '@ebda/shared';
 
 const options: swaggerJsdoc.Options = {
   definition: {

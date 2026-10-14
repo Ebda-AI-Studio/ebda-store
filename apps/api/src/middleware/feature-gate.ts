@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { FeatureKey } from '@force/shared';
+import { FeatureKey } from '@ebda/shared';
 import { featureService } from '../services/feature.service';
 import { resolvePublicStoreId } from '../utils/store-helpers';
 import logger from '../lib/logger';
@@ -9,7 +9,7 @@ import {
   planLimitMessage,
   upgradePlanFor,
   planIncludesMerchantMcp,
-} from '@force/shared';
+} from '@ebda/shared';
 
 /** Features whose availability comes from the plan's boolean limits. */
 const PLAN_GATED_FEATURES: Record<

@@ -4,7 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { writeLimiter } from '../middleware/security';
-import { runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@ebda/database';
 import {
   createSupplier,
   updateSupplier,

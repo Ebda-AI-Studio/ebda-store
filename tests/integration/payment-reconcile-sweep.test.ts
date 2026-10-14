@@ -15,7 +15,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 const h = vi.hoisted(() => ({ sendAlert: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: h.sendAlert }));
 
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import { handlePaymentReconcileSweep } from '@api/lib/inngest/functions/payment-reconcile-sweep';
 
 const hasDb =

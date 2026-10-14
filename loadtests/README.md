@@ -60,10 +60,10 @@ evaluation from 100 VUs hitting up to 20 different tenants at once.
 
 ```bash
 # From repo root (default: 20 stores)
-npm run seed:loadtest --workspace @force/database
+npm run seed:loadtest --workspace @ebda/database
 
 # Override store count
-LOADTEST_STORE_COUNT=10 npm run seed:loadtest --workspace @force/database
+LOADTEST_STORE_COUNT=10 npm run seed:loadtest --workspace @ebda/database
 ```
 
 The seeder is idempotent: re-running it reuses existing `loadtest-store-NNN`
@@ -84,7 +84,7 @@ LOAD_TEST_TOKEN=<same-value-as-LOAD_TEST_BYPASS_TOKEN> \
 #### 3. Clean up after testing
 
 ```bash
-npm run seed:loadtest:cleanup --workspace @force/database
+npm run seed:loadtest:cleanup --workspace @ebda/database
 ```
 
 This deletes all `loadtest-store-*` stores (and their products/categories) and

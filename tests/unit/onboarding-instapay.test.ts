@@ -12,7 +12,7 @@ const { findFirst, update, create, clearCache } = vi.hoisted(() => ({
   clearCache: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { paymentConfig: { findFirst, update, create } },
 }));
 vi.mock('../../apps/api/src/services/payment.service', () => ({

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import sharp from 'sharp';
-import { prisma, Prisma, withStore } from '@force/database';
+import { prisma, Prisma, withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import { StorageService } from './storage.service';

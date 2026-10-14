@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { computeBundlePrice } from '@force/shared';
+import { computeBundlePrice } from '@ebda/shared';
 import { restoreCartShape } from '@api/lib/order-cart-restore';
 
 // ─── Part 1: the restore shape (pure) ───────────────────────────────────────
@@ -162,7 +162,7 @@ vi.mock('@api/services/payment-providers/cod.provider', async importOriginal => 
   ...(await importOriginal<typeof import('@api/services/payment-providers/cod.provider')>()),
   loadCodFeeConfig: vi.fn().mockResolvedValue(null),
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   Prisma: {},
   OrderStatus: {},

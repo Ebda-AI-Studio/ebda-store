@@ -56,7 +56,7 @@ many are there". Use the shared helpers:
 | Filter / sort / aggregate on stock in SQL           | `ON_HAND_SQL`                               | `apps/api/src/lib/effective-inventory-sql.ts` |
 
 Two modules on purpose: the TS helper is imported by cart, orders and several
-routes, so it stays free of any `@force/database` import — otherwise every one
+routes, so it stays free of any `@ebda/database` import — otherwise every one
 of their unit-test mocks has to stub `Prisma.sql`.
 
 Spread `EFFECTIVE_STOCK_SELECT` into a product `select` rather than listing

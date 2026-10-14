@@ -12,7 +12,7 @@
 //
 // Default dry-run; --apply commits.
 import 'dotenv/config';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 const APPLY = process.argv.includes('--apply');
 

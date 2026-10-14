@@ -3,14 +3,14 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
-import { Button, Modal, useToast } from '@force/ui';
+import { Button, Modal, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { WhatsAppIcon } from '../../../../components/icons/WhatsAppIcon';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { useAuth } from '../../../../lib/auth';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPatch, apiPut } from '../../../../lib/api';
-import { PLAN_LABELS, STORE_PLANS, type StorePlan } from '@force/shared';
+import { PLAN_LABELS, STORE_PLANS, type StorePlan } from '@ebda/shared';
 import { SettingsSearch } from '../../../../components/SettingsSearch';
 
 /**

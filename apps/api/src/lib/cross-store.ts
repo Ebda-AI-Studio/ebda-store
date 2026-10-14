@@ -1,4 +1,4 @@
-import { acrossStores, acrossStoresFlat, withUser } from '@force/database';
+import { acrossStores, acrossStoresFlat, withUser } from '@ebda/database';
 import { ownedStoreIds as definerOwnedStoreIds } from './definer';
 
 /**

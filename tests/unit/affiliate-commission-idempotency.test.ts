@@ -26,7 +26,7 @@ const h = vi.hoisted(() => ({
   payoutCreate: vi.fn(async ({ data }: { data: object }) => ({ id: 'payout-1', ...data })),
 }));
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   const prisma = {
     affiliateReferral: { findFirst: h.referralFindFirst, updateMany: h.referralUpdateMany },
     affiliate: {

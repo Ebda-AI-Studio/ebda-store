@@ -49,7 +49,7 @@ const tx = {
   },
 };
 
-vi.mock('@force/database', async () => ({
+vi.mock('@ebda/database', async () => ({
   ...(await import('./helpers/database-mock')).databaseMock({
     // `tx` is initialised after this hoisted factory runs: resolve it lazily.
     prisma: new Proxy({}, { get: (_t, k) => (tx as Record<string | symbol, unknown>)[k] }),

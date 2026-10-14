@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import { api } from '@/lib/api';
 import { classifyBundleCartError, bundleCartErrorCopy } from '@/lib/bundle-cart-errors';
 import { useLanguage } from './LanguageContext';

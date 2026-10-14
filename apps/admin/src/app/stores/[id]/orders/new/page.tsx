@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, useToast } from '@force/ui';
+import { Button, useToast } from '@ebda/ui';
 import { useLocale } from 'next-intl';
-import { EGYPT_GOVERNORATES, areasForGovernorate, roundToMinor, REGION } from '@force/shared';
+import { EGYPT_GOVERNORATES, areasForGovernorate, roundToMinor, REGION } from '@ebda/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { useAuth } from '../../../../../lib/auth';

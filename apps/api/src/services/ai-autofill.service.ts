@@ -1,5 +1,5 @@
-import { AI_AUTOFILL_FIELD_NAMES, fieldsNeedingRefresh, type AiFieldSources } from '@force/shared';
-import { prisma, withStore } from '@force/database';
+import { AI_AUTOFILL_FIELD_NAMES, fieldsNeedingRefresh, type AiFieldSources } from '@ebda/shared';
+import { prisma, withStore } from '@ebda/database';
 import { AIService } from './ai.service';
 import { isAiQuotaCapError } from '../lib/ai-quota';
 import { containsArabic } from '../lib/ai/description-richness';

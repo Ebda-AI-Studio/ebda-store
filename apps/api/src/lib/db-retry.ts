@@ -94,7 +94,7 @@ export async function retryOnWriteConflict<T>(
     } catch (err) {
       // Duck-type on `.code`/`.meta.code` rather than `instanceof
       // PrismaClientKnownRequestError`: P2034 is Prisma-specific, and
-      // instanceof breaks when `@force/database` is mocked in unit tests
+      // instanceof breaks when `@ebda/database` is mocked in unit tests
       // (PrismaClientKnownRequestError is undefined there → "Right-hand side
       // of 'instanceof' is not an object", which would mask the real error).
       // Business errors (AppError) carry codes like NOT_FOUND, never P2034

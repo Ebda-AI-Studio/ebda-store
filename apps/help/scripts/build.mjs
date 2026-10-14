@@ -4,8 +4,8 @@
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL } from '@force/shared/brand';
-import { renderMdx } from '@force/site-kit/build/mdx';
+import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL } from '@ebda/shared/brand';
+import { renderMdx } from '@ebda/site-kit/build/mdx';
 import {
   esc,
   renderFooter,
@@ -15,9 +15,9 @@ import {
   renderToc,
   writeSeoFiles,
   writeSiteCss,
-} from '@force/site-kit/build/shell';
-import { writeSearchAssets } from '@force/site-kit/build/search';
-import { loadContent, resetOut, writePage } from '@force/site-kit/build/site';
+} from '@ebda/site-kit/build/shell';
+import { writeSearchAssets } from '@ebda/site-kit/build/search';
+import { loadContent, resetOut, writePage } from '@ebda/site-kit/build/site';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.join(root, 'out');

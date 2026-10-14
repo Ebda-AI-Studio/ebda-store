@@ -12,7 +12,7 @@ import React from 'react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { layoutToDefinition, resolveLayoutSettings } from '@force/shared';
+import { layoutToDefinition, resolveLayoutSettings } from '@ebda/shared';
 import { PRODUCTS, CATEGORIES, TESTIMONIALS } from '../fixtures/builder/homepage-data';
 
 const ctx = vi.hoisted(() => ({

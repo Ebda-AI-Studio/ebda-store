@@ -9,7 +9,7 @@ import {
   runInTenantContext,
   withStore,
   withUser,
-} from '@force/database';
+} from '@ebda/database';
 import {
   deleteUserAddresses,
   deleteUserTokens,
@@ -29,7 +29,7 @@ import {
   BRAND_STORE_APP_URL,
   PASSWORD_RESET_TTL_MINUTES,
   registrationEventId as registrationEventIdFor,
-} from '@force/shared';
+} from '@ebda/shared';
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
@@ -76,7 +76,7 @@ export const GENERIC_RESEND_VERIFICATION_RESULT = {
   message: 'If an account exists with this email, a verification link has been sent.',
 } as const;
 
-/** Password-reset link lifetime (minutes): the shared constant, see @force/shared auth-policy. */
+/** Password-reset link lifetime (minutes): the shared constant, see @ebda/shared auth-policy. */
 export const RESET_TOKEN_TTL_MINUTES = PASSWORD_RESET_TTL_MINUTES;
 
 /**

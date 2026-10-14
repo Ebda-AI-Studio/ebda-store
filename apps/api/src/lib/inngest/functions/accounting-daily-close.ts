@@ -1,10 +1,10 @@
 import type { InngestFunction } from 'inngest';
-import { withStore, storeDirectory } from '@force/database';
+import { withStore, storeDirectory } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 /**
  * Nightly trial-balance integrity scan. For every store with accounting
  * enabled, sum SUM(DR) and SUM(CR) across ALL posted journal lines. If they

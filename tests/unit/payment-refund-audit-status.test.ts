@@ -15,7 +15,7 @@ const h = vi.hoisted(() => ({
   recordPaymentEvent: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { payment: { findFirst: (...a: unknown[]) => h.paymentFindFirst(...a) } },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
   withStore: (_s: string, fn: () => unknown) => fn(),

@@ -31,7 +31,7 @@
  *    the store into the dunning window with a pay-now notice instead.
  */
 import crypto from 'crypto';
-import { prisma, withStore, acrossStores, currentStoreId, type Prisma } from '@force/database';
+import { prisma, withStore, acrossStores, currentStoreId, type Prisma } from '@ebda/database';
 import { getBillingRefundStoreId, getEntityStoreId } from '../../lib/definer';
 import { pageAcrossStores } from '../../lib/cross-store';
 import { AppError } from '../../middleware/error-handler';

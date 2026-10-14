@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { ShopChrome } from '../../components';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { API_URL } from '../../lib/api';

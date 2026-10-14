@@ -22,7 +22,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { StoreTheme, StoreLocationPublic } from '@force/shared';
+import type { StoreTheme, StoreLocationPublic } from '@ebda/shared';
 import type { FooterProps } from '../types';
 
 // ── Module mocks ────────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import path from 'node:path';
 
-// axe-core is already in the tree (via @force/site-kit → lighthouse); no new dependency.
+// axe-core is already in the tree (via @ebda/site-kit → lighthouse); no new dependency.
 const AXE = path.join(process.cwd(), 'node_modules/axe-core/axe.min.js');
 
 const PAGES = [

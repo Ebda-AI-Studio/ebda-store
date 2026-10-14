@@ -3,8 +3,8 @@
  * Kept in a separate .ts file so vitest (node environment, no JSX) can import
  * and unit-test them without requiring a DOM or JSX transformer.
  */
-import { EGYPT_GOVERNORATES, areasForGovernorate } from '@force/shared';
-import type { EgyptArea, EgyptGovernorate } from '@force/shared';
+import { EGYPT_GOVERNORATES, areasForGovernorate } from '@ebda/shared';
+import type { EgyptArea, EgyptGovernorate } from '@ebda/shared';
 
 /** Filter governorates by query (substring in en or ar) and optional rated set */
 export function filterGovernorates(

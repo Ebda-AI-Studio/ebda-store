@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { prisma, runInTenantContext, SlugEntityType } from '@force/database';
+import { prisma, runInTenantContext, SlugEntityType } from '@ebda/database';
 import { BlogService } from '../../apps/api/src/services/blog.service';
 
 const EMAIL = `blog-slug-redirect-test-${Date.now()}@example.test`;

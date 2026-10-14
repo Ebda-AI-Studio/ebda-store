@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState, use } from 'react';
 import Link from 'next/link';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { SearchInput } from '../../../../components/SearchInput';
 import { apiGet, apiDelete } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 interface BlogPost {
   id: string;

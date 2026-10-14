@@ -9,7 +9,7 @@ import {
   LIVE_HOSTS,
   isLiveHost,
 } from '../../scripts/lib/carrier-sandbox-check.mjs';
-import { providersOfKind } from '@force/shared';
+import { providersOfKind } from '@ebda/shared';
 
 describe('carrier sandbox script', () => {
   it('covers exactly the API carriers of the catalog', () => {

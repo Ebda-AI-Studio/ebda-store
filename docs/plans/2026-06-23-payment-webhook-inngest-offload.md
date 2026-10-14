@@ -96,7 +96,7 @@ querying; consumer reads it before entering tenant context). Written via
 
 ## Validation
 
-- build @force/shared + @force/database (prisma generate) BEFORE typecheck.
+- build @ebda/shared + @ebda/database (prisma generate) BEFORE typecheck.
 - per-app tsc -p apps/api/tsconfig.json (NOT root tsc). lint changed files.
 - Migration hand-written SQL, idempotent IF NOT EXISTS, applies on next API boot.
 

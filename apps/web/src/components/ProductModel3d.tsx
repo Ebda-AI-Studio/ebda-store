@@ -11,10 +11,10 @@
  */
 import dynamic from 'next/dynamic';
 import { useMemo, useRef } from 'react';
-import { resolveModel3dLook, type PublicModel3d } from '@force/shared';
+import { resolveModel3dLook, type PublicModel3d } from '@ebda/shared';
 import { captureEvent } from './PostHogProvider';
 
-const ProductModelViewer = dynamic(() => import('@force/ui/model3d'), {
+const ProductModelViewer = dynamic(() => import('@ebda/ui/model3d'), {
   ssr: false,
   loading: () => null,
 });

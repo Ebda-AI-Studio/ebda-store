@@ -9,7 +9,7 @@ import {
   type CredentialFieldDef,
   type CredentialMode,
   type ProviderCatalogEntry,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { Alert } from '../../../../../components/Alert';
 import { apiPost, apiPut } from '../../../../../lib/api';

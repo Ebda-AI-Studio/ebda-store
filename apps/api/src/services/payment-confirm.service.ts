@@ -33,8 +33,8 @@
  * idempotency) is only enqueued on the first transition into `paid`.
  */
 
-import { prisma, runInTenantContext, withStore } from '@force/database';
-import type { PaymentStatus } from '@force/database';
+import { prisma, runInTenantContext, withStore } from '@ebda/database';
+import type { PaymentStatus } from '@ebda/database';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';

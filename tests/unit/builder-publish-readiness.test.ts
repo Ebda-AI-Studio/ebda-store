@@ -14,7 +14,7 @@ import {
   validateDefinitionSync,
   validatePublishReadiness,
   type PageDefinition,
-} from '@force/shared';
+} from '@ebda/shared';
 import { loadLayoutFixture } from '../fixtures/builder/homepage-data';
 
 const base = (): PageDefinition =>

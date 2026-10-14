@@ -10,7 +10,7 @@
  * suite against their own stubs.
  */
 import crypto from 'node:crypto';
-import { minorToDecimalString, toMinor } from '@force/shared';
+import { minorToDecimalString, toMinor } from '@ebda/shared';
 import {
   assertChargeable,
   assertRefundAmount,

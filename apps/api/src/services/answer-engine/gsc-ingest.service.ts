@@ -34,7 +34,7 @@
  * `gsc-client` module functions) so integration tests never make a live GSC
  * call — see tests/integration/answer-engine/gsc-ingest.test.ts.
  */
-import { prisma, Prisma, withStore } from '@force/database';
+import { prisma, Prisma, withStore } from '@ebda/database';
 import logger from '../../lib/logger';
 import {
   gscSiteUrlsForDomain,

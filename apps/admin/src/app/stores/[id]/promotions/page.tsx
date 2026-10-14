@@ -19,7 +19,7 @@ import { dateTimeLocalValue } from '@/lib/form-text';
 import { ScopePicker } from '../_components/ScopePicker';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
-import { fromMinor, roundToMinor } from '@force/shared';
+import { fromMinor, roundToMinor } from '@ebda/shared';
 import { formatPrice } from '@/lib/format';
 type PromotionType = 'percentage' | 'fixed';
 

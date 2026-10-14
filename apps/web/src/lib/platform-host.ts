@@ -1,6 +1,6 @@
 /**
  * Platform-host detection — a thin wrapper over the ONE host classifier,
- * `parseStoreHost` in `@force/shared`, shared by the storefront middleware
+ * `parseStoreHost` in `@ebda/shared`, shared by the storefront middleware
  * (server) AND `StoreProvider` (client) so the two can never drift.
  *
  * A host is either a STORE host (`<slug>.ebda.app` or a merchant custom
@@ -9,7 +9,7 @@
  * platform host never renders a store — there is no `/<slug>` path entry any
  * more (program plan §1: every store lives at `<slug>.ebda.app`).
  */
-import { parseStoreHost, PREVIEW_HOST_SUFFIXES } from '@force/shared';
+import { parseStoreHost, PREVIEW_HOST_SUFFIXES } from '@ebda/shared';
 
 /** Hosting-provider preview suffixes (re-exported for callers that list them). */
 export const PLATFORM_SUFFIXES: readonly string[] = PREVIEW_HOST_SUFFIXES;

@@ -24,7 +24,7 @@ import {
   isSafeUrl,
   type DraftChrome,
   type FooterColumn,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { Toggle } from '../../../../../components/Toggle';
 import { apiGet } from '../../../../../lib/api';

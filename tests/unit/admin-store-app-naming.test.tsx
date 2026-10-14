@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 import en from '../../apps/admin/src/i18n/messages/en.json';
 import ar from '../../apps/admin/src/i18n/messages/ar.json';
 

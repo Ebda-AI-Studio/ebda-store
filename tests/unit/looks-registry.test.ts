@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { LOOKS, LOOK_TEMPLATES, getLook, looksForTemplate, TEMPLATE_FAMILIES } from '@force/shared';
+import { LOOKS, LOOK_TEMPLATES, getLook, looksForTemplate, TEMPLATE_FAMILIES } from '@ebda/shared';
 
 describe('looks registry', () => {
   it('has exactly 3 looks per template, 15 total, unique ids', () => {

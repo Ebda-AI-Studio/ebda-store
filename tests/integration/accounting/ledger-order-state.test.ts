@@ -17,7 +17,7 @@
  *    already cancelled or refunded.
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { inngest } from '@api/lib/inngest/client';
 import { withDeferredWork } from '@api/lib/after-tenant-commit';
 import { OrderService } from '@api/services/order.service';

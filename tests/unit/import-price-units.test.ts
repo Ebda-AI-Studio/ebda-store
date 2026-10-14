@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import ExcelJS from 'exceljs';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { parsePriceCell } from '../../apps/api/src/services/price-cell';
 import { importCsvToPlatformCsv, parseCsvRecords } from '../../apps/api/src/services/csv-import';
 import { xlsxBufferToImportCsv } from '../../apps/api/src/services/xlsx-import';

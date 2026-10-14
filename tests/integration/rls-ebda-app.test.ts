@@ -42,7 +42,7 @@ import {
   withSystemJob,
   prisma,
   type AppPrismaClient,
-} from '@force/database';
+} from '@ebda/database';
 import {
   resolveStoreId,
   getUserState,

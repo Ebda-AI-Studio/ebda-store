@@ -6,7 +6,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMoney, fmt } from '@/lib/format';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 interface RefundButtonProps {
   storeId: string;
   orderId: string;

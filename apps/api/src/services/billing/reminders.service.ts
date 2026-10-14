@@ -8,7 +8,7 @@
  * run the same day sends nothing. Only the most specific due offset is sent: a
  * job that missed days does not replay the older reminders.
  */
-import { prisma, withStore, acrossStores } from '@force/database';
+import { prisma, withStore, acrossStores } from '@ebda/database';
 import { config } from '../../config';
 import { getEntityStoreId } from '../../lib/definer';
 import logger from '../../lib/logger';

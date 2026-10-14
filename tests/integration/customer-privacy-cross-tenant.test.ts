@@ -22,7 +22,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import { resolveStoreCustomerOrThrow } from '../../apps/api/src/routes/customers.routes';
 
 const hasDb =

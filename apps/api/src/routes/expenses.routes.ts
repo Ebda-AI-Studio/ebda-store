@@ -7,9 +7,9 @@ import { requireFeature } from '../middleware/feature-gate';
 import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
 import { StorageService } from '../services/storage.service';
 import { enforceMaxDimensions } from '../services/image-resize.service';
-import { runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@ebda/database';
 import { inngest } from '../lib/inngest/client';
-import { ALLOWED_CURRENCIES, REGION } from '@force/shared';
+import { ALLOWED_CURRENCIES, REGION } from '@ebda/shared';
 import logger from '../lib/logger';
 import {
   createExpense,

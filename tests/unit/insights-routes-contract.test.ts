@@ -7,7 +7,7 @@
  *    an all-time revenue ranking with the parent `inventory` column), so every
  *    column rendered blank or 0 (2026-09-30 audit, finding 2). The response is
  *    parsed here with the SAME Zod schema the page's types come from
- *    (`productVelocityResponseSchema`, @force/shared). Stock must be the
+ *    (`productVelocityResponseSchema`, @ebda/shared). Stock must be the
  *    variant-aware effective stock, never `products.inventory`
  *    (docs/architecture/inventory-model.md).
  *
@@ -38,7 +38,7 @@ const { mockPrisma } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
   RfmSegment: {

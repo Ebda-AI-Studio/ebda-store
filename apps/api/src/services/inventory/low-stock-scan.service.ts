@@ -24,7 +24,7 @@
  * This is consistent with the owner being the admin managing the store.
  */
 
-import { withStore } from '@force/database';
+import { withStore } from '@ebda/database';
 import { redis } from '../redis.service';
 import { effectiveInventory } from '../../lib/effective-inventory';
 import logger from '../../lib/logger';

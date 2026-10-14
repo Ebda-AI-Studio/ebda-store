@@ -1,4 +1,4 @@
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma } from '@ebda/database';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { withSavepoint } from '../lib/savepoint';
 import logger from '../lib/logger';

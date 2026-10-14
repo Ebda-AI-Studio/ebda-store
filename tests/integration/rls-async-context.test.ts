@@ -24,7 +24,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
-import { prisma, runInTenantContext, withOwnerTx } from '@force/database';
+import { prisma, runInTenantContext, withOwnerTx } from '@ebda/database';
 
 // Skip when there is no real DB (unit-test environment)
 const hasDb =

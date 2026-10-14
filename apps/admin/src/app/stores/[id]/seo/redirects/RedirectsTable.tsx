@@ -1,7 +1,7 @@
 'use client';
 
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 // Split out of page.tsx as a pure function of its props (#903) so it is
 // testable without AdminLayout's context tree (auth/store/features/router) —

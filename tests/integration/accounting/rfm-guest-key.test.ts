@@ -17,7 +17,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createHash } from 'node:crypto';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import { runRfmRollup } from '@api/services/accounting/analytics-rollup.service';
 import { rfmKeyFor } from '@api/lib/customer-key';
 import { aggregateCustomers, segmentsForCustomers } from '@api/services/customer-aggregate.service';

@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { BRAND } from '@force/shared/brand';
+import { BRAND } from '@ebda/shared/brand';
 import { type Locale } from '../lib/site';
 import { EbdaTracking } from './EbdaTracking';
 import '@/app/globals.css';

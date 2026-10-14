@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 
-import { resolveDefaultLanguage } from '@force/shared';
+import { resolveDefaultLanguage } from '@ebda/shared';
 /**
  * The storefront's only two render locales. Kept as its own type (rather
  * than importing `Language` from LanguageContext) so this module has zero

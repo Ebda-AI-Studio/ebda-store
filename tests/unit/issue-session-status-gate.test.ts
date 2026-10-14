@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { mockCreate } = vi.hoisted(() => ({ mockCreate: vi.fn(async () => ({ id: 'rt-1' })) }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { refreshToken: { create: mockCreate } },
   // The session row is written as the user it belongs to: run the callback on the same fake.
   withUser: async (_userId: string, fn: (tx: unknown) => unknown) =>

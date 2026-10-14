@@ -22,7 +22,7 @@ const paymentFindFirst = vi.fn();
 const paymentUpdate = vi.fn().mockResolvedValue({});
 const orderUpdate = vi.fn().mockResolvedValue({});
 const orderFindFirst = vi.fn().mockResolvedValue({ status: 'delivered' });
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     payment: {
       findFirst: (...a: unknown[]) => paymentFindFirst(...a),

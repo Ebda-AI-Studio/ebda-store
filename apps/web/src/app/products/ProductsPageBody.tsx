@@ -9,7 +9,7 @@ import {
   type ProductCardDefaults,
   type FilterSidebarSettings,
   type ProductsPageSettings,
-} from '@force/shared';
+} from '@ebda/shared';
 import { breadcrumbJsonLd, itemList, storeAbsoluteUrl } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
 import ProductsClient from './ProductsClient';

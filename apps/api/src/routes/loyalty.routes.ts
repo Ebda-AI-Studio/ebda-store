@@ -4,7 +4,7 @@ import { authenticate, authorize, customerUserId } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { LoyaltyService } from '../services/loyalty.service';
-import { LoyaltyTransactionType, prisma } from '@force/database';
+import { LoyaltyTransactionType, prisma } from '@ebda/database';
 import { tenantContext } from '../middleware/tenant-context';
 import { rangeOrLegacyDays } from '../lib/report-range';
 

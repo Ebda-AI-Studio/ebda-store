@@ -1,6 +1,6 @@
 import { assertStoreOwnsInTenantScope } from './assert-store-owns';
 import { AppError } from '../../middleware/error-handler';
-import { prisma, Prisma, withMoneyTx } from '@force/database';
+import { prisma, Prisma, withMoneyTx } from '@ebda/database';
 import type { StockAdjustment, StockAdjustmentItem, StockAdjustmentType } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { inngest } from '../../lib/inngest/client';

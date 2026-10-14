@@ -214,7 +214,7 @@ describe.skipIf(!hasDb)('public bundle list route', () => {
     // route were still uncached (the pre-#1565 shape), this would already
     // reflect the deactivation; the whole point of caching this route is that
     // it does NOT, for up to the TTL.
-    const { prisma } = await import('@force/database');
+    const { prisma } = await import('@ebda/database');
     await prisma.bundle.update({ where: { id: bundleId }, data: { isActive: false } });
     const second = await cart.publicBundles().expect(200);
     expect(second.body.data.bundles.map((b: { id: string }) => b.id)).toContain(bundleId);

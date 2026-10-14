@@ -1,4 +1,4 @@
-import { OrderStatus } from '@force/database';
+import { OrderStatus } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 
 /**
@@ -31,7 +31,7 @@ import { AppError } from '../middleware/error-handler';
  * Lives in its own module (no service/inngest imports) so any status writer
  * can import the guard without pulling in the heavy OrderService dependency
  * graph. The merchant surfaces (admin list + order page, orders PWA) read
- * `ORDER_STATUS_TRANSITIONS` in @force/shared; change both together —
+ * `ORDER_STATUS_TRANSITIONS` in @ebda/shared; change both together —
  * tests/unit/order-status-transitions-parity.test.ts fails when they differ.
  */
 export const VALID_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {

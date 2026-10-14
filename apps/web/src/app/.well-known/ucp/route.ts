@@ -5,7 +5,7 @@ import {
   storefrontBaseUrl,
 } from '../../../lib/agent-store-resolver';
 
-import { REGION, minorUnitsPerMajor } from '@force/shared';
+import { REGION, minorUnitsPerMajor } from '@ebda/shared';
 /**
  * `/.well-known/ucp` — Universal Commerce Protocol discovery.
  *

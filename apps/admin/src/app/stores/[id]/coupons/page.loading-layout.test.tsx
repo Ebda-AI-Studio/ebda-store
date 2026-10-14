@@ -37,7 +37,7 @@ vi.mock('../../../../hooks/useRequireFeature', () => ({
   useRequireFeature: () => ({ enabled: true, isLoading: false, gate: gate.value }),
 }));
 
-import { ToastProvider } from '@force/ui';
+import { ToastProvider } from '@ebda/ui';
 import CouponsPage from './page';
 
 beforeEach(() => {

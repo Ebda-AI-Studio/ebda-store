@@ -1,7 +1,7 @@
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import type { Prisma, Supplier, SupplierPaymentTerms } from '@prisma/client';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 export interface CreateSupplierInput {
   storeId: string;
   name: string;

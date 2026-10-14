@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Button } from '@force/ui';
-import { buildStoreShareMessage, resolveDefaultLanguage, waMeShareLink } from '@force/shared';
+import { Button } from '@ebda/ui';
+import { buildStoreShareMessage, resolveDefaultLanguage, waMeShareLink } from '@ebda/shared';
 import { apiPost } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
 import type { OnboardingStore } from './types';

@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
-import { deriveCoreBrandTokens } from '@force/shared';
+import { deriveCoreBrandTokens } from '@ebda/shared';
 import { BrandPreview } from './BrandPreview';
 import { ImageUpload } from '../../../../../components/ImageUpload';
 import { ColorField } from '../../../../../components/ColorField';
 import { hexToHsl, hslToHex } from '../../../../../lib/color';
 import type { StoreBranding, StoreTheme } from './types';
-import type { StoreTheme as SharedStoreTheme } from '@force/shared';
+import type { StoreTheme as SharedStoreTheme } from '@ebda/shared';
 
 interface ThemeTabProps {
   branding: StoreBranding;

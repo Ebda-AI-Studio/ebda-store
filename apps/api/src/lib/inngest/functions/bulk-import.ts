@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInStoreScope, withStore } from '@force/database';
+import { prisma, runInStoreScope, withStore } from '@ebda/database';
 import { BulkService } from '../../../services/bulk.service';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import logger from '../../logger';

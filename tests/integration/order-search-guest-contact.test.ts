@@ -25,7 +25,7 @@
  *     or one that drops `customer_id IS NULL`, cannot use them and reddens this.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma } from '@ebda/database';
 import { hasDb } from '../helpers/bundle-fixtures';
 
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({

@@ -9,7 +9,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 
-import { roundToMinor } from '@force/shared';
+import { roundToMinor } from '@ebda/shared';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface SupplierOption {

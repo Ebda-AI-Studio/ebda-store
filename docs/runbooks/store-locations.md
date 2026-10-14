@@ -46,7 +46,7 @@ Mounted under `/api/v1` (`apps/api/src/routes/locations.routes.ts`):
 
 Service: `apps/api/src/services/locations.service.ts` (`list / listPublished / create / update / remove`).
 Updates/deletes are scoped by `{ id, storeId }` so a tenant can never touch another store's row by id.
-Input validated by `locationInputSchema` (`@force/shared`) — `mapsUrl`/`mapsEmbedUrl` must be http(s) (anti-XSS).
+Input validated by `locationInputSchema` (`@ebda/shared`) — `mapsUrl`/`mapsEmbedUrl` must be http(s) (anti-XSS).
 
 ## Admin
 

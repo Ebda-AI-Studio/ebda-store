@@ -21,7 +21,7 @@ import {
   markSessionEvidence,
   clearStoredSession,
 } from './api';
-import { isIosWebkit, safeInternalPath } from '@force/shared';
+import { isIosWebkit, safeInternalPath } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 

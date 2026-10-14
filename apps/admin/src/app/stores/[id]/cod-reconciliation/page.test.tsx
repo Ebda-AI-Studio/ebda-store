@@ -27,7 +27,7 @@ vi.mock('../../../../hooks/useRequireFeature', () => ({
 }));
 vi.mock('../../../../lib/api', () => api);
 
-import { ToastProvider } from '@force/ui';
+import { ToastProvider } from '@ebda/ui';
 import CodReconciliationPage from './page';
 
 const REPORT = {

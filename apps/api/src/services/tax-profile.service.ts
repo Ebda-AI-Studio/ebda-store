@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { prisma, withUser, type Prisma } from '@force/database';
+import { prisma, withUser, type Prisma } from '@ebda/database';
 import {
   TAX_DOCUMENT_MAX_BYTES,
   TAX_DOCUMENT_MAX_COUNT,
@@ -8,7 +8,7 @@ import {
   type TaxDocumentKindValue,
   type TaxProfileStatusValue,
   type TaxReviewDecision,
-} from '@force/shared';
+} from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import { StorageService } from './storage.service';

@@ -17,8 +17,8 @@ import {
   runInStoreScope,
   runInTenantContext,
   storeDirectory,
-} from '@force/database';
-import { BRAND, getProviderEntry, isActivationRequestable, ACTIVATION_HOURS } from '@force/shared';
+} from '@ebda/database';
+import { BRAND, getProviderEntry, isActivationRequestable, ACTIVATION_HOURS } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';

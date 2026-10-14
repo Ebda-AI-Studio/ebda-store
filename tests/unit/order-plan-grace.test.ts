@@ -5,7 +5,7 @@ const m = vi.hoisted(() => ({
   sub: vi.fn(),
   store: vi.fn(),
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {},
   withStore: (_id: string, fn: Function) =>
     fn({

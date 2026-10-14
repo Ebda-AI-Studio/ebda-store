@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
-import { prisma, withOwnerTx } from '@force/database';
+import { prisma, withOwnerTx } from '@ebda/database';
 
 // F3: prove cross-tenant isolation holds at BOTH layers:
 //  1. RLS — a query executed as the `ebda_app` role with storeA context must

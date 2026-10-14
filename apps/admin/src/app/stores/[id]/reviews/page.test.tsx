@@ -19,7 +19,7 @@ const { apiGet, apiPost, calls, posts } = vi.hoisted(() => ({
 
 vi.mock('@/lib/api', () => ({ apiGet, apiPost, apiPut: vi.fn(), apiDelete: vi.fn() }));
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'store-1' }) }));
-vi.mock('@force/ui', () => ({
+vi.mock('@ebda/ui', () => ({
   Button: ({ children, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
     <button {...rest}>{children}</button>
   ),

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { GeoResultsPanel } from './_components/GeoResultsPanel';
@@ -12,7 +12,7 @@ import { AiUsageSummaryCard } from '../../../../components/ai/AiUsageSummaryCard
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { useT } from '../../../../i18n/useT';
 import { DataTable, type DataTableColumn } from '../../../../components/mobile/DataTable';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 /**
  * Bulk AI sweeps — kick off a catalogue-wide translation or SEO

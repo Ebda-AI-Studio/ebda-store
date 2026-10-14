@@ -7,8 +7,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
-import { Button, Badge, useToast } from '@force/ui';
-import type { StoreLayoutSettings } from '@force/shared';
+import { Button, Badge, useToast } from '@ebda/ui';
+import type { StoreLayoutSettings } from '@ebda/shared';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import {
   resolveSectionZone,
@@ -43,11 +43,11 @@ import {
   resolveCardBadges,
 } from '../../../templates/shared/custom-badge';
 
-import { fromMinor, model3dSwatchColor } from '@force/shared';
+import { fromMinor, model3dSwatchColor } from '@ebda/shared';
 import { Model3dToggle, ProductModel3dPanel } from '../../../components/ProductModel3d';
 import { captureEvent } from '../../../components/PostHogProvider';
 import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
 const FrequentlyBoughtTogether = dynamic(() =>

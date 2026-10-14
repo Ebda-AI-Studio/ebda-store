@@ -123,7 +123,7 @@ const { mockPrisma, TOKEN_OWNER, mockLogger, store, byToken, reset } = vi.hoiste
 });
 
 // `withUser` (the token owner is read as themselves under strict RLS) runs on the same fake client.
-vi.mock('@force/database', async () => ({
+vi.mock('@ebda/database', async () => ({
   ...(await import('./helpers/database-mock')).databaseMock({ prisma: mockPrisma }),
   Prisma: {},
 }));

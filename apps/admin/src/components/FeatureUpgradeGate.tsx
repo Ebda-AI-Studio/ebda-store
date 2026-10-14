@@ -9,8 +9,8 @@
  *     registry — no per-feature hardcoding needed here).
  *   - Chrome ("Available on X", "Upgrade to X", etc.): `featureUpgrade` i18n
  *     namespace added to en.json + ar.json.
- *   - Unlocking plan: lowestPlanForFeature() from @force/shared.
- *   - Plan display label: PLAN_LABELS from @force/shared.
+ *   - Unlocking plan: lowestPlanForFeature() from @ebda/shared.
+ *   - Plan display label: PLAN_LABELS from @ebda/shared.
  *
  * Contact CTA:
  *   Both the primary upgrade button and the secondary "Talk to us" link point
@@ -18,7 +18,7 @@
  */
 
 import { useLocale, useTranslations } from 'next-intl';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { AdminLayout } from './AdminLayout';
 import {
   FEATURE_REGISTRY,
@@ -26,7 +26,7 @@ import {
   PLAN_LABELS,
   lowestPlanForFeature,
   type FeatureKey,
-} from '@force/shared';
+} from '@ebda/shared';
 
 // ─── Contact constant ─────────────────────────────────────────────────────────
 

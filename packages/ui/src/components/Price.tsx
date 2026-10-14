@@ -2,7 +2,7 @@
 
 import { forwardRef } from 'react';
 import { cn } from '../utils/cn';
-import { formatPrice, localizeDigits, REGION, type Numerals } from '@force/shared';
+import { formatPrice, localizeDigits, REGION, type Numerals } from '@ebda/shared';
 
 export interface PriceProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Price in piastres (1 EGP = 100 piastres). For products with variants
@@ -121,5 +121,5 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
 
 Price.displayName = 'Price';
 
-// Re-export the shared formatPrice for consumers that imported it from @force/ui
-export { formatPrice } from '@force/shared';
+// Re-export the shared formatPrice for consumers that imported it from @ebda/ui
+export { formatPrice } from '@ebda/shared';

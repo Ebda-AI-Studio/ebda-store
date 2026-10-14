@@ -446,7 +446,7 @@ Same pattern Batch 2 used for `stock/po-received` → `accounting-post-po-receiv
 
 1. Prisma schema additions (3 new tables, 2 enum additions, Expense + Store extensions)
 2. Hand-written migration (CHECKs + RLS, NO Prisma diff)
-3. Re-export new enums from `@force/database`
+3. Re-export new enums from `@ebda/database`
 
 ### Group B — Reorder + Dead-stock jobs
 

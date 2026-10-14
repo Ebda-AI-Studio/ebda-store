@@ -54,8 +54,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { withRlsBypass, runInTenantContext } from '@force/database';
-import { groupOrderLinesForDisplay, minorToDecimalString } from '@force/shared';
+import { withRlsBypass, runInTenantContext } from '@ebda/database';
+import { groupOrderLinesForDisplay, minorToDecimalString } from '@ebda/shared';
 import { InvoiceService } from '@api/services/invoice.service';
 import { orderConfirmationTemplate } from '@api/services/email-templates/order-confirmation';
 import type { OrderEmailData } from '@api/services/email.service';

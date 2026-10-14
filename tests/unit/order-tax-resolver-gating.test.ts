@@ -21,7 +21,7 @@ const taxRateFindMany = vi.fn();
 const profileFindUnique = vi.fn();
 const isFeatureEnabled = vi.fn();
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   const client = {
     store: { findUnique: (...args: unknown[]) => storeFindUnique(...args) },
     taxRate: { findMany: (...args: unknown[]) => taxRateFindMany(...args) },

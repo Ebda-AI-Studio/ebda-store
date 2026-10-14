@@ -42,7 +42,7 @@ vi.mock('@api/lib/logger', () => ({
 // generateManifest/PWAService pulls in prisma + feature.service + revalidate —
 // none of which this file exercises, but the module graph is shared, so stub
 // enough that importing pwa.service.ts doesn't explode.
-vi.mock('@force/database', () => ({ prisma: {}, Prisma: {} }));
+vi.mock('@ebda/database', () => ({ prisma: {}, Prisma: {} }));
 vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: vi.fn().mockResolvedValue(true) },
 }));

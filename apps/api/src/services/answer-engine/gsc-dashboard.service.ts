@@ -25,7 +25,7 @@
  * and the UI renders a "Google Search Console not connected" empty state
  * instead of a chart.
  */
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { getCachedAnalytics } from '../analytics.service';
 
 export interface GscTrendPoint {

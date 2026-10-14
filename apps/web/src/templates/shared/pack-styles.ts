@@ -1,4 +1,4 @@
-import type { TemplateId } from '@force/shared';
+import type { TemplateId } from '@ebda/shared';
 
 /**
  * Per-pack style tokens for the 5 shared Pecannbee-flow sections
@@ -15,7 +15,7 @@ import type { TemplateId } from '@force/shared';
  *   - hover scale is gentle (1.01–1.03), never aggressive (1.05+)
  *   - section-heading typography is confident at desktop (text-3xl+)
  *
- * Adding a new pack: extend `TemplateId` in @force/shared and add a row here.
+ * Adding a new pack: extend `TemplateId` in @ebda/shared and add a row here.
  * The shared components fall back to `modern` when an id isn't found.
  */
 export interface PackStyles {

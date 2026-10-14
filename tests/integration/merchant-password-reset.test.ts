@@ -23,7 +23,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'crypto';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import merchantSignupRoutes from '@api/routes/merchant-signup.routes';
 import authRoutes from '@api/routes/auth.routes';
 import { errorHandler } from '@api/middleware/error-handler';

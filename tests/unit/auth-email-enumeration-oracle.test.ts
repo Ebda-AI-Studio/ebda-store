@@ -43,7 +43,7 @@ vi.mock('@api/services/auth.service', async () => {
   };
 });
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { user: { findFirst: (...a: unknown[]) => mockUserFindFirst(...a) } },
 }));
 

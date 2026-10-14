@@ -7,7 +7,7 @@
  * the change reaches production.
  *
  * Strategy:
- *  - vi.mock('@force/database') — no real DB, no Neon connection needed
+ *  - vi.mock('@ebda/database') — no real DB, no Neon connection needed
  *  - vi.mock('../services/encryption.service') — bypass key decrypt
  *  - Boot a minimal Express app mounting only wa-bridge.routes
  *  - Validate all response bodies through Zod schemas derived from WBS
@@ -215,8 +215,8 @@ vi.mock('../../apps/api/src/lib/definer', () => ({
   ]),
 }));
 
-// Mock @force/database before importing the route
-vi.mock('@force/database', () => {
+// Mock @ebda/database before importing the route
+vi.mock('@ebda/database', () => {
   const prisma = {
     store: {
       findMany: vi.fn(),
@@ -252,7 +252,7 @@ vi.mock('@force/database', () => {
 });
 
 // Task 10: /store-catalog now checks the `bundles` feature. Mocked directly
-// (rather than mocking @force/database's withRlsBypass/storeFeature that
+// (rather than mocking @ebda/database's withRlsBypass/storeFeature that
 // FeatureService.readFromDb needs) — same pattern as
 // tests/unit/backorder-enforcement.test.ts. Every existing test in this file
 // predates bundles and expects the pre-Task-10 catalog shape, so the default
@@ -314,7 +314,7 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
     app = await buildApp();
 
     // Wire default prisma mocks
-    const { prisma } = await import('@force/database');
+    const { prisma } = await import('@ebda/database');
     (prisma.store.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([MOCK_STORE]);
     (prisma.store.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(MOCK_STORE);
     (prisma.category.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([MOCK_CATEGORY]);
@@ -387,7 +387,7 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
         'test-jwt-secret-for-contract-tests',
         { algorithm: 'HS256', issuer: 'force-api', audience: 'force-wa-cart', expiresIn: 600 }
       );
-      const { prisma } = await import('@force/database');
+      const { prisma } = await import('@ebda/database');
       (prisma.store.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         id: MOCK_STORE.id,
         slug: 'x',
@@ -469,7 +469,7 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
   // `effectiveInventory` fell back to the stale parent column — the bot told
   // shoppers it was in stock while the cart refused every variant.
   it('200 — a product whose variants are ALL disabled is out of stock and lists no variants', async () => {
-    const { prisma } = await import('@force/database');
+    const { prisma } = await import('@ebda/database');
     (prisma.product.findMany as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
       {
         ...MOCK_PRODUCT,
@@ -551,7 +551,7 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
   // ── Store not found ──────────────────────────────────────────────────────────
 
   it('404 — store not found after auth', async () => {
-    const { prisma } = await import('@force/database');
+    const { prisma } = await import('@ebda/database');
     // Auth passes (first findUnique returns the store) but the route's own findUnique returns null
     (prisma.store.findUnique as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce(MOCK_STORE)
@@ -633,13 +633,13 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
       expect(res.body.catalog.products[0].id).toBe(MOCK_PRODUCT.id);
       expect(res.body.catalog.products.some((p: { isBundle?: boolean }) => p.isBundle)).toBe(false);
       // bundles is disabled -> listPurchasableBundles must never be queried.
-      const { prisma } = await import('@force/database');
+      const { prisma } = await import('@ebda/database');
       expect(prisma.bundle.findMany).not.toHaveBeenCalled();
     });
 
     it('enabled: a purchasable bundle appears as a sibling product entry with isBundle:true, correct price, and Arabic name — without leaking per-component prices', async () => {
       const { featureService } = await import('../../apps/api/src/services/feature.service');
-      const { prisma } = await import('@force/database');
+      const { prisma } = await import('@ebda/database');
       (featureService.isFeatureEnabled as ReturnType<typeof vi.fn>).mockImplementation(
         featuresOn('whatsapp', 'bundles')
       );
@@ -709,7 +709,7 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
     const BUNDLE_ID = 'bbbbbbbb-6666-6666-6666-bbbbbbbbbbbb';
 
     it('collapses a bundle box in lastOrder.items into ONE row — never its per-component allocated prices — and emits the bundle id, not null (NEW-P1)', async () => {
-      const { prisma } = await import('@force/database');
+      const { prisma } = await import('@ebda/database');
       (prisma.user.findFirst as ReturnType<typeof vi.fn>).mockResolvedValueOnce(RETURNING_USER);
       (prisma.order.findMany as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
         {
@@ -801,7 +801,7 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
     });
 
     it('NEW-P1: a repeat-order payload built from this bundle row round-trips through cartFromWaSchema (WBS `handleRepeatLastOrder` shape)', async () => {
-      const { prisma } = await import('@force/database');
+      const { prisma } = await import('@ebda/database');
       const { cartFromWaSchema } = await import('../../apps/api/src/routes/wa-bridge.routes');
       (prisma.user.findFirst as ReturnType<typeof vi.fn>).mockResolvedValueOnce(RETURNING_USER);
       (prisma.order.findMany as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
@@ -869,7 +869,7 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
     });
 
     it('leaves a non-bundle lastOrder unchanged — one item row per product, same shape as before this fix', async () => {
-      const { prisma } = await import('@force/database');
+      const { prisma } = await import('@ebda/database');
       (prisma.user.findFirst as ReturnType<typeof vi.fn>).mockResolvedValueOnce(RETURNING_USER);
       (prisma.order.findMany as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
         {

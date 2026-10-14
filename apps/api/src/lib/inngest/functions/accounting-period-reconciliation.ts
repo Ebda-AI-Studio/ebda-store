@@ -1,10 +1,10 @@
 import type { InngestFunction } from 'inngest';
-import { withStore, storeDirectory } from '@force/database';
+import { withStore, storeDirectory } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 /**
  * Cross-check: SUM(Order.total where paymentStatus='paid' AND createdAt in last 24h)
  * MUST equal SUM(JournalLine.credit where account.code IN ('4000','4010','2100')

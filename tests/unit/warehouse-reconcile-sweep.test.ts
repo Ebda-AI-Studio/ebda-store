@@ -24,7 +24,7 @@ const h = vi.hoisted(() => ({
   sendAlert: vi.fn().mockResolvedValue('sent'),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   runInTenantContext: h.runInTenant,
   runInStoreScope: h.runInStoreScope,
   prisma: {},

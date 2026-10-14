@@ -1,6 +1,6 @@
 /**
  * Page-local switch used next to each carrier's "enabled" and
- * "isDefault" controls. Stays here rather than moving into @force/ui
+ * "isDefault" controls. Stays here rather than moving into @ebda/ui
  * because it's tuned for the carrier-settings card and has no other
  * callers.
  */

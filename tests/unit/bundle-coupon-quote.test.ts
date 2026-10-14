@@ -210,7 +210,7 @@ vi.mock('@api/services/payment-providers/cod.provider', async importOriginal => 
   ...(await importOriginal<typeof import('@api/services/payment-providers/cod.provider')>()),
   loadCodFeeConfig: vi.fn().mockResolvedValue(null),
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   scopeTransaction: (tx: any, _g: unknown, fn: any) => fn(tx),
   prisma: mockPrisma,

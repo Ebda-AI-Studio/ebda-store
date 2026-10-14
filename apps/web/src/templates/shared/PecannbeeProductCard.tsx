@@ -6,9 +6,9 @@ import { memo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ProductCardProps } from '../types';
-import type { TemplateId, ProductCardSize } from '@force/shared';
-import { getProductCardTextSizes, resolveColor } from '@force/shared';
-import { cn, CartIcon } from '@force/ui';
+import type { TemplateId, ProductCardSize } from '@ebda/shared';
+import { getProductCardTextSizes, resolveColor } from '@ebda/shared';
+import { cn, CartIcon } from '@ebda/ui';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { useNumerals } from '../../hooks/useNumerals';
@@ -36,8 +36,8 @@ import { BrandPill } from './BrandPill';
 import { getDiscountBadgeColor } from './discount-badge';
 import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
 
-import { fromMinor } from '@force/shared';
-import { REGION } from '@force/shared';
+import { fromMinor } from '@ebda/shared';
+import { REGION } from '@ebda/shared';
 interface PecannbeeProductCardProps extends ProductCardProps {
   pack?: TemplateId;
   /**

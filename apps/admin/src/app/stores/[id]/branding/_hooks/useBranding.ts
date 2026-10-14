@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import { apiGet, apiPut } from '../../../../../lib/api';
 import { DEFAULT_THEME, type StoreBranding, type StoreTheme } from '../_components/types';
 import { themePatch } from './theme-patch';

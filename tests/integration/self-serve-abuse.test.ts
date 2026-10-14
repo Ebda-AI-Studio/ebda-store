@@ -15,7 +15,7 @@ import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { config } from '@api/config';
 import onboardingRoutes from '@api/routes/onboarding.routes';
 import { redis } from '@api/services/redis.service';

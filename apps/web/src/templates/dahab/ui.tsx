@@ -173,7 +173,7 @@ export const ZoomIcon = (p: IconProps) => (
   </svg>
 );
 
-/** Trust-badge glyphs (keys = TRUST_BADGE_ICONS in @force/shared). */
+/** Trust-badge glyphs (keys = TRUST_BADGE_ICONS in @ebda/shared). */
 export const BADGE_GLYPHS: Record<string, ReactNode> = {
   cod: (
     <>

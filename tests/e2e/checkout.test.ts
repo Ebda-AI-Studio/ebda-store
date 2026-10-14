@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import express, { Router } from 'express';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import cartRoutes from '@api/routes/cart.routes';
 import orderRoutes from '@api/routes/order.routes';
 import couponRoutes from '@api/routes/coupon.routes';

@@ -1,5 +1,5 @@
-import type { StoreTheme, TemplateId } from '@force/shared';
-import { colorToHslTriplet, resolveBackgroundPreset } from '@force/shared';
+import type { StoreTheme, TemplateId } from '@ebda/shared';
+import { colorToHslTriplet, resolveBackgroundPreset } from '@ebda/shared';
 
 /**
  * Resolves the EFFECTIVE footer background color so `ShopChrome`'s

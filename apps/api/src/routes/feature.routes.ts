@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
-import { asPlatformOperator, prisma } from '@force/database';
-import { featureKeySchema, featureUpdatesSchema, FEATURE_REGISTRY } from '@force/shared';
+import { asPlatformOperator, prisma } from '@ebda/database';
+import { featureKeySchema, featureUpdatesSchema, FEATURE_REGISTRY } from '@ebda/shared';
 import { featureService } from '../services/feature.service';
 import { auditLog } from '../middleware/security';
 

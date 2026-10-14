@@ -91,7 +91,7 @@ interface JournalLineInput {
 }
 ```
 
-When `currency !== 'KWD'`, `postEntry` passes `fxRate` and `originalAmount` through to the DB row. The **caller is responsible for pre-computing KWD `debit`/`credit`** using `convertToKwd()` from `@force/shared`.
+When `currency !== 'KWD'`, `postEntry` passes `fxRate` and `originalAmount` through to the DB row. The **caller is responsible for pre-computing KWD `debit`/`credit`** using `convertToKwd()` from `@ebda/shared`.
 
 `createData.lines.create` now includes `currency`, `fxRate`, `originalAmount`.
 

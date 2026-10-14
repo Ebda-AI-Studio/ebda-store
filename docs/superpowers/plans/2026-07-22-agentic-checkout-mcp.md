@@ -6,7 +6,7 @@
 
 **Architecture:** A new Express router at `/api/v1/mcp/:storeSlug` builds a stateless MCP server (`@modelcontextprotocol/sdk`, Streamable HTTP, one server+transport per request) bound to the resolved store. Each MCP tool is a thin Zod-validated wrapper over an existing service (`ProductService`, `CartService`, `OrderService`, `PaymentService`). Availability is gated by a new `agent_checkout` feature key (default-on for all paid plans). Agent-created orders are stamped `Order.source='agent'` for audit only — they get and are denied nothing extra vs a human guest order.
 
-**Tech Stack:** Express + TypeScript (`apps/api`), `@modelcontextprotocol/sdk` (stable 1.x), Prisma + Neon, Zod (`@force/shared`), Vitest integration tests against ephemeral Postgres 16 + Redis 7.
+**Tech Stack:** Express + TypeScript (`apps/api`), `@modelcontextprotocol/sdk` (stable 1.x), Prisma + Neon, Zod (`@ebda/shared`), Vitest integration tests against ephemeral Postgres 16 + Redis 7.
 
 **Source of truth:** spec `docs/superpowers/specs/2026-07-22-agentic-checkout-mcp-design.md`.
 
@@ -89,7 +89,7 @@ describe('agent_checkout feature key', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npm run test:unit -w @force/shared -- features` (confirm the exact vitest invocation the repo uses)
+Run: `npm run test:unit -w @ebda/shared -- features` (confirm the exact vitest invocation the repo uses)
 Expected: FAIL — `agent_checkout` not in array.
 
 - [ ] **Step 3: Implement — register the feature key**
@@ -114,7 +114,7 @@ In `packages/shared/src/plan-baselines.ts`, add `'agent_checkout'` to the `START
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npm run test:unit -w @force/shared -- features`
+Run: `npm run test:unit -w @ebda/shared -- features`
 Expected: PASS.
 
 - [ ] **Step 5: Add the MCP SDK dependency + audit**
@@ -1097,7 +1097,7 @@ git commit -m "feat: advertise mcp endpoint in llms.txt + admin agent-order badg
 - [ ] `npm run typecheck` — clean across workspaces.
 - [ ] `npm run lint` — clean.
 - [ ] `npx vitest run apps/api/tests/integration/mcp/agent-checkout.test.ts` — all green.
-- [ ] `npm run test:unit -w @force/shared` — feature-key tests green.
+- [ ] `npm run test:unit -w @ebda/shared` — feature-key tests green.
 - [ ] `npm audit --omit=dev --audit-level=high` — 0 high/critical.
 - [ ] Manual MCP smoke: point a real MCP client (or `npx @modelcontextprotocol/inspector`) at `http://localhost:4000/api/v1/mcp/<slug>` → `tools/list` shows 7 tools → run `search_products` → `add_to_cart` → `place_order` (cod).
 - [ ] Blast-radius statement in the PR body (`source`, `agent_checkout`, `/mcp` route swept across code + docs + feature matrix → clean/fixed).

@@ -20,7 +20,7 @@ vi.mock('@api/services/redis.service', () => ({
   },
 }));
 
-vi.mock('@force/database', () => ({ prisma: {} }));
+vi.mock('@ebda/database', () => ({ prisma: {} }));
 
 // A login attempt has no store and may have no user yet: the audit row is written by the
 // `ebda_audit_log_insert` SECURITY DEFINER function (`insertAuditLog`).

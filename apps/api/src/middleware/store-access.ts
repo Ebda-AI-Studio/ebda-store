@@ -1,6 +1,6 @@
-import { upgradePlanFor } from '@force/shared';
+import { upgradePlanFor } from '@ebda/shared';
 import { Request, Response, NextFunction } from 'express';
-import { withStore, type Prisma } from '@force/database';
+import { withStore, type Prisma } from '@ebda/database';
 import { AppError } from './error-handler';
 import { auditLog } from './security';
 

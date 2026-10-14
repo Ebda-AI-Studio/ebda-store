@@ -25,7 +25,7 @@ const { mockGroup, mockCustomer } = vi.hoisted(() => ({
   mockCustomer: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     customerGroup: mockGroup,
     customer: mockCustomer,

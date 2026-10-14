@@ -8,14 +8,14 @@
 ## Rulings
 
 Ruling C1 — `packages/shared` exports `BundlePricingType` as a string union and does NOT import from
-@force/database; the API passes the Prisma enum value through, the two being structurally identical
-strings. Keeps @force/shared free of a DB dependency, which its other modules already rely on.
+@ebda/database; the API passes the Prisma enum value through, the two being structurally identical
+strings. Keeps @ebda/shared free of a DB dependency, which its other modules already rely on.
 Cost if wrong: a future enum value added in Prisma and not in the union type-errors at the call
 site — a loud failure, not a silent one.
 
 Ruling C2 — `nearestAllocatablePrice` moves to `packages/shared/src/bundle-pricing.ts` beside
 `isAllocatable`; it is pure and has no business in a route module. T4's test imports it from
-'@force/shared'. Cost if wrong: none material — one extra export in an already-exported module.
+'@ebda/shared'. Cost if wrong: none material — one extra export in an already-exported module.
 
 Ruling C3 — T10 is split. The FWB-side work (catalogue bridge payload + /feeds/products.json) stays
 in this branch. The whatsapp-bulk-sender change is a SEPARATE PR in that repo and is out of scope
@@ -492,8 +492,8 @@ this app never inherits P1-2's slice-before-group bug either. New `bundleBadge` 
 `apps/orders/src/i18n/messages.ts` (EN "Bundle" / AR "باقة"), matching admin's copy. Additive: an
 order with no bundle lines groups to one row per item, byte-identical to the pre-fix render (verified
 by test + the `totalRows === items.length` identity). `apps/orders/package.json` now declares
-`"@force/shared": "*"` (the app's `next.config.js` already had `@force/shared` in
-`transpilePackages` and its `tsconfig.json` already had the `@force/shared` path mapping — both were
+`"@ebda/shared": "*"` (the app's `next.config.js` already had `@ebda/shared` in
+`transpilePackages` and its `tsconfig.json` already had the `@ebda/shared` path mapping — both were
 already wired for this dependency, just unused). Cost if wrong: none identified — the additive
 contract is test-enforced and the grouping logic is reused, not reimplemented.
 

@@ -12,7 +12,7 @@ vi.mock('next-intl', () => {
   const t = Object.assign((key: string) => key, { has: () => true });
   return { useTranslations: () => t, useLocale: () => 'en' };
 });
-vi.mock('@force/ui', () => ({
+vi.mock('@ebda/ui', () => ({
   useToast: () => ({ error: vi.fn(), success: vi.fn(), addToast: vi.fn() }),
 }));
 

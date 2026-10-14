@@ -3,7 +3,7 @@ import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { authenticate, rejectImpersonated } from '../middleware/auth';
 import { authLimiter } from '../middleware/security';
-import { withUser } from '@force/database';
+import { withUser } from '@ebda/database';
 import { encryption } from '../services/encryption.service';
 import { MfaService } from '../services/mfa.service';
 import { AuthService } from '../services/auth.service';

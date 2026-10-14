@@ -8,7 +8,7 @@
  * line. Integer piastres only; rate in basis points (14% = 1400).
  * Ruling EBDA-BILLFU-3.
  */
-import type { PlatformVat as StoredPlatformVat } from '@force/shared';
+import type { PlatformVat as StoredPlatformVat } from '@ebda/shared';
 import { getPlatformVat } from '../platform-vat.service';
 
 export interface PlatformVat {

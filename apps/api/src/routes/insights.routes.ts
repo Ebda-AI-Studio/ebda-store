@@ -9,14 +9,14 @@
  *   GET  /:storeId/insights/cohorts                      — full cohort retention matrix + narration
  *   GET  /:storeId/insights/funnel?window=7|30|90        — funnel snapshots + narration
  *   GET  /:storeId/insights/segments                     — RFM segment counts + revenue + actions + narration
- *   GET  /:storeId/insights/products?perPage=50          — top SKUs by 30d units sold (contract: @force/shared productVelocityResponseSchema)
+ *   GET  /:storeId/insights/products?perPage=50          — top SKUs by 30d units sold (contract: @ebda/shared productVelocityResponseSchema)
  *   GET  /:storeId/insights/customers/:customerId/rfm    — single customer RFM snapshot
  *   POST /:storeId/insights/rollup/run-now               — super_admin: trigger on-demand rollup (202)
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma, runInTenantContext, RfmSegment } from '@force/database';
+import { prisma, runInTenantContext, RfmSegment } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireAnalyticsTier } from '../middleware/analytics-tier';
@@ -31,7 +31,7 @@ import {
   PRODUCT_VELOCITY_WINDOW_DAYS,
   type ProductVelocityResponse,
   type ProductVelocityRow,
-} from '@force/shared';
+} from '@ebda/shared';
 
 const router = Router({ mergeParams: true });
 

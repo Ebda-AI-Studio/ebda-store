@@ -4,13 +4,13 @@
  * Part 1 mirrors the brief's original test almost verbatim, with ONE
  * deliberate deviation from the brief text (RULING C2, controller review):
  * `nearestAllocatablePrice` is NOT defined in bundle.routes.ts — Task 2
- * already shipped it in `@force/shared`, and the route file only imports
+ * already shipped it in `@ebda/shared`, and the route file only imports
  * it. Importing it from the routes file (as the brief originally wrote)
  * would not compile.
  *
  * Part 2 boots a minimal Express app mounting only bundle.routes (same
  * app-bootstrap pattern as tests/unit/coupon-targeting-route.test.ts /
- * promotion-preview-route.test.ts): only `@force/database` is mocked, so
+ * promotion-preview-route.test.ts): only `@ebda/database` is mocked, so
  * the real Zod schemas, the real `resolveBundle`/pricing math, and the real
  * `requireFeature` gate all run through the HTTP layer.
  */
@@ -18,7 +18,7 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
-import { isAllocatable, nearestAllocatablePrice, type BundleLine } from '@force/shared';
+import { isAllocatable, nearestAllocatablePrice, type BundleLine } from '@ebda/shared';
 
 // ─── Part 1: pure pricing-math assertions (brief's original test) ─────────
 
@@ -59,7 +59,7 @@ const { mockPrisma, mockIsFeatureEnabled } = vi.hoisted(() => ({
   mockIsFeatureEnabled: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
 }));

@@ -9,7 +9,7 @@ import {
   type CSSProperties,
   type KeyboardEvent,
 } from 'react';
-import type { ActiveModel3dLook } from '@force/shared';
+import type { ActiveModel3dLook } from '@ebda/shared';
 import type { Model3dCopy } from '../lib/content';
 import { egp } from '../lib/demo-stores';
 import { ensureLookFont } from '../lib/looks-frag';
@@ -21,7 +21,7 @@ import type { Locale } from '../lib/site';
  * and the admin preview run), loaded as its own chunk and only once the section is near the
  * screen: three.js never lands in the initial bundle.
  */
-const ProductModelViewer = dynamic(() => import('@force/ui/model3d'), {
+const ProductModelViewer = dynamic(() => import('@ebda/ui/model3d'), {
   ssr: false,
   loading: () => null,
 });

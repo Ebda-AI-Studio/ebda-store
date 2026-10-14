@@ -2,7 +2,7 @@ import { authenticator } from 'otplib';
 import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 const ISSUER: string = BRAND.product.nameEn;
 

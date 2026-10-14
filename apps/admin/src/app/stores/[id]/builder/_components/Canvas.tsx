@@ -18,7 +18,7 @@ import {
   type PageDefinition,
   type ParentToChild,
   type Viewport,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 
 interface Props {

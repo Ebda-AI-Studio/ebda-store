@@ -33,7 +33,7 @@
  * to an empty result set by the direct-compare RLS policies.
  */
 
-import { prisma, withStore } from '@force/database';
+import { prisma, withStore } from '@ebda/database';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 import { effectiveInventory } from '../../lib/effective-inventory';

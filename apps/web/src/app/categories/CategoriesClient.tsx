@@ -16,7 +16,7 @@ import {
   pageTextScale,
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
-import type { CategoriesPageSettings } from '@force/shared';
+import type { CategoriesPageSettings } from '@ebda/shared';
 import { recordLastListing } from '@/lib/last-listing';
 
 interface CategoriesClientProps {

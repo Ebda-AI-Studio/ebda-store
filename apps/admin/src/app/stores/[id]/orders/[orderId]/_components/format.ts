@@ -1,6 +1,6 @@
 import type { AddressJson } from './types';
 
-import { minorToDecimalString, REGION } from '@force/shared';
+import { minorToDecimalString, REGION } from '@ebda/shared';
 export function formatMoney(piastres: number, currency = REGION.currency): string {
   const major = minorToDecimalString(piastres);
   return `${major} ${currency}`;

@@ -47,7 +47,7 @@ model StoreFeature {
 
 ## Feature Registry
 
-Single source of truth in `@force/shared`:
+Single source of truth in `@ebda/shared`:
 
 ```typescript
 // packages/shared/src/features.ts

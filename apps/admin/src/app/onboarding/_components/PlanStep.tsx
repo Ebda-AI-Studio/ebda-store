@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Button } from '@force/ui';
-import { formatMoney } from '@force/shared';
+import { Button } from '@ebda/ui';
+import { formatMoney } from '@ebda/shared';
 import { apiPut } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { isTrialPlanCode, storePlan } from '../../../components/billing/types';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { StoreTheme } from '@force/shared';
+import type { StoreTheme } from '@ebda/shared';
 import { getCustomBadgeTextColor } from './custom-badge';
 
 // Issue #2129 — a token pick must get the platform's PAIRED foreground, not

@@ -2,7 +2,7 @@
 
 import { ReactNode, Suspense } from 'react';
 import dynamic from 'next/dynamic';
-import { ToastProvider } from '@force/ui';
+import { ToastProvider } from '@ebda/ui';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { StoreProvider } from '../contexts/StoreContext';
 import { NotificationProvider } from '../contexts/NotificationContext';

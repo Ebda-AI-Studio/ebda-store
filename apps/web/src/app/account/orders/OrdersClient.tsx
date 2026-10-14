@@ -8,7 +8,7 @@ import { api, type Order } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatDate as formatStoreDate } from '@/lib/format-date';
-import { groupOrderLinesForDisplay, storeNumerals } from '@force/shared';
+import { groupOrderLinesForDisplay, storeNumerals } from '@ebda/shared';
 import { orderStatusLabel } from '@/lib/order-labels';
 
 export default function OrdersClient() {

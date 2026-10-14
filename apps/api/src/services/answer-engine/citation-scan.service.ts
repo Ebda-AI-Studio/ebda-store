@@ -31,7 +31,7 @@
  *     propagates out of `runCitationScan` — the whole store's scan always
  *     completes.
  */
-import { prisma, withStore } from '@force/database';
+import { prisma, withStore } from '@ebda/database';
 import logger from '../../lib/logger';
 import { isAiQuotaCapError } from '../../lib/ai-quota';
 import { recordUsage } from '../ai.service';

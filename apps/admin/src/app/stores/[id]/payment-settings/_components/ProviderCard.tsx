@@ -3,7 +3,7 @@
 import { Alert } from '../../../../../components/Alert';
 import { useT } from '@/i18n/useT';
 
-import { INSTAPAY_DEFAULT_EXPIRY_HOURS, minorToDecimalString, roundToMinor } from '@force/shared';
+import { INSTAPAY_DEFAULT_EXPIRY_HOURS, minorToDecimalString, roundToMinor } from '@ebda/shared';
 
 export interface StorePaymentConfig {
   id?: string;

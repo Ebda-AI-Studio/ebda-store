@@ -1,4 +1,4 @@
-import { formatPrice as sharedFormatPrice, minorToDecimalString, tryToMinor } from '@force/shared';
+import { formatPrice as sharedFormatPrice, minorToDecimalString, tryToMinor } from '@ebda/shared';
 
 /**
  * The admin renders Latin digits in both locales (issue 1971, Ruling

@@ -29,7 +29,7 @@ vi.mock('../../../../i18n/useT', () => {
     vars ? `${key}:${JSON.stringify(vars)}` : key;
   return { useT: () => t };
 });
-vi.mock('@force/ui', () => ({
+vi.mock('@ebda/ui', () => ({
   Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
   Button: (p: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...p} />,
   Select: ({ label }: { label: string }) => <select aria-label={label} />,

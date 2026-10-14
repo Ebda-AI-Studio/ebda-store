@@ -24,7 +24,7 @@ const { holder, mocks } = vi.hoisted(() => {
   };
 });
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   get prisma() {
     return holder.prisma;
   },
@@ -40,7 +40,7 @@ vi.mock('@force/database', () => ({
   onClosedTenantTxAccess: () => undefined,
 }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: vi.fn() }));
-vi.mock('@force/shared', async () => await import('../../packages/shared/src/index'));
+vi.mock('@ebda/shared', async () => await import('../../packages/shared/src/index'));
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'admin-1', role: 'store_admin' };

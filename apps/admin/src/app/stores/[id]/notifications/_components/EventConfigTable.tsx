@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { EventConfig } from './types';

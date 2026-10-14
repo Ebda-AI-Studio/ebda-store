@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Button, Select } from '@force/ui';
+import { Button, Select } from '@ebda/ui';
 import { ShopChrome } from '../../components';
 import { useStoreContact, useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api, API_URL, type Order } from '../../lib/api';
-import { groupOrderLinesForDisplay } from '@force/shared';
+import { groupOrderLinesForDisplay } from '@ebda/shared';
 import { returnPolicyCopy, returnPolicyKind } from '../../lib/return-policy-text';
 
 const RETURN_REASONS = [

@@ -16,7 +16,7 @@
  * transaction AFTER the provider call, never inside a request transaction.
  * COD and InstaPay have no provider behind them and are never breakered.
  */
-import { runInTenantContext, prisma } from '@force/database';
+import { runInTenantContext, prisma } from '@ebda/database';
 import logger from '../../lib/logger';
 import { circuitBreaker } from '../circuit-breaker.service';
 import { AppError } from '../../middleware/error-handler';

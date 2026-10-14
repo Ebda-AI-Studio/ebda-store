@@ -15,7 +15,7 @@ vi.mock('@/lib/api', () => ({
     syncCart: vi.fn(),
   },
 }));
-vi.mock('@force/ui', () => ({ useToast: () => ({ toast: vi.fn() }) }));
+vi.mock('@ebda/ui', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock('./LanguageContext', () => ({
   useLanguage: () => ({ t: (en: string) => en, language: 'en' }),
 }));

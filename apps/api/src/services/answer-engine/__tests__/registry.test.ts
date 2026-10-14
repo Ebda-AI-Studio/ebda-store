@@ -18,7 +18,7 @@ vi.hoisted(() => {
 
 const { mockFindMany } = vi.hoisted(() => ({ mockFindMany: vi.fn() }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { answerEngineProviderConfig: { findMany: mockFindMany } },
 }));
 

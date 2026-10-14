@@ -1,13 +1,13 @@
 'use client';
 
 import { useStoreNumerals } from '../../hooks/useNumerals';
-import { intlLocale } from '@force/shared';
+import { intlLocale } from '@ebda/shared';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { sectionSpacingClasses } from './section-spacing';
-import type { SectionPaddingMaxWidthVisibility } from '@force/shared';
+import type { SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 
 export interface BlogCarouselPost {
   id: string;

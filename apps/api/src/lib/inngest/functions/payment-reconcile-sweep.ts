@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, withStore, acrossStoresFlat } from '@force/database';
+import { prisma, withStore, acrossStoresFlat } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';

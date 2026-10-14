@@ -2,7 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import { formatPercent, formatPosition, type GscDashboardTotals } from './types';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 interface GscTotalsCardsProps {
   totals: GscDashboardTotals;

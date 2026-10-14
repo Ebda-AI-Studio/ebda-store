@@ -1,5 +1,5 @@
-import { prisma, withStore } from '@force/database';
-import { parseReportRange, resolveStoreTimeZone, type ReportRange } from '@force/shared';
+import { prisma, withStore } from '@ebda/database';
+import { parseReportRange, resolveStoreTimeZone, type ReportRange } from '@ebda/shared';
 
 export type RangeOrLegacyResult =
   | { ok: true; from: Date | undefined; to: Date | undefined }

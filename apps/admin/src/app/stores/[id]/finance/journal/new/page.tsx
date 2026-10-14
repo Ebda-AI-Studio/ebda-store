@@ -8,7 +8,7 @@ import { apiGet, apiPost } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { minorToMajor } from '@/lib/format';
 
-import { roundToMinor } from '@force/shared';
+import { roundToMinor } from '@ebda/shared';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AccountRow {

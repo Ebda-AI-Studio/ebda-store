@@ -1,14 +1,14 @@
 /**
  * Unit tests for generateTaxReport aggregation logic.
  *
- * The service uses prisma.$queryRawUnsafe, so we mock the @force/database
+ * The service uses prisma.$queryRawUnsafe, so we mock the @ebda/database
  * module and drive the business logic in-process — no DB required.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ─── Mock @force/database BEFORE importing the service ─────────────────────
+// ─── Mock @ebda/database BEFORE importing the service ─────────────────────
 const mockQueryRawUnsafe = vi.fn();
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     $queryRawUnsafe: (...args: unknown[]) => mockQueryRawUnsafe(...args),
   },

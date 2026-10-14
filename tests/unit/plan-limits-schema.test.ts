@@ -1,6 +1,6 @@
 /**
  * SP5 task 1 — the plan-limits zod schema, the seed plans, and the migration's
- * seed + backfill staying in lockstep with @force/shared.
+ * seed + backfill staying in lockstep with @ebda/shared.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
@@ -15,7 +15,7 @@ import {
   planLimitsSchema,
   planLimitMessage,
   updatePlanSchema,
-} from '@force/shared';
+} from '@ebda/shared';
 
 const sql = fs.readFileSync(
   path.resolve(

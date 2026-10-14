@@ -1,9 +1,9 @@
-import { prisma, Prisma, withStore } from '@force/database';
+import { prisma, Prisma, withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { bustStoreCachesById } from './store.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
-import { TAX_NOT_VERIFIED_CODE } from '@force/shared';
+import { TAX_NOT_VERIFIED_CODE } from '@ebda/shared';
 import { TaxProfileService } from './tax-profile.service';
 
 /**

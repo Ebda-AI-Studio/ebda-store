@@ -39,7 +39,7 @@ const { mockPrisma, mockIsFeatureEnabled, mockAuditLog } = vi.hoisted(() => ({
   mockAuditLog: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
 }));

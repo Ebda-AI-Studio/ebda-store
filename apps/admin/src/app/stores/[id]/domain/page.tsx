@@ -2,14 +2,14 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Badge, Input, Label } from '@force/ui';
+import { Button, Badge, Input, Label } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Alert } from '../../../../components/Alert';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 interface DnsRecordRow {
   type: string;

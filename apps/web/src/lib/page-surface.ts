@@ -5,7 +5,7 @@ import {
   statusInkVars,
   type StoreTheme,
   type PageColorScheme,
-} from '@force/shared';
+} from '@ebda/shared';
 
 /**
  * Smart per-page surface styling.

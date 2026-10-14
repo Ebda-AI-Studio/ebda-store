@@ -8,8 +8,8 @@
  */
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Input, useToast } from '@force/ui';
-import type { ProductModelViewerHandle } from '@force/ui/model3d';
+import { Button, Input, useToast } from '@ebda/ui';
+import type { ProductModelViewerHandle } from '@ebda/ui/model3d';
 import {
   DEFAULT_THEME,
   MODEL3D_MAX_BYTES,
@@ -20,7 +20,7 @@ import {
   validateUsdz,
   type ActiveModel3dLook,
   type Model3dMetalPreset,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { apiDelete, apiGet, apiPut, getApiUrl } from '../../../../../../lib/api';
@@ -28,7 +28,7 @@ import { useFeatures } from '../../../../../../hooks/useFeatures';
 import { ImageUpload } from '../../../../../../components/ImageUpload';
 import { ColorField } from '../../../../../../components/ColorField';
 
-const ProductModelViewer = dynamic(() => import('@force/ui/model3d'), {
+const ProductModelViewer = dynamic(() => import('@ebda/ui/model3d'), {
   ssr: false,
   loading: () => null,
 });

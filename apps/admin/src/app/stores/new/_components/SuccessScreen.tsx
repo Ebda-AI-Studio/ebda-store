@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Badge, Button } from '@force/ui';
+import { Badge, Button } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Alert } from '../../../../components/Alert';
 import { apiGet } from '../../../../lib/api';
@@ -10,7 +10,7 @@ import { getPlatformStoreUrl, getStoreDisplayUrl } from '../../../../lib/store-u
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { CreatedOwner, CreatedStore, DomainStatus } from './types';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 interface DnsRecordRow {
   type: string;

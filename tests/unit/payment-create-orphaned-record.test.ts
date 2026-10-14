@@ -23,7 +23,7 @@ const h = vi.hoisted(() => ({
   recordPaymentEvent: vi.fn(async () => undefined),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     payment: {
       create: (...a: unknown[]) => h.paymentCreate(...a),

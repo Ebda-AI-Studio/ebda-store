@@ -11,7 +11,7 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('bcryptjs', () => ({ default: { hash: async () => 'hash', compare: async () => false } }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   withUser: async (_id: string, fn: (tx: unknown) => unknown) =>
     fn({
       user: {

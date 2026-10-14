@@ -10,7 +10,7 @@ import {
   pageDefinitionSchema,
   definitionToLayout,
   type PageDefinition,
-} from '@force/shared';
+} from '@ebda/shared';
 import { storeJsonLd, breadcrumbJsonLd, itemList, storeAbsoluteUrl } from '../lib/structured-data';
 import { JsonLd } from '../components/JsonLd';
 import { HomePageContent } from './HomePageContent';

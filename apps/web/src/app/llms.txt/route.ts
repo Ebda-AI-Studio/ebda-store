@@ -1,9 +1,9 @@
 import { headers } from 'next/headers';
 import { API_URL } from '../../lib/api';
 import { resolvedViaCookie } from '../../lib/agent-store-resolver';
-import { storeOrigin, BRAND } from '@force/shared';
+import { storeOrigin, BRAND } from '@ebda/shared';
 
-import { minorToDecimalString, REGION } from '@force/shared';
+import { minorToDecimalString, REGION } from '@ebda/shared';
 /**
  * Dynamic /llms.txt — served at three levels:
  *
@@ -23,7 +23,7 @@ import { minorToDecimalString, REGION } from '@force/shared';
  *       resolves to NO store is a 404, never the platform index.
  *
  * All data is fetched from the public API (no direct Prisma — the web app
- * doesn't depend on @force/database).
+ * doesn't depend on @ebda/database).
  */
 
 // ---------------------------------------------------------------------------
@@ -456,7 +456,7 @@ function buildMcpSection(store: PublicStore, base: string): string {
 export function fixCategoryLinks(body: string, categories: Array<{ slug: string }>): string {
   const validSlugs = new Set(categories.map(c => c.slug));
   // The platform's real slug charset (#1854): ASCII + the Arabic block, as
-  // SLUG_STRIP in @force/shared mints them, raw OR percent-encoded. An
+  // SLUG_STRIP in @ebda/shared mints them, raw OR percent-encoded. An
   // ASCII-only class missed a fully-Arabic slug entirely (dead link served)
   // and captured only the ASCII prefix of a mixed one (valid line dropped).
   const categoryLinkPattern = /\/categories\/((?:[a-z0-9\u0600-\u06FF-]|%[0-9a-f]{2})+)/gi;

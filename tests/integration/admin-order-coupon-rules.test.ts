@@ -13,7 +13,7 @@
  * fixtures (retry-safe).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import { OrderService } from '@api/services/order.service';
 import {
   handleOrderRefunded,

@@ -12,7 +12,7 @@
  * — gated on `hasDb` so this suite skips cleanly with no DB configured.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass } from '@ebda/database';
 import { VariantService } from '@api/services/variant.service';
 import { BulkService } from '@api/services/bulk.service';
 import {

@@ -1,4 +1,4 @@
-import { storeHost } from '@force/shared';
+import { storeHost } from '@ebda/shared';
 import logger from './logger';
 import { cfBindings } from '../cf/bindings';
 

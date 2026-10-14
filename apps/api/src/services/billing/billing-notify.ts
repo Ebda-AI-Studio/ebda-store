@@ -3,7 +3,7 @@
  * (socket notification) plus a durable email. Always called AFTER the DB
  * transaction committed; a notification failure never fails billing.
  */
-import { withStore } from '@force/database';
+import { withStore } from '@ebda/database';
 import { config } from '../../config';
 import logger from '../../lib/logger';
 import { EmailService } from '../email.service';
@@ -14,7 +14,7 @@ import { reconcileStoreAccess } from './account.service';
 import { instapayDetails } from './account.service';
 import { supportContact } from './manual-config';
 import { emitEbdaConversion } from '../ebda-ads-emit';
-import { purchaseEventId } from '@force/shared';
+import { purchaseEventId } from '@ebda/shared';
 
 export type BillingEffect =
   | { kind: 'plan_changed'; storeId: string }

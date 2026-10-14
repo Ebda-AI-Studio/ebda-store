@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 /**
  * Funnel read model over `funnel_snapshots` (one row per store per Cairo day,

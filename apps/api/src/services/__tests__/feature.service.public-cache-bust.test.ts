@@ -54,7 +54,7 @@ const {
   mockWithMoneyTx: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     storeFeature: {
       delete: mockStoreFeatureDelete,

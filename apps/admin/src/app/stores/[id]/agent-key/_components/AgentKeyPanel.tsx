@@ -1,8 +1,8 @@
 'use client';
 
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 /**
  * Read-only status + the three actions for the store's MCP agent write

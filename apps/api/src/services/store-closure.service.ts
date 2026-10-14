@@ -1,4 +1,4 @@
-import type { Prisma } from '@force/database';
+import type { Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { FISCAL_RETENTION_YEARS } from './fiscal-document.service';

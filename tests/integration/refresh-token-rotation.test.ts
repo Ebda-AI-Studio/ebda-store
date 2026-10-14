@@ -23,7 +23,7 @@ import { describe, it, expect } from 'vitest';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { AuthService } from '@api/services/auth.service';
 import { config } from '@api/config';
 

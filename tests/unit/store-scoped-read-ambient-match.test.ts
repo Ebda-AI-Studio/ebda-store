@@ -13,7 +13,7 @@ const h = vi.hoisted(() => ({
   runInTenantContext: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   currentTenantGucs: () => h.gucs,
   runInTenantContext: h.runInTenantContext,
 }));

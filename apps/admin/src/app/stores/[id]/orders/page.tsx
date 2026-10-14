@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button, useToast } from '@force/ui';
+import { Button, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { DateRangePicker } from '../../../../components/DateRangePicker';
 import { apiGet, apiPut, apiPost, apiFetch } from '../../../../lib/api';
@@ -12,7 +12,7 @@ import { ManualRefundModal } from '../../../../components/ManualRefundModal';
 import { useT } from '@/i18n/useT';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { exportFilename, orderListFilterParams } from '@force/shared';
+import { exportFilename, orderListFilterParams } from '@ebda/shared';
 import { OrdersFilters } from './_components/OrdersFilters';
 import { OrdersBulkBar } from './_components/OrdersBulkBar';
 import { OrdersTable } from './_components/OrdersTable';

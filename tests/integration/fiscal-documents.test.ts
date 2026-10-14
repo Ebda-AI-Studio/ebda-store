@@ -18,7 +18,7 @@
  *  8. Phones are stored as E.164.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma, runInTenantContext, withMoneyTx } from '@force/database';
+import { prisma, runInTenantContext, withMoneyTx } from '@ebda/database';
 import { OrderService } from '@api/services/order.service';
 import { CartService } from '@api/services/cart.service';
 import { StoreService } from '@api/services/store.service';

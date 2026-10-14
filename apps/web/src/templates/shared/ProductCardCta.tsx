@@ -2,9 +2,9 @@
 
 import type React from 'react';
 import { useRouter } from 'next/navigation';
-import { AddToCartButton, cn } from '@force/ui';
-import type { StoreTheme } from '@force/shared';
-import { resolveColor } from '@force/shared';
+import { AddToCartButton, cn } from '@ebda/ui';
+import type { StoreTheme } from '@ebda/shared';
+import { resolveColor } from '@ebda/shared';
 import type { CtaShape, CtaSize } from './card-size';
 import { ctaShapeClass, ctaSizeClass, labelShapeClass, oosPlacementClass } from './card-size';
 import { avoidReservedCorner } from './badge-collision';

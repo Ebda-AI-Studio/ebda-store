@@ -16,7 +16,7 @@ import {
 
 const { holder } = vi.hoisted(() => ({ holder: { prisma: null as any } }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   get prisma() {
     return holder.prisma;
   },

@@ -90,7 +90,7 @@ Clean. 885 prod dependencies, zero advisories at any severity.
 `npm ls react --all` (after `npm ci`) shows, for `apps/admin`:
 
 ```
-@force/admin@0.1.0
+@ebda/admin@0.1.0
 ├─┬ @dnd-kit/core@6.3.1        → react@19.2.7 (deduped, ROOT copy)
 ├─┬ @dnd-kit/sortable@10.0.0   → react@19.2.7 (deduped, ROOT copy)
 ├─┬ @sentry/nextjs@10.58.0 → @sentry/react@10.58.0 → react@19.2.7 (deduped, ROOT copy)
@@ -103,7 +103,7 @@ Clean. 885 prod dependencies, zero advisories at any severity.
 and for `apps/web`:
 
 ```
-@force/web@0.1.0
+@ebda/web@0.1.0
 ├─┬ @radix-ui/react-slot@1.3.0 → react@19.2.7 (deduped, ROOT copy)
 ├─┬ framer-motion@12.40.0      → react@19.2.7 (deduped, ROOT copy)
 ├─┬ lucide-react@1.21.0        → react@19.2.7 (deduped, ROOT copy)
@@ -241,7 +241,7 @@ Root `package.json`'s own `"typecheck": "tsc --noEmit"` (invoking root `tsconfig
 **not** what CI runs and is currently broken if a developer runs it directly:
 
 - Before `npm run db:generate` + `npm run build -w packages/database`: 1,097 errors, almost
-  all `TS2307 Cannot find module '@force/database'` / `'@api/...'` phantom-error flood — this
+  all `TS2307 Cannot find module '@ebda/database'` / `'@api/...'` phantom-error flood — this
   matches the documented CI/CD rule "Prisma db:generate BEFORE typecheck... without it tsc
   reports ~396 phantom errors" (here it's ~950, larger because the root config also sweeps
   `tests/`).

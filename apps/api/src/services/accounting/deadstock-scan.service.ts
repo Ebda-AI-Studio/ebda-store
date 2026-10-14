@@ -27,7 +27,7 @@
  * direct-compare RLS policies.
  */
 
-import { prisma, withStore, Prisma } from '@force/database';
+import { prisma, withStore, Prisma } from '@ebda/database';
 import { activeVariants, effectiveInventory } from '../../lib/effective-inventory';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';

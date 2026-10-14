@@ -163,7 +163,7 @@ Mobile-first; on desktop the cards arrange in a 2-column grid (Delivery+Payment+
 
 ### B.2 Layout component shape
 
-Reuse `Card`, `Badge`, `Button` from `@force/ui`. New shared components:
+Reuse `Card`, `Badge`, `Button` from `@ebda/ui`. New shared components:
 
 - `<OrderHeaderBar order={order} />`
 - `<DeliveryCard order={order} onEdit={…} />`

@@ -20,7 +20,7 @@ export interface StoreTheme {
    * When unset or 'none', sections share the page background and rely
    * on padding + section title anchors for rhythm. When set to a named
    * preset, adjacent sections alternate visibly via `--bg-page` ↔
-   * `--bg-section-alt` CSS tokens resolved in @force/shared.
+   * `--bg-section-alt` CSS tokens resolved in @ebda/shared.
    *
    * - `none`         — flat surface, no alternation
    * - `warmSand`     — #FAF7F2 ↔ #F0EAE0 (premium grocery / heritage)
@@ -51,7 +51,7 @@ export interface StoreTheme {
   trustStripSize?: 'sm' | 'md' | 'lg';
   /** Header logo sizing (per-store). 'auto' fits each logo by its measured
    *  aspect ratio; sm/md/lg nudge the box. Default 'auto'. Mirrors the
-   *  @force/shared StoreTheme field consumed by the storefront StoreLogo. */
+   *  @ebda/shared StoreTheme field consumed by the storefront StoreLogo. */
   logoSize?: 'auto' | 'sm' | 'md' | 'lg';
   /** Show the virtual Best Sellers tile in the homepage category strip
    *  (default true). Toggled on the Categories page beside the cover. */
@@ -130,7 +130,7 @@ export interface StoreTheme {
    * published Locations. Default false — a store with Locations enabled for
    * the /locations page is unaffected until it opts in here. Also requires
    * `locationsEnabled` and ≥1 published location. Toggled via Branding →
-   * Locations. Mirrors the @force/shared StoreTheme field. 2026-09-25 (B3).
+   * Locations. Mirrors the @ebda/shared StoreTheme field. 2026-09-25 (B3).
    */
   showBranchesInFooter?: boolean;
   /** Free-tier wa.me toggles (SP8); unset = ON when the store has a number. */

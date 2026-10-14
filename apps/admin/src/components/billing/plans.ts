@@ -1,4 +1,4 @@
-import { LOCKED_PUBLIC_PLANS } from '@force/shared';
+import { LOCKED_PUBLIC_PLANS } from '@ebda/shared';
 import { isTrialPlanCode } from './types';
 import type { PlanOption, PlanSelection } from './types';
 

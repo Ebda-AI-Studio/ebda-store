@@ -39,7 +39,7 @@ const paymentEventCreate = vi.fn().mockResolvedValue({});
 
 let paymentFindManyOverride: ((...a: unknown[]) => Promise<unknown[]>) | null = null;
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     payment: {
       findFirst: (...a: unknown[]) => paymentFindFirst(...a),

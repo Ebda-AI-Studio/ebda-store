@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -19,7 +19,7 @@ import {
   instapaySettingsBaseSchema,
   instapaySettingsSchema,
   kashierSettingsSchema,
-} from '@force/shared';
+} from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { providerHealth } from '../services/payment-providers/provider-health';
 import { isProviderActivatedForStore } from '../services/payment-providers/provider-gate';
@@ -51,7 +51,7 @@ router.param('storeId', paymentSettingsRouteContext);
 // ==========================================
 
 const paymentConfigSchema = z.object({
-  // A catalog code (PROVIDERS-1: the list lives in @force/shared, not in a DB enum).
+  // A catalog code (PROVIDERS-1: the list lives in @ebda/shared, not in a DB enum).
   provider: z
     .string()
     .refine(code => PAYMENT_PROVIDER_CODES.includes(code), { message: 'Unknown payment provider' }),

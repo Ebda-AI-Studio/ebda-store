@@ -41,7 +41,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import { computeBundlePrice, isAllocatable, type BundlePricingType } from '@force/shared';
+import { computeBundlePrice, isAllocatable, type BundlePricingType } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { formatPrice, minorToMajor } from '@/lib/format';
 import { AdminLayout } from '../../../../components/AdminLayout';

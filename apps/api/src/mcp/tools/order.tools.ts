@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { storefrontOrigin } from '@force/shared';
+import { storefrontOrigin } from '@ebda/shared';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { prisma, runInTenantContext, withTenantContext } from '@force/database';
+import { prisma, runInTenantContext, withTenantContext } from '@ebda/database';
 import type { McpStore } from '../resolve-store';
 import { OrderService } from '../../services/order.service';
 import { PaymentService } from '../../services/payment-providers/payment.factory';

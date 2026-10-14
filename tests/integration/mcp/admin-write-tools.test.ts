@@ -29,7 +29,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { prisma, withStore } from '@force/database';
+import { prisma, withStore } from '@ebda/database';
 import { hasDb } from '../../helpers/bundle-fixtures';
 import { registerAdminWriteTools } from '@api/mcp/tools/admin-write.tools';
 import { featureService } from '@api/services/feature.service';

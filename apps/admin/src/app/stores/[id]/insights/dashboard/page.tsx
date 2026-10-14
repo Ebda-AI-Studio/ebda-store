@@ -10,7 +10,7 @@ import { apiGet } from '@/lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { isUntrackedForGuests } from '@/lib/guest-checkout';
 
-import { minorToDecimalString, withNumerals } from '@force/shared';
+import { minorToDecimalString, withNumerals } from '@ebda/shared';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TopSku {

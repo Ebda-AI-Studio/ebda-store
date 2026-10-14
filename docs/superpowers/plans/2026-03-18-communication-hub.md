@@ -122,7 +122,7 @@ git commit -m "feat(database): add notification config, event config, push subsc
 
 This service manages per-store channel credentials with encryption. Pattern to follow:
 
-- Import `{ prisma } from '@force/database'`
+- Import `{ prisma } from '@ebda/database'`
 - Import `{ encryption } from './encryption.service'`
 - Import `{ redis } from './redis.service'`
 
@@ -372,7 +372,7 @@ import { notificationConfigService } from './notification-config.service';
 import { whatsappQueue } from './whatsapp-queue.service';
 import { smsQueue } from './sms-queue.service';
 import { pushService } from './push.service';
-import { NotificationEvent, NotificationData, WHATSAPP_TEMPLATES, SMS_TEMPLATES, PUSH_TEMPLATES } from '@force/shared';
+import { NotificationEvent, NotificationData, WHATSAPP_TEMPLATES, SMS_TEMPLATES, PUSH_TEMPLATES } from '@ebda/shared';
 
 class NotificationDispatcher {
   async dispatch(storeId: string, event: NotificationEvent, data: NotificationData): Promise<void> {

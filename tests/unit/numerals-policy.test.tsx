@@ -19,8 +19,8 @@ import {
   localizeDigits,
   storeNumerals,
   withNumerals,
-} from '@force/shared';
-import { Price } from '@force/ui';
+} from '@ebda/shared';
+import { Price } from '@ebda/ui';
 import { getDiscountBadgeText } from '../../apps/web/src/lib/product-pricing';
 import { formatDate } from '../../apps/web/src/lib/format-date';
 

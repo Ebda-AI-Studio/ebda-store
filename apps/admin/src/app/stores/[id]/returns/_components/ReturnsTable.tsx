@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Badge } from '@force/ui';
+import { Button, Badge } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { RETURN_COLORS } from './types';
@@ -8,7 +8,7 @@ import type { ListMeta, ReturnRecord } from './types';
 
 import { formatDate } from '@/lib/format';
 
-import { formatMoney } from '@force/shared';
+import { formatMoney } from '@ebda/shared';
 function formatCurrency(amount: number) {
   return formatMoney(amount, 'en', { fixedDecimals: true });
 }

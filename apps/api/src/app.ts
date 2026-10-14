@@ -32,7 +32,7 @@ import { assertBillingConfigAtBoot } from './services/billing';
 import alertWebhookRoutes from './routes/alert-webhooks.routes';
 import waBridgeRoutes from './routes/wa-bridge.routes';
 import { setupSwagger } from './docs/swagger';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { lookupStore } from './lib/definer';
 import { redis } from './services/redis.service';
 import { circuitBreaker } from './services/circuit-breaker.service';

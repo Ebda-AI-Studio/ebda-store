@@ -11,7 +11,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { layoutToDefinition, resolveLayoutSettings } from '@force/shared';
+import { layoutToDefinition, resolveLayoutSettings } from '@ebda/shared';
 
 const BASE = layoutToDefinition(resolveLayoutSettings({}, 'modern'));
 const LIVE_THEME = { primaryColor: '1 1% 1%', fontFamily: 'serif', showBranchesInFooter: true };
@@ -54,7 +54,7 @@ vi.mock('@api/middleware/security', () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
   writeLimiter: (_req: any, _res: any, next: any) => next(),
 }));
-vi.mock('@force/database', async importOriginal => {
+vi.mock('@ebda/database', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   const prisma = {
     store: m.store,

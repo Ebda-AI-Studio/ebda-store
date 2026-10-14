@@ -5,7 +5,7 @@ import {
   LOCKED_PUBLIC_PLANS,
   planIncludesMerchantMcp,
   planLimitsSchema,
-} from '@force/shared';
+} from '@ebda/shared';
 import { PLANS, PRICING_PUBLISHED } from '../../apps/marketing/src/lib/plans';
 
 const sql = readFileSync(

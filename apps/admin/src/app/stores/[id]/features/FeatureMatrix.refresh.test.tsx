@@ -31,7 +31,7 @@ vi.mock('@/hooks/useFeatures', () => ({
   useFeatures: () => ({ isEnabled: () => true, isLoading: false, refresh: features.refresh }),
 }));
 
-import { ToastProvider } from '@force/ui';
+import { ToastProvider } from '@ebda/ui';
 import { FeatureMatrix } from './FeatureMatrix';
 
 beforeEach(() => {

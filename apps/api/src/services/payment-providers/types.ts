@@ -4,7 +4,7 @@
 // ==========================================
 
 /**
- * A payment provider CODE from the catalog (`PROVIDER_CATALOG` in @force/shared, kind
+ * A payment provider CODE from the catalog (`PROVIDER_CATALOG` in @ebda/shared, kind
  * 'payments'). It used to be a closed union mirrored by a Postgres enum; since 2026-10-07
  * (ruling PROVIDERS-1) the column is TEXT and the catalog is the list, so adding a gateway is a
  * catalog entry + an adapter, never a type edit or a migration.

@@ -8,7 +8,7 @@
  * method the checkout does not take; merchants edit the words.
  */
 import React from 'react';
-import type { BlockNode, SectionPaddingMaxWidthVisibility } from '@force/shared';
+import type { BlockNode, SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 import { useStore } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { sectionBgStyle } from '../../templates/shared/section-bg';

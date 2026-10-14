@@ -2,7 +2,7 @@
 
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
-import { orderTaxPlacement } from '@force/shared';
+import { orderTaxPlacement } from '@ebda/shared';
 import { formatMoney } from './format';
 import type { OrderDetail } from './types';
 

@@ -4,7 +4,7 @@
 
 **Architecture:** All color tokens already live on `StoreTheme` (23 `*Color`/`*Foreground` keys) and already drive storefront CSS vars via `themeToCssVars`. The work is (a) expose the core set as editable `ColorField`s in Branding, (b) extend the Smart Palette to write all derived keys, (c) stop `deriveBrandRoles` from overriding explicitly-set foregrounds, (d) add a real hex text input to `ColorField`. Theme `PUT` is a shallow-merge PATCH, so partial saves are safe.
 
-**Tech Stack:** Next.js admin, `@force/shared` color utils, `ColorField` canonical picker, Zod theme schema (`z.record`).
+**Tech Stack:** Next.js admin, `@ebda/shared` color utils, `ColorField` canonical picker, Zod theme schema (`z.record`).
 
 ---
 

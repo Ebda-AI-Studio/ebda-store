@@ -13,8 +13,8 @@ import crypto from 'crypto';
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import { prisma, withRlsBypass, createPrismaClient, runWithRequestDb } from '@force/database';
-import { definitionToLayout, getLook } from '@force/shared';
+import { prisma, withRlsBypass, createPrismaClient, runWithRequestDb } from '@ebda/database';
+import { definitionToLayout, getLook } from '@ebda/shared';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import storeRoutes from '@api/routes/store.routes';
 import { tenantContext } from '@api/middleware/tenant-context';
@@ -40,8 +40,8 @@ vi.mock('@api/services/r2-cleanup.service', async importOriginal => {
 });
 // Lets one test make the builder's validation (saveDraft) refuse, and one make EVERY top-level
 // section fail publish readiness (as if the whole family still held starter copy).
-vi.mock('@force/shared', async importOriginal => {
-  const real = await importOriginal<typeof import('@force/shared')>();
+vi.mock('@ebda/shared', async importOriginal => {
+  const real = await importOriginal<typeof import('@ebda/shared')>();
   return {
     ...real,
     validateDefinition: (...a: Parameters<typeof real.validateDefinition>) =>

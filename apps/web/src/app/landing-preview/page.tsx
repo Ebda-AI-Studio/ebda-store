@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { EditorialLanding } from '@/components/landing/EditorialLanding';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 /**
  * Preview alias of the editorial platform landing (now also the live landing at

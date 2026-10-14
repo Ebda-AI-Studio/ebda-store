@@ -30,7 +30,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import promotionRoutes from '@api/routes/promotion.routes';
 import { tenantContext } from '@api/middleware/tenant-context';
 

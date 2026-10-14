@@ -15,11 +15,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { rangeOrLegacyDays } from '../lib/report-range';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@ebda/database';
 
 const router = Router({ mergeParams: true });
 

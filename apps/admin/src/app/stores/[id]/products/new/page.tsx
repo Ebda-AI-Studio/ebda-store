@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Button, Input, Textarea, Select } from '@force/ui';
+import { Button, Input, Textarea, Select } from '@ebda/ui';
 import {
   recommendedSizeTextForTemplate,
   type TemplateId,
@@ -11,7 +11,7 @@ import {
   formatPrice,
   PRODUCT_BADGE_LABEL_MAX_LENGTH,
   roundToMinor,
-} from '@force/shared';
+} from '@ebda/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../components/ImageUpload';
 import { useAuth } from '../../../../../lib/auth';

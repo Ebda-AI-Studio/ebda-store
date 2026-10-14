@@ -118,7 +118,7 @@ git commit -m "feat(database): add product relation and frequently bought togeth
 
 - [ ] **Step 1: Create the service**
 
-Import patterns: `import { prisma } from '@force/database'`, `import { redis } from './redis.service'`, `import { featureService } from './feature.service'`, `import logger from '../lib/logger'`
+Import patterns: `import { prisma } from '@ebda/database'`, `import { redis } from './redis.service'`, `import { featureService } from './feature.service'`, `import logger from '../lib/logger'`
 
 **Methods:**
 

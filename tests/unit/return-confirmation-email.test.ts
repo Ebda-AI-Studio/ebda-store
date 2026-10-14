@@ -57,7 +57,7 @@ const {
   },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: prismaMock,
   runInTenantContext: runInTenantContextMock,
   onClosedTenantTxAccess: vi.fn(),

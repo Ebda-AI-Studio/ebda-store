@@ -12,7 +12,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import crypto from 'node:crypto';
 import express from 'express';
 import request from 'supertest';
-import { createPrismaClient, runWithRequestDb, type AppPrismaClient } from '@force/database';
+import { createPrismaClient, runWithRequestDb, type AppPrismaClient } from '@ebda/database';
 import publicStoreLayoutRoutes from '../../apps/api/src/routes/public-store-layout.routes';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';

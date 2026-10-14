@@ -15,7 +15,7 @@ import { notificationConfigService } from './notification-config.service';
 import { smsQueue } from './sms-queue.service';
 import { pushService } from './push.service';
 import { redis } from './redis.service';
-import { prisma, withStore } from '@force/database';
+import { prisma, withStore } from '@ebda/database';
 import logger from '../lib/logger';
 import { config } from '../config';
 import { SmsConsentService } from './sms-consent.service';
@@ -29,7 +29,7 @@ import {
   PUSH_TEMPLATES,
   renderSmsTemplate,
   storefrontOrigin,
-} from '@force/shared';
+} from '@ebda/shared';
 import type { SmsConfig } from './sms.service';
 
 // ==========================================

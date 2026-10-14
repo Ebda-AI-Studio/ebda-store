@@ -10,7 +10,7 @@
  * store/product fixture is needed.
  */
 import { describe, it, expect } from 'vitest';
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma } from '@ebda/database';
 import { ON_HAND_SQL } from '@api/lib/effective-inventory-sql';
 import { effectiveInventory } from '@api/lib/effective-inventory';
 

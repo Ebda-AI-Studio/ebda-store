@@ -6,7 +6,7 @@ const m = vi.hoisted(() => ({
   feature: vi.fn(),
   send: vi.fn(),
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     // Per-store settings are read INSIDE the store's scope, never from an unscoped list.
     store: {

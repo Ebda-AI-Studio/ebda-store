@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { prisma, withStore } from '@force/database';
+import { prisma, withStore } from '@ebda/database';
 import { smsConsentPhoneKey } from '../lib/sms-consent';
 
 /**

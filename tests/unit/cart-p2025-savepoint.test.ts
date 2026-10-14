@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const log: string[] = [];
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   const rec = (name: string, impl?: (...a: any[]) => any) =>
     vi.fn(async (...a: any[]) => {
       log.push(name);
@@ -64,7 +64,7 @@ vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: vi.fn().mockResolvedValue(true) },
 }));
 
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { CartService } from '@api/services/cart.service';
 
 const lineGone = () => Object.assign(new Error('No record was found.'), { code: 'P2025' });

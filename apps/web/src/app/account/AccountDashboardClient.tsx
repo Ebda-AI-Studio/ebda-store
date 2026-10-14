@@ -1,6 +1,6 @@
 'use client';
 
-import { storeNumerals } from '@force/shared';
+import { storeNumerals } from '@ebda/shared';
 import { useState, useEffect } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Link from 'next/link';

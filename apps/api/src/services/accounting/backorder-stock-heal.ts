@@ -1,4 +1,4 @@
-import type { Prisma } from '@force/database';
+import type { Prisma } from '@ebda/database';
 
 /**
  * Heal a NON-variant product's backorder stock debt, up to 0 and never above

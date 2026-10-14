@@ -19,8 +19,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button } from '@force/ui';
-import { formatMoney, withNumerals } from '@force/shared';
+import { Badge, Button } from '@ebda/ui';
+import { formatMoney, withNumerals } from '@ebda/shared';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { DataTable, type DataTableColumn } from '../../components/mobile/DataTable';

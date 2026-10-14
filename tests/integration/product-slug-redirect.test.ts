@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { prisma, runInTenantContext, SlugEntityType } from '@force/database';
+import { prisma, runInTenantContext, SlugEntityType } from '@ebda/database';
 import { ProductService } from '../../apps/api/src/services/product.service';
 
 const EMAIL = `product-slug-redirect-test-${Date.now()}@example.test`;

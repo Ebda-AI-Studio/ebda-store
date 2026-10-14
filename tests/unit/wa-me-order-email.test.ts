@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { prismaStoreFindUnique } = vi.hoisted(() => ({ prismaStoreFindUnique: vi.fn() }));
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   const prisma = { store: { findUnique: prismaStoreFindUnique } };
   return { prisma, withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(prisma) };
 });

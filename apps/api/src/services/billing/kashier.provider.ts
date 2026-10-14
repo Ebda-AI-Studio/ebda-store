@@ -17,7 +17,7 @@
  *
  * Base URL is configurable (`KASHIER_BASE_URL`, default the sandbox).
  */
-import { minorToDecimalString, tryToMinor } from '@force/shared';
+import { minorToDecimalString, tryToMinor } from '@ebda/shared';
 import {
   BillingProviderError,
   BillingSignatureError,

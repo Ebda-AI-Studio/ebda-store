@@ -21,7 +21,7 @@ const { mockPromotion } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { promotion: mockPromotion },
 }));
 

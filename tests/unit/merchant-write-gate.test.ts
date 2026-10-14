@@ -24,7 +24,7 @@ vi.mock('@api/config', () => ({
 vi.mock('@api/lib/logger', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   runInTenantContext: async (_id: string, fn: () => unknown) => fn(),
   withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
     fn({ store: { findUnique: m.settings } }),

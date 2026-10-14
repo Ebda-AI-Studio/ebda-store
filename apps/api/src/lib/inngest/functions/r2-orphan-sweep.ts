@@ -1,7 +1,7 @@
 import type { InngestFunction } from 'inngest';
 import type { S3Client } from '@aws-sdk/client-s3';
 import { loadS3 } from '../../lazy-modules';
-import { prisma, isOwnerRole, withOwnerTx } from '@force/database';
+import { prisma, isOwnerRole, withOwnerTx } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';

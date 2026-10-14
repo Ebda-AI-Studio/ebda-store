@@ -5,7 +5,7 @@ import {
   storefrontBaseUrl,
 } from '../../../lib/agent-store-resolver';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 /**
  * `/.well-known/acp.json` — Agentic Commerce Protocol discovery.
  *

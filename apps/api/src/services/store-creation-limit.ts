@@ -6,7 +6,7 @@
  *
  * `super_admin` provisioning is operator-controlled and never goes through here.
  */
-import { withUser } from '@force/database';
+import { withUser } from '@ebda/database';
 import { abuseConfig } from '../lib/abuse-config';
 import { AppError } from '../middleware/error-handler';
 import { redis } from './redis.service';

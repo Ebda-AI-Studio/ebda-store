@@ -2,7 +2,7 @@
 
 **Goal:** Adapt the delivered FWB interface to Ebda branding and make the self-service setup path understandable in Arabic and English.
 **Architecture:** Retain the fork's existing components, server state and routes. Change presentation, translations and accessibility only; retain merchant storefront palette configuration.
-**Tech stack:** Next.js 16, React 18, Tailwind 3, next-intl, existing @force/ui.
+**Tech stack:** Next.js 16, React 18, Tailwind 3, next-intl, existing @ebda/ui.
 **Spec:** Owner request; approved `plan:docs/brand/ebda-brief-v2.html`; `packages/shared/src/brand/index.ts`.
 
 ## Constraints

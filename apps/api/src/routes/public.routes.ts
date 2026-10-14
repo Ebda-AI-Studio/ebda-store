@@ -6,7 +6,7 @@ import { CartService } from '../services/cart.service';
 import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
-import { prisma, SlugEntityType, withStore } from '@force/database';
+import { prisma, SlugEntityType, withStore } from '@ebda/database';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { resolveSlugRedirectCached } from '../services/slug-redirect.service';
 import { AppError } from '../middleware/error-handler';
@@ -31,7 +31,7 @@ import { storeLookupForHost } from '../lib/store-host';
 import { lookupStore, publicStorePage, type StoreStatusName } from '../lib/definer';
 import { redis } from '../services/redis.service';
 import { previewTokenKey } from '../lib/builder-preview-token';
-import { isReservedSlug, storefrontOrigin } from '@force/shared';
+import { isReservedSlug, storefrontOrigin } from '@ebda/shared';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { setEdgeCache } from '../lib/edge-cache';
 import { buildProductFeed } from '../lib/product-feed';
@@ -50,7 +50,7 @@ import { PaymentService } from '../services/payment-providers/payment.factory';
 import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
 import type { PaymentProvider } from '../services/payment-providers/types';
 
-import { fromMinor } from '@force/shared';
+import { fromMinor } from '@ebda/shared';
 const router = Router();
 
 // Apply public rate limiter to all routes — per-IP first, then the

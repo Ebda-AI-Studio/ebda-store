@@ -7,9 +7,9 @@ import { usePathname } from 'next/navigation';
 import { useCart } from '../../contexts/CartContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStoreUrl } from '../../contexts/StoreContext';
-import type { BottomBarSettings, StoreTheme } from '@force/shared';
-import { resolveColor, DEFAULT_THEME } from '@force/shared';
-import { CartIcon } from '@force/ui';
+import type { BottomBarSettings, StoreTheme } from '@ebda/shared';
+import { resolveColor, DEFAULT_THEME } from '@ebda/shared';
+import { CartIcon } from '@ebda/ui';
 import type { NavItem } from '../types';
 
 /**

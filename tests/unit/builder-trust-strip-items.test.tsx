@@ -19,7 +19,7 @@ import {
   NEW_STORE_LAYOUT_SETTINGS,
   storeLayoutSchema,
   getSectionDefinition,
-} from '@force/shared';
+} from '@ebda/shared';
 
 const ctx = vi.hoisted(() => ({
   store: {} as Record<string, unknown>,

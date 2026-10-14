@@ -20,7 +20,7 @@ vi.mock('../../apps/api/src/lib/logger', () => ({
 
 const mockBulkAiJobFindFirst = vi.fn();
 const mockBulkAiJobCreate = vi.fn();
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     bulkAiJob: {
       findFirst: (...args: unknown[]) => mockBulkAiJobFindFirst(...args),

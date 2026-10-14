@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button } from '@force/ui';
-import { formatMoney } from '@force/shared';
+import { Badge, Button } from '@ebda/ui';
+import { formatMoney } from '@ebda/shared';
 import { DataTable, type DataTableColumn } from '../../../components/mobile/DataTable';
 import { apiGet } from '../../../lib/api';
 import { useT } from '../../../i18n/useT';

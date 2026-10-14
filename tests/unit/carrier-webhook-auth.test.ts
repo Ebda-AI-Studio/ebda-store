@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const findUnique = vi.fn();
 const shipmentFindFirst = vi.fn();
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   const client = {
     shippingCarrierConfig: { findUnique: (...a: unknown[]) => findUnique(...a) },
     shipment: { findFirst: (...a: unknown[]) => shipmentFindFirst(...a) },

@@ -37,7 +37,7 @@ vi.mock('@api/middleware/store-access', () => ({
 
 import express from 'express';
 import request from 'supertest';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import storeRoutes from '@api/routes/store.routes';
 import { getCached } from '@api/lib/public-cache';
 

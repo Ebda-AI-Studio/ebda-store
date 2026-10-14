@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { apiGet } from '../../../../../lib/api';
-import { localDayRange, reportRangeParams } from '@force/shared';
+import { localDayRange, reportRangeParams } from '@ebda/shared';
 import { useLatestRequest } from '../../../../../hooks/useLatestRequest';
 
 export interface AbandonmentItem {

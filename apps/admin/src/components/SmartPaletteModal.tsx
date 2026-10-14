@@ -7,7 +7,7 @@ import {
   DEFAULT_THEME,
   getTemplatePresets,
   getVibePreset,
-} from '@force/shared';
+} from '@ebda/shared';
 import type {
   StoreTheme,
   SectionKey,
@@ -18,7 +18,7 @@ import type {
   CardFrameWidth,
   VibeId,
   TemplateId,
-} from '@force/shared';
+} from '@ebda/shared';
 import { hexToHsl } from '../lib/color';
 import { ColorField } from './ColorField';
 import { SectionPreview } from './SectionPreview';

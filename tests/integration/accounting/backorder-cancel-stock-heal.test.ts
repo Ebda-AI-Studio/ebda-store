@@ -18,7 +18,7 @@
  * (retry-safe).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
+import { prisma, runInTenantContext, withRlsBypass } from '@ebda/database';
 import { CartService } from '@api/services/cart.service';
 import { OrderService } from '@api/services/order.service';
 import { cancelBackorder } from '@api/services/accounting/backorder.service';

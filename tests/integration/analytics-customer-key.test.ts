@@ -14,7 +14,7 @@
  * verbatim, so these assertions cover it too.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass } from '@ebda/database';
 import { AnalyticsService } from '../../apps/api/src/services/analytics.service';
 import { customerKeyOf } from '../../apps/api/src/lib/customer-key';
 import { aggregateCustomers } from '../../apps/api/src/services/customer-aggregate.service';

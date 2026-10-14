@@ -5,7 +5,7 @@ import { useLocalePrice } from '../../hooks/useLocalePrice';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button, Input } from '@force/ui';
+import { Button, Input } from '@ebda/ui';
 import { MinimalChrome } from '../../components';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
@@ -35,7 +35,7 @@ import {
   fromMinor,
   REGION,
   isValidEgyptianMobile,
-} from '@force/shared';
+} from '@ebda/shared';
 import { GovernorateAreaSelect } from './_components/GovernorateAreaSelect';
 import { DeliverySection } from './_components/DeliverySection';
 import { saveCheckoutInfo, loadCheckoutInfo, clearCheckoutInfo } from './_lib/savedCheckout';

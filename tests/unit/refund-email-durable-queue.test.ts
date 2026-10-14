@@ -14,7 +14,7 @@ const { prismaMock, enqueueMock, sendBrandedEmailMock } = vi.hoisted(() => ({
   sendBrandedEmailMock: vi.fn().mockResolvedValue({ id: 'resend-1' }),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: prismaMock,
   withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(prismaMock),
 }));

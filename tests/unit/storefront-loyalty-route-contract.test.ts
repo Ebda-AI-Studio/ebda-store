@@ -35,7 +35,7 @@ import path from 'path';
 
 // ─── Mocks (declared before the route module is dynamically imported) ─────
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {},
   LoyaltyTransactionType: {},
 }));

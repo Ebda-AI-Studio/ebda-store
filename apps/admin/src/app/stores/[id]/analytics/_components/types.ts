@@ -1,5 +1,5 @@
-import type { AnalyticsPeriod, SalesGranularity } from '@force/shared';
-import { formatMoney } from '@force/shared';
+import type { AnalyticsPeriod, SalesGranularity } from '@ebda/shared';
+import { formatMoney } from '@ebda/shared';
 
 export type { SalesGranularity };
 
@@ -95,7 +95,7 @@ export interface CashflowPoint {
  * 9-preset date period union (+ 3 legacy values kept for back-compat with
  * saved URL params / state). Expanded 2026-05-21 (Ahmad: "add this every
  * date part in the code to give me the freedom of choosing"). The single
- * definition lives in `@force/shared` (`ANALYTICS_PERIODS`) so the API's
+ * definition lives in `@ebda/shared` (`ANALYTICS_PERIODS`) so the API's
  * Zod enum and the `analytics.periodsSubtitle.*` i18n keys are checked
  * against the same list. Backend accepts startDate/endDate explicitly, so
  * the frontend resolves the preset to concrete dates before calling the API.

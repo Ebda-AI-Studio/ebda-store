@@ -6,7 +6,7 @@ import { ReturnService, REFUND_METHODS, GATEWAY_REFUND_METHODS } from '../servic
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 const router = Router({ mergeParams: true });
 

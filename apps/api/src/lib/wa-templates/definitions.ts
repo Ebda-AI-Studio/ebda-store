@@ -12,7 +12,7 @@
  * lets us iterate template text without orphaning existing approvals
  * (e.g. `force_order_paid_v1` → `force_order_paid_v2` next iteration).
  */
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 export type TemplateLanguage = 'en' | 'ar';
 export type TemplateCategory = 'UTILITY' | 'MARKETING' | 'AUTHENTICATION';

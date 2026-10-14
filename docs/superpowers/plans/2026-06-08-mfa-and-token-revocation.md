@@ -335,7 +335,7 @@ git commit -m "feat(api): embed jti + tokenVersion in access token"
 
 ```typescript
 import { describe, it, expect, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
 
 const API = `${process.env.API_HOST || 'http://localhost:4000'}/api/v1`;
@@ -425,7 +425,7 @@ req.user = payload;
 next();
 ```
 
-Add imports at top: `import { redis } from '../services/redis.service';` and `import { prisma } from '@force/database';` (match the repo's import alias).
+Add imports at top: `import { redis } from '../services/redis.service';` and `import { prisma } from '@ebda/database';` (match the repo's import alias).
 
 - [ ] **Step 4: Run tests, verify pass**
 
@@ -518,7 +518,7 @@ git commit -m "feat(api): logout denylists jti; logout-all + password-change bum
 
 ```typescript
 import { describe, it, expect, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
 import { authenticator } from 'otplib';
 
@@ -620,7 +620,7 @@ import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { authenticate } from '../middleware/auth';
 import { authLimiter } from '../middleware/security';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { encryption } from '../services/encryption.service';
 import { MfaService } from '../services/mfa.service';
 import { AuthService } from '../services/auth.service';
@@ -747,7 +747,7 @@ git commit -m "feat(api): TOTP enroll/verify/disable + MFA login challenge"
 ```typescript
 // apps/api/src/middleware/require-mfa.ts
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { AppError } from '../lib/errors';
 
 export async function requireMfaEnrolled(req: Request, _res: Response, next: NextFunction) {
@@ -784,7 +784,7 @@ git commit -m "feat(api): enforce MFA enrollment for super_admin"
 
 ```typescript
 // scripts/mfa-reset.ts — usage: DIRECT_URL=... npx tsx scripts/mfa-reset.ts <email>
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 (async () => {
   const email = process.argv[2];
   if (!email) {

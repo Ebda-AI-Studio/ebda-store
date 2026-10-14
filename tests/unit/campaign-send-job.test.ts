@@ -34,7 +34,7 @@ const { holder, sendMarketingEmail, captured, awaitCampaignSendSlot } = vi.hoist
 
 vi.mock('@api/lib/campaign-send-pacer', () => ({ awaitCampaignSendSlot }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   get prisma() {
     return holder.prisma;
   },

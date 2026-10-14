@@ -11,8 +11,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const h = vi.hoisted(() => ({ findMany: vi.fn(), queryRaw: vi.fn() }));
 
-vi.mock('@force/database', async importOriginal => ({
-  ...(await importOriginal<typeof import('@force/database')>()),
+vi.mock('@ebda/database', async importOriginal => ({
+  ...(await importOriginal<typeof import('@ebda/database')>()),
   prisma: {
     // the customer lookup now reads THROUGH this store's orders (groupBy by customerId)
     order: {

@@ -26,12 +26,12 @@
  * Concurrency: limit 1 on the cron so overlapping deploys don't double-run.
  */
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext, storeDirectory, withStore } from '@force/database';
+import { prisma, runInTenantContext, storeDirectory, withStore } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { chunk, BULK_AI_BATCH_SIZE } from '../batch-utils';
 import { isAiEligiblePlan } from '../../ai-plan-eligibility';
-import type { StorePlan } from '@force/shared';
+import type { StorePlan } from '@ebda/shared';
 import { featureService } from '../../../services/feature.service';
 import { isGscConfigured } from '../../../services/answer-engine/gsc-client';
 import {

@@ -25,7 +25,7 @@ const { mockPrisma, redisMock, encryptionMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   withRlsBypass: (fn: (tx: unknown) => unknown) => fn(mockPrisma),
 }));

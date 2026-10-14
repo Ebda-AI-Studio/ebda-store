@@ -22,7 +22,7 @@ vi.mock('next-intl', () => ({
   useTranslations: () => Object.assign((key: string) => key, { has: () => true }),
 }));
 
-vi.mock('@force/shared', () => ({
+vi.mock('@ebda/shared', () => ({
   isIosWebkit: () => false,
   safeInternalPath: (raw: string | null, fallback: string) => raw ?? fallback,
 }));

@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
-import { CartIcon } from '@force/ui';
+import { CartIcon } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { ErrorState } from '../../../../components/ErrorState';
 import { useFeatures } from '../../../../hooks/useFeatures';

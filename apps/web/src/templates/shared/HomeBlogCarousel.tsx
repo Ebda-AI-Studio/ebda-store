@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { BlogCarousel, type BlogCarouselPost } from './BlogCarousel';
 import { useStore } from '../../contexts/StoreContext';
 import { api } from '../../lib/api';
-import type { SectionPaddingMaxWidthVisibility } from '@force/shared';
+import type { SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 
 /**
  * Homepage container for the blog carousel — fetches posts client-side

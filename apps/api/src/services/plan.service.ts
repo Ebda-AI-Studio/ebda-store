@@ -3,13 +3,13 @@
  * `plan-entitlements.ts`; the guard lives in `plan-limit.service.ts`.
  */
 
-import { prisma, withStore } from '@force/database';
+import { prisma, withStore } from '@ebda/database';
 import {
   planLimitsSchema,
   type AssignSubscriptionInput,
   type SubscriptionStatus,
   type UpdatePlanInput,
-} from '@force/shared';
+} from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import { bustStoreCaches } from './store.service';

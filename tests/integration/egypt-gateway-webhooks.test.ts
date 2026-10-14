@@ -17,7 +17,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vites
 import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'node:crypto';
-import { createPrismaClient, runWithRequestDb, type AppPrismaClient } from '@force/database';
+import { createPrismaClient, runWithRequestDb, type AppPrismaClient } from '@ebda/database';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import { encryption } from '@api/services/encryption.service';
 import { inngest } from '@api/lib/inngest/client';

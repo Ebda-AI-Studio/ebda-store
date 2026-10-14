@@ -31,7 +31,7 @@ import {
   cartSessionId,
   type FixtureStore,
 } from '../helpers/bundle-fixtures';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { CartService } from '@api/services/cart.service';
 
 describe.skipIf(!hasDb)('cart holds bundles', () => {

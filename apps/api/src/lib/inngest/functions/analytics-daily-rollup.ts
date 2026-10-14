@@ -27,7 +27,7 @@
  */
 
 import type { InngestFunction } from 'inngest';
-import { runInTenantContext, storeDirectory } from '@force/database';
+import { runInTenantContext, storeDirectory } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import {
@@ -37,7 +37,7 @@ import {
   type RollupResult,
 } from '../../../services/accounting/analytics-rollup.service';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 interface RollupStep {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
 }

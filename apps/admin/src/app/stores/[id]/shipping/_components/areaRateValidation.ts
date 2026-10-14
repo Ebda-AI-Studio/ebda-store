@@ -1,7 +1,7 @@
-import { roundToMinor } from '@force/shared';
+import { roundToMinor } from '@ebda/shared';
 // Pure helpers shared by AreaRateEditor. Kept in a plain .ts module (no JSX)
 // so they can be unit tested directly, without pulling in the client
-// component's React/next-intl/@force/ui dependency graph.
+// component's React/next-intl/@ebda/ui dependency graph.
 
 export function majorToMinor(major: string): number {
   const n = parseFloat(major);

@@ -37,7 +37,7 @@
  * DATABASE_URL, unique suffix, cleans up in afterAll.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma, withRlsBypass, runInTenantContext } from '@force/database';
+import { prisma, withRlsBypass, runInTenantContext } from '@ebda/database';
 import { seedCoaForStore } from '../../../apps/api/src/services/accounting/account.service';
 import { postOrderPaymentJournal as postOrderPaymentJournalRaw } from '../../../apps/api/src/services/accounting/posting/order-posting';
 import { postRefundJournal as postRefundJournalRaw } from '../../../apps/api/src/services/accounting/posting/refund-posting';

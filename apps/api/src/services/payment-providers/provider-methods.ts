@@ -7,7 +7,7 @@ import {
   paymobSettingsBaseSchema,
   kashierSettingsSchema,
   fawrySettingsSchema,
-} from '@force/shared';
+} from '@ebda/shared';
 
 export const METHOD_LABELS: Record<string, { name: string; nameAr: string }> = {
   card: { name: 'Card', nameAr: 'بطاقة' },

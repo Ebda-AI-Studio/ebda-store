@@ -1,6 +1,6 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInStoreScope } from '@force/database';
-import type { AiFieldSources } from '@force/shared';
+import { prisma, runInStoreScope } from '@ebda/database';
+import type { AiFieldSources } from '@ebda/shared';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';

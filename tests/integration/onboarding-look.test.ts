@@ -10,14 +10,14 @@ import crypto from 'crypto';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import { prisma, createPrismaClient, runWithRequestDb } from '@force/database';
+import { prisma, createPrismaClient, runWithRequestDb } from '@ebda/database';
 import {
   getLook,
   LOOKS,
   LOOK_TEMPLATES,
   TEMPLATE_FAMILIES,
   validatePublishReadiness,
-} from '@force/shared';
+} from '@ebda/shared';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import onboardingRoutes from '@api/routes/onboarding.routes';
 import { errorHandler, AppError } from '@api/middleware/error-handler';

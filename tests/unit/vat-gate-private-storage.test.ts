@@ -46,7 +46,7 @@ vi.mock('@api/services/store.service', () => ({ bustStoreCachesById: vi.fn() }))
 vi.mock('@api/lib/after-tenant-commit', () => ({
   deferAfterTenantCommit: (_n: string, run: () => Promise<unknown>) => run(),
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   Prisma: {},
   withUser: (_u: string, fn: () => Promise<unknown>) => fn(),
   prisma: {

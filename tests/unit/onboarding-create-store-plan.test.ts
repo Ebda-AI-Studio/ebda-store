@@ -16,7 +16,7 @@ const m = vi.hoisted(() => ({
   order: [] as string[],
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {},
   Prisma: { PrismaClientKnownRequestError: class extends Error {} },
   withUser: async (_id: string, fn: (tx: unknown) => unknown) =>

@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 /**
  * Whether a store takes GUEST orders (no customer account), within a window.

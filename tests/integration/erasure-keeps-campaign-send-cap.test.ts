@@ -15,7 +15,7 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import crypto from 'crypto';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import { AuthService } from '../../apps/api/src/services/auth.service';
 import { sentInLast24h } from '../../apps/api/src/services/campaign.service';
 

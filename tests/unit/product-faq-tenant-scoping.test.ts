@@ -26,7 +26,7 @@ const mockFaqUpdateMany = vi.fn();
 const mockFaqFindUnique = vi.fn();
 const mockFaqDeleteMany = vi.fn();
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     product: { findFirst: (...args: unknown[]) => mockProductFindFirst(...args) },
     productFaq: {

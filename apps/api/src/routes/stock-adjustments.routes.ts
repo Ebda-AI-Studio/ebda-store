@@ -4,7 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { writeLimiter } from '../middleware/security';
-import { runInTenantContext, prisma } from '@force/database';
+import { runInTenantContext, prisma } from '@ebda/database';
 import { uniqueViolationTarget } from '../lib/prisma-errors';
 import {
   createAdjustment,
@@ -13,7 +13,7 @@ import {
   getAdjustment,
   findAdjustmentByImportKey,
 } from '../services/accounting/stock-adjustment.service';
-import { parseStockAdjustCsv, STOCK_ADJUST_ROW_LIMIT } from '@force/shared';
+import { parseStockAdjustCsv, STOCK_ADJUST_ROW_LIMIT } from '@ebda/shared';
 import { rangeOrLegacyDays } from '../lib/report-range';
 
 const router = Router();

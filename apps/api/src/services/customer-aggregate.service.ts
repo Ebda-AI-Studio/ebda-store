@@ -1,9 +1,9 @@
-import { prisma, Prisma, type RfmSegment } from '@force/database';
+import { prisma, Prisma, type RfmSegment } from '@ebda/database';
 import { getCached, customersCacheKey } from '../lib/public-cache';
 import { customerKeyOf, rfmKeyFor } from '../lib/customer-key';
 import { SmsConsentService } from './sms-consent.service';
 import { AppError } from '../middleware/error-handler';
-import { NON_REVENUE_ORDER_STATUSES } from '@force/shared';
+import { NON_REVENUE_ORDER_STATUSES } from '@ebda/shared';
 
 /**
  * Customer aggregation — the Customers page's definition of "a customer"
@@ -132,7 +132,7 @@ export interface CustomersSummary {
 }
 
 // A literal list, not `Object.values(RfmSegment)`: reading the enum VALUE at
-// module load breaks every unit test that mocks '@force/database' wholesale.
+// module load breaks every unit test that mocks '@ebda/database' wholesale.
 // The type assertion below still fails the build if the enum gains a member.
 export const RFM_SEGMENT_VALUES = [
   'vip',

@@ -16,7 +16,7 @@ import { useCoupons } from './_hooks/useCoupons';
 import { dateTimeLocalValue } from '@/lib/form-text';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
-import { fromMinor } from '@force/shared';
+import { fromMinor } from '@ebda/shared';
 interface CustomerGroupOption {
   id: string;
   name: string;

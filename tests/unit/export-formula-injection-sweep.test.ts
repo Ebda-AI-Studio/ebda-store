@@ -89,7 +89,7 @@ describe('every text/csv emitter routes cells through csvField', () => {
     );
   });
   for (const f of emitters) {
-    it(`${rel(f)} imports csvField from @force/shared (directly or via the bulk service)`, () => {
+    it(`${rel(f)} imports csvField from @ebda/shared (directly or via the bulk service)`, () => {
       const src = readFileSync(f, 'utf-8');
       const viaService = rel(f) === 'routes/bulk.routes.ts' && /BulkService\./.test(src);
       expect(/csvField/.test(src) || viaService).toBe(true);

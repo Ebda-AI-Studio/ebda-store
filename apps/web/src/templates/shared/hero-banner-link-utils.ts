@@ -1,4 +1,4 @@
-import { isSafeUrl, sanitizeUrl } from '@force/shared';
+import { isSafeUrl, sanitizeUrl } from '@ebda/shared';
 
 /**
  * Resolve a banner `link` (`HeroSlide.link` / `HeroBannerProps.link`) to a

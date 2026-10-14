@@ -15,7 +15,7 @@ import {
   validateGlb,
   validateUsdz,
   type PublicModel3dBinding,
-} from '@force/shared';
+} from '@ebda/shared';
 import { buildGlb, buildUsdz, sampleGlb, sampleGltf } from '../helpers/glb-fixtures';
 
 const fail = (bytes: Uint8Array) => {

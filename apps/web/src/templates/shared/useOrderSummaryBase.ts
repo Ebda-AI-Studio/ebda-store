@@ -14,7 +14,7 @@ import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
 import type { OrderSummaryProps } from '../types';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 export interface OrderSummaryBaseResult {
   isRtl: boolean;
   /** Format a piastres-denominated price as "X.XXX EGP" */

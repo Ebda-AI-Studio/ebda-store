@@ -32,7 +32,7 @@ import { Trend } from 'k6/metrics';
 //   LENS_N_HOLD     — override the sustained-peak duration (default 3m)
 //
 // Run:
-//   LOADTEST_STORE_COUNT=80 npm run seed:loadtest --workspace @force/database
+//   LOADTEST_STORE_COUNT=80 npm run seed:loadtest --workspace @ebda/database
 //   STORE_IDS=$(cat loadtests/.loadtest-store-ids.txt) \
 //   BASE_URL=https://<staging-host>/api/v1 \
 //   LOAD_TEST_TOKEN=<token> \
@@ -54,7 +54,7 @@ const HEALTH_BASE = BASE.replace(/\/api\/v1\/?$/, '');
 if (!__ENV.STORE_IDS) {
   throw new Error(
     'STORE_IDS env var is required.\n' +
-      'Seed ~80 stores first: LOADTEST_STORE_COUNT=80 npm run seed:loadtest --workspace @force/database\n' +
+      'Seed ~80 stores first: LOADTEST_STORE_COUNT=80 npm run seed:loadtest --workspace @ebda/database\n' +
       'Then: STORE_IDS=$(cat loadtests/.loadtest-store-ids.txt) BASE_URL=<staging-url>/api/v1 ./loadtests/run.sh lens-n-medium-traffic'
   );
 }

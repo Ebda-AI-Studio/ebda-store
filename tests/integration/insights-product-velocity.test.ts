@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { planService } from '../../apps/api/src/services/plan.service';
 import { productVelocityResponseSchema } from '../../packages/shared/src/schemas/analytics';
 

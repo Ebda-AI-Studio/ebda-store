@@ -20,7 +20,7 @@
  * without a real DATABASE_URL; every fixture id is per call (retry-safe).
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
-import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
+import { prisma, runInTenantContext, withRlsBypass } from '@ebda/database';
 
 vi.mock('@api/services/encryption.service', () => ({
   encryption: { decrypt: (v: string) => v, encrypt: (v: string) => v },

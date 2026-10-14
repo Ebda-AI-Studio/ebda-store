@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { redis } from './redis.service';
 import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';

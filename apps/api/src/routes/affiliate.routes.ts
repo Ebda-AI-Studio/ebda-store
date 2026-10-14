@@ -5,7 +5,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { affiliateService } from '../services/affiliate.service';
 import { listAffiliateEvents } from '../services/affiliate-event.service';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { tenantContext } from '../middleware/tenant-context';
 
 // TWO routers, deliberately (#1993): the admin half is mounted ONLY at the

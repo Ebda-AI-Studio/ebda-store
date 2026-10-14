@@ -15,7 +15,7 @@
  * docs/superpowers/plans/2026-08-30-variant-stock-drift.md). Read stock
  * through here; do not dereference `.inventory` in a new call site.
  *
- * Deliberately free of any `@force/database` import so that every module on
+ * Deliberately free of any `@ebda/database` import so that every module on
  * the request path (cart, orders, routes) can use it without pulling Prisma
  * into their unit-test mocks. The SQL twin — for queries that must filter,
  * sort or aggregate on stock — lives in `effective-inventory-sql.ts`.

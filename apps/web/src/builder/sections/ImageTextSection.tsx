@@ -10,12 +10,12 @@
  * offer inline editing; it is only present on preview renders.
  */
 import React from 'react';
-import { sanitizeUrl } from '@force/shared';
+import { sanitizeUrl } from '@ebda/shared';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
-import type { SectionPaddingMaxWidthVisibility } from '@force/shared';
+import type { SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 
 export interface ImageTextSettings extends SectionPaddingMaxWidthVisibility {
   image?: string;

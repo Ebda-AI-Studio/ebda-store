@@ -16,7 +16,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import crypto from 'crypto';
 import type { PrismaClient } from '@prisma/client';
-import { createPrismaClient } from '@force/database';
+import { createPrismaClient } from '@ebda/database';
 import { assertStrictTablesVisible, type R2CatalogDb } from '@api/lib/r2-references';
 
 const hasDb =

@@ -13,7 +13,7 @@ vi.mock('../../i18n/useT', () => {
     vars ? `${key}:${JSON.stringify(vars)}` : key;
   return { useT: () => t };
 });
-vi.mock('@force/ui', () => ({
+vi.mock('@ebda/ui', () => ({
   Button: (p: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...p} />,
   Input: ({
     label,

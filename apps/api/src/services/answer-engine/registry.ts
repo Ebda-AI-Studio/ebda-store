@@ -19,7 +19,7 @@
  * row rather than failing the whole registry lookup — a single bad
  * config row must not take down every engine's insight check.
  */
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { encryption } from '../encryption.service';
 import logger from '../../lib/logger';
 import { GeminiAnswerEngineProvider } from './gemini.provider';

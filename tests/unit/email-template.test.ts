@@ -1,13 +1,13 @@
-import { BRAND, BRAND_EMAIL_LOGO_URL } from '@force/shared';
+import { BRAND, BRAND_EMAIL_LOGO_URL } from '@ebda/shared';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// email.service now imports @force/database at the module level;
+// email.service now imports @ebda/database at the module level;
 // mock it so this unit test doesn't require a generated prisma client.
 const { prismaStoreFindUnique } = vi.hoisted(() => ({
   prismaStoreFindUnique: vi.fn(),
 }));
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mod: Record<string, any> = {
     prisma: { store: { findUnique: prismaStoreFindUnique } },

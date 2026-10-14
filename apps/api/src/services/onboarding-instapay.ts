@@ -12,8 +12,8 @@
  * shared schema, and the route calls it before `setPaymentMethods` so the
  * "at least one method stays on" rule sees the new state.
  */
-import { prisma, type Prisma } from '@force/database';
-import { instapaySettingsSchema } from '@force/shared';
+import { prisma, type Prisma } from '@ebda/database';
+import { instapaySettingsSchema } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { PaymentService } from './payment.service';
 

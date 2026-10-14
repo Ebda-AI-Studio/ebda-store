@@ -24,7 +24,7 @@
  * `tests/integration/soft-deleted-product-checkout-block.test.ts`.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { AppError } from '@api/middleware/error-handler';
 import { OrderService } from '@api/services/order.service';
 import {

@@ -33,7 +33,7 @@ vi.mock('../../../../../../components/ConfirmActionModal', () => ({
     ) : null,
 }));
 
-import { ToastProvider } from '@force/ui';
+import { ToastProvider } from '@ebda/ui';
 import { ShipmentPickupPanel } from './ShipmentPickupPanel';
 
 const BASE = '/api/v1/stores/s1/shipments/sh-1/pickup';

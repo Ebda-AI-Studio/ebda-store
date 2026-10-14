@@ -8,7 +8,7 @@ import {
   looksForTemplate,
   type LookId,
   type LookTemplate,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 
 interface LookPickerProps {

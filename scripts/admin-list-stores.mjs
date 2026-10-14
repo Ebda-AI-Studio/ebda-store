@@ -1,4 +1,4 @@
-import { prisma as p } from '@force/database';
+import { prisma as p } from '@ebda/database';
 const stores = await p.store.findMany({
   orderBy: { createdAt: 'asc' },
   select: {

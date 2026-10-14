@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 
-// `wa-bridge-auth.ts` imports `@force/database` (Prisma) at module scope —
+// `wa-bridge-auth.ts` imports `@ebda/database` (Prisma) at module scope —
 // mocked here the same way tests/unit/contract-wbs-bridge.test.ts does, so
 // this file can exercise `secretsMatch` without a real DB/Prisma build.
-vi.mock('@force/database', () => ({ withStore: vi.fn() }));
+vi.mock('@ebda/database', () => ({ withStore: vi.fn() }));
 vi.mock('../../apps/api/src/lib/definer', () => ({ wbsBridgeKeys: vi.fn() }));
 vi.mock('../../apps/api/src/services/encryption.service', () => ({
   encryption: { decrypt: vi.fn() },

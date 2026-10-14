@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockReorderSuggestionFindFirst = vi.fn();
 const mockPurchaseOrderItemFindFirst = vi.fn();
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     reorderSuggestion: {
       findFirst: (...args: unknown[]) => mockReorderSuggestionFindFirst(...args),

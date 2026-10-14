@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Badge } from '@force/ui';
+import { Badge } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { formatPrice } from '../../../../../../lib/format';
 

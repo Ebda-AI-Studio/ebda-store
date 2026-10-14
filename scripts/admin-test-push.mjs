@@ -3,7 +3,7 @@
 // actually reachable end-to-end (browser permission → OneSignal player →
 // our DB row → REST broadcast → device buzz).
 //
-// Run from apps/api/ so @force/database resolves and the
+// Run from apps/api/ so @ebda/database resolves and the
 // ONESIGNAL_ADMIN_* / ONESIGNAL_* env vars are loaded:
 //
 //   node ../../scripts/admin-test-push.mjs                  # all super_admins
@@ -16,7 +16,7 @@
 //   railway run -- node ../../scripts/admin-test-push.mjs
 //
 import 'dotenv/config';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 const args = Object.fromEntries(
   process.argv.slice(2).flatMap(a => {

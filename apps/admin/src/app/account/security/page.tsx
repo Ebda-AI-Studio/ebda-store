@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Button, Input, useToast } from '@force/ui';
+import { Button, Input, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { apiPost, apiGet } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
 import { useT } from '@/i18n/useT';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

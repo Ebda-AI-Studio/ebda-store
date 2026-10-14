@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { apiPost } from '../../../lib/api';
-import { isValidEmail, validateStoreSlug } from '@force/shared';
+import { isValidEmail, validateStoreSlug } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { StepIndicator } from './_components/StepIndicator';
 import { StoreDetailsStep } from './_components/StoreDetailsStep';
@@ -67,7 +67,7 @@ export default function CreateStorePage() {
       if (!formData.storeName.trim()) errors.storeName = t('errors.storeNameRequired');
       if (!formData.storeSlug.trim()) errors.storeSlug = t('errors.storeUrlRequired');
       if (formData.storeSlug) {
-        // Same rules the API enforces (@force/shared): format, 3-40 chars, and
+        // Same rules the API enforces (@ebda/shared): format, 3-40 chars, and
         // not a reserved label (`app`, `api`, `www`, …).
         // Protected brand names are decided by the API (a super_admin may claim them).
         const slugCheck = validateStoreSlug(formData.storeSlug, { allowProtected: true });

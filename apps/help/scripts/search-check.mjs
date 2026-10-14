@@ -1,7 +1,7 @@
 // Search smoke gate for help: real queries against the built index, in Chromium.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runSearchCheck } from '@force/site-kit/gates/search';
+import { runSearchCheck } from '@ebda/site-kit/gates/search';
 
 await runSearchCheck({
   root: path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'out'),

@@ -3,11 +3,11 @@
 import Script from 'next/script';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
-import type { MarketingPixels } from '@force/shared';
+import type { MarketingPixels } from '@ebda/shared';
 import { useFeatures } from '../contexts/FeatureContext';
 import { useConsent } from '../contexts/ConsentContext';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 interface MarketingPixelsProps {
   pixels: MarketingPixels;
 }

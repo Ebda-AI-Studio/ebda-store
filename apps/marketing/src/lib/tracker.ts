@@ -1,4 +1,4 @@
-import { createTracker, type Tracker } from '@force/shared/tracking-browser';
+import { createTracker, type Tracker } from '@ebda/shared/tracking-browser';
 import { pagePath } from './site';
 
 let instance: Tracker | null = null;

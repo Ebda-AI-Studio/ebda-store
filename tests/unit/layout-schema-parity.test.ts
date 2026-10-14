@@ -23,7 +23,7 @@ import { describe, it, expect } from 'vitest';
 
 // The runtime key list with compile-time assertions that it stays in sync
 // with the StoreLayoutSettings interface.
-import { LAYOUT_TOP_LEVEL_KEYS } from '@force/shared';
+import { LAYOUT_TOP_LEVEL_KEYS } from '@ebda/shared';
 
 // The exported Zod schema from the route file. We import it here so the test
 // can introspect its shape without spinning up the Express app.

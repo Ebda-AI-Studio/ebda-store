@@ -1,4 +1,4 @@
-import { minorToDecimalString, roundToMinor } from '@force/shared';
+import { minorToDecimalString, roundToMinor } from '@ebda/shared';
 /**
  * `ProductVariant.price` is `Int?` — an OVERRIDE, where null means "sell at the
  * product's price". The variants endpoint returns the raw row, so admin code

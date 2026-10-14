@@ -33,7 +33,7 @@ import {
   type PageDefinition,
   type SectionList,
   type SectionNode,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 
 export interface Selection {

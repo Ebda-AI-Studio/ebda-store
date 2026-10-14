@@ -109,7 +109,7 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { prisma, withMoneyTx, type Prisma } from '@force/database';
+import { prisma, withMoneyTx, type Prisma } from '@ebda/database';
 import { localizeOptionName, localizeOptionValue } from '../apps/web/src/lib/option-localization';
 
 type Tx = Prisma.TransactionClient;

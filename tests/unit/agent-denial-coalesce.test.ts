@@ -35,7 +35,7 @@ const mockRedisSet = vi.fn();
 const mockRedisDel = vi.fn();
 const mockGetRateLimitCount = vi.fn();
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     auditLog: {
       create: (...a: unknown[]) => mockAuditLogCreate(...a),
@@ -208,7 +208,7 @@ describe('#1644 / #1649 auditAgentWrite — denial coalescing WITH a count', () 
   });
 
   it('a repeat NEVER opens a transaction — runInTenantContext is not called for it', async () => {
-    const db = await import('@force/database');
+    const db = await import('@ebda/database');
     fakeRedisRowCache();
     mockIncrementRateLimit.mockResolvedValueOnce(1).mockResolvedValueOnce(2);
 
@@ -413,7 +413,7 @@ describe('#1644 / #1649 auditAgentWrite — denial coalescing WITH a count', () 
   // transaction committed, so a CONCURRENT burst — the real attack shape —
   // all missed the cache and each opened its own transaction.
   it('a concurrent burst opens ONE transaction, and the row still carries every attempt', async () => {
-    const db = await import('@force/database');
+    const db = await import('@ebda/database');
     fakeRedisRowCache();
     fakeCounter();
     // Hold the first insert open until the whole burst has arrived.
@@ -442,7 +442,7 @@ describe('#1644 / #1649 auditAgentWrite — denial coalescing WITH a count', () 
   // reserving writer. If ITS insert then fails, the whole burst used to leave
   // zero rows — invisible to the denial watcher during exactly the flood.
   it('a burst whose reserving insert FAILS still leaves one row carrying every attempt', async () => {
-    const db = await import('@force/database');
+    const db = await import('@ebda/database');
     fakeRedisRowCache();
     fakeCounter();
     let failInsert!: () => void;

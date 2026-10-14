@@ -9,8 +9,8 @@
  * can run inside the caller's transaction.
  */
 
-import type { Prisma } from '@force/database';
-import { DEFAULT_PLAN_SEEDS, STORE_PLAN_TO_PLAN_CODE } from '@force/shared';
+import type { Prisma } from '@ebda/database';
+import { DEFAULT_PLAN_SEEDS, STORE_PLAN_TO_PLAN_CODE } from '@ebda/shared';
 
 type LegacyPlan = keyof typeof STORE_PLAN_TO_PLAN_CODE;
 

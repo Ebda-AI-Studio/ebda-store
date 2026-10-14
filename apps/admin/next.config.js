@@ -133,7 +133,7 @@ const nextConfig = {
   // workspace-isolated resolution; Turbopack is stricter.
   outputFileTracingRoot: path.join(__dirname, '../..'),
 
-  transpilePackages: ['@force/ui', '@force/shared'],
+  transpilePackages: ['@ebda/ui', '@ebda/shared'],
 
   images: {
     // Cloudflare build only: disable Next's sharp-based optimizer (native,
@@ -186,7 +186,7 @@ const nextConfig = {
   },
 
   experimental: {
-    optimizePackageImports: ['@force/shared', '@force/ui'],
+    optimizePackageImports: ['@ebda/shared', '@ebda/ui'],
   },
 
   // 301 permanent redirects from old admin URLs that were renamed.

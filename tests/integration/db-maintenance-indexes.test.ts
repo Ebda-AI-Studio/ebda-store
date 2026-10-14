@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { hasDb } from '../helpers/bundle-fixtures';
 
 const migrationsDir = join(__dirname, '../../packages/database/prisma/migrations');

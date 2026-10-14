@@ -24,7 +24,7 @@
 
 import type { InngestFunction } from 'inngest';
 import * as Sentry from '@sentry/node';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { inngest } from '../client';
 import {
   wbsBridgeService,

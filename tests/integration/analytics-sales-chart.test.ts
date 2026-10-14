@@ -9,7 +9,7 @@
  * (the old behaviour) put it on Sep 1.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { AnalyticsService } from '../../apps/api/src/services/analytics.service';
 
 const OWNER = '00000000-0000-0000-0000-0000000009a1';

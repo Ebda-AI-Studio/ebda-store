@@ -35,7 +35,7 @@ import {
   prisma,
   type AppPrismaClient,
   type IsolateDb,
-} from '@force/database';
+} from '@ebda/database';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw'; // same as the CI role step: roles are cluster-wide, so tests must not rotate it

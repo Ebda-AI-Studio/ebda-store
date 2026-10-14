@@ -17,7 +17,7 @@
  *    checks the carrier's dashboard first).
  *  - Every request and cancel is audit-logged.
  */
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';

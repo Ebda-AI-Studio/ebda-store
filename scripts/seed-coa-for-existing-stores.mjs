@@ -12,7 +12,7 @@
  * seeded automatically on creation via StoreService.createStore.
  */
 
-import { createPrismaClient } from '@force/database';
+import { createPrismaClient } from '@ebda/database';
 import { seedCoaForStore } from '../apps/api/dist/services/accounting/account.service.js';
 
 const APPLY = process.argv.includes('--apply');

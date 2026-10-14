@@ -24,7 +24,7 @@
  */
 
 import type { InngestFunction } from 'inngest';
-import { storeDirectory } from '@force/database';
+import { storeDirectory } from '@ebda/database';
 import { withLeaderLock } from '../../leader-election';
 import { sweepStore } from '../../../services/ai-autofill.service';
 import { recommendationService } from '../../../services/recommendation.service';

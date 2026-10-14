@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { InstapayReceiptView } from '@force/shared';
+import type { InstapayReceiptView } from '@ebda/shared';
 
 const { apiFetch } = vi.hoisted(() => ({ apiFetch: vi.fn() }));
 vi.mock('next-intl', () => ({ useLocale: () => 'en' }));

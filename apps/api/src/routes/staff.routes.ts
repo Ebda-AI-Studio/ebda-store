@@ -13,7 +13,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'crypto';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import { withStore, withUser, UserRole } from '@force/database';
+import { withStore, withUser, UserRole } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';

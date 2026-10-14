@@ -7,7 +7,7 @@
  * updateTheme must shallow-merge those into the stored theme so keys absent
  * from the payload are preserved (no whole-object clobber).
  *
- * Strategy: mock @force/database + the side-effect deps so the test is pure.
+ * Strategy: mock @ebda/database + the side-effect deps so the test is pure.
  * Setting TEST_DATABASE_URL to a non-prod placeholder keeps the global
  * tests/setup-e2e.ts from reading the real DATABASE_URL.
  */
@@ -21,7 +21,7 @@ const { updateMock, findUniqueMock } = vi.hoisted(() => ({
   findUniqueMock: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     store: {
       findUnique: findUniqueMock,
@@ -35,7 +35,7 @@ vi.mock('@force/database', () => ({
   withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
     fn({
       // the transaction client is the same fake client, plus the zero counts
-      ...(await import('@force/database')).prisma,
+      ...(await import('@ebda/database')).prisma,
       product: { count: async () => 0 },
       category: { count: async () => 0 },
       order: { count: async () => 0 },
@@ -44,9 +44,9 @@ vi.mock('@force/database', () => ({
     (o?.storeIds ?? []).map(storeId => ({ storeId, value: { products: 0, orders: 0 } })),
 }));
 
-vi.mock('@force/shared', async importOriginal => ({
+vi.mock('@ebda/shared', async importOriginal => ({
   // Keep the real region config (REGION is read at import time by api config/services).
-  ...(await importOriginal<typeof import('@force/shared')>()),
+  ...(await importOriginal<typeof import('@ebda/shared')>()),
   slugify: (s: string) => s,
 }));
 

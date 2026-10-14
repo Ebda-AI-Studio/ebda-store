@@ -25,7 +25,7 @@ const h = vi.hoisted(() => ({
   orphanAlert: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     order: { findFirst: (...a: unknown[]) => h.orderFindFirst(...a), update: vi.fn() },
     payment: {

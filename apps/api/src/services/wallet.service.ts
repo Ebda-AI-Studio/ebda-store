@@ -7,7 +7,7 @@ import {
   hasTenantContext,
   type WalletTransactionType,
   withStore,
-} from '@force/database';
+} from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import logger from '../lib/logger';

@@ -1,6 +1,6 @@
 'use client';
 
-import { hasWaMeNumber, normalizeEgyptianMobile } from '@force/shared';
+import { hasWaMeNumber, normalizeEgyptianMobile } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import type { StoreBranding } from './types';
 

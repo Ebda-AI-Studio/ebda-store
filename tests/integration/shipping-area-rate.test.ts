@@ -22,7 +22,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import bcrypt from 'bcryptjs';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass } from '@ebda/database';
 import { API_BASE, API_ORIGIN } from '../helpers/api-base';
 
 // One knob (TEST_API_URL) points the whole suite at one API, so a run cannot

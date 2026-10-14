@@ -78,7 +78,7 @@ const storeRowById = (id: string) => {
   return hit ? { ...hit, theme: {}, settings: {}, marketingPixels: null } : null;
 };
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
     fn({
       store: {

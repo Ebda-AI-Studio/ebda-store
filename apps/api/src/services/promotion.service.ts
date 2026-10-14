@@ -5,7 +5,7 @@
  * scope) shared with coupons. Eligibility evaluation lives in the shared
  * targeting evaluator (Task 2), not here — this is persistence only.
  */
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 
 interface CreatePromotionData {

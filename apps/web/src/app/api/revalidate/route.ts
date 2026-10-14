@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
-import { revalidateRequestSchema } from '@force/shared';
+import { revalidateRequestSchema } from '@ebda/shared';
 
 /**
  * On-demand storefront cache purge. The API (Railway) calls this after a

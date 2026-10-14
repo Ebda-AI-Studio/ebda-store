@@ -45,7 +45,7 @@
  *      next store.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { prisma, withRlsBypass, runInTenantContext, runInStoreScope } from '@force/database';
+import { prisma, withRlsBypass, runInTenantContext, runInStoreScope } from '@ebda/database';
 import { generatePrompts } from '../../../apps/api/src/services/answer-engine/prompts';
 import { runCitationScan } from '../../../apps/api/src/services/answer-engine/citation-scan.service';
 import { isPaidEngineOverBudget } from '../../../apps/api/src/services/answer-engine/budget';

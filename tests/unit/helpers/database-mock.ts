@@ -1,5 +1,5 @@
 /**
- * Stand-ins for the `@force/database` tenant helpers, for unit tests that mock
+ * Stand-ins for the `@ebda/database` tenant helpers, for unit tests that mock
  * the module (the real ones need a database).
  *
  * `acrossStores` & co. run the callback ONCE for each store id given in
@@ -8,7 +8,7 @@
  * callback is invoked directly (there is no transaction), so the test's own
  * `prisma` mock answers it. Use it from a `vi.mock` factory:
  *
- *   vi.mock('@force/database', async () =>
+ *   vi.mock('@ebda/database', async () =>
  *     (await import('./helpers/database-mock')).databaseMock({ prisma: mockPrisma }));
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

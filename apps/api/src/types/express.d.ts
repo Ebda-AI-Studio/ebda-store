@@ -1,4 +1,4 @@
-import { Store } from '@force/database';
+import { Store } from '@ebda/database';
 
 declare module 'express-serve-static-core' {
   interface Request {

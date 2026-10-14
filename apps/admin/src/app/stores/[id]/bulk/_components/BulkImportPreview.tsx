@@ -1,8 +1,8 @@
 'use client';
 
 import { useLocale } from 'next-intl';
-import { Button } from '@force/ui';
-import { formatMoney } from '@force/shared';
+import { Button } from '@ebda/ui';
+import { formatMoney } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import type { ImportPreview } from './types';
 

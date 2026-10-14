@@ -40,7 +40,7 @@
  * each against a real sandbox.
  */
 import crypto from 'node:crypto';
-import { kashierSettingsSchema, minorToDecimalString } from '@force/shared';
+import { kashierSettingsSchema, minorToDecimalString } from '@ebda/shared';
 import {
   credentialScope,
   gatewayRequest,

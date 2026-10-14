@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock prisma before importing the service
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   hasTenantContext: () => false,
   currentTenantGucs: () => undefined,
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
@@ -65,7 +65,7 @@ vi.mock('../../apps/api/src/lib/logger', () => ({
   },
 }));
 
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { redis } from '../../apps/api/src/services/redis.service';
 import { recommendationService } from '../../apps/api/src/services/recommendation.service';
 

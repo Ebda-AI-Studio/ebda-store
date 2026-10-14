@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { composeStoreTheme, getLook } from '@force/shared';
+import { composeStoreTheme, getLook } from '@ebda/shared';
 import { middleware } from '../../apps/web/middleware';
 import { applyDemoLook, parseDemoLook } from '../../apps/web/src/lib/demo-look';
 import type { ResolvedStore } from '../../apps/web/src/lib/store-resolver';
@@ -26,8 +26,8 @@ vi.mock('next/headers', () => ({
   headers: async () => ({ get: (k: string) => headerBag.value.get(k.toLowerCase()) ?? null }),
 }));
 // Ruling R4: never flip real registry data; make a look 'built' for one test via the lookup seam.
-vi.mock('@force/shared', async importOriginal => {
-  const real = await importOriginal<typeof import('@force/shared')>();
+vi.mock('@ebda/shared', async importOriginal => {
+  const real = await importOriginal<typeof import('@ebda/shared')>();
   return {
     ...real,
     getLook: (id: string | null | undefined) => {

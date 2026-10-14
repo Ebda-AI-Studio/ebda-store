@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@ebda/database';
 import { fillProductFields, isAutopilotEnabled } from '../../../services/ai-autofill.service';
 import logger from '../../logger';
 import { inngest } from '../client';

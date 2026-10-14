@@ -4,8 +4,8 @@
  * a yes), the unset-env no-op, event_id passing for Meta dedup, the banner and the signup payload.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createTracker, posthogAssetsHost } from '@force/shared/tracking-browser';
-import { EBDA_CONSENT_COOKIE, serializeConsent } from '@force/shared';
+import { createTracker, posthogAssetsHost } from '@ebda/shared/tracking-browser';
+import { EBDA_CONSENT_COOKIE, serializeConsent } from '@ebda/shared';
 
 const CFG = {
   metaPixelId: '123456789',

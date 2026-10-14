@@ -11,7 +11,7 @@ import {
   getProviderEntry,
   providerRequestMailto,
   validateCredentialValue,
-} from '@force/shared';
+} from '@ebda/shared';
 import {
   bindCredentialFields,
   connectionFingerprint,

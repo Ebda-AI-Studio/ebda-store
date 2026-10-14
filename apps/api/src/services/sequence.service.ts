@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { withStore } from '@force/database';
+import { withStore } from '@ebda/database';
 
 const PREFIX = {
   journal: 'JE',

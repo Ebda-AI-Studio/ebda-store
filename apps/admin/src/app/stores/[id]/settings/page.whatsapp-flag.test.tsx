@@ -42,7 +42,7 @@ vi.mock('../../../../components/SettingsSearch', () => ({ SettingsSearch: () => 
 vi.mock('@/i18n/useT', () => ({
   useT: (ns: string) => (key: string) => `${ns}.${key}`,
 }));
-vi.mock('@force/ui', () => ({
+vi.mock('@ebda/ui', () => ({
   Button: ({ children }: { children: ReactNode }) => <button>{children}</button>,
   Modal: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   useToast: () => ({ success: vi.fn(), error: vi.fn() }),

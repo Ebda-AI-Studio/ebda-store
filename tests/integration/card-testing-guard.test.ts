@@ -29,7 +29,7 @@ const h = vi.hoisted(() => ({
   sendAlert: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   // tests/setup-e2e.ts builds the owner-role fixture client from this export;
   // these suites never touch a database, so a stub is enough.
   createPrismaClient: vi.fn(),

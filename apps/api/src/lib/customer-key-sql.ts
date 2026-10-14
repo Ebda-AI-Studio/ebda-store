@@ -1,4 +1,4 @@
-import { Prisma } from '@force/database';
+import { Prisma } from '@ebda/database';
 
 /**
  * SQL twin of the Customers-list key — `customerKeyOf(order) ?? 'guest:' +

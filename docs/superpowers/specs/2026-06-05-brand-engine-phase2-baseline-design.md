@@ -121,7 +121,7 @@ Result: 5 demo URLs, one brand palette, five distinct template identities — th
 
 ## 10. Rollout
 
-Packaged per-template default: `TEMPLATE_LAYOUT_BASELINES` ships in `@force/shared`; new stores + the 5 demos inherit by template. wadyaljuz + palora keep their own saved data. Single merge to main → Vercel storefront + Railway API deploy; demo seed runs once via `railway run`.
+Packaged per-template default: `TEMPLATE_LAYOUT_BASELINES` ships in `@ebda/shared`; new stores + the 5 demos inherit by template. wadyaljuz + palora keep their own saved data. Single merge to main → Vercel storefront + Railway API deploy; demo seed runs once via `railway run`.
 
 ## 11. Open decisions (resolved in brainstorm)
 

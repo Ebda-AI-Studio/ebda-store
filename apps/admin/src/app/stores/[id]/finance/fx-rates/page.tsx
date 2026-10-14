@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { apiGet, apiPost } from '@/lib/api';
-import { ALLOWED_CURRENCIES, withNumerals } from '@force/shared';
+import { ALLOWED_CURRENCIES, withNumerals } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';

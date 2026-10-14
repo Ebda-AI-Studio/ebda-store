@@ -25,7 +25,7 @@
 import type { Express } from 'express';
 import request from 'supertest';
 import { authenticator } from 'otplib';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { encryption } from '@api/services/encryption.service';
 
 /**

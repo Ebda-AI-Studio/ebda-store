@@ -4,7 +4,7 @@
  * than duplicated by Task 6 order expansion, Task 7, and Task 8 storefront
  * rendering).
  *
- * Everything here talks to a REAL Postgres database via `@force/database`'s
+ * Everything here talks to a REAL Postgres database via `@ebda/database`'s
  * `prisma`/`withRlsBypass` — there is no mocked-Prisma path in this file.
  * Callers are responsible for gating their `describe` block on `hasDb`
  * (see `hasDb` below) so the suite skips cleanly when no real database is
@@ -18,8 +18,8 @@
 import express, { type Express } from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import { prisma, withRlsBypass } from '@force/database';
-import type { BundlePricingType } from '@force/shared';
+import { prisma, withRlsBypass } from '@ebda/database';
+import type { BundlePricingType } from '@ebda/shared';
 import cartRoutes from '@api/routes/cart.routes';
 import bundleRoutes from '@api/routes/bundle.routes';
 import returnRoutes from '@api/routes/return.routes';

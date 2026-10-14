@@ -386,7 +386,7 @@ git commit -m "feat(db): migrate accounting foundations + dr=cr trigger + rls"
 
 ---
 
-## Task 3: Re-export the new enums + types from `@force/database`
+## Task 3: Re-export the new enums + types from `@ebda/database`
 
 **Files:**
 
@@ -398,9 +398,9 @@ git commit -m "feat(db): migrate accounting foundations + dr=cr trigger + rls"
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import * as db from '@force/database';
+import * as db from '@ebda/database';
 
-describe('@force/database exports', () => {
+describe('@ebda/database exports', () => {
   it('exports the accounting enums', () => {
     expect(db.AccountType).toBeDefined();
     expect(db.JournalEntrySource).toBeDefined();
@@ -455,7 +455,7 @@ git commit -m "feat(database): re-export accounting enums"
 
 ```ts
 import { describe, it, expect, beforeEach } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { nextSequence } from '../../../apps/api/src/services/sequence.service';
 
 const STORE = '00000000-0000-0000-0000-0000000000aa';
@@ -500,7 +500,7 @@ Expected: FAIL `Cannot find module …/sequence.service`.
 `apps/api/src/services/sequence.service.ts`:
 
 ```ts
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 const PREFIX: Record<string, string> = {
   journal: 'JE',
@@ -560,7 +560,7 @@ git commit -m "feat(api): per-store atomic sequence service"
 `apps/api/src/services/accounting/coa-template.ts`:
 
 ```ts
-import type { AccountType } from '@force/database';
+import type { AccountType } from '@ebda/database';
 
 export interface CoaTemplateRow {
   code: string;
@@ -628,7 +628,7 @@ git commit -m "feat(accounting): kw retail coa template (27 system accounts)"
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import {
   seedCoaForStore,
   listAccountsTree,
@@ -676,7 +676,7 @@ Expected: FAIL — module not found.
 `apps/api/src/services/accounting/account.service.ts`:
 
 ```ts
-import { prisma, AccountType } from '@force/database';
+import { prisma, AccountType } from '@ebda/database';
 import { COA_TEMPLATE } from './coa-template';
 
 /**
@@ -803,7 +803,7 @@ git commit -m "feat(accounting): coa seed (idempotent) + accounts tree query"
 
 ```ts
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { postEntry, reverseEntry } from '../../../apps/api/src/services/accounting/journal.service';
 import {
   seedCoaForStore,
@@ -927,7 +927,7 @@ Expected: FAIL — module not found.
 `apps/api/src/services/accounting/journal.service.ts`:
 
 ```ts
-import { prisma, JournalEntry, JournalEntrySource } from '@force/database';
+import { prisma, JournalEntry, JournalEntrySource } from '@ebda/database';
 import type { Prisma } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 
@@ -1277,7 +1277,7 @@ git commit -m "feat(accounting): post journal entry on order payment"
 
 ```ts
 import type { Prisma } from '@prisma/client';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { reverseEntry } from '../journal.service';
 
 /**
@@ -1396,7 +1396,7 @@ git commit -m "feat(accounting): seed coa on store creation"
 
 ```ts
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 const API_HOST = process.env.API_HOST || 'http://localhost:4000';
 const API_URL = `${API_HOST}/api/v1`;
@@ -1557,7 +1557,7 @@ git commit -m "test(accounting): integration — paid order posts balanced journ
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 describe('refund posts a reversal journal entry', () => {
   it('marks original status=reversed and posts a mirror entry', async () => {
@@ -1688,7 +1688,7 @@ git commit -m "test(accounting): integration — refund reverses original journa
 
 ```ts
 import { Router } from 'express';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { authenticate, authorize, requireStoreAccess } from '../middleware/auth';
 import { runInTenantContext } from '../middleware/tenant-context';
 import { listAccountsTree } from '../services/accounting/account.service';
@@ -1899,7 +1899,7 @@ git commit -m "feat(api): finance routes — accounts tree + journal list/detail
 
 ```ts
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendTelegramAlert } from '../../../services/alerts.service';
@@ -2003,7 +2003,7 @@ git commit -m "feat(inngest): accounting daily close + drift detection"
 
 ```ts
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendTelegramAlert } from '../../../services/alerts.service';
@@ -2639,7 +2639,7 @@ git commit -m "feat(admin): add finance sidebar group (accounts, journal)"
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 describe('webhook re-fire does not double-post', () => {
   it('idempotent journal post via (source, sourceId)', async () => {

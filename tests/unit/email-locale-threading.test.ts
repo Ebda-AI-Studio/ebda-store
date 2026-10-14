@@ -18,7 +18,7 @@ import { EmailService } from '@api/services/email.service';
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     order: {
       findUnique: vi.fn(),
@@ -114,7 +114,7 @@ async function runOrderCreatedHandler(
   locale: string | undefined,
   orderLocaleInDb: string | null
 ) {
-  const { prisma } = await import('@force/database');
+  const { prisma } = await import('@ebda/database');
   const order = mockOrder(orderLocaleInDb);
 
   (prisma.order.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce(order);

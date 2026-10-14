@@ -26,9 +26,9 @@ const checkoutClient = readFileSync(
 const cartClient = readFileSync(join(R, 'apps/web/src/app/cart/CartClient.tsx'), 'utf8');
 
 describe("CheckoutClient — the order's own amounts function (rulings M3-6, MONEYB-2)", () => {
-  it('imports computeOrderAmounts from @force/shared, not a private mirror', () => {
+  it('imports computeOrderAmounts from @ebda/shared, not a private mirror', () => {
     expect(checkoutClient).toMatch(
-      /import\s*\{[^}]*computeOrderAmounts[^}]*\}\s*from\s*'@force\/shared'/
+      /import\s*\{[^}]*computeOrderAmounts[^}]*\}\s*from\s*'@ebda\/shared'/
     );
   });
 
@@ -47,9 +47,9 @@ describe("CheckoutClient — the order's own amounts function (rulings M3-6, MON
 });
 
 describe('CartClient — same function, shipping in the base', () => {
-  it('imports computeOrderAmounts from @force/shared', () => {
+  it('imports computeOrderAmounts from @ebda/shared', () => {
     expect(cartClient).toMatch(
-      /import\s*\{[^}]*computeOrderAmounts[^}]*\}\s*from\s*'@force\/shared'/
+      /import\s*\{[^}]*computeOrderAmounts[^}]*\}\s*from\s*'@ebda\/shared'/
     );
   });
 

@@ -19,7 +19,7 @@
  *     product.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 vi.mock('../../../apps/api/src/services/accounting/gemini-ai.service', () => ({
   callGemini: vi.fn(async () => ({ items: [] })),

@@ -1,10 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { authenticate, customerUserId } from '../middleware/auth';
 import { userContext } from '../middleware/tenant-context';
 
-import { fromMinor } from '@force/shared';
+import { fromMinor } from '@ebda/shared';
 const router = Router();
 
 // Helper to get store ID from request header

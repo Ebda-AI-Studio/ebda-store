@@ -11,7 +11,7 @@ import { createProductSchemaChecked, updateProductSchema } from '../../routes/pr
 import { createCouponSchema, updateCouponSchema } from '../../routes/coupon.routes';
 import { adjustInventorySchema, setInventorySchema } from '../../routes/inventory.routes';
 import { hasPermission } from '../../middleware/rbac';
-import type { InventoryChangeType } from '@force/database';
+import type { InventoryChangeType } from '@ebda/database';
 import { registerMerchantWriteTool, type WriteToolSpec } from '../merchant-write';
 
 /**

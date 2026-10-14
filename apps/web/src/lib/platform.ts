@@ -9,5 +9,5 @@
  * who hits a dead URL sees that merchant's own "page not available", never the
  * platform pitch. That rule is enforced in `app/not-found.tsx`.
  */
-import { BRAND_MARKETING_URL } from '@force/shared';
+import { BRAND_MARKETING_URL } from '@ebda/shared';
 export const PLATFORM_MARKETING_URL: string = BRAND_MARKETING_URL;

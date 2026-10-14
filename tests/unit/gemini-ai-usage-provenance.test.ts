@@ -25,7 +25,7 @@ vi.mock('@google/generative-ai', () => ({
     }
   },
 }));
-vi.mock('@force/database', () => ({ prisma: { aiUsage: { create: h.aiUsageCreate } } }));
+vi.mock('@ebda/database', () => ({ prisma: { aiUsage: { create: h.aiUsageCreate } } }));
 vi.mock('@api/lib/ai-quota', () => ({ assertAiQuota: vi.fn(async () => undefined) }));
 vi.mock('@api/services/ai.service', () => ({ recordUsage: h.recordUsage }));
 vi.mock('@api/lib/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
