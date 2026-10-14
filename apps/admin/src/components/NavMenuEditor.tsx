@@ -23,7 +23,7 @@ export interface NavItem {
   href: string;
 }
 
-const DEFAULT_MENU: NavItem[] = [
+export const DEFAULT_MENU: NavItem[] = [
   { label: 'Products', labelAr: 'المنتجات', href: '/products' },
   { label: 'Categories', labelAr: 'الفئات', href: '/categories' },
   { label: 'About', labelAr: 'من نحن', href: '/about' },

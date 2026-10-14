@@ -59,7 +59,7 @@ interface StoreSettings {
   [key: string]: unknown;
 }
 
-const DEFAULT_SHOP_LINKS: FooterLink[] = [
+export const DEFAULT_SHOP_LINKS: FooterLink[] = [
   { name: 'All Products', nameAr: 'كل المنتجات', href: '/products', enabled: true },
   { name: 'Categories', nameAr: 'الفئات', href: '/categories', enabled: true },
   { name: 'New Arrivals', nameAr: 'أحدث المنتجات', href: '/products?sort=newest', enabled: true },
@@ -67,20 +67,20 @@ const DEFAULT_SHOP_LINKS: FooterLink[] = [
   { name: 'On Sale', nameAr: 'العروض', href: '/products?sale=true', enabled: true },
 ];
 
-const DEFAULT_SUPPORT_LINKS: FooterLink[] = [
+export const DEFAULT_SUPPORT_LINKS: FooterLink[] = [
   { name: 'Contact Us', nameAr: 'تواصل معنا', href: '/contact', enabled: true },
   { name: 'FAQ', nameAr: 'الأسئلة الشائعة', href: '/faq', enabled: true },
   { name: 'Shipping Info', nameAr: 'معلومات الشحن', href: '/shipping', enabled: true },
   { name: 'Returns & Refunds', nameAr: 'الإرجاع والاسترداد', href: '/returns', enabled: true },
 ];
 
-const DEFAULT_COMPANY_LINKS: FooterLink[] = [
+export const DEFAULT_COMPANY_LINKS: FooterLink[] = [
   { name: 'About Us', nameAr: 'من نحن', href: '/about', enabled: true },
   { name: 'Privacy Policy', nameAr: 'سياسة الخصوصية', href: '/privacy', enabled: true },
   { name: 'Terms of Service', nameAr: 'الشروط والأحكام', href: '/terms', enabled: true },
 ];
 
-const DEFAULT_UTILITY_LINKS: UtilityBarLink[] = [
+export const DEFAULT_UTILITY_LINKS: UtilityBarLink[] = [
   { label: 'Contact', labelAr: 'تواصل معنا', href: '/contact', enabled: true },
   { label: 'Wishlist', labelAr: 'المفضلة', href: '/wishlist', enabled: true },
 ];

@@ -27,6 +27,9 @@
  *   `THEME_SETTINGS_SCHEMA`); the document only carries the editor's PENDING
  *   edits to it in the optional `theme` patch (`theme-draft.ts`), which publish
  *   promotes to `stores.theme` and a draft never exposes publicly.
+ * - The header menu, footer link columns and utility bar live in `stores.settings`
+ *   (classic builder shapes); the document carries only the editor's PENDING edits
+ *   to them in the optional `chrome` patch (`chrome-draft.ts`), promoted on publish.
  * - Dynamic data is bound by REFERENCE only (category slug, product ids),
  *   resolved against the caller's store; price, stock and availability are
  *   NEVER stored here.
@@ -37,6 +40,7 @@
  */
 import { z } from 'zod';
 import { draftThemeSchema } from './theme-draft';
+import { draftChromeSchema } from './chrome-draft';
 
 export const PAGE_DEFINITION_SCHEMA_VERSION = 1 as const;
 
@@ -101,6 +105,8 @@ export const pageDefinitionSchema = z
     siteSettings: z.record(z.unknown()),
     /** Draft/published theme PATCH (editor-managed keys only, see `theme-draft.ts`). */
     theme: draftThemeSchema.optional(),
+    /** Draft/published header-menu + footer-links PATCH (see `chrome-draft.ts`). */
+    chrome: draftChromeSchema.optional(),
     legacy: z
       .object({
         /** The raw saved `sectionOrder` (kept so an unedited round trip is byte-identical). */

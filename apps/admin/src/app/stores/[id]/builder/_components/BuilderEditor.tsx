@@ -184,6 +184,9 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
     if (r === 'ok') {
       toastSuccess(t('published'));
       void refreshStore();
+      // The header/footer patch is live now; re-open the page so the next edit
+      // starts from the live values instead of re-sending a stale patch.
+      if (b.doc?.chrome) void b.reload();
     } else if (r === 'failed') toastError(t('publishFailed'));
   };
 
@@ -300,6 +303,27 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
       theme={effectiveTheme(store.theme, b.doc.theme)}
       errors={b.errors}
       dispatch={dispatch}
+      chromeEdit={{
+        chrome: b.doc.chrome,
+        liveVersion: b.publishedRev,
+        // Header / footer links ride the draft document (autosave) and go
+        // live only on Publish. Each edit carries one key; merge it into the
+        // LATEST document so quick edits to different lists never drop each other.
+        onChange: patch =>
+          b.patchDocument(doc => ({
+            ...doc,
+            chrome: {
+              ...doc.chrome,
+              ...patch,
+              ...(patch.footerLinks
+                ? { footerLinks: { ...doc.chrome?.footerLinks, ...patch.footerLinks } }
+                : {}),
+              ...(patch.utilityBar
+                ? { utilityBar: { ...doc.chrome?.utilityBar, ...patch.utilityBar } }
+                : {}),
+            },
+          })),
+      }}
     />
   );
 

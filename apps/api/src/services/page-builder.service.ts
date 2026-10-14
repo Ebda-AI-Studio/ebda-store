@@ -52,6 +52,10 @@ import {
   publishedDocumentAgrees,
   resolveLayoutSettings,
   snapshotEditableTheme,
+  applyChromePatch,
+  hasChromePatch,
+  pageDefinitionSchema,
+  rebaseDraftOntoLive,
   validateDefinition,
   validatePublishReadiness,
   type BuilderIssue,
@@ -168,6 +172,9 @@ function resolvedLayout(store: { layoutSettings: unknown; template: string | nul
 function withoutTheme(document: unknown): PageDefinition {
   const rest = { ...(document as PageDefinition) };
   delete rest.theme;
+  // Same for the header/footer content patch (`chrome`): once published it is
+  // live in `stores.settings`, so it is not re-opened as a pending edit.
+  delete rest.chrome;
   return rest;
 }
 
@@ -385,19 +392,27 @@ async function applyPublishedLayout(
 ): Promise<StoreLayoutSettings> {
   const layout = definitionToLayout(definition);
   const themePatch = definition.theme;
+  const chromePatch = hasChromePatch(definition.chrome) ? definition.chrome : undefined;
   await withStore(storeId, async tx => {
-    // Merge the pending theme over the CURRENT live theme read in this same
-    // transaction (the Branding tab and the classic builder also write other
-    // theme keys), and write it with layout_settings in one statement.
-    const liveTheme = themePatch
-      ? ((await tx.store.findUnique({ where: { id: storeId }, select: { theme: true } }))?.theme ??
-        {})
-      : null;
+    // Merge the pending theme / header+footer content over the CURRENT live
+    // values read in this same transaction (the Branding tab and the classic
+    // builder also write other theme / settings keys), and write them with
+    // layout_settings in one statement.
+    const live =
+      themePatch || chromePatch
+        ? await tx.store.findUnique({
+            where: { id: storeId },
+            select: { theme: true, settings: true },
+          })
+        : null;
     return tx.store.update({
       where: { id: storeId },
       data: {
         layoutSettings: layout as unknown as object,
-        ...(themePatch ? { theme: { ...(liveTheme as object), ...themePatch } } : {}),
+        ...(themePatch ? { theme: { ...((live?.theme ?? {}) as object), ...themePatch } } : {}),
+        ...(chromePatch
+          ? { settings: applyChromePatch(live?.settings, chromePatch) as unknown as object }
+          : {}),
       },
     });
   });
@@ -493,6 +508,8 @@ async function publishNewRevision(args: {
   note: string;
   userId: string | null;
   archiveDraft: boolean;
+  /** Runs in the same savepoint right after the published row is created. */
+  afterCreate?: (publishedRev: number) => Promise<void>;
 }): Promise<'ok' | 'conflict'> {
   const { storeId, pageKey, definition } = args;
   const rev = args.baseRev + 1;
@@ -517,6 +534,7 @@ async function publishNewRevision(args: {
         publishedAt: new Date(),
       },
     });
+    await args.afterCreate?.(rev);
   });
 }
 
@@ -607,9 +625,10 @@ export async function publishLegacyLayout(args: {
   const { storeId, layout } = args;
   const { head, draft, published } = await loadRows(storeId, HOME_PAGE_KEY);
   // The layout knows nothing about document-only sections (image-text,
-  // newsletter): carry them over from the latest document or this save
-  // would delete them.
-  const previous = (draft ?? published)?.document as PageDefinition | undefined;
+  // newsletter): carry them over from the LIVE document or this save would
+  // delete them. Never from the draft: a section that only exists in an
+  // unpublished draft must not go live through this path.
+  const previous = published?.document as PageDefinition | undefined;
   const definition = mergeDocumentOnlySections(layoutToDefinition(layout, HOME_PAGE_KEY), previous);
   // Placeholder-copy check OFF here, deliberately: this legacy PUT cannot
   // author document-only section text (it only carries those sections over
@@ -619,6 +638,32 @@ export async function publishLegacyLayout(args: {
   // rollbackToRevision. (Ruling PLACEHOLDER-1.)
   const readinessErrors = validatePublishReadiness(definition, { placeholderCopy: false });
   if (readinessErrors.length > 0) return { invalid: readinessErrors };
+
+  // A pending visual draft is MERGED with what this save changed instead of
+  // being left stale (the next Publish of it would silently revert this save)
+  // or discarded (Ruling CLASSIC-SAVE-DRAFT-1).
+  let rebased: PageDefinition | null = null;
+  if (draft) {
+    const store = await loadStore(storeId);
+    const previousLive = published
+      ? withoutTheme(published.document)
+      : layoutToDefinition(
+          resolvedLayout(store ?? { layoutSettings: {}, template: null }),
+          HOME_PAGE_KEY
+        );
+    const candidate = rebaseDraftOntoLive(
+      draft.document as PageDefinition,
+      previousLive,
+      definition
+    );
+    const parsed = pageDefinitionSchema.safeParse(candidate);
+    if (parsed.success) rebased = parsed.data;
+    else
+      logger.warn(
+        { storeId },
+        '[page-builder] classic save could not be merged into the pending draft; draft kept as is'
+      );
+  }
   return publishNewRevision({
     storeId,
     pageKey: HOME_PAGE_KEY,
@@ -627,6 +672,21 @@ export async function publishLegacyLayout(args: {
     note: 'saved through the legacy layout endpoint',
     userId: args.userId,
     archiveDraft: false,
+    afterCreate: async publishedRev => {
+      if (!draft || !rebased) return;
+      // The draft moves above the new head (its baseRev), so it stays
+      // publishable and its next autosave does not 409.
+      const { count } = await prisma.storePageRevision.updateMany({
+        where: { id: draft.id, storeId, rev: draft.rev, status: 'draft' },
+        data: {
+          rev: publishedRev + 1,
+          baseRev: publishedRev,
+          document: rebased as unknown as object,
+          docBytes: docBytes(rebased),
+        },
+      });
+      if (count !== 1) throw new RevConflict();
+    },
   });
 }
 

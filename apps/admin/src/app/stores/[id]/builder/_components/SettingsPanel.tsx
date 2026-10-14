@@ -23,6 +23,7 @@ import {
   isSafeUrl,
   locateSection,
   type BlockNode,
+  type DraftChrome,
   type DocumentAction,
   type PageDefinition,
   type SettingDefinition,
@@ -33,6 +34,7 @@ import { useT } from '@/i18n/useT';
 import { ColorField } from '../../../../../components/ColorField';
 import { Toggle } from '../../../../../components/Toggle';
 import { apiGet } from '../../../../../lib/api';
+import { ChromeContentPanel } from './ChromeContentPanel';
 import { MediaPicker } from './MediaPicker';
 import type { Selection } from './SectionTree';
 
@@ -49,6 +51,12 @@ interface Props {
   theme: StoreTheme | undefined;
   errors: Array<{ path: string; messageEn: string; messageAr: string }>;
   dispatch: (a: DocumentAction, coalesceKey?: string) => void;
+  /** Header / footer content edits (menu, footer links): draft-only until Publish. */
+  chromeEdit?: {
+    chrome: DraftChrome | undefined;
+    liveVersion: number | null;
+    onChange: (patch: DraftChrome) => void;
+  };
 }
 
 export function SettingsPanel({
@@ -59,6 +67,7 @@ export function SettingsPanel({
   theme,
   errors,
   dispatch,
+  chromeEdit,
 }: Props) {
   const t = useT('builder.settings');
   const locale = useLocale();
@@ -169,9 +178,24 @@ export function SettingsPanel({
             })}
           </fieldset>
         )}
-        {!block && mode === 'content' && defs.length === 0 && (
-          <ContentElsewhereNotice sectionType={node.type} storeId={storeId} t={t} />
-        )}
+        {!block &&
+          mode === 'content' &&
+          chromeEdit &&
+          (node.type === 'header' || node.type === 'footer') && (
+            <ChromeContentPanel
+              storeId={storeId}
+              kind={node.type}
+              chrome={chromeEdit.chrome}
+              liveVersion={chromeEdit.liveVersion}
+              onChange={chromeEdit.onChange}
+            />
+          )}
+        {!block &&
+          mode === 'content' &&
+          defs.length === 0 &&
+          !(chromeEdit && (node.type === 'header' || node.type === 'footer')) && (
+            <ContentElsewhereNotice sectionType={node.type} storeId={storeId} t={t} />
+          )}
         {defs.map(s => (
           <Field
             key={s.id}
@@ -205,8 +229,6 @@ export function SettingsPanel({
 // remove / reorder); its notice only says so and links nowhere.
 const CONTENT_ELSEWHERE: Record<string, { messageKey: string; route?: string; labelKey?: string }> =
   {
-    header: { messageKey: 'headerContentEmpty', route: 'page-builder', labelKey: 'editInClassic' },
-    footer: { messageKey: 'footerContentEmpty', route: 'page-builder', labelKey: 'editInClassic' },
     announcement: {
       messageKey: 'announcementContentEmpty',
       route: 'announcement',
@@ -242,14 +264,6 @@ function ContentElsewhereNotice({
           {' '}
           <a href={`/stores/${storeId}/${notice.route}`} className="text-primary hover:underline">
             {t(notice.labelKey)}
-          </a>
-        </>
-      )}
-      {sectionType === 'header' && (
-        <>
-          {' · '}
-          <a href={`/stores/${storeId}/branding`} className="text-primary hover:underline">
-            {t('editInBranding')}
           </a>
         </>
       )}

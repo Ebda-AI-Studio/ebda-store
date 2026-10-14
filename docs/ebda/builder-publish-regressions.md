@@ -67,3 +67,26 @@ Live QA separately found an inactive store previewing as 404. That resolver/prev
 ## Editor mobile overflow (bug 7)
 
 At 390px the top bar (logo, Structure/Settings toggles, viewport switch, undo/redo, Publish) was wider than the screen and pushed the document into horizontal scroll in both locales. Below `md` the bar now wraps: the viewport switch moves to its own full-width second row (`order-last`), undo is pushed to the logical end (`max-md:ms-auto`) so Publish stays reachable; `md+` is unchanged (fixed `h-14`, `flex-nowrap`, switch centred). The image field in the settings panel gained `min-w-0` so the two-column Arabic/English image grid cannot widen the drawer. Guard: `EDITOR-MOBILE-1` in `tests/builder-e2e/builder.e2e.ts` asserts `scrollWidth <= clientWidth` for the top bar and every panel (runs in the existing ar/en x 390/820/1280 projects). Not yet verified in a browser; CI runs the suite.
+
+## Classic save vs a pending visual draft; header/footer content in the visual editor (bug 3)
+
+### E2: the classic builder's Save and an unpublished visual draft (Ruling CLASSIC-SAVE-DRAFT-1)
+
+Traced: the classic Save is `PUT /layout` -> `publishLegacyLayout` -> a new PUBLISHED revision (its Save is its Publish, unchanged). The code never deleted the draft row, but it left it stale: the draft kept the pre-save values, its rev fell behind the new head so the next Publish of it answered 409, and once it was saved again and published it silently reverted the classic edit. In addition the new revision copied document-only sections (image-text, newsletter) from `draft ?? published`, so a section that existed only in the unpublished draft went LIVE through the classic Save.
+
+Fix: the classic Save still publishes what it edited, and now MERGES that edit into the pending draft (`rebaseDraftOntoLive`, `packages/shared/src/builder/rebase-draft.ts`) in the same savepoint as the new revision: per section id and per field, only what the save changed (`previous live` -> `new live`) is applied; every other visual edit, the draft `theme` and `chrome` patches and draft-only sections are kept. The draft moves to `rev = newHead + 1, baseRev = newHead`, so it stays publishable. Document-only sections are carried over from the LIVE document only. If the merged draft would not validate, the draft is left as it was and the event is logged (never discarded). Edge: a section the draft deleted stays deleted; a classic reorder reorders the shared sections and keeps draft-only ones after them.
+
+### E3: header menu and footer links editable in the visual editor (Ruling CHROME-DRAFT-1)
+
+The header menu, the top utility bar and the footer link columns are not in `layout_settings`; the classic builder writes them to `stores.settings.navMenu / utilityBar / footerLinks` through `PUT /stores/:id`, which is live at once. The visual editor now edits the SAME shapes but into the draft: `PageDefinition.chrome` (`packages/shared/src/builder/chrome-draft.ts`), a patch of those three keys, following the THEME-DRAFT-1 lifecycle:
+
+- Save: Content tab of the Header / Footer section (`ChromeContentPanel`): add / remove / reorder, label EN + AR, link. Autosaved into the draft; no `stores` write, no cache purge.
+- Links: every href goes through `isSafeUrl` (relative path or http / https / mailto / tel; `javascript:`, `data:`, `vbscript:` and tab-split variants rejected) in the panel (never dispatched) AND in the API schema (422). The storefront also still runs `sanitizeUrl` at render.
+- Publish: `applyChromePatch` merges the patch over the live `stores.settings` read in the same transaction, in the one `stores` update with `layout_settings`; the existing post-commit purge covers every cache layer. Other settings keys and legacy footer keys (`bottomBar`) survive; blank rows are dropped and an all-blank menu is ignored (same as the classic editor).
+- Rollback: re-applies the target revision's patch; a revision without `chrome` leaves live settings alone. A rollback restores the keys that revision's patch carried (not a full snapshot, unlike theme).
+- Canvas: the draft's patch is shown through the `draftSettings` channel `ShopChrome` already prefers (`PreviewThemeOverride`), live as the editor sends the document. After a publish the editor reloads so it never re-sends a stale patch.
+- Notice: the "content lives elsewhere" notice is gone for header/footer; the logo link to Branding remains.
+
+Not done, deliberately: the LOGO and social links. The classic page builder does not edit them either: the logo is a `stores.logo` column owned by the Branding tab (upload pipeline, its own cache path) and social links a separate column. They stay live writes there; the header panel links to Branding. Residual: `isSafeUrl` accepts protocol-relative `//host` as "relative" (existing helper behaviour, not changed here).
+
+Tests: `tests/unit/page-builder-chrome-draft.test.ts` (draft save writes nothing live, unsafe hrefs 422, publish merges + purges, rollback, canvas, classic save keeps/merges the draft), `tests/unit/builder-chrome-draft.test.ts` (schema, merge, re-base), `SettingsPanel.header-footer-content.test.tsx` (panel). Integration (Postgres) runs in CI only.

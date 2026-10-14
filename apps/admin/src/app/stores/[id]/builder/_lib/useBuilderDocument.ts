@@ -145,6 +145,18 @@ export function useBuilderDocument(storeId: string) {
     [setHistory]
   );
 
+  /**
+   * Edit the CURRENT document without reloading the canvas data (header/footer
+   * links, text typing): autosave picks it up like any dispatch; `coalesceKey`
+   * folds a burst of keystrokes into one undo step.
+   */
+  const patchDocument = useCallback(
+    (fn: (doc: PageDefinition) => PageDefinition, coalesceKey?: string) => {
+      setHistory(h => (h ? pushHistory(h, fn(h.present), { coalesceKey }) : h));
+    },
+    [setHistory]
+  );
+
   const saveNow = useCallback(
     async (definition: PageDefinition, baseRev: number): Promise<boolean> => {
       setSaveState('saving');
@@ -299,6 +311,7 @@ export function useBuilderDocument(storeId: string) {
     undo,
     redo,
     replaceDocument,
+    patchDocument,
     /** Flush the pending draft save now (queued behind any in-flight write). */
     saveDraftNow: enqueueSave,
     publish,

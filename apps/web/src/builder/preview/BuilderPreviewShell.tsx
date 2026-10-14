@@ -28,7 +28,7 @@ export function BuilderPreviewShell({
   return (
     // The draft's pending theme edits ride the document, so the canvas paints
     // them as soon as they are saved (and live, via the postMessage render).
-    <PreviewThemeOverride theme={definition.theme}>
+    <PreviewThemeOverride theme={definition.theme} chrome={definition.chrome}>
       <HomePageContent {...content} definition={definition} editorMode />
       <EditorOverlay
         allowedOrigins={allowedOrigins}

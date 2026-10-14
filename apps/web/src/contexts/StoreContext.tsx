@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { chromePreviewSettings, type DraftChrome } from '@force/shared';
 import { api, API_URL } from '../lib/api';
 import { isPlatformHost } from '../lib/platform-host';
 import { setCompareStoreId } from '../lib/compare';
@@ -437,24 +438,34 @@ export function StoreProvider({
  */
 export function PreviewThemeOverride({
   theme,
+  chrome,
   children,
 }: {
   theme: Record<string, unknown> | undefined;
+  /** The draft's pending header-menu / footer-links patch (`PageDefinition.chrome`). */
+  chrome?: DraftChrome;
   children: ReactNode;
 }) {
   const ctx = useStore();
-  const value = useMemo(
-    () =>
-      theme && Object.keys(theme).length > 0
-        ? {
-            ...ctx,
-            store: { ...ctx.store, theme: { ...ctx.store.theme, ...theme } as StoreData['theme'] },
-          }
-        : ctx,
-    [ctx, theme]
-  );
+  const value = useMemo(() => {
+    const hasTheme = !!theme && Object.keys(theme).length > 0;
+    // The same `draftSettings` channel the classic builder's preview uses:
+    // ShopChrome prefers it over `store.settings`, and runs every href through
+    // its scheme allowlist (sanitizeUrl) before rendering.
+    const previewSettings = chromePreviewSettings(ctx.store.settings, chrome);
+    if (!hasTheme && !previewSettings) return ctx;
+    return {
+      ...ctx,
+      store: hasTheme
+        ? { ...ctx.store, theme: { ...ctx.store.theme, ...theme } as StoreData['theme'] }
+        : ctx.store,
+      draftSettings: previewSettings
+        ? { ...(ctx.draftSettings ?? {}), ...previewSettings }
+        : ctx.draftSettings,
+    };
+  }, [ctx, theme, chrome]);
   useEffect(() => {
-    if (value === ctx) return;
+    if (value === ctx || value.store === ctx.store) return;
     // StoreProvider's own effect (a parent, so it runs AFTER this child's) stamps
     // the committed theme on <html>; a microtask lands after that whole flush.
     queueMicrotask(() => applyTheme(value.store.theme));
