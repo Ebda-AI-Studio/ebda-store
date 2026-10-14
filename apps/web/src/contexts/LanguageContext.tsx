@@ -64,8 +64,11 @@ export function LanguageProvider({ children, defaultLanguage }: LanguageProvider
   useIsomorphicLayoutEffect(() => {
     document.documentElement.dir = direction;
     document.documentElement.lang = language;
-    document.body.style.fontFamily =
-      language === 'ar'
+    // A look store's body face comes from `[data-look]` in globals.css (--font-body); an inline
+    // font-family here would beat that rule, so a look store gets none (legacy stores unchanged).
+    document.body.style.fontFamily = document.body.hasAttribute('data-look')
+      ? ''
+      : language === 'ar'
         ? 'var(--font-arabic), var(--font-sans), sans-serif'
         : 'var(--font-sans), sans-serif';
     localStorage.setItem('force-language', language);

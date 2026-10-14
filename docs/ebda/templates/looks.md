@@ -65,10 +65,10 @@ Consumers (all scoped under `[data-look]`, which the root layout sets on `<body>
 
 - Headings and `.font-display` use `--font-display`; English locale uses `--font-latin` first with the Arabic display stack as fallback. Body uses `--font-body`. The fallback chain ends in the platform Arabic face, never a serif default.
 - Section padding scales by `--space-unit`, but only for sections whose spacing is **unset** (`sectionSpacingClasses` adds `sp-top-default` / `sp-bottom-default` for look stores). An explicit merchant spacing preset, even "normal", is never scaled.
-- Product card media uses `aspect-[var(--image-ratio,4/5)]` (`apps/web/src/templates/shared/card-size.ts`): a look store without the variable falls back to 4/5; a legacy store keeps its existing aspect classes.
+- Product card media uses `aspect-[var(--image-ratio,4/5)]` (`apps/web/src/templates/shared/card-size.ts`): a look store without the variable falls back to 4/5; a legacy store keeps its existing aspect classes. The look's ratio is the DEFAULT: the skin's layout baseline contributes no product-card `cardShape`/`cardAspect` on a look store (`resolveLayoutSettings(input, template, look)`, Ruling LOOKS-15), so only a shape or aspect the merchant saved beats it.
 - `a` and `button` transitions use `--motion-duration` (150ms fallback). Under `prefers-reduced-motion: reduce` the variable is forced to `0ms`.
 
-A look store whose merchant cleared `headingFont`/`bodyFont` still gets the look's font (the variables fall back to the look's own faces).
+A look store whose merchant cleared `headingFont`/`bodyFont` still gets the look's font (the variables fall back to the look's own faces). `LanguageProvider` writes no inline `body` font-family on a look store (an inline style would beat the `[data-look]` rule); a legacy store keeps its locale inline font.
 
 **Merchant font overrides** (`resolveLookFonts` in `fonts.ts`, Ruling LOOKS-3: the merchant wins). A stored `headingFont` / `bodyFont` replaces the look's face only when it is a family in `LOOK_FONT_SPECS`; the layout's Google Fonts link (`lookFontsHref(look, theme)`) then loads it instead of the look's face. Any other family (for example a legacy store's old font carried through a `design: 'keep'` switch) is ignored for the look variables and the link, so the CSS never names a family nothing loads; the look's face paints instead. A heading override also replaces `--font-latin`, so English headings use the merchant's face too. Font-family values are allow-listed in `LOOK_VAR_PATTERNS` (letters, digits, spaces, hyphens, apostrophes; quotes, backslashes, `;`, braces, angle brackets and parentheses are refused).
 
@@ -90,6 +90,10 @@ A store with `look = null` (or an unknown look id) gets no `data-look` attribute
 - **Demo stores.** `applyLook` has no demo-specific branch. A demo store (`is_demo`) is a showroom: it previews looks via `?look=` and refuses every order (`403 DEMO_STORE` from `assertOrderAllowed`); see `docs/ebda/templates/demo-store.md`.
 
 Onboarding chooses a look through the same service (`onboarding.service.ts`), with `design: 'reset'` (a new store has no overrides to keep).
+
+## Known residual (Phase S)
+
+The skin baseline still paints its brand-colour section bands on a look store, so a dark-primary look shows near-black bands and the minimal skin's category caption is faint on them (Ruling LOOKS-16). Each look's skin decides its section colours in Phase B.
 
 ## Brand surfaces outside the storefront
 
