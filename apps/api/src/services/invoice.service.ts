@@ -18,6 +18,7 @@ import {
   type EmailDir,
 } from './email-templates/_layout';
 import { AppError } from '../middleware/error-handler';
+import { storeBrandTheme } from '../lib/store-brand-theme';
 
 /**
  * Escape special HTML characters to prevent stored XSS attacks.
@@ -160,6 +161,8 @@ function loadInvoiceOrder(storeId: string, orderId: string) {
           address: true,
           logo: true,
           theme: true,
+          look: true,
+          template: true,
           currency: true,
           timezone: true,
         },
@@ -302,7 +305,8 @@ export class InvoiceService {
     // when the storefront didn't collect a separate billing address.
     const billingAddr = (order.billingAddress as Record<string, string> | null) ?? shippingAddr;
     const payment = order.payments?.[0];
-    const brand = readBrandColor(order.store.theme);
+    // A look store's brand colour is the look's unless the merchant stored one (LOOKS-14).
+    const brand = readBrandColor(storeBrandTheme(order.store));
 
     // Discount line annotation — a coupon code takes priority (matches the
     // persisted couponCode/couponDiscount gating in OrderService.create);
@@ -879,10 +883,9 @@ export function renderInvoiceEmailContent(
   const dir: EmailDir = ar ? 'rtl' : 'ltr';
   const { start, end } = emailSides(dir);
   const c = EMAIL_COLORS;
+  const brandTheme = storeBrandTheme(order.store);
   const brand = emailColor(
-    order.store.theme && typeof order.store.theme === 'object'
-      ? ((order.store.theme as { primaryColor?: string }).primaryColor ?? null)
-      : null
+    typeof brandTheme?.primaryColor === 'string' ? brandTheme.primaryColor : null
   );
   const currency = order.currency || order.store.currency || REGION.currency;
   // Amounts stay an LTR run on the Arabic invoice so a leading minus stays in

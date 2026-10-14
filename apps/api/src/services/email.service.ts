@@ -1,6 +1,7 @@
-import { prisma, withStore } from '@force/database';
+import { withStore } from '@force/database';
 import { config } from '../config';
 import logger from '../lib/logger';
+import { storeBrandTheme } from '../lib/store-brand-theme';
 import { ResendService } from './resend.service';
 // Static import is safe despite the email-queue↔email-service cycle: both sides
 // use the other only at call-time (sendForStore / the queue's drain), never at
@@ -353,6 +354,8 @@ export class EmailService {
           nameAr: true,
           logo: true,
           theme: true,
+          look: true,
+          template: true,
           email: true,
           phone: true,
           address: true,
@@ -372,7 +375,8 @@ export class EmailService {
       name: store.name,
       nameAr: store.nameAr,
       logo: store.logo,
-      theme: store.theme as { primaryColor?: string | null; primary?: string | null } | null,
+      // A look store's brand colour is the look's unless the merchant stored one (LOOKS-14).
+      theme: storeBrandTheme(store) as EmailStoreContext['theme'],
       email: store.email,
       phone: store.phone,
       address: store.address,

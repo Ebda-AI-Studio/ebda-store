@@ -2,6 +2,7 @@ import { prisma } from '@force/database';
 import { isCampaignContentComplete, resolveDefaultLanguage, storefrontOrigin } from '@force/shared';
 import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import { renderBrandedShell } from './email.service';
+import { storeBrandTheme } from '../lib/store-brand-theme';
 
 /**
  * Email campaigns (D2) — the pieces the admin routes, the Inngest send job and
@@ -186,6 +187,8 @@ export interface CampaignStoreContext {
   phone: string | null;
   address: string | null;
   theme: unknown;
+  look?: string | null;
+  template?: string | null;
   settings: unknown;
   slug: string;
   domain: string | null;
@@ -202,6 +205,8 @@ export const CAMPAIGN_STORE_SELECT = {
   phone: true,
   address: true,
   theme: true,
+  look: true,
+  template: true,
   settings: true,
   slug: true,
   domain: true,
@@ -266,7 +271,11 @@ export function renderCampaignEmail(args: {
     email: store.email,
     phone: store.phone,
     address: store.address,
-    theme: store.theme as { primaryColor?: string | null; primary?: string | null } | null,
+    // A look store's brand colour is the look's unless the merchant stored one (LOOKS-14).
+    theme: storeBrandTheme(store) as {
+      primaryColor?: string | null;
+      primary?: string | null;
+    } | null,
     defaultLanguage: locale,
     hidePoweredBy: args.hidePoweredBy,
   });

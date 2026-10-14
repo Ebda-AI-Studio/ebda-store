@@ -91,6 +91,10 @@ A store with `look = null` (or an unknown look id) gets no `data-look` attribute
 
 Onboarding chooses a look through the same service (`onboarding.service.ts`), with `design: 'reset'` (a new store has no overrides to keep).
 
+## Brand surfaces outside the storefront
+
+Store emails, invoices (printable and email), campaign mail and the setup guide read the brand through `storeBrandTheme({ template, look, theme })` (`apps/api/src/lib/store-brand-theme.ts`, Ruling LOOKS-14). A look store is composed with `composeStoreTheme`, so it gets the look's primary unless the merchant stored their own; a legacy store reads its stored theme exactly as before. The setup guide's brand step is complete for a store with a logo, a registered look, or a stored `primaryColor`.
+
 ## Override badges and reset
 
 `overriddenLookKeys(theme, look)` returns the look-owned keys the merchant has stored with a value that differs from the look. The builder's `ThemeSettingsPanel` shows an "edited" badge on each and a reset button. Reset is **draft-first** (Ruling LOOKS-11): flush pending autosave, remove the key from the draft theme (omit it, never `null`) via `replaceDocument` + `saveDraftNow`, then `PUT /stores/:id/theme { key: null }` to remove it from live only if live holds it. Resetting only live would be undone on the next publish; resetting only the draft would leave live untouched until then.
