@@ -260,6 +260,9 @@ export class VariantService {
       throw err;
     }
 
+    // Cached public payloads list this option's values (ids + swatches).
+    await invalidateStoreProductCaches(storeId);
+
     // Fire-and-forget R2 cleanup after the commit — same pattern as
     // updateVariant / deleteVariant above.
     for (const v of variantsToDelete) {
@@ -408,6 +411,7 @@ export class VariantService {
     }
 
     await prisma.productOptionValue.delete({ where: { id: valueId } });
+    await invalidateStoreProductCaches(storeId);
 
     // Fire-and-forget R2 cleanup for any variant images that were just
     // hard-deleted — same pattern as deleteVariant / deleteOption.

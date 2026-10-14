@@ -1146,15 +1146,15 @@ model ProductOption {
 
 // Option values like "Small", "Red"
 model ProductOptionValue {
-  id        String   @id @default(uuid())
-  optionId  String   @map("option_id")
-  value     String // e.g., "Small", "Red"
-  valueAr   String?  @map("value_ar")
+  id             String   @id @default(uuid())
+  optionId       String   @map("option_id")
+  value          String // e.g., "Small", "Red"
+  valueAr        String?  @map("value_ar")
   // Storefront swatch: a hex dot and/or a fabric/photo thumbnail (image wins).
   swatchHex      String?  @map("swatch_hex")
   swatchImageUrl String?  @map("swatch_image_url")
-  position  Int      @default(0)
-  createdAt DateTime @default(now()) @map("created_at")
+  position       Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
 
   option          ProductOption          @relation(fields: [optionId], references: [id], onDelete: Cascade)
   variants        ProductVariantOption[]

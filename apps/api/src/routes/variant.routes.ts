@@ -16,7 +16,7 @@ const router = Router();
 router.param('storeId', tenantContext);
 
 // Validation schemas
-const createOptionSchema = z.object({
+export const createOptionSchema = z.object({
   name: z.string().min(1).max(100),
   nameAr: z.string().max(100).optional(),
   values: z
@@ -37,14 +37,14 @@ const updateOptionSchema = z.object({
   nameAr: z.string().max(100).optional().nullable(),
 });
 
-const createOptionValueSchema = z
+export const createOptionValueSchema = z
   .object({
     value: z.string().min(1).max(100),
     valueAr: z.string().max(100).optional(),
   })
   .merge(optionValueSwatchSchema);
 
-const updateOptionValueSchema = z
+export const updateOptionValueSchema = z
   .object({
     value: z.string().min(1).max(100).optional(),
     valueAr: z.string().max(100).optional().nullable(),

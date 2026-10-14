@@ -125,14 +125,27 @@ describe('option value swatches (in order)', { retry: 0 }, () => {
     expect(sand.swatchHex).toBe('#C2B280');
   });
 
+  it('deleting a value or an option drops it from the (cached) public payload', async () => {
+    const sandId = (await publicValues()).find(v => v.value === 'Sand')!.id;
+    await inStore(() => VariantService.deleteOptionValue(ids.store, ids.product, sandId));
+    expect((await publicValues()).some(v => v.value === 'Sand')).toBe(false);
+    await inStore(() => VariantService.deleteOption(ids.store, ids.product, ids.option));
+    const p = await inStore(() => ProductService.getPublicBySlug(ids.store, ids.slug));
+    expect(p.options).toHaveLength(0);
+  });
+
   it('rejects a bad hex at the route schema and at the DB CHECK', async () => {
     expect(optionValueSwatchSchema.safeParse({ swatchHex: 'red' }).success).toBe(false);
     expect(
       optionValueSwatchSchema.safeParse({ swatchHex: null, swatchImageUrl: null }).success
     ).toBe(true);
+    const keep = await owner.productOption.create({
+      data: { productId: ids.product, name: 'Shade', values: { create: [{ value: 'K' }] } },
+      include: { values: true },
+    });
     await expect(
       owner.$executeRawUnsafe(
-        `UPDATE public.product_option_values SET swatch_hex = 'red' WHERE id = '${ids.teal}'`
+        `UPDATE public.product_option_values SET swatch_hex = 'red' WHERE id = '${keep.values[0].id}'`
       )
     ).rejects.toThrow();
   });
