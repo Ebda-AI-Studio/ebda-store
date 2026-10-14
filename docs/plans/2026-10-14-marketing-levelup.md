@@ -52,3 +52,11 @@ Contrast of the colour tokens (WCAG 2.x ratios, computed by `tests/unit/marketin
 ## P1 as built (2026-10-14, branch `feat/marketing-levelup-p1`)
 
 3D section (Ruling MKT-7), mobile pricing switcher + collapsed comparison, plain-language plan bullets, product-named titles/OG/JSON-LD and the 3 hero features are in. Section order is now `looks, story, model3d, payments, features, pricing, faq, start`. Not in this batch: Alexandria display-type test, the orchestrated hero motion, per-vertical ad landings, and real-device AR checks.
+
+## Working phones batch (Ahmad, 2026-10-14)
+
+- **Ruling MKT-8 — the looks phones are working mini-stores.** Inside every phone (all 15 looks, marketing site): tapping a product opens its product page in the phone (photos, price, sizes/colours where the look shows them, add to cart); category chips/tiles filter the grid; add to cart updates the cart count; the cart opens as a sheet with lines, quantities and total; "كمّل الطلب" ends on an in-phone demo screen ("ده متجر تجريبي — اعمل متجرك زيه") with the signup button. No network calls, no real order. Driven by one shared engine over data attributes the generator emits, styled by each look's own CSS.
+- **Ruling MKT-9 — scrolling and motion.** Native scrolling inside phones (no scroll-jacking), momentum on iOS, `overscroll-behavior: contain` so a phone never drags the page; product page and cart sheet animate with transform/opacity only (≤ 280ms, ease-out), instant under reduced motion; 60fps target on mid-range Android.
+- **Ruling MKT-10 — hero phone removed.** The hero is headline + sub + CTAs; the looks section below is where visitors use the phones (Ahmad: it duplicated the looks section and its scrolling was poor).
+- **Ruling MKT-11 — WhatsApp is a button only.** Icon + "واتساب" / "WhatsApp" label linking to wa.me; the number is never written on the site (Ahmad, 2026-10-14; supersedes the "number shown as text" line above).
+- Leftovers from P1: viewport `colorScheme`/theme colour still night → light; `og.png` still on the retired look → regenerate from a look.
