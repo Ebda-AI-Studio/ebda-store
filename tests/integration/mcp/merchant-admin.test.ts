@@ -304,11 +304,13 @@ describe.skipIf(!hasDb)('merchant-admin MCP surface', () => {
         data: {
           email: `suspendable-${uid()}@example.com`,
           passwordHash: 'not-a-real-hash',
-          role: 'store_admin',
+          role: 'staff',
           firstName: 'Sus',
           lastName: 'Pended',
         },
       });
+      // Not the owner, so the key is valid only while this staff membership exists (verifyMerchantKey).
+      await tx.storeStaff.create({ data: { storeId: A.storeId, userId: u.id } });
       await tx.merchantApiKey.create({
         data: {
           storeId: A.storeId,
@@ -339,11 +341,13 @@ describe.skipIf(!hasDb)('merchant-admin MCP surface', () => {
         data: {
           email: `revokable-${uid()}@example.com`,
           passwordHash: 'not-a-real-hash',
-          role: 'store_admin',
+          role: 'staff',
           firstName: 'Rev',
           lastName: 'Oked',
         },
       });
+      // Not the owner, so the key is valid only while this staff membership exists (verifyMerchantKey).
+      await tx.storeStaff.create({ data: { storeId: A.storeId, userId: u.id } });
       await tx.merchantApiKey.create({
         data: {
           storeId: A.storeId,

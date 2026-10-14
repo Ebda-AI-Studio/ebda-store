@@ -240,7 +240,13 @@ export function registerMerchantWriteTool<S extends ZodRawShape>(
       }
       await assertMerchantWriteEnabled(store.id, spec.name);
 
-      // 2. RBAC of the owning user + the route's feature gate.
+      // 2. RBAC of the owning user + the route's feature gate. A platform super_admin never
+      //    runs a store's own workflow (ORDER-MONEY-SUPERADMIN), so its keys are refused.
+      if (auth.role === 'super_admin') {
+        throw new Error(
+          `FORBIDDEN: ${spec.name}: MCP write tools are not available to platform super-admin keys.`
+        );
+      }
       if (spec.permission && !hasPermission(auth.role as Role, spec.permission)) {
         throw new Error(
           `FORBIDDEN: ${spec.name} needs the "${spec.permission}" permission; the key's owner (${auth.role}) lacks it.`

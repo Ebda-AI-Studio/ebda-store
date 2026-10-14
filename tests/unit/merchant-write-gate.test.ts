@@ -195,6 +195,14 @@ describe('scope, RBAC, entitlement, switch', () => {
     );
   });
 
+  it('refuses a key owned by a platform super_admin (ORDER-MONEY-SUPERADMIN)', async () => {
+    const h = register(plain);
+    await expect(h({ id: 't' }, { authInfo: auth({ role: 'super_admin' }) })).rejects.toThrow(
+      /super-admin/
+    );
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
   it('refuses on a plan without MCP writes (merchant_mcp_write off)', async () => {
     m.featureEnabled.mockImplementation(
       async (_s: string, k: string) => k !== 'merchant_mcp_write'

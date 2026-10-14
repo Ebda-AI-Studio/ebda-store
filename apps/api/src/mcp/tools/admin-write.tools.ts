@@ -44,6 +44,7 @@ const WRITE_TOOLS: WriteToolSpec<ZodRawShape>[] = [
       'refunding: use admin_cancel_order (cancel, confirm round-trip) or the return tools. Refused ' +
       'if the transition is not valid from the order’s current status.',
     input: { orderId: z.string().min(1), status: orderStatusAdvance },
+    roles: ['store_admin', 'staff'], // ORDER-MONEY-SUPERADMIN (#68): never super_admin
     permission: 'orders:manage',
     audit: {
       action: 'order.status_updated',
@@ -71,6 +72,7 @@ const WRITE_TOOLS: WriteToolSpec<ZodRawShape>[] = [
       restoreInventory: z.boolean().default(true).describe('Put the cancelled order’s stock back.'),
     },
     destructive: true,
+    roles: ['store_admin', 'staff'], // ORDER-MONEY-SUPERADMIN (#68): never super_admin
     permission: 'orders:manage',
     audit: {
       action: 'order.cancelled',
@@ -382,19 +384,22 @@ const WRITE_TOOLS: WriteToolSpec<ZodRawShape>[] = [
       'Complete a return and refund the customer with the chosen refundMethod. DESTRUCTIVE and MOVES ' +
       'MONEY: the first call changes nothing and returns a confirmToken plus what would be refunded ' +
       '(read it to the merchant); call again with the SAME arguments plus the token to refund. ' +
-      'Refunding to the original payment method (gateway) needs the orders:refund permission, which ' +
+      'Refunding to the original payment method (gateway) or as store_credit needs the orders:refund permission, which ' +
       'staff do not have.',
     input: { returnId: z.string().min(1), refundMethod: z.enum(REFUND_METHODS) },
     destructive: true,
     permission: 'returns:write',
     feature: 'returns',
     extraAuthorize: (a, auth) => {
+      // Mirrors return.routes.ts: a gateway method sends money back through the provider, and
+      // `store_credit` credits the customer's spendable wallet (F-10, Ruling S8-1, parallel
+      // branch fix/security-batch-2026-10-14). Both need orders:refund; staff lack it.
       if (
-        isGatewayRefundMethod(a.refundMethod) &&
+        (isGatewayRefundMethod(a.refundMethod) || a.refundMethod === 'store_credit') &&
         !hasPermission(auth.role as any, 'orders:refund')
       ) {
         throw new Error(
-          'FORBIDDEN: refunding to the original payment method needs the orders:refund permission; the key’s owner lacks it.'
+          'FORBIDDEN: refunding to the original payment method or as store credit needs the orders:refund permission; the key’s owner lacks it.'
         );
       }
     },
