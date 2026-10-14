@@ -330,10 +330,12 @@ export function definitionToLayout(def: PageDefinition): StoreLayoutSettings {
 export function publishedDocumentAgrees(
   def: PageDefinition,
   layout: StoreLayoutSettings,
-  templateId: TemplateId | undefined
+  templateId: TemplateId | undefined,
+  /** The store's look: resolve the document side the same way the layout was resolved. */
+  look?: string | null
 ): boolean {
   const json = (v: unknown): unknown => JSON.parse(JSON.stringify(v));
-  const served = resolveLayoutSettings(json(definitionToLayout(def)), templateId);
+  const served = resolveLayoutSettings(json(definitionToLayout(def)), templateId, look);
   return isDeepEqualJson(json(served), json(layout));
 }
 

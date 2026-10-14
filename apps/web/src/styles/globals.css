@@ -1167,3 +1167,65 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
 [data-pack='dahab'] [data-section='newsletter'] > div {
   max-width: 38rem;
 }
+
+/* ==========================================================================
+   Looks (Phase S). EVERY rule here is scoped under [data-look], which the
+   root layout sets on <body> only for stores with a valid look. Legacy
+   stores render exactly as before. Vars come from themeToCssVars +
+   lookHead(): --font-display/--font-body/--font-latin/--space-unit/
+   --image-ratio/--motion-duration.
+   ========================================================================== */
+[data-look] {
+  font-family: var(--font-body, var(--font-arabic), var(--font-sans));
+}
+[data-look] h1,
+[data-look] h2,
+[data-look] h3,
+[data-look] .font-display {
+  font-family: var(--font-display);
+}
+/* Section rhythm: only sections whose spacing is UNSET (sectionSpacingClasses adds
+   sp-top-default / sp-bottom-default, and only for a store with a look) scale by
+   --space-unit. An explicit merchant preset, even "normal", carries no marker. */
+[data-look] .sp-top-default {
+  padding-top: calc(3rem * var(--space-unit, 1));
+}
+[data-look] .sp-bottom-default {
+  padding-bottom: calc(3rem * var(--space-unit, 1));
+}
+@media (min-width: 640px) {
+  [data-look] .sp-top-default {
+    padding-top: calc(4rem * var(--space-unit, 1));
+  }
+  [data-look] .sp-bottom-default {
+    padding-bottom: calc(4rem * var(--space-unit, 1));
+  }
+}
+@media (min-width: 1024px) {
+  [data-look] .sp-top-default {
+    padding-top: calc(5rem * var(--space-unit, 1));
+  }
+  [data-look] .sp-bottom-default {
+    padding-bottom: calc(5rem * var(--space-unit, 1));
+  }
+}
+[data-look] a,
+[data-look] button {
+  transition-duration: var(--motion-duration, 150ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-look] {
+    --motion-duration: 0ms;
+  }
+}
+/* A dahab-skinned look keeps the look's display face: the skin sets --font-display on <body>. */
+html[lang] body[data-look][data-pack='dahab'] {
+  --font-display: var(--look-font-display);
+}
+/* English locale: Latin display face first, Arabic display stack as fallback. */
+html[lang='en'] [data-look] h1,
+html[lang='en'] [data-look] h2,
+html[lang='en'] [data-look] h3,
+html[lang='en'] [data-look] .font-display {
+  font-family: var(--font-latin, var(--font-display)), var(--font-display);
+}

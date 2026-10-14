@@ -69,6 +69,21 @@ export function sanitizeCssValue(value: string, fallback = '0'): string {
 
 const NON_COLOR_VARS = new Set(['--radius', '--font-family']);
 
+// A font family name: letters, digits, spaces, hyphens and apostrophes (real Google Fonts
+// names, e.g. "Baloo Bhaijaan 2"). Quotes, backslashes, semicolons, braces, angle brackets and
+// parentheses are refused: they could close the string or the declaration.
+const FAMILY = `"[A-Za-z0-9 '\\-]{1,60}"`;
+/** Look (Phase S) variables: non-colour, each with its own strict allow-list. */
+export const LOOK_VAR_PATTERNS: Record<string, RegExp> = {
+  '--font-display': new RegExp(`^${FAMILY}, var\\(--font-arabic\\), var\\(--font-sans\\)$`),
+  '--look-font-display': new RegExp(`^${FAMILY}, var\\(--font-arabic\\), var\\(--font-sans\\)$`),
+  '--font-latin': new RegExp(`^${FAMILY}, var\\(--font-sans\\)$`),
+  '--font-body': new RegExp(`^${FAMILY}, var\\(--font-arabic\\), var\\(--font-sans\\)$`),
+  '--space-unit': /^\d+(?:\.\d+)?$/,
+  '--image-ratio': /^\d+ \/ \d+$/,
+  '--motion-duration': /^\d+ms$/,
+};
+
 /**
  * Builds the `:root { --var: value; ... }` style-tag body from a store's
  * theme, sanitizing every value. Returns `''` when there's no theme to emit.
@@ -77,19 +92,25 @@ const NON_COLOR_VARS = new Set(['--radius', '--font-family']);
  * so both trees paint an identical theme.
  */
 export function buildThemeStyleTag(
-  theme: StoreTheme | Record<string, unknown> | null | undefined
+  theme: StoreTheme | Record<string, unknown> | null | undefined,
+  lookId?: string | null
 ): string {
-  const themeCssVars = theme ? themeToCssVars(theme as StoreTheme) : null;
+  const themeCssVars = theme ? themeToCssVars(theme as StoreTheme, lookId) : null;
   if (!themeCssVars) return '';
   return `:root { ${Object.entries(themeCssVars)
     .map(([k, v]) => {
       // Issue 2349: a legacy store's ink is exactly `var(--<role>)` — the one
       // non-colour value an `-ink` var may carry (anchored allow-list).
-      const sanitized = NON_COLOR_VARS.has(k)
-        ? sanitizeCssValue(v)
-        : k.endsWith('-ink') && LEGACY_STATUS_INK_VALUE.test(v)
-          ? v
-          : sanitizeThemeColor(v);
+      const sanitized =
+        k in LOOK_VAR_PATTERNS
+          ? LOOK_VAR_PATTERNS[k].test(v)
+            ? v
+            : '0'
+          : NON_COLOR_VARS.has(k)
+            ? sanitizeCssValue(v)
+            : k.endsWith('-ink') && LEGACY_STATUS_INK_VALUE.test(v)
+              ? v
+              : sanitizeThemeColor(v);
       return `${k}: ${sanitized}`;
     })
     .join('; ')} }`;

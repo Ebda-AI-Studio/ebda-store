@@ -12,22 +12,14 @@ export const STEP_ORDER: readonly StepKey[] = [
   'live',
 ];
 
-export type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
-
-export const TEMPLATE_IDS: readonly TemplateId[] = [
-  'modern',
-  'classic',
-  'minimal',
-  'bold',
-  'elegant',
-];
-
 export interface OnboardingStore {
   id: string;
   name: string;
   slug: string;
   status: 'active' | 'inactive' | 'suspended';
-  template: TemplateId;
+  template: string;
+  /** The chosen look (registry id), or null for a store that never picked one. */
+  look: string | null;
   host: string;
   url: string;
   planCode: string | null;

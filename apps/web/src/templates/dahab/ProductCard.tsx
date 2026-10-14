@@ -27,6 +27,7 @@ import Link from 'next/link';
 import type { ProductCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
+import { lookImageAspectClass } from '../shared/card-size';
 import { useNumerals } from '../../hooks/useNumerals';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { getProductPricing, getDiscountBadgeText, isOnSale } from '../../lib/product-pricing';
@@ -111,7 +112,14 @@ export default function DahabProductCard({
           className="relative block overflow-hidden rounded-[var(--radius)] bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-label={name}
         >
-          <div className={cx('relative aspect-[4/5] w-full', !orderable && 'opacity-60')}>
+          <div
+            className={cx(
+              lookImageAspectClass(store.look)
+                ? `relative w-full ${lookImageAspectClass(store.look)}`
+                : 'relative aspect-[4/5] w-full',
+              !orderable && 'opacity-60'
+            )}
+          >
             {primary?.url ? (
               <Image
                 src={primary.url}

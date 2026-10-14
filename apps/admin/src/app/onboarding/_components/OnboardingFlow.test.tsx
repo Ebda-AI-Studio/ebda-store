@@ -7,6 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { getLook } from '@force/shared';
 
 const { apiGet, apiPost, apiPut, replace } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -50,6 +51,7 @@ const inactiveStore = {
   slug: 'my-shop',
   status: 'inactive',
   template: 'modern',
+  look: null,
   host: 'my-shop.ebda.app',
   url: 'https://my-shop.ebda.app',
   planCode: 'free',
@@ -303,12 +305,17 @@ describe('onboarding stepper', () => {
     );
     render(<OnboardingFlow />);
 
-    // Template: pick "elegant" -> PUT, then next.
+    // Look: pick a Dahab look -> PUT /look (design reset: a brand-new store), then next.
     await screen.findByText('onboarding.flow.template.title');
-    fireEvent.click(screen.getByRole('radio', { name: /^onboarding\.flow\.template\.elegant/ }));
+    fireEvent.click(
+      screen.getByRole('radio', { name: new RegExp(getLook('dahab.worn')!.name.en) })
+    );
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
     await waitFor(() =>
-      expect(apiPut).toHaveBeenCalledWith('/api/v1/stores/s1/template', { template: 'elegant' })
+      expect(apiPut).toHaveBeenCalledWith('/api/v1/stores/s1/look', {
+        lookId: 'dahab.worn',
+        design: 'reset',
+      })
     );
 
     // Product: price entered in EGP is sent in piastres, active, with the photo.
@@ -352,6 +359,71 @@ describe('onboarding stepper', () => {
     const wa = screen.getByRole('link', { name: /onboarding\.flow\.live\.whatsapp/ });
     expect(wa.getAttribute('href')).toContain('https://wa.me/?text=');
     expect(wa.getAttribute('href')).toContain(encodeURIComponent('https://my-shop.ebda.app'));
+  });
+
+  it('asks for a look again when the store was created but its look did not apply', async () => {
+    mockState(verifiedNoStore);
+    apiPost.mockResolvedValueOnce({
+      data: { store: inactiveStore, lookApplied: false },
+      error: null,
+    });
+    render(<OnboardingFlow />);
+    fireEvent.change(await toStoreStep(), { target: { value: 'My Shop' } });
+    const create = await screen.findByRole('button', { name: 'onboarding.flow.store.create' });
+    await waitFor(() => expect((create as HTMLButtonElement).disabled).toBe(false), {
+      timeout: 2000,
+    });
+    fireEvent.click(create);
+    await screen.findByText('onboarding.flow.billing.title');
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.billing.continueAnyway' }));
+    await screen.findByText('onboarding.flow.template.title');
+    expect(screen.getByText('onboarding.flow.template.lookNotApplied')).toBeTruthy();
+    // Picking a look again goes through the normal PUT /look.
+    fireEvent.click(
+      screen.getByRole('radio', { name: new RegExp(getLook('dahab.worn')!.name.en) })
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
+    await waitFor(() =>
+      expect(apiPut).toHaveBeenCalledWith('/api/v1/stores/s1/look', {
+        lookId: 'dahab.worn',
+        design: 'reset',
+      })
+    );
+  });
+
+  it('shows no retry prompt when the look applied (or none was asked for)', async () => {
+    mockState({ ...verifiedNoStore, store: inactiveStore, codEnabled: true });
+    render(<OnboardingFlow />);
+    await screen.findByText('onboarding.flow.template.title');
+    expect(screen.queryByText('onboarding.flow.template.lookNotApplied')).toBeNull();
+  });
+
+  it('while saving the look the button is aria-busy with a saving label, and a thrown save does not stick', async () => {
+    mockState({ ...verifiedNoStore, store: inactiveStore, codEnabled: true });
+    let rejectPut: (e: Error) => void = () => {};
+    apiPut.mockImplementationOnce(() => new Promise((_, rej) => (rejectPut = rej)));
+    render(<OnboardingFlow />);
+    await screen.findByText('onboarding.flow.template.title');
+    fireEvent.click(
+      screen.getByRole('radio', { name: new RegExp(getLook('dahab.worn')!.name.en) })
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
+    const busy = await screen.findByRole('button', { name: 'onboarding.flow.template.saving' });
+    expect(busy.getAttribute('aria-busy')).toBe('true');
+    expect((busy as HTMLButtonElement).disabled).toBe(true);
+    rejectPut(new Error('network'));
+    const next = await screen.findByRole('button', { name: 'onboarding.flow.next' });
+    expect((next as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByRole('alert').textContent).toBe('onboarding.flow.template.saveFailed');
+  });
+
+  it('continuing without picking a look saves nothing (the store keeps its default)', async () => {
+    mockState({ ...verifiedNoStore, store: inactiveStore, codEnabled: true });
+    render(<OnboardingFlow />);
+    await screen.findByText('onboarding.flow.template.title');
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
+    await screen.findByText('onboarding.flow.product.title');
+    expect(apiPut).not.toHaveBeenCalled();
   });
 
   it('blocks Continue when COD is switched off (a store needs one payment method)', async () => {

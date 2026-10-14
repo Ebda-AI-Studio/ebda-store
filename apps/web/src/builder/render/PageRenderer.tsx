@@ -479,7 +479,7 @@ export function PageRenderer({
             {categoriesVisible && (
               <section
                 data-section="categories"
-                className={`bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(layout.categories).wrapperClass}`}
+                className={`bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(layout.categories, store.look).wrapperClass}`}
                 style={sectionBgStyle(layout.categories.bgColor, store.theme)}
               >
                 {(() => {
@@ -491,7 +491,8 @@ export function PageRenderer({
                   // md: visibility so e.g. mobile=grid + desktop=horizontal works.
                   // md (768px) is the platform mobile/desktop boundary.
                   const categoriesInnerClass = sectionSpacingClasses(
-                    layout.categories
+                    layout.categories,
+                    store.look
                   ).innerContainerClass;
                   const common = {
                     categories: templateCategories,
@@ -592,7 +593,7 @@ export function PageRenderer({
             {newArrivalsVisible && (
               <section
                 data-section="newArrivals"
-                className={`bg-[hsl(var(--bg-section-alt))] ${sectionSpacingClasses(layout.newArrivals).wrapperClass}`}
+                className={`bg-[hsl(var(--bg-section-alt))] ${sectionSpacingClasses(layout.newArrivals, store.look).wrapperClass}`}
                 style={sectionBgStyle(layout.newArrivals.bgColor, store.theme)}
               >
                 {T.ProductCarousel ? (
@@ -646,7 +647,11 @@ export function PageRenderer({
                     sectionBgColor={layout.newArrivals.bgColor}
                   />
                 ) : (
-                  <div className={sectionSpacingClasses(layout.newArrivals).innerContainerClass}>
+                  <div
+                    className={
+                      sectionSpacingClasses(layout.newArrivals, store.look).innerContainerClass
+                    }
+                  >
                     <T.ProductGrid
                       urlPrefix={storeUrl('')}
                       products={templateNewArrivals}
@@ -685,7 +690,7 @@ export function PageRenderer({
             {bestSellersVisible && (
               <section
                 data-section="bestSellers"
-                className={`bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(layout.bestSellers).wrapperClass}`}
+                className={`bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(layout.bestSellers, store.look).wrapperClass}`}
                 style={sectionBgStyle(layout.bestSellers.bgColor, store.theme)}
               >
                 {T.ProductCarousel ? (
@@ -739,7 +744,11 @@ export function PageRenderer({
                     sectionBgColor={layout.bestSellers.bgColor}
                   />
                 ) : (
-                  <div className={sectionSpacingClasses(layout.bestSellers).innerContainerClass}>
+                  <div
+                    className={
+                      sectionSpacingClasses(layout.bestSellers, store.look).innerContainerClass
+                    }
+                  >
                     <T.ProductGrid
                       urlPrefix={storeUrl('')}
                       products={templateBestSellers}
@@ -879,7 +888,7 @@ export function PageRenderer({
             {testimonialsVisible && T.TestimonialRow && (
               <section
                 data-section="testimonials"
-                className={`bg-[hsl(var(--bg-section-alt))] ${sectionSpacingClasses(layout.testimonials).wrapperClass}`}
+                className={`bg-[hsl(var(--bg-section-alt))] ${sectionSpacingClasses(layout.testimonials, store.look).wrapperClass}`}
                 style={sectionBgStyle(layout.testimonials.bgColor, store.theme)}
               >
                 <T.TestimonialRow
@@ -987,7 +996,7 @@ export function PageRenderer({
               )}
               <section
                 data-section={`extra:${extra.id}`}
-                className={`bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(extra).wrapperClass}`}
+                className={`bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(extra, store.look).wrapperClass}`}
                 style={sectionBgStyle(extra.bgColor, store.theme)}
               >
                 <T.ProductCarousel

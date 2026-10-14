@@ -1,4 +1,4 @@
-import type { SectionPaddingMaxWidthVisibility } from '@force/shared';
+import { getLook, type SectionPaddingMaxWidthVisibility } from '@force/shared';
 
 /**
  * Padding-top preset → Tailwind class.
@@ -70,7 +70,10 @@ function visibilityClass(s: SectionPaddingMaxWidthVisibility): string {
  *
  * **Usage:**
  * ```tsx
- * const { wrapperClass, innerContainerClass } = sectionSpacingClasses(layout.hero);
+ * const { wrapperClass, innerContainerClass } = sectionSpacingClasses(layout.hero, store.look);
+ *
+ * // `store.look` (optional) marks UNSET padding axes so a look's --space-unit can scale them;
+ * // omit it and the output is the legacy class list.
  *
  * // On the outer <section> (replaces or augments the baseline py-* classes):
  * <section className={`bg-[hsl(var(--bg-page))] ${wrapperClass}`}>
@@ -96,16 +99,25 @@ function visibilityClass(s: SectionPaddingMaxWidthVisibility): string {
  *            May be `undefined` when the section's optional layout key hasn't
  *            been set yet; the function falls back to defaults throughout.
  */
-export function sectionSpacingClasses(s: SectionPaddingMaxWidthVisibility | undefined): {
+export function sectionSpacingClasses(
+  s: SectionPaddingMaxWidthVisibility | undefined,
+  /** The store's look id. When it names a valid look, the UNSET (default) padding axes get
+   *  `sp-top-default` / `sp-bottom-default` so globals.css can scale them by --space-unit.
+   *  An explicit preset (even "normal") never gets a marker (Ruling LOOKS-3); no look = no marker. */
+  look?: string | null
+): {
   /** Classes to apply on the outermost `<section>` / `<div>` wrapper.
    *  Includes visibility + vertical padding. */
   wrapperClass: string;
   /** Classes for the inner max-width container `<div>`. */
   innerContainerClass: string;
 } {
+  const mark = getLook(look) !== undefined;
   if (!s) {
     return {
-      wrapperClass: 'py-12 sm:py-16 lg:py-20',
+      wrapperClass: mark
+        ? 'py-12 sm:py-16 lg:py-20 sp-top-default sp-bottom-default'
+        : 'py-12 sm:py-16 lg:py-20',
       innerContainerClass: 'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8',
     };
   }
@@ -119,7 +131,15 @@ export function sectionSpacingClasses(s: SectionPaddingMaxWidthVisibility | unde
   // Visibility
   const vis = visibilityClass(s);
 
-  const wrapperClass = [ptClass, pbClass, vis].filter(Boolean).join(' ');
+  const wrapperClass = [
+    ptClass,
+    pbClass,
+    mark && !s.paddingTop ? 'sp-top-default' : '',
+    mark && !s.paddingBottom ? 'sp-bottom-default' : '',
+    vis,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   // Max-width container
   const innerContainerClass =

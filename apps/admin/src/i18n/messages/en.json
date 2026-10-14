@@ -5226,8 +5226,23 @@
       "brandingSettings": "Branding settings",
       "saveSuccess": "Template saved",
       "saveSuccessBody": "Your storefront template has been updated.",
-      "saveError": "Failed to save template",
-      "saveErrorBody": "Something went wrong. Please try again."
+      "saveError": "Could not switch the look. Please try again.",
+      "saveErrorBody": "Something went wrong. Please try again.",
+      "legacyNote": "This store still uses an older skin. Choosing a look moves it to the new looks system.",
+      "legacySkin": "Current skin: {skin}",
+      "draftReady": "Your new home page is ready as a draft in the editor.",
+      "openBuilder": "Open the editor",
+      "published": "Your new look is live.",
+      "lookTitle": "Choose a look",
+      "invalidLook": "That look is not available any more. Pick another one.",
+      "skins": {
+        "modern": "Modern",
+        "classic": "Classic",
+        "minimal": "Minimal",
+        "bold": "Bold",
+        "elegant": "Elegant",
+        "dahab": "Dahab"
+      }
     }
   },
   "seo": {
@@ -8981,20 +8996,11 @@
       },
       "template": {
         "title": "Pick a look",
-        "subtitle": "Choose a template. You can change it any time.",
-        "modern": "Modern",
-        "modernDesc": "Clean lines and bold accents.",
-        "classic": "Classic",
-        "classicDesc": "Timeless serif elegance.",
-        "minimal": "Minimal",
-        "minimalDesc": "Lots of space, product first.",
-        "bold": "Bold",
-        "boldDesc": "Vibrant and energetic.",
-        "elegant": "Elegant",
-        "elegantDesc": "Refined fashion and beauty look.",
-        "selected": "Selected",
-        "saveFailed": "We could not save the template. Please try again.",
-        "previewNote": "Illustrative layout — your photos and colors are added in store settings."
+        "subtitle": "Choose how your store looks. You can change it any time.",
+        "saveFailed": "We could not save your look. Please try again.",
+        "previewNote": "Previews show the look with sample products. Your photos and products are added next.",
+        "saving": "Saving…",
+        "lookNotApplied": "Your store was created, but its look could not be applied. Please pick a look again."
       },
       "product": {
         "title": "Add your first product",
@@ -9156,6 +9162,21 @@
       "support": "Need help?",
       "footer": "Your store. Your brand.",
       "back": "Back to Ebda Store"
+    }
+  },
+  "looks": {
+    "picker": {
+      "tabs": "Store templates",
+      "selected": "Selected"
+    },
+    "switch": {
+      "title": "Switch to {lookName}",
+      "body": "Your products and content stay as they are. Your home page is rebuilt to match the new look.",
+      "keep": "Keep my colour and font changes",
+      "reset": "Start fresh with this look",
+      "confirm": "Switch look",
+      "cancel": "Cancel",
+      "saving": "Saving…"
     }
   },
   "billingEvents": {
@@ -9798,7 +9819,11 @@
       "saved": "Theme saved to your draft — publish to take it live",
       "error": "Theme not saved — try again",
       "saving": "Saving…",
-      "save": "Save to draft"
+      "save": "Save to draft",
+      "edited": "Edited",
+      "reset": "Reset",
+      "resetOne": "Reset {field} to the look",
+      "resetError": "Could not reset. Try again."
     },
     "revisions": {
       "error": "History could not be loaded.",

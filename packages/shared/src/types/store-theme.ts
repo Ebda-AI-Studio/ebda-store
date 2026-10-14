@@ -6,6 +6,9 @@
 import { deriveBrandRoles } from '../utils/brand-roles';
 import { statusInkVars } from '../utils/status-ink';
 import { colorToHslTriplet } from '../utils/color';
+import type { Density, ImageRatio, Motion } from '../looks/types';
+import { getLook } from '../looks/registry';
+import { resolveLookFonts } from '../looks/fonts';
 
 /**
  * Available store templates
@@ -133,6 +136,11 @@ export interface StoreTheme {
 
   // Styling
   borderRadius: BorderRadius;
+
+  // Look-owned layout tokens (set by a look via composeStoreTheme; absent on legacy stores).
+  density?: Density;
+  imageRatio?: ImageRatio;
+  motion?: Motion;
 
   // Per-store homepage section background preset — see BackgroundPreset
   // for behavior. Optional; missing or 'none' means flat-surface (no
@@ -920,10 +928,38 @@ export function getProductCardTextSizes(cardSize: ProductCardSize | undefined): 
   }
 }
 
+export const LOOK_SPACE_UNIT = { compact: '0.875', regular: '1', airy: '1.25' } as const;
+export const LOOK_MOTION_DURATION = { none: '0ms', subtle: '180ms', expressive: '280ms' } as const;
+
+/**
+ * Look-only CSS variables. Empty unless `lookId` names a registered look
+ * (Ruling R1): a stray density/headingFont on a legacy store emits nothing,
+ * and a look store whose merchant cleared a key still gets the look's font.
+ */
+export function lookCssVars(
+  theme: Partial<StoreTheme>,
+  lookId: string | null | undefined
+): Record<string, string> {
+  const look = getLook(lookId);
+  if (!look) return {};
+  const v: Record<string, string> = {};
+  // Merchant font wins when it is loadable; `latin` follows a merchant heading (resolveLookFonts).
+  const { display, body, latin } = resolveLookFonts(look, theme);
+  v['--font-display'] = `"${display}", var(--font-arabic), var(--font-sans)`;
+  // Same value under a name no skin rule redefines (dahab sets --font-display on <body>).
+  v['--look-font-display'] = v['--font-display'];
+  v['--font-body'] = `"${body}", var(--font-arabic), var(--font-sans)`;
+  v['--font-latin'] = `"${latin}", var(--font-sans)`;
+  if (theme.density) v['--space-unit'] = LOOK_SPACE_UNIT[theme.density];
+  if (theme.imageRatio) v['--image-ratio'] = theme.imageRatio.replace('/', ' / ');
+  if (theme.motion) v['--motion-duration'] = LOOK_MOTION_DURATION[theme.motion];
+  return v;
+}
+
 /**
  * Convert theme to CSS custom properties
  */
-export function themeToCssVars(theme: StoreTheme): Record<string, string> {
+export function themeToCssVars(theme: StoreTheme, lookId?: string | null): Record<string, string> {
   const bg = resolveBackgroundPreset(theme);
   const vars: Record<string, string> = {
     // Core colors
@@ -990,6 +1026,9 @@ export function themeToCssVars(theme: StoreTheme): Record<string, string> {
     if (NON_COLOR_VARS.has(key)) continue;
     vars[key] = colorToHslTriplet(vars[key], theme);
   }
+  // Looks (Phase S): emitted ONLY when the theme carries the key, so legacy
+  // stores (no look) produce the exact same variable set as before (Ruling R1).
+  Object.assign(vars, lookCssVars(theme, lookId));
   // Issue 2349 — status-message inks, measured on this store's own surfaces
   // (after normalisation, so they read the same triplets the page paints).
   // Legacy stores get `var(--<role>)`: identical to the bare role colour.

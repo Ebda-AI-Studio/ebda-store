@@ -251,6 +251,8 @@ model Store {
 
   // Template & Theme
   template       StoreTemplate @default(modern)
+  look           String?       @map("look") // "<template>.<slug>" from the shared looks registry; NULL = template default
+  isDemo         Boolean       @default(false) @map("is_demo")
   theme          Json          @default("{}") // StoreTheme JSON
   layoutSettings Json          @default("{}") @map("layout_settings") // StoreLayoutSettings JSON — empty object means "use packaged defaults" (the Demo Store flow)
 

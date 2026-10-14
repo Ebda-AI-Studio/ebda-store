@@ -1190,6 +1190,15 @@ export default function CheckoutClient() {
       return;
     }
 
+    // Demo store: there is no order to place (the API refuses it too, DEMO_STORE). Stops an
+    // Enter-key implicit submit of the payment form from reaching createOrder.
+    if (store.isDemo) {
+      setCheckoutError(
+        t('This is a demo store — ordering is closed', 'ده متجر تجريبي — الطلب مقفول')
+      );
+      return;
+    }
+
     // #776: `nowMinutes` above ticks every 30s, so it can still be up to a
     // tick behind. Re-read the clock right before validating/using the
     // window, so submission always checks it against "now"; on a lapse the
@@ -2321,6 +2330,7 @@ export default function CheckoutClient() {
                     total={total}
                     formatPrice={formatPrice}
                     belowMinimumOrder={belowMinimumOrder}
+                    isDemo={store.isDemo === true}
                     deliverySection={
                       checkoutDelivery ? (
                         <div data-error={!!deliveryWindowError}>

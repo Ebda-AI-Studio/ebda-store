@@ -22,7 +22,6 @@ import { AppError } from '../middleware/error-handler';
 import { archiveFiscalRecords, assertNoMoneyInFlight } from './store-closure.service';
 import { assertStoreSlug, deriveStoreSlug } from '../lib/store-slug';
 import {
-  slugify,
   slugifyWithFallback,
   isReservedSlug,
   isProtectedSlug,
@@ -31,7 +30,11 @@ import {
   REGION,
   STORE_PLAN_TO_PLAN_CODE,
   NEW_STORE_LAYOUT_SETTINGS,
+  getLook,
+  LOOK_TOKEN_KEYS,
 } from '@force/shared';
+import { applyFamilyForLook } from './page-builder.service';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
@@ -947,16 +950,73 @@ export class StoreService {
       );
     }
 
+    // A bare skin is the legacy way to style a store: picking one leaves the looks
+    // system (the storefront composes skin < look < theme only while `look` is set).
     const updatedStore = await withStore(storeId, tx =>
       tx.store.update({
         where: { id: storeId },
-        data: { template: template as StoreTemplate },
+        data: { template: template as StoreTemplate, ...(store.look ? { look: null } : {}) },
       })
     );
 
     await StoreService.invalidateCache(store);
     await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
     return updatedStore;
+  }
+
+  /**
+   * Apply a look: set `look` + its skin as `template`, optionally reset the look-owned
+   * theme keys (`design: 'reset'`; `keep` leaves every merchant override), then re-shape
+   * the home page to the look's template family without losing content (see
+   * `applyFamilyForLook`: published for a fresh store, a draft otherwise).
+   */
+  static async applyLook(
+    storeId: string,
+    lookId: string,
+    opts: { design: 'keep' | 'reset' },
+    userId: string | null = null
+  ) {
+    const look = getLook(lookId);
+    if (!look) throw new AppError(400, 'INVALID_LOOK', 'Unknown look');
+    const store = await this.getById(storeId);
+    // Builder FIRST: it can refuse (409/422), and a refusal throws before any store write, so a
+    // refused switch leaves the store row untouched. /stores/:id routes run under
+    // storeScopeContext (no request transaction): each query below is its own transaction, so the
+    // builder step and the store update are NOT atomic. If the store update fails after a publish,
+    // a retry converges (the store is no longer fresh, so it takes the draft path). Ruling LOOKS-10.
+    const builder = await applyFamilyForLook(
+      storeId,
+      look.template,
+      userId,
+      opts.design === 'reset' ? LOOK_TOKEN_KEYS : [],
+      look.id
+    );
+    // Re-read the theme in the same transaction as this write (not a stale copy from before the
+    // builder step): a publish above may have merged a pending theme patch into it, and that
+    // must not be overwritten.
+    const updated = await withStore(storeId, async tx => {
+      const live = await tx.store.findUnique({
+        where: { id: storeId },
+        select: { theme: true },
+      });
+      const theme = { ...((live?.theme as Record<string, unknown>) || {}) };
+      if (opts.design === 'reset') for (const k of LOOK_TOKEN_KEYS) delete theme[k];
+      return tx.store.update({
+        where: { id: storeId },
+        data: {
+          look: look.id,
+          template: look.skin as StoreTemplate,
+          theme: theme as Prisma.InputJsonValue,
+        },
+      });
+    });
+    // After the request commits, so a read between the bust and the commit cannot re-cache
+    // the old look (applyLook only; the other update* methods keep their inline bust).
+    void deferAfterTenantCommit('store.applyLook.purge', async () => {
+      await StoreService.invalidateCache(store);
+      await bustStoreCaches(updated.id, updated.slug, updated.domain);
+    }).catch(err => logger.error({ err, storeId }, '[STORE] applyLook cache purge failed'));
+    return { store: updated, builder };
   }
 
   // Shallow-merge PATCH for the theme JSON column. Multiple admin surfaces
@@ -968,10 +1028,16 @@ export class StoreService {
   // theme means a surface only ever overwrites the keys it explicitly sends;
   // keys absent from the payload are preserved. Same read-merge-write posture
   // as `updateFloatingWidget` / `updateSocialLinks`.
+  //
+  // A `null` value DELETES that key (the merchant resets one look override back
+  // to the look's default). Audited 2026-10-14: no admin surface writes an
+  // intentional null into the theme (StoreTheme has no nullable key), so null
+  // is free to carry "remove" and a literal null is never persisted.
   static async updateTheme(storeId: string, theme: Record<string, unknown>) {
     const store = await this.getById(storeId);
     const existingTheme = (store.theme as Record<string, unknown>) || {};
-    const mergedTheme = { ...existingTheme, ...theme };
+    const mergedTheme: Record<string, unknown> = { ...existingTheme, ...theme };
+    for (const [k, v] of Object.entries(theme)) if (v === null) delete mergedTheme[k];
 
     const updatedStore = await withStore(storeId, tx =>
       tx.store.update({

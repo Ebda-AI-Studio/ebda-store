@@ -42,7 +42,9 @@
  * the storefront Next data cache via the `layout:<storeId>` tag, and the
  * store's slug/host/domain resolve keys. Draft saves touch no public cache.
  */
+import { isDeepStrictEqual } from 'node:util';
 import { prisma, withStore } from '@force/database';
+import { AppError } from '../middleware/error-handler';
 import {
   BUILDER_LIMITS,
   PAGE_DEFINITION_SCHEMA_VERSION,
@@ -53,6 +55,8 @@ import {
   resolveLayoutSettings,
   snapshotEditableTheme,
   applyChromePatch,
+  applyTemplateFamily,
+  NEW_STORE_LAYOUT_SETTINGS,
   hasChromePatch,
   pageDefinitionSchema,
   rebaseDraftOntoLive,
@@ -61,7 +65,9 @@ import {
   type BuilderIssue,
   type PageDefinition,
   type StoreLayoutSettings,
+  type TemplateFamily,
   type TemplateId,
+  getLook,
 } from '@force/shared';
 import { withSavepoint } from '../lib/savepoint';
 import { readInStoreContext } from '../lib/store-scoped-read';
@@ -133,7 +139,14 @@ async function loadStore(storeId: string) {
   return withStore(storeId, tx =>
     tx.store.findUnique({
       where: { id: storeId },
-      select: { layoutSettings: true, template: true, slug: true, domain: true, theme: true },
+      select: {
+        layoutSettings: true,
+        template: true,
+        look: true,
+        slug: true,
+        domain: true,
+        theme: true,
+      },
     })
   );
 }
@@ -157,10 +170,15 @@ async function loadRows(storeId: string, pageKey: string) {
   };
 }
 
-function resolvedLayout(store: { layoutSettings: unknown; template: string | null }) {
+function resolvedLayout(store: {
+  layoutSettings: unknown;
+  template: string | null;
+  look?: string | null;
+}) {
   return resolveLayoutSettings(
     store.layoutSettings ?? {},
-    (store.template ?? undefined) as TemplateId | undefined
+    (store.template ?? undefined) as TemplateId | undefined,
+    store.look
   );
 }
 
@@ -212,7 +230,9 @@ export async function getPublishedDefinition(
   storeId: string,
   layout: StoreLayoutSettings,
   templateId: TemplateId | null,
-  pageKey = HOME_PAGE_KEY
+  pageKey = HOME_PAGE_KEY,
+  /** The store's look, so the document side resolves like `layout` did (LOOKS-15). */
+  look: string | null = null
 ): Promise<{ definition: PageDefinition; rev: number | null }> {
   // The public route may run with no tenant context (a storefront fetch by
   // path id carries no store header): enter the store's scope explicitly, or
@@ -226,7 +246,7 @@ export async function getPublishedDefinition(
   if (published) {
     const doc = published.document as unknown as PageDefinition;
     try {
-      if (publishedDocumentAgrees(doc, layout, templateId ?? undefined))
+      if (publishedDocumentAgrees(doc, layout, templateId ?? undefined, look))
         return { definition: doc, rev: published.rev };
     } catch {
       // fall through: an unreadable document renders from layout_settings
@@ -536,6 +556,119 @@ async function publishNewRevision(args: {
     });
     await args.afterCreate?.(rev);
   });
+}
+
+/** A store whose `layout_settings` still holds nothing a merchant wrote (new-store seed or empty). */
+function isUntouchedLayout(layout: unknown): boolean {
+  if (layout == null) return true;
+  if (typeof layout !== 'object') return false;
+  if (Object.keys(layout).length === 0) return true;
+  return isDeepStrictEqual(layout, NEW_STORE_LAYOUT_SETTINGS);
+}
+
+/**
+ * Remove the top-level sections that fail `validatePublishReadiness` (placeholder copy, a hero slide
+ * with no image). Issue paths look like `/sections/<i>/...`; anything not attributable to a
+ * top-level section is left alone, and publish will still refuse it (the caller then stays a draft).
+ */
+function dropUnpublishableSections(definition: PageDefinition): PageDefinition {
+  const bad = new Set<number>();
+  for (const issue of validatePublishReadiness(definition)) {
+    const m = /^\/sections\/(\d+)(?:\/|$)/.exec(issue.path);
+    if (m) bad.add(Number(m[1]));
+  }
+  if (bad.size === 0) return definition;
+  return { ...definition, sections: definition.sections.filter((_, i) => !bad.has(i)) };
+}
+
+/**
+ * Re-shape the home page to a look's template family without losing content
+ * (`applyTemplateFamily` keeps every existing section of a family type and only
+ * adds the missing ones; sections outside the family are dropped from the new
+ * document). Runs in the CALLER's tenant scope, like the builder routes: it only
+ * composes `saveDraft` / `publishDraft`, which scope themselves.
+ *
+ * - genuinely fresh store (no revision, no draft, `layout_settings` empty or the
+ *   new-store seed): published, so it looks like its look immediately;
+ * - EVERYTHING else (a published page, an in-progress draft, or a legacy store
+ *   whose customised `layout_settings` never went through the builder): a DRAFT
+ *   only. Publishing would replace `layout_settings` wholesale and delete the
+ *   R2 images the new document no longer references (Ruling LOOKS-8).
+ * `resetThemeKeys` are stripped from the document's pending theme patch so a
+ * later publish cannot re-apply keys the merchant just reset.
+ */
+export async function applyFamilyForLook(
+  storeId: string,
+  family: TemplateFamily['id'],
+  userId: string | null = null,
+  resetThemeKeys: readonly string[] = [],
+  /** The look being applied. The store row still holds the OLD look/template here (the builder
+   *  step runs first), so a layout-derived page is re-derived for the new skin + look: the look
+   *  owns the default card image ratio, and the old skin's card shape must not be baked into
+   *  the new document (Ruling LOOKS-15). */
+  lookId: string | null = null
+): Promise<'published' | 'draft'> {
+  const state = await getPageState(storeId, HOME_PAGE_KEY);
+  if (!state) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+  const store = await loadStore(storeId);
+  if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+  const look = getLook(lookId);
+  const start =
+    state.source === 'layout' && look
+      ? layoutToDefinition(
+          resolveLayoutSettings(store.layoutSettings ?? {}, look.skin, look.id),
+          HOME_PAGE_KEY
+        )
+      : state.definition;
+  let definition = applyTemplateFamily(start, family);
+  if (definition.theme && resetThemeKeys.length > 0) {
+    const theme = { ...definition.theme } as Record<string, unknown>;
+    for (const k of resetThemeKeys) delete theme[k];
+    const next = { ...definition } as PageDefinition & { theme?: unknown };
+    if (Object.keys(theme).length > 0) next.theme = theme as PageDefinition['theme'];
+    else delete next.theme;
+    definition = next;
+  }
+  let fresh = state.source === 'layout' && isUntouchedLayout(store.layoutSettings);
+  // A genuinely fresh store has no content to lose, so sections that still hold starter copy or a
+  // missing image (and would block the publish) are dropped, and the rest goes live. A store with
+  // content never reaches this: it keeps the draft path below, untouched.
+  if (fresh) {
+    const publishable = dropUnpublishableSections(definition);
+    if (publishable.sections.length > 0) {
+      definition = publishable;
+    } else {
+      // Every section would be dropped: publishing would put an EMPTY home live. Keep the whole
+      // family as a draft instead so the merchant fills it in the editor (Ruling LOOKS-9).
+      logger.warn(
+        { storeId, family },
+        '[page-builder] look family left as a draft: no section is publishable yet'
+      );
+      fresh = false;
+    }
+  }
+  const saved = await saveDraft({
+    storeId,
+    pageKey: HOME_PAGE_KEY,
+    baseRev: state.rev,
+    definition,
+    userId,
+  });
+  if (!saved.ok) throw new AppError(saved.status, saved.code, saved.message);
+  if (!fresh) return 'draft';
+  const published = await publishDraft({
+    storeId,
+    pageKey: HOME_PAGE_KEY,
+    baseRev: saved.value.rev,
+  });
+  if (!published.ok) {
+    logger.warn(
+      { storeId, code: published.code, message: published.message },
+      '[page-builder] look family left as a draft: publish refused'
+    );
+    return 'draft';
+  }
+  return 'published';
 }
 
 export async function rollbackToRevision(args: {

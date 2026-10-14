@@ -29,6 +29,8 @@ import { CookiePreferencesModal } from '../components/CookiePreferencesModal';
 import { CookiePreferencesLink } from '../components/CookiePreferencesLink';
 import { type MarketingPixels, BRAND, resolveDefaultLanguage } from '@force/shared';
 import { buildThemeStyleTag } from '../lib/theme-css';
+import { lookHead } from '../lib/look-head';
+import { DemoLookBar } from '../components/demo/DemoLookBar';
 import { jsonLdScriptContent } from '../lib/json-ld-script';
 import '../styles/globals.css';
 
@@ -239,7 +241,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const effectiveTheme = draftBundle?.theme
     ? { ...(store.theme ?? {}), ...(draftBundle.theme as Record<string, unknown>) }
     : store.theme;
-  const themeStyleTag = buildThemeStyleTag(effectiveTheme);
+  const themeStyleTag = buildThemeStyleTag(effectiveTheme, store.look);
 
   // Build the per-store typography style tags (custom-font @font-face,
   // Google Fonts <link>, and per-zone CSS rules targeting
@@ -499,6 +501,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // duplicate <style> blocks. All inputs above pass through
   // sanitizeFontValue/sanitizeUrl to prevent CSS-injection escapes.
   const typographyCss = [...fontFaceRules, ...zoneRules].join('\n');
+  const look = lookHead(
+    store.look,
+    effectiveTheme as { headingFont?: unknown; bodyFont?: unknown } | null
+  );
   const combinedStyleTag = [themeStyleTag, typographyCss].filter(Boolean).join('\n');
 
   return (
@@ -508,6 +514,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdScriptContent(orgJsonLd) }}
         />
+        {look && (
+          <>
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+            <link rel="stylesheet" href={look.fontsHref} />
+          </>
+        )}
         {googleFontUrls.map(url => (
           <link key={url} rel="stylesheet" href={url} />
         ))}
@@ -543,6 +555,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         // itself loads on the client). Only Dahab sets it: other stores' markup
         // is unchanged.
         data-pack={store.template === 'dahab' ? 'dahab' : undefined}
+        // Looks (Phase S): scopes every look rule in globals.css; absent for legacy stores.
+        data-look={look?.dataLook}
       >
         {/* Reset scroll to top on every route change — the body is the scroll
             container (overflow-x-hidden), so Next's window-targeted scroll
@@ -586,6 +600,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     <AuthProvider>
                       <ToastProvider>
                         <CartProvider>
+                          {store.isDemo && <DemoLookBar activeLook={store.look} />}
                           <div id="main-content">{children}</div>
                           <PushNotificationPrompt />
                           <OneSignalStorefrontInit />

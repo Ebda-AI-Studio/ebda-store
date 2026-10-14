@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { getLook } from '@force/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireVerifiedEmail } from '../middleware/require-verified-email';
@@ -57,6 +58,11 @@ const createStoreSchema = z.object({
   nameAr: z.string().trim().min(1).max(100).optional(),
   slug: z.string().trim().min(1).max(60),
   template: z.enum(SELF_SERVE_TEMPLATES).optional(),
+  /** A look id from the shared registry; unknown ids are refused before anything is created. */
+  lookId: z
+    .string()
+    .refine(id => getLook(id) !== undefined, { message: 'Unknown look' })
+    .optional(),
   language: z.enum(['ar', 'en']).optional(),
   /** Plan chosen at signup (marketing deep link / plan step); billed at trial end. */
   plan: z
@@ -77,7 +83,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = createStoreSchema.parse(req.body);
-      const store = await OnboardingService.createStore(
+      const { store, lookApplied } = await OnboardingService.createStore(
         { userId: req.user!.userId, isSuperAdmin: req.user!.role === 'super_admin' },
         data
       );
@@ -90,7 +96,7 @@ router.post(
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
-      res.status(201).json({ success: true, data: { store } });
+      res.status(201).json({ success: true, data: { store, lookApplied } });
     } catch (error) {
       next(error);
     }

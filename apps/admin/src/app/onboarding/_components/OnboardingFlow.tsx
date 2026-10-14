@@ -41,6 +41,7 @@ export function OnboardingFlow() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [step, setStep] = useState<StepKey>('plan');
   const [store, setStore] = useState<OnboardingStore | null>(null);
+  const [lookFailed, setLookFailed] = useState(false);
   const [productCount, setProductCount] = useState(0);
   const [plan, setPlan] = useState<PlanSelection>(DEFAULT_SELECTION);
   const [plans, setPlans] = useState<PlanOption[]>(STATIC_PLANS);
@@ -156,7 +157,8 @@ export function OnboardingFlow() {
         <StoreStep
           plan={plan}
           onBack={() => setStep('plan')}
-          onCreated={async created => {
+          onCreated={async (created, lookApplied) => {
+            setLookFailed(!lookApplied);
             const createdBilling = await fetchBilling();
             setStore(created);
             setState(prev =>
@@ -192,10 +194,11 @@ export function OnboardingFlow() {
       ) : step === 'template' ? (
         <TemplateStep
           storeId={store.id}
-          initial={store.template}
+          initial={store.look}
+          lookFailed={lookFailed}
           onBack={() => setStep('billing')}
-          onDone={template => {
-            setStore({ ...store, template });
+          onDone={look => {
+            setStore({ ...store, look });
             go(1);
           }}
         />

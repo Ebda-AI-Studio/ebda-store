@@ -304,13 +304,12 @@ export default function StoreLayoutPage() {
       // empty stage = skip the request entirely.
       const themeUpdateKeys = Object.keys(pendingThemeUpdates);
       const hasThemeUpdates = themeUpdateKeys.length > 0;
-      const themePromise =
-        hasThemeUpdates && storeInfo?.theme
-          ? apiPut(`/api/v1/stores/${storeId}/theme`, {
-              ...storeInfo.theme,
-              ...pendingThemeUpdates,
-            })
-          : Promise.resolve({ data: undefined, error: undefined } as const);
+      // `PUT /theme` shallow-merges server-side: send ONLY the staged keys.
+      // Re-sending the page-load snapshot would resurrect a key another
+      // surface (look reset, Branding) removed since this page loaded.
+      const themePromise = hasThemeUpdates
+        ? apiPut(`/api/v1/stores/${storeId}/theme`, pendingThemeUpdates)
+        : Promise.resolve({ data: undefined, error: undefined } as const);
 
       const [layoutResult, typographyResult, themeResult] = await Promise.allSettled([
         saveLayout(layout),

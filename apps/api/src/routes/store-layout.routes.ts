@@ -46,11 +46,12 @@ router.get(
       const { storeId } = req.params;
       const store = await prisma.store.findUnique({
         where: { id: storeId },
-        select: { layoutSettings: true, template: true },
+        select: { layoutSettings: true, template: true, look: true },
       });
       const layout = resolveLayoutSettings(
         store?.layoutSettings ?? {},
-        store?.template as TemplateId | undefined
+        store?.template as TemplateId | undefined,
+        store?.look
       );
       res.json({ success: true, data: { layout } });
     } catch (error) {
@@ -79,16 +80,17 @@ router.put(
 
       const current = await prisma.store.findUnique({
         where: { id: storeId },
-        select: { layoutSettings: true, template: true, slug: true, domain: true },
+        select: { layoutSettings: true, template: true, look: true, slug: true, domain: true },
       });
       const previousLayout = current?.layoutSettings ?? {};
       const currentTemplate = current?.template as TemplateId | undefined;
       const merged = resolveLayoutSettings(
         {
-          ...resolveLayoutSettings(previousLayout, currentTemplate),
+          ...resolveLayoutSettings(previousLayout, currentTemplate, current?.look),
           ...patch,
         },
-        currentTemplate
+        currentTemplate,
+        current?.look
       );
 
       // One writer for page documents (visual builder): this legacy save

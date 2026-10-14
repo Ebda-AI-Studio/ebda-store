@@ -5,7 +5,7 @@ import { intlLocale } from '@force/shared';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { useStoreUrl } from '../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { sectionSpacingClasses } from './section-spacing';
 import type { SectionPaddingMaxWidthVisibility } from '@force/shared';
 
@@ -40,9 +40,10 @@ export function BlogCarousel({ posts, spacingSettings }: BlogCarouselProps) {
   const { isRtl } = useLanguage();
   const numerals = useStoreNumerals();
   const storeUrl = useStoreUrl();
+  const { store } = useStore();
   if (!posts || posts.length === 0) return null;
 
-  const { wrapperClass, innerContainerClass } = sectionSpacingClasses(spacingSettings);
+  const { wrapperClass, innerContainerClass } = sectionSpacingClasses(spacingSettings, store.look);
 
   return (
     <section

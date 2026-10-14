@@ -7,7 +7,7 @@ import {
   type TemplateId,
   type StoreLocationPublic,
   DEFAULT_THEME,
-  getTemplateTheme,
+  composeStoreTheme,
   REGION,
   BRAND,
   parseStoreHost,
@@ -18,6 +18,7 @@ import { devSuffixesAllowed } from './platform-host';
 import { API_URL } from './api';
 import { decodeRouteParam } from './route-params';
 import { StoreTemporarilyUnavailableError } from './store-unavailable';
+import { applyDemoLook, DEMO_LOOK_HEADER } from './demo-look';
 
 // Re-exported so server callers have one import site for the resolver and the
 // failure it can raise. The declaration itself lives in a client-safe module
@@ -52,6 +53,10 @@ export interface ResolvedStore {
 
   // Template & Theme
   template: TemplateId;
+  /** Look id (e.g. 'qamar.atelier'); null/absent = legacy store, rendered exactly as before. */
+  look?: string | null;
+  /** The looks showroom (`stores.is_demo`): previews `?look=` and refuses checkout. */
+  isDemo?: boolean;
   theme: StoreTheme;
   // Per-store typography overrides (font family, size, color per zone
   // + a library of Google Fonts URLs / merchant-uploaded font files).
@@ -268,6 +273,18 @@ export async function getBuilderPreviewToken(): Promise<string | null> {
 }
 
 /**
+ * The demo-showroom look preview for THIS request: the base store, or (only for `isDemo` stores
+ * and only for a built look) the same store wearing the `?look=` look. Middleware sets
+ * `x-demo-look` from a validated `?look=` only (any client-sent value is stripped first); this
+ * applies it AFTER the cached fetch, per request, so the cached base store is never mutated.
+ */
+async function withDemoLookPreview(store: ResolvedStore): Promise<ResolvedStore> {
+  if (!store.isDemo) return store;
+  const raw = (await headers()).get(DEMO_LOOK_HEADER);
+  return raw ? applyDemoLook(store, raw) : store;
+}
+
+/**
  * Check if running on platform domain
  */
 export async function isPlatformDomain(): Promise<boolean> {
@@ -380,7 +397,6 @@ async function fetchStoreByDomain(
       : undefined;
 
     // Merge theme with template defaults
-    const templateTheme = getTemplateTheme(storeData.template || 'modern');
     const customTheme = typeof storeData.theme === 'object' ? storeData.theme : {};
 
     return {
@@ -398,7 +414,13 @@ async function fetchStoreByDomain(
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
-      theme: { ...templateTheme, ...customTheme },
+      look: storeData.look ?? null,
+      isDemo: storeData.isDemo === true,
+      theme: composeStoreTheme({
+        template: storeData.template || 'modern',
+        look: storeData.look,
+        theme: customTheme,
+      }),
       socialLinks: typeof storeData.socialLinks === 'object' ? storeData.socialLinks : {},
       email: storeData.email,
       phone: storeData.phone,
@@ -550,7 +572,6 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
     const disabledCmsSlugs: string[] | undefined = Array.isArray(data.data.disabledCmsSlugs)
       ? data.data.disabledCmsSlugs.filter((s: unknown): s is string => typeof s === 'string')
       : undefined;
-    const templateTheme = getTemplateTheme(storeData.template || 'modern');
     const customTheme = typeof storeData.theme === 'object' ? storeData.theme : {};
 
     return {
@@ -568,7 +589,13 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
-      theme: { ...templateTheme, ...customTheme },
+      look: storeData.look ?? null,
+      isDemo: storeData.isDemo === true,
+      theme: composeStoreTheme({
+        template: storeData.template || 'modern',
+        look: storeData.look,
+        theme: customTheme,
+      }),
       socialLinks: typeof storeData.socialLinks === 'object' ? storeData.socialLinks : {},
       email: storeData.email,
       phone: storeData.phone,
@@ -696,14 +723,14 @@ export async function resolveStoreBySlug(slug: string): Promise<ResolvedStore | 
  *
  * There is no path-slug or cookie identifier any more.
  */
-export async function getStore(): Promise<ResolvedStore> {
+export async function getStore(opts: { demoPreview?: boolean } = {}): Promise<ResolvedStore> {
   const domain = await getStoreDomain();
   if (domain) {
     const builderToken = await getBuilderPreviewToken();
     const { store, transient } = await lenientResolve(() =>
       resolveStoreByDomain(domain, builderToken)
     );
-    if (store) return store;
+    if (store) return opts.demoPreview === false ? store : withDemoLookPreview(store);
     return transient ? TRANSIENTLY_UNRESOLVED_STORE : DEFAULT_STORE;
   }
 
@@ -783,7 +810,7 @@ export async function getStoreOrNotFound(): Promise<ResolvedStore> {
   if (domain) {
     const store = await resolveStoreByDomain(domain, await getBuilderPreviewToken());
     if (!store) notFound();
-    return store;
+    return withDemoLookPreview(store);
   }
 
   // No store identifier: a platform host (the apex, a preview host). A platform
@@ -884,7 +911,6 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
     }
 
     const storeData = data.data.store;
-    const templateTheme = getTemplateTheme(storeData.template || 'modern');
     const customTheme = typeof storeData.theme === 'object' ? storeData.theme : {};
 
     return {
@@ -902,7 +928,13 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
-      theme: { ...templateTheme, ...customTheme },
+      look: storeData.look ?? null,
+      isDemo: storeData.isDemo === true,
+      theme: composeStoreTheme({
+        template: storeData.template || 'modern',
+        look: storeData.look,
+        theme: customTheme,
+      }),
       socialLinks: typeof storeData.socialLinks === 'object' ? storeData.socialLinks : {},
       email: storeData.email,
       phone: storeData.phone,

@@ -120,7 +120,7 @@ export default async function StoreLayout({
 
   // Theme CSS injection — shared builder with the legacy layout (see
   // lib/theme-css.ts) so both trees paint an identical theme.
-  const themeStyleTag = buildThemeStyleTag(store.theme);
+  const themeStyleTag = buildThemeStyleTag(store.theme, store.look);
   // Per-zone typography overrides — shared emitter with the legacy layout's
   // draft-preview path (lib/emit-zone-css.ts). Track-A has no draft concept
   // (preview bypasses this tree entirely), so this always reflects the

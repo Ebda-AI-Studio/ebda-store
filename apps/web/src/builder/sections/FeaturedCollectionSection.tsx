@@ -59,7 +59,7 @@ export function FeaturedCollectionSection({
   const pick = (en?: string, a?: string) => (ar ? a || en : en || a) || '';
   const edit = (key: string): Record<string, string> | undefined =>
     editorMode ? { 'data-builder-setting': ar ? `${key}Ar` : key } : undefined;
-  const spacing = sectionSpacingClasses(settings);
+  const spacing = sectionSpacingClasses(settings, store.look);
   if (products.length === 0) return null;
   const cols = settings.columns ?? 4;
   const button = pick(settings.buttonText, settings.buttonTextAr);

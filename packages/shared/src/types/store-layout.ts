@@ -16,6 +16,7 @@
 import type { LegacyHomeSectionKey } from '../builder/section-keys';
 import type { TemplateId } from './store-theme';
 import { getTemplateBaseline } from './template-baselines';
+import { getLook } from '../looks/registry';
 
 export type HeroMode = 'single' | 'slider';
 
@@ -1129,6 +1130,27 @@ export const DEFAULT_LAYOUT_SETTINGS: StoreLayoutSettings = {
 };
 
 /**
+ * A layout baseline minus the product-card keys that would pick an image ratio
+ * (`cardShape` carries an aspect, `cardAspect` is one) on the two product carousels and
+ * `productCardDefaults`. Used for look stores only: there the look's `--image-ratio` is the
+ * default card ratio, and a skin baseline value would beat it on every card.
+ */
+function withoutBaselineCardRatio(base: StoreLayoutSettings): StoreLayoutSettings {
+  const strip = <T extends object>(section: T): T => {
+    const rest = { ...section } as T & { cardShape?: unknown; cardAspect?: unknown };
+    delete rest.cardShape;
+    delete rest.cardAspect;
+    return rest;
+  };
+  return {
+    ...base,
+    newArrivals: strip(base.newArrivals),
+    bestSellers: strip(base.bestSellers),
+    ...(base.productCardDefaults ? { productCardDefaults: strip(base.productCardDefaults) } : {}),
+  };
+}
+
+/**
  * Merge a partial / unknown blob from JSONB with the packaged defaults (or
  * the per-template baseline when `templateId` is supplied).
  *
@@ -1138,9 +1160,14 @@ export const DEFAULT_LAYOUT_SETTINGS: StoreLayoutSettings = {
  */
 export function resolveLayoutSettings(
   input: unknown,
-  templateId?: TemplateId
+  templateId?: TemplateId,
+  /** The store's look id. A registered look owns the DEFAULT product-card image ratio
+   *  (`--image-ratio`, Ruling LOOKS-15), so the skin baseline's product-card shape and
+   *  aspect are left out; anything the merchant saved still wins. Null/unknown = legacy. */
+  look?: string | null
 ): StoreLayoutSettings {
-  const base = templateId ? getTemplateBaseline(templateId) : DEFAULT_LAYOUT_SETTINGS;
+  const templateBase = templateId ? getTemplateBaseline(templateId) : DEFAULT_LAYOUT_SETTINGS;
+  const base = getLook(look) ? withoutBaselineCardRatio(templateBase) : templateBase;
   if (!input || typeof input !== 'object') return base;
   const raw = input as Partial<StoreLayoutSettings>;
 

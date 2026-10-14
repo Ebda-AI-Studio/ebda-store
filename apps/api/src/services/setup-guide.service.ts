@@ -14,6 +14,7 @@
  */
 import { prisma, withStore } from '@force/database';
 import {
+  getLook,
   SETUP_GUIDE_ITEMS,
   isSetupGuideKey,
   type SetupGuideKey,
@@ -44,7 +45,7 @@ export class SetupGuideService {
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
-        select: { logo: true, theme: true, domain: true, settings: true },
+        select: { logo: true, theme: true, look: true, domain: true, settings: true },
       })
     );
     if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
@@ -61,7 +62,8 @@ export class SetupGuideService {
 
     const fromData: Record<SetupGuideKey, boolean> = {
       add_product: products > 0,
-      brand: !!store.logo || hasBrandColor(store.theme),
+      // A look IS a brand palette: a look store has its colours without storing any (LOOKS-14).
+      brand: !!store.logo || !!getLook(store.look) || hasBrandColor(store.theme),
       shipping: zones > 0,
       // COD is on by default, so "enabled" alone proves nothing: payment is
       // done when the merchant confirmed it (onboarding step / explicit tick)

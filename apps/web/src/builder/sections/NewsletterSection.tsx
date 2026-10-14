@@ -48,7 +48,7 @@ export function NewsletterSection({
   const pick = (en?: string, arv?: string) => (ar ? arv || en : en || arv) || '';
   const [email, setEmail] = useState('');
   const [state, setState] = useState<'idle' | 'busy' | 'done' | 'invalid' | 'error'>('idle');
-  const spacing = sectionSpacingClasses(settings);
+  const spacing = sectionSpacingClasses(settings, store.look);
   const edit = (key: string) =>
     editorMode ? { 'data-builder-setting': ar ? `${key}Ar` : key } : {};
 

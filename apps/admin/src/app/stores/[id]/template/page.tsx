@@ -6,122 +6,50 @@ import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { AdminSkeletonDetail } from '../../../../components/AdminSkeleton';
 import { apiGet, apiPut } from '../../../../lib/api';
-import { useToast } from '@force/ui';
+import { useLocale } from 'next-intl';
+import { getLook, type LookId } from '@force/shared';
 import { useT } from '@/i18n/useT';
+import { LookPicker } from '../../../../components/looks/LookPicker';
+import {
+  LookSwitchDialog,
+  type LookDesignChoice,
+} from '../../../../components/looks/LookSwitchDialog';
 
-type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' | 'dahab';
-
-interface Template {
-  id: TemplateId;
-  name: string;
-  nameAr: string;
-  description: string;
-  descriptionAr: string;
-  tags: string[];
-  bestFor: string;
-  previewColor: string;
-}
-
-const templates: Template[] = [
-  {
-    id: 'modern',
-    name: 'Modern',
-    nameAr: 'عصري',
-    description:
-      'Clean lines, bold accents, and contemporary feel. Perfect for tech and lifestyle brands.',
-    descriptionAr: 'خطوط نظيفة ولمسات جريئة وشعور معاصر. مثالي لماركات التكنولوجيا ونمط الحياة.',
-    tags: ['Tech', 'Lifestyle', 'Gadgets'],
-    bestFor: 'Tech, lifestyle, and modern brands',
-    previewColor: 'from-primary to-primary/90',
-  },
-  {
-    id: 'classic',
-    name: 'Classic',
-    nameAr: 'كلاسيكي',
-    description:
-      'Elegant serif fonts and timeless sophistication. Ideal for luxury and heritage brands.',
-    descriptionAr: 'خطوط أنيقة وتطور خالد. مثالي للعلامات الفاخرة والتراثية.',
-    tags: ['Luxury', 'Heritage', 'Traditional'],
-    bestFor: 'Luxury, heritage, and established brands',
-    previewColor: 'from-amber-700 to-amber-800',
-  },
-  {
-    id: 'minimal',
-    name: 'Minimal',
-    nameAr: 'بسيط',
-    description:
-      'Maximum whitespace, product-focused design. Great for photography and art galleries.',
-    descriptionAr: 'مساحة بيضاء واسعة وتصميم يركز على المنتج. رائع للتصوير ومعارض الفن.',
-    tags: ['Photography', 'Art', 'Design'],
-    bestFor: 'Photography, art galleries, and design studios',
-    previewColor: 'from-neutral-800 to-neutral-900',
-  },
-  {
-    id: 'bold',
-    name: 'Bold',
-    nameAr: 'جريء',
-    description:
-      'Vibrant colors, dynamic layouts, energetic feel. Perfect for youth and sports brands.',
-    descriptionAr:
-      'ألوان نابضة وتخطيطات ديناميكية وشعور بالطاقة. مثالي للعلامات الشبابية والرياضية.',
-    tags: ['Youth', 'Sports', 'Streetwear'],
-    bestFor: 'Youth brands, sports, and streetwear',
-    previewColor: 'from-purple-500 to-purple-600',
-  },
-  {
-    id: 'elegant',
-    name: 'Elegant',
-    nameAr: 'أنيق',
-    description:
-      'Fashion-forward design with refined aesthetics. Best for fashion and beauty brands.',
-    descriptionAr: 'تصميم عصري بجماليات راقية. الأفضل لماركات الأزياء والجمال.',
-    tags: ['Fashion', 'Jewelry', 'Beauty'],
-    bestFor: 'Fashion, jewelry, and beauty brands',
-    previewColor: 'from-rose-500 to-rose-600',
-  },
-  {
-    // Builder Phase 3 pilot. Switching the skin does not rewrite the store's
-    // colours (Ruling DAHAB-3): the gold-on-night palette comes with the
-    // Dahab family preset, not with this switch.
-    id: 'dahab',
-    name: 'Dahab',
-    nameAr: 'دهب',
-    description: 'Gold on night. Made for jewellery, handmade pieces and premium gifts.',
-    descriptionAr: 'دهب على ليل. معمول للمجوهرات والمشغولات اليدوية والهدايا الراقية.',
-    tags: ['Jewellery', 'Handmade', 'Gifts'],
-    bestFor: 'Jewellery, handmade and premium gifts',
-    previewColor: 'from-[#0E1119] to-[#C9A35E]',
-  },
-];
+const SKIN_IDS = ['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab'];
 
 export default function StoreTemplatePage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('template.page');
-  const toast = useToast();
 
-  const [store, setStore] = useState<{ name: string; template: TemplateId } | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>('modern');
+  const skinName = (id: string) => (SKIN_IDS.includes(id) ? t(`skins.${id}`) : id);
+  const locale = useLocale() === 'ar' ? 'ar' : 'en';
+  const [store, setStore] = useState<{
+    name: string;
+    template: string;
+    look: LookId | null;
+  } | null>(null);
+  const [pending, setPending] = useState<LookId | null>(null);
+  const [result, setResult] = useState<'draft' | 'published' | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState<'invalid' | 'generic' | null>(null);
 
-  // Inlined the sibling fetchStore into the effect so the dependency list
-  // stays honest (only storeId). Cancellation flag prevents setState after
-  // unmount if the user navigates away mid-request.
+  // Cancellation flag prevents setState after unmount if the user navigates away mid-request.
   useEffect(() => {
     let cancelled = false;
     async function fetchStore() {
       try {
-        const { data } = await apiGet<{ store: { name: string; template?: TemplateId } }>(
-          `/api/v1/stores/${storeId}`
-        );
+        const { data } = await apiGet<{
+          store: { name: string; template?: string; look?: string | null };
+        }>(`/api/v1/stores/${storeId}`);
         if (cancelled) return;
         if (data?.store) {
           setStore({
             name: data.store.name,
             template: data.store.template || 'modern',
+            look: getLook(data.store.look)?.id ?? null,
           });
-          setSelectedTemplate(data.store.template || 'modern');
         }
       } catch (error) {
         console.error('Failed to fetch store:', error);
@@ -135,27 +63,26 @@ export default function StoreTemplatePage() {
     };
   }, [storeId]);
 
-  async function handleSave() {
+  async function handleConfirm(design: LookDesignChoice) {
+    if (!pending) return;
     setIsSaving(true);
+    setSaveFailed(null);
     try {
-      const { error } = await apiPut(`/api/v1/stores/${storeId}/template`, {
-        template: selectedTemplate,
-      });
-
-      if (error) {
-        toast.error(t('saveError'), error.message || t('saveErrorBody'));
+      const { data, error } = await apiPut<{
+        look: LookId;
+        template: string;
+        builder: 'published' | 'draft';
+      }>(`/api/v1/stores/${storeId}/look`, { lookId: pending, design });
+      if (error || !data) {
+        setSaveFailed(error?.code === 'INVALID_LOOK' ? 'invalid' : 'generic');
         return;
       }
-
-      // Stay on the template page after saving — consistent with every other
-      // settings page (success toast, no navigation). Reflect the saved template
-      // locally so the "Current" badge + the disabled-when-unchanged Save button
-      // update without a reload / kicking the merchant out of the page.
-      setStore(prev => (prev ? { ...prev, template: selectedTemplate } : prev));
-      toast.success(t('saveSuccess'), t('saveSuccessBody'));
+      setStore(prev => (prev ? { ...prev, look: data.look, template: data.template } : prev));
+      setResult(data.builder);
+      setPending(null);
     } catch (err) {
-      console.error('Failed to update template:', err);
-      toast.error(t('saveError'), t('saveErrorBody'));
+      console.error('Failed to switch look:', err);
+      setSaveFailed('generic');
     } finally {
       setIsSaving(false);
     }
@@ -187,106 +114,67 @@ export default function StoreTemplatePage() {
       title={t('title')}
       subtitle={t('subtitleWithStore', { storeName: store.name })}
       actions={
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/stores/${storeId}`}
-            className="px-4 py-2 border border-border rounded-lg hover:bg-muted"
-          >
-            {t('cancel')}
-          </Link>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isSaving || selectedTemplate === store.template}
-            className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
-          >
-            {isSaving ? t('saving') : t('apply')}
-          </button>
-        </div>
+        <Link
+          href={`/stores/${storeId}`}
+          className="inline-flex min-h-11 items-center px-4 py-2 border border-border rounded-lg hover:bg-muted"
+        >
+          {t('cancel')}
+        </Link>
       }
     >
       <div className="space-y-6">
-        {/* Templates Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {templates.map(template => {
-            const isSelected = selectedTemplate === template.id;
-            const isCurrent = store.template === template.id;
+        {!store.look && (
+          <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm" role="note">
+            <p data-testid="legacy-skin" className="font-medium text-foreground">
+              {t('legacySkin', { skin: skinName(store.template) })}
+            </p>
+            <p className="mt-1 text-muted-foreground">{t('legacyNote')}</p>
+          </div>
+        )}
 
-            return (
-              <button
-                type="button"
-                key={template.id}
-                onClick={() => setSelectedTemplate(template.id)}
-                className={`relative text-start bg-card rounded-2xl border-2 overflow-hidden transition-all hover:shadow-lg ${
-                  isSelected
-                    ? 'border-primary ring-4 ring-primary/20'
-                    : 'border-border hover:border-border'
-                }`}
+        {result && (
+          <div
+            role="status"
+            className="rounded-xl border border-success/30 bg-success/5 p-4 text-sm"
+          >
+            <p className="font-medium text-foreground">
+              {result === 'draft' ? t('draftReady') : t('published')}
+            </p>
+            {result === 'draft' && (
+              <Link
+                href={`/stores/${storeId}/builder`}
+                className="mt-2 inline-flex min-h-11 items-center text-primary-ink underline"
               >
-                {/* Preview */}
-                <div
-                  className={`h-48 bg-gradient-to-br ${template.previewColor} p-6 flex flex-col justify-between`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="text-white">
-                      <h3 className="text-2xl font-bold">{template.name}</h3>
-                      <p className="text-white/70 text-sm mt-1">{template.nameAr}</p>
-                    </div>
-                    {isCurrent && (
-                      <span className="bg-white/20 text-white text-xs px-2 py-1 rounded-full">
-                        {t('current')}
-                      </span>
-                    )}
-                  </div>
+                {t('openBuilder')}
+              </Link>
+            )}
+          </div>
+        )}
 
-                  {/* Mock Preview Elements */}
-                  <div className="flex gap-2">
-                    <div className="w-12 h-12 bg-white/20 rounded-lg"></div>
-                    <div className="w-12 h-12 bg-white/20 rounded-lg"></div>
-                    <div className="w-12 h-12 bg-white/20 rounded-lg"></div>
-                  </div>
-                </div>
+        {saveFailed && (
+          <p role="alert" className="text-sm text-destructive-ink">
+            {saveFailed === 'invalid' ? t('invalidLook') : t('saveError')}
+          </p>
+        )}
 
-                {/* Info */}
-                <div className="p-4">
-                  <p className="text-muted-foreground text-sm mb-3">{template.description}</p>
+        <LookPicker
+          value={store.look}
+          locale={locale}
+          onChange={id => {
+            setSaveFailed(null);
+            setResult(null);
+            setPending(id);
+          }}
+        />
 
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {template.tags.map(tag => (
-                      <span
-                        key={tag}
-                        className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">{template.bestFor}</p>
-                </div>
-
-                {/* Selection Indicator */}
-                {isSelected && (
-                  <div className="absolute top-4 end-4 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow">
-                    <svg
-                      className="w-4 h-4 text-primary"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        {pending && (
+          <LookSwitchDialog
+            lookName={locale === 'ar' ? getLook(pending)!.name.ar : getLook(pending)!.name.en}
+            saving={isSaving}
+            onCancel={() => setPending(null)}
+            onConfirm={handleConfirm}
+          />
+        )}
 
         {/* Help Text */}
         <div className="bg-info/5 border border-info/30 rounded-xl p-4">
