@@ -45,3 +45,12 @@ describe('composeStoreTheme', () => {
     ).toEqual(['accentColor']);
   });
 });
+
+describe('lookTheme key guard', () => {
+  it('every look sets exactly LOOK_TOKEN_KEYS (no more, no fewer)', async () => {
+    const { LOOKS, LOOK_TOKEN_KEYS } = await import('@force/shared');
+    for (const l of LOOKS) {
+      expect(Object.keys(lookTheme(l)).sort(), l.id).toEqual([...LOOK_TOKEN_KEYS].sort());
+    }
+  });
+});

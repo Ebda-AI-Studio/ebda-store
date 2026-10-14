@@ -52,6 +52,8 @@ export interface ResolvedStore {
 
   // Template & Theme
   template: TemplateId;
+  /** Look id (e.g. 'qamar.atelier'); null/absent = legacy store, rendered exactly as before. */
+  look?: string | null;
   theme: StoreTheme;
   // Per-store typography overrides (font family, size, color per zone
   // + a library of Google Fonts URLs / merchant-uploaded font files).
@@ -397,6 +399,7 @@ async function fetchStoreByDomain(
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
+      look: storeData.look ?? null,
       theme: composeStoreTheme({
         template: storeData.template || 'modern',
         look: storeData.look,
@@ -570,6 +573,7 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
+      look: storeData.look ?? null,
       theme: composeStoreTheme({
         template: storeData.template || 'modern',
         look: storeData.look,
@@ -907,6 +911,7 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
+      look: storeData.look ?? null,
       theme: composeStoreTheme({
         template: storeData.template || 'modern',
         look: storeData.look,

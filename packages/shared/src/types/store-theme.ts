@@ -926,6 +926,26 @@ export function getProductCardTextSizes(cardSize: ProductCardSize | undefined): 
   }
 }
 
+export const LOOK_SPACE_UNIT = { compact: '0.875', regular: '1', airy: '1.25' } as const;
+export const LOOK_MOTION_DURATION = { none: '0ms', subtle: '180ms', expressive: '280ms' } as const;
+
+/** Look-only CSS variables; empty for a theme with none of the look keys. */
+export function lookCssVars(theme: Partial<StoreTheme>): Record<string, string> {
+  const v: Record<string, string> = {};
+  // headingFont/bodyFont are also accepted by the merchant theme schema, so a
+  // legacy store may carry them without ever rendering them. Only a look theme
+  // (always carries `density`) turns them into variables (Ruling R1).
+  const isLook = theme.density !== undefined;
+  if (isLook && theme.headingFont)
+    v['--font-display'] = `"${theme.headingFont}", var(--font-arabic), var(--font-sans)`;
+  if (isLook && theme.bodyFont)
+    v['--font-body'] = `"${theme.bodyFont}", var(--font-arabic), var(--font-sans)`;
+  if (theme.density) v['--space-unit'] = LOOK_SPACE_UNIT[theme.density];
+  if (theme.imageRatio) v['--image-ratio'] = theme.imageRatio.replace('/', ' / ');
+  if (theme.motion) v['--motion-duration'] = LOOK_MOTION_DURATION[theme.motion];
+  return v;
+}
+
 /**
  * Convert theme to CSS custom properties
  */
@@ -996,6 +1016,9 @@ export function themeToCssVars(theme: StoreTheme): Record<string, string> {
     if (NON_COLOR_VARS.has(key)) continue;
     vars[key] = colorToHslTriplet(vars[key], theme);
   }
+  // Looks (Phase S): emitted ONLY when the theme carries the key, so legacy
+  // stores (no look) produce the exact same variable set as before (Ruling R1).
+  Object.assign(vars, lookCssVars(theme));
   // Issue 2349 — status-message inks, measured on this store's own surfaces
   // (after normalisation, so they read the same triplets the page paints).
   // Legacy stores get `var(--<role>)`: identical to the bare role colour.

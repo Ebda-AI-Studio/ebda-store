@@ -29,6 +29,7 @@ import { CookiePreferencesModal } from '../components/CookiePreferencesModal';
 import { CookiePreferencesLink } from '../components/CookiePreferencesLink';
 import { type MarketingPixels, BRAND, resolveDefaultLanguage } from '@force/shared';
 import { buildThemeStyleTag } from '../lib/theme-css';
+import { lookHead } from '../lib/look-head';
 import { jsonLdScriptContent } from '../lib/json-ld-script';
 import '../styles/globals.css';
 
@@ -499,7 +500,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // duplicate <style> blocks. All inputs above pass through
   // sanitizeFontValue/sanitizeUrl to prevent CSS-injection escapes.
   const typographyCss = [...fontFaceRules, ...zoneRules].join('\n');
-  const combinedStyleTag = [themeStyleTag, typographyCss].filter(Boolean).join('\n');
+  const look = lookHead(store.look);
+  const combinedStyleTag = [themeStyleTag, look?.latinCss, typographyCss]
+    .filter(Boolean)
+    .join('\n');
 
   return (
     <html lang={lang} dir={dir} suppressHydrationWarning>
@@ -508,6 +512,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdScriptContent(orgJsonLd) }}
         />
+        {look && (
+          <>
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+            <link rel="stylesheet" href={look.fontsHref} />
+          </>
+        )}
         {googleFontUrls.map(url => (
           <link key={url} rel="stylesheet" href={url} />
         ))}
@@ -543,6 +553,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         // itself loads on the client). Only Dahab sets it: other stores' markup
         // is unchanged.
         data-pack={store.template === 'dahab' ? 'dahab' : undefined}
+        // Looks (Phase S): scopes every look rule in globals.css; absent for legacy stores.
+        data-look={look?.dataLook}
       >
         {/* Reset scroll to top on every route change — the body is the scroll
             container (overflow-x-hidden), so Next's window-targeted scroll

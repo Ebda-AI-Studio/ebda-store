@@ -69,6 +69,15 @@ export function sanitizeCssValue(value: string, fallback = '0'): string {
 
 const NON_COLOR_VARS = new Set(['--radius', '--font-family']);
 
+/** Look (Phase S) variables: non-colour, each with its own strict allow-list. */
+const LOOK_VAR_PATTERNS: Record<string, RegExp> = {
+  '--font-display': /^"[A-Za-z0-9 ]{1,60}", var\(--font-arabic\), var\(--font-sans\)$/,
+  '--font-body': /^"[A-Za-z0-9 ]{1,60}", var\(--font-arabic\), var\(--font-sans\)$/,
+  '--space-unit': /^\d+(?:\.\d+)?$/,
+  '--image-ratio': /^\d+ \/ \d+$/,
+  '--motion-duration': /^\d+ms$/,
+};
+
 /**
  * Builds the `:root { --var: value; ... }` style-tag body from a store's
  * theme, sanitizing every value. Returns `''` when there's no theme to emit.
@@ -85,11 +94,16 @@ export function buildThemeStyleTag(
     .map(([k, v]) => {
       // Issue 2349: a legacy store's ink is exactly `var(--<role>)` — the one
       // non-colour value an `-ink` var may carry (anchored allow-list).
-      const sanitized = NON_COLOR_VARS.has(k)
-        ? sanitizeCssValue(v)
-        : k.endsWith('-ink') && LEGACY_STATUS_INK_VALUE.test(v)
-          ? v
-          : sanitizeThemeColor(v);
+      const sanitized =
+        k in LOOK_VAR_PATTERNS
+          ? LOOK_VAR_PATTERNS[k].test(v)
+            ? v
+            : '0'
+          : NON_COLOR_VARS.has(k)
+            ? sanitizeCssValue(v)
+            : k.endsWith('-ink') && LEGACY_STATUS_INK_VALUE.test(v)
+              ? v
+              : sanitizeThemeColor(v);
       return `${k}: ${sanitized}`;
     })
     .join('; ')} }`;

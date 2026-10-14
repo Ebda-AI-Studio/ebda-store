@@ -1167,3 +1167,36 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
 [data-pack='dahab'] [data-section='newsletter'] > div {
   max-width: 38rem;
 }
+
+/* ==========================================================================
+   Looks (Phase S). EVERY rule here is scoped under [data-look], which the
+   root layout sets on <body> only for stores with a valid look. Legacy
+   stores render exactly as before. Vars come from themeToCssVars +
+   lookHead(): --font-display/--font-body/--font-latin/--space-unit/
+   --image-ratio/--motion-duration.
+   ========================================================================== */
+[data-look] {
+  font-family: var(--font-body, var(--font-arabic), var(--font-sans));
+}
+[data-look] h1,
+[data-look] h2,
+[data-look] h3,
+[data-look] .font-display {
+  font-family: var(--font-display);
+}
+/* Product card image wrapper (PecannbeeProductCard: first div inside the group/img link). */
+[data-look] .group\/img > div {
+  aspect-ratio: var(--image-ratio, auto);
+}
+[data-look] [data-section] {
+  padding-block: calc(var(--space-unit, 1) * 3rem);
+}
+[data-look] a,
+[data-look] button {
+  transition-duration: var(--motion-duration, 150ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-look] {
+    --motion-duration: 0ms;
+  }
+}

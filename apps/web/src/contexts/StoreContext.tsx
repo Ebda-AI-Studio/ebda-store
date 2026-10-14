@@ -23,6 +23,7 @@ import {
   FONT_FAMILY_MAP,
   resolveBackgroundPreset,
   deriveBrandRoles,
+  lookCssVars,
   colorToHslTriplet,
   statusInkVars,
   REGION,
@@ -35,7 +36,7 @@ import {
  * in @force/shared/src/types/store-theme.ts — keep in sync when adding
  * tokens.
  */
-function themeToCssVars(theme: StoreTheme): Record<string, string> {
+export function themeToCssVars(theme: StoreTheme): Record<string, string> {
   const bg = resolveBackgroundPreset(theme);
   const vars: Record<string, string> = {
     '--primary': theme.primaryColor,
@@ -81,6 +82,8 @@ function themeToCssVars(theme: StoreTheme): Record<string, string> {
     if (NON_COLOR_VARS.has(key)) continue;
     vars[key] = colorToHslTriplet(vars[key], theme);
   }
+  // Looks (Phase S) — MUST match the shared themeToCssVars; empty for legacy themes.
+  Object.assign(vars, lookCssVars(theme));
   // Issue 2349 — status-message inks. MUST match the shared themeToCssVars.
   Object.assign(
     vars,
