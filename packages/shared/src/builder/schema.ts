@@ -23,8 +23,10 @@
  *   responsive.
  * - Colors are hex or THEME TOKEN REFERENCES (`token:primary` …) resolved
  *   against the store theme at render time. The theme itself (colors,
- *   typography, buttons, spacing) is NOT in the document: it is the store's
- *   global theme settings (`THEME_SETTINGS_SCHEMA`).
+ *   typography, buttons, spacing) lives on the store (`stores.theme`, global
+ *   `THEME_SETTINGS_SCHEMA`); the document only carries the editor's PENDING
+ *   edits to it in the optional `theme` patch (`theme-draft.ts`), which publish
+ *   promotes to `stores.theme` and a draft never exposes publicly.
  * - Dynamic data is bound by REFERENCE only (category slug, product ids),
  *   resolved against the caller's store; price, stock and availability are
  *   NEVER stored here.
@@ -34,6 +36,7 @@
  *   document never stores a direction: the visitor's locale picks it.
  */
 import { z } from 'zod';
+import { draftThemeSchema } from './theme-draft';
 
 export const PAGE_DEFINITION_SCHEMA_VERSION = 1 as const;
 
@@ -96,6 +99,8 @@ export const pageDefinitionSchema = z
       .strict(),
     sections: z.array(sectionNodeSchema).max(BUILDER_LIMITS.maxSections),
     siteSettings: z.record(z.unknown()),
+    /** Draft/published theme PATCH (editor-managed keys only, see `theme-draft.ts`). */
+    theme: draftThemeSchema.optional(),
     legacy: z
       .object({
         /** The raw saved `sectionOrder` (kept so an unedited round trip is byte-identical). */

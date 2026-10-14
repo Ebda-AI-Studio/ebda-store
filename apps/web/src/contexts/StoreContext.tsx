@@ -429,6 +429,40 @@ export function StoreProvider({
 }
 
 /**
+ * Builder canvas only: paint the editor's PENDING theme patch (the draft's
+ * `PageDefinition.theme`) over the committed store theme, for both React
+ * consumers of `store.theme.*` and the `:root` CSS variables. The patch is
+ * never part of a public render — only `HomePageBody` mounts this, and only
+ * for a valid builder preview token.
+ */
+export function PreviewThemeOverride({
+  theme,
+  children,
+}: {
+  theme: Record<string, unknown> | undefined;
+  children: ReactNode;
+}) {
+  const ctx = useStore();
+  const value = useMemo(
+    () =>
+      theme && Object.keys(theme).length > 0
+        ? {
+            ...ctx,
+            store: { ...ctx.store, theme: { ...ctx.store.theme, ...theme } as StoreData['theme'] },
+          }
+        : ctx,
+    [ctx, theme]
+  );
+  useEffect(() => {
+    if (value === ctx) return;
+    // StoreProvider's own effect (a parent, so it runs AFTER this child's) stamps
+    // the committed theme on <html>; a microtask lands after that whole flush.
+    queueMicrotask(() => applyTheme(value.store.theme));
+  }, [value, ctx]);
+  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
+}
+
+/**
  * Hook to access store data in client components
  */
 export function useStore(): StoreContextValue {

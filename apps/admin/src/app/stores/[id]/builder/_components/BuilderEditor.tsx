@@ -21,7 +21,9 @@ import {
   BRAND,
   TEMPLATE_FAMILIES,
   applyTemplateFamily,
+  effectiveTheme,
   type ChildToParent,
+  type DraftTheme,
   type DocumentAction,
   type SectionList,
   type StoreTheme,
@@ -64,17 +66,25 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
   const [drawer, setDrawer] = useState<'start' | 'end' | null>(null);
   const [reloadKey, setReloadKey] = useState(1);
 
+  // The LIVE store (its theme is what the storefront shows). Re-read after a
+  // publish or a restore, which are the only things that change it here.
+  const refreshStore = useCallback(
+    () =>
+      apiGet<{ store: StoreInfo }>(`/api/v1/admin/stores/${storeId}`).then(r => {
+        if (r.data?.store) setStore(r.data.store);
+      }),
+    [storeId]
+  );
+
   useEffect(() => {
-    void apiGet<{ store: StoreInfo }>(`/api/v1/admin/stores/${storeId}`).then(r => {
-      if (r.data?.store) setStore(r.data.store);
-    });
+    void refreshStore();
     void apiPost<{ token: string }>(
       `/api/v1/admin/stores/${storeId}/builder/pages/home/preview-token`,
       {}
     ).then(r => {
       if (r.data?.token) setToken(r.data.token);
     });
-  }, [storeId]);
+  }, [storeId, refreshStore]);
 
   // Saved data changed (a new carousel, a new product source): reload the canvas.
   useEffect(() => {
@@ -171,8 +181,10 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
 
   const publish = async () => {
     const r = await b.publish();
-    if (r === 'ok') toastSuccess(t('published'));
-    else if (r === 'failed') toastError(t('publishFailed'));
+    if (r === 'ok') {
+      toastSuccess(t('published'));
+      void refreshStore();
+    } else if (r === 'failed') toastError(t('publishFailed'));
   };
 
   const applyFamily = (id: (typeof TEMPLATE_FAMILIES)[number]['id']) => {
@@ -253,11 +265,13 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         )}
         {tab === 'theme' && (
           <ThemeSettingsPanel
-            storeId={storeId}
-            theme={store.theme}
-            onSaved={patch => {
-              setStore(s => (s ? { ...s, theme: { ...(s.theme as StoreTheme), ...patch } } : s));
-              setReloadKey(k => k + 1);
+            theme={effectiveTheme(store.theme, b.doc.theme)}
+            onSave={patch => {
+              // Draft only: the edit rides the document (autosave API), the
+              // canvas reloads from the draft once it is saved, and the live
+              // theme changes only when Publish promotes it.
+              b.replaceDocument({ ...b.doc!, theme: { ...b.doc!.theme, ...patch } as DraftTheme });
+              return b.saveDraftNow();
             }}
           />
         )}
@@ -268,6 +282,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
             onRestored={() => {
               toastSuccess(t('restored'));
               void b.reload();
+              void refreshStore();
               setReloadKey(k => k + 1);
             }}
           />
@@ -282,7 +297,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
       doc={b.doc}
       selection={selection}
       viewport={viewport}
-      theme={store.theme}
+      theme={effectiveTheme(store.theme, b.doc.theme)}
       errors={b.errors}
       dispatch={dispatch}
     />

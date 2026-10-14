@@ -17,6 +17,7 @@ import { HomePageContent } from './HomePageContent';
 import { BuilderPreviewShell } from '../builder/preview/BuilderPreviewShell';
 import { allowedParentOrigins } from '../builder/preview/allowed-parent-origins';
 import { emitZoneCss } from '../lib/emit-zone-css';
+import { buildThemeStyleTag } from '../lib/theme-css';
 
 /**
  * Homepage body — extracted 2026-07-12 (tenant-cacheable routing, Phase 1)
@@ -482,8 +483,16 @@ export async function HomePageBody({
   // injection vectors). Same pattern + same sanitization as the existing
   // typography emitter in apps/web/src/app/layout.tsx.
   const draftStyleProp = draftStyleCss ? { __html: draftStyleCss } : null;
+  // Builder canvas: the draft's pending theme patch, as a body-level :root rule
+  // so the server-rendered first paint already shows it (it follows the head's
+  // committed-theme tag in source order). The client override in
+  // BuilderPreviewShell takes over after hydration.
+  const builderThemeCss = builderDefinition?.theme
+    ? buildThemeStyleTag({ ...(store.theme ?? {}), ...builderDefinition.theme })
+    : '';
   return (
     <>
+      {builderThemeCss && <style dangerouslySetInnerHTML={{ __html: builderThemeCss }} />}
       {/* Draft typography override — emitted when ?_layoutDraft=token is
           present AND the draft bundle includes typography. Source order
           puts this AFTER the head's committed-typography style tag, so

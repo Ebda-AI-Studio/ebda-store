@@ -25,6 +25,17 @@
  * defence in depth. Race losers fail on a row lock re-check or a unique
  * index inside a SAVEPOINT, so the request transaction survives to answer 409.
  *
+ * Theme (Ruling THEME-DRAFT-1): the editor's global theme edits are a PATCH
+ * in the document (`PageDefinition.theme`, packages/shared theme-draft.ts), so
+ * they follow the same lifecycle. A draft save never touches `stores.theme`;
+ * publish / rollback merge the patch over it inside the SAME `stores` update as
+ * the `layout_settings` back-write (one statement: atomic) and the same
+ * post-commit purge covers it. A published revision records a full snapshot of
+ * the editor-managed keys so rollback restores them; a revision without `theme`
+ * (anything published before this change, the legacy layout PUT) leaves the
+ * live theme alone. The published theme is never part of what the editor
+ * re-opens (`getPageState` strips it) — only a pending draft patch is.
+ *
  * Caches (bounded-stale class: layout/content): a publish/rollback purges
  * every layer through `bustStoreCaches` AFTER the commit
  * (`deferAfterTenantCommit`) — Redis `public:store:*` (+ generation bump),
@@ -40,6 +51,7 @@ import {
   mergeDocumentOnlySections,
   publishedDocumentAgrees,
   resolveLayoutSettings,
+  snapshotEditableTheme,
   validateDefinition,
   validatePublishReadiness,
   type BuilderIssue,
@@ -117,7 +129,7 @@ async function loadStore(storeId: string) {
   return withStore(storeId, tx =>
     tx.store.findUnique({
       where: { id: storeId },
-      select: { layoutSettings: true, template: true, slug: true, domain: true },
+      select: { layoutSettings: true, template: true, slug: true, domain: true, theme: true },
     })
   );
 }
@@ -148,16 +160,28 @@ function resolvedLayout(store: { layoutSettings: unknown; template: string | nul
   );
 }
 
+/**
+ * A published document's `theme` snapshot is already live (`stores.theme`), so
+ * the editor must not re-open it as a pending edit: a stale snapshot sent back
+ * in the next draft would overwrite later live changes to those keys.
+ */
+function withoutTheme(document: unknown): PageDefinition {
+  const rest = { ...(document as PageDefinition) };
+  delete rest.theme;
+  return rest;
+}
+
 export async function getPageState(storeId: string, pageKey: string): Promise<PageState | null> {
   const store = await loadStore(storeId);
   if (!store) return null;
   const { draft, published, head } = await loadRows(storeId, pageKey);
-  const row = draft ?? published;
   return {
     rev: head,
-    definition: row
-      ? (row.document as PageDefinition)
-      : layoutToDefinition(resolvedLayout(store), pageKey),
+    definition: draft
+      ? (draft.document as PageDefinition)
+      : published
+        ? withoutTheme(published.document)
+        : layoutToDefinition(resolvedLayout(store), pageKey),
     source: draft ? 'draft' : published ? 'published' : 'layout',
     draftRev: draft?.rev ?? null,
     publishedRev: published?.rev ?? null,
@@ -314,6 +338,21 @@ export async function saveDraft(args: {
   return { ok: true, value: { rev }, warnings: v.warnings };
 }
 
+/**
+ * Extra columns for the row publish promotes: when the draft carries a theme
+ * patch, the published document records a full snapshot of the editor-managed
+ * keys (live ⊕ patch) so rolling back to it restores exactly those keys.
+ */
+function publishedThemeData(document: unknown, liveTheme: unknown): Record<string, unknown> {
+  const doc = document as PageDefinition;
+  if (!doc.theme) return {};
+  const snapshotted = {
+    ...doc,
+    theme: snapshotEditableTheme(liveTheme as Record<string, unknown> | null, doc.theme),
+  };
+  return { document: snapshotted as unknown as object, docBytes: docBytes(snapshotted) };
+}
+
 /** Promote `row` (or a fresh row) to published inside a savepoint; archive the old one. */
 async function promote(
   storeId: string,
@@ -345,12 +384,23 @@ async function applyPublishedLayout(
   definition: PageDefinition
 ): Promise<StoreLayoutSettings> {
   const layout = definitionToLayout(definition);
-  await withStore(storeId, tx =>
-    tx.store.update({
+  const themePatch = definition.theme;
+  await withStore(storeId, async tx => {
+    // Merge the pending theme over the CURRENT live theme read in this same
+    // transaction (the Branding tab and the classic builder also write other
+    // theme keys), and write it with layout_settings in one statement.
+    const liveTheme = themePatch
+      ? ((await tx.store.findUnique({ where: { id: storeId }, select: { theme: true } }))?.theme ??
+        {})
+      : null;
+    return tx.store.update({
       where: { id: storeId },
-      data: { layoutSettings: layout as unknown as object },
-    })
-  );
+      data: {
+        layoutSettings: layout as unknown as object,
+        ...(themePatch ? { theme: { ...(liveTheme as object), ...themePatch } } : {}),
+      },
+    });
+  });
   void cleanupRemovedJsonUrls(store.layoutSettings ?? {}, layout).catch(err =>
     logger.warn({ err, storeId }, '[page-builder] r2 cleanup failed')
   );
@@ -411,7 +461,11 @@ export async function publishDraft(args: {
   const outcome = await promote(storeId, pageKey, async () => {
     const { count } = await prisma.storePageRevision.updateMany({
       where: { id: draft.id, storeId, rev: baseRev, status: 'draft' },
-      data: { status: 'published', publishedAt: new Date() },
+      data: {
+        status: 'published',
+        publishedAt: new Date(),
+        ...publishedThemeData(draft.document, store.theme),
+      },
     });
     if (count !== 1) throw new RevConflict();
   });

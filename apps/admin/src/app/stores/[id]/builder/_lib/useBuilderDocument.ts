@@ -299,6 +299,8 @@ export function useBuilderDocument(storeId: string) {
     undo,
     redo,
     replaceDocument,
+    /** Flush the pending draft save now (queued behind any in-flight write). */
+    saveDraftNow: enqueueSave,
     publish,
     takeTheirs,
     keepMine,

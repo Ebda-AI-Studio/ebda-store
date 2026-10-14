@@ -9757,10 +9757,10 @@
     },
     "theme": {
       "classicOnly": "edit in the classic page builder",
-      "saved": "Theme saved",
+      "saved": "Theme saved to your draft — publish to take it live",
       "error": "Theme not saved — try again",
       "saving": "Saving…",
-      "save": "Save theme"
+      "save": "Save to draft"
     },
     "revisions": {
       "error": "History could not be loaded.",

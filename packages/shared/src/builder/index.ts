@@ -5,6 +5,7 @@
 export * from './section-keys';
 export * from './viewports';
 export * from './schema';
+export * from './theme-draft';
 export * from './settings-schema';
 export * from './registry';
 export * from './adapter';
