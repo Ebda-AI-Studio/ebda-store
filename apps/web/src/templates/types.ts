@@ -66,6 +66,21 @@ export interface TemplateProduct {
    * lives behind the detail page.
    */
   variants?: Array<{ price?: number | null; compareAtPrice?: number | null }>;
+  /**
+   * Swatch-bearing option values only (the API listing select ships just those).
+   * Feeds `<SwatchDots>` on every card; absent/empty renders nothing.
+   */
+  options?: Array<{
+    name: string;
+    nameAr?: string | null;
+    values: Array<{
+      id?: string;
+      value: string;
+      valueAr?: string | null;
+      swatchHex?: string | null;
+      swatchImageUrl?: string | null;
+    }>;
+  }>;
 }
 
 /**

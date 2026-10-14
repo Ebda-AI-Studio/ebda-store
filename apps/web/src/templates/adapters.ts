@@ -41,6 +41,8 @@ export function toTemplateProduct(p: Product): TemplateProduct {
           compareAtPrice: typeof v.compareAtPrice === 'number' ? v.compareAtPrice : undefined,
         }))
       : undefined,
+    // Whitelist adapter: without this the card swatch dots never render.
+    options: p.options,
   };
 }
 

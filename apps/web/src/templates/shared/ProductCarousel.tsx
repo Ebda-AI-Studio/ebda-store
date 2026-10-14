@@ -35,6 +35,7 @@ import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { getDiscountBadgeText, isOnSale } from '../../lib/product-pricing';
 import { getDiscountBadgeColor } from './discount-badge';
 import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
+import { SwatchDots } from '../../components/commerce/SwatchDots';
 
 /**
  * Horizontal-scroll product strip. Card chrome + CTA pill style vary per pack:
@@ -679,6 +680,11 @@ function SharedProductCarousel({
                                   )}
                                 </div>
                               )}
+                              <SwatchDots
+                                product={product}
+                                max={5}
+                                className={styles.productCardBody ? 'justify-center' : ''}
+                              />
                             </div>
                           );
                         })()}

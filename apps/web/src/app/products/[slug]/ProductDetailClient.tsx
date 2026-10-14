@@ -840,7 +840,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     {images.map((img, index) => (
                       <div
                         key={img.id || index}
-                        className="relative h-full w-full shrink-0 snap-center"
+                        className={`relative h-full w-full shrink-0 snap-center${img.id?.startsWith('variant-') ? ' variant-image-fade' : ''}`}
                       >
                         <Image
                           src={img.url}

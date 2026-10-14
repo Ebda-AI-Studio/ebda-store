@@ -38,6 +38,7 @@ import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions'
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
+import { SwatchDots } from '../../components/commerce/SwatchDots';
 
 /**
  * Modern Template - Product Card
@@ -460,6 +461,7 @@ function ModernProductCard({
                     className={textSizes.price}
                   />
                   <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
+                  <SwatchDots product={product} max={5} className="mt-2" />
                 </div>
               )}
             </>

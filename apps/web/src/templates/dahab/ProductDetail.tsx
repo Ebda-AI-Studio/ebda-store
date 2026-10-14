@@ -129,7 +129,10 @@ function Gallery({
               key={img.id ?? i}
               type="button"
               onClick={() => setLightbox(true)}
-              className="relative aspect-[4/5] w-full shrink-0 snap-center bg-card"
+              className={cx(
+                'relative aspect-[4/5] w-full shrink-0 snap-center bg-card',
+                img.id?.startsWith('variant-') && 'variant-image-fade'
+              )}
               aria-label={t(`Open image ${i + 1} full screen`, `فتح الصورة ${i + 1} بملء الشاشة`)}
             >
               <Image
@@ -200,12 +203,16 @@ function Gallery({
           aria-label={t('Open full screen', 'فتح بملء الشاشة')}
         >
           <Image
+            key={current.id?.startsWith('variant-') ? current.id : 'main'}
             src={current.url}
             alt={current.alt || name}
             fill
             sizes="(min-width: 1024px) 50vw, 60vw"
             priority
-            className="object-cover transition-transform duration-200 ease-out motion-reduce:transition-none"
+            className={cx(
+              'object-cover transition-transform duration-200 ease-out motion-reduce:transition-none',
+              current.id?.startsWith('variant-') && 'variant-image-fade'
+            )}
             style={
               zoom
                 ? { transform: 'scale(1.9)', transformOrigin: `${zoom.x}% ${zoom.y}%` }

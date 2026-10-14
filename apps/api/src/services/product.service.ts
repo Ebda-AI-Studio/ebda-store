@@ -434,6 +434,31 @@ interface AdvancedSearchOptions {
 }
 
 /**
+ * Card/carousel swatch payload for the storefront LISTING selects (not the PDP,
+ * which returns the full option graph). Only values that carry a swatch ship,
+ * capped at 3 options x 8 values, so non-swatch stores add one empty batched
+ * query per page.
+ *
+ * CACHE CLASS: BOUNDED-stale, riding the existing product listing cache. Every
+ * option-value write already calls the product cache bust (Task 1), so a
+ * swatch edit invalidates this payload on the same path as variant writes.
+ */
+export const LISTING_SWATCH_OPTIONS_SELECT = {
+  orderBy: { position: 'asc' as const },
+  take: 3,
+  select: {
+    name: true,
+    nameAr: true,
+    values: {
+      where: { OR: [{ swatchHex: { not: null } }, { swatchImageUrl: { not: null } }] },
+      orderBy: { position: 'asc' as const },
+      take: 8,
+      select: { id: true, value: true, valueAr: true, swatchHex: true, swatchImageUrl: true },
+    },
+  },
+} satisfies Prisma.Product$optionsArgs;
+
+/**
  * Storefront-safe scalar fields for Product — the shape unauthenticated
  * visitors (public product endpoints, guest cart, and the customer's own
  * order view) are allowed to see. Deliberately excludes: `costPrice` /
@@ -1455,6 +1480,7 @@ export class ProductService {
           lowStockThreshold: true,
           images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
           categories: { include: { category: true } },
+          options: LISTING_SWATCH_OPTIONS_SELECT,
           store: { select: { id: true, name: true, slug: true } },
           variants: {
             select: {
@@ -1558,6 +1584,7 @@ export class ProductService {
         lowStockThreshold: true,
         images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
         categories: { include: { category: true } },
+        options: LISTING_SWATCH_OPTIONS_SELECT,
         store: { select: { id: true, name: true, slug: true } },
         // Variants are needed by the storefront card components to (a)
         // pick between the inline "Add to cart" and "View" CTAs, and
@@ -2168,6 +2195,7 @@ export class ProductService {
         include: {
           images: { orderBy: { position: 'asc' }, take: 2 },
           categories: { include: { category: { select: { id: true, name: true, slug: true } } } },
+          options: LISTING_SWATCH_OPTIONS_SELECT,
           reviews: {
             where: { status: 'published' },
             select: { rating: true },

@@ -6,6 +6,7 @@ import type { ProductVariant, ProductOption } from '@/lib/api';
 import { useLanguage } from '../contexts/LanguageContext';
 import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
 import { autoSelection } from '@/lib/single-variant';
+import { swatchOf } from '@ebda/shared';
 
 interface VariantSelectorProps {
   variants: ProductVariant[];
@@ -149,6 +150,9 @@ export function VariantSelector({
               return localizeOptionValue(selectedValue, found?.valueAr, isRtl);
             })()
           : null;
+        // An option with >=1 swatch value renders round swatches; values with
+        // neither hex nor image fall back to a text chip (never an empty circle).
+        const swatchOption = option.values.some(v => swatchOf(v));
         return (
           <div key={option.name}>
             <div className="flex items-center gap-2 mb-2">
@@ -164,7 +168,8 @@ export function VariantSelector({
               )}
             </div>
             <div className="flex flex-wrap gap-2">
-              {option.values.map(({ value, valueAr }) => {
+              {option.values.map(({ value, valueAr, swatchHex, swatchImageUrl }) => {
+                const sw = swatchOption ? swatchOf({ swatchHex, swatchImageUrl }) : null;
                 const isSelected = selected[option.name] === value;
                 const available = isValueAvailable(option.name, value);
                 const thumbnail = getThumbnailForValue(option.name, value);
@@ -173,6 +178,58 @@ export function VariantSelector({
                 // localised ("185 Gram" → "185 جرام"); else English.
                 const pillLabel = localizeOptionValue(value, valueAr, isRtl);
                 const metal = swatch ? metalSwatchColor(value, valueAr) : null;
+                if (sw) {
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => handleSelect(option.name, value)}
+                      disabled={!available}
+                      aria-pressed={isSelected}
+                      aria-label={pillLabel}
+                      title={!available ? t('Out of Stock', 'غير متوفر') : pillLabel}
+                      className={[
+                        'relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full before:absolute before:-inset-1 before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        isSelected
+                          ? 'ring-2 ring-foreground ring-offset-2 ring-offset-background'
+                          : 'ring-1 ring-foreground/15',
+                        available ? '' : 'cursor-not-allowed line-through opacity-50',
+                      ].join(' ')}
+                    >
+                      <span
+                        data-swatch-hex={sw.hex ?? undefined}
+                        className="block h-full w-full overflow-hidden rounded-full"
+                        style={sw.imageUrl ? undefined : { backgroundColor: sw.hex ?? undefined }}
+                      >
+                        {sw.imageUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={sw.imageUrl} alt="" className="h-full w-full object-cover" />
+                        )}
+                      </span>
+                      {!available && (
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-0 text-foreground/50"
+                        >
+                          <svg
+                            className="h-full w-full"
+                            viewBox="0 0 100 100"
+                            preserveAspectRatio="none"
+                          >
+                            <line
+                              x1="14"
+                              y1="86"
+                              x2="86"
+                              y2="14"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            />
+                          </svg>
+                        </span>
+                      )}
+                    </button>
+                  );
+                }
                 return (
                   <button
                     key={value}
@@ -188,7 +245,7 @@ export function VariantSelector({
                               ? 'border-primary text-foreground ring-1 ring-inset ring-primary'
                               : available
                                 ? 'border-border text-foreground/85 hover:border-primary/60'
-                                : 'cursor-not-allowed border-border text-muted-foreground opacity-50',
+                                : 'cursor-not-allowed border-border text-muted-foreground line-through opacity-50',
                           ].join(' ')
                         : [
                             'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition-all',
@@ -197,7 +254,7 @@ export function VariantSelector({
                               ? 'border-primary bg-primary text-white shadow-md shadow-primary/25'
                               : available
                                 ? 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted'
-                                : 'cursor-not-allowed border-border bg-muted text-muted-foreground opacity-50',
+                                : 'cursor-not-allowed border-border bg-muted text-muted-foreground line-through opacity-50',
                           ].join(' ')
                     }
                   >

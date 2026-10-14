@@ -75,7 +75,15 @@ interface ProductOption {
   /** Each value carries both the canonical English string and the Arabic
    *  translation. Storefront reads `valueAr` in isRtl mode and falls
    *  back to `value`; the matching logic always uses `value`. */
-  values: Array<{ value: string; valueAr?: string }>;
+  values: Array<{
+    id?: string;
+    value: string;
+    valueAr?: string;
+    /** `#RRGGBB` colour dot, or null/absent. */
+    swatchHex?: string | null;
+    /** https-only fabric/colour photo; wins over `swatchHex`. */
+    swatchImageUrl?: string | null;
+  }>;
 }
 
 interface ProductCategory {
