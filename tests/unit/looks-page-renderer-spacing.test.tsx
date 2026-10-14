@@ -120,3 +120,14 @@ describe('home page: unset section spacing is marked on look stores only', () =>
     });
   }
 });
+
+describe('home page: a stored look id that is not registered renders as legacy', () => {
+  it('no spacing markers, markup byte-identical to a store with no look', () => {
+    ctx.look = 'qamar.removed';
+    const unknown = renderHome('pecannbee-flow', 'A', 'modern', 'en');
+    ctx.look = null;
+    const legacy = renderHome('pecannbee-flow', 'A', 'modern', 'en');
+    expect(unknown).not.toContain('sp-top-default');
+    expect(unknown).toBe(legacy);
+  });
+});

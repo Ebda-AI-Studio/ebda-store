@@ -57,6 +57,19 @@ describe('template page (looks)', () => {
     expect(screen.getByText('legacyNote')).toBeTruthy();
   });
 
+  it('a stored look id that is not registered renders as "choose a look", without crashing', async () => {
+    storeWith('qamar.removed', 'minimal');
+    render(<StoreTemplatePage />);
+    await screen.findAllByRole('tab');
+    // Treated exactly like a legacy store: the current skin + the "pick a look" note, no look selected.
+    expect(screen.getByTestId('legacy-skin').textContent).toContain('skins.minimal');
+    expect(screen.getByText('legacyNote')).toBeTruthy();
+    for (const radio of screen.getAllByRole('radio'))
+      expect(radio.getAttribute('aria-checked')).not.toBe('true');
+    await pickTarget();
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
   it('choosing a look opens a labelled dialog with keep selected by default', async () => {
     storeWith(null);
     render(<StoreTemplatePage />);
