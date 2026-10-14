@@ -64,7 +64,8 @@ const phones = embed =>
     )
     .join('');
 
-const build = embed => `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+const build =
+  embed => `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
 <title>ebda ابدأ — ابدأ متجرك</title>
 <rect width="${W}" height="${H}" fill="${CANVAS}"/>
 <g filter="url(#sh)">${phones(embed)}</g>
@@ -76,5 +77,7 @@ ${lockup}
 </svg>
 `;
 writeFileSync(path.join(dir, 'og.svg'), build(false));
-await sharp(Buffer.from(build(true))).png({ compressionLevel: 9 }).toFile(path.join(dir, 'og.png'));
+await sharp(Buffer.from(build(true)))
+  .png({ compressionLevel: 9 })
+  .toFile(path.join(dir, 'og.png'));
 console.log('wrote og.svg og.png');
