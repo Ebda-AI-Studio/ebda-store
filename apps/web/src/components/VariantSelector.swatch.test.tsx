@@ -7,8 +7,12 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import React from 'react';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 
+let lang: 'en' | 'ar' = 'en';
 vi.mock('../contexts/LanguageContext', () => ({
-  useLanguage: () => ({ isRtl: false, t: (en: string) => en }),
+  useLanguage: () => ({
+    isRtl: lang === 'ar',
+    t: (en: string, ar: string) => (lang === 'ar' ? ar : en),
+  }),
 }));
 vi.mock('next/image', () => ({
   __esModule: true,
@@ -52,7 +56,10 @@ for (const c of ['Teal', 'Rose', 'Plain'])
         options: { Color: c, Size: s, Length: l },
       } as ProductVariant);
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  lang = 'en';
+});
 
 describe('VariantSelector swatches', () => {
   it('mixed swatch values', () => {
@@ -72,6 +79,7 @@ describe('VariantSelector swatches', () => {
     fireEvent.click(screen.getByRole('button', { name: 'M' }));
     const l56 = screen.getByRole('button', { name: '56' }) as HTMLButtonElement;
     expect(l56.disabled).toBe(true);
+    // Text chip keeps the visible strike.
     expect(l56.className).toMatch(/line-through/);
     expect((screen.getByRole('button', { name: '52' }) as HTMLButtonElement).disabled).toBe(false);
   });
@@ -80,5 +88,28 @@ describe('VariantSelector swatches', () => {
     render(<VariantSelector variants={variants} options={options} onVariantSelect={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /Teal/ }));
     expect(screen.getByText('Color:').parentElement?.textContent).toContain('Teal');
+  });
+
+  it('sold-out swatch announces itself and carries no dead line-through', () => {
+    // Teal is out of stock for every Length once Size M + Length 56 are picked.
+    const soldOut = variants.map(v => ({ ...v, inventory: v.options.Color === 'Rose' ? 0 : 5 }));
+    render(<VariantSelector variants={soldOut} options={options} onVariantSelect={() => {}} />);
+    const rose = screen.getByRole('button', { name: /Rose, Sold out/ }) as HTMLButtonElement;
+    expect(rose.disabled).toBe(true);
+    expect(rose.className).not.toMatch(/line-through/);
+    expect(rose.className).toMatch(/before:-inset-1\.5/); // 32px + 2x6px = 44px hit area
+  });
+
+  it('arabic: axis label, picked name and sold-out suffix', () => {
+    lang = 'ar';
+    const soldOut = variants.map(v => ({ ...v, inventory: v.options.Color === 'Rose' ? 0 : 5 }));
+    render(
+      <div dir="rtl">
+        <VariantSelector variants={soldOut} options={options} onVariantSelect={() => {}} />
+      </div>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'تيل' }));
+    expect(screen.getByText('اللون:').parentElement?.textContent).toContain('تيل');
+    expect(screen.getByRole('button', { name: /روز, نفدت الكمية/ })).toBeTruthy();
   });
 });

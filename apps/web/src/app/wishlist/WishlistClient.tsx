@@ -25,6 +25,7 @@ interface WishlistItem {
     badgeLabelAr?: string | null;
     images: string[];
     status: string;
+    options?: TemplateProduct['options'];
   };
 }
 
@@ -260,6 +261,7 @@ export default function WishlistClient() {
     badgeLabelAr: item.product.badgeLabelAr ?? undefined,
     images: item.product.images.map((url, i) => ({ id: `${item.id}-${i}`, url })),
     inStock: item.product.status === 'active',
+    options: item.product.options,
   }));
 
   const handleAddFromWishlist = async (productId: string) => {

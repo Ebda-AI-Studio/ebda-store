@@ -73,6 +73,8 @@ export interface TemplateProduct {
   options?: Array<{
     name: string;
     nameAr?: string | null;
+    /** Total swatch-bearing values (the row list is capped), for the card's +N. */
+    _count?: { values: number };
     values: Array<{
       id?: string;
       value: string;

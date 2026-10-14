@@ -186,14 +186,16 @@ export function VariantSelector({
                       onClick={() => handleSelect(option.name, value)}
                       disabled={!available}
                       aria-pressed={isSelected}
-                      aria-label={pillLabel}
+                      aria-label={
+                        available ? pillLabel : `${pillLabel}, ${t('Sold out', 'نفدت الكمية')}`
+                      }
                       title={!available ? t('Out of Stock', 'غير متوفر') : pillLabel}
                       className={[
-                        'relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full before:absolute before:-inset-1 before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        'relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full before:absolute before:-inset-1.5 before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                         isSelected
                           ? 'ring-2 ring-foreground ring-offset-2 ring-offset-background'
                           : 'ring-1 ring-foreground/15',
-                        available ? '' : 'cursor-not-allowed line-through opacity-50',
+                        available ? '' : 'cursor-not-allowed opacity-50',
                       ].join(' ')}
                     >
                       <span

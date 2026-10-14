@@ -14,6 +14,7 @@ import { redis } from './redis.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { cleanupRemovedImages } from './r2-cleanup.service';
+import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
 import { PUBLIC_MODEL3D_SELECT, toPublicModel3d } from './product-model.service';
 import { inngest } from '../lib/inngest/client';
 import { stampHumanEdits, enqueueRecommendationsSweepForNewProduct } from './ai-autofill.service';
@@ -432,31 +433,6 @@ interface AdvancedSearchOptions {
     | 'popular'
     | 'rating';
 }
-
-/**
- * Card/carousel swatch payload for the storefront LISTING selects (not the PDP,
- * which returns the full option graph). Only values that carry a swatch ship,
- * capped at 3 options x 8 values, so non-swatch stores add one empty batched
- * query per page.
- *
- * CACHE CLASS: BOUNDED-stale, riding the existing product listing cache. Every
- * option-value write already calls the product cache bust (Task 1), so a
- * swatch edit invalidates this payload on the same path as variant writes.
- */
-export const LISTING_SWATCH_OPTIONS_SELECT = {
-  orderBy: { position: 'asc' as const },
-  take: 3,
-  select: {
-    name: true,
-    nameAr: true,
-    values: {
-      where: { OR: [{ swatchHex: { not: null } }, { swatchImageUrl: { not: null } }] },
-      orderBy: { position: 'asc' as const },
-      take: 8,
-      select: { id: true, value: true, valueAr: true, swatchHex: true, swatchImageUrl: true },
-    },
-  },
-} satisfies Prisma.Product$optionsArgs;
 
 /**
  * Storefront-safe scalar fields for Product — the shape unauthenticated

@@ -72,6 +72,8 @@ interface ProductOption {
   name: string;
   /** Arabic axis label, e.g. `الحجم` for `Size`. */
   nameAr?: string;
+  /** Total swatch-bearing values (the row list is capped), for the card's +N. */
+  _count?: { values: number };
   /** Each value carries both the canonical English string and the Arabic
    *  translation. Storefront reads `valueAr` in isRtl mode and falls
    *  back to `value`; the matching logic always uses `value`. */

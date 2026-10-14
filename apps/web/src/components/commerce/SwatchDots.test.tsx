@@ -60,4 +60,23 @@ describe('SwatchDots', () => {
     expect(screen.getAllByTestId('swatch-dot')).toHaveLength(1);
     expect(container.querySelector('img')).not.toBeNull();
   });
+
+  it('+N counts the real total, not just the shipped rows', () => {
+    const p = {
+      options: [
+        {
+          name: 'Color',
+          _count: { values: 12 },
+          values: Array.from({ length: 8 }, (_, i) => ({
+            id: `${i}`,
+            value: `c${i}`,
+            swatchHex: '#000000',
+          })),
+        },
+      ],
+    };
+    render(<SwatchDots product={p} max={5} />);
+    expect(screen.getAllByTestId('swatch-dot')).toHaveLength(5);
+    expect(screen.getByText('+7')).toBeTruthy();
+  });
 });

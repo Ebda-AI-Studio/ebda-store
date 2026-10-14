@@ -28,6 +28,7 @@ function toTpl(p: RecommendedProduct): TemplateProduct {
     badgeLabelAr: p.badgeLabelAr ?? undefined,
     images: p.images,
     inStock: true,
+    options: p.options,
   };
 }
 
