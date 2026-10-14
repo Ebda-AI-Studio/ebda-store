@@ -14,7 +14,7 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { prisma, withRlsBypass, createPrismaClient, runWithRequestDb } from '@force/database';
-import { getLook } from '@force/shared';
+import { definitionToLayout, getLook } from '@force/shared';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import storeRoutes from '@api/routes/store.routes';
 import { tenantContext } from '@api/middleware/tenant-context';
@@ -244,6 +244,20 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     const revs = await revisions(m.storeId);
     expect(revs.filter(r => r.status === 'published')).toHaveLength(1);
     expect(revs.filter(r => r.status === 'draft')).toHaveLength(0);
+    // LOOKS-15: the published page is derived for the NEW skin + look (the seeded store is on
+    // `modern`, whose baseline sets a rounded-square product card), so no skin card shape or
+    // aspect is baked into the document and the look's image ratio is the default.
+    const doc = (
+      await prisma.storePageRevision.findFirstOrThrow({
+        where: { storeId: m.storeId, pageKey: 'home', status: 'published' },
+        select: { document: true },
+      })
+    ).document as Parameters<typeof definitionToLayout>[0];
+    const published = definitionToLayout(doc);
+    expect(published.productCardDefaults?.cardShape).toBeUndefined();
+    expect(published.productCardDefaults?.cardAspect).toBeUndefined();
+    for (const sec of doc.sections.filter(x => x.type === 'product-carousel'))
+      expect((sec.settings as Record<string, unknown>).cardShape, sec.id).toBeUndefined();
   });
 
   it('empty store whose every family section is unpublishable: stays a DRAFT, never an empty live home', async () => {

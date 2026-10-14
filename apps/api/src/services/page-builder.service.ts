@@ -67,6 +67,7 @@ import {
   type StoreLayoutSettings,
   type TemplateFamily,
   type TemplateId,
+  getLook,
 } from '@force/shared';
 import { withSavepoint } from '../lib/savepoint';
 import { readInStoreContext } from '../lib/store-scoped-read';
@@ -138,7 +139,14 @@ async function loadStore(storeId: string) {
   return withStore(storeId, tx =>
     tx.store.findUnique({
       where: { id: storeId },
-      select: { layoutSettings: true, template: true, slug: true, domain: true, theme: true },
+      select: {
+        layoutSettings: true,
+        template: true,
+        look: true,
+        slug: true,
+        domain: true,
+        theme: true,
+      },
     })
   );
 }
@@ -162,10 +170,15 @@ async function loadRows(storeId: string, pageKey: string) {
   };
 }
 
-function resolvedLayout(store: { layoutSettings: unknown; template: string | null }) {
+function resolvedLayout(store: {
+  layoutSettings: unknown;
+  template: string | null;
+  look?: string | null;
+}) {
   return resolveLayoutSettings(
     store.layoutSettings ?? {},
-    (store.template ?? undefined) as TemplateId | undefined
+    (store.template ?? undefined) as TemplateId | undefined,
+    store.look
   );
 }
 
@@ -217,7 +230,9 @@ export async function getPublishedDefinition(
   storeId: string,
   layout: StoreLayoutSettings,
   templateId: TemplateId | null,
-  pageKey = HOME_PAGE_KEY
+  pageKey = HOME_PAGE_KEY,
+  /** The store's look, so the document side resolves like `layout` did (LOOKS-15). */
+  look: string | null = null
 ): Promise<{ definition: PageDefinition; rev: number | null }> {
   // The public route may run with no tenant context (a storefront fetch by
   // path id carries no store header): enter the store's scope explicitly, or
@@ -231,7 +246,7 @@ export async function getPublishedDefinition(
   if (published) {
     const doc = published.document as unknown as PageDefinition;
     try {
-      if (publishedDocumentAgrees(doc, layout, templateId ?? undefined))
+      if (publishedDocumentAgrees(doc, layout, templateId ?? undefined, look))
         return { definition: doc, rev: published.rev };
     } catch {
       // fall through: an unreadable document renders from layout_settings
@@ -586,13 +601,26 @@ export async function applyFamilyForLook(
   storeId: string,
   family: TemplateFamily['id'],
   userId: string | null = null,
-  resetThemeKeys: readonly string[] = []
+  resetThemeKeys: readonly string[] = [],
+  /** The look being applied. The store row still holds the OLD look/template here (the builder
+   *  step runs first), so a layout-derived page is re-derived for the new skin + look: the look
+   *  owns the default card image ratio, and the old skin's card shape must not be baked into
+   *  the new document (Ruling LOOKS-15). */
+  lookId: string | null = null
 ): Promise<'published' | 'draft'> {
   const state = await getPageState(storeId, HOME_PAGE_KEY);
   if (!state) throw new AppError(404, 'NOT_FOUND', 'Store not found');
   const store = await loadStore(storeId);
   if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
-  let definition = applyTemplateFamily(state.definition, family);
+  const look = getLook(lookId);
+  const start =
+    state.source === 'layout' && look
+      ? layoutToDefinition(
+          resolveLayoutSettings(store.layoutSettings ?? {}, look.skin, look.id),
+          HOME_PAGE_KEY
+        )
+      : state.definition;
+  let definition = applyTemplateFamily(start, family);
   if (definition.theme && resetThemeKeys.length > 0) {
     const theme = { ...definition.theme } as Record<string, unknown>;
     for (const k of resetThemeKeys) delete theme[k];
