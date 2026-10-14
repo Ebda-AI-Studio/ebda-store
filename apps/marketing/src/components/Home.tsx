@@ -19,8 +19,9 @@ import { JsonLd } from './JsonLd';
 import { HeroPhone } from './HeroPhone';
 import { LooksShowcase } from './LooksShowcase';
 import { Reveal, StoryScroll } from './Motion';
-import { Ring3D } from './ring/Ring3D';
+import { Product3D } from './Product3D';
 import { WhatsApp } from './WhatsApp';
+import { FeatureVisuals } from './FeatureVisuals';
 
 function ProviderIcon({ kind }: { kind: 'cash' | 'truck' }) {
   return (
@@ -79,10 +80,10 @@ export function Home({ locale }: { locale: Locale }) {
         phoneLabel={c.story.phoneLabel}
       />
     ),
-    dahab: () => (
-      <Section id="dahab" title={c.dahab.title} className="dahab band-dark">
-        <p className="lead">{c.dahab.lead}</p>
-        <Ring3D l={c.dahab.ring} />
+    model3d: () => (
+      <Section id="model3d" title={c.model3d.title} className="model3d">
+        <p className="lead">{c.model3d.lead}</p>
+        <Product3D copy={c.model3d} locale={locale} />
       </Section>
     ),
     looks: () => (
@@ -93,6 +94,7 @@ export function Home({ locale }: { locale: Locale }) {
     ),
     features: () => (
       <Section id="features" title={c.features.title}>
+        <FeatureVisuals copy={c.features.hero} locale={locale} />
         <ul className="feature-list">
           {c.features.items.map(f => (
             <li key={f.t}>
@@ -148,6 +150,20 @@ export function Home({ locale }: { locale: Locale }) {
       <Section id="pricing" title={c.pricing.title}>
         <p className="lead">{c.pricing.lead}</p>
         <Reveal className="plans-wrap">
+          <fieldset className="plan-pick">
+            <legend>{c.pricing.pickLabel}</legend>
+            {PLANS.map(p => (
+              <Fragment key={p.id}>
+                <input
+                  type="radio"
+                  name="plan-pick"
+                  id={`pick-${p.id}`}
+                  defaultChecked={p.id === 'growth'}
+                />
+                <label htmlFor={`pick-${p.id}`}>{p.name[locale]}</label>
+              </Fragment>
+            ))}
+          </fieldset>
           <ul className="plans">
             {PLANS.map((p, i) => (
               <li
@@ -192,40 +208,46 @@ export function Home({ locale }: { locale: Locale }) {
           </ul>
         </Reveal>
         <p className="muted small">{c.pricing.note}</p>
-        <div className="compare-wrap">
-          <table className="compare">
-            <caption>{c.pricing.compareTitle}</caption>
-            <thead>
-              <tr>
-                <td />
-                {PLANS.map(p => (
-                  <th key={p.id} scope="col" data-plan={p.id}>
-                    {p.name[locale]}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {comparisonRows(locale).map(r => (
-                <tr key={r.label}>
-                  <th scope="row">{r.label}</th>
-                  {r.cells.map((v, i) => (
-                    <td key={PLANS[i].id} data-plan={PLANS[i].id}>
-                      {typeof v === 'boolean' ? (
-                        <span className={v ? 'yes' : 'no'} title={v ? c.pricing.yes : c.pricing.no}>
-                          <span aria-hidden="true">{v ? '✓' : '–'}</span>
-                          <span className="sr-only">{v ? c.pricing.yes : c.pricing.no}</span>
-                        </span>
-                      ) : (
-                        v
-                      )}
-                    </td>
+        <details className="compare-details">
+          <summary>{c.pricing.compareTitle}</summary>
+          <div className="compare-wrap">
+            <table className="compare">
+              <caption>{c.pricing.compareTitle}</caption>
+              <thead>
+                <tr>
+                  <td />
+                  {PLANS.map(p => (
+                    <th key={p.id} scope="col" data-plan={p.id}>
+                      {p.name[locale]}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {comparisonRows(locale).map(r => (
+                  <tr key={r.label}>
+                    <th scope="row">{r.label}</th>
+                    {r.cells.map((v, i) => (
+                      <td key={PLANS[i].id} data-plan={PLANS[i].id}>
+                        {typeof v === 'boolean' ? (
+                          <span
+                            className={v ? 'yes' : 'no'}
+                            title={v ? c.pricing.yes : c.pricing.no}
+                          >
+                            <span aria-hidden="true">{v ? '✓' : '–'}</span>
+                            <span className="sr-only">{v ? c.pricing.yes : c.pricing.no}</span>
+                          </span>
+                        ) : (
+                          v
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
       </Section>
     ),
     faq: () => (

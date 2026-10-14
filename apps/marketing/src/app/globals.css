@@ -17,7 +17,7 @@
   --maxw: 1160px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
-/* a deliberately dark band (the 3D stage, the footer): same names, night values */
+/* a deliberately dark band (the footer): same names, night values */
 .band-dark {
   --canvas: var(--night);
   --panel: #121415;
@@ -1066,7 +1066,223 @@ html[lang='ar'] .story h2 {
   }
 }
 
-/* ---------- features ---------- */
+/* ---------- features: three with a visual each, then a compact list ---------- */
+.fx {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 clamp(36px, 5vw, 56px);
+  display: grid;
+  gap: 20px;
+}
+@media (min-width: 900px) {
+  .fx {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+  }
+}
+.fx-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.fx-visual {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  padding: 16px;
+  display: grid;
+  background: var(--raise);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+.fx-copy {
+  padding: 22px 22px 26px;
+}
+.fx-copy h3 {
+  font-size: 1.35rem;
+  margin: 0 0 6px;
+}
+.fx-copy p {
+  margin: 0;
+  color: var(--muted);
+}
+/* the UI drawn in these visuals is the real product's shape; it is illustrative, never interactive */
+.fx-ui {
+  background: #fff;
+  color: #141414;
+  border: 1px solid #dcdede;
+  border-radius: 12px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  box-shadow: 0 10px 24px -18px rgba(18, 19, 20, 0.45);
+}
+.fx-editor {
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+.fx-editor .fx-ui {
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.fx-label {
+  margin: 0;
+  font-weight: 700;
+  color: #575c5d;
+  font-size: 0.8125rem;
+}
+.fx-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+.fx-rows li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid #dcdede;
+  border-radius: 8px;
+  background: #fafafa;
+}
+.fx-rows li:first-child {
+  border-color: #141414;
+  background: #fff;
+  font-weight: 700;
+}
+.fx-grip {
+  width: 8px;
+  height: 12px;
+  flex: none;
+  background: radial-gradient(circle, #868b8c 1.2px, transparent 1.6px) 0 0 / 4px 4px;
+}
+.fx-dots {
+  display: flex;
+  gap: 6px;
+}
+.fx-dots span {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+.fx-dots span:first-child {
+  outline: 2px solid #141414;
+  outline-offset: 2px;
+}
+.fx-preview {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #dcdede;
+  background: #fff;
+}
+.fx-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+.fx-orders {
+  align-content: center;
+  gap: 12px;
+  padding-inline: 18px;
+}
+.fx-chat {
+  padding: 12px 14px;
+  display: grid;
+  gap: 2px;
+  max-width: 17rem;
+  justify-self: start;
+  border-start-start-radius: 4px;
+}
+.fx-chat p {
+  margin: 0;
+}
+.fx-chat p:first-child {
+  font-weight: 700;
+}
+.fx-chat .fx-send {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #141414;
+  color: #fff;
+  font-weight: 600;
+}
+.fx-push {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  max-width: 17rem;
+  justify-self: end;
+  box-shadow: 0 14px 28px -16px rgba(18, 19, 20, 0.55);
+}
+.fx-push-mark {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--gold);
+}
+.fx-push strong {
+  display: block;
+}
+.fx-push span {
+  color: #575c5d;
+}
+.fx-ai {
+  align-content: center;
+}
+.fx-ai .fx-ui {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+.fx-ai-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.fx-ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #141414;
+  color: #fff;
+  font-weight: 600;
+}
+.fx-lang {
+  display: flex;
+  gap: 4px;
+  font-weight: 700;
+}
+.fx-lang span {
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: #f2f2f2;
+}
+.fx-text {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #f6f6f6;
+}
 .feature-list {
   list-style: none;
   padding: 0;
@@ -1249,6 +1465,67 @@ html[lang='ar'] .price {
 }
 .plan-annual:hover {
   color: var(--fg);
+}
+
+/* plan switcher: a native radio group drawn as a segmented control, only on phones (no JS needed) */
+.plan-pick {
+  position: relative;
+  display: none;
+  margin: 0 0 16px;
+  padding: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--panel);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+}
+.plan-pick legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.plan-pick input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.plan-pick label {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--muted);
+  cursor: pointer;
+}
+.plan-pick input:checked + label {
+  background: var(--fg);
+  color: var(--canvas);
+}
+.plan-pick input:focus-visible + label {
+  outline: 3px solid var(--fg);
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .plan-pick {
+    display: grid;
+  }
+  /* one plan card at a time; the checked radio picks it (growth is checked in the markup) */
+  .plans-wrap .plan {
+    display: none;
+  }
+  .plans-wrap:has(#pick-basic:checked) .plan[data-plan='basic'],
+  .plans-wrap:has(#pick-growth:checked) .plan[data-plan='growth'],
+  .plans-wrap:has(#pick-business:checked) .plan[data-plan='business'] {
+    display: flex;
+  }
+  .plan[data-plan='growth'] {
+    padding-block: 44px 28px;
+  }
 }
 
 /* faq */
@@ -1568,10 +1845,47 @@ html[lang='ar'] .legal-doc p {
   }
 }
 
-/* ---------- full plan comparison ---------- */
+/* ---------- full plan comparison, collapsed behind a summary ---------- */
+.compare-details {
+  margin-top: 40px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+}
+.compare-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 20px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+.compare-details > summary::-webkit-details-marker {
+  display: none;
+}
+.compare-details > summary::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-inline-end: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.2s var(--ease);
+}
+.compare-details[open] > summary::after {
+  transform: rotate(-135deg);
+}
+.compare-details[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
 .compare-wrap {
   position: relative; /* contains the absolutely positioned .sr-only labels */
-  margin-top: 56px;
+  padding: 8px 12px 12px;
   overflow-x: auto;
 }
 .compare {
@@ -1581,10 +1895,12 @@ html[lang='ar'] .legal-doc p {
   font-size: 0.98rem;
 }
 .compare caption {
-  text-align: start;
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 16px;
+  /* the summary above is the visible title; the caption stays for screen readers */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 .compare th,
 .compare td {
@@ -1657,106 +1973,368 @@ html[dir='rtl'] .not-found .lead {
   margin-bottom: 12px;
 }
 
-/* ---------- dahab: the live 3D ring on gold ---------- */
-/* the 3D stage is the page's one deliberate dark band (class band-dark on the section) */
-.dahab h2 {
-  max-width: 18ch;
+/* ---------- 3d: your product page, live (the product's real viewer inside a looks phone) ---------- */
+.m3d-wrap {
+  display: grid;
+  gap: 32px;
+  align-items: start;
 }
-.dahab .lead {
+@media (min-width: 900px) {
+  .m3d-wrap {
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 72px;
+    align-items: center;
+  }
+}
+.m3d-side .lead {
+  margin-top: 0;
+}
+.m3d-qr {
+  display: none;
+}
+/* the desktop AR hand-off: a build-time QR (no runtime service); phones get the viewer's own AR button */
+@media (hover: hover) and (pointer: fine) and (min-width: 900px) {
+  .m3d-qr {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    max-width: 440px;
+    margin-top: 32px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--panel);
+  }
+}
+.m3d-qr img {
+  flex: none;
+  width: 132px;
+  height: 132px;
+  border-radius: 8px;
+  background: #fff;
+}
+.m3d-qr h3 {
+  font-size: 1.1rem;
+  margin: 0 0 4px;
+}
+.m3d-qr p {
+  margin: 0;
   color: var(--muted);
 }
-
-.ring3d {
+.m3d-foot {
+  margin: 16px 0 0;
+}
+.m3d-stage {
+  min-width: 0;
+}
+.m3d-phone {
+  width: min(100%, 380px);
+  margin-inline: auto;
+}
+.m3d-screen {
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  min-height: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--fb), system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  /* the product's viewer is Tailwind-styled: the tokens it reads come from the look on screen */
+  --m3d-bg: var(--bg);
+  --m3d-fg: var(--ink);
+  --m3d-muted: var(--mut);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .m3d-in {
+    animation: m3d-in 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  }
+}
+@keyframes m3d-in {
+  from {
+    opacity: 0;
+  }
+}
+.m3d-hd {
   display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  align-items: center;
   justify-items: center;
-  gap: 12px;
+  height: 52px;
+  padding: 0 6px;
 }
-.ring-stage {
+.m3d-logo {
+  font-family: var(--fd), var(--fb), serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+.m3d-media {
   position: relative;
-  width: min(560px, 100%);
   aspect-ratio: 1;
-  touch-action: pan-y;
+  background: color-mix(in srgb, var(--ink) 5%, var(--bg));
 }
-.ring-poster img,
-.ring-canvas {
+.m3d-still,
+.m3d-still img {
   position: absolute;
   inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
+  object-fit: contain;
 }
-.ring-canvas {
-  cursor: grab;
-  opacity: 0;
-  transition: opacity 0.6s var(--ease);
-}
-.ring-canvas:active {
-  cursor: grabbing;
-}
-.ring-stage[data-live] .ring-canvas {
-  opacity: 1;
-}
-.ring-stage[data-live] .ring-poster {
-  opacity: 0;
-  transition: opacity 0.6s var(--ease);
-}
-.ring-hint {
-  color: var(--muted);
-}
-.ring-swatches {
-  display: grid;
-  gap: 10px;
-  justify-items: center;
-}
-.swatch-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-}
-.swatch {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+.m3d-load {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 14px;
+  width: max-content;
   min-height: 44px;
-  padding: 0 16px 0 10px;
-  border: 1px solid var(--line-strong);
+  margin-inline: auto;
+  padding: 0 20px;
+  border: 0;
   border-radius: 999px;
-  background: transparent;
-  color: var(--fg);
+  background: var(--ink);
+  color: var(--bg);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
 }
-.swatch[aria-pressed='true'] {
-  background: var(--fg);
-  color: var(--canvas);
-  border-color: var(--fg);
+.m3d-info {
+  display: grid;
+  gap: 4px;
+  padding: 16px 18px 20px;
 }
-.swatch-dot {
-  width: 22px;
-  height: 22px;
+.m3d-info h3,
+.m3d-info p {
+  margin: 0;
+}
+.m3d-name {
+  font-family: var(--fd), var(--fb), serif;
+  font-size: 1.3rem;
+  line-height: 1.4;
+  letter-spacing: normal;
+  text-wrap: wrap;
+}
+.m3d-price {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.m3d-desc {
+  color: var(--mut);
+  font-size: 0.9rem;
+}
+.m3d-opt {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+.m3d-opt-label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--mut);
+}
+.m3d-sw {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.m3d-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px 0 8px;
+  border: 1px solid color-mix(in srgb, var(--ink) 40%, var(--bg));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.m3d-swatch[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+.m3d-swatch:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+.m3d-dot {
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.25),
-    inset 0 4px 8px rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3);
 }
-[data-metal='gold'] .swatch-dot {
-  background: radial-gradient(circle at 35% 30%, #fff3c4, #e2b35a 55%, #a87a2c);
+.m3d-cta {
+  display: block;
+  margin-top: 12px;
+  padding: 11px 16px;
+  border-radius: 10px;
+  background: var(--ac);
+  color: var(--bg);
+  text-align: center;
+  font-weight: 700;
 }
-[data-metal='white'] .swatch-dot {
-  background: radial-gradient(circle at 35% 30%, #ffffff, #d4d6d6 55%, #9b9ea0);
+.m3d-credit {
+  text-wrap: balance;
+  max-width: 380px;
+  margin: 14px auto 0;
+  text-align: center;
 }
-[data-metal='rose'] .swatch-dot {
-  background: radial-gradient(circle at 35% 30%, #ffe1d4, #e19c84 55%, #a8634f);
+/* Tailwind utility classes the viewer's markup uses (packages/ui/src/model3d/ProductModelViewer.tsx),
+   scoped to the phone: marketing has no Tailwind. tests/unit/marketing-model3d.test.ts fails when the
+   viewer starts using a class that is not defined here. */
+.m3d .relative {
+  position: relative;
 }
-[data-stone='diamond'] .swatch-dot {
-  background: radial-gradient(circle at 35% 30%, #ffffff, #dfe9f2 55%, #9fb3c4);
+.m3d .absolute {
+  position: absolute;
 }
-[data-stone='emerald'] .swatch-dot {
-  background: radial-gradient(circle at 35% 30%, #9ff0c6, #1e9e62 55%, #0c5233);
+.m3d .inset-0 {
+  inset: 0;
 }
-[data-stone='ruby'] .swatch-dot {
-  background: radial-gradient(circle at 35% 30%, #ffb0c0, #c0143c 55%, #6a0a20);
+.m3d .inset-x-0 {
+  inset-inline: 0;
+}
+.m3d .top-2 {
+  top: 8px;
+}
+.m3d .bottom-3 {
+  bottom: 12px;
+}
+.m3d .end-3 {
+  inset-inline-end: 12px;
+}
+.m3d .block {
+  display: block;
+}
+.m3d .flex {
+  display: flex;
+}
+.m3d .inline-flex {
+  display: inline-flex;
+}
+.m3d .items-center {
+  align-items: center;
+}
+.m3d .justify-center {
+  justify-content: center;
+}
+.m3d .gap-1\.5 {
+  gap: 6px;
+}
+.m3d .h-full {
+  height: 100%;
+}
+.m3d .w-full {
+  width: 100%;
+}
+.m3d .h-4 {
+  height: 16px;
+}
+.m3d .w-4 {
+  width: 16px;
+}
+.m3d .h-10 {
+  height: 40px;
+}
+.m3d .touch-none {
+  touch-action: none;
+}
+.m3d .outline-none {
+  outline: 2px solid transparent;
+}
+.m3d .pointer-events-none {
+  pointer-events: none;
+}
+.m3d .object-contain {
+  object-fit: contain;
+}
+.m3d .rounded-full {
+  border-radius: 999px;
+}
+.m3d .rounded-lg {
+  border-radius: 8px;
+}
+.m3d .px-3 {
+  padding-inline: 12px;
+}
+.m3d .px-4 {
+  padding-inline: 16px;
+}
+.m3d .py-1 {
+  padding-block: 4px;
+}
+.m3d .py-1\.5 {
+  padding-block: 6px;
+}
+.m3d .text-center {
+  text-align: center;
+}
+.m3d .text-xs {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.m3d .text-sm {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+.m3d .text-\[11px\] {
+  /* nothing under 12px on this page */
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.m3d .font-medium {
+  font-weight: 600;
+}
+.m3d .text-foreground {
+  color: var(--m3d-fg);
+}
+.m3d .text-background {
+  color: var(--m3d-bg);
+}
+.m3d .text-muted-foreground {
+  color: var(--m3d-muted);
+}
+.m3d .bg-foreground {
+  background: var(--m3d-fg);
+}
+.m3d .bg-background\/85 {
+  background: color-mix(in srgb, var(--m3d-bg) 85%, transparent);
+}
+.m3d .bg-background\/90 {
+  background: color-mix(in srgb, var(--m3d-bg) 90%, transparent);
+}
+.m3d .shadow-sm {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.m3d .shadow-md {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.m3d .disabled\:opacity-60:disabled {
+  opacity: 0.6;
+}
+/* the viewer's root fills the square media slot; the canvas gets a visible focus ring (its Tailwind
+   outline-none would hide it) and, on touch screens, lets a vertical swipe scroll the page instead
+   of trapping it */
+.m3d .m3d-media > .relative {
+  position: absolute;
+  inset: 0;
+}
+.m3d canvas:focus-visible {
+  outline: 3px solid var(--m3d-fg);
+  outline-offset: -3px;
+}
+.m3d button {
+  font: inherit;
+  cursor: pointer;
+}
+@media (pointer: coarse) {
+  .m3d canvas {
+    touch-action: pan-y !important;
+  }
 }
 
 /* ---------- about page: the studio's line ---------- */

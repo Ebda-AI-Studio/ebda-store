@@ -1,8 +1,8 @@
-# Ebda AI Studio (ابدأ استوديو للذكاء الاصطناعي)
+# Ebda Store (ابدأ ستور)
 
 > Ebda Store, from Ebda AI Studio — Your doorway to business. A self-serve online store builder for sellers in Egypt; a product of Ebda AI Studio (ابدأ استوديو للذكاء الاصطناعي). Arabic-first (RTL) with English. Merchants sign up, build and run their own store; every store gets a free <slug>.ebda.app address and can attach a custom domain.
 
-Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billing saves 25%; 14-day free Growth trial; 0% commission on orders on every plan. Full plan comparison (orders, team, stores, abandoned carts, branding, API/MCP, analytics, support) is on the home page.
+Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billing saves 25%; 14-day free Growth trial; 0% commission on orders on every plan. Full plan comparison (orders, team, stores, winning back abandoned carts, removing the Ebda Store badge, running the store from an AI assistant, 3D product models, analytics, support) is on the home page.
 
 ## Pages
 - [Home (Arabic, Egyptian colloquial)](https://ebda.app/): five templates with three looks each shown in phone previews, how it works in four steps, features, payments and shipping, pricing and plan comparison, FAQ
@@ -16,6 +16,7 @@ Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billi
 
 ## Facts
 - Store design: five templates (Qamar fashion, Souq retail, Jasmine beauty, Lamma home food, Dahab jewellery), three looks each, edited in a visual page builder (colours, photos, sections). Previews on the home page are illustrative.
+- 3D: merchants upload a .glb; shoppers turn it, switch glTF colour variants and place it in their room with AR (Android Scene Viewer, iOS Quick Look). Included on every plan.
 - Payments: cash on delivery, InstaPay, and card/wallet payments through Paymob, Kashier and FawryPay.
 - Shipping: Bosta, ShipBlu, Mylerz and Aramex, or the merchant's own delivery.
 - Also: AI product descriptions and Arabic/English translation, VAT for registered merchants, a dashboard installable on the phone with order notifications, analytics, wa.me WhatsApp order buttons.

@@ -3,6 +3,7 @@ import {
   planIncludesMerchantMcp,
   type PlanLimits,
 } from '@force/shared/plan-limits';
+import { BRAND } from '@force/shared/brand';
 import type { Locale } from './site';
 
 /**
@@ -29,7 +30,7 @@ export interface Plan {
   annualMinor: number;
   tagline: Record<Locale, string>;
   limits: PlanLimits;
-  /** The four headline lines on the plan card (the full table shows everything). */
+  /** The four headline lines on the plan card, in plain words (the full table shows everything). */
   features: Record<Locale, string[]>;
 }
 
@@ -73,6 +74,12 @@ export function limitText(locale: Locale, key: keyof PlanLimits, l: PlanLimits):
   }
 }
 
+/**
+ * The four lines on a plan card, in plain words (outcomes, not feature flags). Every line is
+ * derived from the plan's real limits, so a card never promises what the plan does not include:
+ * the third line is the plan's biggest unlock (more stores, cart recovery or unlimited products),
+ * the fourth is its top perk (priority support, no badge on your store, or your own domain).
+ */
 function headline(locale: Locale, l: PlanLimits): string[] {
   const ar = locale === 'ar';
   const third =
@@ -80,22 +87,23 @@ function headline(locale: Locale, l: PlanLimits): string[] {
       ? limitText(locale, 'maxStores', l)
       : l.abandonedCartAutomation
         ? ar
-          ? 'رجّع السلات المتروكة'
-          : 'Win back abandoned carts'
+          ? 'رجّع العملاء اللي سابوا السلة'
+          : 'Win back shoppers who left their cart'
         : ar
           ? 'منتجات من غير حد'
           : 'Unlimited products';
-  const fourth = l.apiAccess
-    ? ar
-      ? 'ربط API وMCP'
-      : 'API and MCP access'
-    : l.brandingRemoval
+  const fourth =
+    l.supportTier === 'priority'
       ? ar
-        ? 'شيل «مدعوم من ابدأ ستور»'
-        : 'Remove “Powered by Ebda Store”'
-      : ar
-        ? 'دومين خاص بيك'
-        : 'Your own domain';
+        ? 'دعم بالأولوية'
+        : 'Priority support'
+      : l.brandingRemoval
+        ? ar
+          ? `شيل علامة ${BRAND.product.nameAr} من متجرك`
+          : `Remove the ${BRAND.product.nameEn} badge from your store`
+        : ar
+          ? 'دومين خاص بيك'
+          : 'Your own domain';
   return [
     limitText(locale, 'maxOrdersPerMonth', l),
     limitText(locale, 'maxStaff', l),
@@ -153,16 +161,17 @@ export function comparisonRows(locale: Locale): { label: string; cells: Cell[] }
     row(ar ? 'المتاجر' : 'Stores', p => num(p.limits.maxStores)),
     row(ar ? 'دومين خاص' : 'Custom domain', p => p.limits.customDomain),
     row(
-      ar ? 'استرجاع السلات المتروكة' : 'Abandoned cart recovery',
+      ar ? 'رجّع العملاء اللي سابوا السلة' : 'Win back shoppers who left their cart',
       p => p.limits.abandonedCartAutomation
     ),
     row(
-      ar ? 'شيل «مدعوم من ابدأ ستور»' : 'Remove “Powered by Ebda Store”',
+      ar
+        ? `شيل علامة ${BRAND.product.nameAr} من متجرك`
+        : `Remove the ${BRAND.product.nameEn} badge from your store`,
       p => p.limits.brandingRemoval
     ),
-    row(
-      ar ? 'شغّل متجرك من مساعد ذكاء اصطناعي (MCP)' : 'Run your store from an AI assistant (MCP)',
-      p => planIncludesMerchantMcp(p.id, p.limits)
+    row(ar ? 'شغّل متجرك من مساعد ذكاء اصطناعي' : 'Run your store from an AI assistant', p =>
+      planIncludesMerchantMcp(p.id, p.limits)
     ),
     // Not a plan limit: every plan includes it (Ahmad 2026-10-07; R-EBDA-COPY-12).
     row(ar ? 'موديلات 3D للمنتجات' : '3D product models', () => true),
