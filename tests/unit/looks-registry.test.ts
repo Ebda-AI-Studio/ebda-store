@@ -16,8 +16,26 @@ describe('looks registry', () => {
   });
   it('bilingual names and a bold idea on every look', () => {
     for (const l of LOOKS) {
-      expect(l.name.ar && l.name.en && l.idea.ar && l.idea.en).toBeTruthy();
+      for (const [k, v] of Object.entries({
+        'name.ar': l.name.ar,
+        'name.en': l.name.en,
+        'forWhom.ar': l.forWhom.ar,
+        'forWhom.en': l.forWhom.en,
+        'idea.ar': l.idea.ar,
+        'idea.en': l.idea.en,
+      })) {
+        expect(typeof v, `${l.id} ${k}`).toBe('string');
+        expect(v.trim().length, `${l.id} ${k}`).toBeGreaterThan(0);
+      }
     }
+  });
+  it('each template has looks lettered exactly A, B, C', () => {
+    for (const t of LOOK_TEMPLATES)
+      expect(
+        looksForTemplate(t)
+          .map(l => l.letter)
+          .sort()
+      ).toEqual(['A', 'B', 'C']);
   });
   it('getLook resolves ids and rejects unknown/empty', () => {
     expect(getLook('qamar.atelier')?.name.en).toBe('Atelier');
