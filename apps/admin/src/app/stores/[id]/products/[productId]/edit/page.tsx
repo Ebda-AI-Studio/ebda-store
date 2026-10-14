@@ -33,6 +33,7 @@ import { AiFieldBadge } from './_components/AiFieldBadge';
 import { BalanceDescriptionButton } from './_components/BalanceDescriptionButton';
 import { FactsCard } from './_components/FactsCard';
 import { FulfilmentCard, LEAD_TIME_MAX } from './_components/FulfilmentCard';
+import type { SizeChartOption } from '@/components/SizeChartSelect';
 import {
   PersonalisationCard,
   EMPTY_PERSONALISATION,
@@ -62,6 +63,8 @@ interface Product {
   lowStockThreshold?: number;
   /** Made-to-order business days; null = ready to ship. */
   leadTimeDays?: number | null;
+  /** Own size chart; null = inherit the category's. */
+  sizeChartId?: string | null;
   status: string;
   isFeatured: boolean;
   isNew: boolean;
@@ -117,6 +120,7 @@ export default function EditProductPage() {
   // a reload.
   const [aiSources, setAiSources] = useState<Record<string, 'ai' | 'human'>>({});
   const [categories, setCategories] = useState<Category[]>([]);
+  const [sizeCharts, setSizeCharts] = useState<SizeChartOption[]>([]);
   /** Template of the store — used to show per-theme recommended upload sizes. */
   const [storeTemplate, setStoreTemplate] = useState<TemplateId | undefined>();
   const [images, setImages] = useState<string[]>([]);
@@ -153,6 +157,8 @@ export default function EditProductPage() {
     lowStockThreshold: '',
     // Made-to-order business days as the raw input string; '' = ready to ship (sent as null).
     leadTimeDays: '',
+    // Own size chart id; '' = inherit the category's (sent as null).
+    sizeChartId: '',
     status: 'draft',
     isFeatured: false,
     isNew: false,
@@ -197,14 +203,17 @@ export default function EditProductPage() {
         setLoading(true);
         setNotFound(false);
 
-        const [productResult, categoriesResult, storeResult] = await Promise.all([
+        const [productResult, categoriesResult, storeResult, sizeChartsResult] = await Promise.all([
           apiGet<{ product?: Product } & Product>(
             `/api/v1/stores/${storeId}/products/${productId}`
           ),
           apiGet<{ categories: Category[] }>(`/api/v1/stores/${storeId}/categories`),
           // Fetch store template for per-theme upload-size hint (non-critical).
           apiGet<{ store: { template?: TemplateId } }>(`/api/v1/admin/stores/${storeId}`),
+          // Size-guide picker options (non-critical: the picker just lists none on failure).
+          apiGet<{ sizeCharts: SizeChartOption[] }>(`/api/v1/stores/${storeId}/size-charts`),
         ]);
+        setSizeCharts(sizeChartsResult.data?.sizeCharts ?? []);
         if (storeResult.data?.store?.template) {
           setStoreTemplate(storeResult.data.store.template);
         }
@@ -271,6 +280,7 @@ export default function EditProductPage() {
               : String(p.lowStockThreshold),
           leadTimeDays:
             p.leadTimeDays === undefined || p.leadTimeDays === null ? '' : String(p.leadTimeDays),
+          sizeChartId: p.sizeChartId ?? '',
           status: p.status || 'draft',
           isFeatured: p.isFeatured || false,
           isNew: p.isNew || false,
@@ -553,6 +563,7 @@ export default function EditProductPage() {
         facts: factsPayload,
         leadTimeDays,
         personalisation: personal.value,
+        sizeChartId: formData.sizeChartId || null,
       };
 
       if (formData.category) {
@@ -1016,6 +1027,10 @@ export default function EditProductPage() {
             <FulfilmentCard
               value={formData.leadTimeDays}
               onChange={v => updateField('leadTimeDays', v)}
+              storeId={storeId}
+              sizeCharts={sizeCharts}
+              sizeChartId={formData.sizeChartId}
+              onSizeChartChange={v => updateField('sizeChartId', v)}
             />
 
             {/* SEO meta — what shows up on Google + social shares.

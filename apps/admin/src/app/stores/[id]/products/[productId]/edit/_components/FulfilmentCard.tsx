@@ -1,15 +1,17 @@
 'use client';
 
 /**
- * FulfilmentCard: "made to order" lead time for one product.
+ * FulfilmentCard: "made to order" lead time and the size guide for one product.
  *
  * Controlled and presentational: it only edits the page's form state. The edit page owns
- * the single PUT (one writer), so there is no save button here. Empty = ready to ship,
- * which hides the made-to-order line on the storefront delivery chip.
+ * the single PUT (one writer), so there is no save button here. Empty lead time = ready to
+ * ship, which hides the made-to-order line on the storefront delivery chip. Empty size chart =
+ * inherit the category's chart (B0 Task 9).
  */
 
 import { Input } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
+import { SizeChartSelect, type SizeChartOption } from '@/components/SizeChartSelect';
 
 export const LEAD_TIME_MAX = 60;
 
@@ -17,9 +19,21 @@ interface Props {
   /** Raw input string: '' = ready to ship, otherwise integer business days. */
   value: string;
   onChange: (next: string) => void;
+  storeId: string;
+  sizeCharts: SizeChartOption[];
+  /** '' = inherit the category's chart. */
+  sizeChartId: string;
+  onSizeChartChange: (next: string) => void;
 }
 
-export function FulfilmentCard({ value, onChange }: Props) {
+export function FulfilmentCard({
+  value,
+  onChange,
+  storeId,
+  sizeCharts,
+  sizeChartId,
+  onSizeChartChange,
+}: Props) {
   const t = useT('products.edit.fulfilment');
   return (
     <div className="rounded-xl border bg-card p-6 shadow-sm">
@@ -38,6 +52,15 @@ export function FulfilmentCard({ value, onChange }: Props) {
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder={t('placeholder')}
+        />
+      </div>
+      <div className="mt-4 max-w-sm">
+        <SizeChartSelect
+          kind="product"
+          storeId={storeId}
+          charts={sizeCharts}
+          value={sizeChartId}
+          onChange={onSizeChartChange}
         />
       </div>
     </div>

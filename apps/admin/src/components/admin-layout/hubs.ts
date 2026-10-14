@@ -24,6 +24,7 @@ export type HubLabels = {
   content: string;
   blog: string;
   floatingWidget: string;
+  sizeCharts: string;
   // Sales tabs
   orders: string;
   invoices: string;
@@ -96,9 +97,12 @@ export const HUBS: HubDefinition[] = [
       '/blog',
       '/catalog',
       '/floating-widget',
+      '/size-charts',
     ],
     buildTabs: (storeId, labels) => [
       { label: labels.products, href: `/stores/${storeId}/products` },
+      // Size charts sit with the products they describe (B0 Task 9).
+      { label: labels.sizeCharts, href: `/stores/${storeId}/size-charts` },
       { label: labels.visualBuilder, href: `/stores/${storeId}/builder` },
       { label: labels.pageBuilder, href: `/stores/${storeId}/page-builder` },
       { label: labels.content, href: `/stores/${storeId}/content` },

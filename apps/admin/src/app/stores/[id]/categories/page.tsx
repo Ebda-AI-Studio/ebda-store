@@ -15,6 +15,7 @@ import { textFieldValue } from '../../../../lib/form-text';
 import { CategoryForm, type CategoryFormData } from './CategoryForm';
 import { CategoryTable, type Category } from './CategoryTable';
 import { useT } from '@/i18n/useT';
+import type { SizeChartOption } from '../../../../components/SizeChartSelect';
 
 const emptyForm: CategoryFormData = {
   name: '',
@@ -30,6 +31,7 @@ const emptyForm: CategoryFormData = {
   metaDescriptionAeo: '',
   metaDescriptionAeoAr: '',
   showOnHomeStrip: true,
+  sizeChartId: '',
 };
 
 function slugify(text: string) {
@@ -49,6 +51,8 @@ export default function StoreCategoriesPage() {
   const tCommon = useT('common');
 
   const [categories, setCategories] = useState<Category[]>([]);
+  // Size-guide picker options for the category form (B0 Task 9).
+  const [sizeCharts, setSizeCharts] = useState<SizeChartOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Debounced search term — client-side filter over category name (EN + AR).
@@ -238,6 +242,13 @@ export default function StoreCategoriesPage() {
   useEffect(() => {
     fetchCategories();
     fetchBestSellersImage();
+    if (storeId) {
+      apiGet<{ sizeCharts: SizeChartOption[] }>(`/api/v1/stores/${storeId}/size-charts`)
+        .then(({ data }) => setSizeCharts(data?.sizeCharts ?? []))
+        .catch(() => {
+          // non-critical — the picker just lists no charts
+        });
+    }
     // Fetch store template (upload-size hint) + the Best Sellers tile flag
     // + the category count unit label (non-critical). All ride the same store GET.
     if (storeId) {
@@ -298,6 +309,7 @@ export default function StoreCategoriesPage() {
       metaDescriptionAeoAr:
         (cat as Category & { metaDescriptionAeoAr?: string }).metaDescriptionAeoAr || '',
       showOnHomeStrip: (cat as Category & { showOnHomeStrip?: boolean }).showOnHomeStrip ?? true,
+      sizeChartId: (cat as Category & { sizeChartId?: string | null }).sizeChartId ?? '',
     });
     setFormErrors({});
     setSaveMessage(null);
@@ -354,6 +366,7 @@ export default function StoreCategoriesPage() {
         metaDescriptionAeo: form.metaDescriptionAeo?.trim() || null,
         metaDescriptionAeoAr: form.metaDescriptionAeoAr?.trim() || null,
         showOnHomeStrip: form.showOnHomeStrip ?? true,
+        sizeChartId: form.sizeChartId || null,
       };
 
       const { error: apiError } = isEditing
@@ -457,6 +470,7 @@ export default function StoreCategoriesPage() {
             onClose={closeForm}
             slugify={slugify}
             storeId={storeId}
+            sizeCharts={sizeCharts}
           />
         </div>
       )}
