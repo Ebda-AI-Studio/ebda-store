@@ -20,7 +20,7 @@ const router = Router();
 router.param('storeId', tenantContext);
 
 // Validation schemas
-const createCouponSchema = z.object({
+export const createCouponSchema = z.object({
   code: z
     .string()
     .min(1)
