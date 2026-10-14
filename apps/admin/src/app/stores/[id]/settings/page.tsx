@@ -501,8 +501,8 @@ export default function StoreSettingsPage() {
        * Separate card from `agentKey` above because they are different
        * credentials for different callers: that one lets a shopping agent buy,
        * this one lets the merchant run the store. Gated on `merchant_mcp`,
-       * which is in no plan baseline, so the card only appears once a
-       * super-admin has enabled it.
+       * which the plan layer turns on for Growth and Business (a
+       * super-admin override wins), so the card only appears for those.
        */
       key: 'merchantKeys',
       href: `/stores/${storeId}/merchant-keys`,

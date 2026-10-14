@@ -8278,6 +8278,13 @@
     }
   },
   "merchantKeys": {
+    "writeSwitch": {
+      "title": "Let AI assistants make changes (write tools)",
+      "body": "When on, keys with the write or destructive scope can update orders, products, stock, coupons and returns. Deleting, cancelling and refunding always need a second confirmation call. Included with Growth and Business. Turn off to keep every key read-only.",
+      "on": "On",
+      "off": "Off",
+      "saveFailed": "Could not change the setting"
+    },
     "page": {
       "title": "Merchant MCP keys",
       "subtitle": "Credentials that let you run this store from Claude Code or any MCP client, instead of the dashboard.",
@@ -8845,7 +8852,7 @@
     "whatsappAutomation": "WhatsApp automation is not included in your plan. Upgrade to turn it on.",
     "maxStores": "Your plan allows up to {limit} store(s). Upgrade to add more.",
     "brandingRemoval": "Removing the \"Powered by Ebda Store\" footer is not included in your plan. Upgrade to turn it off.",
-    "apiAccess": "API access is not included in your plan. Upgrade to Business to use it.",
+    "apiAccess": "Merchant MCP (running your store from an AI assistant) is not included in your plan. Upgrade to Growth or Business to use it.",
     "analyticsTier": "This analytics view is not included in your plan. Upgrade to unlock it."
   },
   "onboarding": {

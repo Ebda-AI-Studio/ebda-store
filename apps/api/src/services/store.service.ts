@@ -1147,6 +1147,30 @@ export class StoreService {
     return updatedStore;
   }
 
+  /**
+   * Merchant's own per-store switch for the merchant-MCP WRITE tools
+   * (`settings.mcpWriteEnabled`, absent = on). Surgical splice into the
+   * `settings` JSON like `updateFloatingWidget` above — no migration, no new
+   * column. This is the merchant half of the gate; the plan/Feature-Matrix half
+   * is the `merchant_mcp_write` feature (mcp/merchant-write.ts checks both).
+   */
+  static async setMcpWriteEnabled(storeId: string, enabled: boolean) {
+    const store = await this.getById(storeId);
+    const existingSettings = (store.settings as Record<string, unknown>) || {};
+    const mergedSettings = { ...existingSettings, mcpWriteEnabled: enabled };
+
+    const updatedStore = await withStore(storeId, tx =>
+      tx.store.update({
+        where: { id: storeId },
+        data: { settings: mergedSettings as Prisma.InputJsonValue },
+      })
+    );
+
+    await StoreService.invalidateCache(store);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
+    return enabled;
+  }
+
   static async updateSeo(
     storeId: string,
     seo: {

@@ -37,6 +37,7 @@ import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { auditLog } from '../middleware/security';
+import { StoreService } from '../services/store.service';
 import { getAuthUser } from '../utils/store-helpers';
 import {
   generateMerchantKey,
@@ -210,6 +211,55 @@ router.post(
           warning: 'Copy this key now. It cannot be shown again.',
         },
       });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── GET/PUT /stores/:id/integrations/merchant-mcp/write-switch ──────────────
+//
+// The merchant's per-store on/off switch for MCP WRITE tools. Stored in the
+// existing `store.settings` JSON (`mcpWriteEnabled`, absent = on), so no
+// migration. The plan half (Growth + Business) is the `merchant_mcp_write`
+// feature; a write needs BOTH (mcp/merchant-write.ts).
+
+const writeSwitchSchema = z.object({ enabled: z.boolean() });
+
+router.get(
+  '/:id/integrations/merchant-mcp/write-switch',
+  ...chain,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id: storeId } = req.params;
+      const store = await StoreService.getById(storeId);
+      const settings = (store.settings as Record<string, unknown> | null) ?? {};
+      res.json({ success: true, data: { enabled: settings.mcpWriteEnabled !== false } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.put(
+  '/:id/integrations/merchant-mcp/write-switch',
+  ...chain,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id: storeId } = req.params;
+      const { enabled } = writeSwitchSchema.parse(req.body);
+      await StoreService.setMcpWriteEnabled(storeId, enabled);
+      await auditLog({
+        action: 'store.merchant_mcp_write_switch',
+        userId: getAuthUser(req).userId,
+        resourceType: 'store',
+        resourceId: storeId,
+        storeId,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        details: { enabled },
+      });
+      res.json({ success: true, data: { enabled } });
     } catch (err) {
       next(err);
     }
