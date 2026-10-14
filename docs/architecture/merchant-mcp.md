@@ -63,8 +63,10 @@ could be. Cap of 20 active keys per store (housekeeping, not a boundary).
 
 ## Feature gate
 
-`merchant_mcp`, in **no plan baseline** — OFF for every store until a
-super-admin enables it, and the endpoint 404s while off. Correct default for a
+`merchant_mcp`, in no `PLAN_BASELINE` but decided by the plan layer: ON for
+**Growth and Business** (`planIncludesMerchantMcp`, Ahmad 2026-10-14; decoupled
+from `apiAccess`, which stays Business-only), OFF otherwise unless a
+super-admin overrides it, and the endpoint 404s while off. Fail closed for a
 surface that can change anything in a store.
 
 ## Refusals are indistinguishable
@@ -164,9 +166,34 @@ no cost price and `profitItemsMissingCost` says how many lines a partial figure
 excludes; `conversionRate` is orders per product view (%) from
 `funnel_snapshots`, or `null` when no views were recorded — never a fabricated 0.
 
-Phases 2 and 3 (writes, then destructive ops with a `confirm_token` two-step)
-land as separate registrars — see
-`docs/superpowers/specs/2026-09-11-mcp-merchant-admin-design.md`.
+## Write tools (Ahmad's decisions 2026-10-14; Ruling R-EBDA-PRICING-5)
+
+`mcp/tools/admin-write.tools.ts` declares the write tools; every one is
+registered through `registerMerchantWriteTool` (`mcp/merchant-write.ts`), which
+owns the gate chain and runs the SAME service method (and exported Zod schema)
+as the matching admin route:
+
+1. scope (`merchant:write` / `merchant:destructive`) and `auth.storeId === store.id`;
+2. entitlement: feature `merchant_mcp_write` (plan: Growth + Business via
+   `getAutomationFlags().mcpAccess`; Feature-Matrix override wins) AND the
+   merchant's `store.settings.mcpWriteEnabled` (absent = on; toggled from the
+   Merchant MCP keys page, `PUT .../merchant-mcp/write-switch`);
+3. RBAC of the key's owning user (`MerchantAuth.role`) — the route's
+   `requirePermission`/`authorize` set plus its `requireFeature` key;
+4. destructive tools: first call returns summary + HMAC confirm token (tool,
+   store, key, actor, deep-canonical args, 2-minute expiry, nonce); second call
+   with the token executes. The token is single-use (atomic `SET NX` on the
+   AuthState Durable Object) and the claim FAILS CLOSED;
+5. an `intent` audit row (actor=mcp, key id) is written before the mutation via
+   the append-only definer; if it cannot be written the write is refused;
+6. 30 writes/minute per key (`merchantMcpWriteLimiter`); batched JSON-RPC
+   bodies containing writes are rejected.
+
+A service 404 (id from another store, or nonexistent) surfaces as one
+`FORBIDDEN ... not found in this store` message — no existence oracle.
+Operations whose logic is still inline in a route handler are intentionally not
+exposed; the list is in `apps/help/content/en/merchant-mcp-write-tools.mdx`.
+Original design: `docs/superpowers/specs/2026-09-11-mcp-merchant-admin-design.md`.
 
 ## Tenant context
 
