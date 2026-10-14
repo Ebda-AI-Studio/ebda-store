@@ -1142,7 +1142,10 @@ export class OrderService {
         // orders are already paid; a failed wallet debit below rolls back all work.
         const manualHoldAdmitted =
           !paidInFullByWallet && HOLD_CAPPED_PAYMENT_METHODS.has(data.paymentMethod);
-        if (manualHoldAdmitted) {
+        // Ruling S4-1: every unpaid hold is counted, whatever label the client
+        // sent — gateway/unknown labels against the looser cap. Only
+        // `manualHoldAdmitted` (the tight-cap methods) unlocks COD/InstaPay later.
+        if (!paidInFullByWallet) {
           await assertStockHoldCapNotExceeded(tx, storeId, data.paymentMethod, {
             phone: data.shippingAddress.phone,
             email:

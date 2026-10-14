@@ -15,6 +15,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   assertStockHoldCapNotExceeded,
   openUnpaidHoldCap,
+  openUnpaidGatewayHoldCap,
   HOLD_CAPPED_PAYMENT_METHODS,
 } from '@api/lib/stock-hold-cap';
 import { AppError } from '@api/middleware/error-handler';
@@ -43,7 +44,7 @@ describe('stock-hold-cap', () => {
   });
 
   describe('HOLD_CAPPED_PAYMENT_METHODS', () => {
-    it('covers exactly cod + instapay — real-time gateways capture synchronously', () => {
+    it('tight-cap set is exactly cod + instapay; every other label uses the looser gateway cap', () => {
       expect(HOLD_CAPPED_PAYMENT_METHODS.has('cod')).toBe(true);
       expect(HOLD_CAPPED_PAYMENT_METHODS.has('instapay')).toBe(true);
       expect(HOLD_CAPPED_PAYMENT_METHODS.has('kashier')).toBe(false);
@@ -64,16 +65,33 @@ describe('stock-hold-cap', () => {
       };
     }
 
-    it('never queries for a synchronously-captured method (kashier)', async () => {
-      const t = tx(999);
-      await assertStockHoldCapNotExceeded(t, 'store1', 'kashier', { phone: '+201000000000' });
-      expect(t.$queryRaw).not.toHaveBeenCalled();
+    it('counts a gateway-labelled order too, against the looser cap of 5 (S4-1)', async () => {
+      for (const method of ['kashier', 'paymob', 'card-anything']) {
+        const under = tx(4);
+        await expect(
+          assertStockHoldCapNotExceeded(under, 'store1', method, { phone: '+201000000000' })
+        ).resolves.toBeUndefined();
+        expect(under.$queryRaw).toHaveBeenCalledTimes(1);
+        const over = tx(5);
+        await expect(
+          assertStockHoldCapNotExceeded(over, 'store1', method, { phone: '+201000000000' })
+        ).rejects.toMatchObject({ statusCode: 429, code: 'TOO_MANY_OPEN_HOLDS' });
+      }
     });
 
-    it('never queries for a synchronously-captured method (paymob)', async () => {
-      const t = tx(999);
-      await assertStockHoldCapNotExceeded(t, 'store1', 'paymob', { phone: '+201000000000' });
-      expect(t.$queryRaw).not.toHaveBeenCalled();
+    it('gateway IP cap is 4x the gateway identity cap (20) and configurable', async () => {
+      await expect(
+        assertStockHoldCapNotExceeded(tx(0, 19), 'store1', 'paymob', { ip: '1.2.3.4' })
+      ).resolves.toBeUndefined();
+      await expect(
+        assertStockHoldCapNotExceeded(tx(0, 20), 'store1', 'paymob', { ip: '1.2.3.4' })
+      ).rejects.toMatchObject({ statusCode: 429 });
+      process.env.OPEN_UNPAID_GATEWAY_HOLD_CAP = '2';
+      expect(openUnpaidGatewayHoldCap()).toBe(2);
+      await expect(
+        assertStockHoldCapNotExceeded(tx(2), 'store1', 'paymob', { phone: '+201000000000' })
+      ).rejects.toMatchObject({ statusCode: 429 });
+      delete process.env.OPEN_UNPAID_GATEWAY_HOLD_CAP;
     });
 
     it('skips the check entirely when no identity signal is present (no false block on an unidentifiable guest)', async () => {
