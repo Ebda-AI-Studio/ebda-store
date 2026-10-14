@@ -100,6 +100,8 @@ const createProductSchema = z.object({
   leadTimeDays: z.number().int().min(0).max(60).nullable().optional(),
   // Per-line customer text field (e.g. name to embroider). null clears; undefined leaves alone.
   personalisation: personalisationConfigSchema.nullable().optional(),
+  // PDP size guide: own chart; null = inherit the category's chart. undefined leaves alone.
+  sizeChartId: z.string().uuid().nullable().optional(),
   // SEO meta — null clears, undefined leaves alone (Prisma convention).
   metaTitle: z.string().max(180).optional().nullable(),
   metaTitleAr: z.string().max(180).optional().nullable(),

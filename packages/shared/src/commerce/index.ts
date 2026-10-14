@@ -2,3 +2,4 @@ export * from './swatch';
 export * from './product-facts';
 export * from './delivery-window';
 export * from './personalisation';
+export * from './size-chart';

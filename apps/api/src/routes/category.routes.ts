@@ -5,7 +5,8 @@ import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
 import { prisma, SlugEntityType } from '@ebda/database';
-import { invalidateCached } from '../lib/public-cache';
+import { invalidateCached, invalidateStoreProductCaches } from '../lib/public-cache';
+import { assertSizeChartInStore } from '../services/size-chart.service';
 import { deleteR2ObjectIfOrphan } from '../services/r2-cleanup.service';
 import { recordSlugRedirect } from '../services/slug-redirect.service';
 import logger from '../lib/logger';
@@ -31,6 +32,8 @@ const createCategorySchema = z.object({
   metaDescriptionAeo: z.string().max(400).optional().nullable(),
   metaDescriptionAeoAr: z.string().max(400).optional().nullable(),
   showOnHomeStrip: z.boolean().optional(),
+  // Size chart inherited by this category's products on the PDP (B0 Task 9). null clears.
+  sizeChartId: z.string().uuid().nullable().optional(),
 });
 
 export const updateCategorySchema = z.object({
@@ -52,6 +55,8 @@ export const updateCategorySchema = z.object({
   metaDescriptionAeo: z.string().max(400).optional().nullable(),
   metaDescriptionAeoAr: z.string().max(400).optional().nullable(),
   showOnHomeStrip: z.boolean().optional(),
+  // Size chart inherited by this category's products on the PDP (B0 Task 9). null clears.
+  sizeChartId: z.string().uuid().nullable().optional(),
 });
 
 // GET /stores/:storeId/categories/best-sellers-image — read the
@@ -353,6 +358,7 @@ router.post(
     try {
       const { storeId } = req.params;
       const data = createCategorySchema.parse(req.body);
+      await assertSizeChartInStore(storeId, data.sizeChartId);
 
       let baseSlug =
         data.slug ||
@@ -398,6 +404,7 @@ router.post(
           metaDescriptionAeoAr: data.metaDescriptionAeoAr,
           // Homepage-strip visibility (omitted → DB default true).
           showOnHomeStrip: data.showOnHomeStrip,
+          sizeChartId: data.sizeChartId ?? null,
         },
         include: {
           // Exclude archived/deleted from the category product count so it
@@ -446,6 +453,7 @@ router.put(
     try {
       const { storeId, categoryId } = req.params;
       const data = updateCategorySchema.parse(req.body);
+      await assertSizeChartInStore(storeId, data.sizeChartId);
 
       // Verify category belongs to store
       const existing = await prisma.category.findFirst({
@@ -509,6 +517,7 @@ router.put(
           // Homepage-strip visibility — only when present (omitting it never
           // flips an existing value).
           ...(data.showOnHomeStrip !== undefined ? { showOnHomeStrip: data.showOnHomeStrip } : {}),
+          ...(data.sizeChartId !== undefined ? { sizeChartId: data.sizeChartId } : {}),
         },
         include: {
           // Exclude archived/deleted from the category product count so it
@@ -551,6 +560,11 @@ router.put(
       });
 
       await invalidateCached(`public:categories:${storeId}`);
+      // The PDP payload carries the category's size chart (inherited by its products), so a
+      // changed link must reach the product caches too (this also clears the categories cache).
+      if (data.sizeChartId !== undefined && data.sizeChartId !== existing.sizeChartId) {
+        await invalidateStoreProductCaches(storeId);
+      }
 
       res.json({
         success: true,
@@ -602,6 +616,8 @@ router.delete(
       });
 
       await invalidateCached(`public:categories:${storeId}`);
+      // A deleted category stops lending its size chart to its products' PDPs.
+      if (existing.sizeChartId) await invalidateStoreProductCaches(storeId);
 
       res.json({
         success: true,

@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod';
 import { ProductService } from '../services/product.service';
+import { SizeChartService } from '../services/size-chart.service';
 import { CartService } from '../services/cart.service';
 import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
@@ -351,6 +352,26 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
       success: true,
       data: { product: payload },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /public/size-charts — every size chart of the resolved store, for the storefront
+ * `/size-guide` page (B0 Task 9). The PDP gets its own resolved chart inside the product payload.
+ * CACHE CLASS: BOUNDED-stale display content. No Redis layer: one indexed query, fronted by the
+ * storefront's `products:<store>` data-cache tag, which every chart write purges through
+ * invalidateStoreProductCaches; the 60s edge cache is the same residual as the PDP.
+ */
+router.get('/size-charts', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = await getStoreIdFromRequest(req);
+    const sizeCharts = await readInStoreContext(storeId, () =>
+      SizeChartService.listPublic(storeId)
+    );
+    setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
+    res.json({ success: true, data: { sizeCharts } });
   } catch (error) {
     next(error);
   }

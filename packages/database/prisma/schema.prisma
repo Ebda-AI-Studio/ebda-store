@@ -471,6 +471,7 @@ model Store {
   codRemittances           CodRemittance[]
   pageRevisions            StorePageRevision[]
   productModels            ProductModel[]
+  sizeCharts               SizeChart[]
   productModelBindings     ProductModelBinding[]
   affiliates               Affiliate[]
   affiliateReferrals       AffiliateReferral[]
@@ -864,20 +865,24 @@ model Category {
   // sweep. Storefront coalesces at render time: AEO > SEO > null.
   metaDescriptionAeo   String?   @map("meta_description_aeo")
   metaDescriptionAeoAr String?   @map("meta_description_aeo_ar")
+  // Size chart every product in this category inherits unless it has its own. null = none.
+  sizeChartId          String?   @map("size_chart_id")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
   deletedAt            DateTime? @map("deleted_at") // Soft delete support
 
   // Relations
-  store    Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  parent   Category?         @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children Category[]        @relation("CategoryHierarchy")
-  products ProductCategory[]
+  store     Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  parent    Category?         @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children  Category[]        @relation("CategoryHierarchy")
+  products  ProductCategory[]
+  sizeChart SizeChart?        @relation(fields: [sizeChartId], references: [id], onDelete: SetNull)
 
   @@unique([storeId, slug])
   @@index([storeId])
   @@index([parentId])
   @@index([isActive])
+  @@index([sizeChartId])
   @@map("categories")
 }
 
@@ -930,6 +935,8 @@ model Product {
   leadTimeDays         Int?          @map("lead_time_days")
   // PersonalisationConfig (@ebda/shared personalisationConfigSchema): the PDP text field the customer fills per line ("Name to embroider"). null / enabled:false = no field.
   personalisation      Json?
+  // Own size chart for the PDP size guide; null = inherit the category's chart (if any).
+  sizeChartId          String?       @map("size_chart_id")
   // Short 1-2 sentence blurb, distinct from the full `description`. Written
   // by the bulk-ai-excerpt sweep (or manually) — surfaced anywhere a compact
   // summary is useful (search results, share cards). Bilingual EN+AR.
@@ -1000,6 +1007,7 @@ model Product {
   dailyViews           ProductDailyView[]
   bundleItems          BundleItem[]
   model3d              ProductModel?
+  sizeChart            SizeChart?                 @relation(fields: [sizeChartId], references: [id], onDelete: SetNull)
 
   @@unique([storeId, slug])
   @@unique([storeId, sku]) // Prevent duplicate SKUs within a store (null values are excluded)
@@ -1023,6 +1031,7 @@ model Product {
   // Barcode lookup index — barcode scan resolves within a store scope.
   // Added 2026-06-15 for inventory.barcode Enterprise feature.
   @@index([storeId, barcode])
+  @@index([sizeChartId])
   @@map("products")
 }
 
@@ -1242,6 +1251,33 @@ model ProductModel {
 
   @@index([storeId])
   @@map("product_models")
+}
+
+// Size chart (B0 Task 9): a merchant-authored measurements table shown in the PDP size guide
+// and on /size-guide. UI: admin /stores/[id]/size-charts (editor), product FulfilmentCard and
+// category form pickers; storefront SizeChartDialog + /size-guide. Shape: @ebda/shared sizeChartSchema.
+model SizeChart {
+  id         String     @id @default(uuid())
+  storeId    String     @map("store_id")
+  name       String     @default("")
+  nameAr     String     @default("") @map("name_ar")
+  // 'cm' | 'in' (CHECK constraint).
+  unit       String     @default("cm")
+  // [{ label, labelAr }], 2..10.
+  columns    Json
+  // string[][], 1..30 rows, one cell per column.
+  rows       Json
+  note       String     @default("")
+  noteAr     String     @default("") @map("note_ar")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  store      Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products   Product[]
+  categories Category[]
+
+  @@index([storeId])
+  @@map("size_charts")
 }
 
 // Option value -> 3D finish (material colour/metal, or a glTF variant).

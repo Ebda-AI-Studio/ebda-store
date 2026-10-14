@@ -22,6 +22,11 @@ import logger from '../lib/logger';
 import { cleanupRemovedImages } from './r2-cleanup.service';
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
 import { PUBLIC_MODEL3D_SELECT, toPublicModel3d } from './product-model.service';
+import {
+  assertSizeChartInStore,
+  resolvePdpSizeChart,
+  SIZE_CHART_PUBLIC_SELECT,
+} from './size-chart.service';
 import { inngest } from '../lib/inngest/client';
 import { stampHumanEdits, enqueueRecommendationsSweepForNewProduct } from './ai-autofill.service';
 import { recordSlugRedirect } from './slug-redirect.service';
@@ -289,6 +294,8 @@ interface CreateProductData {
   leadTimeDays?: number | null;
   /** PDP personalisation field config; `null` clears, `undefined` leaves alone. */
   personalisation?: PersonalisationConfig | null;
+  /** Own size chart (same store, checked); `null` = inherit the category's, `undefined` leaves alone. */
+  sizeChartId?: string | null;
   categories?: string[];
   images?: { url: string; alt?: string }[];
   /** SEO meta — set per-product or via the AI sweep. `null` clears. */
@@ -747,6 +754,7 @@ export class ProductService {
     // Plan ceiling (SP5): one more product must fit the store's maxProducts.
     await assertWithinLimit(storeId, 'maxProducts');
     await this.assertCategoriesInStore(storeId, data.categories);
+    await assertSizeChartInStore(storeId, data.sizeChartId);
     // slugifyWithFallback, never bare slugify: a name that slugifies to '' (no
     // letters/digits, or a product created before its name was filled in) gave
     // baseSlug = '', so the de-duplication loop below produced '', '-1', '-2'.
@@ -804,6 +812,7 @@ export class ProductService {
         ...(data.facts !== undefined ? { facts: data.facts } : {}),
         ...(data.leadTimeDays !== undefined ? { leadTimeDays: data.leadTimeDays } : {}),
         ...personalisationWrite(data.personalisation),
+        ...(data.sizeChartId !== undefined ? { sizeChartId: data.sizeChartId } : {}),
         images: data.images
           ? {
               create: data.images.map((img, index) => ({
@@ -855,6 +864,7 @@ export class ProductService {
 
   static async update(storeId: string, productId: string, data: UpdateProductData) {
     await this.assertCategoriesInStore(storeId, data.categories);
+    await assertSizeChartInStore(storeId, data.sizeChartId);
     const product = await this.getById(storeId, productId);
 
     // Money guard: a fixed discount must never exceed the price (would store a
@@ -1001,6 +1011,7 @@ export class ProductService {
           ...(data.facts !== undefined ? { facts: data.facts } : {}),
           ...(data.leadTimeDays !== undefined ? { leadTimeDays: data.leadTimeDays } : {}),
           ...personalisationWrite(data.personalisation),
+          ...(data.sizeChartId !== undefined ? { sizeChartId: data.sizeChartId } : {}),
           inventory: data.inventory,
           ...(data.lowStockThreshold !== undefined
             ? { lowStockThreshold: data.lowStockThreshold }
@@ -1674,8 +1685,15 @@ export class ProductService {
     ...STOREFRONT_PRODUCT_SELECT,
     lowStockThreshold: true,
     images: { orderBy: { position: 'asc' } },
-    categories: { include: { category: true } },
+    // Each category carries its size chart so the PDP can inherit it (`resolvePdpSizeChart`);
+    // the nested chart is stripped from the payload again in `withSizeChart`.
+    categories: {
+      include: { category: { include: { sizeChart: { select: SIZE_CHART_PUBLIC_SELECT } } } },
+    },
     store: { select: { id: true, name: true, slug: true } },
+    // PDP size guide. CACHE CLASS: BOUNDED-stale, rides the PDP cache; every chart write and every
+    // product/category write that changes `sizeChartId` calls invalidateStoreProductCaches.
+    sizeChart: { select: SIZE_CHART_PUBLIC_SELECT },
     faqs: {
       select: {
         id: true,
@@ -1885,6 +1903,28 @@ export class ProductService {
     };
   }
 
+  /**
+   * Flatten the PDP size chart: `sizeChart` = the product's own chart, else its category's, else
+   * null. The per-category chart used for the fallback is dropped from `categories` so the
+   * payload carries the table once.
+   */
+  private static withSizeChart<
+    T extends {
+      sizeChart: unknown;
+      categories: Array<{ category: { sizeChart: unknown } & Record<string, unknown> }>;
+    },
+  >(product: T) {
+    const sizeChart = resolvePdpSizeChart(product);
+    return {
+      ...product,
+      sizeChart,
+      categories: product.categories.map(pc => {
+        const { sizeChart: _drop, ...category } = pc.category;
+        return { ...pc, category };
+      }),
+    };
+  }
+
   static async getPublicBySlug(storeId: string, slug: string) {
     const product = await prisma.product.findFirst({
       where: { storeId, slug, status: 'active', deletedAt: null },
@@ -1909,7 +1949,7 @@ export class ProductService {
     };
 
     return {
-      ...this.publicDetailWithStock(product),
+      ...this.publicDetailWithStock(this.withSizeChart(product)),
       model3d: toPublicModel3d(product.model3d),
       ratingStats,
     };
@@ -1939,7 +1979,7 @@ export class ProductService {
     };
 
     return {
-      ...this.publicDetailWithStock(product),
+      ...this.publicDetailWithStock(this.withSizeChart(product)),
       model3d: toPublicModel3d(product.model3d),
       ratingStats,
     };
