@@ -54,12 +54,57 @@ def I(n, s=22):
     return (f'<svg viewBox="0 0 24 24" width="{s}" height="{s}" fill="none" stroke="currentColor" stroke-width="1.8" '
             f'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{p}</svg>')
 
+
+# ---------- working-phone data attributes (Ruling MKT-8) ----------
+# Every product card carries what the in-phone engine (src/lib/phone-store.ts) needs to open its product page
+# and add it to the cart: data-p-id/-name/-price/-old/-img/-imgs/-cat plus per-vertical details. Nothing here
+# calls the network; the extra photos are other looks' photos of the same product key.
+def _q(v): return _html.escape(str(v), quote=True)
+
+def pid(name): return f'{CUR[0]}-' + hashlib.md5(name.encode()).hexdigest()[:6]
+
+def gallery(key, n=4):
+    """Photo URLs for a product page: the look's own, then the same product key in the template's other looks
+    (and numbered variants such as ring2), then hero shots, 2 to `n` images. [] outside export mode."""
+    if not EXPORT[0]: return []
+    t, own = CUR[0][0], CUR[0]
+    order = [own] + [t + c for c in 'abc' if t + c != own]
+    names = []
+    def add(stem):
+        for fn in order:
+            for suffix in ('', '2', '3'):
+                nm = f'{fn}__{stem}{suffix}.webp'
+                if os.path.exists(os.path.join(WEBDIR, nm)) and nm not in names: names.append(nm)
+    add(key)
+    if len(names) < 2: add('hero')
+    names = names[:n]
+    for nm in names: EXPORTED.setdefault(nm, None)
+    return [f'/looks/img/{nm}' for nm in names]
+
+def pd(name, price_, old=None, key=None, cat=None, **x):
+    """data-* attributes for one product (put them on the card element). `key` = photo key of the card image;
+    `cat` = space separated category tokens matching the data-cat of the look's chips/tiles; **x = per-vertical
+    details (sizes, colors, specs, ing, skin, shades, portion, lead, karat, mm, engrave, gift, unit, days, desc, mat, occ)."""
+    imgs = gallery(key) if key else []
+    a = {'id': pid(name), 'name': name, 'price': price_, 'old': old, 'img': imgs[0] if imgs else None,
+         'imgs': ','.join(imgs) if imgs else None, 'cat': cat}
+    a.update(x)
+    return ' '.join(f'data-p-{k.replace("_", "-")}="{_q(v)}"' for k, v in a.items() if v not in (None, ''))
+
+def bundle(items):
+    """data-bundle JSON for 'add the whole look': [(name, price, key)]"""
+    import json
+    out = []
+    for n, p, k in items:
+        g = gallery(k); out.append({'id': pid(n), 'name': n, 'price': p, 'img': g[0] if g else ''})
+    return f'data-bundle="{_q(json.dumps(out, ensure_ascii=False))}"'
+
 def fmt(n): return f'{n:,} ج.م'
 def price(n, old=None, cls=''):
     o = f' <s class="old">{fmt(old)}</s>' if old else ''
     return f'<span class="price {cls}">{fmt(n)}</span>{o}'
 
-import os, base64
+import os, base64, hashlib, html as _html
 CUR = [None]
 _PH = {}
 HERE = os.path.dirname(os.path.abspath(__file__))

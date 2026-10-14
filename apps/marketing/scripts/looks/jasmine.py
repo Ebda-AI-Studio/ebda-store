@@ -11,15 +11,18 @@ def ja():
     hero = img('dropper', ('#4a4130', '#231f18', '#b9741f', '#f3efe6', '#e9b266'), 'قارورة سيروم كهرمانية', 1.5, pk='hero')
     ings = ['زيت حبة البركة', 'عسل سدر', 'ماء ورد بلدي', 'زبدة الشيا', 'فيتامين E']
     il = ''.join(f'<li><span class="dot"></span>{t}</li>' for t in ings)
-    chips = ''.join(f'<button class="chip{" on" if i == 0 else ""}" type="button">{t}</button>' for i, t in enumerate(['كل البشرات', 'جافة', 'دهنية', 'مختلطة', 'حساسة']))
+    chips = ''.join(f'<button class="chip{" on" if i == 0 else ""}" type="button" data-cat="{k}">{t}</button>' for i, (t, k) in enumerate([('كل البشرات', 'all'), ('جافة', 'dry'), ('دهنية', 'oily'), ('مختلطة', 'mixed'), ('حساسة', 'sensitive')]))
+    SK = {'dry': 'جافة', 'oily': 'دهنية', 'mixed': 'مختلطة', 'sensitive': 'حساسة'}
+    skin = {'سيروم حبة البركة والعسل': 'oily mixed', 'كريم الشيا المرطب': 'dry sensitive', 'زيت الأرجان الصافي': 'dry mixed', 'ماء ورد بلدي': 'dry oily mixed sensitive',
+            'مقشر العسل والشوفان': 'oily mixed', 'بلسم الشفايف بالعسل': 'dry sensitive', 'ماسك الطين الأخضر': 'oily mixed', 'زيت جوز الهند للجسم': 'dry'}
     prods = [('سيروم حبة البركة والعسل', 'حبة البركة · عسل سدر · فيتامين E', 420, 495, 'dropper'), ('كريم الشيا المرطب', 'زبدة الشيا · زيت اللوز · جلسرين', 380, None, 'jar'),
              ('زيت الأرجان الصافي', 'أرجان 100% معصور على البارد', 295, None, 'dropper'), ('ماء ورد بلدي', 'ورد جوري مقطّر · بدون كحول', 120, None, 'pump'),
              ('مقشر العسل والشوفان', 'شوفان · عسل · حمض اللاكتيك', 260, 310, 'tube'), ('بلسم الشفايف بالعسل', 'شمع نحل · عسل · زيت جوجوبا', 85, None, 'compact'),
              ('ماسك الطين الأخضر', 'طين أخضر · زيت شجرة الشاي', 190, None, 'mask'), ('زيت جوز الهند للجسم', 'جوز هند بكر · فانيليا طبيعية', 210, None, 'jar')]
-    rows = ''.join(f'<article class="rw"><div class="ph rt">{img(k, P[k], n, 1.2)}</div><div class="rb"><h3>{n}</h3><p class="ing">{i}</p>{price(p, o)}</div>'
-                   f'<button class="qa" type="button" aria-label="إضافة {n}">{I("plus", 18)}</button></article>' for n, i, p, o, k in prods)
+    rows = ''.join(f'<article class="rw" {pd(n, p, o, k, cat=skin[n], ing=i, skin="، ".join(SK[x] for x in skin[n].split()), desc="بدون عطور صناعية · بدون بارابين")}><div class="ph rt">{img(k, P[k], n, 1.2)}</div><div class="rb"><h3>{n}</h3><p class="ing">{i}</p>{price(p, o)}</div>'
+                   f'<button class="qa" type="button" aria-label="إضافة {n}" data-add>{I("plus", 18)}</button></article>' for n, i, p, o, k in prods)
     css = f"""
-&{{--bg:{BG};--ink:{TX};--mut:{MUT};--ac:{AMT};--fd:'Amiri';--fb:'Noto Sans Arabic';--fl:'Fraunces'}}
+&{{--bg:{BG};--ink:{TX};--mut:{MUT};--ac:{AMT};--btn:{AM};--btnfg:{ONA};--r:8px;--rb:8px;--ga:4/4.4;--fd:'Amiri';--fb:'Noto Sans Arabic';--fl:'Fraunces'}}
 & .hd{{display:flex;align-items:center;justify-content:space-between;height:70px;padding:0 6px;position:sticky;top:0;z-index:3;background:{BG}}}
 & .logo{{text-align:center;line-height:1}}
 & .logo b{{display:block;font-family:var(--fd),serif;font-size:38px;color:{AMT}}}
@@ -49,10 +52,10 @@ def ja():
 & .ritual p{{margin-top:8px;font-size:15px}}
 & .ritual a{{display:inline-block;margin-top:14px;padding:10px 22px;border:2px solid {ONA};border-radius:8px;font-weight:700;font-size:14px}}
 """
-    html = f"""<header class="hd"><button class="ib" type="button" aria-label="القائمة">{I('menu')}</button><div class="logo"><b>ياسمين</b><i>JASMINE</i></div><button class="ib" type="button" aria-label="السلة">{I('bag')}</button></header>
+    html = f"""<header class="hd"><button class="ib" type="button" aria-label="القائمة" data-open-menu>{I('menu')}</button><div class="logo"><b>ياسمين</b><i>JASMINE</i></div><button class="ib" type="button" aria-label="السلة" data-open-cart>{I('bag')}</button></header>
 <section class="hero"><div><h2>اللي جوّه الازازة أهم من برّاها</h2><ul>{il}</ul><a class="cta" href="#">شوف السيروم</a></div><div class="ph">{hero}</div></section>
 <section class="skin"><h2>حسب نوع بشرتك</h2><nav class="chips" aria-label="نوع البشرة">{chips}</nav></section>
-<section class="rows">{rows}</section>
+<section class="rows" data-grid>{rows}</section>
 <section class="ritual"><h2>طقس المسا: ننضّف، نغذّي، ونقفل بالزيت</h2><p>تحضيرات بالمكونات الطبيعية زي ما كانت صيدليات إسكندرية بتعمل زمان، من غير عطور صناعية.</p><a href="#">اقرأ الحكاية</a></section>
 {footer('#231f18', '#f3efe6', '#d1c9b8', 'ياسمين', 'عناية بالبشرة بمكونات طبيعية وواضحة.', ['من نحن', 'المكونات', 'الشحن والاسترجاع', 'تواصلي معنا'])}"""
     return css, html
@@ -72,12 +75,14 @@ def jb():
     shades = ['#c2185b', '#e57399', '#a8323e', '#d98a6c', '#7a2e3d']
     prods = [('تينت شفايف', 'lipstick', 175, None, shades), ('بلاشر كريمي', 'compact', 240, 290, ['#f48fb1', '#e57399', '#d98a6c']), ('كريم مرطب بالورد', 'jar', 320, None, []),
              ('ماسك الشيت', 'mask', 55, None, []), ('غسول الوجه', 'pump', 210, None, []), ('كونسيلر ناعم', 'tube', 195, 230, ['#f3cdb4', '#e6b393', '#c98e6b', '#9a6445'])]
-    cards = ''.join(f'<article><div class="ph" style="aspect-ratio:1/1.1">{img(k, P[k], n, 1.2)}</div><h3 class="nm">{n}</h3>'
+    SHN = {'#c2185b': 'توت', '#e57399': 'روز', '#a8323e': 'أحمر', '#d98a6c': 'مشمشي', '#7a2e3d': 'عنابي', '#f48fb1': 'وردي', '#f3cdb4': 'فاتح', '#e6b393': 'فاتح دافئ', '#c98e6b': 'قمحي', '#9a6445': 'أسمر'}
+    desc = {'تينت شفايف': 'يثبت 8 ساعات · لمسة مطفية', 'بلاشر كريمي': 'يتفرد بالصباع · يدوم طول اليوم', 'كريم مرطب بالورد': 'ترطيب 24 ساعة · من غير لمعة', 'ماسك الشيت': 'ماسك قماش مشبّع بالسيروم · 20 دقيقة', 'غسول الوجه': 'رغوة ناعمة · pH متوازن', 'كونسيلر ناعم': 'تغطية متوسطة · من غير تكتل'}
+    cards = ''.join(f'<article {pd(n, p, o, k, shades="|".join(f"{SHN[c]}:{c}" for c in sh), desc=desc[n])}><div class="ph" style="aspect-ratio:1/1.1">{img(k, P[k], n, 1.2)}</div><h3 class="nm">{n}</h3>'
                     + (f'<div class="sw">{"".join(f"<i style=background:{c}></i>" for c in sh)}</div>' if sh else '<div class="sw" style="height:16px"></div>')
-                    + f'<div class="pr">{price(p, o)}<button class="qa" type="button" aria-label="إضافة {n}">{I("plus", 18)}</button></div></article>' for n, k, p, o, sh in prods)
+                    + f'<div class="pr">{price(p, o)}<button class="qa" type="button" aria-label="إضافة {n}" data-add>{I("plus", 18)}</button></div></article>' for n, k, p, o, sh in prods)
     ug = ''.join(f'<div class="ph u">{img("face", ("#fbe8ec", "#f0b9c5", c, "#fff", a), "صورة عميلة", 1.0, pk=f"face{i}")}</div>' for i, (c, a) in enumerate([('#c2185b', '#f48fb1'), ('#3a1e2a', '#c2185b'), ('#e57399', '#fff'), ('#7a2e3d', '#f06292'), ('#c2185b', '#fff')]))
     css = f"""
-&{{--bg:{BG};--ink:{INK};--mut:{MUT};--ac:{RBT};--fd:'Rubik';--fb:'Tajawal';--fl:'DM Sans'}}
+&{{--bg:{BG};--ink:{INK};--mut:{MUT};--ac:{RBT};--btn:{RB};--btnfg:{ONR};--r:12px;--rb:999px;--ga:1/1.1;--fd:'Rubik';--fb:'Tajawal';--fl:'DM Sans'}}
 & .hd{{display:flex;align-items:center;justify-content:space-between;height:68px;padding:0 6px;position:sticky;top:0;z-index:3;background:{BG}}}
 & .logo{{font-family:var(--fd),sans-serif;font-size:36px;font-weight:700;color:{RBT};display:flex;align-items:baseline;gap:8px;line-height:1}}
 & .logo i{{font-family:var(--fl),sans-serif;font-style:normal;font-size:13px;letter-spacing:.24em;color:{INK};font-weight:500}}
@@ -105,10 +110,10 @@ def jb():
 & .ugc>h2{{font-size:24px;padding:0 16px 12px}}
 & .u{{flex:none;width:112px;height:112px;border-radius:12px}}
 """
-    html = f"""<header class="hd"><button class="ib" type="button" aria-label="القائمة">{I('menu')}</button><div class="logo">ياسمين <i>JASMINE</i></div><button class="ib" type="button" aria-label="السلة">{I('bag')}</button></header>
+    html = f"""<header class="hd"><button class="ib" type="button" aria-label="القائمة" data-open-menu>{I('menu')}</button><div class="logo">ياسمين <i>JASMINE</i></div><button class="ib" type="button" aria-label="السلة" data-open-cart>{I('bag')}</button></header>
 <section class="hero"><div class="ph">{hero}</div><h2>لون الشفايف هو لون الصفحة</h2><p>درجات بتلبّس كل بشرة مصرية، من الفاتح للقمحي.</p><a class="cta" href="#">جرّبي الدرجات</a></section>
 <section class="sec"><h2>روتينك اليومي</h2><div class="snap">{rc}</div></section>
-<section class="sec" style="padding-top:26px"><h2>أحدث المنتجات</h2><div class="g2">{cards}</div></section>
+<section class="sec" style="padding-top:26px"><h2>أحدث المنتجات</h2><div class="g2" data-grid>{cards}</div></section>
 <section class="ugc"><h2>بنات ياسمين بيجرّبوا</h2><div class="row">{ug}</div></section>
 {footer('#3a1e2a', '#fff1f3', '#e9c3cd', 'ياسمين', 'ألوان وعناية في مكان واحد.', ['من نحن', 'درجات الألوان', 'الشحن والاسترجاع', 'تواصلي معنا'])}"""
     return css, html
@@ -122,16 +127,20 @@ def jc():
     cw = lambda c, d, a: ('#f1f8f7', '#dcefec', c, d, a)
     P = {'pump': cw('#ffffff', MINT, '#cfeee8'), 'dropper': cw('#e6f5f2', INK, MINT), 'tube': cw('#ffffff', MINT, '#d5efe9'), 'jar': cw('#ffffff', INK, MINT), 'mask': cw('#ffffff', MINT, '#cfeee8')}
     hero = img('pump', ('#eaf6f4', '#c3e5df', '#ffffff', MINT, '#cfeee8'), 'عبوة غسول', 1.45, pk='hero')
-    steps = [('1', 'نضّفي', 'غسول لطيف بالساليسيليك 1%', 'pump', 180), ('2', 'عالجي', 'سيروم نياسيناميد 10%', 'dropper', 340), ('3', 'احمي', 'واقي شمس SPF 50+', 'tube', 290)]
-    st = ''.join(f'<li class="st"><span class="n">{n}</span><div class="ph sh">{img(k, P[k], t, 1.2)}</div><div class="sb"><h3>{t}</h3><p>{d}</p>{price(p)}</div><button class="qa" type="button" aria-label="إضافة {t}">{I("plus", 18)}</button></li>' for n, t, d, k, p in steps)
-    cons = [('حب الشباب', 'تنظيف المسام وتهدئة الالتهاب'), ('تصبغات', 'توحيد اللون وإضاءة تدريجية'), ('جفاف', 'ترطيب عميق وحماية الحاجز')]
-    ct = ''.join(f'<a class="cn" href="#"><h3>{t}</h3><p>{d}</p></a>' for t, d in cons)
+    CN = {'acne': 'حب الشباب', 'pigment': 'تصبغات', 'dry': 'جفاف'}
+    concern = {'سيروم نياسيناميد': 'acne pigment', 'غسول ساليسيليك': 'acne', 'كريم سيراميد': 'dry', 'واقي شمس SPF 50+': 'pigment', 'سيروم فيتامين C': 'pigment', 'ماسك مرطّب': 'dry'}
+    dsc = 'اختبار حساسية · بإشراف صيدلانية · من غير عطور'
+    steps = [('1', 'نضّفي', 'غسول لطيف بالساليسيليك 1%', 'pump', 180, 'غسول ساليسيليك', 'ساليسيليك 1%'), ('2', 'عالجي', 'سيروم نياسيناميد 10%', 'dropper', 340, 'سيروم نياسيناميد', 'نياسيناميد 10%'),
+             ('3', 'احمي', 'واقي شمس SPF 50+', 'tube', 290, 'واقي شمس SPF 50+', 'فلاتر معدنية')]
+    st = ''.join(f'<li class="st" {pd(pn, p, {"سيروم نياسيناميد": 395, "واقي شمس SPF 50+": 330}.get(pn), k, cat=concern[pn], ing=act, skin="، ".join(CN[x] for x in concern[pn].split()), desc=dsc)}><span class="n">{n}</span><div class="ph sh">{img(k, P[k], t, 1.2)}</div><div class="sb"><h3>{t}</h3><p>{d}</p>{price(p)}</div><button class="qa" type="button" aria-label="إضافة {t}" data-add>{I("plus", 18)}</button></li>' for n, t, d, k, p, pn, act in steps)
+    cons = [('حب الشباب', 'تنظيف المسام وتهدئة الالتهاب', 'acne'), ('تصبغات', 'توحيد اللون وإضاءة تدريجية', 'pigment'), ('جفاف', 'ترطيب عميق وحماية الحاجز', 'dry')]
+    ct = ''.join(f'<a class="cn" href="#" data-cat="{c}"><h3>{t}</h3><p>{d}</p></a>' for t, d, c in cons)
     prods = [('سيروم نياسيناميد', 'نياسيناميد 10%', 340, 395, 'dropper'), ('غسول ساليسيليك', 'ساليسيليك 1%', 180, None, 'pump'), ('كريم سيراميد', 'سيراميد 3%', 365, None, 'jar'),
              ('واقي شمس SPF 50+', 'فلاتر معدنية', 290, 330, 'tube'), ('سيروم فيتامين C', 'فيتامين C 15%', 410, None, 'dropper'), ('ماسك مرطّب', 'هيالورونيك 2%', 60, None, 'mask')]
-    cards = ''.join(f'<article><div class="ph" style="aspect-ratio:1/1.1">{img(k, P[k], n, 1.15)}</div><span class="act">{a}</span><h3 class="nm">{n}</h3>'
-                    f'<div class="pr">{price(p, o)}<button class="qa" type="button" aria-label="إضافة {n}">{I("plus", 18)}</button></div></article>' for n, a, p, o, k in prods)
+    cards = ''.join(f'<article {pd(n, p, o, k, cat=concern[n], ing=a, skin="، ".join(CN[x] for x in concern[n].split()), desc=dsc)}><div class="ph" style="aspect-ratio:1/1.1">{img(k, P[k], n, 1.15)}</div><span class="act">{a}</span><h3 class="nm">{n}</h3>'
+                    f'<div class="pr">{price(p, o)}<button class="qa" type="button" aria-label="إضافة {n}" data-add>{I("plus", 18)}</button></div></article>' for n, a, p, o, k in prods)
     css = f"""
-&{{--bg:#fff;--ink:{INK};--mut:{MUT};--ac:{MT};--fd:'Readex Pro';--fb:'Readex Pro';--fl:'Figtree'}}
+&{{--bg:#fff;--ink:{INK};--mut:{MUT};--ac:{MT};--btn:{MINT};--btnfg:{ONM};--r:10px;--rb:8px;--ga:1/1.1;--fd:'Readex Pro';--fb:'Readex Pro';--fl:'Figtree'}}
 & .hd{{display:flex;align-items:center;justify-content:space-between;height:66px;padding:0 6px;position:sticky;top:0;z-index:3;background:#fff;border-bottom:1px solid #e2eceb}}
 & .logo{{font-size:30px;font-weight:600;display:flex;align-items:baseline;gap:8px;line-height:1}}
 & .logo i{{font-family:var(--fl),sans-serif;font-style:normal;font-size:13px;letter-spacing:.26em;color:{MUT};font-weight:500}}
@@ -158,10 +167,10 @@ def jc():
 & .act{{display:inline-block;margin-top:6px;background:{AQ};color:{INK};font-size:12px;font-weight:600;padding:1px 10px;border-radius:999px}}
 & .pr{{display:flex;justify-content:space-between;align-items:center}}
 """
-    html = f"""<header class="hd"><button class="ib" type="button" aria-label="القائمة">{I('menu')}</button><div class="logo">ياسمين <i>JASMINE</i></div><button class="ib" type="button" aria-label="السلة">{I('bag')}</button></header>
+    html = f"""<header class="hd"><button class="ib" type="button" aria-label="القائمة" data-open-menu>{I('menu')}</button><div class="logo">ياسمين <i>JASMINE</i></div><button class="ib" type="button" aria-label="السلة" data-open-cart>{I('bag')}</button></header>
 <section class="hero"><div><h2>بشرة هادية بخطوات واضحة</h2><p>روتين معتمد على مكونات فعّالة بتركيزات مكتوبة.</p><a class="cta" href="#">ابدئي روتينك</a></div><div class="ph">{hero}</div></section>
 <section class="rt"><h2>روتينك في 3 خطوات</h2><ol style="list-style:none;margin:0;padding:0">{st}</ol></section>
 <section class="cons"><h2>إيه اللي مضايق بشرتك؟</h2>{ct}</section>
-<section class="shop"><h2>كل المنتجات</h2><div class="g2">{cards}</div></section>
+<section class="shop"><h2>كل المنتجات</h2><div class="g2" data-grid>{cards}</div></section>
 {footer('#13212b', '#ffffff', '#bfd0d8', 'ياسمين', 'عناية جلدية بمعايير واضحة، بإشراف صيدلانية.', ['من نحن', 'المكونات', 'الشحن والاسترجاع', 'تواصلي معنا'])}"""
     return css, html

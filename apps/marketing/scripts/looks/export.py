@@ -4,7 +4,8 @@ Writes, under apps/marketing/public/looks/:
   <template>.html   fragment: <style> (scoped per phone) + one block per look, separated by <!--look-->
   img/<fn>__<key>.webp  photos (converted from LOOKS_IMG_DIR jpgs when present; existing webps are kept)
 and apps/marketing/src/lib/looks-fonts.ts (Google Fonts families per template).
-No base64 anywhere. Photos are lazy <img>, links and idle buttons are inert (tabindex -1).
+No base64 anywhere. Photos are lazy <img>, links and idle buttons are inert (tabindex -1) except the engine's controls
+(data-cat, data-add, data-open-*), which the working-phone engine binds to.
 """
 import os, re, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -16,10 +17,11 @@ from catalog import T, FONTS
 ROOT = os.path.join(lib.HERE, '..', '..')
 OUT = os.path.join(ROOT, 'public', 'looks')
 os.makedirs(os.path.join(OUT, 'img'), exist_ok=True)
-INTERACTIVE = re.compile(r'class="(?:chip|cmp|day)\b')
+# Controls that stay in the tab order: the in-phone engine (src/lib/phone-store-dom.ts) binds to these.
+INTERACTIVE = re.compile(r'class="(?:chip|cmp|day)\b|data-(?:add|open-cart|open-menu|open-search|bundle)\b')
 
 def inert(html):
-    html = re.sub(r'<a (href="#")', r'<a tabindex="-1" \1', html)
+    html = re.sub(r'<a (href="#")(?![^>]*data-cat)', r'<a tabindex="-1" \1', html)
     def btn(m):
         tag = m.group(0)
         return tag if INTERACTIVE.search(tag) else tag.replace('<button ', '<button tabindex="-1" ', 1)
@@ -54,6 +56,12 @@ def dedupe_alt(html):
         return m.group(0).replace('alt="%s"' % m.group(1), 'alt=""', 1) if re.search('>\\s*' + re.escape(m.group(1)) + '\\s*<', m.string[m.end():m.end() + 260]) else m.group(0)
     return re.sub(r'<img class="im"[^>]*? alt="([^"]+)"[^>]*>', alt, html)
 
+def ps_css(scope):
+    """The working-phone engine styles (phone-store.css), scoped like a look's own CSS but once per template."""
+    css = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'phone-store.css'), encoding='utf-8').read()
+    css = re.sub(r'/\*.*?\*/', '', css, flags=re.S).replace('&', scope)
+    return re.sub(r'\s*\n\s*', ' ', css).strip()
+
 def fam(font):
     return font.split(':')[0].replace('+', ' ')
 
@@ -70,6 +78,7 @@ for tid, en, ar, vert, items in T:
         used.update(re.findall(r"--f[dbl]:'([^']+)'", css))
         styles.append(re.sub(r'\s*\n\s*', ' ', scoped))
         blocks.append(f'<div class="scr" id="{pid}" dir="rtl" lang="ar" tabindex="0" role="region" aria-label="{ar} · {en} {letter} {name}">{inert(html)}</div>')
+    styles.append(ps_css(':is(' + ','.join(f'#ph-{tid}-{x[1].lower()}' for x in items) + ')'))
     frag = '<style>' + ''.join(styles) + '</style><!--look-->' + '<!--look-->'.join(blocks)
     assert 'data:' not in frag and 'base64' not in frag, f'{tid}: inline data URI in fragment'
     with open(os.path.join(OUT, f'{tid}.html'), 'w', encoding='utf-8') as f: f.write(frag)
