@@ -9,8 +9,9 @@
  * seed rows a super-admin-provisioned one does (VAT rate, default category,
  * COD payment config, subscription).
  */
-import { prisma, Prisma, withUser, withStore } from '@force/database';
+import { prisma, Prisma, withUser, withStore, runInStoreScope } from '@force/database';
 import {
+  getLook,
   storeCreatedEventId,
   storeHost,
   storefrontOrigin,
@@ -18,8 +19,9 @@ import {
   type StoreSlugErrorCode,
 } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
+import logger from '../lib/logger';
 import { ProvisioningService } from './provisioning.service';
-import { bustStoreCaches } from './store.service';
+import { bustStoreCaches, StoreService } from './store.service';
 import { SetupGuideService } from './setup-guide.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { storeIdBySlug } from '../lib/definer';
@@ -36,6 +38,7 @@ import { emitEbdaConversion } from './ebda-ads-emit';
 /** A self-serve owner may hold this many stores (abuse bound; raise with plans). */
 export const MAX_SELF_SERVE_STORES_PER_OWNER = 3;
 
+/** Legacy bare-skin choice, kept for callers that predate looks (new clients send `lookId`). */
 export const SELF_SERVE_TEMPLATES = ['modern', 'classic', 'minimal', 'bold', 'elegant'] as const;
 export type SelfServeTemplate = (typeof SELF_SERVE_TEMPLATES)[number];
 
@@ -99,6 +102,7 @@ export class OnboardingService {
           domain: true,
           status: true,
           template: true,
+          look: true,
           plan: true,
         },
       })
@@ -140,6 +144,7 @@ export class OnboardingService {
             slug: store.slug,
             status: store.status,
             template: store.template,
+            look: store.look,
             host: storeHost(store.slug),
             url: storefrontOrigin({ slug: store.slug, domain: store.domain }),
             planCode: subscriptionPlan,
@@ -158,6 +163,8 @@ export class OnboardingService {
       nameAr?: string;
       slug: string;
       template?: SelfServeTemplate;
+      /** A look from the registry: sets look + skin and shapes the home page (wins over `template`). */
+      lookId?: string;
       language?: 'ar' | 'en';
       /** Plan chosen at signup (billed at trial end); defaults to Growth monthly. */
       plan?: TrialChoice;
@@ -185,6 +192,11 @@ export class OnboardingService {
     const { plan: chosen } = await loadPayablePlan(trialChoice.planCode, trialChoice.interval);
     if (!chosen.isPublic) {
       throw new AppError(400, 'PLAN_NOT_PURCHASABLE', 'This plan cannot be purchased');
+    }
+
+    const look = input.lookId === undefined ? undefined : getLook(input.lookId);
+    if (input.lookId !== undefined && !look) {
+      throw new AppError(400, 'INVALID_LOOK', 'Unknown look');
     }
 
     const availability = await this.checkSlug(input.slug, {
@@ -222,7 +234,7 @@ export class OnboardingService {
           growthTrial: ownedNow === 0,
           trialChoice,
           status: 'inactive',
-          template: input.template,
+          template: look ? (look.skin as SelfServeTemplate) : input.template,
           ownerEmail: user.email,
           ownerName: `${user.firstName} ${user.lastName}`.trim() || user.email,
           settings: { defaultLanguage: input.language ?? 'ar' },
@@ -236,6 +248,7 @@ export class OnboardingService {
             storeId: result.store.id,
           });
         }
+        if (look) await this.applyChosenLook(result.store.id, look.id, owner.userId);
         return result.store;
       } catch (err) {
         // Lost the slug race between the check above and the insert.
@@ -246,6 +259,24 @@ export class OnboardingService {
       }
     };
     return owner.isSuperAdmin ? create() : withStoreCreationLock(owner.userId, create);
+  }
+
+  /**
+   * Put the chosen look on a just-provisioned store. Onboarding runs with NO ambient tenant
+   * context, so the work is bound to the new store's scope (applyLook reads/writes the store and
+   * its home-page revisions). A brand-new store is "genuinely fresh", so the home page is
+   * published. Best effort: the store already exists and is usable, and a retry of the whole
+   * request would only hit SLUG_TAKEN, so a failure is logged and the merchant re-picks a look in
+   * the builder rather than being told their store was not created.
+   */
+  private static async applyChosenLook(storeId: string, lookId: string, userId: string) {
+    try {
+      await runInStoreScope(storeId, () =>
+        StoreService.applyLook(storeId, lookId, { design: 'reset' }, userId)
+      );
+    } catch (err) {
+      logger.error({ err, storeId, lookId }, '[ONBOARDING] applying the chosen look failed');
+    }
   }
 
   /**
