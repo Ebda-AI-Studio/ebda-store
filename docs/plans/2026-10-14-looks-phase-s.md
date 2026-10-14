@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Every store has a *look* (one of 15: 5 templates × 3), picked at onboarding or later, that sets its design tokens and section mix; switching looks never loses content, merchant design edits show as overrides with reset, and a demo store can preview any built look without saving.
+**Goal:** Every store has a _look_ (one of 15: 5 templates × 3), picked at onboarding or later, that sets its design tokens and section mix; switching looks never loses content, merchant design edits show as overrides with reset, and a demo store can preview any built look without saving.
 
 **Architecture:** Looks are data in `@force/shared` (`packages/shared/src/looks/`), never forked code. The storefront composes the theme as `DEFAULT_THEME < TEMPLATE_THEMES[skin] < look tokens < stores.theme` through ONE function, `composeStoreTheme`, used by every resolver site. The look id lives in a new nullable column `stores.look`; switching is one API call (`PUT /stores/:id/look`) that sets skin + look, optionally clears overridden token keys, and applies the look's section mix to the builder (publish for an empty store, draft otherwise). Skins per template arrive in Phase B; until then every look renders on the `minimal` skin with its own tokens.
 
@@ -11,6 +11,7 @@
 **Spec:** `docs/plans/2026-10-14-templates-and-editor-program.md` (Phase S + Rulings TPL-1..3, MKT-3), `docs/ebda/templates/2026-10-14-directions.md` (the 15 looks), `PRODUCT.md`. Current-system map: §"What exists today" below (gathered 2026-10-14 from source).
 
 ## Rulings (decided at plan time)
+
 - **Ruling LOOKS-1 — a look is data over the shared section registry + token set; it never forks commerce code.** Evidence: TPL-1; Dahab's skin already shows the cost of a forked component set (12 handover sites). Cost if wrong: a look needs a layout the registry can't express → that look waits for a new section type in Phase B (acceptable).
 - **Ruling LOOKS-2 — the look id is a Store column `stores.look` (nullable TEXT), not a StoreTheme key.** Evidence: StoreTheme is an untyped, shallow-merged JSON written by four surfaces (Branding, Smart Palette, builder publish, legacy PUT); a key there can be clobbered by any of them, and the resolver needs the look BEFORE it merges the theme. CLAUDE.md UI rule 3 prefers theme JSON unless API-gated — the look is read by the API (onboarding, demo gating, publish) so the column is justified. Cost if wrong: one extra column to migrate away from.
 - **Ruling LOOKS-3 — switching look keeps content always; design overrides are kept unless the merchant chooses "reset".** Evidence: TPL-1 ("switching keeps content; a switch asks before discarding design overrides"). Cost if wrong: a merchant who expected a clean switch sees their old colours — the dialog's default and copy make the choice explicit.
@@ -18,6 +19,7 @@
 - **Ruling LOOKS-5 — the four template enum values (qamar, souq, jasmine, lamma) are NOT added in Phase S.** Evidence: `TemplateId` drives five exhaustive `Record<TemplateId,…>` maps (serverTemplate, pack-styles, baselines, TEMPLATE_THEMES, templates/index); adding ids before their skins exist forces placeholder entries. Each id is added in Phase B with its skin. Cost if wrong: none for Phase S; `LookDefinition.skin` carries the rendering skin meanwhile.
 
 ## Global Constraints
+
 - Colours in StoreTheme are bare HSL triplets (`'26 100% 50%'`); convert from hex with `hexToHsl` (`packages/shared/src/utils/color.ts:207`).
 - WCAG AA: every text pair ≥ 4.5:1 (`contrastRatio`, `color.ts:320`); nothing under 12px.
 - No cream/sand page backgrounds (OKLCH L 0.84–0.97, C < 0.06, hue 40–100) — enforced by test.
@@ -29,6 +31,7 @@
 - Docs parity in the same PR: `docs/architecture/store-theme-flags.md`, `docs/RULINGS.md`, `docs/ebda/templates/looks.md` (new).
 
 ## Review Focus
+
 1. **Merchant edited colours, then switches look** → with "keep", their edited keys still win and show as overrides; with "reset", the new look's tokens show. (Task 6 test `applyLook keep vs reset`.)
 2. **`stores.look` holds an id that no longer exists** (renamed/removed look) → storefront renders the skin defaults, never 500s; admin shows "choose a look". (Task 3 test `unknown look id falls back`.)
 3. **`?look=` on a non-demo store** → ignored, response cacheable as normal; on a demo store → applied with `Cache-Control: private, no-store`. (Task 9 tests.)
@@ -38,6 +41,7 @@
 ---
 
 ## What exists today (facts, 2026-10-14)
+
 - `stores.template` enum `StoreTemplate {modern classic minimal bold elegant dahab}` (`schema.prisma:827`); write path `PUT /stores/:id/template` → `StoreService.updateTemplate` (`store.service.ts:938`, hard-coded list :941).
 - Theme compose: `{...getTemplateTheme(template), ...stores.theme}` in `apps/web/src/lib/store-resolver.ts:383`, `:553`, `:887`.
 - `StoreService.updateTheme` (`store.service.ts:971`) shallow-merges; no delete.
@@ -49,6 +53,7 @@
 - Orders: `OrderService.create` calls `assertOrderAllowed(storeId)` first (`order.service.ts:597`).
 
 ## File map
+
 - Create `packages/shared/src/looks/types.ts` — `LookId`, `LookTokens`, `LookDefinition`, `LOOK_TOKEN_KEYS`.
 - Create `packages/shared/src/looks/registry.ts` — the 15 `LOOKS`, `getLook`, `looksForTemplate`, `LOOK_TEMPLATES`.
 - Create `packages/shared/src/looks/compose.ts` — `lookTheme(look)`, `composeStoreTheme({template, look, theme})`, `overriddenLookKeys(theme, look)`.
@@ -68,11 +73,13 @@
 ### Task 1: Look types and the 15-look registry
 
 **Files:**
+
 - Create: `packages/shared/src/looks/types.ts`, `packages/shared/src/looks/registry.ts`, `packages/shared/src/looks/index.ts`
 - Modify: `packages/shared/src/index.ts` (add `export * from './looks';`)
 - Test: `tests/unit/looks-registry.test.ts`
 
 **Interfaces:**
+
 - Produces: `type LookTemplate = 'qamar'|'souq'|'jasmine'|'lamma'|'dahab'`; `type LookId = \`${LookTemplate}.${string}\``; `interface LookTokens`; `interface LookDefinition`; `LOOKS: readonly LookDefinition[]`; `getLook(id: string | null | undefined): LookDefinition | undefined`; `looksForTemplate(t: LookTemplate): LookDefinition[]`; `LOOK_TEMPLATES: readonly LookTemplate[]`; `LOOK_TOKEN_KEYS: readonly (keyof StoreTheme)[]`.
 
 - [ ] **Step 1: Write the failing test**
@@ -124,8 +131,14 @@ export type Motion = 'none' | 'subtle' | 'expressive';
 
 /** Colour roles as hex; converted to HSL triplets by lookTheme(). */
 export interface LookTokens {
-  page: string; surface: string; ink: string; muted: string;
-  primary: string; onPrimary: string; accent: string; line: string;
+  page: string;
+  surface: string;
+  ink: string;
+  muted: string;
+  primary: string;
+  onPrimary: string;
+  accent: string;
+  line: string;
   /** Arabic display face, body face (Arabic-capable), Latin display face — Google Fonts family names. */
   fonts: { display: string; body: string; latin: string };
   radius: BorderRadius;
@@ -150,10 +163,31 @@ export interface LookDefinition {
 
 /** StoreTheme keys a look owns. A stored value for one of these is a merchant override. */
 export const LOOK_TOKEN_KEYS = [
-  'backgroundColor', 'foregroundColor', 'cardColor', 'cardForeground', 'popoverColor', 'popoverForeground',
-  'mutedColor', 'mutedForeground', 'primaryColor', 'primaryForeground', 'accentColor', 'accentForeground',
-  'secondaryColor', 'secondaryForeground', 'borderColor', 'inputColor', 'ringColor',
-  'headingFont', 'bodyFont', 'borderRadius', 'density', 'imageRatio', 'motion', 'bgPage', 'bgSectionAlt',
+  'backgroundColor',
+  'foregroundColor',
+  'cardColor',
+  'cardForeground',
+  'popoverColor',
+  'popoverForeground',
+  'mutedColor',
+  'mutedForeground',
+  'primaryColor',
+  'primaryForeground',
+  'accentColor',
+  'accentForeground',
+  'secondaryColor',
+  'secondaryForeground',
+  'borderColor',
+  'inputColor',
+  'ringColor',
+  'headingFont',
+  'bodyFont',
+  'borderRadius',
+  'density',
+  'imageRatio',
+  'motion',
+  'bgPage',
+  'bgSectionAlt',
 ] as const satisfies readonly (keyof StoreTheme)[];
 ```
 
@@ -163,115 +197,435 @@ export const LOOK_TOKEN_KEYS = [
 // packages/shared/src/looks/registry.ts
 import type { LookDefinition, LookTemplate } from './types';
 
-export const LOOK_TEMPLATES: readonly LookTemplate[] = ['dahab', 'qamar', 'souq', 'jasmine', 'lamma'];
+export const LOOK_TEMPLATES: readonly LookTemplate[] = [
+  'dahab',
+  'qamar',
+  'souq',
+  'jasmine',
+  'lamma',
+];
 
 const L = (d: LookDefinition) => d;
 export const LOOKS: readonly LookDefinition[] = [
-  L({ id: 'qamar.atelier', template: 'qamar', letter: 'A', skin: 'minimal', status: 'designed',
+  L({
+    id: 'qamar.atelier',
+    template: 'qamar',
+    letter: 'A',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'أتيليه', en: 'Atelier' },
     forWhom: { ar: 'لبوتيك هدومه بتتكلم لوحدها.', en: 'For a boutique whose clothes speak alone.' },
-    idea: { ar: 'صور كبيرة وواجهة قليلة: الهدوم هي الواجهة.', en: 'Oversized photography, almost no chrome.' },
-    tokens: { page: '#FFFFFF', surface: '#FFFFFF', ink: '#141414', muted: '#5C5C5C', primary: '#141414', onPrimary: '#FFFFFF',
-      accent: '#6E1F2A', line: '#E6E6E6', fonts: { display: 'Noto Naskh Arabic', body: 'IBM Plex Sans Arabic', latin: 'Cormorant Garamond' },
-      radius: 'none', density: 'airy', imageRatio: '3/4', motion: 'subtle' } }),
-  L({ id: 'qamar.lookbook', template: 'qamar', letter: 'B', skin: 'minimal', status: 'designed',
+    idea: {
+      ar: 'صور كبيرة وواجهة قليلة: الهدوم هي الواجهة.',
+      en: 'Oversized photography, almost no chrome.',
+    },
+    tokens: {
+      page: '#FFFFFF',
+      surface: '#FFFFFF',
+      ink: '#141414',
+      muted: '#5C5C5C',
+      primary: '#141414',
+      onPrimary: '#FFFFFF',
+      accent: '#6E1F2A',
+      line: '#E6E6E6',
+      fonts: {
+        display: 'Noto Naskh Arabic',
+        body: 'IBM Plex Sans Arabic',
+        latin: 'Cormorant Garamond',
+      },
+      radius: 'none',
+      density: 'airy',
+      imageRatio: '3/4',
+      motion: 'subtle',
+    },
+  }),
+  L({
+    id: 'qamar.lookbook',
+    template: 'qamar',
+    letter: 'B',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'لوك بوك', en: 'Lookbook' },
-    forWhom: { ar: 'للستايلست والمحلات اللي بتبيع لوك كامل.', en: 'For stylists who sell whole outfits.' },
+    forWhom: {
+      ar: 'للستايلست والمحلات اللي بتبيع لوك كامل.',
+      en: 'For stylists who sell whole outfits.',
+    },
     idea: { ar: 'اشتري اللوك كله بضغطة.', en: 'Shop the whole outfit in one tap.' },
-    tokens: { page: '#1E2340', surface: '#2A3158', ink: '#F4F1FA', muted: '#C3C0D8', primary: '#E8A33D', onPrimary: '#1E2340',
-      accent: '#E8A33D', line: '#3B4270', fonts: { display: 'Lalezar', body: 'Tajawal', latin: 'Archivo' },
-      radius: 'md', density: 'regular', imageRatio: '4/5', motion: 'expressive' } }),
-  L({ id: 'qamar.vitrine', template: 'qamar', letter: 'C', skin: 'minimal', status: 'designed',
+    tokens: {
+      page: '#1E2340',
+      surface: '#2A3158',
+      ink: '#F4F1FA',
+      muted: '#C3C0D8',
+      primary: '#E8A33D',
+      onPrimary: '#1E2340',
+      accent: '#E8A33D',
+      line: '#3B4270',
+      fonts: { display: 'Lalezar', body: 'Tajawal', latin: 'Archivo' },
+      radius: 'md',
+      density: 'regular',
+      imageRatio: '4/5',
+      motion: 'expressive',
+    },
+  }),
+  L({
+    id: 'qamar.vitrine',
+    template: 'qamar',
+    letter: 'C',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'فاترينة', en: 'Vitrine' },
     forWhom: { ar: 'لهدوم المناسبات: فرح وخطوبة وسهرة.', en: 'For occasion wear.' },
     idea: { ar: 'تسوّق حسب المناسبة.', en: 'Occasion-first navigation.' },
-    tokens: { page: '#F5F5F6', surface: '#FFFFFF', ink: '#1A1A1F', muted: '#55555E', primary: '#1F4E54', onPrimary: '#FFFFFF',
-      accent: '#9E5E5E', line: '#E0E0E5', fonts: { display: 'Aref Ruqaa', body: 'Noto Sans Arabic', latin: 'Playfair Display' },
-      radius: 'sm', density: 'regular', imageRatio: '3/4', motion: 'subtle' } }),
-  L({ id: 'souq.catalogue', template: 'souq', letter: 'A', skin: 'minimal', status: 'designed',
+    tokens: {
+      page: '#F5F5F6',
+      surface: '#FFFFFF',
+      ink: '#1A1A1F',
+      muted: '#55555E',
+      primary: '#1F4E54',
+      onPrimary: '#FFFFFF',
+      accent: '#9E5E5E',
+      line: '#E0E0E5',
+      fonts: { display: 'Aref Ruqaa', body: 'Noto Sans Arabic', latin: 'Playfair Display' },
+      radius: 'sm',
+      density: 'regular',
+      imageRatio: '3/4',
+      motion: 'subtle',
+    },
+  }),
+  L({
+    id: 'souq.catalogue',
+    template: 'souq',
+    letter: 'A',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'كتالوج', en: 'Catalogue' },
-    forWhom: { ar: 'لمحل فيه أصناف كتير والزبون عارف عايز إيه.', en: 'For many SKUs and shoppers who know what they want.' },
+    forWhom: {
+      ar: 'لمحل فيه أصناف كتير والزبون عارف عايز إيه.',
+      en: 'For many SKUs and shoppers who know what they want.',
+    },
     idea: { ar: 'توصل للي عايزه في ضغطتين.', en: 'Find it in two taps.' },
-    tokens: { page: '#FFFFFF', surface: '#F5F7FA', ink: '#10151C', muted: '#555D69', primary: '#1F5FD6', onPrimary: '#FFFFFF',
-      accent: '#1F5FD6', line: '#E2E6EC', fonts: { display: 'IBM Plex Sans Arabic', body: 'IBM Plex Sans Arabic', latin: 'IBM Plex Sans' },
-      radius: 'md', density: 'compact', imageRatio: '1/1', motion: 'subtle' } }),
-  L({ id: 'souq.night', template: 'souq', letter: 'B', skin: 'minimal', status: 'designed',
+    tokens: {
+      page: '#FFFFFF',
+      surface: '#F5F7FA',
+      ink: '#10151C',
+      muted: '#555D69',
+      primary: '#1F5FD6',
+      onPrimary: '#FFFFFF',
+      accent: '#1F5FD6',
+      line: '#E2E6EC',
+      fonts: {
+        display: 'IBM Plex Sans Arabic',
+        body: 'IBM Plex Sans Arabic',
+        latin: 'IBM Plex Sans',
+      },
+      radius: 'md',
+      density: 'compact',
+      imageRatio: '1/1',
+      motion: 'subtle',
+    },
+  }),
+  L({
+    id: 'souq.night',
+    template: 'souq',
+    letter: 'B',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'سوق الليل', en: 'Night souq' },
-    forWhom: { ar: 'لتاجر عايز دفا وشخصية.', en: 'For a retailer who wants warmth and personality.' },
+    forWhom: {
+      ar: 'لتاجر عايز دفا وشخصية.',
+      en: 'For a retailer who wants warmth and personality.',
+    },
     idea: { ar: 'سوق منوّر من غير زحمة.', en: 'Lit and alive without clutter.' },
-    tokens: { page: '#0F3B2E', surface: '#14503F', ink: '#F6F3EA', muted: '#B4CDC0', primary: '#C89B3C', onPrimary: '#10151C',
-      accent: '#E2702B', line: '#1E5A48', fonts: { display: 'Changa', body: 'Cairo', latin: 'Manrope' },
-      radius: 'md', density: 'regular', imageRatio: '1/1', motion: 'expressive' } }),
-  L({ id: 'souq.showroom', template: 'souq', letter: 'C', skin: 'minimal', status: 'designed',
+    tokens: {
+      page: '#0F3B2E',
+      surface: '#14503F',
+      ink: '#F6F3EA',
+      muted: '#B4CDC0',
+      primary: '#C89B3C',
+      onPrimary: '#10151C',
+      accent: '#E2702B',
+      line: '#1E5A48',
+      fonts: { display: 'Changa', body: 'Cairo', latin: 'Manrope' },
+      radius: 'md',
+      density: 'regular',
+      imageRatio: '1/1',
+      motion: 'expressive',
+    },
+  }),
+  L({
+    id: 'souq.showroom',
+    template: 'souq',
+    letter: 'C',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'شو روم', en: 'Showroom' },
-    forWhom: { ar: 'لمجموعة صغيرة فاخرة بتتباع قطعة قطعة.', en: 'For a small premium range sold one object at a time.' },
+    forWhom: {
+      ar: 'لمجموعة صغيرة فاخرة بتتباع قطعة قطعة.',
+      en: 'For a small premium range sold one object at a time.',
+    },
     idea: { ar: 'المنتج هو البطل.', en: 'Product as hero.' },
-    tokens: { page: '#F2F3F5', surface: '#FFFFFF', ink: '#0B0C0E', muted: '#565B63', primary: '#2A6BFF', onPrimary: '#FFFFFF',
-      accent: '#2A6BFF', line: '#DFE2E7', fonts: { display: 'Alexandria', body: 'Readex Pro', latin: 'Inter Tight' },
-      radius: 'lg', density: 'airy', imageRatio: '1/1', motion: 'subtle' } }),
-  L({ id: 'jasmine.apothecary', template: 'jasmine', letter: 'A', skin: 'minimal', status: 'designed',
+    tokens: {
+      page: '#F2F3F5',
+      surface: '#FFFFFF',
+      ink: '#0B0C0E',
+      muted: '#565B63',
+      primary: '#2A6BFF',
+      onPrimary: '#FFFFFF',
+      accent: '#2A6BFF',
+      line: '#DFE2E7',
+      fonts: { display: 'Alexandria', body: 'Readex Pro', latin: 'Inter Tight' },
+      radius: 'lg',
+      density: 'airy',
+      imageRatio: '1/1',
+      motion: 'subtle',
+    },
+  }),
+  L({
+    id: 'jasmine.apothecary',
+    template: 'jasmine',
+    letter: 'A',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'عطارة', en: 'Apothecary' },
-    forWhom: { ar: 'للعناية الطبيعية اللي الثقة فيها من مكوناتها.', en: 'For natural skincare trusted for its ingredients.' },
+    forWhom: {
+      ar: 'للعناية الطبيعية اللي الثقة فيها من مكوناتها.',
+      en: 'For natural skincare trusted for its ingredients.',
+    },
     idea: { ar: 'المكونات الأول، وبعدين المنتج.', en: 'Ingredients first.' },
-    tokens: { page: '#2E2A22', surface: '#3A352B', ink: '#F3EFE6', muted: '#CFC7B6', primary: '#C9822B', onPrimary: '#1E1B16',
-      accent: '#D9984A', line: '#4A4438', fonts: { display: 'Amiri', body: 'Noto Sans Arabic', latin: 'Fraunces' },
-      radius: 'sm', density: 'regular', imageRatio: '4/5', motion: 'subtle' } }),
-  L({ id: 'jasmine.bloom', template: 'jasmine', letter: 'B', skin: 'minimal', status: 'designed',
+    tokens: {
+      page: '#2E2A22',
+      surface: '#3A352B',
+      ink: '#F3EFE6',
+      muted: '#CFC7B6',
+      primary: '#C9822B',
+      onPrimary: '#1E1B16',
+      accent: '#D9984A',
+      line: '#4A4438',
+      fonts: { display: 'Amiri', body: 'Noto Sans Arabic', latin: 'Fraunces' },
+      radius: 'sm',
+      density: 'regular',
+      imageRatio: '4/5',
+      motion: 'subtle',
+    },
+  }),
+  L({
+    id: 'jasmine.bloom',
+    template: 'jasmine',
+    letter: 'B',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'بلوم', en: 'Bloom' },
-    forWhom: { ar: 'للمكياج وجمهور صغير بيختار بالدرجة.', en: 'For colour cosmetics chosen by shade.' },
+    forWhom: {
+      ar: 'للمكياج وجمهور صغير بيختار بالدرجة.',
+      en: 'For colour cosmetics chosen by shade.',
+    },
     idea: { ar: 'لون المنتج هو لون الصفحة.', en: 'The product colour is the page colour.' },
-    tokens: { page: '#F6D7DC', surface: '#FFFFFF', ink: '#3A1E2A', muted: '#66404E', primary: '#B0154F', onPrimary: '#FFFFFF',
-      accent: '#B0154F', line: '#E9C0C8', fonts: { display: 'Rubik', body: 'Tajawal', latin: 'DM Sans' },
-      radius: 'lg', density: 'regular', imageRatio: '1/1', motion: 'expressive' } }),
-  L({ id: 'jasmine.clinic', template: 'jasmine', letter: 'C', skin: 'minimal', status: 'designed',
+    tokens: {
+      page: '#F6D7DC',
+      surface: '#FFFFFF',
+      ink: '#3A1E2A',
+      muted: '#66404E',
+      primary: '#B0154F',
+      onPrimary: '#FFFFFF',
+      accent: '#B0154F',
+      line: '#E9C0C8',
+      fonts: { display: 'Rubik', body: 'Tajawal', latin: 'DM Sans' },
+      radius: 'lg',
+      density: 'regular',
+      imageRatio: '1/1',
+      motion: 'expressive',
+    },
+  }),
+  L({
+    id: 'jasmine.clinic',
+    template: 'jasmine',
+    letter: 'C',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'عيادة', en: 'Clinic' },
-    forWhom: { ar: 'للمواد الفعالة لما الزبون عنده مشكلة يحلها.', en: 'For actives that solve a concern.' },
+    forWhom: {
+      ar: 'للمواد الفعالة لما الزبون عنده مشكلة يحلها.',
+      en: 'For actives that solve a concern.',
+    },
     idea: { ar: 'الروتين هو القائمة.', en: 'The routine is the navigation.' },
-    tokens: { page: '#FFFFFF', surface: '#E6F5F2', ink: '#13212B', muted: '#4A5862', primary: '#1F7F6C', onPrimary: '#FFFFFF',
-      accent: '#1F7F6C', line: '#D3E8E3', fonts: { display: 'Readex Pro', body: 'Readex Pro', latin: 'Figtree' },
-      radius: 'md', density: 'airy', imageRatio: '1/1', motion: 'subtle' } }),
-  L({ id: 'lamma.table', template: 'lamma', letter: 'A', skin: 'minimal', status: 'designed',
+    tokens: {
+      page: '#FFFFFF',
+      surface: '#E6F5F2',
+      ink: '#13212B',
+      muted: '#4A5862',
+      primary: '#1F7F6C',
+      onPrimary: '#FFFFFF',
+      accent: '#1F7F6C',
+      line: '#D3E8E3',
+      fonts: { display: 'Readex Pro', body: 'Readex Pro', latin: 'Figtree' },
+      radius: 'md',
+      density: 'airy',
+      imageRatio: '1/1',
+      motion: 'subtle',
+    },
+  }),
+  L({
+    id: 'lamma.table',
+    template: 'lamma',
+    letter: 'A',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'سفرة العيلة', en: 'Family table' },
-    forWhom: { ar: 'لمطبخ بيتي بياخد طلبات زي المطعم.', en: 'For a home kitchen taking same-day orders.' },
+    forWhom: {
+      ar: 'لمطبخ بيتي بياخد طلبات زي المطعم.',
+      en: 'For a home kitchen taking same-day orders.',
+    },
     idea: { ar: 'اطلب زي المنيو، مش زي المحل.', en: 'Order like a menu.' },
-    tokens: { page: '#FFFFFF', surface: '#F7E6E1', ink: '#2A1A14', muted: '#655149', primary: '#B5482E', onPrimary: '#FFFFFF',
-      accent: '#3E7A3A', line: '#EAD8D2', fonts: { display: 'El Messiri', body: 'Cairo', latin: 'Fraunces' },
-      radius: 'md', density: 'regular', imageRatio: '4/3', motion: 'subtle' } }),
-  L({ id: 'lamma.notebook', template: 'lamma', letter: 'B', skin: 'minimal', status: 'designed',
+    tokens: {
+      page: '#FFFFFF',
+      surface: '#F7E6E1',
+      ink: '#2A1A14',
+      muted: '#655149',
+      primary: '#B5482E',
+      onPrimary: '#FFFFFF',
+      accent: '#3E7A3A',
+      line: '#EAD8D2',
+      fonts: { display: 'El Messiri', body: 'Cairo', latin: 'Fraunces' },
+      radius: 'md',
+      density: 'regular',
+      imageRatio: '4/3',
+      motion: 'subtle',
+    },
+  }),
+  L({
+    id: 'lamma.notebook',
+    template: 'lamma',
+    letter: 'B',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'كشكول المطبخ', en: 'Kitchen notebook' },
     forWhom: { ar: 'لطباخة واحدة اسمها هو البراند.', en: 'For one named cook who is the brand.' },
     idea: { ar: 'الطباخة هي البراند.', en: 'The cook is the brand.' },
-    tokens: { page: '#1F3D2B', surface: '#29503A', ink: '#F5F7F2', muted: '#C3D3C8', primary: '#E0A526', onPrimary: '#1F3D2B',
-      accent: '#E0A526', line: '#345E46', fonts: { display: 'Aref Ruqaa', body: 'Noto Naskh Arabic', latin: 'Lora' },
-      radius: 'sm', density: 'airy', imageRatio: '4/3', motion: 'subtle' } }),
-  L({ id: 'lamma.market', template: 'lamma', letter: 'C', skin: 'minimal', status: 'designed',
+    tokens: {
+      page: '#1F3D2B',
+      surface: '#29503A',
+      ink: '#F5F7F2',
+      muted: '#C3D3C8',
+      primary: '#E0A526',
+      onPrimary: '#1F3D2B',
+      accent: '#E0A526',
+      line: '#345E46',
+      fonts: { display: 'Aref Ruqaa', body: 'Noto Naskh Arabic', latin: 'Lora' },
+      radius: 'sm',
+      density: 'airy',
+      imageRatio: '4/3',
+      motion: 'subtle',
+    },
+  }),
+  L({
+    id: 'lamma.market',
+    template: 'lamma',
+    letter: 'C',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'سوق طازة', en: 'Fresh market' },
-    forWhom: { ar: 'للبقالة والخضار اللي الطلب بيتكرر فيها.', en: 'For grocery with repeat baskets.' },
+    forWhom: {
+      ar: 'للبقالة والخضار اللي الطلب بيتكرر فيها.',
+      en: 'For grocery with repeat baskets.',
+    },
     idea: { ar: 'كل حاجة في ضغطتين.', en: 'Everything in two taps.' },
-    tokens: { page: '#FFFFFF', surface: '#F4F4F4', ink: '#1B1B1B', muted: '#575757', primary: '#23744A', onPrimary: '#FFFFFF',
-      accent: '#C8361F', line: '#E4E4E4', fonts: { display: 'Baloo Bhaijaan 2', body: 'Almarai', latin: 'Nunito' },
-      radius: 'lg', density: 'compact', imageRatio: '1/1', motion: 'expressive' } }),
-  L({ id: 'dahab.worn', template: 'dahab', letter: 'A', skin: 'minimal', status: 'designed',
+    tokens: {
+      page: '#FFFFFF',
+      surface: '#F4F4F4',
+      ink: '#1B1B1B',
+      muted: '#575757',
+      primary: '#23744A',
+      onPrimary: '#FFFFFF',
+      accent: '#C8361F',
+      line: '#E4E4E4',
+      fonts: { display: 'Baloo Bhaijaan 2', body: 'Almarai', latin: 'Nunito' },
+      radius: 'lg',
+      density: 'compact',
+      imageRatio: '1/1',
+      motion: 'expressive',
+    },
+  }),
+  L({
+    id: 'dahab.worn',
+    template: 'dahab',
+    letter: 'A',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'على الإيد', en: 'Worn' },
-    forWhom: { ar: 'لصايغ زباينه بيسألوا عن المقاس والعيار.', en: 'For a jeweller whose customers ask about size and karat.' },
+    forWhom: {
+      ar: 'لصايغ زباينه بيسألوا عن المقاس والعيار.',
+      en: 'For a jeweller whose customers ask about size and karat.',
+    },
     idea: { ar: 'متلبسة، مش معروضة: المقاس والعيار باينين دايمًا.', en: 'Worn, not displayed.' },
-    tokens: { page: '#FFFFFF', surface: '#F6F6F6', ink: '#121212', muted: '#5A5A5A', primary: '#121212', onPrimary: '#FFFFFF',
-      accent: '#9A6E2A', line: '#E8E8E8', fonts: { display: 'Reem Kufi', body: 'IBM Plex Sans Arabic', latin: 'Bodoni Moda' },
-      radius: 'none', density: 'airy', imageRatio: '4/5', motion: 'subtle' } }),
-  L({ id: 'dahab.workshop', template: 'dahab', letter: 'B', skin: 'minimal', status: 'designed',
+    tokens: {
+      page: '#FFFFFF',
+      surface: '#F6F6F6',
+      ink: '#121212',
+      muted: '#5A5A5A',
+      primary: '#121212',
+      onPrimary: '#FFFFFF',
+      accent: '#9A6E2A',
+      line: '#E8E8E8',
+      fonts: { display: 'Reem Kufi', body: 'IBM Plex Sans Arabic', latin: 'Bodoni Moda' },
+      radius: 'none',
+      density: 'airy',
+      imageRatio: '4/5',
+      motion: 'subtle',
+    },
+  }),
+  L({
+    id: 'dahab.workshop',
+    template: 'dahab',
+    letter: 'B',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'الورشة', en: 'Workshop' },
     forWhom: { ar: 'لورشة فضة يدوي الصنعة فيها هي السبب.', en: 'For a handmade silver studio.' },
     idea: { ar: 'الصنعة هي المنتج.', en: 'The making is the product.' },
-    tokens: { page: '#0F4C4A', surface: '#135957', ink: '#FFFFFF', muted: '#CFE2E0', primary: '#E2674A', onPrimary: '#10151C',
-      accent: '#D9DDE2', line: '#1F6664', fonts: { display: 'Markazi Text', body: 'Almarai', latin: 'Libre Caslon Text' },
-      radius: 'sm', density: 'regular', imageRatio: '1/1', motion: 'subtle' } }),
-  L({ id: 'dahab.giftbox', template: 'dahab', letter: 'C', skin: 'minimal', status: 'designed',
+    tokens: {
+      page: '#0F4C4A',
+      surface: '#135957',
+      ink: '#FFFFFF',
+      muted: '#CFE2E0',
+      primary: '#E2674A',
+      onPrimary: '#10151C',
+      accent: '#D9DDE2',
+      line: '#1F6664',
+      fonts: { display: 'Markazi Text', body: 'Almarai', latin: 'Libre Caslon Text' },
+      radius: 'sm',
+      density: 'regular',
+      imageRatio: '1/1',
+      motion: 'subtle',
+    },
+  }),
+  L({
+    id: 'dahab.giftbox',
+    template: 'dahab',
+    letter: 'C',
+    skin: 'minimal',
+    status: 'designed',
     name: { ar: 'علبة هدية', en: 'Gift box' },
-    forWhom: { ar: 'لمشتري الهدايا اللي بيبدأ بمين وبكام.', en: 'For gift buyers who start with who and how much.' },
+    forWhom: {
+      ar: 'لمشتري الهدايا اللي بيبدأ بمين وبكام.',
+      en: 'For gift buyers who start with who and how much.',
+    },
     idea: { ar: 'تسوّق حسب الشخص والميزانية.', en: 'Shop by recipient and budget.' },
-    tokens: { page: '#FFFFFF', surface: '#F2C9C4', ink: '#16201C', muted: '#4E5A54', primary: '#0E5C46', onPrimary: '#FFFFFF',
-      accent: '#7E5E27', line: '#E6E6E6', fonts: { display: 'Kufam', body: 'Tajawal', latin: 'Italiana' },
-      radius: 'md', density: 'regular', imageRatio: '1/1', motion: 'subtle' } }),
+    tokens: {
+      page: '#FFFFFF',
+      surface: '#F2C9C4',
+      ink: '#16201C',
+      muted: '#4E5A54',
+      primary: '#0E5C46',
+      onPrimary: '#FFFFFF',
+      accent: '#7E5E27',
+      line: '#E6E6E6',
+      fonts: { display: 'Kufam', body: 'Tajawal', latin: 'Italiana' },
+      radius: 'md',
+      density: 'regular',
+      imageRatio: '1/1',
+      motion: 'subtle',
+    },
+  }),
 ];
 
 export function getLook(id: string | null | undefined): LookDefinition | undefined {
@@ -312,7 +666,10 @@ const PAIRS: [string, (t: any) => [string, string]][] = [
 
 function hexToOklchLC(hex: string): { L: number; C: number; h: number } {
   const n = parseInt(hex.slice(1), 16);
-  const lin = (c: number) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const lin = (c: number) => {
+    c /= 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
   const [r, g, b] = [lin((n >> 16) & 255), lin((n >> 8) & 255), lin(n & 255)];
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
   const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
@@ -348,12 +705,14 @@ describe('no cream/sand page backgrounds', () => {
 ### Task 3: New theme keys + `composeStoreTheme` used by every resolver site
 
 **Files:**
+
 - Modify: `packages/shared/src/types/store-theme.ts` (add to `StoreTheme`: `density?: Density; imageRatio?: ImageRatio; motion?: Motion;` and to `DEFAULT_THEME`: `density: 'regular', imageRatio: '1/1', motion: 'subtle'`; import the types from `../looks/types`)
 - Create: `packages/shared/src/looks/compose.ts`
 - Modify: `apps/web/src/lib/store-resolver.ts:383`, `:553`, `:887` (each `{ ...templateTheme, ...customTheme }` → `composeStoreTheme({ template, look: storeData.look, theme: customTheme })`); add `look` to the store select used by each site.
 - Test: `tests/unit/looks-compose.test.ts`
 
 **Interfaces:**
+
 - Produces: `lookTheme(look: LookDefinition): Partial<StoreTheme>`; `composeStoreTheme(i: { template: TemplateId; look?: string | null; theme?: Record<string, unknown> | null }): StoreTheme`; `overriddenLookKeys(theme: Record<string, unknown> | null | undefined, look: LookDefinition): (typeof LOOK_TOKEN_KEYS)[number][]`.
 
 - [ ] **Step 1: Write the failing test**
@@ -361,7 +720,14 @@ describe('no cream/sand page backgrounds', () => {
 ```ts
 // tests/unit/looks-compose.test.ts
 import { describe, it, expect } from 'vitest';
-import { composeStoreTheme, getLook, lookTheme, overriddenLookKeys, hexToHsl, getTemplateTheme } from '@force/shared';
+import {
+  composeStoreTheme,
+  getLook,
+  lookTheme,
+  overriddenLookKeys,
+  hexToHsl,
+  getTemplateTheme,
+} from '@force/shared';
 
 describe('composeStoreTheme', () => {
   const atelier = getLook('qamar.atelier')!;
@@ -373,7 +739,11 @@ describe('composeStoreTheme', () => {
     expect(t.density).toBe('airy');
   });
   it('stored merchant values win over the look', () => {
-    const t = composeStoreTheme({ template: 'minimal', look: 'qamar.atelier', theme: { primaryColor: '1 2% 3%' } });
+    const t = composeStoreTheme({
+      template: 'minimal',
+      look: 'qamar.atelier',
+      theme: { primaryColor: '1 2% 3%' },
+    });
     expect(t.primaryColor).toBe('1 2% 3%');
   });
   it('unknown look id falls back to the skin theme, never throws', () => {
@@ -381,13 +751,19 @@ describe('composeStoreTheme', () => {
     expect(t.primaryColor).toBe(getTemplateTheme('minimal').primaryColor);
   });
   it('null look = legacy store, unchanged behaviour', () => {
-    expect(composeStoreTheme({ template: 'modern', look: null, theme: { x: 1 } as any }))
-      .toEqual({ ...getTemplateTheme('modern'), x: 1 });
+    expect(composeStoreTheme({ template: 'modern', look: null, theme: { x: 1 } as any })).toEqual({
+      ...getTemplateTheme('modern'),
+      x: 1,
+    });
   });
   it('overriddenLookKeys lists only stored keys that differ from the look', () => {
     const lt = lookTheme(atelier);
-    expect(overriddenLookKeys({ primaryColor: lt.primaryColor, accentColor: '0 0% 0%', showQuickAdd: true }, atelier))
-      .toEqual(['accentColor']);
+    expect(
+      overriddenLookKeys(
+        { primaryColor: lt.primaryColor, accentColor: '0 0% 0%', showQuickAdd: true },
+        atelier
+      )
+    ).toEqual(['accentColor']);
   });
 });
 ```
@@ -407,22 +783,38 @@ export function lookTheme(look: LookDefinition): Partial<StoreTheme> {
   const t = look.tokens;
   const h = hexToHsl;
   return {
-    backgroundColor: h(t.page), foregroundColor: h(t.ink),
-    cardColor: h(t.surface), cardForeground: h(t.ink),
-    popoverColor: h(t.surface), popoverForeground: h(t.ink),
-    mutedColor: h(t.surface), mutedForeground: h(t.muted),
-    secondaryColor: h(t.surface), secondaryForeground: h(t.ink),
-    primaryColor: h(t.primary), primaryForeground: h(t.onPrimary),
-    accentColor: h(t.accent), accentForeground: h(t.onPrimary),
-    borderColor: h(t.line), inputColor: h(t.line), ringColor: h(t.primary),
-    bgPage: t.page, bgSectionAlt: t.surface,
-    headingFont: t.fonts.display, bodyFont: t.fonts.body,
-    borderRadius: t.radius, density: t.density, imageRatio: t.imageRatio, motion: t.motion,
+    backgroundColor: h(t.page),
+    foregroundColor: h(t.ink),
+    cardColor: h(t.surface),
+    cardForeground: h(t.ink),
+    popoverColor: h(t.surface),
+    popoverForeground: h(t.ink),
+    mutedColor: h(t.surface),
+    mutedForeground: h(t.muted),
+    secondaryColor: h(t.surface),
+    secondaryForeground: h(t.ink),
+    primaryColor: h(t.primary),
+    primaryForeground: h(t.onPrimary),
+    accentColor: h(t.accent),
+    accentForeground: h(t.onPrimary),
+    borderColor: h(t.line),
+    inputColor: h(t.line),
+    ringColor: h(t.primary),
+    bgPage: t.page,
+    bgSectionAlt: t.surface,
+    headingFont: t.fonts.display,
+    bodyFont: t.fonts.body,
+    borderRadius: t.radius,
+    density: t.density,
+    imageRatio: t.imageRatio,
+    motion: t.motion,
   } as Partial<StoreTheme>;
 }
 
 export function composeStoreTheme(i: {
-  template: TemplateId; look?: string | null; theme?: Record<string, unknown> | null;
+  template: TemplateId;
+  look?: string | null;
+  theme?: Record<string, unknown> | null;
 }): StoreTheme {
   const look = getLook(i.look);
   return {
@@ -433,7 +825,8 @@ export function composeStoreTheme(i: {
 }
 
 export function overriddenLookKeys(
-  theme: Record<string, unknown> | null | undefined, look: LookDefinition
+  theme: Record<string, unknown> | null | undefined,
+  look: LookDefinition
 ): (typeof LOOK_TOKEN_KEYS)[number][] {
   if (!theme) return [];
   const base = lookTheme(look) as Record<string, unknown>;
@@ -450,6 +843,7 @@ Before editing `bgPage`/`bgSectionAlt`: check their stored format in `store-them
 ### Task 4: Storefront consumes the new tokens + loads only the look's fonts
 
 **Files:**
+
 - Create: `packages/shared/src/looks/fonts.ts`
 - Modify: `apps/web/src/lib/theme-css.ts` (emit vars), `apps/web/src/contexts/StoreContext.tsx` `themeToCssVars` (same vars — keep both in sync; add a test that they produce identical var sets), `apps/web/src/app/layout.tsx` (one `<link rel="stylesheet">` for the look's fonts when `look` set), `apps/web/src/styles/globals.css` (consumers)
 - Test: `tests/unit/looks-fonts.test.ts`, extend `tests/unit/theme-css*.test.ts` if present (grep) else add `tests/unit/looks-css-vars.test.ts`
@@ -470,17 +864,27 @@ describe('look fonts', () => {
     for (const l of LOOKS) {
       const u = new URL(lookFontsHref(l));
       expect(u.origin + u.pathname).toBe('https://fonts.googleapis.com/css2');
-      expect(u.searchParams.getAll('family')).toHaveLength(new Set(Object.values(l.tokens.fonts)).size);
+      expect(u.searchParams.getAll('family')).toHaveLength(
+        new Set(Object.values(l.tokens.fonts)).size
+      );
       expect(u.searchParams.get('display')).toBe('swap');
     }
   });
   it('display/body stacks always end in the platform Arabic + sans fallbacks', () => {
-    const css = buildThemeStyleTag(composeStoreTheme({ template: 'minimal', look: 'qamar.atelier', theme: {} }));
-    expect(css).toMatch(/--font-display:\s*"Noto Naskh Arabic", var\(--font-arabic\), var\(--font-sans\)/);
-    expect(css).toMatch(/--font-body:\s*"IBM Plex Sans Arabic", var\(--font-arabic\), var\(--font-sans\)/);
+    const css = buildThemeStyleTag(
+      composeStoreTheme({ template: 'minimal', look: 'qamar.atelier', theme: {} })
+    );
+    expect(css).toMatch(
+      /--font-display:\s*"Noto Naskh Arabic", var\(--font-arabic\), var\(--font-sans\)/
+    );
+    expect(css).toMatch(
+      /--font-body:\s*"IBM Plex Sans Arabic", var\(--font-arabic\), var\(--font-sans\)/
+    );
   });
   it('density, ratio and motion become vars', () => {
-    const css = buildThemeStyleTag(composeStoreTheme({ template: 'minimal', look: 'lamma.market', theme: {} }));
+    const css = buildThemeStyleTag(
+      composeStoreTheme({ template: 'minimal', look: 'lamma.market', theme: {} })
+    );
     expect(css).toContain('--space-unit: 0.875');
     expect(css).toContain('--image-ratio: 1 / 1');
     expect(css).toContain('--motion-duration: 280ms');
@@ -495,15 +899,38 @@ describe('look fonts', () => {
 import type { LookDefinition } from './types';
 /** Weights per family actually used by the looks (display 600/700, body 400/500/700). */
 export const LOOK_FONT_SPECS: Record<string, string> = {
-  'Noto Naskh Arabic': 'wght@400;700', 'IBM Plex Sans Arabic': 'wght@400;500;600;700', 'Cormorant Garamond': 'wght@600',
-  Lalezar: '', Tajawal: 'wght@400;500;700', Archivo: 'wght@500;700', 'Aref Ruqaa': 'wght@400;700',
-  'Noto Sans Arabic': 'wght@400;500;600;700', 'Playfair Display': 'wght@600', 'IBM Plex Sans': 'wght@500;600',
-  Changa: 'wght@600;700', Cairo: 'wght@400;600;700', Manrope: 'wght@600;700', Alexandria: 'wght@500;700',
-  'Readex Pro': 'wght@400;500;600', 'Inter Tight': 'wght@500;600', Amiri: 'wght@400;700', Fraunces: 'wght@600',
-  Rubik: 'wght@500;700', 'DM Sans': 'wght@500;700', Figtree: 'wght@500;600', 'El Messiri': 'wght@600;700',
-  Lora: 'wght@500;600', 'Baloo Bhaijaan 2': 'wght@600;700', Almarai: 'wght@400;700;800', Nunito: 'wght@600;700;800',
-  'Reem Kufi': 'wght@600', 'Bodoni Moda': 'wght@600', 'Markazi Text': 'wght@600', 'Libre Caslon Text': 'wght@400;700',
-  Kufam: 'wght@600', Italiana: '',
+  'Noto Naskh Arabic': 'wght@400;700',
+  'IBM Plex Sans Arabic': 'wght@400;500;600;700',
+  'Cormorant Garamond': 'wght@600',
+  Lalezar: '',
+  Tajawal: 'wght@400;500;700',
+  Archivo: 'wght@500;700',
+  'Aref Ruqaa': 'wght@400;700',
+  'Noto Sans Arabic': 'wght@400;500;600;700',
+  'Playfair Display': 'wght@600',
+  'IBM Plex Sans': 'wght@500;600',
+  Changa: 'wght@600;700',
+  Cairo: 'wght@400;600;700',
+  Manrope: 'wght@600;700',
+  Alexandria: 'wght@500;700',
+  'Readex Pro': 'wght@400;500;600',
+  'Inter Tight': 'wght@500;600',
+  Amiri: 'wght@400;700',
+  Fraunces: 'wght@600',
+  Rubik: 'wght@500;700',
+  'DM Sans': 'wght@500;700',
+  Figtree: 'wght@500;600',
+  'El Messiri': 'wght@600;700',
+  Lora: 'wght@500;600',
+  'Baloo Bhaijaan 2': 'wght@600;700',
+  Almarai: 'wght@400;700;800',
+  Nunito: 'wght@600;700;800',
+  'Reem Kufi': 'wght@600',
+  'Bodoni Moda': 'wght@600',
+  'Markazi Text': 'wght@600',
+  'Libre Caslon Text': 'wght@400;700',
+  Kufam: 'wght@600',
+  Italiana: '',
 };
 export function lookFontsHref(look: LookDefinition): string {
   const fams = [...new Set(Object.values(look.tokens.fonts))];
@@ -545,6 +972,7 @@ Plus `CREATE OR REPLACE` for every definer that returns store identity columns, 
 **Files:** `apps/api/src/services/store.service.ts`, `apps/api/src/routes/store.routes.ts`, `apps/api/src/services/page-builder.service.ts` (reuse existing publish/draft functions — read their signatures first), Test: `tests/integration/store-look.test.ts`, `tests/unit/store-theme-null-delete.test.ts`
 
 **Interfaces:**
+
 - Produces: `StoreService.applyLook(storeId: string, lookId: string, opts: { design: 'keep' | 'reset' }): Promise<{ store: Store; builder: 'published' | 'draft' }>`; route `PUT /api/v1/stores/:id/look` body `{ lookId: string, design: 'keep'|'reset' }` → `200 { success: true, data: { look, template, builder } }`; `400 INVALID_LOOK`.
 - Changes: `updateTheme` treats a `null` value as "delete this key" (needed for reset-one-override in Task 8).
 
@@ -627,10 +1055,12 @@ static async applyLook(storeId: string, lookId: string, opts: { design: 'keep' |
 ---
 
 ## Verification (finish line)
+
 - **Must work:** onboarding with a look → store renders with that look's colours/fonts/density on `<slug>.ebda.app` (ar + en); switching look keeps products/text/images; "keep" preserves edited colours; reset-one-override works; demo store refuses orders.
 - **Exercised:** unit + integration suites above; `npm run typecheck`, `lint`, `build`; Playwright smoke: onboarding → pick `dahab.worn` → storefront screenshot at 390/1280 ar/en; production after deploy: `/health` = merge SHA, read-only SQL shows `stores.look` column, one QA store switched to a look and screenshotted (ask Ahmad before switching the prod QA store).
 - **Must not change:** checkout/pricing/inventory/permissions/tenant isolation; every legacy store (look = null) renders byte-identical (characterization snapshots).
 - **Done when:** all green in CI, deployed, verified live, Ahmad reviews the look picker.
 
 ## Out of scope (Phase B / E)
+
 Per-template skins and new section types (lookbook carousel, gift finder, routine steps, maker strip, occasion tiles, ingredient hero, engraving band, making steps, reorder row); flipping looks to `status: 'built'`; full editor redesign (Phase E); deleting FWB skins.
