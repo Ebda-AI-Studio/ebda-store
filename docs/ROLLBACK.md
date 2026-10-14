@@ -105,6 +105,9 @@ Backups are stored at `~/Desktop/projects/_backups/ebda/` on the developer Mac, 
 # (a dump that failed verify-dump.sh, parked by scripts/backup-db.sh), and a
 # fresh one sorts to the top as if it were the most recent good backup.
 ls -lt ~/Desktop/projects/_backups/ebda/*.sql.gz
+# The nightly dump needs NEON_API_KEY_EBDA (a Whisky 11-org key) in
+# ~/.whisky-services.env — the default NEON_API_KEY is scoped to another org and
+# fails with "no connection string" (it did, every night, until 2026-10-14).
 # pick the dump timestamped before the bad deploy, then verify it BEFORE
 # trusting it — present + correctly-named is not the same as restorable:
 bash scripts/verify-dump.sh <chosen>.sql.gz

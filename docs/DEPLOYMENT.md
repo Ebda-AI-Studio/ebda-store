@@ -222,7 +222,7 @@ Use the connection strings from your Neon project dashboard:
 - `DATABASE_URL` — pooled URL (PgBouncer, port 5432, `?pgbouncer=true`)
 - `DIRECT_URL` — direct (non-pooled) URL required for Prisma migrations
 
-Backups: daily local `pg_dump` runs on the developer Mac at 3:30am via launchd (`com.forceai.neon-backup`). 30-day rotation at `~/Desktop/projects/_backups/force-website-builder/`. See `docs/ROLLBACK.md` §C for the restore procedure.
+Backups: daily local `pg_dump` runs on the developer Mac at 3:30am via launchd (`com.forceai.neon-backup`). 30-day rotation at `~/Desktop/projects/_backups/ebda/` (requires `NEON_API_KEY_EBDA` in `~/.whisky-services.env`). See `docs/ROLLBACK.md` §C for the restore procedure.
 
 ---
 
