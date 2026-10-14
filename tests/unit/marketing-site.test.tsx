@@ -25,9 +25,12 @@ const ar = renderToStaticMarkup(<Home locale="ar" />);
 const en = renderToStaticMarkup(<Home locale="en" />);
 
 describe('marketing nav', () => {
-  it('uses the company name in both marketing page titles', () => {
-    expect(pageMetadata('ar', '').title).toContain('ابدأ استوديو للذكاء الاصطناعي');
-    expect(pageMetadata('en', '').title).toContain('Ebda AI Studio');
+  it('names the product (not the studio) in both marketing page titles', () => {
+    expect(pageMetadata('ar', '').title).toContain('ابدأ ستور');
+    expect(pageMetadata('en', '').title).toContain('Ebda Store');
+    expect(`${pageMetadata('ar', '').title}${pageMetadata('en', '').title}`).not.toMatch(
+      /Ebda AI Studio|ابدأ استوديو/
+    );
   });
   it('has the five links in page order with correct targets (en)', () => {
     const nav = en.match(/<nav aria-label="Main navigation".*?<\/nav>/s)![0];
@@ -129,10 +132,19 @@ describe('marketing hero and structure', () => {
     ).toBe(true);
   });
   it('renders sections in the exact required order', () => {
-    const expected = ['looks', 'story', 'dahab', 'payments', 'features', 'pricing', 'faq', 'start'];
+    const expected = [
+      'looks',
+      'story',
+      'model3d',
+      'payments',
+      'features',
+      'pricing',
+      'faq',
+      'start',
+    ];
     expect([...SECTION_ORDER]).toEqual(expected);
     for (const html of [ar, en]) {
-      const ids = [...html.matchAll(/<section id="([a-z]+)" class="(?:section|story)[" ]/g)].map(
+      const ids = [...html.matchAll(/<section id="([a-z0-9]+)" class="(?:section|story)[" ]/g)].map(
         m => m[1]
       );
       expect(ids).toEqual(expected);
@@ -220,8 +232,8 @@ describe('marketing honesty', () => {
       'Orders a month',
       'Team members',
       'Stores',
-      'Abandoned cart recovery',
-      'Run your store from an AI assistant (MCP)',
+      'Win back shoppers who left their cart',
+      'Run your store from an AI assistant',
       'Analytics',
       'Support',
     ])
@@ -268,7 +280,7 @@ describe('marketing honesty', () => {
         expect(h).not.toMatch(/Ahmad|أحمد|Sharaf|شرف/);
       }
   });
-  it('the four steps appear once (in the story, each with its one-line how) and the 3D ring ships its assets and controls', () => {
+  it('the four steps appear once (in the story, each with its one-line how)', () => {
     for (const html of [ar, en]) {
       const story = html.match(/<section id="story".*?<\/section>/s)![0];
       expect(story.match(/<li data-n="/g)).toHaveLength(4);
@@ -277,17 +289,80 @@ describe('marketing honesty', () => {
       expect(html.match(/<ol class="/g)!.length).toBe(2); // story steps + story toasts
       // the order notifications at the end of the story
       expect(story.match(/class="story-toast"/g)).toHaveLength(4);
-      // 3D ring: poster first, swatches are real buttons with pressed state
-      expect(html).toContain('/ring/ring-gold-diamond.webp');
-      expect(html.match(/class="swatch"/g)).toHaveLength(6);
-      expect(html).toMatch(
-        /aria-pressed="true"[^>]*data-metal="gold"|data-metal="gold"[^>]*aria-pressed="true"/
-      );
     }
     expect(ar).toContain('اختار اسم ولوجو.');
-    expect(ar).toContain('بالصور والأسعار والمقاسات، أو من ملف CSV.');
+    // plain words: an Excel file, not "CSV"
+    expect(ar).toContain('بالصور والأسعار والمقاسات، أو من ملف إكسل.');
+    expect(en).toContain('Photos, prices and sizes, or an Excel file.');
     expect(ar).toContain('بوسطة استلمت الشحنة');
     expect(en).toContain('Pick a name and logo.');
+  });
+  it('the 3D section replaces the ring: still first, chips, colour swatches, licence credit, QR, no ring left', () => {
+    for (const [html, locale] of [
+      [ar, 'ar'],
+      [en, 'en'],
+    ] as const) {
+      const sec = html.match(/<section id="model3d".*?<\/section>/s)![0];
+      expect(sec).toContain('/3d/stills/qamar-midnight.webp'); // the still is the server-rendered first paint
+      expect(sec.match(/role="tab"/g)).toHaveLength(3);
+      expect(sec).toContain(`/3d/qr/qamar-${locale}.svg`);
+      // the three glTF colourways are real buttons with a pressed state and visible text
+      expect(sec.match(/class="m3d-swatch"/g)).toHaveLength(3);
+      expect(sec).toMatch(
+        /aria-pressed="true"[^>]*class="m3d-swatch"|class="m3d-swatch"[^>]*aria-pressed="true"/
+      );
+      // CC BY 4.0 attribution next to the viewer (licence breach if it goes missing)
+      expect(sec).toMatch(/Shopify/);
+      expect(sec).toContain('creativecommons.org/licenses/by/4.0/');
+      expect(html).not.toMatch(/\/ring\/|class="swatch"|ring-stage|id="dahab"/);
+    }
+    expect(ar).toContain('خلّي عميلك يقلّب المنتج بإيده.');
+    expect(en).toContain('Let shoppers turn it in their hands.');
+  });
+  it('pricing on phones: a radio-group plan switcher (growth checked) and the comparison collapsed in a details', () => {
+    for (const html of [ar, en]) {
+      const pr = html.match(/<section id="pricing".*?<\/section>/s)![0];
+      expect(pr.match(/<input type="radio" name="plan-pick"/g)).toHaveLength(3);
+      expect(pr).toMatch(/id="pick-growth" checked=""/);
+      expect(pr).not.toMatch(/id="pick-(basic|business)" checked/);
+      for (const id of ['basic', 'growth', 'business'])
+        expect(pr).toContain(`<label for="pick-${id}">`);
+      expect(pr).toMatch(
+        /<details class="compare-details"><summary>(قارن الباقات|Compare plans)<\/summary>/
+      );
+      expect(pr).not.toMatch(/<details class="compare-details" open/);
+    }
+  });
+  it("plan bullets are plain words and match each plan's real entitlements", () => {
+    const all = JSON.stringify(PLANS.map(p => p.features));
+    expect(all).not.toMatch(/MCP|API|CSV|Powered by|مدعوم من/);
+    const bullets = (id: string, l: 'en' | 'ar') => PLANS.find(p => p.id === id)!.features[l];
+    // basic: no cart recovery, no badge removal, no priority support in its limits => none promised
+    expect(bullets('basic', 'en').join('|')).not.toMatch(/cart|badge|Priority/);
+    expect(bullets('growth', 'en')).toContain('Win back shoppers who left their cart');
+    expect(bullets('growth', 'en')).toContain('Remove the Ebda Store badge from your store');
+    expect(bullets('business', 'en')).toContain('Priority support');
+    expect(bullets('business', 'ar')).toContain('دعم بالأولوية');
+    for (const p of PLANS) {
+      expect(p.features.en).toHaveLength(4);
+      expect(p.features.ar).toHaveLength(4);
+      // every promise is backed by the plan's limits
+      if (p.features.en.some(f => /cart/.test(f)))
+        expect(p.limits.abandonedCartAutomation).toBe(true);
+      if (p.features.en.some(f => /badge/.test(f))) expect(p.limits.brandingRemoval).toBe(true);
+      if (p.features.en.some(f => /Priority/.test(f)))
+        expect(p.limits.supportTier).toBe('priority');
+    }
+  });
+  it('features: three hero features each with a visual, then a compact list of the rest', () => {
+    for (const html of [ar, en]) {
+      const f = html.match(/<section id="features".*?<\/section>/s)![0];
+      expect(f.match(/class="fx-card"/g)).toHaveLength(3);
+      for (const k of ['editor', 'orders', 'ai']) expect(f).toContain(`data-feature="${k}"`);
+      expect(f.match(/class="fx-visual[^"]*" role="img" aria-label="[^"]+"/g)).toHaveLength(3);
+      expect(f.match(/<ul class="feature-list">.*?<\/ul>/s)![0].match(/<li>/g)).toHaveLength(4);
+      expect(f).not.toMatch(/<svg[^>]*class="[^"]*illustration/);
+    }
   });
   it('shows the WhatsApp line in the header, FAQ and close: wa.me link plus the number as selectable text', () => {
     for (const html of [ar, en]) {

@@ -48,3 +48,7 @@ Contrast of the colour tokens (WCAG 2.x ratios, computed by `tests/unit/marketin
 | dark band: text `#f3f5f4` on night                | 18.0            | 4.5              |
 | dark band: muted `#a9b1af` on night / panel       | 9.0 / 8.4       | 4.5              |
 | dark band: lift `#CBA873` on night / panel        | 8.8 / 8.3       | 4.5              |
+
+## P1 as built (2026-10-14, branch `feat/marketing-levelup-p1`)
+
+3D section (Ruling MKT-7), mobile pricing switcher + collapsed comparison, plain-language plan bullets, product-named titles/OG/JSON-LD and the 3 hero features are in. Section order is now `looks, story, model3d, payments, features, pricing, faq, start`. Not in this batch: Alexandria display-type test, the orchestrated hero motion, per-vertical ad landings, and real-device AR checks.

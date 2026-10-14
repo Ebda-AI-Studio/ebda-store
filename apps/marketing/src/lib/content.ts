@@ -19,13 +19,75 @@ export interface StoryStep {
   d: string;
 }
 
-export interface RingCopy {
-  label: string;
+/** One vertical of the 3D section: a look's product page around a real 3D model. */
+export interface Model3dVertical {
+  name: string;
+  kind: string;
+  /** The demo product on the phone's product page (illustrative: no real shop). */
+  product: { name: string; price: number; desc: string };
+  /** Accessible name of the 3D canvas and alt of its still image. */
+  alt: string;
+  /** Visible credit line next to the viewer (licence + author). */
+  credit: { text: string; linkLabel: string; href: string };
+  /** Colour names for the model's glTF variants (qamar only), by variant id. */
+  variants?: Record<string, string>;
+}
+
+export interface Model3dCopy {
+  title: string;
+  lead: string;
+  tablistLabel: string;
+  /** Badge on the phone: the shop and product are illustrations. */
+  badge: string;
+  /** aria-label of the phone region. */
+  pageLabel: string;
+  /** Hint shown over the live model. */
   hint: string;
-  metalLabel: string;
-  stoneLabel: string;
-  metals: { gold: string; white: string; rose: string };
-  stones: { diamond: string; emerald: string; ruby: string };
+  ar: string;
+  loading: string;
+  error: string;
+  /** Screen-reader only: how to turn the model from the keyboard. */
+  keys: string;
+  colourLabel: string;
+  addToCart: string;
+  /** Shown instead of the live model for reduced motion / Save-Data: a button that loads it. */
+  load: string;
+  qr: { title: string; hint: string; alt: string };
+  footnote: string;
+  verticals: Record<'qamar' | 'souq' | 'lamma', Model3dVertical>;
+}
+
+/** The three hero features of the features section, each with a visual. */
+export interface HeroFeatures {
+  editor: {
+    t: string;
+    d: string;
+    /** Visual: the editor's section list, a colour row, and the preview. */
+    sectionsLabel: string;
+    sections: string[];
+    colourLabel: string;
+    previewAlt: string;
+  };
+  orders: {
+    t: string;
+    d: string;
+    /** Visual: a customer's WhatsApp order message and the push notification it triggers. */
+    chatLabel: string;
+    message: string[];
+    send: string;
+    pushT: string;
+    pushD: string;
+  };
+  ai: {
+    t: string;
+    d: string;
+    /** Visual: the product form with the AI button and the two drafted descriptions. */
+    formLabel: string;
+    descLabel: string;
+    button: string;
+    ar: string;
+    en: string;
+  };
 }
 
 export interface LookCopy {
@@ -112,10 +174,16 @@ export interface Copy {
     toasts: { t: string; d: string }[];
     phoneLabel: string;
   };
-  dahab: { title: string; lead: string; ring: RingCopy };
+  /** The product page running a real 3D model (the same viewer merchants get), per vertical. */
+  model3d: Model3dCopy;
   /** The interactive template + look picker (5 templates x 3 looks, phone previews). */
   looks: LooksCopy;
-  features: { title: string; items: { t: string; d: string }[] };
+  features: {
+    title: string;
+    hero: HeroFeatures;
+    /** The rest of the features: a compact list. */
+    items: { t: string; d: string }[];
+  };
   providers: {
     title: string;
     payLabel: string;
@@ -133,6 +201,8 @@ export interface Copy {
     perMonth: string;
     annual: string;
     compareTitle: string;
+    /** Legend of the phone-width plan switcher (screen readers). */
+    pickLabel: string;
     yes: string;
     no: string;
     trial: string;
@@ -181,7 +251,7 @@ export interface Copy {
 export const COPY: Record<Locale, Copy> = {
   ar: {
     meta: {
-      title: 'ابدأ استوديو للذكاء الاصطناعي — اعمل متجرك أونلاين في دقايق',
+      title: `${PN.nameAr} — اعمل متجرك أونلاين في دقايق`,
       description:
         'ابدأ ستور من ابدأ استوديو للذكاء الاصطناعي — بابك لبدء مشروعك. اعمل متجرك أونلاين في دقايق: لينك باسمك، دفع أونلاين وكاش وإنستا باي، وشحن مع بوسطة وأرامكس.',
     },
@@ -212,23 +282,80 @@ export const COPY: Record<Locale, Copy> = {
         badge: 'صور توضيحية',
       },
     },
-    dahab: {
-      title: 'شوفه لايف، من كل زاوية.',
-      lead: 'لفّ الخاتم واختار المعدن والحجر. كده عميلك يشوف منتجك على متجرك.',
-      ring: {
-        label: 'خاتم سوليتير ثلاثي الأبعاد بيلف، تقدر تسحبه علشان تلفه',
-        hint: 'اسحب علشان تلفّه',
-        metalLabel: 'المعدن',
-        stoneLabel: 'الحجر',
-        metals: { gold: 'دهب أصفر', white: 'دهب أبيض', rose: 'روز جولد' },
-        stones: { diamond: 'ألماظ', emerald: 'زمرد', ruby: 'ياقوت' },
+    model3d: {
+      title: 'خلّي عميلك يقلّب المنتج بإيده.',
+      lead: 'ارفع موديل 3D لمنتجك، وعميلك يلفّه ويغيّر لونه ويشوفه في أوضته، من صفحة المنتج على متجرك.',
+      tablistLabel: 'اختار شكل المتجر',
+      badge: 'صور توضيحية',
+      pageLabel: 'صفحة منتج على متجر تجريبي، بموديل 3D بيلف',
+      hint: 'اسحب علشان تلفّه',
+      ar: 'شوفه في مكانك',
+      loading: 'بنحمّل الموديل...',
+      error: 'الموديل ماحمّلش. جرّب تاني.',
+      keys: 'اضغط على الموديل واستعمل الأسهم علشان تلفّه، وزرار + و- للتقريب.',
+      colourLabel: 'اللون',
+      addToCart: 'أضف للسلة',
+      load: 'شغّل الموديل 3D',
+      qr: {
+        title: 'شوفه في أوضتك',
+        hint: 'وجّه كاميرا موبايلك على الكود، واضغط «شوفه في مكانك».',
+        alt: 'كود QR بيفتح موديل {name} على موبايلك',
+      },
+      footnote: 'متاح في كل الباقات.',
+      verticals: {
+        qamar: {
+          name: 'قمر',
+          kind: 'أزياء وأحذية',
+          product: {
+            name: 'كوتشي قمر اليومي',
+            price: 1450,
+            desc: 'خفيف ومريح لليوم كله، ومتاح بـ3 ألوان.',
+          },
+          alt: 'موديل 3D لكوتشي رياضي، اسحب علشان تلفّه',
+          credit: {
+            text: 'موديل الكوتشي: Shopify، رخصة CC BY 4.0 (محسّن للويب).',
+            linkLabel: 'نص الرخصة',
+            href: 'https://creativecommons.org/licenses/by/4.0/',
+          },
+          variants: { midnight: 'أزرق', beach: 'وردي', street: 'أسود' },
+        },
+        souq: {
+          name: 'سوق',
+          kind: 'تجزئة وهدايا',
+          product: {
+            name: 'فانوس نحاس مشغول',
+            price: 890,
+            desc: 'نحاس مشغول بإيد صنايعي، بينوّر الأوضة من غير ما يزحمها.',
+          },
+          alt: 'موديل 3D لفانوس نحاس، اسحب علشان تلفّه',
+          credit: {
+            text: 'موديل الفانوس: Bhargav Kubal عبر Poly Haven، CC0 (من غير السلسلة).',
+            linkLabel: 'المصدر',
+            href: 'https://polyhaven.com/a/brass_diya_lantern',
+          },
+        },
+        lamma: {
+          name: 'لمّة',
+          kind: 'البيت والمطبخ',
+          product: {
+            name: 'فانوس السفرة النحاس',
+            price: 760,
+            desc: 'يحط على السفرة ويدفّي القعدة، ويتغسل بسهولة.',
+          },
+          alt: 'موديل 3D لفانوس نحاس للسفرة، اسحب علشان تلفّه',
+          credit: {
+            text: 'موديل الفانوس: Bhargav Kubal عبر Poly Haven، CC0 (من غير السلسلة).',
+            linkLabel: 'المصدر',
+            href: 'https://polyhaven.com/a/brass_diya_lantern',
+          },
+        },
       },
     },
     story: {
       title: 'متجرك بيتبني قدامك.',
       steps: [
         { t: 'اختار اسم ولوجو.', d: 'سجّل بإيميل وباسورد، واختار اللينك بتاعك.' },
-        { t: 'نزّل منتجاتك.', d: 'بالصور والأسعار والمقاسات، أو من ملف CSV.' },
+        { t: 'نزّل منتجاتك.', d: 'بالصور والأسعار والمقاسات، أو من ملف إكسل.' },
         { t: 'ظبّط ألوانك وصورك.', d: 'اختار شكل متجرك، وكل حاجة فيه تتعدّل.' },
         { t: 'وأول طلب يوصلك.', d: 'وتابع الدفع والشحن من موبايلك.' },
       ],
@@ -349,13 +476,42 @@ export const COPY: Record<Locale, Copy> = {
     },
     features: {
       title: 'كل اللي محتاجه عشان تبيع.',
+      hero: {
+        editor: {
+          t: 'عدّل متجرك زي ما تحب',
+          d: 'غيّر الألوان والصور والأقسام، وشوف التغيير قدامك على طول. من غير مبرمج.',
+          sectionsLabel: 'أقسام الصفحة',
+          sections: ['الغلاف', 'الأقسام', 'المنتجات', 'آراء العملاء'],
+          colourLabel: 'لون المتجر',
+          previewAlt: 'معاينة صفحة متجر بتتغيّر مع كل تعديل في المحرر',
+        },
+        orders: {
+          t: 'الطلب يوصلك على واتساب',
+          d: 'العميل يبعتلك تفاصيل الطلب جاهزة بضغطة، وإشعار على موبايلك مع كل طلب جديد.',
+          chatLabel: 'رسالة طلب على واتساب',
+          message: [
+            'طلب جديد من المتجر',
+            'كوتشي قمر اليومي × 1',
+            'الإجمالي: 1,450 ج.م',
+            'الدفع عند الاستلام',
+          ],
+          send: 'إرسال الطلب على واتساب',
+          pushT: 'طلب جديد · 1,450 ج.م',
+          pushD: 'الدفع عند الاستلام',
+        },
+        ai: {
+          t: 'الذكاء الاصطناعي يكتب عنك',
+          d: 'يكتب وصف منتجاتك ويترجمه عربي وإنجليزي، وانت تراجعه وتنشره.',
+          formLabel: 'نموذج منتج بوصف مكتوب بالذكاء الاصطناعي',
+          descLabel: 'الوصف',
+          button: 'اكتب بالذكاء الاصطناعي',
+          ar: 'كوتشي خفيف ومريح لليوم كله، بنعل مرن وتصميم بسيط يمشي مع أي لبس.',
+          en: 'A light, comfortable sneaker for all-day wear, with a flexible sole and a clean design that goes with anything.',
+        },
+      },
       items: [
-        { t: 'محرر صفحات', d: 'عدّل أي جزء في متجرك وشوفه قدامك على طول.' },
-        { t: 'ذكاء اصطناعي معاك', d: 'يكتب وصف منتجاتك ويترجمه عربي وإنجليزي.' },
-        { t: 'متجرك في جيبك', d: 'لوحة التحكم على موبايلك، وإشعار مع كل طلب.' },
         { t: 'أرقامك قدامك', d: 'اعرف إيه اللي بيتباع وإيه اللي واقف.' },
         { t: 'الضريبة محسوبة', d: 'لو مسجّل ضريبيًا، القيمة المضافة بتتحسب لوحدها.' },
-        { t: 'الطلب على واتساب', d: 'العميل يبعتلك تفاصيل الطلب جاهزة بضغطة.' },
         { t: 'دومين باسمك', d: 'اربط دومينك، أو خليك على <اسمك>.ebda.app.' },
         { t: 'عربي وإنجليزي', d: 'متجرك ولوحة التحكم بالعربي من الأساس، ومعاهم إنجليزي.' },
       ],
@@ -389,6 +545,7 @@ export const COPY: Record<Locale, Copy> = {
       perMonth: 'في الشهر',
       annual: 'سنوي',
       compareTitle: 'قارن الباقات',
+      pickLabel: 'اختار الباقة',
       yes: 'متاح',
       no: 'مش متاح',
       trial: '14 يوم ببلاش',
@@ -481,7 +638,7 @@ export const COPY: Record<Locale, Copy> = {
   },
   en: {
     meta: {
-      title: 'Ebda AI Studio — Open your store online in minutes',
+      title: `${PN.nameEn} — Open your store online in minutes`,
       description:
         'Ebda Store, from Ebda AI Studio — Your doorway to business. Open your online store in minutes: your own link, online payments, cash and InstaPay, shipping with Bosta and Aramex.',
     },
@@ -512,23 +669,80 @@ export const COPY: Record<Locale, Copy> = {
         badge: 'Illustrative',
       },
     },
-    dahab: {
-      title: 'See it live, from every angle.',
-      lead: 'Turn the ring and pick the metal and stone. That’s how customers see your product.',
-      ring: {
-        label: 'A 3D solitaire ring turning; drag to spin it',
-        hint: 'Drag to spin',
-        metalLabel: 'Metal',
-        stoneLabel: 'Stone',
-        metals: { gold: 'Yellow gold', white: 'White gold', rose: 'Rose gold' },
-        stones: { diamond: 'Diamond', emerald: 'Emerald', ruby: 'Ruby' },
+    model3d: {
+      title: 'Let shoppers turn it in their hands.',
+      lead: 'Upload a 3D model and customers spin it, switch colours and place it in their room, right on your product page.',
+      tablistLabel: 'Pick a store look',
+      badge: 'Illustrative',
+      pageLabel: 'A product page on a demo store, with a turning 3D model',
+      hint: 'Drag to turn',
+      ar: 'View in your space',
+      loading: 'Loading the model...',
+      error: 'The model did not load. Try again.',
+      keys: 'Focus the model and use the arrow keys to turn it, and + and - to zoom.',
+      colourLabel: 'Colour',
+      addToCart: 'Add to cart',
+      load: 'Load the 3D model',
+      qr: {
+        title: 'See it in your room',
+        hint: 'Point your phone camera at the code, then tap “View in your space”.',
+        alt: 'QR code that opens the {name} model on your phone',
+      },
+      footnote: 'Included on every plan.',
+      verticals: {
+        qamar: {
+          name: 'Qamar',
+          kind: 'Fashion and shoes',
+          product: {
+            name: 'Qamar everyday sneaker',
+            price: 1450,
+            desc: 'Light and comfortable all day, in three colours.',
+          },
+          alt: '3D model of a sneaker; drag to turn it',
+          credit: {
+            text: 'Sneaker model: Shopify, licensed CC BY 4.0 (optimised for the web).',
+            linkLabel: 'Licence text',
+            href: 'https://creativecommons.org/licenses/by/4.0/',
+          },
+          variants: { midnight: 'Blue', beach: 'Rose', street: 'Black' },
+        },
+        souq: {
+          name: 'Souq',
+          kind: 'Retail and gifts',
+          product: {
+            name: 'Worked brass lantern',
+            price: 890,
+            desc: 'Hand-worked brass that lights a room without crowding it.',
+          },
+          alt: '3D model of a brass lantern; drag to turn it',
+          credit: {
+            text: 'Lantern model: Bhargav Kubal via Poly Haven, CC0 (chain removed).',
+            linkLabel: 'Source',
+            href: 'https://polyhaven.com/a/brass_diya_lantern',
+          },
+        },
+        lamma: {
+          name: 'Lamma',
+          kind: 'Home and kitchen',
+          product: {
+            name: 'Brass table lantern',
+            price: 760,
+            desc: 'Sits on the table, warms the evening, wipes clean.',
+          },
+          alt: '3D model of a brass table lantern; drag to turn it',
+          credit: {
+            text: 'Lantern model: Bhargav Kubal via Poly Haven, CC0 (chain removed).',
+            linkLabel: 'Source',
+            href: 'https://polyhaven.com/a/brass_diya_lantern',
+          },
+        },
       },
     },
     story: {
       title: 'Watch your store come together.',
       steps: [
         { t: 'Pick a name and logo.', d: 'Sign up with email and password, then pick your link.' },
-        { t: 'Add your products.', d: 'Photos, prices and sizes, or a CSV file.' },
+        { t: 'Add your products.', d: 'Photos, prices and sizes, or an Excel file.' },
         { t: 'Tune your colours and photos.', d: 'Pick your store’s look, everything editable.' },
         { t: 'And the first order arrives.', d: 'Follow payment and shipping from your phone.' },
       ],
@@ -650,16 +864,42 @@ export const COPY: Record<Locale, Copy> = {
     },
     features: {
       title: 'Everything you need to sell.',
-      items: [
-        { t: 'Page builder', d: 'Edit any part of your store and see it live.' },
-        { t: 'AI on your side', d: 'Writes your product descriptions, in Arabic and English.' },
-        {
-          t: 'Your store in your pocket',
-          d: 'The dashboard on your phone, with a ping for every order.',
+      hero: {
+        editor: {
+          t: 'Edit your store your way',
+          d: 'Change colours, photos and sections, and watch it update live. No developer needed.',
+          sectionsLabel: 'Page sections',
+          sections: ['Cover', 'Categories', 'Products', 'Reviews'],
+          colourLabel: 'Store colour',
+          previewAlt: 'A store page preview that changes with every edit in the editor',
         },
+        orders: {
+          t: 'Orders land on WhatsApp',
+          d: 'Customers send you the order details in one tap, and your phone pings for every new order.',
+          chatLabel: 'A WhatsApp order message',
+          message: [
+            'New order from the store',
+            'Qamar everyday sneaker × 1',
+            'Total: EGP 1,450',
+            'Cash on delivery',
+          ],
+          send: 'Send the order on WhatsApp',
+          pushT: 'New order · EGP 1,450',
+          pushD: 'Cash on delivery',
+        },
+        ai: {
+          t: 'AI writes for you',
+          d: 'Writes your product descriptions and translates them into Arabic and English. You review and publish.',
+          formLabel: 'A product form with an AI-written description',
+          descLabel: 'Description',
+          button: 'Write with AI',
+          ar: 'كوتشي خفيف ومريح لليوم كله، بنعل مرن وتصميم بسيط يمشي مع أي لبس.',
+          en: 'A light, comfortable sneaker for all-day wear, with a flexible sole and a clean design that goes with anything.',
+        },
+      },
+      items: [
         { t: 'Your numbers', d: 'See what sells and what doesn’t.' },
         { t: 'VAT, handled', d: 'Registered for VAT? It’s calculated for you.' },
-        { t: 'Orders on WhatsApp', d: 'Customers send you the order details in one tap.' },
         { t: 'Your own domain', d: 'Connect your domain, or stay on <you>.ebda.app.' },
         {
           t: 'Arabic and English',
@@ -696,6 +936,7 @@ export const COPY: Record<Locale, Copy> = {
       perMonth: 'a month',
       annual: 'yearly',
       compareTitle: 'Compare plans',
+      pickLabel: 'Choose a plan',
       yes: 'Included',
       no: 'Not included',
       trial: '14 days free',
