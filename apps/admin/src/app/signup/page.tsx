@@ -7,6 +7,7 @@ import { useLocale } from 'next-intl';
 import { Button, Input } from '@force/ui';
 import { PublicShell } from '../../components/onboarding/PublicShell';
 import { apiGet, apiPost } from '../../lib/api';
+import { getEbdaTracker } from '../../lib/ebda-tracker';
 import { useAuth } from '../../lib/auth';
 import { validateSignup, type SignupFields } from '../../lib/onboarding-validation';
 import { useT } from '@/i18n/useT';
@@ -84,6 +85,9 @@ export default function SignupPage() {
 
     setSubmitting(true);
     const email = fields.email.trim();
+    // Ebda's own ads tracking: attribution + click ids, only when the visitor consented.
+    const tracker = getEbdaTracker();
+    const tracking = tracker?.signupPayload();
     const { error } = await apiPost('/api/v1/auth/merchant/signup', {
       email,
       password: fields.password,
@@ -92,6 +96,7 @@ export default function SignupPage() {
       language: document.documentElement.dir === 'rtl' ? 'ar' : 'en',
       formToken,
       company_site: honeypot,
+      ...(tracking ? { tracking } : {}),
     });
     setSubmitting(false);
     if (error) {
@@ -108,6 +113,11 @@ export default function SignupPage() {
       }
       return;
     }
+    // Lead: the form was accepted (browser-only; the account is not real until verified).
+    tracker?.track('signup_submitted', {
+      eventId: `lead_${crypto.randomUUID()}`,
+      props: { content_name: 'signup' },
+    });
     setSentTo(email);
   }
 

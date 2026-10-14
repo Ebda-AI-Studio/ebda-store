@@ -6,6 +6,7 @@ import { storeScopeContext, tenantContext } from '../middleware/tenant-context';
 import { requireStoreAccess } from '../middleware/store-access';
 import { Prisma, prisma, StoreStatus, withUser, asPlatformOperator } from '@force/database';
 import { StoreService } from '../services/store.service';
+import { acquisitionForAdmin } from '../services/ebda-ads.service';
 import { resolveDomainService } from '../services/domain-provider';
 import { DomainClaimService, normalizeDomain } from '../services/domain-claim.service';
 import { assertStoreCreationBudget, withStoreCreationLock } from '../services/store-creation-limit';
@@ -496,14 +497,22 @@ router.get(
     try {
       const { id } = req.params;
 
-      const store = await StoreService.getById(id);
+      const isSuperAdmin = req.user?.role === 'super_admin';
+      const store = await StoreService.getById(id, { includeAcquisition: isSuperAdmin });
 
       // Mask marketing-pixel secrets (Meta CAPI / TikTok Events access tokens)
       // before the store object leaves the API. They're long-lived secrets the
       // admin UI must not display in plaintext; on save, masked values are
       // treated as "unchanged" (see PUT /marketing-pixels).
       const safeStore = store
-        ? { ...store, marketingPixels: maskMarketingPixelSecrets(store.marketingPixels) }
+        ? {
+            ...store,
+            marketingPixels: maskMarketingPixelSecrets(store.marketingPixels),
+            // Super-admin only: how the owner found Ebda. ip / user agent / Meta ids stay server-side.
+            ...(isSuperAdmin
+              ? { owner: { ...store.owner, acquisition: acquisitionForAdmin(store.owner) } }
+              : {}),
+          }
         : store;
 
       res.json({

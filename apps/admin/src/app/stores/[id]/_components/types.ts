@@ -1,3 +1,19 @@
+export interface StoreAcquisition {
+  attribution: {
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+    utm_content?: string;
+    utm_term?: string;
+    fbclid?: string;
+    landing?: string;
+    referrer?: string;
+    first_seen: number;
+  } | null;
+  consent: { analytics: boolean; marketing: boolean };
+  capturedAt: string;
+}
+
 export interface Store {
   id: string;
   name: string;
@@ -18,6 +34,8 @@ export interface Store {
     email: string;
     firstName: string;
     lastName: string;
+    /** Super-admin only: how the owner found Ebda (null = no consented tracking at signup). */
+    acquisition?: StoreAcquisition | null;
   };
   _count?: {
     products: number;

@@ -12,13 +12,14 @@
  */
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { withUser } from '@force/database';
+import { withUser, type Prisma } from '@force/database';
 import { normalizeEgyptianMobile } from '@force/shared';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
 import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';
 import { AuthService } from './auth.service';
 import { sendMerchantDuplicateSignupNotice } from './platform-mailer';
+import { buildAcquisition, signupTrackingSchema } from './ebda-ads.service';
 
 /** Same password policy as `/auth/register` (also used by `/auth/reset-password`). */
 export const passwordSchema = z
@@ -52,6 +53,11 @@ export const merchantSignupSchema = z.object({
    */
   company_site: z.string().max(500).optional(),
   formToken: z.string().max(200).optional(),
+  /**
+   * Ebda's own acquisition tracking (utm/fbclid/Meta ids + the consent the visitor gave).
+   * Sent by the form only when the visitor allowed tracking; stored on `users.acquisition`.
+   */
+  tracking: signupTrackingSchema.optional(),
 });
 
 export type MerchantSignupInput = z.infer<typeof merchantSignupSchema>;
@@ -70,7 +76,10 @@ const SALT_ROUNDS = 12;
 const DUMMY_HASH = '$2b$12$OW.xBchkmJbVjXDhBSQ6ke4cdbV/iuOcgjbbGK9ZslpcF5fkkynha';
 
 export class MerchantSignupService {
-  static async signup(input: MerchantSignupInput): Promise<typeof GENERIC_SIGNUP_RESULT> {
+  static async signup(
+    input: MerchantSignupInput,
+    request: { ip?: string; userAgent?: string } = {}
+  ): Promise<typeof GENERIC_SIGNUP_RESULT> {
     const { email, name, language } = input;
     const phone = input.phone ? normalizeEgyptianMobile(input.phone) : null;
 
@@ -120,10 +129,15 @@ export class MerchantSignupService {
     if (!created.created) return GENERIC_SIGNUP_RESULT;
     // Phone and language are not part of the definer's contract: set them as the
     // new user (its own row, under its own user scope).
+    const acquisition = buildAcquisition(input.tracking, request);
     await withUser(created.id, tx =>
       tx.user.update({
         where: { id: created.id },
-        data: { phone, language: language ?? 'ar' },
+        data: {
+          phone,
+          language: language ?? 'ar',
+          ...(acquisition ? { acquisition: acquisition as unknown as Prisma.InputJsonValue } : {}),
+        },
       })
     );
     const user = {

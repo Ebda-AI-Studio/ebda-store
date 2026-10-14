@@ -11,6 +11,7 @@
  */
 import { prisma, Prisma, withUser, withStore } from '@force/database';
 import {
+  storeCreatedEventId,
   storeHost,
   storefrontOrigin,
   validateStoreSlug,
@@ -30,6 +31,7 @@ import {
   loadPayablePlan,
 } from './billing/subscription-billing.service';
 import { DEFAULT_TRIAL_CHOICE, type TrialChoice } from './billing/trial';
+import { emitEbdaConversion } from './ebda-ads-emit';
 
 /** A self-serve owner may hold this many stores (abuse bound; raise with plans). */
 export const MAX_SELF_SERVE_STORES_PER_OWNER = 3;
@@ -225,6 +227,15 @@ export class OnboardingService {
           ownerName: `${user.firstName} ${user.lastName}`.trim() || user.email,
           settings: { defaultLanguage: input.language ?? 'ar' },
         });
+        // Ebda's own ads funnel: the browser fires StoreCreated with the same id. Fail-open.
+        if (!owner.isSuperAdmin) {
+          await emitEbdaConversion({
+            name: 'StoreCreated',
+            eventId: storeCreatedEventId(result.store.id),
+            userId: owner.userId,
+            storeId: result.store.id,
+          });
+        }
         return result.store;
       } catch (err) {
         // Lost the slug race between the check above and the insert.

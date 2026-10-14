@@ -25,7 +25,11 @@ import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { sendMerchantPasswordResetEmail, sendMerchantVerificationEmail } from './platform-mailer';
 import { accountLockout } from './account-lockout.service';
-import { BRAND_STORE_APP_URL, PASSWORD_RESET_TTL_MINUTES } from '@force/shared';
+import {
+  BRAND_STORE_APP_URL,
+  PASSWORD_RESET_TTL_MINUTES,
+  registrationEventId as registrationEventIdFor,
+} from '@force/shared';
 import { cfWaitUntil } from '../cf/bindings';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
@@ -37,6 +41,7 @@ import { sendAlert } from './alerts.service';
 import { SEND_CAP_WINDOW_MS } from './campaign.service';
 import { inngest } from '../lib/inngest/client';
 import { WalletService } from './wallet.service';
+import { emitEbdaConversion } from './ebda-ads-emit';
 
 interface TokenPayload {
   userId: string;
@@ -547,7 +552,9 @@ export class AuthService {
   /**
    * Verify email with token
    */
-  static async verifyEmail(token: string): Promise<{ success: boolean; message: string }> {
+  static async verifyEmail(
+    token: string
+  ): Promise<{ success: boolean; message: string; registrationEventId?: string }> {
     // Hash the provided token
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
@@ -646,7 +653,19 @@ export class AuthService {
       );
     }
 
-    return { success: true, message: 'Email verified successfully' };
+    // Ebda's own ads funnel: a MERCHANT (admin namespace, no storeId) just verified. The browser
+    // fires CompleteRegistration with this id; the server twin dedups against it. Fail-open.
+    let registrationEventId: string | undefined;
+    if (!tokenUser.storeId) {
+      registrationEventId = registrationEventIdFor(tokenUser.id);
+      await emitEbdaConversion({
+        name: 'CompleteRegistration',
+        eventId: registrationEventId,
+        userId: tokenUser.id,
+      });
+    }
+
+    return { success: true, message: 'Email verified successfully', registrationEventId };
   }
 
   /**
@@ -2160,6 +2179,8 @@ export class AuthService {
           phone: null,
           avatar: null,
           dateOfBirth: null,
+          // Ebda's own ads tracking (ip, user agent, Meta ids, utm): personal data on the row.
+          acquisition: Prisma.DbNull,
           passwordHash: crypto.randomBytes(32).toString('hex'),
           status: 'inactive',
           deletedAt: new Date(),

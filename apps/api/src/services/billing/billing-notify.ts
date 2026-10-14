@@ -13,11 +13,19 @@ import { bustStoreCaches } from '../store.service';
 import { reconcileStoreAccess } from './account.service';
 import { instapayDetails } from './account.service';
 import { supportContact } from './manual-config';
+import { emitEbdaConversion } from '../ebda-ads-emit';
+import { purchaseEventId } from '@force/shared';
 
 export type BillingEffect =
   | { kind: 'plan_changed'; storeId: string }
   /** Money was recorded: lift an `unpaid` suspension, re-apply the store allowance. */
   | { kind: 'payment_recorded'; storeId: string }
+  /**
+   * A subscription payment succeeded (card checkout/upgrade/trial-end charge, or a manual
+   * InstaPay approval). Feeds Ebda's own ads funnel; the Inngest function decides whether it
+   * is the store's FIRST paid payment.
+   */
+  | { kind: 'subscription_paid'; storeId: string; billingEventId: string }
   /** The daily job suspended an unpaid InstaPay store (`applied` = this run did it). */
   | { kind: 'store_suspended'; storeId: string; applied: boolean }
   | {
@@ -49,6 +57,7 @@ async function storeContext(storeId: string) {
         slug: true,
         domain: true,
         settings: true,
+        ownerId: true,
         owner: { select: { email: true } },
       },
     });
@@ -76,6 +85,16 @@ async function runOne(effect: BillingEffect): Promise<void> {
   const ctx = await storeContext(effect.storeId);
   if (!ctx) return;
   const { store } = ctx;
+  if (effect.kind === 'subscription_paid') {
+    await emitEbdaConversion({
+      name: 'Purchase',
+      eventId: purchaseEventId(effect.billingEventId),
+      userId: store.ownerId,
+      storeId: effect.storeId,
+      billingEventId: effect.billingEventId,
+    });
+    return;
+  }
   if (effect.kind === 'plan_changed' || effect.kind === 'downgraded') {
     await featureService.invalidateCache(effect.storeId);
     await bustStoreCaches(effect.storeId, store.slug, store.domain);

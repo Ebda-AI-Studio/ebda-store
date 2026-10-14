@@ -53,7 +53,10 @@ router.post(
         res.status(200).json({ success: true, data: GENERIC_SIGNUP_RESULT });
         return;
       }
-      const result = await MerchantSignupService.signup(data);
+      const result = await MerchantSignupService.signup(data, {
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
       await auditLog({
         action: 'merchant.signup',
         resourceType: 'user',

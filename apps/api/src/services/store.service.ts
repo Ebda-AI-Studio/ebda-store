@@ -273,15 +273,23 @@ export class StoreService {
     return store;
   }
 
-  static async getById(storeId: string) {
+  static async getById(storeId: string, opts: { includeAcquisition?: boolean } = {}) {
     // Inside the store's own scope: the payload names the owner, whose `users` row is visible from
     // there (owner of the current store) and from nowhere else under strict RLS.
+    // `includeAcquisition` (super-admin only, set by the route): how the owner found Ebda
+    // (utm / fbclid / landing). Never part of a merchant's own view of their store.
     const store = await withStore(storeId, tx =>
       tx.store.findUnique({
         where: { id: storeId },
         include: {
           owner: {
-            select: { id: true, email: true, firstName: true, lastName: true },
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              ...(opts.includeAcquisition ? { acquisition: true } : {}),
+            },
           },
         },
       })

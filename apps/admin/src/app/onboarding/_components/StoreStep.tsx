@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Input } from '@force/ui';
 import { validateStoreSlug } from '@force/shared';
+import { storeCreatedEventId } from '@force/shared';
 import { apiGet, apiPost } from '../../../lib/api';
+import { getEbdaTracker } from '../../../lib/ebda-tracker';
 import { suggestSlug } from '../../../lib/onboarding-validation';
 import { useT } from '@/i18n/useT';
 import type { PlanSelection } from '../../../components/billing/types';
@@ -118,6 +120,8 @@ export function StoreStep({
       else setFormError(t('createFailed'));
       return;
     }
+    // StoreCreated: same event_id as the server's Conversions API event (dedup).
+    getEbdaTracker()?.track('store_created', { eventId: storeCreatedEventId(data.store.id) });
     onCreated(data.store);
   }
 

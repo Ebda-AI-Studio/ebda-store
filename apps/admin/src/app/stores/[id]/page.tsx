@@ -17,6 +17,7 @@ import { StatsGrid } from './_components/StatsGrid';
 import { DashboardAccountingSummary } from './_components/DashboardAccountingSummary';
 import { StoreDetailsCard } from './_components/StoreDetailsCard';
 import { StoreOwnerCard } from './_components/StoreOwnerCard';
+import { AcquisitionCard } from './_components/AcquisitionCard';
 import { QuickActions } from './_components/QuickActions';
 import { SettingsLink } from './_components/SettingsLink';
 import { SuspendStoreModal } from './_components/SuspendStoreModal';
@@ -156,7 +157,10 @@ export default function StoreDetailPage() {
             resetEditForm();
           }}
         />
-        <StoreOwnerCard owner={store.owner} />
+        <div className="space-y-6">
+          <StoreOwnerCard owner={store.owner} />
+          {isSuperAdmin && <AcquisitionCard acquisition={store.owner.acquisition} />}
+        </div>
       </div>
 
       {/* Custom Domain panel lives at /stores/[id]/domain — removed from the

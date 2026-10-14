@@ -58,6 +58,12 @@ model User {
   updatedAt     DateTime   @updatedAt @map("updated_at")
   deletedAt     DateTime?  @map("deleted_at") // Soft delete support
 
+  // Ebda's own acquisition tracking (merchant accounts only): first-touch utm/fbclid, Meta
+  // click/browser ids, consent and the signup request's ip/ua. NULL for customers, super-admins
+  // and anyone who signed up without consenting. Shape: EbdaAcquisition in
+  // apps/api/src/services/ebda-ads.service.ts. Additive column; see docs/ebda/ads-tracking.md.
+  acquisition Json?
+
   // 2FA / MFA
   mfaEnabled     Boolean   @default(false) @map("mfa_enabled")
   mfaSecret      String?   @map("mfa_secret")

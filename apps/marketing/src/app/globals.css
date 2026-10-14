@@ -1250,6 +1250,15 @@ html[lang='ar'] .price {
   flex-wrap: wrap;
   margin: 0 0 8px;
 }
+.footer-links .link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
 .footer-brand {
   margin-bottom: 4px;
   display: flex;

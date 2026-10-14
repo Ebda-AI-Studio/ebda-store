@@ -2,19 +2,15 @@
 
 Moved verbatim from `CLAUDE.md` (2026-07-11) so the instruction file stays rules-only. This is the canonical env catalog; update it in the SAME session as any env change (documentation-parity rule).
 
-## Deploy (GitHub Actions → Railway)
+## Deploy (GitHub Actions → Cloudflare Workers)
 
-Read by `.github/workflows/railway-deploy.yml`. Documented here because an operator who
-sets only some of them can leave the API with no deploy path at all — see
-`docs/migration/railway-actions-deploy.md` for the required order.
+The API is the Cloudflare Worker `ebda-api` (`api.ebda.app`), deployed only by `.github/workflows/cf-api-deploy.yml` (`workflow_dispatch`); admin/web/orders/marketing deploy from their own `cf-*-deploy.yml` on push to `main`. There is no Railway deploy for this repo (the Railway section that used to sit here was inherited from Force Website Builder).
 
-- `RAILWAY_ACTIONS_DEPLOY` (repo **variable**) — **the switch.** Until it is the string `'true'` the deploy job is gated off at job level and reports as **skipped**. Not a secret, because a job-level `if:` cannot read secrets.
-- `RAILWAY_TOKEN` (repo **secret**) — Railway PROJECT token scoped to the `production` environment. Once `RAILWAY_ACTIONS_DEPLOY` is `'true'`, a missing token **fails** the job rather than skipping it: after cutover an absent token is a misconfiguration, not a no-op.
-- `RAILWAY_SERVICE` (repo variable, default `api`) — the service to deploy.
-- `RAILWAY_ENVIRONMENT` (repo variable, default `production`).
-- `RAILWAY_HEALTH_URL` (repo variable, default `https://api.force-ai.co/health`) — polled to confirm the deployed commit is the one serving.
+- `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (repo **secrets**) — used by every `cf-*-deploy.yml`.
+- `EBDA_HYPERDRIVE_ID`, `EBDA_KV_CACHE_ID` (repo **variables**) — substituted into `.wrangler.deploy.jsonc` by `scripts/ebda-cf-api-config.mjs`; `apps/api/wrangler.jsonc` keeps placeholder zeros for local dev.
+- Runtime secrets of the API Worker are set with `wrangler secret put <NAME> --name ebda-api` (list with `wrangler secret list --name ebda-api`); the variables below marked "API" live there.
 
-## API (Railway)
+## API (Cloudflare Worker `ebda-api` — `wrangler secret`)
 
 Required in production (app crashes without these):
 
@@ -24,7 +20,6 @@ Required in production (app crashes without these):
 - `JWT_SECRET` — min 32 chars, no placeholder values. Signs sessions only: rotating it signs everyone out and nothing else. The long-lived links in SMS and email (SMS opt-out, campaign unsubscribe, review requests) are no longer keyed on it (issue 2424). Campaign unsubscribe and review links signed before that change still verify against it until the next rotation.
 - `ENCRYPTION_KEY` — min 32 chars. Besides encrypting stored secrets, it is the root of the purpose-bound HKDF keys in `apps/api/src/lib/derived-secret.ts` that MAC the SMS opt-out link and, unless their dedicated secrets are set, the campaign unsubscribe and review links (issue 2424). No new variable is needed for them. Rotating `ENCRYPTION_KEY` is already a re-encryption event, and it also voids every one of those links already sent.
 - `REVIEW_TOKEN_SECRET` (optional; unset → a key derived from `ENCRYPTION_KEY`, issue 2424 — it used to fall back to `JWT_SECRET`) — HMAC key for the review-request link (`/review/<order>/<product>?token=`, 90-day expiry). With it unset, links signed before issue 2424 still verify against `JWT_SECRET`.
-- `PORT` — set automatically by Railway
 - `CF_WORKERS_DEV_SUBDOMAIN` (optional) — our Cloudflare workers.dev account subdomain; CORS then trusts `ebda-{web,admin,orders}.<subdomain>.workers.dev` preview origins (`apps/api/src/lib/cors-cache.ts`). Unset = no preview origin is trusted.
 - `BUILD_COMMIT_SHA` (optional, build-time) — the commit the image was built from, baked by `Dockerfile.api` from the `GIT_COMMIT_SHA` build arg. Surfaced on `/health` as `commit` so a deploy can be verified as **live** rather than merely green: a 200 is returned identically by the container still serving the previous release. Unset → `/health` reports `commit: null`, which means _unknown_, not _not deployed_. To populate it under Railway (which builds the image itself), set `GIT_COMMIT_SHA` as a service variable so it reaches the Docker build.
 - `RAILWAY_GIT_COMMIT_SHA` (read-only, platform) — **injected at runtime; verified 2026-09-03.** The first deploy carrying `/health`'s build identity reported the correct commit with no build arg and no service variable set, so this is what populates `commit` today. It appears in NEITHER listing — not the 85 the CLI reports, nor the 8 the dashboard shows as "added by Railway" — because both describe what is _configured_ on the service, which is not the container's environment. Do not conclude a platform variable is absent from either list alone.
@@ -122,12 +117,31 @@ Read on every call (change takes effect without a rebuild). Integers unless note
 - **Custom domains** — `DOMAIN_CLAIM_TTL_HOURS` (72): a pending/failed claim older than this is released by the `domain-claim-sweep` Inngest cron (every 15 min). A domain is only served once Cloudflare for SaaS reports it verified (`stores.domain_status = 'active'`).
 - **Card testing (online payments only, COD exempt)** — `PAYMENT_ATTEMPTS_PER_STORE_10M` (120), `PAYMENT_ATTEMPTS_PER_IP_10M` (10), `PAYMENT_SESSION_MAX_DECLINES` (5 declines block the checkout session for 1h), `PAYMENT_IP_MAX_DECLINES` (10 per IP per hour), `PAYMENT_ALERT_MIN_ATTEMPTS` (20) and `PAYMENT_ALERT_DECLINE_RATIO` (float 0..1, default 0.6): a store with that many attempts this hour and at least that decline ratio raises a store-scoped P1 (`payment.card_testing.decline_spike`, at most once per store per hour). Counters are Redis fixed windows and fail OPEN when Redis is down.
 
+### Ebda's own ads tracking (platform funnel, 2026-10-14)
+
+All optional. Unset = the feature is a no-op with one info log; nothing breaks. Not the per-merchant storefront pixels. Full guide: `docs/ebda/ads-tracking.md`.
+
+- `EBDA_META_PIXEL_ID` — Ebda's own Meta Pixel / dataset id (public value). With the token below it enables the server-side Conversions API for `CompleteRegistration`, `StoreCreated` and `Purchase` (first paid subscription, EGP).
+- `EBDA_META_CAPI_TOKEN` — **secret.** Conversions API access token for that pixel. Both this and the pixel id are required, else no-op.
+- `EBDA_META_TEST_EVENT_CODE` — optional. Routes server events to Events Manager > Test events (`TEST12345`). Remove it for real traffic.
+- `EBDA_POSTHOG_KEY` — optional public PostHog project key for the server-side `subscription_paid` event (the one funnel step the browser cannot see). Falls back to `NEXT_PUBLIC_POSTHOG_KEY` if set on the API service; host from `NEXT_PUBLIC_POSTHOG_HOST` (default `https://eu.i.posthog.com`).
+- Migration `20261014000000_user_acquisition` adds the nullable `users.acquisition` jsonb column (apply before deploying this API build).
+
 ## Admin (Cloudflare Worker `ebda-admin`)
 
 - `NEXT_PUBLIC_API_URL` — the live API host, `https://api.force-ai.co` (Cloudflare custom domain in front of the Railway API service; the old raw `api-production-c058.up.railway.app` hostname 404s — corrected 2026-09-02)
+- `NEXT_PUBLIC_EBDA_META_PIXEL_ID` — **build-time, public.** Ebda's own Meta Pixel id (same value as the API's `EBDA_META_PIXEL_ID`). Loaded ONLY after the visitor accepts the cookie banner, ONLY on `/signup`, `/verify-email`, `/onboarding`. Unset = no Meta script. GitHub repo **variable** `NEXT_PUBLIC_EBDA_META_PIXEL_ID`, wired in `cf-admin-deploy.yml`. PostHog for the same pages reuses `NEXT_PUBLIC_POSTHOG_KEY` / `_HOST` (named instance `ebda`, consent-gated; the pre-existing operator PostHog provider is separate).
 - `NEXT_PUBLIC_ONESIGNAL_APP_ID` — OneSignal app ID for the admin PWA (`react-onesignal` in `apps/admin`).
 - `NEXT_PUBLIC_SENTRY_DSN_ADMIN` — admin client Sentry DSN. Initialized in `apps/admin/instrumentation-client.ts` (replaced the dead `sentry.client.config.ts`, same latent bug as web — no `withSentryConfig`, fixed 2026-06-25). Server Sentry off on the CF target (instrumentation.ts moved aside). **`next.config.js` is now wrapped in `withSentryConfig` (fixed 2026-07-02, audit H2)** — see the shared `SENTRY_AUTH_TOKEN` note below for source maps/releases. **NOT yet given the `@sentry/cloudflare` worker-entry treatment** that `apps/web` got 2026-07-02; tracked as a follow-up, same pattern.
 - `ADMIN_DEFAULT_FRAME_SRC` — **build-time only** (read in `apps/admin/next.config.js`, which Next evaluates at build time — setting/changing this has NO effect without a rebuild). Overrides the CSP `frame-src` allowlist for every admin route EXCEPT the page-builder live-preview page itself (that route always permits any `https:` origin, since a merchant's custom domain is unknowable at build time — see the file's own comments). **Never set in any environment today** — the default (`https://store.force-ai.co https://*.force-ai.co https://store.forcemediakw.com https://*.forcemediakw.com`) is what ships. Renamed 2026-09-25 from `ADMIN_PREVIEW_FRAME_SRC` — the old name implied it controlled the preview route; it controls the opposite (the catch-all/default route).
+
+## Marketing (Cloudflare Worker `ebda-marketing`, static export)
+
+Build-time only (the site is a static export; values are inlined by `next build` in `cf-marketing-deploy.yml`). All optional.
+
+- `NEXT_PUBLIC_EBDA_META_PIXEL_ID` — Ebda's own Meta Pixel id (GitHub repo variable). Unset = no Meta script.
+- `NEXT_PUBLIC_POSTHOG_KEY` (secret in the workflow) / `NEXT_PUBLIC_POSTHOG_HOST` (variable, default `https://eu.i.posthog.com`) — PostHog funnel. Unset = no PostHog script.
+- Both load only after the cookie banner is accepted. See `docs/ebda/ads-tracking.md`.
 
 ## Web (Cloudflare Worker `ebda-web`)
 

@@ -356,7 +356,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '5. Service providers (sub-processors)',
         p: [
-          'We use these providers to run the Service. Each processes data only on our instructions and under its own security and data terms: Cloudflare (website and API hosting, delivery, key-value storage, queues and file/image storage); Neon (database hosting, EU region); Resend (transactional and campaign email); Sentry (error and performance monitoring, EU region); Inngest (background job processing); Google Gemini (Google; AI features: only the text you submit to an AI feature is sent); PostHog (EU cloud; product analytics in the merchant dashboard); and OneSignal (United States; push notifications to the merchant dashboard installed as a home-screen app).',
+          'We use these providers to run the Service. Each processes data only on our instructions and under its own security and data terms: Cloudflare (website and API hosting, delivery, key-value storage, queues and file/image storage); Neon (database hosting, EU region); Resend (transactional and campaign email); Sentry (error and performance monitoring, EU region); Inngest (background job processing); Google Gemini (Google; AI features: only the text you submit to an AI feature is sent); PostHog (EU cloud; product analytics in the merchant dashboard and, with your consent, the sign-up funnel); Meta (advertising measurement of our own ads, only with your consent); and OneSignal (United States; push notifications to the merchant dashboard installed as a home-screen app).',
           'We may add or replace providers; the current list is maintained on this page. We do not sell personal data.',
         ],
       },
@@ -387,7 +387,7 @@ export const LEGAL_EN: LegalPages = {
       {
         h: '10. Cookies',
         p: [
-          'This marketing website does not use advertising or tracking cookies. The merchant dashboard and stores use cookies and similar storage that are necessary to sign in and operate, and optional analytics only where enabled and, where required, with your consent.',
+          'This marketing website and the sign-up pages use optional advertising and analytics cookies (Meta Pixel and PostHog) to measure where visitors come from and whether our ads work. They are loaded only after you accept the cookie banner, they are not loaded if you decline, and you can change your choice at any time from the "Cookie settings" link in the footer. If you accept, we also keep the campaign details of the link you arrived from (UTM parameters and the Meta click id) with your account when you sign up, and our server reports your sign-up, store creation and first payment to Meta using hashed contact details. The merchant dashboard and stores use cookies and similar storage that are necessary to sign in and operate, and optional analytics only where enabled and, where required, with your consent.',
         ],
       },
       {

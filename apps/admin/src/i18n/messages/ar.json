@@ -282,6 +282,20 @@
         "deleteFailed": "فشل حذف المتجر",
         "deletedToastTitle": "تم حذف المتجر",
         "deletedToastDescription": "تم حذف {name} وجميع بياناته."
+      },
+      "acquisition": {
+        "title": "عرف ابدأ منين",
+        "none": "مفيش بيانات مصدر. صاحب المتجر سجّل من غير ما يوافق على التتبع، أو قبل ما التتبع يتفعّل.",
+        "source": "المصدر",
+        "medium": "الوسيط",
+        "campaign": "الحملة",
+        "content": "المحتوى",
+        "term": "الكلمة",
+        "fbclid": "ضغطة إعلان ميتا",
+        "present": "أيوه (fbclid متسجّل)",
+        "landing": "صفحة الدخول",
+        "referrer": "جاي من",
+        "firstSeen": "أول زيارة"
       }
     },
     "list": {

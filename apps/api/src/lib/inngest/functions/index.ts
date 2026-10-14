@@ -44,6 +44,7 @@ import { aiAutofillProduct } from './ai-autofill-product';
 import { aiAutofillCleanup } from './ai-autofill-cleanup';
 import { aiAutofillSweep } from './ai-autofill-sweep';
 import { orderCapiConversion } from './order-capi-conversion';
+import { ebdaAdsConversion } from './ebda-ads-conversion';
 import { orderAutoCancelUnpaid } from './order-auto-cancel-unpaid';
 import { instapayExpiry } from './instapay-expiry';
 import { shipmentCreate } from './shipment-create';
@@ -141,6 +142,8 @@ const allInngestFunctions: InngestFunction.Any[] = [
   aiAutofillSweep,
   // Server-side conversion API: Meta CAPI + TikTok Events API on purchase
   orderCapiConversion,
+  // Ebda's OWN acquisition funnel: Meta CAPI for registration / store created / first paid sub.
+  ebdaAdsConversion,
   // Auto-cancel stale unpaid orders past AUTO_CANCEL_UNPAID_DAYS (daily cron).
   orderAutoCancelUnpaid,
   instapayExpiry,
