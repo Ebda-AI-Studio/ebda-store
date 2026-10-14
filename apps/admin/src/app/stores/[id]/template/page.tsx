@@ -152,7 +152,7 @@ export default function StoreTemplatePage() {
         )}
 
         {saveFailed && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-sm text-destructive-ink">
             {saveFailed === 'invalid' ? t('invalidLook') : t('saveError')}
           </p>
         )}

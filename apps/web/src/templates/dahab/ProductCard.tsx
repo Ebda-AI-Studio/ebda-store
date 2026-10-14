@@ -114,8 +114,9 @@ export default function DahabProductCard({
         >
           <div
             className={cx(
-              'relative w-full',
-              lookImageAspectClass(store.look) || 'aspect-[4/5]',
+              lookImageAspectClass(store.look)
+                ? `relative w-full ${lookImageAspectClass(store.look)}`
+                : 'relative aspect-[4/5] w-full',
               !orderable && 'opacity-60'
             )}
           >
