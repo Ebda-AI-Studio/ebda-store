@@ -9,6 +9,7 @@ import { generateProductFaqs } from '../../ai/product-faq-generator';
 import { AppError } from '../../../middleware/error-handler';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { invalidateStoreProductCaches } from '../../public-cache';
+import { isPlaceholderText } from '../../ai/placeholder-guard';
 
 /**
  * Catalogue-wide product-FAQ sweep.
@@ -234,14 +235,19 @@ const bulkAiProductFaqsFn = inngest.createFunction(
                 `product-faqs:${product.id}`
               );
 
-              // Keep only well-formed rows (question + answer present).
+              // Keep only well-formed, non-placeholder rows (question + answer
+              // present and neither is degenerate Gemini output like "N/A" —
+              // this sweep writes straight to the live product page with no
+              // merchant review step, see placeholder-guard.ts).
               const validFaqs = faqs.filter(
                 f =>
                   f &&
                   typeof f.question === 'string' &&
                   f.question.trim() &&
                   typeof f.answer === 'string' &&
-                  f.answer.trim()
+                  f.answer.trim() &&
+                  !isPlaceholderText(f.question) &&
+                  !isPlaceholderText(f.answer)
               );
 
               if (validFaqs.length === 0) {

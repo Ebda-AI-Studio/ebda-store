@@ -16,6 +16,7 @@ import type { z } from 'zod';
 import { isSafeUrl } from '../utils/safe-url';
 import { storeLayoutSchema } from './layout-schema';
 import { allSections, sectionToLegacy } from './adapter';
+import { isPlaceholderCopy } from './placeholder-copy';
 import { getSectionDefinition, VIEWPORTS } from './registry';
 import {
   BUILDER_LIMITS,
@@ -24,6 +25,7 @@ import {
   type SectionNode,
 } from './schema';
 import type { SectionGroup } from './registry';
+import type { SettingDefinition } from './settings-schema';
 
 export interface BuilderIssue {
   code:
@@ -41,7 +43,8 @@ export interface BuilderIssue {
     | 'GROUP_MISMATCH'
     | 'PROPS_INVALID'
     | 'REF_NOT_FOUND'
-    | 'MISSING_IMAGE';
+    | 'MISSING_IMAGE'
+    | 'PLACEHOLDER_COPY';
   path: string;
   messageEn: string;
   messageAr: string;
@@ -315,11 +318,40 @@ export function validateDefinitionSync(input: unknown): ValidationResult {
  * autosave never blocks on an edit still in progress; callers run this
  * ADDITIONALLY, only at publish time.
  */
-export function validatePublishReadiness(def: PageDefinition): BuilderIssue[] {
+export function validatePublishReadiness(
+  def: PageDefinition,
+  opts: { placeholderCopy?: boolean } = {}
+): BuilderIssue[] {
+  const checkCopy = opts.placeholderCopy !== false;
   const errors: BuilderIssue[] = [];
   const visit = (nodes: SectionNode[], base: string) => {
     nodes.forEach((n, i) => {
-      if (n.hidden || n.type !== 'hero') return;
+      if (n.hidden) return;
+      const sectionDef = getSectionDefinition(n.type);
+      if (checkCopy && sectionDef) {
+        scanPlaceholderCopy(
+          n.settings,
+          sectionDef.settings,
+          `${base}/${i}/settings`,
+          sectionDef.labelEn,
+          sectionDef.labelAr,
+          errors
+        );
+        (n.blocks ?? []).forEach((b, j) => {
+          if (b.hidden) return;
+          const blockDef = sectionDef.blocks.find(x => x.type === b.type);
+          if (!blockDef) return;
+          scanPlaceholderCopy(
+            b.settings,
+            blockDef.settings,
+            `${base}/${i}/blocks/${j}/settings`,
+            `${sectionDef.labelEn} / ${blockDef.labelEn}`,
+            `${sectionDef.labelAr} / ${blockDef.labelAr}`,
+            errors
+          );
+        });
+      }
+      if (n.type !== 'hero') return;
       (n.blocks ?? []).forEach((b, j) => {
         if (b.hidden || b.type !== 'slide') return;
         const image = (b.settings as Record<string, unknown>).image;
@@ -340,6 +372,36 @@ export function validatePublishReadiness(def: PageDefinition): BuilderIssue[] {
   visit(def.sections, '/sections');
   visit(def.sectionGroups.footer, '/sectionGroups/footer');
   return errors;
+}
+
+/**
+ * Flags text/textarea settings (and their `Ar` twins) that still hold
+ * placeholder copy. Only descriptor-declared TEXT settings are read, so ids,
+ * URLs, colours and select values can never false-positive.
+ */
+function scanPlaceholderCopy(
+  values: Record<string, unknown>,
+  descriptors: readonly SettingDefinition[],
+  basePath: string,
+  sectionEn: string,
+  sectionAr: string,
+  errors: BuilderIssue[]
+): void {
+  for (const d of descriptors) {
+    if (d.type !== 'text' && d.type !== 'textarea') continue;
+    const keys = d.localized ? [d.id, `${d.id}Ar`] : [d.id];
+    for (const key of keys) {
+      if (!isPlaceholderCopy(values[key])) continue;
+      errors.push(
+        issue(
+          'PLACEHOLDER_COPY',
+          `${basePath}/${key}`,
+          `"${sectionEn}": "${d.labelEn}" still has placeholder text. Replace it with your own before publishing.`,
+          `"${sectionAr}": "${d.labelAr}" لسه فيه نص مؤقت. اكتب نصك قبل النشر.`
+        )
+      );
+    }
+  }
 }
 
 /** Section types whose settings hold catalogue refs (`categorySlug` / `manualProductIds`). */

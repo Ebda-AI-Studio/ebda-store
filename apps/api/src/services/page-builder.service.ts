@@ -395,7 +395,9 @@ export async function publishDraft(args: {
       errors: v.errors,
     };
   // Structurally valid is not publish-ready: a draft may still hold a hero
-  // slide with no image chosen yet (allowed so autosave can persist it).
+  // slide with no image chosen yet (allowed so autosave can persist it), or
+  // starter/placeholder text ("Tell customers what makes your products
+  // special.") that must never go live (PLACEHOLDER_COPY).
   const readinessErrors = validatePublishReadiness(v.definition);
   if (readinessErrors.length > 0)
     return {
@@ -555,7 +557,13 @@ export async function publishLegacyLayout(args: {
   // would delete them.
   const previous = (draft ?? published)?.document as PageDefinition | undefined;
   const definition = mergeDocumentOnlySections(layoutToDefinition(layout, HOME_PAGE_KEY), previous);
-  const readinessErrors = validatePublishReadiness(definition);
+  // Placeholder-copy check OFF here, deliberately: this legacy PUT cannot
+  // author document-only section text (it only carries those sections over
+  // unchanged from the previous document), so gating it would 422 an
+  // unrelated theme/layout save for a store whose existing page still holds
+  // starter copy. The copy is gated where it is authored: publishDraft and
+  // rollbackToRevision. (Ruling PLACEHOLDER-1.)
+  const readinessErrors = validatePublishReadiness(definition, { placeholderCopy: false });
   if (readinessErrors.length > 0) return { invalid: readinessErrors };
   return publishNewRevision({
     storeId,

@@ -161,6 +161,14 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
     return () => window.removeEventListener('beforeunload', onBefore);
   }, [b.dirty]);
 
+  // Issues that stop a publish but not a draft save (placeholder text, an
+  // imageless hero slide). The API already localizes each message; the banner
+  // lists them all so the merchant sees every section to fix, not only the
+  // selected one.
+  const publishBlockers = b.errors.filter(
+    e => e.code === 'PLACEHOLDER_COPY' || e.code === 'MISSING_IMAGE'
+  );
+
   const publish = async () => {
     const r = await b.publish();
     if (r === 'ok') toastSuccess(t('published'));
@@ -387,6 +395,21 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
           {b.publishing ? t('publishing') : t('publish')}
         </button>
       </header>
+
+      {publishBlockers.length > 0 && (
+        <div
+          role="alert"
+          className="border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm"
+          data-testid="publish-blockers"
+        >
+          <p className="font-semibold">{t('publishBlocked.title')}</p>
+          <ul className="mt-1 list-disc ps-5 text-xs">
+            {publishBlockers.map(e => (
+              <li key={e.path}>{locale === 'ar' ? e.messageAr : e.messageEn}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {b.saveState === 'conflict' && (
         <div

@@ -9,6 +9,7 @@ export * from './settings-schema';
 export * from './registry';
 export * from './adapter';
 export * from './validate';
+export * from './placeholder-copy';
 export { storeLayoutSchema, heroSlideSchema } from './layout-schema';
 export * from './template-families';
 export * from './sections-document-only';

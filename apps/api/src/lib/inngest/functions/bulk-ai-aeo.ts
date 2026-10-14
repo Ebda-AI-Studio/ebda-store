@@ -14,6 +14,7 @@ import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { buildMetaAeoPrompt, generateProductMetaAeo } from '../../ai/product-meta-aeo-generator';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import { bustStoreCachesById } from '../../../services/store.service';
+import { isPlaceholderText } from '../../ai/placeholder-guard';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
@@ -454,6 +455,10 @@ No other text, no markdown code fences — pure JSON only.`;
             skipped++;
             continue;
           }
+          if (isPlaceholderText(f.question) || isPlaceholderText(f.answer)) {
+            skipped++;
+            continue;
+          }
           if (lockedQuestions.has(f.question.trim().toLowerCase())) {
             skipped++;
             continue;
@@ -765,6 +770,10 @@ No markdown, no code fences — pure JSON only.`;
             skipped++;
             continue;
           }
+          if (isPlaceholderText(h.title) || isPlaceholderText(h.description)) {
+            skipped++;
+            continue;
+          }
           if (lockedTitles.has(h.title.trim().toLowerCase())) {
             skipped++;
             continue;
@@ -1046,7 +1055,11 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                 );
                 const raw = stripFences(genResult.response.text());
                 const parsed = JSON.parse(raw) as { en: string; ar: string };
-                if (typeof parsed.en === 'string' && parsed.en.trim()) {
+                if (
+                  typeof parsed.en === 'string' &&
+                  parsed.en.trim() &&
+                  !isPlaceholderText(parsed.en)
+                ) {
                   await prisma.store.update({
                     where: { id: storeId },
                     data: {
@@ -1117,7 +1130,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                     ),
                   `meta-aeo:product:${p.id}`
                 );
-                if (generated.en) {
+                if (generated.en && !isPlaceholderText(generated.en)) {
                   await prisma.product.update({
                     where: { id: p.id, storeId },
                     data: {
@@ -1189,7 +1202,11 @@ const bulkAiMetaAeoFn = inngest.createFunction(
               );
               const raw = stripFences(genResult.response.text());
               const parsed = JSON.parse(raw) as { en: string; ar: string };
-              if (typeof parsed.en === 'string' && parsed.en.trim()) {
+              if (
+                typeof parsed.en === 'string' &&
+                parsed.en.trim() &&
+                !isPlaceholderText(parsed.en)
+              ) {
                 await prisma.category.update({
                   where: { id: c.id, storeId },
                   data: {
