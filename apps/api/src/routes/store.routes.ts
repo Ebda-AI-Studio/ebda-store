@@ -149,6 +149,10 @@ export const updateStoreSchema = createStoreSchema.partial().extend({
     .optional(),
 });
 
+const lookBody = z
+  .object({ lookId: z.string().max(40), design: z.enum(['keep', 'reset']).default('keep') })
+  .strict();
+
 const themeSchema = z.record(z.string(), z.unknown()).refine(
   data => {
     // Validate known string fields have reasonable lengths
@@ -813,6 +817,28 @@ router.put(
       res.json({
         success: true,
         data: { store },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /stores/:id/look - Apply a look (sets look + skin, re-shapes the home page)
+router.put(
+  '/:id/look',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { lookId, design } = lookBody.parse(req.body);
+      const { store, builder } = await StoreService.applyLook(id, lookId, { design });
+      res.json({
+        success: true,
+        data: { look: store.look, template: store.template, builder },
       });
     } catch (error) {
       next(error);

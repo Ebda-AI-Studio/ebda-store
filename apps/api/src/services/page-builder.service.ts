@@ -43,6 +43,7 @@
  * store's slug/host/domain resolve keys. Draft saves touch no public cache.
  */
 import { prisma, withStore } from '@force/database';
+import { AppError } from '../middleware/error-handler';
 import {
   BUILDER_LIMITS,
   PAGE_DEFINITION_SCHEMA_VERSION,
@@ -53,6 +54,7 @@ import {
   resolveLayoutSettings,
   snapshotEditableTheme,
   applyChromePatch,
+  applyTemplateFamily,
   hasChromePatch,
   pageDefinitionSchema,
   rebaseDraftOntoLive,
@@ -61,6 +63,7 @@ import {
   type BuilderIssue,
   type PageDefinition,
   type StoreLayoutSettings,
+  type TemplateFamily,
   type TemplateId,
 } from '@force/shared';
 import { withSavepoint } from '../lib/savepoint';
@@ -536,6 +539,49 @@ async function publishNewRevision(args: {
     });
     await args.afterCreate?.(rev);
   });
+}
+
+/**
+ * Re-shape the home page to a look's template family without losing content
+ * (`applyTemplateFamily` keeps every existing section of a family type and only
+ * adds the missing ones). Runs in the CALLER's tenant scope, like the builder
+ * routes: it only composes `saveDraft` / `publishDraft`, which scope themselves.
+ *
+ * - no revision yet (the home page still derives from `layout_settings`): the
+ *   result is published, so a fresh store looks like its look immediately;
+ * - a published page, or a work-in-progress draft: the result is saved as a
+ *   DRAFT only. The live page changes when the merchant publishes.
+ * A fresh store whose family is not publish-ready (placeholder copy) also stays a draft.
+ */
+export async function applyFamilyForLook(
+  storeId: string,
+  family: TemplateFamily['id'],
+  userId: string | null = null
+): Promise<'published' | 'draft'> {
+  const state = await getPageState(storeId, HOME_PAGE_KEY);
+  if (!state) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+  const saved = await saveDraft({
+    storeId,
+    pageKey: HOME_PAGE_KEY,
+    baseRev: state.rev,
+    definition: applyTemplateFamily(state.definition, family),
+    userId,
+  });
+  if (!saved.ok) throw new AppError(saved.status, saved.code, saved.message);
+  if (state.source !== 'layout') return 'draft';
+  const published = await publishDraft({
+    storeId,
+    pageKey: HOME_PAGE_KEY,
+    baseRev: saved.value.rev,
+  });
+  if (!published.ok) {
+    logger.warn(
+      { storeId, code: published.code },
+      '[page-builder] look family left as a draft: not publish-ready'
+    );
+    return 'draft';
+  }
+  return 'published';
 }
 
 export async function rollbackToRevision(args: {
