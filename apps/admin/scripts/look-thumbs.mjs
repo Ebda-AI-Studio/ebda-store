@@ -30,7 +30,10 @@ const registry = readFileSync(join(repo, 'packages/shared/src/looks/registry.ts'
 const looks = [
   ...registry.matchAll(/id: '([a-z]+\.[a-z0-9-]+)',\s*template: '([a-z]+)',\s*letter: '([ABC])'/g),
 ].map(m => ({ id: m[1], template: m[2], letter: m[3].toLowerCase() }));
-if (looks.length === 0) throw new Error('no looks parsed from the registry');
+const EXPECTED_LOOKS = 15; // 5 templates x 3 looks
+if (looks.length !== EXPECTED_LOOKS) {
+  throw new Error(`parsed ${looks.length} looks from the registry, expected ${EXPECTED_LOOKS}`);
+}
 
 const fontsTs = readFileSync(join(marketing, 'src/lib/looks-fonts.ts'), 'utf8');
 const fontsFor = template => {

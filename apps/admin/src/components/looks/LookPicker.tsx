@@ -103,47 +103,48 @@ export function LookPicker({ value, onChange, locale }: LookPickerProps) {
           );
         })}
       </div>
-      <div
-        id={`${uid}-panel`}
-        role="radiogroup"
-        aria-labelledby={`${uid}-tab-${active}`}
-        className="grid grid-cols-1 gap-3 sm:grid-cols-3"
-      >
-        {looks.map(look => {
-          const on = value === look.id;
-          const name = rtl ? look.name.ar : look.name.en;
-          return (
-            <button
-              key={look.id}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              onClick={() => onChange(look.id)}
-              className={`flex flex-col gap-2 rounded-lg border p-2 text-start transition-colors ${
-                on ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:bg-muted/40'
-              }`}
-            >
-              {/* A fixed first-screen crop (360px wide webp); next/image adds nothing for a static asset. */}
-              <img
-                src={`/looks/${look.id}.webp`}
-                alt={name}
-                loading="lazy"
-                decoding="async"
-                className="aspect-[4/5] w-full rounded-md border border-border bg-muted object-cover object-top"
-              />
-              <span className="block text-sm font-medium text-foreground">
-                {name}
-                {on && <span className="ms-2 text-xs text-primary-ink">{t('selected')}</span>}
-              </span>
-              <span className="block text-xs text-foreground/80">
-                {rtl ? look.forWhom.ar : look.forWhom.en}
-              </span>
-              <span className="block text-xs text-muted-foreground">
-                {rtl ? look.idea.ar : look.idea.en}
-              </span>
-            </button>
-          );
-        })}
+      <div id={`${uid}-panel`} role="tabpanel" aria-labelledby={`${uid}-tab-${active}`}>
+        <div
+          role="radiogroup"
+          aria-labelledby={`${uid}-tab-${active}`}
+          className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+        >
+          {looks.map(look => {
+            const on = value === look.id;
+            const name = rtl ? look.name.ar : look.name.en;
+            return (
+              <button
+                key={look.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => onChange(look.id)}
+                className={`flex flex-col gap-2 rounded-lg border p-2 text-start transition-colors ${
+                  on ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:bg-muted/40'
+                }`}
+              >
+                {/* A fixed first-screen crop (360px wide webp); next/image adds nothing for a static asset. */}
+                <img
+                  src={`/looks/${look.id}.webp`}
+                  alt={name}
+                  loading="lazy"
+                  decoding="async"
+                  className="aspect-[4/5] w-full rounded-md border border-border bg-muted object-cover object-top"
+                />
+                <span className="block text-sm font-medium text-foreground">
+                  {name}
+                  {on && <span className="ms-2 text-xs text-primary-ink">{t('selected')}</span>}
+                </span>
+                <span className="block text-xs text-foreground/80">
+                  {rtl ? look.forWhom.ar : look.forWhom.en}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {rtl ? look.idea.ar : look.idea.en}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

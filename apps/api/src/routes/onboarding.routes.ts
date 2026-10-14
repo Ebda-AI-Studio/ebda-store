@@ -83,7 +83,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = createStoreSchema.parse(req.body);
-      const store = await OnboardingService.createStore(
+      const { store, lookApplied } = await OnboardingService.createStore(
         { userId: req.user!.userId, isSuperAdmin: req.user!.role === 'super_admin' },
         data
       );
@@ -96,7 +96,7 @@ router.post(
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
-      res.status(201).json({ success: true, data: { store } });
+      res.status(201).json({ success: true, data: { store, lookApplied } });
     } catch (error) {
       next(error);
     }

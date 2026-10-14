@@ -248,8 +248,11 @@ export class OnboardingService {
             storeId: result.store.id,
           });
         }
-        if (look) await this.applyChosenLook(result.store.id, look.id, owner.userId);
-        return result.store;
+        // No look asked for counts as applied: only a requested-and-failed look is reported.
+        const lookApplied = look
+          ? await this.applyChosenLook(result.store.id, look.id, owner.userId)
+          : true;
+        return { store: result.store, lookApplied };
       } catch (err) {
         // Lost the slug race between the check above and the insert.
         if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -266,16 +269,25 @@ export class OnboardingService {
    * context, so the work is bound to the new store's scope (applyLook reads/writes the store and
    * its home-page revisions). A brand-new store is "genuinely fresh", so the home page is
    * published. Best effort: the store already exists and is usable, and a retry of the whole
-   * request would only hit SLUG_TAKEN, so a failure is logged and the merchant re-picks a look in
-   * the builder rather than being told their store was not created.
+   * request would only hit SLUG_TAKEN, so a failure is logged and reported as `lookApplied: false`
+   * (the client asks the merchant to pick a look again) rather than failing the creation.
    */
-  private static async applyChosenLook(storeId: string, lookId: string, userId: string) {
+  private static async applyChosenLook(
+    storeId: string,
+    lookId: string,
+    userId: string
+  ): Promise<boolean> {
     try {
       await runInStoreScope(storeId, () =>
         StoreService.applyLook(storeId, lookId, { design: 'reset' }, userId)
       );
+      return true;
     } catch (err) {
-      logger.error({ err, storeId, lookId }, '[ONBOARDING] applying the chosen look failed');
+      logger.error(
+        { err, code: err instanceof AppError ? err.code : undefined, storeId, lookId },
+        '[ONBOARDING] applying the chosen look failed'
+      );
+      return false;
     }
   }
 

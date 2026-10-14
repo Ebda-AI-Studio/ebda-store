@@ -8983,7 +8983,9 @@
         "title": "Pick a look",
         "subtitle": "Choose how your store looks. You can change it any time.",
         "saveFailed": "We could not save your look. Please try again.",
-        "previewNote": "Previews show the look with sample products. Your photos and products are added next."
+        "previewNote": "Previews show the look with sample products. Your photos and products are added next.",
+        "saving": "Saving…",
+        "lookNotApplied": "Your store was created, but its look could not be applied. Please pick a look again."
       },
       "product": {
         "title": "Add your first product",

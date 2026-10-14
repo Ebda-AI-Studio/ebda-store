@@ -44,6 +44,15 @@ describe('LookPicker', () => {
     expect(within(card).getByText(l.idea.ar)).toBeTruthy();
   });
 
+  it('tabs control a tabpanel that wraps the radiogroup and is labelled by the active tab', () => {
+    render(<LookPicker value={null} onChange={() => {}} locale="en" />);
+    const panel = screen.getByRole('tabpanel');
+    const active = tabs().find(t => t.getAttribute('aria-selected') === 'true')!;
+    expect(active.getAttribute('aria-controls')).toBe(panel.id);
+    expect(panel.getAttribute('aria-labelledby')).toBe(active.id);
+    expect(within(panel).getByRole('radiogroup')).toBeTruthy();
+  });
+
   it('is LTR in English', () => {
     const { container } = render(<LookPicker value={null} onChange={() => {}} locale="en" />);
     expect((container.firstChild as HTMLElement).getAttribute('dir')).toBe('ltr');

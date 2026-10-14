@@ -552,6 +552,21 @@ function isUntouchedLayout(layout: unknown): boolean {
 }
 
 /**
+ * Remove the top-level sections that fail `validatePublishReadiness` (placeholder copy, a hero slide
+ * with no image). Issue paths look like `/sections/<i>/...`; anything not attributable to a
+ * top-level section is left alone, and publish will still refuse it (the caller then stays a draft).
+ */
+function dropUnpublishableSections(definition: PageDefinition): PageDefinition {
+  const bad = new Set<number>();
+  for (const issue of validatePublishReadiness(definition)) {
+    const m = /^\/sections\/(\d+)(?:\/|$)/.exec(issue.path);
+    if (m) bad.add(Number(m[1]));
+  }
+  if (bad.size === 0) return definition;
+  return { ...definition, sections: definition.sections.filter((_, i) => !bad.has(i)) };
+}
+
+/**
  * Re-shape the home page to a look's template family without losing content
  * (`applyTemplateFamily` keeps every existing section of a family type and only
  * adds the missing ones; sections outside the family are dropped from the new
@@ -586,6 +601,11 @@ export async function applyFamilyForLook(
     else delete next.theme;
     definition = next;
   }
+  const fresh = state.source === 'layout' && isUntouchedLayout(store.layoutSettings);
+  // A genuinely fresh store has no content to lose, so sections that still hold starter copy or a
+  // missing image (and would block the publish) are dropped, and the rest goes live. A store with
+  // content never reaches this: it keeps the draft path below, untouched.
+  if (fresh) definition = dropUnpublishableSections(definition);
   const saved = await saveDraft({
     storeId,
     pageKey: HOME_PAGE_KEY,
@@ -594,7 +614,7 @@ export async function applyFamilyForLook(
     userId,
   });
   if (!saved.ok) throw new AppError(saved.status, saved.code, saved.message);
-  if (state.source !== 'layout' || !isUntouchedLayout(store.layoutSettings)) return 'draft';
+  if (!fresh) return 'draft';
   const published = await publishDraft({
     storeId,
     pageKey: HOME_PAGE_KEY,

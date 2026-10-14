@@ -16,11 +16,14 @@ import { LookPicker } from '../../../components/looks/LookPicker';
 export function TemplateStep({
   storeId,
   initial,
+  lookFailed = false,
   onBack,
   onDone,
 }: {
   storeId: string;
   initial: string | null;
+  /** The store was created but the look chosen at creation did not apply: ask for it again. */
+  lookFailed?: boolean;
   onBack: () => void;
   onDone: (look: string | null) => void;
 }) {
@@ -37,14 +40,20 @@ export function TemplateStep({
     // Nothing picked (or unchanged): keep the store as it is, never send an empty choice.
     if (selected && selected !== initialLook) {
       setSaving(true);
-      const { error: apiError } = await apiPut(`/api/v1/stores/${storeId}/look`, {
-        lookId: selected,
-        design: 'reset',
-      });
-      setSaving(false);
-      if (apiError) {
+      try {
+        const { error: apiError } = await apiPut(`/api/v1/stores/${storeId}/look`, {
+          lookId: selected,
+          design: 'reset',
+        });
+        if (apiError) {
+          setError(t('saveFailed'));
+          return;
+        }
+      } catch {
         setError(t('saveFailed'));
         return;
+      } finally {
+        setSaving(false);
       }
     }
     onDone(selected ?? initial);
@@ -56,6 +65,11 @@ export function TemplateStep({
         <h2 className="text-lg font-semibold text-foreground">{t('title')}</h2>
         <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
       </div>
+      {lookFailed && !initialLook && (
+        <div role="status" className="rounded-lg bg-muted p-3 text-sm text-foreground">
+          {t('lookNotApplied')}
+        </div>
+      )}
       {error && (
         <div role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive-ink">
           {error}
@@ -67,8 +81,14 @@ export function TemplateStep({
         <Button type="button" variant="outline" onClick={onBack}>
           {tFlow('back')}
         </Button>
-        <Button type="button" className="flex-1" disabled={saving} onClick={handleNext}>
-          {tFlow('next')}
+        <Button
+          type="button"
+          className="flex-1"
+          disabled={saving}
+          aria-busy={saving}
+          onClick={handleNext}
+        >
+          {saving ? t('saving') : tFlow('next')}
         </Button>
       </div>
     </div>

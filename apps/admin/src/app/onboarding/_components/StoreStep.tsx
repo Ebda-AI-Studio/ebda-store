@@ -40,7 +40,7 @@ export function StoreStep({
   /** The plan chosen in the plan step; sent so the trial is billed for it on day 15. */
   plan?: PlanSelection;
   onBack?: () => void;
-  onCreated: (store: OnboardingStore) => void;
+  onCreated: (store: OnboardingStore, lookApplied: boolean) => void;
 }) {
   const tFlow = useT('onboarding.flow');
   const t = useT('onboarding.flow.store');
@@ -104,12 +104,15 @@ export function StoreStep({
     }
     if (slugUi.kind !== 'available') return;
     setCreating(true);
-    const { data, error } = await apiPost<{ store: OnboardingStore }>('/api/v1/onboarding/store', {
-      name: name.trim(),
-      slug,
-      language: document.documentElement.dir === 'rtl' ? 'ar' : 'en',
-      ...(plan ? { plan: { planCode: plan.planCode, interval: plan.interval } } : {}),
-    });
+    const { data, error } = await apiPost<{ store: OnboardingStore; lookApplied?: boolean }>(
+      '/api/v1/onboarding/store',
+      {
+        name: name.trim(),
+        slug,
+        language: document.documentElement.dir === 'rtl' ? 'ar' : 'en',
+        ...(plan ? { plan: { planCode: plan.planCode, interval: plan.interval } } : {}),
+      }
+    );
     setCreating(false);
     if (error || !data) {
       if (error?.code === 'SLUG_TAKEN') setSlugUi({ kind: 'problem', key: 'taken' });
@@ -122,7 +125,7 @@ export function StoreStep({
     }
     // StoreCreated: same event_id as the server's Conversions API event (dedup).
     getEbdaTracker()?.track('store_created', { eventId: storeCreatedEventId(data.store.id) });
-    onCreated(data.store);
+    onCreated(data.store, data.lookApplied !== false);
   }
 
   return (
