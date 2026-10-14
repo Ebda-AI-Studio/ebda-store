@@ -433,8 +433,12 @@ router.post(
       // gateway refund, which is `orders:refund` — the permission
       // staff deliberately lack (rbac.ts, and the sibling order refund route).
       // Store credit / bank transfer / cash / manual record money only.
+      // F-10 (2026-10-14, reversible default; Ruling S8-1): `store_credit` credits the
+      // customer's spendable wallet — money — so it needs the same permission. Cash,
+      // bank transfer and manual only RECORD a refund made elsewhere and stay open.
       if (
-        (GATEWAY_REFUND_METHODS as readonly string[]).includes(refundMethod) &&
+        ((GATEWAY_REFUND_METHODS as readonly string[]).includes(refundMethod) ||
+          refundMethod === 'store_credit') &&
         !hasPermission(req.user!.role as Role, 'orders:refund')
       ) {
         res.status(403).json({
@@ -442,7 +446,7 @@ router.post(
           error: {
             code: 'REFUND_PERMISSION_REQUIRED',
             message:
-              'Refunding to the original payment method requires the orders:refund permission.',
+              'Refunding to the original payment method or as store credit requires the orders:refund permission.',
           },
         });
         return;

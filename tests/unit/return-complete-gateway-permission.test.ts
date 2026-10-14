@@ -80,11 +80,27 @@ describe('returns complete — gateway refunds need orders:refund (issue 2024)',
     expect(mockComplete).not.toHaveBeenCalled();
   });
 
-  it('still lets staff complete with a non-gateway method', async () => {
+  it('refuses staff store_credit too (F-10: it credits a spendable wallet), before any refund runs', async () => {
     state.role = 'staff';
     const res = await request(app()).post(COMPLETE).send({ refundMethod: 'store_credit' });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('REFUND_PERMISSION_REQUIRED');
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
+
+  it('still lets staff complete with a record-only method (cash, bank transfer, manual)', async () => {
+    state.role = 'staff';
+    for (const method of ['cash', 'bank_transfer', 'manual']) {
+      const res = await request(app()).post(COMPLETE).send({ refundMethod: method });
+      expect(res.status).toBe(200);
+      expect(mockComplete).toHaveBeenCalledWith('store-1', 'ret-1', 'u-1', method);
+    }
+  });
+
+  it('lets a store_admin complete with store_credit', async () => {
+    state.role = 'store_admin';
+    const res = await request(app()).post(COMPLETE).send({ refundMethod: 'store_credit' });
     expect(res.status).toBe(200);
-    expect(mockComplete).toHaveBeenCalledWith('store-1', 'ret-1', 'u-1', 'store_credit');
   });
 
   it('lets a store_admin send a gateway refund', async () => {
