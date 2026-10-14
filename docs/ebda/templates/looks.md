@@ -13,7 +13,7 @@ Looks are **data**, not code: they live in `@force/shared` (`packages/shared/src
 
 ## The 15 looks
 
-All 15 are `status: 'designed'` today: tokens and section mix exist, no per-template skin yet, every look renders on `skin: 'minimal'` (Dahab's on the `dahab` skin). The showroom lists and previews only `built` looks, so nothing is visible there until Phase B flips them after Ahmad's review.
+All 15 are `status: 'designed'` today: tokens and section mix exist, no per-template skin yet, every look renders on `skin: 'minimal'`. The showroom lists and previews only `built` looks, so nothing is visible there until Phase B flips them after Ahmad's review.
 
 | Id                   | Template | Name (ar)    | Name (en)        | Status   |
 | -------------------- | -------- | ------------ | ---------------- | -------- |
@@ -51,15 +51,15 @@ The merchant always wins: any key present in `stores.theme` overrides the look. 
 
 `themeToCssVars(theme, lookId)` (shared, SSR) and its client mirror in `StoreContext.tsx` emit the look variables, and only when `lookId` names a registered look. Values are validated by an allowlist in `apps/web/src/lib/theme-css.ts`.
 
-| Variable              | Source                                  | Value                                                                                      |
-| --------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `--font-display`      | `headingFont` (else the look's display) | `"<Family>", var(--font-arabic), var(--font-sans)`                                         |
-| `--look-font-display` | same as `--font-display`                | same string, under a name no skin rule redefines (Dahab sets `--font-display` on `<body>`) |
-| `--font-body`         | `bodyFont` (else the look's body)       | `"<Family>", var(--font-arabic), var(--font-sans)`                                         |
-| `--font-latin`        | the look's Latin display face           | `"<Family>", var(--font-sans)`; used first for headings when `lang="en"`                   |
-| `--space-unit`        | `density`                               | `compact` 0.875, `regular` 1, `airy` 1.25                                                  |
-| `--image-ratio`       | `imageRatio`                            | `1/1`, `4/5`, `3/4` or `4/3` written as `4 / 5`                                            |
-| `--motion-duration`   | `motion`                                | `none` 0ms, `subtle` 180ms, `expressive` 280ms                                             |
+| Variable              | Source                                  | Value                                                                                                                                                                                                                                                                               |
+| --------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--font-display`      | `headingFont` (else the look's display) | `"<Family>", var(--font-arabic), var(--font-sans)`                                                                                                                                                                                                                                  |
+| `--look-font-display` | same as `--font-display`                | same string, under a name no skin rule redefines (the dahab skin sets `--font-display` on `<body>`; the `[data-look][data-pack='dahab']` rule restores the look's face and only matters for a legacy dahab-skin store that is given a look, since every look has `skin: 'minimal'`) |
+| `--font-body`         | `bodyFont` (else the look's body)       | `"<Family>", var(--font-arabic), var(--font-sans)`                                                                                                                                                                                                                                  |
+| `--font-latin`        | the look's Latin display face           | `"<Family>", var(--font-sans)`; used first for headings when `lang="en"`                                                                                                                                                                                                            |
+| `--space-unit`        | `density`                               | `compact` 0.875, `regular` 1, `airy` 1.25                                                                                                                                                                                                                                           |
+| `--image-ratio`       | `imageRatio`                            | `1/1`, `4/5`, `3/4` or `4/3` written as `4 / 5`                                                                                                                                                                                                                                     |
+| `--motion-duration`   | `motion`                                | `none` 0ms, `subtle` 180ms, `expressive` 280ms                                                                                                                                                                                                                                      |
 
 Consumers (all scoped under `[data-look]`, which the root layout sets on `<body>` only for a store with a valid look; `globals.css`):
 
@@ -67,6 +67,8 @@ Consumers (all scoped under `[data-look]`, which the root layout sets on `<body>
 - Section padding scales by `--space-unit`, but only for sections whose spacing is **unset** (`sectionSpacingClasses` adds `sp-top-default` / `sp-bottom-default` for look stores). An explicit merchant spacing preset, even "normal", is never scaled.
 - Product card media uses `aspect-[var(--image-ratio,4/5)]` (`apps/web/src/templates/shared/card-size.ts`): a look store without the variable falls back to 4/5; a legacy store keeps its existing aspect classes.
 - `a` and `button` transitions use `--motion-duration` (150ms fallback). Under `prefers-reduced-motion: reduce` the variable is forced to `0ms`.
+
+A look store whose merchant cleared `headingFont`/`bodyFont` still gets the look's font (the variables fall back to the look's own faces).
 
 Fonts load through `lookHead(lookId)` (`apps/web/src/lib/look-head.ts`), which returns `{ dataLook, fontsHref }` or `null`.
 
@@ -85,7 +87,7 @@ A store with `look = null` (or an unknown look id) gets no `data-look` attribute
 - **Publish vs draft.** Only a genuinely fresh store publishes: `layout_settings` null/empty/equal to `NEW_STORE_LAYOUT_SETTINGS` and no draft revision exists. Sections that fail `validatePublishReadiness` (placeholder copy, a hero slide without an image) are dropped first, the rest goes live, and the merchant adds the dropped ones in the editor. Every other store gets the new family as a **draft** and presses publish. If a fresh store's publish is still refused, it stays a draft with a logged warning rather than failing the switch (Rulings LOOKS-8..10).
 - **Demo stores.** `applyLook` has no demo-specific branch. A demo store (`is_demo`) is a showroom: it previews looks via `?look=` and refuses every order (`403 DEMO_STORE` from `assertOrderAllowed`); see `docs/ebda/templates/demo-store.md`.
 
-Onboarding chooses a look through the same service (`onboarding.service.ts`), defaulting to `keep` because a new store has no overrides.
+Onboarding chooses a look through the same service (`onboarding.service.ts`), with `design: 'reset'` (a new store has no overrides to keep).
 
 ## Override badges and reset
 
