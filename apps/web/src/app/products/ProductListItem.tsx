@@ -7,6 +7,7 @@ import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { useStoreNumerals } from '../../hooks/useNumerals';
 import Image from 'next/image';
 import type { Product } from '@/lib/api';
+import { SwatchDots } from '../../components/commerce/SwatchDots';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { getProductPricing, getDiscountBadgeText } from '@/lib/product-pricing';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
@@ -223,26 +224,29 @@ export function ProductListItem({
           </h3>
         </div>
         <div className="flex items-center justify-between">
-          {priceVisible ? (
-            <div className="flex items-center gap-2">
-              {pricing.mode === 'fromMin' && (
-                <span className="text-xs text-muted-foreground">{t('From', 'ابتداءً من')}</span>
-              )}
-              <span
-                className="text-xl font-bold text-primary tabular-nums"
-                data-zone="productPrice"
-              >
-                {formatPrice(pricing.displayPrice)}
-              </span>
-              {pricing.displayCompare && pricing.displayCompare > pricing.displayPrice && (
-                <span className="text-sm text-muted-foreground line-through">
-                  {formatPrice(pricing.displayCompare)}
+          <div className="flex flex-col gap-1.5">
+            {priceVisible ? (
+              <div className="flex items-center gap-2">
+                {pricing.mode === 'fromMin' && (
+                  <span className="text-xs text-muted-foreground">{t('From', 'ابتداءً من')}</span>
+                )}
+                <span
+                  className="text-xl font-bold text-primary tabular-nums"
+                  data-zone="productPrice"
+                >
+                  {formatPrice(pricing.displayPrice)}
                 </span>
-              )}
-            </div>
-          ) : (
-            <span />
-          )}
+                {pricing.displayCompare && pricing.displayCompare > pricing.displayPrice && (
+                  <span className="text-sm text-muted-foreground line-through">
+                    {formatPrice(pricing.displayCompare)}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <span />
+            )}
+            <SwatchDots product={product} max={5} />
+          </div>
           <div className="flex items-center gap-2">
             {/* Compare button for list view */}
             <button
