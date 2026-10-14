@@ -500,7 +500,7 @@ function ImageField({
   const t = useT('builder.settings');
   const [open, setOpen] = useState(false);
   return (
-    <div>
+    <div className="min-w-0">
       {tag && <span className="mb-0.5 block text-[11px] text-muted-foreground">{tag}</span>}
       <div className="flex items-center gap-2">
         {value ? (

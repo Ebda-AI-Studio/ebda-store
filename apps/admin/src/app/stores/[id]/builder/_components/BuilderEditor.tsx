@@ -305,7 +305,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground" data-testid="builder">
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3">
+      <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-3 py-1 md:h-14 md:flex-nowrap md:py-0">
         <Link
           href={`/stores/${storeId}`}
           className="flex items-center gap-2"
@@ -336,7 +336,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         <div
           role="radiogroup"
           aria-label={t('viewport.label')}
-          className="mx-auto inline-flex rounded-lg bg-muted p-0.5 text-xs"
+          className="order-last mx-auto inline-flex rounded-lg bg-muted p-0.5 text-xs max-md:max-w-full md:order-none"
         >
           {(['desktop', 'tablet', 'mobile'] as const).map(v => (
             <button
@@ -358,7 +358,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
           disabled={!b.canUndo}
           aria-label={t('undo')}
           title={t('undo')}
-          className="rounded px-2 py-1 text-sm hover:bg-muted disabled:opacity-30"
+          className="rounded px-2 py-1 text-sm hover:bg-muted disabled:opacity-30 max-md:ms-auto"
           data-testid="undo"
         >
           ↶

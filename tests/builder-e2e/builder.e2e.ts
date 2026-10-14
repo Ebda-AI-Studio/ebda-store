@@ -346,3 +346,38 @@ test('a message from a foreign origin is ignored by the editor', async ({ page }
   await page.waitForTimeout(500);
   await expect(page.getByTestId('field-title')).toHaveValue('Shop by category');
 });
+
+test('no horizontal document overflow on any editor panel (EDITOR-MOBILE-1)', async ({ page }) => {
+  await openBuilder(page);
+  const noOverflow = async (what: string) => {
+    const m = await page.evaluate(() => ({
+      sw: document.documentElement.scrollWidth,
+      cw: document.documentElement.clientWidth,
+    }));
+    expect(m.sw, `${what}: scrollWidth ${m.sw} > clientWidth ${m.cw}`).toBeLessThanOrEqual(m.cw);
+  };
+  await noOverflow('top bar + canvas');
+  await expect(page.getByTestId('publish')).toBeInViewport();
+  await expect(page.getByTestId('builder-canvas')).toBeVisible();
+
+  await structure(page);
+  await noOverflow('sections tree');
+  const startTabs = page.getByRole('tablist').first().getByRole('tab');
+  await startTabs.nth(1).click();
+  await expect(page.getByTestId('theme-settings')).toBeVisible();
+  await noOverflow('theme panel');
+  await startTabs.nth(2).click();
+  await expect(page.getByTestId('revisions-panel')).toBeVisible();
+  await noOverflow('history panel');
+  await startTabs.nth(0).click();
+
+  await page
+    .getByTestId('tree-group-template')
+    .locator('[data-testid^="tree-select-"]')
+    .first()
+    .click();
+  await settings(page);
+  await noOverflow('settings panel (content)');
+  await page.getByTestId('settings-panel').getByRole('tab').nth(1).click();
+  await noOverflow('settings panel (design)');
+});
