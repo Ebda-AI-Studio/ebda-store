@@ -12,8 +12,6 @@
     "og": "node scripts/make-og.mjs",
     "looks": "python3 scripts/looks/export.py",
     "demo-credits": "node scripts/demo-credits.mjs",
-    "capture:stores": "bash scripts/storefront-capture/run.sh",
-    "poster": "node scripts/make-hero-poster.mjs && prettier --write src/lib/hero-poster.ts",
     "check:links": "node scripts/check-links.mjs",
     "check:a11y": "node scripts/a11y-check.mjs",
     "check:lighthouse": "node scripts/lighthouse-check.mjs",
