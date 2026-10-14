@@ -5,6 +5,7 @@ import { runInStoreScope } from '@ebda/database';
 import { resolveStoreBySlug } from '../mcp/resolve-store';
 import { classifyToolCall, resolveAgentAuth } from '../mcp/agent-auth';
 import { AppError } from '../middleware/error-handler';
+import { rejectBatches } from '../mcp/reject-batches';
 import logger from '../lib/logger';
 
 /**
@@ -45,6 +46,8 @@ import logger from '../lib/logger';
  * enforce on it. See `mcp/agent-auth.ts`.
  */
 const router = Router();
+// One JSON-RPC message per POST: a batch would run up to 100 calls for one limiter token.
+router.use(rejectBatches);
 router.use(publicLimiter);
 
 /**

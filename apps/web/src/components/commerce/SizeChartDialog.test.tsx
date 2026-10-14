@@ -26,6 +26,8 @@ afterEach(() => {
   cleanup();
   lang = 'en';
   arabicDigits = false;
+  document.body.style.overflow = '';
+  document.documentElement.style.overflow = '';
 });
 
 const arOnly: PublicSizeChart = {
@@ -104,7 +106,6 @@ describe('SizeChartDialog scroll lock', () => {
     fireEvent.click(document.querySelector('dialog')!); // backdrop
     expect(document.body.style.overflow).toBe('auto');
     expect(document.documentElement.style.overflow).toBe('');
-    document.body.style.overflow = '';
   });
 
   it('the native close event (Esc) also restores, and unmounting while open restores', () => {

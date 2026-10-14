@@ -5,6 +5,7 @@ import { featureService } from '../services/feature.service';
 import { resolveStoreBySlug } from '../mcp/resolve-store';
 import { verifyMerchantKey, MERCHANT_MCP_FEATURE, MERCHANT_KEY_HEADER } from '../mcp/merchant-auth';
 import { AppError } from '../middleware/error-handler';
+import { rejectBatches } from '../mcp/reject-batches';
 import { makeRateLimitStore, rateLimitRedisClient } from '../middleware/security';
 import { ADMIN_WRITE_TOOL_NAMES } from '../mcp/tools/admin-write.tools';
 import logger from '../lib/logger';
@@ -88,6 +89,8 @@ export const merchantMcpIpLimiter = rateLimit({
   keyGenerator: merchantMcpIpLimiterKey,
   message: { error: 'Too many requests' },
 });
+// Batches are refused before any limiter (mcp/reject-batches.ts): one POST = one message.
+router.use(rejectBatches);
 router.use(merchantMcpIpLimiter);
 
 /**
@@ -133,9 +136,10 @@ router.use(merchantMcpLimiter);
  * catalogue READ job must not share a budget with — or be throttled by — a
  * handful of order mutations. `skip` is true for every non-write call
  * (reads, `initialize`, `tools/list`), so this limiter is invisible to them;
- * each streamable-HTTP POST carries exactly one JSON-RPC call (confirmed by
- * `adminToolCallLog` below, which already reads `body.params.name` per
- * request), so checking the body here is NOT a race with what actually runs.
+ * each streamable-HTTP POST carries exactly one JSON-RPC call (array bodies
+ * are refused up front by `rejectBatches`, and `adminToolCallLog` below reads
+ * `body.params.name` per request), so checking the body here is NOT a race
+ * with what actually runs.
  */
 function isWriteCallMessage(msg: unknown): boolean {
   const m = msg as { method?: unknown; params?: { name?: unknown } } | undefined;
@@ -146,32 +150,10 @@ function isWriteCallMessage(msg: unknown): boolean {
   );
 }
 
-/**
- * A JSON-RPC BATCH (array body) would carry N write calls in one HTTP request
- * and so spend one limiter token for N mutations. Any batch containing a write
- * call is refused outright (400) before the limiter; single messages are
- * counted one-to-one.
- */
+/** Batches never get this far (`rejectBatches`), so the body is one message. */
 function isAdminWriteToolCall(req: Request): boolean {
-  const body = req.body as unknown;
-  return Array.isArray(body) ? body.some(isWriteCallMessage) : isWriteCallMessage(body);
+  return isWriteCallMessage(req.body as unknown);
 }
-
-export function rejectWriteBatches(req: Request, res: Response, next: NextFunction): void {
-  if (Array.isArray(req.body) && req.body.some(isWriteCallMessage)) {
-    res.status(400).json({
-      jsonrpc: '2.0',
-      error: {
-        code: -32600,
-        message: 'Batched write calls are not supported; send one write per request.',
-      },
-      id: null,
-    });
-    return;
-  }
-  next();
-}
-router.use(rejectWriteBatches);
 
 export const merchantMcpWriteLimiter = rateLimit({
   store: makeRateLimitStore(rateLimitRedisClient, 'mmcp-write'),
