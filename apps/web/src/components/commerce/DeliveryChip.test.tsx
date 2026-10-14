@@ -75,6 +75,34 @@ describe('DeliveryChip', () => {
     const chip = await screen.findByTestId('delivery-chip');
     expect(chip.textContent).toContain('يوصلك بين');
     expect(chip.textContent).toContain('بيتجهز خصيصًا لك في 5 أيام');
+    // The "و" attaches to the second date.
+    expect(chip.textContent).toMatch(/بين \S+ \d+ \S+ و\S+ \d+ \S+/);
+  });
+
+  it.each([
+    [1, 'ar', 'بيتجهز خصيصًا لك في يوم'],
+    [2, 'ar', 'بيتجهز خصيصًا لك في يومين'],
+    [5, 'ar', 'بيتجهز خصيصًا لك في 5 أيام'],
+    [11, 'ar', 'بيتجهز خصيصًا لك في 11 يوم'],
+    [1, 'en', 'Made for you in 1 day'],
+    [2, 'en', 'Made for you in 2 days'],
+    [5, 'en', 'Made for you in 5 days'],
+    [11, 'en', 'Made for you in 11 days'],
+  ] as const)('lead time %i in %s reads %j', async (n, l, expected) => {
+    lang = l;
+    zones = [zone()];
+    render(<DeliveryChip leadTimeDays={n} />);
+    const chip = await screen.findByTestId('delivery-chip');
+    const lines = Array.from(chip.querySelectorAll('p')).map(p => p.textContent);
+    expect(lines[1]).toBe(expected);
+  });
+
+  it('english window reads "Arrives Thu 15 Oct - ..." with no comma after the weekday', async () => {
+    lang = 'en';
+    zones = [zone({ estimatedDaysMin: 1, estimatedDaysMax: 1 })];
+    render(<DeliveryChip leadTimeDays={null} />);
+    const chip = await screen.findByTestId('delivery-chip');
+    expect(chip.textContent).toContain('Arrives Thu 15 Oct');
   });
 
   it('single day reads "يوصلك X" and omits the lead line when ready to ship', async () => {

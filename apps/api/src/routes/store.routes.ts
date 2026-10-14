@@ -61,6 +61,28 @@ function parseStoreBody<S extends z.ZodTypeAny>(schema: S, body: unknown): z.inf
   throw result.error;
 }
 
+/**
+ * Store-wide delivery estimate (`settings.deliveryDays`, business days): null clears, anything
+ * else must satisfy the shared schema. Applied on EVERY route that can write `settings`
+ * (create + update); super-admin provisioning uses a strict object that drops the key.
+ */
+function addDeliveryDaysIssues(
+  settings: Record<string, unknown> | undefined,
+  ctx: z.RefinementCtx
+) {
+  const dd = settings?.deliveryDays;
+  if (dd === undefined || dd === null) return;
+  const parsed = deliveryDaysSchema.safeParse(dd);
+  if (parsed.success) return;
+  for (const issue of parsed.error.issues) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['deliveryDays', ...issue.path],
+      message: issue.message,
+    });
+  }
+}
+
 // Validation schemas
 const createStoreSchema = z.object({
   name: z.string().min(1).max(100),
@@ -69,7 +91,10 @@ const createStoreSchema = z.object({
   // definition in @ebda/shared — the same list the host parser and resolver use.
   slug: storeSlugSchema.optional(),
   domain: z.string().optional(),
-  settings: z.record(z.string(), z.any()).optional(),
+  settings: z
+    .record(z.string(), z.any())
+    .superRefine((settings, ctx) => addDeliveryDaysIssues(settings, ctx))
+    .optional(),
 });
 
 const heroNullableStr = (maxLen: number) =>
@@ -143,19 +168,7 @@ export const updateStoreSchema = createStoreSchema.partial().extend({
           }
         }
       }
-      // Store-wide delivery estimate (business days). null clears; anything else must be a valid range.
-      if (settings?.deliveryDays !== undefined && settings.deliveryDays !== null) {
-        const parsed = deliveryDaysSchema.safeParse(settings.deliveryDays);
-        if (!parsed.success) {
-          for (const issue of parsed.error.issues) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ['deliveryDays', ...issue.path],
-              message: issue.message,
-            });
-          }
-        }
-      }
+      addDeliveryDaysIssues(settings, ctx);
       // The same open `settings` blob also carries `floatingWidget`, whose button
       // links render as `<a href>`; the dedicated route validates them, so this
       // generic path must too (S2 — otherwise it is the bypass).

@@ -20,6 +20,14 @@ function zonesFor(storeId: string): Promise<Zones> {
   return p;
 }
 
+/** "in N days" tail of the made-to-order line, with Arabic noun agreement: يوم / يومين / N أيام / N يوم. */
+function leadTimeText(n: number, lang: 'ar' | 'en', localize: (v: number) => string): string {
+  if (lang === 'en') return `Made for you in ${n} ${n === 1 ? 'day' : 'days'}`;
+  const days =
+    n === 1 ? 'يوم' : n === 2 ? 'يومين' : n <= 10 ? `${localize(n)} أيام` : `${localize(n)} يوم`;
+  return `بيتجهز خصيصًا لك في ${days}`;
+}
+
 /**
  * "Arrives Sun 19 Oct – Tue 21 Oct" under the add-to-cart button, plus one muted line when
  * the product is made to order. Business days (Fridays skipped) from the store's active
@@ -77,7 +85,7 @@ export function DeliveryChip({ leadTimeDays }: { leadTimeDays?: number | null })
   const text =
     from === to
       ? t(`Arrives ${from}`, `يوصلك ${from}`)
-      : t(`Arrives ${from} – ${to}`, `يوصلك بين ${from} و ${to}`);
+      : t(`Arrives ${from} – ${to}`, `يوصلك بين ${from} و${to}`);
 
   return (
     <div data-testid="delivery-chip" className="mt-3 flex items-start gap-2 text-foreground">
@@ -97,7 +105,7 @@ export function DeliveryChip({ leadTimeDays }: { leadTimeDays?: number | null })
         <p className="text-sm">{text}</p>
         {lead && (
           <p className="text-[13px] text-muted-foreground">
-            {t(`Made for you in ${lead} days`, `بيتجهز خصيصًا لك في ${localize(lead)} أيام`)}
+            {leadTimeText(lead, language === 'ar' ? 'ar' : 'en', localize)}
           </p>
         )}
       </div>

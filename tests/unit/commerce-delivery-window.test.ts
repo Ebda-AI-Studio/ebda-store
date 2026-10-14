@@ -94,6 +94,43 @@ describe('deliveryWindow (business days, Friday skipped)', () => {
     ).toEqual(new Date('2026-10-17T22:30:00Z'));
   });
 
+  it('zero business days started on a Friday moves to Saturday', () => {
+    const fri = at('2026-10-16');
+    const zones = [{ isActive: true, estimatedDaysMin: 0, estimatedDaysMax: 0 }];
+    expect(deliveryWindow({ now: fri, leadTimeDays: null, zones })).toEqual({
+      from: at('2026-10-17'),
+      to: at('2026-10-17'),
+    });
+    // Non-Friday zero stays the same day.
+    expect(deliveryWindow({ now, leadTimeDays: null, zones })).toEqual({ from: now, to: now });
+  });
+
+  it('keeps the Cairo wall-clock time across the DST end (2026-10-29)', () => {
+    // 23:30 Cairo (UTC+3) on Wed 28 Oct, the day before clocks go back.
+    const start = new Date('2026-10-28T20:30:00Z');
+    const w = deliveryWindow({
+      now: start,
+      leadTimeDays: null,
+      zones: [{ isActive: true, estimatedDaysMin: 1, estimatedDaysMax: 3 }],
+    })!;
+    const cairo = (d: Date) =>
+      new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Africa/Cairo',
+        dateStyle: 'short',
+        timeStyle: 'short',
+      }).format(d);
+    // Thu 29, (Fri 30 skipped), Sat 31, Sun 1 Nov: all at 23:30 Cairo, not 22:30.
+    expect(cairo(w.from)).toBe('2026-10-29 23:30');
+    expect(cairo(w.to)).toBe('2026-11-01 23:30');
+    expect(w.to).toEqual(new Date('2026-11-01T21:30:00Z')); // UTC+2 after the switch
+    const three = deliveryWindow({
+      now: start,
+      leadTimeDays: null,
+      zones: [{ isActive: true, estimatedDaysMin: 2, estimatedDaysMax: 2 }],
+    })!;
+    expect(cairo(three.from)).toBe('2026-10-31 23:30');
+  });
+
   it('uses the store-wide fallback only when no active zone has numbers', () => {
     const fallback = { min: 2, max: 4 };
     expect(

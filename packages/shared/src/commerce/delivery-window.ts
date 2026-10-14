@@ -24,26 +24,85 @@ type Zone = {
 
 const DAY = 86_400_000;
 const DEFAULT_TZ = 'Africa/Cairo';
+const FRIDAY = 5; // Date#getUTCDay
 
-/** Egypt's weekend day. Couriers work Saturdays, so Friday is the only skipped day. */
-function isFriday(d: Date, timeZone: string): boolean {
-  let name: string;
+/** A usable IANA zone: a typo in store settings falls back to Cairo instead of throwing. */
+function safeZone(timeZone: string): string {
   try {
-    name = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(d);
+    new Intl.DateTimeFormat('en-US', { timeZone });
+    return timeZone;
   } catch {
-    name = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: DEFAULT_TZ }).format(d);
+    return DEFAULT_TZ;
   }
-  return name === 'Fri';
 }
 
-/** Add `n` business days (Fridays never count, in `timeZone`), keeping the time of day. */
+function wallClock(instant: number, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+  }).formatToParts(new Date(instant));
+  const get = (type: string) => Number(parts.find(p => p.type === type)?.value);
+  return {
+    y: get('year'),
+    mo: get('month'),
+    d: get('day'),
+    h: get('hour'),
+    mi: get('minute'),
+    s: get('second'),
+  };
+}
+
+/** The instant whose wall clock in `timeZone` reads y-mo-d h:mi:s (DST-correct). */
+function wallToInstant(
+  w: { y: number; mo: number; d: number; h: number; mi: number; s: number },
+  timeZone: string
+): number {
+  const asUtc = Date.UTC(w.y, w.mo - 1, w.d, w.h, w.mi, w.s);
+  const offsetAt = (t: number) => {
+    const c = wallClock(t, timeZone);
+    return Date.UTC(c.y, c.mo - 1, c.d, c.h, c.mi, c.s) - Math.floor(t / 1000) * 1000;
+  };
+  const first = asUtc - offsetAt(asUtc);
+  const second = asUtc - offsetAt(first);
+  return second;
+}
+
+/**
+ * Add `n` business days in the store timezone. Steps whole CALENDAR days (never 24h, which
+ * drifts an hour across Egypt's DST switch), skips Fridays (Egypt's weekend; couriers work
+ * Saturdays), and keeps the wall-clock time of day. Zero days from a Friday moves to Saturday.
+ */
 function addBusinessDays(from: Date, n: number, timeZone: string): Date {
-  let t = from.getTime();
+  const tz = safeZone(timeZone);
+  const w = wallClock(from.getTime(), tz);
+  const ms = ((from.getTime() % 1000) + 1000) % 1000;
+  // A UTC-noon Date stands for the calendar day; +24h on it is always the next calendar day.
+  let cal = Date.UTC(w.y, w.mo - 1, w.d, 12);
   for (let i = 0; i < n; i++) {
-    t += DAY;
-    while (isFriday(new Date(t), timeZone)) t += DAY;
+    cal += DAY;
+    while (new Date(cal).getUTCDay() === FRIDAY) cal += DAY;
   }
-  return new Date(t);
+  if (new Date(cal).getUTCDay() === FRIDAY) cal += DAY;
+  const c = new Date(cal);
+  return new Date(
+    wallToInstant(
+      {
+        y: c.getUTCFullYear(),
+        mo: c.getUTCMonth() + 1,
+        d: c.getUTCDate(),
+        h: w.h,
+        mi: w.mi,
+        s: w.s,
+      },
+      tz
+    ) + ms
+  );
 }
 
 /**

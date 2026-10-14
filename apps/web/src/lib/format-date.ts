@@ -50,7 +50,8 @@ function presetOptions(style: FormatDateStyle): Intl.DateTimeFormatOptions {
     case 'short':
       return { year: 'numeric', month: 'numeric', day: 'numeric' };
     case 'day':
-      // No year: "Sun, Oct 19" / "الأحد ١٩ أكتوبر" — for near-term dates like a delivery window.
+      // No year, e.g. "Wed 21 Oct" / "الأربعاء ٢١ أكتوبر": for near-term dates like a delivery
+      // window. Parts are re-joined weekday day month (see `format`), so no locale comma.
       return { weekday: 'short', day: 'numeric', month: 'short' };
     case 'datetime':
       return {
@@ -83,21 +84,24 @@ export function formatDate(input: string | number | Date, opts: FormatDateOption
   if (!date) return '';
 
   const locale = resolveLocale(opts.language, opts.numerals);
-  const timeZone = opts.timezone || DEFAULT_TIMEZONE;
-  const options: Intl.DateTimeFormatOptions = {
-    ...presetOptions(opts.style ?? 'long'),
-    timeZone,
+  const style = opts.style ?? 'long';
+  const format = (timeZone: string): string => {
+    const dtf = new Intl.DateTimeFormat(locale, { ...presetOptions(style), timeZone });
+    if (style !== 'day') return dtf.format(date);
+    // Fixed weekday-day-month order with single spaces: en-US would say "Wed, Oct 21".
+    const parts = dtf.formatToParts(date);
+    return (['weekday', 'day', 'month'] as const)
+      .map(t => parts.find(p => p.type === t)?.value)
+      .filter(Boolean)
+      .join(' ');
   };
 
   try {
-    return new Intl.DateTimeFormat(locale, options).format(date);
+    return format(opts.timezone || DEFAULT_TIMEZONE);
   } catch {
     // An invalid IANA zone (typo in admin settings) would otherwise crash
     // every page that renders a date. Fall back silently to the default.
-    return new Intl.DateTimeFormat(locale, {
-      ...presetOptions(opts.style ?? 'long'),
-      timeZone: DEFAULT_TIMEZONE,
-    }).format(date);
+    return format(DEFAULT_TIMEZONE);
   }
 }
 
