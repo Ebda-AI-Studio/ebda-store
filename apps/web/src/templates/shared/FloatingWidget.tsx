@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { resolveColor } from '@force/shared';
+import { resolveColor, sanitizeUrl } from '@force/shared';
 import type {
   FloatingButton,
   FloatingButtonKind,
@@ -190,8 +190,12 @@ function resolveButtonHref(
       return b.emailSubject
         ? `mailto:${b.emailAddress}?subject=${encodeURIComponent(b.emailSubject)}`
         : `mailto:${b.emailAddress}`;
-    case 'custom':
-      return b.customHref ?? null;
+    case 'custom': {
+      // S2: scheme-validate at render too — rows saved before the API guard (or
+      // through the generic settings write) may hold `javascript:` / `data:`.
+      const href = b.customHref ? sanitizeUrl(b.customHref, '') : '';
+      return href || null;
+    }
     case 'music':
       return null; // music doesn't navigate — toggles audio
     case 'tiktok': {

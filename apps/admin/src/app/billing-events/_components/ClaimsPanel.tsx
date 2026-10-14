@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Badge, Button, Input, Modal } from '@force/ui';
-import { formatMoney, type InstapayReceiptView } from '@force/shared';
+import { formatMoney, isSafeUrl, type InstapayReceiptView } from '@force/shared';
 import { DataTable, type DataTableColumn } from '../../../components/mobile/DataTable';
 import { apiGet, apiPost } from '../../../lib/api';
 import { useT } from '../../../i18n/useT';
@@ -163,7 +163,8 @@ export function ClaimsPanel({
       cell: r => (
         <span dir="ltr" className="break-all">
           {r.receipt?.fields.reference ?? r.payerReference ?? '—'}
-          {r.proofUrl && (
+          {/* S2: the platform operator clicks this; only http(s)/relative links render. */}
+          {r.proofUrl && isSafeUrl(r.proofUrl) && (
             <a
               href={r.proofUrl}
               target="_blank"

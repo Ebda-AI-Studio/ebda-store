@@ -58,6 +58,22 @@ export function openUnpaidHoldCap(): number {
   return Number.isInteger(raw) && raw > 0 ? raw : DEFAULT_OPEN_UNPAID_HOLD_CAP;
 }
 
+/**
+ * Looser identity cap for every OTHER method label (gateway checkouts, or any
+ * string a client invents: `paymentMethod` is a free string at order creation).
+ * Orders carry no persisted payment method, so before this cap existed an
+ * attacker declared `paymentMethod: "card"`, skipped the COD/InstaPay cap, never
+ * opened the gateway, and pinned stock for the whole AUTO_CANCEL_UNPAID_DAYS
+ * window (ruling S4-1). It is looser than the manual cap because a shopper
+ * whose card fails legitimately retries with a fresh order (ruling
+ * PR65-MANUAL-CONVERSION). `OPEN_UNPAID_GATEWAY_HOLD_CAP`, default 5.
+ */
+const DEFAULT_OPEN_UNPAID_GATEWAY_HOLD_CAP = 5;
+export function openUnpaidGatewayHoldCap(): number {
+  const raw = Number(process.env.OPEN_UNPAID_GATEWAY_HOLD_CAP);
+  return Number.isInteger(raw) && raw > 0 ? raw : DEFAULT_OPEN_UNPAID_GATEWAY_HOLD_CAP;
+}
+
 /** `OPEN_UNPAID_HOLD_IP_CAP` env var, default `openUnpaidHoldCap() * 4`. */
 export function openUnpaidHoldIpCap(): number {
   const raw = Number(process.env.OPEN_UNPAID_HOLD_IP_CAP);
@@ -98,10 +114,10 @@ export interface HoldCapIdentity {
 
 /**
  * Reject a new order (429) once the caller already has too many open holds
- * on this store for a capped payment method: `openUnpaidHoldCap()` matched by
- * phone OR email, or the separately-tolerant `openUnpaidHoldIpCap()` matched
- * by IP, including when contact identity is present. A no-op for
- * every other payment method, and a no-op when the caller supplied NEITHER a
+ * on this store: `openUnpaidHoldCap()` (COD/InstaPay) or
+ * `openUnpaidGatewayHoldCap()` (any other method label) matched by phone OR
+ * email, or the separately-tolerant IP cap (4x) matched by IP, including when
+ * contact identity is present. A no-op when the caller supplied NEITHER a
  * phone NOR an email NOR an IP — a false block on an unidentifiable guest is
  * worse than the narrow loophole (same tradeoff the per-user coupon-limit
  * check ahead of it in `OrderService.create` already makes).
@@ -117,7 +133,9 @@ export async function assertStockHoldCapNotExceeded(
   paymentMethod: string,
   identity: HoldCapIdentity
 ): Promise<void> {
-  if (!HOLD_CAPPED_PAYMENT_METHODS.has(paymentMethod)) return;
+  // Every method is counted (ruling S4-1); the manual methods get the tight cap,
+  // everything else the looser gateway cap. Full-wallet orders never get here.
+  const manual = HOLD_CAPPED_PAYMENT_METHODS.has(paymentMethod);
   if (!identity.phone && !identity.email && !identity.ip) return;
 
   const phone = identity.phone || null;
@@ -160,10 +178,11 @@ export async function assertStockHoldCapNotExceeded(
     ip_count: 0n,
   };
 
-  if (
-    Number(phone_or_email_count) >= openUnpaidHoldCap() ||
-    Number(ip_count) >= openUnpaidHoldIpCap()
-  ) {
+  const identityCap = manual ? openUnpaidHoldCap() : openUnpaidGatewayHoldCap();
+  const ipCap = manual
+    ? openUnpaidHoldIpCap()
+    : identityCap * DEFAULT_OPEN_UNPAID_HOLD_IP_MULTIPLIER;
+  if (Number(phone_or_email_count) >= identityCap || Number(ip_count) >= ipCap) {
     throw new AppError(
       429,
       'TOO_MANY_OPEN_HOLDS',

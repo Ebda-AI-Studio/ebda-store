@@ -80,6 +80,8 @@ const nextConfig = {
             value:
               "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; " +
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.onesignal.com https://*.onesignal.com https://onesignal.com https://eu-assets.i.posthog.com https://eu.i.posthog.com https://static.cloudflareinsights.com; " +
+              // S10: inline event-handler attributes never run (React binds handlers in JS).
+              "script-src-attr 'none'; " +
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://*.onesignal.com; " +
               "font-src 'self' data: https://fonts.gstatic.com; " +
               "img-src 'self' data: https: blob:; " +

@@ -30,6 +30,7 @@ import {
   maskMarketingPixelSecrets,
   preserveMaskedPixelSecrets,
 } from '../lib/marketing-pixels-secrets';
+import { floatingWidgetLinkIssues } from '../lib/floating-widget-links';
 
 const router = Router();
 
@@ -136,6 +137,12 @@ export const updateStoreSchema = createStoreSchema.partial().extend({
             });
           }
         }
+      }
+      // The same open `settings` blob also carries `floatingWidget`, whose button
+      // links render as `<a href>`; the dedicated route validates them, so this
+      // generic path must too (S2 — otherwise it is the bypass).
+      for (const issue of floatingWidgetLinkIssues(settings)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: issue.path, message: issue.message });
       }
     })
     .optional(),
@@ -371,13 +378,14 @@ const floatingButtonSchema = z
     emailSubject: optionalStr(200),
     musicUrl: optionalStr(500),
     musicLoop: z.boolean().optional(),
-    customHref: optionalStr(500),
+    // Rendered as an `<a href>` — scheme-validated (S2); `optionalStr` accepted `javascript:`.
+    customHref: safeOptionalUrl,
     // New social kinds (must be listed explicitly — the schema uses .strip(),
     // so an un-listed field would be silently dropped on save).
     tiktokHandle: optionalStr(100),
     snapchatHandle: optionalStr(100),
-    youtubeUrl: optionalStr(500),
-    facebookUrl: optionalStr(500),
+    youtubeUrl: safeOptionalUrl,
+    facebookUrl: safeOptionalUrl,
     xHandle: optionalStr(100),
     telegramHandle: optionalStr(100),
   })

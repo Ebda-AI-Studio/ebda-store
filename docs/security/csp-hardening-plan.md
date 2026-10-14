@@ -1,7 +1,7 @@
 # CSP hardening: removing `script-src 'unsafe-inline'`
 
 Status: **documented, not implemented** (2026-07-11). `'unsafe-inline'` and
-`'unsafe-eval'` remain in `script-src` on all three frontends
+`'unsafe-eval'` remain in `script-src` on all three frontends (2026-10-14: `script-src-attr 'none'` now blocks inline event-handler attributes on `apps/web` and `apps/orders`, Ruling S10-1)
 (`apps/web`, `apps/admin`, `apps/orders`) for now. This doc scopes what a
 nonce-based migration requires so it can be picked up as its own tracked
 piece of work, reviewed and shipped behind a preview deploy — not rushed

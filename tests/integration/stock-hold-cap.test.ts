@@ -16,7 +16,8 @@
  * after acquiring sorted tenant identity locks. Phone/email default to two
  * open unpaid holds; IP independently defaults to eight, even with contacts.
  * Fully wallet-paid orders are exempt, and rejected partial-wallet holds
- * never debit the wallet. Gateway creation remains uncapped; manual payment
+ * never debit the wallet. Any other method label (gateway, or an invented one) is
+ * counted against a looser cap (default 5, ruling S4-1); manual payment
  * attachment requires the server-owned admission marker.
  *
  * Same fixtures + "real Postgres, no DB bypass" convention as
@@ -229,15 +230,31 @@ describe.skipIf(!hasDb)('stock-hold abuse fix (open unpaid order cap)', () => {
     expect(second.id).toBeTruthy();
   });
 
-  it('does NOT cap a real-time-captured gateway method (paymob) — unbounded orders from the same phone all succeed', async () => {
+  it('caps a gateway-labelled hold at the looser gateway cap (5): five succeed, the sixth is rejected (S4-1)', async () => {
     const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
     const { store, productId } = await setUp(suffix);
     const phone = `+2012${suffix.replace(/\D/g, '').slice(0, 8).padEnd(8, '3')}`;
 
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       const order = await placeOrder(store.storeId, productId, { paymentMethod: 'paymob', phone });
       expect(order.id).toBeTruthy();
     }
+    await expect(
+      placeOrder(store.storeId, productId, { paymentMethod: 'paymob', phone })
+    ).rejects.toMatchObject({ statusCode: 429, code: 'TOO_MANY_OPEN_HOLDS' });
+  });
+
+  it('an invented method label gets no way around the cap (S4-1)', async () => {
+    process.env.OPEN_UNPAID_GATEWAY_HOLD_CAP = '1';
+    const suffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+    const { store, productId } = await setUp(suffix);
+    const phone = `+2014${suffix.replace(/\D/g, '').slice(0, 8).padEnd(8, '5')}`;
+
+    await placeOrder(store.storeId, productId, { paymentMethod: 'card-xyz', phone });
+    await expect(
+      placeOrder(store.storeId, productId, { paymentMethod: 'card-xyz', phone })
+    ).rejects.toMatchObject({ statusCode: 429 });
+    delete process.env.OPEN_UNPAID_GATEWAY_HOLD_CAP;
   });
 
   it('respects a configured lower cap (OPEN_UNPAID_HOLD_CAP=1)', async () => {

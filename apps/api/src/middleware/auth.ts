@@ -5,6 +5,7 @@ import { AppError } from './error-handler';
 import { redis } from '../services/redis.service';
 import { getUserState } from '../lib/definer';
 import logger from '../lib/logger';
+import { customerTokenMatchesRequestStore } from '../lib/customer-store-binding';
 
 export interface AuthPayload {
   userId: string;
@@ -163,6 +164,17 @@ export async function authenticate(
       return next(new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked'));
     }
 
+    // F-01 / Ruling S11-1: a CUSTOMER token only works for the store it was issued
+    // for AND from that store's own origin. One place for every customer route.
+    // Merchant/staff/super_admin tokens are authorised by ownership + requireStoreAccess
+    // instead and are not touched. Same 401 as any dead token, so a probe learns nothing.
+    if (
+      payload.role === 'customer' &&
+      !(await customerTokenMatchesRequestStore(req, payload.storeId))
+    ) {
+      return next(new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token'));
+    }
+
     req.user = payload;
     // Expose the jti on the request so downstream middleware (e.g. logout)
     // can denylist this specific token without re-decoding.
@@ -245,6 +257,15 @@ export async function optionalAuthenticate(
     // suspended user must fall through to "continue as guest", never
     // establish an identity.
     if (blocked) return next();
+
+    // F-01 / Ruling S11-1: a customer token for another store (or from another store's
+    // origin) is no identity here — continue as a guest, exactly as for a dead token.
+    if (
+      payload.role === 'customer' &&
+      !(await customerTokenMatchesRequestStore(req, payload.storeId))
+    ) {
+      return next();
+    }
 
     req.user = payload;
   } catch (err) {

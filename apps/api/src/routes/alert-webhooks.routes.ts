@@ -16,12 +16,28 @@ const ALERTS_TOKEN = process.env.ALERTS_WEBHOOK_TOKEN;
 if (!ALERTS_TOKEN && process.env.NODE_ENV === 'production') {
   logger.error(
     { rule: 'CLAUDE.md#12', endpoint: '/api/v1/alerts/webhooks/*' },
-    'ALERTS_WEBHOOK_TOKEN is unset in production — webhook bridge accepts any payload. Set the env var on Railway immediately.'
+    'ALERTS_WEBHOOK_TOKEN is unset in production — webhook bridge rejects every call (fail closed). Set it with `wrangler secret put ALERTS_WEBHOOK_TOKEN --name ebda-api`; until then the bridge refuses every call.'
   );
 }
 
 function requireToken(req: Request, res: Response): boolean {
-  if (!ALERTS_TOKEN) return true;
+  if (!ALERTS_TOKEN) {
+    // Fail CLOSED in production: an unset token used to mean "accept any
+    // payload", so anyone could post fake alerts to the operator's Telegram.
+    // Dev / preview keep the convenience of no token.
+    if (process.env.NODE_ENV === 'production') {
+      res.status(503).json({
+        ok: false,
+        success: false,
+        error: {
+          code: 'alerts_not_configured',
+          message: 'Alerts webhook token is not configured.',
+        },
+      });
+      return false;
+    }
+    return true;
+  }
   const token = (req.query.token as string) || req.header('x-alerts-token') || '';
   if (!token || token.length !== ALERTS_TOKEN.length) {
     res.status(401).json({
@@ -56,11 +72,20 @@ const optStr = z.string().optional().catch(undefined);
 const optNum = z.number().optional().catch(undefined);
 const optObj = <T extends z.ZodRawShape>(shape: T) => z.object(shape).optional().catch(undefined);
 
+const SENTRY_ALERT_ACTIONS = new Set(['created', 'triggered']);
+
 const sentryBodySchema = z
   .object({
     action: optStr,
     data: optObj({
       issue: optObj({
+        title: optStr,
+        web_url: optStr,
+        level: optStr,
+        project: optObj({ slug: optStr }),
+      }),
+      // Alert-rule action payload (internal integration, action "triggered").
+      event: optObj({
         title: optStr,
         web_url: optStr,
         level: optStr,
@@ -117,7 +142,14 @@ router.post('/sentry', async (req, res, next) => {
   try {
     if (!requireToken(req, res)) return;
     const body = sentryBodySchema.parse(req.body);
-    const issue = body.data?.issue ?? body.event ?? {};
+    // Issue webhooks fire on every lifecycle change (created, resolved,
+    // assigned, archived...). Only a NEW issue or a triggered alert rule is an
+    // alert; the rest are acknowledged and dropped so Telegram stays signal.
+    if (body.action && !SENTRY_ALERT_ACTIONS.has(body.action)) {
+      res.json({ ok: true, ignored: body.action });
+      return;
+    }
+    const issue = body.data?.issue ?? body.data?.event ?? body.event ?? {};
     const title = ((issue as { title?: string }).title ?? 'sentry alert').slice(0, 200);
     const url = (issue as { web_url?: string }).web_url ?? '';
     const sentryLevel = ((issue as { level?: string }).level ?? '').toLowerCase();
@@ -125,7 +157,7 @@ router.post('/sentry', async (req, res, next) => {
     await sendAlert({
       level,
       scope: 'platform',
-      source: `sentry.${(body.data?.issue?.project?.slug as string | undefined) ?? 'unknown'}`,
+      source: `sentry.${((body.data?.issue?.project?.slug ?? body.data?.event?.project?.slug) as string | undefined) ?? 'unknown'}`,
       title: `sentry: ${title}`,
       body: url || 'no issue url',
       context: { action: body.action, sentryLevel },

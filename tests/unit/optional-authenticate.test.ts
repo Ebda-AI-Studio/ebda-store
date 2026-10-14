@@ -55,7 +55,14 @@ function makeReq(token?: string): Request {
   } as unknown as Request;
 }
 
-const BASE = { userId: 'u-1', email: 'u@example.com', role: 'customer', tv: 0 };
+// A customer token carries the store it was issued for (F-01, Ruling S11-1).
+const BASE = {
+  userId: 'u-1',
+  email: 'u@example.com',
+  role: 'customer',
+  tv: 0,
+  storeId: 'store-1',
+};
 
 describe('optionalAuthenticate', () => {
   beforeEach(() => {
