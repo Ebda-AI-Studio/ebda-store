@@ -27,6 +27,8 @@ import type { ProductFact } from '@ebda/shared';
 import { FactsTable } from '../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../components/commerce/DeliveryChip';
 import { PersonalisationField } from '../../components/commerce/PersonalisationField';
+import { SizeChartDialog } from '../../components/commerce/SizeChartDialog';
+import type { PublicSizeChart } from '@ebda/shared';
 import {
   CloseIcon,
   DAHAB_BTN_PRIMARY,
@@ -73,6 +75,8 @@ export interface DahabProductDetailProps {
   leadTimeDays?: number | null;
   /** Raw PersonalisationConfig; the field renders above the buy row only when enabled. */
   personalisation?: unknown;
+  /** Resolved size chart (product's, else category's); the size-guide button hides without one. */
+  sizeChart?: PublicSizeChart | null;
   note?: string;
   onNoteChange?: (v: string) => void;
   /** Spec table, WhatsApp order button, share row — platform components. */
@@ -401,14 +405,17 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
               </p>
             )}
 
-            {p.variants.length > 0 && p.options.length > 0 && (
+            {p.variants.length > 0 && p.options.length > 0 ? (
               <VariantSelector
                 variants={p.variants}
                 options={p.options}
                 onVariantSelect={p.onVariantSelect}
                 onShopperSelect={p.onShopperSelect}
                 appearance="swatch"
+                sizeGuide={p.sizeChart ? <SizeChartDialog chart={p.sizeChart} /> : undefined}
               />
+            ) : (
+              <SizeChartDialog chart={p.sizeChart} className="mt-4" />
             )}
 
             {p.onNoteChange && (

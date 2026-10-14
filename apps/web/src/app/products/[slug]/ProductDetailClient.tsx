@@ -50,6 +50,7 @@ import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
 import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
+import { SizeChartDialog } from '../../../components/commerce/SizeChartDialog';
 import { StickyAddToCart } from '../../../components/commerce/StickyAddToCart';
 import {
   PersonalisationField,
@@ -720,6 +721,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             sku={product.sku}
             facts={product.facts}
             leadTimeDays={product.leadTimeDays}
+            sizeChart={product.sizeChart}
             specs={
               (product as { specifications?: unknown }).specifications ? (
                 <SpecTable
@@ -1041,7 +1043,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               )}
 
               {/* Variant Selector */}
-              {hasVariants && hasOptions && (
+              {hasVariants && hasOptions ? (
                 <VariantSelector
                   variants={productVariants}
                   options={productOptions}
@@ -1049,7 +1051,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   onShopperSelect={() => setShopperPickedVariant(true)}
                   onSelectionChange={setPickedOptions}
                   swatchColor={model3d ? swatchColor : undefined}
+                  sizeGuide={
+                    product.sizeChart ? <SizeChartDialog chart={product.sizeChart} /> : undefined
+                  }
                 />
+              ) : (
+                // No selector to sit beside: the guide gets its own line (renders nothing without a chart).
+                <SizeChartDialog chart={product.sizeChart} className="mt-4" />
               )}
 
               <PersonalisationField

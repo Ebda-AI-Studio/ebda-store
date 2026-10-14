@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import Image from 'next/image';
 import type { ProductVariant, ProductOption } from '@/lib/api';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -26,6 +26,16 @@ interface VariantSelectorProps {
    * colours. Presentation only — selection and availability logic is shared.
    */
   appearance?: 'pill' | 'swatch';
+  /**
+   * Size-guide trigger (B0 Task 9). Rendered beside the label of the option named like a size
+   * (`isSizeOption`), else once under the selector. Omitted = nothing renders.
+   */
+  sizeGuide?: ReactNode;
+}
+
+/** An option the size guide belongs to: "Size", "Ring size", "المقاس", "مقاس"... */
+export function isSizeOption(option: { name: string; nameAr?: string | null }): boolean {
+  return /size|مقاس/i.test(`${option.name} ${option.nameAr ?? ''}`);
 }
 
 /** Metal colour dot for a gold-colour option value (`swatch` appearance). */
@@ -45,6 +55,7 @@ export function VariantSelector({
   onSelectionChange,
   swatchColor,
   appearance = 'pill',
+  sizeGuide,
 }: VariantSelectorProps) {
   const swatch = appearance === 'swatch';
   const { t, isRtl } = useLanguage();
@@ -132,6 +143,8 @@ export function VariantSelector({
   const currentVariant = allPicked
     ? (variants.find(v => optionNames.every(name => v.options[name] === selected[name])) ?? null)
     : null;
+  // The guide sits by the first size-like option; with none, under the whole selector.
+  const sizeGuideOption = sizeGuide ? options.find(isSizeOption)?.name : undefined;
 
   return (
     <div className="mt-6 space-y-5">
@@ -167,6 +180,9 @@ export function VariantSelector({
               </span>
               {selectedDisplay && (
                 <span className="text-sm text-muted-foreground">{selectedDisplay}</span>
+              )}
+              {option.name === sizeGuideOption && (
+                <span className="-my-3 ms-auto">{sizeGuide}</span>
               )}
             </div>
             <div className="flex flex-wrap gap-2">
@@ -322,6 +338,8 @@ export function VariantSelector({
           </div>
         );
       })}
+
+      {sizeGuide && !sizeGuideOption && <div className="-mt-2">{sizeGuide}</div>}
 
       {/* Feedback panel only shows when something is wrong: variant
           out of stock, or no variant matches the picked combo. The

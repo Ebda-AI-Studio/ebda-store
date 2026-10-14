@@ -23,7 +23,12 @@
  * admin app uses a simpler 'authToken' approach.
  */
 import { isIosWebkit } from '@ebda/shared';
-import type { PublicModel3d, ProductFact, PersonalisationConfig } from '@ebda/shared';
+import type {
+  PublicModel3d,
+  ProductFact,
+  PersonalisationConfig,
+  PublicSizeChart,
+} from '@ebda/shared';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
@@ -132,6 +137,8 @@ interface Product {
   leadTimeDays?: number | null;
   /** PDP personalisation field (PersonalisationConfig); null/absent = no field. */
   personalisation?: PersonalisationConfig | null;
+  /** PDP size guide: the product's chart, else its category's; null/absent = no guide. */
+  sizeChart?: PublicSizeChart | null;
   inventory?: number;
   /** Server-computed: inventory <= 0 && allowBackorder. Keeps Add-to-Cart
    *  enabled for out-of-stock backorderable products (the cart/order API
