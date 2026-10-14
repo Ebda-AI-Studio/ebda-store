@@ -1,22 +1,18 @@
 'use client';
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type MouseEvent,
-} from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { LooksCopy } from '../lib/content';
 import { ensureLookFont, parseFragment, type Frag } from '../lib/looks-frag';
+import { mountPhones } from '../lib/phone-store-dom';
+import { SIGNUP_URL } from '../lib/site';
 
 const LETTERS = ['A', 'B', 'C'] as const;
 
 /**
- * Pick a template, see its three looks as scrollable phones. The first template's markup is
- * rendered by the server; the others are fetched from /looks on first select. In-phone chips
- * and toggles are plain delegated handlers; links inside the phones do nothing.
+ * Pick a template, see its three looks as working mini-stores in phones (Ruling MKT-8): the
+ * product page, category filters, cart and the demo checkout are driven by phone-store-dom.ts
+ * over the data attributes the generator emits. The first template's markup is rendered by the
+ * server; the others are fetched from /looks on first select. Links inside the phones do nothing.
  */
 export function LooksShowcase({
   copy,
@@ -119,26 +115,14 @@ export function LooksShowcase({
     setCurrent(i);
   };
 
-  const onPhoneClick = (e: MouseEvent) => {
-    const t = e.target as HTMLElement;
-    const inPhone = t.closest('.scr');
-    if (!inPhone) return;
-    const chip = t.closest('.chip');
-    const cmp = t.closest('.cmp');
-    const day = t.closest('.day');
-    if (chip || day) {
-      const el = (chip ?? day) as HTMLElement;
-      const sel = chip ? '.chip' : '.day';
-      el.parentElement?.querySelectorAll(sel).forEach(x => x.classList.remove('on'));
-      el.classList.add('on');
-    } else if (cmp) {
-      cmp.setAttribute(
-        'aria-pressed',
-        cmp.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'
-      );
-    }
-    if (t.closest('a')) e.preventDefault();
-  };
+  // Each phone becomes a working store once its markup is in the DOM; the cleanup removes every
+  // listener and layer, so switching template (or a Strict Mode remount) never leaves one behind.
+  const activeFrag = frags[active];
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || !activeFrag) return;
+    return mountPhones(track, { signupUrl: SIGNUP_URL });
+  }, [active, activeFrag]);
 
   const tpl = copy.templates.find(t => t.id === active) ?? copy.templates[0];
   const items = copy.items[active];
@@ -197,7 +181,6 @@ export function LooksShowcase({
             className={`looks-trio${switched ? ' looks-trio-in' : ''}`}
             key={active}
             ref={trackRef}
-            onClick={onPhoneClick}
           >
             {items.map((it, i) => (
               <figure className="looks-item" key={LETTERS[i]}>

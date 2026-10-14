@@ -10,6 +10,25 @@ const reducedMotion = () =>
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /**
+ * The static story (the finished store in normal flow): what reduced-motion visitors and visitors without
+ * JavaScript get. The server renders the JS state instead (step 0, phone tilted in, live layout) so the first
+ * frame paints exactly where the scroll script will leave it; these overrides take over where that script
+ * never runs. Used twice: a `<style media="(prefers-reduced-motion: reduce)">` and a `<noscript><style>`.
+ */
+const STORY_STATIC_CSS = `
+.story[data-live]{height:auto!important}
+.story[data-live] .story-sticky{position:static!important;height:auto!important;display:block!important;overflow:visible!important;padding-block:clamp(72px,11vw,132px)!important}
+.story[data-live] h2{font-size:clamp(1.9rem,5.2vw,3.4rem)!important;margin-bottom:24px!important}
+.story[data-live] .story-steps li{display:grid!important}
+.story .story-phone{--w:min(300px,70vw)!important;transform:none!important}
+.story .story-frame[data-f='1']{opacity:0!important}
+.story .story-frame[data-f='4']{opacity:1!important}
+.story .story-toast{transform:none!important;opacity:1!important}
+.story[data-live] .story-steps li .story-step-t{color:var(--fg)!important}
+.story[data-live] .story-steps li::before{color:var(--accent-text)!important}
+`;
+
+/**
  * The pinned scroll story: the Dahab store assembling inside a phone, one frame per step
  * (name + logo, products, colours + photos, first order). The server renders the finished state
  * (step 4: the last frame plus the notifications) so no-JS, reduced-motion and crawlers see the
@@ -71,7 +90,19 @@ export function StoryScroll({
   }, []);
 
   return (
-    <section id="story" ref={ref} className="story" data-step="4" aria-labelledby="story-h">
+    <section
+      id="story"
+      ref={ref}
+      className="story"
+      data-live="1"
+      data-step="0"
+      style={{ '--p': 0, '--in': 0 } as CSSProperties}
+      aria-labelledby="story-h"
+    >
+      <style media="(prefers-reduced-motion: reduce)">{STORY_STATIC_CSS}</style>
+      <noscript>
+        <style>{STORY_STATIC_CSS}</style>
+      </noscript>
       <div className="story-sticky">
         <div className="wrap story-grid">
           <div className="story-copy">
@@ -96,7 +127,10 @@ export function StoryScroll({
                       width={f.w}
                       height={f.h}
                       alt=""
-                      loading="lazy"
+                      // frame 1 is the first thing the story paints and, on phones, sits in the first
+                      // screen: it is the LCP element, so it loads eagerly at high priority
+                      loading={i === 0 ? 'eager' : 'lazy'}
+                      {...(i === 0 ? ({ fetchPriority: 'high' } as object) : {})}
                       decoding="async"
                     />
                   </picture>

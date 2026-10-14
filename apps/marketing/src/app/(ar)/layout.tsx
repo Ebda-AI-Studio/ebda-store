@@ -4,7 +4,7 @@ import { RootShell } from '@/components/RootShell';
 import { pageMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = pageMetadata('ar', '');
-export const viewport: Viewport = { themeColor: '#0A0B0C', colorScheme: 'dark' };
+export const viewport: Viewport = { themeColor: '#FAFAFA', colorScheme: 'light' };
 
 export default function Layout({ children }: { children: ReactNode }) {
   return <RootShell locale="ar">{children}</RootShell>;

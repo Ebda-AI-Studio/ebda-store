@@ -1,7 +1,7 @@
 /**
  * The marketing 3D section (Ruling MKT-2): the committed assets are the ones the code expects
  * (valid for the product's own validator, meshopt not Draco, small), the licence credit exists in
- * CREDITS.md AND in the visible copy, the build-time QR codes are fresh, the phone skins mirror the
+ * CREDITS.md AND on the /credits page linked from the footer (never under the viewer, MKT-12), the build-time QR codes are fresh, the phone skins mirror the
  * looks they claim, and the viewer's Tailwind classes are all defined in the marketing CSS shim.
  */
 import { describe, it, expect } from 'vitest';
@@ -17,6 +17,12 @@ import {
 } from '../../apps/marketing/src/lib/model3d';
 import { qrTargets, renderQr } from '../../apps/marketing/src/lib/model3d-qr';
 import { COPY } from '../../apps/marketing/src/lib/content';
+import { MODEL_CREDITS } from '../../apps/marketing/src/lib/credits';
+import { CreditsPage } from '../../apps/marketing/src/components/CreditsPage';
+import { Footer } from '../../apps/marketing/src/components/Footer';
+import { Home } from '../../apps/marketing/src/components/Home';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 const MK = path.resolve(__dirname, '../../apps/marketing');
 const pub = (p: string) => path.join(MK, 'public', p);
@@ -40,24 +46,54 @@ describe('3D assets', () => {
     for (const id of MODEL3D_IDS)
       for (const v of MODEL3D[id].variants.length ? MODEL3D[id].variants.map(x => x.id) : [null])
         bases.add(stillBase(id, v));
-    expect(bases.size).toBe(4); // three sneaker colourways + the lantern
+    expect(bases.size).toBe(5); // three sneaker colourways + the lantern + the clay pot
     for (const b of bases)
       for (const ext of ['webp', 'avif']) expect(existsSync(pub(`${b}.${ext}`))).toBe(true);
   });
 });
 
-describe('licence credits', () => {
-  it('CREDITS.md credits Shopify (CC BY 4.0) and Poly Haven (CC0)', () => {
+describe('licence credits (Ruling MKT-12)', () => {
+  it('CREDITS.md credits Shopify (CC BY 4.0) and Poly Haven (CC0) for all three models', () => {
     const c = readFileSync(pub('demo/CREDITS.md'), 'utf8');
     expect(c).toMatch(/qamar-sneaker\.glb.*Shopify.*CC BY 4\.0/);
     expect(c).toMatch(/brass-diya-lantern\.glb.*Bhargav Kubal.*CC0/);
+    expect(c).toMatch(/lamma-clay-pot\.glb.*Aron Łyczek.*CC0/);
   });
-  it('the visible credit next to the viewer names Shopify and links the licence, in both languages', () => {
+  it('every shipped model has a credit entry with author, licence link and a statement of changes', () => {
+    for (const id of MODEL3D_IDS) {
+      const file = MODEL3D[id].glb.split('/').pop()!;
+      const m = MODEL_CREDITS.find(x => x.file === file);
+      expect(m, `${file} has no credit`).toBeTruthy();
+      expect(m!.author).toBeTruthy();
+      expect(m!.licenseUrl).toMatch(/^https:\/\/creativecommons\.org\//);
+      expect(m!.changes.ar.length).toBeGreaterThan(10);
+      expect(m!.changes.en.length).toBeGreaterThan(10);
+    }
+    expect(MODEL_CREDITS.find(m => m.author === 'Shopify')?.license).toBe('CC BY 4.0');
+  });
+  it('the /credits page names Shopify, CC BY 4.0, links the licence and says it was modified, in both languages', () => {
     for (const l of ['ar', 'en'] as const) {
-      const q = COPY[l].model3d.verticals.qamar.credit;
-      expect(q.text).toMatch(/Shopify/);
-      expect(q.text).toMatch(/CC BY 4\.0/);
-      expect(q.href).toBe('https://creativecommons.org/licenses/by/4.0/');
+      const html = renderToStaticMarkup(createElement(CreditsPage, { locale: l }));
+      expect(html).toContain('Shopify');
+      expect(html).toContain('CC BY 4.0');
+      expect(html).toContain('href="https://creativecommons.org/licenses/by/4.0/"');
+      expect(html).toContain('MaterialsVariantsShoe');
+      expect(html).toContain(l === 'ar' ? 'معدّل' : 'modified');
+      for (const m of MODEL_CREDITS) expect(html).toContain(`data-credit="${m.file}"`);
+    }
+  });
+  it('every footer links to the credits page, and the home page no longer shows a credit under the viewer', () => {
+    for (const [l, href, label] of [
+      ['ar', '/credits/', 'حقوق الصور والموديلات'],
+      ['en', '/en/credits/', 'Credits'],
+    ] as const) {
+      const footer = renderToStaticMarkup(createElement(Footer, { locale: l }));
+      expect(footer).toMatch(
+        new RegExp(`<a href="${href.replace(/\//g, '\\/')}?"[^>]*>${label}</a>`)
+      );
+      const home = renderToStaticMarkup(createElement(Home, { locale: l }));
+      expect(home).not.toContain('m3d-credit');
+      expect(home).not.toMatch(/CC BY 4\.0/);
     }
   });
 });

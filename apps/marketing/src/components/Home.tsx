@@ -16,7 +16,6 @@ import {
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { JsonLd } from './JsonLd';
-import { HeroPhone } from './HeroPhone';
 import { LooksShowcase } from './LooksShowcase';
 import { Reveal, StoryScroll } from './Motion';
 import { Product3D } from './Product3D';
@@ -316,11 +315,6 @@ export function Home({ locale }: { locale: Locale }) {
                 </a>
               </p>
             </div>
-            <HeroPhone
-              copy={c.hero.phone}
-              templates={c.looks.templates}
-              initialHtml={initialLooksFragment()}
-            />
           </div>
         </section>
         {SECTION_ORDER.map(id => (

@@ -1,11 +1,12 @@
 from lib import *
 
 def _sub(css, **k):
-    for a, b in k.items(): css = css.replace('@' + a, b)
+    for a, b in sorted(k.items(), key=lambda kv: -len(kv[0])): css = css.replace('@' + a, b)   # longest name first: @GD must not become @G + 'D'
     return css
 
-def _chips(items, cls=''):
-    return ''.join(f'<button class="chip{" on" if i == 0 else ""}" type="button">{t}</button>' for i, t in enumerate(items))
+def _chips(items, cls='', keys=None, facet=None):
+    f = f' data-facet="{facet}"' if facet else ''
+    return ''.join(f'<button class="chip{" on" if i == 0 else ""}" type="button"' + (f' data-cat="{keys[i]}"{f}' if keys else '') + f'>{t}</button>' for i, t in enumerate(items))
 
 # ====================== DAHAB A · WORN ======================
 def da():
@@ -17,10 +18,15 @@ def da():
     prods = [('خاتم سوليتير ذهب', 'عرض 2 مم · عيار 18', 14500, 'ring'), ('سلسلة بميدالية صغيرة', 'طول 45 سم · عيار 21', 6200, 'chain'),
              ('إنسيال ذهب رفيع', 'عرض 4 مم · عيار 21', 9800, 'bracelet'), ('حلق دائري صغير', 'قطر 14 مم · عيار 21', 3500, 'ear'),
              ('طقم سلسلة وحلق', 'سلسلة 42 سم · عيار 21', 17900, 'set'), ('دلاية دائرية', 'قطر 12 مم · عيار 21', 4800, 'pendant')]
-    cards = ''.join(f'<article><div class="ph" style="aspect-ratio:4/5">{img("compact", cw, n, pk=k)}</div>'
+    DK = {'ring': 'rings', 'chain': 'chains', 'bracelet': 'bracelets', 'ear': 'earrings', 'set': 'sets', 'pendant': 'chains'}
+    def spec(s):
+        m, k = [x.strip() for x in s.split('·')]
+        return dict(mm=m, karat=k.replace('عيار', '').strip())
+    ex = {'ring': dict(sizes='12|13|14|15|16|17', engrave='12'), 'pendant': dict(engrave='12')}
+    cards = ''.join(f'<article {pd(n, p, None, k, cat=DK[k], desc="تتسلّم في علبة هدية مع شهادة العيار", **spec(s), **ex.get(k, {}))}><div class="ph" style="aspect-ratio:4/5">{img("compact", cw, n, pk=k)}</div>'
                     f'<h3 class="nm" style="margin-top:8px">{n}</h3><p class="sz">{s}</p>{price(p)}</article>' for n, s, p, k in prods)
     css = _sub("""
-&{--bg:#fff;--ink:#121212;--mut:#5A5A5A;--ac:@G;--fd:'Reem Kufi';--fb:'IBM Plex Sans Arabic';--fl:'Bodoni Moda'}
+&{--bg:#fff;--ink:#121212;--mut:#5A5A5A;--ac:@G;--btn:#121212;--btnfg:#fff;--r:0px;--rb:0px;--ga:4/5;--fd:'Reem Kufi';--fb:'IBM Plex Sans Arabic';--fl:'Bodoni Moda'}
 & h3.nm{font-family:var(--fb),sans-serif;font-weight:600}
 & .hd{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;height:64px;padding:0 6px;position:sticky;top:0;background:#fff;z-index:3}
 & .logo{text-align:center;line-height:1}
@@ -45,12 +51,12 @@ def da():
 & .eng p{font-size:14px;margin-top:6px;color:#e4e4e4}
 & .eng .ln{display:inline-block;margin-top:14px;font-weight:600;font-size:14px;color:@GD;border-bottom:1px solid @GD;padding-bottom:2px}
 """, G=G, GD=GD)
-    html = f"""<header class="hd"><button class="ib" type="button" aria-label="القائمة">{I('menu')}</button>
-<div class="logo"><b>دهب</b><i>DAHAB</i></div><button class="ib" type="button" aria-label="السلة">{I('bag')}</button></header>
+    html = f"""<header class="hd"><button class="ib" type="button" aria-label="القائمة" data-open-menu>{I('menu')}</button>
+<div class="logo"><b>دهب</b><i>DAHAB</i></div><button class="ib" type="button" aria-label="السلة" data-open-cart>{I('bag')}</button></header>
 <section class="hero"><div class="ph" style="aspect-ratio:4/5">{img('compact', cw, 'خاتم ذهب على إيد', pk='hero')}</div>
 <div class="cap"><h2>الدهب بيتشاف على الإيد</h2><p>كل قطعة متصورة لابساها، بمقاسها الحقيقي.</p><a class="cta" href="#">شوفي القطع</a></div></section>
-<nav class="chips" aria-label="القطع">{_chips(['الكل', 'خواتم', 'سلاسل', 'أساور', 'حلقان', 'أطقم'])}</nav>
-<section class="g2">{cards}</section>
+<nav class="chips" aria-label="القطع">{_chips(['الكل', 'خواتم', 'سلاسل', 'أساور', 'حلقان', 'أطقم'], keys=['all', 'rings', 'chains', 'bracelets', 'earrings', 'sets'])}</nav>
+<section class="g2" data-grid>{cards}</section>
 <section class="eng"><div class="ph" style="aspect-ratio:16/10">{img('compact', cw, 'خاتم بالحفر', pk='ring2')}</div>
 <div class="cap"><h2>اكتبي اسمك أو تاريخ بنفسك</h2><p>حفر بالليزر على الخاتم أو الدلاية، جاهز في يومين، من غير مصاريف زيادة لحد 12 حرف.</p><a class="ln" href="#">ابدئي التخصيص</a></div></section>
 {footer('#121212', '#ffffff', '#cfcfcf', 'دهب', 'مجوهرات ذهب عيار 18 و21، من قلب جاردن سيتي.', ['من نحن', 'دليل المقاسات', 'الشحن والاسترجاع', 'تواصلي معنا'])}"""
@@ -66,12 +72,12 @@ def db():
     cw = ('#0F4C4A', '#0a3836', SIL, '#9aa3ad', COR)
     prods = [('خاتم فضة بفيروز', 1450, 'تتعمل في 3 أيام', 'ring'), ('أسورة منقوشة', 2800, 'تتعمل في 5 أيام', 'cuff'),
              ('دلاية مينا زرقا', 950, 'جاهزة النهاردة', 'pendant'), ('حلق فضة متدلي', 1200, 'تتعمل في 3 أيام', 'earring')]
-    cards = ''.join(f'<article><div class="ph" style="aspect-ratio:1/1">{img("compact", cw, n, pk=k)}</div><h3 class="nm" style="margin-top:8px">{n}</h3>'
-                    f'<span class="lead">{t}</span><div class="pr"><span class="price">{fmt(p)}</span><button class="add" type="button" aria-label="أضيفي {n}">{I("plus", 18)}</button></div></article>' for n, p, t, k in prods)
+    cards = ''.join(f'<article {pd(n, p, None, k, lead=t, mat="فضة 925 مصنوعة يدويًا", desc="بتتمضي بإيد عم صلاح وبتتسلّم مع ضمان الصنعة")}><div class="ph" style="aspect-ratio:1/1">{img("compact", cw, n, pk=k)}</div><h3 class="nm" style="margin-top:8px">{n}</h3>'
+                    f'<span class="lead">{t}</span><div class="pr"><span class="price">{fmt(p)}</span><button class="add" type="button" aria-label="أضيفي {n}" data-add>{I("plus", 18)}</button></div></article>' for n, p, t, k in prods)
     steps = [('رسم', 'بنرسم القطعة على الورق بمقاسك ونتفق على التفاصيل.'), ('صب', 'بنصب الفضة في القالب ونشغّلها بالإيد قطعة قطعة.'), ('تلميع', 'بنلمّع ونركّب الفيروز ونفحص كل قطعة قبل ما تتغلف.')]
     st = ''.join(f'<li><b class="num">{i + 1}</b><div><h3>{t}</h3><p>{d}</p></div></li>' for i, (t, d) in enumerate(steps))
     css = _sub("""
-&{--bg:#fff;--ink:#14201f;--mut:#4a5857;--ac:#0F4C4A;--fd:'Markazi Text';--fb:'Almarai';--fl:'Libre Caslon Text'}
+&{--bg:#fff;--ink:#14201f;--mut:#4a5857;--ac:#0F4C4A;--btn:#E2674A;--btnfg:@ONC;--r:6px;--rb:4px;--ga:1/1;--fd:'Markazi Text';--fb:'Almarai';--fl:'Libre Caslon Text'}
 & h3.nm{font-family:var(--fb),sans-serif;font-weight:600}
 & .hd{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;height:64px;padding:0 6px;position:sticky;top:0;background:#0F4C4A;color:#fff;z-index:3;border-bottom:1px solid #D9DDE2}
 & .logo{text-align:center;line-height:1}
@@ -101,8 +107,8 @@ def db():
 & .mk h2{font-size:30px}
 & .mk p{font-size:14px;color:var(--mut);margin-top:4px}
 """, ONC=ONC)
-    html = f"""<header class="hd"><button class="ib" type="button" aria-label="القائمة">{I('menu')}</button>
-<div class="logo"><b>دهب</b><i>DAHAB · SILVER</i></div><button class="ib" type="button" aria-label="السلة">{I('bag')}</button></header>
+    html = f"""<header class="hd"><button class="ib" type="button" aria-label="القائمة" data-open-menu>{I('menu')}</button>
+<div class="logo"><b>دهب</b><i>DAHAB · SILVER</i></div><button class="ib" type="button" aria-label="السلة" data-open-cart>{I('bag')}</button></header>
 <section class="tb"><div class="ph" style="aspect-ratio:4/3.4">{img('compact', cw, 'إيد صايغ بتشتغل على الفضة', pk='hero')}</div>
 <div class="cap"><h2>مصنوعة بإيد في الفسطاط</h2><p>فضة وفيروز بتتعمل قدامك، قطعة قطعة، من ورشة عم صلاح.</p><a class="cta" href="#">شوفي الشغل</a></div></section>
 <section class="jr"><h2>رحلة القطعة</h2><ol>{st}</ol></section>
@@ -122,10 +128,11 @@ def dc():
     cw = ('#fdf3f1', BL, EM, '#083d2e', GOLD)
     prods = [('حلق دهب صغير', 1650, 'earring'), ('سلسلة بقلب', 4200, 'necklace'), ('إنسيال ذهب', 3800, 'bracelet'),
              ('خاتم بفص', 7500, 'ring'), ('طقم هدية كامل', 9400, 'set'), ('دلاية ذهب مع كارت', 4900, 'necklace')]
-    cards = ''.join(f'<article><div class="ph" style="aspect-ratio:1/1">{img("compact", cw, n, pk=k)}</div><h3 class="nm" style="margin-top:8px">{n}</h3>{price(p)}'
+    OCC = {'حلق دهب صغير': 'birthday grad', 'سلسلة بقلب': 'mothers birthday', 'إنسيال ذهب': 'engagement mothers', 'خاتم بفص': 'engagement', 'طقم هدية كامل': 'engagement mothers grad', 'دلاية ذهب مع كارت': 'birthday grad mothers'}
+    cards = ''.join(f'<article {pd(n, p, None, k, occ=OCC[n], gift="1", mat="ذهب عيار 21", desc="تتسلّم متغلفة في علبة زمردي مع شريط ساتان")}><div class="ph" style="aspect-ratio:1/1">{img("compact", cw, n, pk=k)}</div><h3 class="nm" style="margin-top:8px">{n}</h3>{price(p)}'
                     f'<p class="gw">{I("check", 14)} تغليف هدية</p><button class="cmp" type="button" aria-pressed="false">اكتبي كارت</button></article>' for n, p, k in prods)
     css = _sub("""
-&{--bg:#fff;--ink:#16201C;--mut:@MUT;--ac:@G;--fd:'Kufam';--fb:'Tajawal';--fl:'Italiana'}
+&{--bg:#fff;--ink:#16201C;--mut:@MUT;--ac:@G;--btn:#0E5C46;--btnfg:#fff;--r:8px;--rb:6px;--ga:1/1;--fd:'Kufam';--fb:'Tajawal';--fl:'Italiana'}
 & h3.nm{font-family:var(--fb),sans-serif;font-weight:600}
 & .hd{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;height:64px;padding:0 6px;position:sticky;top:0;background:#fff;z-index:3;border-bottom:1px solid #F2C9C4}
 & .logo{text-align:center;line-height:1}
@@ -157,15 +164,15 @@ def dc():
 & .pk .ph{border-radius:8px}
 & .pk .ln{display:inline-block;margin-top:14px;font-weight:700;font-size:14px;color:@GBd;border-bottom:1px solid @GBd;padding-bottom:2px}
 """, MUT=MUT, G=G, GBd=fix('#8a6420', BL, 4.5, 'DC link on blush'))
-    html = f"""<header class="hd"><button class="ib" type="button" aria-label="القائمة">{I('menu')}</button>
-<div class="logo"><b>دهب</b><i>DAHAB</i></div><button class="ib" type="button" aria-label="السلة">{I('bag')}</button></header>
+    html = f"""<header class="hd"><button class="ib" type="button" aria-label="القائمة" data-open-menu>{I('menu')}</button>
+<div class="logo"><b>دهب</b><i>DAHAB</i></div><button class="ib" type="button" aria-label="السلة" data-open-cart>{I('bag')}</button></header>
 <section class="fd"><h2>هدية لمين؟ وبكام؟</h2><p>اختاري المناسبة والميزانية، ونطلعلك القطع المناسبة متغلفة.</p>
-<h3>المناسبة</h3><nav class="chips" aria-label="المناسبة">{_chips(['خطوبة', 'عيد ميلاد', 'عيد الأم', 'تخرج'])}</nav>
-<h3>الميزانية</h3><nav class="chips" aria-label="الميزانية">{_chips(['أقل من 2,000 ج.م', 'أقل من 5,000 ج.م', 'أقل من 10,000 ج.م'])}</nav>
+<h3>المناسبة</h3><nav class="chips" aria-label="المناسبة">{_chips(['كل المناسبات', 'خطوبة', 'عيد ميلاد', 'عيد الأم', 'تخرج'], keys=['all', 'engagement', 'birthday', 'mothers', 'grad'], facet='occ')}</nav>
+<h3>الميزانية</h3><nav class="chips" aria-label="الميزانية">{_chips(['أي ميزانية', 'أقل من 2,000 ج.م', 'أقل من 5,000 ج.م', 'أقل من 10,000 ج.م'], keys=['all', '2000', '5000', '10000'], facet='max')}</nav>
 <span class="dl">{I('pin', 16)} اطلبي النهاردة، يوصل الخميس</span></section>
 <section class="hero"><div class="ph" style="aspect-ratio:16/11">{img('compact', cw, 'فتح علبة هدية', pk='hero')}</div>
 <div class="cap"><h2>لحظة الفتح بتفرّق</h2><p>علبة زمردي وشريط ساتان، جاهزة تتقدم من غير ما تتغلف تاني.</p></div></section>
-<section class="sec"><div class="g2">{cards}</div></section>
+<section class="sec"><div class="g2" data-grid>{cards}</div></section>
 <section class="pk"><h2>التغليف جزء من الهدية</h2><p>كل طلب بيوصل في علبة زمردي بشريط ساتان وكارت بخط إيدينا، من غير زيادة في السعر.</p>
 <div class="pair"><div class="ph" style="aspect-ratio:1/1">{img('compact', cw, 'علب هدايا', pk='box')}</div><div class="ph" style="aspect-ratio:3/4">{img('compact', cw, 'شريط ساتان', pk='ribbon')}</div></div>
 <a class="ln" href="#">شوفي أشكال التغليف</a></section>

@@ -1,4 +1,4 @@
-import { whatsappDisplay, whatsappUrl } from '@force/shared/brand';
+import { whatsappUrl } from '@force/shared/brand';
 
 function ChatIcon() {
   return (
@@ -19,40 +19,31 @@ function ChatIcon() {
 }
 
 /**
- * The public WhatsApp line. The number is always real, selectable text (dir=ltr) beside the
- * wa.me link, never only an icon: people copy it into their own contacts.
- * `compact`: header form (icon + label; the number is hidden below the desktop breakpoint,
- * where it is repeated inside the menu).
+ * The public WhatsApp line, as a button only (Ruling MKT-11): icon + label linking to wa.me.
+ * The number is never written on the page; it lives in BRAND.contact.whatsapp and nowhere visible.
+ * `compact`: header form; the label is hidden below the desktop breakpoint (icon-only, aria-label stays).
  */
 export function WhatsApp({
   label,
   ariaLabel,
   compact = false,
-  showNumber = true,
 }: {
   label: string;
   ariaLabel: string;
   compact?: boolean;
-  showNumber?: boolean;
 }) {
-  const num = whatsappDisplay();
   return (
     <span className={`wa${compact ? ' wa-compact' : ''}`}>
       <a
         href={whatsappUrl()}
         className="wa-link"
-        aria-label={`${ariaLabel} ${num}`}
+        aria-label={ariaLabel}
         rel="noopener"
         data-whatsapp=""
       >
         <ChatIcon />
         <span className="wa-label">{label}</span>
       </a>
-      {showNumber && (
-        <span className="wa-num" dir="ltr" lang="en" translate="no">
-          {num}
-        </span>
-      )}
     </span>
   );
 }

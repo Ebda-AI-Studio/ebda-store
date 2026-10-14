@@ -1,0 +1,773 @@
+/* Working-phone engine styles (src/lib/phone-store-dom.ts). `&` is the look's phone (id-scoped by export.py,
+   so these rules win over the look's own `& img`, `& h2`, `& button` base rules). Everything is drawn from the
+   look's variables: --bg --ink --mut --ac --fd --fb plus the per-look tokens --btn --btnfg (primary button),
+   --r (image/card radius), --rb (button radius), --ga (product photo ratio).
+   Motion (MKT-9): transform + opacity only, <= 280ms ease-out-quart, none under reduced motion. */
+& {
+  --ps-ease: cubic-bezier(0.25, 1, 0.5, 1);
+  --ps-surf: rgba(128, 128, 128, 0.12);
+  --ps-line: rgba(128, 128, 128, 0.3);
+  --ps-surf: color-mix(in srgb, var(--ink) 7%, var(--bg));
+  --ps-line: color-mix(in srgb, var(--ink) 20%, var(--bg));
+  --rs: calc(var(--r, 0px) * 1.6);
+}
+&.ps-lock {
+  overflow: hidden;
+}
+@media (pointer: coarse) {
+  & {
+    overscroll-behavior-y: contain;
+  }
+}
+/* a page (product, demo checkout) covers the whole home: its sticky bars (cart bar, tabs, header) must not
+   show through or stack with the page's own bar; sheets keep the dimmed home visible */
+&.ps-covered > :not(.ps-layer) {
+  visibility: hidden;
+}
+& [data-p-id] {
+  cursor: pointer;
+}
+& [data-p-id] .ph[role='button']:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: -3px;
+}
+& [data-cat] {
+  cursor: pointer;
+}
+& .ps-off {
+  display: none !important;
+}
+& .ib[data-open-cart] {
+  position: relative;
+}
+& .ps-badge {
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--btn);
+  color: var(--btnfg);
+  font:
+    700 11px/18px var(--fb),
+    system-ui,
+    sans-serif;
+  text-align: center;
+  pointer-events: none;
+}
+& .ps-badge[hidden] {
+  display: none;
+}
+& .srch {
+  cursor: pointer;
+}
+
+/* grid states */
+& .ps-fbar {
+  grid-column: 1/-1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--ps-surf);
+  font-size: 13px;
+  font-weight: 600;
+}
+& .ps-fbar button,
+& .ps-empty button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--ps-line);
+  border-radius: var(--rb);
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+& .ps-empty {
+  grid-column: 1/-1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 44px 24px;
+  text-align: center;
+  color: var(--mut);
+}
+& .ps-empty b {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+/* layer */
+& .ps-layer {
+  position: sticky;
+  top: 0;
+  height: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+& .ps-root {
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  height: var(--ps-h, 640px);
+  overflow: hidden;
+  pointer-events: none;
+}
+& .ps-view {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: auto;
+}
+& .ps-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+& .ps-view :focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+& .ps-view button {
+  font-family: var(--fb), system-ui, sans-serif;
+}
+
+/* pages: product, demo checkout. In from the leading edge (a push in RTL). */
+& .ps-page {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--fb), Tajawal, system-ui, sans-serif;
+  transform: translateX(-100%);
+  transition: transform 260ms var(--ps-ease);
+}
+& .ps-page.is-in {
+  transform: none;
+}
+& .ps-bar {
+  flex: none;
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  align-items: center;
+  height: 56px;
+  padding: 0 2px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--ps-line);
+}
+& .ps-ibtn {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  display: grid;
+  place-items: center;
+}
+& .ps-bar-t {
+  font-family: var(--fd), var(--fb), serif;
+  font-weight: 700;
+  font-size: 17px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+}
+& .ps-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+& .ps-gal {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  aspect-ratio: var(--ga, 1/1);
+  background: var(--ps-surf);
+}
+& .ps-gal::-webkit-scrollbar {
+  display: none;
+}
+& .ps-slide {
+  flex: 0 0 100%;
+  height: 100%;
+  margin: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+& .ps-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  -webkit-user-drag: none;
+}
+& .ps-dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px 0 0;
+}
+& .ps-dots i {
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--ink);
+  opacity: 0.22;
+  transition: opacity 200ms var(--ps-ease);
+}
+& .ps-dots i.is-on {
+  opacity: 1;
+}
+& .ps-info {
+  padding: 16px 18px 28px;
+}
+& .ps-title {
+  font-family: var(--fd), var(--fb), serif;
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.35;
+  margin: 0;
+}
+& .ps-pricerow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 0;
+}
+& .ps-price {
+  font-weight: 700;
+  font-size: 19px;
+  color: var(--ac);
+}
+& .ps-old {
+  color: var(--mut);
+  font-size: 14px;
+}
+& .ps-save {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 1px 9px;
+  border-radius: var(--rb);
+  background: var(--btn);
+  color: var(--btnfg);
+}
+& .ps-desc {
+  margin: 10px 0 0;
+  color: var(--mut);
+  font-size: 14px;
+  line-height: 1.7;
+}
+& .ps-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+}
+& .ps-specs li {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: var(--rb);
+  background: var(--ps-surf);
+}
+& .ps-grp {
+  border: 0;
+  margin: 18px 0 0;
+  padding: 0;
+  min-width: 0;
+}
+& .ps-grp legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+& .ps-picked {
+  font-weight: 500;
+  color: var(--mut);
+}
+& .ps-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+& .ps-chip {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--ps-line);
+  border-radius: var(--rb);
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  transition:
+    background-color 150ms,
+    color 150ms;
+}
+& .ps-chip.is-on {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+& .ps-sw {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 3px solid var(--bg);
+  border-radius: 50%;
+  background: var(--sw);
+  box-shadow: 0 0 0 1px var(--ps-line);
+}
+& .ps-sw.is-on {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+& .ps-fld {
+  display: block;
+  margin: 16px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+& .ps-fld span {
+  display: block;
+  margin-bottom: 6px;
+}
+& .ps-in {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid var(--ps-line);
+  border-radius: min(var(--rb), 12px);
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+}
+& .ps-chk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 0;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+}
+& .ps-chk input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--btn);
+}
+& .ps-facts {
+  margin: 18px 0 0;
+  border-top: 1px solid var(--ps-line);
+}
+& .ps-facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ps-line);
+}
+& .ps-facts dt {
+  color: var(--mut);
+  font-size: 13px;
+  flex: none;
+}
+& .ps-facts dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: end;
+}
+& .ps-qrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  font-weight: 700;
+}
+& .ps-qty {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--ps-line);
+  border-radius: var(--rb);
+}
+& .ps-qty button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  display: grid;
+  place-items: center;
+}
+& .ps-qty output {
+  min-width: 28px;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+& .ps-foot {
+  flex: none;
+  padding: 10px 14px;
+  background: var(--bg);
+  border-top: 1px solid var(--ps-line);
+}
+& .ps-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--rb);
+  background: var(--btn);
+  color: var(--btnfg);
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 120ms var(--ps-ease);
+}
+& .ps-cta:active {
+  transform: scale(0.985);
+}
+& .ps-ghost {
+  min-height: 48px;
+  padding: 0 22px;
+  border: 1px solid var(--ps-line);
+  border-radius: var(--rb);
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* sheets: cart, menu, search. Rise from the bottom over a dim backdrop. */
+& .ps-sheetwrap {
+  pointer-events: none;
+}
+& .ps-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 8, 10, 0.52);
+  opacity: 0;
+  transition: opacity 200ms var(--ps-ease);
+  pointer-events: auto;
+}
+& .ps-sheetwrap.is-in .ps-dim {
+  opacity: 1;
+}
+& .ps-sheet {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 88%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--fb), Tajawal, system-ui, sans-serif;
+  border-radius: var(--rs) var(--rs) 0 0;
+  transform: translateY(100%);
+  transition: transform 280ms var(--ps-ease);
+  pointer-events: auto;
+  box-shadow: 0 -1px 0 var(--ps-line);
+}
+& .ps-sheetwrap.is-in .ps-sheet {
+  transform: none;
+}
+& .ps-shead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 6px;
+  padding-inline: 18px 8px;
+  border-bottom: 1px solid var(--ps-line);
+}
+& .ps-shead h2 {
+  font-family: var(--fd), var(--fb), serif;
+  font-size: 21px;
+  margin: 0;
+}
+& .ps-sbody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 18px 18px;
+}
+& .ps-lines {
+  margin: 0;
+  padding: 0;
+}
+& .ps-line {
+  display: grid;
+  grid-template-columns: 64px 1fr 40px;
+  grid-template-areas: 't b r' 't q q';
+  gap: 6px 12px;
+  align-items: start;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--ps-line);
+}
+& .ps-lthumb {
+  grid-area: t;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: min(var(--r), 12px);
+  background: var(--ps-surf);
+}
+& .ps-lthumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+& .ps-lbody {
+  grid-area: b;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+& .ps-lbody b {
+  font-size: 14px;
+  line-height: 1.5;
+}
+& .ps-lopt {
+  color: var(--mut);
+  font-size: 12px;
+}
+& .ps-lprice {
+  font-weight: 700;
+  color: var(--ac);
+  font-size: 14px;
+}
+& .ps-line .ps-qty {
+  grid-area: q;
+  justify-self: start;
+}
+& .ps-line .ps-qty button {
+  width: 40px;
+  height: 40px;
+}
+& .ps-rm {
+  grid-area: r;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--mut);
+  display: grid;
+  place-items: center;
+}
+& .ps-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 16px 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+}
+& .ps-total b {
+  font-family: var(--fd), var(--fb), serif;
+  font-size: 22px;
+  color: var(--ac);
+}
+& .ps-note {
+  margin: 0 0 14px;
+  color: var(--mut);
+  font-size: 12px;
+}
+& .ps-emptycart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 38px 12px 22px;
+  text-align: center;
+  color: var(--mut);
+}
+& .ps-emptycart b {
+  color: var(--ink);
+  font-size: 17px;
+}
+& .ps-emptycart .ps-ghost {
+  margin-top: 10px;
+}
+& .ps-menu li,
+& .ps-results li {
+  border-bottom: 1px solid var(--ps-line);
+}
+& .ps-menu button {
+  width: 100%;
+  min-height: 54px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  text-align: start;
+}
+& .ps-results button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: start;
+}
+& .ps-results .ps-lthumb {
+  width: 48px;
+  height: 48px;
+}
+& .ps-nohit {
+  padding: 18px 0;
+  color: var(--mut);
+  font-size: 14px;
+}
+& .ps-search {
+  margin: 14px 0 6px;
+}
+& .ps-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* the demo checkout screen */
+& .ps-donebody {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 24px 32px;
+  text-align: center;
+}
+& .ps-tick {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: var(--btn);
+  color: var(--btnfg);
+}
+& .ps-donebody h2 {
+  font-family: var(--fd), var(--fb), serif;
+  font-size: 30px;
+  margin: 8px 0 0;
+}
+& .ps-big {
+  font-family: var(--fd), var(--fb), serif;
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--ac);
+  margin: 0;
+}
+& .ps-donebody .ps-desc {
+  max-width: 30ch;
+  margin: 0;
+}
+& .ps-sum {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  margin: 12px 0 4px;
+  padding: 12px 16px;
+  border-radius: min(var(--r), 14px);
+  background: var(--ps-surf);
+  font-size: 14px;
+}
+& .ps-signup {
+  justify-content: center;
+  margin-top: 8px;
+}
+
+/* toast: "added to cart" (the live region announces it; this is the visible half) */
+& .ps-toast {
+  position: absolute;
+  z-index: 9;
+  inset-inline: 16px;
+  bottom: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 6px;
+  padding-inline: 16px 8px;
+  border-radius: min(var(--rb), 14px);
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(14px);
+  transition:
+    transform 220ms var(--ps-ease),
+    opacity 220ms var(--ps-ease),
+    visibility 0s linear 220ms;
+  pointer-events: none;
+}
+& .ps-toast.is-on {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+  pointer-events: auto;
+}
+& .ps-toast button {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  & .ps-page,
+  & .ps-sheet,
+  & .ps-dim,
+  & .ps-toast,
+  & .ps-dots i,
+  & .ps-cta,
+  & .ps-chip {
+    transition: none;
+  }
+}
