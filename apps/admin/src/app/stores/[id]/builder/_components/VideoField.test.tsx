@@ -68,7 +68,7 @@ describe('VideoField', () => {
     fireEvent.change(screen.getByTestId('video-file-input'), {
       target: { files: [file(6 * 1024 * 1024 + 1, 'video/mp4')] },
     });
-    expect((await screen.findByRole('alert')).textContent).toBe('الفيديو أكبر من ٦ ميجا');
+    expect((await screen.findByRole('alert')).textContent).toBe('الفيديو أكبر من 6 ميجا');
     expect(uploadVideo).not.toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -87,7 +87,7 @@ describe('VideoField', () => {
     const v = screen.getByTestId('video-preview') as HTMLVideoElement;
     expect(v.muted).toBe(true);
     expect(v.loop).toBe(true);
-    expect(screen.getByTestId('video-size').textContent).toBe('٢٫٠ ميجا');
+    expect(screen.getByTestId('video-size').textContent).toBe('2.0 ميجا');
   });
 
   it('remove clears the value', () => {

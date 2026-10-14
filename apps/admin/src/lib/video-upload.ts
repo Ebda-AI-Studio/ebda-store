@@ -10,14 +10,8 @@ export function checkVideoFile(file: { size: number; type: string }): VideoCheck
   return 'ok';
 }
 
-/**
- * Megabytes with one decimal ("2.4" / "٢٫٤"), never "NaN". Arabic-Indic digits in
- * Arabic so the readout matches the «الفيديو أكبر من ٦ ميجا» message.
- */
-export function formatMegabytes(bytes: number, locale = 'en'): string {
+/** Megabytes with one decimal ("2.4"), never "NaN". Latin digits in both locales (NUMERALS-1, issue 1971). */
+export function formatMegabytes(bytes: number): string {
   const mb = Number.isFinite(bytes) && bytes >= 0 ? bytes / (1024 * 1024) : 0;
-  return new Intl.NumberFormat(locale === 'ar' ? 'ar-EG-u-nu-arab' : 'en-US', {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(mb);
+  return mb.toFixed(1);
 }

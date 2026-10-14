@@ -8,7 +8,6 @@
  * same limits and sniffs the bytes.
  */
 import { useEffect, useRef, useState } from 'react';
-import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { VIDEO_ACCEPT, checkVideoFile, formatMegabytes } from '@/lib/video-upload';
@@ -25,7 +24,6 @@ export function VideoField({
   onChange: (v: string | undefined) => void;
 }) {
   const t = useT('builder.settings');
-  const locale = useLocale();
   const { uploadVideo, uploading, error: uploadError } = useImageUpload();
   const inputRef = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -90,7 +88,7 @@ export function VideoField({
           </button>
           {value && bytes !== null && (
             <span className="text-[11px] text-muted-foreground" data-testid="video-size">
-              {t('videoSize', { size: formatMegabytes(bytes, locale) })}
+              {t('videoSize', { size: formatMegabytes(bytes) })}
             </span>
           )}
           {value && (

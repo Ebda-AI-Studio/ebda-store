@@ -107,6 +107,6 @@ describe('VideoField client-side guard', () => {
   it('formats megabytes with one decimal and never NaN', () => {
     expect(formatMegabytes(2.5 * 1024 * 1024)).toBe('2.5');
     expect(formatMegabytes(NaN)).toBe('0.0');
-    expect(formatMegabytes(2.5 * 1024 * 1024, 'ar')).toBe('٢٫٥');
+    expect(formatMegabytes(2.5 * 1024 * 1024)).toBe('2.5');
   });
 });
