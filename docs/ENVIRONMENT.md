@@ -2,19 +2,15 @@
 
 Moved verbatim from `CLAUDE.md` (2026-07-11) so the instruction file stays rules-only. This is the canonical env catalog; update it in the SAME session as any env change (documentation-parity rule).
 
-## Deploy (GitHub Actions → Railway)
+## Deploy (GitHub Actions → Cloudflare Workers)
 
-Read by `.github/workflows/railway-deploy.yml`. Documented here because an operator who
-sets only some of them can leave the API with no deploy path at all — see
-`docs/migration/railway-actions-deploy.md` for the required order.
+The API is the Cloudflare Worker `ebda-api` (`api.ebda.app`), deployed only by `.github/workflows/cf-api-deploy.yml` (`workflow_dispatch`); admin/web/orders/marketing deploy from their own `cf-*-deploy.yml` on push to `main`. There is no Railway deploy for this repo (the Railway section that used to sit here was inherited from Force Website Builder).
 
-- `RAILWAY_ACTIONS_DEPLOY` (repo **variable**) — **the switch.** Until it is the string `'true'` the deploy job is gated off at job level and reports as **skipped**. Not a secret, because a job-level `if:` cannot read secrets.
-- `RAILWAY_TOKEN` (repo **secret**) — Railway PROJECT token scoped to the `production` environment. Once `RAILWAY_ACTIONS_DEPLOY` is `'true'`, a missing token **fails** the job rather than skipping it: after cutover an absent token is a misconfiguration, not a no-op.
-- `RAILWAY_SERVICE` (repo variable, default `api`) — the service to deploy.
-- `RAILWAY_ENVIRONMENT` (repo variable, default `production`).
-- `RAILWAY_HEALTH_URL` (repo variable, default `https://api.force-ai.co/health`) — polled to confirm the deployed commit is the one serving.
+- `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (repo **secrets**) — used by every `cf-*-deploy.yml`.
+- `EBDA_HYPERDRIVE_ID`, `EBDA_KV_CACHE_ID` (repo **variables**) — substituted into `.wrangler.deploy.jsonc` by `scripts/ebda-cf-api-config.mjs`; `apps/api/wrangler.jsonc` keeps placeholder zeros for local dev.
+- Runtime secrets of the API Worker are set with `wrangler secret put <NAME> --name ebda-api` (list with `wrangler secret list --name ebda-api`); the variables below marked "API" live there.
 
-## API (Railway)
+## API (Cloudflare Worker `ebda-api` — `wrangler secret`)
 
 Required in production (app crashes without these):
 
@@ -24,7 +20,6 @@ Required in production (app crashes without these):
 - `JWT_SECRET` — min 32 chars, no placeholder values. Signs sessions only: rotating it signs everyone out and nothing else. The long-lived links in SMS and email (SMS opt-out, campaign unsubscribe, review requests) are no longer keyed on it (issue 2424). Campaign unsubscribe and review links signed before that change still verify against it until the next rotation.
 - `ENCRYPTION_KEY` — min 32 chars. Besides encrypting stored secrets, it is the root of the purpose-bound HKDF keys in `apps/api/src/lib/derived-secret.ts` that MAC the SMS opt-out link and, unless their dedicated secrets are set, the campaign unsubscribe and review links (issue 2424). No new variable is needed for them. Rotating `ENCRYPTION_KEY` is already a re-encryption event, and it also voids every one of those links already sent.
 - `REVIEW_TOKEN_SECRET` (optional; unset → a key derived from `ENCRYPTION_KEY`, issue 2424 — it used to fall back to `JWT_SECRET`) — HMAC key for the review-request link (`/review/<order>/<product>?token=`, 90-day expiry). With it unset, links signed before issue 2424 still verify against `JWT_SECRET`.
-- `PORT` — set automatically by Railway
 - `CF_WORKERS_DEV_SUBDOMAIN` (optional) — our Cloudflare workers.dev account subdomain; CORS then trusts `ebda-{web,admin,orders}.<subdomain>.workers.dev` preview origins (`apps/api/src/lib/cors-cache.ts`). Unset = no preview origin is trusted.
 - `BUILD_COMMIT_SHA` (optional, build-time) — the commit the image was built from, baked by `Dockerfile.api` from the `GIT_COMMIT_SHA` build arg. Surfaced on `/health` as `commit` so a deploy can be verified as **live** rather than merely green: a 200 is returned identically by the container still serving the previous release. Unset → `/health` reports `commit: null`, which means _unknown_, not _not deployed_. To populate it under Railway (which builds the image itself), set `GIT_COMMIT_SHA` as a service variable so it reaches the Docker build.
 - `RAILWAY_GIT_COMMIT_SHA` (read-only, platform) — **injected at runtime; verified 2026-09-03.** The first deploy carrying `/health`'s build identity reported the correct commit with no build arg and no service variable set, so this is what populates `commit` today. It appears in NEITHER listing — not the 85 the CLI reports, nor the 8 the dashboard shows as "added by Railway" — because both describe what is _configured_ on the service, which is not the container's environment. Do not conclude a platform variable is absent from either list alone.
