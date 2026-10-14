@@ -742,10 +742,7 @@ describe.skipIf(!hasDb)('InstaPay receipts (money batch A)', () => {
           http().post(`${base}/refund-via-provider`).set(bearer(superAdmin.jwt)).send({})
         ),
         await asApp(async () =>
-          http()
-            .put(`${base}/status`)
-            .set(bearer(superAdmin.jwt))
-            .send({ status: 'confirmed' })
+          http().put(`${base}/status`).set(bearer(superAdmin.jwt)).send({ status: 'confirmed' })
         ),
       ]) {
         expect(res.status).toBe(403);
