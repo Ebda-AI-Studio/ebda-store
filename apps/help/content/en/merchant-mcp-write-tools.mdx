@@ -31,44 +31,44 @@ A token works **once**, for **two minutes**, for **that exact action on that exa
 
 ## Tools
 
-| Tool | What it does | Needs confirmation |
-|---|---|---|
-| `admin_update_order_status` | Move an order to confirmed, processing, shipped or delivered | No |
-| `admin_cancel_order` | Cancel an order, optionally returning stock | Yes |
-| `admin_create_product` | Create a product (same fields and checks as the dashboard form) | No |
-| `admin_update_product` | Change fields on a product | No |
-| `admin_delete_product` | Delete a product | Yes |
-| `admin_adjust_inventory` | Add or remove stock by a quantity, with a reason | No |
-| `admin_set_inventory` | Set stock to an exact count | No |
-| `admin_create_coupon` | Create a discount coupon | No |
-| `admin_update_coupon` | Change a coupon | No |
-| `admin_toggle_coupon` | Turn a coupon on or off | No |
-| `admin_delete_coupon` | Delete a coupon | Yes |
-| `admin_approve_return` | Approve a customer's return request | No |
-| `admin_reject_return` | Reject a return (a reason is required) | No |
-| `admin_mark_return_received` | Record that returned goods arrived | No |
-| `admin_complete_return` | Complete a return and refund the customer | Yes |
+| Tool                         | What it does                                                    | Needs confirmation |
+| ---------------------------- | --------------------------------------------------------------- | ------------------ |
+| `admin_update_order_status`  | Move an order to confirmed, processing, shipped or delivered    | No                 |
+| `admin_cancel_order`         | Cancel an order, optionally returning stock                     | Yes                |
+| `admin_create_product`       | Create a product (same fields and checks as the dashboard form) | No                 |
+| `admin_update_product`       | Change fields on a product                                      | No                 |
+| `admin_delete_product`       | Delete a product                                                | Yes                |
+| `admin_adjust_inventory`     | Add or remove stock by a quantity, with a reason                | No                 |
+| `admin_set_inventory`        | Set stock to an exact count                                     | No                 |
+| `admin_create_coupon`        | Create a discount coupon                                        | No                 |
+| `admin_update_coupon`        | Change a coupon                                                 | No                 |
+| `admin_toggle_coupon`        | Turn a coupon on or off                                         | No                 |
+| `admin_delete_coupon`        | Delete a coupon                                                 | Yes                |
+| `admin_approve_return`       | Approve a customer's return request                             | No                 |
+| `admin_reject_return`        | Reject a return (a reason is required)                          | No                 |
+| `admin_mark_return_received` | Record that returned goods arrived                              | No                 |
+| `admin_complete_return`      | Complete a return and refund the customer                       | Yes                |
 
 Every tool runs the same code and the same validation as the matching dashboard action, and only ever touches **your** store.
 
 ## Money
 
-Shopper payments are approved by you, never by the assistant. The assistant can refund only through a return you (or it, with your confirmation) completed, using the same refund methods and rules as the dashboard. Refunding to the customer's original payment method needs the **orders:refund** permission (the store owner), which staff do not have. Marking an order paid, confirming InstaPay receipts and refunding straight from an order are **not** available through MCP.
+Shopper payments are approved by you, never by the assistant. The assistant can refund only through a return you (or it, with your confirmation) completed, using the same refund methods and rules as the dashboard. Refunding to the customer's original payment method, or as store credit, needs the **orders:refund** permission (the store owner), which staff do not have. Marking an order paid, confirming InstaPay receipts and refunding straight from an order are **not** available through MCP.
 
 ## Not available yet
 
 These dashboard actions are not exposed through MCP, mostly because their logic still lives inside the dashboard screen rather than a shared service. Do them in the dashboard for now.
 
-| Area | Why not yet |
-|---|---|
-| Categories (create, edit, delete, reorder) | Logic not yet shared; planned next |
-| Product variants, bulk product edits | Planned next; bulk edits will need the confirm step |
-| Order notes, fulfilment and tracking, invoices | Planned next |
-| Mark paid, InstaPay confirmation, refund from an order | Moves shopper money; dashboard only |
-| Customers (edit, erase, export) | Personal data; dashboard only |
-| Store settings, payment and shipping setup, staff, domains, billing | Security and money settings; dashboard only |
-| Pages and content builder | Planned next |
-| Platform administration | Never exposed |
+| Area                                                                | Why not yet                                         |
+| ------------------------------------------------------------------- | --------------------------------------------------- |
+| Categories (create, edit, delete, reorder)                          | Logic not yet shared; planned next                  |
+| Product variants, bulk product edits                                | Planned next; bulk edits will need the confirm step |
+| Order notes, fulfilment and tracking, invoices                      | Planned next                                        |
+| Mark paid, InstaPay confirmation, refund from an order              | Moves shopper money; dashboard only                 |
+| Customers (edit, erase, export)                                     | Personal data; dashboard only                       |
+| Store settings, payment and shipping setup, staff, domains, billing | Security and money settings; dashboard only         |
+| Pages and content builder                                           | Planned next                                        |
+| Platform administration                                             | Never exposed                                       |
 
 ## Limits and records
 
