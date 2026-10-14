@@ -386,7 +386,7 @@ html[lang='ar'] .hero h1 {
   color: var(--muted);
   line-height: 1.6;
   margin: 0 0 28px;
-  max-width: 40ch;
+  max-width: 46ch;
 }
 @media (prefers-reduced-motion: no-preference) {
   .hero h1,
@@ -2091,12 +2091,6 @@ html[dir='rtl'] .not-found .lead {
   text-align: center;
   font-weight: 700;
 }
-.m3d-credit {
-  text-wrap: balance;
-  max-width: 380px;
-  margin: 14px auto 0;
-  text-align: center;
-}
 /* Tailwind utility classes the viewer's markup uses (packages/ui/src/model3d/ProductModelViewer.tsx),
    scoped to the phone: marketing has no Tailwind. tests/unit/marketing-model3d.test.ts fails when the
    viewer starts using a class that is not defined here. */
@@ -2265,5 +2259,41 @@ html[dir='rtl'] .not-found .lead {
   border-top: 1px solid var(--line);
 }
 .footer-legal p {
+  margin: 0;
+}
+
+/* /credits: one card per third-party model */
+.credit-list {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+.credit-list li {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.credit-list h3 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+.credit-list dl {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.credit-list dl div {
+  display: grid;
+  grid-template-columns: minmax(84px, 130px) 1fr;
+  gap: 12px;
+}
+.credit-list dt {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.credit-list dd {
   margin: 0;
 }

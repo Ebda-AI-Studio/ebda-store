@@ -19,10 +19,10 @@ export const LEGAL_SLUGS = [
   'acceptable-use',
 ] as const;
 export type LegalSlug = (typeof LEGAL_SLUGS)[number];
-export type PageSlug = '' | 'about' | LegalSlug;
+export type PageSlug = '' | 'about' | 'credits' | LegalSlug;
 
 /** Every public marketing page (same set in both locales). The sitemap is generated from this. */
-export const SITE_PAGES = ['', 'about', ...LEGAL_SLUGS] as const;
+export const SITE_PAGES = ['', 'about', 'credits', ...LEGAL_SLUGS] as const;
 
 /** Page path (no trailing slash except root) for a locale, e.g. pagePath('en','privacy') -> /en/privacy */
 export function pagePath(locale: Locale, page: PageSlug): string {
@@ -34,13 +34,13 @@ export function pagePath(locale: Locale, page: PageSlug): string {
 export const absoluteUrl = (p: string) =>
   `${SITE_URL}${p === '/' ? '/' : p + '/'}`.replace(/\/\/$/, '/');
 
-/** Section ids, in page order. Ruling MKT-1 (2026-10-14): the hero is rendered by Home itself, then
- *  looks first (the product is the proof), the story scroll (the four steps, shown once; Ahmad kept it on
- *  2026-10-14 and re-skinned it with the Dahab look), the live 3D product page (MKT-2, P1; it replaced
- *  the procedural ring), payments, features, pricing, FAQ, close. The studio story lives on /about, not on the home page. */
+/** Section ids, in page order. Ruling MKT-1 (2026-10-14): the hero is rendered by Home itself. Ruling MKT-14
+ *  (Ahmad, 2026-10-14; it reversed MKT-1's looks-first order): the story scroll first (the four steps, shown
+ *  once, the Dahab look building itself), then the looks to use, the live 3D product page (MKT-2), payments,
+ *  features, pricing, FAQ, close. The studio story lives on /about, not on the home page. */
 export const SECTION_ORDER = [
-  'looks',
   'story',
+  'looks',
   'model3d',
   'payments',
   'features',
@@ -52,8 +52,8 @@ export type SectionId = (typeof SECTION_ORDER)[number];
 
 /** Top-nav items other than the wordmark and the account actions, in page order. */
 export const NAV_ANCHORS = [
-  { key: 'looks', target: 'looks' },
   { key: 'solutions', target: 'story' },
+  { key: 'looks', target: 'looks' },
   { key: 'features', target: 'features' },
   { key: 'pricing', target: 'pricing' },
   { key: 'resources', target: 'faq' },

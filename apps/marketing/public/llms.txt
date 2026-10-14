@@ -5,7 +5,7 @@
 Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billing saves 25%; 14-day free Growth trial; 0% commission on orders on every plan. Full plan comparison (orders, team, stores, winning back abandoned carts, removing the Ebda Store badge, running the store from an AI assistant, 3D product models, analytics, support) is on the home page.
 
 ## Pages
-- [Home (Arabic, Egyptian colloquial)](https://ebda.app/): five templates with three looks each shown in phone previews, how it works in four steps, features, payments and shipping, pricing and plan comparison, FAQ
+- [Home (Arabic, Egyptian colloquial)](https://ebda.app/): how it works in four steps, five templates with three looks each as working phone previews (open a product, add to cart), features, payments and shipping, pricing and plan comparison, FAQ
 - [Home (English)](https://ebda.app/en/): the same in English
 - [About Ebda AI Studio](https://ebda.app/about/) ([English](https://ebda.app/en/about/)): the company behind Ebda Store, the Ebda AI Studio story, contact
 - [Legal notice](https://ebda.app/legal/)

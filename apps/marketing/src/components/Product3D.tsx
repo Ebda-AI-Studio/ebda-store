@@ -330,12 +330,6 @@ export function Product3D({ copy, locale }: { copy: Model3dCopy; locale: Locale 
         <p className="sr-only" id="m3d-keys">
           {copy.keys}
         </p>
-        <p className="m3d-credit muted small">
-          {v.credit.text}{' '}
-          <a href={v.credit.href} target="_blank" rel="noopener noreferrer">
-            {v.credit.linkLabel}
-          </a>
-        </p>
       </div>
     </div>
   );

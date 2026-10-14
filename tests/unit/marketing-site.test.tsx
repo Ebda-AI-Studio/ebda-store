@@ -36,13 +36,13 @@ describe('marketing nav', () => {
     const nav = en.match(/<nav aria-label="Main navigation".*?<\/nav>/s)![0];
     const labels = [...nav.matchAll(/<a href="([^"]+)">([^<]+)<\/a>/g)].slice(0, 5);
     expect(labels.map(m => m[2])).toEqual([
-      'Templates',
       'How it works',
+      'Templates',
       'Features',
       'Pricing',
       'FAQ',
     ]);
-    expect(labels.map(m => m[1])).toEqual(['#looks', '#story', '#features', '#pricing', '#faq']);
+    expect(labels.map(m => m[1])).toEqual(['#story', '#looks', '#features', '#pricing', '#faq']);
     // every nav target exists on the page, in the same order as the sections
     const at = (id: string) => en.indexOf(`<section id="${id}"`);
     const pos = labels.map(m => at(m[1].slice(1)));
@@ -130,9 +130,10 @@ describe('marketing hero and structure', () => {
     ).toBe(true);
   });
   it('renders sections in the exact required order', () => {
+    // MKT-14 (Ahmad 2026-10-14): story first, then the looks
     const expected = [
-      'looks',
       'story',
+      'looks',
       'model3d',
       'payments',
       'features',
@@ -295,7 +296,7 @@ describe('marketing honesty', () => {
     expect(ar).toContain('بوسطة استلمت الشحنة');
     expect(en).toContain('Pick a name and logo.');
   });
-  it('the 3D section replaces the ring: still first, chips, colour swatches, licence credit, QR, no ring left', () => {
+  it('the 3D section replaces the ring: still first, chips, colour swatches, no credit line under it, QR, no ring left', () => {
     for (const [html, locale] of [
       [ar, 'ar'],
       [en, 'en'],
@@ -309,9 +310,10 @@ describe('marketing honesty', () => {
       expect(sec).toMatch(
         /aria-pressed="true"[^>]*class="m3d-swatch"|class="m3d-swatch"[^>]*aria-pressed="true"/
       );
-      // CC BY 4.0 attribution next to the viewer (licence breach if it goes missing)
-      expect(sec).toMatch(/Shopify/);
-      expect(sec).toContain('creativecommons.org/licenses/by/4.0/');
+      // MKT-12: no credit line under the viewer; the CC BY 4.0 attribution lives on /credits, linked from the
+      // footer (tests/unit/marketing-model3d.test.ts guards it, so it can never just disappear)
+      expect(sec).not.toMatch(/Shopify|m3d-credit|CC BY/);
+      expect(html).toMatch(locale === 'ar' ? /href="\/credits\/?"/ : /href="\/en\/credits\/?"/);
       expect(html).not.toMatch(/\/ring\/|class="swatch"|ring-stage|id="dahab"/);
     }
     expect(ar).toContain('خلّي عميلك يقلّب المنتج بإيده.');
@@ -385,7 +387,7 @@ describe('marketing honesty', () => {
       [ar, 'صور توضيحية'],
       [en, 'Illustrative'],
     ] as const) {
-      const s = html.match(/<section id="looks".*?<section id="story"/s)![0];
+      const s = html.match(/<section id="looks".*?<section id="model3d"/s)![0];
       expect(s.match(/role="tab"/g)).toHaveLength(5);
       expect(s).toContain('role="tablist"');
       expect(s).toMatch(

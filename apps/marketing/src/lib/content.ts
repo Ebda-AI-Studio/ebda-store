@@ -27,8 +27,6 @@ export interface Model3dVertical {
   product: { name: string; price: number; desc: string };
   /** Accessible name of the 3D canvas and alt of its still image. */
   alt: string;
-  /** Visible credit line next to the viewer (licence + author). */
-  credit: { text: string; linkLabel: string; href: string };
   /** Colour names for the model's glTF variants (qamar only), by variant id. */
   variants?: Record<string, string>;
 }
@@ -142,6 +140,23 @@ export interface Copy {
     /** Secondary link: jumps to #looks. */
     secondary: string;
   };
+  /** The /credits page (Ruling MKT-12): attribution for the third-party 3D models and the illustrative photos. */
+  creditsPage: {
+    title: string;
+    desc: string;
+    intro: string;
+    modelsH: string;
+    modelsLead: string;
+    author: string;
+    source: string;
+    license: string;
+    changes: string;
+    triangles: string;
+    use: string;
+    photosH: string;
+    photosP: string;
+    modified: string;
+  };
   /** The /about page: company line, story heading, contact heading. */
   aboutPage: {
     title: string;
@@ -231,6 +246,8 @@ export interface Copy {
     contact: string;
     legalVersion: string;
     about: string;
+    /** Footer link to /credits. */
+    credits: string;
     /** Ownership + copyright line (company names come from BRAND.company). */
     ownership: string;
   };
@@ -294,11 +311,6 @@ export const COPY: Record<Locale, Copy> = {
             desc: 'خفيف ومريح لليوم كله، ومتاح بـ3 ألوان.',
           },
           alt: 'موديل 3D لكوتشي رياضي، اسحب علشان تلفّه',
-          credit: {
-            text: 'موديل الكوتشي: Shopify، رخصة CC BY 4.0 (محسّن للويب).',
-            linkLabel: 'نص الرخصة',
-            href: 'https://creativecommons.org/licenses/by/4.0/',
-          },
           variants: { midnight: 'أزرق', beach: 'وردي', street: 'أسود' },
         },
         souq: {
@@ -310,26 +322,16 @@ export const COPY: Record<Locale, Copy> = {
             desc: 'نحاس مشغول بإيد صنايعي، بينوّر الأوضة من غير ما يزحمها.',
           },
           alt: 'موديل 3D لفانوس نحاس، اسحب علشان تلفّه',
-          credit: {
-            text: 'موديل الفانوس: Bhargav Kubal عبر Poly Haven، CC0 (من غير السلسلة).',
-            linkLabel: 'المصدر',
-            href: 'https://polyhaven.com/a/brass_diya_lantern',
-          },
         },
         lamma: {
           name: 'لمّة',
           kind: 'البيت والمطبخ',
           product: {
-            name: 'فانوس السفرة النحاس',
-            price: 760,
-            desc: 'يحط على السفرة ويدفّي القعدة، ويتغسل بسهولة.',
+            name: 'حلة فخار بغطاها',
+            price: 380,
+            desc: 'فخار مزجّج بيسوّي الأكل على نار هادية، وبيحافظ على سخونته على السفرة.',
           },
-          alt: 'موديل 3D لفانوس نحاس للسفرة، اسحب علشان تلفّه',
-          credit: {
-            text: 'موديل الفانوس: Bhargav Kubal عبر Poly Haven، CC0 (من غير السلسلة).',
-            linkLabel: 'المصدر',
-            href: 'https://polyhaven.com/a/brass_diya_lantern',
-          },
+          alt: 'موديل 3D لحلة فخار بغطاها، اسحب علشان تلفّها',
         },
       },
     },
@@ -567,6 +569,24 @@ export const COPY: Record<Locale, Copy> = {
         },
       ],
     },
+    creditsPage: {
+      title: 'حقوق الصور والموديلات',
+      desc: 'الموديلات ثلاثية الأبعاد والصور اللي في ابدأ ستور، ومين عملها وتحت أي رخصة.',
+      intro:
+        'المتاجر اللي بتشوفها على الموقع أمثلة توضيحية. الموديلات ثلاثية الأبعاد اللي في صفحة المنتج مأخوذة من مصادر مفتوحة، وده نسبها كاملة.',
+      modelsH: 'موديلات 3D',
+      modelsLead: 'كل موديل اتحسّن للويب بـ gltf-transform. التعديلات مكتوبة قدام كل واحد.',
+      author: 'صاحب الموديل',
+      source: 'المصدر',
+      license: 'الرخصة',
+      changes: 'التعديلات',
+      triangles: 'المثلثات',
+      use: 'بيظهر في',
+      photosH: 'صور القوالب',
+      photosP:
+        'الصور في القوالب الخمسة وأشكالها الخمستاشر اتعملت بالذكاء الاصطناعي (Cloudflare Workers AI، موديل FLUX.1 schnell) علشان توضيح الفكرة. مش بتعرض أي محل أو منتج أو شخص حقيقي ومش محتاجة نسب.',
+      modified: 'معدّل',
+    },
     aboutPage: {
       title: 'عن ابدأ استوديو للذكاء الاصطناعي',
       desc: 'ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، من ابدأ استوديو للذكاء الاصطناعي.',
@@ -614,6 +634,7 @@ export const COPY: Record<Locale, Copy> = {
       contact: 'تواصل: ahlan@ebda.app',
       legalVersion: 'الإصدار 1.0 من الوثائق القانونية · 2026-10-07.',
       about: 'عن ابدأ استوديو للذكاء الاصطناعي',
+      credits: 'حقوق الصور والموديلات',
       ownership: `ابدأ ستور منتج من ${CO.shortNameAr}. © 2026 ${CO.shortNameAr}. جميع الحقوق محفوظة.`,
     },
     legalPages: LEGAL_AR,
@@ -674,11 +695,6 @@ export const COPY: Record<Locale, Copy> = {
             desc: 'Light and comfortable all day, in three colours.',
           },
           alt: '3D model of a sneaker; drag to turn it',
-          credit: {
-            text: 'Sneaker model: Shopify, licensed CC BY 4.0 (optimised for the web).',
-            linkLabel: 'Licence text',
-            href: 'https://creativecommons.org/licenses/by/4.0/',
-          },
           variants: { midnight: 'Blue', beach: 'Rose', street: 'Black' },
         },
         souq: {
@@ -690,26 +706,16 @@ export const COPY: Record<Locale, Copy> = {
             desc: 'Hand-worked brass that lights a room without crowding it.',
           },
           alt: '3D model of a brass lantern; drag to turn it',
-          credit: {
-            text: 'Lantern model: Bhargav Kubal via Poly Haven, CC0 (chain removed).',
-            linkLabel: 'Source',
-            href: 'https://polyhaven.com/a/brass_diya_lantern',
-          },
         },
         lamma: {
           name: 'Lamma',
           kind: 'Home and kitchen',
           product: {
-            name: 'Brass table lantern',
-            price: 760,
-            desc: 'Sits on the table, warms the evening, wipes clean.',
+            name: 'Lidded clay pot',
+            price: 380,
+            desc: 'Glazed earthenware that cooks slowly and keeps the food hot at the table.',
           },
-          alt: '3D model of a brass table lantern; drag to turn it',
-          credit: {
-            text: 'Lantern model: Bhargav Kubal via Poly Haven, CC0 (chain removed).',
-            linkLabel: 'Source',
-            href: 'https://polyhaven.com/a/brass_diya_lantern',
-          },
+          alt: '3D model of a lidded clay cooking pot; drag to turn it',
         },
       },
     },
@@ -951,6 +957,25 @@ export const COPY: Record<Locale, Copy> = {
         },
       ],
     },
+    creditsPage: {
+      title: 'Credits',
+      desc: 'The 3D models and images on Ebda Store: who made them and under which licence.',
+      intro:
+        'The stores you see on this site are illustrations. The 3D models on the product page come from openly licensed sources; here is the full attribution.',
+      modelsH: '3D models',
+      modelsLead:
+        'Each model was optimised for the web with gltf-transform. The changes are listed beside each one.',
+      author: 'Author',
+      source: 'Source',
+      license: 'Licence',
+      changes: 'Changes',
+      triangles: 'Triangles',
+      use: 'Shown in',
+      photosH: 'Template photos',
+      photosP:
+        'The photos in the five templates and their fifteen looks are AI-generated (Cloudflare Workers AI, FLUX.1 schnell) to illustrate the idea. They show no real shop, product or person and need no attribution.',
+      modified: 'modified',
+    },
     aboutPage: {
       title: 'About Ebda AI Studio',
       desc: 'Ebda Store is an online store builder for merchants in Egypt, a product of Ebda AI Studio.',
@@ -998,6 +1023,7 @@ export const COPY: Record<Locale, Copy> = {
       contact: 'Contact: ahlan@ebda.app',
       legalVersion: 'Legal documents version 1.0 · 2026-10-07.',
       about: 'About Ebda AI Studio',
+      credits: 'Credits',
       ownership: `Ebda Store is a product of ${CO.shortNameEn}. © 2026 ${CO.shortNameEn}. All rights reserved.`,
     },
     legalPages: LEGAL_EN,

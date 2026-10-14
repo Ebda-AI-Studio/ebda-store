@@ -1,7 +1,7 @@
 import type { Locale } from './site';
 import { HOME, absoluteUrl } from './site';
 
-/** The three verticals of the 3D section (Ruling MKT-2). Qamar shows the sneaker, Souq and Lamma the lantern. */
+/** The three verticals of the 3D section (Ruling MKT-2). Qamar shows the sneaker, Souq the brass lantern, Lamma its own clay pot (MKT-13). */
 export const MODEL3D_IDS = ['qamar', 'souq', 'lamma'] as const;
 export type Model3dId = (typeof MODEL3D_IDS)[number];
 
@@ -54,7 +54,7 @@ export const MODEL3D: Record<Model3dId, Model3dDef> = {
   },
   lamma: {
     id: 'lamma',
-    glb: '/3d/brass-diya-lantern.glb',
+    glb: '/3d/lamma-clay-pot.glb',
     variants: [],
     skin: {
       look: 'lamma-a',
@@ -70,10 +70,11 @@ export const MODEL3D: Record<Model3dId, Model3dDef> = {
 
 /**
  * Still image (no extension) shown before the model loads and instead of it for reduced motion,
- * Save-Data and no WebGL: one per sneaker colourway, one for the lantern.
+ * Save-Data and no WebGL: one per sneaker colourway, one for the lantern, one for the clay pot.
  */
 export function stillBase(id: Model3dId, variant: string | null): string {
-  return id === 'qamar' ? `/3d/stills/qamar-${variant ?? 'midnight'}` : '/3d/stills/lantern';
+  if (id === 'qamar') return `/3d/stills/qamar-${variant ?? 'midnight'}`;
+  return id === 'lamma' ? '/3d/stills/clay-pot' : '/3d/stills/lantern';
 }
 
 /** Where a phone lands after scanning the desktop QR: this page, this vertical, this section. */

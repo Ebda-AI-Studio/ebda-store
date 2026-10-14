@@ -48,8 +48,14 @@ async function shoot(name) {
     fit: 'contain',
     background: { r: 0, g: 0, b: 0, alpha: 0 },
   });
-  await img.clone().webp({ quality: 84, alphaQuality: 90 }).toFile(path.join(out, `${name}.webp`));
-  await img.clone().avif({ quality: 58 }).toFile(path.join(out, `${name}.avif`));
+  await img
+    .clone()
+    .webp({ quality: 84, alphaQuality: 90 })
+    .toFile(path.join(out, `${name}.webp`));
+  await img
+    .clone()
+    .avif({ quality: 58 })
+    .toFile(path.join(out, `${name}.avif`));
   console.log('still', name);
 }
 
@@ -66,4 +72,9 @@ await page.waitForTimeout(400); // the chip drops data-ready; the new model sets
 await page.waitForSelector('.m3d-media[data-ready]', { state: 'attached', timeout: 60_000 });
 await page.waitForTimeout(900);
 await shoot('lantern');
+await page.evaluate(() => document.getElementById('m3d-tab-lamma').click());
+await page.waitForTimeout(400);
+await page.waitForSelector('.m3d-media[data-ready]', { state: 'attached', timeout: 60_000 });
+await page.waitForTimeout(900);
+await shoot('clay-pot');
 await browser.close();
