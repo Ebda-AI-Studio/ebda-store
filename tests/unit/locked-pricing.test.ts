@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { DEFAULT_PLAN_SEEDS, LOCKED_PUBLIC_PLANS, planLimitsSchema } from '@force/shared';
+import {
+  DEFAULT_PLAN_SEEDS,
+  LOCKED_PUBLIC_PLANS,
+  planIncludesMerchantMcp,
+  planLimitsSchema,
+} from '@force/shared';
 import { PLANS, PRICING_PUBLISHED } from '../../apps/marketing/src/lib/plans';
 
 const sql = readFileSync(
@@ -42,7 +47,13 @@ describe('locked pricing contract (docs/plans/2026-10-05-pricing-decisions.md)',
     expect(pick(l => l.maxStores)).toEqual([1, 1, 3]);
     expect(pick(l => l.abandonedCartAutomation)).toEqual([false, true, true]);
     expect(pick(l => l.brandingRemoval)).toEqual([false, true, true]);
+    // apiAccess (future API/webhooks) stays Business-only; the MCP rule is `planIncludesMerchantMcp`.
     expect(pick(l => l.apiAccess)).toEqual([false, false, true]);
+    expect(LOCKED_PUBLIC_PLANS.map(p => planIncludesMerchantMcp(p.code, p.limits))).toEqual([
+      false,
+      true,
+      true,
+    ]);
     expect(pick(l => l.analyticsTier)).toEqual(['basic', 'standard', 'advanced']);
     expect(pick(l => l.supportTier)).toEqual(['email', 'chat', 'priority']);
   });

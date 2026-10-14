@@ -30,7 +30,7 @@ const router = Router();
 // Each handler below carries the narrowest applicable sub-key.
 
 // Validation schemas
-const adjustInventorySchema = z.object({
+export const adjustInventorySchema = z.object({
   productId: z.string().uuid(),
   quantity: z.number().int(),
   type: z.enum([
@@ -45,7 +45,7 @@ const adjustInventorySchema = z.object({
   reference: z.string().optional(),
 });
 
-const setInventorySchema = z.object({
+export const setInventorySchema = z.object({
   quantity: z.number().int().min(0),
   reason: z.string().optional(),
 });

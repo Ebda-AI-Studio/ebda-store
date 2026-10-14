@@ -1,4 +1,8 @@
-import { LOCKED_PUBLIC_PLANS, type PlanLimits } from '@force/shared/plan-limits';
+import {
+  LOCKED_PUBLIC_PLANS,
+  planIncludesMerchantMcp,
+  type PlanLimits,
+} from '@force/shared/plan-limits';
 import type { Locale } from './site';
 
 /**
@@ -156,7 +160,10 @@ export function comparisonRows(locale: Locale): { label: string; cells: Cell[] }
       ar ? 'شيل «مدعوم من ابدأ ستور»' : 'Remove “Powered by Ebda Store”',
       p => p.limits.brandingRemoval
     ),
-    row(ar ? 'ربط API وMCP' : 'API and MCP access', p => p.limits.apiAccess),
+    row(
+      ar ? 'شغّل متجرك من مساعد ذكاء اصطناعي (MCP)' : 'Run your store from an AI assistant (MCP)',
+      p => planIncludesMerchantMcp(p.id, p.limits)
+    ),
     // Not a plan limit: every plan includes it (Ahmad 2026-10-07; R-EBDA-COPY-12).
     row(ar ? 'موديلات 3D للمنتجات' : '3D product models', () => true),
     row(ar ? 'التحليلات' : 'Analytics', p => tiers[p.limits.analyticsTier]),

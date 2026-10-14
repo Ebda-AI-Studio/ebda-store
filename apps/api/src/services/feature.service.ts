@@ -134,6 +134,7 @@ class FeatureService {
       whatsappAutomation: boolean;
       brandingRemoval: boolean;
       apiAccess: boolean;
+      mcpAccess: boolean;
     } | null
   ): Record<FeatureKey, boolean> {
     // Start with all false.
@@ -156,9 +157,13 @@ class FeatureService {
       map.abandoned_cart = flags.abandonedCartAutomation;
       map.whatsapp = flags.whatsappAutomation;
       // Locked pricing (2026-10-05): branding removal -> Growth+Business;
-      // merchant API access (the merchant-admin MCP surface) -> Business.
+      // merchant-admin MCP (keys, read tools, write tools) -> Growth + Business
+      // (2026-10-14, decoupled from `apiAccess`; see planIncludesMerchantMcp).
       map.remove_branding = flags.brandingRemoval;
-      map.merchant_mcp = flags.apiAccess;
+      map.merchant_mcp = flags.mcpAccess;
+      // The merchant's own write switch is `store.settings.mcpWriteEnabled`
+      // (mcp/merchant-write.ts); a StoreFeature override still wins both ways.
+      map.merchant_mcp_write = flags.mcpAccess;
     }
     // Layer 2: per-store overrides on top.
     for (const row of rows) {

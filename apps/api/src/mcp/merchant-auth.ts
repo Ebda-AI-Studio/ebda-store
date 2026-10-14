@@ -101,8 +101,23 @@ export interface MerchantAuth extends AuthInfo {
   keyId: string;
   /** The human this key acts as. A key is a device, not an identity. */
   userId: string;
+  /**
+   * The owning user's role, re-read on EVERY verification (same `ebda_user_state`
+   * read as the active check). Write tools apply the SAME RBAC permission the
+   * admin route applies to that user (staff cannot delete products over MCP
+   * any more than in the dashboard). Never a scope substitute.
+   */
+  role: string;
   storeId: string;
   scopes: string[];
+  /**
+   * Carried from the verifying request so write tools (merchant-write.ts) can
+   * attribute an audit row without threading `req` through every handler —
+   * mirrors `agent-auth.ts`'s `context.ip`/`context.userAgent` for the buyer
+   * surface. Never a secret; safe on the object the SDK echoes to tools.
+   */
+  ip: string | undefined;
+  userAgent: string | undefined;
 }
 
 /**
@@ -152,6 +167,30 @@ export function hasPlausibleMerchantKeyShape(req: Request): boolean {
  * another store. Comparing `key.storeId` to the already-resolved store is what
  * stops a merchant using their own valid key against someone else's endpoint.
  */
+/** Mirrors `requireStoreAccess`: owner for store_admin, a `store_staff` row for staff, nobody else. */
+export async function isStoreMember(
+  storeId: string,
+  userId: string,
+  role: string
+): Promise<boolean> {
+  if (role === 'store_admin') {
+    const s = await withStore(storeId, tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { ownerId: true } })
+    );
+    return s?.ownerId === userId;
+  }
+  if (role === 'staff') {
+    const m = await withStore(storeId, tx =>
+      tx.storeStaff.findUnique({
+        where: { userId_storeId: { userId, storeId } },
+        select: { id: true },
+      })
+    );
+    return !!m;
+  }
+  return false;
+}
+
 export async function verifyMerchantKey(req: Request, store: McpStore): Promise<MerchantAuth> {
   const presented = req.get(MERCHANT_KEY_HEADER);
   if (!presented || presented.length < MERCHANT_KEY_PREFIX.length + 8) {
@@ -194,6 +233,12 @@ export async function verifyMerchantKey(req: Request, store: McpStore): Promise<
   // instead of refusing the key.
   const keyUser = key ? await getUserState(key.userId) : null;
 
+  // MEMBERSHIP, re-read per call with the same rule requireStoreAccess applies: a
+  // store_admin must still OWN this store, staff must still hold a store_staff row.
+  // Any other role (customer, super_admin) is never a member, so its key is refused.
+  // A user moved/removed from the store without being deleted therefore loses the key.
+  const isMember = key && keyUser ? await isStoreMember(store.id, key.userId, keyUser.role) : false;
+
   const now = new Date();
   const userActive = !!keyUser && keyUser.deletedAt === null && keyUser.status === 'active';
   const valid =
@@ -202,7 +247,8 @@ export async function verifyMerchantKey(req: Request, store: McpStore): Promise<
     key.storeId === store.id &&
     key.revokedAt === null &&
     (key.expiresAt === null || key.expiresAt > now) &&
-    userActive;
+    userActive &&
+    isMember;
 
   if (!key || !valid) {
     // Logged at warn so a credential-stuffing run against the admin surface is
@@ -220,7 +266,9 @@ export async function verifyMerchantKey(req: Request, store: McpStore): Promise<
               ? 'revoked'
               : !userActive
                 ? 'user_inactive'
-                : 'expired',
+                : !isMember
+                  ? 'not_a_member'
+                  : 'expired',
         ip: req.ip,
         userAgent: req.get('user-agent'),
       },
@@ -244,8 +292,11 @@ export async function verifyMerchantKey(req: Request, store: McpStore): Promise<
     clientId: key.id,
     keyId: key.id,
     userId: key.userId,
+    role: keyUser!.role,
     storeId: key.storeId,
     scopes: key.scopes,
+    ip: req.ip,
+    userAgent: req.get('user-agent') ?? undefined,
   };
 }
 

@@ -258,6 +258,16 @@ router.delete(
         })
       );
 
+      // Their merchant-MCP keys die with the membership. verifyMerchantKey already
+      // refuses a non-member on every call; revoking here also stops a key
+      // resurrecting if the same person is later re-added to this store.
+      await withStore(storeId, tx =>
+        tx.merchantApiKey.updateMany({
+          where: { storeId, userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        })
+      );
+
       await auditLog({
         action: 'staff.removed',
         userId: req.user!.userId,

@@ -24,6 +24,8 @@ const findUnique = vi.fn();
 const userOf = vi.hoisted(() => ({ value: null as unknown }));
 const getUserState = vi.hoisted(() => vi.fn());
 const update = vi.fn().mockResolvedValue({});
+// Store membership the verifier re-reads per call (mirrors requireStoreAccess).
+const membership = vi.hoisted(() => ({ ownerId: 'user-1' as string | null, staffRow: true }));
 
 vi.mock('@force/database', () => {
   // Declared INSIDE the factory: vi.mock is hoisted above module-scope consts,
@@ -37,6 +39,8 @@ vi.mock('@force/database', () => {
       },
       update: (...a: unknown[]) => update(...a),
     },
+    store: { findUnique: async () => ({ ownerId: membership.ownerId }) },
+    storeStaff: { findUnique: async () => (membership.staffRow ? { id: 'ss-1' } : null) },
   };
   return {
     prisma: client,
@@ -84,7 +88,7 @@ function validRow(plaintext: string, overrides: Record<string, unknown> = {}) {
     scopes: [MERCHANT_SCOPES.read],
     revokedAt: null,
     expiresAt: null,
-    user: { status: 'active', deletedAt: null },
+    user: { status: 'active', deletedAt: null, role: 'store_admin' },
     ...overrides,
   };
 }
@@ -114,6 +118,8 @@ describe('verifyMerchantKey', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getUserState.mockImplementation(async () => userOf.value);
+    membership.ownerId = 'user-1';
+    membership.staffRow = true;
     update.mockResolvedValue({});
   });
 
@@ -158,6 +164,42 @@ describe('verifyMerchantKey', () => {
       statusCode: 404,
     });
   });
+
+  it('REFUSES a store_admin key whose owner no longer owns the store', async () => {
+    const { plaintext } = generateMerchantKey();
+    findUnique.mockResolvedValue(validRow(plaintext));
+    membership.ownerId = 'someone-else';
+    await expect(verifyMerchantKey(reqWithKey(plaintext), STORE)).rejects.toMatchObject({
+      statusCode: 404,
+    });
+  });
+
+  it('staff key: accepted while a store_staff row exists, REFUSED once removed from the store', async () => {
+    const { plaintext } = generateMerchantKey();
+    findUnique.mockResolvedValue(
+      validRow(plaintext, { user: { status: 'active', deletedAt: null, role: 'staff' } })
+    );
+    await expect(verifyMerchantKey(reqWithKey(plaintext), STORE)).resolves.toMatchObject({
+      role: 'staff',
+    });
+    membership.staffRow = false;
+    await expect(verifyMerchantKey(reqWithKey(plaintext), STORE)).rejects.toMatchObject({
+      statusCode: 404,
+    });
+  });
+
+  it.each(['customer', 'super_admin'])(
+    'refuses a key whose owner is now a %s (never a member)',
+    async role => {
+      const { plaintext } = generateMerchantKey();
+      findUnique.mockResolvedValue(
+        validRow(plaintext, { user: { status: 'active', deletedAt: null, role } })
+      );
+      await expect(verifyMerchantKey(reqWithKey(plaintext), STORE)).rejects.toMatchObject({
+        statusCode: 404,
+      });
+    }
+  );
 
   it('refuses a revoked key', async () => {
     const { plaintext } = generateMerchantKey();

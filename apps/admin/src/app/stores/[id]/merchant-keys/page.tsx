@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button, Modal, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
-import { apiDelete, apiGet, apiPost, getApiUrl } from '../../../../lib/api';
+import { apiDelete, apiGet, apiPost, apiPut, getApiUrl } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { withNumerals } from '@force/shared';
@@ -101,6 +101,26 @@ export default function MerchantKeysPage() {
   const [revokeTarget, setRevokeTarget] = useState<KeyRow | null>(null);
 
   const endpoint = `/api/v1/stores/${storeId}/integrations/merchant-keys`;
+  const switchEndpoint = `/api/v1/stores/${storeId}/integrations/merchant-mcp/write-switch`;
+
+  // Merchant's own on/off for MCP write tools (store.settings.mcpWriteEnabled).
+  const [writeEnabled, setWriteEnabled] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!storeId) return;
+    void apiGet<{ enabled: boolean }>(switchEndpoint).then(({ data: r }) => {
+      if (r) setWriteEnabled(r.enabled);
+    });
+  }, [storeId, switchEndpoint]);
+  const toggleWrite = async () => {
+    if (writeEnabled === null) return;
+    const next = !writeEnabled;
+    const { error } = await apiPut<{ enabled: boolean }>(switchEndpoint, { enabled: next });
+    if (error) {
+      toastError(t('writeSwitch.saveFailed'), error.message);
+      return;
+    }
+    setWriteEnabled(next);
+  };
 
   const load = useCallback(async () => {
     if (!storeId) return;
@@ -295,6 +315,26 @@ export default function MerchantKeysPage() {
       }
     >
       <div className="space-y-4">
+        <div className="flex items-start justify-between gap-4 rounded-lg border bg-card p-4">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground" dir="auto">
+              {t('writeSwitch.title')}
+            </h2>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground" dir="auto">
+              {t('writeSwitch.body')}
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant={writeEnabled ? 'default' : 'outline'}
+            disabled={writeEnabled === null}
+            aria-pressed={writeEnabled === true}
+            onClick={() => void toggleWrite()}
+          >
+            {writeEnabled ? t('writeSwitch.on') : t('writeSwitch.off')}
+          </Button>
+        </div>
         <div className="rounded-lg border bg-card p-4">
           <h2 className="text-sm font-semibold text-foreground" dir="auto">
             {t('intro.heading')}

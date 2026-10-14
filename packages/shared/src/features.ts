@@ -65,10 +65,20 @@ export const FEATURE_KEYS_ARRAY = [
   'agent_checkout_open_writes',
   // MERCHANT-ADMIN MCP surface (2026-09-11). Full store CRUD over MCP, so a
   // merchant can operate their store from Claude Code instead of the admin
-  // dashboard. NOT part of any plan baseline: it resolves OFF for every store
-  // until a super-admin turns it on, and the endpoint 404s while off — the
-  // correct default for a surface that can change anything in a store.
+  // dashboard. In NO PLAN_BASELINE; since 2026-10-14 it is decided by the PLAN
+  // (Growth + Business, `planIncludesMerchantMcp`) via FeatureService's plan
+  // layer, a super-admin StoreFeature override wins both ways, and the endpoint
+  // 404s while off — fail closed for a surface that can change anything.
   'merchant_mcp',
+  // Merchant MCP WRITE tools (2026-10-10, Ahmad; binding decision 4). A second,
+  // narrower gate UNDER `merchant_mcp` (the whole surface; both Growth +
+  // Business via `planIncludesMerchantMcp`, NOT `apiAccess`): mutating a store from an LLM transcript is a bigger blast
+  // radius than reading one. Decided by the PLAN (Growth + Business — see
+  // `getAutomationFlags().mcpAccess`) via FeatureService's plan layer, in NO
+  // PLAN_BASELINE; a super-admin StoreFeature override wins both ways. The
+  // merchant's own per-store switch is `store.settings.mcpWriteEnabled`
+  // (default on). See apps/api/src/mcp/merchant-write.ts.
+  'merchant_mcp_write',
   // Hide the "Powered by Ebda" storefront footer (2026-10-07). Decided by the
   // PLAN (`brandingRemoval` limit: Growth + Business) via FeatureService's plan
   // layer — in NO PLAN_BASELINE; a super-admin StoreFeature override still wins.
@@ -611,6 +621,22 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'يوفّر خادم MCP منفصلاً ومحمياً ببيانات اعتماد ليتمكّن التاجر من إدارة متجره من Claude Code ' +
       'أو أي عميل MCP بدلاً من لوحة التحكم — قراءة التحليلات وتصفّح المنتجات وتعديلها وإدارة الطلبات. ' +
       'يختلف عن الشراء عبر الوكلاء الموجّه للمشترين: هذا لا يستجيب أبداً بدون مفتاح التاجر.',
+    category: 'marketing',
+    tier: 'addon',
+  },
+  merchant_mcp_write: {
+    key: 'merchant_mcp_write',
+    name: 'Merchant MCP — write tools',
+    nameAr: 'MCP للتاجر — أدوات الكتابة',
+    description:
+      'Lets the Merchant MCP surface (above) mutate the store — update order status, cancel ' +
+      'orders, and more — instead of read-only. Requires Merchant MCP to be on; destructive ' +
+      'actions (cancel, delete, refund, bulk) still need a confirm round-trip. On by plan ' +
+      'for Growth and Business; the merchant can switch it off per store.',
+    descriptionAr:
+      'تسمح لـ MCP التاجر (أعلاه) بتعديل المتجر — تحديث حالة الطلب، إلغاء الطلبات، وأكثر — ' +
+      'بدلاً من القراءة فقط. يتطلب تفعيل MCP التاجر أولاً؛ والإجراءات الحاسمة (الإلغاء، الحذف، ' +
+      'العمليات الجماعية) تحتاج تأكيداً على دفعتين. مفعّلة حسب الباقة (النمو والأعمال)، ويقدر التاجر يقفلها لكل متجر.',
     category: 'marketing',
     tier: 'addon',
   },

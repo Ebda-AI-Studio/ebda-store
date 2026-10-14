@@ -4,7 +4,12 @@ import { featureService } from '../services/feature.service';
 import { resolvePublicStoreId } from '../utils/store-helpers';
 import logger from '../lib/logger';
 import { getEntitlements } from '../services/plan-entitlements';
-import { PLAN_LIMIT_ERROR_CODE, planLimitMessage, upgradePlanFor } from '@force/shared';
+import {
+  PLAN_LIMIT_ERROR_CODE,
+  planLimitMessage,
+  upgradePlanFor,
+  planIncludesMerchantMcp,
+} from '@force/shared';
 
 /** Features whose availability comes from the plan's boolean limits. */
 const PLAN_GATED_FEATURES: Record<
@@ -82,7 +87,12 @@ export function requireFeature(featureKey: FeatureKey) {
         const planKey = PLAN_GATED_FEATURES[featureKey as string];
         if (planKey) {
           const e = await getEntitlements(storeId);
-          if (e && e.limits[planKey] !== true) {
+          // merchant_mcp is decided by the Growth+Business rule, not by `apiAccess` alone.
+          const planHas =
+            featureKey === 'merchant_mcp'
+              ? !!e && planIncludesMerchantMcp(e.planCode, e.limits)
+              : e?.limits[planKey] === true;
+          if (e && !planHas) {
             const messageEn = planLimitMessage(planKey, false, 'en');
             const messageAr = planLimitMessage(planKey, false, 'ar');
             res.status(402).json({
@@ -94,7 +104,10 @@ export function requireFeature(featureKey: FeatureKey) {
                   limitKey: planKey,
                   limit: false,
                   planCode: e.planCode,
-                  upgradeTo: upgradePlanFor(planKey, true),
+                  upgradeTo: upgradePlanFor(
+                    featureKey === 'merchant_mcp' ? 'merchantMcp' : planKey,
+                    true
+                  ),
                   messageEn,
                   messageAr,
                 },

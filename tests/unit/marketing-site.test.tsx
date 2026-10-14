@@ -164,7 +164,7 @@ describe('marketing honesty', () => {
       'Team members',
       'Stores',
       'Abandoned cart recovery',
-      'API and MCP access',
+      'Run your store from an AI assistant (MCP)',
       'Analytics',
       'Support',
     ])

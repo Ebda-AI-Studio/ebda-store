@@ -1,0 +1,80 @@
+---
+title: Running your store from an AI assistant (write tools)
+description: What an AI assistant connected through Merchant MCP can change in your store, which plans include it, how the confirm step protects deletes and refunds, and how to switch it off.
+section: Settings
+order: 60
+appPath: /stores/:id/merchant-keys
+keywords: mcp agent claude write tools cancel order refund delete product coupon inventory confirm token api key growth business
+---
+
+## What this is
+
+Merchant MCP lets you connect Claude, or any MCP-compatible assistant, to your store with an API key instead of opening the dashboard. Reading (orders, products, analytics) is always available to a valid key. **Write tools** let the same assistant make changes, the way a staff member would from the dashboard.
+
+An assistant never gets more power than the person who created the key. If that person is a **staff** member who cannot delete products in the dashboard, the key cannot delete them either.
+
+## Plans and the on/off switch
+
+- Merchant MCP, both reading and these write tools, plus creating keys, is included with the **Growth** and **Business** plans. Basic does not include it.
+- You decide per store: open **Merchant MCP keys** and use the **write tools switch** at the top. Off means every key is read-only, immediately. The platform team can also switch it off for a store from the Features page.
+- A key also needs the right scope: `merchant:write` for everyday changes, `merchant:destructive` for deleting, cancelling and refunding. A key issued only for reporting (`merchant:read`) cannot change anything.
+
+## The confirm step (deleting, cancelling, refunding)
+
+Some actions cannot be easily undone, so the assistant cannot do them in one step:
+
+1. The assistant calls the tool (for example `admin_delete_product`) with the product id.
+2. **Nothing changes.** The tool replies with a short summary of exactly what would happen and a **confirmation token**.
+3. The assistant shows you that summary. If you agree, it calls the same tool again with the same arguments plus the token, and only then does it happen.
+
+A token works **once**, for **two minutes**, for **that exact action on that exact item**, from the same key. A token for order A cannot cancel order B, a used token cannot be replayed, and a changed argument gets a fresh summary instead of an action.
+
+## Tools
+
+| Tool                         | What it does                                                    | Needs confirmation |
+| ---------------------------- | --------------------------------------------------------------- | ------------------ |
+| `admin_update_order_status`  | Move an order to confirmed, processing, shipped or delivered    | No                 |
+| `admin_cancel_order`         | Cancel an order, optionally returning stock                     | Yes                |
+| `admin_create_product`       | Create a product (same fields and checks as the dashboard form) | No                 |
+| `admin_update_product`       | Change fields on a product                                      | No                 |
+| `admin_delete_product`       | Delete a product                                                | Yes                |
+| `admin_adjust_inventory`     | Add or remove stock by a quantity, with a reason                | No                 |
+| `admin_set_inventory`        | Set stock to an exact count                                     | No                 |
+| `admin_create_coupon`        | Create a discount coupon                                        | No                 |
+| `admin_update_coupon`        | Change a coupon                                                 | No                 |
+| `admin_toggle_coupon`        | Turn a coupon on or off                                         | No                 |
+| `admin_delete_coupon`        | Delete a coupon                                                 | Yes                |
+| `admin_approve_return`       | Approve a customer's return request                             | No                 |
+| `admin_reject_return`        | Reject a return (a reason is required)                          | No                 |
+| `admin_mark_return_received` | Record that returned goods arrived                              | No                 |
+| `admin_complete_return`      | Complete a return and refund the customer                       | Yes                |
+
+Every tool runs the same code and the same validation as the matching dashboard action, and only ever touches **your** store.
+
+## Money
+
+Shopper payments are approved by you, never by the assistant. The assistant can refund only through a return you (or it, with your confirmation) completed, using the same refund methods and rules as the dashboard. Refunding to the customer's original payment method, or as store credit, needs the **orders:refund** permission (the store owner), which staff do not have. Marking an order paid, confirming InstaPay receipts and refunding straight from an order are **not** available through MCP.
+
+## Not available yet
+
+These dashboard actions are not exposed through MCP, mostly because their logic still lives inside the dashboard screen rather than a shared service. Do them in the dashboard for now.
+
+| Area                                                                | Why not yet                                         |
+| ------------------------------------------------------------------- | --------------------------------------------------- |
+| Categories (create, edit, delete, reorder)                          | Logic not yet shared; planned next                  |
+| Product variants, bulk product edits                                | Planned next; bulk edits will need the confirm step |
+| Order notes, fulfilment and tracking, invoices                      | Planned next                                        |
+| Mark paid, InstaPay confirmation, refund from an order              | Moves shopper money; dashboard only                 |
+| Customers (edit, erase, export)                                     | Personal data; dashboard only                       |
+| Store settings, payment and shipping setup, staff, domains, billing | Security and money settings; dashboard only         |
+| Pages and content builder                                           | Planned next                                        |
+| Platform administration                                             | Never exposed                                       |
+
+## Limits and records
+
+- Writes are limited to 30 per minute per key, and a request that bundles several writes together is refused.
+- Every write is recorded in your audit trail with the key that made it and a marker showing it came from an AI assistant. The record is written **before** the change; if it cannot be written, the change is not made.
+
+## Turning it off
+
+Use the write tools switch on the **Merchant MCP keys** page, or revoke the key. Reading keeps working; every write tool refuses at once.

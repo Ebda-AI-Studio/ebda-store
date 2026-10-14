@@ -28,6 +28,7 @@
 import { withStore, type Prisma } from '@force/database';
 import {
   DEFAULT_PLAN_SEEDS,
+  planIncludesMerchantMcp,
   FALLBACK_PLAN_CODE,
   STORE_PLAN_TO_PLAN_CODE,
   planLimitsSchema,
@@ -125,17 +126,20 @@ export async function getEntitlements(
 /**
  * The plan flags FeatureService layers over PLAN_BASELINE (and under a
  * StoreFeature override): the two automation flags, plus `brandingRemoval`
- * (-> `remove_branding`) and `apiAccess` (-> `merchant_mcp`). `null` = no plan
+ * (-> `remove_branding`) and the merchant-MCP entitlement `mcpAccess` (-> `merchant_mcp` + `merchant_mcp_write`; Growth + Business, NOT `apiAccess`). `null` = no plan
  * decision (unknown store).
  */
 export async function getAutomationFlags(
   storeId: string,
   tx?: Tx,
   known?: { legacyPlan: keyof typeof STORE_PLAN_TO_PLAN_CODE }
-): Promise<Pick<
-  PlanLimits,
-  'abandonedCartAutomation' | 'whatsappAutomation' | 'brandingRemoval' | 'apiAccess'
-> | null> {
+): Promise<
+  | (Pick<
+      PlanLimits,
+      'abandonedCartAutomation' | 'whatsappAutomation' | 'brandingRemoval' | 'apiAccess'
+    > & { mcpAccess: boolean })
+  | null
+> {
   const e = await getEntitlements(storeId, tx, known);
   if (!e) return null;
   return {
@@ -143,6 +147,9 @@ export async function getAutomationFlags(
     whatsappAutomation: e.limits.whatsappAutomation,
     brandingRemoval: e.limits.brandingRemoval,
     apiAccess: e.limits.apiAccess,
+    // Merchant MCP (keys + read + write tools): Growth + Business (Ahmad 2026-10-14),
+    // decided on the EFFECTIVE plan (a canceled Growth store falls back to free => off).
+    mcpAccess: planIncludesMerchantMcp(e.planCode, e.limits),
   };
 }
 
