@@ -9,24 +9,9 @@ import {
   type MouseEvent,
 } from 'react';
 import type { LooksCopy } from '../lib/content';
-import { LOOK_FONTS } from '../lib/looks-fonts';
+import { ensureLookFont, parseFragment, type Frag } from '../lib/looks-frag';
 
 const LETTERS = ['A', 'B', 'C'] as const;
-const SPLIT = '<!--look-->';
-type Frag = { css: string; looks: string[] };
-
-/** /looks/<id>.html is `<style>` + one block per look, separated by <!--look-->. */
-function parse(html: string): Frag {
-  const [css, ...looks] = html.split(SPLIT);
-  return { css: css.replace(/^<style>|<\/style>$/g, ''), looks };
-}
-
-function fontHref(id: string): string | null {
-  const fams = LOOK_FONTS[id as keyof typeof LOOK_FONTS];
-  return fams
-    ? `https://fonts.googleapis.com/css2?${fams.map(f => `family=${f}`).join('&')}&display=swap`
-    : null;
-}
 
 /**
  * Pick a template, see its three looks as scrollable phones. The first template's markup is
@@ -45,7 +30,7 @@ export function LooksShowcase({
   const firstId = copy.templates[0].id;
   const [active, setActive] = useState(firstId);
   const [frags, setFrags] = useState<Record<string, Frag>>(() =>
-    initialHtml ? { [firstId]: parse(initialHtml) } : {}
+    initialHtml ? { [firstId]: parseFragment(initialHtml) } : {}
   );
   const [failed, setFailed] = useState<string | null>(null);
   const [current, setCurrent] = useState(0);
@@ -57,9 +42,9 @@ export function LooksShowcase({
 
   const load = useCallback((id: string) => {
     setFailed(null);
-    fetch(`/looks/${id}.html`)
+    fetch(`/looks/${id}`)
       .then(r => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
-      .then(t => setFrags(f => ({ ...f, [id]: parse(t) })))
+      .then(t => setFrags(f => ({ ...f, [id]: parseFragment(t) })))
       .catch(() => setFailed(id));
   }, []);
 
@@ -84,13 +69,7 @@ export function LooksShowcase({
     return () => io.disconnect();
   }, []);
   useEffect(() => {
-    const href = fontHref(active);
-    if (!seen || !href || document.querySelector(`link[data-looks-font="${active}"]`)) return;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = href;
-    link.dataset.looksFont = active;
-    document.head.appendChild(link);
+    if (seen) ensureLookFont(active);
   }, [active, seen]);
 
   // Which look the A/B/C switch shows follows the snap scroll.
