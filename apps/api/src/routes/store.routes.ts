@@ -835,7 +835,12 @@ router.put(
     try {
       const { id } = req.params;
       const { lookId, design } = lookBody.parse(req.body);
-      const { store, builder } = await StoreService.applyLook(id, lookId, { design });
+      const { store, builder } = await StoreService.applyLook(
+        id,
+        lookId,
+        { design },
+        getAuthUser(req).userId
+      );
       res.json({
         success: true,
         data: { look: store.look, template: store.template, builder },

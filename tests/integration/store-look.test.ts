@@ -22,7 +22,32 @@ import { errorHandler } from '@api/middleware/error-handler';
 import { config } from '@api/config';
 import { hasDb } from '../helpers/bundle-fixtures';
 
-const { invalidated } = vi.hoisted(() => ({ invalidated: [] as string[] }));
+const { invalidated, r2Cleanup, failValidation } = vi.hoisted(() => ({
+  invalidated: [] as string[],
+  r2Cleanup: vi.fn(),
+  failValidation: { on: false },
+}));
+vi.mock('@api/services/r2-cleanup.service', async importOriginal => {
+  const real = await importOriginal<typeof import('@api/services/r2-cleanup.service')>();
+  return {
+    ...real,
+    cleanupRemovedJsonUrls: (...a: Parameters<typeof real.cleanupRemovedJsonUrls>) => {
+      r2Cleanup(...a);
+      return real.cleanupRemovedJsonUrls(...a);
+    },
+  };
+});
+// Lets one test make the builder's validation (saveDraft) refuse.
+vi.mock('@force/shared', async importOriginal => {
+  const real = await importOriginal<typeof import('@force/shared')>();
+  return {
+    ...real,
+    validateDefinition: (...a: Parameters<typeof real.validateDefinition>) =>
+      failValidation.on
+        ? Promise.resolve({ ok: false, errors: [] })
+        : real.validateDefinition(...a),
+  };
+});
 vi.mock('@api/lib/public-cache', async importOriginal => {
   const real = await importOriginal<typeof import('@api/lib/public-cache')>();
   return {
@@ -68,7 +93,11 @@ function buildApp(): Express {
   return app;
 }
 
-async function seedMerchant(tag: string, theme: Record<string, unknown> = {}) {
+async function seedMerchant(
+  tag: string,
+  theme: Record<string, unknown> = {},
+  layoutSettings?: Record<string, unknown>
+) {
   return withRlsBypass(async tx => {
     const email = `look-${tag}-${run}@test.local`;
     const user = await tx.user.create({
@@ -90,6 +119,7 @@ async function seedMerchant(tag: string, theme: Record<string, unknown> = {}) {
         ownerId: user.id,
         status: 'active',
         theme: theme as object,
+        ...(layoutSettings ? { layoutSettings: layoutSettings as object } : {}),
       },
     });
     userIds.push(user.id);
@@ -103,7 +133,7 @@ async function seedMerchant(tag: string, theme: Record<string, unknown> = {}) {
         audience: 'force-app',
       }
     );
-    return { storeId: store.id, slug: store.slug, token };
+    return { storeId: store.id, slug: store.slug, token, userId: user.id };
   });
 }
 
@@ -197,6 +227,85 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     expect(revs.filter(r => r.status === 'draft')).toHaveLength(1);
     expect(invalidated.filter(k => k === `public:store:${m.storeId}`)).toHaveLength(1);
     expect(invalidated).toContain(`public:store:${m.slug}`);
+  });
+
+  it('legacy store with customised layout_settings and no builder revision: DRAFT only, layout + R2 untouched', async () => {
+    const layout = {
+      brandStory: { enabled: true, titleEn: 'Our story', image: 'https://pub-x.r2.dev/story.jpg' },
+    };
+    const m = await seedMerchant('legacy-layout', {}, layout);
+    const before = await prisma.store.findUniqueOrThrow({
+      where: { id: m.storeId },
+      select: { layoutSettings: true },
+    });
+    r2Cleanup.mockClear();
+    const res = await put(m.storeId, m.token, { lookId: LOOK_ID, design: 'keep' });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.data.builder).toBe('draft');
+    await awaitDeferredWork(5000);
+    const after = await prisma.store.findUniqueOrThrow({
+      where: { id: m.storeId },
+      select: { layoutSettings: true },
+    });
+    expect(JSON.stringify(after.layoutSettings)).toBe(JSON.stringify(before.layoutSettings));
+    expect(r2Cleanup).not.toHaveBeenCalled();
+    const revs = await revisions(m.storeId);
+    expect(revs.map(r => r.status)).toEqual(['draft']);
+  });
+
+  it('a builder refusal leaves look/template/theme unchanged and the error propagates', async () => {
+    const m = await seedMerchant('refuse', { primaryColor: 'X' });
+    failValidation.on = true;
+    try {
+      const res = await put(m.storeId, m.token, { lookId: LOOK_ID, design: 'reset' });
+      expect(res.status).toBe(422);
+      expect(res.body.error.code).toBe('INVALID_DEFINITION');
+    } finally {
+      failValidation.on = false;
+    }
+    expect(await row(m.storeId)).toMatchObject({
+      look: null,
+      template: 'modern',
+      theme: { primaryColor: 'X' },
+    });
+  });
+
+  it("reset strips look keys from a pending draft's theme patch", async () => {
+    const m = await seedMerchant('draft-theme', { primaryColor: 'X' });
+    expect((await put(m.storeId, m.token, { lookId: LOOK_ID, design: 'keep' })).status).toBe(200);
+    const pub = await prisma.storePageRevision.findFirstOrThrow({
+      where: { storeId: m.storeId, pageKey: 'home', status: 'published' },
+    });
+    await prisma.storePageRevision.create({
+      data: {
+        storeId: m.storeId,
+        pageKey: 'home',
+        rev: pub.rev + 1,
+        status: 'draft',
+        schemaVersion: pub.schemaVersion,
+        document: { ...(pub.document as object), theme: { primaryColor: '#112233' } },
+        docBytes: 10,
+        baseRev: pub.rev,
+      },
+    });
+    const res = await put(m.storeId, m.token, { lookId: LOOK_ID, design: 'reset' });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const draft = await prisma.storePageRevision.findFirstOrThrow({
+      where: { storeId: m.storeId, pageKey: 'home', status: 'draft' },
+    });
+    expect(
+      (draft.document as { theme?: Record<string, unknown> }).theme?.primaryColor
+    ).toBeUndefined();
+  });
+
+  it('keeps createdBy on the revision it writes', async () => {
+    const m = await seedMerchant('actor');
+    expect((await put(m.storeId, m.token, { lookId: LOOK_ID, design: 'keep' })).status).toBe(200);
+    const rev = await prisma.storePageRevision.findFirstOrThrow({
+      where: { storeId: m.storeId, pageKey: 'home' },
+      select: { createdBy: true },
+    });
+    expect(rev.createdBy).toBe(m.userId);
   });
 
   it("another merchant's store is refused and not modified", async () => {

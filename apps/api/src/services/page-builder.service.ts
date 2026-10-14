@@ -42,6 +42,7 @@
  * the storefront Next data cache via the `layout:<storeId>` tag, and the
  * store's slug/host/domain resolve keys. Draft saves touch no public cache.
  */
+import { isDeepStrictEqual } from 'node:util';
 import { prisma, withStore } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import {
@@ -55,6 +56,7 @@ import {
   snapshotEditableTheme,
   applyChromePatch,
   applyTemplateFamily,
+  NEW_STORE_LAYOUT_SETTINGS,
   hasChromePatch,
   pageDefinitionSchema,
   rebaseDraftOntoLive,
@@ -541,34 +543,58 @@ async function publishNewRevision(args: {
   });
 }
 
+/** A store whose `layout_settings` still holds nothing a merchant wrote (new-store seed or empty). */
+function isUntouchedLayout(layout: unknown): boolean {
+  if (layout == null) return true;
+  if (typeof layout !== 'object') return false;
+  if (Object.keys(layout).length === 0) return true;
+  return isDeepStrictEqual(layout, NEW_STORE_LAYOUT_SETTINGS);
+}
+
 /**
  * Re-shape the home page to a look's template family without losing content
  * (`applyTemplateFamily` keeps every existing section of a family type and only
- * adds the missing ones). Runs in the CALLER's tenant scope, like the builder
- * routes: it only composes `saveDraft` / `publishDraft`, which scope themselves.
+ * adds the missing ones; sections outside the family are dropped from the new
+ * document). Runs in the CALLER's tenant scope, like the builder routes: it only
+ * composes `saveDraft` / `publishDraft`, which scope themselves.
  *
- * - no revision yet (the home page still derives from `layout_settings`): the
- *   result is published, so a fresh store looks like its look immediately;
- * - a published page, or a work-in-progress draft: the result is saved as a
- *   DRAFT only. The live page changes when the merchant publishes.
- * A fresh store whose family is not publish-ready (placeholder copy) also stays a draft.
+ * - genuinely fresh store (no revision, no draft, `layout_settings` empty or the
+ *   new-store seed): published, so it looks like its look immediately;
+ * - EVERYTHING else (a published page, an in-progress draft, or a legacy store
+ *   whose customised `layout_settings` never went through the builder): a DRAFT
+ *   only. Publishing would replace `layout_settings` wholesale and delete the
+ *   R2 images the new document no longer references (Ruling LOOKS-APPLY-1).
+ * `resetThemeKeys` are stripped from the document's pending theme patch so a
+ * later publish cannot re-apply keys the merchant just reset.
  */
 export async function applyFamilyForLook(
   storeId: string,
   family: TemplateFamily['id'],
-  userId: string | null = null
+  userId: string | null = null,
+  resetThemeKeys: readonly string[] = []
 ): Promise<'published' | 'draft'> {
   const state = await getPageState(storeId, HOME_PAGE_KEY);
   if (!state) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+  const store = await loadStore(storeId);
+  if (!store) throw new AppError(404, 'NOT_FOUND', 'Store not found');
+  let definition = applyTemplateFamily(state.definition, family);
+  if (definition.theme && resetThemeKeys.length > 0) {
+    const theme = { ...definition.theme } as Record<string, unknown>;
+    for (const k of resetThemeKeys) delete theme[k];
+    const next = { ...definition } as PageDefinition & { theme?: unknown };
+    if (Object.keys(theme).length > 0) next.theme = theme as PageDefinition['theme'];
+    else delete next.theme;
+    definition = next;
+  }
   const saved = await saveDraft({
     storeId,
     pageKey: HOME_PAGE_KEY,
     baseRev: state.rev,
-    definition: applyTemplateFamily(state.definition, family),
+    definition,
     userId,
   });
   if (!saved.ok) throw new AppError(saved.status, saved.code, saved.message);
-  if (state.source !== 'layout') return 'draft';
+  if (state.source !== 'layout' || !isUntouchedLayout(store.layoutSettings)) return 'draft';
   const published = await publishDraft({
     storeId,
     pageKey: HOME_PAGE_KEY,
@@ -576,8 +602,8 @@ export async function applyFamilyForLook(
   });
   if (!published.ok) {
     logger.warn(
-      { storeId, code: published.code },
-      '[page-builder] look family left as a draft: not publish-ready'
+      { storeId, code: published.code, message: published.message },
+      '[page-builder] look family left as a draft: publish refused'
     );
     return 'draft';
   }

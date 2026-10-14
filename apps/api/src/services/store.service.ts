@@ -35,6 +35,7 @@ import {
   LOOK_TOKEN_KEYS,
 } from '@force/shared';
 import { applyFamilyForLook } from './page-builder.service';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
@@ -970,25 +971,47 @@ export class StoreService {
    * the home page to the look's template family without losing content (see
    * `applyFamilyForLook`: published for a fresh store, a draft otherwise).
    */
-  static async applyLook(storeId: string, lookId: string, opts: { design: 'keep' | 'reset' }) {
+  static async applyLook(
+    storeId: string,
+    lookId: string,
+    opts: { design: 'keep' | 'reset' },
+    userId: string | null = null
+  ) {
     const look = getLook(lookId);
     if (!look) throw new AppError(400, 'INVALID_LOOK', 'Unknown look');
     const store = await this.getById(storeId);
-    const theme = { ...((store.theme as Record<string, unknown>) || {}) };
-    if (opts.design === 'reset') for (const k of LOOK_TOKEN_KEYS) delete theme[k];
-    const updated = await withStore(storeId, tx =>
-      tx.store.update({
+    // Builder FIRST: it can refuse (409/422); the request transaction commits on any <500,
+    // so a store row switched before a refusal would stay switched under an error response.
+    const builder = await applyFamilyForLook(
+      storeId,
+      look.template,
+      userId,
+      opts.design === 'reset' ? LOOK_TOKEN_KEYS : []
+    );
+    // Re-read the theme in the same tx as the write: a publish above may have merged a
+    // pending theme patch into it, and that must not be overwritten.
+    const updated = await withStore(storeId, async tx => {
+      const live = await tx.store.findUnique({
+        where: { id: storeId },
+        select: { theme: true },
+      });
+      const theme = { ...((live?.theme as Record<string, unknown>) || {}) };
+      if (opts.design === 'reset') for (const k of LOOK_TOKEN_KEYS) delete theme[k];
+      return tx.store.update({
         where: { id: storeId },
         data: {
           look: look.id,
           template: look.skin as StoreTemplate,
           theme: theme as Prisma.InputJsonValue,
         },
-      })
-    );
-    const builder = await applyFamilyForLook(storeId, look.template);
-    await StoreService.invalidateCache(store);
-    await bustStoreCaches(updated.id, updated.slug, updated.domain);
+      });
+    });
+    // After the request commits, so a read between the bust and the commit cannot re-cache
+    // the old look (applyLook only; the other update* methods keep their inline bust).
+    void deferAfterTenantCommit('store.applyLook.purge', async () => {
+      await StoreService.invalidateCache(store);
+      await bustStoreCaches(updated.id, updated.slug, updated.domain);
+    }).catch(err => logger.error({ err, storeId }, '[STORE] applyLook cache purge failed'));
     return { store: updated, builder };
   }
 
