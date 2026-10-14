@@ -145,7 +145,7 @@ describe.skipIf(!hasDb)('store-count gate through the real engine', () => {
 });
 
 describe.skipIf(!hasDb)('branding, API access and analytics through the real feature map', () => {
-  it('Basic keeps the footer and has no API; Growth drops the footer; Business adds API', async () => {
+  it('Basic keeps the footer and has no API; Growth drops the footer and gets MCP; Business keeps both', async () => {
     const owner = await makeOwner();
     const basic = await makeStore(owner, 'basic');
     const growth = await makeStore(owner, 'growth');
@@ -156,7 +156,7 @@ describe.skipIf(!hasDb)('branding, API access and analytics through the real fea
       return [m.remove_branding, m.merchant_mcp];
     };
     expect(await f(basic)).toEqual([false, false]);
-    expect(await f(growth)).toEqual([true, false]);
+    expect(await f(growth)).toEqual([true, true]); // MCP: Growth + Business (2026-10-14)
     expect(await f(business)).toEqual([true, true]);
 
     await expect(assertAnalyticsTier(basic, 'standard')).rejects.toMatchObject({

@@ -33,7 +33,11 @@ export const planLimitsSchema = z
     whatsappAutomation: z.boolean(),
     /** Hide the "Powered by Ebda" storefront footer attribution. */
     brandingRemoval: z.boolean(),
-    /** Merchant API access: the merchant-admin MCP surface + its keys (no outbound webhooks exist yet). */
+    /**
+     * Programmatic API access (Business). Since 2026-10-14 this is NO LONGER the MCP gate: the
+     * merchant-admin MCP is decided by `planIncludesMerchantMcp` (Growth + Business). `apiAccess`
+     * stays reserved for future outbound API/webhook access.
+     */
     apiAccess: z.boolean(),
     analyticsTier: z.enum(ANALYTICS_TIERS),
     supportTier: z.enum(SUPPORT_TIERS),
@@ -41,6 +45,20 @@ export const planLimitsSchema = z
   .strict();
 
 export type PlanLimits = z.infer<typeof planLimitsSchema>;
+
+/**
+ * Plan codes that include the merchant-admin MCP (key minting, read tools and write
+ * tools). Ahmad 2026-10-14: Growth + Business. Decoupled from `apiAccess` on purpose:
+ * widening `apiAccess` would need a data change to the live `plans` rows (and breaks the
+ * migration-equals-seeds contract test), and would hand Growth the future API/webhook
+ * entitlement that was never decided.
+ */
+export const MERCHANT_MCP_PLAN_CODES: readonly string[] = ['growth', 'business'];
+
+/** True when a plan includes the merchant MCP: a listed code, or any plan that grants `apiAccess`. */
+export function planIncludesMerchantMcp(code: string, limits: { apiAccess: boolean }): boolean {
+  return limits.apiAccess || MERCHANT_MCP_PLAN_CODES.includes(code);
+}
 export type PlanLimitKey = keyof PlanLimits;
 
 /** Limits that are a count ceiling (null = unlimited). */
@@ -394,7 +412,8 @@ export function planLimitMessage(
     maxStores: `Your plan allows up to ${n} store${n === '1' ? '' : 's'}. Upgrade to add more.`,
     brandingRemoval:
       'Removing the "Powered by Ebda Store" footer is not included in your plan. Upgrade to turn it off.',
-    apiAccess: 'API access is not included in your plan. Upgrade to Business to use it.',
+    apiAccess:
+      'Merchant MCP (running your store from an AI assistant) is not included in your plan. Upgrade to Growth or Business to use it.',
     customDomain:
       'Custom domains are not included in your plan. Upgrade to connect your own domain.',
     abandonedCartAutomation:
@@ -408,7 +427,8 @@ export function planLimitMessage(
     maxStorageMb: `باقتك تسمح بمساحة تخزين حتى ${n} ميجابايت. قم بالترقية لإضافة المزيد.`,
     maxStores: `باقتك تسمح بحد أقصى ${n} متجر. قم بالترقية لإضافة المزيد.`,
     brandingRemoval: 'إزالة شعار «مدعوم من ابدأ ستور» غير متاحة في باقتك. قم بالترقية لإخفائه.',
-    apiAccess: 'الوصول عبر API غير متاح في باقتك. قم بالترقية إلى باقة الأعمال لاستخدامه.',
+    apiAccess:
+      'تشغيل المتجر من مساعد ذكاء اصطناعي (MCP) غير متاح في باقتك. قم بالترقية إلى باقة النمو أو الأعمال لاستخدامه.',
     customDomain: 'النطاق المخصص غير متاح في باقتك. قم بالترقية لربط نطاقك الخاص.',
     abandonedCartAutomation: 'استرداد السلات المتروكة غير متاح في باقتك. قم بالترقية لتفعيله.',
     whatsappAutomation: 'أتمتة واتساب غير متاحة في باقتك. قم بالترقية لتفعيلها.',
@@ -431,6 +451,10 @@ export function upgradePlanFor(
   const plans = [...LOCKED_PUBLIC_PLANS].sort(
     (a, b) => (a.priceMonthlyMinor ?? Infinity) - (b.priceMonthlyMinor ?? Infinity)
   );
+  if (limitKey === 'merchantMcp') {
+    const hit = plans.find(p => planIncludesMerchantMcp(p.code, p.limits));
+    return hit ? { code: hit.code, nameEn: hit.nameEn, nameAr: hit.nameAr } : null;
+  }
   for (const p of plans) {
     const v = (p.limits as Record<string, unknown>)[limitKey];
     let ok = false;

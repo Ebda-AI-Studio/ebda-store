@@ -22,23 +22,24 @@ Engine on `main` still has placeholders. This file is the source of truth until 
 
 ## Entitlements (committed defaults)
 
-| Lever                     | Basic     | Growth    | Business           |
-| ------------------------- | --------- | --------- | ------------------ |
-| Price / month (piastres)  | 149_000   | 349_000   | 999_000            |
-| Price / year (piastres)   | 1_341_000 | 3_141_000 | 8_991_000          |
-| Staff seats               | 2         | 5         | 15                 |
-| Orders / month            | 300       | 3_000     | unlimited (`null`) |
-| Products                  | unlimited | unlimited | unlimited          |
-| Stores                    | 1         | 1         | 3                  |
-| Custom domain             | yes       | yes       | yes                |
-| “Powered by Ebda”         | yes       | off       | off                |
-| COD + InstaPay + gateways | all       | all       | all                |
-| Carriers                  | all       | all       | all                |
-| WhatsApp                  | `wa.me`   | `wa.me`   | `wa.me`            |
-| Abandoned cart            | no        | yes       | yes                |
-| API / webhooks            | no        | no        | yes                |
-| Analytics                 | basic     | standard  | advanced           |
-| Support                   | email     | chat      | priority           |
+| Lever                                                  | Basic     | Growth    | Business           |
+| ------------------------------------------------------ | --------- | --------- | ------------------ | -------------------------------------------------------------------- |
+| Price / month (piastres)                               | 149_000   | 349_000   | 999_000            |
+| Price / year (piastres)                                | 1_341_000 | 3_141_000 | 8_991_000          |
+| Staff seats                                            | 2         | 5         | 15                 |
+| Orders / month                                         | 300       | 3_000     | unlimited (`null`) |
+| Products                                               | unlimited | unlimited | unlimited          |
+| Stores                                                 | 1         | 1         | 3                  |
+| Custom domain                                          | yes       | yes       | yes                |
+| “Powered by Ebda”                                      | yes       | off       | off                |
+| COD + InstaPay + gateways                              | all       | all       | all                |
+| Carriers                                               | all       | all       | all                |
+| WhatsApp                                               | `wa.me`   | `wa.me`   | `wa.me`            |
+| Abandoned cart                                         | no        | yes       | yes                |
+| API / webhooks                                         | no        | no        | yes                |
+| Merchant MCP (AI assistant, keys + read + write tools) | no        | yes       | yes                | <!-- 2026-10-14 Ahmad: opened to Growth; Ruling R-EBDA-PRICING-5 --> |
+| Analytics                                              | basic     | standard  | advanced           |
+| Support                                                | email     | chat      | priority           |
 
 Order-cap enforcement is the only hard stop, and only after the 7-day grace.
 

@@ -248,6 +248,7 @@ describe('upsell target (cheapest public plan that fits)', () => {
     ['maxOrdersPerMonth', 3001, 'business'],
     ['brandingRemoval', true, 'growth'],
     ['apiAccess', true, 'business'],
+    ['merchantMcp', true, 'growth'],
     ['analyticsTier', 'standard', 'growth'],
     ['analyticsTier', 'advanced', 'business'],
   ])('%s needs %s -> %s', (key, need, code) => {

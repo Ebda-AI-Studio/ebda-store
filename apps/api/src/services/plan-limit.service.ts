@@ -20,9 +20,10 @@
  *   maxStores    StoreService.create (POST /stores) and OnboardingService.createStore,
  *                via `assertOwnerMayCreateStore`: the owner's best plan across their
  *                live stores must have room for one more (1 / 1 / 3)
- *   brandingRemoval / apiAccess  not throwing writes: layered by FeatureService into
+ *   brandingRemoval / merchant MCP  not throwing writes: layered by FeatureService into
  *                `remove_branding` (storefront footer) and `merchant_mcp` (key
- *                issuance + the MCP runtime both `requireFeature`/feature-check it)
+ *                issuance + the MCP runtime both `requireFeature`/feature-check it).
+ *                MCP is Growth + Business (`planIncludesMerchantMcp`), not `apiAccess`.
  *   analyticsTier  `requireAnalyticsTier` on the insights routes (see below)
  *   maxOrdersPerMonth  blocks after a seven-day grace; see `assertOrderAllowed`.
  *   maxStorageMb  declared + shown, not enforced: R2 usage per store is not

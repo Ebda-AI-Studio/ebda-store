@@ -3,7 +3,7 @@
  * One block per lever, each proven at the SERVER write/resolve path:
  *   stores 1/1/3          assertOwnerMayCreateStore (StoreService.create, OnboardingService.createStore)
  *   branding removal      FeatureService layer -> `remove_branding` (storefront payload + customer email)
- *   API access            FeatureService layer -> `merchant_mcp` (key routes + MCP runtime requireFeature)
+ *   Merchant MCP          FeatureService layer -> `merchant_mcp` + `merchant_mcp_write` (Growth + Business, 2026-10-14; NOT `apiAccess`)
  *   analytics tiers       assertAnalyticsTier / requireAnalyticsTier on the insights routes
  *   hidden plans          re-saving a comped store never demotes it
  */
@@ -142,10 +142,37 @@ describe('brandingRemoval / apiAccess -> feature map (server-resolved, override 
 
   it.each([
     ['basic', false],
-    ['growth', false],
+    ['growth', true],
     ['business', true],
-  ])('%s: merchant_mcp (API access) = %s', async (code, expected) => {
+  ])('%s: merchant_mcp (Growth + Business, Ahmad 2026-10-14) = %s', async (code, expected) => {
     expect((await features(code)).merchant_mcp).toBe(expected);
+  });
+
+  it.each([
+    ['basic', false],
+    ['growth', true],
+    ['business', true],
+  ])('%s: merchant_mcp_write (MCP write tools) = %s', async (code, expected) => {
+    expect((await features(code)).merchant_mcp_write).toBe(expected);
+  });
+
+  it('merchant_mcp is decided by the plan rule, not apiAccess: Growth has the MCP but still no apiAccess', async () => {
+    const growth = DEFAULT_PLAN_SEEDS.find(p => p.code === 'growth')!;
+    expect(growth.limits.apiAccess).toBe(false);
+    expect((await features('growth')).merchant_mcp).toBe(true);
+  });
+
+  it('merchant_mcp_write: a canceled Growth store falls back to free => off; override wins both ways', async () => {
+    onPlans({ 'st-c': { code: 'growth', status: 'canceled' } });
+    expect((await featureService.getStoreFeatures('st-c')).merchant_mcp_write).toBe(false);
+
+    onPlans({ 'st-g': { code: 'growth' } });
+    m.featureRows.mockResolvedValue([{ featureKey: 'merchant_mcp_write', enabled: false }]);
+    expect((await featureService.getStoreFeatures('st-g')).merchant_mcp_write).toBe(false);
+
+    onPlans({ 'st-b': { code: 'basic' } });
+    m.featureRows.mockResolvedValue([{ featureKey: 'merchant_mcp_write', enabled: true }]);
+    expect((await featureService.getStoreFeatures('st-b')).merchant_mcp_write).toBe(true);
   });
 
   it('a super-admin StoreFeature override still wins over the plan, both ways', async () => {
