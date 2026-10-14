@@ -282,6 +282,20 @@
         "deleteFailed": "Failed to delete store",
         "deletedToastTitle": "Store deleted",
         "deletedToastDescription": "{name} and all of its data have been removed."
+      },
+      "acquisition": {
+        "title": "How they found Ebda",
+        "none": "No acquisition data. The owner signed up without accepting tracking, or before it existed.",
+        "source": "Source",
+        "medium": "Medium",
+        "campaign": "Campaign",
+        "content": "Content",
+        "term": "Term",
+        "fbclid": "Meta ad click",
+        "present": "Yes (fbclid captured)",
+        "landing": "Landing page",
+        "referrer": "Referrer",
+        "firstSeen": "First seen"
       }
     },
     "list": {

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button, Input } from '@force/ui';
 import { PublicShell } from '../../components/onboarding/PublicShell';
 import { apiPost } from '../../lib/api';
+import { getEbdaTracker } from '../../lib/ebda-tracker';
 import { useAuth } from '../../lib/auth';
 import { useT } from '@/i18n/useT';
 
@@ -37,12 +38,21 @@ export default function VerifyEmailPage() {
       setPhase({ kind: 'error', reason: 'missing' });
       return;
     }
-    apiPost('/api/v1/auth/verify-email', { token }).then(({ error }) => {
-      if (!error) setPhase({ kind: 'success' });
-      else if (error.code === 'TOKEN_EXPIRED') setPhase({ kind: 'error', reason: 'expired' });
-      else if (error.code === 'TOKEN_INVALID') setPhase({ kind: 'error', reason: 'invalid' });
-      else setPhase({ kind: 'error', reason: 'generic' });
-    });
+    apiPost<{ registrationEventId?: string }>('/api/v1/auth/verify-email', { token }).then(
+      ({ data, error }) => {
+        if (!error) {
+          setPhase({ kind: 'success' });
+          // CompleteRegistration: same event_id as the server's Conversions API event (dedup).
+          if (data?.registrationEventId) {
+            getEbdaTracker()?.track('registration_completed', {
+              eventId: data.registrationEventId,
+            });
+          }
+        } else if (error.code === 'TOKEN_EXPIRED') setPhase({ kind: 'error', reason: 'expired' });
+        else if (error.code === 'TOKEN_INVALID') setPhase({ kind: 'error', reason: 'invalid' });
+        else setPhase({ kind: 'error', reason: 'generic' });
+      }
+    );
   }, []);
 
   function goOn() {
