@@ -280,7 +280,7 @@ export default function MinimalHeader({
           className={`lg:hidden grid overflow-hidden transition-[grid-template-rows] ease-out motion-reduce:duration-0 ${isMenuOpen ? 'grid-rows-[1fr] duration-[220ms]' : 'grid-rows-[0fr] duration-[160ms]'}`}
           aria-hidden={!isMenuOpen}
           {...(!isMenuOpen
-            ? ({ inert: '' } as unknown as React.HTMLAttributes<HTMLDivElement>)
+            ? ({ inert: true } as unknown as React.HTMLAttributes<HTMLDivElement>)
             : {})}
         >
           <nav className="min-h-0 overflow-hidden">

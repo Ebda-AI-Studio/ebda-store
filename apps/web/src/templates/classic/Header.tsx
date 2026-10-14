@@ -317,7 +317,9 @@ export default function ClassicHeader({
       <div
         className={`md:hidden grid overflow-hidden transition-[grid-template-rows] ease-out motion-reduce:duration-0 border-t border-border/40 bg-white dark:bg-background ${isMenuOpen ? 'grid-rows-[1fr] duration-[220ms]' : 'grid-rows-[0fr] duration-[160ms]'}`}
         aria-hidden={!isMenuOpen}
-        {...(!isMenuOpen ? ({ inert: '' } as unknown as React.HTMLAttributes<HTMLDivElement>) : {})}
+        {...(!isMenuOpen
+          ? ({ inert: true } as unknown as React.HTMLAttributes<HTMLDivElement>)
+          : {})}
       >
         <div className="min-h-0 overflow-hidden">
           <nav className="container mx-auto px-4 py-5" dir={isRtl ? 'rtl' : 'ltr'}>
