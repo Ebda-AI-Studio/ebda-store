@@ -8,7 +8,7 @@ import { useLanguage } from './LanguageContext';
 import { useStore } from './StoreContext';
 
 import { readLocalCart, toSyncPayload } from './cart-hydration';
-import { cartTotals, mapServerItem, type ServerCartItem } from './cart-lines';
+import { cartTotals, mapServerItem, sameLine, type ServerCartItem } from './cart-lines';
 
 export interface CartItem {
   // Server cart_item row id once the item is synced. Before the first
@@ -27,6 +27,8 @@ export interface CartItem {
   /** Resolved variant label (e.g. "Red / Large") for display on the cart page. */
   variantTitle?: string;
   variantTitleAr?: string;
+  /** Personalisation text (e.g. a name to embroider). Part of the line identity — see `sameLine`. */
+  note?: string;
   /**
    * #1766 — the merchant deleted this product. The line is shown as "no
    * longer available", excluded from `total`/`itemCount`, and must be removed
@@ -255,18 +257,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       quantity: number = 1
     ): Promise<boolean> => {
       const productId = item.id;
+      const line = { productId, variantId: item.variantId, note: item.note || undefined };
 
       // Optimistic update so the cart badge + drawer update immediately.
       setItems(prev => {
-        const existing = prev.find(
-          i => i.productId === productId && i.variantId === item.variantId
-        );
+        const existing = prev.find(i => sameLine(i, line));
         if (existing) {
-          return prev.map(i =>
-            i.productId === productId && i.variantId === item.variantId
-              ? { ...i, quantity: i.quantity + quantity }
-              : i
-          );
+          return prev.map(i => (sameLine(i, line) ? { ...i, quantity: i.quantity + quantity } : i));
         }
         return [
           ...prev,
@@ -281,17 +278,38 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             image: item.image,
             category: item.category,
             variantId: item.variantId,
+            note: line.note,
           },
         ];
       });
 
       try {
-        const res = await api.addToCart(productId, quantity, item.variantId ?? undefined);
+        const res = await api.addToCart(
+          productId,
+          quantity,
+          item.variantId ?? undefined,
+          line.note
+        );
         if (res.success && res.data?.cart) {
           setItems((res.data.cart.items as ServerCartItem[]).map(mapServerItem));
           setBundles(
             ((res.data.cart.bundles as ServerCartBundle[] | undefined) ?? []).map(mapServerBundle)
           );
+        } else if (res.error?.code === 'PERSONALISATION_REQUIRED') {
+          // A quick-add (product card, carousel, wishlist) on a product whose
+          // merchant requires personalisation: the text can only be typed on the
+          // PDP, so send the shopper there instead of a dead-end error toast.
+          await refetchCart().catch(() => {});
+          toast.info(
+            t('Personalise it first', 'اكتب التخصيص الأول'),
+            t('Add your text on the product page.', 'اكتبه في صفحة المنتج.')
+          );
+          // Plain navigation, not useRouter: this provider also renders outside
+          // the app router (tests, the layout render harnesses).
+          if (item.slug && typeof window !== 'undefined') {
+            window.location.assign(`/products/${encodeURIComponent(item.slug)}`);
+          }
+          return false;
         } else {
           await refetchCart();
           throw new Error(res.error?.message || 'Failed to add item to cart');

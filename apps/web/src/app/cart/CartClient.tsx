@@ -29,6 +29,7 @@ import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
 import { resolveColor, checkMinimumOrder, computeOrderAmounts } from '@ebda/shared';
 import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
+import { CartLineNote } from '../../components/commerce/CartLineNote';
 
 export default function CartClient() {
   const {
@@ -570,6 +571,7 @@ export default function CartClient() {
                         image: item.image,
                         variantTitle: item.variantTitle,
                         variantTitleAr: item.variantTitleAr,
+                        note: item.note,
                         unavailable: item.unavailable,
                       }))}
                       isRtl={language === 'ar'}
@@ -642,6 +644,10 @@ export default function CartClient() {
                                       : item.variantTitle}
                                   </p>
                                 )}
+                                <CartLineNote
+                                  note={item.note}
+                                  className="mt-0.5 text-sm text-muted-foreground"
+                                />
                                 {item.unavailable && <CartLineUnavailableNotice />}
                                 <p
                                   className="mt-1 text-base font-bold text-muted-foreground sm:text-lg"

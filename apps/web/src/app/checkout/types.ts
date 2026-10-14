@@ -5,6 +5,8 @@ export interface CheckoutCartItem {
   productId: string;
   quantity: number;
   price: number;
+  /** Personalisation text shown under the line name. */
+  note?: string;
   product: {
     id: string;
     name: string;

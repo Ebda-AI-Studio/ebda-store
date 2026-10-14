@@ -26,6 +26,7 @@ import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import type { ProductFact } from '@ebda/shared';
 import { FactsTable } from '../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../components/commerce/DeliveryChip';
+import { PersonalisationField } from '../../components/commerce/PersonalisationField';
 import {
   CloseIcon,
   DAHAB_BTN_PRIMARY,
@@ -70,6 +71,10 @@ export interface DahabProductDetailProps {
   facts?: ProductFact[];
   /** Made-to-order business days; feeds the delivers-by chip under the buy button. */
   leadTimeDays?: number | null;
+  /** Raw PersonalisationConfig; the field renders above the buy row only when enabled. */
+  personalisation?: unknown;
+  note?: string;
+  onNoteChange?: (v: string) => void;
   /** Spec table, WhatsApp order button, share row — platform components. */
   specs?: ReactNode;
   extras?: ReactNode;
@@ -394,6 +399,15 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 onVariantSelect={p.onVariantSelect}
                 onShopperSelect={p.onShopperSelect}
                 appearance="swatch"
+              />
+            )}
+
+            {p.onNoteChange && (
+              <PersonalisationField
+                config={p.personalisation}
+                value={p.note ?? ''}
+                onChange={p.onNoteChange}
+                className="mt-8"
               />
             )}
 

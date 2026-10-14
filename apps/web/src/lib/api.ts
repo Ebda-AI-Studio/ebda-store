@@ -23,7 +23,7 @@
  * admin app uses a simpler 'authToken' approach.
  */
 import { isIosWebkit } from '@ebda/shared';
-import type { PublicModel3d, ProductFact } from '@ebda/shared';
+import type { PublicModel3d, ProductFact, PersonalisationConfig } from '@ebda/shared';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
@@ -130,6 +130,8 @@ interface Product {
   facts?: ProductFact[];
   /** Made-to-order business days; null/absent = ready to ship. Feeds the PDP delivers-by chip. */
   leadTimeDays?: number | null;
+  /** PDP personalisation field (PersonalisationConfig); null/absent = no field. */
+  personalisation?: PersonalisationConfig | null;
   inventory?: number;
   /** Server-computed: inventory <= 0 && allowBackorder. Keeps Add-to-Cart
    *  enabled for out-of-stock backorderable products (the cart/order API
@@ -191,6 +193,8 @@ interface CartItem {
   productId: string;
   quantity: number;
   price: number;
+  /** Personalisation text; part of the line identity. */
+  note?: string | null;
   product: Product;
 }
 
@@ -270,6 +274,10 @@ interface Order {
     quantity: number;
     price: number;
     product?: Product;
+    /** Snapshotted variant title (storefront orders since B0 Task 5). */
+    variantName?: string | null;
+    /** The customer's personalisation text for this line. */
+    personalisation?: string | null;
     /**
      * Set when this line is a bundle component (Task 6). `bundleGroupId`
      * groups the lines that came from ONE box — group by it to render a
@@ -1175,14 +1183,16 @@ class ApiClient {
     return this.request<{ cart: Cart }>('/public/cart');
   }
 
-  async addToCart(productId: string, quantity = 1, variantId?: string) {
+  async addToCart(productId: string, quantity = 1, variantId?: string, note?: string) {
     return this.request<{ cart: Cart }>('/public/cart/items', {
       method: 'POST',
-      body: JSON.stringify({ productId, quantity, variantId }),
+      body: JSON.stringify({ productId, quantity, variantId, ...(note ? { note } : {}) }),
     });
   }
 
-  async syncCart(items: Array<{ productId: string; quantity: number; variantId?: string }>) {
+  async syncCart(
+    items: Array<{ productId: string; quantity: number; variantId?: string; note?: string }>
+  ) {
     return this.request<{ cart: Cart }>('/public/cart/sync', {
       method: 'POST',
       body: JSON.stringify({ items }),

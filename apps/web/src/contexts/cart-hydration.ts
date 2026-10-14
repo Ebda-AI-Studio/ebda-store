@@ -42,12 +42,15 @@ export function readLocalCart(storageKey: string): CartItem[] {
  */
 export function toSyncPayload(
   localItems: CartItem[]
-): Array<{ productId: string; quantity: number; variantId?: string }> {
+): Array<{ productId: string; quantity: number; variantId?: string; note?: string }> {
   return localItems
     .filter(i => (i.productId || i.id) && i.quantity > 0)
     .map(i => ({
       productId: (i.productId || i.id) as string,
       quantity: i.quantity,
       variantId: i.variantId,
+      // The note is part of the line identity — dropping it here would merge
+      // "Sara" and "Omar" into one unnamed line on the guest→server sync.
+      ...(i.note ? { note: i.note } : {}),
     }));
 }

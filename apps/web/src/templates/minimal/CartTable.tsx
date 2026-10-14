@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { CartTableProps } from '../types';
 import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
+import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 
@@ -62,6 +63,7 @@ export default function MinimalCartTable({
                     {isRtl && item.variantTitleAr ? item.variantTitleAr : item.variantTitle}
                   </p>
                 )}
+                <CartLineNote note={item.note} />
                 {item.unavailable && <CartLineUnavailableNotice />}
                 <p
                   className="mt-1 text-sm text-muted-foreground tabular-nums"

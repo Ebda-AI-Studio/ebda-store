@@ -13,6 +13,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { useNumerals } from '../../hooks/useNumerals';
 import { DahabDrawer } from './Drawer';
+import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { DAHAB_BTN_PRIMARY, DAHAB_BTN_SECONDARY, MinusIcon, PlusIcon, cx } from './ui';
 
 export function DahabCartDrawer({
@@ -127,6 +128,7 @@ export function DahabCartDrawer({
                     </p>
                   </div>
                   {variant && <p className="mt-1 text-xs text-muted-foreground">{variant}</p>}
+                  <CartLineNote note={item.note} />
                   {item.unavailable && (
                     <p className="mt-1 text-xs text-destructive-ink">
                       {t('No longer available', 'لم تعد متاحة')}

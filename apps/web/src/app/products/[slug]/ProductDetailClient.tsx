@@ -50,6 +50,11 @@ import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
 import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
+import {
+  PersonalisationField,
+  personalisationMissing,
+} from '../../../components/commerce/PersonalisationField';
+import { cleanNote } from '@ebda/shared';
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
 const FrequentlyBoughtTogether = dynamic(() =>
@@ -162,6 +167,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const [isLoading, setIsLoading] = useState(!initialProduct);
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  // Per-item personalisation text (e.g. the name to embroider). Part of the cart line identity.
+  const [note, setNote] = useState('');
   const [selectedImage, setSelectedImage] = useState(0);
   const [isAdding, setIsAdding] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -415,6 +422,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
       return;
     }
 
+    if (personalisationMissing(product.personalisation, note)) return;
+
     setIsAdding(true);
     const added = await addItem(
       {
@@ -428,6 +437,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
         category: product.categories?.[0]?.category?.name,
         // Pass the variantId so the backend can track the correct SKU
         variantId: selectedVariant?.id,
+        note: cleanNote(note) ?? undefined,
       },
       quantity
     );
@@ -558,6 +568,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const canBackorder =
     outOfStock &&
     (selectedVariant ? selectedVariant.acceptsBackorder : product.acceptsBackorder) === true;
+  // THE add-to-cart disabled rule. Every buy button on this page (default button,
+  // Dahab main + pinned bar, any sticky bar) reads this one value, so a required
+  // personalisation can never be skipped by a second button.
+  const addDisabled =
+    (outOfStock && !canBackorder) ||
+    variantRequired ||
+    personalisationMissing(product.personalisation, note);
 
   // Custom (merchant-authored) badge on the PDP. A badge that shows on the
   // card and then vanishes on the product's own page is the same defect as
@@ -664,7 +681,10 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             }
             onAddToCart={handleAddToCart}
             isAdding={isAdding}
-            addDisabled={(outOfStock && !canBackorder) || variantRequired}
+            addDisabled={addDisabled}
+            personalisation={product.personalisation}
+            note={note}
+            onNoteChange={setNote}
             addLabel={
               variantRequired
                 ? t('Choose options', 'اختيار المقاس')
@@ -1007,6 +1027,12 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 />
               )}
 
+              <PersonalisationField
+                config={product.personalisation}
+                value={note}
+                onChange={setNote}
+              />
+
               {/* Quantity & Add to Cart */}
               <div className="mt-8 space-y-4">
                 <div className="flex items-center gap-4">
@@ -1064,7 +1090,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     className="flex-1"
                     onClick={handleAddToCart}
                     isLoading={isAdding}
-                    disabled={(outOfStock && !canBackorder) || variantRequired}
+                    disabled={addDisabled}
                   >
                     {variantRequired
                       ? t('Select Options', 'اختر الخيارات')

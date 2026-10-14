@@ -17,6 +17,7 @@ import { firePurchasePixelOnce } from '../../../lib/purchase-pixel-guard';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatDate } from '@/lib/format-date';
 import { useLastListing } from '../../../hooks/useLastListing';
+import { CartLineNote } from '../../../components/commerce/CartLineNote';
 import { groupOrderLinesForDisplay, fromMinor, REGION, storeNumerals } from '@ebda/shared';
 
 // Payment verification outcome that drives the truthful headline/icon.
@@ -312,6 +313,10 @@ function SuccessContent() {
                         <p className="font-medium text-foreground">
                           {row.item.product?.name || 'Product'}
                         </p>
+                        <CartLineNote
+                          note={row.item.personalisation}
+                          className="text-sm text-muted-foreground"
+                        />
                         <p className="text-sm text-muted-foreground">
                           {t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: {row.item.quantity}
                         </p>

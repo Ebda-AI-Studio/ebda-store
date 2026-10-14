@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { CartTableProps } from '../types';
 import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
+import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
@@ -52,6 +53,7 @@ export default function DahabCartTable({
                     {name}
                   </Link>
                   {variant && <p className="mt-1 text-xs text-muted-foreground">{variant}</p>}
+                  <CartLineNote note={item.note} />
                   {item.unavailable && <CartLineUnavailableNotice />}
                   <p
                     className="mt-1.5 text-sm tabular-nums text-muted-foreground"

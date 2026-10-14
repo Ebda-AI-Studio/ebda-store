@@ -282,6 +282,7 @@ export default function CheckoutClient() {
           productId: item.productId,
           quantity: item.quantity,
           price: item.price,
+          note: item.note,
           product: {
             id: item.productId,
             name: item.name,
