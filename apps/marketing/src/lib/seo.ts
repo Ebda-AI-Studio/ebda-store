@@ -14,11 +14,17 @@ import {
 
 type Page = PageSlug;
 
+const productLabel = (locale: Locale) =>
+  locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn;
+const productAlt = (locale: Locale) =>
+  locale === 'ar' ? BRAND.product.nameEn : BRAND.product.nameAr;
+
 const OG_IMAGE = {
   url: '/og.png',
   width: 1200,
   height: 630,
-  alt: 'ابدأ استوديو للذكاء الاصطناعي Ebda AI Studio — بابك لبدء مشروعك. Your doorway to business.',
+  // Describes what og.png shows (the wordmark, «ابدأ متجرك» and the domain), nothing else.
+  alt: `ebda ابدأ — ابدأ متجرك · ${BRAND.domains.marketing}`,
 };
 
 /** Metadata for a page in a locale, incl. canonical + hreflang alternates. */
@@ -29,7 +35,9 @@ export function pageMetadata(
   description?: string
 ): Metadata {
   const c = COPY[locale];
-  const name = locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn;
+  // Titles, OG and Twitter name the PRODUCT (ruling PRODUCT-NAME-1); the studio is only the
+  // publisher / organization (see jsonLd).
+  const name = productLabel(locale);
   const t = title ? (title.includes(name) ? title : `${title} | ${name}`) : c.meta.title;
   const d = description ?? c.meta.description;
   const languages: Record<string, string> = {
@@ -65,7 +73,10 @@ export function pageMetadata(
   };
 }
 
-/** JSON-LD graph: Organization + WebSite + SoftwareApplication (offers from PLANS) + FAQPage (home). No ratings. */
+/**
+ * JSON-LD graph: Organization (the studio, the publisher) + WebSite and SoftwareApplication (both name the
+ * product, «ابدأ ستور» / Ebda Store) + FAQPage (home). Offers come from PLANS. No ratings.
+ */
 export function jsonLd(locale: Locale) {
   const c = COPY[locale];
   const org = `${SITE_URL}/#organization`;
@@ -88,15 +99,15 @@ export function jsonLd(locale: Locale) {
         '@type': 'WebSite',
         '@id': site,
         url: absoluteUrl(HOME[locale]),
-        name: locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn,
-        alternateName: locale === 'ar' ? BRAND.company.shortNameEn : BRAND.company.shortNameAr,
+        name: productLabel(locale),
+        alternateName: productAlt(locale),
         inLanguage: locale,
         publisher: { '@id': org },
       },
       {
         '@type': 'SoftwareApplication',
-        name: BRAND.product.nameEn,
-        alternateName: BRAND.product.nameAr,
+        name: productLabel(locale),
+        alternateName: productAlt(locale),
         applicationCategory: 'BusinessApplication',
         operatingSystem: 'Web',
         description: c.meta.description,

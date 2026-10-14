@@ -70,6 +70,13 @@ describe('JSON-LD', () => {
       const g = JSON.parse(JSON.stringify(jsonLd(locale)))['@graph'];
       const byType = Object.fromEntries(g.map((n: { '@type': string }) => [n['@type'], n]));
       expect(byType.Organization.sameAs).toEqual([]);
+      // the studio is the organization / publisher; the site and the app are the product
+      expect(byType.Organization.name).toBe('Ebda AI Studio');
+      const product = locale === 'ar' ? 'ابدأ ستور' : 'Ebda Store';
+      expect(byType.WebSite.name).toBe(product);
+      expect(byType.SoftwareApplication.name).toBe(product);
+      expect(byType.WebSite.publisher['@id']).toBe(byType.Organization['@id']);
+      expect(byType.SoftwareApplication.publisher['@id']).toBe(byType.Organization['@id']);
       expect(byType.Organization.logo).toMatch(/^https:\/\/ebda\.app\//);
       const offers = byType.SoftwareApplication.offers;
       expect(offers.map((o: { price: string }) => o.price)).toEqual(
@@ -103,12 +110,12 @@ describe('every page exports metadata with a canonical', () => {
       // The home pages inherit metadata from their locale layout.
       const meta = mod.metadata ?? (await import(path.join(dir, 'layout.tsx'))).metadata;
       expect(meta, `${rel} must export metadata`).toBeTruthy();
-      expect(meta.title).toContain(isEn ? 'Ebda AI Studio' : 'ابدأ استوديو للذكاء الاصطناعي');
+      // the PRODUCT is named in the title, OG and Twitter; the studio is only the publisher
+      expect(meta.title).toContain(isEn ? 'Ebda Store' : 'ابدأ ستور');
+      expect(meta.openGraph.title).not.toMatch(/Ebda AI Studio\s*$/);
       expect(meta.openGraph.title).toBe(meta.title);
       expect(meta.twitter.title).toBe(meta.title);
-      expect(meta.openGraph.siteName).toBe(
-        isEn ? 'Ebda AI Studio' : 'ابدأ استوديو للذكاء الاصطناعي'
-      );
+      expect(meta.openGraph.siteName).toBe(isEn ? 'Ebda Store' : 'ابدأ ستور');
       expect(meta.description).toBeTruthy();
       expect(meta.alternates.canonical).toBe(pagePath(isEn ? 'en' : 'ar', page));
       expect(Object.keys(meta.alternates.languages).sort()).toEqual(['ar', 'en', 'x-default']);
