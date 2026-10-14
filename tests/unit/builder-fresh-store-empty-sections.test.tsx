@@ -78,7 +78,9 @@ const withDividers = () =>
       bestSellers: { dividers: { above: { enabled: true } } },
       brandStory: { dividers: { above: { enabled: true } } },
       blogCarousel: { dividers: { above: { enabled: true } } },
-      testimonials: { dividers: { above: { enabled: true } } },
+      // Testimonials default OFF for new stores (fake-reviews posture); the
+      // merchant opts in, so the empty-hint / render paths need it on here.
+      testimonials: { enabled: true, dividers: { above: { enabled: true } } },
     } as never,
     'modern'
   );
@@ -194,12 +196,14 @@ describe('image-text with nothing in it', () => {
 });
 
 describe('provisioning defaults', () => {
-  it('writes no layout, section or seeded content, so a new store gets the data-driven default document', () => {
+  it('writes no sections or seeded content (only the new-store trust-strip layout), so a new store gets the data-driven default document', () => {
     const src = readFileSync(
       join(__dirname, '../../apps/api/src/services/provisioning.service.ts'),
       'utf8'
     );
-    expect(src).not.toMatch(/layoutSettings|pageDefinition|builderDocument|tx\.product\.create/);
+    expect(src).not.toMatch(/pageDefinition|builderDocument|tx\.product\.create/);
+    // The one layout it writes is the trust strip switched off (items: []).
+    expect(src).toMatch(/layoutSettings: NEW_STORE_LAYOUT_SETTINGS/);
     // The only content row it seeds is the one default category.
     expect(src).toMatch(/tx\.category\.create/);
   });
