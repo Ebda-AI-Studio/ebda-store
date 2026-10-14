@@ -103,11 +103,11 @@ describe('every page exports metadata with a canonical', () => {
       // The home pages inherit metadata from their locale layout.
       const meta = mod.metadata ?? (await import(path.join(dir, 'layout.tsx'))).metadata;
       expect(meta, `${rel} must export metadata`).toBeTruthy();
-      expect(meta.title).toContain(isEn ? 'Ebda AI Studio' : 'ابدأ ستوديو للذكاء الاصطناعي');
+      expect(meta.title).toContain(isEn ? 'Ebda AI Studio' : 'ابدأ استوديو للذكاء الاصطناعي');
       expect(meta.openGraph.title).toBe(meta.title);
       expect(meta.twitter.title).toBe(meta.title);
       expect(meta.openGraph.siteName).toBe(
-        isEn ? 'Ebda AI Studio' : 'ابدأ ستوديو للذكاء الاصطناعي'
+        isEn ? 'Ebda AI Studio' : 'ابدأ استوديو للذكاء الاصطناعي'
       );
       expect(meta.description).toBeTruthy();
       expect(meta.alternates.canonical).toBe(pagePath(isEn ? 'en' : 'ar', page));
