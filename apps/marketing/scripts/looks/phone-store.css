@@ -19,6 +19,11 @@
     overscroll-behavior-y: contain;
   }
 }
+/* a page (product, demo checkout) covers the whole home: its sticky bars (cart bar, tabs, header) must not
+   show through or stack with the page's own bar; sheets keep the dimmed home visible */
+&.ps-covered > :not(.ps-layer) {
+  visibility: hidden;
+}
 & [data-p-id] {
   cursor: pointer;
 }

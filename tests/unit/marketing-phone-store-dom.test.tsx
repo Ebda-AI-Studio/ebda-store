@@ -89,6 +89,26 @@ describe('working phone: Qamar A', () => {
     off();
   });
 
+  it('a page (product, demo checkout) covers the home bars; a sheet does not; closing restores them', () => {
+    const { scr, off } = phone('souq', 0);
+    const home = () => scr.classList.contains('ps-covered');
+    expect(home()).toBe(false);
+    click($(scr, '[data-p-id] .ph[role=button]'));
+    expect(home()).toBe(true);
+    expect($(scr, '.cart').closest('[inert]') ?? scr.querySelector('.cart[inert]')).toBeTruthy();
+    click($(scr, '.ps-pdp [data-ps-act=add]'));
+    click($(scr, '.ps-pdp [data-ps-act=back]'));
+    expect(home()).toBe(false);
+    click($(scr, '.ib[data-open-cart]'));
+    expect(home()).toBe(false); // the cart sheet over the home keeps the dimmed home visible
+    click($(scr, '.ps-cart [data-ps-act=checkout]'));
+    expect(home()).toBe(true);
+    esc(scr);
+    expect(home()).toBe(false);
+    expect(scr.querySelector('[inert]')).toBeNull();
+    off();
+  });
+
   it('quick add on a product with sizes opens its page; the empty cart says so', () => {
     const { scr, off } = phone('qamar', 1);
     click($(scr, '.ib[data-open-cart]'));

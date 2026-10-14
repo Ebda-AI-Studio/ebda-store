@@ -361,7 +361,8 @@ html[lang='en'] .wm-name {
 
 /* hero (MKT-10): the headline, one primary action and a link to the looks. The phones live in #looks. */
 .hero {
-  padding-block: clamp(28px, 5vw, 80px) clamp(40px, 7vw, 96px);
+  /* no phone any more (MKT-10): the story starts right under the calls to action */
+  padding-block: clamp(24px, 4.5vw, 64px) clamp(8px, 2vw, 24px);
 }
 .hero-inner {
   display: grid;
@@ -542,7 +543,7 @@ html[lang='ar'] .section h2 {
   height: 100svh;
   padding-block: 72px 24px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   overflow: hidden;
 }
 .story-grid {

@@ -448,6 +448,10 @@ ${stepper(l.key, l.qty)}<button type="button" class="ps-rm" data-ps-act="rm" dat
   function updateInert() {
     const open = shown.length > 0;
     scr.classList.toggle('ps-lock', open);
+    scr.classList.toggle(
+      'ps-covered',
+      shown.some(s => s.view.t === 'pdp' || s.view.t === 'done')
+    );
     for (const ch of [...scr.children]) {
       if (ch === layer) continue;
       if (open) ch.setAttribute('inert', '');
@@ -732,7 +736,7 @@ ${stepper(l.key, l.qty)}<button type="button" class="ps-rm" data-ps-act="rm" dat
     cleanups.forEach(fn => fn());
     observers.forEach(io => io.disconnect());
     layer.remove();
-    scr.classList.remove('ps-lock');
+    scr.classList.remove('ps-lock', 'ps-covered');
     for (const ch of [...scr.children]) ch.removeAttribute('inert');
     cartButtons.forEach(b => b.querySelector('.ps-badge')?.remove());
     delete scr.dataset.psMounted;
