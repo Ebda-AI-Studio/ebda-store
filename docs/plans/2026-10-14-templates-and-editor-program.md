@@ -36,6 +36,8 @@ Approved by Ahmad 2026-10-14 ("approve the 3 as options under the template itsel
 ## Phase B — build (one template at a time, Sonnet agents, Opus review)
 Per template, like Dahab: `apps/web/src/templates/<id>/` skin, `TEMPLATE_THEMES` + `TEMPLATE_LAYOUT_BASELINES`, onboarding option, section variants, `docs/ebda/templates/<id>.md`, contrast unit test, demo store seed (`scripts/<id>-demo/`) with a real-looking Egyptian catalogue (photos generated in-palette, labelled illustrative).
 
+Plus the public demo (Ruling MKT-3, `docs/plans/2026-10-14-marketing-levelup.md`): `storedemo.ebda.app`, a seeded demo store with a demo-only selector bar (template → look) that previews any built look without persisting; checkout impossible there. Each template's looks join it as they are built.
+
 ## Phase E — editor pass
 Critique the current editor (impeccable critique + design-critique + apple-design + emil-design-eng) and fix to the bar: direct manipulation on canvas, instant feedback, undo/redo everywhere, autosave state always visible, device preview, phone-usable editor, keyboard paths, Arabic-first labels, no dead ends.
 
