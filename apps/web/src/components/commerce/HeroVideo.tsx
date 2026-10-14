@@ -113,7 +113,6 @@ export function HeroVideo({
     <>
       {children ??
         (poster ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img src={poster} alt={alt} className="absolute inset-0 h-full w-full object-cover" />
         ) : null)}
       {show && (

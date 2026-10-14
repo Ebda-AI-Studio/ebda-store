@@ -225,7 +225,6 @@ export function VariantSelector({
                         style={sw.imageUrl ? undefined : { backgroundColor: sw.hex ?? undefined }}
                       >
                         {sw.imageUrl && (
-                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={sw.imageUrl} alt="" className="h-full w-full object-cover" />
                         )}
                       </span>

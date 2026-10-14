@@ -232,7 +232,9 @@ test.describe('commerce b0 flow @local-stack', () => {
     ]);
 
     // 1. The PDP.
-    await page.goto(`/products/${PRODUCT_SLUG}`, { waitUntil: 'networkidle' });
+    await page.goto(`/products/${PRODUCT_SLUG}`, { waitUntil: 'domcontentloaded' });
+    // Local dev stack: wait for hydration before clicking (buttons are inert until then).
+    await page.waitForLoadState('networkidle');
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
 
     // 2. Swatches, the struck sold-out combo, facts, delivery chip, size guide.
@@ -292,7 +294,8 @@ test.describe('commerce b0 flow @local-stack', () => {
     await sticky.getByRole('button').click();
 
     // 5. The cart: two lines, one note each, and the sticky total bar.
-    await page.goto('/cart', { waitUntil: 'networkidle' });
+    await page.goto('/cart', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
     // CartLineNote renders `✎ <bdi>note</bdi>` (the pencil is its own aria-hidden span).
     const noteLine = (name: string) =>
       page.locator('p', { has: page.locator(`bdi:text-is("${name}")`) });
@@ -303,7 +306,7 @@ test.describe('commerce b0 flow @local-stack', () => {
 
     // 6. COD checkout.
     await page.getByTestId('sticky-cart-total').getByRole('link').click();
-    await page.waitForURL(/\/checkout/);
+    await page.waitForURL(/\/checkout/, { waitUntil: 'domcontentloaded' });
     await fillCheckout(page);
     await page.getByRole('button', { name: 'المتابعة للدفع' }).click();
     await page.getByText('الدفع عند الاستلام').first().click();
@@ -311,7 +314,10 @@ test.describe('commerce b0 flow @local-stack', () => {
       .getByRole('button', { name: /تأكيد الطلب|إتمام الطلب|إتمام|تأكيد/ })
       .last()
       .click();
-    await page.waitForURL(/\/checkout\/success/, { timeout: 60_000 });
+    await page.waitForURL(/\/checkout\/success/, {
+      timeout: 60_000,
+      waitUntil: 'domcontentloaded',
+    });
     orderId = new URL(page.url()).searchParams.get('orderId') ?? '';
 
     // 7. The receipt: both notes, cash on delivery, never "paid".
@@ -345,8 +351,12 @@ test.describe('commerce b0 flow @local-stack', () => {
 async function fillCheckout(page: Page) {
   await page.locator('input[autocomplete="given-name"]').fill('Test');
   await page.locator('input[autocomplete="family-name"]').fill('Buyer');
-  await page.locator('input[autocomplete="tel"]').fill('+201012345678');
-  await page.locator('input[autocomplete="email"]').fill('b0-e2e@example.test');
+  await page.locator('input[autocomplete="tel"]').fill(
+    `+2010${Math.floor(Math.random() * 1e8)
+      .toString()
+      .padStart(8, '0')}`
+  );
+  await page.locator('input[autocomplete="email"]').fill(`b0-e2e-${Date.now()}@example.test`);
   await pickCombobox(page, 'المحافظة', 'القاهرة');
   await pickCombobox(page, 'المنطقة', undefined);
   await page.locator('input[autocomplete="address-line1"]').fill('Test Street');

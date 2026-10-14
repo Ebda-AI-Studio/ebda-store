@@ -21,7 +21,6 @@ export type PersonalisationConfig = z.infer<typeof personalisationConfigSchema>;
 //   LRM/RLM (U+200E/F), line/paragraph separators (U+2028/9), bidi
 //   embeddings/overrides (U+202A-U+202E), isolates (U+2066-U+2069), BOM (U+FEFF).
 const STRIP =
-  // eslint-disable-next-line no-control-regex, no-misleading-character-class
   /[\u0000-\u001F\u007F-\u009F\u061C\u200B-\u200F\u2028\u2029\u202A-\u202E\u2066-\u2069\uFEFF]/g;
 
 /** Customer note with invisible characters stripped and trimmed, NOT capped; empty → null. */
