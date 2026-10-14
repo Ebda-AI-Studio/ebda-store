@@ -4,8 +4,15 @@
  * CI unit test.
  */
 import { containsArabic } from '../description-richness';
+import { isPlaceholderText } from '../placeholder-guard';
 
 export { containsArabic };
+
+// Re-exported under its historical eval-harness name so this stays a single
+// definition shared with the LIVE bulk-sweep write paths
+// (`lib/ai/placeholder-guard.ts`) — the harness and production can no
+// longer drift apart on what counts as "placeholder text".
+export const isPlaceholder = isPlaceholderText;
 
 const ARABIC_CHAR_G = /[؀-ۿݐ-ݿ]/g;
 const LATIN_CHAR_G = /[A-Za-z]/g;
@@ -16,26 +23,6 @@ function scriptCharCount(v: string, pattern: RegExp): number {
 
 export function isNonEmptyString(v: unknown): v is string {
   return typeof v === 'string' && v.trim().length > 0;
-}
-
-/** Placeholder / degenerate content a real generation should never emit. */
-const PLACEHOLDER_PATTERNS = [
-  /^n\/a$/i,
-  /^todo$/i,
-  /^tbd$/i,
-  /^undefined$/i,
-  /^null$/i,
-  /^\.{3,}$/,
-  /^-+$/,
-  /^lorem ipsum/i,
-  /^\[.*\]$/, // "[insert text here]"
-];
-
-export function isPlaceholder(v: unknown): boolean {
-  if (typeof v !== 'string') return true;
-  const t = v.trim();
-  if (!t) return true;
-  return PLACEHOLDER_PATTERNS.some(p => p.test(t));
 }
 
 export function withinLength(v: unknown, max: number): boolean {

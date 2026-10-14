@@ -30,6 +30,7 @@ import {
   trustBadgeBlockSchema,
   TRUST_BADGE_ICONS,
 } from './sections-document-only';
+import { PLACEHOLDER_STARTER_COPY } from './placeholder-copy';
 import { DEFAULT_LAYOUT_SETTINGS } from '../types/store-layout';
 import type { LegacyHomeSectionKey } from './section-keys';
 import { VIEWPORTS, type Viewport } from './viewports';
@@ -440,8 +441,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         settings: {
           heading: 'Our story',
           headingAr: 'حكايتنا',
-          body: 'Tell customers what makes your products special.',
-          bodyAr: 'احكِ لعملائك ما يميز منتجاتك.',
+          body: PLACEHOLDER_STARTER_COPY.imageTextBody.en,
+          bodyAr: PLACEHOLDER_STARTER_COPY.imageTextBody.ar,
           imagePosition: 'start',
           imageAspect: 'square',
         },
