@@ -122,12 +122,31 @@ Read on every call (change takes effect without a rebuild). Integers unless note
 - **Custom domains** — `DOMAIN_CLAIM_TTL_HOURS` (72): a pending/failed claim older than this is released by the `domain-claim-sweep` Inngest cron (every 15 min). A domain is only served once Cloudflare for SaaS reports it verified (`stores.domain_status = 'active'`).
 - **Card testing (online payments only, COD exempt)** — `PAYMENT_ATTEMPTS_PER_STORE_10M` (120), `PAYMENT_ATTEMPTS_PER_IP_10M` (10), `PAYMENT_SESSION_MAX_DECLINES` (5 declines block the checkout session for 1h), `PAYMENT_IP_MAX_DECLINES` (10 per IP per hour), `PAYMENT_ALERT_MIN_ATTEMPTS` (20) and `PAYMENT_ALERT_DECLINE_RATIO` (float 0..1, default 0.6): a store with that many attempts this hour and at least that decline ratio raises a store-scoped P1 (`payment.card_testing.decline_spike`, at most once per store per hour). Counters are Redis fixed windows and fail OPEN when Redis is down.
 
+### Ebda's own ads tracking (platform funnel, 2026-10-14)
+
+All optional. Unset = the feature is a no-op with one info log; nothing breaks. Not the per-merchant storefront pixels. Full guide: `docs/ebda/ads-tracking.md`.
+
+- `EBDA_META_PIXEL_ID` — Ebda's own Meta Pixel / dataset id (public value). With the token below it enables the server-side Conversions API for `CompleteRegistration`, `StoreCreated` and `Purchase` (first paid subscription, EGP).
+- `EBDA_META_CAPI_TOKEN` — **secret.** Conversions API access token for that pixel. Both this and the pixel id are required, else no-op.
+- `EBDA_META_TEST_EVENT_CODE` — optional. Routes server events to Events Manager > Test events (`TEST12345`). Remove it for real traffic.
+- `EBDA_POSTHOG_KEY` — optional public PostHog project key for the server-side `subscription_paid` event (the one funnel step the browser cannot see). Falls back to `NEXT_PUBLIC_POSTHOG_KEY` if set on the API service; host from `NEXT_PUBLIC_POSTHOG_HOST` (default `https://eu.i.posthog.com`).
+- Migration `20261014000000_user_acquisition` adds the nullable `users.acquisition` jsonb column (apply before deploying this API build).
+
 ## Admin (Cloudflare Worker `ebda-admin`)
 
 - `NEXT_PUBLIC_API_URL` — the live API host, `https://api.force-ai.co` (Cloudflare custom domain in front of the Railway API service; the old raw `api-production-c058.up.railway.app` hostname 404s — corrected 2026-09-02)
+- `NEXT_PUBLIC_EBDA_META_PIXEL_ID` — **build-time, public.** Ebda's own Meta Pixel id (same value as the API's `EBDA_META_PIXEL_ID`). Loaded ONLY after the visitor accepts the cookie banner, ONLY on `/signup`, `/verify-email`, `/onboarding`. Unset = no Meta script. GitHub repo **variable** `NEXT_PUBLIC_EBDA_META_PIXEL_ID`, wired in `cf-admin-deploy.yml`. PostHog for the same pages reuses `NEXT_PUBLIC_POSTHOG_KEY` / `_HOST` (named instance `ebda`, consent-gated; the pre-existing operator PostHog provider is separate).
 - `NEXT_PUBLIC_ONESIGNAL_APP_ID` — OneSignal app ID for the admin PWA (`react-onesignal` in `apps/admin`).
 - `NEXT_PUBLIC_SENTRY_DSN_ADMIN` — admin client Sentry DSN. Initialized in `apps/admin/instrumentation-client.ts` (replaced the dead `sentry.client.config.ts`, same latent bug as web — no `withSentryConfig`, fixed 2026-06-25). Server Sentry off on the CF target (instrumentation.ts moved aside). **`next.config.js` is now wrapped in `withSentryConfig` (fixed 2026-07-02, audit H2)** — see the shared `SENTRY_AUTH_TOKEN` note below for source maps/releases. **NOT yet given the `@sentry/cloudflare` worker-entry treatment** that `apps/web` got 2026-07-02; tracked as a follow-up, same pattern.
 - `ADMIN_DEFAULT_FRAME_SRC` — **build-time only** (read in `apps/admin/next.config.js`, which Next evaluates at build time — setting/changing this has NO effect without a rebuild). Overrides the CSP `frame-src` allowlist for every admin route EXCEPT the page-builder live-preview page itself (that route always permits any `https:` origin, since a merchant's custom domain is unknowable at build time — see the file's own comments). **Never set in any environment today** — the default (`https://store.force-ai.co https://*.force-ai.co https://store.forcemediakw.com https://*.forcemediakw.com`) is what ships. Renamed 2026-09-25 from `ADMIN_PREVIEW_FRAME_SRC` — the old name implied it controlled the preview route; it controls the opposite (the catch-all/default route).
+
+## Marketing (Cloudflare Worker `ebda-marketing`, static export)
+
+Build-time only (the site is a static export; values are inlined by `next build` in `cf-marketing-deploy.yml`). All optional.
+
+- `NEXT_PUBLIC_EBDA_META_PIXEL_ID` — Ebda's own Meta Pixel id (GitHub repo variable). Unset = no Meta script.
+- `NEXT_PUBLIC_POSTHOG_KEY` (secret in the workflow) / `NEXT_PUBLIC_POSTHOG_HOST` (variable, default `https://eu.i.posthog.com`) — PostHog funnel. Unset = no PostHog script.
+- Both load only after the cookie banner is accepted. See `docs/ebda/ads-tracking.md`.
 
 ## Web (Cloudflare Worker `ebda-web`)
 
