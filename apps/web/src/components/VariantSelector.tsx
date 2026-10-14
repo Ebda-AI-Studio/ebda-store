@@ -113,15 +113,17 @@ export function VariantSelector({
   }
 
   /**
-   * Return the imageUrl to preview next to a given option value pill, if
-   * any. Picks the first variant matching `[optionName] = value` that has
-   * an `imageUrl` set so the customer can see "200g" looks different from
-   * "50g" before committing to a full selection. Returns undefined when
-   * no matching variant has an image — caller hides the thumbnail.
+   * Thumbnail for a value pill, only when it is TRUE of the value: every
+   * variant that carries `[optionName] = value` shares the same non-null
+   * imageUrl. A single-axis "200g" qualifies; on a multi-axis product one
+   * Rose/S/52 photo must not appear on the "S" and "52" chips. Returns
+   * undefined otherwise, and the caller hides the thumbnail.
    */
   function getThumbnailForValue(optionName: string, value: string): string | undefined {
-    const match = variants.find(v => v.options[optionName] === value && v.imageUrl);
-    return match?.imageUrl;
+    const matching = variants.filter(v => v.options[optionName] === value);
+    const first = matching[0]?.imageUrl;
+    if (!first) return undefined;
+    return matching.every(v => v.imageUrl === first) ? first : undefined;
   }
 
   // Find the currently matched variant for live price/stock display

@@ -113,3 +113,85 @@ describe('VariantSelector swatches', () => {
     expect(screen.getByRole('button', { name: /روز, نفدت الكمية/ })).toBeTruthy();
   });
 });
+
+describe('VariantSelector value thumbnails', () => {
+  const thumbOptions = (names: string[]) =>
+    names.map(n => ({
+      id: n,
+      name: n,
+      values:
+        n === 'Size'
+          ? [{ value: 'S' }, { value: 'M' }]
+          : n === 'Length'
+            ? [{ value: '52' }, { value: '56' }]
+            : [{ value: 'Rose' }, { value: 'Teal' }],
+    })) as unknown as Opt[];
+
+  it('multi-axis: one variant image does not put a thumbnail on Size or Length chips', () => {
+    const opts = thumbOptions(['Color', 'Size', 'Length']);
+    const vs = variants
+      .filter(v => v.options.Color !== 'Plain')
+      .map(v => ({
+        ...v,
+        imageUrl: v.id === 'Rose-S-52' ? 'https://x.r2.dev/rose-s-52.webp' : undefined,
+      }));
+    render(<VariantSelector variants={vs} options={opts} onVariantSelect={() => {}} />);
+    for (const name of ['S', 'M', '52', '56', 'Teal', 'Rose']) {
+      expect(screen.getByRole('button', { name }).querySelector('img')).toBeNull();
+    }
+  });
+
+  it('every Rose variant sharing one image gives the Rose chip that thumbnail', () => {
+    const opts = thumbOptions(['Color']);
+    const vs = [
+      {
+        id: 'r1',
+        price: 1,
+        inventory: 5,
+        options: { Color: 'Rose' },
+        imageUrl: 'https://x.r2.dev/rose.webp',
+      },
+      {
+        id: 'r2',
+        price: 1,
+        inventory: 5,
+        options: { Color: 'Rose' },
+        imageUrl: 'https://x.r2.dev/rose.webp',
+      },
+      { id: 't1', price: 1, inventory: 5, options: { Color: 'Teal' } },
+    ] as ProductVariant[];
+    render(<VariantSelector variants={vs} options={opts} onVariantSelect={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Rose' }).querySelector('img')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Teal' }).querySelector('img')).toBeNull();
+  });
+
+  it('swatch rendering wins over a shared thumbnail', () => {
+    const vs = variants.map(v => ({
+      ...v,
+      imageUrl: v.options.Color === 'Teal' ? 'https://x.r2.dev/t.webp' : undefined,
+    }));
+    render(<VariantSelector variants={vs} options={options} onVariantSelect={() => {}} />);
+    const teal = screen.getByRole('button', { name: /Teal/ });
+    expect(teal.querySelectorAll('img')).toHaveLength(0);
+    expect(teal.querySelector('[data-swatch-hex="#1F4E54"]')).not.toBeNull();
+  });
+
+  it('single axis: each value with its own image keeps its thumbnail', () => {
+    const opts = [
+      { id: 'w', name: 'Weight', values: [{ value: '200g' }, { value: '50g' }] },
+    ] as unknown as Opt[];
+    const vs = [
+      {
+        id: 'a',
+        price: 1,
+        inventory: 5,
+        options: { Weight: '200g' },
+        imageUrl: 'https://x.r2.dev/200.webp',
+      },
+      { id: 'b', price: 1, inventory: 5, options: { Weight: '50g' } },
+    ] as ProductVariant[];
+    render(<VariantSelector variants={vs} options={opts} onVariantSelect={() => {}} />);
+    expect(screen.getByRole('button', { name: '200g' }).querySelector('img')).not.toBeNull();
+    expect(screen.getByRole('button', { name: '50g' }).querySelector('img')).toBeNull();
+  });
+});
