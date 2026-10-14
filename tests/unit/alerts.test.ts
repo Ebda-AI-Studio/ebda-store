@@ -115,6 +115,8 @@ describe('sendAlert — configured', () => {
     expect(body.chat_id).toBe('-1001234567890');
     expect(body.text).toContain('🔴');
     expect(body.text).toContain('[P0 PLATFORM]'); // default scope when omitted
+    // Product name leads the first line (one company bot serves every product).
+    expect(body.text.split('\n')[0]).toMatch(/Ebda Store: /);
     expect(body.text).toContain('payment.webhook.hmac_fail');
     expect(body.text).toContain('tap provider HMAC fail');
     expect(body.text).toContain('"store": "demo-shop"');

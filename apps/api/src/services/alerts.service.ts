@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { BRAND } from '@force/shared';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { redis } from './redis.service';
@@ -124,7 +125,10 @@ function buildMessage(opts: AlertOptions): string {
   const env = config.nodeEnv;
 
   const lines: string[] = [
-    `${emoji} [${opts.level.toUpperCase()} ${scope.toUpperCase()}] ${opts.title}`,
+    // Product name FIRST (Ahmad 2026-10-14): one Ebda AI Studio bot serves every
+    // product (Store, WhatsApp, CRM, ERP…), so each alert says which one broke.
+    `${emoji} ${BRAND.product.nameEn}: ${opts.title}`,
+    `[${opts.level.toUpperCase()} ${scope.toUpperCase()}]`,
   ];
 
   if (scope === 'store' && opts.store) {

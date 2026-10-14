@@ -478,12 +478,12 @@ Sentry / Axiom / PostHog each have their own native notification channels (email
   - `POST /api/v1/alerts/webhooks/axiom?token=<TOKEN>` — Axiom monitor → P1 platform
   - `POST /api/v1/alerts/webhooks/posthog?token=<TOKEN>` — PostHog insight alert → P1 platform
   - `POST /api/v1/alerts/webhooks/generic?token=<TOKEN>` — `{title, body, level, source}` for any other service
-- **Auth**: shared-secret token via querystring `?token=...` or header `x-alerts-token: ...`; gated on `ALERTS_WEBHOOK_TOKEN` env var on Railway. Token rotation = single Railway var change, no code touch.
-- **Result**: regardless of which external service raised the alarm, it lands in the same `@ForceAI1_bot` Telegram chat with the same `[P1 PLATFORM]` header format as the internal call sites.
-- **Configure per external service**:
-  - **Sentry** → Project Settings → Alerts → Create Alert Rule → Action: "Send a notification via an integration" → Webhook → URL = `https://api.force-ai.co/api/v1/alerts/webhooks/sentry?token=<ALERTS_WEBHOOK_TOKEN>`
-  - **Axiom** → dataset → Monitors → New monitor → Notifier: Webhook → URL = `https://api.force-ai.co/api/v1/alerts/webhooks/axiom?token=<ALERTS_WEBHOOK_TOKEN>`
-  - **PostHog** → Insights → Subscriptions → Webhook URL = `https://api.force-ai.co/api/v1/alerts/webhooks/posthog?token=<ALERTS_WEBHOOK_TOKEN>`
+- **Auth**: shared-secret token via querystring `?token=...` or header `x-alerts-token: ...`, checked against `ALERTS_WEBHOOK_TOKEN` (a `wrangler secret` on the `ebda-api` Worker; the value lives in macOS Keychain `ebda-alerts-webhook-token`). **Fail closed in production**: with the secret unset every call gets 503 `alerts_not_configured` (it used to accept any payload — security audit F-06, 2026-10-14).
+- **Delivery**: one company bot, **@EbdaAIStudiobot** (Ebda AI Studio), serves every product. `TELEGRAM_BOT_TOKEN` + `TELEGRAM_ALERT_CHAT_ID` are `ebda-api` Worker secrets (Keychain `ebda-telegram-bot` / `ebda-telegram-alert-chat-id`). Every alert's first line is `<emoji> Ebda Store: <problem>` (product name from `BRAND.product.nameEn`), then the `[LEVEL SCOPE]` tag.
+- **Configured senders**:
+  - **Sentry** (org `whisky11`, projects `ebda-api`/`ebda-web`/`ebda-admin`/`ebda-orders`): internal integration **"Ebda AI Studio Alerts"** subscribed to `issue` webhooks → `https://api.ebda.app/api/v1/alerts/webhooks/sentry?token=<ALERTS_WEBHOOK_TOKEN>`. The route alerts only on `created` (new issue) and `triggered` (alert-rule action); resolved/assigned/archived are acknowledged and dropped.
+  - **PostHog** (EU, project 296820): not wired yet — needs a chosen metric (e.g. zero sign-ups/day) before an insight alert means anything.
+  - **Axiom**: not used by Ebda Store.
 - **What this does NOT do**: it doesn't replace each service's dashboard — Sentry issues still live in Sentry, etc. It only adds Telegram as a parallel notification channel for high-signal events.
 
 ### Verifying end-to-end
