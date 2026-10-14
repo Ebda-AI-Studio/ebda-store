@@ -5050,9 +5050,7 @@ function ExtraSectionCard({
             </label>
             <ColorField
               label={t('extraSection.iconColorLabel')}
-              value={
-                (settings as import('@ebda/shared').TrustStripSettings | undefined)?.iconColor
-              }
+              value={(settings as import('@ebda/shared').TrustStripSettings | undefined)?.iconColor}
               onChange={v => onPatch({ iconColor: v })}
               theme={theme}
             />
@@ -5066,9 +5064,7 @@ function ExtraSectionCard({
             />
             <ColorField
               label={t('extraSection.textColorLabel')}
-              value={
-                (settings as import('@ebda/shared').TrustStripSettings | undefined)?.textColor
-              }
+              value={(settings as import('@ebda/shared').TrustStripSettings | undefined)?.textColor}
               onChange={v => onPatch({ textColor: v })}
               theme={theme}
             />

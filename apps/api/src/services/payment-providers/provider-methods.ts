@@ -3,11 +3,7 @@
  * One place for "which methods does this store's Paymob offer", used by the checkout
  * config, the v1 bridge (`getPaymentMethods`) and the admin.
  */
-import {
-  paymobSettingsBaseSchema,
-  kashierSettingsSchema,
-  fawrySettingsSchema,
-} from '@ebda/shared';
+import { paymobSettingsBaseSchema, kashierSettingsSchema, fawrySettingsSchema } from '@ebda/shared';
 
 export const METHOD_LABELS: Record<string, { name: string; nameAr: string }> = {
   card: { name: 'Card', nameAr: 'بطاقة' },
