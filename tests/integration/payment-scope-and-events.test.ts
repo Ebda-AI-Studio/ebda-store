@@ -98,6 +98,11 @@ describe.skipIf(!hasDb)('payment scope: link/retry outside a tx, events definer'
       data: { storeId: store.id, wbsApiKey: encryption.encrypt('wbs-test-key') },
     });
     storeIds.push(store.id);
+    // WHATSAPP-OFF-1: the WhatsApp payment-link send needs the per-store
+    // `whatsapp` override (the feature is OFF for every plan, `comped` included).
+    await owner.storeFeature.create({
+      data: { storeId: store.id, featureKey: 'whatsapp', enabled: true },
+    });
     await planService.assignPlan(store.id, { planCode: 'comped' });
     const product = await owner.product.create({
       data: {

@@ -28,6 +28,7 @@ import { prisma } from '@force/database';
 import { groupOrderLinesForDisplay, BRAND_MARKETING_URL } from '@force/shared';
 import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
+import { isWhatsappEnabled, FEATURE_DISABLED_BODY } from '../middleware/wa-feature-gate';
 import { makeRateLimitStore, rateLimitRedisClient } from '../middleware/security';
 import {
   EFFECTIVE_STOCK_SELECT,
@@ -1130,6 +1131,13 @@ router.post('/cart/redeem', async (req: Request, res: Response) => {
     });
     if (!store?.wbsEnabled) {
       res.status(403).json({ success: false, error: 'STORE_WBS_DISABLED' });
+      return;
+    }
+
+    // Unauthenticated-by-key endpoint (the signed token is the credential), so it
+    // needs its own feature check: waBridgeAuth does not run here.
+    if (!(await isWhatsappEnabled(store.id))) {
+      res.status(403).json(FEATURE_DISABLED_BODY);
       return;
     }
 

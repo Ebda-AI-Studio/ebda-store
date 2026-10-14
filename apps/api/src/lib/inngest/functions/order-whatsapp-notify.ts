@@ -95,7 +95,7 @@ export async function handleOrderWhatsAppNotify(
     featureService.isFeatureEnabled(storeId, 'whatsapp')
   );
   if (!featureEnabled) {
-    logger.info({ storeId }, '[WBS-NOTIFY] WhatsApp feature not enabled for store — skipping');
+    logger.debug({ storeId }, '[WBS-NOTIFY] WhatsApp feature not enabled for store — skipping');
     return { skipped: 'feature-disabled' };
   }
 

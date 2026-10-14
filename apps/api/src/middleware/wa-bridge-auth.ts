@@ -12,6 +12,12 @@
  *
  * Refuses to match against stores where `wbsEnabled=false` or
  * `wbsClientId is null` (the merchant disconnected the integration).
+ *
+ * Also refuses (403 FEATURE_DISABLED) when the store's `whatsapp` feature
+ * resolves OFF. The WhatsApp Business API integration is flagged OFF for every
+ * store (Ruling WHATSAPP-OFF-1, 2026-10-14); a super-admin StoreFeature
+ * override enables it per store. Public bridge endpoints called by WBS all go
+ * through this middleware, so the gate lives here.
  */
 
 import { Request, Response, NextFunction } from 'express';
@@ -19,6 +25,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { withStore } from '@force/database';
 import { wbsBridgeKeys } from '../lib/definer';
 import { encryption } from '../services/encryption.service';
+import { isWhatsappEnabled, FEATURE_DISABLED_BODY } from './wa-feature-gate';
 import logger from '../lib/logger';
 
 /**
@@ -89,6 +96,12 @@ export async function waBridgeAuth(req: Request, res: Response, next: NextFuncti
     if (!store) {
       logger.warn({ ip: req.ip }, '[wa-bridge-auth] invalid api key');
       res.status(401).json({ success: false, error: 'WBS_API_KEY_INVALID' });
+      return;
+    }
+
+    if (!(await isWhatsappEnabled(store.id))) {
+      logger.debug({ storeId: store.id }, '[wa-bridge-auth] whatsapp feature disabled — refusing');
+      res.status(403).json(FEATURE_DISABLED_BODY);
       return;
     }
 

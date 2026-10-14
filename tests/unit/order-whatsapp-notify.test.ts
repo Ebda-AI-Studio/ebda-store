@@ -87,7 +87,7 @@ vi.mock('@sentry/node', () => ({
 }));
 
 vi.mock('@api/lib/logger', () => ({
-  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 vi.mock('@api/services/feature.service', () => ({
@@ -157,6 +157,21 @@ describe('orderWhatsAppNotify', () => {
     mockPrismaStore.update.mockResolvedValue({});
     mockSendOrderNotification.mockResolvedValue({ messageId: 'wamid.test', status: 'sent' });
   });
+
+  it.each(['order/created', 'order/shipped', 'order/delivered', 'order/refunded'])(
+    'WHATSAPP-OFF-1: %s skips (no send, no store read, no throw) when the whatsapp feature is OFF',
+    async eventName => {
+      const { featureService } = await import('@api/services/feature.service');
+      const isOn = featureService.isFeatureEnabled as ReturnType<typeof vi.fn>;
+      isOn.mockResolvedValueOnce(false);
+      const result = await runHandler(eventName, ORDER_ID, STORE_ID);
+      expect(result).toEqual({ skipped: 'feature-disabled' });
+      expect(isOn).toHaveBeenCalledWith(STORE_ID, 'whatsapp');
+      expect(mockSendOrderNotification).not.toHaveBeenCalled();
+      expect(mockPrismaStore.findUnique).not.toHaveBeenCalled();
+      expect(mockPrismaNotificationLog.create).not.toHaveBeenCalled();
+    }
+  );
 
   it('skips when store is not found', async () => {
     mockPrismaStore.findUnique.mockResolvedValue(null);

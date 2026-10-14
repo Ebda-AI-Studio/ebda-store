@@ -32,6 +32,7 @@ import { hasTenantContext, prisma, withMoneyTx, type Prisma } from '@force/datab
 import { config } from '../config';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { encryption } from '../services/encryption.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
@@ -87,6 +88,10 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // Sends the link through the WhatsApp Business API (WBS) — flagged OFF for
+  // every store (WHATSAPP-OFF-1). The wa.me "share link" flow on the order
+  // page is a different endpoint and does not depend on this flag.
+  requireFeature('whatsapp'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     const storeId = req.params.id;

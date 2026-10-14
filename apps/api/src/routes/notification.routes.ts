@@ -23,11 +23,13 @@ const publicRouter = Router();
 
 // The generic `:channel` param route can't take a single `requireFeature(key)`
 // at the middleware layer (channel isn't known until the request lands), so
-// the gate is resolved per-channel inside the handler instead. `whatsapp`
-// (and any other unlisted channel) is core / not plan-gated here — only the
-// paid channels below need a check. Mirrors requireFeature's fail-closed
-// 403 FEATURE_DISABLED shape + super_admin bypass.
+// the gate is resolved per-channel inside the handler instead. Any unlisted
+// channel is not plan-gated here — only the channels below need a check.
+// `whatsapp` (Business API) is flagged OFF for every store (WHATSAPP-OFF-1).
+// Mirrors requireFeature's fail-closed 403 FEATURE_DISABLED shape + super_admin
+// bypass.
 const GATED_CHANNEL_FEATURES: Partial<Record<string, FeatureKey>> = {
+  whatsapp: 'whatsapp',
   sms: 'sms',
   push: 'push_notifications',
 };
