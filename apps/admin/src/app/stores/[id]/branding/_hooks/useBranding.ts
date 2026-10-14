@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@force/ui';
 import { apiGet, apiPut } from '../../../../../lib/api';
 import { DEFAULT_THEME, type StoreBranding, type StoreTheme } from '../_components/types';
+import { themePatch } from './theme-patch';
 
 interface StoreResponse {
   id: string;
@@ -61,6 +62,10 @@ export function useBranding(storeId: string, messages: ToastMessages) {
   const [branding, setBranding] = useState<StoreBranding | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  // The theme as SHOWN when the page loaded (stored theme over the display
+  // defaults). Saving diffs against it so only the keys the merchant changed
+  // here reach `PUT /theme` — never the defaults (see theme-patch.ts).
+  const [loadedTheme, setLoadedTheme] = useState<StoreTheme | null>(null);
 
   const fetchBranding = useCallback(async () => {
     try {
@@ -94,6 +99,8 @@ export function useBranding(storeId: string, messages: ToastMessages) {
         const addressUrl =
           typeof settingsContact.addressUrl === 'string' ? settingsContact.addressUrl : undefined;
 
+        const shownTheme: StoreTheme = { ...DEFAULT_THEME, ...(store.theme || {}) };
+        setLoadedTheme(shownTheme);
         setBranding({
           id: store.id,
           name: store.name,
@@ -103,7 +110,7 @@ export function useBranding(storeId: string, messages: ToastMessages) {
           favicon: store.favicon,
           description: store.description,
           descriptionAr: store.descriptionAr,
-          theme: { ...DEFAULT_THEME, ...(store.theme || {}) },
+          theme: shownTheme,
           email: store.email,
           phone: store.phone,
           phoneAr: store.phoneAr,
@@ -167,6 +174,11 @@ export function useBranding(storeId: string, messages: ToastMessages) {
         });
       })();
 
+      // Only the keys the merchant changed on this page; nothing at all when
+      // the theme was not touched (a logo/phone edit must not write theme).
+      const changedTheme = themePatch(loadedTheme ?? branding.theme, branding.theme);
+      const themeChanged = Object.keys(changedTheme).length > 0;
+
       const [brandingResult, themeResult, contactResult, socialResult, settingsResult] =
         await Promise.all([
           apiPut(`${basePath}/branding`, {
@@ -178,7 +190,9 @@ export function useBranding(storeId: string, messages: ToastMessages) {
             description: branding.description,
             descriptionAr: branding.descriptionAr,
           }),
-          apiPut(`${basePath}/theme`, branding.theme),
+          themeChanged
+            ? apiPut(`${basePath}/theme`, changedTheme)
+            : Promise.resolve({ data: null, error: null }),
           apiPut(`${basePath}/contact`, {
             email: branding.email,
             phone: branding.phone,
@@ -218,6 +232,7 @@ export function useBranding(storeId: string, messages: ToastMessages) {
         return;
       }
 
+      setLoadedTheme(branding.theme);
       toast.success(messages.saveSuccessTitle, messages.saveSuccessBody);
     } catch (error) {
       console.error('Failed to save branding:', error);
@@ -225,7 +240,7 @@ export function useBranding(storeId: string, messages: ToastMessages) {
     } finally {
       setIsSaving(false);
     }
-  }, [branding, storeId, toast, messages]);
+  }, [branding, loadedTheme, storeId, toast, messages]);
 
   return {
     branding,
