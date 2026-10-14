@@ -491,7 +491,8 @@ export function PageRenderer({
                   // md: visibility so e.g. mobile=grid + desktop=horizontal works.
                   // md (768px) is the platform mobile/desktop boundary.
                   const categoriesInnerClass = sectionSpacingClasses(
-                    layout.categories
+                    layout.categories,
+                    store.look
                   ).innerContainerClass;
                   const common = {
                     categories: templateCategories,
@@ -887,7 +888,7 @@ export function PageRenderer({
             {testimonialsVisible && T.TestimonialRow && (
               <section
                 data-section="testimonials"
-                className={`bg-[hsl(var(--bg-section-alt))] ${sectionSpacingClasses(layout.testimonials).wrapperClass}`}
+                className={`bg-[hsl(var(--bg-section-alt))] ${sectionSpacingClasses(layout.testimonials, store.look).wrapperClass}`}
                 style={sectionBgStyle(layout.testimonials.bgColor, store.theme)}
               >
                 <T.TestimonialRow

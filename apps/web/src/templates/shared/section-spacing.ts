@@ -70,7 +70,10 @@ function visibilityClass(s: SectionPaddingMaxWidthVisibility): string {
  *
  * **Usage:**
  * ```tsx
- * const { wrapperClass, innerContainerClass } = sectionSpacingClasses(layout.hero);
+ * const { wrapperClass, innerContainerClass } = sectionSpacingClasses(layout.hero, store.look);
+ *
+ * // `store.look` (optional) marks UNSET padding axes so a look's --space-unit can scale them;
+ * // omit it and the output is the legacy class list.
  *
  * // On the outer <section> (replaces or augments the baseline py-* classes):
  * <section className={`bg-[hsl(var(--bg-page))] ${wrapperClass}`}>
