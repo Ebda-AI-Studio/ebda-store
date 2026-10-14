@@ -261,6 +261,12 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'إرسال تأكيدات الطلب وتحديثات الشحن والتسليم عبر منصة ابدأ للواتساب التجاري. يربط التاجر حساب الواتساب التجاري الخاص به في صفحة إشعارات الواتساب ويختار قالب Meta معتمد لكل حدث.',
     category: 'marketing',
     tier: 'addon',
+    // hidden (case 1: not launched). The WhatsApp Business API integration is
+    // flagged OFF 2026-10-14 (Ruling WHATSAPP-OFF-1): in NO plan baseline, so no
+    // store resolves it ON, and out of the feature matrix. The code stays; it
+    // launches later with the WhatsApp product (whatsapp.ebda.app / WBS). A
+    // super-admin StoreFeature `whatsapp` override (API) enables one store.
+    hidden: true,
   },
   sms: {
     key: 'sms',

@@ -44,19 +44,18 @@ const STARTER_CORE: FeatureKey[] = [
   'shipping_carriers',
   'bulk_operations',
   'abandoned_cart',
-  // WhatsApp admin access is available to ALL stores by default (managed-agency:
-  // Ahmad onboards every client and WhatsApp is a core offering — default full
-  // access, restrict by exception). The feature still needs per-tenant WABA
-  // config to actually send; the baseline only ungates the admin section so
-  // every merchant can set it up. To restrict a specific client (limited deal),
-  // super-admin sets a StoreFeature `whatsapp` override with enabled=false.
-  'whatsapp',
+  // `whatsapp` (the WhatsApp Business API integration: WBS bridge, templates,
+  // bot, order-update sends) is deliberately in NO baseline. Flagged OFF
+  // 2026-10-14 (Ruling WHATSAPP-OFF-1): the code stays, no merchant sees it;
+  // it launches later with the WhatsApp product (whatsapp.ebda.app / WBS).
+  // A super-admin StoreFeature `whatsapp` override (enabled=true) turns it on
+  // for one store. wa.me links never depend on this flag.
   // Basic inventory (granular sub-feature). The legacy `inventory` parent
   // flag is intentionally NOT in any baseline — new code paths read
   // `inventory.basic` and friends.
   'inventory.basic',
   // Staff accounts: core operational need, universal by default (managed-agency
-  // pattern, like `whatsapp`). Previously in NO baseline yet fully implemented +
+  // pattern). Previously in NO baseline yet fully implemented +
   // ungated → available to every plan anyway but declared-disabled (dead flag).
   // Declaring it here makes the registry/baseline/enforcement agree; staff.routes
   // now calls requireFeature('staff_accounts'), so a super-admin can still
@@ -69,7 +68,7 @@ const STARTER_CORE: FeatureKey[] = [
   // and left the flagship AI Product Feed disabled on every single store
   // (a live storefront returned 404 for /feeds/products.json). Revenue comes
   // from the platform, not from gating the differentiator. Restrict a specific
-  // client via a StoreFeature override, as with `whatsapp` and `staff_accounts`.
+  // client via a StoreFeature override, as with `staff_accounts`.
   'agent_feed',
   'agent_checkout',
   // Answer-Engine Insights (Task 1, 2026-07-22): same AI-first rationale as
@@ -146,8 +145,6 @@ export const PLAN_BASELINE: Record<StorePlan, readonly FeatureKey[]> = {
     'coupons',
     'reviews',
     'inventory.basic',
-    // WhatsApp admin access is universal (managed-agency default — see STARTER_CORE).
-    'whatsapp',
     // 3D product models are on every plan (Ruling R-EBDA-3D-2), the fallback
     // `free` tier included, so a lapsed store's PDP does not lose its models.
     'product_3d',

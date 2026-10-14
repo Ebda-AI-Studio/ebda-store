@@ -155,7 +155,11 @@ class FeatureService {
     // UNDER the per-store overrides so super-admin can still grant/revoke.
     if (flags) {
       map.abandoned_cart = flags.abandonedCartAutomation;
-      map.whatsapp = flags.whatsappAutomation;
+      // `whatsapp` (WhatsApp Business API integration) is deliberately NOT
+      // derived from `flags.whatsappAutomation`: it is flagged OFF for every
+      // plan (Ruling WHATSAPP-OFF-1, 2026-10-14) and only a StoreFeature
+      // override (Layer 2) can turn it on. The plan limit itself stays in the
+      // plans data for when the WhatsApp product launches.
       // Locked pricing (2026-10-05): branding removal -> Growth+Business;
       // merchant-admin MCP (keys, read tools, write tools) -> Growth + Business
       // (2026-10-14, decoupled from `apiAccess`; see planIncludesMerchantMcp).
