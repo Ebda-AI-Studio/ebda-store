@@ -1,7 +1,7 @@
 'use client';
 
 import { LOOKS, type LookTemplate } from '@force/shared';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { defaultIsLookBuilt, type IsLookBuilt } from '../../lib/demo-look';
 
@@ -16,7 +16,7 @@ const TEMPLATE_NAMES: Record<LookTemplate, { en: string; ar: string }> = {
 
 /**
  * Showroom bar for the demo store (`store.isDemo`): picks a BUILT look to preview. Selecting one
- * navigates to `?look=<id>` on the same path (other query params kept); the server applies it
+ * loads `?look=<id>` on the same path (full document load) (other query params kept); the server applies it
  * through the normal composition path (see `lib/demo-look.ts`). Designed-only looks are never
  * listed, so with every look still 'designed' the bar renders nothing. `isBuilt` is injectable
  * for tests (default: the registry's `status === 'built'`).
@@ -29,7 +29,6 @@ export function DemoLookBar({
   isBuilt?: IsLookBuilt;
 }) {
   const { language, t } = useLanguage();
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -41,7 +40,10 @@ export function DemoLookBar({
   const select = (lookId: string) => {
     const params = new URLSearchParams(searchParams?.toString() ?? '');
     params.set('look', lookId);
-    router.push(`${pathname}?${params.toString()}`);
+    // Full document load, not router.push: a search-param-only App Router navigation re-renders
+    // the page segment but NOT the root layout, which is where the look's data-look, CSS vars,
+    // font link and StoreProvider initialStore are applied.
+    window.location.assign(`${pathname}?${params.toString()}`);
   };
 
   return (

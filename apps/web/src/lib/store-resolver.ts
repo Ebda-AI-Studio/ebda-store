@@ -723,14 +723,14 @@ export async function resolveStoreBySlug(slug: string): Promise<ResolvedStore | 
  *
  * There is no path-slug or cookie identifier any more.
  */
-export async function getStore(): Promise<ResolvedStore> {
+export async function getStore(opts: { demoPreview?: boolean } = {}): Promise<ResolvedStore> {
   const domain = await getStoreDomain();
   if (domain) {
     const builderToken = await getBuilderPreviewToken();
     const { store, transient } = await lenientResolve(() =>
       resolveStoreByDomain(domain, builderToken)
     );
-    if (store) return withDemoLookPreview(store);
+    if (store) return opts.demoPreview === false ? store : withDemoLookPreview(store);
     return transient ? TRANSIENTLY_UNRESOLVED_STORE : DEFAULT_STORE;
   }
 

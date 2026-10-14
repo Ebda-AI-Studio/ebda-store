@@ -240,6 +240,13 @@ describe('store-resolver: x-demo-look', () => {
     expect(s.isDemo).toBe(false);
   });
 
+  it('getStore({ demoPreview: false }) (the /og card) never applies the preview', async () => {
+    builtOverride.ids.add('souq.night');
+    fetchMock.mockResolvedValue(apiStore(true));
+    headerBag.value.set('x-demo-look', 'souq.night');
+    expect((await resolver.getStore({ demoPreview: false })).look).toBe('qamar.atelier');
+  });
+
   it('the lenient getStore() applies it the same way', async () => {
     builtOverride.ids.add('souq.night');
     fetchMock.mockResolvedValue(apiStore(true));

@@ -4,15 +4,14 @@
  * `?look=<id>` on the same path, and the label says it is a demo store. Plus the checkout notice
  * that replaces the pay action on a demo store.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeAll } from 'vitest';
 import React from 'react';
 import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 
-const push = vi.fn();
+const assign = vi.fn();
 let pathname = '/products';
 let search = '';
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push }),
   usePathname: () => pathname,
   useSearchParams: () => new URLSearchParams(search),
 }));
@@ -25,12 +24,16 @@ vi.mock('../../contexts/LanguageContext', () => ({
   }),
 }));
 
+beforeAll(() => {
+  Object.defineProperty(window, 'location', { value: { assign }, writable: true });
+});
+
 import { DemoLookBar } from './DemoLookBar';
 import { DemoCheckoutNotice } from './DemoCheckoutNotice';
 
 afterEach(() => {
   cleanup();
-  push.mockReset();
+  assign.mockReset();
   pathname = '/products';
   search = '';
   lang = 'en';
@@ -71,14 +74,14 @@ describe('DemoLookBar', () => {
     pathname = '/products/linen-shirt';
     const { container } = render(<DemoLookBar activeLook="qamar.atelier" isBuilt={isBuilt} />);
     fireEvent.change(container.querySelector('select')!, { target: { value: 'souq.night' } });
-    expect(push).toHaveBeenCalledWith('/products/linen-shirt?look=souq.night');
+    expect(assign).toHaveBeenCalledWith('/products/linen-shirt?look=souq.night');
   });
 
   it('keeps other query params and replaces an existing look', () => {
     search = 'sort=new&look=qamar.atelier';
     const { container } = render(<DemoLookBar activeLook="qamar.atelier" isBuilt={isBuilt} />);
     fireEvent.change(container.querySelector('select')!, { target: { value: 'souq.night' } });
-    expect(push).toHaveBeenCalledWith('/products?sort=new&look=souq.night');
+    expect(assign).toHaveBeenCalledWith('/products?sort=new&look=souq.night');
   });
 
   it('shows the active look as selected', () => {

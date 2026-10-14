@@ -76,14 +76,36 @@ export const CATALOGUE = [
   },
 ];
 
+// pg-connection-string is the parser the pg driver itself uses (transitive dep of pg; not declared
+// here on purpose), so locality is decided from the host the driver will actually connect to.
+import { createRequire } from 'node:module';
+const { parse: parsePgUrl } = createRequire(import.meta.url)('pg-connection-string');
+
+/** The host pg will connect to ('' when none/unparseable). A unix-socket path starts with '/'. */
 export function hostOf(url) {
   try {
-    return new URL(url).hostname.replace(/^\[|\]$/g, '').toLowerCase();
+    new URL(url);
+    return String(parsePgUrl(url).host ?? '')
+      .replace(/^\[|\]$/g, '')
+      .toLowerCase();
   } catch {
     return null;
   }
 }
-export const isLocalUrl = url => ['localhost', '127.0.0.1', '::1'].includes(hostOf(url) ?? '');
+/** `?host=` / `?hostaddr=` can redirect the connection away from the URL authority: never trusted. */
+export function overridesHost(url) {
+  try {
+    const q = new URL(url).searchParams;
+    return q.has('host') || q.has('hostaddr');
+  } catch {
+    return true;
+  }
+}
+export const isLocalUrl = url => {
+  if (overridesHost(url)) return false;
+  const h = hostOf(url);
+  return h !== null && (['localhost', '127.0.0.1', '::1'].includes(h) || h.startsWith('/'));
+};
 
 /** The human-readable plan, printed before anything is written. */
 export function describePlan(url) {

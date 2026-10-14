@@ -149,8 +149,10 @@ async function resolveCardStoreBySlug(slug: string): Promise<ResolvedStore | nul
 export async function GET(request: Request): Promise<Response> {
   const slug = new URL(request.url).searchParams.get('slug');
   // Slug wins (path-based stores); fall back to header-resolved store (custom
-  // domains) or the platform default so the route never throws.
-  const store = (slug ? await resolveCardStoreBySlug(slug) : null) ?? (await getStore());
+  // domains) or the platform default so the route never throws. Never the demo `?look=` preview:
+  // the card is stored publicly, so a previewed colour must not reach it.
+  const store =
+    (slug ? await resolveCardStoreBySlug(slug) : null) ?? (await getStore({ demoPreview: false }));
 
   const primaryHsl = (store.theme as unknown as Record<string, unknown>)?.primaryColor as
     | string

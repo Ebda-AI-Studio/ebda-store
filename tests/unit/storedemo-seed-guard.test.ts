@@ -17,6 +17,20 @@ describe('storedemo seed guard', () => {
     expect(guard(remote, ['--allow-remote']).ok).toBe(false);
     expect(guard(remote, ['--yes-production']).ok).toBe(true);
   });
+  it('refuses a ?host= / ?hostaddr= override that points the driver at another host', () => {
+    for (const u of [
+      pg('a:b@localhost:5432/x?host=ep-x.neon.tech'),
+      pg('a:b@localhost/x?hostaddr=203.0.113.7'),
+      pg('a:b@/x?host=/var/run/postgresql'),
+    ]) {
+      expect(isLocalUrl(u)).toBe(false);
+      expect(guard(u, []).ok).toBe(false);
+    }
+  });
+  it('treats a unix-socket authority as local', () => {
+    expect(isLocalUrl(pg('a:b@%2Fvar%2Frun%2Fpostgresql/x'))).toBe(true);
+    expect(guard(pg('a:b@%2Fvar%2Frun%2Fpostgresql/x'), []).ok).toBe(true);
+  });
   it('refuses a missing or invalid url', () => {
     expect(guard(undefined, ['--yes-production']).ok).toBe(false);
     expect(guard('not a url', ['--yes-production']).ok).toBe(false);
