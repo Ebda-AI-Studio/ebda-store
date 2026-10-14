@@ -20,13 +20,16 @@ export function StickyCartTotal(p: {
   blockedMessage?: string;
 }) {
   const show = p.itemCount > 0;
+  // 'blocked' = the bar also carries the one-line blocked message (~24px taller),
+  // so globals.css reserves more body space for it.
+  const flag = p.disabled && p.blockedMessage ? 'blocked' : '1';
   useEffect(() => {
     if (!show) return;
-    document.body.dataset.stickyCart = '1';
+    document.body.dataset.stickyCart = flag;
     return () => {
       delete document.body.dataset.stickyCart;
     };
-  }, [show]);
+  }, [show, flag]);
   if (!show) return null;
   return (
     <div

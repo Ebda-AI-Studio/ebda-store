@@ -1194,6 +1194,19 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
   body[data-sticky-cart='1'] {
     padding-bottom: calc(8rem + 4.25rem);
   }
+  /* Cart bar with its blocked-message line (~24px taller). */
+  body[data-sticky-cart='blocked'] {
+    padding-bottom: calc(8rem + 4.25rem + 1.5rem);
+  }
+  /* Floating widget (br/bl, bottom 80px, z-60) would sit inside the sticky bar's
+   * band: lift it clear of tab bar (56px) + bar (~68px) + gap. Not top positions. */
+  body[data-sticky-atc='1'] [data-floating-widget='bottom'],
+  body[data-sticky-cart='1'] [data-floating-widget='bottom'] {
+    bottom: calc(140px + env(safe-area-inset-bottom));
+  }
+  body[data-sticky-cart='blocked'] [data-floating-widget='bottom'] {
+    bottom: calc(164px + env(safe-area-inset-bottom));
+  }
 }
 
 /* Sticky bar entrance: ease-out-quint, 300ms. The global reduced-motion rule

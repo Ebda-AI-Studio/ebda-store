@@ -576,6 +576,19 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // personalisation can never be skipped by a second button.
   const noteMissing = personalisationMissing(product.personalisation, note);
   const addDisabled = (outOfStock && !canBackorder) || variantRequired || noteMissing;
+  // ONE source for the buy label and the price text: the main button, the Dahab
+  // pinned bar and the default sticky bar all read these.
+  const addLabel = variantRequired
+    ? t('Select Options', 'اختر الخيارات')
+    : canBackorder
+      ? t('Pre-order', 'اطلب مسبقاً')
+      : outOfStock
+        ? t('Out of Stock', 'غير متوفر')
+        : t('Add to Cart', translations['Add to Cart']);
+  const priceText =
+    pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
+      ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
+      : formatPrice(displayPrice);
   // The WhatsApp order/ask button carries the typed note and follows the SAME
   // required-personalisation gate as add-to-cart.
   const personalisationCfg = activePersonalisation(product.personalisation);
@@ -666,11 +679,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             returnsHref={storeUrl('/returns')}
             excerpt={displayExcerpt}
             description={displayDescription}
-            priceText={
-              pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
-                ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
-                : formatPrice(displayPrice)
-            }
+            priceText={priceText}
             compareText={
               pricing.mode === 'single' && displayCompare && displayCompare > displayPrice
                 ? formatPrice(displayCompare)
@@ -1009,9 +1018,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   data-zone="productPrice"
                   style={zoneStyle(pdpPriceZone, pdpScale)}
                 >
-                  {pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
-                    ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
-                    : formatPrice(displayPrice)}
+                  {priceText}
                 </span>
                 {pricing.mode === 'single' && displayCompare && displayCompare > displayPrice && (
                   <span className="text-lg text-muted-foreground line-through">
@@ -1110,13 +1117,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     isLoading={isAdding}
                     disabled={addDisabled}
                   >
-                    {variantRequired
-                      ? t('Select Options', 'اختر الخيارات')
-                      : canBackorder
-                        ? t('Pre-order', 'اطلب مسبقاً')
-                        : outOfStock
-                          ? t('Out of Stock', 'غير متوفر')
-                          : t('Add to Cart', translations['Add to Cart'])}
+                    {addLabel}
                   </Button>
 
                   <Button
@@ -1266,20 +1267,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
       <StickyAddToCart
         anchorRef={buyRef}
         title={displayName}
-        price={
-          pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
-            ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
-            : formatPrice(displayPrice)
-        }
-        label={
-          variantRequired
-            ? t('Select Options', 'اختر الخيارات')
-            : canBackorder
-              ? t('Pre-order', 'اطلب مسبقاً')
-              : outOfStock
-                ? t('Out of Stock', 'غير متوفر')
-                : t('Add to Cart', translations['Add to Cart'])
-        }
+        price={priceText}
+        label={addLabel}
         disabled={addDisabled || isAdding}
         onAdd={handleAddToCart}
       />

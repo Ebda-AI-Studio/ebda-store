@@ -556,7 +556,10 @@ export function FloatingWidget({ config, theme, isRtl, contact, socials }: Float
     : 'hsl(var(--primary))';
 
   return (
-    <div className={`fixed z-[60] ${responsiveHideClass} flex-col ${positionClass}`}>
+    <div
+      data-floating-widget={position === 'br' || position === 'bl' ? 'bottom' : 'top'}
+      className={`fixed z-[60] ${responsiveHideClass} flex-col ${positionClass}`}
+    >
       {/* Expanded button stack — only rendered when expanded AND there's
           at least one configured button. Direction handled by container
           flex direction. */}
