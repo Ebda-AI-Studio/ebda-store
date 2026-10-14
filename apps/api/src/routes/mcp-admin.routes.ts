@@ -6,6 +6,7 @@ import { resolveStoreBySlug } from '../mcp/resolve-store';
 import { verifyMerchantKey, MERCHANT_MCP_FEATURE, MERCHANT_KEY_HEADER } from '../mcp/merchant-auth';
 import { AppError } from '../middleware/error-handler';
 import { makeRateLimitStore, rateLimitRedisClient } from '../middleware/security';
+import { ADMIN_WRITE_TOOL_NAMES } from '../mcp/tools/admin-write.tools';
 import logger from '../lib/logger';
 
 /**
@@ -126,6 +127,74 @@ export const merchantMcpLimiter = rateLimit({
 router.use(merchantMcpLimiter);
 
 /**
+ * Tighter budget for WRITE tool calls, same shape as `writeLimiter`
+ * (middleware/security.ts, 30/min) but scoped to this router's own
+ * key-fingerprint partitioning (requirement 5, Ahmad 2026-10-10) — a bulk
+ * catalogue READ job must not share a budget with — or be throttled by — a
+ * handful of order mutations. `skip` is true for every non-write call
+ * (reads, `initialize`, `tools/list`), so this limiter is invisible to them;
+ * each streamable-HTTP POST carries exactly one JSON-RPC call (confirmed by
+ * `adminToolCallLog` below, which already reads `body.params.name` per
+ * request), so checking the body here is NOT a race with what actually runs.
+ */
+function isWriteCallMessage(msg: unknown): boolean {
+  const m = msg as { method?: unknown; params?: { name?: unknown } } | undefined;
+  return (
+    m?.method === 'tools/call' &&
+    typeof m?.params?.name === 'string' &&
+    ADMIN_WRITE_TOOL_NAMES.has(m.params.name)
+  );
+}
+
+/**
+ * A JSON-RPC BATCH (array body) would carry N write calls in one HTTP request
+ * and so spend one limiter token for N mutations. Any batch containing a write
+ * call is refused outright (400) before the limiter; single messages are
+ * counted one-to-one.
+ */
+function isAdminWriteToolCall(req: Request): boolean {
+  const body = req.body as unknown;
+  return Array.isArray(body) ? body.some(isWriteCallMessage) : isWriteCallMessage(body);
+}
+
+function rejectWriteBatches(req: Request, res: Response, next: NextFunction): void {
+  if (Array.isArray(req.body) && req.body.some(isWriteCallMessage)) {
+    res.status(400).json({
+      jsonrpc: '2.0',
+      error: {
+        code: -32600,
+        message: 'Batched write calls are not supported; send one write per request.',
+      },
+      id: null,
+    });
+    return;
+  }
+  next();
+}
+router.use(rejectWriteBatches);
+
+export const merchantMcpWriteLimiter = rateLimit({
+  store: makeRateLimitStore(rateLimitRedisClient, 'mmcp-write'),
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  skip: req => !isAdminWriteToolCall(req),
+  // Keyed on the presented key's hash ALONE (no IP): one leaked/valid key
+  // spread over many source IPs still spends ONE write budget. An unverified
+  // key can only ever reach a 404, so its own bucket costs nothing.
+  keyGenerator: req => {
+    const presented = req.get(MERCHANT_KEY_HEADER);
+    return presented
+      ? `mmcpw:${hashMerchantKey(presented).slice(0, 24)}`
+      : `mmcpw:ip:${ipKeyGenerator(req.ip ?? '')}`;
+  },
+  message: { error: 'Too many write requests' },
+});
+router.use(merchantMcpWriteLimiter);
+
+/**
  * Structured `mcp.admin_tool_call` log line. Every admin call is the same
  * `POST /api/v1/mcp/admin/<slug>` with the same 200, so `requestLogger` alone
  * cannot tell a merchant reading analytics from one editing the catalogue.
@@ -167,9 +236,9 @@ async function handleMerchantMcpPost(req: Request, res: Response): Promise<void>
 
   const store = await resolveStoreBySlug(req.params.storeSlug); // throws 404 on miss
 
-  // Fail closed. `merchant_mcp` is in no plan baseline, so this is OFF for
-  // every store until a super-admin turns it on — the whole surface is dark
-  // by default, which is the correct posture for full-CRUD store control.
+  // Fail closed. `merchant_mcp` resolves from the PLAN (Growth + Business) and
+  // is OFF for every other store unless a super-admin overrides it — the whole
+  // surface is dark by default, the correct posture for full-CRUD control.
   const enabled = await featureService.isFeatureEnabled(store.id, MERCHANT_MCP_FEATURE);
   if (!enabled) throw new AppError(404, 'NOT_FOUND', 'Not found');
 

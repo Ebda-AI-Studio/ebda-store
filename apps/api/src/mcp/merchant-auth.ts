@@ -101,8 +101,23 @@ export interface MerchantAuth extends AuthInfo {
   keyId: string;
   /** The human this key acts as. A key is a device, not an identity. */
   userId: string;
+  /**
+   * The owning user's role, re-read on EVERY verification (same `ebda_user_state`
+   * read as the active check). Write tools apply the SAME RBAC permission the
+   * admin route applies to that user (staff cannot delete products over MCP
+   * any more than in the dashboard). Never a scope substitute.
+   */
+  role: string;
   storeId: string;
   scopes: string[];
+  /**
+   * Carried from the verifying request so write tools (merchant-write.ts) can
+   * attribute an audit row without threading `req` through every handler —
+   * mirrors `agent-auth.ts`'s `context.ip`/`context.userAgent` for the buyer
+   * surface. Never a secret; safe on the object the SDK echoes to tools.
+   */
+  ip: string | undefined;
+  userAgent: string | undefined;
 }
 
 /**
@@ -244,8 +259,11 @@ export async function verifyMerchantKey(req: Request, store: McpStore): Promise<
     clientId: key.id,
     keyId: key.id,
     userId: key.userId,
+    role: keyUser!.role,
     storeId: key.storeId,
     scopes: key.scopes,
+    ip: req.ip,
+    userAgent: req.get('user-agent') ?? undefined,
   };
 }
 
