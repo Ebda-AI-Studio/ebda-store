@@ -92,6 +92,7 @@ const NOT_R2_REFERENCES: Record<string, string> = {
   'Product.dimensions': 'numeric width/height/length/weight object',
   'Product.aiFieldSources': 'per-field AI provenance flags',
   'Product.facts': 'spec rows (name/value text pairs + onCard flag), no media',
+  'Product.personalisation': 'PDP text-field config (labels, maxLength, flags), no media',
   'Product.aiBalanceBackup': 'backup of name/description text + aiFieldSources, no media',
   'Order.shippingAddress': 'postal address',
   'Order.billingAddress': 'postal address',

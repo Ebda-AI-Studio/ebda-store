@@ -3,6 +3,17 @@ import { escapeHtml, emailMoney } from './_util';
 import { waMeEmailBlock } from './_wa-me';
 import type { OrderEmailData } from '../email.service';
 
+/** Variant title and the customer's personalisation ("✎ Sara") under the item name, escaped. */
+function itemDetail(item: OrderEmailData['items'][number]): string {
+  const variant = item.variantName
+    ? `<br><span style="font-size: 12px; color: #64748b;">${escapeHtml(item.variantName)}</span>`
+    : '';
+  const note = item.personalisation
+    ? `<br><span style="font-size: 12px;">&#9998; <bdi>${escapeHtml(item.personalisation)}</bdi></span>`
+    : '';
+  return variant + note;
+}
+
 /** Delivery-address lines (street, landmark, area + governorate, country) with no empty/stray lines. */
 function addressHtml(addr: OrderEmailData['shippingAddress'], locale: 'ar' | 'en'): string {
   return orderAddressLines(addr as unknown as Record<string, unknown>, locale)
@@ -134,7 +145,7 @@ export const orderConfirmationTemplate = {
       .map(
         item => `
       <tr>
-        <td>${escapeHtml(item.name)}</td>
+        <td>${escapeHtml(item.name)}${itemDetail(item)}</td>
         <td style="text-align: center;">${item.quantity}</td>
         <td style="text-align: end;">${emailMoney(item.price, d.currency, 'en')}</td>
       </tr>`
@@ -176,7 +187,7 @@ export const orderConfirmationTemplate = {
       .map(
         item => `
       <tr>
-        <td>${escapeHtml(item.nameAr || item.name)}</td>
+        <td>${escapeHtml(item.nameAr || item.name)}${itemDetail(item)}</td>
         <td style="text-align: center;">${item.quantity}</td>
         <td style="text-align: end;">${emailMoney(item.price, d.currency, 'ar')}</td>
       </tr>`

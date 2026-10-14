@@ -136,6 +136,8 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
         order.items as Array<{
           id: string;
           productName: string;
+          variantName?: string | null;
+          personalisation?: string | null;
           quantity: number;
           price: number;
           product?: { nameAr?: string | null } | null;
@@ -149,6 +151,8 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
           : {
               name: row.item.productName,
               nameAr: row.item.product?.nameAr ?? null,
+              variantName: row.item.variantName ?? null,
+              personalisation: row.item.personalisation ?? null,
               quantity: row.item.quantity,
               price: row.item.price,
             }

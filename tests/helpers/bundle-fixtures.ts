@@ -301,8 +301,12 @@ export function cartClientFor(app: Express, storeId: string, sessionId: string) 
   const base = `/api/v1/stores/${storeId}/cart`;
   return {
     getCart: () => request(app).get(base).set('x-session-id', sessionId),
-    addToCart: (body: { productId: string; quantity?: number; variantId?: string }) =>
-      request(app).post(`${base}/items`).set('x-session-id', sessionId).send(body),
+    addToCart: (body: {
+      productId: string;
+      quantity?: number;
+      variantId?: string;
+      note?: string;
+    }) => request(app).post(`${base}/items`).set('x-session-id', sessionId).send(body),
     removeFromCart: (itemId: string) =>
       request(app).delete(`${base}/items/${itemId}`).set('x-session-id', sessionId),
     addBundleToCart: (body: { bundleId: string; quantity?: number }) =>

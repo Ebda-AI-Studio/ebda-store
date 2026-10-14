@@ -14,6 +14,7 @@ import {
   slugifyWithFallback,
   AI_AUTOFILL_FIELD_NAMES,
   type ProductFact,
+  type PersonalisationConfig,
 } from '@ebda/shared';
 import { redis } from './redis.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
@@ -286,6 +287,8 @@ interface CreateProductData {
   facts?: ProductFact[];
   /** Made-to-order business days; `null` clears, `undefined` leaves alone. */
   leadTimeDays?: number | null;
+  /** PDP personalisation field config; `null` clears, `undefined` leaves alone. */
+  personalisation?: PersonalisationConfig | null;
   categories?: string[];
   images?: { url: string; alt?: string }[];
   /** SEO meta — set per-product or via the AI sweep. `null` clears. */
@@ -497,9 +500,19 @@ export const STOREFRONT_PRODUCT_SELECT = {
   // Made-to-order days for the PDP delivers-by chip. CACHE CLASS: BOUNDED-stale, rides the
   // PDP cache; invalidateStoreProductCache (called on every product update) busts it.
   leadTimeDays: true,
+  // PDP personalisation field config (label, maxLength, required). CACHE CLASS: BOUNDED-stale,
+  // rides the PDP cache; invalidateStoreProductCache (every product update) busts it. Display
+  // only: CartService.addItem re-reads the column uncached to enforce required/maxLength.
+  personalisation: true,
   updatedAt: true,
   createdAt: true,
 } as const satisfies Prisma.ProductSelect;
+
+/** Json column write: `null` must become SQL NULL (Prisma.DbNull), `undefined` leaves it alone. */
+function personalisationWrite(v: PersonalisationConfig | null | undefined) {
+  if (v === undefined) return {};
+  return { personalisation: v === null ? Prisma.DbNull : v };
+}
 
 export class ProductService {
   static async list(storeId: string, options: ListProductsOptions = {}) {
@@ -790,6 +803,7 @@ export class ProductService {
         badgeLabelAr: data.badgeLabelAr ?? null,
         ...(data.facts !== undefined ? { facts: data.facts } : {}),
         ...(data.leadTimeDays !== undefined ? { leadTimeDays: data.leadTimeDays } : {}),
+        ...personalisationWrite(data.personalisation),
         images: data.images
           ? {
               create: data.images.map((img, index) => ({
@@ -986,6 +1000,7 @@ export class ProductService {
           ...(data.badgeLabelAr !== undefined ? { badgeLabelAr: data.badgeLabelAr } : {}),
           ...(data.facts !== undefined ? { facts: data.facts } : {}),
           ...(data.leadTimeDays !== undefined ? { leadTimeDays: data.leadTimeDays } : {}),
+          ...personalisationWrite(data.personalisation),
           inventory: data.inventory,
           ...(data.lowStockThreshold !== undefined
             ? { lowStockThreshold: data.lowStockThreshold }

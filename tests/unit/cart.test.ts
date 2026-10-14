@@ -276,6 +276,7 @@ describe('CartService', () => {
           cartId: mockCart.id,
           productId: 'prod-123',
           variantId: null,
+          note: null,
           quantity: 2,
         },
       });
@@ -504,7 +505,13 @@ describe('CartService', () => {
       await CartService.addItem(mockStoreId, mockSessionId, 'prod-123', 3);
 
       expect(prisma.cartItem.create).toHaveBeenCalledWith({
-        data: { cartId: mockCart.id, productId: 'prod-123', variantId: null, quantity: 3 },
+        data: {
+          cartId: mockCart.id,
+          productId: 'prod-123',
+          variantId: null,
+          note: null,
+          quantity: 3,
+        },
       });
     });
   });
@@ -597,6 +604,7 @@ describe('CartService', () => {
           cartId: mockUserCart.id,
           productId: 'prod-2',
           variantId: null,
+          note: null,
           quantity: 1,
         },
       });

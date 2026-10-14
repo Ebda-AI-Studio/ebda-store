@@ -1,0 +1,75 @@
+/**
+ * B0 Task 5: one variant can sit on several lines of one order ("Sara" and
+ * "Omar" on the same abaya). Scan-to-pick must fill the first line still short
+ * of its quantity, then move on — a bare findFirst capped every scan at the
+ * first line and the order never reached fully-picked.
+ *
+ * Mutation proof: go back to picking `candidates[0]` → the second scan lands on
+ * the already-full line and the test goes red.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+type Line = { id: string; quantity: number; pickedQty: number; personalisation: string | null };
+let lines: Line[] = [];
+const update = vi.fn(
+  async ({ where, data }: { where: { id: string }; data: { pickedQty: number } }) => {
+    const l = lines.find(x => x.id === where.id)!;
+    l.pickedQty = data.pickedQty;
+    return l;
+  }
+);
+
+vi.mock('@ebda/database', () => ({
+  prisma: {
+    product: { findFirst: async () => null },
+    productVariant: {
+      findFirst: async () => ({
+        id: 'v1',
+        barcode: 'B1',
+        sku: null,
+        inventory: 5,
+        title: 'M',
+        titleAr: null,
+        productId: 'p1',
+        product: { name: 'Abaya', nameAr: null },
+      }),
+    },
+    orderItem: {
+      findMany: async () =>
+        lines.map(l => ({
+          ...l,
+          orderId: 'o1',
+          productId: 'p1',
+          variantId: 'v1',
+          productName: 'Abaya',
+        })),
+      update: (a: never) => update(a),
+    },
+    $queryRaw: async () => [
+      { remaining: BigInt(lines.filter(l => l.pickedQty < l.quantity).length) },
+    ],
+  },
+  runInTenantContext: vi.fn(),
+  Prisma: { sql: () => ({}), join: () => ({}), empty: {} },
+}));
+
+import { pickOrderItemByBarcode } from '@api/services/barcode-scan.service';
+
+beforeEach(() => {
+  lines = [
+    { id: 'a', quantity: 1, pickedQty: 0, personalisation: 'Sara' },
+    { id: 'b', quantity: 1, pickedQty: 0, personalisation: 'Omar' },
+  ];
+  update.mockClear();
+});
+
+describe('pickOrderItemByBarcode with personalised lines', () => {
+  it('fills the first open line, then the next, and reports the order fully picked', async () => {
+    const first = await pickOrderItemByBarcode('s1', 'o1', 'B1');
+    expect(first.personalisation).toBe('Sara');
+    expect(first.orderFullyPicked).toBe(false);
+    const second = await pickOrderItemByBarcode('s1', 'o1', 'B1');
+    expect(second.personalisation).toBe('Omar');
+    expect(second.orderFullyPicked).toBe(true);
+  });
+});

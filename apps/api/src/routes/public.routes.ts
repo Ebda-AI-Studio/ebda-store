@@ -93,6 +93,8 @@ const addCartItemSchema = z.object({
   productId: z.string().uuid(),
   quantity: z.number().int().min(1).default(1),
   variantId: z.string().uuid().optional(),
+  // Personalisation text. 400 before cleaning; cleanNote caps the stored text at 200.
+  note: z.string().max(400).optional(),
 });
 
 const updateCartItemSchema = z.object({
@@ -544,7 +546,7 @@ router.post('/cart/items', cartLimiter, async (req: Request, res: Response, next
       return;
     }
 
-    const { productId, quantity, variantId } = addCartItemSchema.parse(req.body);
+    const { productId, quantity, variantId, note } = addCartItemSchema.parse(req.body);
     const storeId = await getStoreIdFromRequest(req);
     const cart = await CartService.addItem(
       storeId,
@@ -552,7 +554,8 @@ router.post('/cart/items', cartLimiter, async (req: Request, res: Response, next
       productId,
       quantity,
       undefined,
-      variantId
+      variantId,
+      note
     );
 
     res.json({
@@ -575,6 +578,7 @@ const syncCartSchema = z.object({
         productId: z.string().uuid(),
         quantity: z.number().int().min(1),
         variantId: z.string().uuid().optional(),
+        note: z.string().max(400).optional(),
       })
     )
     .max(100),

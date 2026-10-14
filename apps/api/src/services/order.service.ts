@@ -1545,6 +1545,15 @@ export class OrderService {
                   // already carries variantId; we just have to copy it.
                   variantId: (item as { variantId?: string | null }).variantId ?? null,
                   productName: item.product.name,
+                  // Snapshot the chosen variant's title (Arabic when the buyer
+                  // ordered in Arabic and the merchant wrote one). Storefront
+                  // orders never wrote it, so admin/invoice/email showed no size
+                  // or colour for a variant line; createAdminOrder already did.
+                  variantName: item.variant
+                    ? (data.locale === 'ar' && item.variant.titleAr) || item.variant.title
+                    : null,
+                  // The customer's personalisation text (cart line note).
+                  personalisation: (item as { note?: string | null }).note ?? null,
                   sku: item.product.sku,
                   quantity: item.quantity,
                   // Charge the chosen variant's price (fall back to the parent
