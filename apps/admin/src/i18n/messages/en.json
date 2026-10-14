@@ -5157,6 +5157,7 @@
     },
     "row": {
       "enabledBy": "Enabled by",
+      "hiddenFromMerchants": "Hidden from merchants",
       "enabledOn": "on"
     },
     "matrix": {

@@ -14,3 +14,15 @@ describe('agent_checkout feature key', () => {
     expect(PLAN_BASELINE.free).not.toContain('agent_checkout');
   });
 });
+
+describe('super-admin vs merchant feature lists (WHATSAPP-OFF-1)', () => {
+  it('merchant list hides whatsapp; super-admin list includes only allowlisted hidden features', async () => {
+    const { getVisibleFeatures, getSuperAdminFeatures } = await import('../features');
+    const merchant = getVisibleFeatures().map(f => f.key);
+    const admin = getSuperAdminFeatures().map(f => f.key);
+    expect(merchant).not.toContain('whatsapp');
+    expect(admin).toContain('whatsapp');
+    expect(admin).not.toContain('seo');
+    expect(admin).not.toContain('search_autocomplete');
+  });
+});

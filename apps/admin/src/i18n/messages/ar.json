@@ -5157,6 +5157,7 @@
     },
     "row": {
       "enabledBy": "فُعّل بواسطة",
+      "hiddenFromMerchants": "مخفية عن التجار",
       "enabledOn": "في"
     },
     "matrix": {
