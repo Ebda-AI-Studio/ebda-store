@@ -11,13 +11,18 @@ Ahmad, 2026-10-14: Ebda Store does not launch until Qamar, Souq, Jasmine and Lam
 ## Phase D — directions → looks (decided)
 Round 1 produced 3 directions per template (`docs/ebda/templates/2026-10-14-directions.md`, gallery https://claude.ai/artifact/Xqg35JTvMtrMddaAufvJkg).
 
-**Ruling TPL-1 — every direction ships; none is dropped.** Ahmad, 2026-10-14: each template carries all 3 directions as selectable **looks** (Qamar: Atelier / Lookbook / Vitrine; Souq: Catalogue / Night souq / Showroom; Jasmine: Apothecary / Bloom / Clinic; Lamma: Family table / Kitchen notebook / Fresh market). The merchant picks a look at onboarding or later in the editor, then edits everything. Dahab keeps its one look for now (a second/third Dahab look is a later call). Evidence: the launch rule's goal "fit every person's style" is better served by 3 starting points per vertical than 1. Cost if wrong: 12 looks instead of 4 roughly triples design + scenario-test work before launch.
+**Ruling TPL-1 — every direction ships; none is dropped.** Ahmad, 2026-10-14: each template carries all 3 directions as selectable **looks** (Qamar: Atelier / Lookbook / Vitrine; Souq: Catalogue / Night souq / Showroom; Jasmine: Apothecary / Bloom / Clinic; Lamma: Family table / Kitchen notebook / Fresh market). The merchant picks a look at onboarding or later in the editor, then edits everything. Dahab gets the same treatment (Ruling TPL-2 below). Evidence: the launch rule's goal "fit every person's style" is better served by 3 starting points per vertical than 1. Cost if wrong: 12 looks instead of 4 roughly triples design + scenario-test work before launch.
 
 Consequences:
 - A **look** = a token set (colour roles, type pair, radius, density, image ratio, motion) + a section mix + per-section variant choices + layout topology. It is data over the shared section registry, never a forked skin; commerce logic stays in shared components (Dahab pattern).
 - Switching look keeps the merchant's content (products, text, images, logo); only design changes. Local edits made after a switch show as overrides with reset, and a switch asks before discarding design overrides.
 - Output per look: a design brief (scene sentence, colour strategy, token table, type pair AR+Latin, the bold idea, section mix, motion).
 - The scenario matrix runs per **look** (12 + Dahab), not per template.
+
+**Ruling TPL-2 — Dahab is redesigned as 3 new looks (Worn / Workshop / Gift box); the night+gold+arch skin is retired.** Ahmad, 2026-10-14: "it was designed wrong, not like those". The existing skin's commerce wiring (ProductDetail, drawers, 3D slot, contrast test) is reused; its visual language is not. The live preview store moves to a new look before the old skin is deleted. Cost if wrong: Dahab's approved-for-review work is discarded visually and the pilot timeline restarts.
+
+**Ruling TPL-3 — the illustrative photos are marketing assets.** Ahmad, 2026-10-14: the generated in-palette photos from the directions gallery are used on the marketing site (ebda.app) to show the templates and their looks. They are labelled illustrative (AI-generated sample products, not a real merchant's catalogue), stored in R2 at web sizes, and re-shot per look once each look's final palette is locked. Cost if wrong: a shopper or merchant reads a sample as a real store; the label is what prevents that.
+
 - Known fix before build: the Qamar C hero photo has garbled "ZAS" text; regenerate.
 
 ## Phase S — one system contract (templates ↔ editor)
