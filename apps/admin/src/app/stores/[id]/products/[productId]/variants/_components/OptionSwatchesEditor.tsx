@@ -1,13 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, useToast } from '@ebda/ui';
-import { DEFAULT_THEME, resolveColor } from '@ebda/shared';
+import { DEFAULT_THEME, resolveColor, type StoreTheme } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { ImageUpload } from '@/components/ImageUpload';
 import { ColorField } from '@/components/ColorField';
-import { apiPut } from '../../../../../../../lib/api';
+import { apiGet, apiPut } from '../../../../../../../lib/api';
 import type { Option } from './types';
+
+const FALLBACK_THEME: StoreTheme = DEFAULT_THEME;
 
 interface Props {
   storeId: string;
@@ -30,6 +32,15 @@ export function OptionSwatchesEditor({ storeId, productId, options, onSaved }: P
   const t = useT('products.variants.simpleForm');
   const { success: toastSuccess, error: toastError } = useToast();
   const [saving, setSaving] = useState(false);
+  const [storeTheme, setStoreTheme] = useState<StoreTheme | undefined>();
+  useEffect(() => {
+    apiGet<{ store: { theme?: StoreTheme } }>(`/api/v1/admin/stores/${storeId}`)
+      .then(({ data }) => setStoreTheme(data?.store?.theme))
+      .catch(() => {
+        // non-critical: falls back to the default theme for the picker
+      });
+  }, [storeId]);
+  const theme = storeTheme ?? FALLBACK_THEME;
   const [drafts, setDrafts] = useState<Record<string, Draft>>(() => {
     const init: Record<string, Draft> = {};
     for (const o of options)
@@ -85,10 +96,10 @@ export function OptionSwatchesEditor({ storeId, productId, options, onSaved }: P
                     <ColorField
                       label={t('colSwatchColor')}
                       value={d.hex || undefined}
-                      theme={DEFAULT_THEME}
+                      theme={theme}
                       showContrastPreview={false}
                       onChange={c => {
-                        const hex = c.startsWith('#') ? c : resolveColor(c, DEFAULT_THEME);
+                        const hex = c.startsWith('#') ? c : resolveColor(c, theme);
                         if (!c) patch(v.id, { hex: '' });
                         else if (hex && /^#[0-9a-fA-F]{6}$/.test(hex))
                           patch(v.id, { hex: hex.toLowerCase() });

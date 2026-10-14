@@ -24,5 +24,7 @@ describe('swatch', () => {
     expect(ok('javascript:alert(1)')).toBe(false);
     expect(ok('data:image/png;base64,xx')).toBe(false);
     expect(ok('http://x.com/a.png')).toBe(false);
+    expect(() => ok('not a url')).not.toThrow();
+    expect(ok('not a url')).toBe(false);
   });
 });

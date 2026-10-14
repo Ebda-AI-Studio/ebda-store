@@ -10,7 +10,14 @@ export const optionValueSwatchSchema = z.object({
     .max(2048)
     .url()
     // Rendered into <img>/CSS by the storefront: https only (no javascript:, data:, http:).
-    .refine(v => new URL(v).protocol === 'https:', 'Use an https URL')
+    .refine(v => {
+      // Zod still runs refine after a failed .url(); never throw on a malformed value.
+      try {
+        return new URL(v).protocol === 'https:';
+      } catch {
+        return false;
+      }
+    }, 'Use an https URL')
     .nullable()
     .optional(),
 });
