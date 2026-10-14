@@ -133,12 +133,12 @@ Also included in every tier at no extra charge:
 | `inventory.multi_warehouse`, `inventory.barcode`, `inventory.purchase_orders`, `inventory.bulk_adjustments`     | "Full warehouse management — barcode scanning (receive/pick/cycle-count), multi-location stock, PO workflow"                        | Included in Enterprise                                           |
 | `accounting.tax_reports`, `accounting.multi_currency`, `accounting.profit_anomaly`, `accounting.bank_reconcile` | "Advanced accounting: VAT/tax reports (XLSX), multi-currency FX + KWD conversion, profit anomaly AI, bank reconciliation (CSV/OFX)" | Included in Enterprise                                           |
 
-> **`whatsapp` admin access is baseline-included on every plan (Starter, Professional, Enterprise —
-> even the `free` grace state).** Per `packages/shared/src/plan-baselines.ts`, `whatsapp` is in
-> `STARTER_CORE`, so the `/whatsapp` admin section is available to every client by default
-> (managed-agency default: Ahmad onboards every client and WhatsApp is a core offering). A
-> super-admin can restrict a specific client by exception (a `StoreFeature` `whatsapp` override
-> with `enabled=false`), but it is never sold as a plan upgrade.
+> **`whatsapp` (the WhatsApp Business API integration) is OFF for every store and in NO plan
+> baseline (flagged off 2026-10-14, Ruling `WHATSAPP-OFF-1`).** The code is kept; it launches later
+> with the WhatsApp product (whatsapp.ebda.app / WBS). Until then merchants get free `wa.me` buttons
+> only, and no plan, page or pricing copy mentions WhatsApp automation. A super-admin can enable it
+> for one store with a `StoreFeature` `whatsapp` override (`enabled=true`). The old
+> "managed-agency, universal by default" model (2026-06-09, #94) is retired.
 
 > **What you still charge for is the activation SERVICE, not the feature gate.** Turning on live
 > WhatsApp ordering requires an active Force AI WhatsApp Business Platform account + a

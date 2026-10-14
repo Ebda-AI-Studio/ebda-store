@@ -103,7 +103,9 @@ interface Charge {
 }
 
 const BAR_KEYS = ['maxProducts', 'maxStaff', 'maxOrdersPerMonth'] as const;
-const FEATURE_KEYS = ['customDomain', 'abandonedCartAutomation', 'whatsappAutomation'] as const;
+// `whatsappAutomation` is not listed: the WhatsApp Business API is flagged OFF for
+// every store (Ruling WHATSAPP-OFF-1), so it is not a plan benefit shown to merchants.
+const FEATURE_KEYS = ['customDomain', 'abandonedCartAutomation'] as const;
 
 function UsageBar({
   label,

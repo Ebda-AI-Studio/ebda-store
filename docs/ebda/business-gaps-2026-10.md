@@ -142,7 +142,7 @@ What already exists and is countable today (MEASURED — these give exception CO
 | Payment-webhook failures        | Super-admin `/webhook-events` (replay)                                                                                                                                          |
 | Onboarding stuck                | Setup-guide `done` per item (`packages/shared/src/setup-guide.ts`) — shows WHERE a merchant stalls                                                                              |
 | Refunds                         | Order/refund records (merchant-side; Ebda carries no money for card sales, BYO keys)                                                                                            |
-| WhatsApp connection problems    | Today only a `wa.me` link (no API connection to fail); the inherited WABA admin is in every baseline but needs per-tenant config                                                |
+| WhatsApp connection problems    | Today only a `wa.me` link (no API connection to fail); the inherited WABA admin is flagged OFF for every store (Ruling WHATSAPP-OFF-1) and is not visible to merchants          |
 
 The single biggest "little intervention" risk visible in code is the **manual renewal path**: every merchant who pays by InstaPay/bank instead of card costs a human action every month. Kashier card recurring is the automatic path, and recurring-agreement enablement on Ebda's account still needs written confirmation from Kashier (research brief + STATUS item 9; the latest Kashier commit #54 is a **sandbox** run).
 

@@ -26,7 +26,7 @@
  * This test makes ZERO real DB calls — it's entirely mocked.
  */
 
-import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import { z } from 'zod';
@@ -256,13 +256,21 @@ vi.mock('@force/database', () => {
 // FeatureService.readFromDb needs) — same pattern as
 // tests/unit/backorder-enforcement.test.ts. Every existing test in this file
 // predates bundles and expects the pre-Task-10 catalog shape, so the default
-// resolves `false` — see the dedicated bundles describe block below for the
+// resolves `false` (bar `whatsapp`, see featuresOn) — see the dedicated bundles describe block below for the
 // enabled case.
 vi.mock('../../apps/api/src/services/feature.service', () => ({
   featureService: {
     isFeatureEnabled: vi.fn().mockResolvedValue(false),
   },
 }));
+// The `whatsapp` feature is OFF for every store by default (WHATSAPP-OFF-1);
+// waBridgeAuth refuses 403 unless the store's feature resolves ON, so the
+// contract suite (which tests the bridge as a store with the override) turns
+// ONLY that key on.
+const featuresOn =
+  (...keys: string[]) =>
+  async (_storeId: string, key: string) =>
+    keys.includes(key);
 
 // Mock encryption service — decrypt strips the 'encrypted:' prefix so the
 // stored mock value 'encrypted:<key>' decrypts to '<key>'
@@ -318,7 +326,9 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
     (prisma.bundle.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     (prisma.bundleItem.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     const { featureService } = await import('../../apps/api/src/services/feature.service');
-    (featureService.isFeatureEnabled as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    (featureService.isFeatureEnabled as ReturnType<typeof vi.fn>).mockImplementation(
+      featuresOn('whatsapp')
+    );
   });
 
   afterAll(() => {
@@ -326,6 +336,84 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
   });
 
   // ── Auth matrix ─────────────────────────────────────────────────────────────
+
+  // ── WHATSAPP-OFF-1: the integration is flagged OFF unless the store has the override ──
+
+  describe('whatsapp feature OFF (WHATSAPP-OFF-1)', () => {
+    afterEach(async () => {
+      const { featureService } = await import('../../apps/api/src/services/feature.service');
+      (featureService.isFeatureEnabled as ReturnType<typeof vi.fn>).mockImplementation(
+        featuresOn('whatsapp')
+      );
+    });
+
+    it.each([
+      ['GET', '/api/v1/wa-bridge/health'],
+      ['GET', '/api/v1/wa-bridge/categories'],
+      ['GET', '/api/v1/wa-bridge/store-catalog'],
+      ['GET', '/api/v1/wa-bridge/products/search?q=a'],
+      ['GET', '/api/v1/wa-bridge/store/service-menu'],
+      ['GET', '/api/v1/wa-bridge/customer-addresses?phone=%2B96512345678'],
+    ])('403 FEATURE_DISABLED — %s %s with a valid key', async (_m, path) => {
+      const { featureService } = await import('../../apps/api/src/services/feature.service');
+      (featureService.isFeatureEnabled as ReturnType<typeof vi.fn>).mockImplementation(
+        featuresOn()
+      );
+      const res = await request(app).get(path).set('x-wbs-api-key', TEST_WBS_API_KEY);
+      expect(res.status).toBe(403);
+      expect(res.body).toMatchObject({
+        success: false,
+        code: 'FEATURE_DISABLED',
+        feature: 'whatsapp',
+      });
+    });
+
+    it('403 FEATURE_DISABLED — POST /cart/from-wa and /templates/status with a valid key', async () => {
+      const { featureService } = await import('../../apps/api/src/services/feature.service');
+      (featureService.isFeatureEnabled as ReturnType<typeof vi.fn>).mockImplementation(
+        featuresOn()
+      );
+      for (const path of ['/api/v1/wa-bridge/cart/from-wa', '/api/v1/wa-bridge/templates/status']) {
+        const res = await request(app).post(path).set('x-wbs-api-key', TEST_WBS_API_KEY).send({});
+        expect(res.status).toBe(403);
+        expect(res.body.code).toBe('FEATURE_DISABLED');
+      }
+    });
+
+    it('403 FEATURE_DISABLED — POST /cart/redeem with a valid signed token', async () => {
+      const jwt = (await import('jsonwebtoken')).default;
+      const token = jwt.sign(
+        { sub: 'wa-cart', storeId: MOCK_STORE.id },
+        'test-jwt-secret-for-contract-tests',
+        { algorithm: 'HS256', issuer: 'force-api', audience: 'force-wa-cart', expiresIn: 600 }
+      );
+      const { prisma } = await import('@force/database');
+      (prisma.store.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: MOCK_STORE.id,
+        slug: 'x',
+        wbsEnabled: true,
+      });
+      const { featureService } = await import('../../apps/api/src/services/feature.service');
+      (featureService.isFeatureEnabled as ReturnType<typeof vi.fn>).mockImplementation(
+        featuresOn()
+      );
+      const off = await request(app).post('/api/v1/wa-bridge/cart/redeem').send({ token });
+      expect(off.status).toBe(403);
+      expect(off.body.code).toBe('FEATURE_DISABLED');
+
+      // ...and the same token redeems once the per-store override is on.
+      (prisma.store.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: MOCK_STORE.id,
+        slug: 'x',
+        wbsEnabled: true,
+      });
+      (featureService.isFeatureEnabled as ReturnType<typeof vi.fn>).mockImplementation(
+        featuresOn('whatsapp')
+      );
+      const on = await request(app).post('/api/v1/wa-bridge/cart/redeem').send({ token });
+      expect(on.status).toBe(200);
+    });
+  });
 
   it('401 — missing x-wbs-api-key header', async () => {
     const res = await request(app).get('/api/v1/wa-bridge/store-catalog');
@@ -528,6 +616,13 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
   };
 
   describe('bundles feature', () => {
+    afterEach(async () => {
+      const { featureService } = await import('../../apps/api/src/services/feature.service');
+      (featureService.isFeatureEnabled as ReturnType<typeof vi.fn>).mockImplementation(
+        featuresOn('whatsapp')
+      );
+    });
+
     it('disabled (default): catalog.products contains ONLY the real product — byte-identical to the pre-bundles shape', async () => {
       const res = await request(app)
         .get('/api/v1/wa-bridge/store-catalog')
@@ -545,7 +640,9 @@ describe('contract: GET /wa-bridge/store-catalog (Ebda → WBS consumer)', () =>
     it('enabled: a purchasable bundle appears as a sibling product entry with isBundle:true, correct price, and Arabic name — without leaking per-component prices', async () => {
       const { featureService } = await import('../../apps/api/src/services/feature.service');
       const { prisma } = await import('@force/database');
-      (featureService.isFeatureEnabled as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+      (featureService.isFeatureEnabled as ReturnType<typeof vi.fn>).mockImplementation(
+        featuresOn('whatsapp', 'bundles')
+      );
       (prisma.bundle.findMany as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
         {
           id: MOCK_BUNDLE_ROW.id,

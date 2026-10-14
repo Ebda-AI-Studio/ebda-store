@@ -301,13 +301,15 @@ describe.skipIf(!hasDb)(
 );
 
 describe.skipIf(!hasDb)('plans engine — automation flags feed the feature gate', () => {
-  it('free: whatsapp + abandoned_cart off; comped: on; StoreFeature override still wins', async () => {
+  it('abandoned_cart follows the plan; whatsapp is OFF on every plan (WHATSAPP-OFF-1); a StoreFeature override still wins', async () => {
     const free = await makeStore('free');
     expect(await featureService.isFeatureEnabled(free.storeId, 'whatsapp')).toBe(false);
     expect(await featureService.isFeatureEnabled(free.storeId, 'abandoned_cart')).toBe(false);
 
+    // comped is "everything on" at the plans-engine level, yet the WhatsApp
+    // Business API stays flagged OFF — only the per-store override turns it on.
     const comped = await makeStore('comped');
-    expect(await featureService.isFeatureEnabled(comped.storeId, 'whatsapp')).toBe(true);
+    expect(await featureService.isFeatureEnabled(comped.storeId, 'whatsapp')).toBe(false);
     expect(await featureService.isFeatureEnabled(comped.storeId, 'abandoned_cart')).toBe(true);
 
     await prisma.storeFeature.create({
@@ -315,6 +317,8 @@ describe.skipIf(!hasDb)('plans engine — automation flags feed the feature gate
     });
     await featureService.invalidateCache(free.storeId);
     expect(await featureService.isFeatureEnabled(free.storeId, 'whatsapp')).toBe(true);
+    // ...and only for that store.
+    expect(await featureService.isFeatureEnabled(comped.storeId, 'whatsapp')).toBe(false);
   });
 });
 

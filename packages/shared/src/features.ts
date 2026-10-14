@@ -139,11 +139,25 @@ export interface FeatureDefinition {
    * 2026-04-29.
    */
   hidden?: boolean;
+  /**
+   * With `hidden: true`: still show this feature (with a "hidden from
+   * merchants" badge) in the SUPER-ADMIN per-store FeatureMatrix, so a
+   * super-admin can switch it per store. Explicit allowlist: platform-level
+   * hidden features (seo, search_autocomplete) have no per-store meaning and
+   * stay out. Merchant lists keep using getVisibleFeatures().
+   */
+  superAdminToggleable?: boolean;
 }
 
 /** Filtered view of the registry: only features that are actually
  *  toggleable from the admin UI. Use this when rendering the features
  *  page or the "Coming soon" gates so dead toggles don't appear. */
+/** Super-admin matrix view: merchant-visible features plus the hidden ones
+ *  explicitly marked `superAdminToggleable`. */
+export function getSuperAdminFeatures(): FeatureDefinition[] {
+  return Object.values(FEATURE_REGISTRY).filter(f => !f.hidden || f.superAdminToggleable);
+}
+
 export function getVisibleFeatures(): FeatureDefinition[] {
   return Object.values(FEATURE_REGISTRY).filter(f => !f.hidden);
 }
@@ -261,6 +275,13 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'إرسال تأكيدات الطلب وتحديثات الشحن والتسليم عبر منصة ابدأ للواتساب التجاري. يربط التاجر حساب الواتساب التجاري الخاص به في صفحة إشعارات الواتساب ويختار قالب Meta معتمد لكل حدث.',
     category: 'marketing',
     tier: 'addon',
+    // hidden (case 1: not launched). The WhatsApp Business API integration is
+    // flagged OFF 2026-10-14 (Ruling WHATSAPP-OFF-1): in NO plan baseline, so no
+    // store resolves it ON, and out of the feature matrix. The code stays; it
+    // launches later with the WhatsApp product (whatsapp.ebda.app / WBS). A
+    // super-admin StoreFeature `whatsapp` override (API) enables one store.
+    hidden: true,
+    superAdminToggleable: true, // switchable per store from the super-admin FeatureMatrix
   },
   sms: {
     key: 'sms',

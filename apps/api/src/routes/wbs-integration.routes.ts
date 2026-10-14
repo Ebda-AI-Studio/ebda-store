@@ -739,6 +739,7 @@ router.post(
   requireMfaEnrolled,
   authorize('super_admin'),
   requireStoreAccess,
+  requireFeature('whatsapp'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;

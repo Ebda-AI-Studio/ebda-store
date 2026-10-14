@@ -57,7 +57,7 @@ export const productMetaSync = async ({
     // super-admin has revoked the override).
     const whatsappEnabled = await featureService.isFeatureEnabled(storeId, 'whatsapp');
     if (!whatsappEnabled) {
-      logger.info(
+      logger.debug(
         { storeId, productId, action },
         'product-meta-sync: whatsapp feature not enabled for this store, skipping'
       );

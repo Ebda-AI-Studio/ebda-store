@@ -153,7 +153,10 @@ beforeEach(() => {
   }));
   mockPrisma.order.delete.mockResolvedValue({});
   mockOrderGate.mockResolvedValue(undefined);
-  mockIsFeatureEnabled.mockResolvedValue(false);
+  // `whatsapp` is OFF for every store by default (WHATSAPP-OFF-1): the route
+  // sends through the WhatsApp Business API, so these tests run as a store with
+  // the per-store override. Every other feature stays off.
+  mockIsFeatureEnabled.mockImplementation(async (_s: string, key: string) => key === 'whatsapp');
   mockPaymentService.getDefaultProvider.mockResolvedValue('paymob');
   mockPaymentService.createPayment.mockResolvedValue({
     paymentUrl: 'https://pay.example/inv-1',
@@ -177,6 +180,19 @@ function expectEnvelope(res: request.Response, status: number, code: string) {
 }
 
 describe('POST /stores/:id/payment-links', () => {
+  it('WHATSAPP-OFF-1: refuses 403 FEATURE_DISABLED when the whatsapp feature is OFF — no order, no send', async () => {
+    mockIsFeatureEnabled.mockImplementation(async () => false);
+    const res = await request(app).post(URL).send(BODY);
+    expect(res.status).toBe(403);
+    expect(res.body).toMatchObject({
+      success: false,
+      code: 'FEATURE_DISABLED',
+      feature: 'whatsapp',
+    });
+    expect(mockPrisma.order.create).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('happy path: prices the draft order from the catalogue and sends the link via WBS', async () => {
     const res = await request(app)
       .post(URL)

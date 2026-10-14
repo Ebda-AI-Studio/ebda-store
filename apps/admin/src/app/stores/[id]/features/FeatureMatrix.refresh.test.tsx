@@ -85,3 +85,21 @@ describe('FeatureMatrix → store feature context', () => {
     expect(features.refresh).not.toHaveBeenCalled();
   });
 });
+
+describe('FeatureMatrix → hidden-from-merchants features (WHATSAPP-OFF-1)', () => {
+  it('shows whatsapp with the badge and toggles it via PUT; platform-hidden ones stay out', async () => {
+    render(
+      <ToastProvider>
+        <FeatureMatrix storeId="s1" />
+      </ToastProvider>
+    );
+    expect(await screen.findByText('WhatsApp Notifications')).toBeTruthy();
+    expect(screen.getAllByText('row.hiddenFromMerchants').length).toBe(1);
+    expect(screen.queryByText('SEO Tools')).toBeNull();
+
+    const row = screen.getByText('WhatsApp Notifications').closest('div.flex.items-start');
+    fireEvent.click(row!.querySelector('[role="switch"]')!);
+    await waitFor(() => expect(api.apiPut).toHaveBeenCalledTimes(1));
+    expect(String(api.apiPut.mock.calls[0][0])).toContain('/features/whatsapp');
+  });
+});

@@ -124,6 +124,12 @@ describe.skipIf(!hasDb)('demo store refuses orders', () => {
         create: { storeId: s.storeId, wbsApiKey: 'enc-test-key' },
         update: { wbsApiKey: 'enc-test-key' },
       });
+      // WHATSAPP-OFF-1: `whatsapp` is OFF for every store by default, so this
+      // store carries the per-store override — otherwise the feature gate (not
+      // is_demo) would be the thing refusing.
+      await tx.storeFeature.create({
+        data: { storeId: s.storeId, featureKey: 'whatsapp', enabled: true },
+      });
       await tx.whatsAppTemplate.create({
         data: {
           storeId: s.storeId,

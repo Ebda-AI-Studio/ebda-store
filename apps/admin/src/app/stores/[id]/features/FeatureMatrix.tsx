@@ -9,7 +9,7 @@ import {
   PLAN_LABELS,
   STORE_PLANS,
   isInBaseline,
-  getVisibleFeatures,
+  getSuperAdminFeatures,
   type StorePlan,
   type FeatureKey,
   type FeatureCategory,
@@ -146,6 +146,11 @@ function FeatureRowItem({ def, plan, overrideRow, inFlight, onAction }: FeatureR
         </p>
         <div className="mt-1.5 flex flex-wrap gap-1.5 items-center">
           <TriStateBadge state={state} plan={plan} />
+          {def.hidden && (
+            <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              {tFeatures('row.hiddenFromMerchants')}
+            </span>
+          )}
           {(state === 'override_on' || state === 'override_off') && overrideRow?.enabledBy && (
             <span className="text-xs text-muted-foreground">
               {tFeatures('row.enabledBy')}{' '}
@@ -413,7 +418,7 @@ export function FeatureMatrix({ storeId }: FeatureMatrixProps) {
   }
 
   // Group visible features by category
-  const visibleFeatures = getVisibleFeatures();
+  const visibleFeatures = getSuperAdminFeatures();
   const grouped: Record<FeatureCategory, FeatureDefinition[]> = {
     commerce: [],
     marketing: [],
