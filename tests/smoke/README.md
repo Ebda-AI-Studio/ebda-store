@@ -83,3 +83,13 @@ Health endpoints check the API. These smoke specs check that the deployed front-
 - Flaky timing-dependent assertions ("wait 5s then check") — use Playwright `expect.poll` or `waitForURL`
 
 For deeper coverage, write a normal e2e under `tests/e2e/` (Vitest + supertest, API-level) or extend the integration suite under `tests/integration/`.
+
+## B0 commerce flow (local stack only)
+
+`commerce-b0.spec.ts` is NOT a read-only prod smoke. It drives the Phase B0 flow (swatches, struck Size x Length combo, facts, delivery chip, size guide, required personalisation, sticky add-to-cart bar, personalised cart lines, COD checkout, receipt-printer success page, admin order via API) against the local seeded stack (`b0-minimal`, API :4100, web :3100 behind the host-shim proxy). It has its own Playwright project and **skips itself when that stack is unreachable**, so a smoke run against a deployed environment is unaffected.
+
+```bash
+npx playwright test tests/smoke/commerce-b0.spec.ts --project=commerce-b0
+```
+
+Env overrides: `B0_WEB_URL`, `B0_API_URL`, `B0_STORE_SLUG`, `B0_PRODUCT_SLUG`, `B0_OWNER_EMAIL` / `B0_OWNER_PASSWORD` (else read from `B0_CREDENTIALS_FILE`). It writes to the local DB only (one size chart, product facts/personalisation/lead time, a COD config, one order) and restores the product, chart and COD config afterwards. The admin order step asserts through the admin API the order page calls; the admin UI is not driven.
