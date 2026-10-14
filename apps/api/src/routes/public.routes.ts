@@ -1838,7 +1838,7 @@ router.get(
 
       if (previewStoreId) {
         // Fresh read, any lifecycle status, bound to the token's store. NOT
-        // routed through getCached (the shared `public:store:resolve:<host>`
+        // routed through the public cache helper (the shared `public:store:resolve:<host>`
         // key public requests hit) and never edge-cacheable.
         const previewResult = await loadPayload(
           ['active', 'suspended', 'inactive'],
