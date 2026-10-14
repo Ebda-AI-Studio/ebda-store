@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { runInStoreScope } from '@force/database';
+import { runInStoreScope } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { processExpenseReceipt } from '../../../services/accounting/expense-ocr.service';

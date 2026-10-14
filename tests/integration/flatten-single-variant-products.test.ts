@@ -20,7 +20,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { Express } from 'express';
 import crypto from 'crypto';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass } from '@ebda/database';
 import {
   hasDb,
   buildBundleTestApp,

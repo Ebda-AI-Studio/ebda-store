@@ -3,8 +3,8 @@
 import type React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { cn } from '@force/ui';
-import { IMAGE_STANDARDS, sanitizeUrl } from '@force/shared';
+import { cn } from '@ebda/ui';
+import { IMAGE_STANDARDS, sanitizeUrl } from '@ebda/shared';
 import type { HeroBannerProps } from '../types';
 import { getPackStyles } from './pack-styles';
 import { responsiveFontSize } from './section-typography';

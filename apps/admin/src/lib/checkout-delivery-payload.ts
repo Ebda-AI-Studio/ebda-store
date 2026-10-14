@@ -1,7 +1,7 @@
-import type { CheckoutDeliverySettings } from '@force/shared';
+import type { CheckoutDeliverySettings } from '@ebda/shared';
 import { textFieldValue } from './form-text';
 
-import { roundToMinor } from '@force/shared';
+import { roundToMinor } from '@ebda/shared';
 /**
  * Payload builder for the per-store checkout-delivery settings page.
  *

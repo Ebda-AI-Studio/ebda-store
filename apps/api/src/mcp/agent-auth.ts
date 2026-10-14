@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Request } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
-import { prisma, runInTenantContext, runInStoreScope, withStore } from '@force/database';
+import { prisma, runInTenantContext, runInStoreScope, withStore } from '@ebda/database';
 import { insertAuditLog } from '../lib/definer';
 import type { McpStore } from './resolve-store';
 import { encryption } from '../services/encryption.service';

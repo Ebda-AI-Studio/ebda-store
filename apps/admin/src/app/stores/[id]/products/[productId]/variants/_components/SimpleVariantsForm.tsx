@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Input, useToast } from '@force/ui';
+import { Button, Input, useToast } from '@ebda/ui';
 import {
   recommendedSizeTextForTemplate,
   type TemplateId,
   minorToDecimalString,
   roundToMinor,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { ImageUpload } from '@/components/ImageUpload';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../../../lib/api';

@@ -7,8 +7,8 @@
  * Cards are the platform card, so each skin draws its own (Dahab's included).
  */
 import React from 'react';
-import type { SectionPaddingMaxWidthVisibility, TemplateId } from '@force/shared';
-import { sanitizeUrl } from '@force/shared';
+import type { SectionPaddingMaxWidthVisibility, TemplateId } from '@ebda/shared';
+import { sanitizeUrl } from '@ebda/shared';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { sectionBgStyle } from '../../templates/shared/section-bg';

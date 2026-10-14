@@ -16,7 +16,7 @@ const findUnique = vi.fn();
 const upsert = vi.fn();
 const findMany = vi.fn();
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   const client = {
     notificationConfig: {
       findUnique: (...a: unknown[]) => findUnique(...a),

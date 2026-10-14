@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'crypto';
-import { prisma, Prisma, hasTenantContext, withMoneyTx } from '@force/database';
+import { prisma, Prisma, hasTenantContext, withMoneyTx } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { recordAffiliateEvent, affiliateEventCreate } from './affiliate-event.service';

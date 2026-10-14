@@ -7,7 +7,7 @@
  * subdomains" fails.
  */
 import { describe, it, expect } from 'vitest';
-import { DISPOSABLE_EMAIL_DOMAINS, emailDomain, isDisposableEmail } from '@force/shared';
+import { DISPOSABLE_EMAIL_DOMAINS, emailDomain, isDisposableEmail } from '@ebda/shared';
 
 describe('disposable email blocklist', () => {
   it('ships a few hundred domains, all lowercase bare domains', () => {

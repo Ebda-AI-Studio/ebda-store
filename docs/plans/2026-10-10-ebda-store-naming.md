@@ -81,7 +81,7 @@ export function productName(locale?: string | null): string {
 
 **Files:** root `package.json`, root `package-lock.json`, `README.md`, `CLAUDE.md`, current deployment docs, current workflow references. Keep generated graph output out of broad search output; regenerate it after code changes.
 
-**Interfaces:** Repository name becomes `Whisky-11/ebda-store`; npm root package becomes `ebda-store`; package scopes remain `@force/*` internal identifiers. Expanded legal operator remains unchanged.
+**Interfaces:** Repository name becomes `Whisky-11/ebda-store`; npm root package becomes `ebda-store`; package scopes remain `@ebda/*` internal identifiers. Expanded legal operator remains unchanged.
 
 - [ ] Confirm the destination repo slug does not already exist, and enumerate every old remote reference:
 

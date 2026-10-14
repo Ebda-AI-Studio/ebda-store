@@ -34,7 +34,7 @@ import {
   prisma,
   TenantScopeViolation,
   type AppPrismaClient,
-} from '@force/database';
+} from '@ebda/database';
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 const APP_PASSWORD = process.env.EBDA_APP_PASSWORD || 'ci-only-app-pw';

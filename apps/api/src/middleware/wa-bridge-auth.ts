@@ -22,7 +22,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { withStore } from '@force/database';
+import { withStore } from '@ebda/database';
 import { wbsBridgeKeys } from '../lib/definer';
 import { encryption } from '../services/encryption.service';
 import { isWhatsappEnabled, FEATURE_DISABLED_BODY } from './wa-feature-gate';

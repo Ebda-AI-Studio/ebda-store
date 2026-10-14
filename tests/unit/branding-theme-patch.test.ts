@@ -11,7 +11,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { LOOK_TOKEN_KEYS } from '@force/shared';
+import { LOOK_TOKEN_KEYS } from '@ebda/shared';
 import { DEFAULT_THEME, type StoreTheme } from '@admin/app/stores/[id]/branding/_components/types';
 import { themePatch } from '@admin/app/stores/[id]/branding/_hooks/theme-patch';
 

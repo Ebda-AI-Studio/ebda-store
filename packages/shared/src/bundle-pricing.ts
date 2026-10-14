@@ -5,7 +5,7 @@
  * both a unit `price` and a `total`. A line total that is not divisible by its
  * quantity cannot be stored without one of those two lying.
  *
- * `BundlePricingType` is declared locally (not imported from `@force/database`)
+ * `BundlePricingType` is declared locally (not imported from `@ebda/database`)
  * so this package stays DB-free (RULING C1). It is structurally identical to
  * the Prisma enum of the same name.
  */

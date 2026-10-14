@@ -5,7 +5,7 @@ import { useAuthFormSubmit } from '../../../hooks/useAuthFormSubmit';
 import { validateRegistration } from './validate-registration';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Input } from '@force/ui';
+import { Button, Input } from '@ebda/ui';
 import { api } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
 import { useStoreUrl, useStore } from '../../../contexts/StoreContext';

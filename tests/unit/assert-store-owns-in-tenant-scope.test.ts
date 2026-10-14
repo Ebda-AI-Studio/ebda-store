@@ -15,7 +15,7 @@ const mockRunInTenantContext = vi.fn(async (_s: string, fn: () => Promise<unknow
   return fn();
 });
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     product: {
       findMany: vi.fn(async () => {

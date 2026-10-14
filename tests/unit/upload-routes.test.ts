@@ -65,7 +65,7 @@ vi.mock('@api/middleware/security', () => ({
   auditLog: vi.fn(async () => undefined),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
 }));
 

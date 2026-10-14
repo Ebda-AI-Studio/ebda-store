@@ -12,7 +12,7 @@
  * delivery (so a FORGED relabel of a recorded transaction does not rewrite the record).
  */
 import crypto from 'node:crypto';
-import { toMinor, minorToDecimalString } from '@force/shared';
+import { toMinor, minorToDecimalString } from '@ebda/shared';
 import {
   kashierSignature,
   KASHIER_SIGNATURE_HEADER,

@@ -2,14 +2,14 @@
 
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Button } from '@force/ui';
-import { getLook, type LookId } from '@force/shared';
+import { Button } from '@ebda/ui';
+import { getLook, type LookId } from '@ebda/shared';
 import { apiPut } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { LookPicker } from '../../../components/looks/LookPicker';
 
 /**
- * Onboarding "pick a look". The look list lives in @force/shared (`LOOKS`), rendered by
+ * Onboarding "pick a look". The look list lives in @ebda/shared (`LOOKS`), rendered by
  * `LookPicker`; this step only saves the choice. A brand-new store has nothing to lose, so the
  * look's design tokens replace the defaults (`design: 'reset'`).
  */

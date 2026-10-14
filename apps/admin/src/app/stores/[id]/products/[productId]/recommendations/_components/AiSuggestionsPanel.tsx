@@ -16,7 +16,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
-import { Button, Modal, useToast } from '@force/ui';
+import { Button, Modal, useToast } from '@ebda/ui';
 import { apiGet } from '../../../../../../../lib/api';
 import type { ProductSummary } from './ProductSearch';
 import { useT } from '@/i18n/useT';

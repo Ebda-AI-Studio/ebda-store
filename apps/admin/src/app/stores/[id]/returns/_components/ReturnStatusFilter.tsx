@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { RETURN_FILTER_KEYS, type ReturnFilter } from './types';
 

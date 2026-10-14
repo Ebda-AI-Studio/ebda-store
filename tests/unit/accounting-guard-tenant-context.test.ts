@@ -65,7 +65,7 @@ const mockWithRlsBypass = vi.fn(async (fn: (tx: typeof mockTx) => unknown) => {
 });
 
 const ambient = { value: true };
-vi.mock('@force/database', async () => ({
+vi.mock('@ebda/database', async () => ({
   ...(await import('./helpers/database-mock')).databaseMock({ prisma: {} }),
   prisma: {},
   hasTenantContext: () => ambient.value,

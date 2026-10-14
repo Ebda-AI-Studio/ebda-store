@@ -21,4 +21,4 @@ export {
   themeToCssString,
   applyThemeToDocument,
   themeToStyleObject,
-} from '@force/shared';
+} from '@ebda/shared';

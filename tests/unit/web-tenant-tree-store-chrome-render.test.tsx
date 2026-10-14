@@ -77,7 +77,7 @@ vi.mock('../../apps/web/src/lib/store-resolver', () => ({
 const passthrough = ({ children }: { children?: React.ReactNode }) => <>{children}</>;
 const nothing = () => null;
 
-vi.mock('@force/ui', () => ({ ToastProvider: passthrough }));
+vi.mock('@ebda/ui', () => ({ ToastProvider: passthrough }));
 vi.mock('../../apps/web/src/contexts/LanguageContext', () => ({ LanguageProvider: passthrough }));
 vi.mock('../../apps/web/src/contexts/StoreContext', () => ({ StoreProvider: passthrough }));
 vi.mock('../../apps/web/src/contexts/CartContext', () => ({ CartProvider: passthrough }));

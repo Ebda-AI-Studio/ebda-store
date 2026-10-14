@@ -28,8 +28,8 @@
  *   npx tsx scripts/repair-degenerate-product-slugs.ts
  *   npx tsx scripts/repair-degenerate-product-slugs.ts --store <id> --apply
  */
-import { prisma, SlugEntityType, withRlsBypass } from '@force/database';
-import { slugifyWithFallback } from '@force/shared';
+import { prisma, SlugEntityType, withRlsBypass } from '@ebda/database';
+import { slugifyWithFallback } from '@ebda/shared';
 import { recordSlugRedirect } from '../apps/api/src/services/slug-redirect.service';
 
 const APPLY = process.argv.includes('--apply');

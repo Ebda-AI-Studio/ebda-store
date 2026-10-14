@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { sectionSpacingClasses } from './section-spacing';
-import type { SectionPaddingMaxWidthVisibility } from '@force/shared';
+import type { SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 
 /**
  * Bucket E (2026-05-17): inline editorial brand story block — image on

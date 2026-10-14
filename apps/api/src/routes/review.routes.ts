@@ -7,7 +7,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { ReviewService } from '../services/review.service';
 import { LoyaltyService } from '../services/loyalty.service';
 import logger from '../lib/logger';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { draftOwnerResponse, summarizeProductReviews } from '../lib/ai/review-tools';
 

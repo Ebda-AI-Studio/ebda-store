@@ -13,7 +13,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { render, cleanup } from '@testing-library/react';
-import type { MarketingPixels } from '@force/shared';
+import type { MarketingPixels } from '@ebda/shared';
 
 vi.mock('next/script', () => ({
   __esModule: true,

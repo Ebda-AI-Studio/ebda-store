@@ -25,7 +25,7 @@
  * FeatureService. The `plans` catalog has no tenant and is read as is.
  */
 
-import { withStore, type Prisma } from '@force/database';
+import { withStore, type Prisma } from '@ebda/database';
 import {
   DEFAULT_PLAN_SEEDS,
   planIncludesMerchantMcp,
@@ -34,7 +34,7 @@ import {
   planLimitsSchema,
   type PlanLimits,
   type SubscriptionStatus,
-} from '@force/shared';
+} from '@ebda/shared';
 import logger from '../lib/logger';
 
 type Tx = Prisma.TransactionClient;

@@ -1,7 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Request } from 'express';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
-import { withStore } from '@force/database';
+import { withStore } from '@ebda/database';
 import { getUserState } from '../lib/definer';
 import type { McpStore } from './resolve-store';
 import { AppError } from '../middleware/error-handler';

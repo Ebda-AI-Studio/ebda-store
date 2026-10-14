@@ -22,8 +22,8 @@
  * authenticates via 'accessToken' with session/store headers, while the
  * admin app uses a simpler 'authToken' approach.
  */
-import { isIosWebkit } from '@force/shared';
-import type { PublicModel3d } from '@force/shared';
+import { isIosWebkit } from '@ebda/shared';
+import type { PublicModel3d } from '@ebda/shared';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 

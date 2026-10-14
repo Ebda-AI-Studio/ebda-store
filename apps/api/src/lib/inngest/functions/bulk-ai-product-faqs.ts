@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInStoreScope } from '@force/database';
+import { prisma, runInStoreScope } from '@ebda/database';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';

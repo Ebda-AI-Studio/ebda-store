@@ -1,6 +1,6 @@
 /**
  * Haversine great-circle distance — pure utility, no dependencies.
- * Extracted so unit tests can import it without pulling in @force/database.
+ * Extracted so unit tests can import it without pulling in @ebda/database.
  */
 
 const EARTH_RADIUS_KM = 6371;

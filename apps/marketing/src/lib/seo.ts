@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { BRAND } from '@force/shared/brand';
+import { BRAND } from '@ebda/shared/brand';
 import { COPY } from './content';
 import { PLANS, PRICING_PUBLISHED } from './plans';
 import {

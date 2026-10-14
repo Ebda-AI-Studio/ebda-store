@@ -17,7 +17,7 @@ import {
 } from './card-size';
 import type { CategoryStripProps } from '../types';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor } from '@force/shared';
+import { resolveColor } from '@ebda/shared';
 import { responsiveFontSize } from './section-typography';
 
 /**

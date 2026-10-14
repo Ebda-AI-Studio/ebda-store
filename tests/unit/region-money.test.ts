@@ -39,7 +39,7 @@ import {
   computeOrderTax,
   computeDiscountAmount,
   applyDiscount,
-} from '@force/shared';
+} from '@ebda/shared';
 import {
   allocatePartialReturn,
   splitByPaymentMix,

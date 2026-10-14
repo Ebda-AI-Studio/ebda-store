@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { queryRaw } = vi.hoisted(() => ({ queryRaw: vi.fn() }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { $queryRaw: queryRaw },
   Prisma: { sql: () => ({}) },
 }));

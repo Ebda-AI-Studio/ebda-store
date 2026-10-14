@@ -14,7 +14,7 @@
  * The scan crons already filter on `accountingEnabled && aiFeaturesEnabled`,
  * but those are per-store toggles a merchant controls — not a plan gate.
  */
-import type { StorePlan } from '@force/shared';
+import type { StorePlan } from '@ebda/shared';
 
 /** Plans excluded from AI spend. Keep in sync with PLAN_BASELINE.free. */
 const AI_INELIGIBLE_PLANS: readonly StorePlan[] = ['free'] as const;

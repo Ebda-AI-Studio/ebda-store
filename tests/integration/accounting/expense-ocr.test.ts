@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 // vi.mock is hoisted by vitest before imports — must appear at module top-level.
 //

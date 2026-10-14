@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 
 const findFirst = vi.fn();
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { store: { findFirst: (...a: unknown[]) => findFirst(...a) } },
 }));
 

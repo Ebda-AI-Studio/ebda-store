@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
-import { ACTIVATION_HOURS, withNumerals } from '@force/shared';
+import { ACTIVATION_HOURS, withNumerals } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { Alert } from './Alert';
 import { apiPost } from '../lib/api';

@@ -7,7 +7,7 @@ import {
   type DividerSettings,
   type SectionDividers,
   type StoreTheme,
-} from '@force/shared';
+} from '@ebda/shared';
 
 /** The five divider slots a section can render, in storefront top-to-bottom order. */
 const DIVIDER_SLOTS = ['above', 'kicker', 'title', 'subtitle', 'belowHeading'] as const;

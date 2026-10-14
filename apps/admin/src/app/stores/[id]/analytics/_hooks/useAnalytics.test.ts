@@ -7,7 +7,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, renderHook, waitFor } from '@testing-library/react';
-import { parseReportRange } from '@force/shared';
+import { parseReportRange } from '@ebda/shared';
 
 const apiGet = vi.fn();
 vi.mock('../../../../../lib/api', () => ({ apiGet: (url: string) => apiGet(url) }));

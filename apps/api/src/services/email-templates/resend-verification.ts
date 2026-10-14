@@ -1,5 +1,5 @@
 import { escapeHtml } from './_util';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 export interface ResendVerificationData {
   email: string;

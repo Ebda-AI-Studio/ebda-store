@@ -1,8 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { storefrontOrigin } from '@force/shared';
+import { storefrontOrigin } from '@ebda/shared';
 import express from 'express';
 import crypto from 'crypto';
-import { runInTenantContext, withStore } from '@force/database';
+import { runInTenantContext, withStore } from '@ebda/database';
 import {
   findOrderByIdempotencyKey,
   getOrderStoreId,

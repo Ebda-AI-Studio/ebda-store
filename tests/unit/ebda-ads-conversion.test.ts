@@ -13,7 +13,7 @@ vi.mock('@api/lib/logger', () => ({ default: logger }));
 vi.mock('@api/lib/inngest/client', () => ({
   inngest: { createFunction: (_c: unknown, h: unknown) => ({ handler: h }), send: sendMock },
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   withUser: async (_id: string, fn: (tx: unknown) => unknown) =>
     fn({ user: { findUnique: async () => db.user } }),
   withStore: async (_id: string, fn: (tx: unknown) => unknown) =>

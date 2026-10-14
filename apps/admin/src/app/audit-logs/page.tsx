@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button, Badge } from '@force/ui';
+import { Button, Badge } from '@ebda/ui';
 import { AdminLayout } from '../../components/AdminLayout';
 import { apiGet } from '../../lib/api';
 import { useAuth } from '../../lib/auth';

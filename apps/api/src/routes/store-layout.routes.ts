@@ -2,16 +2,16 @@
  * Store layout settings — admin GET/PUT for the layout-toggle page +
  * a public read used by the storefront when rendering the home composition.
  *
- * The shape is `StoreLayoutSettings` from @force/shared; an empty `{}` blob
+ * The shape is `StoreLayoutSettings` from @ebda/shared; an empty `{}` blob
  * resolves to packaged Pecannbee-flow defaults via `resolveLayoutSettings`,
  * so existing tenants don't need a backfill before this ships.
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma } from '@force/database';
-import { resolveLayoutSettings, storeLayoutSchema, heroSlideSchema } from '@force/shared';
-import type { TemplateId } from '@force/shared';
+import { prisma } from '@ebda/database';
+import { resolveLayoutSettings, storeLayoutSchema, heroSlideSchema } from '@ebda/shared';
+import type { TemplateId } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';
@@ -25,7 +25,7 @@ import { randomBytes } from 'node:crypto';
 
 const router = Router({ mergeParams: true });
 
-// The layout Zod schema lives in @force/shared (`builder/layout-schema.ts`) so
+// The layout Zod schema lives in @ebda/shared (`builder/layout-schema.ts`) so
 // the visual-builder section registry and this PUT validate with ONE schema.
 // Re-exported under the old names for `tests/unit/layout-schema-parity.test.ts`
 // and `tests/unit/hero-slide-schema.test.ts`.

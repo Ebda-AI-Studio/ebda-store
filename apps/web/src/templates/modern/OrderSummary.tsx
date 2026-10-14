@@ -4,7 +4,7 @@ import Link from 'next/link';
 import type { OrderSummaryProps } from '../types';
 import { useOrderSummaryBase } from '../shared/useOrderSummaryBase';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 export default function ModernOrderSummary({
   subtotal,
   discount = 0,

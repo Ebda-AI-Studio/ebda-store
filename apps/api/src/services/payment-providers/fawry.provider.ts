@@ -37,7 +37,7 @@ import {
   fawrySettingsSchema,
   minorToDecimalString,
   FAWRY_DEFAULT_EXPIRY_HOURS,
-} from '@force/shared';
+} from '@ebda/shared';
 import {
   credentialScope,
   gatewayRequest,

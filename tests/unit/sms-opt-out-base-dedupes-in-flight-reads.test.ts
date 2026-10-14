@@ -10,7 +10,7 @@ const h = vi.hoisted(() => ({
   findUnique: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { store: { findUnique: h.findUnique } },
   // `stores` is under RLS: the base is read inside the store's own scope (`withStore`).
   withStore: async (_id: string, fn: (tx: unknown) => unknown) =>

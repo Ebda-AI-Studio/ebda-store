@@ -43,7 +43,7 @@ const mockCreateManyProductTag = vi.fn();
 const mockFindUniqueJob = vi.fn();
 const mockUpdateJob = vi.fn();
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   runInStoreScope: (_storeId: string, fn: () => unknown) => fn(),
   prisma: {
     store: { findUnique: (...args: unknown[]) => mockFindUniqueStore(...args) },

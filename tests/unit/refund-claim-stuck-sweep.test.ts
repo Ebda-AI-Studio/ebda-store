@@ -63,7 +63,7 @@ h.findMany.mockImplementation(
   }
 );
 
-vi.mock('@force/database', async () =>
+vi.mock('@ebda/database', async () =>
   (await import('./helpers/database-mock')).databaseMock({
     prisma: { paymentEvent: { findMany: h.findMany } },
   })

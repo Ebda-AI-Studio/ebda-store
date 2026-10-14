@@ -27,7 +27,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'crypto';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass } from '@ebda/database';
 
 vi.mock('@api/middleware/auth', async importOriginal => {
   const actual = await importOriginal<typeof import('@api/middleware/auth')>();
@@ -55,7 +55,7 @@ import { AuthService } from '@api/services/auth.service';
 import { CartService } from '@api/services/cart.service';
 import { OrderService } from '@api/services/order.service';
 import { verifySmsOptOutToken, SMS_OPT_OUT_TOKEN_LENGTH } from '@api/lib/sms-consent';
-import { storefrontOrigin } from '@force/shared';
+import { storefrontOrigin } from '@ebda/shared';
 import { cartSessionId } from '../helpers/bundle-fixtures';
 
 const hasDb =

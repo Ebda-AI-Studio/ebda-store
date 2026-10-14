@@ -4,9 +4,9 @@
 
 **Goal:** Rebuild the Force AI platform landing (`store.forcemediakw.com` → `apps/web/src/components/PlatformLanding.tsx`) using curated 21st.dev components, recolored to the Force brand, assembled section-by-section as Ahmad feeds prompts.
 
-**Architecture:** Drop 21st.dev components under `apps/web/src/components/ui/` (shadcn target; `@/*`→`src/*` already resolves; `cn` shimmed from `@force/ui` via `src/lib/utils.ts`). Compose them into section components under `apps/web/src/components/landing/`. Iterate on an isolated `/landing-preview` route so the live landing never breaks mid-build. Swap into `page.tsx` only on Ahmad's sign-off.
+**Architecture:** Drop 21st.dev components under `apps/web/src/components/ui/` (shadcn target; `@/*`→`src/*` already resolves; `cn` shimmed from `@ebda/ui` via `src/lib/utils.ts`). Compose them into section components under `apps/web/src/components/landing/`. Iterate on an isolated `/landing-preview` route so the live landing never breaks mid-build. Swap into `page.tsx` only on Ahmad's sign-off.
 
-**Tech stack:** Next.js 16 App Router, Tailwind, TS. New deps: `three` (WebGL hero), `framer-motion` + `motion` (animation), `@tsparticles/{react,slim,engine}` (sparkles), `class-variance-authority` + `@radix-ui/react-slot` + `@radix-ui/react-icons` (buttons/badge/card), `clsx` + `tailwind-merge` (cn — already transitively in @force/ui), `color-bits` (flickering footer), `lucide-react` (icons), `react-use-measure` (infinite slider).
+**Tech stack:** Next.js 16 App Router, Tailwind, TS. New deps: `three` (WebGL hero), `framer-motion` + `motion` (animation), `@tsparticles/{react,slim,engine}` (sparkles), `class-variance-authority` + `@radix-ui/react-slot` + `@radix-ui/react-icons` (buttons/badge/card), `clsx` + `tailwind-merge` (cn — already transitively in @ebda/ui), `color-bits` (flickering footer), `lucide-react` (icons), `react-use-measure` (infinite slider).
 
 ## Brand recolor rule (applies to EVERY component)
 

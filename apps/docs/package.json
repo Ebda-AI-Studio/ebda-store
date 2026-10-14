@@ -1,5 +1,5 @@
 {
-  "name": "@force/docs",
+  "name": "@ebda/docs",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",
@@ -17,7 +17,7 @@
     "check:search": "node scripts/search-check.mjs"
   },
   "dependencies": {
-    "@force/site-kit": "*"
+    "@ebda/site-kit": "*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -1,4 +1,4 @@
-import { prisma, hasTenantContext, runInTenantContext } from '@force/database';
+import { prisma, hasTenantContext, runInTenantContext } from '@ebda/database';
 import type { Prisma } from '@prisma/client';
 import { AppError } from '../../middleware/error-handler';
 

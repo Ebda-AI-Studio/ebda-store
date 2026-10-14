@@ -8,7 +8,7 @@
 
 Two-layer feature resolution: `PLAN_BASELINE[plan]` constant lists baseline-included features per plan. `StoreFeature` table holds per-store overrides on top of the baseline. Resolution = override (if row present) ?? baseline includes featureKey. Plan changes preserve overrides — super-admin can grant a single feature without bumping the plan. UI shows store-admin only the features that resolve to enabled; super-admin sees the full registry with per-feature toggles + the resolved-from-baseline-or-override breakdown.
 
-**Tech Stack:** Prisma migration (Postgres), TypeScript constant + Zod schema in `@force/shared`, Next.js App Router admin page, Express service + route on the API, RBAC via existing `authorize('super_admin')` middleware.
+**Tech Stack:** Prisma migration (Postgres), TypeScript constant + Zod schema in `@ebda/shared`, Next.js App Router admin page, Express service + route on the API, RBAC via existing `authorize('super_admin')` middleware.
 
 ---
 
@@ -208,7 +208,7 @@ describe('PLAN_BASELINE', () => {
 - [ ] **Step 4: Run + commit**
 
 ```
-npm test -w @force/shared
+npm test -w @ebda/shared
 git add packages/shared/src/features.ts packages/shared/src/plan-baselines.ts packages/shared/src/__tests__/plan-baselines.test.ts
 git commit -m "feat(shared): add plan-baselines constant + inventory and accounting sub-features"
 ```
@@ -247,9 +247,9 @@ git commit -m "feat(db): align StorePlan enum with new tier naming"
 
 ```ts
 // apps/api/src/lib/feature-gate.ts
-import { prisma } from '@force/database';
-import { FEATURE_REGISTRY, type FeatureKey } from '@force/shared';
-import { PLAN_BASELINE, type StorePlan } from '@force/shared/plan-baselines';
+import { prisma } from '@ebda/database';
+import { FEATURE_REGISTRY, type FeatureKey } from '@ebda/shared';
+import { PLAN_BASELINE, type StorePlan } from '@ebda/shared/plan-baselines';
 
 // In-memory cache (Redis-backed in prod via redis.service) keyed by storeId.
 // Invalidate on StoreFeature change OR Store.plan change.

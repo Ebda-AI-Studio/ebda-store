@@ -26,7 +26,7 @@ import { useT } from '../../i18n/useT';
 import type { Period, ResolvedDateRange } from '../../app/stores/[id]/analytics/_components/types';
 import { resolveDateRange } from '../../app/stores/[id]/analytics/_components/types';
 import { DataTable, type DataTableColumn } from '../mobile/DataTable';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

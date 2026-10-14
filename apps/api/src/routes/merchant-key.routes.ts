@@ -31,7 +31,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';

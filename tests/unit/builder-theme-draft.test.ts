@@ -13,7 +13,7 @@ import {
   snapshotEditableTheme,
   validateDefinitionSync,
   type PageDefinition,
-} from '@force/shared';
+} from '@ebda/shared';
 
 const base = (): PageDefinition => layoutToDefinition(resolveLayoutSettings({}, 'modern'));
 const withTheme = (theme: unknown) => ({ ...base(), theme }) as unknown;

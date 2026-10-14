@@ -7,13 +7,13 @@
  * `storeBrandTheme` (composeStoreTheme for a look store, the stored theme for a legacy one).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getLook, hexToHsl } from '@force/shared';
+import { getLook, hexToHsl } from '@ebda/shared';
 
 const { state, sent } = vi.hoisted(() => ({
   state: { store: null as Record<string, unknown> | null, order: null as unknown },
   sent: [] as string[],
 }));
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   const count = async () => 0;
   const tx = { store: { findUnique: async () => state.store } };
   return {

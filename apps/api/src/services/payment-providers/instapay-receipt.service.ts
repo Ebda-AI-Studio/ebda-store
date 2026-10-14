@@ -16,7 +16,7 @@
  * (`recordManualPayment` for subscriptions, `InstapayService.confirm` for orders).
  */
 import crypto from 'crypto';
-import { prisma, withStore, type Prisma } from '@force/database';
+import { prisma, withStore, type Prisma } from '@ebda/database';
 import {
   INSTAPAY_RECEIPT_LOW_CONFIDENCE,
   INSTAPAY_RECEIPT_MAX_BYTES,
@@ -29,7 +29,7 @@ import {
   type InstapayReceiptFlag,
   type InstapayReceiptMime,
   type InstapayReceiptView,
-} from '@force/shared';
+} from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
 import { inngest } from '../../lib/inngest/client';

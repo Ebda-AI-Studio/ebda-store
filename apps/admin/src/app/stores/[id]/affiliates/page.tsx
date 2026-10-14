@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { SearchInput } from '../../../../components/SearchInput';
@@ -22,7 +22,7 @@ import {
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { useLatestRequest } from '../../../../hooks/useLatestRequest';
 
-import { roundToMinor, REGION } from '@force/shared';
+import { roundToMinor, REGION } from '@ebda/shared';
 type TabKey = 'affiliates' | 'config';
 
 // Narrow type for tolerant unwrapping of legacy `{ data: { ... } }` responses.

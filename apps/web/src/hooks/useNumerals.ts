@@ -5,7 +5,7 @@ import {
   localizeDigits,
   storeNumerals,
   type Numerals,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStore } from '../contexts/StoreContext';
 

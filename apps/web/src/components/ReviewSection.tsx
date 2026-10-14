@@ -1,10 +1,10 @@
 'use client';
 
-import { storeNumerals } from '@force/shared';
+import { storeNumerals } from '@ebda/shared';
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { api } from '../lib/api';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';

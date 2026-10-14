@@ -28,7 +28,7 @@ const { findFirst, getStats } = vi.hoisted(() => ({
   getStats: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { order: { findFirst } },
 }));
 vi.mock('@api/services/abandoned-cart.service', () => ({

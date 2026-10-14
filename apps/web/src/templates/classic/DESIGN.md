@@ -192,7 +192,7 @@ There is no rounded box — the entire field is a hairline underline, evoking a 
 
 ### Badges & Pills
 
-Classic overrides `@force/ui`'s `ProductBadge` styling per-instance:
+Classic overrides `@ebda/ui`'s `ProductBadge` styling per-instance:
 
 ```
 font-serif tracking-widest uppercase rounded-none text-[10px]

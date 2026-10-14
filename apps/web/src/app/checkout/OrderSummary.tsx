@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
-import { Button, Input } from '@force/ui';
+import { Button, Input } from '@ebda/ui';
 import type { CSSProperties } from 'react';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';

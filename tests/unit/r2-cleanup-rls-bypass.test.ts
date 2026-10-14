@@ -51,7 +51,7 @@ const {
   };
 });
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: prismaDecoy,
   storeDirectory: storeFindMany,
   withStore: withRlsBypassMock,

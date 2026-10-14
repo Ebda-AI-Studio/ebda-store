@@ -1,13 +1,13 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Button, Input, Modal, Select } from '@force/ui';
+import { Button, Input, Modal, Select } from '@ebda/ui';
 import {
   INSTAPAY_RECEIPT_MIME_TYPES,
   normalizeInstapayReference,
   toAsciiDigits,
   tryToMinor,
-} from '@force/shared';
+} from '@ebda/shared';
 import { apiPost } from '../../../lib/api';
 import { postMultipart } from '../../../components/instapay/api';
 import { useT } from '../../../i18n/useT';

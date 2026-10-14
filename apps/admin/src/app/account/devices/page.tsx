@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { apiGet, apiDelete } from '../../../lib/api';
 import { useT } from '@/i18n/useT';

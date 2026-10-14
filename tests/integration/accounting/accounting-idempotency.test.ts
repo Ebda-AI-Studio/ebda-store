@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { seedCoaForStore } from '../../../apps/api/src/services/accounting/account.service';
 import { postOrderPaymentJournal } from '../../../apps/api/src/services/accounting/posting/order-posting';
 

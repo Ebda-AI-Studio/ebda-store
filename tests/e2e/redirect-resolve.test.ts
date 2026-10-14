@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import express from 'express';
-import { prisma, SlugEntityType } from '@force/database';
+import { prisma, SlugEntityType } from '@ebda/database';
 import { recordSlugRedirect } from '../../apps/api/src/services/slug-redirect.service';
 import publicRoutes from '@api/routes/public.routes';
 import { errorHandler } from '@api/middleware/error-handler';

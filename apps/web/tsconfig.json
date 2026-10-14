@@ -11,9 +11,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@force/shared": ["../../packages/shared/src"],
-      "@force/ui": ["../../packages/ui/src"],
-      "@force/ui/model3d": ["../../packages/ui/src/model3d"]
+      "@ebda/shared": ["../../packages/shared/src"],
+      "@ebda/ui": ["../../packages/ui/src"],
+      "@ebda/ui/model3d": ["../../packages/ui/src/model3d"]
     },
     "plugins": [
       {

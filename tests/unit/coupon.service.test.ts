@@ -12,7 +12,7 @@ const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: { coupon: { findFirst: vi.fn() } },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   Prisma: {},
 }));

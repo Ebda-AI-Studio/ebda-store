@@ -41,7 +41,7 @@ changes an unrelated surface.
 So the viewer is built from the primitives model-viewer itself wraps, all inside the `three` package we
 already ship (no new dependency): `GLTFLoader`, `OrbitControls`, `RoomEnvironment` (PBR lighting with no
 HDR download), `MeshoptDecoder` (pure JS, embedded wasm) and `USDZExporter` (on-device USDZ for iOS AR —
-the same trick model-viewer uses). It lives in `packages/ui/src/model3d/` (subpath `@force/ui/model3d`)
+the same trick model-viewer uses). It lives in `packages/ui/src/model3d/` (subpath `@ebda/ui/model3d`)
 so the admin preview and the storefront run the same code, and it is only ever reached through
 `next/dynamic(..., { ssr: false })` on an explicit tap, so three is never in the initial bundle.
 Revisit model-viewer when a release accepts three ≥ 0.184.

@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useLocale } from 'next-intl';
-import { Button, Badge } from '@force/ui';
+import { Button, Badge } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { useFeatures } from '@/hooks/useFeatures';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
@@ -10,7 +10,7 @@ import { ReturnLifecycleTimeline } from '../../../../../components/return-timeli
 import { RETURN_COLORS } from './types';
 import type { ReturnItem, ReturnRecord } from './types';
 
-import { formatMoney } from '@force/shared';
+import { formatMoney } from '@ebda/shared';
 function formatCurrency(amount: number) {
   return formatMoney(amount, 'en', { fixedDecimals: true });
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Badge, Modal, useToast } from '@force/ui';
+import { Button, Badge, Modal, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { SearchInput } from '../../../../components/SearchInput';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';

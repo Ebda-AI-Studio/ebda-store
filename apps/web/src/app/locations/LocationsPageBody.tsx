@@ -1,7 +1,7 @@
 import type { ResolvedStore } from '../../lib/store-resolver';
 import { API_URL } from '../../lib/api';
 import { publicLayoutUrl } from '../../lib/preview-draft';
-import { resolveLayoutSettings, type LocationsPageSettings } from '@force/shared';
+import { resolveLayoutSettings, type LocationsPageSettings } from '@ebda/shared';
 import LocationsClient from './LocationsClient';
 
 /**

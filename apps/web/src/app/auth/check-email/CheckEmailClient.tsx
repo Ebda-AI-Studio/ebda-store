@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { MinimalChrome } from '../../../components';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';

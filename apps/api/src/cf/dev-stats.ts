@@ -5,7 +5,7 @@
 // deployed Worker has no such routes. Stats report what the leased-client design promises: clients
 // built never exceed the pool maximum, leases still held when idle are 0 (no leaked connection or
 // client), and requests that never queried opened no connection.
-import type { ClientLease, IsolateDb } from '@force/database';
+import type { ClientLease, IsolateDb } from '@ebda/database';
 import type { CfBindings } from './bindings';
 
 let leasesSeen = 0;

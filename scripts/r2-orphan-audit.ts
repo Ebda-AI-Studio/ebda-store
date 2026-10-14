@@ -33,7 +33,7 @@
 
 import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import type { PrismaClient } from '@prisma/client';
-import { createPrismaClient } from '@force/database';
+import { createPrismaClient } from '@ebda/database';
 import * as fs from 'fs';
 import * as path from 'path';
 import {

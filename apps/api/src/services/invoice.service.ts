@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import {
   groupOrderLinesForDisplay,
   intlLocale,
@@ -6,7 +6,7 @@ import {
   orderTaxPlacement,
   REGION,
   taxInvoiceInfo,
-} from '@force/shared';
+} from '@ebda/shared';
 import { emailMoney } from './email-templates/_util';
 import {
   EMAIL_COLORS,

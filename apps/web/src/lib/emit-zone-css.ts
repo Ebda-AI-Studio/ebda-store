@@ -12,7 +12,7 @@
  * layout.tsx's full emitter out is a separate cleanup.
  */
 
-import type { StoreTheme } from '@force/shared';
+import type { StoreTheme } from '@ebda/shared';
 
 const ZONE_NAMES = [
   'beforeHeader',

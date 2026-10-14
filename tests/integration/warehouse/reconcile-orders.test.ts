@@ -36,7 +36,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { InventoryService } from '../../../apps/api/src/services/inventory.service';
 import { WarehouseService } from '../../../apps/api/src/services/warehouse.service';
 import { handleOrderRefunded } from '../../../apps/api/src/lib/inngest/functions/order-refunded';

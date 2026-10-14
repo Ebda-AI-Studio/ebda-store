@@ -35,7 +35,7 @@ const tx = {
   $queryRaw: vi.fn(),
 };
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   // Inside a request the service runs on the ambient (proxied) client, so the
   // mock `prisma` carries the same tx accessors.
   prisma: new Proxy(

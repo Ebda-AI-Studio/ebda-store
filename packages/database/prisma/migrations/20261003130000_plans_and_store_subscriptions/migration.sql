@@ -62,7 +62,7 @@ ALTER TABLE "store_subscriptions"
   ADD CONSTRAINT "store_subscriptions_plan_code_fkey"
   FOREIGN KEY ("plan_code") REFERENCES "plans"("code") ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- Seed plans (parity with DEFAULT_PLAN_SEEDS in @force/shared — pinned by a unit test).
+-- Seed plans (parity with DEFAULT_PLAN_SEEDS in @ebda/shared — pinned by a unit test).
 -- SEED:BEGIN
 INSERT INTO "plans" ("id", "code", "name_en", "name_ar", "sort", "is_public", "feature_tier", "limits") VALUES
   (gen_random_uuid()::text, 'free', 'Free', 'مجاني', 10, true, 'free', '{"maxProducts":50,"maxStaff":1,"maxOrdersPerMonth":100,"maxStorageMb":500,"customDomain":false,"platformFeeBps":150,"codPlatformFeeBps":0,"abandonedCartAutomation":false,"whatsappAutomation":false}'::jsonb),

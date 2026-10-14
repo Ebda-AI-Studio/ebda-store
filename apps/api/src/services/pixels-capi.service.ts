@@ -28,7 +28,7 @@ import crypto from 'crypto';
 import logger from '../lib/logger';
 import { sendAlert } from './alerts.service';
 
-import { fromMinor, REGION } from '@force/shared';
+import { fromMinor, REGION } from '@ebda/shared';
 // ─── Hashing helpers ─────────────────────────────────────────────────────────
 
 /**

@@ -3,8 +3,8 @@
 import React from 'react';
 import type { Product, Category } from '@/lib/api';
 import { ShopChrome } from '../components';
-import type { TemplateId, StoreLayoutSettings, PageDefinition } from '@force/shared';
-import { layoutToDefinition } from '@force/shared';
+import type { TemplateId, StoreLayoutSettings, PageDefinition } from '@ebda/shared';
+import { layoutToDefinition } from '@ebda/shared';
 import { PageRenderer } from '../builder/render/PageRenderer';
 
 /**

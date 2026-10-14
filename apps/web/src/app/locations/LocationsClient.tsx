@@ -13,8 +13,8 @@ import {
   pageTextScale,
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
-import { mapsEmbedSrc } from '@force/shared';
-import type { LocationsPageSettings } from '@force/shared';
+import { mapsEmbedSrc } from '@ebda/shared';
+import type { LocationsPageSettings } from '@ebda/shared';
 
 interface StoreLocation {
   id: string;

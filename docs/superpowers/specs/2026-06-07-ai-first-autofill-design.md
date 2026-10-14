@@ -49,7 +49,7 @@ aiFieldSources Json @default("{}") @map("ai_field_sources")
   expand-first rule.
 - Absent key = `empty` (unknown) → AI may fill.
 
-### 3.2 AI-writable field registry (`@force/shared`)
+### 3.2 AI-writable field registry (`@ebda/shared`)
 
 One exported constant is the single source of truth for **which** Product fields the AI
 manages and **what source field(s)** each derives from. Both the provenance diff (§3.4) and

@@ -8,7 +8,7 @@
  * value never breaks render. Defaults match Ahmad's 2026-05-16
  * "smaller" preference (sm category, sm product).
  */
-import { getLook } from '@force/shared';
+import { getLook } from '@ebda/shared';
 import type {
   CardAspect,
   CardFrameSize,
@@ -18,7 +18,7 @@ import type {
   CardImageRadius,
   CardShape,
   CardSize,
-} from '@force/shared';
+} from '@ebda/shared';
 
 /**
  * Category card size → tailwind max-w classes (mobile + desktop).

@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, storeDirectory, withStore } from '@force/database';
+import { prisma, storeDirectory, withStore } from '@ebda/database';
 import logger from '../../logger';
 import { maskEmail } from '../../pii-mask';
 import { inngest } from '../client';

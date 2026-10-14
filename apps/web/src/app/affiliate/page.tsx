@@ -8,7 +8,7 @@ import { useFeatures } from '../../contexts/FeatureContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { API_URL } from '../../lib/api';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 // ==========================================
 // Referral Tracking (run once per session)
 // ==========================================

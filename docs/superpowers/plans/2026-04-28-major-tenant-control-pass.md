@@ -68,7 +68,7 @@ Currently Elegant + Classic packs render a top bar with "Contact / Wishlist" or 
 
 **E1.** Globalize toast in storefront: when `addItem` is called from anywhere (PLP card, product detail, etc.), show a toast with product name + "View cart" CTA.
 
-- `apps/web/src/contexts/CartContext.tsx::addItem` should fire a toast via `useToast` from `@force/ui`.
+- `apps/web/src/contexts/CartContext.tsx::addItem` should fire a toast via `useToast` from `@ebda/ui`.
 - Verify `<ToastProvider>` is mounted at the root of the storefront (it's at admin already; check web).
 
 ---

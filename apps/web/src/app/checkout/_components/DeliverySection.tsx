@@ -2,7 +2,7 @@
 
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatWindowTime, type DeliverySelection } from '../_lib/deliveryWindows';
-import type { CheckoutDeliverySettings } from '@force/shared';
+import type { CheckoutDeliverySettings } from '@ebda/shared';
 
 interface DeliverySectionProps {
   settings: CheckoutDeliverySettings;

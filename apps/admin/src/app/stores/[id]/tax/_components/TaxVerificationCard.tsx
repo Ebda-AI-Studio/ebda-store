@@ -12,7 +12,7 @@ import {
   type TaxDocumentKindValue,
   type TaxProfileStatusValue,
   withNumerals,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiDelete, apiFetch, apiGet, apiPost, apiPut } from '@/lib/api';
 import { openProtectedDocument } from '@/lib/open-document';

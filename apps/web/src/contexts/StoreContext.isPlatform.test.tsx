@@ -24,7 +24,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import { DEFAULT_THEME } from '@force/shared';
+import { DEFAULT_THEME } from '@ebda/shared';
 import { StoreProvider, useIsPlatform, useStoreUrl, type StoreData } from './StoreContext';
 
 vi.mock('../lib/platform-host', () => ({

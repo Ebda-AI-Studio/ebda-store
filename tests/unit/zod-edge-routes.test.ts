@@ -62,13 +62,13 @@ vi.mock('@api/services/image-resize.service', () => ({
   resizeToAspect: vi.fn(),
   enforceMaxDimensions: vi.fn(),
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { wishlist: { findFirst: m.wishlistFind, update: m.wishlistUpdate, create: vi.fn() } },
   runInTenantContext: async (_s: string, fn: () => unknown) => fn(),
 }));
 vi.mock('next/cache', () => ({ revalidateTag: m.revalidateTag }));
 // One zod instance for the shared schema and the routes under test.
-vi.mock('@force/shared', async () => await import('../../packages/shared/src/index'));
+vi.mock('@ebda/shared', async () => await import('../../packages/shared/src/index'));
 
 import alertWebhooks from '@api/routes/alert-webhooks.routes';
 import recommendationRoutes from '@api/routes/recommendation.routes';

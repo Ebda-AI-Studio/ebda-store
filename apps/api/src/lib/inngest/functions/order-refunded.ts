@@ -1,5 +1,5 @@
 import { NonRetriableError, type InngestFunction } from 'inngest';
-import { prisma, runInTenantContext, withMoneyTx, type Prisma } from '@force/database';
+import { prisma, runInTenantContext, withMoneyTx, type Prisma } from '@ebda/database';
 import { EmailService, type OrderRefundEmailData } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
 import { OneSignalService } from '../../../services/onesignal.service';
@@ -16,7 +16,7 @@ import logger from '../../logger';
 import { inngest } from '../client';
 import { auditLogExists } from '../../definer';
 
-import { fromMinor } from '@force/shared';
+import { fromMinor } from '@ebda/shared';
 interface FanoutStep {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
 }

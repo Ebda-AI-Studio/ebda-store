@@ -37,7 +37,7 @@ import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import ExcelJS from 'exceljs';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import apiRoutes from '@api/routes';
 import { errorHandler } from '@api/middleware/error-handler';
 import { config } from '@api/config';

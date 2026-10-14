@@ -11,7 +11,7 @@
  * Retry-safe: every fixture is keyed on a per-CALL unique suffix.
  */
 import { describe, it, expect, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import {
   R2_REFERENCE_COLUMNS,
   collectReferencedR2Keys,

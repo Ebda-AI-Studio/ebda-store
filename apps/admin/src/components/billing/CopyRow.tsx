@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 
 /** A labelled value with a copy button (InstaPay handle / amount / reference). */
 export function CopyRow({

@@ -21,7 +21,7 @@
  * session, so a retried attempt never inherits the failed attempt's balance.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { prisma, withMoneyTx } from '@force/database';
+import { prisma, withMoneyTx } from '@ebda/database';
 import { WalletService } from '@api/services/wallet.service';
 import { OrderService } from '@api/services/order.service';
 import { ReturnService } from '@api/services/return.service';

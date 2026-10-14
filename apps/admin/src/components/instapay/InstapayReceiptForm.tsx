@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Button, Input } from '@force/ui';
+import { Button, Input } from '@ebda/ui';
 import {
   INSTAPAY_RECEIPT_MAX_BYTES,
   INSTAPAY_RECEIPT_MIME_TYPES,
@@ -10,7 +10,7 @@ import {
   toAsciiDigits,
   tryToMinor,
   type InstapayReceiptView,
-} from '@force/shared';
+} from '@ebda/shared';
 import { apiGet, apiPost } from '../../lib/api';
 import { useT } from '../../i18n/useT';
 import { postMultipart, receiptErrorKey } from './api';

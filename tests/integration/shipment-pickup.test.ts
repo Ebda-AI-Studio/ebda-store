@@ -27,7 +27,7 @@ import {
   runInTenantContext,
   runWithRequestDb,
   type AppPrismaClient,
-} from '@force/database';
+} from '@ebda/database';
 import { config } from '@api/config';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import { serveStub, type ServedStub } from '../stubs/serve';

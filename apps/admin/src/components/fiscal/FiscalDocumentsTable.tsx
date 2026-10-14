@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
-import { Badge } from '@force/ui';
+import { Badge } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '../mobile/DataTable';
 import {

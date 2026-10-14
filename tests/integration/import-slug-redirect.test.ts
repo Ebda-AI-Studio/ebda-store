@@ -14,7 +14,7 @@
  * exactly those rows (cascade) in afterAll. No TRUNCATE.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma, SlugEntityType } from '@force/database';
+import { prisma, SlugEntityType } from '@ebda/database';
 import { BulkService } from '../../apps/api/src/services/bulk.service';
 
 const SUFFIX = `import-slug-redirect-${Date.now()}`;

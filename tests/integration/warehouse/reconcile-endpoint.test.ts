@@ -35,7 +35,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
 import { reconcileOneStoreOnDemand } from '@api/lib/inngest/functions/warehouse-reconcile-sweep';
 import { API_BASE } from '../../helpers/api-base';

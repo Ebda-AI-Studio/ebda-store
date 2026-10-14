@@ -46,7 +46,7 @@ vi.mock('@api/services/plan-sync', () => ({
     calls.push('syncSubscription');
   }),
 }));
-vi.mock('@force/database', async importOriginal => {
+vi.mock('@ebda/database', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,

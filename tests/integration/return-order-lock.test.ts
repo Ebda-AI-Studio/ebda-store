@@ -14,7 +14,7 @@
  * shape as a tenant-scoped HTTP request. Self-skips without a real DATABASE_URL.
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
-import { runInTenantContext, withRlsBypass } from '@force/database';
+import { runInTenantContext, withRlsBypass } from '@ebda/database';
 import { ReturnService } from '@api/services/return.service';
 
 const hasDb =
@@ -248,7 +248,7 @@ describe.skipIf(!hasDb)('returns on one order are serialised by the order lock',
     const lockTaken = new Promise<void>(r => (locked = r));
     // Stand-in for a completion mid-refund: holds the same advisory key.
     const holder = runInTenantContext(storeId, async () => {
-      const { prisma } = await import('@force/database');
+      const { prisma } = await import('@ebda/database');
       await prisma.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`return-order:${orderId}`}, 0))`;
       locked();
       await held;

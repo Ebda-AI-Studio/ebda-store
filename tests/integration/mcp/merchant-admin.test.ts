@@ -28,7 +28,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import { AuthService } from '@api/services/auth.service';
 import mcpAdminRoutes from '@api/routes/mcp-admin.routes';
 import { errorHandler } from '@api/middleware/error-handler';

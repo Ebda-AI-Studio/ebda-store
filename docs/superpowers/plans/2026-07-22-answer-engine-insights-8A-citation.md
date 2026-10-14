@@ -6,7 +6,7 @@
 
 **Architecture:** An `AnswerEngineProvider` interface with 3 adapters. A weekly Inngest cron enumerates AI-eligible stores, generates buyer-intent prompts, runs each ENABLED provider through the `ai-quota` budget guard, detects whether the store's domain/brand is cited (Gemini uses grounding-metadata source URLs), and writes append-only `AnswerEngineCheck` rows. A super-admin config surface (encrypted keys + per-engine toggle, `PaymentConfig`-style masking) turns the paid engines on with no redeploy. A merchant dashboard (zero-dep charts) shows cited-vs-competitors trends with recs deep-linking to the existing `bulk-ai-geo` sweeps.
 
-**Tech Stack:** Express + TS (`apps/api`), `@google/generative-ai@0.24.1` (Gemini), Perplexity + OpenAI via `fetch`, Inngest cron, Prisma + Neon, Zod (`@force/shared`), Next.js admin (`apps/admin`), Vitest.
+**Tech Stack:** Express + TS (`apps/api`), `@google/generative-ai@0.24.1` (Gemini), Perplexity + OpenAI via `fetch`, Inngest cron, Prisma + Neon, Zod (`@ebda/shared`), Next.js admin (`apps/admin`), Vitest.
 
 **Source of truth:** spec `docs/superpowers/specs/2026-07-22-answer-engine-insights-design.md`. Sibling (GSC) ships in Plan 8B.
 
@@ -71,7 +71,7 @@ expect(PLAN_BASELINE.starter).toContain('answer_engine_insights');
 expect(PLAN_BASELINE.free).not.toContain('answer_engine_insights');
 ```
 
-- [ ] **Step 2: Run → fails.** `npm run test:unit -w @force/shared -- features`
+- [ ] **Step 2: Run → fails.** `npm run test:unit -w @ebda/shared -- features`
 - [ ] **Step 3: Implement** — add `'answer_engine_insights'` to `FEATURE_KEYS_ARRAY` (near `agent_feed`), a `FEATURE_REGISTRY` entry (`name: 'Answer-Engine Insights'`, `nameAr: 'رؤى محركات الإجابة'`, description EN+AR about measuring AI answer-engine citations, `category: 'marketing'`, `tier: 'addon'`), and add it to `STARTER_CORE` in `plan-baselines.ts`.
 - [ ] **Step 4: Run → passes.**
 - [ ] **Step 5: Commit** — `feat(shared): add answer_engine_insights feature key`
@@ -205,7 +205,7 @@ Add the `answerEngineChecks AnswerEngineCheck[]` back-relation to `model Store`.
 
 ## Final verification (before PR)
 
-- [ ] `npm run typecheck`, `npm run lint` clean; the answer-engine unit + integration suites green; `npm run test:unit -w @force/shared` green.
+- [ ] `npm run typecheck`, `npm run lint` clean; the answer-engine unit + integration suites green; `npm run test:unit -w @ebda/shared` green.
 - [ ] `npm audit --omit=dev --audit-level=high` — 0 new high/critical.
 - [ ] Whole-branch review (Opus): grounding-fallback correctness, secret masking (no plaintext key ever returned/logged), budget-guard fail-soft, tenant isolation on the dashboard, untrusted-output handling.
 - [ ] Blast-radius statement in the PR body. PR → main, NOT merged (deploy-all-at-once batch).

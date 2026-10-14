@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { Modal } from '@force/ui';
+import { Modal } from '@ebda/ui';
 import { apiGet } from '@/lib/api';
 import { useT } from '@/i18n/useT';
 

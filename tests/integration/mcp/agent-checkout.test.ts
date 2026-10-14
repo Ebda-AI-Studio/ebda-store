@@ -62,7 +62,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { encryption } from '../../../apps/api/src/services/encryption.service';

@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Modal } from '@force/ui';
+import { Button, Modal } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import type { Product } from './types';
 

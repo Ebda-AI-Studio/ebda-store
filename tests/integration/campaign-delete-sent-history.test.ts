@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {

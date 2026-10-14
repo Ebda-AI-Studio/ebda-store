@@ -5,7 +5,7 @@
  * localStorage-persisted locale is the right fit — no server round-trip,
  * works offline.
  */
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 export type Locale = 'en' | 'ar';
 

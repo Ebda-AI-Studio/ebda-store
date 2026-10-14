@@ -29,7 +29,7 @@ const h = vi.hoisted(() => {
   };
 });
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     warehouse: { findFirst: h.warehouseFindFirst },
     product: { findFirst: h.productFindFirst },

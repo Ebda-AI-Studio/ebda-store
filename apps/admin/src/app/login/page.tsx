@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button, Input } from '@force/ui';
+import { Button, Input } from '@ebda/ui';
 import { useAuth, postLoginDestination, type MfaChallenge } from '../../lib/auth';
 import { useT } from '@/i18n/useT';
 import { NileNight } from './_components/NileNight';

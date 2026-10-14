@@ -19,7 +19,7 @@
  *     fallback — plus the store scope, soft-deleted orders and guest orders.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma } from '@ebda/database';
 import { hasDb } from '../helpers/bundle-fixtures';
 
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({

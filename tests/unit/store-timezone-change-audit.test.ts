@@ -31,7 +31,7 @@ vi.mock('@api/services/store.service', () => ({
   StoreService: { update: (...a: unknown[]) => updateMock(...a) },
   bustStoreCaches: vi.fn(),
 }));
-vi.mock('@force/database', async importOriginal => {
+vi.mock('@ebda/database', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, prisma: { store: { findUnique: findUniqueMock } } };
 });

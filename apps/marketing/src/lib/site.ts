@@ -1,4 +1,4 @@
-import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL } from '@force/shared/brand';
+import { BRAND, BRAND_STORE_APP_URL, BRAND_MARKETING_URL } from '@ebda/shared/brand';
 
 export type Locale = 'ar' | 'en';
 export const LOCALES: readonly Locale[] = ['ar', 'en'] as const;

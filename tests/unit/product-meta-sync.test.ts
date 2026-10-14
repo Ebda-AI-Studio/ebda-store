@@ -23,7 +23,7 @@ vi.mock('@api/services/feature.service', () => ({
 // validates the storeId is a UUID). These tests inject a mock prisma and use a
 // short non-UUID test storeId, so mock the tenant context to a passthrough that
 // just runs the callback (prisma comes from the injected mock below).
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {},
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
 }));

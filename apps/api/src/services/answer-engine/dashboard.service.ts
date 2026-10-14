@@ -56,7 +56,7 @@
  * print a cited rate while its banner says the signal is unavailable. An
  * engine with no grounded check has `citedRate: null` (unknown, not 0%).
  */
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma } from '@ebda/database';
 import { getCachedAnalytics } from '../analytics.service';
 
 export interface AnswerEngineSummary {

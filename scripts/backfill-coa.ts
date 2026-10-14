@@ -18,7 +18,7 @@
  * or via the API:
  *   POST /api/v1/stores/<storeId>/finance/accounts/seed
  */
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { seedCoaForStore } from '../apps/api/src/services/accounting/account.service';
 
 async function main() {

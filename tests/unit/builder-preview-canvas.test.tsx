@@ -22,7 +22,7 @@ import {
   resolveLayoutSettings,
   reduceDocument,
   type PageDefinition,
-} from '@force/shared';
+} from '@ebda/shared';
 
 const m = vi.hoisted(() => ({
   store: new Map<string, unknown>(),

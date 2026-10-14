@@ -20,7 +20,7 @@ import {
   normalizeInstapayReceiver,
   zonedLocalToUtc,
   type InstapayReceiptFields,
-} from '@force/shared';
+} from '@ebda/shared';
 import {
   amountToMinor,
   normalizeReceiptExtraction,

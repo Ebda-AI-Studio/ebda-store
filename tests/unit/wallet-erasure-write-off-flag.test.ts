@@ -6,7 +6,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 const findMany = vi.fn();
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { walletTransaction: { findMany: (...a: unknown[]) => findMany(...a) } },
   Prisma: {},
 }));

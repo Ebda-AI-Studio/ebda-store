@@ -21,14 +21,14 @@
  * re-matched to a second row (enforced by the exclusion query).
  */
 
-import { prisma, runInTenantContext, withStore } from '@force/database';
+import { prisma, runInTenantContext, withStore } from '@ebda/database';
 import type { BankMatchStatus, BankTransaction, Prisma } from '@prisma/client';
 import { parseStatementCsv, parseStatementOfx, type ParsedRow } from './bank-statement-parser';
 import { assertStoreOwns } from './assert-store-owns';
 import { AppError } from '../../middleware/error-handler';
 import { COUNTED_STATUSES_SQL } from './reports.service';
 
-import { minorToDecimalString } from '@force/shared';
+import { minorToDecimalString } from '@ebda/shared';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Fil tolerance for amount matching (5 piastres = 0.005 EGP — rounding/truncation). */

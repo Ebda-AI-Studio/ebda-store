@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { countAiUsage } from './definer';
 import { geminiKeyCount } from './ai/gemini-keys';
 import { AppError } from '../middleware/error-handler';

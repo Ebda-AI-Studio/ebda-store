@@ -14,8 +14,8 @@
  * `scripts/provider-sandbox-check.mjs`, and ONLY outside production: in production it is ignored,
  * so no environment variable can put an unverified gateway in front of a paying customer.
  */
-import { getProviderEntry, isProviderSelectable } from '@force/shared';
-import { prisma, withStore } from '@force/database';
+import { getProviderEntry, isProviderSelectable } from '@ebda/shared';
+import { prisma, withStore } from '@ebda/database';
 
 export function unverifiedProvidersAllowed(): boolean {
   return (

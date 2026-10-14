@@ -1,6 +1,6 @@
 import type { AddressJson } from './orders';
 
-import { REGION, minorToDecimalString, withNumerals } from '@force/shared';
+import { REGION, minorToDecimalString, withNumerals } from '@ebda/shared';
 /**
  * Order money is stored in minor units (EGP: 1 EGP = 100 piastres) — same convention as the
  * admin's order formatMoney. The decimals/scale come from `currencyExponent(currency)`.

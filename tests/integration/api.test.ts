@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
 import { API_BASE, API_ORIGIN } from '../helpers/api-base';
 

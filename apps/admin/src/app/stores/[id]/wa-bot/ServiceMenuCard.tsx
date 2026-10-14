@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react';
-import { Button, useToast } from '@force/ui';
+import { Button, useToast } from '@ebda/ui';
 import { apiPut } from '../../../../lib/api';
 import { Toggle } from '../../../../components/Toggle';
 import type { BotServiceMenu } from '../../../../lib/types/wa-bot';

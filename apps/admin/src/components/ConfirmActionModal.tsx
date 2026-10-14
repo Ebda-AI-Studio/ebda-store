@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Modal } from '@force/ui';
+import { Button, Modal } from '@ebda/ui';
 
 interface ConfirmActionModalProps {
   open: boolean;
@@ -17,7 +17,7 @@ interface ConfirmActionModalProps {
 /**
  * Reusable styled confirmation modal. Replaces native window.confirm() with an
  * accessible dialog that supports an optional destructive variant. The shared
- * @force/ui Modal handles the dialog/aria-modal/labelledby wiring, ESC key,
+ * @ebda/ui Modal handles the dialog/aria-modal/labelledby wiring, ESC key,
  * backdrop click, and focus trap; we just compose the content + actions.
  */
 export function ConfirmActionModal({

@@ -124,7 +124,7 @@ That's it. The next push to `main` touching `apps/web/**` deploys automatically.
 ## What the workflow does
 
 1. `npm ci`
-2. Builds the workspace packages the storefront needs (`@force/database` → `@force/shared` → `@force/ui`)
+2. Builds the workspace packages the storefront needs (`@ebda/database` → `@ebda/shared` → `@ebda/ui`)
 3. `scripts/cf-setup-local.sh web` — installs the local-only OpenNext/wrangler devDeps and writes `apps/web/{open-next.config.ts,wrangler.jsonc}` **with the force-ai.co routes** (store + cf fallback + `*/*` SaaS catch-all)
 4. Writes `apps/web/.env.production.local` from the repo variables (NEXT*PUBLIC*\* are build-time inlined)
 5. `scripts/cf-build.sh web` — the OpenNext build (moves `instrumentation.ts` aside for the trace workaround, then restores it)

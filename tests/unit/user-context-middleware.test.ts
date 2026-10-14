@@ -21,7 +21,7 @@ const runInTenantContextMock = vi.fn(
   async (_storeId: string | undefined, fn: () => Promise<unknown>, _userId?: string) => fn()
 );
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   runInTenantContext: (...args: [string | undefined, () => Promise<unknown>, string?]) =>
     runInTenantContextMock(...args),
 }));

@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const storeCreate = vi.fn();
 const storeGate = vi.hoisted(() => vi.fn());
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     store: {
       findMany: async () => [], // owner holds no store yet -> plan gate passes

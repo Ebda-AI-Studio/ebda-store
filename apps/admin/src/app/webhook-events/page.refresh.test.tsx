@@ -23,7 +23,7 @@ vi.mock('next/link', () => ({
     <a href={href}>{children}</a>
   ),
 }));
-vi.mock('@force/ui', () => ({
+vi.mock('@ebda/ui', () => ({
   Button: ({ children, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
     <button {...rest}>{children}</button>
   ),

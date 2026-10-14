@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { affiliateService } from '../../apps/api/src/services/affiliate.service';
 
 const OWNER_ID = '00000000-0000-0000-0000-000000006180';

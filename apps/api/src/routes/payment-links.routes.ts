@@ -26,9 +26,9 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { computeOrderAmounts, normalizePhoneForStorage, storefrontOrigin } from '@force/shared';
+import { computeOrderAmounts, normalizePhoneForStorage, storefrontOrigin } from '@ebda/shared';
 import { z } from 'zod';
-import { hasTenantContext, prisma, withMoneyTx, type Prisma } from '@force/database';
+import { hasTenantContext, prisma, withMoneyTx, type Prisma } from '@ebda/database';
 import { config } from '../config';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -46,7 +46,7 @@ import { assertOrderAllowed } from '../services/plan-limit.service';
 import logger from '../lib/logger';
 import type { Currency } from '../services/payment-providers/types';
 
-import { minorToDecimalString, REGION } from '@force/shared';
+import { minorToDecimalString, REGION } from '@ebda/shared';
 import { paymentWebhookUrl } from '../services/payment-providers/webhook-url';
 const router = Router({ mergeParams: true });
 

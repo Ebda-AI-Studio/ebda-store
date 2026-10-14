@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Input, Modal, Select } from '@force/ui';
-import { minorToDecimalString, tryToMinor } from '@force/shared';
+import { Button, Input, Modal, Select } from '@ebda/ui';
+import { minorToDecimalString, tryToMinor } from '@ebda/shared';
 import { apiGet, apiPost } from '../../../lib/api';
 import { useT } from '../../../i18n/useT';
 

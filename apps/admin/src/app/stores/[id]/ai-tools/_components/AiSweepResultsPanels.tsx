@@ -11,7 +11,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { apiGet } from '../../../../../lib/api';
 import { useT } from '@/i18n/useT';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 // ---------------------------------------------------------------------------
 // Types

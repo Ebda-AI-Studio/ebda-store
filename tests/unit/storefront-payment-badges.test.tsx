@@ -53,7 +53,7 @@ vi.mock('../../apps/web/src/components', () => ({
 vi.mock('../../apps/web/src/components/CartRecommendations', () => ({
   CartRecommendations: () => null,
 }));
-vi.mock('@force/ui', async original => ({
+vi.mock('@ebda/ui', async original => ({
   ...(await original<Record<string, unknown>>()),
   useToast: () => ({ info: vi.fn(), success: vi.fn(), error: vi.fn() }),
 }));

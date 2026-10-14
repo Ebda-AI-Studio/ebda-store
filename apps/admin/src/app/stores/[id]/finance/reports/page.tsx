@@ -9,7 +9,7 @@ import { apiGet, apiFetch } from '@/lib/api';
 import { minorToMajor } from '@/lib/format';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
-import { resolveStoreTimeZone, zonedIsoDay, zonedMonthStartDay } from '@force/shared';
+import { resolveStoreTimeZone, zonedIsoDay, zonedMonthStartDay } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

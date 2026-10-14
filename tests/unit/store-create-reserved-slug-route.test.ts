@@ -4,7 +4,7 @@
  * `support`, …) with a stable machine-readable code — `SLUG_RESERVED`,
  * `SLUG_TOO_SHORT`, … — rather than a generic VALIDATION_ERROR, and the
  * service is never called. The reserved list is the single one in
- * `@force/shared`; this test iterates it, so adding a label there is covered
+ * `@ebda/shared`; this test iterates it, so adding a label there is covered
  * here without an edit.
  *
  * HTTP-level (supertest) against the real `store.routes.ts` router with the
@@ -13,7 +13,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { RESERVED_SLUGS, STORE_SLUG_MIN_LENGTH } from '@force/shared';
+import { RESERVED_SLUGS, STORE_SLUG_MIN_LENGTH } from '@ebda/shared';
 
 // `id` is reserved as a hostname but is already below the slug minimum (SLUG_TOO_SHORT).
 const RESERVED_CREATABLE = RESERVED_SLUGS.filter(s => s.length >= STORE_SLUG_MIN_LENGTH);
@@ -47,15 +47,15 @@ vi.mock('@api/utils/store-helpers', () => ({ getAuthUser: (req: any) => req.user
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { store: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() } },
   Prisma: { DbNull: null },
   StoreStatus: { active: 'active', suspended: 'suspended' },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  withStore: async (_s: string, fn: any) => fn((await import('@force/database')).prisma),
+  withStore: async (_s: string, fn: any) => fn((await import('@ebda/database')).prisma),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  withUser: async (_u: string, fn: any) => fn((await import('@force/database')).prisma),
+  withUser: async (_u: string, fn: any) => fn((await import('@ebda/database')).prisma),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   asPlatformOperator: (_u: string, fn: any) => fn(),
 }));

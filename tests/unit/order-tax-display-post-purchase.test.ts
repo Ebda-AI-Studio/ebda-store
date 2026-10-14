@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { orderTaxPlacement } from '@force/shared';
+import { orderTaxPlacement } from '@ebda/shared';
 
 /**
  * Issue 2210 — the post-purchase order surfaces printed an INCLUSIVE `tax`
@@ -11,7 +11,7 @@ import { orderTaxPlacement } from '@force/shared';
  */
 
 const mockFindFirst = vi.fn();
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     fiscalDocument: { findMany: async () => [] }, // legacy order: no fiscal document (MONEYB-1)
     order: { findFirst: (...a: unknown[]) => mockFindFirst(...a) },

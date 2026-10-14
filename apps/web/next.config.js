@@ -28,7 +28,7 @@ const nextConfig = {
   // the same setting in apps/admin/next.config.js.
   outputFileTracingRoot: path.join(__dirname, '../..'),
 
-  transpilePackages: ['@force/ui', '@force/shared'],
+  transpilePackages: ['@ebda/ui', '@ebda/shared'],
 
   images: {
     // Cloudflare build only: disable Next's sharp-based image optimizer (native,
@@ -83,7 +83,7 @@ const nextConfig = {
   },
 
   experimental: {
-    optimizePackageImports: ['@force/shared', '@force/ui'],
+    optimizePackageImports: ['@ebda/shared', '@ebda/ui'],
   },
 
   // Security headers

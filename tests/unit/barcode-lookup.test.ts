@@ -7,12 +7,12 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ─── Mock @force/database prisma ────────────────────────────────────────────
+// ─── Mock @ebda/database prisma ────────────────────────────────────────────
 
 const mockFindFirstProduct = vi.fn();
 const mockFindFirstVariant = vi.fn();
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     product: { findFirst: (...args: unknown[]) => mockFindFirstProduct(...args) },
     productVariant: { findFirst: (...args: unknown[]) => mockFindFirstVariant(...args) },

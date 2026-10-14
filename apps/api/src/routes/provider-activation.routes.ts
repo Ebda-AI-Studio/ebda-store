@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma, asPlatformOperator } from '@force/database';
-import { PAYMENT_PROVIDER_CODES, SHIPPING_PROVIDER_CODES } from '@force/shared';
+import { prisma, asPlatformOperator } from '@ebda/database';
+import { PAYMENT_PROVIDER_CODES, SHIPPING_PROVIDER_CODES } from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { requireStoreAccess } from '../middleware/store-access';

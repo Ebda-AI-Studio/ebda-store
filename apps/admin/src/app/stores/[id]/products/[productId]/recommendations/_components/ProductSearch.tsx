@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { Input } from '@force/ui';
+import { Input } from '@ebda/ui';
 import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../../../lib/api';

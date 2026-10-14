@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto';
-import { normalizeEgyptianMobile } from '@force/shared';
+import { normalizeEgyptianMobile } from '@ebda/shared';
 import { derivedSecret } from './derived-secret';
 
 /**

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { productName } from '../lib/product-name';
 

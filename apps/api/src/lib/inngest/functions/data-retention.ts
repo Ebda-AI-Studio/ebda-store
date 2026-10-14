@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, withStore, acrossStores, acrossStoresFlat } from '@force/database';
+import { prisma, withStore, acrossStores, acrossStoresFlat } from '@ebda/database';
 import { AuthService, eraseNeedsCrmReview } from '../../../services/auth.service';
 import logger from '../../logger';
 import { inngest } from '../client';

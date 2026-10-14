@@ -4,7 +4,7 @@
  * the shape the section will take (image side, columns, form) at a glance
  * and costs no network. Mirrors in RTL (logical `start`/`end`).
  */
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 const GOLD = BRAND.colors.gold;
 const LIFT = BRAND.colors.lift;

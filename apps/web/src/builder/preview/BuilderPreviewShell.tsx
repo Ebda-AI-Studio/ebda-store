@@ -9,7 +9,7 @@
  */
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import type { PageDefinition } from '@force/shared';
+import type { PageDefinition } from '@ebda/shared';
 import { HomePageContent } from '../../app/HomePageContent';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { PreviewThemeOverride } from '../../contexts/StoreContext';

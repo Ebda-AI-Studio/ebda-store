@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma } from '@force/database';
-import { egyptAddressSchema } from '@force/shared';
+import { prisma } from '@ebda/database';
+import { egyptAddressSchema } from '@ebda/shared';
 import { authenticate } from '../middleware/auth';
 import { userContext } from '../middleware/tenant-context';
 
@@ -37,7 +37,7 @@ router.use(userContext(req => req.user!.userId));
 
 // Validation schema for creating/updating an address.
 //
-// Derives from the canonical `egyptAddressSchema` in @force/shared which
+// Derives from the canonical `egyptAddressSchema` in @ebda/shared which
 // covers the full Egypt field set (governorate / governorateAr / area /
 // areaAr / state / ...).  The `isDefault` flag is the only address-book-
 // specific addition.  This fixes the silent-drop bug where governorate +

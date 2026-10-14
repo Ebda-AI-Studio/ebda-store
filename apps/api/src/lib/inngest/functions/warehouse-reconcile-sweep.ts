@@ -1,11 +1,11 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInStoreScope, acrossStores } from '@force/database';
+import { prisma, runInStoreScope, acrossStores } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { WarehouseService } from '../../../services/warehouse.service';
 import { sendAlert } from '../../../services/alerts.service';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 interface FanoutStep {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
 }

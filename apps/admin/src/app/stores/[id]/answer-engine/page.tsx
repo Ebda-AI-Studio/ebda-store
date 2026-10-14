@@ -16,7 +16,7 @@ import { GscNotConnected } from './_components/GscNotConnected';
 import { GscTotalsCards } from './_components/GscTotalsCards';
 import { GscTrendChart } from './_components/GscTrendChart';
 import { GscTopQueriesList } from './_components/GscTopQueriesList';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 /**
  * Merchant-facing answer-engine (AEO/GEO citation) dashboard (Task 7).

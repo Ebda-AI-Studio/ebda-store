@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { prisma, withSystemJob, type Prisma } from '@force/database';
+import { prisma, withSystemJob, type Prisma } from '@ebda/database';
 
 /**
  * Typed wrappers for the SECURITY DEFINER functions of the strict-RLS migration

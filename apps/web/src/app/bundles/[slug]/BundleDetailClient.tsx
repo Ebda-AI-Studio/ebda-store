@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Button, Badge } from '@force/ui';
+import { Button, Badge } from '@ebda/ui';
 import { api, type PublicBundleDetail } from '@/lib/api';
 import { useLocalePrice } from '../../../hooks/useLocalePrice';
 import { useCart } from '../../../contexts/CartContext';
@@ -20,7 +20,7 @@ import {
   pickBundleComponentNames,
 } from '@/lib/bundle-locale';
 
-import { fromMinor, REGION } from '@force/shared';
+import { fromMinor, REGION } from '@ebda/shared';
 function BundleSkeleton() {
   return (
     <div className="grid gap-8 lg:grid-cols-2 animate-pulse">

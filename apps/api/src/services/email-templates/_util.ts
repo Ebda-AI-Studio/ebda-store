@@ -1,4 +1,4 @@
-import { formatMoney, formatPrice, REGION } from '@force/shared';
+import { formatMoney, formatPrice, REGION } from '@ebda/shared';
 
 /**
  * HTML escape for safe interpolation of user-controlled strings in email templates.

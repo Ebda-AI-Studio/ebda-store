@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import crypto from 'crypto';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { BulkService } from '../../apps/api/src/services/bulk.service';
 
 const hasDb =

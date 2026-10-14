@@ -1,4 +1,4 @@
-import { createPrismaClient } from '@force/database';
+import { createPrismaClient } from '@ebda/database';
 
 const prisma = createPrismaClient({
   connectionString: process.env.DATABASE_URL ?? '',

@@ -6,10 +6,10 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { prisma, withStore } from '@force/database';
+import { prisma, withStore } from '@ebda/database';
 import { lookupStore } from '../lib/definer';
-import { resolveLayoutSettings } from '@force/shared';
-import type { TemplateId } from '@force/shared';
+import { resolveLayoutSettings } from '@ebda/shared';
+import type { TemplateId } from '@ebda/shared';
 import { redis } from '../services/redis.service';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import {

@@ -16,7 +16,7 @@
  */
 
 /** The canonical email body width. Fluid below it (`width:100%;max-width`). */
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 export const EMAIL_MAX_WIDTH = 600;
 /**
  * Store logo box: at most this wide AND at most EMAIL_LOGO_MAX_HEIGHT tall,

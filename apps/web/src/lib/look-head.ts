@@ -1,4 +1,4 @@
-import { getLook, lookFontsHref } from '@force/shared';
+import { getLook, lookFontsHref } from '@ebda/shared';
 
 /**
  * Head/body hooks for a store's look. Everything is null for a legacy store

@@ -4,7 +4,7 @@ import {
   footerLogoContrastFilter,
   parseColorToRgb,
   resolveBackgroundPreset,
-} from '@force/shared';
+} from '@ebda/shared';
 import { resolveFooterAutoContrastBg } from './footer-logo-bg';
 
 /**

@@ -1,7 +1,7 @@
 'use client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { BrandedStoreWireframe } from '@/components/landing/BeforeAfterSection';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 // Editorial grain — kills the flat "cheap" feel (matches the ebda.app umbrella).
 const GRAIN =

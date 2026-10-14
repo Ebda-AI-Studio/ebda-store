@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { OrderService } from '@api/services/order.service';
 import { LoyaltyService } from '@api/services/loyalty.service';
 import { CartService } from '@api/services/cart.service';

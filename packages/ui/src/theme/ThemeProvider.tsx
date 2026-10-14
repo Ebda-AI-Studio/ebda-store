@@ -1,8 +1,8 @@
 'use client';
 
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
-import type { StoreTheme, TemplateId } from '@force/shared';
-import { DEFAULT_THEME, getTemplateTheme, themeToCssVars } from '@force/shared';
+import type { StoreTheme, TemplateId } from '@ebda/shared';
+import { DEFAULT_THEME, getTemplateTheme, themeToCssVars } from '@ebda/shared';
 
 /**
  * Theme context value

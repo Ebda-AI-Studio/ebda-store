@@ -21,7 +21,7 @@
  */
 
 import { useEffect } from 'react';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 const ZONES = [
   'beforeHeader',

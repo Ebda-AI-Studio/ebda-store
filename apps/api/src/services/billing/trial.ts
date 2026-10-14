@@ -5,7 +5,7 @@
  * EBDA-FUNNEL-3). The trial clock restarts when the first card is saved
  * (EBDA-FUNNEL-4), so these dates are the setup window until then.
  */
-import type { Prisma } from '@force/database';
+import type { Prisma } from '@ebda/database';
 import { addDays, TRIAL_DAYS, TRIAL_PLAN_CODE, type BillingInterval } from './period';
 
 export interface TrialChoice {

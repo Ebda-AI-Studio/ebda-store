@@ -32,7 +32,7 @@ const paymentConfigFindMany = vi.fn();
 let paymentFindManyOverride: ((...a: unknown[]) => Promise<unknown[]>) | null = null;
 const txMock = vi.fn((ops: unknown[]) => Promise.all(ops));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   currentStoreId: () => STORE_ID,
   prisma: {
     payment: {

@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { Prisma } from '@force/database';
+import { Prisma } from '@ebda/database';
 import {
   planBundlePinnedVariantSkips,
   variantsPinnedByBundleMessage,

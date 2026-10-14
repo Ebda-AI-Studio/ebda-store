@@ -4,13 +4,13 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { isPlatformOrigin } from '../lib/cors-cache';
-import { withUser } from '@force/database';
+import { withUser } from '@ebda/database';
 import { getUserState } from '../lib/definer';
 import { redis } from './redis.service';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
 import { AppError } from '../middleware/error-handler';
-import { fromMinor, formatMoney } from '@force/shared';
+import { fromMinor, formatMoney } from '@ebda/shared';
 import { isWorkers } from '../lib/runtime';
 import { cfBindings, cfWaitUntil } from '../cf/bindings';
 // UiRefreshEvent is defined in lib/socket-broadcast and re-exported; we inline

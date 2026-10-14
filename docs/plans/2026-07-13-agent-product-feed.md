@@ -13,7 +13,7 @@
 - Prices are stored as **fils** (`Int`); feed prices render as `(price/1000).toFixed(3) + ' ' + store.currency` (e.g. `"12.500 KWD"`).
 - `agent_feed` goes in `FEATURE_KEYS_ARRAY` + `FEATURE_REGISTRY` but **NOT** in any array in `plan-baselines.ts` (not STARTER_CORE, not additions). Default resolution = disabled everywhere; sale = super-admin enables a `StoreFeature` row via the existing FeatureMatrix admin grid.
 - Fail-closed gating: disabled feature → HTTP **404** (not 403 — a public URL must not advertise the feature's existence).
-- `apps/web` never imports Prisma/`@force/database`; all data via the public API (same rule as llms.txt, see its doc comment).
+- `apps/web` never imports Prisma/`@ebda/database`; all data via the public API (same rule as llms.txt, see its doc comment).
 - No changes to pricing numbers, SLA terms, or contract legal clauses in docs.
 - Commit style: conventional commits, `git add` specific paths only (never `-A`/`.`), every commit ends with:
   `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`

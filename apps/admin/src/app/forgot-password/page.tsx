@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Button, Input } from '@force/ui';
-import { PASSWORD_RESET_TTL_MINUTES, isValidEmail } from '@force/shared';
+import { Button, Input } from '@ebda/ui';
+import { PASSWORD_RESET_TTL_MINUTES, isValidEmail } from '@ebda/shared';
 import { PublicShell } from '../../components/onboarding/PublicShell';
 import { apiPost } from '../../lib/api';
 import { useT } from '@/i18n/useT';

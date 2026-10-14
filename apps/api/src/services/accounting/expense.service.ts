@@ -1,5 +1,5 @@
 import { assertStoreOwnsInTenantScope } from './assert-store-owns';
-import { prisma, hasTenantContext, runInTenantContext } from '@force/database';
+import { prisma, hasTenantContext, runInTenantContext } from '@ebda/database';
 import type { Expense } from '@prisma/client';
 import {
   isCashOrBankAccount,
@@ -7,7 +7,7 @@ import {
   requiresFxRate,
   ALLOWED_CURRENCIES,
   REGION,
-} from '@force/shared';
+} from '@ebda/shared';
 import { nextSequence } from '../sequence.service';
 import { inngest } from '../../lib/inngest/client';
 import logger from '../../lib/logger';

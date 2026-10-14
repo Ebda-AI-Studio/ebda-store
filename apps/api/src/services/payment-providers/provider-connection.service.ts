@@ -17,7 +17,7 @@ import {
   validateCredentialValue,
   type CredentialMode,
   type ProviderCatalogEntry,
-} from '@force/shared';
+} from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
 import {
   bindCredentialFields,

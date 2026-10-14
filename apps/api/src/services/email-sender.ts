@@ -4,7 +4,7 @@
 // Why a standalone module: this is a pure function (no I/O, no DB) so it
 // gets the cheapest possible unit tests — feed it a plain object, assert
 // the from-line. The full ResendService composes this helper.
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 const PLATFORM_EMAIL_DOMAIN: string = BRAND.domains.marketing;
 

@@ -17,7 +17,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
-import type { PageDefinition } from '@force/shared';
+import type { PageDefinition } from '@ebda/shared';
 
 type Pending = { url: string; body: unknown; resolve: (v: unknown) => void };
 const puts: Pending[] = [];

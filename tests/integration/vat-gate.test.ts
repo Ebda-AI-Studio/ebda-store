@@ -28,7 +28,7 @@ import {
   runInTenantContext,
   withRlsBypass,
   type AppPrismaClient,
-} from '@force/database';
+} from '@ebda/database';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import { resolveActiveTaxRate } from '@api/lib/order-tax';
 import { OrderService } from '@api/services/order.service';
@@ -263,7 +263,7 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
       runInTenantContext(
         s.storeId,
         async () => {
-          const { prisma } = await import('@force/database');
+          const { prisma } = await import('@ebda/database');
           return prisma.storeTaxProfile.update({
             where: { storeId: s.storeId },
             data: { status: 'verified' },
@@ -307,7 +307,7 @@ describe.skipIf(!hasDb)('VAT gate against Postgres as ebda_app', () => {
       runInTenantContext(
         a.storeId,
         async () => {
-          const { prisma } = await import('@force/database');
+          const { prisma } = await import('@ebda/database');
           // Layer 1 (code guard): a typed query naming ANOTHER store is refused
           // before it reaches SQL.
           const guardRefusals = await Promise.all(

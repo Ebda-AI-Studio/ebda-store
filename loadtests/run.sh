@@ -27,7 +27,7 @@ fi
 if [ "$SCENARIO" = "multi-store-storm" ] || [ "$SCENARIO" = "multi-store-checkout-storm" ] || [ "$SCENARIO" = "lens-n-medium-traffic" ]; then
   if [ -z "${STORE_IDS:-}" ]; then
     echo "STORE_IDS env var is required for $SCENARIO (comma-separated store uuids)." >&2
-    echo "Seed them first: npm run seed:loadtest --workspace @force/database" >&2
+    echo "Seed them first: npm run seed:loadtest --workspace @ebda/database" >&2
     echo "Then: STORE_IDS=\$(cat loadtests/.loadtest-store-ids.txt) ./run.sh $SCENARIO" >&2
     exit 1
   fi

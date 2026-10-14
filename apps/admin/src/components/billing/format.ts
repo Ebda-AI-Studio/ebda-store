@@ -1,5 +1,5 @@
 import type { BillingCard } from './types';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 export type UiLocale = 'ar' | 'en';
 

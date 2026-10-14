@@ -1,5 +1,5 @@
-import { prisma, withStore } from '@force/database';
-import type { LocationInput } from '@force/shared';
+import { prisma, withStore } from '@ebda/database';
+import type { LocationInput } from '@ebda/shared';
 import { bustStoreCaches } from './store.service';
 
 export class LocationsService {

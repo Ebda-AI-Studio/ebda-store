@@ -32,7 +32,7 @@
  * configured.
  */
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { ReturnService } from '@api/services/return.service';
 import { OrderService } from '@api/services/order.service';
 import { handleOrderRefunded } from '@api/lib/inngest/functions/order-refunded';

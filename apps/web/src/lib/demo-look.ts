@@ -1,4 +1,4 @@
-import { composeStoreTheme, getLook } from '@force/shared';
+import { composeStoreTheme, getLook } from '@ebda/shared';
 import type { ResolvedStore } from './store-resolver';
 
 import { parseDemoLook } from './demo-look-param';

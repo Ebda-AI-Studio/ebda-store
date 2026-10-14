@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { FOCUS_MODE_STORAGE_KEY } from '@/lib/focus-mode-key';
 import { usePathname, useRouter } from 'next/navigation';
-import { storefrontOrigin } from '@force/shared';
+import { storefrontOrigin } from '@ebda/shared';
 import { useAuth } from '../lib/auth';
 import { useStore } from '../contexts/StoreContext';
 import { useCurrentStore } from '../hooks/useCurrentStore';

@@ -26,7 +26,7 @@ const mockState = vi.hoisted(() => ({
 
 // ─── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     store: {
       findUnique: (...args: unknown[]) => mockState.storeFindUnique(...args),

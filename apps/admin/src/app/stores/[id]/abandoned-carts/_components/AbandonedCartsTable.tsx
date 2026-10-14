@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
-import { CartIcon } from '@force/ui';
+import { CartIcon } from '@ebda/ui';
 import { minorToMajor } from '@/lib/format';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { ABANDONED_CART_COLORS, CART_STATUS_KEYS } from './types';
 import type { AbandonedCartRecord, ListMeta } from './types';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 const formatMajor = minorToMajor;
 

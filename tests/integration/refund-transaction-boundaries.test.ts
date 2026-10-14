@@ -21,7 +21,7 @@
  * Self-skips without a real DATABASE_URL, like every DB-direct test here.
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
-import { runInTenantContext, withRlsBypass } from '@force/database';
+import { runInTenantContext, withRlsBypass } from '@ebda/database';
 
 vi.mock('@api/services/encryption.service', () => ({
   encryption: { decrypt: (v: string) => v, encrypt: (v: string) => v },

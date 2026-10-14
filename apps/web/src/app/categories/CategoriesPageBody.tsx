@@ -1,7 +1,7 @@
 import type { ResolvedStore } from '../../lib/store-resolver';
 import { API_URL, type Category } from '@/lib/api';
 import { publicLayoutUrl } from '../../lib/preview-draft';
-import { resolveLayoutSettings, type CategoriesPageSettings } from '@force/shared';
+import { resolveLayoutSettings, type CategoriesPageSettings } from '@ebda/shared';
 import { breadcrumbJsonLd, itemList, storeAbsoluteUrl } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
 import CategoriesClient from './CategoriesClient';

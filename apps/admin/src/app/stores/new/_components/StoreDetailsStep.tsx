@@ -1,6 +1,6 @@
 'use client';
 
-import { Input } from '@force/ui';
+import { Input } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { STORE_HOST_SUFFIX } from '@/lib/store-url';
 import type { FormData } from './types';

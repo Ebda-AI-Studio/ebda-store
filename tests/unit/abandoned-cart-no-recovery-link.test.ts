@@ -22,7 +22,7 @@ const h = vi.hoisted(() => ({
   queryRaw: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { abandonedCart: { update: h.update, groupBy: h.groupBy }, $queryRaw: h.queryRaw },
   withRlsBypass: vi.fn(),
 }));

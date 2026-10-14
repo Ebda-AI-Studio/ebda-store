@@ -30,7 +30,7 @@
  *      override.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass } from '@ebda/database';
 import { runGscIngest } from '../../../apps/api/src/services/answer-engine/gsc-ingest.service';
 import { GscNoAccessError } from '../../../apps/api/src/services/answer-engine/gsc-client';
 import type { GscResult } from '../../../apps/api/src/services/answer-engine/gsc-client';

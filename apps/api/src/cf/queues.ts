@@ -13,7 +13,7 @@
  * That is the upgrade from today's at-most-once (RPOP then send); the SMS path is idempotent
  * through its NotificationLog key.
  */
-import { runInStoreScope } from '@force/database';
+import { runInStoreScope } from '@ebda/database';
 import { emailQueue, isQueuedEmail } from '../services/email-queue.service';
 import { smsQueue, isQueuedSms } from '../services/sms-queue.service';
 import logger from '../lib/logger';

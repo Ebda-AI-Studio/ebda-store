@@ -1,6 +1,6 @@
 // Static page shell shared by docs + help: header (wordmark, nav, language switch, search),
 // optional sidebar, footer. Pure string templates; no client framework.
-import { BRAND } from '@force/shared/brand';
+import { BRAND } from '@ebda/shared/brand';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

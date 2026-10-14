@@ -1,14 +1,14 @@
 'use client';
 
-import { storeNumerals } from '@force/shared';
+import { storeNumerals } from '@ebda/shared';
 import { useCallback, useEffect, useState } from 'react';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { api } from '@/lib/api';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useLocalePrice } from '../../../hooks/useLocalePrice';
 import { formatDate } from '@/lib/format-date';
 import { useStore } from '../../../contexts/StoreContext';
-import type { InstapayInstructions } from '@force/shared';
+import type { InstapayInstructions } from '@ebda/shared';
 import { InstapayReceiptUploader, type InstapayProof } from './InstapayReceiptUploader';
 
 interface InstapayView {

@@ -1,9 +1,9 @@
 import dotenv from 'dotenv';
 import crypto from 'crypto';
-import { BRAND, brandUrl } from '@force/shared';
+import { BRAND, brandUrl } from '@ebda/shared';
 import { isWorkers } from '../lib/runtime';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 dotenv.config();
 
 // Generate a random secret for development only - this is NOT secure for production

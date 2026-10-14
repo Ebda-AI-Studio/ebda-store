@@ -21,7 +21,7 @@ import { AiUsageSummaryCard } from '../../../../components/ai/AiUsageSummaryCard
 import { DataTable, type DataTableColumn } from '../../../../components/mobile/DataTable';
 import { useT } from '../../../../i18n/useT';
 import { formatSpend } from '../../../../lib/ai-spend';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 // ── Types ─────────────────────────────────────────────────────────────
 

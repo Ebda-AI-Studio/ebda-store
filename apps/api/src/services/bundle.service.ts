@@ -7,8 +7,8 @@
  * move through orders, bulk edit, import, returns, etc.), so a cached count
  * would drift the moment stock moved through any path other than this one.
  */
-import type { DbClient } from '@force/database';
-import { computeBundlePrice, type BundleLine, type BundlePricingType } from '@force/shared';
+import type { DbClient } from '@ebda/database';
+import { computeBundlePrice, type BundleLine, type BundlePricingType } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { effectiveInventory } from '../lib/effective-inventory';
@@ -184,7 +184,7 @@ export function nextSaleWindowBoundarySeconds(
  * `ResolvedBundle` — selling surfaces MUST check it; this resolver does not
  * filter on it so admin can still load a disabled/expired bundle to edit).
  *
- * `client` is typed `DbClient` (`@force/database`'s own alias for "the app
+ * `client` is typed `DbClient` (`@ebda/database`'s own alias for "the app
  * client or an interactive-transaction client") — the same DI shape as
  * `LoyaltyService.redeemPoints` / `setOrderStatusGuarded` elsewhere in this
  * package — so a caller (e.g. checkout) can resolve a bundle inside the same

@@ -28,7 +28,7 @@ const { mockStoreFindUnique, mockStoreFeatureFindMany } = vi.hoisted(() => ({
   mockStoreFeatureFindMany: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     storeFeature: { deleteMany: vi.fn(), delete: vi.fn() },
     store: { update: vi.fn() },

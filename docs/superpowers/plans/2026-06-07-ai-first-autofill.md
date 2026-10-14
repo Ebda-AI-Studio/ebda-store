@@ -6,7 +6,7 @@
 
 **Architecture:** A per-field provenance map (`ai_field_sources` JSON column on `Product`) records each AI-writable field as `ai` or `human`. The product service stamps `human` on any field a merchant changes and emits enriched `product.upserted` / `product.deleted` events. A new `ai-autofill-product` Inngest function (debounced) fills `empty` fields and refreshes `ai`-owned fields whose source changed, reusing the existing `AIService` methods (which already enforce quota, caching, and usage recording). A leader-locked 3-day cron sweep fills gaps + refreshes stale AI content + recomputes order-driven recommendations. A `aiAutopilot` per-store toggle (default ON) gates it. The admin product editor shows a ✨ AI badge on AI-owned fields.
 
-**Tech Stack:** Express + Prisma (apps/api), Inngest (event/cron orchestration), Google Gemini via `AIService`, Next.js admin (apps/admin), shared types in `@force/shared`, vitest.
+**Tech Stack:** Express + Prisma (apps/api), Inngest (event/cron orchestration), Google Gemini via `AIService`, Next.js admin (apps/admin), shared types in `@ebda/shared`, vitest.
 
 **Spec:** `docs/superpowers/specs/2026-06-07-ai-first-autofill-design.md`
 
@@ -48,7 +48,7 @@ These are deliberate, behavior-preserving deviations discovered while reading th
 
 ## Phase 1 — Provenance foundation
 
-### Task 1: Field registry + provenance types in `@force/shared`
+### Task 1: Field registry + provenance types in `@ebda/shared`
 
 **Files:**
 
@@ -187,7 +187,7 @@ In `model Product`, next to the other meta fields, add:
 ```prisma
   /// Per-field AI provenance: { "<field>": "ai" | "human" }. Absent key =
   /// never set. Drives the autofill override guarantee — AI never touches a
-  /// field marked "human". See @force/shared AI_AUTOFILL_FIELDS.
+  /// field marked "human". See @ebda/shared AI_AUTOFILL_FIELDS.
   aiFieldSources Json @default("{}") @map("ai_field_sources")
 ```
 
@@ -273,7 +273,7 @@ Expected: FAIL — `stampHumanEdits` not exported.
 
 ```ts
 // apps/api/src/services/ai-autofill.service.ts
-import { AI_AUTOFILL_FIELD_NAMES, type AiFieldSources } from '@force/shared';
+import { AI_AUTOFILL_FIELD_NAMES, type AiFieldSources } from '@ebda/shared';
 
 /**
  * Diff incoming admin-form values against the stored values and update the
@@ -328,7 +328,7 @@ git commit -m "feat: stampHumanEdits provenance diff helper"
 
 ```ts
 import { stampHumanEdits } from './ai-autofill.service';
-import { AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
+import { AI_AUTOFILL_FIELD_NAMES } from '@ebda/shared';
 ```
 
 - [ ] **Step 2: Enrich the `create` event (op=create)**
@@ -447,11 +447,11 @@ Expected: FAIL — `computeFillSet` not exported.
 Append to `apps/api/src/services/ai-autofill.service.ts`:
 
 ```ts
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { AIService } from './ai.service';
 import { isAiQuotaCapError } from '../lib/ai-quota';
 import logger from '../lib/logger';
-import { fieldsNeedingRefresh, type AiFieldSources } from '@force/shared';
+import { fieldsNeedingRefresh, type AiFieldSources } from '@ebda/shared';
 
 /** Which fields to (re)generate for this product event. */
 export function computeFillSet(
@@ -651,7 +651,7 @@ git commit -m "feat: fillProductFields autofill core reusing AIService"
 ```ts
 // apps/api/src/lib/inngest/functions/ai-autofill-product.ts
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { fillProductFields } from '../../../services/ai-autofill.service';
 import { isAutopilotEnabled } from '../../../services/ai-autofill.service';
 import logger from '../../logger';
@@ -765,7 +765,7 @@ git commit -m "feat: ai-autofill-product inngest handler with autopilot gate"
 ```ts
 // apps/api/src/lib/inngest/functions/ai-autofill-cleanup.ts
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { recommendationService } from '../../../services/recommendation.service';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -892,7 +892,7 @@ export async function sweepStore(storeId: string): Promise<{ products: number; f
 ```ts
 // apps/api/src/lib/inngest/functions/ai-autofill-sweep.ts
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { withLeaderLock } from '../../leader-election';
 import { sweepStore } from '../../../services/ai-autofill.service';
 import { recommendationService } from '../../../services/recommendation.service';
@@ -1139,9 +1139,9 @@ Expected: FAIL until `onlyFields` is wired (it is, from Task 5's edit) — if Ta
 In `apps/api/src/routes/ai.routes.ts`, add (mirrors the auth/middleware shape of the other product AI routes in that file — match the existing `authenticate → authorize → requireStoreAccess` chain used by neighbours):
 
 ```ts
-import { AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
+import { AI_AUTOFILL_FIELD_NAMES } from '@ebda/shared';
 import { fillProductFields } from '../services/ai-autofill.service';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 /**
  * POST /stores/:storeId/products/:productId/ai/reset-field
@@ -1290,7 +1290,7 @@ git commit -m "feat: hand-back-to-ai button and reset-field endpoint"
 ```ts
 // tests/integration/ai-autofill.test.ts
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { fillProductFields } from '../../apps/api/src/services/ai-autofill.service';
 import { AIService } from '../../apps/api/src/services/ai.service';
 

@@ -32,7 +32,7 @@ const mockPrismaNotificationLog = {
   count: vi.fn().mockResolvedValue(0),
 };
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     store: mockPrismaStore,
     order: mockPrismaOrder,

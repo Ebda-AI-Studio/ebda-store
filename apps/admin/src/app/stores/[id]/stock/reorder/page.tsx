@@ -7,8 +7,8 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { useAuth } from '@/lib/auth';
 import { apiGet, apiPost } from '@/lib/api';
-import { useToast } from '@force/ui';
-import { withNumerals } from '@force/shared';
+import { useToast } from '@ebda/ui';
+import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

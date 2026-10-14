@@ -17,7 +17,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'crypto';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { planService } from '@api/services/plan.service';
 import merchantSignupRoutes from '@api/routes/merchant-signup.routes';
 import authRoutes from '@api/routes/auth.routes';

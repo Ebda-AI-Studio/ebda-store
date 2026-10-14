@@ -1,11 +1,11 @@
-import { getLook, type SectionPaddingMaxWidthVisibility } from '@force/shared';
+import { getLook, type SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 
 /**
  * Padding-top preset → Tailwind class.
  * Default (undefined) keeps the baseline `py-*` the section already applies
  * (caller must NOT add the baseline when paddingTop is explicitly set, else
  * both stack). Map matches the admin SectionPaddingMaxWidthBlock labels and
- * the `SectionPaddingMaxWidthVisibility` type in @force/shared.
+ * the `SectionPaddingMaxWidthVisibility` type in @ebda/shared.
  *
  * Scale chosen to mirror the existing `py-12 sm:py-16 lg:py-20` baseline
  * (= 'normal') with proportional steps above and below.

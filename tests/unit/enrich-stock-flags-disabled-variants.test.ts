@@ -9,8 +9,8 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('@force/database', async importOriginal => ({
-  ...(await importOriginal<typeof import('@force/database')>()),
+vi.mock('@ebda/database', async importOriginal => ({
+  ...(await importOriginal<typeof import('@ebda/database')>()),
   prisma: {},
 }));
 

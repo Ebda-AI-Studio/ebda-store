@@ -1,13 +1,13 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, storeDirectory, withStore } from '@force/database';
+import { prisma, storeDirectory, withStore } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runDeadstockScan } from '../../../services/accounting/deadstock-scan.service';
 import { isAiEligiblePlan } from '../../ai-plan-eligibility';
-import type { StorePlan } from '@force/shared';
+import type { StorePlan } from '@ebda/shared';
 import { featureService } from '../../../services/feature.service';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 /**
  * Cron-triggered dead-stock scan — runs every Sunday at 06:00 Egypt time (03:00 UTC).
  *

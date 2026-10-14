@@ -19,7 +19,7 @@
  * Uses DATABASE_URL (the owner role). SELECT only, inside a READ ONLY
  * transaction with the RLS bypass set.
  */
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 export interface VariantlessPoRow {
   storeSlug: string;

@@ -15,7 +15,7 @@ const mockFlagFindFirst = vi.fn();
 const mockFlagUpdate = vi.fn();
 const mockCouponCreate = vi.fn();
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     deadStockFlag: {
       findFirst: (...args: unknown[]) => mockFlagFindFirst(...args),

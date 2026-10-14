@@ -9,7 +9,7 @@ import { useRequireFeature } from '../../../../../hooks/useRequireFeature';
 import { useLatestRequest } from '../../../../../hooks/useLatestRequest';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
-import { localDayRange, reportRangeParams, withNumerals } from '@force/shared';
+import { localDayRange, reportRangeParams, withNumerals } from '@ebda/shared';
 
 interface LoyaltyTransaction {
   id: string;

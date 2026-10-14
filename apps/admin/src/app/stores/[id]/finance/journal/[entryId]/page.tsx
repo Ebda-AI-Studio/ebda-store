@@ -7,7 +7,7 @@ import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 import { minorToMajor } from '@/lib/format';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { apiPut } from '../../../../../lib/api';
 import { useCurrentStore } from '../../../../../hooks/useCurrentStore';

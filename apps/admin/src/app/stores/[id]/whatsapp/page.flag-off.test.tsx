@@ -33,7 +33,7 @@ vi.mock('../../../../hooks/useFeatures', () => ({
 vi.mock('../../../../components/AdminLayout', () => ({
   AdminLayout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
-vi.mock('@force/ui', () => ({
+vi.mock('@ebda/ui', () => ({
   Button: ({ children }: { children: ReactNode }) => <button>{children}</button>,
 }));
 vi.mock('../../../../components/whatsapp/ConnectionTab', () => ({

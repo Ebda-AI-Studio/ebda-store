@@ -1,4 +1,4 @@
-import { orderAddressLines, orderTaxPlacement, taxInvoiceInfo } from '@force/shared';
+import { orderAddressLines, orderTaxPlacement, taxInvoiceInfo } from '@ebda/shared';
 import { escapeHtml, emailMoney } from './_util';
 import { waMeEmailBlock } from './_wa-me';
 import type { OrderEmailData } from '../email.service';

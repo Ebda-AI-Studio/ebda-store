@@ -13,12 +13,12 @@
  * at consent time so `broadcastToStore` can target only that tenant.
  */
 
-import { withStore, withUser } from '@force/database';
+import { withStore, withUser } from '@ebda/database';
 import { adminPushPlayerIds } from '../lib/definer';
 import { config } from '../config';
 import logger from '../lib/logger';
 
-import { minorToDecimalString } from '@force/shared';
+import { minorToDecimalString } from '@ebda/shared';
 const ENDPOINT = 'https://onesignal.com/api/v1/notifications';
 
 interface NotifyOrderInput {

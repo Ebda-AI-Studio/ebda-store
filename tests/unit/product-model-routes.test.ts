@@ -38,7 +38,7 @@ const m = vi.hoisted(() => ({
   audit: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
   prisma: { productModel: { findFirst: m.findFirst, update: m.update, delete: m.del } },
 }));

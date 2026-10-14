@@ -1,4 +1,4 @@
-import type { TemplateId } from '@force/shared';
+import type { TemplateId } from '@ebda/shared';
 import type { TemplateComponents } from './types';
 
 // Lazy load templates for code splitting

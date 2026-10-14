@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
-import { CartIcon } from '@force/ui';
+import { CartIcon } from '@ebda/ui';
 import { formatCurrency, formatNumber, type DashboardStats } from './types';
 
 interface StatCardProps {

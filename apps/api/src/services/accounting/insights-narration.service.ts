@@ -15,7 +15,7 @@
  * keeps Gemini call counts low.
  */
 
-import { prisma, runInStoreScope, withStore } from '@force/database';
+import { prisma, runInStoreScope, withStore } from '@ebda/database';
 import { callGemini } from './gemini-ai.service';
 import logger from '../../lib/logger';
 

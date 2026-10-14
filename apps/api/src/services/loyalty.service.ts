@@ -1,9 +1,9 @@
-import { prisma, Prisma, LoyaltyTransactionType, withMoneyTx, withStore } from '@force/database';
+import { prisma, Prisma, LoyaltyTransactionType, withMoneyTx, withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { featureService } from './feature.service';
 
-import { fromMinor, minorToDecimalString } from '@force/shared';
+import { fromMinor, minorToDecimalString } from '@ebda/shared';
 // Default loyalty settings structure
 export interface LoyaltySettings {
   // Points earning

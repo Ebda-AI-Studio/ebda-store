@@ -21,7 +21,7 @@ vi.mock('@web/contexts/LanguageContext', () => ({
   useLanguage: () => ({ language: 'ar', isRtl: true, t: (en: string, ar?: string) => ar ?? en }),
 }));
 
-import { buildCodConfirmationMessage, waMeLink } from '@force/shared';
+import { buildCodConfirmationMessage, waMeLink } from '@ebda/shared';
 import { orderConfirmationTemplate } from '@api/services/email-templates/order-confirmation';
 import { buildOrderEmailWaMe } from '@api/services/email-templates/_wa-me';
 

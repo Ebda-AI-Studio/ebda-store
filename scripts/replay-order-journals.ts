@@ -5,7 +5,7 @@
  * posts ONLY the journal — no emails/notifications re-fire.
  * Run by Ahmad post-CoA-seed: `npx tsx scripts/replay-order-journals.ts`
  */
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass } from '@ebda/database';
 import { postOrderPaymentJournal } from '../apps/api/src/services/accounting/posting/order-posting';
 
 async function main() {

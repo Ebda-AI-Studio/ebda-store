@@ -289,7 +289,7 @@ AS $fn$
 $fn$;
 
 --     ebda_is_system_job(p_job): the transaction was opened by the named platform
---       job (`withSystemJob` in @force/database sets app.system_job
+--       job (`withSystemJob` in @ebda/database sets app.system_job
 --       transaction-locally). Used ONLY for the few cross-store definers that run
 --       from a cron with no store and no user (audit retention, the webhook
 --       inbox consumer). It is a named, narrow context, not a bypass: it opens

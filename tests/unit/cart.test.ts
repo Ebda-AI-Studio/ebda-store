@@ -5,10 +5,10 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CartService } from '@api/services/cart.service';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 // Mock Prisma
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     cart: {
       findFirst: vi.fn(),
@@ -41,7 +41,7 @@ vi.mock('@force/database', () => ({
     $transaction: vi.fn().mockImplementation(async (fn: any) => {
       if (typeof fn === 'function') {
         // Pass the mocked prisma itself as the transaction client
-        const { prisma: mockPrisma } = await import('@force/database');
+        const { prisma: mockPrisma } = await import('@ebda/database');
         return fn(mockPrisma);
       }
       return fn;

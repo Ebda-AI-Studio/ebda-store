@@ -17,10 +17,10 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, useToast } from '@force/ui';
+import { Button, useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../lib/api';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 interface BroadcastFormState {
   titleEn: string;

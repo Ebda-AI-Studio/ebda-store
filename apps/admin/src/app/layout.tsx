@@ -5,7 +5,7 @@ import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { Providers } from './providers';
 import { intlFormats } from '../i18n/formats';
 import '../styles/globals.css';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 import { productName } from '../lib/product-name';
 
 const geist = Geist({

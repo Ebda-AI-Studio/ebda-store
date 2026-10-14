@@ -2,8 +2,8 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { ColorContrastPreview } from './ColorContrastPreview';
-import { COLOR_TOKENS, resolveColor } from '@force/shared';
-import type { StoreTheme, ColorToken } from '@force/shared';
+import { COLOR_TOKENS, resolveColor } from '@ebda/shared';
+import type { StoreTheme, ColorToken } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 
 interface ColorFieldProps {

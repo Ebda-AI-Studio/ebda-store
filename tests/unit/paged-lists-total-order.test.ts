@@ -13,7 +13,7 @@ const { expenseFindMany, poFindMany } = vi.hoisted(() => ({
   poFindMany: vi.fn(),
 }));
 
-vi.mock('@force/database', async importOriginal => {
+vi.mock('@ebda/database', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,

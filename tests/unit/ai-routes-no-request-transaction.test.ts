@@ -33,7 +33,7 @@ const h = vi.hoisted(() => ({
   txOpened: 0,
 }));
 
-vi.mock('@force/database', async () => {
+vi.mock('@ebda/database', async () => {
   const { AsyncLocalStorage: ALS } = await import('async_hooks');
   const TX_TIMEOUT_MS = 30_000;
   const tx = new ALS<{ openedAt: number }>();
@@ -81,7 +81,7 @@ vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { tenantContext, storeScopeContext, aiRouteContext } from '@api/middleware/tenant-context';
 import { errorHandler } from '@api/middleware/error-handler';
 

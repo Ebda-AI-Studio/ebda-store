@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import { groupOrderLinesForDisplay } from '@force/shared';
+import { groupOrderLinesForDisplay } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';

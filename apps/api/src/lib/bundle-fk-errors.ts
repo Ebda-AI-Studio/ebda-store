@@ -1,4 +1,4 @@
-import { Prisma } from '@force/database';
+import { Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 
 /**

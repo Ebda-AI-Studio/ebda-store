@@ -19,7 +19,7 @@ import request from 'supertest';
 // ─── Mocks (declared before the route module is dynamically imported) ─────
 
 const orderFindFirst = vi.fn();
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     order: { findFirst: (...a: unknown[]) => orderFindFirst(...a) },
   },

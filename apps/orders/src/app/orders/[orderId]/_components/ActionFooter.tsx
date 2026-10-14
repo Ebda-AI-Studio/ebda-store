@@ -1,6 +1,6 @@
 'use client';
 
-import { orderActionVisibility, refundViaProviderRemaining } from '@force/shared';
+import { orderActionVisibility, refundViaProviderRemaining } from '@ebda/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { statusOptionsForRole, type OrderDetail } from '@/lib/orders';
 import { PaymentLinkButton } from './PaymentLinkButton';

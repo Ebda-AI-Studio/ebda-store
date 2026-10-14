@@ -9,7 +9,7 @@ import {
   PROVIDER_CATALOG,
   getProviderEntry,
   providersOfKind,
-} from '@force/shared';
+} from '@ebda/shared';
 import { encryption } from '@api/services/encryption.service';
 import {
   activeCredentials,

@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
-import { prisma, SlugEntityType, withTenantContext } from '@force/database';
+import { prisma, SlugEntityType, withTenantContext } from '@ebda/database';
 import { recordSlugRedirect } from '../../apps/api/src/services/slug-redirect.service';
 import { parseImportCsv, computeCandidates } from '../../scripts/backfill-slug-redirects';
 

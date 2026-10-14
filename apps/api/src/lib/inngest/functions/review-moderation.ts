@@ -1,6 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { inngest } from '../client';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { translateReview, detectSpamReview } from '../../ai/review-tools';
 import logger from '../../logger';
 import { featureService } from '../../../services/feature.service';

@@ -9,15 +9,15 @@ import Link from 'next/link';
 // `layout.announcement.enabled ?? announcementBar.enabled` and the same for
 // bgColor). This page is now content-only: it edits text/link/textColor and
 // no longer sends `enabled`/`bgColor`, so the two surfaces can't diverge.
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Alert } from '../../../../components/Alert';
 import { ColorField } from '../../../../components/ColorField';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
-import type { StoreTheme } from '@force/shared';
+import type { StoreTheme } from '@ebda/shared';
 
-// Field names mirror the canonical AnnouncementBar shape from @force/shared
+// Field names mirror the canonical AnnouncementBar shape from @ebda/shared
 // and the API's announcementSchema (`bgColor`, `link`). The previous local
 // names (`backgroundColor`, `linkUrl`) were silently dropped by Zod's
 // .strip() so the bg color and link never reached the DB.

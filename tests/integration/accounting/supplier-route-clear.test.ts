@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 vi.mock('../../../apps/api/src/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {

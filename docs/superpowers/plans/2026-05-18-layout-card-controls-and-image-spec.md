@@ -4,7 +4,7 @@
 
 **Goal:** Land four merchant-tunable improvements in one batch: (1) mobile image-size spec refresh per Ahmad's reference set (banner 900×700, category 630×630, product 600×600), (2) new `xxs` card size for ultra-compact grids, (3) per-section background-color picker on every homepage section, (4) per-section AND store-wide product-card frame color that reaches PLP / category / search — not just homepage carousels.
 
-**Architecture:** All four changes ride the existing FWB pattern: types in `@force/shared/types/store-layout.ts`, Zod in `apps/api/src/routes/store-layout.routes.ts`, admin UI in `apps/admin/src/app/stores/[id]/layout/page.tsx`, consumer wiring in `apps/web/src/app/HomePageContent.tsx` + `ProductCarousel.tsx` + `PecannbeeProductCard.tsx` + the 5 theme `ProductCard.tsx`. Two new design elements: (a) a `ProductCardDefaults` block in layout settings that PLP / category / search read so the size/frame picker no longer stops at the homepage edge, and (b) a `bgColor` field on every section interface that the storefront applies as an inline style on the section wrapper (orthogonal to the existing theme-level `backgroundPreset` alternation; per-section bgColor wins when set).
+**Architecture:** All four changes ride the existing FWB pattern: types in `@ebda/shared/types/store-layout.ts`, Zod in `apps/api/src/routes/store-layout.routes.ts`, admin UI in `apps/admin/src/app/stores/[id]/layout/page.tsx`, consumer wiring in `apps/web/src/app/HomePageContent.tsx` + `ProductCarousel.tsx` + `PecannbeeProductCard.tsx` + the 5 theme `ProductCard.tsx`. Two new design elements: (a) a `ProductCardDefaults` block in layout settings that PLP / category / search read so the size/frame picker no longer stops at the homepage edge, and (b) a `bgColor` field on every section interface that the storefront applies as an inline style on the section wrapper (orthogonal to the existing theme-level `backgroundPreset` alternation; per-section bgColor wins when set).
 
 **Tech Stack:** TypeScript, Zod, React (Next.js 16 App Router for `apps/admin` + `apps/web`), Tailwind CSS, Prisma JSONB column (`stores.layout_settings`), no migration needed.
 
@@ -229,7 +229,7 @@ Place it before the `case 'xs':` line.
 - [ ] **Step 3: Re-run typecheck**
 
 Run: `npm run typecheck`
-Expected: PASS. If other consumer files emerge from the earlier task that aren't covered by these two helpers (e.g. `getProductCardTextSizes` in `@force/shared`), add `xxs` branches there too with sane font-size pairs (text-[10px] mobile / text-xs desktop for the name, etc.).
+Expected: PASS. If other consumer files emerge from the earlier task that aren't covered by these two helpers (e.g. `getProductCardTextSizes` in `@ebda/shared`), add `xxs` branches there too with sane font-size pairs (text-[10px] mobile / text-xs desktop for the name, etc.).
 
 #### Task 6: Add `xxs` to Zod schema
 

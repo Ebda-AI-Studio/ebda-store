@@ -6,7 +6,7 @@ import {
   withMoneyTx,
   scopeTransaction,
   withStore,
-} from '@force/database';
+} from '@ebda/database';
 import {
   checkMinimumOrder,
   allocateBundlePrice,
@@ -16,7 +16,7 @@ import {
   minorToDecimalString,
   normalizePhoneForStorage,
   REGION,
-} from '@force/shared';
+} from '@ebda/shared';
 import { FiscalDocumentService } from './fiscal-document.service';
 import { recordPaymentEvent } from './payment-event.service';
 

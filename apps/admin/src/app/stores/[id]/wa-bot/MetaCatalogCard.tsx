@@ -11,7 +11,7 @@
  */
 
 import { useState } from 'react';
-import { Button, useToast } from '@force/ui';
+import { Button, useToast } from '@ebda/ui';
 import { apiPost, apiPut } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
 import type { MetaCatalogConfig } from '../../../../lib/types/wa-bot';

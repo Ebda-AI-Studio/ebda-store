@@ -19,7 +19,7 @@ const { apiGet, apiPatch, calls, patches } = vi.hoisted(() => ({
 
 vi.mock('@/lib/api', () => ({ apiGet, apiPatch, apiPost: vi.fn(), apiPut: vi.fn() }));
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'store-1' }) }));
-vi.mock('@force/ui', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
+vi.mock('@ebda/ui', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
 vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));
 vi.mock('@/hooks/useRequireFeature', () => ({
   useRequireFeature: () => ({ enabled: true, isLoading: false, gate: null }),

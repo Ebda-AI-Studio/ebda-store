@@ -13,7 +13,7 @@ import { TaxRatesTable } from './_components/TaxRatesTable';
 import { TaxRateFormModal } from './_components/TaxRateFormModal';
 import { TaxInfoBox } from './_components/TaxInfoBox';
 import { TaxVerificationCard } from './_components/TaxVerificationCard';
-import { TAX_NOT_VERIFIED_CODE, type TaxProfileStatusValue } from '@force/shared';
+import { TAX_NOT_VERIFIED_CODE, type TaxProfileStatusValue } from '@ebda/shared';
 import {
   DEFAULT_FORM,
   type RateFilter,

@@ -12,14 +12,14 @@
  * zones are RLS-protected): routes mount it behind `tenantContext`; other
  * callers wrap it in `readInStoreContext`.
  */
-import { prisma, withStore } from '@force/database';
+import { prisma, withStore } from '@ebda/database';
 import {
   getLook,
   SETUP_GUIDE_ITEMS,
   isSetupGuideKey,
   type SetupGuideKey,
   type SetupGuideState,
-} from '@force/shared';
+} from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 
 interface StoredGuide {

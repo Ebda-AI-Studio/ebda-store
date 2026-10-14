@@ -22,7 +22,7 @@
  * `stores` has RLS disabled (Ruling FRT-3), so these reads/writes need no tenant
  * context and stay in the existing plain-prisma style.
  */
-import { prisma, Prisma, storeDirectory, withStore } from '@force/database';
+import { prisma, Prisma, storeDirectory, withStore } from '@ebda/database';
 import { storeIdByDomain, storeIdsClaimingDomain } from '../lib/definer';
 import { abuseConfig } from '../lib/abuse-config';
 import { bustCorsCache } from '../lib/cors-cache';

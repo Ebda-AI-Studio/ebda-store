@@ -1,10 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { writeLimiter } from '../middleware/security';
 import { LocationsService } from '../services/locations.service';
-import { locationInputSchema } from '@force/shared';
+import { locationInputSchema } from '@ebda/shared';
 import { tenantContext } from '../middleware/tenant-context';
 
 /**

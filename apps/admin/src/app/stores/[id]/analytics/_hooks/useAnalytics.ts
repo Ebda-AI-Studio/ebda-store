@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { reportRangeQueryString } from '@force/shared';
+import { reportRangeQueryString } from '@ebda/shared';
 import { apiGet } from '../../../../../lib/api';
 import { useLatestRequest } from '../../../../../hooks/useLatestRequest';
 import type {

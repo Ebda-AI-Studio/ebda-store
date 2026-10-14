@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { LOOKS, THEME_SETTINGS_SCHEMA, lookTheme } from '@force/shared';
+import { LOOKS, THEME_SETTINGS_SCHEMA, lookTheme } from '@ebda/shared';
 
 const { apiPut } = vi.hoisted(() => ({ apiPut: vi.fn() }));
 vi.mock('../../../../../lib/api', () => ({ apiPut }));

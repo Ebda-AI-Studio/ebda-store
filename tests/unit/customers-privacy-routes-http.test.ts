@@ -33,8 +33,8 @@ const h = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@force/database', async importOriginal => {
-  const actual = await importOriginal<typeof import('@force/database')>();
+vi.mock('@ebda/database', async importOriginal => {
+  const actual = await importOriginal<typeof import('@ebda/database')>();
   const prisma = { user: { findUnique: h.userFindUnique }, store: { findUnique: vi.fn() } };
   return {
     ...actual,
@@ -112,7 +112,7 @@ beforeEach(async () => {
   h.eraseAccount.mockResolvedValue({ crmChecked: false, crmRowsScrubbed: 0, crmAmbiguous: false });
   h.exportAccount.mockResolvedValue({ account: {} });
 
-  const dbMock = await import('@force/database');
+  const dbMock = await import('@ebda/database');
   // requireStoreAccess: admin-a owns store A only.
   (dbMock as any).prisma.store.findUnique.mockImplementation(({ where }: any) =>
     Promise.resolve(

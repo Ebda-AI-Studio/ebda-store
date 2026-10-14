@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useLocalePrice } from '../../../hooks/useLocalePrice';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { api, type Order } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
 import { WaMeCodConfirmButton } from '../../../templates/shared/WaMeButtons';
@@ -17,7 +17,7 @@ import { firePurchasePixelOnce } from '../../../lib/purchase-pixel-guard';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatDate } from '@/lib/format-date';
 import { useLastListing } from '../../../hooks/useLastListing';
-import { groupOrderLinesForDisplay, fromMinor, REGION, storeNumerals } from '@force/shared';
+import { groupOrderLinesForDisplay, fromMinor, REGION, storeNumerals } from '@ebda/shared';
 
 // Payment verification outcome that drives the truthful headline/icon.
 //   verifying → we're asking the API to confirm with the gateway

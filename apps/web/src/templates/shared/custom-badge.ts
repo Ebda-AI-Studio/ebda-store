@@ -1,5 +1,5 @@
-import type { StoreTheme } from '@force/shared';
-import { resolveColor } from '@force/shared';
+import type { StoreTheme } from '@ebda/shared';
+import { resolveColor } from '@ebda/shared';
 import { DISCOUNT_BADGE_DEFAULT_POSITION, type DiscountBadgePosition } from './discount-badge';
 import { avoidReservedCorner, type CornerV } from './badge-collision';
 

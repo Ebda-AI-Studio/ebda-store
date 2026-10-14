@@ -2,7 +2,7 @@
 
 import { useT } from '@/i18n/useT';
 import { TIER_COLORS, type LoyaltyStats } from './types';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 interface LoyaltyStatsCardsProps {
   stats: LoyaltyStats;

@@ -10,9 +10,9 @@ import { BottomTabBar } from '../templates/shared/BottomTabBar';
 import { FloatingWidget } from '../templates/shared/FloatingWidget';
 import { SectionDivider, resolveSlotDividerSettings } from '../templates/shared/SectionDivider';
 import { resolveFooterAutoContrastBg } from '../lib/footer-logo-bg';
-import type { FloatingWidgetConfig } from '@force/shared';
-import { resolveColor, footerLogoContrastFilter, sanitizeUrl } from '@force/shared';
-import type { StoreLayoutSettings } from '@force/shared';
+import type { FloatingWidgetConfig } from '@ebda/shared';
+import { resolveColor, footerLogoContrastFilter, sanitizeUrl } from '@ebda/shared';
+import type { StoreLayoutSettings } from '@ebda/shared';
 import { sectionVisibilityClass } from '../templates/shared/section-spacing';
 import type {
   FooterBottomBarConfig,

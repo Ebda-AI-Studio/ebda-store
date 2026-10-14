@@ -38,7 +38,7 @@ const {
   mockProductCategoryFindMany: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     product: { findMany: mockProductFindMany, count: mockProductCount },
     productOption: { findMany: mockProductOptionFindMany },

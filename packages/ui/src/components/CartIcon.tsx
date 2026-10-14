@@ -11,7 +11,7 @@ export interface CartIconProps {
 
 /**
  * Shared shopping-cart-on-wheels icon extracted from ~15 inline SVG copies
- * across apps/web and apps/admin. Both apps depend on @force/ui so this is
+ * across apps/web and apps/admin. Both apps depend on @ebda/ui so this is
  * the single source of truth for the canonical cart glyph.
  *
  * Canonical path (commit e6ae439):

@@ -13,7 +13,7 @@ const h = vi.hoisted(() => ({
   historyCreate: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     productVariant: { findFirst: h.findFirst, update: h.update },
     inventoryHistory: { create: h.historyCreate },

@@ -11,7 +11,7 @@
  *     └─ processPointExpiration()
  */
 
-import { prisma, runInStoreScope, storeDirectory } from '@force/database';
+import { prisma, runInStoreScope, storeDirectory } from '@ebda/database';
 import { featureService } from './feature.service';
 import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';

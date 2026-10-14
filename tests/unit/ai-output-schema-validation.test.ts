@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 // ai.service pulls in Prisma/Redis/Gemini at import time; none of that is
 // needed to exercise the pure validation layer.
-vi.mock('@force/database', () => ({ prisma: {} }));
+vi.mock('@ebda/database', () => ({ prisma: {} }));
 vi.mock('../../apps/api/src/services/redis.service', () => ({ redis: {} }));
 
 import {

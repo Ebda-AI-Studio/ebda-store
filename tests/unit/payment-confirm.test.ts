@@ -25,7 +25,7 @@ const orderFindUnique = vi.fn().mockResolvedValue({ status: 'pending' });
 // The amount-mismatch alert path resolves the store name for the Telegram
 // header — mock a store row so the alert-building code has something to read.
 const storeFindUnique = vi.fn().mockResolvedValue({ name: 'Test Store' });
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mod: Record<string, any> = {
     prisma: {

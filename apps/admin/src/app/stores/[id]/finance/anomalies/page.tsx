@@ -7,7 +7,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { useRequireFeature } from '@/hooks/useRequireFeature';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

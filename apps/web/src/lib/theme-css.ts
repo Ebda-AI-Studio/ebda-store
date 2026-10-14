@@ -1,4 +1,4 @@
-import { LEGACY_STATUS_INK_VALUE, themeToCssVars, type StoreTheme } from '@force/shared';
+import { LEGACY_STATUS_INK_VALUE, themeToCssVars, type StoreTheme } from '@ebda/shared';
 
 /**
  * Theme color/CSS-variable sanitizers + the `:root { ... }` style-tag

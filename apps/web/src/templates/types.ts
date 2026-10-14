@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { ResolvedZone } from './shared/section-typography';
-import type { CardFrameSize, CardFrameWidth } from '@force/shared';
+import type { CardFrameSize, CardFrameWidth } from '@ebda/shared';
 
 /**
  * Resolved per-store cart typography, passed from CartClient into the theme
@@ -282,7 +282,7 @@ export interface FooterProps {
    * `socialOrder` (merchant-controlled display order of footer social icons).
    * Optional: footers that don't read any theme flag degrade gracefully.
    */
-  theme?: import('@force/shared').StoreTheme;
+  theme?: import('@ebda/shared').StoreTheme;
   /**
    * Per-store footer columns (shop / company / support) and newsletter
    * toggle. When undefined or every section is empty, the template renders
@@ -346,7 +346,7 @@ export interface FooterProps {
    * source of truth for whether the "Branches" column renders, not merely
    * whether this prop is populated.
    */
-  locations?: import('@force/shared').StoreLocationPublic[];
+  locations?: import('@ebda/shared').StoreLocationPublic[];
 }
 
 /**
@@ -404,7 +404,7 @@ export interface HeroBannerProps {
    * style tokens (see `templates/shared/pack-styles.ts`). When omitted the
    * components fall back to the Modern style.
    */
-  pack?: import('@force/shared').TemplateId;
+  pack?: import('@ebda/shared').TemplateId;
   /**
    * Pass `priority` to the underlying next/image so the LCP banner preloads.
    * Default true for the standalone single banner; set false from HeroSlider
@@ -448,7 +448,7 @@ export interface HeroSliderProps {
   /** Autoplay interval in ms; 0 disables autoplay (manual swipe only). */
   autoplayMs?: number;
   isRtl?: boolean;
-  pack?: import('@force/shared').TemplateId;
+  pack?: import('@ebda/shared').TemplateId;
   /** See HeroBannerProps.presentation — same semantics, applies to every slide. */
   presentation?: 'full-bleed' | 'framed';
   /**
@@ -484,21 +484,21 @@ export interface ProductCarouselProps {
   showSubtitleLines?: boolean;
   /** Per-section divider settings — see SectionDividers. Wins over the
    *  legacy showKickerLines/showSubtitleLines toggles when set. */
-  dividers?: import('@force/shared').SectionDividers;
+  dividers?: import('@ebda/shared').SectionDividers;
   /** Optional href for the "See all" link. Hidden when omitted. */
   seeAllHref?: string;
   isRtl?: boolean;
   currency?: string;
   onAddToCart?: (productId: string) => Promise<void> | void;
   urlPrefix?: string;
-  pack?: import('@force/shared').TemplateId;
+  pack?: import('@ebda/shared').TemplateId;
   // Per-store card customisation — 2026-05-16. Mirrors CategoryGridProps so
   // newArrivals + bestSellers admin forms expose the same controls
   // (size + aspect + named shape + spacing + label/hover toggles).
-  cardSize?: import('@force/shared').CardSize;
-  cardAspect?: import('@force/shared').CardAspect;
-  cardShape?: import('@force/shared').CardShape;
-  cardGap?: import('@force/shared').CardGap;
+  cardSize?: import('@ebda/shared').CardSize;
+  cardAspect?: import('@ebda/shared').CardAspect;
+  cardShape?: import('@ebda/shared').CardShape;
+  cardGap?: import('@ebda/shared').CardGap;
   showLabel?: boolean;
   showHover?: boolean;
   /** Wrap each card in a frame. Default false. Pair with cardFrameStyle. */
@@ -532,9 +532,9 @@ export interface ProductCarouselProps {
    */
   sectionBgColor?: string;
   /** Item 8 — per-card image aspect ratio for the card image wrapper. */
-  cardImageAspect?: import('@force/shared').CardImageAspect;
+  cardImageAspect?: import('@ebda/shared').CardImageAspect;
   /** Item 8 — per-card image corner radius for the card image wrapper. */
-  cardImageRadius?: import('@force/shared').CardImageRadius;
+  cardImageRadius?: import('@ebda/shared').CardImageRadius;
   /** Item 9 — show/hide the product name on carousel cards. Default true. */
   showCardName?: boolean;
   /** Item 9 — show/hide the product price on carousel cards. Default true. */
@@ -561,18 +561,18 @@ export interface CategoryStripProps {
    *  @deprecated 2026-05-20 — use `dividers.subtitle.enabled` instead. */
   showSubtitleLines?: boolean;
   /** Per-section divider settings — see SectionDividers. */
-  dividers?: import('@force/shared').SectionDividers;
+  dividers?: import('@ebda/shared').SectionDividers;
   seeAllHref?: string;
   isRtl?: boolean;
   urlPrefix?: string;
-  pack?: import('@force/shared').TemplateId;
+  pack?: import('@ebda/shared').TemplateId;
   // Per-store card customisation — 2026-05-17. Same controls as the
   // CategoryGrid path so swapping a store from grid → horizontal in
   // admin keeps every visual tuning the merchant already applied.
-  cardSize?: import('@force/shared').CardSize;
-  cardAspect?: import('@force/shared').CardAspect;
-  cardShape?: import('@force/shared').CardShape;
-  cardGap?: import('@force/shared').CardGap;
+  cardSize?: import('@ebda/shared').CardSize;
+  cardAspect?: import('@ebda/shared').CardAspect;
+  cardShape?: import('@ebda/shared').CardShape;
+  cardGap?: import('@ebda/shared').CardGap;
   showLabel?: boolean;
   showHover?: boolean;
   /** Wrap each card in a frame. Default false. Pair with cardFrameStyle. */
@@ -596,7 +596,7 @@ export interface CategoryStripProps {
   /** Caption placement for this render: 'below' (label under image) or
    *  'overlay' (label over the image bottom with a gradient scrim). Resolved
    *  per breakpoint by HomePageContent. Default 'below'. */
-  captionPosition?: import('@force/shared').CategoriesCaption;
+  captionPosition?: import('@ebda/shared').CategoriesCaption;
 }
 
 /**
@@ -617,13 +617,13 @@ export interface TestimonialRowProps {
   title?: string;
   titleAr?: string;
   isRtl?: boolean;
-  pack?: import('@force/shared').TemplateId;
+  pack?: import('@ebda/shared').TemplateId;
   /** Per-section typography zone overrides resolved by resolveSectionZone(). */
   headingZone?: ResolvedZone;
   kickerZone?: ResolvedZone;
   subtitleZone?: ResolvedZone;
   /** Per-section divider settings — see SectionDividers. */
-  dividers?: import('@force/shared').SectionDividers;
+  dividers?: import('@ebda/shared').SectionDividers;
   /**
    * The resolved background color of the testimonials section wrapper
    * (e.g. `layout.testimonials.bgColor`). Forwarded to `SectionHeading` so
@@ -664,10 +664,10 @@ export interface ProductCardProps {
   // Per-card layout overrides from productCardDefaults — 2026-05-18 Sprint 4.
   // These allow PLP / category / search surfaces to reflect the merchant's
   // global card-defaults settings set in Admin → Layout.
-  cardSize?: import('@force/shared').CardSize;
-  cardAspect?: import('@force/shared').CardAspect;
-  cardShape?: import('@force/shared').CardShape;
-  cardGap?: import('@force/shared').CardGap;
+  cardSize?: import('@ebda/shared').CardSize;
+  cardAspect?: import('@ebda/shared').CardAspect;
+  cardShape?: import('@ebda/shared').CardShape;
+  cardGap?: import('@ebda/shared').CardGap;
   showLabel?: boolean;
   showHover?: boolean;
   showCardFrame?: boolean;
@@ -692,12 +692,12 @@ export interface ProductCardProps {
    * template's default aspect on the card image wrapper (1:1 / 4:5 / 3:4 /
    * 16:9 / auto). Sourced from productCardDefaults.cardImageAspect.
    */
-  cardImageAspect?: import('@force/shared').CardImageAspect;
+  cardImageAspect?: import('@ebda/shared').CardImageAspect;
   /**
    * Item 8 — per-card image corner radius override. Applied on the image
    * wrapper div. Sourced from productCardDefaults.cardImageRadius.
    */
-  cardImageRadius?: import('@force/shared').CardImageRadius;
+  cardImageRadius?: import('@ebda/shared').CardImageRadius;
   /**
    * Item 9 — show / hide the product name below the card image.
    * Default undefined / true → name always visible.
@@ -742,12 +742,12 @@ export interface CategoryCardProps {
   category: TemplateCategory;
   isRtl?: boolean;
   /** Per-store card size — admin-controlled. */
-  cardSize?: import('@force/shared').CardSize;
+  cardSize?: import('@ebda/shared').CardSize;
   /** Per-store card aspect — admin-controlled. */
-  cardAspect?: import('@force/shared').CardAspect;
+  cardAspect?: import('@ebda/shared').CardAspect;
   /** Per-store named shape — when set (not 'theme'), bundles aspect +
    *  rounding so the merchant doesn't tune each axis separately. */
-  cardShape?: import('@force/shared').CardShape;
+  cardShape?: import('@ebda/shared').CardShape;
   /** Show label below image. */
   showLabel?: boolean;
   /** Enable hover/zoom effects. */
@@ -758,7 +758,7 @@ export interface CategoryCardProps {
   /** Caption placement for this render: 'below' (label under image) or
    *  'overlay' (label over the image bottom with a gradient scrim). Resolved
    *  per breakpoint by HomePageContent. Default 'below'. */
-  captionPosition?: import('@force/shared').CategoriesCaption;
+  captionPosition?: import('@ebda/shared').CategoriesCaption;
 }
 
 /**
@@ -781,16 +781,16 @@ export interface CategoryGridProps {
   /** Toggle flanking hairlines around the subtitle. Default true. */
   showSubtitleLines?: boolean;
   /** Per-section divider settings — see SectionDividers. */
-  dividers?: import('@force/shared').SectionDividers;
+  dividers?: import('@ebda/shared').SectionDividers;
   /** Per-store card size override. */
-  cardSize?: import('@force/shared').CardSize;
+  cardSize?: import('@ebda/shared').CardSize;
   /** Per-store card aspect override. */
-  cardAspect?: import('@force/shared').CardAspect;
+  cardAspect?: import('@ebda/shared').CardAspect;
   /** Per-store named shape override (circle/rounded-square/square/soft/portrait/landscape/pill).
    *  When set, bundles aspect + rounding so merchant doesn't tune each axis. */
-  cardShape?: import('@force/shared').CardShape;
+  cardShape?: import('@ebda/shared').CardShape;
   /** Per-store spacing between cards (tight/normal/loose/xloose). Default 'normal'. */
-  cardGap?: import('@force/shared').CardGap;
+  cardGap?: import('@ebda/shared').CardGap;
   /** Show label below image (default true). */
   showLabel?: boolean;
   /** Enable hover/zoom (default true). */
@@ -822,7 +822,7 @@ export interface CategoryGridProps {
   /** Caption placement for this render: 'below' (label under image) or
    *  'overlay' (label over the image bottom with a gradient scrim). Resolved
    *  per breakpoint by HomePageContent. Default 'below'. */
-  captionPosition?: import('@force/shared').CategoriesCaption;
+  captionPosition?: import('@ebda/shared').CategoriesCaption;
   /**
    * The resolved background color of the section that wraps this grid
    * (e.g. `layout.categories.bgColor`). Forwarded to `SectionHeading` so the

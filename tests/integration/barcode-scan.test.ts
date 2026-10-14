@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import {
   lookupBarcode,
   receiveByBarcode,

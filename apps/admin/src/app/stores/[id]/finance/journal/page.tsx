@@ -15,7 +15,7 @@ import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useNotifications, useUiRefresh } from '@/contexts/NotificationContext';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

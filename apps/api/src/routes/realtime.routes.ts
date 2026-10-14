@@ -13,7 +13,7 @@
  * own handshake middleware.
  */
 import { Router, Request, Response } from 'express';
-import { withUser } from '@force/database';
+import { withUser } from '@ebda/database';
 import { authenticate } from '../middleware/auth';
 import { getAuthUser } from '../utils/store-helpers';
 

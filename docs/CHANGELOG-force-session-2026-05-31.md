@@ -15,11 +15,11 @@ Live log of what changed this session so you can track it. Newest at top. FWB = 
 
 ## ✅ TRULY VERIFIED FINAL @ main `8b5ad921` — full tsc 0 errors (api+admin+web)
 
-Ran clean `npm ci` + `prisma generate` + `@force/database` build in a fresh worktree off origin/main, then `tsc --noEmit` on all 3 apps: **api=0, admin=0, web=0**. Authoritative verdict. One real bug had slipped my earlier grep-sweep claims — review `page.tsx` used `API_URL` without importing it — fixed in `8b5ad921`. Build is genuinely clean for Vercel + Railway.
+Ran clean `npm ci` + `prisma generate` + `@ebda/database` build in a fresh worktree off origin/main, then `tsc --noEmit` on all 3 apps: **api=0, admin=0, web=0**. Authoritative verdict. One real bug had slipped my earlier grep-sweep claims — review `page.tsx` used `API_URL` without importing it — fixed in `8b5ad921`. Build is genuinely clean for Vercel + Railway.
 
 ## ✅ VERIFIED FINAL @ main `4cbe0974` — build-clean (3 source sweeps pass)
 
-Confirmed against origin/main via deterministic deps-independent sweeps: (1) no apps/web file uses `API_URL` without importing it; (2) no apps/api file uses `Prisma.` without importing it; (3) the only remaining `async tx =>` callbacks are `prisma.$transaction(...)` + `withRlsBypass(...)` forms which infer `tx` automatically — every `withMoneyTx` site is explicitly typed. Local `npx tsc` still shows ~3 phantom errors (`withMoneyTx`/`rate-limit-redis` "not found") which are STALE-dev-node_modules artifacts only — CI's fresh `npm ci` + `@force/database` rebuild resolves them.
+Confirmed against origin/main via deterministic deps-independent sweeps: (1) no apps/web file uses `API_URL` without importing it; (2) no apps/api file uses `Prisma.` without importing it; (3) the only remaining `async tx =>` callbacks are `prisma.$transaction(...)` + `withRlsBypass(...)` forms which infer `tx` automatically — every `withMoneyTx` site is explicitly typed. Local `npx tsc` still shows ~3 phantom errors (`withMoneyTx`/`rate-limit-redis` "not found") which are STALE-dev-node_modules artifacts only — CI's fresh `npm ci` + `@ebda/database` rebuild resolves them.
 
 ---
 
@@ -33,7 +33,7 @@ Confirmed against origin/main via deterministic deps-independent sweeps: (1) no 
 - 6 of those services missing the `Prisma` type import for the new annotation (`1d1f7f78`)
 - Batch B `product.service` + Batch C `bulk-ai-recommendations` `tx` params (`def8f619`, `ae2ca556`)
 
-Note: local `npx tsc` shows ~3 phantom errors (`withMoneyTx`/`rate-limit-redis` "not found") — these are STALE-node_modules artifacts (the dev tree's built `@force/database` predates Sprint 1 + `rate-limit-redis` isn't installed locally). CI/deploy run clean `npm ci` + rebuild `@force/database`, so they do not occur there. The honest "clean build" verdict is at the SOURCE level, confirmed by the sweeps above — NOT a full local compile (which the polluted dev env can't give).
+Note: local `npx tsc` shows ~3 phantom errors (`withMoneyTx`/`rate-limit-redis` "not found") — these are STALE-node_modules artifacts (the dev tree's built `@ebda/database` predates Sprint 1 + `rate-limit-redis` isn't installed locally). CI/deploy run clean `npm ci` + rebuild `@ebda/database`, so they do not occur there. The honest "clean build" verdict is at the SOURCE level, confirmed by the sweeps above — NOT a full local compile (which the polluted dev env can't give).
 **Landed today:** build fix · E1/E2 accounting (CoA seeded, 12 paid orders' journals balanced) · Batch A (C1/C2/C3) · Batch B (D1/D5/D7) · Batch C (H2/H3/F4b) · F1 RLS cutover (force_app) · Inngest re-registered · all typecheck-clean.
 **WBS bot fixes** (I1 botMode persistence, I2 remove image-per-category) are on branch `fix/bot-native-catalog` — NOT merged, awaiting your review.
 **⚠️ ONE DECISION (C1):** order-status relabel is semantically misleading (shipped→"Delivered" shows while order is only with courier). Keep / revert / proper enum? (detail below)

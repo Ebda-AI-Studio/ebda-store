@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction, CookieOptions } from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
-import { withUser } from '@force/database';
+import { withUser } from '@ebda/database';
 import { config } from '../config';
 import { authenticate, rejectImpersonated } from '../middleware/auth';
 import {

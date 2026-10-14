@@ -1,6 +1,6 @@
 // Idempotent: create-or-promote a super_admin user.
 //
-// Usage (run from apps/api/ so @force/database resolves):
+// Usage (run from apps/api/ so @ebda/database resolves):
 //   node ../../scripts/admin-upsert-super-admin.mjs --email=foo@bar.com --password=secret
 //   node ../../scripts/admin-upsert-super-admin.mjs --email=foo@bar.com --password=secret --apply
 //
@@ -17,7 +17,7 @@
 // the-same-email-on-some-store would not collide with that index since
 // customer rows have storeId set.
 import 'dotenv/config';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import bcrypt from 'bcryptjs';
 
 const args = Object.fromEntries(

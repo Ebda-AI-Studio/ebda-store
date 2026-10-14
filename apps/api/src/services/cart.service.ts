@@ -15,7 +15,7 @@
  * cached on the `CartBundle` row — every read recomputes via
  * `resolveBundle` from the CURRENT component prices/stock.
  */
-import { prisma, Prisma, hasTenantContext } from '@force/database';
+import { prisma, Prisma, hasTenantContext } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import { retryOnWriteConflict } from '../lib/db-retry';
@@ -97,7 +97,7 @@ const AMBIENT_TX_RETRY = { retries: 1, baseDelayMs: 5 } as const;
  * FORCE-API-2B (2026-09-12, `PUT /public/cart/items/:id`) was exactly that —
  * a 500 for a line the customer had just removed. Duck-typed on `.code` for
  * the same reason as `lib/db-retry.ts` (instanceof breaks under the mocked
- * `@force/database`).
+ * `@ebda/database`).
  */
 function isLineGone(err: unknown): boolean {
   return (err as { code?: unknown } | null)?.code === 'P2025';

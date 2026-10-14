@@ -4,7 +4,7 @@
 // (only if the owner doesn't own anything else).
 //
 // Dry-run by default; pass `--apply` to actually delete.
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 const APPLY = process.argv.includes('--apply');
 

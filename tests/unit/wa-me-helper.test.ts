@@ -16,7 +16,7 @@ import {
   waMeLink,
   waMeNumber,
   waMeShareLink,
-} from '@force/shared';
+} from '@ebda/shared';
 
 describe('waMeNumber / waMeLink — Egyptian number normalisation', () => {
   const E = '201012345678';

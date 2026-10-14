@@ -482,7 +482,7 @@ git commit -m "feat(api): shared promotion/coupon targeting evaluator"
 
 - [ ] **Step 1: Write failing service tests**
 
-Create `tests/unit/promotion.service.test.ts` mirroring the mock style of `tests/unit/customer-group.service.test.ts` (hoisted `mockPromotion` with `findMany/findFirst/create/update/delete/count`, `vi.mock('@force/database')`). Assert:
+Create `tests/unit/promotion.service.test.ts` mirroring the mock style of `tests/unit/customer-group.service.test.ts` (hoisted `mockPromotion` with `findMany/findFirst/create/update/delete/count`, `vi.mock('@ebda/database')`). Assert:
 
 ```ts
 // create: rejects value>100 for percentage type
@@ -675,7 +675,7 @@ git commit -m "feat(api): add targeting to coupons"
 - [ ] **Step 3: Implement `promotion-resolver.ts`**
 
 ```ts
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-targeting';
 
 export async function resolveCustomerContext(

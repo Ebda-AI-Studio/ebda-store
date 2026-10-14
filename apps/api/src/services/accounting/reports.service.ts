@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 export interface TrialBalanceRow {
   accountId: string;

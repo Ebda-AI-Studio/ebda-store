@@ -17,7 +17,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
-import { Prisma } from '@force/database';
+import { Prisma } from '@ebda/database';
 import { errorHandler } from '@api/middleware/error-handler';
 
 function makeRes() {

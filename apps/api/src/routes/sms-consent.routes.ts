@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { runInTenantContext, withUser } from '@force/database';
+import { runInTenantContext, withUser } from '@ebda/database';
 import { authenticate, customerUserId } from '../middleware/auth';
 import { publicLimiter, writeLimiter } from '../middleware/security';
 import { getStoreIdFromRequest } from '../utils/store-helpers';

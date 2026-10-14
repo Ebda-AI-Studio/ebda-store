@@ -38,7 +38,7 @@ vi.mock('../../../../components/AdminLayout', () => ({
 }));
 vi.mock('../../../../lib/api', () => api);
 
-import { ToastProvider } from '@force/ui';
+import { ToastProvider } from '@ebda/ui';
 import CustomersPage from './page';
 
 const ROWS = [

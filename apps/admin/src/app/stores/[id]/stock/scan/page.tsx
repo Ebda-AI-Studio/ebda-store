@@ -20,7 +20,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

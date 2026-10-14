@@ -1,9 +1,9 @@
 import type { InngestFunction } from 'inngest';
 import { inngest } from '../client';
-import { prisma as defaultPrisma, runInTenantContext } from '@force/database';
+import { prisma as defaultPrisma, runInTenantContext } from '@ebda/database';
 import logger from '../../logger';
 import { featureService } from '../../../services/feature.service';
-import { storeOrigin } from '@force/shared';
+import { storeOrigin } from '@ebda/shared';
 
 interface SyncArgs {
   // The upsert emitter (product.service) sends `op: 'create'|'update'`, NOT `action`.

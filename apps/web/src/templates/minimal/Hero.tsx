@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { sanitizeUrl } from '@force/shared';
+import { sanitizeUrl } from '@ebda/shared';
 import type { HeroProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 

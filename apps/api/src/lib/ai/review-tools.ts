@@ -1,5 +1,5 @@
 import { GeminiFailoverClient } from './gemini-keys';
-import { prisma, currentStoreId } from '@force/database';
+import { prisma, currentStoreId } from '@ebda/database';
 import { config } from '../../config';
 import logger from '../logger';
 import { assertAiQuota } from '../ai-quota';

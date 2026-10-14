@@ -236,7 +236,7 @@ model Store {
   // the text-only treatment.
   bestSellersImage       String?     @map("best_sellers_image")
   // Per-store typography overrides — see TypographySettings type in
-  // @force/shared. JSON because the shape will keep evolving (more
+  // @ebda/shared. JSON because the shape will keep evolving (more
   // zones, line-height/letter-spacing, etc.) and we don't want a
   // column-add migration each time.
   typography             Json?       @map("typography")
@@ -943,7 +943,7 @@ model Product {
   citationCopyAr       String?       @map("citation_copy_ar")
   // Per-field AI provenance: { "<field>": "ai" | "human" }. Absent key =
   // never set. Drives the AI-first autofill override guarantee — the engine
-  // never overwrites a field marked "human". See @force/shared
+  // never overwrites a field marked "human". See @ebda/shared
   // AI_AUTOFILL_FIELDS / fieldsNeedingRefresh.
   aiFieldSources       Json          @default("{}") @map("ai_field_sources")
   aiBalanceBackup      Json?         @default("{}") @map("ai_balance_backup")
@@ -1424,7 +1424,7 @@ model Order {
   // GL posting and the refund allocator must still read THIS order's money
   // the way it was charged. Every `order.tax` consumer honours it: the money
   // paths (services/accounting/posting/{order-posting,partial-return-allocation}.ts)
-  // and every post-purchase display via `orderTaxPlacement` (@force/shared) —
+  // and every post-purchase display via `orderTaxPlacement` (@ebda/shared) —
   // invoice, confirmation email, admin + orders-app order cards, the account
   // order page — plus the XLSX export's "Tax Included In Price" column.
   taxIncludedInPrice          Boolean            @default(false) @map("tax_included_in_price")
@@ -4660,7 +4660,7 @@ enum SubscriptionStatus {
 /// RLS — reads are public-safe config; writes only go through the super-admin
 /// `PUT /admin/plans/:code`. Prices are NULL until Ahmad sets them (null means
 /// "not set yet", never "free"). `limits` is validated by `planLimitsSchema`
-/// (@force/shared) on every write; a null numeric limit means unlimited.
+/// (@ebda/shared) on every write; a null numeric limit means unlimited.
 model Plan {
   id                String    @id @default(uuid())
   code              String    @unique

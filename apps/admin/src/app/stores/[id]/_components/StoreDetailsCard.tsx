@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Button, Input, Label } from '@force/ui';
+import { Badge, Button, Input, Label } from '@ebda/ui';
 import { formatDate } from '../../../../lib/format';
 import { getStoreDisplayUrl } from '../../../../lib/store-url';
 import { useT } from '@/i18n/useT';

@@ -26,8 +26,8 @@ vi.mock('@/i18n/useT', () => ({
   useT: () => (key: string, vars?: Record<string, unknown>) =>
     vars && 'page' in vars ? `page ${vars.page}` : key,
 }));
-vi.mock('@force/ui', async importOriginal => ({
-  ...(await importOriginal<typeof import('@force/ui')>()),
+vi.mock('@ebda/ui', async importOriginal => ({
+  ...(await importOriginal<typeof import('@ebda/ui')>()),
   useToast: () => ({ success: vi.fn(), error: vi.fn() }),
 }));
 vi.mock('@/lib/format', () => ({ formatPrice: (n: number) => String(n) }));

@@ -1,4 +1,4 @@
-import { prisma, withStore, DbClient } from '@force/database';
+import { prisma, withStore, DbClient } from '@ebda/database';
 import type { AccountType, Prisma } from '@prisma/client';
 import { COA_TEMPLATE } from './coa-template';
 import { postEntry } from './journal.service';

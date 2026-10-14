@@ -30,8 +30,8 @@
  *                 tracked yet (follow-up).
  */
 
-import { upgradePlanFor } from '@force/shared';
-import { prisma, withStore, withUser, type Prisma } from '@force/database';
+import { upgradePlanFor } from '@ebda/shared';
+import { prisma, withStore, withUser, type Prisma } from '@ebda/database';
 import {
   PLAN_LIMIT_ERROR_CODE,
   isNumericLimitKey,
@@ -41,7 +41,7 @@ import {
   regionYearMonth,
   type BooleanLimitKey,
   type GatedLimitKey,
-} from '@force/shared';
+} from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { getEntitlements, parseLimits, type Entitlements } from './plan-entitlements';
 import { socketService } from './socket.service';

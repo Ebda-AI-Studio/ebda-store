@@ -72,7 +72,7 @@ export const colorValue = z
   )
   .optional();
 
-// Per-zone typography override — mirrors ZoneOverride in @force/shared.
+// Per-zone typography override — mirrors ZoneOverride in @ebda/shared.
 // color reuses colorValue (hex or token:<name>).
 export const zoneOverride = z
   .object({

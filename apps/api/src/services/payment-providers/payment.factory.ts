@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { currentStoreId, prisma, Prisma, runInTenantContext, withStore } from '@force/database';
+import { currentStoreId, prisma, Prisma, runInTenantContext, withStore } from '@ebda/database';
 import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
@@ -33,7 +33,7 @@ import { toProviderCredentials } from './credentials';
 import { activatedProvidersForStore, isProviderUsable } from './provider-gate';
 import { V2ProviderBridge } from './v2-bridge';
 import { PaymentProviderError, type WebhookPayload } from './types';
-import type { PaymentStatus as DbPaymentStatus } from '@force/database';
+import type { PaymentStatus as DbPaymentStatus } from '@ebda/database';
 import {
   resolveRefundSettlement,
   readAccountedRefundEventIds,
@@ -53,7 +53,7 @@ import {
   REFUND_RECONCILED_EVENT,
 } from './refund-outcome';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 import { paymentWebhookUrl } from './webhook-url';
 // ==========================================
 // Payment Factory

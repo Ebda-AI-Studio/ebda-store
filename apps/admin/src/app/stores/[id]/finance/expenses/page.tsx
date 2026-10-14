@@ -11,7 +11,7 @@ import { minorToMajor } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

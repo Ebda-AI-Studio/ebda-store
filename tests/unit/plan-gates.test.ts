@@ -8,7 +8,7 @@
  *   hidden plans          re-saving a comped store never demotes it
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { DEFAULT_PLAN_SEEDS } from '@force/shared';
+import { DEFAULT_PLAN_SEEDS } from '@ebda/shared';
 
 const m = vi.hoisted(() => ({
   storeFindMany: vi.fn(),
@@ -22,7 +22,7 @@ const m = vi.hoisted(() => ({
 vi.mock('@api/services/redis.service', () => ({
   redis: { get: vi.fn().mockResolvedValue(null), set: vi.fn(), delete: vi.fn() },
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { store: { findMany: m.storeFindMany } },
   Prisma: {},
   withMoneyTx: vi.fn(),

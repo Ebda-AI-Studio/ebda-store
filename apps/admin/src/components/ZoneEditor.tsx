@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import type { ZoneOverride, StoreTheme, ColorToken } from '@force/shared';
+import type { ZoneOverride, StoreTheme, ColorToken } from '@ebda/shared';
 import { ColorField } from './ColorField';
 import { useT } from '@/i18n/useT';
 

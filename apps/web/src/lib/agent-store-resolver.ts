@@ -1,6 +1,6 @@
 import { headers } from 'next/headers';
 import { API_URL } from './api';
-import { storefrontOrigin } from '@force/shared';
+import { storefrontOrigin } from '@ebda/shared';
 
 /**
  * Resolve "which store is this request for?" for the AGENT-FACING routes —

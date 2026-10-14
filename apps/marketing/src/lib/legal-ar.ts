@@ -1,4 +1,4 @@
-import { BRAND } from '@force/shared/brand';
+import { BRAND } from '@ebda/shared/brand';
 import type { LegalPages } from './legal-types';
 
 const OP = BRAND.company.shortNameAr;

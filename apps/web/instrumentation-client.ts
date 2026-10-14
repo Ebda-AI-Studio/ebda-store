@@ -24,7 +24,7 @@
  * distinct from PostHog which IS marketing analytics and needs explicit consent.
  */
 import * as Sentry from '@sentry/nextjs';
-import { isHostInjectedScriptEvent } from '@force/shared';
+import { isHostInjectedScriptEvent } from '@ebda/shared';
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN_WEB;
 
@@ -75,7 +75,7 @@ if (dsn) {
     environment: process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.NODE_ENV || 'development',
     // Errors thrown INSIDE a script the host app injected (Chrome for iOS's
     // WKUserScripts — FORCE-WEB-K/M/Q/N/P), not by our bundle. Narrow by
-    // design: see @force/shared sentry-host-injected-filter for the evidence.
+    // design: see @ebda/shared sentry-host-injected-filter for the evidence.
     beforeSend(event) {
       const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
       return isHostInjectedScriptEvent(event, ua) ? null : event;

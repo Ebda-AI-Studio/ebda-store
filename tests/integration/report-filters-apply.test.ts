@@ -4,7 +4,7 @@
  * store history (every status, every date) while his list was filtered.
  *
  * Every surface below is driven over HTTP against real Postgres with the SAME
- * query string the admin builds (via the `@force/shared` contract helpers),
+ * query string the admin builds (via the `@ebda/shared` contract helpers),
  * and each test asserts that a DIFFERENT selected filter changes both the
  * request AND the rows that come back. Auth is stubbed; the routers,
  * services and SQL are the real ones.
@@ -18,14 +18,14 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import ExcelJS from 'exceljs';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import {
   reportRangeQueryString,
   orderListFilterParams,
   customerListFilterParams,
   reportRangeParams,
   localDayRange,
-} from '@force/shared';
+} from '@ebda/shared';
 
 vi.mock('../../apps/api/src/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {

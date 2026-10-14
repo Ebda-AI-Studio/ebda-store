@@ -18,8 +18,8 @@
  * request context (public endpoint, no JWT) and the table has RLS enabled.
  */
 
-import { withStore } from '@force/database';
-import { regionDayStart } from '@force/shared';
+import { withStore } from '@ebda/database';
+import { regionDayStart } from '@ebda/shared';
 import { BoundedMap } from '../lib/bounded-map';
 import { isWorkers } from '../lib/runtime';
 import logger from '../lib/logger';

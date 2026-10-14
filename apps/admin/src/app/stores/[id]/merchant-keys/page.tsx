@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Modal, useToast } from '@force/ui';
+import { Button, Modal, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { apiDelete, apiGet, apiPost, apiPut, getApiUrl } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 /**
  * Merchant screen for the MCP merchant-admin keys — issue, review, revoke.

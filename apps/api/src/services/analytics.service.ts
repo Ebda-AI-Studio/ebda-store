@@ -1,4 +1,4 @@
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma } from '@ebda/database';
 import { ON_HAND_SQL, storeStockValueFils } from '../lib/effective-inventory-sql';
 import { CUSTOMER_KEY_SQL } from '../lib/customer-key-sql';
 import { redis } from './redis.service';
@@ -8,7 +8,7 @@ import {
   pickSalesGranularity,
   type AnalyticsPeriod,
   type SalesGranularity,
-} from '@force/shared';
+} from '@ebda/shared';
 
 // ==========================================
 // Simple cache-aside helper for analytics queries (60s TTL).

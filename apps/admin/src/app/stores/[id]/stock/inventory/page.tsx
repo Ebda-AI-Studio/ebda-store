@@ -9,7 +9,7 @@ import { useT } from '@/i18n/useT';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
-import { Button, useToast } from '@force/ui';
+import { Button, useToast } from '@ebda/ui';
 
 // ─── Select-all checkbox (indeterminate-aware) ─────────────────────────────────
 

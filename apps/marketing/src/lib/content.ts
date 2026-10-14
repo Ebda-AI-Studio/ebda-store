@@ -1,4 +1,4 @@
-import { BRAND } from '@force/shared/brand';
+import { BRAND } from '@ebda/shared/brand';
 import { LEGAL_AR } from './legal-ar';
 import { LEGAL_EN } from './legal-en';
 import type { LegalPages } from './legal-types';

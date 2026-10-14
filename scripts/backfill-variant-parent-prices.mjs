@@ -15,7 +15,7 @@
 //     product carries one of its own.
 //
 // Dry-run by default. Pass `--apply` to write.
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 const APPLY = process.argv.includes('--apply');
 

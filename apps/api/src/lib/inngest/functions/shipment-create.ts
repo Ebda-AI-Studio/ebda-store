@@ -1,5 +1,5 @@
 import { NonRetriableError, type InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';

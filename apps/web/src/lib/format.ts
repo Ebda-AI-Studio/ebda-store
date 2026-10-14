@@ -1,1 +1,1 @@
-export { formatPrice } from '@force/shared';
+export { formatPrice } from '@ebda/shared';

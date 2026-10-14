@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeOrderTax } from '@force/shared';
+import { computeOrderTax } from '@ebda/shared';
 import { computeOrderTax as apiComputeOrderTax } from '@api/lib/order-tax';
 
 /**
@@ -7,7 +7,7 @@ import { computeOrderTax as apiComputeOrderTax } from '@api/lib/order-tax';
  * all, and its total excluded tax — a store with tax added on top of prices
  * showed the shopper a total lower than what they were actually charged.
  *
- * The fix moves `computeOrderTax` into `@force/shared` so the storefront
+ * The fix moves `computeOrderTax` into `@ebda/shared` so the storefront
  * (checkout + cart summary) and the API (order creation — the authoritative
  * charge) call the SAME function rather than two implementations that could
  * drift apart. `apps/api/src/lib/order-tax.ts` re-exports it for the

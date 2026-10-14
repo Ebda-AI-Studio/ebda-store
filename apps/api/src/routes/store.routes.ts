@@ -4,7 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { storeScopeContext, tenantContext } from '../middleware/tenant-context';
 import { requireStoreAccess } from '../middleware/store-access';
-import { Prisma, prisma, StoreStatus, withUser, asPlatformOperator } from '@force/database';
+import { Prisma, prisma, StoreStatus, withUser, asPlatformOperator } from '@ebda/database';
 import { StoreService } from '../services/store.service';
 import { acquisitionForAdmin } from '../services/ebda-ads.service';
 import { resolveDomainService } from '../services/domain-provider';
@@ -29,7 +29,7 @@ import {
   LOOK_DENSITIES,
   LOOK_IMAGE_RATIOS,
   LOOK_MOTIONS,
-} from '@force/shared';
+} from '@ebda/shared';
 import {
   maskMarketingPixelSecrets,
   preserveMaskedPixelSecrets,
@@ -65,7 +65,7 @@ const createStoreSchema = z.object({
   name: z.string().min(1).max(100),
   // `<slug>.ebda.app`: lowercase a-z0-9/hyphen, 3-40 chars, no leading/trailing/
   // double hyphen, and never a reserved label (`app`, `api`, `www`, …). One
-  // definition in @force/shared — the same list the host parser and resolver use.
+  // definition in @ebda/shared — the same list the host parser and resolver use.
   slug: storeSlugSchema.optional(),
   domain: z.string().optional(),
   settings: z.record(z.string(), z.any()).optional(),
@@ -352,7 +352,7 @@ const socialSchema = z
   })
   .strip();
 
-// Announcement payload mirrors the @force/shared AnnouncementBar shape. The
+// Announcement payload mirrors the @ebda/shared AnnouncementBar shape. The
 // storefront renders linkText / linkTextAr / dismissible alongside the link
 // itself, so the schema must accept (and the .strip() must not drop) them.
 const announcementSchema = z
@@ -372,7 +372,7 @@ const announcementSchema = z
 const marketingPixelsSchema = z.record(z.string(), z.unknown());
 
 // Floating widget — sticky button group on the storefront. Schema mirrors
-// the FloatingWidgetConfig type in @force/shared. The buttons array can
+// the FloatingWidgetConfig type in @ebda/shared. The buttons array can
 // hold any FloatingButton shape; we use z.record for the per-button object
 // so adding a new optional field on the client (e.g. a new social kind)
 // doesn't immediately require a backend redeploy. Length caps prevent
@@ -380,7 +380,7 @@ const marketingPixelsSchema = z.record(z.string(), z.unknown());
 const floatingButtonSchema = z
   .object({
     id: z.string().max(64),
-    // Keep in sync with FloatingButtonKind in @force/shared. The social kinds
+    // Keep in sync with FloatingButtonKind in @ebda/shared. The social kinds
     // inherit their value from the store's contact/socialLinks at render time
     // when left blank (so a merchant can save them empty on purpose).
     kind: z.enum([

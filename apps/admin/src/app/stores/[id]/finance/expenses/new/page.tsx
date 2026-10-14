@@ -15,7 +15,7 @@ import {
   minorToDecimalString,
   roundToMinor,
   REGION,
-} from '@force/shared';
+} from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

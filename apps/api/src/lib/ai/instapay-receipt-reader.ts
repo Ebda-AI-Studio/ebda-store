@@ -19,7 +19,7 @@ import {
   normalizeInstapayReference,
   toAsciiDigits,
   type InstapayReceiptExtraction,
-} from '@force/shared';
+} from '@ebda/shared';
 import { callGemini } from '../../services/accounting/gemini-ai.service';
 
 export const INSTAPAY_RECEIPT_AI_TIMEOUT_MS = 25_000;

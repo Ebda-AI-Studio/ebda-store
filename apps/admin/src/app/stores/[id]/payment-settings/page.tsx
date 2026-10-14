@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@force/ui';
-import { BRAND, PROVIDER_CATALOG, providerRequestMailto } from '@force/shared';
+import { Button } from '@ebda/ui';
+import { BRAND, PROVIDER_CATALOG, providerRequestMailto } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';

@@ -6,7 +6,7 @@ import {
   lookFontsHref,
   composeStoreTheme,
   type StoreTheme,
-} from '@force/shared';
+} from '@ebda/shared';
 import { buildThemeStyleTag, LOOK_VAR_PATTERNS } from '../../apps/web/src/lib/theme-css';
 import { lookHead } from '../../apps/web/src/lib/look-head';
 

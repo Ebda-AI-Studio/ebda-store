@@ -1,4 +1,4 @@
-import { ORDER_STATUS_TRANSITIONS, orderStatusOptions } from '@force/shared';
+import { ORDER_STATUS_TRANSITIONS, orderStatusOptions } from '@ebda/shared';
 
 export interface OrderCustomer {
   id: string;
@@ -69,7 +69,7 @@ export interface Pagination {
 }
 
 // Valid status transitions and the per-order options — one canonical map in
-// @force/shared, read by the order list, the order page and the orders PWA
+// @ebda/shared, read by the order list, the order page and the orders PWA
 // (#1936/#1947). The API enforces its own typed copy
 // (apps/api/src/services/order-status-machine.ts); a parity test pins them.
 export const VALID_TRANSITIONS: Readonly<Record<string, readonly string[]>> =

@@ -18,7 +18,7 @@ import {
   mergeDocumentOnlySections,
   type PageDefinition,
   type StoreLayoutSettings,
-} from '@force/shared';
+} from '@ebda/shared';
 import { apiGet, apiPost, apiPut, type ApiError } from './api';
 
 export const HOME_PAGE = 'home';

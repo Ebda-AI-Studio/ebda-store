@@ -61,8 +61,8 @@ export function workspaceAliases(root: string): Record<string, string> {
     '@database': path.resolve(root, './packages/database'),
     '@shared': path.resolve(root, './packages/shared'),
     // Pure brand module only — keeps marketing bundles free of the shared barrel.
-    '@force/shared/brand': path.resolve(root, './packages/shared/src/brand'),
+    '@ebda/shared/brand': path.resolve(root, './packages/shared/src/brand'),
     // The 3D viewer subpath (apps map it in tsconfig `paths`; vite needs it here).
-    '@force/ui/model3d': path.resolve(root, './packages/ui/src/model3d'),
+    '@ebda/ui/model3d': path.resolve(root, './packages/ui/src/model3d'),
   };
 }

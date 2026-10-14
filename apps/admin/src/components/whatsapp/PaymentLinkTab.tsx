@@ -6,13 +6,13 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Button, useToast } from '@force/ui';
+import { Button, useToast } from '@ebda/ui';
 import { apiGet, apiPost } from '../../lib/api';
 import { formatPrice } from '../../lib/format';
 import { useT } from '../../i18n/useT';
 import { paymentLinkErrorMessage } from './payment-link-errors';
 
-import { minorToDecimalString, roundToMinor, REGION } from '@force/shared';
+import { minorToDecimalString, roundToMinor, REGION } from '@ebda/shared';
 interface PaymentLinkResponse {
   paymentUrl: string;
   orderId: string;

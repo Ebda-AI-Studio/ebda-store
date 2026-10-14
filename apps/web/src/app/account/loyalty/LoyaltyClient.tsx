@@ -1,6 +1,6 @@
 'use client';
 
-import { storeNumerals } from '@force/shared';
+import { storeNumerals } from '@ebda/shared';
 import { useState, useEffect } from 'react';
 import { useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -8,7 +8,7 @@ import { useNumerals } from '../../../hooks/useNumerals';
 import { useFeatures } from '../../../contexts/FeatureContext';
 import { api, API_URL } from '../../../lib/api';
 import { formatDate as formatStoreDate } from '../../../lib/format-date';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 
 interface LoyaltyPoints {
   points: number;

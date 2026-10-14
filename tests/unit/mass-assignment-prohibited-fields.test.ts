@@ -120,7 +120,7 @@ const prismaStub = {
   order: { findFirst: vi.fn(), findMany: vi.fn() },
   auditLog: { create: vi.fn().mockResolvedValue({}) },
 };
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: prismaStub,
   Prisma: { DbNull: null },
   StoreStatus: { active: 'active', suspended: 'suspended' },

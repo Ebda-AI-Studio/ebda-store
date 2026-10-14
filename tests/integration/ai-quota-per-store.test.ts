@@ -17,7 +17,7 @@
  *     interactive AI for the whole platform.
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import { assertAiQuota, isAiQuotaCapError } from '@api/lib/ai-quota';
 
 const hasDb =

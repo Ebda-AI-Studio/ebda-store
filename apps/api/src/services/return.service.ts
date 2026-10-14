@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { prisma, Prisma, ReturnStatus, ReturnType } from '@force/database';
+import { prisma, Prisma, ReturnStatus, ReturnType } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
@@ -25,7 +25,7 @@ import { featureService } from './feature.service';
 import { WalletService } from './wallet.service';
 import { evaluateReturnWindow } from '../lib/return-window';
 
-import { minorToDecimalString } from '@force/shared';
+import { minorToDecimalString } from '@ebda/shared';
 interface CreateReturnItemInput {
   orderItemId: string;
   productId: string;

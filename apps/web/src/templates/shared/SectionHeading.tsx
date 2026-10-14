@@ -2,13 +2,13 @@
 
 import type React from 'react';
 import Link from 'next/link';
-import type { TemplateId, SectionDividers, DividerSettings } from '@force/shared';
+import type { TemplateId, SectionDividers, DividerSettings } from '@ebda/shared';
 import {
   DEFAULT_DIVIDER_SETTINGS,
   resolveColor,
   pickReadableForeground,
   contrastRatio,
-} from '@force/shared';
+} from '@ebda/shared';
 import { getPackStyles } from './pack-styles';
 import type { ResolvedZone } from './section-typography';
 import { responsiveFontSize } from './section-typography';

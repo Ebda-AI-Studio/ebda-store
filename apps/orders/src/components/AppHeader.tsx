@@ -4,7 +4,7 @@ import { StorePicker } from './StorePicker';
 import { LangToggle } from './LangToggle';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/lib/auth';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 export function AppHeader() {
   const { t } = useLanguage();

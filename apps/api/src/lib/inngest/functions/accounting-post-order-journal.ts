@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { postOrderPaymentJournal } from '../../../services/accounting/posting/order-posting';

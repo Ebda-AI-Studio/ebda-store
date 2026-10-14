@@ -2,7 +2,7 @@
 
 import { PLATFORM_MARKETING_URL } from '../lib/platform';
 import { useLanguage, translations } from '../contexts/LanguageContext';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 /**
  * 404 for the bare platform host (`ebda.app/<unknown-slug>`).

@@ -26,14 +26,14 @@ import {
   excelMoneyFormat,
   BRAND,
   storefrontOrigin,
-} from '@force/shared';
+} from '@ebda/shared';
 import { COUPON_OVERRIDE_AUDIT_ACTION } from '../lib/coupon-override';
 import { InvoiceService } from '../services/invoice.service';
 import { hasPermission, requirePermission, type Role } from '../middleware/rbac';
 import { hasCapturedPayment } from '../services/order-refund-gating';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { PaymentService } from '../services/payment-providers/payment.factory';
@@ -41,9 +41,9 @@ import { recordPaymentEvent } from '../services/payment-event.service';
 import { InstapayService } from '../services/payment-providers/instapay.service';
 import { InstapayReceiptService } from '../services/payment-providers/instapay-receipt.service';
 import multer from 'multer';
-import { INSTAPAY_RECEIPT_MAX_BYTES, instapayRefundRecordSchema } from '@force/shared';
+import { INSTAPAY_RECEIPT_MAX_BYTES, instapayRefundRecordSchema } from '@ebda/shared';
 import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
-import { runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@ebda/database';
 import { config } from '../config';
 import type { Currency, PaymentProvider } from '../services/payment-providers/types';
 import { AppError } from '../middleware/error-handler';

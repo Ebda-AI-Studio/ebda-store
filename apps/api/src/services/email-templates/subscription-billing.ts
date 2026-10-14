@@ -1,4 +1,4 @@
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 import { escapeHtml, emailMoney } from './_util';
 
 export type SubscriptionBillingNoticeKind =

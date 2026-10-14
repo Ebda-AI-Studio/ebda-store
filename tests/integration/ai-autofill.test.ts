@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { AIService } from '../../apps/api/src/services/ai.service';
 import { fillProductFields } from '../../apps/api/src/services/ai-autofill.service';
 

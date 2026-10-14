@@ -104,7 +104,7 @@ vi.mock('@api/lib/inngest/client', () => ({
   inngest: { send: sendMock },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   Prisma: {},
   // These tests cover the context-less callers (self-service /auth/me/erase,

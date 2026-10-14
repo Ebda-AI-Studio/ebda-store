@@ -9,7 +9,7 @@
  *
  *  - DOES NOT SHIP: `awaiting_payment_confirmation` allows only `confirmed` and
  *    `cancelled` in the one state machine (`order-status-machine.ts`, mirrored in
- *    @force/shared), and `assertOrderFulfillable` blocks carrier booking.
+ *    @ebda/shared), and `assertOrderFulfillable` blocks carrier booking.
  *  - DOES NOT COUNT AS REVENUE: the order stays `paymentStatus='unpaid'` with a
  *    `pending` Payment until `confirm`; every revenue aggregate excludes the status
  *    (`NON_REVENUE_ORDER_STATUSES`), and the GL only posts `paymentStatus='paid'`.
@@ -40,7 +40,7 @@ import {
   prisma,
   withStore,
   type Prisma,
-} from '@force/database';
+} from '@ebda/database';
 import {
   AWAITING_PAYMENT_CONFIRMATION,
   INSTAPAY_DEFAULT_EXPIRY_HOURS,
@@ -50,7 +50,7 @@ import {
   type InstapayInstructions,
   type InstapayReceiptFields,
   type InstapayRefundRecord,
-} from '@force/shared';
+} from '@ebda/shared';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
 import { inngest } from '../../lib/inngest/client';

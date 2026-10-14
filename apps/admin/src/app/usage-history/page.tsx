@@ -26,7 +26,7 @@ import { DataTable, type DataTableColumn } from '../../components/mobile/DataTab
 import { useT } from '../../i18n/useT';
 import { formatSpend } from '@/lib/ai-spend';
 
-import { formatMoney, withNumerals } from '@force/shared';
+import { formatMoney, withNumerals } from '@ebda/shared';
 interface UsageStoreRow {
   storeId: string;
   slug: string;

@@ -1,7 +1,7 @@
 /**
  * DOM-free logic for the builder canvas overlay (unit-tested in node).
  */
-import { getSectionDefinition, locateSection, type PageDefinition } from '@force/shared';
+import { getSectionDefinition, locateSection, type PageDefinition } from '@ebda/shared';
 
 /** Minimal element shape the overlay needs (Element satisfies it). */
 export interface ElementLike {

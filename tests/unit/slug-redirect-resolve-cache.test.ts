@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const findUnique = vi.fn();
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { slugRedirect: { findUnique: (...a: unknown[]) => findUnique(...a) } },
   SlugEntityType: { PRODUCT: 'PRODUCT', BLOG: 'BLOG', CATEGORY: 'CATEGORY', PAGE: 'PAGE' },
 }));

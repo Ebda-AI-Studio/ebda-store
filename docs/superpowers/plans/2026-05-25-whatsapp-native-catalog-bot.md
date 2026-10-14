@@ -900,7 +900,7 @@ describe('productMetaSync', () => {
 ```ts
 // apps/api/src/lib/inngest/functions/product-meta-sync.ts
 import { inngest } from '../client';
-import { prisma as defaultPrisma } from '@force/database';
+import { prisma as defaultPrisma } from '@ebda/database';
 import logger from '../../logger';
 
 interface SyncArgs {

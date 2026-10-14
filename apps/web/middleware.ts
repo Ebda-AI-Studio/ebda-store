@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { parseStoreHost, storeHost, type ParsedStoreHost, type PlatformApp } from '@force/shared';
+import { parseStoreHost, storeHost, type ParsedStoreHost, type PlatformApp } from '@ebda/shared';
 // Relative import (not the `@/*` tsconfig alias) so this file is importable
 // directly from the root Vitest suite, which has no per-workspace `@/*`
 // alias plugin (each app's `@/*` points at its OWN `src/`, so a single

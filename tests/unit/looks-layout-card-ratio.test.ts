@@ -15,7 +15,7 @@ import {
   layoutToDefinition,
   publishedDocumentAgrees,
   type StoreLayoutSettings,
-} from '@force/shared';
+} from '@ebda/shared';
 
 const ratioKeys = (l: StoreLayoutSettings) => ({
   newArrivals: [l.newArrivals.cardShape, l.newArrivals.cardAspect],

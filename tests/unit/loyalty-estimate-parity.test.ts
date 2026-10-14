@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('@force/database', () => ({ prisma: {}, Prisma: {}, withMoneyTx: vi.fn() }));
+vi.mock('@ebda/database', () => ({ prisma: {}, Prisma: {}, withMoneyTx: vi.fn() }));
 vi.mock('@api/services/feature.service', () => ({ featureService: {} }));
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },

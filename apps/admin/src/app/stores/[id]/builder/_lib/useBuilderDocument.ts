@@ -4,7 +4,7 @@
  * Editor state for the visual builder (Phase 2): the document with undo/redo,
  * DRAFT AUTOSAVE against the optimistic-concurrency API, publish, and the
  * conflict state. One writer: every change goes through `dispatch`, which
- * runs the pure registry-checked reducer from @force/shared.
+ * runs the pure registry-checked reducer from @ebda/shared.
  *
  * Save model (same API as Phase 1):
  *   - edits debounce `AUTOSAVE_MS`, then `PUT …/draft { baseRev, definition }`;
@@ -25,7 +25,7 @@ import {
   type DocumentAction,
   type History,
   type PageDefinition,
-} from '@force/shared';
+} from '@ebda/shared';
 import { apiGet, apiPost, apiPut } from '../../../../../lib/api';
 
 export const AUTOSAVE_MS = 1200;

@@ -1,5 +1,5 @@
 {
-  "name": "@force/help",
+  "name": "@ebda/help",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",
@@ -16,7 +16,7 @@
     "check:search": "node scripts/search-check.mjs"
   },
   "dependencies": {
-    "@force/site-kit": "*"
+    "@ebda/site-kit": "*"
   },
   "devDependencies": {
     "eslint": "^9.0.0",

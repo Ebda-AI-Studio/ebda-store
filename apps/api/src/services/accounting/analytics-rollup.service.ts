@@ -16,8 +16,8 @@
  * Zero-customer stores: every function returns 0 cleanly — no throws.
  */
 
-import { prisma } from '@force/database';
-import { RfmSegment } from '@force/database';
+import { prisma } from '@ebda/database';
+import { RfmSegment } from '@ebda/database';
 import logger from '../../lib/logger';
 import { customerKeyOf, isGuestOrder, rfmKeyFor } from '../../lib/customer-key';
 // Every snapshot write below is savepointed (issue 2215's class): the daily
@@ -31,7 +31,7 @@ import {
   regionDayStartOffset,
   regionMonthStart,
   regionYearMonth,
-} from '@force/shared';
+} from '@ebda/shared';
 /**
  * Rows per savepoint on the per-row UPDATE loops (issue 2293). A savepoint
  * per row issued SAVEPOINT + UPDATE + RELEASE — three round trips per row —

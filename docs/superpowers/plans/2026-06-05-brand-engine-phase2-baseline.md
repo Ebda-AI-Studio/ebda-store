@@ -6,7 +6,7 @@
 
 **Architecture:** A shared structural base (`BASE_BRANDED_LAYOUT`, extracted from wadyaljuz's tokenized layout with content stripped) + a small per-template identity descriptor applied by `buildTemplateBaseline`, yielding `TEMPLATE_LAYOUT_BASELINES`. `resolveLayoutSettings(input, templateId?)` merges a store's saved layout over its template baseline (saved wins; no `templateId` → today's behavior). API layout routes pass `store.template`. Demos inherit by setting `layoutSettings = {}`.
 
-**Tech Stack:** TypeScript, `@force/shared` (`StoreLayoutSettings`, `DEFAULT_LAYOUT_SETTINGS`, `resolveLayoutSettings`), vitest, Prisma. Spec: `docs/superpowers/specs/2026-06-05-brand-engine-phase2-baseline-design.md`.
+**Tech Stack:** TypeScript, `@ebda/shared` (`StoreLayoutSettings`, `DEFAULT_LAYOUT_SETTINGS`, `resolveLayoutSettings`), vitest, Prisma. Spec: `docs/superpowers/specs/2026-06-05-brand-engine-phase2-baseline-design.md`.
 
 **Scope note:** Phase 2 of the Brand Engine. Phase 1 (color engine `deriveBrandRoles`) is merged (PR #61). This plan is the layout baseline. Independent, shippable, single PR.
 
@@ -670,7 +670,7 @@ export type { TemplateIdentity } from './types/template-baselines';
 
 Run: `npx tsc --noEmit -p packages/shared/tsconfig.json`
 Expected: no errors (no circular-import error — the back-edge is runtime-only).
-Run: `npm run build --workspace=@force/shared`
+Run: `npm run build --workspace=@ebda/shared`
 Expected: builds; `grep -n derive... ` not needed — confirm: `grep -rn "getTemplateBaseline" packages/shared/dist/types/template-baselines.d.ts` returns the export.
 
 - [ ] **Step 4: Commit**
@@ -790,7 +790,7 @@ Proves wadyaljuz's resolved layout is byte-identical before/after (it has a full
 // before/after Phase 2. palora is logged but NOT gated (adopts minimal baseline).
 //   run:  node packages/database/scripts/verify-baseline-nodrift.mjs
 import { PrismaClient } from '@prisma/client';
-import { resolveLayoutSettings } from '@force/shared';
+import { resolveLayoutSettings } from '@ebda/shared';
 
 const prisma = new PrismaClient();
 

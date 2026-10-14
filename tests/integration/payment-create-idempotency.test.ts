@@ -28,7 +28,7 @@ vi.mock('@api/services/alerts.service', () => ({ sendAlert: h.sendAlert }));
 
 import express from 'express';
 import request from 'supertest';
-import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
+import { prisma, runInTenantContext, withRlsBypass } from '@ebda/database';
 import paymentRoutes from '@api/routes/payment.routes';
 import { alertIfDuplicateCapture } from '@api/services/payment-providers/payment.factory';
 

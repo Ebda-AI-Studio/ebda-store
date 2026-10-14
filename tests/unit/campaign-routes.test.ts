@@ -33,7 +33,7 @@ const { holder, mocks } = vi.hoisted(() => {
   };
 });
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   get prisma() {
     return holder.prisma;
   },
@@ -63,11 +63,11 @@ vi.mock('@force/database', () => ({
 }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: vi.fn() }));
 
-// Load @force/shared from SOURCE so its schemas and the API's errorHandler
+// Load @ebda/shared from SOURCE so its schemas and the API's errorHandler
 // share one `zod` instance. The package's CJS dist would `require('zod')` and
 // hand vitest's ESM errorHandler a different ZodError class (instanceof false
 // → 500). Production is CJS on both sides, so this is a test-harness concern.
-vi.mock('@force/shared', async () => await import('../../packages/shared/src/index'));
+vi.mock('@ebda/shared', async () => await import('../../packages/shared/src/index'));
 
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {

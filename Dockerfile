@@ -35,7 +35,7 @@ COPY . .
 RUN npx prisma generate --schema=packages/database/prisma/schema.prisma
 
 ENV NODE_ENV=production
-RUN npm run build -w @force/shared && npm run build -w apps/api
+RUN npm run build -w @ebda/shared && npm run build -w apps/api
 
 # ============================================
 # Stage 2b: Full Builder (for web + admin)

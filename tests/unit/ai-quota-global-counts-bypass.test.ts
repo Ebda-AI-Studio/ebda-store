@@ -22,7 +22,7 @@ const h = vi.hoisted(() => ({
   withRlsBypass: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { aiUsage: { count: h.ambientCount } },
 }));
 // The two platform counts go through the SECURITY DEFINER `ebda_ai_usage_count` (a single

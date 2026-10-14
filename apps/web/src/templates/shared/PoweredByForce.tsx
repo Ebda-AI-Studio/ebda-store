@@ -1,7 +1,7 @@
 'use client';
 
 import { useLanguage } from '../../contexts/LanguageContext';
-import { BRAND, BRAND_MARKETING_URL } from '@force/shared';
+import { BRAND, BRAND_MARKETING_URL } from '@ebda/shared';
 
 /**
  * "Powered by Ebda" footer attribution. Rendered as the very last line

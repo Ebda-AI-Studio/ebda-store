@@ -7,14 +7,14 @@ import { BulkService } from '../services/bulk.service';
 import { xlsxBufferToImportCsv } from '../services/xlsx-import';
 import { importCsvToPlatformCsv } from '../services/csv-import';
 import { buildImportPreview } from '../services/import-preview';
-import { prisma, ProductStatus } from '@force/database';
+import { prisma, ProductStatus } from '@ebda/database';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { inngest } from '../lib/inngest/client';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
 import { tenantContext } from '../middleware/tenant-context';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 
-import { fromMinor, excelMoneyFormat } from '@force/shared';
+import { fromMinor, excelMoneyFormat } from '@ebda/shared';
 const router = Router();
 
 // Mounted at the bare '/stores' prefix in routes/index.ts, so Express does

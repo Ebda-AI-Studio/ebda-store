@@ -6,10 +6,10 @@ import {
   withMoneyTx,
   SlugEntityType,
   withStore,
-} from '@force/database';
+} from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { activeVariants, effectiveInventory } from '../lib/effective-inventory';
-import { slugify, slugifyWithFallback, AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
+import { slugify, slugifyWithFallback, AI_AUTOFILL_FIELD_NAMES } from '@ebda/shared';
 import { redis } from './redis.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';

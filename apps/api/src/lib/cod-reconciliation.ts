@@ -18,7 +18,7 @@
  * tests and the reconciliation page's totals bar rest on.
  */
 import { createHash } from 'node:crypto';
-import { tryToMinor } from '@force/shared';
+import { tryToMinor } from '@ebda/shared';
 import { parseCsvRecords } from '../services/csv-import';
 
 export type ReconStatus =

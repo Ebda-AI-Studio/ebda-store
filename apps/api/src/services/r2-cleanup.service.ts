@@ -1,4 +1,4 @@
-import { storeDirectory, withStore } from '@force/database';
+import { storeDirectory, withStore } from '@ebda/database';
 import { config } from '../config';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { StorageService } from './storage.service';

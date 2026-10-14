@@ -648,8 +648,8 @@ CF_DEP="@opennextjs/cloudflare@1.19.11"; WRANGLER="wrangler@^4.86.0"
 
 # 1. devDeps (local only — never committed to package.json to keep Vercel/CI lean)
 for app in "${APPS[@]}"; do
-  echo "→ installing CF devDeps for @force/$app"
-  npm i -D "$CF_DEP" "$WRANGLER" -w "@force/$app" --no-audit --no-fund
+  echo "→ installing CF devDeps for @ebda/$app"
+  npm i -D "$CF_DEP" "$WRANGLER" -w "@ebda/$app" --no-audit --no-fund
 done
 
 # 2. per-app open-next.config.ts + wrangler.jsonc

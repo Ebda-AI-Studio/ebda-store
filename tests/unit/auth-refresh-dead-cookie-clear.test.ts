@@ -22,7 +22,7 @@ vi.mock('@api/services/auth.service', () => ({
   AuthService: { refreshTokens: (...a: unknown[]) => mockRefreshTokens(...a) },
   GENERIC_RESEND_VERIFICATION_RESULT: { success: true, message: 'x' },
 }));
-vi.mock('@force/database', () => ({ prisma: {} }));
+vi.mock('@ebda/database', () => ({ prisma: {} }));
 vi.mock('@api/middleware/security', () => ({
   authLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   verifyEmailLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),

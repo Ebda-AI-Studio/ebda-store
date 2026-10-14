@@ -15,7 +15,7 @@ vi.mock('@api/services/sms-queue.service', () => ({
   smsQueue,
   isQueuedSms: (v: any) => !!v && typeof v.id === 'string' && typeof v.storeId === 'string',
 }));
-vi.mock('@force/database', () => ({ runInStoreScope }));
+vi.mock('@ebda/database', () => ({ runInStoreScope }));
 vi.mock('@api/lib/logger', () => ({
   default: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));

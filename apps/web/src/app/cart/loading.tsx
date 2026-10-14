@@ -1,4 +1,4 @@
-import { Skeleton } from '@force/ui';
+import { Skeleton } from '@ebda/ui';
 import { ShopChrome } from '../../components';
 
 export default function CartLoading() {

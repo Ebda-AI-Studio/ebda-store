@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Input, useToast } from '@force/ui';
+import { Button, Input, useToast } from '@ebda/ui';
 import { api, type SmsConsentResponse } from '@/lib/api';
 import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { useStoreUrl } from '../../../contexts/StoreContext';

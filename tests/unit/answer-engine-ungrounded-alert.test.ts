@@ -18,7 +18,7 @@ const h = vi.hoisted(() => ({
   createFunction: vi.fn((cfg: unknown, handler: unknown) => ({ cfg, handler })),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   runInTenantContext: async (_s: string, fn: () => Promise<unknown>) => fn(),
   runInStoreScope: async (_s: string, fn: () => Promise<unknown>) => fn(),
   // The cron lists stores through the directory definer; the filter is applied in code.

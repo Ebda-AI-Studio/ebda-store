@@ -1,5 +1,5 @@
-import { prisma, Prisma, withMoneyTx, withStore } from '@force/database';
-import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@force/shared';
+import { prisma, Prisma, withMoneyTx, withStore } from '@ebda/database';
+import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@ebda/shared';
 import { redis } from './redis.service';
 import { bustStoreCaches } from './store.service';
 import logger from '../lib/logger';

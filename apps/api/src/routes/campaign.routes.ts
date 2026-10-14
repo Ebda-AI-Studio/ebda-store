@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma, Prisma, runInTenantContext } from '@force/database';
+import { prisma, Prisma, runInTenantContext } from '@ebda/database';
 import {
   CAMPAIGN_MAX_SCHEDULE_DAYS,
   CAMPAIGN_RECIPIENT_STATUSES,
@@ -9,7 +9,7 @@ import {
   campaignSendSchema,
   isCampaignContentComplete,
   isCampaignSendable,
-} from '@force/shared';
+} from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';

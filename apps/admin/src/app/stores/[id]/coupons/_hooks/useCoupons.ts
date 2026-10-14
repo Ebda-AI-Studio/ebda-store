@@ -6,7 +6,7 @@ import { textFieldValue, numericFieldValue, dateFieldValue } from '../../../../.
 import type { Coupon, CouponFormData, CouponStatusFilter } from '../_components/types';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 
-import { roundToMinor } from '@force/shared';
+import { roundToMinor } from '@ebda/shared';
 interface UseCouponsResult {
   coupons: Coupon[];
   isLoading: boolean;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { IMAGE_STANDARDS } from '@force/shared';
+import { IMAGE_STANDARDS } from '@ebda/shared';
 import { HeroBanner } from './HeroBanner';
 import type { HeroSliderProps } from '../types';
 

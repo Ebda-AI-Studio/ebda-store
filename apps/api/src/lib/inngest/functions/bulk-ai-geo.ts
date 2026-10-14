@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInStoreScope } from '@force/database';
+import { prisma, runInStoreScope } from '@ebda/database';
 import { GeminiFailoverClient } from '../../ai/gemini-keys';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -14,7 +14,7 @@ import { AppError } from '../../../middleware/error-handler';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import { bustStoreCachesById } from '../../../services/store.service';
-import { storeOrigin } from '@force/shared';
+import { storeOrigin } from '@ebda/shared';
 import { isPlaceholderText } from '../../ai/placeholder-guard';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';

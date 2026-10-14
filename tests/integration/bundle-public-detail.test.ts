@@ -16,7 +16,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { Express } from 'express';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import {
   hasDb,
   buildBundleTestApp,

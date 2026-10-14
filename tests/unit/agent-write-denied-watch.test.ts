@@ -51,7 +51,7 @@ const {
 // `acrossStores` visits every store in its own tenant transaction. The stand-in answers the
 // two questions the watcher asks of it without a database: the per-store denial counts
 // (`groupBy` stub) and which of the given stores have ever had an agent order (`orderFindMany`).
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { auditLog: { count: (...a: unknown[]) => mockAuditCount(...a) } },
   withStore: mockRlsBypass,
   acrossStores: async (fn: (storeId: string) => Promise<unknown>, o?: { storeIds?: string[] }) => {

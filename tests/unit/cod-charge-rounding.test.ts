@@ -6,7 +6,7 @@
  * only; the percentage rounds HALF UP.
  */
 import { describe, it, expect } from 'vitest';
-import { codFeeForOrder } from '@force/shared';
+import { codFeeForOrder } from '@ebda/shared';
 import { codCollectMinor, codFeeConfigFromRow } from '@api/services/payment-providers/cod.provider';
 
 const fee = (goods: number, cfg: { fixedFee?: number; percentBps?: number }, shipping = 0) =>

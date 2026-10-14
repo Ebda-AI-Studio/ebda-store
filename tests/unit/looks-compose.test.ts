@@ -6,7 +6,7 @@ import {
   overriddenLookKeys,
   hexToHsl,
   getTemplateTheme,
-} from '@force/shared';
+} from '@ebda/shared';
 
 describe('composeStoreTheme', () => {
   const atelier = getLook('qamar.atelier')!;
@@ -48,7 +48,7 @@ describe('composeStoreTheme', () => {
 
 describe('lookTheme key guard', () => {
   it('every look sets exactly LOOK_TOKEN_KEYS (no more, no fewer)', async () => {
-    const { LOOKS, LOOK_TOKEN_KEYS } = await import('@force/shared');
+    const { LOOKS, LOOK_TOKEN_KEYS } = await import('@ebda/shared');
     for (const l of LOOKS) {
       expect(Object.keys(lookTheme(l)).sort(), l.id).toEqual([...LOOK_TOKEN_KEYS].sort());
     }

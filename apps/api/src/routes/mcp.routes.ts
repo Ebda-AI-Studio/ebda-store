@@ -1,7 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { publicLimiter } from '../middleware/security';
 import { featureService } from '../services/feature.service';
-import { runInStoreScope } from '@force/database';
+import { runInStoreScope } from '@ebda/database';
 import { resolveStoreBySlug } from '../mcp/resolve-store';
 import { classifyToolCall, resolveAgentAuth } from '../mcp/agent-auth';
 import { AppError } from '../middleware/error-handler';

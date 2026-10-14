@@ -11,7 +11,7 @@
  * remains the single authority for stock mutations.
  */
 
-import { prisma, runInTenantContext, Prisma } from '@force/database';
+import { prisma, runInTenantContext, Prisma } from '@ebda/database';
 import { InventoryService } from './inventory.service';
 import { createAdjustment, postAdjustment } from './accounting/stock-adjustment.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';

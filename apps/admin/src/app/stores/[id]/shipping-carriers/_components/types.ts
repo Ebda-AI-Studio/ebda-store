@@ -4,7 +4,7 @@
  * module, avoiding duplicate type declarations.
  */
 
-import type { CredentialMode } from '@force/shared';
+import type { CredentialMode } from '@ebda/shared';
 import type { PickupAddress } from './PickupAddressForm';
 
 export type CarrierKey = 'bosta' | 'shipblu' | 'mylerz' | 'aramex' | 'manual';

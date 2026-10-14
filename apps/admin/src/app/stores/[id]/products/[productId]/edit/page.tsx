@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Button, Input, Textarea, Select } from '@force/ui';
+import { Button, Input, Textarea, Select } from '@ebda/ui';
 import {
   recommendedSizeTextForTemplate,
   type TemplateId,
@@ -13,7 +13,7 @@ import {
   minorToDecimalString,
   roundToMinor,
   REGION,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 

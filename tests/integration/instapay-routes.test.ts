@@ -8,7 +8,7 @@ import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { createPrismaClient, runWithRequestDb, type AppPrismaClient } from '@force/database';
+import { createPrismaClient, runWithRequestDb, type AppPrismaClient } from '@ebda/database';
 import { config } from '@api/config';
 import { inngest } from '@api/lib/inngest/client';
 import { OneSignalService } from '@api/services/onesignal.service';

@@ -17,7 +17,7 @@ vi.mock('@api/services/ebda-ads-emit', () => ({
     return state.impl(req);
   },
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
     fn({
       store: {

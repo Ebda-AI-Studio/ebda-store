@@ -226,7 +226,7 @@ migration drops nothing, sets nothing NOT NULL, and never alters cart_items."
 
 **Interfaces:**
 
-- Consumes: `BundlePricingType` from `@force/database` (or a local string union to keep this package DB-free — prefer the local union).
+- Consumes: `BundlePricingType` from `@ebda/database` (or a local string union to keep this package DB-free — prefer the local union).
 - Produces:
   - `computeBundlePrice(componentSum: number, pricingType: BundlePricingType, pricingValue: number): number`
   - `allocateBundlePrice(lines: BundleLine[], bundlePrice: number): AllocatedLine[]`
@@ -244,7 +244,7 @@ import {
   allocateBundlePrice,
   isAllocatable,
   type BundleLine,
-} from '@force/shared';
+} from '@ebda/shared';
 
 // Ramadan Box: Dates 4.500 x1, Honey 6.000 x1, Nuts 2.000 x2 -> sum 14.500
 const BOX: BundleLine[] = [
@@ -485,7 +485,7 @@ distribution reddens 'sums to the bundle price EXACTLY' by name."
 
 **Interfaces:**
 
-- Consumes: `allocateBundlePrice`, `computeBundlePrice` from `@force/shared`.
+- Consumes: `allocateBundlePrice`, `computeBundlePrice` from `@ebda/shared`.
 - Produces:
   - `bundleAvailability(items: AvailabilityItem[]): number`
   - `type AvailabilityItem = { quantity: number; trackInventory: boolean; availableStock: number }`
@@ -631,7 +631,7 @@ Add `'bundles'` to the `FeatureKey` union. In `plan-baselines.ts` add a comment 
 ```typescript
 // tests/unit/bundle-validation.test.ts
 import { describe, it, expect } from 'vitest';
-import { isAllocatable, type BundleLine } from '@force/shared';
+import { isAllocatable, type BundleLine } from '@ebda/shared';
 import { nearestAllocatablePrice } from '../../apps/api/src/routes/bundle.routes';
 
 const ALL_PAIRS: BundleLine[] = [

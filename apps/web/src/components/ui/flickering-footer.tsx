@@ -5,7 +5,7 @@ import { parse, toRGBA } from 'color-bits';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { BRAND, BRAND_MARKETING_URL } from '@force/shared';
+import { BRAND, BRAND_MARKETING_URL } from '@ebda/shared';
 
 // ---------------------------------------------------------------------------
 // color-bits helpers

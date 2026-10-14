@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, getApiUrl, apiFetch, apiPost } from '../../../../lib/api';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 /**
  * Admin newsletter page.

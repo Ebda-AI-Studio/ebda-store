@@ -5,7 +5,7 @@ import {
   resolveDefaultLanguage,
   waMeLink,
   type WaMeLocale,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
 import type { OrderDetail } from './types';
 

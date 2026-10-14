@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
-import { RfmSegment } from '@force/database';
+import { prisma } from '@ebda/database';
+import { RfmSegment } from '@ebda/database';
 
 // No Gemini mock needed — analytics-rollup.service.ts does not call Gemini.
 // narration is handled by a separate insights-narration service.

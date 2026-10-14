@@ -12,14 +12,14 @@ import { HomeBlogCarousel } from '../../templates/shared/HomeBlogCarousel';
 import { SectionDivider, resolveSlotDividerSettings } from '../../templates/shared/SectionDivider';
 import { toTemplateProduct, toTemplateCategory } from '../../templates/adapters';
 import { getHomepageTemplate } from '../../lib/serverTemplate';
-import type { TemplateId, PageDefinition } from '@force/shared';
+import type { TemplateId, PageDefinition } from '@ebda/shared';
 import {
   sanitizeUrl,
   definitionToLayout,
   getSectionDefinition,
   renderableSections,
   sectionToLegacy,
-} from '@force/shared';
+} from '@ebda/shared';
 import { EmptySectionHint, type EmptySectionKind } from './EmptySectionHint';
 import { ImageTextSection, type ImageTextSettings } from '../sections/ImageTextSection';
 import { NewsletterSection, type NewsletterSettings } from '../sections/NewsletterSection';

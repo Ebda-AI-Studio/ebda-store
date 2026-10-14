@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { BRAND } from '@force/shared/brand';
+import { BRAND } from '@ebda/shared/brand';
 
 export const dynamic = 'force-static';
 

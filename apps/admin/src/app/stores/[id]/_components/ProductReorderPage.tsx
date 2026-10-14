@@ -20,7 +20,7 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Button, useToast } from '@force/ui';
+import { Button, useToast } from '@ebda/ui';
 import { useLocale } from 'next-intl';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';

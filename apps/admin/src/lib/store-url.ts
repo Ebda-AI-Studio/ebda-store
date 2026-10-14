@@ -5,7 +5,7 @@
 // on the apex. This module is the single place admin code turns a store into a
 // URL/display host — it delegates to the shared brand helpers so the format
 // can never drift from the storefront's own host routing.
-import { BRAND, storeHost, storefrontOrigin } from '@force/shared';
+import { BRAND, storeHost, storefrontOrigin } from '@ebda/shared';
 
 /** The suffix the free store address ends with, e.g. `.ebda.app`. */
 export const STORE_HOST_SUFFIX: string = BRAND.domains.storeSuffix;

@@ -86,7 +86,7 @@ vi.mock('@api/services/redis.service', () => ({
 
 // withRlsBypass passes its callback a `tx` argument that mirrors prisma.
 // We capture the callback and call it immediately with the hoisted mock tx.
-vi.mock('@force/database', async () => ({
+vi.mock('@ebda/database', async () => ({
   ...(await import('./helpers/database-mock')).databaseMock({ prisma: mockTx }),
 }));
 

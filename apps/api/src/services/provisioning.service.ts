@@ -8,7 +8,7 @@ import {
   scopeTransaction,
   withMoneyTx,
   withStore,
-} from '@force/database';
+} from '@ebda/database';
 import { ensureAdminUser, storeIdByDomain, storeIdBySlug } from '../lib/definer';
 import { bustStoreCaches } from './store.service';
 import { syncSubscriptionFromLegacyPlan } from './plan-sync';
@@ -27,7 +27,7 @@ import {
   storefrontOrigin,
   isReservedSlug,
   NEW_STORE_LAYOUT_SETTINGS,
-} from '@force/shared';
+} from '@ebda/shared';
 
 // ==========================================
 // Store Provisioning Service

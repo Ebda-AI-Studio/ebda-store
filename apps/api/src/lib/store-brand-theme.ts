@@ -1,4 +1,4 @@
-import { composeStoreTheme, getLook, type TemplateId } from '@force/shared';
+import { composeStoreTheme, getLook, type TemplateId } from '@ebda/shared';
 
 /**
  * The theme a store's brand surfaces OUTSIDE the storefront read (emails, invoices, campaign

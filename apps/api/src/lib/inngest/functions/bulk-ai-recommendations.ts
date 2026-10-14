@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { Prisma, prisma, withMoneyTx, runInStoreScope } from '@force/database';
+import { Prisma, prisma, withMoneyTx, runInStoreScope } from '@ebda/database';
 import { GeminiFailoverClient } from '../../ai/gemini-keys';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';

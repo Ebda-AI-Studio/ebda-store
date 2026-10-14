@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { WarehouseService } from '../../../apps/api/src/services/warehouse.service';
 import logger from '../../../apps/api/src/lib/logger';
 

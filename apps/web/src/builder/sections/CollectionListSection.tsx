@@ -8,7 +8,7 @@
  * renders but opens the full catalogue (the validator warns the editor).
  */
 import React from 'react';
-import type { BlockNode, SectionPaddingMaxWidthVisibility } from '@force/shared';
+import type { BlockNode, SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 import type { Category } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';

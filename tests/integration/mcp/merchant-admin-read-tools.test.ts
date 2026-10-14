@@ -22,7 +22,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import mcpAdminRoutes from '@api/routes/mcp-admin.routes';
 import { errorHandler } from '@api/middleware/error-handler';
 import { generateMerchantKey, MERCHANT_SCOPES, MERCHANT_KEY_HEADER } from '@api/mcp/merchant-auth';

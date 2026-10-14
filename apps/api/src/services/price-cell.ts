@@ -1,4 +1,4 @@
-import { tryToMinor } from '@force/shared';
+import { tryToMinor } from '@ebda/shared';
 
 /**
  * One parser for every price cell a merchant can upload (platform CSV, XLSX,

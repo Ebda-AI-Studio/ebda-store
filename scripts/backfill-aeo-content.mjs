@@ -6,7 +6,7 @@
 //
 // Default: dry-run (prints what would happen).
 // Apply mode: node scripts/backfill-aeo-content.mjs --apply
-//             (run from apps/api/ so @force/database resolves)
+//             (run from apps/api/ so @ebda/database resolves)
 //
 // Optional filter: --store-slug=<slug>  (test one store before going wide)
 //
@@ -25,7 +25,7 @@
 // NOT yet run with --apply — left for Ahmad to fire when ready.
 
 import 'dotenv/config';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 const apply = process.argv.includes('--apply');
 const filterArg = process.argv.find(a => a.startsWith('--store-slug='));
@@ -165,7 +165,7 @@ console.log(`\n✓ Done. Queued: ${succeeded} stores, Failed: ${failed} stores.`
 if (succeeded > 0) {
   console.log('\nInspect progress in the Inngest dashboard or via:');
   console.log(
-    `  node -e "const {prisma}=await import('@force/database'); console.log(JSON.stringify(await prisma.bulkAiJob.findMany({where:{status:'running'},select:{id:true,kind:true,storeId:true,processed:true,total:true},take:20}),null,2)); await prisma.$disconnect()"`
+    `  node -e "const {prisma}=await import('@ebda/database'); console.log(JSON.stringify(await prisma.bulkAiJob.findMany({where:{status:'running'},select:{id:true,kind:true,storeId:true,processed:true,total:true},take:20}),null,2)); await prisma.$disconnect()"`
   );
 }
 

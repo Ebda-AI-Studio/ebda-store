@@ -1,6 +1,6 @@
 'use client';
 
-import { resolveColor, pickReadableForeground } from '@force/shared';
+import { resolveColor, pickReadableForeground } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import type {
   StoreTheme,
@@ -8,7 +8,7 @@ import type {
   CardFrameWidth,
   SectionDividers,
   DividerSettings,
-} from '@force/shared';
+} from '@ebda/shared';
 
 type ZoneStyle = {
   color?: string;

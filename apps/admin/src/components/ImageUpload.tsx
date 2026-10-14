@@ -115,7 +115,7 @@ interface MultiImageUploadProps {
   /**
    * Recommended-size hint rendered under the dropzone — same prop name +
    * behavior as ImageUpload. Use `recommendedSizeText(key)` from
-   * `@force/shared/image-standards` to stay in sync with design.md.
+   * `@ebda/shared/image-standards` to stay in sync with design.md.
    */
   recommendedSizeHint?: string;
 }

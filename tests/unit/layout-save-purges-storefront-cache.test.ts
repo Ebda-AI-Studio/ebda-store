@@ -48,7 +48,7 @@ vi.mock('@api/services/store.service', () => ({ bustStoreCaches: m.bustStoreCach
 vi.mock('@api/services/page-builder.service', () => ({
   publishLegacyLayout: vi.fn().mockResolvedValue('ok'),
 }));
-vi.mock('@force/database', async importOriginal => {
+vi.mock('@ebda/database', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, prisma: { store: { findUnique: m.findUnique, update: m.update } } };
 });

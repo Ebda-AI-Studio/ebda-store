@@ -1,8 +1,8 @@
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-targeting';
 
-import { fromMinor, REGION, minorToDecimalString } from '@force/shared';
+import { fromMinor, REGION, minorToDecimalString } from '@ebda/shared';
 /** One coupon rule an admin order broke. `code` is the checkout error code. */
 export interface CouponRuleViolation {
   code:

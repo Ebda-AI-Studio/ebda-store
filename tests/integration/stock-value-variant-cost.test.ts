@@ -11,7 +11,7 @@
  * balance entry.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { AnalyticsService } from '../../apps/api/src/services/analytics.service';
 import { InventoryService } from '../../apps/api/src/services/inventory.service';
 import {

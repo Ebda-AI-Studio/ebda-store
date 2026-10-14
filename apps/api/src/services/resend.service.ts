@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { prisma, withStore } from '@force/database';
+import { prisma, withStore } from '@ebda/database';
 import { config } from '../config';
 import logger from '../lib/logger';
 import { resolveSender, type StoreSenderShape } from './email-sender';

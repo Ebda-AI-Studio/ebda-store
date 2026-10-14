@@ -18,7 +18,7 @@ const { mockOrderFindMany, mockSend, mockSendAlert } = vi.hoisted(() => ({
   mockSendAlert: vi.fn(),
 }));
 
-vi.mock('@force/database', async () =>
+vi.mock('@ebda/database', async () =>
   (await import('./helpers/database-mock')).databaseMock({
     prisma: { order: { findMany: mockOrderFindMany } },
   })

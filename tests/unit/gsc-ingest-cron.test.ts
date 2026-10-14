@@ -20,7 +20,7 @@ vi.mock('../../apps/api/src/services/answer-engine/gsc-client', () => ({
 }));
 
 const mockWithRlsBypass = vi.fn();
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   withRlsBypass: (...args: unknown[]) => mockWithRlsBypass(...args),
   runInTenantContext: vi.fn(),
 }));

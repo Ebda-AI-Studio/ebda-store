@@ -7,7 +7,7 @@
  * must give up after the cap. Verified here against the real Prisma error type.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { Prisma } from '@force/database';
+import { Prisma } from '@ebda/database';
 import { retryOnWriteConflict } from '../../apps/api/src/lib/db-retry';
 
 function p2034(): Prisma.PrismaClientKnownRequestError {

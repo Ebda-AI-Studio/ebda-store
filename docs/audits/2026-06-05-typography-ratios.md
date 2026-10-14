@@ -295,7 +295,7 @@ Per web interface guidelines, price columns (cart table, order summary, account 
 - All `getProductCardTextSizes()` consumers (carousel + PLP cards)
 - `apps/web/src/app/account/orders/OrdersClient.tsx` — order total column
 
-`formatPrice()` in `@force/shared` returns a string; `tabular-nums` must be applied via Tailwind on the surrounding element. Tailwind class is `tabular-nums` (applies `font-variant-numeric: tabular-nums`).
+`formatPrice()` in `@ebda/shared` returns a string; `tabular-nums` must be applied via Tailwind on the surrounding element. Tailwind class is `tabular-nums` (applies `font-variant-numeric: tabular-nums`).
 
 ---
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
-import { IMAGE_STANDARDS } from '@force/shared';
+import { IMAGE_STANDARDS } from '@ebda/shared';
 import { ImageUpload } from '../../../../../components/ImageUpload';
 import type { StoreBranding } from './types';
 

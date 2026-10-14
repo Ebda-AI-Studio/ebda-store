@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 export function LandingHeader() {
   const { language, setLanguage, t } = useLanguage();

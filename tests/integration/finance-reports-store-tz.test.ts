@@ -19,11 +19,11 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import ExcelJS from 'exceljs';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { seedCoaForStore } from '../../apps/api/src/services/accounting/account.service';
 import { postOrderPaymentJournal } from '../../apps/api/src/services/accounting/posting/order-posting';
 
-import { fromMinor } from '@force/shared';
+import { fromMinor } from '@ebda/shared';
 vi.mock('../../apps/api/src/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {
     req.user = { userId: 'admin-1', role: 'store_admin' };

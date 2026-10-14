@@ -1,4 +1,4 @@
-import { intlLocale } from '@force/shared';
+import { intlLocale } from '@ebda/shared';
 import { emailMoney } from './email-templates/_util';
 import type { RefundDocumentPayload, SaleDocumentPayload } from './fiscal-document.service';
 

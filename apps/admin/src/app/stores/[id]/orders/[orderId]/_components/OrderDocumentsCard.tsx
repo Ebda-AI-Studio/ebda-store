@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
-import { Badge } from '@force/ui';
+import { Badge } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { useCurrentStore } from '@/hooks/useCurrentStore';
 import { apiGet } from '../../../../../../lib/api';

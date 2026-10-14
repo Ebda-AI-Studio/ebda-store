@@ -1,4 +1,4 @@
-import type { AccountType } from '@force/database';
+import type { AccountType } from '@ebda/database';
 
 export interface CoaTemplateRow {
   code: string;

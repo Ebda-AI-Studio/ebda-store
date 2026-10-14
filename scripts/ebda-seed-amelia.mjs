@@ -53,7 +53,7 @@ process.env.DIRECT_URL ??= dbUrl;
 const csvPath = resolve(root, opt('--csv', 'tests/fixtures/amelia-aurum-catalogue.csv'));
 const ownerEmail = opt('--owner-email', 'amelia-owner@ebda.local');
 
-const { prisma, runInStoreScope, withUser } = await import('@force/database');
+const { prisma, runInStoreScope, withUser } = await import('@ebda/database');
 const { ensureAdminUser } = await import('../apps/api/src/lib/definer.ts');
 const { StoreService } = await import('../apps/api/src/services/store.service.ts');
 const { BulkService } = await import('../apps/api/src/services/bulk.service.ts');

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Modal } from '@force/ui';
+import { Button, Modal } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 
 interface RejectReasonModalProps {

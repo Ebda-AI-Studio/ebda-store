@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiFetch } from '../../../../../../lib/api';
 import { useRequireFeature } from '../../../../../../hooks/useRequireFeature';

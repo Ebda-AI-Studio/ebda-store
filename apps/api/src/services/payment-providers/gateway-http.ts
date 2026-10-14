@@ -14,7 +14,7 @@
  *    float: `0.29 * 100 = 28.999999999999996` is exactly the defect this prevents.
  */
 import crypto from 'node:crypto';
-import { toMinor } from '@force/shared';
+import { toMinor } from '@ebda/shared';
 import { callProvider } from './provider-call';
 import {
   PaymentProviderError,

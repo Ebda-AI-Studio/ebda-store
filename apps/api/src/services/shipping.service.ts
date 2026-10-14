@@ -1,4 +1,4 @@
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 
 // ─── Pure fee resolver (no DB) ────────────────────────────────────────────────

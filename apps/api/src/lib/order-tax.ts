@@ -1,13 +1,13 @@
-import { withStore } from '@force/database';
+import { withStore } from '@ebda/database';
 
 /**
- * `computeOrderTax` now lives in `@force/shared` so the storefront checkout
+ * `computeOrderTax` now lives in `@ebda/shared` so the storefront checkout
  * and cart summaries can import the SAME formula and never drift from what
  * this API actually charges (ruling M3-6, docs/RULINGS.md). Re-exported here
  * so the existing `@api/lib/order-tax` import path (order.service.ts, this
  * file's own test) keeps working unchanged.
  */
-export { computeOrderTax } from '@force/shared';
+export { computeOrderTax } from '@ebda/shared';
 
 /**
  * The store's tax rate as a percentage (e.g. 14 for 14%) and whether its listed

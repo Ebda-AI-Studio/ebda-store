@@ -8,12 +8,12 @@ import request from 'supertest';
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import featureRoutes from '@api/routes/feature.routes';
 import authRoutes from '@api/routes/auth.routes';
 import mfaRoutes from '@api/routes/mfa.routes';
 import { errorHandler } from '@api/middleware/error-handler';
-import { FEATURE_KEYS_ARRAY, PLAN_BASELINE } from '@force/shared';
+import { FEATURE_KEYS_ARRAY, PLAN_BASELINE } from '@ebda/shared';
 import { createSuperAdminWithMfa, loginAsSuperAdmin } from './helpers/mfa-login';
 
 // ==========================================

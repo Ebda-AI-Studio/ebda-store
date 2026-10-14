@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LangToggle } from '@/components/LangToggle';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 const loginSchema = z.object({
   email: z.string().email(),

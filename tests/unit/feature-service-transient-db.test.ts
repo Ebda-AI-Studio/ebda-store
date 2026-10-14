@@ -30,7 +30,7 @@ const { findUnique, findMany, withRlsBypass } = vi.hoisted(() => {
   };
 });
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {},
   Prisma: {},
   withMoneyTx: vi.fn(),

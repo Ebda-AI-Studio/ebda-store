@@ -93,7 +93,7 @@ vi.mock('@api/services/payment-providers/cod.provider', async importOriginal => 
   ...(await importOriginal<typeof import('@api/services/payment-providers/cod.provider')>()),
   loadCodFeeConfig: vi.fn().mockResolvedValue(null),
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     order: { findUnique: h.orderFindUnique, updateMany: h.orderUpdateMany },
     return: { updateMany: h.returnUpdateMany },

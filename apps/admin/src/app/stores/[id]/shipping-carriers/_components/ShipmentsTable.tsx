@@ -5,7 +5,7 @@ import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { SHIPMENT_COLORS } from './types';
 import type { Shipment } from './types';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 interface ShipmentsTableProps {
   shipments: Shipment[];

@@ -25,7 +25,7 @@ const h = vi.hoisted(() => ({
   sendSms: vi.fn(async () => ({ messageId: 'm1' })),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { notificationLog: h.notificationLog },
   runInStoreScope: (_storeId: string, fn: () => unknown) => fn(),
 }));

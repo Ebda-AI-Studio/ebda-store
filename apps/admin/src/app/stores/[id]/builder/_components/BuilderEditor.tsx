@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import {
   BRAND,
   TEMPLATE_FAMILIES,
@@ -29,7 +29,7 @@ import {
   type SectionList,
   type StoreTheme,
   type Viewport,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { getStoreHref } from '../../../../../lib/store-url';

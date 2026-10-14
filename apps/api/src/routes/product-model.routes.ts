@@ -16,7 +16,7 @@
  */
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import { runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@ebda/database';
 import {
   MODEL3D_MAX_BYTES,
   model3dBindingsBodySchema,
@@ -25,7 +25,7 @@ import {
   validateGlb,
   validateUsdz,
   type Model3dErrorCode,
-} from '@force/shared';
+} from '@ebda/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -37,7 +37,7 @@ import { StorageService } from '../services/storage.service';
 import { deleteR2ObjectIfOrphan, urlToR2Key } from '../services/r2-cleanup.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import {
   ADMIN_MODEL3D_SELECT,
   assertProductInStore,

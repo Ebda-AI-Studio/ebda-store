@@ -12,7 +12,7 @@
  *      -> "inclusive does not change the total" goes red.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { BRAND, DEFAULT_PLATFORM_VAT, type PlatformVat } from '@force/shared';
+import { BRAND, DEFAULT_PLATFORM_VAT, type PlatformVat } from '@ebda/shared';
 
 const h = vi.hoisted(() => ({ getPlatformVat: vi.fn() }));
 vi.mock('@api/services/platform-vat.service', () => ({ getPlatformVat: h.getPlatformVat }));

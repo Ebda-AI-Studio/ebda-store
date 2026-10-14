@@ -12,7 +12,7 @@
 // breakdown). This file makes the equivalence claim a real, committed,
 // deterministic test that a future change to either algorithm must pass.
 import { describe, it, expect } from 'vitest';
-import { allocateBundlePrice, type BundleLine, type AllocatedLine } from '@force/shared';
+import { allocateBundlePrice, type BundleLine, type AllocatedLine } from '@ebda/shared';
 
 /**
  * REFERENCE IMPLEMENTATION — the pre-optimization round-robin algorithm,

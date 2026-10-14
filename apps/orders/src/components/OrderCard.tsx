@@ -7,7 +7,7 @@ import { formatMoney, formatDateTime, customerName } from '@/lib/format';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ConfirmInstapayButton } from './ConfirmInstapayButton';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 export function OrderCard({
   order,
   storeId,

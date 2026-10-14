@@ -4,7 +4,7 @@ import {
   resolveWaMeVisibility,
   waMeLink,
   type WaMeToggles,
-} from '@force/shared';
+} from '@ebda/shared';
 import { escapeHtml } from './_util';
 import type { OrderEmailData } from '../email.service';
 

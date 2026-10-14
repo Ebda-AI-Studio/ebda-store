@@ -17,13 +17,13 @@ describe('apps/status independence', () => {
     );
   });
 
-  it('imports nothing from apps/api, apps/*, @force/database or @force/api', () => {
+  it('imports nothing from apps/api, apps/*, @ebda/database or @ebda/api', () => {
     for (const f of files) {
       const src = readFileSync(path.join(SRC, f), 'utf8');
       const imports = [...src.matchAll(/from\s+['"]([^'"]+)['"]/g)].map(m => m[1]);
       for (const spec of imports) {
         expect(spec, `${f} imports ${spec}`).not.toMatch(
-          /apps\/(api|admin|web|orders|marketing)|@force\/(api|database|ui)\b/
+          /apps\/(api|admin|web|orders|marketing)|@ebda\/(api|database|ui)\b/
         );
         if (spec.includes('packages/'))
           expect(spec, `${f}`).toMatch(/packages\/shared\/src\/brand\/index$/);

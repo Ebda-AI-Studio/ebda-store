@@ -20,7 +20,7 @@ import { GeminiFailoverClient } from '../lib/ai/gemini-keys';
 import { z } from 'zod';
 import { createHash } from 'crypto';
 import sharp from 'sharp';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { config } from '../config';
 import { redis } from './redis.service';
 import { AppError } from '../middleware/error-handler';

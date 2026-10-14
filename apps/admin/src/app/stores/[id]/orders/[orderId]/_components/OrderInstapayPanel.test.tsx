@@ -14,7 +14,7 @@ vi.mock('@/i18n/useT', () => ({ useT: () => (k: string) => k }));
 vi.mock('../../../../../../i18n/useT', () => ({
   useT: () => (k: string, v?: Record<string, unknown>) => (v ? `${k}:${JSON.stringify(v)}` : k),
 }));
-vi.mock('@force/ui', () => ({
+vi.mock('@ebda/ui', () => ({
   Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
   Button: (p: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...p} />,
   Input: ({ label, ...p }: { label?: string } & React.InputHTMLAttributes<HTMLInputElement>) => (

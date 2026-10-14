@@ -229,7 +229,7 @@ git commit -m "feat(cart): track last activity timestamp for abandonment detecti
 Import patterns:
 
 ```typescript
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { redis } from './redis.service';
 import { featureService } from './feature.service';
 import { notificationDispatcher } from './notification-dispatcher.service';

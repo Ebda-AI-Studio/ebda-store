@@ -836,12 +836,12 @@ git commit -m "feat(security): quarterly secret rotation workflow + manual-key r
 
 ```typescript
 import { describe, it, expect } from 'vitest';
-import { runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@ebda/database';
 // seed two stores A,B with one product each in beforeAll (reuse existing helpers)
 describe('RLS enforcement', () => {
   it('cannot read another store rows under tenant context', async () => {
     const rows = await runInTenantContext(STORE_A_ID, async () => {
-      const { getTx } = await import('@force/database');
+      const { getTx } = await import('@ebda/database');
       return getTx().product.findMany({ where: { storeId: STORE_B_ID } });
     });
     expect(rows).toHaveLength(0);
@@ -1143,7 +1143,7 @@ JSON
 
 **Placeholder scan:** no "TBD"/"add error handling"/"similar to" — all code blocks are concrete. The only deferred-by-design item is `CREDENTIAL_ENCRYPTION_KEY` rotation (intentionally a guided runbook, flagged with reason).
 
-**Type/name consistency:** `runInTenantContext` used consistently (FWB `@force/database`, WBS `db.js`); check names in WS-G match job `name:` values gathered in inventory; `force_app` role name consistent FWB↔WBS.
+**Type/name consistency:** `runInTenantContext` used consistently (FWB `@ebda/database`, WBS `db.js`); check names in WS-G match job `name:` values gathered in inventory; `force_app` role name consistent FWB↔WBS.
 
 **Known external prerequisites** (cannot be done from code alone — Ahmad/owner action): run `claude setup-token` once → set `CLAUDE_CODE_OAUTH_TOKEN` per repo (subscription, not API key); Infisical org + machine token; `NEON_API_KEY`; enable GitHub code scanning per repo if Advanced Setup prompts; confirm a Vercel preview URL exists for each app to point ZAP at (avoid scanning prod write paths).
 

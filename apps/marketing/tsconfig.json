@@ -13,9 +13,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@force/shared/brand": ["../../packages/shared/src/brand"],
-      "@force/ui/model3d": ["../../packages/ui/src/model3d"],
-      "@force/shared/tracking-browser": ["../../packages/shared/src/tracking/browser"]
+      "@ebda/shared/brand": ["../../packages/shared/src/brand"],
+      "@ebda/ui/model3d": ["../../packages/ui/src/model3d"],
+      "@ebda/shared/tracking-browser": ["../../packages/shared/src/tracking/browser"]
     },
     "plugins": [{ "name": "next" }],
     "allowJs": true

@@ -11,10 +11,10 @@ import {
   normalizeTaxRegistrationNumber,
   platformVatSchema,
   taxProfileDetailsSchema,
-} from '@force/shared';
+} from '@ebda/shared';
 
 const findUnique = vi.fn();
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { systemSetting: { findUnique: (...a: unknown[]) => findUnique(...a) } },
   withUser: (_u: string, fn: () => Promise<unknown>) => fn(),
 }));

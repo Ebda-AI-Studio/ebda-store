@@ -995,7 +995,7 @@ Each batch is a coherent ship-able unit. Run the standing recipe (13-rule code-q
 
 - Prisma schema: `Account`, `JournalEntry`, `JournalLine` + `Store` extensions (`accountingEnabled`, `defaultTaxRateBps`, `fiscalYearStartMonth`).
 - Hand-written migration for CHECK constraints + deferred DR=CR trigger + RLS policies + per-store sequence table.
-- `@force/database` exports for new enums.
+- `@ebda/database` exports for new enums.
 - `apps/api/src/services/accounting/`:
   - `account.service.ts` — COA CRUD + seed-on-store-create hook.
   - `journal.service.ts` — `post(entry, lines)`, `reverse(entryId)`, idempotency check by `(source, sourceId)`.
@@ -1037,7 +1037,7 @@ Each batch is a coherent ship-able unit. Run the standing recipe (13-rule code-q
 - Schema: `CustomerCohortSnapshot`, `FunnelSnapshot`, `CustomerRfmSnapshot`.
 - Inngest function `analytics/daily-rollup` daily 02:00 KW running cohort + funnel + RFM in sequence (concurrency-keyed per store).
 - Admin pages under `/stores/:id/insights/*` (5 pages per Part 6).
-- Reusable chart primitives (cohort heatmap, funnel bar, RFM scatter) in `@force/ui` if not already present.
+- Reusable chart primitives (cohort heatmap, funnel bar, RFM scatter) in `@ebda/ui` if not already present.
 - AI commentary endpoints (rate-limited, lazy-fired on dashboard load with caching).
 - E2E test: seed N customers across cohorts → rollup → assert retention matrix matches expected.
 

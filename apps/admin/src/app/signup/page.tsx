@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import { Button, Input } from '@force/ui';
+import { Button, Input } from '@ebda/ui';
 import { PublicShell } from '../../components/onboarding/PublicShell';
 import { apiGet, apiPost } from '../../lib/api';
 import { getEbdaTracker } from '../../lib/ebda-tracker';

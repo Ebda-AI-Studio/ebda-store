@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { formatMoney } from '@force/shared';
+import { formatMoney } from '@ebda/shared';
 import { useT } from '../../i18n/useT';
 import { CopyRow } from './CopyRow';
 import type { UiLocale } from './format';

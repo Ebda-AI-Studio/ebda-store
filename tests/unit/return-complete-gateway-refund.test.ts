@@ -42,7 +42,7 @@ const findOutstandingRefundClaims = vi.fn();
 // issue 2002: a non-gateway completion settles any open claim for its key.
 const reconcileOutstandingRefundClaims = vi.fn().mockResolvedValue([]);
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     return: {
       update: (...a: unknown[]) => returnUpdate(...a),

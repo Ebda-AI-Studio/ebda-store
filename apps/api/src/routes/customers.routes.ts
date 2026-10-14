@@ -7,7 +7,7 @@ import {
   addFiltersSheet,
   summarizeExportFilters,
 } from '../lib/exports/xlsx';
-import { prisma, type RfmSegment } from '@force/database';
+import { prisma, type RfmSegment } from '@ebda/database';
 import { authenticate, authorize, rejectImpersonated } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { AppError } from '../middleware/error-handler';
@@ -28,9 +28,9 @@ import {
 import { AuthService, eraseNeedsCrmReview } from '../services/auth.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
-import { minorToDecimalString, excelMoneyFormat } from '@force/shared';
+import { minorToDecimalString, excelMoneyFormat } from '@ebda/shared';
 const router = Router({ mergeParams: true });
 
 // The aggregation itself (grouping, KPI summary, segment parsing, the detail

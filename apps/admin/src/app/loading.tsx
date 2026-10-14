@@ -1,6 +1,6 @@
 'use client';
 
-import { SkeletonDashboardStats, SkeletonTable } from '@force/ui';
+import { SkeletonDashboardStats, SkeletonTable } from '@ebda/ui';
 import { AdminLayout } from '../components/AdminLayout';
 import { useT } from '@/i18n/useT';
 

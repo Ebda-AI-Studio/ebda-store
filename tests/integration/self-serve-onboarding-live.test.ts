@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { API_BASE } from '../helpers/api-base';
 import { hasDb } from '../helpers/bundle-fixtures';
 

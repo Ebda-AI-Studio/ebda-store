@@ -25,7 +25,7 @@ const { svc } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@force/database', () => ({ prisma: {} }));
+vi.mock('@ebda/database', () => ({ prisma: {} }));
 vi.mock('@api/services/analytics.service', () => ({ AnalyticsService: svc }));
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (_req: any, _res: any, next: any) => next(),

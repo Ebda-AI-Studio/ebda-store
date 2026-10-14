@@ -8,8 +8,8 @@ import {
   withUser,
   withMoneyTx,
   StoreStatus,
-} from '@force/database';
-import type { StoreTemplate } from '@force/database';
+} from '@ebda/database';
+import type { StoreTemplate } from '@ebda/database';
 import {
   deleteUserTokens,
   detachStoreAuditLogs,
@@ -32,7 +32,7 @@ import {
   NEW_STORE_LAYOUT_SETTINGS,
   getLook,
   LOOK_TOKEN_KEYS,
-} from '@force/shared';
+} from '@ebda/shared';
 import { applyFamilyForLook } from './page-builder.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { redis } from './redis.service';

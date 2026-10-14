@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { withUser } from '@force/database';
+import { withUser } from '@ebda/database';
 import { AppError } from './error-handler';
 
 /**

@@ -24,9 +24,9 @@ import {
   fromMinor,
   REGION,
   storeNumerals,
-} from '@force/shared';
+} from '@ebda/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
-import { Price, ProductBadge, cn } from '@force/ui';
+import { Price, ProductBadge, cn } from '@ebda/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';

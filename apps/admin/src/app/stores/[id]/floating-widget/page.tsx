@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { ColorField } from '../../../../components/ColorField';
@@ -15,8 +15,8 @@ import type {
   FloatingPosition,
   FloatingWidgetConfig,
   StoreTheme,
-} from '@force/shared';
-import { DEFAULT_FLOATING_WIDGET_CONFIG } from '@force/shared';
+} from '@ebda/shared';
+import { DEFAULT_FLOATING_WIDGET_CONFIG } from '@ebda/shared';
 
 interface StoreSocialLinks {
   instagram?: string;

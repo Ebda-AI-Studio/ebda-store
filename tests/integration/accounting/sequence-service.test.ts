@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { nextSequence } from '../../../apps/api/src/services/sequence.service';
 
 const OWNER_ID = '00000000-0000-0000-0000-0000000000aa';

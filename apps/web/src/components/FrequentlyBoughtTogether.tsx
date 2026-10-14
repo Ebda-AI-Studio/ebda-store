@@ -9,7 +9,7 @@ import {
 import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStore, useStoreUrl, useStoreTemplate } from '../contexts/StoreContext';
-import { useToast, Skeleton, SkeletonProductCard } from '@force/ui';
+import { useToast, Skeleton, SkeletonProductCard } from '@ebda/ui';
 import { PecannbeeProductCard } from '../templates/shared/PecannbeeProductCard';
 import { gridGapClass } from '../templates/shared/card-size';
 import { SectionRetryNotice } from './SectionRetryNotice';

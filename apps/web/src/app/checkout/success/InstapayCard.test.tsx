@@ -18,7 +18,7 @@ vi.mock('../../../hooks/useLocalePrice', () => ({
   useLocalePrice: () => (n: number) => `EGP ${n / 100}`,
 }));
 vi.mock('@/lib/format-date', () => ({ formatDate: () => 'soon' }));
-vi.mock('@force/ui', () => ({
+vi.mock('@ebda/ui', () => ({
   Button: (p: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...p} />,
 }));
 

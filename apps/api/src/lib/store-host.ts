@@ -1,4 +1,4 @@
-import { parseStoreHost, storeHost } from '@force/shared';
+import { parseStoreHost, storeHost } from '@ebda/shared';
 
 /**
  * How a request `Host` maps to a store row — the API half of Ebda's host

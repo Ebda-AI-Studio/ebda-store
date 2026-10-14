@@ -12,7 +12,7 @@ import request from 'supertest';
 
 const seen = vi.hoisted(() => ({ tiers: [] as string[] }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {},
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),
   RfmSegment: {},

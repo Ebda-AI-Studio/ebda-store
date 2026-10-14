@@ -9,7 +9,7 @@ import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/secur
 import { PWAService, generatePwaIconSet } from '../services/pwa.service';
 import { cleanupRemovedJsonUrls } from '../services/r2-cleanup.service';
 import { tenantContext } from '../middleware/tenant-context';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 
 const router = Router();

@@ -3,7 +3,7 @@ import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { Request, Response, NextFunction } from 'express';
 import { config } from '../config';
 import logger from '../lib/logger';
-import { Prisma } from '@force/database';
+import { Prisma } from '@ebda/database';
 import { isExpectedClientError } from '../middleware/error-handler';
 
 // ==========================================

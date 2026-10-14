@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button, Input } from '@force/ui';
-import { formatMoney, type InstapayReceiptView } from '@force/shared';
+import { Badge, Button, Input } from '@ebda/ui';
+import { formatMoney, type InstapayReceiptView } from '@ebda/shared';
 import { useT } from '../../i18n/useT';
 import { useBlobUrl } from './api';
 import { cairoParts } from './format';

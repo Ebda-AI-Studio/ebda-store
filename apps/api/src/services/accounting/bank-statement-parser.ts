@@ -14,7 +14,7 @@
 
 import { createHash } from 'crypto';
 
-import { REGION, currencyExponent, minorUnitsPerMajor } from '@force/shared';
+import { REGION, currencyExponent, minorUnitsPerMajor } from '@ebda/shared';
 export type TransactionDirection = 'debit' | 'credit';
 
 export interface ParsedRow {

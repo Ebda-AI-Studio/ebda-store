@@ -9,7 +9,7 @@ import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { buildSidebarVars, countActiveFilters } from './filter-sidebar-state';
 import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
 
-import { REGION, roundToMinor } from '@force/shared';
+import { REGION, roundToMinor } from '@ebda/shared';
 interface SortOption {
   value: string;
   label: string;

@@ -41,7 +41,7 @@ vi.mock('@api/middleware/feature-gate', () => ({
       next(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {},
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
 }));

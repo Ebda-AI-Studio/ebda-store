@@ -15,10 +15,10 @@ import type {
   ProductCardDefaults,
   FilterSidebarSettings,
   ProductsPageSettings,
-} from '@force/shared';
-import { resolveColor, colorToHslTriplet } from '@force/shared';
+} from '@ebda/shared';
+import { resolveColor, colorToHslTriplet } from '@ebda/shared';
 import { pageSurfaceStyle } from '@/lib/page-surface';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import { useCart } from '../../contexts/CartContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { ShopChrome } from '../../components';
@@ -39,7 +39,7 @@ import { ProductsFilterSidebar } from './ProductsFilterSidebar';
 import { ProductsPagination } from './ProductsPagination';
 import { recordLastListing, consumeFocusProduct } from '@/lib/last-listing';
 
-import { roundToMinor } from '@force/shared';
+import { roundToMinor } from '@ebda/shared';
 /**
  * How many products the user can choose to load per PLP page. Capped at 96
  * because larger pages start to hurt mobile data + LCP without much UX win.

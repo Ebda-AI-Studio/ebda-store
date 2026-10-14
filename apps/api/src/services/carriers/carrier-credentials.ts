@@ -20,7 +20,7 @@
  * (`activeCredentials`). Never logged, never returned to a browser: the admin sees
  * `credential_hints` ("saved" + last 4 of a long secret, the value of a non-secret field).
  */
-import type { CredentialMode, ProviderCatalogEntry } from '@force/shared';
+import type { CredentialMode, ProviderCatalogEntry } from '@ebda/shared';
 import { encryption } from '../encryption.service';
 import {
   connectionFingerprint,

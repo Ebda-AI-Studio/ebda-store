@@ -7,7 +7,7 @@ import { requirePermission } from '../middleware/rbac';
 import { StorageService } from '../services/storage.service';
 import { resizeToAspect, enforceMaxDimensions } from '../services/image-resize.service';
 import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/security';
-import { runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@ebda/database';
 
 /**
  * Run a function under the tenant RLS context if a storeId is known,

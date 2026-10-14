@@ -22,7 +22,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass } from '@ebda/database';
 import { WarehouseService } from '@api/services/warehouse.service';
 
 // ─── Test isolation owner ──────────────────────────────────────────────────────

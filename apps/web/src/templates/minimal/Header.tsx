@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { CartIcon } from '@force/ui';
+import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';

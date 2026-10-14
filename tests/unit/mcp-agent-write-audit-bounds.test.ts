@@ -32,7 +32,7 @@ const mockAuditLog = vi.fn().mockResolvedValue(undefined);
 // call in this file takes the "first in window" create path — reshape the
 // Prisma `data` payload into the same flat shape `auditLog()` used to receive
 // so `deniedRow()` below is unaffected.
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     paymentConfig: { findFirst: vi.fn() },
     auditLog: {

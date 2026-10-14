@@ -28,7 +28,7 @@
  * without a real DATABASE_URL.
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass } from '@ebda/database';
 import { handleOrderRefunded } from '@api/lib/inngest/functions/order-refunded';
 import { ReturnService } from '@api/services/return.service';
 import { OrderService } from '@api/services/order.service';

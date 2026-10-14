@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupOrderLinesForDisplay, type OrderLineBase } from '@force/shared';
+import { groupOrderLinesForDisplay, type OrderLineBase } from '@ebda/shared';
 
 interface Line extends OrderLineBase {
   productName: string;

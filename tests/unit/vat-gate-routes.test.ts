@@ -58,7 +58,7 @@ vi.mock('@api/services/platform-vat.service', () => ({
   getPlatformVat: h.getPlatformVat,
   updatePlatformVat: h.updatePlatformVat,
 }));
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mod: Record<string, any> = {
     Prisma: {},

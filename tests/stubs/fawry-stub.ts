@@ -8,7 +8,7 @@
  * in the adapter.
  */
 import crypto from 'node:crypto';
-import { toMinor, minorToDecimalString } from '@force/shared';
+import { toMinor, minorToDecimalString } from '@ebda/shared';
 import type { ContractControl, SignedWebhook } from '../contract/payment-provider.contract';
 import { FaultGate, json, readJson, type StubFault } from './stub-common';
 

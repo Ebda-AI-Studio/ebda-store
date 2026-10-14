@@ -7,7 +7,7 @@
 > project this runbook describes creating is decommissioned; the steps below are
 > kept for historical context only.
 
-The Orders PWA (`apps/orders`, `@force/orders`) is a focused, installable
+The Orders PWA (`apps/orders`, `@ebda/orders`) is a focused, installable
 order-management app for store staff. It deploys to its **own Vercel project**
 on the domain **`orders.forcemediakw.com`** — separate from the admin
 (`app.forcemediakw.com`) and storefront (`wadyaljuz.com`) projects.
@@ -24,14 +24,14 @@ Mirror the `force-admin` / `force-web` project setup:
 2. **Project name:** `force-orders`.
 3. **Root Directory:** `apps/orders` (so Vercel builds only this app).
    Vercel auto-detects Next.js + the npm-workspaces monorepo and installs from
-   the repo root. `@force/shared` is consumed via `transpilePackages` in
+   the repo root. `@ebda/shared` is consumed via `transpilePackages` in
    `apps/orders/next.config.js`, so Next compiles it from source — no extra
    build step is required.
 4. **Framework Preset:** Next.js (auto-detected; also pinned in `vercel.json`).
 5. Leave Build/Install commands at the Vercel defaults — the monorepo install
    pulls all workspace deps.
 
-> If a sibling app's deploy ever fails to find `@force/shared` types, enable
+> If a sibling app's deploy ever fails to find `@ebda/shared` types, enable
 > "Include source files outside of the Root Directory in the Build Step" in
 > Project Settings → General — but the default monorepo behavior already does
 > this here.

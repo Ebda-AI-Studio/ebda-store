@@ -193,7 +193,7 @@ function runTest(entry) {
   return { passed: res.status === 0, summary: counts };
 }
 
-// Preflight: the workspace packages must be BUILT. Unbuilt @force/shared makes
+// Preflight: the workspace packages must be BUILT. Unbuilt @ebda/shared makes
 // every test that imports it fail to collect, which vitest reports as
 // "Tests  no tests" — the runner would then score each defence ERROR for a
 // reason that has nothing to do with the defence. Fail loudly here instead.

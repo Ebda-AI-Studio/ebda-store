@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Input, useToast } from '@force/ui';
+import { Button, Input, useToast } from '@ebda/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 export default function ProfileClient() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading, refreshUser } = useAuth();

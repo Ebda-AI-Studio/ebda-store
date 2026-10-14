@@ -41,7 +41,7 @@ if (
 }
 process.env.DIRECT_URL ??= dbUrl;
 
-const { prisma } = await import('@force/database');
+const { prisma } = await import('@ebda/database');
 const { planService } = await import('../apps/api/src/services/plan.service.ts');
 
 try {

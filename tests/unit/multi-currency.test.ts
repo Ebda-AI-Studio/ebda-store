@@ -16,7 +16,7 @@ import {
   ALLOWED_CURRENCIES,
   currencyExponent,
   REGION,
-} from '@force/shared';
+} from '@ebda/shared';
 
 // ─── convertToBase ────────────────────────────────────────────────────────────
 

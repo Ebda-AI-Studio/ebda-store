@@ -10,9 +10,9 @@ import { ErrorState } from '@/components/ErrorState';
 // Contract shared with apps/api/src/routes/insights.routes.ts — the page was
 // once built against six fields the route never returned, so every column
 // rendered blank or 0 (2026-09-30 audit, finding 2).
-import type { ProductVelocityResponse, ProductVelocityRow } from '@force/shared';
+import type { ProductVelocityResponse, ProductVelocityRow } from '@ebda/shared';
 
-import { minorToDecimalString } from '@force/shared';
+import { minorToDecimalString } from '@ebda/shared';
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 // Unknown (null) renders as "—", never as a fabricated 0.

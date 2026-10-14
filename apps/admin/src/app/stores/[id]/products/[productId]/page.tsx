@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Badge, Modal, useToast } from '@force/ui';
+import { Button, Badge, Modal, useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { useAuth } from '../../../../../lib/auth';

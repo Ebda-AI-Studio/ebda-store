@@ -248,7 +248,7 @@ The email input is sharp-cornered (no rounding) and sits flush against the submi
 
 ### Badges & Pills
 
-`@force/ui`'s `ProductBadge` is restyled per-instance:
+`@ebda/ui`'s `ProductBadge` is restyled per-instance:
 
 ```
 text-[9px] tracking-[0.2em] uppercase rounded-none bg-foreground text-background font-normal

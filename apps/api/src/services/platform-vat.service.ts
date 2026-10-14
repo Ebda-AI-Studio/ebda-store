@@ -1,10 +1,10 @@
-import { prisma, withUser } from '@force/database';
+import { prisma, withUser } from '@ebda/database';
 import {
   DEFAULT_PLATFORM_VAT,
   PLATFORM_VAT_SETTING_KEY,
   platformVatSchema,
   type PlatformVat,
-} from '@force/shared';
+} from '@ebda/shared';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
 import { parseInput } from '../lib/parse-input';

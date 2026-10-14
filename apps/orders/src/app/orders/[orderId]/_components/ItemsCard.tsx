@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { groupOrderLinesForDisplay, type OrderDisplayLine } from '@force/shared';
+import { groupOrderLinesForDisplay, type OrderDisplayLine } from '@ebda/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMoney, fmt } from '@/lib/format';
 import type { OrderDetail, OrderLineItem } from '@/lib/orders';

@@ -13,7 +13,7 @@ import {
   rebaseDraftOntoLive,
   resolveLayoutSettings,
   type PageDefinition,
-} from '@force/shared';
+} from '@ebda/shared';
 
 const BASE = layoutToDefinition(resolveLayoutSettings({}, 'modern'), 'home');
 

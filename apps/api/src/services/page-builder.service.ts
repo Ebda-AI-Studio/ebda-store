@@ -43,7 +43,7 @@
  * store's slug/host/domain resolve keys. Draft saves touch no public cache.
  */
 import { isDeepStrictEqual } from 'node:util';
-import { prisma, withStore } from '@force/database';
+import { prisma, withStore } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import {
   BUILDER_LIMITS,
@@ -68,7 +68,7 @@ import {
   type TemplateFamily,
   type TemplateId,
   getLook,
-} from '@force/shared';
+} from '@ebda/shared';
 import { withSavepoint } from '../lib/savepoint';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';

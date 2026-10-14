@@ -10,7 +10,7 @@
  * retry attempt cannot be "the newest" (retry-safe).
  */
 import { describe, it, expect } from 'vitest';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import { loadUsageHistoryRows } from '@api/routes/admin.routes';
 import { hasDb, seedBundleStore } from '../helpers/bundle-fixtures';
 

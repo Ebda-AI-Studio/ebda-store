@@ -3,7 +3,7 @@
 import AnimatedTextCycle from '@/components/ui/animated-text-cycle';
 import { Aurora } from '@/components/landing/Reveal';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 const CYCLE_WORDS = ['storefront', 'catalog', 'checkout', 'brand', 'growth'];
 

@@ -20,7 +20,7 @@ vi.mock('@api/services/feature.service', () => ({
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {},
   Prisma: {},
   withMoneyTx: vi.fn(),

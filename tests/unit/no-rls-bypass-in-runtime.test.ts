@@ -29,11 +29,11 @@ const IMPORTS_BYPASS = /import\s*(?:type\s*)?\{[^}]*\b(withRlsBypass|withOwnerTx
 
 describe('no RLS bypass in the API runtime', () => {
   it('the detector sees an import of the bypass helpers', () => {
-    expect(IMPORTS_BYPASS.test("import { prisma, withRlsBypass } from '@force/database';")).toBe(
+    expect(IMPORTS_BYPASS.test("import { prisma, withRlsBypass } from '@ebda/database';")).toBe(
       true
     );
-    expect(IMPORTS_BYPASS.test("import { withOwnerTx } from '@force/database';")).toBe(true);
-    expect(IMPORTS_BYPASS.test("import { prisma, withStore } from '@force/database';")).toBe(false);
+    expect(IMPORTS_BYPASS.test("import { withOwnerTx } from '@ebda/database';")).toBe(true);
+    expect(IMPORTS_BYPASS.test("import { prisma, withStore } from '@ebda/database';")).toBe(false);
   });
 
   it('only the allow-listed owner-role job imports withRlsBypass / withOwnerTx', () => {

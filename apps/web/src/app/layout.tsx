@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
 import { cookies, headers } from 'next/headers';
 import { Plus_Jakarta_Sans, IBM_Plex_Sans_Arabic, Amiri, Marcellus } from 'next/font/google';
-import { ToastProvider } from '@force/ui';
+import { ToastProvider } from '@ebda/ui';
 import { LanguageProvider } from '../contexts/LanguageContext';
 import { StoreProvider } from '../contexts/StoreContext';
 import { CartProvider } from '../contexts/CartContext';
@@ -27,7 +27,7 @@ import { ConsentProvider, type ConsentState } from '../contexts/ConsentContext';
 import { CookieConsentBanner } from '../components/CookieConsentBanner';
 import { CookiePreferencesModal } from '../components/CookiePreferencesModal';
 import { CookiePreferencesLink } from '../components/CookiePreferencesLink';
-import { type MarketingPixels, BRAND, resolveDefaultLanguage } from '@force/shared';
+import { type MarketingPixels, BRAND, resolveDefaultLanguage } from '@ebda/shared';
 import { buildThemeStyleTag } from '../lib/theme-css';
 import { lookHead } from '../lib/look-head';
 import { DemoLookBar } from '../components/demo/DemoLookBar';
@@ -288,7 +288,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // `--primary` would emit `hsl()` (invalid) and the browser would
   // silently drop the whole `background-color` declaration — the
   // merchant would see no colour on the chip even after saving.
-  // Fallback HSL values mirror @force/ui's default theme palette.
+  // Fallback HSL values mirror @ebda/ui's default theme palette.
   //
   // SMART CONTEXT (Ahmad 2026-05-16): some brand tokens are BACKGROUND-
   // semantic (brand-muted, brand-background) — using them as text colour

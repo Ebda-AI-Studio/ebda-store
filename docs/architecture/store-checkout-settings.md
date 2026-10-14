@@ -1,7 +1,7 @@
 # Per-store checkout & order settings (`Store.settings` JSON)
 
 Opt-in, per-store checkout/order behaviours. All live in the `Store.settings` JSON
-column (typed as `StoreSettings` in `@force/shared`) — **no dedicated DB columns, no
+column (typed as `StoreSettings` in `@ebda/shared`) — **no dedicated DB columns, no
 migrations**. Every one is platform-level (any store can enable it, never hardcoded to a
 slug). Merchant-editable at **Store → Settings → Delivery**
 (`apps/admin/src/app/stores/[id]/delivery/page.tsx`). Unset/empty = feature off.

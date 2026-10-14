@@ -256,7 +256,7 @@ text-sm font-medium transition-colors duration-200
 
 ### Badges & Pills
 
-`@force/ui` `ProductBadge` overrides:
+`@ebda/ui` `ProductBadge` overrides:
 
 ```
 font-black px-3 py-1.5 rounded-none

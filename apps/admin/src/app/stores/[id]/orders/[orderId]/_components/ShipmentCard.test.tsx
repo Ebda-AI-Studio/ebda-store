@@ -37,7 +37,7 @@ vi.mock('../../../../../../components/ConfirmActionModal', () => ({
     ) : null,
 }));
 
-import { ToastProvider } from '@force/ui';
+import { ToastProvider } from '@ebda/ui';
 import { ShipmentCard } from './ShipmentCard';
 
 const CARRIERS = [

@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
-import { resolveColor } from '@force/shared';
-import type { StoreTheme } from '@force/shared';
+import { resolveColor } from '@ebda/shared';
+import type { StoreTheme } from '@ebda/shared';
 
 /**
  * Per-section style — paints the merchant's explicit bg override only.

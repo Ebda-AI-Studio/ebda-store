@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { seedCoaForStore } from '../../../apps/api/src/services/accounting/account.service';
 import { createSupplier } from '../../../apps/api/src/services/accounting/supplier.service';
 import {

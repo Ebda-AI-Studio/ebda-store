@@ -13,7 +13,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 const h = vi.hoisted(() => ({ wrapCalls: 0, failPaymentCommit: false, orphanAlert: vi.fn() }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { paymentConfig: { findFirst: vi.fn() } },
   runInTenantContext: vi.fn(async (_storeId: string, fn: () => unknown) => {
     h.wrapCalls++;

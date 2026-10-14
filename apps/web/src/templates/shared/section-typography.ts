@@ -1,5 +1,5 @@
-import { resolveColor, pickReadableForeground, contrastRatio } from '@force/shared';
-import type { ZoneOverride, StoreTheme } from '@force/shared';
+import { resolveColor, pickReadableForeground, contrastRatio } from '@ebda/shared';
+import type { ZoneOverride, StoreTheme } from '@ebda/shared';
 import type { CSSProperties } from 'react';
 
 export interface ResolvedZone {

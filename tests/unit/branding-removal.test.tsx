@@ -16,7 +16,7 @@ vi.mock('@web/contexts/LanguageContext', () => ({
 vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: m.isEnabled },
 }));
-vi.mock('@force/database', () => ({ prisma: {} }));
+vi.mock('@ebda/database', () => ({ prisma: {} }));
 vi.mock('@api/config', () => ({ config: {} }));
 vi.mock('@api/lib/logger', () => ({ default: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 vi.mock('@api/services/resend.service', () => ({ ResendService: {} }));

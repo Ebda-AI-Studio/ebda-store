@@ -20,8 +20,8 @@ import {
   parentToChildSchema,
   type ChildToParent,
   type PageDefinition,
-} from '@force/shared';
-import { BRAND } from '@force/shared';
+} from '@ebda/shared';
+import { BRAND } from '@ebda/shared';
 import { inlineSettingFor, sectionIdOf, unionRect, type Rect } from './overlay-logic';
 
 interface Props {

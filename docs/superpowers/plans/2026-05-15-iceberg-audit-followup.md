@@ -73,7 +73,7 @@ docs, and no A/B testing layer.
 #### 6. Data Integrity
 
 **Status**: ✅ Production-ready
-**Evidence**: Zod validation at every API boundary (shared schemas in `@force/shared`); `apps/api/src/middleware/security.ts` — `sanitizeInput` middleware strips null bytes, control chars, zero-width Unicode, enforces 10KB string cap; DB unique indexes enforced at Prisma schema level; idempotency on payment webhooks (`apps/api/src/routes/webhook.routes.ts:60-90`).
+**Evidence**: Zod validation at every API boundary (shared schemas in `@ebda/shared`); `apps/api/src/middleware/security.ts` — `sanitizeInput` middleware strips null bytes, control chars, zero-width Unicode, enforces 10KB string cap; DB unique indexes enforced at Prisma schema level; idempotency on payment webhooks (`apps/api/src/routes/webhook.routes.ts:60-90`).
 
 #### 7. Data Retention
 

@@ -7,7 +7,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { AdminSkeletonDetail } from '../../../../components/AdminSkeleton';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useLocale } from 'next-intl';
-import { getLook, type LookId } from '@force/shared';
+import { getLook, type LookId } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { LookPicker } from '../../../../components/looks/LookPicker';
 import {

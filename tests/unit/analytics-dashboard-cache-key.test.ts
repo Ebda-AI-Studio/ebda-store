@@ -15,7 +15,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('@force/database', () => ({ prisma: {}, Prisma: { sql: () => ({}), empty: {} } }));
+vi.mock('@ebda/database', () => ({ prisma: {}, Prisma: { sql: () => ({}), empty: {} } }));
 vi.mock('@api/services/redis.service', () => ({
   redis: { get: vi.fn(async () => null), set: vi.fn(async () => undefined) },
 }));
@@ -61,7 +61,7 @@ describe('dashboard stats cache', () => {
   it('the all-time customer count is shared across date ranges', async () => {
     vi.spyOn(AnalyticsService as any, 'getPeriodStats').mockResolvedValue(STATS);
     vi.spyOn(AnalyticsService, 'getViewsConversionRate').mockResolvedValue(null);
-    const { prisma } = await import('@force/database');
+    const { prisma } = await import('@ebda/database');
     (prisma as any).product = { count: vi.fn(async () => 0) };
     const allTime = vi.spyOn(AnalyticsService, 'countDistinctCustomers').mockResolvedValue(7);
 

@@ -19,8 +19,8 @@ import { describe, it, expect, afterAll, beforeAll, vi } from 'vitest';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { prisma, withRlsBypass, type Prisma } from '@force/database';
-import { planLimitsSchema, type PlanLimits } from '@force/shared';
+import { prisma, withRlsBypass, type Prisma } from '@ebda/database';
+import { planLimitsSchema, type PlanLimits } from '@ebda/shared';
 import {
   assertWithinLimit,
   noteOrderCreated,

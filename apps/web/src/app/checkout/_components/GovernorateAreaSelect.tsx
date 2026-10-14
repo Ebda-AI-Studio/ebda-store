@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useId, useMemo } from 'react';
-import { EGYPT_GOVERNORATES, areasForGovernorate } from '@force/shared';
+import { EGYPT_GOVERNORATES, areasForGovernorate } from '@ebda/shared';
 // Pure filter logic lives in a separate .ts file so vitest (node env) can
 // import and unit-test it without a JSX transformer.
 export { filterGovernorates, filterAreas } from './governorate-area-utils';

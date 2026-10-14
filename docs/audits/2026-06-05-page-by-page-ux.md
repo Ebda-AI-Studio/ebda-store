@@ -380,8 +380,8 @@
 
 ### 11.5 A11y
 
-- **P2** — Form uses `<Input label=...>` components which should render `<label>` internally. Confirm that `@force/ui` Input renders `htmlFor` correctly — not visible from this component but critical.
-- **P2** — Error `role="alert"` is present — correct. The submit button uses `isLoading` prop for loading state — no `aria-disabled` verification visible but assumed handled by `@force/ui Button`.
+- **P2** — Form uses `<Input label=...>` components which should render `<label>` internally. Confirm that `@ebda/ui` Input renders `htmlFor` correctly — not visible from this component but critical.
+- **P2** — Error `role="alert"` is present — correct. The submit button uses `isLoading` prop for loading state — no `aria-disabled` verification visible but assumed handled by `@ebda/ui Button`.
 
 ---
 

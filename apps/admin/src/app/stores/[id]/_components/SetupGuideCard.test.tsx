@@ -7,7 +7,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { SETUP_GUIDE_ITEMS, type SetupGuideState } from '@force/shared';
+import { SETUP_GUIDE_ITEMS, type SetupGuideState } from '@ebda/shared';
 
 const { apiGet, apiPut } = vi.hoisted(() => ({ apiGet: vi.fn(), apiPut: vi.fn() }));
 vi.mock('../../../../lib/api', () => ({ apiGet, apiPut }));

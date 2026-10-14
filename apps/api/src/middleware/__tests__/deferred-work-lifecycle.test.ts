@@ -60,7 +60,7 @@ const runInTenantContextMock = vi.hoisted(() =>
   )
 );
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   runInTenantContext: (...args: [string | undefined, () => Promise<unknown>, string?]) =>
     runInTenantContextMock(...args),
   // `after-tenant-commit.ts` imports this for the boot-time detector; the

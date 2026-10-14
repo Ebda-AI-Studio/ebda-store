@@ -1,4 +1,4 @@
-import { formatMoney, localizeDigits, type Numerals } from '@force/shared';
+import { formatMoney, localizeDigits, type Numerals } from '@ebda/shared';
 /**
  * Variant-aware pricing helpers for storefront + admin product cards.
  *

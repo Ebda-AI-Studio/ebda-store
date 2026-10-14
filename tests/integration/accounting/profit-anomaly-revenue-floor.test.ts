@@ -14,7 +14,7 @@
  * Every store is created per test, so a --retry re-run gets fresh rows.
  */
 import { describe, it, expect, afterAll, vi } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 vi.mock('../../../apps/api/src/services/accounting/gemini-ai.service', () => ({
   callGemini: vi.fn(async () => ({

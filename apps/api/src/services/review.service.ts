@@ -1,4 +1,4 @@
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { socketService } from './socket.service';
 import logger from '../lib/logger';

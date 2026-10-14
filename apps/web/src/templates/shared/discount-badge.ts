@@ -1,5 +1,5 @@
-import type { StoreTheme } from '@force/shared';
-import { resolveColor } from '@force/shared';
+import type { StoreTheme } from '@ebda/shared';
+import { resolveColor } from '@ebda/shared';
 
 /**
  * Discount/sale badge corner + color — merchant-configurable via Page

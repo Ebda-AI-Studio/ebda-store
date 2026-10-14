@@ -18,8 +18,8 @@
  * only adds enforcement gates — it never changes PLAN_BASELINE or StoreFeature rows.
  */
 
-import { prisma } from '@force/database';
-import { PLAN_BASELINE, FEATURE_KEYS_ARRAY } from '@force/shared';
+import { prisma } from '@ebda/database';
+import { PLAN_BASELINE, FEATURE_KEYS_ARRAY } from '@ebda/shared';
 
 // The two real merchants (slugs are stable across environments).
 const TARGET_SLUGS = ['demo-shop', 'demo-boutique'];

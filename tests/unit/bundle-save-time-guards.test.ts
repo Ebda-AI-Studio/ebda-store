@@ -125,7 +125,7 @@ const { mockPrisma } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   Prisma: {},
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
@@ -532,7 +532,7 @@ describe('POST /:storeId/bundles — fractional-remainder tie agrees with checko
   // is NOT allocatable at 499, but the reverse (high id first, qty 2 then
   // qty 3) IS — same components, same price, order is the only variable.
   it('sanity: the fixture is a genuine order-flip at the bundle-pricing level', async () => {
-    const { isAllocatable } = await import('@force/shared');
+    const { isAllocatable } = await import('@ebda/shared');
     const checkoutOrder = [
       { key: 'low', unitPrice: 100, quantity: 3 },
       { key: 'high', unitPrice: 100, quantity: 2 },

@@ -39,7 +39,7 @@ const { mockPrisma, txMock } = vi.hoisted(() => {
   };
 });
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   Prisma: {},
   ProductStatus: {},

@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { paymentConfig: { findFirst: vi.fn() } },
   runInTenantContext: vi.fn((_storeId: string, fn: () => unknown) => fn()),
   withTenantContext: vi.fn((_storeId: string, fn: (tx: unknown) => unknown) => fn({})),
@@ -58,7 +58,7 @@ import { registerOrderTools } from '@api/mcp/tools/order.tools';
 import { authorizedAgentExtra } from '../helpers/mcp-agent-auth';
 import { OrderService } from '@api/services/order.service';
 import { PaymentService } from '@api/services/payment-providers/payment.factory';
-import { runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@ebda/database';
 
 function harness() {
   // `place_order` is a WRITE tool: it now refuses without the `agent:write`

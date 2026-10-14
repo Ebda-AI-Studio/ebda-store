@@ -11,7 +11,7 @@
  * setting coherent).
  */
 
-import type { StoreTheme } from '@force/shared';
+import type { StoreTheme } from '@ebda/shared';
 
 const DEFAULT_UNIT_EN = 'pieces';
 const DEFAULT_UNIT_AR = 'قطعة';

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { apiGet, apiPut, apiPost } from '../../../../../lib/api';

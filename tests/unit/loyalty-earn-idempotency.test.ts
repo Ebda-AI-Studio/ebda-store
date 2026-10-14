@@ -29,7 +29,7 @@ const h = vi.hoisted(() => ({
   transaction: vi.fn(),
 }));
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   // Minimal stand-in for Prisma's real PrismaClientKnownRequestError so the
   // source's `err instanceof Prisma.PrismaClientKnownRequestError` check
   // works against errors constructed via this same mocked `Prisma` export.
@@ -57,7 +57,7 @@ vi.mock('@api/services/feature.service', () => ({
   featureService: { isFeatureEnabled: h.isFeatureEnabled },
 }));
 
-import { Prisma } from '@force/database';
+import { Prisma } from '@ebda/database';
 import { LoyaltyService } from '@api/services/loyalty.service';
 
 beforeEach(() => {

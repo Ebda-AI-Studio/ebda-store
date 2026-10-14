@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import express, { Router } from 'express';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import productRoutes from '@api/routes/product.routes';
 import authRoutes from '@api/routes/auth.routes';
 import mfaRoutes from '@api/routes/mfa.routes';

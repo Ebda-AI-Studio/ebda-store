@@ -115,7 +115,7 @@ const { mockPrisma } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: mockPrisma,
   Prisma: {},
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),

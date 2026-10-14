@@ -5,10 +5,10 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Button, useToast } from '@force/ui';
+import { Button, useToast } from '@ebda/ui';
 import { apiGet, apiPost, apiPut } from '../../lib/api';
 import { useT } from '../../i18n/useT';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 const Icon = {
   Sparkles: (p: { className?: string }) => (

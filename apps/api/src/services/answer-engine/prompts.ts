@@ -19,9 +19,9 @@
  * runs once per store per scan, multiplied by every enabled engine, so its
  * output size directly drives AI spend.
  */
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 export interface GeneratedPrompt {
   text: string;
   locale: 'en' | 'ar';

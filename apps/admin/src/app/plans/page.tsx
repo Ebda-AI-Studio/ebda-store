@@ -13,8 +13,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Badge, Button, Input, Modal, ModalBody, ModalFooter, useToast } from '@force/ui';
-import { formatMoney, type PlanLimits, withNumerals } from '@force/shared';
+import { Badge, Button, Input, Modal, ModalBody, ModalFooter, useToast } from '@ebda/ui';
+import { formatMoney, type PlanLimits, withNumerals } from '@ebda/shared';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { Toggle } from '../../components/Toggle';

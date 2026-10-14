@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useAuth } from '../../../../lib/auth';
 import { apiGet, apiDelete } from '../../../../lib/api';

@@ -34,7 +34,7 @@ APP_DIR="$ROOT/apps/$APP"
 BIN="$ROOT/node_modules/.bin/opennextjs-cloudflare"
 
 [ -d "$APP_DIR" ] || { echo "cf-build: no such app: apps/$APP" >&2; exit 1; }
-[ -x "$BIN" ] || { echo "cf-build: @opennextjs/cloudflare not installed — run: npm i -D @opennextjs/cloudflare@1.19.11 wrangler@4.116.0 -w @force/$APP" >&2; exit 1; }
+[ -x "$BIN" ] || { echo "cf-build: @opennextjs/cloudflare not installed — run: npm i -D @opennextjs/cloudflare@1.19.11 wrangler@4.116.0 -w @ebda/$APP" >&2; exit 1; }
 [ -f "$APP_DIR/wrangler.jsonc" ] || { echo "cf-build: missing apps/$APP/wrangler.jsonc (see docs/migration/cloudflare-preview-workers.md)" >&2; exit 1; }
 
 # The API origin must be baked into Next's browser bundle at build time.

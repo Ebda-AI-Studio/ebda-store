@@ -13,7 +13,7 @@
  *   - anything else (store/admin/orders subdomains, `/<slug>`, EVERY merchant
  *     domain) → `next`, i.e. fall through to the Next storefront UNCHANGED.
  */
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 export const COMPANY_APEX: string = BRAND.domains.marketing;
 /** Pages project that serves the marketing site (SP9 creates it). */

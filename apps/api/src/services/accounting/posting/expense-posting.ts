@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { postEntry } from '../journal.service';
 import logger from '../../../lib/logger';
 

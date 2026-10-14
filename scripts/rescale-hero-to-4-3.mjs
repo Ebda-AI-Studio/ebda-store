@@ -31,7 +31,7 @@ import 'dotenv/config';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
 import sharp from 'sharp';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 const SLUG = process.argv[2];
 const APPLY = process.argv.includes('--apply');

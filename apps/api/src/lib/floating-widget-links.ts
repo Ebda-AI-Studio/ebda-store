@@ -1,4 +1,4 @@
-import { isSafeUrl } from '@force/shared';
+import { isSafeUrl } from '@ebda/shared';
 
 /**
  * Floating-widget button fields that become an `<a href>` on the storefront.

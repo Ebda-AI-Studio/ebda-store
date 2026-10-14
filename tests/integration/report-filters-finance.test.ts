@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import ExcelJS from 'exceljs';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import {
   seedCoaForStore,
   getSystemAccountIdByCode,

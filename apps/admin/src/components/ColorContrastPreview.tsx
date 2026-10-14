@@ -1,7 +1,7 @@
 'use client';
 
-import { resolveColor, pickReadableForeground, contrastRatio } from '@force/shared';
-import type { StoreTheme } from '@force/shared';
+import { resolveColor, pickReadableForeground, contrastRatio } from '@ebda/shared';
+import type { StoreTheme } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 
 interface ColorContrastPreviewProps {

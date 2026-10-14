@@ -1,5 +1,5 @@
-import { prisma, type Prisma } from '@force/database';
-import { groupOrderLinesForDisplay, mulDivRound, orderAddressLines } from '@force/shared';
+import { prisma, type Prisma } from '@ebda/database';
+import { groupOrderLinesForDisplay, mulDivRound, orderAddressLines } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 

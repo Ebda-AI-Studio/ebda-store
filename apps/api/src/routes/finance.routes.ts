@@ -20,7 +20,7 @@ import {
   storeStockValueFils,
 } from '../lib/effective-inventory-sql';
 import { z } from 'zod';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -36,7 +36,7 @@ import {
   fromMinor,
   REGION,
   excelMoneyFormat,
-} from '@force/shared';
+} from '@ebda/shared';
 import { storeTimeZone } from '../lib/report-range';
 import {
   listAccountsTree,

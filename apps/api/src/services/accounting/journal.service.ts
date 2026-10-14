@@ -1,4 +1,4 @@
-import { prisma, withStore, currentStoreId } from '@force/database';
+import { prisma, withStore, currentStoreId } from '@ebda/database';
 import { getEntityStoreId } from '../../lib/definer';
 import type { JournalEntry, JournalEntrySource, Prisma } from '@prisma/client';
 import { Prisma as PrismaNs } from '@prisma/client';
@@ -6,7 +6,7 @@ import { nextSequence } from '../sequence.service';
 import { broadcastToStore } from '../../lib/socket-broadcast';
 import { withSavepointOn } from '../../lib/savepoint';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 export interface JournalLineInput {
   accountId: string;
   debit: number;

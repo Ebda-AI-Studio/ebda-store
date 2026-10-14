@@ -30,7 +30,7 @@ const BASE = __ENV.BASE_URL || 'https://api.ebda.app/api/v1';
 if (!__ENV.STORE_IDS) {
   throw new Error(
     'STORE_IDS env var is required.\n' +
-      'Seed stores first: npm run seed:loadtest --workspace @force/database\n' +
+      'Seed stores first: npm run seed:loadtest --workspace @ebda/database\n' +
       'Then: STORE_IDS=$(cat loadtests/.loadtest-store-ids.txt) ./loadtests/run.sh multi-store-storm'
   );
 }

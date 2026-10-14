@@ -38,7 +38,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import express from 'express';
 import http from 'http';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass } from '@ebda/database';
 import { tenantContext } from '@api/middleware/tenant-context';
 import { deferAfterTenantCommit } from '@api/lib/after-tenant-commit';
 

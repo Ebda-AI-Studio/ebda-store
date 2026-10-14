@@ -38,7 +38,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import {
   hasDb,
   buildBundleTestApp,

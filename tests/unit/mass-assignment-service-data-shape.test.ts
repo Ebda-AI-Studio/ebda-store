@@ -14,7 +14,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 const { storeUpdate } = vi.hoisted(() => ({ storeUpdate: vi.fn() }));
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   const existing = {
     id: 'store-1',
     slug: 'store-one',
@@ -30,7 +30,7 @@ vi.mock('@force/database', () => {
     withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
       fn({
         // the transaction client is the same fake client, plus the zero counts
-        ...(await import('@force/database')).prisma,
+        ...(await import('@ebda/database')).prisma,
         product: { count: async () => 0 },
         category: { count: async () => 0 },
         order: { count: async () => 0 },

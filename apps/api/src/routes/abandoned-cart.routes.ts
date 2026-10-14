@@ -4,7 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { abandonedCartService } from '../services/abandoned-cart.service';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { config } from '../config';
 import { tenantContext } from '../middleware/tenant-context';
 import { GUEST_CHECKOUT_LOOKBACK_DAYS, storeTakesGuestOrders } from '../lib/guest-checkout';

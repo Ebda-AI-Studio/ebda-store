@@ -1,4 +1,4 @@
-import { currentTenantGucs, runInTenantContext } from '@force/database';
+import { currentTenantGucs, runInTenantContext } from '@ebda/database';
 
 /**
  * Run `fn` scoped to `storeId` under RLS, whether or not the caller already

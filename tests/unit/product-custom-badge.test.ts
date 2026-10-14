@@ -8,7 +8,7 @@
  * anywhere is the bug this file exists to prevent.
  *
  * Imported from SOURCE (`apps/web/src/templates/shared/custom-badge`), never
- * through a package entry point — `@force/shared` resolves to
+ * through a package entry point — `@ebda/shared` resolves to
  * packages/shared/DIST, so a test written against it passes on the last build
  * instead of on the code under review.
  */

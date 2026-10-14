@@ -18,8 +18,8 @@ import {
   runInStoreScope,
   storeDirectory,
   withStore,
-} from '@force/database';
-import { storefrontOrigin } from '@force/shared';
+} from '@ebda/database';
+import { storefrontOrigin } from '@ebda/shared';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { redis } from './redis.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
@@ -29,7 +29,7 @@ import { encryption } from './encryption.service';
 import logger from '../lib/logger';
 import crypto from 'crypto';
 import { config } from '../config';
-import type { NotificationData, NotificationEvent } from '@force/shared';
+import type { NotificationData, NotificationEvent } from '@ebda/shared';
 
 // ==========================================
 // Constants / Types

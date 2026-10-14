@@ -19,7 +19,7 @@
  * public store cache is keyed on slug / domain, so a retry gets fresh keys.
  */
 import { describe, it, expect, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { API_BASE } from '../helpers/api-base';
 
 const created: { storeIds: string[]; userIds: string[] } = { storeIds: [], userIds: [] };

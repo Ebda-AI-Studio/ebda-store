@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { composeStoreTheme } from '@force/shared';
+import { composeStoreTheme } from '@ebda/shared';
 
 // StoreContext pulls React providers; only its exported pure mirror is needed.
 vi.mock('../../apps/web/src/contexts/LanguageContext', () => ({ useLanguage: () => ({}) }));
 import { themeToCssVars as clientVars } from '../../apps/web/src/contexts/StoreContext';
-import { themeToCssVars as sharedVars } from '@force/shared';
+import { themeToCssVars as sharedVars } from '@ebda/shared';
 
 describe('themeToCssVars parity (SSR shared vs client mirror)', () => {
   for (const [name, input] of [

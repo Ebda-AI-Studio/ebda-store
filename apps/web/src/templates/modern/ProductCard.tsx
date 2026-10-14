@@ -24,8 +24,8 @@ import {
   fromMinor,
   REGION,
   storeNumerals,
-} from '@force/shared';
-import { Price, ProductBadge, ProductBadgeGroup, Rating, cn } from '@force/ui';
+} from '@ebda/shared';
+import { Price, ProductBadge, ProductBadgeGroup, Rating, cn } from '@ebda/ui';
 import { getDiscountBadgeText } from '../../lib/product-pricing';
 import { getDiscountBadgeColor } from '../shared/discount-badge';
 import {
@@ -42,7 +42,7 @@ import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/Product
 /**
  * Modern Template - Product Card
  *
- * Uses shared components from @force/ui:
+ * Uses shared components from @ebda/ui:
  * - Price: Currency formatting with discount display
  * - ProductBadge: Sale, new, sold out badges
  * - Rating: Star rating display

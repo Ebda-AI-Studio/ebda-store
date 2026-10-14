@@ -3,7 +3,7 @@
  * Basic included — no plan gate. And the AR hand-off helpers.
  */
 import { describe, it, expect } from 'vitest';
-import { FEATURE_REGISTRY, PLAN_BASELINE, STORE_PLANS, DEFAULT_PLAN_SEEDS } from '@force/shared';
+import { FEATURE_REGISTRY, PLAN_BASELINE, STORE_PLANS, DEFAULT_PLAN_SEEDS } from '@ebda/shared';
 import { arPlatform, sceneViewerIntent } from '../../packages/ui/src/model3d/ar';
 
 describe('product_3d is in every plan', () => {

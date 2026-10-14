@@ -4,7 +4,7 @@
 
 **Goal:** Build a per-store feature flag system where super_admin manually enables/disables features per store, with full API gating, admin UI toggles, and storefront hiding.
 
-**Architecture:** New `StoreFeature` DB table with `(storeId, featureKey)` unique pairs. Feature registry in `@force/shared`. `requireFeature()` middleware on API routes. Redis-cached lookups. Features tab on admin store detail page. Storefront reads features from existing store data endpoint.
+**Architecture:** New `StoreFeature` DB table with `(storeId, featureKey)` unique pairs. Feature registry in `@ebda/shared`. `requireFeature()` middleware on API routes. Redis-cached lookups. Features tab on admin store detail page. Storefront reads features from existing store data endpoint.
 
 **Tech Stack:** Prisma (PostgreSQL), Express.js middleware, Redis caching, React (Next.js App Router), Zod validation, Vitest
 
@@ -55,7 +55,7 @@
 
 ---
 
-## Task 1: Feature Registry in @force/shared
+## Task 1: Feature Registry in @ebda/shared
 
 **Files:**
 
@@ -212,9 +212,9 @@ git commit -m "feat(database): add store_features table for per-store feature to
 - [ ] **Step 1: Write the feature service**
 
 ```typescript
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { redis } from './redis.service';
-import { FeatureKey, FEATURE_KEYS_ARRAY } from '@force/shared/features';
+import { FeatureKey, FEATURE_KEYS_ARRAY } from '@ebda/shared/features';
 
 const CACHE_PREFIX = 'features:store:';
 const CACHE_TTL = 300; // 5 minutes
@@ -389,7 +389,7 @@ git commit -m "feat(api): add feature service with redis-cached store feature lo
 
 ```typescript
 import { Request, Response, NextFunction } from 'express';
-import { FeatureKey } from '@force/shared/features';
+import { FeatureKey } from '@ebda/shared/features';
 import { featureService } from '../services/feature.service';
 
 /**
@@ -467,7 +467,7 @@ import {
   mockStore,
   mockAdmin,
 } from '../setup';
-import { FEATURE_KEYS_ARRAY, featureKeySchema, featureUpdatesSchema } from '@force/shared/features';
+import { FEATURE_KEYS_ARRAY, featureKeySchema, featureUpdatesSchema } from '@ebda/shared/features';
 
 describe('Feature Toggle Engine', () => {
   describe('Feature Registry', () => {
@@ -583,7 +583,7 @@ cd /Users/ahmadsharaf/Desktop/projects/force-website-builder
 npx vitest run tests/unit/feature.test.ts
 ```
 
-Expected: All tests pass. If module resolution fails for `@force/shared/features`, check the workspace alias configuration and adjust the import path.
+Expected: All tests pass. If module resolution fails for `@ebda/shared/features`, check the workspace alias configuration and adjust the import path.
 
 - [ ] **Step 3: Commit**
 
@@ -609,9 +609,9 @@ Read the existing route patterns first. Look at `apps/api/src/routes/admin.route
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { featureService } from '../services/feature.service';
-import { featureKeySchema, featureUpdatesSchema, FEATURE_REGISTRY } from '@force/shared/features';
+import { featureKeySchema, featureUpdatesSchema, FEATURE_REGISTRY } from '@ebda/shared/features';
 
 const router = Router();
 
@@ -834,7 +834,7 @@ Create `scripts/migrate-feature-flags.ts`:
 //   if store.pwaEnabled → upsert StoreFeature(storeId, 'pwa', true)
 ```
 
-Use `import { prisma } from '@force/database'` (same import as all services).
+Use `import { prisma } from '@ebda/database'` (same import as all services).
 
 - [ ] **Step 4: Run the migration script**
 

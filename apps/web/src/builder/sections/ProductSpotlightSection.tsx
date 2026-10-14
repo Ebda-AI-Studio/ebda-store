@@ -8,8 +8,8 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import type { SectionPaddingMaxWidthVisibility } from '@force/shared';
-import { sanitizeUrl } from '@force/shared';
+import type { SectionPaddingMaxWidthVisibility } from '@ebda/shared';
+import { sanitizeUrl } from '@ebda/shared';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useLocalePrice } from '../../hooks/useLocalePrice';

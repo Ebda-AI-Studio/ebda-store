@@ -21,7 +21,7 @@ const { runInTenantContextMock } = vi.hoisted(() => ({
   runInTenantContextMock: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   runInTenantContext: (...args: [string | undefined, () => Promise<unknown>, string?]) =>
     runInTenantContextMock(...args),
 }));

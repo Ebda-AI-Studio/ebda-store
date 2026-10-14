@@ -8,9 +8,9 @@
  * AreaRateEditor.getIncompleteNewRows.test.ts` for the sibling convention
  * this file follows.
  */
-import type { BundleLine } from '@force/shared';
+import type { BundleLine } from '@ebda/shared';
 
-import { roundToMinor } from '@force/shared';
+import { roundToMinor } from '@ebda/shared';
 /**
  * Availability sentinel for "every component is untracked" — mirrors
  * `UNTRACKED_AVAILABILITY_CAP` in `apps/api/src/services/bundle.service.ts`
@@ -59,7 +59,7 @@ export function computeComponentSum(lines: Array<{ unitPrice: number; quantity: 
 }
 
 /** Converts the picker's line rows into the `BundleLine[]` shape the
- *  `@force/shared` pricing/allocation functions take (keyed positionally —
+ *  `@ebda/shared` pricing/allocation functions take (keyed positionally —
  *  the key only needs to be unique within one preview computation). */
 export function toBundleLines(items: Array<{ unitPrice: number; quantity: number }>): BundleLine[] {
   return items.map((it, i) => ({ key: String(i), unitPrice: it.unitPrice, quantity: it.quantity }));

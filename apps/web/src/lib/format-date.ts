@@ -14,7 +14,7 @@
  * truly bespoke can still drop down to `Intl.DateTimeFormat` directly, but
  * that should be rare.
  */
-import { intlLocale, type Numerals } from '@force/shared';
+import { intlLocale, type Numerals } from '@ebda/shared';
 
 export type FormatDateStyle = 'short' | 'long' | 'datetime';
 

@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { vi } from 'vitest';
-import type { InstapayReceiptFields } from '@force/shared';
+import type { InstapayReceiptFields } from '@ebda/shared';
 import { StorageService } from '@api/services/storage.service';
 import { setReceiptModelCallForTests } from '@api/lib/ai/instapay-receipt-reader';
 import { InstapayReceiptService } from '@api/services/payment-providers/instapay-receipt.service';

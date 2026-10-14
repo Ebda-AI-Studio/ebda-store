@@ -1,6 +1,6 @@
 // tests/unit/looks-contrast.test.ts
 import { describe, it, expect } from 'vitest';
-import { LOOKS, contrastRatio } from '@force/shared';
+import { LOOKS, contrastRatio } from '@ebda/shared';
 
 const PAIRS: [string, (t: any) => [string, string]][] = [
   ['ink on page', t => [t.page, t.ink]],

@@ -9,7 +9,7 @@
  * what the customer is shown: the merchant's handle/phone, the exact amount in
  * piastres, and the order reference to quote.
  */
-import { INSTAPAY_DEFAULT_EXPIRY_HOURS, instapaySettingsSchema } from '@force/shared';
+import { INSTAPAY_DEFAULT_EXPIRY_HOURS, instapaySettingsSchema } from '@ebda/shared';
 import { assertChargeable } from './provider-call';
 import {
   PaymentProviderError,

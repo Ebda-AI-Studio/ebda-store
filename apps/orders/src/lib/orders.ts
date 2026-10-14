@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod';
-import { ORDER_STATUS_TRANSITIONS, orderStatusOptions } from '@force/shared';
+import { ORDER_STATUS_TRANSITIONS, orderStatusOptions } from '@ebda/shared';
 
 export interface OrderCustomer {
   id: string;
@@ -165,7 +165,7 @@ export interface Pagination {
 
 /**
  * Valid status transitions and the per-order options — the canonical map in
- * @force/shared, the same one the admin order list and order page read. This
+ * @ebda/shared, the same one the admin order list and order page read. This
  * file kept its own copy, which drifted: no `cancelled` key and `refunded`
  * only from `delivered`, so a paid, cancelled order could not be marked
  * refunded from the PWA (#1936, also #1899 — shipped -> processing on shipment

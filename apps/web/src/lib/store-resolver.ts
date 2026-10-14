@@ -13,7 +13,7 @@ import {
   parseStoreHost,
   isReservedSlug,
   validateStoreSlugFormat,
-} from '@force/shared';
+} from '@ebda/shared';
 import { devSuffixesAllowed } from './platform-host';
 import { API_URL } from './api';
 import { decodeRouteParam } from './route-params';
@@ -61,7 +61,7 @@ export interface ResolvedStore {
   // Per-store typography overrides (font family, size, color per zone
   // + a library of Google Fonts URLs / merchant-uploaded font files).
   // Loaded from Store.typography JSON. Untyped here because the
-  // shape lives in @force/shared/types/typography and dragging that
+  // shape lives in @ebda/shared/types/typography and dragging that
   // import in would force a chain of build dependencies the resolver
   // doesn't currently need.
   typography?: Record<string, unknown> | null;

@@ -9,7 +9,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
 import { useFeatures } from '@/hooks/useFeatures';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
-import { Button, useToast } from '@force/ui';
+import { Button, useToast } from '@ebda/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

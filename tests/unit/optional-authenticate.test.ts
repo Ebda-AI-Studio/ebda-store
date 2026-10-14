@@ -30,7 +30,7 @@ vi.mock('../../apps/api/src/services/redis.service', () => ({
   },
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { user: { findUnique: () => Promise.resolve({ tokenVersion }) } },
 }));
 

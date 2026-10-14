@@ -25,7 +25,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     user: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     store: { findFirst: vi.fn() },

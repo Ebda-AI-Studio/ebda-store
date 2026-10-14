@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { resolveColor, sanitizeUrl } from '@force/shared';
+import { resolveColor, sanitizeUrl } from '@ebda/shared';
 import type {
   FloatingButton,
   FloatingButtonKind,
   FloatingWidgetConfig,
   StoreTheme,
-} from '@force/shared';
+} from '@ebda/shared';
 import { InstagramGlyphIcon, WhatsappGlyphIcon, VolumeMaxIcon, VolumeMutedIcon } from './icons';
 import type { StoreContact, StoreSocials } from '../types';
 

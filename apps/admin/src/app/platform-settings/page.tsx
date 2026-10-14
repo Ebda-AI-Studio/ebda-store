@@ -10,14 +10,14 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Input, useToast } from '@force/ui';
+import { Button, Input, useToast } from '@ebda/ui';
 import {
   DEFAULT_PLATFORM_VAT,
   PLATFORM_VAT_MODES,
   normalizeTaxRegistrationNumber,
   type PlatformVat,
   type PlatformVatMode,
-} from '@force/shared';
+} from '@ebda/shared';
 import { AdminLayout } from '../../components/AdminLayout';
 import { RequireSuperAdmin } from '../../components/RequireSuperAdmin';
 import { Toggle } from '../../components/Toggle';

@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { Toggle } from '../../../../../components/Toggle';
 import { ConnectionStatus } from '../../../../../components/ConnectionStatus';
 import { useT } from '@/i18n/useT';

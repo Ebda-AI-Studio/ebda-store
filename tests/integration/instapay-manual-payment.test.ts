@@ -27,7 +27,7 @@ import {
   runWithRequestDb,
   runInTenantContext,
   type AppPrismaClient,
-} from '@force/database';
+} from '@ebda/database';
 import { inngest } from '@api/lib/inngest/client';
 import { OneSignalService } from '@api/services/onesignal.service';
 import { InstapayService, runPostCommit } from '@api/services/payment-providers/instapay.service';

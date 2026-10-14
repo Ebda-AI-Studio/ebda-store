@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, type ReactNode } from 'react';
-import { useToast } from '@force/ui';
+import { useToast } from '@ebda/ui';
 import { apiGet, apiPut } from '../lib/api';
 import { useT } from '@/i18n/useT';
 

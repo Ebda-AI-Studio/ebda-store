@@ -24,8 +24,8 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
 }));
 vi.mock('@/hooks/useFeatures', () => ({ useFeatures: () => ({ isEnabled: () => false }) }));
-vi.mock('@force/ui', async importOriginal => ({
-  ...(await importOriginal<typeof import('@force/ui')>()),
+vi.mock('@ebda/ui', async importOriginal => ({
+  ...(await importOriginal<typeof import('@ebda/ui')>()),
   useToast: () => ({ success: vi.fn(), error: vi.fn() }),
 }));
 vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));

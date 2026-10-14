@@ -20,7 +20,7 @@ import { OrderCard } from '@/components/OrderCard';
 import { InstallPrompt } from '@/components/InstallPrompt';
 import { EnableNotifications } from '@/components/EnableNotifications';
 import { NewOrderWatcher } from '@/components/NewOrderWatcher';
-import { reportRangeParams } from '@force/shared';
+import { reportRangeParams } from '@ebda/shared';
 
 const POLL_MS = 30_000;
 const PER_PAGE_OPTIONS = [10, 25, 50] as const;

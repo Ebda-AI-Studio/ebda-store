@@ -14,7 +14,7 @@ import express, { type Express } from 'express';
 import request from 'supertest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { prisma, runInStoreScope } from '@force/database';
+import { prisma, runInStoreScope } from '@ebda/database';
 import publicRoutes from '@api/routes/public.routes';
 import { errorHandler } from '@api/middleware/error-handler';
 import { BulkService } from '@api/services/bulk.service';

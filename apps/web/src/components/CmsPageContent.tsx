@@ -1,6 +1,6 @@
 'use client';
 
-import { storeNumerals } from '@force/shared';
+import { storeNumerals } from '@ebda/shared';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useStore } from '../contexts/StoreContext';

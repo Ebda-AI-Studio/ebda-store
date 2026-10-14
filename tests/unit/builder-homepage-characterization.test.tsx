@@ -27,7 +27,7 @@ import {
   layoutToDefinition,
   reduceDocument,
   type TemplateId,
-} from '@force/shared';
+} from '@ebda/shared';
 import {
   LAYOUT_FIXTURES,
   TEMPLATES,

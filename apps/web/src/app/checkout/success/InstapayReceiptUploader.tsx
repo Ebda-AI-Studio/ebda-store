@@ -7,9 +7,9 @@ import {
   normalizeInstapayReference,
   toAsciiDigits,
   tryToMinor,
-} from '@force/shared';
-import type { InstapayReceiptView } from '@force/shared';
-import { Button } from '@force/ui';
+} from '@ebda/shared';
+import type { InstapayReceiptView } from '@ebda/shared';
+import { Button } from '@ebda/ui';
 import { api } from '@/lib/api';
 import { useLanguage } from '../../../contexts/LanguageContext';
 

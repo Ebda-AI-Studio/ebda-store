@@ -1,4 +1,4 @@
-import type { ProductCardDefaults, StoreLayoutSettings } from '@force/shared';
+import type { ProductCardDefaults, StoreLayoutSettings } from '@ebda/shared';
 import type { CtaShape, CtaSize } from './card-size';
 
 /**

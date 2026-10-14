@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Modal, useToast } from '@force/ui';
+import { Button, Modal, useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 import { apiGet, apiPost } from '../../../../../../lib/api';

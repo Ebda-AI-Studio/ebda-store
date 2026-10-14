@@ -31,7 +31,7 @@ const { findUniqueMock, findManyMock, countMock, redisGetMock, redisSetMock } = 
   redisSetMock: vi.fn(),
 }));
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     store: {
       findUnique: findUniqueMock,
@@ -46,7 +46,7 @@ vi.mock('@force/database', () => ({
   withStore: async (_id: string, fn: (tx: unknown) => unknown) =>
     fn({
       // the transaction client is the same fake client, plus the zero counts
-      ...(await import('@force/database')).prisma,
+      ...(await import('@ebda/database')).prisma,
       product: { count: async () => 0 },
       category: { count: async () => 0 },
       order: { count: async () => 0 },
@@ -59,9 +59,9 @@ vi.mock('../../apps/api/src/lib/definer', async importOriginal => ({
   ...(await importOriginal<typeof import('../../apps/api/src/lib/definer')>()),
   storeIdBySlug: vi.fn(async () => '11111111-1111-1111-1111-111111111111'),
 }));
-vi.mock('@force/shared', async importOriginal => ({
+vi.mock('@ebda/shared', async importOriginal => ({
   // Keep the real region config (REGION is read at import time by api config/services).
-  ...(await importOriginal<typeof import('@force/shared')>()),
+  ...(await importOriginal<typeof import('@ebda/shared')>()),
   slugify: (s: string) => s,
 }));
 vi.mock('../../apps/api/src/services/redis.service', () => ({

@@ -8,7 +8,7 @@ import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStore, useStoreUrl, useStoreTemplate } from '../contexts/StoreContext';
 import { ProductCarousel } from '../templates/shared/ProductCarousel';
-import { Skeleton } from '@force/ui';
+import { Skeleton } from '@ebda/ui';
 import { SectionRetryNotice } from './SectionRetryNotice';
 
 /** Loading placeholder sized to the eventual horizontal carousel strip

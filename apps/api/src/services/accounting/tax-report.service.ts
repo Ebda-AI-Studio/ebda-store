@@ -1,5 +1,5 @@
-import { prisma } from '@force/database';
-import { DEFAULT_STORE_TIME_ZONE, zonedIsoDay } from '@force/shared';
+import { prisma } from '@ebda/database';
+import { DEFAULT_STORE_TIME_ZONE, zonedIsoDay } from '@ebda/shared';
 
 /**
  * One transaction-level tax row — one row per order-source journal entry

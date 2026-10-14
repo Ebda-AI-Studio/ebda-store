@@ -11,7 +11,7 @@
  * tests/setup-e2e.ts additionally refuses to run against production.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { BulkService } from '../../apps/api/src/services/bulk.service';
 
 const SUFFIX = `variant-import-${Date.now()}`;

@@ -1,7 +1,7 @@
 /**
  * Ebda brand identity — the single source of truth for every user-visible
  * brand string, colour, font, domain and sender address across apps/* and
- * packages/*. Import from `@force/shared` (the package scope is an internal
+ * packages/*. Import from `@ebda/shared` (the package scope is an internal
  * identifier and is intentionally unchanged).
  *
  * Pure data + pure helpers: no runtime imports, safe in Workers, middleware,

@@ -20,7 +20,7 @@ const nextConfig = {
   // workspace-hoisted deps from the root node_modules.
   outputFileTracingRoot: path.join(__dirname, '../..'),
 
-  transpilePackages: ['@force/shared'],
+  transpilePackages: ['@ebda/shared'],
 
   // Product image thumbnails on the order detail page come from the same R2 /
   // CDN hosts the admin + storefront use. Mirror the admin's allowlist so

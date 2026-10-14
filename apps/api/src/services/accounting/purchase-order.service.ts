@@ -1,5 +1,5 @@
 import { assertStoreOwnsInTenantScope } from './assert-store-owns';
-import { prisma, withMoneyTx, hasTenantContext, runInTenantContext } from '@force/database';
+import { prisma, withMoneyTx, hasTenantContext, runInTenantContext } from '@ebda/database';
 import type { Prisma, PurchaseOrder, PurchaseOrderItem } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { getSystemAccountIdByCode } from './account.service';

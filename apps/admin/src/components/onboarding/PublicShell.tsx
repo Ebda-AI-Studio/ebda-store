@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Image from 'next/image';
-import { BRAND, BRAND_MARKETING_URL } from '@force/shared';
+import { BRAND, BRAND_MARKETING_URL } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import AdminLanguageSwitcher from '../AdminLanguageSwitcher';
 import { DocumentTitle } from '../DocumentTitle';

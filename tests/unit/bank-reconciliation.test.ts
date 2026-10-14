@@ -295,7 +295,7 @@ describe('parseStatementOfx — error cases', () => {
 
 // ─── Matching engine ──────────────────────────────────────────────────────────
 // The matching engine queries the DB; we test the pure matching *logic*
-// by mocking @force/database and driving runAutoMatch with controlled data.
+// by mocking @ebda/database and driving runAutoMatch with controlled data.
 
 const mockWithRlsBypass = vi.fn();
 const mockRunInTenantContext = vi.fn();
@@ -310,7 +310,7 @@ const mockJournalEntryFindFirst = vi.fn();
 const mockBankTxFindFirst = vi.fn();
 const mockQueryRawUnsafe = vi.fn();
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     bankTransaction: {
       updateMany: (...a: unknown[]) => mockBankTxUpdateMany(...a),

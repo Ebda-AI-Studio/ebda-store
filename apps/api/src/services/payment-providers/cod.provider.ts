@@ -8,8 +8,8 @@
  * with. Nothing here adds a fee any more: `/payments/create` only records what
  * the courier collects, `order.total − wallet`.
  */
-import { prisma } from '@force/database';
-import { type CodFeeConfig } from '@force/shared';
+import { prisma } from '@ebda/database';
+import { type CodFeeConfig } from '@ebda/shared';
 import { assertChargeable } from './provider-call';
 import {
   PaymentProviderError,

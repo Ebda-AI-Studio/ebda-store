@@ -12,7 +12,7 @@
  * 23505. Never rely on the service alone — concurrent writers would race, which
  * is exactly why the index exists underneath.
  */
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { withSavepoint } from '../lib/savepoint';
 

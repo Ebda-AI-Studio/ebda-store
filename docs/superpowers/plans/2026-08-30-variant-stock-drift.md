@@ -288,9 +288,9 @@ unblocks them, so it lands on its own commit and can ship ahead of the rest if n
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CartService } from '@api/services/cart.service';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     cart: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), findUnique: vi.fn() },
     cartItem: { findFirst: vi.fn(), update: vi.fn(), delete: vi.fn() },

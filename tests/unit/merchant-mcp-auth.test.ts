@@ -27,7 +27,7 @@ const update = vi.fn().mockResolvedValue({});
 // Store membership the verifier re-reads per call (mirrors requireStoreAccess).
 const membership = vi.hoisted(() => ({ ownerId: 'user-1' as string | null, staffRow: true }));
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   // Declared INSIDE the factory: vi.mock is hoisted above module-scope consts,
   // so a `tx` defined outside would be undefined when this runs.
   const client = {

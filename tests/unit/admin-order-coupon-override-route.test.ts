@@ -51,7 +51,7 @@ vi.mock('@api/utils/store-helpers', () => ({ getAuthUser: (req: any) => req.user
 vi.mock('@api/lib/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {},
   Prisma: { DbNull: null },
   runInTenantContext: (_s: string, fn: () => unknown) => fn(),

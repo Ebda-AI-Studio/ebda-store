@@ -3,7 +3,7 @@
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { TIER_COLORS, TIER_KEYS, type LoyaltyMember, type TierKey } from './types';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 interface MembersTableProps {
   members: LoyaltyMember[];

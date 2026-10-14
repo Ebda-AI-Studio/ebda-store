@@ -24,7 +24,7 @@ import {
   hasTenantContext,
   runWithRequestDb,
   type AppPrismaClient,
-} from '@force/database';
+} from '@ebda/database';
 import { KashierStub, KASHIER_STUB } from '../stubs/kashier-stub';
 import { PaymobStub, PAYMOB_STUB } from '../stubs/paymob-stub';
 import { serveStub, type ServedStub } from '../stubs/serve';

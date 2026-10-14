@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { OrderService } from '../../../services/order.service';

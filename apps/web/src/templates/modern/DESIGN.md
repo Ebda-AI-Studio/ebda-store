@@ -195,7 +195,7 @@ text-sm text-white placeholder:text-gray-500
 
 ### Badges & Pills
 
-Modern uses `@force/ui`'s `ProductBadge` with default styling — `rounded-full`, `text-[10px]` to `text-xs`, `font-bold`. Sale and "new" badges sit `top-3 start-3` (RTL-aware via `start-*`). The cart count badge is a circle `min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-[10px] font-bold`.
+Modern uses `@ebda/ui`'s `ProductBadge` with default styling — `rounded-full`, `text-[10px]` to `text-xs`, `font-bold`. Sale and "new" badges sit `top-3 start-3` (RTL-aware via `start-*`). The cart count badge is a circle `min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-[10px] font-bold`.
 
 ### Navigation
 

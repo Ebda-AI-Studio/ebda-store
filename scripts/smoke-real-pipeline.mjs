@@ -23,7 +23,7 @@ if (!process.env.RESEND_API_KEY && !process.env.SMTP_PASSWORD) {
   process.exit(1);
 }
 
-const { createPrismaClient } = await import('@force/database');
+const { createPrismaClient } = await import('@ebda/database');
 const prisma = createPrismaClient({ connectionString: process.env.DATABASE_URL ?? '', role: 'owner' });
 
 const store = await prisma.store.findFirst({

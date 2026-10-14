@@ -1,4 +1,4 @@
-import { currentStoreId } from '@force/database';
+import { currentStoreId } from '@ebda/database';
 import { withScopedToOrderStore } from './order-scope';
 import type { Prisma } from '@prisma/client';
 import { getSystemAccountIdByCode } from '../account.service';

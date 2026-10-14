@@ -1,9 +1,9 @@
 import type { ResolvedStore } from './store-resolver';
 import { pickMetaDescription } from './seo/meta-description';
 import type { StorefrontLocale } from './seo/resolve-locale';
-import { BRAND_MARKETING_URL, storefrontOrigin } from '@force/shared';
+import { BRAND_MARKETING_URL, storefrontOrigin } from '@ebda/shared';
 
-import { minorToDecimalString, REGION } from '@force/shared';
+import { minorToDecimalString, REGION } from '@ebda/shared';
 /**
  * The name/description a JSON-LD node publishes for `locale` (#2196): the
  * Arabic field when the page resolved to `ar` and the merchant filled it in,

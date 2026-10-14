@@ -69,7 +69,7 @@
  */
 
 import { AsyncLocalStorage } from 'async_hooks';
-import { onClosedTenantTxAccess, runInTenantContext } from '@force/database';
+import { onClosedTenantTxAccess, runInTenantContext } from '@ebda/database';
 import logger from './logger';
 import { cfBindings, cfWaitUntil } from '../cf/bindings';
 import { sendAlert } from '../services/alerts.service';
@@ -425,7 +425,7 @@ function reportDeferredFailure(name: string, err: unknown, ctx: TenantCommitCont
 }
 
 /**
- * Wire the `@force/database` closed-transaction detector to the API's logging
+ * Wire the `@ebda/database` closed-transaction detector to the API's logging
  * and alerting. Call once at boot.
  *
  * This is the enforcement half: `deferAfterTenantCommit` fixes the sites we

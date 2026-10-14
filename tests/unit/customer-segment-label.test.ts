@@ -23,7 +23,7 @@ import { describe, it, expect, vi } from 'vitest';
 // Mock workspace packages so this test can run without node_modules
 // installed for the whole monorepo — only the pure classifySegment
 // logic (which makes zero DB calls) is under test here.
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {},
   RfmSegment: {
     vip: 'vip',

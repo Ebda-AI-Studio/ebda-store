@@ -13,7 +13,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { prisma, Prisma, withMoneyTx } from '@force/database';
+import { prisma, Prisma, withMoneyTx } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { haversineKm } from '../lib/haversine';
@@ -146,7 +146,7 @@ const WAREHOUSE_SELECT = {
  * Safe to retry: the whole `withMoneyTx` rolls back on the error, so a re-run
  * applies the set (absolute) or the delta exactly once. The transaction is
  * its own (`$transaction` is not proxied onto the request's tenant tx — see
- * `hasTenantContext` in @force/database), so the retry never runs inside an
+ * `hasTenantContext` in @ebda/database), so the retry never runs inside an
  * aborted outer transaction. Raw-query failures carry the SQLSTATE at
  * `err.meta.code`, which is why the codes are passed explicitly (see the
  * reconcile docstring below).

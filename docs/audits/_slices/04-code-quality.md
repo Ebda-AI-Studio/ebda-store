@@ -16,22 +16,22 @@ FWB is a well-structured commercial SaaS monorepo with strong architectural inte
 apps/api      → Express API (206 .ts files)
 apps/admin    → Next.js 16 admin (331 .ts/.tsx files, 86 pages)
 apps/web      → Next.js 16 storefront (238 .ts/.tsx files, 37 pages)
-packages/database → @force/database — Prisma client + bcryptjs
-packages/shared   → @force/shared — Zod schemas + types
-packages/ui       → @force/ui — React components (CVA, clsx, tailwind-merge)
-packages/config   → @force/config — shared tooling config
+packages/database → @ebda/database — Prisma client + bcryptjs
+packages/shared   → @ebda/shared — Zod schemas + types
+packages/ui       → @ebda/ui — React components (CVA, clsx, tailwind-merge)
+packages/config   → @ebda/config — shared tooling config
 ```
 
 **Dep graph (clean acyclic hierarchy):**
 
-- `apps/api` → `@force/database`, `@force/shared`
-- `apps/admin` → `@force/shared`, `@force/ui`
-- `apps/web` → `@force/shared`, `@force/ui`
+- `apps/api` → `@ebda/database`, `@ebda/shared`
+- `apps/admin` → `@ebda/shared`, `@ebda/ui`
+- `apps/web` → `@ebda/shared`, `@ebda/ui`
 - `packages/ui` → React only
 - `packages/shared` → Zod only
 - `packages/database` → Prisma + bcryptjs
 
-No circular deps. `@force/config` unused by any app — likely a stub. The boundary discipline is excellent: `apps/api` is the only consumer of `@force/database`, and frontends have no DB access path. 306 files in `apps/` import from `@force/*` correctly.
+No circular deps. `@ebda/config` unused by any app — likely a stub. The boundary discipline is excellent: `apps/api` is the only consumer of `@ebda/database`, and frontends have no DB access path. 306 files in `apps/` import from `@ebda/*` correctly.
 
 #### 4.2 Dependency Health (Audit, Outdated, Overrides)
 
@@ -138,7 +138,7 @@ The `as any` pattern in admin pages suggests `ApiResponse<T>` wrapper isn't type
 **Dead code signals:**
 
 - `NotificationContext` sets up WebSocket but no pages call `subscribeToStore()` — wired but inactive
-- `@force/config` package exists but no app `package.json` lists it as dependency
+- `@ebda/config` package exists but no app `package.json` lists it as dependency
 - Stale Vercel projects (`force-web-sigma`, `force-web-sigma-seven`) flagged for deletion
 
 **`__dangerously_set_inner_HTML__` usage** (8 instances, all safe — JSON-LD via stringify, CmsPageContent uses HTML escape, admin content renders use URL validator for link protocols).

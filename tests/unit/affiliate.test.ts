@@ -8,14 +8,14 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { affiliateService } from '@api/services/affiliate.service';
-import { prisma, withMoneyTx } from '@force/database';
+import { prisma, withMoneyTx } from '@ebda/database';
 import { AppError } from '@api/middleware/error-handler';
 
 // ==========================================
 // Mock prisma + dependencies
 // ==========================================
 
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: {
     affiliateConfig: {
       findUnique: vi.fn(),

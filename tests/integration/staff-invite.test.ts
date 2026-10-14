@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'crypto';
-import { withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@ebda/database';
 import staffRoutes from '@api/routes/staff.routes';
 import authRoutes from '@api/routes/auth.routes';
 import { tenantContext } from '@api/middleware/tenant-context';

@@ -21,7 +21,7 @@ vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'store-1' }) }));
 vi.mock('next/link', () => ({
   default: ({ children }: { children: React.ReactNode }) => children,
 }));
-vi.mock('@force/ui', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
+vi.mock('@ebda/ui', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
 vi.mock('@/i18n/useT', () => ({ useT: () => (key: string) => key }));
 vi.mock('@/hooks/useRequireFeature', () => ({
   useRequireFeature: () => ({ enabled: true, isLoading: false, gate: null }),

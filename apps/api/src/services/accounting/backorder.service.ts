@@ -1,4 +1,4 @@
-import { prisma, Prisma, withMoneyTx, hasTenantContext } from '@force/database';
+import { prisma, Prisma, withMoneyTx, hasTenantContext } from '@ebda/database';
 import logger from '../../lib/logger';
 import { invalidateStoreProductCaches } from '../../lib/public-cache';
 import { OrderService } from '../order.service';

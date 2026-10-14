@@ -3,7 +3,7 @@
  * idempotent read is retried a bounded number of times; nothing else is.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Prisma } from '@force/database';
+import { Prisma } from '@ebda/database';
 
 const redisMock = vi.hoisted(() => ({
   get: vi.fn(async () => null as unknown),

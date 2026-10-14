@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Input, Modal, Select, useToast } from '@force/ui';
+import { Button, Input, Modal, Select, useToast } from '@ebda/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useStoreUrl } from '../../../contexts/StoreContext';
 
-import { REGION, areasForGovernorate, orderAddressLines } from '@force/shared';
+import { REGION, areasForGovernorate, orderAddressLines } from '@ebda/shared';
 interface Address {
   id: string;
   firstName: string;

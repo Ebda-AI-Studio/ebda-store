@@ -1,4 +1,4 @@
-import { groupOrderLinesForDisplay, type OrderLineBase } from '@force/shared';
+import { groupOrderLinesForDisplay, type OrderLineBase } from '@ebda/shared';
 import type { PaymentItem } from '../services/payment-providers/types';
 
 export interface PaymentLineItemSource extends OrderLineBase {

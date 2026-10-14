@@ -25,7 +25,7 @@ vi.mock('@api/services/account-lockout.service', () => ({
 vi.mock('@api/services/redis.service', () => ({ redis: {} }));
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { send: vi.fn() } }));
 vi.mock('@api/services/alerts.service', () => ({ sendAlert: vi.fn() }));
-vi.mock('@force/database', () => ({
+vi.mock('@ebda/database', () => ({
   prisma: { user: { findFirst: vi.fn().mockResolvedValue(null) } },
   Prisma: {},
   hasTenantContext: () => false,

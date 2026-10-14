@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import type { StockAdjustmentType } from '@prisma/client';
 import { postEntry } from '../journal.service';
 import { getSystemAccountIdByCode } from '../account.service';

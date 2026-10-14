@@ -29,7 +29,7 @@ import {
   prisma,
   TenantScopeViolation,
   type AppPrismaClient,
-} from '@force/database';
+} from '@ebda/database';
 import {
   applyTemplateFamily,
   layoutToDefinition,
@@ -38,7 +38,7 @@ import {
   resolveLayoutSettings,
   TEMPLATE_FAMILIES,
   type PageDefinition,
-} from '@force/shared';
+} from '@ebda/shared';
 import publicStoreLayoutRoutes from '../../apps/api/src/routes/public-store-layout.routes';
 import {
   getPageState,
@@ -499,7 +499,7 @@ describe('integrity guards', { retry: 0 }, () => {
 
 describe('document-only sections survive the legacy save paths', { retry: 0 }, () => {
   it('a legacy layout PUT keeps an image-text section the new builder added', async () => {
-    const { reduceDocument } = await import('@force/shared');
+    const { reduceDocument } = await import('@ebda/shared');
     const storeId = await freshStore('doconly');
     const withImage = withRealCopy(
       reduceDocument(docFor({}), {

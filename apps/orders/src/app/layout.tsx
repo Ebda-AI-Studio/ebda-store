@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Providers } from './providers';
-import { BRAND } from '@force/shared';
+import { BRAND } from '@ebda/shared';
 
 export const metadata: Metadata = {
   title: `${BRAND.product.nameEn} Orders`,

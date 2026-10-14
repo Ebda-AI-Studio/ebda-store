@@ -54,7 +54,7 @@ Everything below is ranked by severity × effort. The first 3 sections are the *
 - `apps/web/src/app/products/ProductsFilterSidebar.tsx:36-59` — filter search input
 - `apps/admin/src/app/stores/[id]/branding/_components/ContactInfoTab.tsx:21,31,44,54,68,78` + `BrandingIdentityTab.tsx:22,31,48,59` — multiple raw inputs with `<label>` siblings missing `htmlFor`/matching `id`
 
-**Fix:** add `htmlFor={id}` + matching `id`. For admin, better: route through `@force/ui` `<Input label={...}>` which handles this automatically.
+**Fix:** add `htmlFor={id}` + matching `id`. For admin, better: route through `@ebda/ui` `<Input label={...}>` which handles this automatically.
 
 ---
 
@@ -169,7 +169,7 @@ Also: `text-white` hardcoded on primary buttons (`payment-settings/page.tsx:111`
 
 **Fix:** extract `<Alert variant="warning|success|info">` using semantic tokens.
 
-### 18. 11 inline "outline secondary" buttons duplicating `@force/ui` `Button variant="outline"`
+### 18. 11 inline "outline secondary" buttons duplicating `@ebda/ui` `Button variant="outline"`
 
 `settings/page.tsx:333`, `orders/page.tsx:184`, `customers/page.tsx:163`, `payment-settings/page.tsx:215`, `announcement/page.tsx:104`, `pages/page.tsx:260`, `seo/page.tsx:134`, `categories/page.tsx:194`, `users/[id]/page.tsx:151`, `language/page.tsx:85`, `branding/_components/BrandPreview.tsx:33` — all define `px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted font-medium` inline.
 

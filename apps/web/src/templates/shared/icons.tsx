@@ -1,6 +1,6 @@
 import type React from 'react';
 import Image from 'next/image';
-import { sanitizeUrl } from '@force/shared';
+import { sanitizeUrl } from '@ebda/shared';
 import type { StoreContact, StoreSocials } from '../types';
 
 // ---------------------------------------------------------------------------

@@ -12,8 +12,8 @@
  */
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { withUser, type Prisma } from '@force/database';
-import { normalizeEgyptianMobile } from '@force/shared';
+import { withUser, type Prisma } from '@ebda/database';
+import { normalizeEgyptianMobile } from '@ebda/shared';
 import logger from '../lib/logger';
 import { maskEmail } from '../lib/pii-mask';
 import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';

@@ -1,4 +1,4 @@
-import { DbClient, Prisma, SlugEntityType, prisma } from '@force/database';
+import { DbClient, Prisma, SlugEntityType, prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { BoundedMap } from '../lib/bounded-map';
 

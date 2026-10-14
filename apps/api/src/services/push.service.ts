@@ -7,7 +7,7 @@
  */
 
 import webpush from 'web-push';
-import { currentStoreId, prisma, withStore, runInTenantContext } from '@force/database';
+import { currentStoreId, prisma, withStore, runInTenantContext } from '@ebda/database';
 import logger from '../lib/logger';
 import { config } from '../config';
 import { notificationConfigService } from './notification-config.service';

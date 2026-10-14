@@ -17,7 +17,7 @@ const { mockPrisma } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@force/database', () => ({ prisma: mockPrisma }));
+vi.mock('@ebda/database', () => ({ prisma: mockPrisma }));
 
 import {
   listSlugRedirects,

@@ -2,7 +2,7 @@
 // already deleted. They no longer own anything; their audit-log refs
 // can be nulled out (userId is nullable on the audit_logs table) and
 // the user rows themselves dropped.
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 const APPLY = process.argv.includes('--apply');
 

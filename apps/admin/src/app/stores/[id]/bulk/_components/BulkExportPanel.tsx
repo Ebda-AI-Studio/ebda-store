@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Input, Label } from '@force/ui';
+import { Button, Input, Label } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import type { ExportFilters } from './types';
 

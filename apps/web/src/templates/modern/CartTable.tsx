@@ -7,7 +7,7 @@ import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 
-import { REGION } from '@force/shared';
+import { REGION } from '@ebda/shared';
 /**
  * Modern template — cart item list. Each row is a card with the product
  * image, name, quantity controls, and remove button, using the same

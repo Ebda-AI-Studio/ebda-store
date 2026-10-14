@@ -25,7 +25,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'node:crypto';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';

@@ -41,7 +41,7 @@ vi.mock('../../../../lib/api', () => api);
 const auth = vi.hoisted(() => ({ role: 'store_admin' as string }));
 vi.mock('../../../../lib/auth', () => ({ useAuth: () => ({ user: { role: auth.role } }) }));
 
-import { ToastProvider } from '@force/ui';
+import { ToastProvider } from '@ebda/ui';
 import OrdersPage from './page';
 
 const ORDER = {

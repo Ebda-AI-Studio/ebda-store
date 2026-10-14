@@ -1,4 +1,4 @@
-import { prisma, hasTenantContext } from '@force/database';
+import { prisma, hasTenantContext } from '@ebda/database';
 import logger from './logger';
 
 /** The one method the savepoint bracket needs from a Prisma client or tx. */
@@ -22,7 +22,7 @@ let savepointSeq = 0;
  * WHY THIS EXISTS
  *
  * `middleware/tenant-context.ts` wraps every store-scoped request in one
- * interactive Prisma transaction, and `@force/database`'s `prisma` proxy routes
+ * interactive Prisma transaction, and `@ebda/database`'s `prisma` proxy routes
  * every model call inside that request onto it. Postgres puts a transaction
  * into ABORTED state the moment ANY statement in it errors: every later
  * statement then fails with SQLSTATE `25P02` ("current transaction is aborted,

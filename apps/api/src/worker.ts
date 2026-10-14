@@ -20,7 +20,7 @@
 import { handleAsNodeRequest } from 'cloudflare:node';
 import { createServer } from 'node:http';
 import app from './app';
-import { ClientPoolTimeout, createIsolateDb, prisma, type IsolateDb } from '@force/database';
+import { ClientPoolTimeout, createIsolateDb, prisma, type IsolateDb } from '@ebda/database';
 import { awaitDeferredWork } from './lib/after-tenant-commit';
 import { redis } from './services/redis.service';
 import { SentryService } from './services/sentry.service';

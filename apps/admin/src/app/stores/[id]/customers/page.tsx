@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
-import { Button, useToast } from '@force/ui';
+import { Button, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { AdminSkeletonTable } from '../../../../components/AdminSkeleton';
 import { apiGet, apiFetch } from '../../../../lib/api';
@@ -67,7 +67,7 @@ interface CustomersListResponse {
 }
 
 import { formatDate, formatPrice } from '@/lib/format';
-import { customerListFilterParams } from '@force/shared';
+import { customerListFilterParams } from '@ebda/shared';
 
 export default function StoreCustomersPage() {
   const params = useParams();

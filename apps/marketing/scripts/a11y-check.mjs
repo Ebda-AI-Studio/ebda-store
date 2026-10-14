@@ -3,7 +3,7 @@
 // The runner is shared (packages/site-kit); this file only declares what to scan.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runA11y } from '@force/site-kit/gates/a11y';
+import { runA11y } from '@ebda/site-kit/gates/a11y';
 
 const pages = [
   '/',

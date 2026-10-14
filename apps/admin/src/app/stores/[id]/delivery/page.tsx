@@ -3,14 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { buildCheckoutDeliverySettings } from '../../../../lib/checkout-delivery-payload';
 import { useT } from '@/i18n/useT';
-import type { CheckoutDeliverySettings, CheckoutDeliveryWindow } from '@force/shared';
+import type { CheckoutDeliverySettings, CheckoutDeliveryWindow } from '@ebda/shared';
 
-import { minorToDecimalString } from '@force/shared';
+import { minorToDecimalString } from '@ebda/shared';
 const DEFAULT_CONFIG: CheckoutDeliverySettings = {
   note: { enabled: false, text: '', textAr: '' },
   windows: { enabled: false, items: [] },

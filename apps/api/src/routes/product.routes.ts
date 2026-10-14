@@ -6,12 +6,12 @@ import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { invalidateCachedPrefix } from '../lib/public-cache';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { EXCERPT_MAX_LENGTH } from '../lib/ai/product-excerpt-generator';
-import { PRODUCT_BADGE_LABEL_MAX_LENGTH } from '@force/shared';
+import { PRODUCT_BADGE_LABEL_MAX_LENGTH } from '@ebda/shared';
 
 const router = Router({ mergeParams: true });
 

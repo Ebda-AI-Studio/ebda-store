@@ -6,7 +6,7 @@ import type { AbandonmentRecord, ListMeta } from '../_hooks/usePaymentAbandonmen
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 import { formatPrice } from '@/lib/format';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 /** Converts piastres (integer) to an EGP display string (2 decimals). */
 const formatMajor = formatPrice;

@@ -15,7 +15,7 @@ import {
 import { JsonLd } from '../../../components/JsonLd';
 import BundleDetailClient from './BundleDetailClient';
 
-import { fromMinor, REGION } from '@force/shared';
+import { fromMinor, REGION } from '@ebda/shared';
 /**
  * Bundle detail (PDP-equivalent for a fixed kit) page body — mirrors
  * `products/[slug]/ProductDetailBody.tsx`'s server/client split (server

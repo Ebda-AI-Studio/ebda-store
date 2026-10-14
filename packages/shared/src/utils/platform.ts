@@ -5,7 +5,7 @@
  * browser contexts (client components, event handlers, useEffect, etc.).
  * All functions guard against `typeof navigator === 'undefined'` for SSR.
  *
- * @force/shared targets Node + Browser runtimes; the DOM lib is not included
+ * @ebda/shared targets Node + Browser runtimes; the DOM lib is not included
  * in the tsconfig so we access the browser globals through `globalThis` (which
  * is available in both runtimes without needing lib: ["DOM"]).
  */

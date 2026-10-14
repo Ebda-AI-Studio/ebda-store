@@ -4,9 +4,9 @@
 
 **Goal:** At storefront checkout the customer picks **Governorate (المحافظة)** then **Area (المنطقة)**; the shipping fee is resolved per **area** from a **merchant-editable** rate table, seeded for Wady Aljuz from their handwritten zone sheets.
 
-**Architecture:** A canonical Kuwait governorate→area dataset lives in `@force/shared` (single source, replaces 3 duplicated hardcoded lists). A new additive Prisma model `ShippingAreaRate` holds one merchant-editable fee per `(store, governorate, area)`. `ShippingService.calculateShipping` resolves in priority: **per-area rate → legacy ShippingZone match → store default/first zone → 0**, so existing stores are untouched (fully backward-compatible). The storefront replaces its single governorate `<Select>` with two cascading selects; the admin gets a governorate-accordion area-fee editor. The order `shippingAddress` JSON gains `governorate`/`governorateAr`; `area`/`areaAr` become the sub-area.
+**Architecture:** A canonical Kuwait governorate→area dataset lives in `@ebda/shared` (single source, replaces 3 duplicated hardcoded lists). A new additive Prisma model `ShippingAreaRate` holds one merchant-editable fee per `(store, governorate, area)`. `ShippingService.calculateShipping` resolves in priority: **per-area rate → legacy ShippingZone match → store default/first zone → 0**, so existing stores are untouched (fully backward-compatible). The storefront replaces its single governorate `<Select>` with two cascading selects; the admin gets a governorate-accordion area-fee editor. The order `shippingAddress` JSON gains `governorate`/`governorateAr`; `area`/`areaAr` become the sub-area.
 
-**Tech Stack:** Next.js 16 (apps/web storefront, apps/admin), Express + Prisma + Neon Postgres (apps/api), `@force/shared` workspace, Zod validation, vitest (unit) + jest/supertest (integration) + Playwright (e2e). Amounts in **fils** (Int; ÷1000 = KWD).
+**Tech Stack:** Next.js 16 (apps/web storefront, apps/admin), Express + Prisma + Neon Postgres (apps/api), `@ebda/shared` workspace, Zod validation, vitest (unit) + jest/supertest (integration) + Playwright (e2e). Amounts in **fils** (Int; ÷1000 = KWD).
 
 ---
 
@@ -270,7 +270,7 @@ Union of the two complementary sheets; where they differ, seed = the **lower** v
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import { KUWAIT_GOVERNORATES, areasForGovernorate, findGovernorateByArea } from '@force/shared';
+import { KUWAIT_GOVERNORATES, areasForGovernorate, findGovernorateByArea } from '@ebda/shared';
 
 describe('kuwait-areas dataset', () => {
   it('has exactly 6 governorates', () => {
@@ -303,7 +303,7 @@ describe('kuwait-areas dataset', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/unit/kuwait-areas.test.ts`
-Expected: FAIL — module `@force/shared` has no `KUWAIT_GOVERNORATES` export.
+Expected: FAIL — module `@ebda/shared` has no `KUWAIT_GOVERNORATES` export.
 
 - [ ] **Step 3: Create the dataset file** — paste the full `kuwait-areas.ts` content from the "Canonical dataset" section above verbatim.
 
@@ -546,7 +546,7 @@ git commit -m "feat(api): governorate+area on shipping address (validator+types 
   - **Hide-unpriced filter (locked decision):** accept an optional `ratedAreas?: Set<string>` / `ratedGovernorates?: Set<string>` prop. When provided (store has area-rates), restrict the typeahead options to rated areas/governorates; when absent (store has none), show the full canonical list. Checkout fetches `GET /stores/public/:storeId/shipping/area-rates` on mount to build these sets.
   - Props: `{ governorate, area, onChange(govEn, areaEn), locale, ratedAreas?, ratedGovernorates? }`.
 
-- [ ] **Step 3: Expand the address form** to the pecannbee field set + order (RTL): البلد (country, default `KW`/الكويت, clearable, fixed list) → المحافظة/المنطقة (the typeahead pair) → قطعة `block`_ → الشارع `street`_ → الجادة `avenue` → منزل `house`\* → الطابق `floor` → شقة `apartment` → ملاحظات `notes`. Extend `formData` with these keys; remove the legacy single `KUWAIT_AREAS` dropdown + local constant (import canonical from `@force/shared`).
+- [ ] **Step 3: Expand the address form** to the pecannbee field set + order (RTL): البلد (country, default `KW`/الكويت, clearable, fixed list) → المحافظة/المنطقة (the typeahead pair) → قطعة `block`_ → الشارع `street`_ → الجادة `avenue` → منزل `house`\* → الطابق `floor` → شقة `apartment` → ملاحظات `notes`. Extend `formData` with these keys; remove the legacy single `KUWAIT_AREAS` dropdown + local constant (import canonical from `@ebda/shared`).
 
 - [ ] **Step 4: Delivery-method panel** — render a "طريقة التوصيل" card that shows _"حدد عنوانك لعرض خيارات التوصيل"_ until both governorate+area are set; once set, call `calculateShipping({ governorate, area, orderTotal })` and show the resolved fee (or "غير متاح للتوصيل / لم يتم تحديد رسوم" when `matched:false`). Trigger recalculation on **area** change.
 

@@ -1,7 +1,7 @@
 'use client';
 
-import { Button, Input, Select } from '@force/ui';
-import { PRODUCT_BADGE_LABEL_MAX_LENGTH } from '@force/shared';
+import { Button, Input, Select } from '@ebda/ui';
+import { PRODUCT_BADGE_LABEL_MAX_LENGTH } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { AICategorySuggestions } from '../../../../../../../components/AICategorySuggestions';
 

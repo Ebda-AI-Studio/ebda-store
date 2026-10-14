@@ -51,7 +51,7 @@ const colorValue = z
 
 Empty string = unset (existing behaviour, falls back to the theme background preset).
 
-### 1.2 `resolveColor` helper (`@force/shared`)
+### 1.2 `resolveColor` helper (`@ebda/shared`)
 
 ```ts
 import type { StoreTheme } from './store-theme';
@@ -84,7 +84,7 @@ export function resolveColor(value: ColorValue | undefined, theme: StoreTheme): 
 }
 ```
 
-### 1.3 `pickReadableForeground` helper (`@force/shared`)
+### 1.3 `pickReadableForeground` helper (`@ebda/shared`)
 
 ```ts
 /**
@@ -300,7 +300,7 @@ Extracted from the current Typography page. Owns: font-family, size, weight, col
 
 Lands on the current `/layout` page (no merge yet). Smaller, lower risk, immediately useful.
 
-- `resolveColor` + `pickReadableForeground` + `contrastRatio` helpers in `@force/shared`
+- `resolveColor` + `pickReadableForeground` + `contrastRatio` helpers in `@ebda/shared`
 - Section-scoped CSS var wiring in `HomePageContent.tsx` (5 sections × 2 wrappers each)
 - Token-aware `ColorField` component in admin
 - `<ColorContrastPreview />` component
@@ -382,7 +382,7 @@ export interface CategoriesSettings extends SectionTitleOverride, SectionBgOverr
 A new helper in `apps/web/src/templates/shared/section-typography.ts`:
 
 ```ts
-import type { ZoneOverride } from '@force/shared';
+import type { ZoneOverride } from '@ebda/shared';
 
 export interface ResolvedZone {
   fontFamily?: string;

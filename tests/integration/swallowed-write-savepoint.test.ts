@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import crypto from 'crypto';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma, runInTenantContext } from '@ebda/database';
 import { auditLog } from '../../apps/api/src/middleware/security';
 
 const hasDb =

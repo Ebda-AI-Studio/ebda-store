@@ -16,7 +16,7 @@ import express, { type Express } from 'express';
 import request from 'supertest';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { createPrismaClient, runWithRequestDb, type AppPrismaClient } from '@force/database';
+import { createPrismaClient, runWithRequestDb, type AppPrismaClient } from '@ebda/database';
 import { config } from '@api/config';
 import { inngest } from '@api/lib/inngest/client';
 import paymentSettingsRoutes from '@api/routes/payment-settings.routes';
@@ -25,7 +25,7 @@ import { errorHandler } from '@api/middleware/error-handler';
 import { planService } from '@api/services/plan.service';
 import { redis } from '@api/services/redis.service';
 import { PaymentService } from '@api/services/payment-providers/payment.factory';
-import { getProviderEntry } from '@force/shared';
+import { getProviderEntry } from '@ebda/shared';
 import { KashierStub, KASHIER_STUB } from '../stubs/kashier-stub';
 import { serveStub, type ServedStub } from '../stubs/serve';
 

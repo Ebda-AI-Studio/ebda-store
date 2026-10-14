@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button, Modal, useToast } from '@force/ui';
+import { Button, Modal, useToast } from '@ebda/ui';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
 import type { Product } from './types';
 import { variantPriceToField, variantFieldToPrice } from '@/lib/variant-price';
 
-import { roundToMinor } from '@force/shared';
+import { roundToMinor } from '@ebda/shared';
 // ─── local types ─────────────────────────────────────────────────────────────
 
 interface Category {

@@ -8,7 +8,7 @@
 #
 #   1. It runs `npm ci` first (clean install from the committed package-lock).
 #   2. It runs `npx prisma generate` via the root `db:generate` script so that
-#      the @force/database package types are available before the Next build.
+#      the @ebda/database package types are available before the Next build.
 #
 # cf-build.sh (the sibling script) is the LOCAL manual path — it skips install
 # steps because a developer already has node_modules.  Use cf-ci-build.sh ONLY

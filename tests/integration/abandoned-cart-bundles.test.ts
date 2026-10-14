@@ -28,7 +28,7 @@
  * suite under tests/integration.
  */
 import { describe, it, expect } from 'vitest';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass } from '@ebda/database';
 import {
   hasDb,
   seedBundleStore,

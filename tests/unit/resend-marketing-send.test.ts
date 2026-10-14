@@ -21,7 +21,7 @@ vi.mock('resend', () => ({
     batch = { send: batchSend };
   },
 }));
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   const prisma = { store: { findUnique } };
   return { prisma, withStore: (_id: string, fn: (tx: unknown) => unknown) => fn(prisma) };
 });

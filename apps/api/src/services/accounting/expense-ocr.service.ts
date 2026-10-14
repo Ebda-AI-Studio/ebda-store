@@ -13,13 +13,13 @@
 
 import https from 'https';
 import http from 'http';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 import { createExpense } from './expense.service';
 import { getSystemAccountIdByCode } from './account.service';
 
-import { REGION, roundToMinor } from '@force/shared';
+import { REGION, roundToMinor } from '@ebda/shared';
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------

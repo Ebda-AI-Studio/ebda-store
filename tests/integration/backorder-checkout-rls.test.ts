@@ -22,7 +22,7 @@
  * is keyed on a per-CALL unique suffix.
  */
 import { describe, it, expect, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { API_BASE } from '../helpers/api-base';
 import { hasDb, cartSessionId, DEFAULT_TEST_SHIPPING_ADDRESS } from '../helpers/bundle-fixtures';
 

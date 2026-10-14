@@ -1,4 +1,4 @@
-import { whatsappUrl } from '@force/shared/brand';
+import { whatsappUrl } from '@ebda/shared/brand';
 
 function ChatIcon() {
   return (

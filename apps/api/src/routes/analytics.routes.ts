@@ -3,15 +3,15 @@ import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { AnalyticsService } from '../services/analytics.service';
 import { requireStoreAccess } from '../middleware/store-access';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import logger from '../lib/logger';
 import { z } from 'zod';
-import { analyticsPeriodSchema, parseReportRange, type ReportRange } from '@force/shared';
+import { analyticsPeriodSchema, parseReportRange, type ReportRange } from '@ebda/shared';
 
 const router = Router({ mergeParams: true });
 
 /**
- * Parses the shared report-range contract (`@force/shared` report-range).
+ * Parses the shared report-range contract (`@ebda/shared` report-range).
  * Half a range, an unparseable date or start > end is a 422 — before this, a
  * route that got only one bound silently used month-to-date, and an invalid
  * date reached Prisma as `Invalid Date` (500). Returns `null` after answering.

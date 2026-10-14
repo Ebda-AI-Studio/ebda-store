@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useToast } from '@force/ui';
-import type { InstapayReceiptView } from '@force/shared';
+import { useToast } from '@ebda/ui';
+import type { InstapayReceiptView } from '@ebda/shared';
 import { apiGet, apiPost } from '../../../../../../lib/api';
 import { InstapayReceiptReview } from '../../../../../../components/instapay/InstapayReceiptReview';
 import { useT } from '@/i18n/useT';

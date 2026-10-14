@@ -10,7 +10,7 @@ import { apiGet } from '@/lib/api';
 import { minorToMajor } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { isUntrackedForGuests } from '@/lib/guest-checkout';
-import { withNumerals } from '@force/shared';
+import { withNumerals } from '@ebda/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

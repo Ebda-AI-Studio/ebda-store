@@ -20,7 +20,7 @@ import {
   waMeLink,
   type WaMeAddress,
   type WaMeOrderItem,
-} from '@force/shared';
+} from '@ebda/shared';
 import { useStore } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { WhatsappGlyphIcon } from './icons';

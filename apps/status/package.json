@@ -1,5 +1,5 @@
 {
-  "name": "@force/status",
+  "name": "@ebda/status",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",
@@ -22,7 +22,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.22.0",
     "@cloudflare/workers-types": "^5.20261003.1",
-    "@force/site-kit": "*",
+    "@ebda/site-kit": "*",
     "eslint": "^9.0.0",
     "tsx": "^4.20.0",
     "typescript": "^5.3.0",

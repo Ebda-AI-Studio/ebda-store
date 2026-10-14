@@ -423,7 +423,7 @@ router.post(
       const { storeId, orderId } = req.params;
 
       // Find the shipment for this order
-      const { prisma } = await import('@force/database');
+      const { prisma } = await import('@ebda/database');
       const existing = await prisma.shipment.findFirst({ where: { orderId, storeId } });
 
       if (!existing) {
@@ -475,7 +475,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const { prisma } = await import('@force/database');
+      const { prisma } = await import('@ebda/database');
       const existing = await prisma.shipment.findFirst({ where: { id, storeId } });
       if (!existing) {
         res.status(404).json({
@@ -573,7 +573,7 @@ router.post(
     try {
       const { storeId, id } = req.params;
       const { status, restock } = manualStatusSchema.parse(req.body);
-      const { prisma } = await import('@force/database');
+      const { prisma } = await import('@ebda/database');
       const existing = await prisma.shipment.findFirst({ where: { id, storeId } });
       if (!existing) {
         res.status(404).json({
@@ -699,7 +699,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
-      const { prisma } = await import('@force/database');
+      const { prisma } = await import('@ebda/database');
 
       const shipment = await prisma.shipment.findFirst({
         where: { id, storeId },
@@ -743,7 +743,7 @@ router.post(
       const { storeId, id } = req.params;
 
       // Verify the shipment belongs to this store
-      const { prisma } = await import('@force/database');
+      const { prisma } = await import('@ebda/database');
       const existing = await prisma.shipment.findFirst({ where: { id, storeId } });
 
       if (!existing) {
@@ -780,7 +780,7 @@ router.get(
       const { storeId, orderId } = req.params;
       const user = req.user;
 
-      const { prisma } = await import('@force/database');
+      const { prisma } = await import('@ebda/database');
 
       // Fetch order to verify ownership
       const order = await prisma.order.findFirst({

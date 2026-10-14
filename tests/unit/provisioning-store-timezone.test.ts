@@ -13,7 +13,7 @@ const { storeCreate, taxRateCreate, subUpdate } = vi.hoisted(() => ({
   subUpdate: vi.fn(),
 }));
 
-vi.mock('@force/database', () => {
+vi.mock('@ebda/database', () => {
   const tx = {
     $executeRaw: vi.fn(),
     // the owner is found-or-created by the `ebda_admin_user_ensure` definer, run on this tx

@@ -12,7 +12,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import React from 'react';
 import { render, cleanup, fireEvent } from '@testing-library/react';
-import type { PublicModel3d } from '@force/shared';
+import type { PublicModel3d } from '@ebda/shared';
 
 const viewerProps = vi.fn();
 vi.mock('next/dynamic', () => ({

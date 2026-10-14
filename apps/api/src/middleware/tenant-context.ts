@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { runInStoreScope, runInTenantContext } from '@force/database';
+import { runInStoreScope, runInTenantContext } from '@ebda/database';
 import { withDeferredWork } from '../lib/after-tenant-commit';
 import { resolvePublicStoreId } from '../utils/store-helpers';
 import { runRequestInTransaction } from './request-transaction';

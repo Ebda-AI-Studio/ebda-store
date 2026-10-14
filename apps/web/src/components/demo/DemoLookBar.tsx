@@ -1,6 +1,6 @@
 'use client';
 
-import { LOOKS, type LookTemplate } from '@force/shared';
+import { LOOKS, type LookTemplate } from '@ebda/shared';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { defaultIsLookBuilt, type IsLookBuilt } from '../../lib/demo-look';

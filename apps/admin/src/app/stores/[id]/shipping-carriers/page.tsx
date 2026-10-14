@@ -6,7 +6,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet } from '../../../../lib/api';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { useT } from '@/i18n/useT';
-import { BRAND, providerRequestMailto, providersOfKind } from '@force/shared';
+import { BRAND, providerRequestMailto, providersOfKind } from '@ebda/shared';
 import { useStoreActivations } from '../../../../lib/provider-activation';
 import { ShippingCarriersEmptyState } from './_components/ShippingCarriersEmptyState';
 import { CarrierConnectCard } from './_components/CarrierConnectCard';

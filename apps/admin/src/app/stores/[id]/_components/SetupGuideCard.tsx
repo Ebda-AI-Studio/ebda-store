@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Button } from '@force/ui';
+import { Button } from '@ebda/ui';
 import {
   SETUP_GUIDE_ITEMS,
   buildStoreShareMessage,
@@ -11,7 +11,7 @@ import {
   type WaMeLocale,
   type SetupGuideKey,
   type SetupGuideState,
-} from '@force/shared';
+} from '@ebda/shared';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 

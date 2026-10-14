@@ -845,7 +845,7 @@ git commit -m "feat(db): migrate batch 2 — 8 tables + 5 enums + extensions + c
 
 ```ts
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import {
   createSupplier,
   updateSupplier,
@@ -910,7 +910,7 @@ Run: `npx vitest run tests/integration/accounting/supplier-service.test.ts` → 
 `apps/api/src/services/accounting/supplier.service.ts`:
 
 ```ts
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import type { Prisma, Supplier, SupplierPaymentTerms } from '@prisma/client';
 
 export interface CreateSupplierInput {
@@ -1015,7 +1015,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
-import { runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@ebda/database';
 import {
   createSupplier,
   updateSupplier,
@@ -1169,7 +1169,7 @@ This is the HEAVIEST task. The receive flow implements spec Part 2.3.
 
 ```ts
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { seedCoaForStore } from '../../../apps/api/src/services/accounting/account.service';
 import { createSupplier } from '../../../apps/api/src/services/accounting/supplier.service';
 import {
@@ -1262,7 +1262,7 @@ Run: FAIL `Cannot find module`.
 `apps/api/src/services/accounting/purchase-order.service.ts`:
 
 ```ts
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import type { Prisma, PurchaseOrder, PurchaseOrderItem } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { getSystemAccountIdByCode } from './account.service';
@@ -1623,7 +1623,7 @@ git commit -m "feat(accounting): po service + receive flow (wac + backorder fifo
 `apps/api/src/services/accounting/posting/po-receive-posting.ts`:
 
 ```ts
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { postEntry } from '../journal.service';
 import { getSystemAccountIdByCode } from '../account.service';
 import logger from '../../../lib/logger';
@@ -1847,7 +1847,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
-import { runInTenantContext } from '@force/database';
+import { runInTenantContext } from '@ebda/database';
 import {
   createPurchaseOrder,
   receivePurchaseOrder,
@@ -2035,7 +2035,7 @@ git commit -m "feat(accounting): po-receive posting helper + inngest + routes"
 `apps/api/src/services/accounting/stock-adjustment.service.ts`:
 
 ```ts
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import type { StockAdjustment, StockAdjustmentType } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { inngest } from '../../lib/inngest/client';
@@ -2191,7 +2191,7 @@ export async function getAdjustment(storeId: string, id: string) {
 `apps/api/src/services/accounting/posting/stock-adjustment-posting.ts`:
 
 ```ts
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { postEntry } from '../journal.service';
 import { getSystemAccountIdByCode } from '../account.service';
 import logger from '../../../lib/logger';
@@ -2333,7 +2333,7 @@ git commit -m "feat(accounting): expense service + posting + inngest + routes"
 `apps/api/src/services/accounting/backorder.service.ts`:
 
 ```ts
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 import { OrderService } from '../order.service'; // existing applyRefundEffects
 import logger from '../../lib/logger';
 
@@ -2551,7 +2551,7 @@ Commit: `feat(api): expose inStock + acceptsBackorder + lowStock + availableQty 
 ### Service
 
 ```ts
-import { prisma } from '@force/database';
+import { prisma } from '@ebda/database';
 
 export interface TrialBalanceRow {
   accountId: string;

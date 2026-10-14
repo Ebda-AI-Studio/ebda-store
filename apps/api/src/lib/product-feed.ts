@@ -1,4 +1,4 @@
-import { minorToDecimalString } from '@force/shared';
+import { minorToDecimalString } from '@ebda/shared';
 /**
  * Pure builder for the public AI product feed (agent_feed feature).
  * Field naming follows the OpenAI Product Feed conventions:
@@ -31,7 +31,7 @@ export interface FeedProductInput {
  * `bundle.service.ts`'s `listPurchasableBundles`/`describeBundleContents`
  * produce, kept as a separate input type (rather than reusing
  * `PurchasableBundleSummary` directly) so this file doesn't depend on
- * `@force/database`'s `DbClient` types. `componentSum` is the bundle's
+ * `@ebda/database`'s `DbClient` types. `componentSum` is the bundle's
  * pre-discount total — used ONLY as the feed's "was" price (mirrors
  * `compareAtPrice` for a product); the per-component allocation is never
  * exposed here (see `ResolvedBundle`'s doc comment in bundle.service.ts).
