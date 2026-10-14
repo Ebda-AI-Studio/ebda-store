@@ -22,6 +22,34 @@ export interface RingCopy {
   stones: { diamond: string; emerald: string; ruby: string };
 }
 
+export interface LookCopy {
+  name: string;
+  /** Who this look is for. */
+  who: string;
+  /** The bold idea behind it. */
+  idea: string;
+}
+
+export interface LooksCopy {
+  title: string;
+  lead: string;
+  tablistLabel: string;
+  /** Badge on every phone: the photos and shops are illustrations. */
+  badge: string;
+  /** aria-label of the A/B/C look switch (phone width). */
+  switchLabel: string;
+  ideaLabel: string;
+  loading: string;
+  failed: string;
+  retry: string;
+  /** English page only: the phones stay Arabic. */
+  bilingualNote: string;
+  /** Tab labels, in tab order: id matches /looks/<id>.html. */
+  templates: { id: string; name: string; kind: string }[];
+  /** The three looks (A, B, C) of each template. */
+  items: Record<string, [LookCopy, LookCopy, LookCopy]>;
+}
+
 export interface Copy {
   meta: { title: string; description: string };
   skip: string;
@@ -61,11 +89,8 @@ export interface Copy {
   how: { title: string; steps: { t: string; d: string }[] };
   breakout: { title: string; words: [string, string, string] };
   dahab: { title: string; lead: string; ring: RingCopy };
-  templates: {
-    title: string;
-    lead: string;
-    devicesLabel: string;
-  };
+  /** The interactive template + look picker (5 templates x 3 looks, phone previews). */
+  looks: LooksCopy;
   features: { title: string; items: { t: string; d: string }[] };
   providers: {
     title: string;
@@ -178,10 +203,111 @@ export const COPY: Record<Locale, Copy> = {
         stones: { diamond: 'ألماظ', emerald: 'زمرد', ruby: 'ياقوت' },
       },
     },
-    templates: {
-      title: 'متجر واحد، على كل الشاشات.',
-      lead: 'نفس المتجر على الموبايل والتابلت واللابتوب.',
-      devicesLabel: 'متجر مجوهرات حقيقي على ابدأ ستور، على لابتوب وتابلت وموبايل',
+    looks: {
+      title: 'اختار قالب، وبعدين اختار شكله.',
+      lead: '5 قوالب، وكل قالب بـ3 أشكال. لفّ جوه أي موبايل واضغط على الفلاتر زي ما عميلك هيعمل. وبعد ما تختار، المحرر بيغيّر لك أي حاجة.',
+      tablistLabel: 'القوالب',
+      badge: 'صور توضيحية',
+      switchLabel: 'الشكل',
+      ideaLabel: 'الفكرة',
+      loading: 'بنحمّل القالب...',
+      failed: 'القالب ماحمّلش.',
+      retry: 'جرّب تاني',
+      bilingualNote: '',
+      templates: [
+        { id: 'qamar', name: 'قمر', kind: 'أزياء وبوتيكات' },
+        { id: 'souq', name: 'سوق', kind: 'تجزئة وإلكترونيات' },
+        { id: 'jasmine', name: 'ياسمين', kind: 'جمال وعناية بالبشرة' },
+        { id: 'lamma', name: 'لمّة', kind: 'أكل بيت ومطابخ منزلية' },
+        { id: 'dahab', name: 'دهب', kind: 'مجوهرات وهدايا وشغل إيد' },
+      ],
+      items: {
+        qamar: [
+          {
+            name: 'أتيليه',
+            who: 'لبوتيك عايز هدومه تتكلم لوحدها: هادي وأبيض وبشكل مجلات.',
+            idea: 'صور منتجات كبيرة وتقريبًا من غير زحمة: الهدوم هي الواجهة.',
+          },
+          {
+            name: 'لوك بوك',
+            who: 'للستايليست ومحلات الفاست فاشن اللي بتبيع إطلالات مش قطع لوحدها.',
+            idea: 'اشتري الإطلالة كلها: كل لوك فيه قطعه وأسعاره، وبضغطة واحدة تضيفهم كلهم.',
+          },
+          {
+            name: 'فيترين',
+            who: 'لملابس المناسبات (فرح وخطوبة وسهرة) اللي المناسبة هي اللي بتحدد الشراء.',
+            idea: 'التنقل بالمناسبة: فرح، خطوبة، سهرة، وكل واحدة بألوانها.',
+          },
+        ],
+        souq: [
+          {
+            name: 'كتالوج',
+            who: 'لمحل فيه أصناف كتير والزبون جاي عارف عايز إيه.',
+            idea: 'توصل للي عايزه في ضغطتين: البحث والأقسام قبل أي صورة كبيرة.',
+          },
+          {
+            name: 'سوق الليل',
+            who: 'لتاجر عايز دفا وشخصية مش جدول مواصفات.',
+            idea: 'سوق حيّ ومنوّر من غير زحمة، والبرتقاني محجوز للعروض بس.',
+          },
+          {
+            name: 'شو روم',
+            who: 'لمجموعة صغيرة فاخرة (موبايلات، لابتوبات) بتتباع قطعة قطعة.',
+            idea: 'المنتج هو البطل، قطعة واحدة في كل شاشة، وزرار مقارنة.',
+          },
+        ],
+        jasmine: [
+          {
+            name: 'عطارة',
+            who: 'للعناية الطبيعية والتراثية اللي الثقة فيها جاية من اللي جواها.',
+            idea: 'المكونات الأول: إيه اللي جواه، وبعدين المنتج.',
+          },
+          {
+            name: 'بلوم',
+            who: 'للمكياج الملوّن والجمهور الشاب اللي بيشتري بالدرجة.',
+            idea: 'لون المنتج هو لون الصفحة، ودرجات اللون في كل حتة.',
+          },
+          {
+            name: 'كلينك',
+            who: 'للمنتجات الفعّالة بأسلوب دكاترة الجلدية، والعميل جاي بمشكلة عايز يحلها.',
+            idea: 'الروتين هو التنقل: نضّف، عالج، احمي.',
+          },
+        ],
+        lamma: [
+          {
+            name: 'سفرة العيلة',
+            who: 'لمطبخ بيتي بيستلم طلبات في نفس اليوم زي منيو مطعم.',
+            idea: 'اطلب زي المنيو مش زي المحل: تابات وأحجام وأزرار إضافة كبيرة.',
+          },
+          {
+            name: 'كراسة المطبخ',
+            who: 'لطباخة واحدة معروفة بوشها وحكايتها هي البراند.',
+            idea: 'الطباخة هي البراند: حجز مسبق باليوم، والأطباق بتتحكي كحكايات.',
+          },
+          {
+            name: 'السوق الطازج',
+            who: 'للبقالة وتوصيل الخضار والفاكهة اللي الطلب المتكرر فيها هو الأساس.',
+            idea: 'كل حاجة في ضغطتين، وممرات بألوان وإجمالي السلة بيتحدّث لحظيًا.',
+          },
+        ],
+        dahab: [
+          {
+            name: 'على الجلد',
+            who: 'لصايغ دهب زباينه بيقلقوا من المقاس والعيار قبل ما يحبوا القطعة.',
+            idea: 'مش معروض، لابسه: كل صورة على الجلد، والمقاس والعيار ظاهرين على طول.',
+          },
+          {
+            name: 'الورشة',
+            who: 'لاستوديو فضة هاند ميد صنعته هي سبب إنك تدفع أكتر.',
+            idea: 'الصنعة هي المنتج: رسم وصب وتلميع فعلي، ومدة التنفيذ على كل قطعة.',
+          },
+          {
+            name: 'علبة الهدية',
+            who: 'لمشتري الهدايا اللي بيبدأ من الشخص اللي بيهاديه وميزانيته.',
+            idea: 'تسوّق بالشخص والميزانية، والتغليف والكارت ظاهرين قبل الدفع.',
+          },
+        ],
+      },
     },
     features: {
       title: 'كل اللي محتاجه عشان تبيع.',
@@ -374,10 +500,112 @@ export const COPY: Record<Locale, Copy> = {
         stones: { diamond: 'Diamond', emerald: 'Emerald', ruby: 'Ruby' },
       },
     },
-    templates: {
-      title: 'One store, on every screen.',
-      lead: 'The same store on phone, tablet and laptop.',
-      devicesLabel: 'A real jewellery store on Ebda Store, on a laptop, tablet and phone',
+    looks: {
+      title: 'Pick a template, then pick its look.',
+      lead: '5 templates, 3 looks each. Scroll inside any phone and tap the filters the way your customers will. Once you choose, the editor changes anything.',
+      tablistLabel: 'Templates',
+      badge: 'Illustrative',
+      switchLabel: 'Look',
+      ideaLabel: 'Bold idea',
+      loading: 'Loading the template...',
+      failed: 'The template did not load.',
+      retry: 'Try again',
+      bilingualNote:
+        'Every template ships in Arabic and English. The previews here are shown in Arabic.',
+      templates: [
+        { id: 'qamar', name: 'Qamar', kind: 'Fashion and boutiques' },
+        { id: 'souq', name: 'Souq', kind: 'General retail and electronics' },
+        { id: 'jasmine', name: 'Jasmine', kind: 'Beauty and skincare' },
+        { id: 'lamma', name: 'Lamma', kind: 'Home food and home kitchens' },
+        { id: 'dahab', name: 'Dahab', kind: 'Jewellery, handmade and gifts' },
+      ],
+      items: {
+        qamar: [
+          {
+            name: 'Atelier',
+            who: 'For a boutique whose clothes should speak alone: calm, white, editorial.',
+            idea: 'Oversized product photography with almost no chrome: the clothes are the interface.',
+          },
+          {
+            name: 'Lookbook',
+            who: 'For stylists and fast-fashion shops that sell outfits, not single pieces.',
+            idea: 'Shop the whole outfit: each look carries its items and prices, one tap adds the lot.',
+          },
+          {
+            name: 'Vitrine',
+            who: 'For occasion wear (weddings, engagements, evenings) where the event decides the purchase.',
+            idea: 'Occasion-first navigation: wedding, engagement, evening, each on its own palette band.',
+          },
+        ],
+        souq: [
+          {
+            name: 'Catalogue',
+            who: 'For a shop with many SKUs where shoppers arrive knowing what they want.',
+            idea: 'Find it in two taps: search and categories come before any hero.',
+          },
+          {
+            name: 'Night souq',
+            who: 'For a retailer who wants warmth and personality, not a spec sheet.',
+            idea: 'A market that feels lit and alive without clutter; orange is reserved for deals only.',
+          },
+          {
+            name: 'Showroom',
+            who: 'For a small, premium range (phones, laptops) sold one object at a time.',
+            idea: 'Product as hero, one object per screen, with a compare toggle.',
+          },
+        ],
+        jasmine: [
+          {
+            name: 'Apothecary',
+            who: 'For natural and heritage skincare where trust comes from what is inside.',
+            idea: 'Ingredients first: what is in it, then the product.',
+          },
+          {
+            name: 'Bloom',
+            who: 'For colour cosmetics and a young audience that shops by shade.',
+            idea: 'The colour of the product is the colour of the page; shade swatches everywhere.',
+          },
+          {
+            name: 'Clinic',
+            who: 'For dermatologist-style actives where the shopper has a concern to solve.',
+            idea: 'The routine is the navigation: cleanse, treat, protect.',
+          },
+        ],
+        lamma: [
+          {
+            name: 'Family table',
+            who: 'For a home kitchen that takes same-day orders like a restaurant menu.',
+            idea: 'Order like a menu, not like a shop: tabs, portions, big add buttons.',
+          },
+          {
+            name: 'Kitchen notebook',
+            who: 'For a single named cook whose face and story are the brand.',
+            idea: 'The cook is the brand: pre-order by day, dishes told as stories.',
+          },
+          {
+            name: 'Fresh market',
+            who: 'For grocery and produce delivery where repeat baskets matter.',
+            idea: 'Everything in two taps, with colour-coded aisles and a live cart total.',
+          },
+        ],
+        dahab: [
+          {
+            name: 'Worn',
+            who: 'For a gold jeweller whose customers worry about size and karat before they fall in love.',
+            idea: 'Worn, not displayed: every photo is on skin, and size and karat are always visible.',
+          },
+          {
+            name: 'Workshop',
+            who: 'For a handmade silver studio whose craft is the reason to pay more.',
+            idea: 'The making is the product: a real draw, cast, polish sequence and a lead time on every piece.',
+          },
+          {
+            name: 'Gift box',
+            who: 'For gift buyers who start from who it is for and how much they can spend.',
+            idea: 'Shop by recipient and budget, with the wrapping and card visible before checkout.',
+          },
+        ],
+      },
     },
     features: {
       title: 'Everything you need to sell.',

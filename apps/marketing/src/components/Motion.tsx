@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 import { DEVICE_SHOTS, STORY_STRIP } from '../lib/device-shots';
-import { Laptop, Phone, Screen, Tablet } from './Devices';
+import { Phone } from './Devices';
 
 const reducedMotion = () =>
   typeof window.matchMedia === 'function' &&
@@ -140,28 +140,6 @@ export function StoryScroll({
         </div>
       </div>
     </section>
-  );
-}
-
-/**
- * One store on every screen: the same real storefront captured at true phone, tablet and
- * laptop viewports. A single store until the designed templates exist (builder Phase 3).
- */
-export function DevicesShowcase({ devicesLabel }: { devicesLabel: string }) {
-  return (
-    <div className="showcase">
-      <div className="devices" role="img" aria-label={devicesLabel}>
-        <Laptop className="devices-laptop">
-          <Screen tpl="dahab" device="laptop" sizes="(min-width: 700px) 620px, 92vw" />
-        </Laptop>
-        <Tablet className="devices-tablet">
-          <Screen tpl="dahab" device="tablet" sizes="210px" />
-        </Tablet>
-        <Phone className="devices-phone">
-          <Screen tpl="dahab" device="phone" sizes="140px" />
-        </Phone>
-      </div>
-    </div>
   );
 }
 

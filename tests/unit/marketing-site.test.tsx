@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { Home } from '../../apps/marketing/src/components/Home';
 import { LegalPage } from '../../apps/marketing/src/components/LegalPage';
@@ -63,7 +63,7 @@ describe('marketing hero and structure', () => {
     const expected = [
       'story',
       'how',
-      'templates',
+      'looks',
       'breakout',
       'dahab',
       'features',
@@ -221,19 +221,38 @@ describe('marketing honesty', () => {
     expect(ar).toContain('بوسطة استلمت الشحنة');
     expect(ar).toContain('وصلك دفع إنستا باي');
   });
-  it('shows ONE real store (Dahab) on every device, high-res, and no food anywhere', () => {
-    // Real storefront captures (apps/web) at true device sizes, never a hand-made mock.
-    for (const d of ['phone-600', 'phone-900', 'tablet-840', 'laptop-1280', 'laptop-1920'])
-      expect(en).toContain(`/devices/dahab-${d}.webp`);
-    expect(en).toContain('/devices/dahab-story-900.webp');
-    for (const html of [ar, en]) {
-      expect(html).not.toMatch(/souq-|qamar-|lamma-|jasmine-|data-pal=/);
-      // no template switcher promising looks that are not shown
-      expect(html).not.toMatch(/tpl-tab|Five templates|خمس قوالب/);
+  it('shows the looks picker: 5 template tabs, Qamar rendered, every phone labelled illustrative', () => {
+    for (const [html, badge] of [
+      [ar, 'صور توضيحية'],
+      [en, 'Illustrative'],
+    ] as const) {
+      const s = html.match(/<section id="looks".*?<section id="breakout"/s)![0];
+      expect(s.match(/role="tab"/g)).toHaveLength(5);
+      expect(s).toContain('role="tablist"');
+      expect(s).toMatch(
+        /aria-selected="true"[^>]*id="looks-tab-qamar"|id="looks-tab-qamar"[^>]*aria-selected="true"/
+      );
+      expect(s.match(new RegExp(`<span class="look-badge">${badge}</span>`, 'g'))).toHaveLength(3);
+      for (const l of ['a', 'b', 'c']) expect(s).toContain(`id="ph-qamar-${l}"`);
+      // photos are files, never inlined
+      expect(s).toContain('/looks/img/qa__hero.webp');
+      expect(s).not.toContain('base64');
     }
-    expect(ar).not.toMatch(/كيكة|أكل بيتي|طبيخ|محشي|ورق عنب/);
-    expect(en).not.toMatch(/cake|home-food|home food|kitchen/i);
-    expect(en).not.toMatch(/lorem|placeholder/i);
+    expect(en).toContain('Every template ships in Arabic and English');
+    // the old Dahab device captures are gone (the story + break-out phones are the only Dahab captures left)
+    for (const d of ['laptop', 'tablet', 'phone'])
+      for (const html of [ar, en]) expect(html).not.toContain(`/devices/dahab-${d}`);
+  });
+  it('ships every template fragment and photo it references', () => {
+    for (const t of ['qamar', 'souq', 'jasmine', 'lamma', 'dahab']) {
+      const frag = pub(`looks/${t}.html`);
+      expect(frag.split('<!--look-->')).toHaveLength(4);
+      expect(frag).not.toContain('base64');
+      for (const m of frag.matchAll(/\/looks\/img\/([\w-]+\.webp)/g))
+        expect(
+          existsSync(path.resolve(__dirname, '../../apps/marketing/public/looks/img', m[1]))
+        ).toBe(true);
+    }
   });
   it('prices use Western digits and ج.م on the Arabic page', () => {
     const s = ar.match(/<section id="pricing".*?<\/section>/s)![0];

@@ -4,6 +4,7 @@ import { COPY, type Provider } from '../lib/content';
 import { egp } from '../lib/demo-stores';
 import { HERO_POSTER_SVG } from '../lib/hero-poster';
 import { PLANS, PRICING_PLACEHOLDER, PRICING_PUBLISHED, comparisonRows } from '../lib/plans';
+import { initialLooksFragment } from '../lib/looks-initial';
 import { jsonLd } from '../lib/seo';
 import {
   FIRST_MERCHANT,
@@ -18,7 +19,8 @@ import { Header } from './Header';
 import { JsonLd } from './JsonLd';
 import { About } from './About';
 import { Breakout } from './Breakout';
-import { DevicesShowcase, Reveal, StoryScroll } from './Motion';
+import { LooksShowcase } from './LooksShowcase';
+import { Reveal, StoryScroll } from './Motion';
 import { Ring3D } from './ring/Ring3D';
 import { NileNight } from './NileNight';
 
@@ -111,10 +113,10 @@ export function Home({ locale }: { locale: Locale }) {
         <Ring3D l={c.dahab.ring} />
       </Section>
     ),
-    templates: () => (
-      <Section id="templates" title={c.templates.title} className="templates">
-        <p className="lead">{c.templates.lead}</p>
-        <DevicesShowcase devicesLabel={c.templates.devicesLabel} />
+    looks: () => (
+      <Section id="looks" title={c.looks.title} className="looks">
+        <p className="lead">{c.looks.lead}</p>
+        <LooksShowcase copy={c.looks} rtl={rtl} initialHtml={initialLooksFragment()} />
       </Section>
     ),
     features: () => (

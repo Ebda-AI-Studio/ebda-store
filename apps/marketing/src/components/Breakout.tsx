@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Phone, Screen } from './Devices';
+import { Phone } from './Devices';
 
 const reducedMotion = () =>
   typeof window.matchMedia === 'function' &&
@@ -67,7 +67,23 @@ export function Breakout({ title, words }: { title: string; words: [string, stri
         </div>
         <div className="bo-stage">
           <Phone className="bo-phone">
-            <Screen tpl="dahab" device="phone" sizes="280px" />
+            <picture className="shot">
+              <source
+                type="image/avif"
+                srcSet="/looks/phone-600.avif 600w, /looks/phone-900.avif 900w"
+                sizes="280px"
+              />
+              <img
+                src="/looks/phone-900.webp"
+                srcSet="/looks/phone-600.webp 600w, /looks/phone-900.webp 900w"
+                sizes="280px"
+                width={900}
+                height={1948}
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
+            </picture>
           </Phone>
           <picture className="bo-ring" aria-hidden="true">
             <source type="image/avif" srcSet="/ring/ring-gold-diamond.avif" />
