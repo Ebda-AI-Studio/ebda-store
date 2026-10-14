@@ -114,6 +114,24 @@ describe("script-src-attr 'none' on the storefront and the Orders PWA (S10)", ()
   });
 });
 
+/**
+ * B0 Task 7: builder hero/section <video> files live in the R2 public bucket.
+ * With no `media-src`, <video> falls back to `default-src 'self'` and the
+ * browser BLOCKS the R2 file. The storefront renders it; the admin VideoField
+ * previews it. Same media hosts as the storefront's connect-src.
+ */
+describe('media-src admits R2 video on the storefront and the admin (B0 Task 7)', () => {
+  it.each(['apps/web/next.config.js', 'apps/admin/next.config.js'])('%s', config => {
+    const src = stripJsComments(readFileSync(join(ROOT, config), 'utf8'));
+    const m = src.match(/media-src ([^;"`]*)/);
+    expect(m, `${config} has no media-src`).not.toBeNull();
+    const sources = m![1].trim().split(/\s+/);
+    for (const host of ["'self'", 'https://*.r2.dev', 'https://media.ebda.app', 'blob:']) {
+      expect(sources).toContain(host);
+    }
+  });
+});
+
 describe('CSP directive floor (what ZAP 10055 no longer watches)', () => {
   const present = CONFIGS.filter(c => existsSync(join(ROOT, c)));
 

@@ -21,6 +21,7 @@ export type SettingType =
   | 'text'
   | 'textarea'
   | 'image'
+  | 'video'
   | 'url'
   | 'color'
   | 'select'
@@ -98,6 +99,20 @@ export const settingFactories = {
   ): SettingDefinition => ({
     id,
     type: 'image',
+    labelEn,
+    labelAr,
+    group: 'content',
+    ...extra,
+  }),
+  /** A video URL (mp4/webm, <= 6 MB) uploaded via `POST /uploads/video`. */
+  video: (
+    id: string,
+    labelEn: string,
+    labelAr: string,
+    extra: Partial<SettingDefinition> = {}
+  ): SettingDefinition => ({
+    id,
+    type: 'video',
     labelEn,
     labelAr,
     group: 'content',

@@ -16,6 +16,8 @@ export interface UploadOptions {
   contentType?: string;
   maxSize?: number; // in bytes
   allowedTypes?: string[];
+  /** Overrides the default 1-year `Cache-Control` (e.g. add `immutable` for uuid-keyed video). */
+  cacheControl?: string;
   /**
    * Optional tenant scope. When set together with a whitelisted `folder`,
    * the resulting R2 key is namespaced as `stores/<storeId>/<folder>/...`.
@@ -130,6 +132,7 @@ export class StorageService {
       contentType,
       maxSize = DEFAULT_MAX_SIZE,
       allowedTypes = DEFAULT_ALLOWED_TYPES,
+      cacheControl = 'public, max-age=31536000', // 1 year cache
       storeId,
     } = options;
 
@@ -172,7 +175,7 @@ export class StorageService {
         Key: key,
         Body: buffer,
         ContentType: mimeType,
-        CacheControl: 'public, max-age=31536000', // 1 year cache
+        CacheControl: cacheControl,
       })
     );
 

@@ -24,7 +24,7 @@ export function useImageUpload() {
    * `folder` value — that would double-prefix.
    */
   const buildUploadUrl = (
-    path: 'image' | 'images',
+    path: 'image' | 'images' | 'video',
     folder: string,
     storeId?: string,
     aspect?: string
@@ -63,6 +63,38 @@ export function useImageUpload() {
           },
         });
         return url;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t('errors.uploadFailed'));
+        return null;
+      } finally {
+        setUploading(false);
+        setProgress(0);
+      }
+    },
+    [t]
+  );
+
+  /** One mp4/webm (<= 6 MB, enforced by the caller AND the API) via POST /uploads/video. */
+  const uploadVideo = useCallback(
+    async (file: File, folder: string, storeId?: string): Promise<string | null> => {
+      setError(null);
+      setUploading(true);
+      setProgress(0);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        return await runXhr<string>({
+          t,
+          url: buildUploadUrl('video', folder, storeId),
+          formData,
+          onProgress: setProgress,
+          parse: data => {
+            if (data.success && data.data?.url) return data.data.url as string;
+            throw new Error(data.error?.message || t('errors.uploadFailed'));
+          },
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : t('errors.uploadFailed'));
         return null;
@@ -114,6 +146,7 @@ export function useImageUpload() {
     error,
     setError,
     uploadSingle,
+    uploadVideo,
     uploadMulti,
   };
 }

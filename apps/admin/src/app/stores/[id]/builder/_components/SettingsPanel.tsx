@@ -36,6 +36,7 @@ import { Toggle } from '../../../../../components/Toggle';
 import { apiGet } from '../../../../../lib/api';
 import { ChromeContentPanel } from './ChromeContentPanel';
 import { MediaPicker } from './MediaPicker';
+import { VideoField } from './VideoField';
 import type { Selection } from './SectionTree';
 
 type Mode = 'content' | 'design';
@@ -385,6 +386,29 @@ function Field({
               : [[def.id, '']]
             ).map(([key, tag]) => (
               <ImageField
+                key={key}
+                storeId={storeId}
+                tag={tag}
+                value={str(key)}
+                onChange={v => onChange(key, v)}
+              />
+            ))}
+          </div>
+        </div>
+      );
+    case 'video':
+      return (
+        <div>
+          {header}
+          <div className={def.localized ? 'grid grid-cols-2 gap-2' : ''}>
+            {(def.localized
+              ? [
+                  [`${def.id}Ar`, t('arabic')],
+                  [def.id, t('english')],
+                ]
+              : [[def.id, '']]
+            ).map(([key, tag]) => (
+              <VideoField
                 key={key}
                 storeId={storeId}
                 tag={tag}
