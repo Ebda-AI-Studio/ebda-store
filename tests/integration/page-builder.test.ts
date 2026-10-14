@@ -82,6 +82,27 @@ async function layoutOf(storeId: string) {
 const docFor = (raw: unknown): PageDefinition =>
   layoutToDefinition(resolveLayoutSettings(raw, 'modern'));
 
+/**
+ * The Add-section / template-family presets seed image-text with INSTRUCTIONAL
+ * starter body copy, which the publish gate refuses (PLACEHOLDER_COPY). Tests
+ * that publish such a document stand in for the merchant who wrote their own.
+ */
+const withRealCopy = (doc: PageDefinition): PageDefinition => ({
+  ...doc,
+  sections: doc.sections.map(n =>
+    n.type === 'image-text'
+      ? {
+          ...n,
+          settings: {
+            ...n.settings,
+            body: 'Handmade candles poured in small batches in Cairo.',
+            bodyAr: 'شموع يدوية بنصبّها على دفعات صغيرة في القاهرة.',
+          },
+        }
+      : n
+  ),
+});
+
 async function freshStore(tag: string, template = 'modern'): Promise<string> {
   const u = await owner.user.create({
     data: {
@@ -480,13 +501,15 @@ describe('document-only sections survive the legacy save paths', { retry: 0 }, (
   it('a legacy layout PUT keeps an image-text section the new builder added', async () => {
     const { reduceDocument } = await import('@force/shared');
     const storeId = await freshStore('doconly');
-    const withImage = reduceDocument(docFor({}), {
-      type: 'addSection',
-      list: 'template',
-      sectionType: 'image-text',
-      presetIndex: 0,
-      index: 1,
-    }).doc;
+    const withImage = withRealCopy(
+      reduceDocument(docFor({}), {
+        type: 'addSection',
+        list: 'template',
+        sectionType: 'image-text',
+        presetIndex: 0,
+        index: 1,
+      }).doc
+    );
     await inStore(storeId, () =>
       saveDraft({ storeId, pageKey: HOME, baseRev: 0, definition: withImage, userId: null })
     );
@@ -663,6 +686,129 @@ describe(
 );
 
 /**
+ * Bug 10: "placeholder copy gets published." The Add-section / template-family
+ * presets seed instructional starter text. Every path that makes a document
+ * live (publishDraft, rollbackToRevision) must refuse it; the legacy layout PUT
+ * is deliberately exempt (Ruling PLACEHOLDER-1: it cannot author that text).
+ */
+describe('publish readiness: starter placeholder copy cannot go live', { retry: 0 }, () => {
+  const withStarterSection = (): PageDefinition =>
+    reduceDocument(docFor({}), {
+      type: 'addSection',
+      list: 'template',
+      sectionType: 'image-text',
+      presetIndex: 0,
+      index: 1,
+    }).doc;
+  const codes = (r: unknown) => (r as { errors: Array<{ code: string }> }).errors.map(e => e.code);
+
+  it('publishDraft refuses starter copy (422 PLACEHOLDER_COPY, bilingual, nothing published), then succeeds once rewritten', async () => {
+    const storeId = await freshStore('ph-publish');
+    const doc = withStarterSection();
+    const saved = await inStore(storeId, () =>
+      saveDraft({ storeId, pageKey: HOME, baseRev: 0, definition: doc, userId: null })
+    );
+    expect(saved).toMatchObject({ ok: true, value: { rev: 1 } }); // drafts may hold it
+    const blocked = await inStore(storeId, () =>
+      publishDraft({ storeId, pageKey: HOME, baseRev: 1 })
+    );
+    expect(blocked).toMatchObject({ ok: false, status: 422, code: 'INVALID_DEFINITION' });
+    expect(codes(blocked)).toContain('PLACEHOLDER_COPY');
+    const e = (blocked as { errors: Array<{ messageEn: string; messageAr: string }> }).errors[0];
+    expect(e.messageEn).toContain('Image with text');
+    expect(e.messageAr).toContain('صورة مع نص');
+    expect(await owner.storePageRevision.count({ where: { storeId, status: 'published' } })).toBe(
+      0
+    );
+
+    await inStore(storeId, () =>
+      saveDraft({
+        storeId,
+        pageKey: HOME,
+        baseRev: 1,
+        definition: withRealCopy(doc),
+        userId: null,
+      })
+    );
+    const ok = await inStore(storeId, () => publishDraft({ storeId, pageKey: HOME, baseRev: 2 }));
+    expect(ok).toMatchObject({ ok: true, value: { rev: 2 } });
+  });
+
+  it('a HIDDEN section holding starter copy does not block publish', async () => {
+    const storeId = await freshStore('ph-hidden');
+    const doc = withStarterSection();
+    const hidden: PageDefinition = {
+      ...doc,
+      sections: doc.sections.map(n => (n.type === 'image-text' ? { ...n, hidden: true } : n)),
+    };
+    await inStore(storeId, () =>
+      saveDraft({ storeId, pageKey: HOME, baseRev: 0, definition: hidden, userId: null })
+    );
+    const r = await inStore(storeId, () => publishDraft({ storeId, pageKey: HOME, baseRev: 1 }));
+    expect(r).toMatchObject({ ok: true });
+  });
+
+  it('rollback refuses to republish an archived revision that holds starter copy', async () => {
+    const storeId = await freshStore('ph-rollback');
+    const good = docFor({});
+    const bad = withStarterSection();
+    const badRev = await owner.storePageRevision.create({
+      data: {
+        storeId,
+        pageKey: HOME,
+        rev: 1,
+        status: 'archived',
+        schemaVersion: good.schemaVersion,
+        document: bad as unknown as object,
+        docBytes: Buffer.byteLength(JSON.stringify(bad)),
+        baseRev: 0,
+      },
+    });
+    await inStore(storeId, () =>
+      saveDraft({ storeId, pageKey: HOME, baseRev: 1, definition: good, userId: null })
+    );
+    await inStore(storeId, () => publishDraft({ storeId, pageKey: HOME, baseRev: 2 }));
+    const result = await inStore(storeId, () =>
+      rollbackToRevision({
+        storeId,
+        pageKey: HOME,
+        targetRev: badRev.rev,
+        baseRev: 2,
+        userId: null,
+      })
+    );
+    expect(result).toMatchObject({ ok: false, status: 422, code: 'INVALID_DEFINITION' });
+    expect(codes(result)).toContain('PLACEHOLDER_COPY');
+    expect(await owner.storePageRevision.count({ where: { storeId, status: 'published' } })).toBe(
+      1
+    );
+  });
+
+  it('tenant scoping unchanged: store B publishing clean content is unaffected by store A refusal', async () => {
+    const a = await freshStore('ph-iso-a');
+    const b = await freshStore('ph-iso-b');
+    await inStore(a, () =>
+      saveDraft({
+        storeId: a,
+        pageKey: HOME,
+        baseRev: 0,
+        definition: withStarterSection(),
+        userId: null,
+      })
+    );
+    await inStore(b, () =>
+      saveDraft({ storeId: b, pageKey: HOME, baseRev: 0, definition: docFor({}), userId: null })
+    );
+    expect(
+      await inStore(a, () => publishDraft({ storeId: a, pageKey: HOME, baseRev: 1 }))
+    ).toMatchObject({ ok: false });
+    expect(
+      await inStore(b, () => publishDraft({ storeId: b, pageKey: HOME, baseRev: 1 }))
+    ).toMatchObject({ ok: true });
+  });
+});
+
+/**
  * Ruling BUILDER-PUBLISH-1 regression: builder publish -> the PUBLIC layout
  * route (the storefront's only source) must serve the published document,
  * never the layout-derived fallback. Before the fix every template family
@@ -676,7 +822,7 @@ describe('builder publish -> storefront route serves the published document', { 
     const storeId = await freshStore(`pub-${template}`, template);
     const st = await inStore(storeId, () => getPageState(storeId, HOME));
     expect(st!.source).toBe('layout');
-    const doc = edit(st!.definition);
+    const doc = withRealCopy(edit(st!.definition));
     const saved = await inStore(storeId, () =>
       saveDraft({ storeId, pageKey: HOME, baseRev: 0, definition: doc, userId: null })
     );

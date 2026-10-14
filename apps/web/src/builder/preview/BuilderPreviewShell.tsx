@@ -12,6 +12,7 @@ import dynamic from 'next/dynamic';
 import type { PageDefinition } from '@force/shared';
 import { HomePageContent } from '../../app/HomePageContent';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { PreviewThemeOverride } from '../../contexts/StoreContext';
 
 const EditorOverlay = dynamic(() => import('./EditorOverlay'), { ssr: false });
 
@@ -25,7 +26,9 @@ export function BuilderPreviewShell({
   const [definition, setDefinition] = useState(initialDefinition);
   const { language } = useLanguage();
   return (
-    <>
+    // The draft's pending theme edits ride the document, so the canvas paints
+    // them as soon as they are saved (and live, via the postMessage render).
+    <PreviewThemeOverride theme={definition.theme} chrome={definition.chrome}>
       <HomePageContent {...content} definition={definition} editorMode />
       <EditorOverlay
         allowedOrigins={allowedOrigins}
@@ -33,6 +36,6 @@ export function BuilderPreviewShell({
         definition={definition}
         onRender={setDefinition}
       />
-    </>
+    </PreviewThemeOverride>
   );
 }

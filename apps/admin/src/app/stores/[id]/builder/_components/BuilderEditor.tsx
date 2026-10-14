@@ -21,7 +21,9 @@ import {
   BRAND,
   TEMPLATE_FAMILIES,
   applyTemplateFamily,
+  effectiveTheme,
   type ChildToParent,
+  type DraftTheme,
   type DocumentAction,
   type SectionList,
   type StoreTheme,
@@ -64,17 +66,25 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
   const [drawer, setDrawer] = useState<'start' | 'end' | null>(null);
   const [reloadKey, setReloadKey] = useState(1);
 
+  // The LIVE store (its theme is what the storefront shows). Re-read after a
+  // publish or a restore, which are the only things that change it here.
+  const refreshStore = useCallback(
+    () =>
+      apiGet<{ store: StoreInfo }>(`/api/v1/admin/stores/${storeId}`).then(r => {
+        if (r.data?.store) setStore(r.data.store);
+      }),
+    [storeId]
+  );
+
   useEffect(() => {
-    void apiGet<{ store: StoreInfo }>(`/api/v1/admin/stores/${storeId}`).then(r => {
-      if (r.data?.store) setStore(r.data.store);
-    });
+    void refreshStore();
     void apiPost<{ token: string }>(
       `/api/v1/admin/stores/${storeId}/builder/pages/home/preview-token`,
       {}
     ).then(r => {
       if (r.data?.token) setToken(r.data.token);
     });
-  }, [storeId]);
+  }, [storeId, refreshStore]);
 
   // Saved data changed (a new carousel, a new product source): reload the canvas.
   useEffect(() => {
@@ -161,10 +171,23 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
     return () => window.removeEventListener('beforeunload', onBefore);
   }, [b.dirty]);
 
+  // Issues that stop a publish but not a draft save (placeholder text, an
+  // imageless hero slide). The API already localizes each message; the banner
+  // lists them all so the merchant sees every section to fix, not only the
+  // selected one.
+  const publishBlockers = b.errors.filter(
+    e => e.code === 'PLACEHOLDER_COPY' || e.code === 'MISSING_IMAGE'
+  );
+
   const publish = async () => {
     const r = await b.publish();
-    if (r === 'ok') toastSuccess(t('published'));
-    else if (r === 'failed') toastError(t('publishFailed'));
+    if (r === 'ok') {
+      toastSuccess(t('published'));
+      void refreshStore();
+      // The header/footer patch is live now; re-open the page so the next edit
+      // starts from the live values instead of re-sending a stale patch.
+      if (b.doc?.chrome) void b.reload();
+    } else if (r === 'failed') toastError(t('publishFailed'));
   };
 
   const applyFamily = (id: (typeof TEMPLATE_FAMILIES)[number]['id']) => {
@@ -245,11 +268,13 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         )}
         {tab === 'theme' && (
           <ThemeSettingsPanel
-            storeId={storeId}
-            theme={store.theme}
-            onSaved={patch => {
-              setStore(s => (s ? { ...s, theme: { ...(s.theme as StoreTheme), ...patch } } : s));
-              setReloadKey(k => k + 1);
+            theme={effectiveTheme(store.theme, b.doc.theme)}
+            onSave={patch => {
+              // Draft only: the edit rides the document (autosave API), the
+              // canvas reloads from the draft once it is saved, and the live
+              // theme changes only when Publish promotes it.
+              b.replaceDocument({ ...b.doc!, theme: { ...b.doc!.theme, ...patch } as DraftTheme });
+              return b.saveDraftNow();
             }}
           />
         )}
@@ -260,6 +285,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
             onRestored={() => {
               toastSuccess(t('restored'));
               void b.reload();
+              void refreshStore();
               setReloadKey(k => k + 1);
             }}
           />
@@ -274,15 +300,36 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
       doc={b.doc}
       selection={selection}
       viewport={viewport}
-      theme={store.theme}
+      theme={effectiveTheme(store.theme, b.doc.theme)}
       errors={b.errors}
       dispatch={dispatch}
+      chromeEdit={{
+        chrome: b.doc.chrome,
+        liveVersion: b.publishedRev,
+        // Header / footer links ride the draft document (autosave) and go
+        // live only on Publish. Each edit carries one key; merge it into the
+        // LATEST document so quick edits to different lists never drop each other.
+        onChange: patch =>
+          b.patchDocument(doc => ({
+            ...doc,
+            chrome: {
+              ...doc.chrome,
+              ...patch,
+              ...(patch.footerLinks
+                ? { footerLinks: { ...doc.chrome?.footerLinks, ...patch.footerLinks } }
+                : {}),
+              ...(patch.utilityBar
+                ? { utilityBar: { ...doc.chrome?.utilityBar, ...patch.utilityBar } }
+                : {}),
+            },
+          })),
+      }}
     />
   );
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground" data-testid="builder">
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3">
+      <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-3 py-1 md:h-14 md:flex-nowrap md:py-0">
         <Link
           href={`/stores/${storeId}`}
           className="flex items-center gap-2"
@@ -313,7 +360,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
         <div
           role="radiogroup"
           aria-label={t('viewport.label')}
-          className="mx-auto inline-flex rounded-lg bg-muted p-0.5 text-xs"
+          className="order-last mx-auto inline-flex rounded-lg bg-muted p-0.5 text-xs max-md:max-w-full md:order-none"
         >
           {(['desktop', 'tablet', 'mobile'] as const).map(v => (
             <button
@@ -335,7 +382,7 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
           disabled={!b.canUndo}
           aria-label={t('undo')}
           title={t('undo')}
-          className="rounded px-2 py-1 text-sm hover:bg-muted disabled:opacity-30"
+          className="rounded px-2 py-1 text-sm hover:bg-muted disabled:opacity-30 max-md:ms-auto"
           data-testid="undo"
         >
           ↶
@@ -387,6 +434,21 @@ export function BuilderEditor({ storeId }: { storeId: string }) {
           {b.publishing ? t('publishing') : t('publish')}
         </button>
       </header>
+
+      {publishBlockers.length > 0 && (
+        <div
+          role="alert"
+          className="border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm"
+          data-testid="publish-blockers"
+        >
+          <p className="font-semibold">{t('publishBlocked.title')}</p>
+          <ul className="mt-1 list-disc ps-5 text-xs">
+            {publishBlockers.map(e => (
+              <li key={e.path}>{locale === 'ar' ? e.messageAr : e.messageEn}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {b.saveState === 'conflict' && (
         <div

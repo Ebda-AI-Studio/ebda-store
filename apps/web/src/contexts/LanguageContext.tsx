@@ -293,6 +293,22 @@ export const translations = {
     'بالاشتراك توافق على استلام رسائل تسويقية من هذا المتجر.',
   'Privacy policy': 'سياسة الخصوصية',
 
+  // Editor canvas hints for sections with nothing to show yet (EmptySectionHint).
+  // Never shown on the public storefront, which hides these sections instead.
+  'Add categories and they will appear here.': 'ضيف أقسام وهتظهر هنا.',
+  'Add products and your newest ones will appear here.': 'ضيف منتجات وأحدث منتجاتك هتظهر هنا.',
+  'Best sellers appear here once your products start selling.':
+    'الأكثر مبيعاً هيظهر هنا أول ما منتجاتك تبدأ تتباع.',
+  'Add a store description or image in store settings to show your story here.':
+    'ضيف وصف أو صورة للمتجر من إعدادات المتجر وحكايتك هتظهر هنا.',
+  'Publish a blog post to show it here.': 'انشر مقال في المدونة وهيظهر هنا.',
+  'Write your own trust items (delivery, payment, returns) and they will show here.':
+    'اكتب نقاط الثقة بتاعتك (التوصيل، الدفع، الاسترجاع) وهتظهر هنا.',
+  'Customer reviews appear here once customers leave them.':
+    'آراء العملاء هتظهر هنا أول ما العملاء يكتبوها.',
+  'Only you see this in the editor. Visitors do not see an empty section.':
+    'إنت بس اللي بتشوف ده في المحرر. الزوار مش بيشوفوا قسم فاضي.',
+
   // Route error fallback — Try Again while the refresh is in flight.
   'Retrying…': 'جارٍ إعادة المحاولة…',
 } as const;

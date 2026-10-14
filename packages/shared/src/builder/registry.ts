@@ -30,6 +30,7 @@ import {
   trustBadgeBlockSchema,
   TRUST_BADGE_ICONS,
 } from './sections-document-only';
+import { PLACEHOLDER_STARTER_COPY } from './placeholder-copy';
 import { DEFAULT_LAYOUT_SETTINGS } from '../types/store-layout';
 import type { LegacyHomeSectionKey } from './section-keys';
 import { VIEWPORTS, type Viewport } from './viewports';
@@ -326,6 +327,25 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     legacyKey: 'trustStrip',
     rendererKey: 'home.trustStrip',
     group: 'template',
+    blocks: [
+      {
+        type: 'item',
+        labelEn: 'Trust item',
+        labelAr: 'عنصر ثقة',
+        maxCount: 6,
+        settings: [
+          s.select(
+            'icon',
+            'Icon',
+            'الأيقونة',
+            TRUST_BADGE_ICONS.map(i => opt(i, BADGE_ICON_LABELS[i][0], BADGE_ICON_LABELS[i][1])),
+            { group: 'content' }
+          ),
+          s.text('title', 'Title', 'العنوان', { localized: true }),
+          s.text('text', 'Subtitle (optional)', 'سطر فرعي (اختياري)', { localized: true }),
+        ],
+      },
+    ],
     settings: [
       s.select('layout', 'Layout', 'التخطيط', [
         opt('horizontal', 'Row', 'صف'),
@@ -440,8 +460,8 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         settings: {
           heading: 'Our story',
           headingAr: 'حكايتنا',
-          body: 'Tell customers what makes your products special.',
-          bodyAr: 'احكِ لعملائك ما يميز منتجاتك.',
+          body: PLACEHOLDER_STARTER_COPY.imageTextBody.en,
+          bodyAr: PLACEHOLDER_STARTER_COPY.imageTextBody.ar,
           imagePosition: 'start',
           imageAspect: 'square',
         },

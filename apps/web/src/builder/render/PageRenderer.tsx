@@ -7,7 +7,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useCart } from '../../contexts/CartContext';
 import { SectionErrorBoundary } from '../../components';
 import { BrandStoryBlock } from '../../templates/shared/BrandStoryBlock';
-import { TrustStrip } from '../../templates/shared/TrustStrip';
+import { TrustStrip, resolveTrustStripItems } from '../../templates/shared/TrustStrip';
 import { HomeBlogCarousel } from '../../templates/shared/HomeBlogCarousel';
 import { SectionDivider, resolveSlotDividerSettings } from '../../templates/shared/SectionDivider';
 import { toTemplateProduct, toTemplateCategory } from '../../templates/adapters';
@@ -20,6 +20,7 @@ import {
   renderableSections,
   sectionToLegacy,
 } from '@force/shared';
+import { EmptySectionHint, type EmptySectionKind } from './EmptySectionHint';
 import { ImageTextSection, type ImageTextSettings } from '../sections/ImageTextSection';
 import { NewsletterSection, type NewsletterSettings } from '../sections/NewsletterSection';
 import {
@@ -354,6 +355,29 @@ export function PageRenderer({
     heroImage
   );
 
+  // Data-driven sections render nothing publicly when they have nothing to
+  // show (never an empty shell, never a stray divider). In the editor canvas
+  // they show a dashed hint instead, so the merchant can still see and select
+  // them. A section the merchant switched off shows neither.
+  const categoriesVisible = layout.categories.enabled && templateCategories.length > 0;
+  const newArrivalsVisible = layout.newArrivals.enabled && templateNewArrivals.length > 0;
+  const bestSellersVisible = layout.bestSellers.enabled && templateBestSellers.length > 0;
+  const testimonialsVisible =
+    layout.testimonials.enabled && testimonials.length > 0 && !!T.TestimonialRow;
+  const brandStoryEnabled = layout.brandStory?.enabled ?? store.theme?.showBrandStory !== false;
+  const brandStoryVisible =
+    brandStoryEnabled &&
+    !!(store.heroImage || store.description?.trim() || store.descriptionAr?.trim());
+  // Trust strip: `items` absent = legacy store (fixed defaults, always something
+  // to show); present = merchant-owned, hidden while it has no usable item.
+  const trustStripEnabled = layout.trustStrip?.enabled ?? store.theme?.showTrustStrip !== false;
+  const trustStripVisible =
+    trustStripEnabled && resolveTrustStripItems(layout.trustStrip?.items, isRtl).length > 0;
+  const emptyHint = (kind: EmptySectionKind, enabled: boolean, visible: boolean) =>
+    editorMode && enabled && !visible ? <EmptySectionHint kind={kind} /> : null;
+  // A divider only separates two rendered sections.
+  const dividerOk = (visible: boolean) => visible || editorMode;
+
   return (
     <>
       {/* Section titles. Each section settings type extends
@@ -446,13 +470,13 @@ export function PageRenderer({
         const categoriesJSX = (
           <>
             {/* Per-section `above` divider (opt-in) — renders before categories. */}
-            {layout.categories.dividers?.above?.enabled && (
+            {dividerOk(categoriesVisible) && layout.categories.dividers?.above?.enabled && (
               <SectionDivider
                 settings={resolveSlotDividerSettings(layout.categories.dividers, 'above')}
                 hideForExplicitBg={!!(layout.hero.bgColor || layout.categories.bgColor)}
               />
             )}
-            {layout.categories.enabled && templateCategories.length > 0 && (
+            {categoriesVisible && (
               <section
                 data-section="categories"
                 className={`bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(layout.categories).wrapperClass}`}
@@ -545,6 +569,7 @@ export function PageRenderer({
                 })()}
               </section>
             )}
+            {emptyHint('categories', layout.categories.enabled, categoriesVisible)}
           </>
         );
 
@@ -558,11 +583,13 @@ export function PageRenderer({
         // the categories section above.
         const newArrivalsJSX = (
           <SectionErrorBoundary section="newArrivals">
-            <SectionDivider
-              settings={resolveSlotDividerSettings(layout.newArrivals.dividers, 'above')}
-              hideForExplicitBg={!!(layout.categories.bgColor || layout.newArrivals.bgColor)}
-            />
-            {layout.newArrivals.enabled && templateNewArrivals.length > 0 && (
+            {dividerOk(newArrivalsVisible) && (
+              <SectionDivider
+                settings={resolveSlotDividerSettings(layout.newArrivals.dividers, 'above')}
+                hideForExplicitBg={!!(layout.categories.bgColor || layout.newArrivals.bgColor)}
+              />
+            )}
+            {newArrivalsVisible && (
               <section
                 data-section="newArrivals"
                 className={`bg-[hsl(var(--bg-section-alt))] ${sectionSpacingClasses(layout.newArrivals).wrapperClass}`}
@@ -634,6 +661,7 @@ export function PageRenderer({
                 )}
               </section>
             )}
+            {emptyHint('newArrivals', layout.newArrivals.enabled, newArrivalsVisible)}
           </SectionErrorBoundary>
         );
 
@@ -648,11 +676,13 @@ export function PageRenderer({
         // the new default visual under `none`.
         const bestSellersJSX = (
           <SectionErrorBoundary section="bestSellers">
-            <SectionDivider
-              settings={resolveSlotDividerSettings(layout.bestSellers.dividers, 'above')}
-              hideForExplicitBg={!!(layout.newArrivals.bgColor || layout.bestSellers.bgColor)}
-            />
-            {layout.bestSellers.enabled && templateBestSellers.length > 0 && (
+            {dividerOk(bestSellersVisible) && (
+              <SectionDivider
+                settings={resolveSlotDividerSettings(layout.bestSellers.dividers, 'above')}
+                hideForExplicitBg={!!(layout.newArrivals.bgColor || layout.bestSellers.bgColor)}
+              />
+            )}
+            {bestSellersVisible && (
               <section
                 data-section="bestSellers"
                 className={`bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(layout.bestSellers).wrapperClass}`}
@@ -724,6 +754,7 @@ export function PageRenderer({
                 )}
               </section>
             )}
+            {emptyHint('bestSellers', layout.bestSellers.enabled, bestSellersVisible)}
           </SectionErrorBoundary>
         );
 
@@ -734,12 +765,15 @@ export function PageRenderer({
         // Legacy fallback: `theme.showBrandStory`.
         const brandStoryJSX = (
           <SectionErrorBoundary section="brandStory">
-            {(layout.brandStory?.enabled ?? store.theme?.showBrandStory !== false) ? (
+            {brandStoryVisible || (brandStoryEnabled && editorMode) ? (
               <>
-                <SectionDivider
-                  settings={resolveSlotDividerSettings(layout.brandStory?.dividers, 'above')}
-                  hideForExplicitBg={!!(layout.bestSellers.bgColor || layout.brandStory?.bgColor)}
-                />
+                {dividerOk(brandStoryVisible) && (
+                  <SectionDivider
+                    settings={resolveSlotDividerSettings(layout.brandStory?.dividers, 'above')}
+                    hideForExplicitBg={!!(layout.bestSellers.bgColor || layout.brandStory?.bgColor)}
+                  />
+                )}
+                {emptyHint('brandStory', brandStoryEnabled, brandStoryVisible)}
                 <BrandStoryBlock
                   image={store.heroImage ?? undefined}
                   body={store.description ?? undefined}
@@ -757,35 +791,44 @@ export function PageRenderer({
           <SectionErrorBoundary section="blogCarousel">
             {(layout.blogCarousel?.enabled ?? store.blogEnabled !== false) ? (
               <>
-                <SectionDivider
-                  settings={resolveSlotDividerSettings(layout.blogCarousel?.dividers, 'above')}
-                  // Suppress when EITHER flanking section is colored. The
-                  // preceding section (default order) is brandStory or
-                  // bestSellers — checking only blogCarousel's own bgColor let a
-                  // white divider band show over the white page bg between two
-                  // brown sections (demo-store). Mirrors the bestSellers/brandStory
-                  // dividers which already check both sides.
-                  hideForExplicitBg={
-                    !!(
-                      layout.bestSellers.bgColor ||
-                      layout.brandStory?.bgColor ||
-                      layout.blogCarousel?.bgColor
-                    )
+                {/* The divider and the editor hint ride inside HomeBlogCarousel:
+                    whether there are posts is only known after its client fetch. */}
+                <HomeBlogCarousel
+                  spacingSettings={layout.blogCarousel}
+                  before={
+                    <SectionDivider
+                      settings={resolveSlotDividerSettings(layout.blogCarousel?.dividers, 'above')}
+                      // Suppress when EITHER flanking section is colored. The
+                      // preceding section (default order) is brandStory or
+                      // bestSellers — checking only blogCarousel's own bgColor let a
+                      // white divider band show over the white page bg between two
+                      // brown sections (demo-store). Mirrors the bestSellers/brandStory
+                      // dividers which already check both sides.
+                      hideForExplicitBg={
+                        !!(
+                          layout.bestSellers.bgColor ||
+                          layout.brandStory?.bgColor ||
+                          layout.blogCarousel?.bgColor
+                        )
+                      }
+                    />
                   }
+                  emptyFallback={editorMode ? <EmptySectionHint kind="blogCarousel" /> : undefined}
                 />
-                <HomeBlogCarousel spacingSettings={layout.blogCarousel} />
               </>
             ) : null}
           </SectionErrorBoundary>
         );
 
         // Trust Strip — folded into page-builder 2026-05-20.
-        // Ships 3 universal items (Fast Delivery / Quality / Support)
-        // with bilingual platform copy. Auto-hides when disabled.
-        // Legacy fallback: `theme.showTrustStrip`.
+        // Merchant-written items (`trustStrip.items`). A store saved before
+        // items existed has no `items` key and keeps the 3 fixed legacy items
+        // (Fast Delivery / Quality / Support); new stores are provisioned with
+        // `items: []` and show nothing until the merchant adds some.
+        // Auto-hides when disabled or empty. Legacy fallback: `theme.showTrustStrip`.
         const trustStripJSX = (
           <SectionErrorBoundary section="trustStrip">
-            {(layout.trustStrip?.enabled ?? store.theme?.showTrustStrip !== false) ? (
+            {trustStripVisible ? (
               <>
                 <SectionDivider
                   settings={resolveSlotDividerSettings(layout.trustStrip?.dividers, 'above')}
@@ -805,7 +848,9 @@ export function PageRenderer({
                 />
                 <TrustStrip settings={layout.trustStrip} />
               </>
-            ) : null}
+            ) : (
+              emptyHint('trustStrip', trustStripEnabled, false)
+            )}
           </SectionErrorBoundary>
         );
 
@@ -817,19 +862,21 @@ export function PageRenderer({
         // wins over the legacy fallback.
         const testimonialsJSX = (
           <SectionErrorBoundary section="testimonials">
-            <SectionDivider
-              settings={resolveSlotDividerSettings(layout.testimonials.dividers, 'above')}
-              hideForExplicitBg={
-                !!(
-                  layout.bestSellers.bgColor ||
-                  layout.brandStory?.bgColor ||
-                  layout.blogCarousel?.bgColor ||
-                  layout.trustStrip?.bgColor ||
-                  layout.testimonials.bgColor
-                )
-              }
-            />
-            {layout.testimonials.enabled && testimonials.length > 0 && T.TestimonialRow && (
+            {dividerOk(testimonialsVisible) && (
+              <SectionDivider
+                settings={resolveSlotDividerSettings(layout.testimonials.dividers, 'above')}
+                hideForExplicitBg={
+                  !!(
+                    layout.bestSellers.bgColor ||
+                    layout.brandStory?.bgColor ||
+                    layout.blogCarousel?.bgColor ||
+                    layout.trustStrip?.bgColor ||
+                    layout.testimonials.bgColor
+                  )
+                }
+              />
+            )}
+            {testimonialsVisible && T.TestimonialRow && (
               <section
                 data-section="testimonials"
                 className={`bg-[hsl(var(--bg-section-alt))] ${sectionSpacingClasses(layout.testimonials).wrapperClass}`}
@@ -849,6 +896,7 @@ export function PageRenderer({
                 />
               </section>
             )}
+            {emptyHint('testimonials', layout.testimonials.enabled, testimonialsVisible)}
           </SectionErrorBoundary>
         );
 

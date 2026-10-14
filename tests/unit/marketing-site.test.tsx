@@ -26,7 +26,7 @@ const en = renderToStaticMarkup(<Home locale="en" />);
 
 describe('marketing nav', () => {
   it('uses the company name in both marketing page titles', () => {
-    expect(pageMetadata('ar', '').title).toContain('ابدأ ستوديو للذكاء الاصطناعي');
+    expect(pageMetadata('ar', '').title).toContain('ابدأ استوديو للذكاء الاصطناعي');
     expect(pageMetadata('en', '').title).toContain('Ebda AI Studio');
   });
   it('has the five links in order with correct targets (en)', () => {
@@ -173,13 +173,13 @@ describe('marketing honesty', () => {
     expect(s).toContain('EGP 89,910');
   });
   it('brand line, footer ownership line and Western digits everywhere', () => {
-    expect(ar).toContain('ابدأ ستوديو للذكاء الاصطناعي — بابك لبدء مشروعك.');
+    expect(ar).toContain('ابدأ استوديو للذكاء الاصطناعي — بابك لبدء مشروعك.');
     expect(en).toContain('Ebda AI Studio — Your doorway to business.');
     expect(en).toContain(
       'Ebda Store is a product of Ebda AI Studio. © 2026 Ebda AI Studio. All rights reserved.'
     );
     expect(ar).toContain(
-      'ابدأ ستور منتج من ابدأ ستوديو للذكاء الاصطناعي. © 2026 ابدأ ستوديو للذكاء الاصطناعي. جميع الحقوق محفوظة.'
+      'ابدأ ستور منتج من ابدأ استوديو للذكاء الاصطناعي. © 2026 ابدأ استوديو للذكاء الاصطناعي. جميع الحقوق محفوظة.'
     );
     // no Arabic-Indic digits anywhere on either home page or any legal page
     expect(ar).not.toMatch(/[٠-٩]/);
@@ -197,7 +197,7 @@ describe('marketing honesty', () => {
       'The Service is a technology platform owned and operated by Ebda AI Studio'
     );
     const lar = renderToStaticMarkup(<LegalPage locale="ar" page="terms" />);
-    expect(lar).toContain('اتفاق بينك وبين ابدأ ستوديو للذكاء الاصطناعي');
+    expect(lar).toContain('اتفاق بينك وبين ابدأ استوديو للذكاء الاصطناعي');
     for (const l of ['ar', 'en'] as const)
       for (const page of LEGAL_SLUGS) {
         const h = renderToStaticMarkup(<LegalPage locale={l} page={page} />);
@@ -247,7 +247,7 @@ describe('marketing honesty', () => {
     for (const html of [ar, en, ...pages]) expect(html).not.toMatch(/whisky/i);
     const org = jsonLd('en')['@graph'][0] as Record<string, unknown>;
     expect(org.name).toBe('Ebda AI Studio');
-    expect(org.alternateName).toBe('ابدأ ستوديو للذكاء الاصطناعي');
+    expect(org.alternateName).toBe('ابدأ استوديو للذكاء الاصطناعي');
     expect(org.url).toBe('https://ebda.app');
     expect(org).not.toHaveProperty('parentOrganization');
     expect(JSON.stringify(org)).not.toMatch(/whisky/i);
@@ -256,7 +256,9 @@ describe('marketing honesty', () => {
     for (const l of ['ar', 'en'] as const) {
       const html = renderToStaticMarkup(<AboutPage locale={l} />);
       expect(html).toContain(
-        l === 'en' ? 'owned and operated by Ebda AI Studio' : 'مملوكة لابدأ ستوديو للذكاء الاصطناعي'
+        l === 'en'
+          ? 'owned and operated by Ebda AI Studio'
+          : 'مملوكة لابدأ استوديو للذكاء الاصطناعي'
       );
       expect(html).toContain('ahlan@ebda.app');
       expect(html).toContain('security@ebda.app');

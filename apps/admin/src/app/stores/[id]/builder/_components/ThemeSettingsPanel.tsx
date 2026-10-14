@@ -2,9 +2,10 @@
 
 /**
  * Global theme settings (Shopify `settings_schema`): colours, typography,
- * buttons, spacing — generated from `THEME_SETTINGS_SCHEMA`. These live on
- * the store theme, whose single writer is the theme PUT (a server-side
- * shallow-merge PATCH): we send ONLY the keys this panel changed.
+ * buttons, spacing — generated from `THEME_SETTINGS_SCHEMA`. Saving writes ONLY
+ * the keys this panel changed into the page DRAFT (`PageDefinition.theme`, via
+ * `onSave`); nothing reaches the live store theme until Publish promotes the
+ * draft (Ruling THEME-DRAFT-1). `theme` is the effective theme: live + draft.
  * Theme colours are stored as HSL triplets; the colour field speaks hex.
  */
 import { useState } from 'react';
@@ -19,16 +20,14 @@ import {
 import { useT } from '@/i18n/useT';
 import { ColorField } from '../../../../../components/ColorField';
 import { Toggle } from '../../../../../components/Toggle';
-import { apiPut } from '../../../../../lib/api';
 
 export function ThemeSettingsPanel({
-  storeId,
   theme,
-  onSaved,
+  onSave,
 }: {
-  storeId: string;
   theme: StoreTheme | undefined;
-  onSaved: (patch: Partial<StoreTheme>) => void;
+  /** Writes the patch into the draft and resolves true once the draft is saved. */
+  onSave: (patch: Partial<StoreTheme>) => Promise<boolean>;
 }) {
   const t = useT('builder.theme');
   const locale = useLocale();
@@ -41,9 +40,8 @@ export function ThemeSettingsPanel({
   };
   const save = async () => {
     setState('saving');
-    const res = await apiPut(`/api/v1/stores/${storeId}/theme`, patch);
-    if (res.error) return setState('error');
-    onSaved(patch);
+    const ok = await onSave(patch);
+    if (!ok) return setState('error');
     setPatch({});
     setState('saved');
   };

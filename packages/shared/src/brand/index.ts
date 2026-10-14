@@ -11,7 +11,7 @@
 
 export const BRAND = {
   name: 'Ebda AI Studio',
-  nameAr: 'ابدأ ستوديو للذكاء الاصطناعي',
+  nameAr: 'ابدأ استوديو للذكاء الاصطناعي',
   /**
    * The PRODUCT (the store builder). `name`/`nameAr` above name the company; anything naming the product or the Service
    * reads this (ruling PRODUCT-NAME-1). Future products: Ebda WhatsApp / CRM / ERP.
@@ -22,9 +22,9 @@ export const BRAND = {
   },
   /** The company behind Ebda (single source for every operator mention; ruling OPERATOR-1). */
   company: {
-    legalNameAr: 'ابدأ ستوديو للذكاء الاصطناعي والبرمجيات والتسويق الرقمي',
+    legalNameAr: 'ابدأ استوديو للذكاء الاصطناعي والبرمجيات والتسويق الرقمي',
     legalNameEn: 'Ebda AI Studio for Artificial Intelligence, Software and Digital Marketing',
-    shortNameAr: 'ابدأ ستوديو للذكاء الاصطناعي',
+    shortNameAr: 'ابدأ استوديو للذكاء الاصطناعي',
     shortNameEn: 'Ebda AI Studio',
     url: 'https://ebda.app',
   },

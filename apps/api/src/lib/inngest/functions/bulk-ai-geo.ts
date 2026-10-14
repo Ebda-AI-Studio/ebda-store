@@ -15,6 +15,7 @@ import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 import { invalidateStoreProductCaches } from '../../public-cache';
 import { bustStoreCachesById } from '../../../services/store.service';
 import { storeOrigin } from '@force/shared';
+import { isPlaceholderText } from '../../ai/placeholder-guard';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
@@ -244,7 +245,7 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
             );
             const text = genResult.response.text().trim();
 
-            if (text.length > 50) {
+            if (text.length > 50 && !isPlaceholderText(text)) {
               await prisma.store.update({
                 where: { id: storeId },
                 data: { llmsTxt: text.slice(0, 4000) },
@@ -516,7 +517,11 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
               const raw = sanitizeJsonControlChars(stripFences(genResult.response.text()));
               const parsed = JSON.parse(raw) as { en: string; ar: string };
 
-              if (typeof parsed.en === 'string' && parsed.en.trim()) {
+              if (
+                typeof parsed.en === 'string' &&
+                parsed.en.trim() &&
+                !isPlaceholderText(parsed.en)
+              ) {
                 await prisma.product.update({
                   where: { id: p.id, storeId },
                   data: {

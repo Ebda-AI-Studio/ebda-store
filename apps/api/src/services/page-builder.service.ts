@@ -25,6 +25,17 @@
  * defence in depth. Race losers fail on a row lock re-check or a unique
  * index inside a SAVEPOINT, so the request transaction survives to answer 409.
  *
+ * Theme (Ruling THEME-DRAFT-1): the editor's global theme edits are a PATCH
+ * in the document (`PageDefinition.theme`, packages/shared theme-draft.ts), so
+ * they follow the same lifecycle. A draft save never touches `stores.theme`;
+ * publish / rollback merge the patch over it inside the SAME `stores` update as
+ * the `layout_settings` back-write (one statement: atomic) and the same
+ * post-commit purge covers it. A published revision records a full snapshot of
+ * the editor-managed keys so rollback restores them; a revision without `theme`
+ * (anything published before this change, the legacy layout PUT) leaves the
+ * live theme alone. The published theme is never part of what the editor
+ * re-opens (`getPageState` strips it) — only a pending draft patch is.
+ *
  * Caches (bounded-stale class: layout/content): a publish/rollback purges
  * every layer through `bustStoreCaches` AFTER the commit
  * (`deferAfterTenantCommit`) — Redis `public:store:*` (+ generation bump),
@@ -40,6 +51,11 @@ import {
   mergeDocumentOnlySections,
   publishedDocumentAgrees,
   resolveLayoutSettings,
+  snapshotEditableTheme,
+  applyChromePatch,
+  hasChromePatch,
+  pageDefinitionSchema,
+  rebaseDraftOntoLive,
   validateDefinition,
   validatePublishReadiness,
   type BuilderIssue,
@@ -117,7 +133,7 @@ async function loadStore(storeId: string) {
   return withStore(storeId, tx =>
     tx.store.findUnique({
       where: { id: storeId },
-      select: { layoutSettings: true, template: true, slug: true, domain: true },
+      select: { layoutSettings: true, template: true, slug: true, domain: true, theme: true },
     })
   );
 }
@@ -148,16 +164,31 @@ function resolvedLayout(store: { layoutSettings: unknown; template: string | nul
   );
 }
 
+/**
+ * A published document's `theme` snapshot is already live (`stores.theme`), so
+ * the editor must not re-open it as a pending edit: a stale snapshot sent back
+ * in the next draft would overwrite later live changes to those keys.
+ */
+function withoutTheme(document: unknown): PageDefinition {
+  const rest = { ...(document as PageDefinition) };
+  delete rest.theme;
+  // Same for the header/footer content patch (`chrome`): once published it is
+  // live in `stores.settings`, so it is not re-opened as a pending edit.
+  delete rest.chrome;
+  return rest;
+}
+
 export async function getPageState(storeId: string, pageKey: string): Promise<PageState | null> {
   const store = await loadStore(storeId);
   if (!store) return null;
   const { draft, published, head } = await loadRows(storeId, pageKey);
-  const row = draft ?? published;
   return {
     rev: head,
-    definition: row
-      ? (row.document as PageDefinition)
-      : layoutToDefinition(resolvedLayout(store), pageKey),
+    definition: draft
+      ? (draft.document as PageDefinition)
+      : published
+        ? withoutTheme(published.document)
+        : layoutToDefinition(resolvedLayout(store), pageKey),
     source: draft ? 'draft' : published ? 'published' : 'layout',
     draftRev: draft?.rev ?? null,
     publishedRev: published?.rev ?? null,
@@ -314,6 +345,21 @@ export async function saveDraft(args: {
   return { ok: true, value: { rev }, warnings: v.warnings };
 }
 
+/**
+ * Extra columns for the row publish promotes: when the draft carries a theme
+ * patch, the published document records a full snapshot of the editor-managed
+ * keys (live ⊕ patch) so rolling back to it restores exactly those keys.
+ */
+function publishedThemeData(document: unknown, liveTheme: unknown): Record<string, unknown> {
+  const doc = document as PageDefinition;
+  if (!doc.theme) return {};
+  const snapshotted = {
+    ...doc,
+    theme: snapshotEditableTheme(liveTheme as Record<string, unknown> | null, doc.theme),
+  };
+  return { document: snapshotted as unknown as object, docBytes: docBytes(snapshotted) };
+}
+
 /** Promote `row` (or a fresh row) to published inside a savepoint; archive the old one. */
 async function promote(
   storeId: string,
@@ -345,12 +391,31 @@ async function applyPublishedLayout(
   definition: PageDefinition
 ): Promise<StoreLayoutSettings> {
   const layout = definitionToLayout(definition);
-  await withStore(storeId, tx =>
-    tx.store.update({
+  const themePatch = definition.theme;
+  const chromePatch = hasChromePatch(definition.chrome) ? definition.chrome : undefined;
+  await withStore(storeId, async tx => {
+    // Merge the pending theme / header+footer content over the CURRENT live
+    // values read in this same transaction (the Branding tab and the classic
+    // builder also write other theme / settings keys), and write them with
+    // layout_settings in one statement.
+    const live =
+      themePatch || chromePatch
+        ? await tx.store.findUnique({
+            where: { id: storeId },
+            select: { theme: true, settings: true },
+          })
+        : null;
+    return tx.store.update({
       where: { id: storeId },
-      data: { layoutSettings: layout as unknown as object },
-    })
-  );
+      data: {
+        layoutSettings: layout as unknown as object,
+        ...(themePatch ? { theme: { ...((live?.theme ?? {}) as object), ...themePatch } } : {}),
+        ...(chromePatch
+          ? { settings: applyChromePatch(live?.settings, chromePatch) as unknown as object }
+          : {}),
+      },
+    });
+  });
   void cleanupRemovedJsonUrls(store.layoutSettings ?? {}, layout).catch(err =>
     logger.warn({ err, storeId }, '[page-builder] r2 cleanup failed')
   );
@@ -395,7 +460,9 @@ export async function publishDraft(args: {
       errors: v.errors,
     };
   // Structurally valid is not publish-ready: a draft may still hold a hero
-  // slide with no image chosen yet (allowed so autosave can persist it).
+  // slide with no image chosen yet (allowed so autosave can persist it), or
+  // starter/placeholder text ("Tell customers what makes your products
+  // special.") that must never go live (PLACEHOLDER_COPY).
   const readinessErrors = validatePublishReadiness(v.definition);
   if (readinessErrors.length > 0)
     return {
@@ -409,7 +476,11 @@ export async function publishDraft(args: {
   const outcome = await promote(storeId, pageKey, async () => {
     const { count } = await prisma.storePageRevision.updateMany({
       where: { id: draft.id, storeId, rev: baseRev, status: 'draft' },
-      data: { status: 'published', publishedAt: new Date() },
+      data: {
+        status: 'published',
+        publishedAt: new Date(),
+        ...publishedThemeData(draft.document, store.theme),
+      },
     });
     if (count !== 1) throw new RevConflict();
   });
@@ -437,6 +508,8 @@ async function publishNewRevision(args: {
   note: string;
   userId: string | null;
   archiveDraft: boolean;
+  /** Runs in the same savepoint right after the published row is created. */
+  afterCreate?: (publishedRev: number) => Promise<void>;
 }): Promise<'ok' | 'conflict'> {
   const { storeId, pageKey, definition } = args;
   const rev = args.baseRev + 1;
@@ -461,6 +534,7 @@ async function publishNewRevision(args: {
         publishedAt: new Date(),
       },
     });
+    await args.afterCreate?.(rev);
   });
 }
 
@@ -551,12 +625,45 @@ export async function publishLegacyLayout(args: {
   const { storeId, layout } = args;
   const { head, draft, published } = await loadRows(storeId, HOME_PAGE_KEY);
   // The layout knows nothing about document-only sections (image-text,
-  // newsletter): carry them over from the latest document or this save
-  // would delete them.
-  const previous = (draft ?? published)?.document as PageDefinition | undefined;
+  // newsletter): carry them over from the LIVE document or this save would
+  // delete them. Never from the draft: a section that only exists in an
+  // unpublished draft must not go live through this path.
+  const previous = published?.document as PageDefinition | undefined;
   const definition = mergeDocumentOnlySections(layoutToDefinition(layout, HOME_PAGE_KEY), previous);
-  const readinessErrors = validatePublishReadiness(definition);
+  // Placeholder-copy check OFF here, deliberately: this legacy PUT cannot
+  // author document-only section text (it only carries those sections over
+  // unchanged from the previous document), so gating it would 422 an
+  // unrelated theme/layout save for a store whose existing page still holds
+  // starter copy. The copy is gated where it is authored: publishDraft and
+  // rollbackToRevision. (Ruling PLACEHOLDER-1.)
+  const readinessErrors = validatePublishReadiness(definition, { placeholderCopy: false });
   if (readinessErrors.length > 0) return { invalid: readinessErrors };
+
+  // A pending visual draft is MERGED with what this save changed instead of
+  // being left stale (the next Publish of it would silently revert this save)
+  // or discarded (Ruling CLASSIC-SAVE-DRAFT-1).
+  let rebased: PageDefinition | null = null;
+  if (draft) {
+    const store = await loadStore(storeId);
+    const previousLive = published
+      ? withoutTheme(published.document)
+      : layoutToDefinition(
+          resolvedLayout(store ?? { layoutSettings: {}, template: null }),
+          HOME_PAGE_KEY
+        );
+    const candidate = rebaseDraftOntoLive(
+      draft.document as PageDefinition,
+      previousLive,
+      definition
+    );
+    const parsed = pageDefinitionSchema.safeParse(candidate);
+    if (parsed.success) rebased = parsed.data;
+    else
+      logger.warn(
+        { storeId },
+        '[page-builder] classic save could not be merged into the pending draft; draft kept as is'
+      );
+  }
   return publishNewRevision({
     storeId,
     pageKey: HOME_PAGE_KEY,
@@ -565,6 +672,21 @@ export async function publishLegacyLayout(args: {
     note: 'saved through the legacy layout endpoint',
     userId: args.userId,
     archiveDraft: false,
+    afterCreate: async publishedRev => {
+      if (!draft || !rebased) return;
+      // The draft moves above the new head (its baseRev), so it stays
+      // publishable and its next autosave does not 409.
+      const { count } = await prisma.storePageRevision.updateMany({
+        where: { id: draft.id, storeId, rev: draft.rev, status: 'draft' },
+        data: {
+          rev: publishedRev + 1,
+          baseRev: publishedRev,
+          document: rebased as unknown as object,
+          docBytes: docBytes(rebased),
+        },
+      });
+      if (count !== 1) throw new RevConflict();
+    },
   });
 }
 
@@ -598,8 +720,7 @@ export { BUILDER_LIMITS };
 
 /** Redis TTL for a builder preview token (the Redis TTL floor is 120s). */
 export const PREVIEW_TOKEN_TTL_SECONDS = 3600;
-export const previewTokenKey = (storeId: string, token: string) =>
-  `builder-preview:${storeId}:${token}`;
+export { previewTokenKey } from '../lib/builder-preview-token';
 
 /**
  * The document the editor canvas renders for a preview token: the working

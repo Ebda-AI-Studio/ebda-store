@@ -28,7 +28,9 @@ import { featureService } from '../services/feature.service';
 import { notificationDispatcher } from '../services/notification-dispatcher.service';
 import { getCached } from '../lib/public-cache';
 import { storeLookupForHost } from '../lib/store-host';
-import { lookupStore, publicStorePage } from '../lib/definer';
+import { lookupStore, publicStorePage, type StoreStatusName } from '../lib/definer';
+import { redis } from '../services/redis.service';
+import { previewTokenKey } from '../lib/builder-preview-token';
 import { isReservedSlug, storefrontOrigin } from '@force/shared';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { setEdgeCache } from '../lib/edge-cache';
@@ -1641,6 +1643,35 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
   }
 });
 
+/** Header the storefront forwards (server-to-server) from the editor canvas `?_builder=` token. */
+export const BUILDER_PREVIEW_TOKEN_HEADER = 'x-builder-preview-token';
+
+/**
+ * The store id an editor preview token unlocks for THIS host, or null.
+ *
+ * The token (minted by the authenticated admin route, Redis-stored under
+ * `builder-preview:<storeId>:<token>`) is verified SERVER-SIDE here: the host is
+ * resolved to its store id through the lookup definer (any status), then the
+ * Redis entry for exactly (that store, that token) must exist. A token minted
+ * for store A therefore cannot unlock store B's host, and an expired/forged
+ * token finds no entry. A bare query flag is never trusted. Any failure returns
+ * null and the caller serves the unchanged public (active/suspended only) path.
+ */
+async function resolveBuilderPreviewStoreId(
+  rawToken: string | string[] | undefined,
+  lookup: NonNullable<ReturnType<typeof storeLookupForHost>>
+): Promise<string | null> {
+  const token = typeof rawToken === 'string' ? rawToken : '';
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return null;
+  const hit = await lookupStore(
+    lookup.by === 'slug' ? { slug: lookup.slug } : { domain: lookup.domain },
+    ['active', 'suspended', 'inactive']
+  );
+  if (!hit) return null;
+  const entry = await redis.get<{ pageKey?: string }>(previewTokenKey(hit.id, token), true);
+  return entry && typeof entry.pageKey === 'string' ? hit.id : null;
+}
+
 // GET /store/resolve - Resolve store by domain header (for multi-tenant)
 router.get(
   '/store/resolve',
@@ -1677,7 +1708,19 @@ router.get(
       // can never share an entry. A MISS throws out of the fetcher: getCached
       // only stores what the fetcher returns, so an unknown host is never
       // cached (a store created a second later must resolve immediately).
-      const result = await getCached(`public:store:resolve:${lookup.cacheHost}`, 120, async () => {
+      // Builder-preview bypass (see resolveBuilderPreviewStoreId): a VALID,
+      // store-bound editor token lets the canvas resolve a store that is not
+      // active yet. Never cached, never indexable. No/invalid token -> falls
+      // through to the unchanged public path below.
+      const previewStoreId = await resolveBuilderPreviewStoreId(
+        req.headers[BUILDER_PREVIEW_TOKEN_HEADER],
+        lookup
+      );
+
+      const loadPayload = async (
+        statuses: readonly StoreStatusName[],
+        expectedStoreId?: string
+      ) => {
         // Find store by domain. Suspended stores are returned with their
         // `status` so the storefront can render the branded maintenance page
         // for that store. Inactive (archived/draft) and soft-deleted stores
@@ -1686,8 +1729,12 @@ router.get(
         // the row inside that store's own scope.
         const hit = await lookupStore(
           lookup.by === 'slug' ? { slug: lookup.slug } : { domain: lookup.domain },
-          ['active', 'suspended']
+          statuses
         );
+        // Preview only: the row must be the exact store the token was bound to.
+        if (hit && expectedStoreId && hit.id !== expectedStoreId) {
+          throw new AppError(404, 'STORE_NOT_FOUND', 'No store found for the specified domain');
+        }
         const store = hit
           ? await withStore(hit.id, tx =>
               tx.store.findUnique({
@@ -1787,7 +1834,26 @@ router.get(
 
         const locations = await fetchFooterLocations(store);
         return { store: publicStore, enabledFeatures, disabledCmsSlugs, locations };
-      });
+      };
+
+      if (previewStoreId) {
+        // Fresh read, any lifecycle status, bound to the token's store. NOT
+        // routed through the public cache helper (the shared `public:store:resolve:<host>`
+        // key public requests hit) and never edge-cacheable.
+        const previewResult = await loadPayload(
+          ['active', 'suspended', 'inactive'],
+          previewStoreId
+        );
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+        res.vary(BUILDER_PREVIEW_TOKEN_HEADER);
+        res.json({ success: true, data: previewResult });
+        return;
+      }
+
+      const result = await getCached(`public:store:resolve:${lookup.cacheHost}`, 120, () =>
+        loadPayload(['active', 'suspended'])
+      );
 
       if (!result) {
         res.status(404).json({

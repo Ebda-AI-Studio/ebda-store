@@ -268,6 +268,7 @@ describe('settings schemas (drive the Phase 2 auto-generated panel)', () => {
     'layoutMobile', // -> responsive.mobile.settings.layout
     'captionPositionMobile', // -> responsive.mobile.settings.captionPosition
     'slides', // -> blocks
+    'items', // trust strip items -> blocks
     'id', // product carousel's internal id (kept in settings, not editable)
   ]);
   const shapeKeys = (schema: unknown): string[] =>

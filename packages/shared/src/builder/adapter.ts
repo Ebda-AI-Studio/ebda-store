@@ -97,6 +97,8 @@ export const SITE_SETTING_KEYS = [
 /** Legacy keys whose array entries become blocks: `<layoutKey>.<field>` -> block type. */
 const BLOCK_FIELDS: Record<string, { field: string; blockType: string; idPrefix: string }> = {
   hero: { field: 'slides', blockType: 'slide', idPrefix: 'slide' },
+  // Absent `items` stays absent (legacy fixed defaults); `[]` round-trips as no blocks.
+  trustStrip: { field: 'items', blockType: 'item', idPrefix: 'item' },
 };
 
 function legacyToSection(

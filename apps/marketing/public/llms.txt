@@ -1,6 +1,6 @@
-# Ebda AI Studio (ابدأ ستوديو للذكاء الاصطناعي)
+# Ebda AI Studio (ابدأ استوديو للذكاء الاصطناعي)
 
-> Ebda Store, from Ebda AI Studio — Your doorway to business. A self-serve online store builder for sellers in Egypt; a product of Ebda AI Studio (ابدأ ستوديو للذكاء الاصطناعي). Arabic-first (RTL) with English. Merchants sign up, build and run their own store; every store gets a free <slug>.ebda.app address and can attach a custom domain.
+> Ebda Store, from Ebda AI Studio — Your doorway to business. A self-serve online store builder for sellers in Egypt; a product of Ebda AI Studio (ابدأ استوديو للذكاء الاصطناعي). Arabic-first (RTL) with English. Merchants sign up, build and run their own store; every store gets a free <slug>.ebda.app address and can attach a custom domain.
 
 Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billing saves 25%; 14-day free Growth trial; 0% commission on orders on every plan. Full plan comparison (orders, team, stores, abandoned carts, branding, API/MCP, analytics, support) is on the home page.
 

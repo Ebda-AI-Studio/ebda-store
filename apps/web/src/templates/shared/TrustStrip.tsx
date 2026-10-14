@@ -3,7 +3,8 @@
 import React from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import type { TrustStripSettings } from '@force/shared';
+import type { TrustStripSettings, TrustStripItem } from '@force/shared';
+import { BadgeGlyph } from '../dahab/ui';
 import { resolveColor, pickReadableForeground } from '@force/shared';
 import { sectionSpacingClasses } from './section-spacing';
 import { sectionBgStyle } from './section-bg';
@@ -63,6 +64,45 @@ const DEFAULT_TRUST_ITEMS: TrustItem[] = [
     subAr: 'نحن هنا متى ما احتجت إلينا',
   },
 ];
+
+/** What one strip item renders: merchant text, or a legacy fixed default. */
+interface ResolvedItem {
+  key: string;
+  title: string;
+  sub: string;
+  iconPath?: string;
+  icon?: string;
+}
+
+/**
+ * The items a strip shows. `settings.items` ABSENT = a store that predates
+ * editable items, so it keeps the three fixed defaults it always showed.
+ * PRESENT (even `[]`) = merchant-owned: only their items, none = nothing.
+ * Items with no text in the current locale (either language) are dropped.
+ */
+export function resolveTrustStripItems(
+  items: TrustStripItem[] | undefined,
+  isRtl: boolean
+): ResolvedItem[] {
+  if (items === undefined) {
+    return DEFAULT_TRUST_ITEMS.map(i => ({
+      key: i.titleEn,
+      title: isRtl ? i.titleAr : i.titleEn,
+      sub: isRtl ? i.subAr : i.subEn,
+      iconPath: i.iconPath,
+    }));
+  }
+  const pick = (en?: string, ar?: string) =>
+    ((isRtl ? ar?.trim() || en?.trim() : en?.trim() || ar?.trim()) ?? '') as string;
+  return items
+    .map((it, i) => ({
+      key: `item-${i}`,
+      title: pick(it.title, it.titleAr),
+      sub: pick(it.text, it.textAr),
+      icon: it.icon,
+    }))
+    .filter(it => it.title || it.sub);
+}
 
 export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {}) {
   const { isRtl } = useLanguage();
@@ -160,6 +200,10 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
         }
       : undefined;
 
+  const resolved = resolveTrustStripItems(settings?.items, isRtl);
+  // Never an empty shell: a merchant-owned strip with no items renders nothing.
+  if (resolved.length === 0) return null;
+
   return (
     <section
       aria-label={isRtl ? 'لماذا تتسوق معنا' : 'Why shop with us'}
@@ -169,9 +213,9 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
     >
       <div className={innerContainerClass}>
         <ul className={listClass}>
-          {DEFAULT_TRUST_ITEMS.map(item => (
+          {resolved.map(item => (
             <li
-              key={item.titleEn}
+              key={item.key}
               className="flex flex-col items-center text-center gap-2 px-1 sm:px-2"
             >
               <span
@@ -179,21 +223,34 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
                 style={iconWrapStyle}
                 aria-hidden
               >
-                <svg className={iconSvgClass} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.7}
-                    d={item.iconPath}
-                  />
-                </svg>
+                {item.iconPath ? (
+                  <svg
+                    className={iconSvgClass}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.7}
+                      d={item.iconPath}
+                    />
+                  </svg>
+                ) : (
+                  <BadgeGlyph icon={item.icon} className={iconSvgClass} />
+                )}
               </span>
-              <h3 className={titleClass} style={textFgStyle}>
-                {isRtl ? item.titleAr : item.titleEn}
-              </h3>
-              <p className={subClass} style={textFgStyle}>
-                {isRtl ? item.subAr : item.subEn}
-              </p>
+              {item.title && (
+                <h3 className={titleClass} style={textFgStyle}>
+                  {item.title}
+                </h3>
+              )}
+              {item.sub && (
+                <p className={subClass} style={textFgStyle}>
+                  {item.sub}
+                </p>
+              )}
             </li>
           ))}
         </ul>
