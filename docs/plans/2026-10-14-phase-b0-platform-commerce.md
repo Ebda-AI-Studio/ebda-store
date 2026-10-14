@@ -40,6 +40,58 @@
 - Commit subjects are all lowercase (commitlint). `git add` takes explicit paths only. Never `--no-verify`.
 - Reduced motion: every animation has a `prefers-reduced-motion: reduce` path that shows the end state instantly.
 
+## Taste bar (Ahmad, 2026-10-14: "Ebda must have the same thing")
+
+Reference: Instagram reel `DeeZGosSon1`, "Taste". When anyone can build anything with a prompt, every product on the shelf does the same thing. What wins is taste: **what to make, what to leave out, and how it should feel when you open it.** Every Egyptian store builder will ship swatches and size charts. Ebda's difference is that ours look and feel considered. **Ruling B0-4** makes this binding on every UI task in this plan, because "looks good" is not a finish line. Cost if wrong: about one extra review round per UI task.
+
+**1. What to leave out. These are hard limits, and a reviewer rejects the task on any breach:**
+
+- **Product card.** Below the price, a card shows at most 5 swatch dots (then `+N`) and at most 2 fact chips. Nothing else is added in B0:
+  - no HOT/FEATURED badges;
+  - no stock nags;
+  - no countdowns;
+  - no second CTA.
+
+  The merchant's existing `badgeLabel` stays the only badge.
+
+- **PDP above the fold on a 390px phone.** It shows these, in this order, and nothing more:
+  - the gallery;
+  - the title;
+  - the price;
+  - the selectors;
+  - personalisation, when it is enabled;
+  - the add-to-cart button;
+  - the delivery chip.
+
+  Facts and the size chart sit below, or one tap away.
+
+- **Accent colour.** One accent, used for the primary action only. Swatches, chips and the delivery line use ink and muted tokens, never a new colour.
+- **Unfilled features.** A feature with no merchant data renders nothing. There are no empty states, placeholders or "coming soon" on the storefront.
+- **Strings.** At most one line of helper text per control. If the copy needs two lines, the control is wrong.
+- **Text.** No gradient text, side-stripe borders, glassmorphism or ghost cards (impeccable absolute bans). The radius comes from `var(--radius)` only.
+
+**2. How it feels when you open it:**
+
+- **First paint is the product.** The product image (or the hero poster) is the LCP element. Nothing animates before it is visible.
+- **Motion only where it means something.** Three moments in B0 move:
+  - the receipt prints;
+  - the sticky bar slides in;
+  - a swatch tap crossfades the gallery image.
+
+  Everything else is still. The easing is ease-out-quint or ease-out-expo, with no bounce. Every animation has a reduced-motion end state.
+
+- **Arabic is the design language, not a translation.** Each surface is designed and screenshotted in Arabic first, with Arabic-Indic numerals on, then checked in English.
+- **The feature reads as the store's, not as Ebda's.** Each component pulls from the active skin and look tokens, so a Dahab store and a Qamar Atelier store each look native.
+
+**3. The taste gate, run at the end of every UI task** (Tasks 2, 3, 4, 5, 6, 8, 9 and 10). It sits between "tests pass" and "commit":
+
+- Screenshot the changed surface at 390×844 Arabic and 1280×800 English, on two skins: `minimal` (the default FWB path) and `dahab`. Where a demo store can preview looks, also screenshot with `?look=qamar.atelier`. Save them under the task's report directory.
+- Run the `impeccable` skill's `critique` on that surface. Fix every P0/P1, and record any P2 you leave as a Ruling with cost-if-wrong.
+- Compare the result against the research references (`docs/ebda/templates/research/qamar.md`). The bar is the **restraint of Mamzi and Everlane**, with **Egyptian-shopper clarity** (COD and delivery always visible). The anti-bar is Alamal's clutter.
+- Write a three-line taste note in the task report: what was left out, what moves and why, and what it feels like on open.
+
+The task reviewer checks the screenshots and note against sections 1–2 and rejects the task on a breach. Ahmad's live review (UI rule 10, 2–4 rounds) happens on the PR before merge.
+
 ## Review Focus
 
 1. **Same product + variant, different personalisation text.** Expected: two cart lines and two order lines. With the same text, the quantity merges into one line. (Task 5, test `personalised lines stay separate`.)
@@ -68,7 +120,7 @@
 | Builder            | `packages/shared/src/builder/{settings-schema,registry,layout-schema}.ts`, admin `builder/_components/SettingsPanel.tsx` + new `VideoField.tsx`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Admin              | `products/[productId]/variants/_components/SimpleVariantsForm.tsx`, `products/[productId]/edit/_components/` (new `FactsCard.tsx`, `PersonalisationCard.tsx`, `FulfilmentCard.tsx`), `orders/[orderId]/_components/ItemsCard.tsx`, new `size-charts/` page, category edit                                                                                                                                                                                                                                                                                                                                                       |
 | Storefront         | `components/VariantSelector.tsx`, new `components/commerce/` (`SwatchDots.tsx`, `FactsTable.tsx`, `FactChips.tsx`, `PersonalisationField.tsx`, `DeliveryChip.tsx`, `StickyAddToCart.tsx`, `StickyCartTotal.tsx`, `SizeChartDialog.tsx`, `HeroVideo.tsx`, `ReceiptPrinter.tsx`), both PDP paths, all card paths, `CartContext.tsx`, `app/cart/CartClient.tsx`, `templates/dahab/CartDrawer.tsx`, `app/checkout/OrderSummary.tsx`, `app/checkout/success/SuccessClient.tsx`, hero renderers (`templates/shared/HeroSlider.tsx`, `templates/shared/HeroBannerLink.tsx`, `templates/dahab/Hero.tsx`), new `app/size-guide/page.tsx` |
-| Docs               | new `docs/ebda/templates/platform-commerce.md`, plus `docs/architecture/store-theme-flags.md` (card render-path list unchanged, new card elements noted), `docs/ebda/templates/research/SUMMARY.md` status column                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Docs               | `CLAUDE.md` (pillar 5: Taste), new `docs/ebda/templates/platform-commerce.md`, plus `docs/architecture/store-theme-flags.md` (card render-path list unchanged, new card elements noted), `docs/ebda/templates/research/SUMMARY.md` status column                                                                                                                                                                                                                                                                                                                                                                                |
 
 ---
 
@@ -431,6 +483,8 @@ When `swatchOption && sw` is true, render a round 32px button:
 - Accessible name: the localised value via `aria-label`.
 
 When `swatchOption && !sw`, render the existing chip. Add `line-through opacity-50` next to every existing `disabled={!available}`, for both appearances. Keep the Dahab `appearance === 'swatch'` branch untouched. Show the selected swatch's localised name beside the option label ("اللون: تيل").
+
+Gallery crossfade (taste bar §2). The PDP already swaps to the picked variant's `imageUrl` (`ProductDetailClient.tsx:~190, ~490`). Make that swap a 200 ms opacity crossfade (ease-out-quint, instant under reduced motion) on both PDP paths, and do not change the image source logic. When the picked colour has no variant image but its option value has a `swatchImageUrl`, the gallery stays on the current image. A fabric close-up is not a product photo.
 
 - [ ] **Step 4: Card payload**
 
@@ -1639,6 +1693,15 @@ Grep every new identifier across `apps packages tests docs scripts .github`:
 - Confirm every consumer is updated: admin type files, the web `api.ts` types, the export/import of products (grep `bulk` export columns. If product export lists columns, add `facts`/`leadTimeDays` or record a ruling for why not), the MCP tools that read or write products (grep `apps/api/src/mcp` for product schemas), and `scripts/rls-payload-parity.mjs` coverage of the new public fields.
 - Write the result into the PR body as `blast-radius: swept <ids> across <scopes> → …`.
 
+- [ ] **Step 3b: Whole-flow taste pass + make taste a standing rule**
+
+- Walk the full E2E flow (PDP → cart → checkout → receipt) on a 390px phone in Arabic and in English, on `minimal` and on `dahab`. Run the `impeccable` skill's `critique` on the flow as one experience, not per screen. Fix P0/P1 and rule on any P2.
+- Add pillar 5 to the "Strategic positioning" list in `CLAUDE.md`:
+
+  > 5. **Taste** — when anyone can build a store, the difference is what we leave out and how it feels when it opens. Every UI change passes the taste bar in `docs/plans/2026-10-14-phase-b0-platform-commerce.md` (§ Taste bar): hard leave-out limits, motion only where it means something, Arabic-first screenshots, an impeccable critique before commit.
+
+  Also add `taste-bar` to the anti-patterns line: "features that add chrome without adding meaning".
+
 - [ ] **Step 4: Full gates**
 
 Run: `npm run typecheck && npm run lint && npm run test:unit` → all exit 0 (capture `$?` per command, not through a pipe). Run `npm run test:integration` against the local Postgres. Record the counts in the report.
@@ -1646,7 +1709,7 @@ Run: `npm run typecheck && npm run lint && npm run test:unit` → all exit 0 (ca
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tests/smoke/commerce-b0.spec.ts docs/ebda/templates/platform-commerce.md docs/ebda/templates/research docs/architecture/store-theme-flags.md docs/RULINGS.md docs/plans/2026-10-14-phase-b0-platform-commerce.md
+git add CLAUDE.md tests/smoke/commerce-b0.spec.ts docs/ebda/templates/platform-commerce.md docs/ebda/templates/research docs/architecture/store-theme-flags.md docs/RULINGS.md docs/plans/2026-10-14-phase-b0-platform-commerce.md
 git commit -m "docs(commerce): b0 platform features doc, rulings, research status and e2e"
 ```
 
