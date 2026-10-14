@@ -33,6 +33,8 @@ let testStoreId: string | null = null;
 let testUserId: string | null = null;
 let testProductId: string | null = null;
 let authToken: string | null = null;
+let storeAdminId: string | null = null;
+let storeAdminToken: string | null = null;
 let createdOrderId: string | null = null;
 let customerToken: string | null = null;
 let testCustomerId: string | null = null;
@@ -52,12 +54,39 @@ describe('Order Flow', () => {
     });
     testUserId = user.id;
 
+    // Store-order status transitions are the merchant's to run (ruling
+    // ORDER-MONEY-SUPERADMIN): the store is owned by a store_admin, not the
+    // super_admin fixture above, so the status-update tests exercise the
+    // real authorization path instead of super_admin's blanket access.
+    const storeAdminPassword = 'Test123!@#StoreAdmin';
+    const storeAdminHashedPassword = await import('bcryptjs').then(bcrypt =>
+      bcrypt.hash(storeAdminPassword, 12)
+    );
+    const storeAdminEmail = `order-test-store-admin-${Date.now()}@example.com`;
+    const storeAdmin = await prisma.user.create({
+      data: {
+        email: storeAdminEmail,
+        passwordHash: storeAdminHashedPassword,
+        firstName: 'Order',
+        lastName: 'StoreAdmin',
+        role: 'store_admin',
+        status: 'active',
+        emailVerified: true,
+      },
+    });
+    storeAdminId = storeAdmin.id;
+    const storeAdminLogin = await request(app).post('/auth/login').send({
+      email: storeAdminEmail,
+      password: storeAdminPassword,
+    });
+    storeAdminToken = storeAdminLogin.body.data?.accessToken;
+
     // Create test store
     const store = await prisma.store.create({
       data: {
         name: 'Order Test Store',
         slug: `order-test-store-${Date.now()}`,
-        ownerId: user.id,
+        ownerId: storeAdmin.id,
         status: 'active',
       },
     });
@@ -138,6 +167,9 @@ describe('Order Flow', () => {
     }
     if (testUserId) {
       await prisma.user.delete({ where: { id: testUserId } }).catch(() => {});
+    }
+    if (storeAdminId) {
+      await prisma.user.delete({ where: { id: storeAdminId } }).catch(() => {});
     }
     await prisma.$disconnect();
   });
@@ -284,13 +316,13 @@ describe('Order Flow', () => {
 
   describe('Order Status Updates', () => {
     it('should update order status', async () => {
-      if (!authToken || !createdOrderId || !testStoreId) {
+      if (!storeAdminToken || !createdOrderId || !testStoreId) {
         throw new Error('Prerequisites not met');
       }
 
       const res = await request(app)
         .put(`/stores/${testStoreId}/orders/${createdOrderId}/status`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${storeAdminToken}`)
         .send({ status: 'processing' });
 
       expect(res.status).toBe(200);
@@ -386,7 +418,7 @@ describe('Order Flow', () => {
     });
 
     it('should cancel order and restore inventory', async () => {
-      if (!customerToken || !authToken || !testStoreId || !cancelProduct) {
+      if (!customerToken || !storeAdminToken || !testStoreId || !cancelProduct) {
         throw new Error('Prerequisites not met');
       }
 
@@ -423,7 +455,7 @@ describe('Order Flow', () => {
       // Cancel the order via the status endpoint (no separate /cancel route)
       const cancelRes = await request(app)
         .put(`/stores/${testStoreId}/orders/${cancelOrderId}/status`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${storeAdminToken}`)
         .send({ status: 'cancelled' });
 
       expect(cancelRes.status).toBe(200);
