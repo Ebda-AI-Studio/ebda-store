@@ -99,7 +99,7 @@ Store emails, invoices (printable and email), campaign mail and the setup guide 
 
 `overriddenLookKeys(theme, look)` returns the look-owned keys the merchant has stored with a value that differs from the look. The builder's `ThemeSettingsPanel` shows an "edited" badge on each and a reset button. Reset is **draft-first** (Ruling LOOKS-11): flush pending autosave, remove the key from the draft theme (omit it, never `null`) via `replaceDocument` + `saveDraftNow`, then `PUT /stores/:id/theme { key: null }` to remove it from live only if live holds it. Resetting only live would be undone on the next publish; resetting only the draft would leave live untouched until then.
 
-`PUT /stores/:id/theme` treats `null` as "delete this key" (see `docs/architecture/store-theme-flags.md`).
+`PUT /stores/:id/theme` treats `null` as "delete this key" (see `docs/architecture/store-theme-flags.md`). It also refuses (400) any `density`, `imageRatio` or `motion` value outside `LOOK_DENSITIES` / `LOOK_IMAGE_RATIOS` / `LOOK_MOTIONS` (`packages/shared/src/looks/types.ts`); `null` still deletes the key.
 
 ## Demo preview
 

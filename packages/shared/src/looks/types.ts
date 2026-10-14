@@ -2,9 +2,13 @@ import type { StoreTheme, TemplateId, BorderRadius } from '../types/store-theme'
 
 export type LookTemplate = 'qamar' | 'souq' | 'jasmine' | 'lamma' | 'dahab';
 export type LookId = `${LookTemplate}.${string}`;
-export type Density = 'compact' | 'regular' | 'airy';
-export type ImageRatio = '1/1' | '4/5' | '3/4' | '4/3';
-export type Motion = 'none' | 'subtle' | 'expressive';
+/** The allowed values of the look-only theme keys (also the theme PUT's allow-lists). */
+export const LOOK_DENSITIES = ['compact', 'regular', 'airy'] as const;
+export const LOOK_IMAGE_RATIOS = ['1/1', '4/5', '3/4', '4/3'] as const;
+export const LOOK_MOTIONS = ['none', 'subtle', 'expressive'] as const;
+export type Density = (typeof LOOK_DENSITIES)[number];
+export type ImageRatio = (typeof LOOK_IMAGE_RATIOS)[number];
+export type Motion = (typeof LOOK_MOTIONS)[number];
 
 /** Colour roles as hex; converted to HSL triplets by lookTheme(). */
 export interface LookTokens {

@@ -203,6 +203,30 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     expect(s.look).toBe(LOOK_ID);
   });
 
+  it('theme PUT: density / imageRatio / motion accept only their known values (null deletes)', async () => {
+    const m = await seedMerchant('look-keys', { density: 'airy', motion: 'subtle' });
+    const putTheme = (body: Record<string, unknown>) =>
+      request(app)
+        .put(`/api/v1/stores/${m.storeId}/theme`)
+        .set({ Authorization: `Bearer ${m.token}` })
+        .send(body);
+    for (const bad of [
+      { density: 'huge' },
+      { imageRatio: '16/9' },
+      { imageRatio: '1 / 1' },
+      { motion: 'wild' },
+      { density: 3 },
+      { motion: '' },
+    ]) {
+      const res = await putTheme(bad);
+      expect(res.status, JSON.stringify(bad)).toBe(400);
+    }
+    expect((await row(m.storeId)).theme).toEqual({ density: 'airy', motion: 'subtle' });
+    const ok = await putTheme({ density: 'compact', imageRatio: '3/4', motion: null });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect((await row(m.storeId)).theme).toEqual({ density: 'compact', imageRatio: '3/4' });
+  });
+
   it('unknown look: 400 INVALID_LOOK and the store is unchanged', async () => {
     const m = await seedMerchant('bad', { primaryColor: 'X' });
     const res = await put(m.storeId, m.token, { lookId: 'nope.nothing', design: 'reset' });
