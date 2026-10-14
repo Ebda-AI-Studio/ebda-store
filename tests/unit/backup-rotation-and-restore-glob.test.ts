@@ -50,17 +50,13 @@ describe('#1846 — pre-push dumps get their own rotation, separate from the nig
 describe('#1847 — restore runbooks glob to *.sql.gz and verify before trusting', () => {
   it('DB-BACKUP-RESTORE.md globs the local-dump listing and verifies the chosen file', () => {
     const doc = read('docs/DB-BACKUP-RESTORE.md');
-    expect(doc).toMatch(
-      /ls -lt ~\/Desktop\/projects\/_backups\/force-website-builder\/\*\.sql\.gz/
-    );
+    expect(doc).toMatch(/ls -lt ~\/Desktop\/projects\/_backups\/ebda\/\*\.sql\.gz/);
     expect(doc).toMatch(/bash scripts\/verify-dump\.sh "\$DUMP"/);
   });
 
   it('ROLLBACK.md globs the "find the right backup" listing and verifies the chosen file', () => {
     const doc = read('docs/ROLLBACK.md');
-    expect(doc).toMatch(
-      /ls -lt ~\/Desktop\/projects\/_backups\/force-website-builder\/\*\.sql\.gz/
-    );
+    expect(doc).toMatch(/ls -lt ~\/Desktop\/projects\/_backups\/ebda\/\*\.sql\.gz/);
     expect(doc).toMatch(/bash scripts\/verify-dump\.sh <chosen>\.sql\.gz/);
   });
 });

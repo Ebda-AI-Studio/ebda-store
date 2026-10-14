@@ -112,8 +112,8 @@ fi
 case "$DATABASE_URL" in
   *-pooler.*)
     echo "ERROR: DATABASE_URL points at the Neon POOLER; pg_dump needs the DIRECT url." >&2
-    echo "       Fix: export DATABASE_URL=\"\$(neonctl connection-string --project-id crimson-king-40424588 \\" >&2
-    echo "              --org-id org-lingering-river-25973882 --role-name neondb_owner)\"" >&2
+    echo "       Fix: export DATABASE_URL=\"\$(neonctl connection-string --project-id lucky-truth-54548746 \\" >&2
+    echo "              --org-id org-proud-silence-64969971 --role-name neondb_owner)\"" >&2
     echo "       (the nightly ~/.claude/scripts/backup-all-neon.sh pulls it from Neon for this reason)" >&2
     exit 1
     ;;

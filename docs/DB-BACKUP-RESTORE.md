@@ -80,7 +80,7 @@ Central script `~/.claude/scripts/backup-all-neon.sh` (launchd `com.forceai.neon
 03:30 daily; runs on next wake if the Mac slept) gzip-dumps every Force Neon DB to
 `~/Desktop/projects/_backups/<project>/`, keeps **30** (~1 month).
 
-- **Location (FWB):** `~/Desktop/projects/_backups/force-website-builder/`
+- **Location (Ebda Store):** `~/Desktop/projects/_backups/ebda/` (needs `NEON_API_KEY_EBDA`, a Whisky 11-org key, in `~/.whisky-services.env`)
 - **Size:** ~19 MB total for the whole 30-day window; latest single dump ≈ **1.4 MB gzipped**
   (the entire DB — it's small). Files are `<UTC-timestamp>.sql.gz` (plaintext gzip) plus the
   `.sql.gz.enc` copies pushed off-site.
@@ -130,8 +130,8 @@ export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
 #    FAILED verify-dump.sh, parked by scripts/backup-db.sh — see below), and
 #    a fresh one sorts to the top of `ls -lt` as if it were the most recent
 #    good backup.
-ls -lt ~/Desktop/projects/_backups/force-website-builder/*.sql.gz
-DUMP=~/Desktop/projects/_backups/force-website-builder/<chosen>.sql.gz
+ls -lt ~/Desktop/projects/_backups/ebda/*.sql.gz
+DUMP=~/Desktop/projects/_backups/ebda/<chosen>.sql.gz
 #    …or fetch + decrypt an R2 copy:
 #    KEY=$(cat ~/.claude/.force-website-builder-backup-key)
 #    openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$KEY" \
