@@ -192,10 +192,10 @@ export function OnboardingFlow() {
       ) : step === 'template' ? (
         <TemplateStep
           storeId={store.id}
-          initial={store.template}
+          initial={store.look}
           onBack={() => setStep('billing')}
-          onDone={template => {
-            setStore({ ...store, template });
+          onDone={look => {
+            setStore({ ...store, look });
             go(1);
           }}
         />

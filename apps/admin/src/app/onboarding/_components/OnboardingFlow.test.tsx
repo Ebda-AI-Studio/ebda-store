@@ -7,6 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { getLook } from '@force/shared';
 
 const { apiGet, apiPost, apiPut, replace } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -50,6 +51,7 @@ const inactiveStore = {
   slug: 'my-shop',
   status: 'inactive',
   template: 'modern',
+  look: null,
   host: 'my-shop.ebda.app',
   url: 'https://my-shop.ebda.app',
   planCode: 'free',
@@ -303,12 +305,17 @@ describe('onboarding stepper', () => {
     );
     render(<OnboardingFlow />);
 
-    // Template: pick "elegant" -> PUT, then next.
+    // Look: pick a Dahab look -> PUT /look (design reset: a brand-new store), then next.
     await screen.findByText('onboarding.flow.template.title');
-    fireEvent.click(screen.getByRole('radio', { name: /^onboarding\.flow\.template\.elegant/ }));
+    fireEvent.click(
+      screen.getByRole('radio', { name: new RegExp(getLook('dahab.worn')!.name.en) })
+    );
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
     await waitFor(() =>
-      expect(apiPut).toHaveBeenCalledWith('/api/v1/stores/s1/template', { template: 'elegant' })
+      expect(apiPut).toHaveBeenCalledWith('/api/v1/stores/s1/look', {
+        lookId: 'dahab.worn',
+        design: 'reset',
+      })
     );
 
     // Product: price entered in EGP is sent in piastres, active, with the photo.
@@ -352,6 +359,15 @@ describe('onboarding stepper', () => {
     const wa = screen.getByRole('link', { name: /onboarding\.flow\.live\.whatsapp/ });
     expect(wa.getAttribute('href')).toContain('https://wa.me/?text=');
     expect(wa.getAttribute('href')).toContain(encodeURIComponent('https://my-shop.ebda.app'));
+  });
+
+  it('continuing without picking a look saves nothing (the store keeps its default)', async () => {
+    mockState({ ...verifiedNoStore, store: inactiveStore, codEnabled: true });
+    render(<OnboardingFlow />);
+    await screen.findByText('onboarding.flow.template.title');
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.flow.next' }));
+    await screen.findByText('onboarding.flow.product.title');
+    expect(apiPut).not.toHaveBeenCalled();
   });
 
   it('blocks Continue when COD is switched off (a store needs one payment method)', async () => {

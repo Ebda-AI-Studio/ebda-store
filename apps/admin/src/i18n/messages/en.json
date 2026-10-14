@@ -8981,20 +8981,9 @@
       },
       "template": {
         "title": "Pick a look",
-        "subtitle": "Choose a template. You can change it any time.",
-        "modern": "Modern",
-        "modernDesc": "Clean lines and bold accents.",
-        "classic": "Classic",
-        "classicDesc": "Timeless serif elegance.",
-        "minimal": "Minimal",
-        "minimalDesc": "Lots of space, product first.",
-        "bold": "Bold",
-        "boldDesc": "Vibrant and energetic.",
-        "elegant": "Elegant",
-        "elegantDesc": "Refined fashion and beauty look.",
-        "selected": "Selected",
-        "saveFailed": "We could not save the template. Please try again.",
-        "previewNote": "Illustrative layout — your photos and colors are added in store settings."
+        "subtitle": "Choose how your store looks. You can change it any time.",
+        "saveFailed": "We could not save your look. Please try again.",
+        "previewNote": "Previews show the look with sample products. Your photos and products are added next."
       },
       "product": {
         "title": "Add your first product",
@@ -9156,6 +9145,12 @@
       "support": "Need help?",
       "footer": "Your store. Your brand.",
       "back": "Back to Ebda Store"
+    }
+  },
+  "looks": {
+    "picker": {
+      "tabs": "Store templates",
+      "selected": "Selected"
     }
   },
   "billingEvents": {
