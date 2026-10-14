@@ -35,6 +35,14 @@
     "./plan-limits": {
       "types": "./src/schemas/plan-limits.ts",
       "default": "./src/schemas/plan-limits.ts"
+    },
+    "./tracking": {
+      "types": "./src/tracking/index.ts",
+      "default": "./src/tracking/index.ts"
+    },
+    "./tracking-browser": {
+      "types": "./src/tracking/browser.ts",
+      "default": "./src/tracking/browser.ts"
     }
   },
   "files": [
