@@ -57,7 +57,10 @@ export function commerceDetail(p: any) {
           name: chart.name || undefined,
           name_ar: chart.nameAr || undefined,
           unit: chart.unit,
-          columns: (chart.columns ?? []).map((c: any) => c.label || c.labelAr),
+          columns: (chart.columns ?? []).map((c: any) => ({
+            label: c.label || undefined,
+            label_ar: c.labelAr || undefined,
+          })),
           rows: chart.rows,
         }
       : undefined,

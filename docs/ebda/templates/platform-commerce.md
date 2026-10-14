@@ -7,7 +7,7 @@ Rules that apply to all of them:
 - **Platform code, never per store.** Every feature is data-driven and renders nothing until a merchant enters data (no empty states, no placeholders). No new `StoreTheme` toggle was added (the ThemeTab ceiling is 7).
 - **Bilingual.** Each merchant field has an `Ar` twin. The active language wins; the other is the fallback, never a blank.
 - **Taste bar (B0-4).** On a card: at most 5 swatch dots (then `+N`) and at most 2 fact chips, below the price, and nothing else. One accent colour (the primary action). Motion in exactly three places: the receipt print, the sticky bar slide-in, the swatch crossfade, each with a reduced-motion end state.
-- **Two PDP paths.** `apps/web/src/app/products/[slug]/ProductDetailClient.tsx` (default skins) and `apps/web/src/templates/dahab/ProductDetail.tsx`. **Card paths:** `PecannbeeProductCard`, the five `templates/{modern,elegant,classic,minimal,bold}/ProductCard.tsx`, `shared/ProductCarousel.tsx`, `app/products/ProductListItem.tsx`, `templates/dahab/ProductCard.tsx` (which `dahab/ProductCarousel.tsx` renders), plus four lists that hand-build a `TemplateProduct` and are card paths too: `YouMightAlsoLike`, `CartRecommendations`, `FrequentlyBoughtTogether`, `WishlistClient`.
+- **Two PDP paths.** `apps/web/src/app/products/[slug]/ProductDetailClient.tsx` (default skins) and `apps/web/src/templates/dahab/ProductDetail.tsx`. **Card paths = the 8 card paths + Dahab (`ProductCard` + `ProductCarousel`) + the 4 hand-built mappers.** The 8: `PecannbeeProductCard`, the five `templates/{modern,elegant,classic,minimal,bold}/ProductCard.tsx`, `shared/ProductCarousel.tsx`, `app/products/ProductListItem.tsx`. Dahab: `templates/dahab/ProductCard.tsx` (which `dahab/ProductCarousel.tsx` renders). The 4 hand-built mappers build their own `TemplateProduct` and are card paths too: `YouMightAlsoLike`, `CartRecommendations`, `FrequentlyBoughtTogether`, `WishlistClient`.
 - **Cache class.** Every one of these reads rides the public product caches and is BOUNDED-stale (the PDP revalidates in 60 s, listings and recommendations in at most 5 minutes). Every write goes through `invalidateStoreProductCaches`, so a save shows within seconds on the storefront.
 - **Migrations** (all additive): `20261016000100_option_value_swatches`, `20261016000300_product_facts`, `20261016000400_product_lead_time`, `20261016000500_personalisation`, `20261016000900_size_charts`. Video, hero video, the sticky bars, the receipt and `deliveryDays` need none.
 
@@ -23,7 +23,7 @@ Rules that apply to all of them:
 **Where it renders.**
 
 - PDP, both paths: the selector in `components/VariantSelector.tsx` (32 px round button, 44 px hit area, ring on the picked one, the picked value named beside the axis label, the localised name as `aria-label`). A colour tap crossfades the gallery image over 200 ms (ease-out-quint, reduced motion: instant, never on first paint).
-- Cards: `SwatchDots` on all nine card paths and the four lists above. Decorative (`aria-hidden`), at most 5 dots and then `+N`. `N` counts every swatch value, not only the shipped ones (`_count.values`).
+- Cards: `SwatchDots` on the 8 card paths + Dahab + the 4 hand-built mappers. Decorative (`aria-hidden`), at most 5 dots and then `+N`. `N` counts every swatch value, not only the shipped ones (`_count.values`).
 - Dahab's own `appearance='swatch'` / `swatchColor` is untouched; a product that has swatch values uses the round swatch even under Dahab.
 
 **Data.** `ProductOptionValue.swatchHex` (`#RRGGBB`, DB CHECK and `swatchHexSchema`), `ProductOptionValue.swatchImageUrl` (https only, at most 2048 characters, B0-8). Public PDP payload: each option value ships `id`, `swatchHex`, `swatchImageUrl`. Listings carry them through `LISTING_SWATCH_OPTIONS_SELECT` (`apps/api/src/lib/listing-swatch-select.ts`: up to 3 options and 8 swatch-bearing values each), also used by the recommendation and wishlist selects. The R2 registry lists `ProductOptionValue.swatchImageUrl`, so the orphan sweep keeps swatch photos.
@@ -52,7 +52,7 @@ Rules that apply to all of them:
 
 **Where it renders.**
 
-- Cards: `FactChips` under the price (value only, no key) on all nine card paths and the four lists.
+- Cards: `FactChips` under the price (value only, no key) on the 8 card paths + Dahab + the 4 hand-built mappers.
 - PDP: `FactsTable`, below the buy box on the default PDP (after SKU, to keep the 390 px fold), and as a closed "تفاصيل المنتج / Product details" accordion on Dahab.
 - Compare: `lib/compare-facts.ts` merges rows by the exact (English, Arabic) name pair; `CompareClient` renders them. A compare list saved before B0 shows no fact rows until the product is re-added (B0-14).
 

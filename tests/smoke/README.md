@@ -84,12 +84,15 @@ Health endpoints check the API. These smoke specs check that the deployed front-
 
 For deeper coverage, write a normal e2e under `tests/e2e/` (Vitest + supertest, API-level) or extend the integration suite under `tests/integration/`.
 
-## B0 commerce flow (local stack only)
+## B0 commerce flow (manual local gate, NOT a CI gate)
 
-`commerce-b0.spec.ts` is NOT a read-only prod smoke. It drives the Phase B0 flow (swatches, struck Size x Length combo, facts, delivery chip, size guide, required personalisation, sticky add-to-cart bar, personalised cart lines, COD checkout, receipt-printer success page, admin order via API) against the local seeded stack (`b0-minimal`, API :4100, web :3100 behind the host-shim proxy). It has its own Playwright project and **skips itself when that stack is unreachable**, so a smoke run against a deployed environment is unaffected.
+`commerce-b0.spec.ts` is not a read-only prod smoke and **it does not run in CI**. It is a manual gate you run on a developer machine against a local seeded stack (setup recipe: [`commerce-b0.setup.md`](./commerce-b0.setup.md)). It drives the Phase B0 flow (swatches, struck Size x Length combo, facts, delivery chip, size guide, required personalisation, sticky add-to-cart bar, personalised cart lines, COD checkout, receipt-printer success page, admin order via API) and has its own Playwright project.
 
 ```bash
-npx playwright test tests/smoke/commerce-b0.spec.ts --project=commerce-b0
+export B0_OWNER_EMAIL=... B0_OWNER_PASSWORD=...   # env only, no credentials file
+B0_REQUIRE_STACK=1 npx playwright test tests/smoke/commerce-b0.spec.ts --project=commerce-b0
 ```
 
-Env overrides: `B0_WEB_URL`, `B0_API_URL`, `B0_STORE_SLUG`, `B0_PRODUCT_SLUG`, `B0_OWNER_EMAIL` / `B0_OWNER_PASSWORD` (else read from `B0_CREDENTIALS_FILE`). It writes to the local DB only (one size chart, product facts/personalisation/lead time, a COD config, one order) and restores the product, chart and COD config afterwards. The admin order step asserts through the admin API the order page calls; the admin UI is not driven.
+With `B0_REQUIRE_STACK=1` a missing stack or missing credentials FAILS the run. Without it the file skips itself (so a smoke run against a deployed environment is unaffected), and a skip is not a pass.
+
+Env: `B0_WEB_URL`, `B0_API_URL`, `B0_STORE_SLUG`, `B0_PRODUCT_SLUG`, `B0_OWNER_EMAIL`, `B0_OWNER_PASSWORD`, `B0_REQUIRE_STACK`. It writes to the local DB only (one size chart, product facts/personalisation/lead time, a COD config, one order) and restores the product, chart and COD config afterwards. The admin order step asserts through the admin API the order page calls; the admin UI is not driven.

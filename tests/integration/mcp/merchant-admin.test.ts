@@ -259,6 +259,48 @@ describe.skipIf(!hasDb)('merchant-admin MCP surface', () => {
     expect(res.text).toContain('draft');
   });
 
+  it('admin_get_product returns the B0 fields (facts, leadTimeDays, personalisation, sizeChartId)', async () => {
+    const chart = await withRlsBypass(async tx => {
+      const c = await tx.sizeChart.create({
+        data: {
+          storeId: A.storeId,
+          name: 'mcp chart',
+          columns: [{ label: 'Size' }, { label: 'Length' }],
+          rows: [['S', '52']],
+        },
+      });
+      await tx.product.update({
+        where: { id: A.productId },
+        data: {
+          facts: [
+            { key: 'Fabric', keyAr: 'الخامة', value: 'Linen', valueAr: 'كتان', onCard: true },
+          ],
+          leadTimeDays: 5,
+          personalisation: {
+            enabled: true,
+            required: true,
+            label: 'Name',
+            labelAr: 'الاسم',
+            maxLength: 12,
+          },
+          sizeChartId: c.id,
+        },
+      });
+      return c;
+    });
+    const res = await call(A.slug, 'admin_get_product', { productId: A.productId }, A.readKey);
+    expect(res.status).toBe(200);
+    expect(res.text).not.toContain('isError');
+    // The tool result is JSON text inside the JSON-RPC envelope: match the escaped payload.
+    const text = res.text.replace(/\\"/g, '"');
+    expect(text).toContain('"facts":[{"key":"Fabric","keyAr":"الخامة","value":"Linen"');
+    expect(text).toContain('"leadTimeDays":5');
+    expect(text).toContain('"personalisation":{');
+    expect(text).toContain('"required":true');
+    expect(text).toContain('"maxLength":12');
+    expect(text).toContain(`"sizeChartId":"${chart.id}"`);
+  });
+
   it("admin_get_product refuses store B's product id on store A", async () => {
     const res = await call(A.slug, 'admin_get_product', { productId: B.productId }, A.readKey);
     expect(res.status).toBe(200); // JSON-RPC transport succeeded...

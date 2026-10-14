@@ -1,26 +1,24 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 /**
  * Phase B0 commerce flow, driven against the LOCAL seeded stack (never production):
  *   PDP (swatches, struck combo, facts, delivery chip, size guide, required personalisation)
  *   -> sticky add-to-cart bar -> cart (two personalised lines + sticky total) -> COD checkout
  *   -> receipt-printer success page -> the same order through the admin API.
  *
- * Needs the local stack from `.superpowers/.../local-stack/README.md` (API :4100, web via the
- * host-shim proxy :3100, store `b0-minimal`, the "Linen Abaya" fixture). When the stack is not
- * reachable the whole file SKIPS, so the default `playwright test` smoke run against a deployed
- * environment is unaffected. It mutates the local DB only: it creates one size chart, edits the
+ * Needs the local stack described in `tests/smoke/commerce-b0.setup.md` (API :4100, web via a
+ * host-shim proxy :3100, store `b0-minimal`, the "Linen Abaya" fixture). This is a MANUAL local
+ * gate, not a CI gate. Without `B0_REQUIRE_STACK=1`, an unreachable stack or missing credentials
+ * SKIPS the file (so a smoke run against a deployed environment is unaffected); with
+ * `B0_REQUIRE_STACK=1` it FAILS loudly instead, so a gate run can never pass by skipping. It mutates the local DB only: it creates one size chart, edits the
  * Linen Abaya through the admin API, places one COD order, and restores the product afterwards.
  *
- * Env (all optional):
+ * Env:
+ *   B0_REQUIRE_STACK=1                          fail instead of skip when the stack/credentials are missing
+ *   B0_OWNER_EMAIL / B0_OWNER_PASSWORD          REQUIRED, the store owner's login (env only, never a file)
  *   B0_WEB_URL      storefront origin           default http://b0-minimal.localhost:3100
  *   B0_API_URL      API origin + /api/v1        default http://127.0.0.1:4100/api/v1
  *   B0_STORE_SLUG   store slug                  default b0-minimal
  *   B0_PRODUCT_SLUG product slug                default linen-abaya
- *   B0_OWNER_EMAIL / B0_OWNER_PASSWORD          else read from B0_CREDENTIALS_FILE
- *   B0_CREDENTIALS_FILE                         default the local-stack CREDENTIALS.local (chmod 600)
  *
  * Step 8 (admin order view) is asserted through the admin API the order page calls
  * (`GET /stores/:id/orders/:orderId`); the admin UI itself is not driven here.
@@ -30,21 +28,11 @@ const WEB = process.env.B0_WEB_URL ?? 'http://b0-minimal.localhost:3100';
 const API = process.env.B0_API_URL ?? 'http://127.0.0.1:4100/api/v1';
 const STORE_SLUG = process.env.B0_STORE_SLUG ?? 'b0-minimal';
 const PRODUCT_SLUG = process.env.B0_PRODUCT_SLUG ?? 'linen-abaya';
-const CREDS_FILE =
-  process.env.B0_CREDENTIALS_FILE ??
-  resolve(
-    __dirname,
-    '../../.superpowers/sdd/2026-10-14-phase-b0-platform-commerce/local-stack/CREDENTIALS.local'
-  );
+const REQUIRE_STACK = process.env.B0_REQUIRE_STACK === '1';
 
 function ownerCredentials(): { email: string; password: string } | null {
-  let email = process.env.B0_OWNER_EMAIL;
-  let password = process.env.B0_OWNER_PASSWORD;
-  if ((!email || !password) && existsSync(CREDS_FILE)) {
-    const raw = readFileSync(CREDS_FILE, 'utf8');
-    email ??= /^B0_OWNER_EMAIL=(.+)$/m.exec(raw)?.[1];
-    password ??= /^B0_OWNER_PASSWORD=(.+)$/m.exec(raw)?.[1];
-  }
+  const email = process.env.B0_OWNER_EMAIL;
+  const password = process.env.B0_OWNER_PASSWORD;
   return email && password ? { email, password } : null;
 }
 
@@ -53,6 +41,8 @@ let token = '';
 let storeId = '';
 let productId = '';
 let createdChartId = '';
+let variantId = '';
+let variantOriginalStock = 0;
 let codCreated = false;
 let codWasDisabled = false;
 let originalProduct: Json = {};
@@ -85,6 +75,11 @@ test.describe('commerce b0 flow @local-stack', () => {
       const creds = ownerCredentials();
       if (!stackUp || !creds) {
         stackUp = false;
+        if (REQUIRE_STACK) {
+          throw new Error(
+            `B0_REQUIRE_STACK=1 but the local B0 stack is not usable: api=${ping ? ping.status() : 'unreachable'} (${API}), web=${web ? web.status() : 'unreachable'} (${WEB}), credentials=${creds ? 'set' : 'MISSING (B0_OWNER_EMAIL / B0_OWNER_PASSWORD)'}. See tests/smoke/commerce-b0.setup.md.`
+          );
+        }
         return;
       }
 
@@ -158,6 +153,27 @@ test.describe('commerce b0 flow @local-stack', () => {
       });
       expect(put.status, JSON.stringify(put.body)).toBe(200);
 
+      // The flow buys Rose / M / 54 twice per run and the COD order holds stock, so make sure
+      // there is plenty; it is only ever topped UP and left that way (never restored lower), because
+      // lowering it again would hand the next run a drained, cached PDP.
+      const vs = await adminFetch(
+        request,
+        'get',
+        `/stores/${storeId}/products/${productId}/variants`
+      );
+      const list = (vs.body.data.variants ?? vs.body.data) as Json[];
+      const rose = list.find(v => String(v.title).replace(/\s+/g, '') === 'Rose/M/54');
+      expect(rose, 'variant Rose / M / 54 (see commerce-b0.setup.md)').toBeTruthy();
+      variantId = rose!.id;
+      variantOriginalStock = rose!.inventory;
+      const stock = await adminFetch(
+        request,
+        'put',
+        `/stores/${storeId}/products/${productId}/variants/${variantId}`,
+        { inventory: Math.max(variantOriginalStock, 50) }
+      );
+      expect(stock.status, JSON.stringify(stock.body)).toBe(200);
+
       // The store needs cash on delivery enabled for the COD checkout step.
       const cod = await adminFetch(request, 'post', `/payment-settings/store/${storeId}`, {
         provider: 'cod',
@@ -193,6 +209,13 @@ test.describe('commerce b0 flow @local-stack', () => {
           sizeChartId: originalProduct.sizeChartId,
         });
       }
+      if (orderId) {
+        // An open unpaid COD order counts toward the per-IP stock-hold cap and holds stock;
+        // cancel it so repeated runs do not exhaust the cap (429 TOO_MANY_OPEN_HOLDS).
+        await adminFetch(request, 'put', `/stores/${storeId}/orders/${orderId}/status`, {
+          status: 'cancelled',
+        });
+      }
       if (createdChartId) {
         await adminFetch(request, 'delete', `/stores/${storeId}/size-charts/${createdChartId}`);
       }
@@ -209,7 +232,10 @@ test.describe('commerce b0 flow @local-stack', () => {
   });
 
   test.beforeEach(() => {
-    test.skip(!stackUp, 'local B0 stack (API :4100 + web :3100 + owner credentials) not reachable');
+    test.skip(
+      !stackUp && !REQUIRE_STACK,
+      'local B0 stack (API :4100 + web :3100 + B0_OWNER_* env) not usable'
+    );
   });
 
   test.use({ viewport: { width: 390, height: 844 }, baseURL: WEB });
@@ -232,9 +258,20 @@ test.describe('commerce b0 flow @local-stack', () => {
     ]);
 
     // 1. The PDP.
+    // The dev PDP is cached for up to 60 s, so right after a stock top-up Rose / M / 54 can still
+    // read sold out. Reload until it is purchasable (a no-op on a normal run).
+    for (let attempt = 0; ; attempt++) {
+      await page.goto(`/products/${PRODUCT_SLUG}`, { waitUntil: 'domcontentloaded' });
+      // Local dev stack: wait for hydration before clicking (buttons are inert until then).
+      await settle(page);
+      await page.getByRole('button', { name: 'وردي' }).click();
+      await page.getByRole('button', { name: 'M', exact: true }).click();
+      if (await page.getByRole('button', { name: '54 سم' }).isEnabled()) break;
+      expect(attempt, 'Rose / M / 54 stayed sold out (stale cache or no stock)').toBeLessThan(18);
+      await page.waitForTimeout(5_000);
+    }
     await page.goto(`/products/${PRODUCT_SLUG}`, { waitUntil: 'domcontentloaded' });
-    // Local dev stack: wait for hydration before clicking (buttons are inert until then).
-    await page.waitForLoadState('networkidle');
+    await settle(page);
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
 
     // 2. Swatches, the struck sold-out combo, facts, delivery chip, size guide.
@@ -295,7 +332,7 @@ test.describe('commerce b0 flow @local-stack', () => {
 
     // 5. The cart: two lines, one note each, and the sticky total bar.
     await page.goto('/cart', { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle');
+    await settle(page);
     // CartLineNote renders `✎ <bdi>note</bdi>` (the pencil is its own aria-hidden span).
     const noteLine = (name: string) =>
       page.locator('p', { has: page.locator(`bdi:text-is("${name}")`) });
@@ -347,6 +384,11 @@ test.describe('commerce b0 flow @local-stack', () => {
     }
   });
 });
+
+/** Wait for the dev server to go quiet (hydration), but never fail on a chatty HMR socket. */
+async function settle(page: Page) {
+  await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+}
 
 async function fillCheckout(page: Page) {
   await page.locator('input[autocomplete="given-name"]').fill('Test');

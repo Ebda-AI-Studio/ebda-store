@@ -74,7 +74,10 @@ describe('buyer MCP get_product carries the B0 commerce fields', () => {
     expect(out.size_chart).toEqual({
       name: 'Abaya',
       unit: 'cm',
-      columns: ['Size', 'Length'],
+      columns: [
+        { label: 'Size', label_ar: 'المقاس' },
+        { label: 'Length', label_ar: 'الطول' },
+      ],
       rows: [['S', '52']],
     });
   });
