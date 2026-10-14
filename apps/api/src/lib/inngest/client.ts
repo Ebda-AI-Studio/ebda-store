@@ -313,6 +313,20 @@ type CampaignSendRequestedEvent = EventPayload & {
   };
 };
 
+// Ebda's own acquisition conversions (Meta Conversions API). Emitted after the business
+// transaction committed; see functions/ebda-ads-conversion.ts and services/ebda-ads-emit.ts.
+type EbdaAdsConversionRequestedEvent = EventPayload & {
+  name: 'ebda-ads/conversion.requested';
+  data: {
+    name: 'CompleteRegistration' | 'StoreCreated' | 'Purchase';
+    /** Meta dedup id, shared with the browser twin (shared/tracking/event-ids.ts). */
+    eventId: string;
+    userId: string;
+    storeId?: string;
+    billingEventId?: string;
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -345,7 +359,8 @@ export type AppEvent =
   | AnswerEngineScanRequestedEvent
   | GscIngestRequestedEvent
   | ContactFormSubmittedEvent
-  | CampaignSendRequestedEvent;
+  | CampaignSendRequestedEvent
+  | EbdaAdsConversionRequestedEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots

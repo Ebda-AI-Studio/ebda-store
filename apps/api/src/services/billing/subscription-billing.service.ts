@@ -285,6 +285,7 @@ async function applySuccess(
     await applyPlan(tx, row.storeId, row.planCode);
     effects.push({ kind: 'plan_changed', storeId: row.storeId });
     effects.push({ kind: 'payment_recorded', storeId: row.storeId });
+    effects.push({ kind: 'subscription_paid', storeId: row.storeId, billingEventId: row.id });
     return;
   }
 
@@ -335,6 +336,11 @@ async function applySuccess(
       effects.push({ kind: 'plan_changed', storeId: row.storeId });
     }
     effects.push({ kind: 'payment_recorded', storeId: row.storeId });
+    // Only a charge that ENDS a trial can be the first paid payment (the trial-end charge is a
+    // `renewal`); later renewals are not conversions, so they are not queued.
+    if (sub.status === 'trialing') {
+      effects.push({ kind: 'subscription_paid', storeId: row.storeId, billingEventId: row.id });
+    }
   }
 }
 

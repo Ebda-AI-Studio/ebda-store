@@ -858,6 +858,7 @@ export async function recordManualPayment(input: ManualPaymentInput): Promise<Ma
         planCode: plan.code,
         periodEnd: result.periodEnd!,
       },
+      { kind: 'subscription_paid', storeId: input.storeId, billingEventId: result.billingEventId },
     ]);
   }
   return result;
