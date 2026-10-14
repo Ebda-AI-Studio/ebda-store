@@ -37,7 +37,7 @@ vi.mock('next-intl', async () => {
     footerContentEmpty: 'Footer links live elsewhere for now.',
     announcementContentEmpty: "This bar's text lives elsewhere for now.",
     brandStoryContentEmpty: "This section's text and image live elsewhere for now.",
-    trustStripContentEmpty: "This strip's items live elsewhere for now.",
+    trustStripContentEmpty: 'Write your own trust items: add them under this section.',
     editInClassic: 'Edit in the classic page builder',
     editAnnouncement: 'Edit announcement text',
     editStoreDescription: 'Edit store description',
@@ -114,7 +114,6 @@ describe('SettingsPanel — header/footer Content tab points elsewhere instead o
   it.each([
     ['announcement', 'Edit announcement text', '/stores/store-1/announcement'],
     ['brand-story', 'Edit store description', '/stores/store-1/branding'],
-    ['trust-strip', 'Edit strip style', '/stores/store-1/page-builder'],
   ])(
     '%s: points to the actual editor without claiming fixed content is editable',
     (type, label, href) => {
@@ -128,13 +127,19 @@ describe('SettingsPanel — header/footer Content tab points elsewhere instead o
   it.each([
     ['announcement', 'تعديل نص الإعلان', '/stores/store-1/announcement'],
     ['brand-story', 'تعديل وصف المتجر', '/stores/store-1/branding'],
-    ['trust-strip', 'تعديل تنسيق الشريط', '/stores/store-1/page-builder'],
   ])('%s: Arabic uses the same verified destination', (type, label, href) => {
     localeState.value = 'ar';
     renderPanel(type, type);
     const panel = screen.getByTestId(`${type}-content-elsewhere`);
     expect(panel.querySelector('a')?.textContent).toBe(label);
     expect(panel.querySelector('a')?.getAttribute('href')).toBe(href);
-    if (type === 'trust-strip') expect(panel.textContent).toContain('عناصر هذا الشريط ثابتة');
+  });
+
+  it('trust-strip: items are now editable as blocks, so the notice says so and links nowhere', () => {
+    renderPanel('trust-strip', 'trust-strip');
+    const panel = screen.getByTestId('trust-strip-content-elsewhere');
+    expect(panel.textContent).toContain('Write your own trust items');
+    expect(panel.querySelector('a')).toBeNull();
+    expect(panel.textContent).not.toContain('fixed');
   });
 });

@@ -201,26 +201,24 @@ export function SettingsPanel({
 }
 
 // These sections have no local content fields. Point to the verified source
-// editor; the trust strip has fixed items and only offers style controls.
-const CONTENT_ELSEWHERE: Record<string, { messageKey: string; route: string; labelKey: string }> = {
-  header: { messageKey: 'headerContentEmpty', route: 'page-builder', labelKey: 'editInClassic' },
-  footer: { messageKey: 'footerContentEmpty', route: 'page-builder', labelKey: 'editInClassic' },
-  announcement: {
-    messageKey: 'announcementContentEmpty',
-    route: 'announcement',
-    labelKey: 'editAnnouncement',
-  },
-  'brand-story': {
-    messageKey: 'brandStoryContentEmpty',
-    route: 'branding',
-    labelKey: 'editStoreDescription',
-  },
-  'trust-strip': {
-    messageKey: 'trustStripContentEmpty',
-    route: 'page-builder',
-    labelKey: 'editTrustStripStyle',
-  },
-};
+// editor. The trust strip's items are blocks edited in the section list (add /
+// remove / reorder); its notice only says so and links nowhere.
+const CONTENT_ELSEWHERE: Record<string, { messageKey: string; route?: string; labelKey?: string }> =
+  {
+    header: { messageKey: 'headerContentEmpty', route: 'page-builder', labelKey: 'editInClassic' },
+    footer: { messageKey: 'footerContentEmpty', route: 'page-builder', labelKey: 'editInClassic' },
+    announcement: {
+      messageKey: 'announcementContentEmpty',
+      route: 'announcement',
+      labelKey: 'editAnnouncement',
+    },
+    'brand-story': {
+      messageKey: 'brandStoryContentEmpty',
+      route: 'branding',
+      labelKey: 'editStoreDescription',
+    },
+    'trust-strip': { messageKey: 'trustStripContentEmpty' },
+  };
 
 function ContentElsewhereNotice({
   sectionType,
@@ -238,10 +236,15 @@ function ContentElsewhereNotice({
       data-testid={`${sectionType}-content-elsewhere`}
       className="rounded-lg border border-dashed border-border p-2 text-xs text-muted-foreground"
     >
-      {t(notice.messageKey)}{' '}
-      <a href={`/stores/${storeId}/${notice.route}`} className="text-primary hover:underline">
-        {t(notice.labelKey)}
-      </a>
+      {t(notice.messageKey)}
+      {notice.route && notice.labelKey && (
+        <>
+          {' '}
+          <a href={`/stores/${storeId}/${notice.route}`} className="text-primary hover:underline">
+            {t(notice.labelKey)}
+          </a>
+        </>
+      )}
       {sectionType === 'header' && (
         <>
           {' · '}

@@ -9747,7 +9747,7 @@
       "editTrustStripStyle": "Edit strip style",
       "announcementContentEmpty": "Edit this bar’s text in Announcement.",
       "brandStoryContentEmpty": "This section uses your store description. Edit the text in Branding.",
-      "trustStripContentEmpty": "This strip’s items are fixed. You can change its visibility and style in the classic page builder.",
+      "trustStripContentEmpty": "Write your own trust items (delivery, payment, returns): add them under this section in the section list. A strip with no items is hidden on your store.",
       "changeImage": "Change",
       "chooseImage": "Choose image",
       "removeImage": "Remove",

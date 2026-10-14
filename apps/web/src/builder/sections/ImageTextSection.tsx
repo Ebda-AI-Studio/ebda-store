@@ -61,6 +61,17 @@ export function ImageTextSection({
   const edit = (key: string) =>
     editorMode ? { 'data-builder-setting': ar ? `${key}Ar` : key } : {};
   const imageFirst = (settings.imagePosition ?? 'start') === 'start';
+  // A section with no image, heading, text or button is an empty shell: hide it
+  // on the public storefront. The editor canvas still shows it (with the grey
+  // image placeholder) so the merchant can select and fill it.
+  const hasContent = !!(image || heading || body || button);
+  if (!hasContent && !editorMode) return null;
+  // No image chosen yet: publicly show the text on its own, never a grey box.
+  const showImageColumn = !!image || editorMode;
+
+  const textColumnClass = showImageColumn
+    ? `${imageFirst ? 'md:order-2' : 'md:order-1'} text-start`
+    : 'text-start md:col-span-2';
 
   return (
     <section
@@ -71,22 +82,24 @@ export function ImageTextSection({
       <div
         className={`${spacing.innerContainerClass} grid items-center gap-6 md:grid-cols-2 md:gap-10`}
       >
-        <div className={imageFirst ? 'md:order-1' : 'md:order-2'}>
-          {image ? (
-            <img
-              src={image}
-              alt={alt}
-              loading="lazy"
-              className={`w-full rounded-[var(--radius)] object-cover ${ASPECT[settings.imageAspect ?? 'square']}`}
-            />
-          ) : (
-            <div
-              aria-hidden="true"
-              className={`w-full rounded-[var(--radius)] bg-muted ${ASPECT[settings.imageAspect ?? 'square']}`}
-            />
-          )}
-        </div>
-        <div className={`${imageFirst ? 'md:order-2' : 'md:order-1'} text-start`}>
+        {showImageColumn && (
+          <div className={imageFirst ? 'md:order-1' : 'md:order-2'}>
+            {image ? (
+              <img
+                src={image}
+                alt={alt}
+                loading="lazy"
+                className={`w-full rounded-[var(--radius)] object-cover ${ASPECT[settings.imageAspect ?? 'square']}`}
+              />
+            ) : (
+              <div
+                aria-hidden="true"
+                className={`w-full rounded-[var(--radius)] bg-muted ${ASPECT[settings.imageAspect ?? 'square']}`}
+              />
+            )}
+          </div>
+        )}
+        <div className={textColumnClass}>
           {heading && (
             <h2
               className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"

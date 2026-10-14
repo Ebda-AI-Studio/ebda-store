@@ -327,6 +327,25 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     legacyKey: 'trustStrip',
     rendererKey: 'home.trustStrip',
     group: 'template',
+    blocks: [
+      {
+        type: 'item',
+        labelEn: 'Trust item',
+        labelAr: 'عنصر ثقة',
+        maxCount: 6,
+        settings: [
+          s.select(
+            'icon',
+            'Icon',
+            'الأيقونة',
+            TRUST_BADGE_ICONS.map(i => opt(i, BADGE_ICON_LABELS[i][0], BADGE_ICON_LABELS[i][1])),
+            { group: 'content' }
+          ),
+          s.text('title', 'Title', 'العنوان', { localized: true }),
+          s.text('text', 'Subtitle (optional)', 'سطر فرعي (اختياري)', { localized: true }),
+        ],
+      },
+    ],
     settings: [
       s.select('layout', 'Layout', 'التخطيط', [
         opt('horizontal', 'Row', 'صف'),

@@ -647,9 +647,27 @@ export interface BrandStorySettings extends SectionBgOverride, SectionPaddingMax
  * Trust Strip — 3 trust-signal badges (free delivery / returns / support).
  * Folded into page-builder 2026-05-20.
  */
+export interface TrustStripItem {
+  /** Optional glyph key (the trust-badge icon set). */
+  icon?: string;
+  title?: string;
+  titleAr?: string;
+  /** Optional one-line subtitle. */
+  text?: string;
+  textAr?: string;
+}
+
 export interface TrustStripSettings extends SectionBgOverride, SectionPaddingMaxWidthVisibility {
   /** When false, hide on storefront. Legacy fallback: `theme.showTrustStrip`. */
   enabled?: boolean;
+  /**
+   * The merchant's own trust items. ABSENT (key not stored) = a store that
+   * predates editable items: the storefront keeps rendering the three fixed
+   * legacy defaults. PRESENT (even `[]`) = merchant-owned: only these items
+   * render, and an empty list hides the strip. New stores are provisioned
+   * with `items: []`, so they show nothing until the merchant adds items.
+   */
+  items?: TrustStripItem[];
   /** Horizontal (3-up tight) or vertical (stacked). Default 'horizontal'.
    *  Legacy fallback: `theme.trustStripLayout`. */
   layout?: 'horizontal' | 'vertical';
@@ -1034,6 +1052,18 @@ type _AssertKeysComplete = keyof StoreLayoutSettings extends (typeof LAYOUT_TOP_
 export const _layoutKeysCoversInterface: _AssertKeysCover = true;
 /** @internal compile-time assertion — do not use at runtime */
 export const _layoutInterfaceCoversKeys: _AssertKeysComplete = true;
+
+/**
+ * `stores.layout_settings` for a store created from now on. Only what must
+ * differ from "empty object = packaged defaults": the trust strip is
+ * merchant-owned (`items: []` = hidden until they write items). A store whose
+ * column is `{}` or lacks `trustStrip.items` keeps the fixed legacy items, so
+ * existing stores render exactly as before. Written by `ProvisioningService`
+ * and `StoreService.create`.
+ */
+export const NEW_STORE_LAYOUT_SETTINGS = {
+  trustStrip: { items: [] },
+} satisfies Pick<StoreLayoutSettings, 'trustStrip'>;
 
 /**
  * Pecannbee flow defaults. When a tenant's `layout_settings` column is `{}`

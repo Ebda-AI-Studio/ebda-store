@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { BlogCarousel, type BlogCarouselPost } from './BlogCarousel';
 import { useStore } from '../../contexts/StoreContext';
 import { api } from '../../lib/api';
@@ -19,8 +19,15 @@ import type { SectionPaddingMaxWidthVisibility } from '@force/shared';
  */
 export function HomeBlogCarousel({
   spacingSettings,
+  before,
+  emptyFallback,
 }: {
   spacingSettings?: SectionPaddingMaxWidthVisibility;
+  /** Rendered only together with the carousel (e.g. the section divider), so
+   *  a store with no posts gets no stray divider. */
+  before?: ReactNode;
+  /** Rendered instead of nothing when there is nothing to show (editor canvas hint). */
+  emptyFallback?: ReactNode;
 } = {}) {
   const { store } = useStore();
   const [posts, setPosts] = useState<BlogCarouselPost[] | null>(null);
@@ -49,7 +56,12 @@ export function HomeBlogCarousel({
     };
   }, [store.id, store.blogEnabled]);
 
-  if (!store.blogEnabled) return null;
-  if (!posts || posts.length === 0) return null;
-  return <BlogCarousel posts={posts} spacingSettings={spacingSettings} />;
+  if (!store.blogEnabled) return <>{emptyFallback}</>;
+  if (!posts || posts.length === 0) return <>{emptyFallback}</>;
+  return (
+    <>
+      {before}
+      <BlogCarousel posts={posts} spacingSettings={spacingSettings} />
+    </>
+  );
 }

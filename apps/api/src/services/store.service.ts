@@ -30,6 +30,7 @@ import {
   storeHost,
   REGION,
   STORE_PLAN_TO_PLAN_CODE,
+  NEW_STORE_LAYOUT_SETTINGS,
 } from '@force/shared';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
@@ -415,6 +416,9 @@ export class StoreService {
           domain: data.domain,
           ...(data.domain ? { domainStatus: 'active', domainVerifiedAt: new Date() } : {}),
           ownerId,
+          // Same fresh-store default as provisioning: no trust strip until the
+          // merchant writes items (empty `items` = merchant-owned, hidden).
+          layoutSettings: NEW_STORE_LAYOUT_SETTINGS,
           ...(merchantCreate
             ? {
                 status: 'inactive' as const,

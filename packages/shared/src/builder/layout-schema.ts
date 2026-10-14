@@ -387,6 +387,22 @@ const layoutSchemaInternal = z
     trustStrip: z
       .object({
         enabled: z.boolean().optional(),
+        // Merchant-owned items. Absent = legacy store (fixed defaults render);
+        // must be listed or Zod strips it on every PUT (same trap as above).
+        items: z
+          .array(
+            z
+              .object({
+                icon: z.string().max(32).optional(),
+                title: z.string().max(80).optional(),
+                titleAr: z.string().max(80).optional(),
+                text: z.string().max(200).optional(),
+                textAr: z.string().max(200).optional(),
+              })
+              .strict()
+          )
+          .max(6)
+          .optional(),
         layout: z.enum(['horizontal', 'vertical']).optional(),
         // `size`, `iconColor`, `iconBgColor` were missing here. This schema has
         // no .passthrough(), so the parse step silently stripped them on every

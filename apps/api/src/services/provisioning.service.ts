@@ -26,6 +26,7 @@ import {
   REGION,
   storefrontOrigin,
   isReservedSlug,
+  NEW_STORE_LAYOUT_SETTINGS,
 } from '@force/shared';
 
 // ==========================================
@@ -208,6 +209,11 @@ export class ProvisioningService {
               ownerId: owner.id,
               status,
               ...(template ? { template } : {}),
+              // A new store starts with NO trust strip: `items: []` marks the
+              // strip merchant-owned (empty = hidden). Stores that predate this
+              // have no `items` key and keep the fixed defaults (see
+              // TrustStripSettings.items). No migration needed.
+              layoutSettings: NEW_STORE_LAYOUT_SETTINGS,
               plan,
               ...(isValidTimeZone(requestedZone) ? { timezone: requestedZone } : {}),
               settings: {
