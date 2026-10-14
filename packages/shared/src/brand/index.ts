@@ -70,6 +70,13 @@ export const BRAND = {
    */
   supportEmail: 'ahlan@ebda.app',
   noReplyEmail: 'no-reply@ebda.app',
+  /**
+   * Public WhatsApp line for pre-sales questions (the marketing site header, FAQ and close).
+   * E.164 with the leading +; use `whatsappUrl()` / `whatsappDisplay()` to render it.
+   */
+  contact: {
+    whatsapp: '+201207761882',
+  },
   legalUrls: {
     terms: 'https://ebda.app/terms',
     privacy: 'https://ebda.app/privacy',
@@ -100,6 +107,17 @@ export const BRAND_MARKETING_URL = brandUrl(BRAND.domains.marketing);
 export const BRAND_STORE_APP_URL = brandUrl(BRAND.domains.storeApp);
 /** API origin, e.g. `https://api.ebda.app`. */
 export const BRAND_API_URL = brandUrl(BRAND.domains.api);
+
+/** `https://wa.me/<digits>` for the public WhatsApp line (digits only, no +), optional prefilled text. */
+export function whatsappUrl(text?: string): string {
+  const url = `https://wa.me/${BRAND.contact.whatsapp.replace(/\D/g, '')}`;
+  return text ? `${url}?text=${encodeURIComponent(text)}` : url;
+}
+
+/** The WhatsApp number for display, e.g. `+20 120 776 1882` (render left-to-right, selectable). */
+export function whatsappDisplay(): string {
+  return BRAND.contact.whatsapp.replace(/^\+20(\d{3})(\d{3})(\d{4})$/, '+20 $1 $2 $3');
+}
 
 /** Hosted PNG of the mark for transactional email (mail clients drop SVG). */
 export const BRAND_EMAIL_LOGO_URL = `${BRAND_MARKETING_URL}/email-logo.png`;

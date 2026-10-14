@@ -9,6 +9,8 @@ import {
   poweredByBrand,
   storeHost,
   storeOrigin,
+  whatsappDisplay,
+  whatsappUrl,
 } from '../../packages/shared/src/brand';
 
 describe('BRAND', () => {
@@ -27,6 +29,15 @@ describe('BRAND', () => {
     expect(BRAND.fonts.arabic).toBe('IBM Plex Sans Arabic');
     expect(BRAND.supportEmail).toBe('ahlan@ebda.app');
     expect(BRAND.noReplyEmail).toBe('no-reply@ebda.app');
+  });
+
+  it('carries the public WhatsApp line once, with a wa.me link and a readable form', () => {
+    expect(BRAND.contact.whatsapp).toBe('+201207761882');
+    expect(whatsappUrl()).toBe('https://wa.me/201207761882');
+    expect(whatsappUrl('أهلاً ستور')).toBe(
+      `https://wa.me/201207761882?text=${encodeURIComponent('أهلاً ستور')}`
+    );
+    expect(whatsappDisplay()).toBe('+20 120 776 1882');
   });
 
   it('store.ebda.app is the merchant app; admin.ebda.app is retired (HOST-STORE-1)', () => {
