@@ -22,10 +22,11 @@ import { errorHandler } from '@api/middleware/error-handler';
 import { config } from '@api/config';
 import { hasDb } from '../helpers/bundle-fixtures';
 
-const { invalidated, r2Cleanup, failValidation } = vi.hoisted(() => ({
+const { invalidated, r2Cleanup, failValidation, notReady } = vi.hoisted(() => ({
   invalidated: [] as string[],
   r2Cleanup: vi.fn(),
   failValidation: { on: false },
+  notReady: { on: false },
 }));
 vi.mock('@api/services/r2-cleanup.service', async importOriginal => {
   const real = await importOriginal<typeof import('@api/services/r2-cleanup.service')>();
@@ -37,7 +38,8 @@ vi.mock('@api/services/r2-cleanup.service', async importOriginal => {
     },
   };
 });
-// Lets one test make the builder's validation (saveDraft) refuse.
+// Lets one test make the builder's validation (saveDraft) refuse, and one make EVERY top-level
+// section fail publish readiness (as if the whole family still held starter copy).
 vi.mock('@force/shared', async importOriginal => {
   const real = await importOriginal<typeof import('@force/shared')>();
   return {
@@ -46,6 +48,15 @@ vi.mock('@force/shared', async importOriginal => {
       failValidation.on
         ? Promise.resolve({ ok: false, errors: [] })
         : real.validateDefinition(...a),
+    validatePublishReadiness: (...a: Parameters<typeof real.validatePublishReadiness>) =>
+      notReady.on
+        ? a[0].sections.map((_, i) => ({
+            code: 'PLACEHOLDER_COPY' as const,
+            path: `/sections/${i}/settings`,
+            messageEn: 'starter copy',
+            messageAr: 'starter copy',
+          }))
+        : real.validatePublishReadiness(...a),
   };
 });
 vi.mock('@api/lib/public-cache', async importOriginal => {
@@ -209,6 +220,27 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     const revs = await revisions(m.storeId);
     expect(revs.filter(r => r.status === 'published')).toHaveLength(1);
     expect(revs.filter(r => r.status === 'draft')).toHaveLength(0);
+  });
+
+  it('empty store whose every family section is unpublishable: stays a DRAFT, never an empty live home', async () => {
+    const m = await seedMerchant('all-unready');
+    notReady.on = true;
+    try {
+      const res = await put(m.storeId, m.token, { lookId: LOOK_ID, design: 'keep' });
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      expect(res.body.data.builder).toBe('draft');
+    } finally {
+      notReady.on = false;
+    }
+    const revs = await revisions(m.storeId);
+    expect(revs.filter(r => r.status === 'published')).toHaveLength(0);
+    const draft = await prisma.storePageRevision.findFirstOrThrow({
+      where: { storeId: m.storeId, pageKey: 'home', status: 'draft' },
+      select: { document: true },
+    });
+    // The draft keeps the whole family for the merchant to fill, not the emptied copy.
+    expect((draft.document as { sections: unknown[] }).sections.length).toBeGreaterThan(0);
+    expect((await row(m.storeId)).look).toBe(LOOK_ID);
   });
 
   it('store with a published revision: a DRAFT is created, published is untouched, caches busted once', async () => {

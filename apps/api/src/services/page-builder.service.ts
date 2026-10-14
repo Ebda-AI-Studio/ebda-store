@@ -578,7 +578,7 @@ function dropUnpublishableSections(definition: PageDefinition): PageDefinition {
  * - EVERYTHING else (a published page, an in-progress draft, or a legacy store
  *   whose customised `layout_settings` never went through the builder): a DRAFT
  *   only. Publishing would replace `layout_settings` wholesale and delete the
- *   R2 images the new document no longer references (Ruling LOOKS-APPLY-1).
+ *   R2 images the new document no longer references (Ruling LOOKS-8).
  * `resetThemeKeys` are stripped from the document's pending theme patch so a
  * later publish cannot re-apply keys the merchant just reset.
  */
@@ -601,11 +601,24 @@ export async function applyFamilyForLook(
     else delete next.theme;
     definition = next;
   }
-  const fresh = state.source === 'layout' && isUntouchedLayout(store.layoutSettings);
+  let fresh = state.source === 'layout' && isUntouchedLayout(store.layoutSettings);
   // A genuinely fresh store has no content to lose, so sections that still hold starter copy or a
   // missing image (and would block the publish) are dropped, and the rest goes live. A store with
   // content never reaches this: it keeps the draft path below, untouched.
-  if (fresh) definition = dropUnpublishableSections(definition);
+  if (fresh) {
+    const publishable = dropUnpublishableSections(definition);
+    if (publishable.sections.length > 0) {
+      definition = publishable;
+    } else {
+      // Every section would be dropped: publishing would put an EMPTY home live. Keep the whole
+      // family as a draft instead so the merchant fills it in the editor (Ruling LOOKS-9).
+      logger.warn(
+        { storeId, family },
+        '[page-builder] look family left as a draft: no section is publishable yet'
+      );
+      fresh = false;
+    }
+  }
   const saved = await saveDraft({
     storeId,
     pageKey: HOME_PAGE_KEY,
