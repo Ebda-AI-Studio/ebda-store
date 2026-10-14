@@ -13,6 +13,7 @@ import {
   cardAspectClass,
   cardShapeClasses,
   cardImageAspectClass,
+  lookImageAspectClass,
   cardImageRadiusClass,
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -261,7 +262,7 @@ function ModernProductCard({
       >
         {/* Image Container — item 8: aspect+radius from admin overrides. */}
         <div
-          className={`relative overflow-hidden bg-muted ${imgRadiusCls} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-muted ${imgRadiusCls} ${imgAspectCls || aspectOverride || lookImageAspectClass(store.look) || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {product.images?.[0]?.url ? (
             <>

@@ -488,7 +488,7 @@ export async function HomePageBody({
   // committed-theme tag in source order). The client override in
   // BuilderPreviewShell takes over after hydration.
   const builderThemeCss = builderDefinition?.theme
-    ? buildThemeStyleTag({ ...(store.theme ?? {}), ...builderDefinition.theme })
+    ? buildThemeStyleTag({ ...(store.theme ?? {}), ...builderDefinition.theme }, store.look)
     : '';
   return (
     <>

@@ -58,12 +58,12 @@ const base = {
   currency: 'EGP',
   timezone: 'Africa/Cairo',
 };
-async function html(look: string | null) {
+async function html(look: string | null, template = 'minimal') {
   current = {
     ...base,
     look,
-    template: 'minimal',
-    theme: composeStoreTheme({ template: 'minimal', look, theme: {} }),
+    template,
+    theme: composeStoreTheme({ template: template as 'minimal', look, theme: {} }),
   };
   return renderToStaticMarkup(await RootLayout({ children: <main>x</main> }));
 }
@@ -78,6 +78,22 @@ describe('RootLayout: look hooks', () => {
       '--font-latin: &quot;Cormorant Garamond&quot;'.replace('&quot;', '"').replace('&quot;', '"')
     );
     expect(out).toContain('--space-unit: 1.25');
+  });
+  it('look on the dahab skin: data-pack and data-look both set, look display var emitted', async () => {
+    const out = await html('dahab.worn', 'dahab');
+    expect(out).toContain('data-pack="dahab"');
+    expect(out).toContain('data-look="dahab.worn"');
+    expect(out).toMatch(/--look-font-display: "[A-Za-z ]+"/);
+  });
+  it('a stray density on a legacy store emits no look vars', async () => {
+    current = {
+      ...base,
+      look: null,
+      template: 'minimal',
+      theme: composeStoreTheme({ template: 'minimal', theme: { density: 'airy' } }),
+    };
+    const out = renderToStaticMarkup(await RootLayout({ children: <main>x</main> }));
+    expect(out).not.toContain('--space-unit');
   });
   it('legacy store: nothing new', async () => {
     for (const look of [null, 'nope.unknown']) {

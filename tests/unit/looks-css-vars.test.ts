@@ -8,12 +8,14 @@ import { themeToCssVars as sharedVars } from '@force/shared';
 
 describe('themeToCssVars parity (SSR shared vs client mirror)', () => {
   for (const [name, input] of [
-    ['look theme', { template: 'minimal', look: 'souq.bazaar', theme: {} }],
+    ['look theme', { template: 'minimal', look: 'souq.night', theme: {} }],
     ['legacy theme', { template: 'minimal', theme: {} }],
   ] as const) {
     it(`${name}: identical variable sets and values`, () => {
       const t = composeStoreTheme(input as Parameters<typeof composeStoreTheme>[0]);
-      expect(clientVars(t)).toEqual(sharedVars(t));
+      const lookId = (input as { look?: string }).look;
+      expect(clientVars(t, lookId)).toEqual(sharedVars(t, lookId));
+      if (lookId) expect(Object.keys(clientVars(t, lookId))).toContain('--font-latin');
     });
   }
 });

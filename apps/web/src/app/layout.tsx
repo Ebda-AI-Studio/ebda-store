@@ -240,7 +240,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const effectiveTheme = draftBundle?.theme
     ? { ...(store.theme ?? {}), ...(draftBundle.theme as Record<string, unknown>) }
     : store.theme;
-  const themeStyleTag = buildThemeStyleTag(effectiveTheme);
+  const themeStyleTag = buildThemeStyleTag(effectiveTheme, store.look);
 
   // Build the per-store typography style tags (custom-font @font-face,
   // Google Fonts <link>, and per-zone CSS rules targeting
@@ -501,9 +501,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // sanitizeFontValue/sanitizeUrl to prevent CSS-injection escapes.
   const typographyCss = [...fontFaceRules, ...zoneRules].join('\n');
   const look = lookHead(store.look);
-  const combinedStyleTag = [themeStyleTag, look?.latinCss, typographyCss]
-    .filter(Boolean)
-    .join('\n');
+  const combinedStyleTag = [themeStyleTag, typographyCss].filter(Boolean).join('\n');
 
   return (
     <html lang={lang} dir={dir} suppressHydrationWarning>

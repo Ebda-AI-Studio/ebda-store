@@ -36,7 +36,7 @@ import {
  * in @force/shared/src/types/store-theme.ts — keep in sync when adding
  * tokens.
  */
-export function themeToCssVars(theme: StoreTheme): Record<string, string> {
+export function themeToCssVars(theme: StoreTheme, lookId?: string | null): Record<string, string> {
   const bg = resolveBackgroundPreset(theme);
   const vars: Record<string, string> = {
     '--primary': theme.primaryColor,
@@ -83,7 +83,7 @@ export function themeToCssVars(theme: StoreTheme): Record<string, string> {
     vars[key] = colorToHslTriplet(vars[key], theme);
   }
   // Looks (Phase S) — MUST match the shared themeToCssVars; empty for legacy themes.
-  Object.assign(vars, lookCssVars(theme));
+  Object.assign(vars, lookCssVars(theme, lookId));
   // Issue 2349 — status-message inks. MUST match the shared themeToCssVars.
   Object.assign(
     vars,
@@ -123,6 +123,8 @@ export interface StoreData {
   /** Merchant's published return window in days: 0 = returns not accepted, null/absent = not declared. */
   returnWindowDays?: number | null;
   template: TemplateId;
+  /** Look id; null/absent = legacy store. */
+  look?: string | null;
   theme: StoreTheme;
   socialLinks: StoreSocialLinks;
   email?: string;
@@ -282,11 +284,11 @@ interface StoreProviderProps {
 /**
  * Apply theme CSS variables to the document
  */
-function applyTheme(theme: StoreTheme | undefined): void {
+function applyTheme(theme: StoreTheme | undefined, lookId?: string | null): void {
   if (typeof document === 'undefined') return;
   if (!theme) return;
 
-  const cssVars = themeToCssVars(theme);
+  const cssVars = themeToCssVars(theme, lookId);
   const root = document.documentElement;
 
   Object.entries(cssVars).forEach(([property, value]) => {
@@ -407,8 +409,8 @@ export function StoreProvider({
 
   // Apply theme on mount and when theme changes (committed OR draft).
   useEffect(() => {
-    applyTheme(effectiveStore.theme || DEFAULT_THEME);
-  }, [effectiveStore.theme]);
+    applyTheme(effectiveStore.theme || DEFAULT_THEME, effectiveStore.look);
+  }, [effectiveStore.theme, effectiveStore.look]);
 
   // Apply favicon
   useEffect(() => {
@@ -471,7 +473,7 @@ export function PreviewThemeOverride({
     if (value === ctx || value.store === ctx.store) return;
     // StoreProvider's own effect (a parent, so it runs AFTER this child's) stamps
     // the committed theme on <html>; a microtask lands after that whole flush.
-    queueMicrotask(() => applyTheme(value.store.theme));
+    queueMicrotask(() => applyTheme(value.store.theme, value.store.look));
   }, [value, ctx]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

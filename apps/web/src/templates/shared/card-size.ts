@@ -8,6 +8,7 @@
  * value never breaks render. Defaults match Ahmad's 2026-05-16
  * "smaller" preference (sm category, sm product).
  */
+import { getLook } from '@force/shared';
 import type {
   CardAspect,
   CardFrameSize,
@@ -294,6 +295,17 @@ export function cardImageAspectClass(aspect: CardImageAspect | undefined): strin
     default:
       return '';
   }
+}
+
+/**
+ * Looks (Phase S) — the look's image ratio as the DEFAULT card image aspect.
+ * Sits BELOW every merchant choice (cardImageAspect, cardShape, cardAspect —
+ * Ruling LOOKS-3) and ABOVE only the template's own default. '' for a store
+ * with no valid look, so legacy markup is byte-identical. The var is set on
+ * :root by themeToCssVars.
+ */
+export function lookImageAspectClass(look: string | null | undefined): string {
+  return getLook(look) ? 'aspect-[var(--image-ratio)]' : '';
 }
 
 /**

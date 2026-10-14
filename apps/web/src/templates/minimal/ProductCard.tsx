@@ -13,6 +13,7 @@ import {
   cardAspectClass,
   cardShapeClasses,
   cardImageAspectClass,
+  lookImageAspectClass,
   cardImageRadiusClass,
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -198,7 +199,7 @@ function MinimalProductCard({
         {/* Image — PC-3: aspect driven by cardShape/cardAspect; falls back to
             mobile-square / desktop-portrait theme default. */}
         <div
-          className={`relative overflow-hidden bg-muted/30 mb-3 ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-muted/30 mb-3 ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || lookImageAspectClass(store.look) || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {/* Platform-level OOS ribbon — minimal pack stays chrome-free
               elsewhere, but the OOS state needs unambiguous communication

@@ -1184,12 +1184,39 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
 [data-look] .font-display {
   font-family: var(--font-display);
 }
-/* Product card image wrapper (PecannbeeProductCard: first div inside the group/img link). */
-[data-look] .group\/img > div {
-  aspect-ratio: var(--image-ratio, auto);
+/* Section rhythm: only the DEFAULT spacing preset (py-12 sm:py-16 lg:py-20 from
+   sectionSpacingClasses) scales by --space-unit. Explicit merchant presets
+   (none/tight/loose/xloose) and the full-bleed hero are untouched. */
+[data-look] .py-12.sm\:py-16.lg\:py-20 {
+  padding-block: calc(3rem * var(--space-unit, 1));
 }
-[data-look] [data-section] {
-  padding-block: calc(var(--space-unit, 1) * 3rem);
+[data-look] .pt-12.sm\:pt-16.lg\:pt-20 {
+  padding-top: calc(3rem * var(--space-unit, 1));
+}
+[data-look] .pb-12.sm\:pb-16.lg\:pb-20 {
+  padding-bottom: calc(3rem * var(--space-unit, 1));
+}
+@media (min-width: 640px) {
+  [data-look] .py-12.sm\:py-16.lg\:py-20 {
+    padding-block: calc(4rem * var(--space-unit, 1));
+  }
+  [data-look] .pt-12.sm\:pt-16.lg\:pt-20 {
+    padding-top: calc(4rem * var(--space-unit, 1));
+  }
+  [data-look] .pb-12.sm\:pb-16.lg\:pb-20 {
+    padding-bottom: calc(4rem * var(--space-unit, 1));
+  }
+}
+@media (min-width: 1024px) {
+  [data-look] .py-12.sm\:py-16.lg\:py-20 {
+    padding-block: calc(5rem * var(--space-unit, 1));
+  }
+  [data-look] .pt-12.sm\:pt-16.lg\:pt-20 {
+    padding-top: calc(5rem * var(--space-unit, 1));
+  }
+  [data-look] .pb-12.sm\:pb-16.lg\:pb-20 {
+    padding-bottom: calc(5rem * var(--space-unit, 1));
+  }
 }
 [data-look] a,
 [data-look] button {
@@ -1199,4 +1226,15 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
   [data-look] {
     --motion-duration: 0ms;
   }
+}
+/* A dahab-skinned look keeps the look's display face: the skin sets --font-display on <body>. */
+html[lang] body[data-look][data-pack='dahab'] {
+  --font-display: var(--look-font-display);
+}
+/* English locale: Latin display face first, Arabic display stack as fallback. */
+html[lang='en'] [data-look] h1,
+html[lang='en'] [data-look] h2,
+html[lang='en'] [data-look] h3,
+html[lang='en'] [data-look] .font-display {
+  font-family: var(--font-latin, var(--font-display)), var(--font-display);
 }

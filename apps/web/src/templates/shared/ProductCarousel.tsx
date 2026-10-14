@@ -17,6 +17,7 @@ import {
   gridGapClass,
   productSizeClass,
   cardImageAspectClass,
+  lookImageAspectClass,
   cardImageRadiusClass,
   ctaShapeClass,
   ctaSizeClass,
@@ -148,7 +149,11 @@ function SharedProductCarousel({
   const shape = cardShapeClasses(cardShape);
   // Match PecannbeeProductCard + 4/5 theme cards so the same product isn't square
   // in a carousel but portrait in a category grid (audit: ratio consistency).
-  const aspectCls = shape.aspect || cardAspectClass(cardAspect) || 'aspect-square sm:aspect-[3/4]';
+  const aspectCls =
+    shape.aspect ||
+    cardAspectClass(cardAspect) ||
+    lookImageAspectClass(store.look) ||
+    'aspect-square sm:aspect-[3/4]';
 
   // Item 8 — per-card image aspect + radius overrides.
   const imgAspectCls = cardImageAspectClass(cardImageAspect);

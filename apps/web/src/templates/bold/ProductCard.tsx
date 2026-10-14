@@ -13,6 +13,7 @@ import {
   cardAspectClass,
   cardShapeClasses,
   cardImageAspectClass,
+  lookImageAspectClass,
   cardImageRadiusClass,
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -195,7 +196,7 @@ function BoldProductCard({
         {/* Image — PC-3: aspect driven by cardShape/cardAspect; bold theme
             default stays aspect-square to preserve the streetwear brand identity. */}
         <div
-          className={`relative overflow-hidden bg-muted ${imgRadiusCls} ${imgAspectCls || aspectOverride || 'aspect-square'}`}
+          className={`relative overflow-hidden bg-muted ${imgRadiusCls} ${imgAspectCls || aspectOverride || lookImageAspectClass(store.look) || 'aspect-square'}`}
         >
           {/* Platform-level OOS ribbon (red, prominent) — same visual
               across every theme (2026-05-16).

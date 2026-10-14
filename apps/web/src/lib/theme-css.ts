@@ -72,6 +72,8 @@ const NON_COLOR_VARS = new Set(['--radius', '--font-family']);
 /** Look (Phase S) variables: non-colour, each with its own strict allow-list. */
 const LOOK_VAR_PATTERNS: Record<string, RegExp> = {
   '--font-display': /^"[A-Za-z0-9 ]{1,60}", var\(--font-arabic\), var\(--font-sans\)$/,
+  '--look-font-display': /^"[A-Za-z0-9 ]{1,60}", var\(--font-arabic\), var\(--font-sans\)$/,
+  '--font-latin': /^"[A-Za-z0-9 ]{1,60}", var\(--font-sans\)$/,
   '--font-body': /^"[A-Za-z0-9 ]{1,60}", var\(--font-arabic\), var\(--font-sans\)$/,
   '--space-unit': /^\d+(?:\.\d+)?$/,
   '--image-ratio': /^\d+ \/ \d+$/,
@@ -86,9 +88,10 @@ const LOOK_VAR_PATTERNS: Record<string, RegExp> = {
  * so both trees paint an identical theme.
  */
 export function buildThemeStyleTag(
-  theme: StoreTheme | Record<string, unknown> | null | undefined
+  theme: StoreTheme | Record<string, unknown> | null | undefined,
+  lookId?: string | null
 ): string {
-  const themeCssVars = theme ? themeToCssVars(theme as StoreTheme) : null;
+  const themeCssVars = theme ? themeToCssVars(theme as StoreTheme, lookId) : null;
   if (!themeCssVars) return '';
   return `:root { ${Object.entries(themeCssVars)
     .map(([k, v]) => {
