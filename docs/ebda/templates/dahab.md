@@ -1,5 +1,7 @@
 # Dahab (دهب) — storefront template
 
+> **Historical reference (2026-10-14).** Ruling TPL-2 retired the night/gold/arch skin described below. Dahab is now three looks in the looks registry — Worn (`dahab.worn`), Workshop (`dahab.workshop`), Gift box (`dahab.giftbox`) — see `docs/ebda/templates/looks.md`. The commerce wiring (ProductDetail, drawers, 3D slot) is reused; the visual language below is kept only as history until the old skin is deleted.
+
 Builder Phase 3 pilot, 2026-10-07. Family `dahab` in `TEMPLATE_FAMILIES` (jewellery, handmade, premium gifts), with its own component skin (`stores.template = 'dahab'`). Status: **built for Ahmad's review; no other template is built until he approves the look** (preview: `https://dahab-preview.ebda.app`, admin `https://admin-preview.ebda.app`).
 
 ## Design

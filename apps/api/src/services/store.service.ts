@@ -980,16 +980,20 @@ export class StoreService {
     const look = getLook(lookId);
     if (!look) throw new AppError(400, 'INVALID_LOOK', 'Unknown look');
     const store = await this.getById(storeId);
-    // Builder FIRST: it can refuse (409/422); the request transaction commits on any <500,
-    // so a store row switched before a refusal would stay switched under an error response.
+    // Builder FIRST: it can refuse (409/422), and a refusal throws before any store write, so a
+    // refused switch leaves the store row untouched. /stores/:id routes run under
+    // storeScopeContext (no request transaction): each query below is its own transaction, so the
+    // builder step and the store update are NOT atomic. If the store update fails after a publish,
+    // a retry converges (the store is no longer fresh, so it takes the draft path). Ruling LOOKS-10.
     const builder = await applyFamilyForLook(
       storeId,
       look.template,
       userId,
       opts.design === 'reset' ? LOOK_TOKEN_KEYS : []
     );
-    // Re-read the theme in the same tx as the write: a publish above may have merged a
-    // pending theme patch into it, and that must not be overwritten.
+    // Re-read the theme in the same transaction as this write (not a stale copy from before the
+    // builder step): a publish above may have merged a pending theme patch into it, and that
+    // must not be overwritten.
     const updated = await withStore(storeId, async tx => {
       const live = await tx.store.findUnique({
         where: { id: storeId },
