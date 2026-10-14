@@ -197,11 +197,48 @@ async function seedFixtures(db) {
       data: { storeId, name: 'Nuts', slug: 'nuts', isActive: true },
       select: { id: true },
     });
+    // B0 commerce data rides ONE product (index 3: the cart flow below uses the first product
+    // and must not hit a required-personalisation 400) so the owner/ebda_app diff covers the new
+    // public fields: facts, personalisation, lead time, the size chart (a new strict-RLS table
+    // read through a product -> chart include) and option-value swatches.
+    const sizeChart = await db.sizeChart.create({
+      data: {
+        storeId,
+        name: 'Parity chart',
+        nameAr: 'مقاسات',
+        unit: 'cm',
+        columns: [
+          { label: 'Size', labelAr: 'المقاس' },
+          { label: 'Length', labelAr: 'الطول' },
+        ],
+        rows: [
+          ['S', '52'],
+          ['M', '54'],
+        ],
+      },
+      select: { id: true },
+    });
     const products = [];
     for (let i = 0; i < 4; i++) {
       const p = await db.product.create({
         data: {
           storeId,
+          ...(i === 3
+            ? {
+                facts: [
+                  { key: 'Fabric', keyAr: 'الخامة', value: 'Linen', valueAr: 'كتان', onCard: true },
+                ],
+                personalisation: {
+                  enabled: true,
+                  required: false,
+                  label: 'Name',
+                  labelAr: 'الاسم',
+                  maxLength: 12,
+                },
+                leadTimeDays: 5,
+                sizeChartId: sizeChart.id,
+              }
+            : {}),
           name: `Product ${i}`,
           slug: `product-${i}`,
           description: `Product ${i} description`,
@@ -214,6 +251,26 @@ async function seedFixtures(db) {
         select: { id: true },
       });
       products.push(p.id);
+      if (i === 3) {
+        await db.productOption.create({
+          data: {
+            productId: p.id,
+            name: 'Colour',
+            nameAr: 'اللون',
+            position: 0,
+            values: {
+              create: [
+                { value: 'Red', valueAr: 'أحمر', swatchHex: '#C0392B', position: 0 },
+                {
+                  value: 'Blue',
+                  swatchImageUrl: `https://example.test/${f.slug}/blue.jpg`,
+                  position: 1,
+                },
+              ],
+            },
+          },
+        });
+      }
       await db.productImage.create({
         data: { productId: p.id, url: `https://example.test/${f.slug}/${i}.jpg`, position: 0 },
       });
@@ -432,6 +489,7 @@ function readEndpoints(s) {
     { name: 'products featured', path: '/public/products?featured=true&limit=8', headers: byId },
     { name: 'products newest', path: '/public/products?sort=newest&limit=8', headers: byId },
     { name: 'categories', path: '/public/categories', headers: byId },
+    { name: 'size charts', path: '/public/size-charts', headers: byId },
     { name: 'product feed', path: '/public/feed/products.json', headers: byId },
     { name: 'layout', path: `/public/stores/${id}/layout` },
     { name: 'testimonials', path: `/public/stores/${id}/testimonials` },
@@ -532,7 +590,8 @@ async function loadStores(db) {
       where: { storeId: s.id, status: 'active', deletedAt: null },
       select: { id: true, slug: true, inventory: true },
       orderBy: { createdAt: 'asc' },
-      take: 3,
+      // 4 = every seeded product, so the PDP of the B0 commerce product (index 3) is compared.
+      take: 4,
     });
     s.blogSlugs = (
       await db.blogPost.findMany({

@@ -138,6 +138,25 @@ async function createVariantsForProductTx(
 ): Promise<number> {
   if (variants.length === 0) return 0;
 
+  // Remember what the merchant entered on the existing option values BEFORE the replace below
+  // clears them: the sheet carries only option names and values, so the Arabic twins and the B0
+  // swatches (hex / photo) are keyed by `name|value` and written back onto the recreated rows.
+  // Without this a re-import silently wipes every swatch (and Arabic option label) of the store.
+  const prior = await tx.productOption.findMany({
+    where: { productId },
+    select: {
+      name: true,
+      nameAr: true,
+      values: {
+        select: { value: true, valueAr: true, swatchHex: true, swatchImageUrl: true },
+      },
+    },
+  });
+  const priorOptionAr = new Map(prior.map(o => [o.name, o.nameAr]));
+  const priorValue = new Map(
+    prior.flatMap(o => o.values.map(v => [`${o.name}|${v.value}`, v] as const))
+  );
+
   // Clear existing options/variants (cascades to values + junction rows).
   //
   // P1-4 (final review): `bundle_items.variant_id` is ON DELETE RESTRICT, so
@@ -162,7 +181,12 @@ async function createVariantsForProductTx(
   const createdOptions =
     collected.length > 0
       ? await tx.productOption.createManyAndReturn({
-          data: collected.map((opt, oi) => ({ productId, name: opt.name, position: oi })),
+          data: collected.map((opt, oi) => ({
+            productId,
+            name: opt.name,
+            nameAr: priorOptionAr.get(opt.name) ?? null,
+            position: oi,
+          })),
         })
       : [];
   const optionIdByName = new Map(createdOptions.map(o => [o.name, o.id]));
@@ -171,11 +195,26 @@ async function createVariantsForProductTx(
   // 2) Option values, batched. Correlate by (optionId, value) — distinct per
   // option per collectOptions — into the same `name|value` -> valueId map
   // the junction-building step below expects.
-  const valueRows: Array<{ optionId: string; value: string; position: number }> = [];
+  const valueRows: Array<{
+    optionId: string;
+    value: string;
+    valueAr: string | null;
+    swatchHex: string | null;
+    swatchImageUrl: string | null;
+    position: number;
+  }> = [];
   for (const opt of collected) {
     const optionId = optionIdByName.get(opt.name)!;
     opt.values.forEach((value, vi) => {
-      valueRows.push({ optionId, value, position: vi });
+      const kept = priorValue.get(`${opt.name}|${value}`);
+      valueRows.push({
+        optionId,
+        value,
+        valueAr: kept?.valueAr ?? null,
+        swatchHex: kept?.swatchHex ?? null,
+        swatchImageUrl: kept?.swatchImageUrl ?? null,
+        position: vi,
+      });
     });
   }
   const createdValues =

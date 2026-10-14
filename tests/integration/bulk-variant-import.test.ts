@@ -107,6 +107,62 @@ describe('bulk import with variants', () => {
     expect(variants[0].price).toBe(2600);
   });
 
+  it('re-import keeps option-value swatches and Arabic option labels (matched by name|value)', async () => {
+    const sku = `SWATCH-${SUFFIX}`;
+    const first = [
+      'name,sku,price,parentSku,option1Name,option1Value',
+      `Swatch Abaya,${sku},1000,,,`,
+      `,${sku}-R,1000,${sku},Colour,Red`,
+      `,${sku}-B,1000,${sku},Colour,Blue`,
+    ].join('\n');
+    const r1 = await BulkService.importProducts(storeId, first, { updateExisting: true }, userId);
+    expect(r1.failed).toBe(0);
+
+    // The merchant dresses the values in the admin (swatch hex / photo, Arabic labels).
+    const product = await prisma.product.findFirstOrThrow({ where: { storeId, sku } });
+    const option = await prisma.productOption.findFirstOrThrow({
+      where: { productId: product.id, name: 'Colour' },
+    });
+    await prisma.productOption.update({ where: { id: option.id }, data: { nameAr: 'اللون' } });
+    await prisma.productOptionValue.updateMany({
+      where: { optionId: option.id, value: 'Red' },
+      data: { valueAr: 'أحمر', swatchHex: '#C0392B' },
+    });
+    await prisma.productOptionValue.updateMany({
+      where: { optionId: option.id, value: 'Blue' },
+      data: { swatchImageUrl: 'https://example.com/blue-linen.jpg' },
+    });
+
+    // A re-import that changes a price and adds a Green value.
+    const again = [
+      'name,sku,price,parentSku,option1Name,option1Value',
+      `Swatch Abaya,${sku},1000,,,`,
+      `,${sku}-R,1100,${sku},Colour,Red`,
+      `,${sku}-B,1100,${sku},Colour,Blue`,
+      `,${sku}-G,1100,${sku},Colour,Green`,
+    ].join('\n');
+    const r2 = await BulkService.importProducts(storeId, again, { updateExisting: true }, userId);
+    expect(r2.failed).toBe(0);
+
+    const options = await prisma.productOption.findMany({
+      where: { productId: product.id },
+      include: { values: true },
+    });
+    expect(options).toHaveLength(1);
+    expect(options[0].nameAr).toBe('اللون');
+    const byValue = new Map(options[0].values.map(v => [v.value, v]));
+    expect(byValue.get('Red')).toMatchObject({ valueAr: 'أحمر', swatchHex: '#C0392B' });
+    expect(byValue.get('Blue')?.swatchImageUrl).toBe('https://example.com/blue-linen.jpg');
+    expect(byValue.get('Green')).toMatchObject({
+      valueAr: null,
+      swatchHex: null,
+      swatchImageUrl: null,
+    });
+    const variants = await prisma.productVariant.findMany({ where: { productId: product.id } });
+    expect(variants).toHaveLength(3);
+    expect(variants.every(v => v.price === 1100)).toBe(true);
+  });
+
   it('imports a product whose description contains an embedded newline as ONE product', async () => {
     const csv = [
       'name,sku,price,description',
