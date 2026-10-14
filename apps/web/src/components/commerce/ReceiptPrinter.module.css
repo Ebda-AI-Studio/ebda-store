@@ -1,10 +1,10 @@
 /* Receipt printer (B0 Task 10). Layout is Tailwind; only what Tailwind cannot
    say lives here: the feed keyframes, the torn edge mask, the mono stack. */
 
-/* Latin + digits in mono; Arabic glyphs fall through to the body's Arabic face
-   (there is no good Arabic mono). */
+/* Western digit runs, order numbers and English labels only: Arabic text never
+   gets this class (there is no good Arabic mono), see `Num` in the component. */
 .mono {
-  font-family: ui-monospace, 'IBM Plex Mono', Menlo, 'IBM Plex Sans Arabic', monospace;
+  font-family: ui-monospace, 'IBM Plex Mono', Menlo, monospace;
   font-variant-numeric: tabular-nums;
 }
 
@@ -90,9 +90,14 @@
   border-top: 1px dashed rgb(20 20 20 / 0.28);
 }
 
-/* Status swap: the new state fades in over 150ms; a check draws itself. */
+/* Status swap: a 150ms crossfade, the old line out while the new one comes
+   in, stacked in one grid cell; a check draws itself. */
 .statusIn {
   animation: statusIn 150ms ease-out both;
+}
+.statusOut {
+  animation: statusOut 150ms ease-out both;
+  pointer-events: none;
 }
 @keyframes statusIn {
   from {
@@ -100,6 +105,14 @@
   }
   to {
     opacity: 1;
+  }
+}
+@keyframes statusOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 .draw {
@@ -117,6 +130,9 @@
   .feeding,
   .statusIn {
     animation: none;
+  }
+  .statusOut {
+    display: none;
   }
   .draw {
     animation: none;

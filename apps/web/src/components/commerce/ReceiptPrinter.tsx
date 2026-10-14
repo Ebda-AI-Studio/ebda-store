@@ -40,7 +40,7 @@ export type PaymentState =
   | 'awaiting'
   | 'unknown';
 
-type ReceiptStore = Pick<StoreData, 'name' | 'nameAr' | 'logo' | 'logoAr' | 'timezone' | 'theme'>;
+type ReceiptStore = Pick<StoreData, 'name' | 'nameAr' | 'logo' | 'logoAr' | 'timezone'>;
 
 export interface ReceiptPrinterProps {
   order: Order | null;
@@ -54,7 +54,33 @@ const REDUCED = '(prefers-reduced-motion: reduce)';
 /** Mirror the `.feeding` animation in ReceiptPrinter.module.css. */
 const FEED_DELAY_MS = 250;
 const FEED_MS = 1600;
+/** Status crossfade length; mirrors `.statusIn` / `.statusOut` in the CSS module. */
+const SWAP_MS = 150;
+/** Before the order arrives the empty slot holds about a two-line receipt (the
+ *  common Egyptian basket), so the one jump at load is a line or two at most.
+ *  Measured on the local stack: see task-10-report.md, fix round 1. */
+const LOADING_RESERVE = 'min-h-[32rem]';
 const printedKey = (orderId: string) => `receipt-printed:${orderId}`;
+
+/** Western digit runs ("4,310", "2026/10/15") in the mono face; everything else
+ *  (Arabic-Indic digits, "ج.م", "EGP", spaces) stays in the body font, so no
+ *  Arabic glyph or word space is ever set in a Latin mono. */
+const LATIN_NUMBER = /([0-9](?:[0-9,.:/-]*[0-9])?)/;
+function Num({ children }: { children: string }) {
+  return (
+    <span className="tabular-nums">
+      {children.split(LATIN_NUMBER).map((part, i) =>
+        i % 2 === 1 ? (
+          <span key={i} className={styles.mono}>
+            {part}
+          </span>
+        ) : (
+          part
+        )
+      )}
+    </span>
+  );
+}
 
 /** Feed only on the first view of this order in this tab, and never under reduced motion. */
 function shouldFeed(orderId: string): boolean {
@@ -108,9 +134,24 @@ export function ReceiptPrinter({
   }, [order, feed]);
 
   const status: StatusKind = loading || (order && !feedDone) ? 'printing' : paymentState;
-  const copy = statusCopy(status, t);
 
-  const storeName = (language === 'ar' && store.nameAr?.trim() ? store.nameAr : store.name) || '';
+  // Crossfade: when the status changes, the old line stays for one 150ms
+  // fade-out on top of the new line's fade-in (derived state, set in render).
+  const [shown, setShown] = useState<StatusKind>(status);
+  const [leaving, setLeaving] = useState<StatusKind | null>(null);
+  if (status !== shown) {
+    setLeaving(shown);
+    setShown(status);
+  }
+  useEffect(() => {
+    if (!leaving) return;
+    // Backstop for reduced motion (no animation, so no animationend).
+    const timer = window.setTimeout(() => setLeaving(null), SWAP_MS + 50);
+    return () => window.clearTimeout(timer);
+  }, [leaving]);
+
+  const ar = language === 'ar';
+  const storeName = pickLocalizedName(store, ar) ?? '';
   const logo = language === 'ar' && store.logoAr ? store.logoAr : store.logo;
   const rows = order ? groupOrderLinesForDisplay(order.items) : [];
   // A bundle box counts once, as the customer bought it.
@@ -119,6 +160,7 @@ export function ReceiptPrinter({
     0
   );
   const paid = paymentState === 'paid';
+  const payment = order ? paymentLabel(order, paymentState, language) : null;
 
   return (
     <section
@@ -153,32 +195,44 @@ export function ReceiptPrinter({
             </div>
             {order && (
               <div className="shrink-0 text-end">
-                <p className="text-[11px] opacity-60">{t('Order total', 'إجمالي الطلب')}</p>
-                <p className={`${styles.mono} text-base font-semibold`}>
-                  {formatPrice(order.total)}
+                <p className="text-xs opacity-60">{t('Order total', 'إجمالي الطلب')}</p>
+                <p className="text-base font-semibold">
+                  <Num>{formatPrice(order.total)}</Num>
                 </p>
               </div>
             )}
           </div>
-          <div
-            className="mt-3 flex min-h-5 items-center gap-2 text-xs"
-            aria-live="polite"
-            role="status"
-          >
-            <span key={status} className={`${styles.statusIn} flex items-center gap-2`}>
-              <StatusIcon kind={status} />
-              <span>{copy}</span>
+          <div className="mt-3 grid min-h-5 text-xs" aria-live="polite" role="status">
+            {leaving && (
+              <span
+                key={`out-${leaving}`}
+                aria-hidden="true"
+                data-testid="receipt-status-leaving"
+                className={`${styles.statusOut} col-start-1 row-start-1 flex items-center gap-2`}
+                onAnimationEnd={() => setLeaving(null)}
+              >
+                <StatusIcon kind={leaving} />
+                <span>{statusCopy(leaving, t)}</span>
+              </span>
+            )}
+            <span
+              key={shown}
+              data-testid="receipt-status-current"
+              className={`${leaving ? styles.statusIn : ''} col-start-1 row-start-1 flex items-center gap-2`}
+            >
+              <StatusIcon kind={shown} current />
+              <span>{statusCopy(shown, t)}</span>
             </span>
           </div>
         </div>
-        <div className={`${styles.slit} mx-2.5 mb-0.5 mt-2 h-1.5 rounded-full`} />
+        <div className={`${styles.slit} mx-2.5 mb-0.5 mt-2 h-1.5 rounded-[var(--radius)]`} />
       </div>
 
       {/* Paper. While the order loads the slot is empty but holds a typical
-          receipt's height, so the page does not jump when it arrives. */}
-      <div
-        className={`${styles.window} mx-4 sm:mx-5 ${order ? '' : loading ? 'min-h-[26rem]' : ''}`}
-      >
+          receipt's height; once the order is known the paper is in the flow at
+          its final height before the feed starts (the feed is transform-only),
+          so the page moves at most once, at load, and never when the feed ends. */}
+      <div className={`${styles.window} mx-4 sm:mx-5 ${order ? '' : LOADING_RESERVE}`}>
         {order && (
           <div
             className={`${styles.feeder} ${feed && !feedDone ? styles.feeding : ''}`}
@@ -188,7 +242,7 @@ export function ReceiptPrinter({
               if (e.target === e.currentTarget) setFedId(order.id);
             }}
           >
-            <article className={`${styles.paper} px-5 pt-6 text-[13px] leading-snug`}>
+            <article className={`${styles.paper} px-5 pt-6 text-sm leading-snug`}>
               <h2 className="flex justify-center">
                 {logo ? (
                   <img
@@ -208,9 +262,7 @@ export function ReceiptPrinter({
                   const qty = row.kind === 'bundle' ? row.quantity : row.item.quantity;
                   const name =
                     row.kind === 'bundle'
-                      ? language === 'ar' && row.nameAr?.trim()
-                        ? row.nameAr
-                        : row.name
+                      ? (pickLocalizedName(row, ar) ?? t('Bundle', 'باقة'))
                       : (pickLocalizedName(row.item.product, isRtl) ?? t('Product', 'منتج'));
                   const amount =
                     row.kind === 'bundle' ? row.total : row.item.price * row.item.quantity;
@@ -218,7 +270,9 @@ export function ReceiptPrinter({
                     <li key={row.key} data-testid="receipt-line" className="flex gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="font-medium">
-                          <span className={`${styles.mono} opacity-60`}>{localize(qty)}×</span>{' '}
+                          <span className="opacity-60">
+                            <Num>{localize(qty)}</Num>×
+                          </span>{' '}
                           {name}
                         </p>
                         {row.kind === 'item' && row.item.variantName && (
@@ -233,7 +287,9 @@ export function ReceiptPrinter({
                           />
                         )}
                       </div>
-                      <p className={`${styles.mono} shrink-0`}>{formatPrice(amount)}</p>
+                      <p className="shrink-0">
+                        <Num>{formatPrice(amount)}</Num>
+                      </p>
                     </li>
                   );
                 })}
@@ -241,32 +297,30 @@ export function ReceiptPrinter({
 
               <hr className={`${styles.rule} my-4 border-0`} />
 
-              <Totals
-                order={order}
-                paid={paid}
-                formatPrice={formatPrice}
-                t={t}
-                ar={language === 'ar'}
-              />
+              <Totals order={order} paid={paid} formatPrice={formatPrice} t={t} ar={ar} />
 
               <hr className={`${styles.rule} my-4 border-0`} />
 
               <dl className="space-y-1.5 text-xs">
-                <MetaRow label={t('Order no.', 'رقم الطلب')} ar={language === 'ar'}>
-                  <span dir="ltr">#{order.orderNumber}</span>
+                <MetaRow label={t('Order no.', 'رقم الطلب')} ar={ar}>
+                  <span dir="ltr" className={styles.mono} data-testid="receipt-order-number">
+                    #{order.orderNumber}
+                  </span>
                 </MetaRow>
-                {paymentLabel(order, paymentState, language) && (
-                  <MetaRow label={t('Payment', 'طريقة الدفع')} ar={language === 'ar'}>
-                    {paymentLabel(order, paymentState, language)}
+                {payment && (
+                  <MetaRow label={t('Payment', 'طريقة الدفع')} ar={ar}>
+                    <span data-testid="receipt-payment-label">{payment}</span>
                   </MetaRow>
                 )}
-                <MetaRow label={t('Date', 'التاريخ')} ar={language === 'ar'}>
-                  {formatDate(order.createdAt, {
-                    timezone: store.timezone,
-                    language,
-                    numerals,
-                    style: 'short',
-                  })}
+                <MetaRow label={t('Date', 'التاريخ')} ar={ar}>
+                  <Num>
+                    {formatDate(order.createdAt, {
+                      timezone: store.timezone,
+                      language,
+                      numerals,
+                      style: 'short',
+                    })}
+                  </Num>
                 </MetaRow>
               </dl>
 
@@ -275,7 +329,7 @@ export function ReceiptPrinter({
                 <p
                   data-testid="receipt-barcode-caption"
                   dir="ltr"
-                  className={`${styles.mono} text-[11px] tracking-[0.3em] text-[#141414]/60`}
+                  className={`${styles.mono} text-xs tracking-[0.3em] text-[#141414]/60`}
                 >
                   #{order.orderNumber}
                 </p>
@@ -284,15 +338,6 @@ export function ReceiptPrinter({
           </div>
         )}
       </div>
-
-      {!order && !loading && (
-        <p className="mt-2 text-center text-sm text-muted-foreground">
-          {t(
-            'Your order has been received. You can track its status anytime from your account.',
-            'تم استلام طلبك. يمكنك متابعة حالته في أي وقت من حسابك.'
-          )}
-        </p>
-      )}
     </section>
   );
 }
@@ -319,27 +364,27 @@ function Totals({
     <dl className="space-y-1.5">
       {typeof order.subtotal === 'number' && (
         <MoneyRow label={t('Subtotal', 'المجموع الفرعي')} ar={ar}>
-          {formatPrice(order.subtotal)}
+          <Num>{formatPrice(order.subtotal)}</Num>
         </MoneyRow>
       )}
       {(order.discount ?? 0) > 0 && (
         <MoneyRow label={t('Discount', 'الخصم')} ar={ar}>
-          <span dir="ltr">−{formatPrice(order.discount ?? 0)}</span>
+          <Num>{`−${formatPrice(order.discount ?? 0)}`}</Num>
         </MoneyRow>
       )}
       {typeof order.shipping === 'number' && (
         <MoneyRow label={t('Shipping', 'الشحن')} ar={ar}>
-          {order.shipping > 0 ? formatPrice(order.shipping) : t('Free', 'مجاني')}
+          {order.shipping > 0 ? <Num>{formatPrice(order.shipping)}</Num> : t('Free', 'مجاني')}
         </MoneyRow>
       )}
       {(order.codFee ?? 0) > 0 && (
         <MoneyRow label={t('Cash on delivery fee', 'رسوم الدفع عند الاستلام')} ar={ar}>
-          {formatPrice(order.codFee ?? 0)}
+          <Num>{formatPrice(order.codFee ?? 0)}</Num>
         </MoneyRow>
       )}
       {(tax.taxRow ?? 0) > 0 && (
         <MoneyRow label={t('Tax', 'الضريبة')} ar={ar}>
-          {formatPrice(tax.taxRow ?? 0)}
+          <Num>{formatPrice(tax.taxRow ?? 0)}</Num>
         </MoneyRow>
       )}
       <div className="flex items-baseline justify-between gap-3 pt-2">
@@ -348,28 +393,36 @@ function Totals({
         >
           {paid ? t('Total paid', 'المدفوع') : t('Total', 'الإجمالي')}
         </dt>
-        <dd className={`${styles.mono} text-lg font-bold`}>{formatPrice(order.total)}</dd>
+        <dd className="text-lg font-bold" data-testid="receipt-total">
+          <Num>{formatPrice(order.total)}</Num>
+        </dd>
       </div>
       {tax.includedTaxCaption !== null && (
         <MoneyRow label={t('Incl. VAT', 'شامل ضريبة القيمة المضافة')} ar={ar}>
-          {formatPrice(tax.includedTaxCaption)}
+          <Num>{formatPrice(tax.includedTaxCaption)}</Num>
         </MoneyRow>
       )}
       {wallet > 0 && (
         <>
           <MoneyRow label={t('From wallet', 'من المحفظة')} ar={ar}>
-            <span dir="ltr">−{formatPrice(wallet)}</span>
+            <Num>{`−${formatPrice(wallet)}`}</Num>
           </MoneyRow>
-          <MoneyRow label={t('Amount due', 'المبلغ المستحق')} ar={ar}>
-            {formatPrice(Math.max(0, order.total - wallet))}
-          </MoneyRow>
+          {/* The rest is owed only when nobody charged it yet (COD, transfer);
+              on a paid order the gateway already took it. */}
+          {!paid && (
+            <MoneyRow label={t('Amount due', 'المبلغ المستحق')} ar={ar}>
+              <Num>{formatPrice(Math.max(0, order.total - wallet))}</Num>
+            </MoneyRow>
+          )}
         </>
       )}
     </dl>
   );
 }
 
-/** Label at the start, amount at the end; English labels set as mono small caps. */
+/** Label at the start, value at the end. English labels are Latin mono small
+ *  caps (the receipt voice); Arabic labels and every value stay in the body
+ *  font, with only Western digit runs in mono via `Num`. */
 function MoneyRow({ label, ar, children }: { label: string; ar: boolean; children: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-xs">
@@ -380,7 +433,7 @@ function MoneyRow({ label, ar, children }: { label: string; ar: boolean; childre
       >
         {label}
       </dt>
-      <dd className={styles.mono}>{children}</dd>
+      <dd>{children}</dd>
     </div>
   );
 }
@@ -428,12 +481,13 @@ function statusCopy(kind: StatusKind, t: (en: string, ar: string) => string): st
   }
 }
 
-function StatusIcon({ kind }: { kind: StatusKind }) {
+function StatusIcon({ kind, current = false }: { kind: StatusKind; current?: boolean }) {
   const common = 'h-4 w-4 shrink-0';
+  const testId = current ? 'receipt-status-icon' : undefined;
   if (kind === 'printing' || kind === 'verifying') {
     return (
       <span
-        data-testid="receipt-status-icon"
+        data-testid={testId}
         data-state={kind}
         aria-hidden="true"
         className={`${common} rounded-full border-2 border-current border-t-transparent opacity-70 motion-safe:animate-spin`}
@@ -450,7 +504,7 @@ function StatusIcon({ kind }: { kind: StatusKind }) {
           : 'currentColor';
   return (
     <svg
-      data-testid="receipt-status-icon"
+      data-testid={testId}
       data-state={kind}
       aria-hidden="true"
       viewBox="0 0 16 16"

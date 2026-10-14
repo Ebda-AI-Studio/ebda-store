@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import React from 'react';
 import { render, screen, cleanup, fireEvent, within, act } from '@testing-library/react';
-import { groupOrderLinesForDisplay } from '@ebda/shared';
+import { groupOrderLinesForDisplay, localizeDigits } from '@ebda/shared';
 import type { Order } from '@/lib/api';
 
 let lang: 'en' | 'ar' = 'ar';
@@ -13,20 +13,24 @@ vi.mock('@/contexts/LanguageContext', () => ({
     t: (en: string, ar: string) => (lang === 'ar' ? ar : en),
   }),
 }));
-vi.mock('@/hooks/useLocalePrice', () => ({
-  useLocalePrice: () => (minor: number) => `${minor / 100} EGP`,
-}));
+// The real useLocalePrice runs (shared formatPrice); only the store's digit
+// choice is stubbed, so one test can switch a store to Arabic-Indic.
+let numerals: 'latn' | 'arab' = 'latn';
 vi.mock('@/hooks/useNumerals', () => ({
-  useNumerals: () => ({ localize: (v: string | number) => String(v), numerals: 'latn' }),
+  useStoreNumerals: () => numerals,
+  useNumerals: () => ({
+    localize: (v: string | number) => localizeDigits(v, numerals),
+    numerals,
+  }),
 }));
 
 import { ReceiptPrinter } from './ReceiptPrinter';
+import styles from './ReceiptPrinter.module.css';
 
 const store = {
   name: 'Linen House',
   nameAr: 'بيت الكتان',
   timezone: 'Africa/Cairo',
-  theme: {} as never,
 };
 
 const product = (name: string, nameAr: string) => ({ name, nameAr }) as never;
@@ -105,6 +109,7 @@ function mockMatchMedia(matches: Record<string, boolean>) {
 
 beforeEach(() => {
   lang = 'ar';
+  numerals = 'latn';
   mockMatchMedia({});
   window.sessionStorage.clear();
 });
@@ -159,7 +164,8 @@ describe('ReceiptPrinter', () => {
     );
     expect(screen.getAllByTestId('receipt-line')).toHaveLength(3);
     expect(screen.getByText(/علبة هدية/)).toBeTruthy();
-    expect(screen.getByText('180 EGP')).toBeTruthy(); // bundle = one summed row
+    // bundle = one row priced at the box total (100 + 80), never its components
+    expect(screen.getAllByTestId('receipt-line')[2].textContent).toMatch(/180/);
     expect(screen.getByTestId('receipt-barcode-caption').textContent).toContain(
       orderWithBundle.orderNumber
     );
@@ -258,5 +264,91 @@ describe('ReceiptPrinter', () => {
       />
     );
     expect(screen.getByText('بطاقة')).toBeTruthy();
+  });
+
+  it('sets only Western digit runs in mono: the payment label and Free use the body font', () => {
+    expect(styles.mono).toBeTruthy();
+    render(<ReceiptPrinter order={{ ...order, shipping: 0 }} paymentState="cod" store={store} />);
+    const label = screen.getByTestId('receipt-payment-label');
+    expect(label.textContent).toBe('الدفع عند الاستلام');
+    expect(label.className).not.toContain(styles.mono);
+    expect(label.closest(`.${styles.mono}`)).toBeNull();
+    expect(label.querySelector(`.${styles.mono}`)).toBeNull();
+    const free = screen.getByText('مجاني');
+    expect(free.closest(`.${styles.mono}`)).toBeNull();
+    // every mono run on the receipt is Latin digits / order-number only
+    for (const el of document.querySelectorAll(`.${styles.mono}`)) {
+      expect(el.textContent).not.toMatch(/[؀-ۿ]/);
+    }
+  });
+
+  it('crossfades the status: the old line fades out over the new one, then leaves', () => {
+    render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    expect(screen.queryByTestId('receipt-status-leaving')).toBeNull(); // no fade on first paint
+    finishFeed();
+    const leaving = screen.getByTestId('receipt-status-leaving');
+    expect(leaving.getAttribute('aria-hidden')).toBe('true');
+    expect(leaving.className).toContain(styles.statusOut);
+    expect(leaving.textContent).toContain('بنطبع فاتورتك…');
+    const current = screen.getByTestId('receipt-status-current');
+    expect(current.className).toContain(styles.statusIn);
+    expect(current.textContent).toContain('طلبك اتسجل، الدفع عند الاستلام');
+    fireEvent(leaving, new Event('animationend', { bubbles: true }));
+    fireEvent(leaving, new Event('webkitAnimationEnd', { bubbles: true }));
+    expect(screen.queryByTestId('receipt-status-leaving')).toBeNull();
+  });
+
+  it('reduced motion never mounts a fading status line', () => {
+    mockMatchMedia({ '(prefers-reduced-motion: reduce)': true });
+    render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    expect(screen.queryByTestId('receipt-status-leaving')).toBeNull();
+    expect(screen.getByTestId('receipt-status-current').className).not.toContain(styles.statusIn);
+  });
+
+  it('wallet: amount due shows on a cod order and is hidden once paid', () => {
+    const walletOrder = { ...order, walletAmount: 20000 };
+    render(<ReceiptPrinter order={walletOrder} paymentState="cod" store={store} />);
+    expect(screen.getByText('المبلغ المستحق')).toBeTruthy();
+    expect(screen.getByText('من المحفظة')).toBeTruthy();
+    cleanup();
+    render(<ReceiptPrinter order={walletOrder} paymentState="paid" store={store} />);
+    expect(screen.queryByText('المبلغ المستحق')).toBeNull();
+    expect(screen.getByText('من المحفظة')).toBeTruthy();
+  });
+
+  it('store and bundle names fall back across languages, never blank', () => {
+    const blankBundle: Order = {
+      ...orderWithBundle,
+      items: orderWithBundle.items.map(i => (i.bundleGroupId ? { ...i, bundleNameAr: '  ' } : i)),
+    };
+    render(
+      <ReceiptPrinter order={blankBundle} paymentState="paid" store={{ ...store, nameAr: '' }} />
+    );
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Linen House');
+    expect(screen.getAllByTestId('receipt-line')[2].textContent).toContain('Gift box');
+    cleanup();
+    lang = 'en';
+    render(
+      <ReceiptPrinter
+        order={{
+          ...orderWithBundle,
+          items: orderWithBundle.items.map(i => (i.bundleGroupId ? { ...i, bundleName: '' } : i)),
+        }}
+        paymentState="paid"
+        store={{ ...store, name: ' ' }}
+      />
+    );
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('بيت الكتان');
+    expect(screen.getAllByTestId('receipt-line')[2].textContent).toContain('علبة هدية');
+  });
+
+  it('arabic-indic store: money in ٠-٩, the order number stays Western', () => {
+    numerals = 'arab';
+    render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    const total = screen.getByTestId('receipt-total').textContent ?? '';
+    expect(total).toMatch(/٩٥٠/);
+    expect(total).not.toMatch(/[0-9]/);
+    expect(screen.getByTestId('receipt-order-number').textContent).toBe('#1043');
+    expect(screen.getByTestId('receipt-barcode-caption').textContent).toBe('#1043');
   });
 });

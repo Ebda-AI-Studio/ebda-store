@@ -179,20 +179,32 @@ function SuccessContent() {
                   'تم تأكيد دفعتك وسيتم شحن طلبك قريباً.'
                 );
 
+  // The receipt printer owns the confirmation moment (Task 10 ruling): while
+  // it renders (loading or loaded) the hero icon and the COD banner step aside,
+  // since its status line says the same thing. If the order could not be
+  // loaded there is no receipt to carry the message, so they come back.
+  const showReceipt = order !== null || isLoading;
+
   return (
     <MinimalChrome>
       <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="text-center">
           {/* Status icon \u2014 reflects the VERIFIED payment state, not an
               unconditional checkmark. */}
-          {paymentState === 'verifying' ||
-          paymentState === 'pending' ||
-          paymentState === 'awaiting' ? (
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-warning/15">
+          {showReceipt ? null : paymentState === 'verifying' ||
+            paymentState === 'pending' ||
+            paymentState === 'awaiting' ? (
+            <div
+              data-testid="success-hero-icon"
+              className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-warning/15"
+            >
               <div className="h-9 w-9 animate-spin rounded-full border-4 border-warning border-t-transparent" />
             </div>
           ) : paymentState === 'failed' ? (
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--destructive,0_84%_60%))]/15">
+            <div
+              data-testid="success-hero-icon"
+              className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--destructive,0_84%_60%))]/15"
+            >
               <svg
                 className="h-10 w-10 text-[hsl(var(--destructive,0_84%_60%))]"
                 fill="none"
@@ -208,7 +220,10 @@ function SuccessContent() {
               </svg>
             </div>
           ) : (
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-success/20">
+            <div
+              data-testid="success-hero-icon"
+              className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-success/20"
+            >
               <svg
                 className="h-10 w-10 text-success-ink"
                 fill="none"
@@ -225,11 +240,16 @@ function SuccessContent() {
             </div>
           )}
 
-          <h1 className="mt-6 text-3xl font-bold text-foreground">{heading}</h1>
+          <h1 className={`${showReceipt ? '' : 'mt-6 '}text-3xl font-bold text-foreground`}>
+            {heading}
+          </h1>
           <p className="mt-2 text-lg text-muted-foreground">{subCopy}</p>
 
-          {isCod && (
-            <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
+          {isCod && !showReceipt && (
+            <div
+              data-testid="success-cod-banner"
+              className="mt-4 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3"
+            >
               <p className="text-sm font-medium text-warning-ink">
                 {t(
                   'Cash on Delivery — Pay when your order arrives',
@@ -254,12 +274,21 @@ function SuccessContent() {
             <WaMeCodConfirmButton order={order} className="mx-auto mt-6 max-w-md" />
           )}
 
-          <ReceiptPrinter
-            order={order}
-            paymentState={paymentState}
-            store={store}
-            loading={isLoading}
-          />
+          {showReceipt ? (
+            <ReceiptPrinter
+              order={order}
+              paymentState={paymentState}
+              store={store}
+              loading={isLoading}
+            />
+          ) : (
+            <p className="mt-8 text-sm text-muted-foreground">
+              {t(
+                'Your order has been received. You can track its status anytime from your account.',
+                'تم استلام طلبك. يمكنك متابعة حالته في أي وقت من حسابك.'
+              )}
+            </p>
+          )}
 
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center">
             {paymentState === 'failed' && orderId ? (
