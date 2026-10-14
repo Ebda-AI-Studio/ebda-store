@@ -2378,7 +2378,7 @@
       },
       "notifications": {
         "title": "Notifications",
-        "description": "WhatsApp, SMS, and Push notification settings"
+        "description": "SMS and Push notification settings"
       },
       "affiliates": {
         "title": "Affiliate Program",
@@ -4625,11 +4625,11 @@
   "notifications": {
     "page": {
       "title": "Notifications",
-      "subtitle": "Configure WhatsApp, SMS, and push notification channels"
+      "subtitle": "Configure SMS and push notification channels"
     },
     "empty": {
       "title": "No notification channels enabled",
-      "description": "Enable notification channels (WhatsApp, SMS, or Push Notifications) in your store features to configure them here.",
+      "description": "Enable notification channels (SMS or Push Notifications) in your store features to configure them here.",
       "ctaEnable": "Enable channels"
     },
     "shared": {

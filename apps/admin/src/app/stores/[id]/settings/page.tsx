@@ -464,6 +464,10 @@ export default function StoreSettingsPage() {
     {
       key: 'whatsapp',
       href: `/stores/${storeId}/whatsapp`,
+      // WhatsApp Business API integration: flagged OFF for every store
+      // (Ruling WHATSAPP-OFF-1, 2026-10-14) — the card (and its status fetch)
+      // renders only when the `whatsapp` feature resolves ON for the store.
+      featureKey: 'whatsapp',
       color: 'bg-[#25D366]/10 text-[#25D366]',
       icon: <WhatsAppIcon className="h-6 w-6" />,
     },
