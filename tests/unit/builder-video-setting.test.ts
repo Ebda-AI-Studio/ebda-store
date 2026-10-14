@@ -60,6 +60,30 @@ describe('sniffVideo', () => {
     expect(sniffVideo(Buffer.alloc(0))).toBeNull();
     expect(sniffVideo(Buffer.from('ftyp'))).toBeNull();
   });
+  it('accepts every allowlisted major brand and rejects heic/avif/quicktime/3gp', () => {
+    const box = (brand: string) =>
+      Buffer.concat([
+        Buffer.from([0, 0, 0, 0x18]),
+        Buffer.from(`ftyp${brand}`, 'latin1'),
+        Buffer.alloc(16),
+      ]);
+    for (const b of [
+      'isom',
+      'iso2',
+      'iso3',
+      'iso4',
+      'iso5',
+      'iso6',
+      'mp41',
+      'mp42',
+      'avc1',
+      'dash',
+      'M4V ',
+    ]) {
+      expect(sniffVideo(box(b))).toBe('video/mp4');
+    }
+    for (const b of ['heic', 'avif', 'qt  ', '3gp4', 'mif1']) expect(sniffVideo(box(b))).toBeNull();
+  });
   it('does not treat "ftyp" at offset 0 as mp4', () => {
     expect(sniffVideo(Buffer.from('ftypmp42000000000000'))).toBeNull();
   });
@@ -83,5 +107,6 @@ describe('VideoField client-side guard', () => {
   it('formats megabytes with one decimal and never NaN', () => {
     expect(formatMegabytes(2.5 * 1024 * 1024)).toBe('2.5');
     expect(formatMegabytes(NaN)).toBe('0.0');
+    expect(formatMegabytes(2.5 * 1024 * 1024, 'ar')).toBe('٢٫٥');
   });
 });

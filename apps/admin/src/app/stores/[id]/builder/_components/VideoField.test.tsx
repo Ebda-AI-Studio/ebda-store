@@ -36,7 +36,32 @@ afterEach(() => {
   uploadVideo.mockClear();
 });
 
+function mockMotion(reduce: boolean) {
+  window.matchMedia = ((q: string) => ({
+    matches: reduce && q.includes('reduce'),
+    media: q,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  })) as unknown as typeof window.matchMedia;
+}
+
 describe('VideoField', () => {
+  it('autoplays muted when motion is allowed', () => {
+    mockMotion(false);
+    render(<VideoField storeId="s1" tag="" value="https://media.test/x.mp4" onChange={vi.fn()} />);
+    const v = screen.getByTestId('video-preview') as HTMLVideoElement;
+    expect(v.autoplay).toBe(true);
+    expect(v.controls).toBe(false);
+  });
+
+  it('under prefers-reduced-motion: no autoplay, controls shown', () => {
+    mockMotion(true);
+    render(<VideoField storeId="s1" tag="" value="https://media.test/x.mp4" onChange={vi.fn()} />);
+    const v = screen.getByTestId('video-preview') as HTMLVideoElement;
+    expect(v.autoplay).toBe(false);
+    expect(v.controls).toBe(true);
+  });
+
   it('refuses a file over 6 MB with the Arabic message and does not upload', async () => {
     const onChange = vi.fn();
     render(<VideoField storeId="s1" tag="" value="" onChange={onChange} />);
@@ -62,7 +87,7 @@ describe('VideoField', () => {
     const v = screen.getByTestId('video-preview') as HTMLVideoElement;
     expect(v.muted).toBe(true);
     expect(v.loop).toBe(true);
-    expect(screen.getByTestId('video-size').textContent).toBe('2.0 ميجا');
+    expect(screen.getByTestId('video-size').textContent).toBe('٢٫٠ ميجا');
   });
 
   it('remove clears the value', () => {

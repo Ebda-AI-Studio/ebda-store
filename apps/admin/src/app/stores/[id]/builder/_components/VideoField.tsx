@@ -7,7 +7,8 @@
  * here first so a 40 MB file never leaves the browser; the API enforces the
  * same limits and sniffs the bytes.
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { VIDEO_ACCEPT, checkVideoFile, formatMegabytes } from '@/lib/video-upload';
@@ -24,10 +25,21 @@ export function VideoField({
   onChange: (v: string | undefined) => void;
 }) {
   const t = useT('builder.settings');
+  const locale = useLocale();
   const { uploadVideo, uploading, error: uploadError } = useImageUpload();
   const inputRef = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [bytes, setBytes] = useState<number | null>(null);
+  // Reduced motion: no autoplay, show the first frame with controls instead.
+  const [reduceMotion, setReduceMotion] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    if (!mq) return;
+    setReduceMotion(mq.matches);
+    const on = (e: MediaQueryListEvent) => setReduceMotion(e.matches);
+    mq.addEventListener?.('change', on);
+    return () => mq.removeEventListener?.('change', on);
+  }, []);
 
   const pick = async (file: File | undefined) => {
     if (!file) return;
@@ -54,7 +66,8 @@ export function VideoField({
             src={value}
             muted
             loop
-            autoPlay
+            autoPlay={!reduceMotion}
+            controls={reduceMotion}
             playsInline
             preload="metadata"
             className="h-12 w-20 rounded-md border border-border object-cover"
@@ -77,7 +90,7 @@ export function VideoField({
           </button>
           {value && bytes !== null && (
             <span className="text-[11px] text-muted-foreground" data-testid="video-size">
-              {t('videoSize', { size: formatMegabytes(bytes) })}
+              {t('videoSize', { size: formatMegabytes(bytes, locale) })}
             </span>
           )}
           {value && (

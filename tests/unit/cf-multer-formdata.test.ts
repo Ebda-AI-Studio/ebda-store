@@ -1,7 +1,10 @@
 /** The `multer` replacement used on Workers (apps/api/src/cf/stubs/multer-formdata.ts), on Request.formData(). */
 import { describe, it, expect } from 'vitest';
 import { Readable } from 'node:stream';
-import multer, { MulterError } from '../../apps/api/src/cf/stubs/multer-formdata';
+import multer, {
+  MulterError,
+  FRAMING_ALLOWANCE,
+} from '../../apps/api/src/cf/stubs/multer-formdata';
 
 async function run(
   mw: (req: any, res: unknown, next: (e?: unknown) => void) => Promise<void>,
@@ -110,5 +113,64 @@ describe('multer on Request.formData()', () => {
     expect(multer.memoryStorage()).toBeTruthy();
     expect(new MulterError('LIMIT_FILE_SIZE', 'f').message).toBe('File too large');
     expect(multer.MulterError).toBe(MulterError);
+  });
+});
+
+describe('pre-parse body cap (formData() buffers everything, so the route limit must not be trusted)', () => {
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024, files: 1 } });
+  const CAP = 1024 + FRAMING_ALLOWANCE;
+
+  function rawRun(chunks: Buffer[], headers: Record<string, string>) {
+    const req: any = Object.assign(Readable.from(chunks), { headers });
+    return new Promise<{ req: any; err: unknown }>(resolve => {
+      void upload.single('file')(req, {}, (err?: unknown) => resolve({ req, err }));
+    });
+  }
+
+  it('an oversize Content-Length is rejected as LIMIT_FILE_SIZE without reading the body', async () => {
+    let pulled = 0;
+    const req: any = Object.assign(
+      new Readable({
+        read() {
+          pulled++;
+          this.push(null);
+        },
+      }),
+      {
+        headers: {
+          'content-type': 'multipart/form-data; boundary=x',
+          'content-length': String(CAP + 1),
+        },
+      }
+    );
+    const err = await new Promise<unknown>(resolve => void upload.single('file')(req, {}, resolve));
+    expect(err).toBeInstanceOf(MulterError);
+    expect((err as MulterError).code).toBe('LIMIT_FILE_SIZE');
+    expect(pulled).toBe(0);
+  });
+
+  it('a chunked body past the cap with NO Content-Length errors as LIMIT_FILE_SIZE', async () => {
+    const chunk = Buffer.alloc(32 * 1024, 1);
+    const chunks = Array.from({ length: 4 }, () => chunk); // 128 KB > CAP
+    const { err } = await rawRun(chunks, { 'content-type': 'multipart/form-data; boundary=x' });
+    expect(err).toBeInstanceOf(MulterError);
+    expect((err as MulterError).code).toBe('LIMIT_FILE_SIZE');
+  });
+
+  it('a lying (small) Content-Length does not bypass the counter', async () => {
+    const chunks = Array.from({ length: 4 }, () => Buffer.alloc(32 * 1024, 1));
+    const { err } = await rawRun(chunks, {
+      'content-type': 'multipart/form-data; boundary=x',
+      'content-length': '10',
+    });
+    expect((err as MulterError).code).toBe('LIMIT_FILE_SIZE');
+  });
+
+  it('a body under the cap still parses', async () => {
+    const form = new FormData();
+    form.set('file', file('ok.png', 'image/png', 900));
+    const { req, err } = await run(upload.single('file'), form);
+    expect(err).toBeUndefined();
+    expect(req.file.size).toBe(900);
   });
 });

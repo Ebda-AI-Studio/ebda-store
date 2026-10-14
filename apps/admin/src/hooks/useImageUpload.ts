@@ -37,8 +37,10 @@ export function useImageUpload() {
     return `${getApiUrl()}/api/v1/uploads/${path}?${params.toString()}`;
   };
 
-  const uploadSingle = useCallback(
+  /** One file via POST /uploads/<path>; resolves to its public URL or null (error state set). */
+  const uploadOne = useCallback(
     async (
+      path: 'image' | 'video',
       file: File,
       folder: string,
       storeId?: string,
@@ -52,9 +54,9 @@ export function useImageUpload() {
       formData.append('file', file);
 
       try {
-        const url = await runXhr<string>({
+        return await runXhr<string>({
           t,
-          url: buildUploadUrl('image', folder, storeId, aspect),
+          url: buildUploadUrl(path, folder, storeId, aspect),
           formData,
           onProgress: setProgress,
           parse: data => {
@@ -62,7 +64,6 @@ export function useImageUpload() {
             throw new Error(data.error?.message || t('errors.uploadFailed'));
           },
         });
-        return url;
       } catch (err) {
         setError(err instanceof Error ? err.message : t('errors.uploadFailed'));
         return null;
@@ -74,36 +75,16 @@ export function useImageUpload() {
     [t]
   );
 
-  /** One mp4/webm (<= 6 MB, enforced by the caller AND the API) via POST /uploads/video. */
+  const uploadSingle = useCallback(
+    (file: File, folder: string, storeId?: string, aspect?: string) =>
+      uploadOne('image', file, folder, storeId, aspect),
+    [uploadOne]
+  );
+
+  /** One mp4/webm (<= 6 MB, enforced by the caller AND the API). */
   const uploadVideo = useCallback(
-    async (file: File, folder: string, storeId?: string): Promise<string | null> => {
-      setError(null);
-      setUploading(true);
-      setProgress(0);
-
-      const formData = new FormData();
-      formData.append('file', file);
-
-      try {
-        return await runXhr<string>({
-          t,
-          url: buildUploadUrl('video', folder, storeId),
-          formData,
-          onProgress: setProgress,
-          parse: data => {
-            if (data.success && data.data?.url) return data.data.url as string;
-            throw new Error(data.error?.message || t('errors.uploadFailed'));
-          },
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : t('errors.uploadFailed'));
-        return null;
-      } finally {
-        setUploading(false);
-        setProgress(0);
-      }
-    },
-    [t]
+    (file: File, folder: string, storeId?: string) => uploadOne('video', file, folder, storeId),
+    [uploadOne]
   );
 
   const uploadMulti = useCallback(

@@ -168,6 +168,7 @@ describe.skipIf(!hasDb)('POST /uploads/video', () => {
   });
 
   it('the image route still refuses video', async () => {
+    putMock.mockClear();
     const r = await request(app)
       .post(`/api/v1/uploads/image?folder=hero&storeId=${storeId}`)
       .set('Authorization', `Bearer ${token}`)

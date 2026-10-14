@@ -301,7 +301,7 @@ const videoUpload = multer({
   },
 });
 
-/** multer's size error -> 413, the filter's AppError -> its own status. */
+/** multer's size error -> 413, other MulterErrors -> 400, the filter's AppError -> its own status. */
 function receiveVideo(req: Request, res: Response, next: NextFunction): void {
   videoUpload.single('file')(req, res, (err?: unknown) => {
     if (!err) return next();
@@ -310,6 +310,11 @@ function receiveVideo(req: Request, res: Response, next: NextFunction): void {
         success: false,
         error: { code: 'VIDEO_TOO_LARGE', message: 'Video is larger than 6 MB' },
       });
+      return;
+    }
+    if (err instanceof multer.MulterError) {
+      // LIMIT_UNEXPECTED_FILE / LIMIT_FILE_COUNT (a second file, a wrong field): the client's fault.
+      res.status(400).json({ success: false, error: { code: err.code, message: err.message } });
       return;
     }
     if (err instanceof AppError) {
