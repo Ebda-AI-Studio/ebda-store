@@ -7,7 +7,7 @@ import {
   type TemplateId,
   type StoreLocationPublic,
   DEFAULT_THEME,
-  getTemplateTheme,
+  composeStoreTheme,
   REGION,
   BRAND,
   parseStoreHost,
@@ -380,7 +380,6 @@ async function fetchStoreByDomain(
       : undefined;
 
     // Merge theme with template defaults
-    const templateTheme = getTemplateTheme(storeData.template || 'modern');
     const customTheme = typeof storeData.theme === 'object' ? storeData.theme : {};
 
     return {
@@ -398,7 +397,11 @@ async function fetchStoreByDomain(
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
-      theme: { ...templateTheme, ...customTheme },
+      theme: composeStoreTheme({
+        template: storeData.template || 'modern',
+        look: storeData.look,
+        theme: customTheme,
+      }),
       socialLinks: typeof storeData.socialLinks === 'object' ? storeData.socialLinks : {},
       email: storeData.email,
       phone: storeData.phone,
@@ -550,7 +553,6 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
     const disabledCmsSlugs: string[] | undefined = Array.isArray(data.data.disabledCmsSlugs)
       ? data.data.disabledCmsSlugs.filter((s: unknown): s is string => typeof s === 'string')
       : undefined;
-    const templateTheme = getTemplateTheme(storeData.template || 'modern');
     const customTheme = typeof storeData.theme === 'object' ? storeData.theme : {};
 
     return {
@@ -568,7 +570,11 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
-      theme: { ...templateTheme, ...customTheme },
+      theme: composeStoreTheme({
+        template: storeData.template || 'modern',
+        look: storeData.look,
+        theme: customTheme,
+      }),
       socialLinks: typeof storeData.socialLinks === 'object' ? storeData.socialLinks : {},
       email: storeData.email,
       phone: storeData.phone,
@@ -884,7 +890,6 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
     }
 
     const storeData = data.data.store;
-    const templateTheme = getTemplateTheme(storeData.template || 'modern');
     const customTheme = typeof storeData.theme === 'object' ? storeData.theme : {};
 
     return {
@@ -902,7 +907,11 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       currency: storeData.currency || REGION.currency,
       timezone: storeData.timezone || 'Africa/Cairo',
       template: storeData.template || 'modern',
-      theme: { ...templateTheme, ...customTheme },
+      theme: composeStoreTheme({
+        template: storeData.template || 'modern',
+        look: storeData.look,
+        theme: customTheme,
+      }),
       socialLinks: typeof storeData.socialLinks === 'object' ? storeData.socialLinks : {},
       email: storeData.email,
       phone: storeData.phone,

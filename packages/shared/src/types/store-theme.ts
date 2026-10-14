@@ -6,6 +6,7 @@
 import { deriveBrandRoles } from '../utils/brand-roles';
 import { statusInkVars } from '../utils/status-ink';
 import { colorToHslTriplet } from '../utils/color';
+import type { Density, ImageRatio, Motion } from '../looks/types';
 
 /**
  * Available store templates
@@ -133,6 +134,11 @@ export interface StoreTheme {
 
   // Styling
   borderRadius: BorderRadius;
+
+  // Look-owned layout tokens (set by a look via composeStoreTheme; absent on legacy stores).
+  density?: Density;
+  imageRatio?: ImageRatio;
+  motion?: Motion;
 
   // Per-store homepage section background preset — see BackgroundPreset
   // for behavior. Optional; missing or 'none' means flat-surface (no

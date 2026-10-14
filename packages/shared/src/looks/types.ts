@@ -62,5 +62,7 @@ export const LOOK_TOKEN_KEYS = [
   'borderRadius',
   'bgPage',
   'bgSectionAlt',
-  // 'density', 'imageRatio', 'motion' join this list when StoreTheme gains those fields (later task).
+  'density',
+  'imageRatio',
+  'motion',
 ] as const satisfies readonly (keyof StoreTheme)[];
