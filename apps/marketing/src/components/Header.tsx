@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { BRAND } from '@force/shared/brand';
 import { COPY } from '../lib/content';
+import { WhatsApp } from './WhatsApp';
 import {
   HOME,
   LOGIN_URL,
@@ -31,10 +32,14 @@ export function Header({
   return (
     <header className="site-header">
       <div className="wrap header-row">
-        <Link href={home} className="wordmark" aria-label={`${BRAND.name} ${BRAND.nameAr}`}>
+        <Link
+          href={home}
+          className="wordmark"
+          aria-label={locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn}
+        >
           <img src="/icon.svg" alt="" width={28} height={28} />
-          <span className={locale === 'ar' ? 'wm-ar' : 'wm-latin'}>
-            {locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn}
+          <span className="wm-name">
+            {locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn}
           </span>
         </Link>
         <nav aria-label={c.nav.label} className="nav">
@@ -46,13 +51,35 @@ export function Header({
             ))}
           </ul>
           <details className="nav-menu">
-            <summary>{c.nav.menu}</summary>
+            <summary>
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path
+                  d="M4 7h16M4 12h16M4 17h16"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              </svg>
+              <span className="menu-label">{c.nav.menu}</span>
+            </summary>
             <ul>
               {NAV_ANCHORS.map(n => (
                 <li key={n.key}>
                   <a href={anchor(n.target)}>{c.nav[n.key]}</a>
                 </li>
               ))}
+              <li className="menu-wa">
+                <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} />
+              </li>
+              <li className="menu-lang">
+                <Link href={pagePath(other, page)} hrefLang={other} lang={other}>
+                  {c.nav.switchTo}
+                </Link>
+              </li>
+              <li className="menu-login">
+                <a href={LOGIN_URL}>{c.nav.login}</a>
+              </li>
             </ul>
           </details>
         </nav>
@@ -69,6 +96,7 @@ export function Header({
           <a href={LOGIN_URL} className="link-login">
             {c.nav.login}
           </a>
+          <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} compact />
           <a href={SIGNUP_URL} className="btn btn-primary">
             {c.nav.start}
           </a>

@@ -1,21 +1,20 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
-import { DEVICE_SHOTS, STORY_STRIP } from '../lib/device-shots';
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import type { StoryStep } from '../lib/content';
+import { STORY_FRAMES } from '../lib/story-frames';
 import { Phone } from './Devices';
 
 const reducedMotion = () =>
   typeof window.matchMedia === 'function' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** How far the full-page strip can scroll inside the phone, as % of the strip's height. */
-const PHONE_VIEWPORT = { w: 390, h: 844 };
-const STRIP_MAX_PCT =
-  (1 - PHONE_VIEWPORT.h / PHONE_VIEWPORT.w / (STORY_STRIP.h / STORY_STRIP.w)) * 100;
-
 /**
- * The pinned scroll story. The server renders the finished state (step 4) so no-JS,
- * reduced-motion and crawlers see the whole store; on scroll we drive --p and data-step.
+ * The pinned scroll story: the Dahab store assembling inside a phone, one frame per step
+ * (name + logo, products, colours + photos, first order). The server renders the finished state
+ * (step 4: the last frame plus the notifications) so no-JS, reduced-motion and crawlers see the
+ * whole store; on scroll we drive --p and data-step, and CSS crossfades the frame for that step.
+ * The frames are screenshots of the Dahab look A fragment (scripts/story-frames/make.mjs).
  */
 export function StoryScroll({
   title,
@@ -24,7 +23,7 @@ export function StoryScroll({
   phoneLabel,
 }: {
   title: string;
-  steps: string[];
+  steps: StoryStep[];
   toasts: { t: string; d: string }[];
   phoneLabel: string;
 }) {
@@ -43,11 +42,6 @@ export function StoryScroll({
       el.style.setProperty('--p', p.toFixed(4));
       el.style.setProperty('--in', Math.min(1, p / 0.12).toFixed(4));
       el.dataset.step = String(step);
-      // Steps 1-3: the real store scrolls inside the phone, from the hero down to its products.
-      el.style.setProperty(
-        '--scroll',
-        (Math.min(1, Math.max(0, (p - 0.12) / 0.62)) * 0.66).toFixed(4)
-      );
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update);
@@ -84,49 +78,33 @@ export function StoryScroll({
             <h2 id="story-h">{title}</h2>
             <ol className="story-steps">
               {steps.map((s, i) => (
-                <li key={s} data-n={i + 1}>
-                  {s}
+                <li key={s.t} data-n={i + 1}>
+                  <span className="story-step-t">{s.t}</span>
+                  <span className="story-step-d">{s.d}</span>
                 </li>
               ))}
             </ol>
           </div>
           <div className="story-stage" role="img" aria-label={phoneLabel}>
-            <div className="story-glow" />
             <Phone className="story-phone">
-              <div
-                className="story-screen"
-                style={{ '--strip-max': `${STRIP_MAX_PCT.toFixed(3)}%` } as React.CSSProperties}
-              >
-                <picture className="story-strip">
-                  <source type="image/avif" srcSet="/devices/dahab-story-900.avif" />
-                  <img
-                    src="/devices/dahab-story-900.webp"
-                    width={STORY_STRIP.w}
-                    height={STORY_STRIP.h}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </picture>
-                {'bar' in DEVICE_SHOTS.dahab && (
-                  <picture className="story-bar">
-                    <source type="image/avif" srcSet="/devices/dahab-bar-900.avif" />
+              <div className="story-screen">
+                {STORY_FRAMES.map((f, i) => (
+                  <picture className="story-frame" data-f={i + 1} key={f.name}>
+                    <source type="image/avif" srcSet={`/devices/${f.name}.avif`} />
                     <img
-                      src="/devices/dahab-bar-900.webp"
-                      width={900}
-                      height={Math.round(
-                        (900 * DEVICE_SHOTS.dahab.bar.h) / DEVICE_SHOTS.dahab.bar.w
-                      )}
+                      src={`/devices/${f.name}.webp`}
+                      width={f.w}
+                      height={f.h}
                       alt=""
                       loading="lazy"
                       decoding="async"
                     />
                   </picture>
-                )}
+                ))}
               </div>
               <ol className="story-toasts" aria-hidden="true">
                 {toasts.map((n, i) => (
-                  <li key={n.t} className="story-toast" style={{ '--i': i } as React.CSSProperties}>
+                  <li key={n.t} className="story-toast" style={{ '--i': i } as CSSProperties}>
                     <span className="toast-mark" />
                     <span>
                       <strong>{n.t}</strong>

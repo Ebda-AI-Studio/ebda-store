@@ -5,12 +5,18 @@ import type { LegalPages } from './legal-types';
 import type { Locale } from './site';
 
 const CO = BRAND.company;
+const PN = BRAND.product;
 
 /** A payment or shipping provider; `logo` is a file in public/logos/ (none = our own icon). */
 export interface Provider {
   name: string;
   logo?: string;
   icon?: 'cash' | 'truck';
+}
+
+export interface StoryStep {
+  t: string;
+  d: string;
 }
 
 export interface RingCopy {
@@ -59,6 +65,7 @@ export interface Copy {
     solutions: string;
     pricing: string;
     resources: string;
+    looks: string;
     login: string;
     start: string;
     menu: string;
@@ -66,28 +73,45 @@ export interface Copy {
     switchLabel: string;
   };
   hero: {
-    /** The brand line, «ابدأ — بابك لبدء مشروعك.» */
-    brand: string;
     h1: string;
+    /** Names the product (BRAND.product), then what it gives you. */
     sub: string;
     cta: string;
+    /** Secondary link: jumps to #looks. */
     secondary: string;
-    slugLabel: string;
+    /** The one phone that cycles through the five templates' first look. */
+    phone: {
+      /** Accessible name of the cycling preview. */
+      label: string;
+      pause: string;
+      play: string;
+      /** aria-label of each vertical dot; `{name}` is the template name. */
+      show: string;
+      /** Visible caption mark: the preview is an illustration. */
+      badge: string;
+    };
   };
   /** The /about page: company line, story heading, contact heading. */
-  aboutPage: { title: string; company: string; storyH: string; contactH: string; desc: string };
-  /** «حكاية ابدأ»: why the name and the open-door mark. */
-  about: { title: string; paras: string[]; close: string; markLabel: string };
-  /** The pinned scroll story: a store assembling inside a phone. */
+  aboutPage: {
+    title: string;
+    company: string;
+    /** The studio's line, «ابدأ — بابك لبدء مشروعك.» (moved off the home hero, MKT-1). */
+    brandLine: string;
+    storyH: string;
+    contactH: string;
+    desc: string;
+  };
+  /** «حكاية ابدأ»: why the name and the open-door mark (shown on /about). */
+  about: { title: string; paras: string[]; close: string };
+  /** The pinned scroll story: the Dahab store assembling inside a phone, one frame per step. */
   story: {
     title: string;
-    steps: [string, string, string, string];
+    /** The four steps in order: what you do, and the one line that says how. */
+    steps: [StoryStep, StoryStep, StoryStep, StoryStep];
     /** The notification stream at the end of the story, oldest first. */
     toasts: { t: string; d: string }[];
     phoneLabel: string;
   };
-  how: { title: string; steps: { t: string; d: string }[] };
-  breakout: { title: string; words: [string, string, string] };
   dahab: { title: string; lead: string; ring: RingCopy };
   /** The interactive template + look picker (5 templates x 3 looks, phone previews). */
   looks: LooksCopy;
@@ -116,6 +140,17 @@ export interface Copy {
     planCtaAnnual: string;
   };
   faq: { title: string; items: { q: string; a: string }[] };
+  /** The public WhatsApp line (number comes from BRAND.contact.whatsapp). */
+  whatsapp: {
+    /** Visible link label next to the icon. */
+    label: string;
+    /** aria-label of the icon-only header link; the number is appended. */
+    aria: string;
+    /** One line under the FAQ; ends before the link. */
+    faq: string;
+    /** One line in the closing section; ends before the link. */
+    close: string;
+  };
   /** Footer contact block. */
   contact: { title: string; hello: string; security: string };
   start: {
@@ -157,6 +192,7 @@ export const COPY: Record<Locale, Copy> = {
       solutions: 'إزاي بيشتغل',
       pricing: 'الأسعار',
       resources: 'أسئلة',
+      looks: 'القوالب',
       login: 'دخول',
       start: 'ابدأ دلوقتي',
       menu: 'القائمة',
@@ -164,34 +200,18 @@ export const COPY: Record<Locale, Copy> = {
       switchLabel: 'Switch to English',
     },
     hero: {
-      brand: 'ابدأ استوديو للذكاء الاصطناعي — بابك لبدء مشروعك.',
       h1: 'ابدأ متجرك أونلاين في دقايق.',
-      sub: 'لينك باسمك، منتجاتك، وطلباتك. كله من موبايلك.',
+      sub: `${PN.nameAr} بيديك لينك باسمك، ومنتجاتك، وطلباتك. كله من موبايلك.`,
       cta: 'ابدأ دلوقتي',
-      secondary: 'شوف إزاي',
-      slugLabel: 'لينك متجرك',
+      secondary: 'شوف القوالب',
+      phone: {
+        label: 'معاينة بتتغيّر: أول شكل في كل قالب من القوالب الخمسة، بصور توضيحية',
+        pause: 'وقّف التغيير',
+        play: 'شغّل التغيير',
+        show: 'اعرض قالب {name}',
+        badge: 'صور توضيحية',
+      },
     },
-    story: {
-      title: 'متجرك بيتبني قدامك.',
-      steps: ['اختار اسم ولوجو.', 'نزّل منتجاتك.', 'ظبّط ألوانك وصورك.', 'وأول طلب يوصلك.'],
-      toasts: [
-        { t: 'طلب جديد · 9,750 ج.م', d: 'سلسلة دهب · الدفع عند الاستلام' },
-        { t: 'بوسطة استلمت الشحنة', d: 'الطلب رقم 1043 في الطريق للعميل' },
-        { t: 'وصلك دفع إنستا باي', d: '18,500 ج.م من سارة م.' },
-        { t: 'عميل جديد اشترك في النشرة', d: 'نهى اشتركت في عروض الأسبوع' },
-      ],
-      phoneLabel: 'متجر مجوهرات بيتبني على الموبايل، وبعدين توصله الطلبات والإشعارات.',
-    },
-    how: {
-      title: '4 خطوات وتبدأ تبيع.',
-      steps: [
-        { t: 'سجّل وسمّي متجرك', d: 'إيميل وباسورد، واختار اللينك بتاعك.' },
-        { t: 'نزّل منتجاتك', d: 'بالصور والأسعار والمقاسات، أو من ملف CSV.' },
-        { t: 'اختار شكل متجرك', d: 'ألوانك وصورك، وكل حاجة فيه تتعدّل.' },
-        { t: 'استقبل الطلبات', d: 'وتابع الدفع والشحن من موبايلك.' },
-      ],
-    },
-    breakout: { title: 'منتجك هو البطل.', words: ['ابدأ', 'متجرك', 'دلوقتي'] },
     dahab: {
       title: 'شوفه لايف، من كل زاوية.',
       lead: 'لفّ الخاتم واختار المعدن والحجر. كده عميلك يشوف منتجك على متجرك.',
@@ -203,6 +223,23 @@ export const COPY: Record<Locale, Copy> = {
         metals: { gold: 'دهب أصفر', white: 'دهب أبيض', rose: 'روز جولد' },
         stones: { diamond: 'ألماظ', emerald: 'زمرد', ruby: 'ياقوت' },
       },
+    },
+    story: {
+      title: 'متجرك بيتبني قدامك.',
+      steps: [
+        { t: 'اختار اسم ولوجو.', d: 'سجّل بإيميل وباسورد، واختار اللينك بتاعك.' },
+        { t: 'نزّل منتجاتك.', d: 'بالصور والأسعار والمقاسات، أو من ملف CSV.' },
+        { t: 'ظبّط ألوانك وصورك.', d: 'اختار شكل متجرك، وكل حاجة فيه تتعدّل.' },
+        { t: 'وأول طلب يوصلك.', d: 'وتابع الدفع والشحن من موبايلك.' },
+      ],
+      toasts: [
+        { t: 'طلب جديد · 9,800 ج.م', d: 'إنسيال دهب رفيع · الدفع عند الاستلام' },
+        { t: 'بوسطة استلمت الشحنة', d: 'الطلب رقم 1043 في الطريق للعميل' },
+        { t: 'وصلك دفع إنستا باي', d: '18,500 ج.م من سارة م.' },
+        { t: 'عميل جديد اشترك في النشرة', d: 'نهى اشتركت في عروض الأسبوع' },
+      ],
+      phoneLabel:
+        'متجر مجوهرات (قالب دهب) بيتبني على الموبايل: اسم ولوجو، منتجات، ألوان وصور، وبعدين توصله الطلبات والإشعارات. صور توضيحية.',
     },
     looks: {
       title: 'اختار قالب، وبعدين اختار شكله.',
@@ -394,6 +431,7 @@ export const COPY: Record<Locale, Copy> = {
     aboutPage: {
       title: 'عن ابدأ استوديو للذكاء الاصطناعي',
       desc: 'ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، من ابدأ استوديو للذكاء الاصطناعي.',
+      brandLine: 'ابدأ استوديو للذكاء الاصطناعي — بابك لبدء مشروعك.',
       company: `ابدأ ستور منصة تقنية لبناء المتاجر الإلكترونية للتجار في مصر، مملوكة ل${CO.shortNameAr} وتديرها.`,
       storyH: 'حكاية ابدأ استوديو للذكاء الاصطناعي',
       contactH: 'تواصل معنا',
@@ -406,7 +444,12 @@ export const COPY: Record<Locale, Copy> = {
         'ابدأ استوديو للذكاء الاصطناعي موجودة علشان تسهّل أول باب. علشان كده اللوجو باب، واللي جوّاه هو صاحب الفكرة، واقف على العتبة. مش محتاج يفهم في منصات التجارة الإلكترونية ولا الـ API ولا البنية التحتية ولا ربط واتساب. محتاج بس ياخد أول خطوة.',
       ],
       close: 'ابدأ.',
-      markLabel: 'لوجو ابدأ استوديو للذكاء الاصطناعي: باب مفتوح، وصاحب الفكرة بيعدّي منه',
+    },
+    whatsapp: {
+      label: 'واتساب',
+      aria: 'كلمنا على واتساب',
+      faq: 'لسه عندك سؤال؟ كلمنا على واتساب وهنرد عليك:',
+      close: 'محتاج تسأل قبل ما تبدأ؟ كلمنا على واتساب:',
     },
     contact: {
       title: 'تواصل معانا',
@@ -449,6 +492,7 @@ export const COPY: Record<Locale, Copy> = {
       solutions: 'How it works',
       pricing: 'Pricing',
       resources: 'FAQ',
+      looks: 'Templates',
       login: 'Log in',
       start: 'Start now',
       menu: 'Menu',
@@ -456,40 +500,18 @@ export const COPY: Record<Locale, Copy> = {
       switchLabel: 'التبديل إلى العربية',
     },
     hero: {
-      brand: 'Ebda AI Studio — Your doorway to business.',
       h1: 'Open your online store in minutes.',
-      sub: 'Your own link, products and orders. All from your phone.',
+      sub: `${PN.nameEn} gives you your own link, products and orders. All from your phone.`,
       cta: 'Start now',
-      secondary: 'See how',
-      slugLabel: 'Your store link',
+      secondary: 'See the templates',
+      phone: {
+        label: 'A rotating preview: the first look of each of the five templates, illustrative',
+        pause: 'Pause the preview',
+        play: 'Play the preview',
+        show: 'Show the {name} template',
+        badge: 'Illustrative',
+      },
     },
-    story: {
-      title: 'Watch your store come together.',
-      steps: [
-        'Pick a name and logo.',
-        'Add your products.',
-        'Tune your colours and photos.',
-        'And the first order arrives.',
-      ],
-      toasts: [
-        { t: 'New order · EGP 9,750', d: 'Gold chain · cash on delivery' },
-        { t: 'Bosta picked up the parcel', d: 'Order 1043 is on its way' },
-        { t: 'InstaPay payment received', d: 'EGP 18,500 from Sara M.' },
-        { t: 'New newsletter subscriber', d: 'Noha joined this week’s offers' },
-      ],
-      phoneLabel:
-        'A jewellery store being built on a phone, then receiving orders and notifications.',
-    },
-    how: {
-      title: 'Four steps and you’re selling.',
-      steps: [
-        { t: 'Sign up and name your store', d: 'Email and password, then pick your link.' },
-        { t: 'Add your products', d: 'Photos, prices and sizes, or a CSV file.' },
-        { t: 'Pick your store’s look', d: 'Your colours and photos, everything editable.' },
-        { t: 'Take orders', d: 'And follow payment and shipping from your phone.' },
-      ],
-    },
-    breakout: { title: 'Your product is the star.', words: ['ابدأ', 'متجرك', 'دلوقتي'] },
     dahab: {
       title: 'See it live, from every angle.',
       lead: 'Turn the ring and pick the metal and stone. That’s how customers see your product.',
@@ -501,6 +523,23 @@ export const COPY: Record<Locale, Copy> = {
         metals: { gold: 'Yellow gold', white: 'White gold', rose: 'Rose gold' },
         stones: { diamond: 'Diamond', emerald: 'Emerald', ruby: 'Ruby' },
       },
+    },
+    story: {
+      title: 'Watch your store come together.',
+      steps: [
+        { t: 'Pick a name and logo.', d: 'Sign up with email and password, then pick your link.' },
+        { t: 'Add your products.', d: 'Photos, prices and sizes, or a CSV file.' },
+        { t: 'Tune your colours and photos.', d: 'Pick your store’s look, everything editable.' },
+        { t: 'And the first order arrives.', d: 'Follow payment and shipping from your phone.' },
+      ],
+      toasts: [
+        { t: 'New order · EGP 9,800', d: 'Slim gold bangle · cash on delivery' },
+        { t: 'Bosta picked up the parcel', d: 'Order 1043 is on its way' },
+        { t: 'InstaPay payment received', d: 'EGP 18,500 from Sara M.' },
+        { t: 'New newsletter subscriber', d: 'Noha joined this week’s offers' },
+      ],
+      phoneLabel:
+        'A jewellery store (the Dahab template) being built on a phone: name and logo, products, colours and photos, then orders and notifications. Illustrative.',
     },
     looks: {
       title: 'Pick a template, then pick its look.',
@@ -699,6 +738,7 @@ export const COPY: Record<Locale, Copy> = {
     aboutPage: {
       title: 'About Ebda AI Studio',
       desc: 'Ebda Store is an online store builder for merchants in Egypt, a product of Ebda AI Studio.',
+      brandLine: 'Ebda AI Studio — Your doorway to business.',
       company: `Ebda Store is an online store builder for merchants in Egypt, a technology platform owned and operated by ${CO.shortNameEn}.`,
       storyH: 'The Ebda AI Studio story',
       contactH: 'Contact',
@@ -711,8 +751,12 @@ export const COPY: Record<Locale, Copy> = {
         'Ebda AI Studio exists to make the first door simple. That’s why the logo is a doorway, and the shape inside is the person with the idea, standing at the entrance. They don’t need to know e-commerce platforms, APIs, infrastructure or WhatsApp integrations. They just take the first step.',
       ],
       close: 'ابدأ.',
-      markLabel:
-        'The Ebda AI Studio mark: an open doorway, with the person with the idea stepping through',
+    },
+    whatsapp: {
+      label: 'WhatsApp',
+      aria: 'Chat with us on WhatsApp',
+      faq: 'Still have a question? Message us on WhatsApp:',
+      close: 'Want to ask something first? Message us on WhatsApp:',
     },
     contact: {
       title: 'Contact us',

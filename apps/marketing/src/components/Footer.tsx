@@ -8,19 +8,14 @@ export function Footer({ locale }: { locale: Locale }) {
   const c = COPY[locale].footer;
   const k = COPY[locale].contact;
   return (
-    <footer className="site-footer">
+    <footer className="site-footer band-dark">
       <div className="wrap footer-row">
         <div>
           <p className="footer-brand">
-            <img
-              src="/icon.svg"
-              alt={`${BRAND.name} ${BRAND.nameAr}`}
-              className="footer-mark"
-              width={28}
-              height={28}
-            />
-            <span>{locale === 'ar' ? BRAND.company.shortNameAr : BRAND.company.shortNameEn}</span>
+            <img src="/icon.svg" alt="" className="footer-mark" width={28} height={28} />
+            <span>{locale === 'ar' ? BRAND.product.nameAr : BRAND.product.nameEn}</span>
           </p>
+          <p className="footer-credit">{c.product}</p>
           <p className="footer-h">{k.title}</p>
           <dl className="footer-contact">
             <div>

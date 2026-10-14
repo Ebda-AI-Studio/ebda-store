@@ -29,11 +29,32 @@ describe('marketing nav', () => {
     expect(pageMetadata('ar', '').title).toContain('ابدأ استوديو للذكاء الاصطناعي');
     expect(pageMetadata('en', '').title).toContain('Ebda AI Studio');
   });
-  it('has the five links in order with correct targets (en)', () => {
+  it('has the five links in page order with correct targets (en)', () => {
     const nav = en.match(/<nav aria-label="Main navigation".*?<\/nav>/s)![0];
-    const labels = [...nav.matchAll(/<a href="([^"]+)">([^<]+)<\/a>/g)].slice(0, 4);
-    expect(labels.map(m => m[2])).toEqual(['Features', 'How it works', 'Pricing', 'FAQ']);
-    expect(labels.map(m => m[1])).toEqual(['#features', '#how', '#pricing', '#faq']);
+    const labels = [...nav.matchAll(/<a href="([^"]+)">([^<]+)<\/a>/g)].slice(0, 5);
+    expect(labels.map(m => m[2])).toEqual([
+      'Templates',
+      'How it works',
+      'Features',
+      'Pricing',
+      'FAQ',
+    ]);
+    expect(labels.map(m => m[1])).toEqual(['#looks', '#story', '#features', '#pricing', '#faq']);
+    // every nav target exists on the page, in the same order as the sections
+    const at = (id: string) => en.indexOf(`<section id="${id}"`);
+    const pos = labels.map(m => at(m[1].slice(1)));
+    expect(pos.every(p => p > 0)).toBe(true);
+    expect([...pos].sort((a, b) => a - b)).toEqual(pos);
+  });
+  it('names the product, not the studio, in the header wordmark (MKT-1)', () => {
+    for (const [html, name] of [
+      [ar, 'ابدأ ستور'],
+      [en, 'Ebda Store'],
+    ] as const) {
+      const wm = html.match(/<a class="wordmark".*?<\/a>/s)![0];
+      expect(wm).toContain(`>${name}</span>`);
+      expect(wm).not.toMatch(/Ebda AI Studio|ابدأ استوديو/);
+    }
   });
   it('Log in -> app login, Start now -> app signup, in both locales', () => {
     expect(LOGIN_URL).toBe('https://store.ebda.app/login');
@@ -59,25 +80,61 @@ describe('marketing hero and structure', () => {
     // No English sentence on the Arabic hero any more (R-EBDA-COPY-1).
     expect(ar).not.toContain('Your business, your store');
   });
+  it('hero = h1 + sub naming the product + ONE signup CTA + a link to #looks + one phone (MKT-1)', () => {
+    for (const [html, name, secondary] of [
+      [ar, 'ابدأ ستور بيديك', 'شوف القوالب'],
+      [en, 'Ebda Store gives you', 'See the templates'],
+    ] as const) {
+      const hero = html.match(/<section class="hero".*?<\/section>/s)![0];
+      expect(hero).toContain(name);
+      expect(hero.match(/class="btn btn-primary btn-lg"/g)).toHaveLength(1);
+      expect(hero).toContain(`href="${SIGNUP_URL}"`);
+      expect(hero).toMatch(
+        new RegExp(`<a href="#looks" class="btn btn-ghost btn-lg">${secondary}<`)
+      );
+      // one phone, first frame is Qamar look A, rendered by the server (static for no-JS / reduced motion)
+      expect(hero.match(/class="look-phone"/g)).toHaveLength(1);
+      expect(hero).toContain('id="hp-qamar-a"');
+      expect(hero).not.toContain('id="ph-qamar-a"');
+      // the retired hero furniture is gone: particles, poster, studio kicker, slug pill
+      expect(hero).not.toMatch(/nile|hero-poster|hero-brand|slug-pill|<canvas/);
+      expect(hero).not.toMatch(/ابدأ استوديو للذكاء|Ebda AI Studio/);
+    }
+  });
+  it('the retired sections and their assets are gone; the story stays with the new Dahab frames (MKT-1)', () => {
+    for (const html of [ar, en]) {
+      expect(html).not.toMatch(
+        /id="breakout"|id="about"|id="how"|bo-ring|steps4|story-strip|story-bar/
+      );
+      // the story is kept, re-skinned: one Dahab look A frame per step, server renders the last
+      expect(html.match(/class="story-frame"/g)).toHaveLength(4);
+      for (const n of [1, 2, 3, 4]) expect(html).toContain(`/devices/dahab-story-${n}-900.webp`);
+      expect(html).not.toMatch(/dahab-story-900|dahab-bar/);
+    }
+    const dev = path.resolve(__dirname, '../../apps/marketing/public/devices');
+    for (const n of [1, 2, 3, 4])
+      for (const ext of ['avif', 'webp'])
+        expect(existsSync(`${dev}/dahab-story-${n}-900.${ext}`)).toBe(true);
+    for (const old of ['dahab-story-900', 'dahab-bar-900'])
+      for (const ext of ['avif', 'webp']) expect(existsSync(`${dev}/${old}.${ext}`)).toBe(false);
+    for (const f of [
+      'src/components/Breakout.tsx',
+      'src/components/NileNight.tsx',
+      'src/lib/device-shots.ts',
+      'scripts/storefront-capture',
+    ])
+      expect(existsSync(path.resolve(__dirname, '../../apps/marketing', f))).toBe(false);
+    expect(
+      existsSync(path.resolve(__dirname, '../../apps/marketing/scripts/story-frames/make.mjs'))
+    ).toBe(true);
+  });
   it('renders sections in the exact required order', () => {
-    const expected = [
-      'story',
-      'how',
-      'looks',
-      'breakout',
-      'dahab',
-      'features',
-      'payments',
-      'about',
-      'pricing',
-      'faq',
-      'start',
-    ];
+    const expected = ['looks', 'story', 'dahab', 'payments', 'features', 'pricing', 'faq', 'start'];
     expect([...SECTION_ORDER]).toEqual(expected);
     for (const html of [ar, en]) {
-      const ids = [
-        ...html.matchAll(/<section id="([a-z]+)" class="(?:section|story|breakout)[" ]/g),
-      ].map(m => m[1]);
+      const ids = [...html.matchAll(/<section id="([a-z]+)" class="(?:section|story)[" ]/g)].map(
+        m => m[1]
+      );
       expect(ids).toEqual(expected);
     }
   });
@@ -172,9 +229,16 @@ describe('marketing honesty', () => {
     expect(s).toContain('EGP 13,410');
     expect(s).toContain('EGP 89,910');
   });
-  it('brand line, footer ownership line and Western digits everywhere', () => {
-    expect(ar).toContain('ابدأ استوديو للذكاء الاصطناعي — بابك لبدء مشروعك.');
-    expect(en).toContain('Ebda AI Studio — Your doorway to business.');
+  it('footer ownership line, studio credit and Western digits everywhere', () => {
+    // the studio's line moved off the home page to /about (MKT-1); the footer carries a one-line credit
+    expect(renderToStaticMarkup(<AboutPage locale="ar" />)).toContain(
+      'ابدأ استوديو للذكاء الاصطناعي — بابك لبدء مشروعك.'
+    );
+    expect(renderToStaticMarkup(<AboutPage locale="en" />)).toContain(
+      'Ebda AI Studio — Your doorway to business.'
+    );
+    expect(en).toContain('<p class="footer-credit">Ebda Store — a product of Ebda AI Studio</p>');
+    expect(ar).toContain('منتج من ابدأ استوديو للذكاء الاصطناعي</p>');
     expect(en).toContain(
       'Ebda Store is a product of Ebda AI Studio. © 2026 Ebda AI Studio. All rights reserved.'
     );
@@ -204,29 +268,52 @@ describe('marketing honesty', () => {
         expect(h).not.toMatch(/Ahmad|أحمد|Sharaf|شرف/);
       }
   });
-  it('the new motion sections ship their real assets and accessible controls', () => {
+  it('the four steps appear once (in the story, each with its one-line how) and the 3D ring ships its assets and controls', () => {
     for (const html of [ar, en]) {
-      // four numbered steps, a real sequence
-      expect(html.match(/class="step4"/g)).toHaveLength(4);
-      expect(html).toContain('>01<');
+      const story = html.match(/<section id="story".*?<\/section>/s)![0];
+      expect(story.match(/<li data-n="/g)).toHaveLength(4);
+      expect(story.match(/class="story-step-d"/g)).toHaveLength(4);
+      // the separate how band is gone: no second numbered list of the same four steps
+      expect(html.match(/<ol class="/g)!.length).toBe(2); // story steps + story toasts
+      // the order notifications at the end of the story
+      expect(story.match(/class="story-toast"/g)).toHaveLength(4);
       // 3D ring: poster first, swatches are real buttons with pressed state
       expect(html).toContain('/ring/ring-gold-diamond.webp');
       expect(html.match(/class="swatch"/g)).toHaveLength(6);
       expect(html).toMatch(
         /aria-pressed="true"[^>]*data-metal="gold"|data-metal="gold"[^>]*aria-pressed="true"/
       );
-      // notification stream: four toasts
-      expect(html.match(/class="story-toast"/g)).toHaveLength(4);
     }
+    expect(ar).toContain('اختار اسم ولوجو.');
+    expect(ar).toContain('بالصور والأسعار والمقاسات، أو من ملف CSV.');
     expect(ar).toContain('بوسطة استلمت الشحنة');
-    expect(ar).toContain('وصلك دفع إنستا باي');
+    expect(en).toContain('Pick a name and logo.');
+  });
+  it('shows the WhatsApp line in the header, FAQ and close: wa.me link plus the number as selectable text', () => {
+    for (const html of [ar, en]) {
+      const wa = (h: string) => h.match(/<span class="wa[ "][\s\S]*?<\/span><\/span>/g) ?? [];
+      const header = html.match(/<header class="site-header".*?<\/header>/s)![0];
+      const faq = html.match(/<section id="faq".*?<\/section>/s)![0];
+      const close = html.match(/<section id="start".*?<\/section>/s)![0];
+      for (const part of [header, faq, close]) {
+        expect(part).toContain('href="https://wa.me/201207761882"');
+        expect(part).toContain(
+          '<span class="wa-num" dir="ltr" lang="en" translate="no">+20 120 776 1882</span>'
+        );
+        expect(wa(part).length).toBeGreaterThan(0);
+      }
+      // the number is text, not only an icon: the link also carries it in its accessible name
+      expect(header).toMatch(/aria-label="[^"]*\+20 120 776 1882"/);
+    }
+    expect(ar).toContain('>واتساب<');
+    expect(en).toContain('>WhatsApp<');
   });
   it('shows the looks picker: 5 template tabs, Qamar rendered, every phone labelled illustrative', () => {
     for (const [html, badge] of [
       [ar, 'صور توضيحية'],
       [en, 'Illustrative'],
     ] as const) {
-      const s = html.match(/<section id="looks".*?<section id="breakout"/s)![0];
+      const s = html.match(/<section id="looks".*?<section id="story"/s)![0];
       expect(s.match(/role="tab"/g)).toHaveLength(5);
       expect(s).toContain('role="tablist"');
       expect(s).toMatch(
@@ -239,9 +326,13 @@ describe('marketing honesty', () => {
       expect(s).not.toContain('base64');
     }
     expect(en).toContain('Every template ships in Arabic and English');
-    // the old Dahab device captures are gone (the story + break-out phones are the only Dahab captures left)
-    for (const d of ['laptop', 'tablet', 'phone'])
-      for (const html of [ar, en]) expect(html).not.toContain(`/devices/dahab-${d}`);
+    // the looks fetch is extensionless: Workers Static Assets 307-redirect /looks/x.html to /looks/x
+    const showcase = readFileSync(
+      path.resolve(__dirname, '../../apps/marketing/src/components/LooksShowcase.tsx'),
+      'utf8'
+    );
+    expect(showcase).toContain('fetch(`/looks/${id}`)');
+    expect(showcase).not.toMatch(/fetch\([^)]*\.html/);
   });
   it('ships every template fragment and photo it references', () => {
     for (const t of ['qamar', 'souq', 'jasmine', 'lamma', 'dahab']) {
@@ -336,7 +427,9 @@ describe('marketing SEO and trust surface', () => {
       for (const page of LEGAL_SLUGS) {
         const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);
         expect(html).toContain(badge);
-        expect(html).not.toMatch(/\b\d{5,}\b/);
+        // the header's public WhatsApp line is a contact number, not a registration number
+        const withoutPhone = html.replace(/201207761882|\+20 120 776 1882/g, '');
+        expect(withoutPhone).not.toMatch(/\b\d{5,}\b/);
       }
     }
   });

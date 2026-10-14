@@ -28,7 +28,10 @@ export function startServer(root, port = 0) {
     try {
       if ((await stat(file)).isDirectory()) file = path.join(file, 'index.html');
     } catch {
-      /* fall through to 404 */
+      // Workers Static Assets serve /x from x.html (html_handling): same here, so an
+      // extensionless fetch behaves locally as it does in production.
+      if (!path.extname(file) && (await stat(`${file}.html`).catch(() => null))?.isFile())
+        file = `${file}.html`;
     }
     try {
       const body = await readFile(file);
