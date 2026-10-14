@@ -143,6 +143,13 @@ const nextConfig = {
               // googleads.g.doubleclick.net; without them the Ads tag loads
               // and every conversion is silently CSP-blocked.
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://connect.facebook.net https://analytics.tiktok.com https://sc-static.net https://static.ads-twitter.com https://s.pinimg.com https://cdn.onesignal.com https://*.onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://eu-assets.i.posthog.com https://eu.i.posthog.com https://static.cloudflareinsights.com",
+              // S10 (2026-10-14): inline event-handler ATTRIBUTES (onclick=, onerror=…)
+              // are never legitimate here — React attaches handlers in JS and no
+              // vendor snippet in MarketingPixels writes on* attributes. `script-src`
+              // keeps 'unsafe-inline' for Next's flight data (docs/architecture/
+              // storefront-csp.md), but this separate directive shuts the attribute
+              // half of that hole, so an injected `<img onerror=…>` no longer runs.
+              "script-src-attr 'none'",
               // OneSignal v16 page SDK pulls a stylesheet from
               // https://onesignal.com/sdks/... at runtime — that's the
               // bare apex, not cdn., so include it explicitly.

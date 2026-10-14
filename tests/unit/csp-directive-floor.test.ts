@@ -100,6 +100,20 @@ const REQUIRED: { directive: string; pattern: RegExp }[] = [
   { directive: 'form-action', pattern: /form-action\s+'self'/ },
 ];
 
+/**
+ * S10 (2026-10-14): `script-src` keeps 'unsafe-inline' (Ahmad 2026-09-02,
+ * docs/architecture/storefront-csp.md), which also lets an injected inline
+ * event-handler ATTRIBUTE run. `script-src-attr 'none'` is a separate directive
+ * that blocks exactly that half without touching Next's inline flight data.
+ * Storefront and Orders PWA only; no inline `on*=` attribute exists in either.
+ */
+describe("script-src-attr 'none' on the storefront and the Orders PWA (S10)", () => {
+  it.each(['apps/web/next.config.js', 'apps/orders/next.config.js'])('%s', config => {
+    const src = stripJsComments(readFileSync(join(ROOT, config), 'utf8'));
+    expect(src).toMatch(/script-src-attr\s+'none'/);
+  });
+});
+
 describe('CSP directive floor (what ZAP 10055 no longer watches)', () => {
   const present = CONFIGS.filter(c => existsSync(join(ROOT, c)));
 
