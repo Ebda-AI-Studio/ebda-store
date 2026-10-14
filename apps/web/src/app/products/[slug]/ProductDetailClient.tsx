@@ -50,6 +50,7 @@ import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
 import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
+import { StickyAddToCart } from '../../../components/commerce/StickyAddToCart';
 import {
   PersonalisationField,
   personalisationMissing,
@@ -209,6 +210,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // swipe, and smooth-scroll to the slide when the index is set externally
   // (thumbnail click / variant image).
   const galleryRef = useRef<HTMLDivElement>(null);
+  // Anchor for the phone sticky add-to-cart bar: the main buy row.
+  const buyRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = galleryRef.current;
     if (!el) return;
@@ -1099,7 +1102,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   </div>
                 )}
 
-                <div className="flex gap-4">
+                <div className="flex gap-4" ref={buyRef}>
                   <Button
                     size="lg"
                     className="flex-1"
@@ -1259,6 +1262,27 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
           )}
         </div>
       </div>
+      {/* Phone sticky bar: SAME handler + SAME addDisabled/label as the main button. */}
+      <StickyAddToCart
+        anchorRef={buyRef}
+        title={displayName}
+        price={
+          pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
+            ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
+            : formatPrice(displayPrice)
+        }
+        label={
+          variantRequired
+            ? t('Select Options', 'اختر الخيارات')
+            : canBackorder
+              ? t('Pre-order', 'اطلب مسبقاً')
+              : outOfStock
+                ? t('Out of Stock', 'غير متوفر')
+                : t('Add to Cart', translations['Add to Cart'])
+        }
+        disabled={addDisabled || isAdding}
+        onAdd={handleAddToCart}
+      />
     </ShopChrome>
   );
 }

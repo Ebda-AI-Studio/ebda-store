@@ -1186,6 +1186,30 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
   max-width: 38rem;
 }
 
+/* Sticky mobile bars (PDP add-to-cart, cart total). UI rule 6: space is reserved on
+ * <body> (never the chrome wrapper). Body already carries pb-32 for the 56px
+ * BottomTabBar, so the bar (4.25rem) is added on top of that, not instead of it. */
+@media (max-width: 767px) {
+  body[data-sticky-atc='1'],
+  body[data-sticky-cart='1'] {
+    padding-bottom: calc(8rem + 4.25rem);
+  }
+}
+
+/* Sticky bar entrance: ease-out-quint, 300ms. The global reduced-motion rule
+ * above collapses it to the end state instantly. */
+@keyframes stickyBarIn {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.sticky-bar-in {
+  animation: stickyBarIn 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* ==========================================================================
    Looks (Phase S). EVERY rule here is scoped under [data-look], which the
    root layout sets on <body> only for stores with a valid look. Legacy

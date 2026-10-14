@@ -30,6 +30,7 @@ import { formatTaxRowLabel } from '../../lib/tax-display';
 import { resolveColor, checkMinimumOrder, computeOrderAmounts } from '@ebda/shared';
 import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
+import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
 
 export default function CartClient() {
   const {
@@ -1224,6 +1225,19 @@ export default function CartClient() {
           )}
         </div>
       </div>
+      {/* Phone sticky total: same checkoutBlocked rule + message as the summary CTA. */}
+      <StickyCartTotal
+        total={formatPrice(total)}
+        itemCount={cartCount}
+        itemCountLabel={t(
+          `${localize(cartCount)} ${cartCount === 1 ? 'item' : 'items'}`,
+          `${localize(cartCount)} منتج`
+        )}
+        href={storeUrl('/checkout')}
+        label={t('Checkout', 'إتمام الطلب')}
+        disabled={checkoutBlocked}
+        blockedMessage={checkoutBlockedMessage}
+      />
     </ShopChrome>
   );
 }

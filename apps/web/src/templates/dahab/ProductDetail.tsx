@@ -313,6 +313,15 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
     return () => io.disconnect();
   }, []);
 
+  // Body-level space for the pinned bar (UI rule 6), same flag as StickyAddToCart.
+  useEffect(() => {
+    if (!pinBar) return;
+    document.body.dataset.stickyAtc = '1';
+    return () => {
+      delete document.body.dataset.stickyAtc;
+    };
+  }, [pinBar]);
+
   return (
     <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8" data-zone="products">
       <nav
@@ -514,8 +523,8 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
         aria-hidden={!pinBar}
         inert={!pinBar ? true : undefined}
         className={cx(
-          'fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur-md transition-transform duration-300 motion-reduce:transition-none md:hidden',
-          pinBar ? 'translate-y-0' : 'translate-y-full'
+          'fixed inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-md transition-transform duration-300 motion-reduce:transition-none md:hidden',
+          pinBar ? 'translate-y-0' : 'translate-y-[calc(100%+56px+env(safe-area-inset-bottom))]'
         )}
       >
         <div className="flex items-center gap-3">
