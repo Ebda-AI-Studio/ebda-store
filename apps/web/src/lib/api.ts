@@ -23,7 +23,7 @@
  * admin app uses a simpler 'authToken' approach.
  */
 import { isIosWebkit } from '@ebda/shared';
-import type { PublicModel3d } from '@ebda/shared';
+import type { PublicModel3d, ProductFact } from '@ebda/shared';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
@@ -126,6 +126,8 @@ interface Product {
   badgeLabel?: string | null;
   /** Arabic counterpart; either side alone is enough (each falls back to the other). */
   badgeLabelAr?: string | null;
+  /** Merchant spec rows (fabric, karat...): PDP table, card chips, compare rows. */
+  facts?: ProductFact[];
   inventory?: number;
   /** Server-computed: inventory <= 0 && allowBackorder. Keeps Add-to-Cart
    *  enabled for out-of-stock backorderable products (the cart/order API

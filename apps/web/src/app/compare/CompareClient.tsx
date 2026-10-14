@@ -10,6 +10,7 @@ import { useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { compareStorageKey } from '../../lib/compare';
+import { factText, type ProductFact } from '@ebda/shared';
 
 interface CompareProduct {
   id: string;
@@ -20,6 +21,7 @@ interface CompareProduct {
   images: string[];
   description?: string;
   specifications?: Record<string, string>;
+  facts?: ProductFact[];
 }
 
 // Load compare products from localStorage
@@ -41,7 +43,7 @@ export default function CompareClient() {
   const [isLoading] = useState(false);
   const { addItem } = useCart();
   const storeUrl = useStoreUrl();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { money } = useNumerals();
 
   function handleAddToCart(product: CompareProduct) {
@@ -141,6 +143,26 @@ export default function CompareClient() {
       Object.keys(p.specifications).forEach(key => allSpecs.add(key));
     }
   });
+
+  // One row per distinct fact name across the compared products (first-seen
+  // order). A fact matches a row by its English OR Arabic name, so products that
+  // name the same fact in different languages still share a row. "—" where a
+  // product lacks the key.
+  const lang = language === 'ar' ? 'ar' : 'en';
+  const names = (f: ProductFact) =>
+    [f.key, f.keyAr].map(k => k.trim().toLowerCase()).filter(Boolean);
+  const factRows: Array<{ names: Set<string>; label: string }> = [];
+  products.forEach(p =>
+    (p.facts ?? []).forEach(f => {
+      const row = factRows.find(r => names(f).some(n => r.names.has(n)));
+      if (row) names(f).forEach(n => row.names.add(n));
+      else factRows.push({ names: new Set(names(f)), label: factText(f, lang).key });
+    })
+  );
+  const factValue = (p: CompareProduct, rowNames: Set<string>) => {
+    const f = p.facts?.find(x => names(x).some(n => rowNames.has(n)));
+    return f ? factText(f, lang).value : '';
+  };
 
   return (
     <ShopChrome>
@@ -266,6 +288,18 @@ export default function CompareClient() {
                     <td key={product.id} className="p-4 text-center text-sm">
                       {product.specifications?.[spec] || (
                         <span className="text-muted-foreground/70">-</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {factRows.map(row => (
+                <tr key={`fact-${row.label}`} className="border-t">
+                  <td className="p-4 font-medium text-muted-foreground">{row.label}</td>
+                  {products.map(product => (
+                    <td key={product.id} className="p-4 text-center text-sm">
+                      {factValue(product, row.names) || (
+                        <span className="text-muted-foreground/70">&mdash;</span>
                       )}
                     </td>
                   ))}

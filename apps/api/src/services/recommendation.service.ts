@@ -30,6 +30,8 @@ const productSelect = {
   // as "the badge works everywhere except the recommendation strips".
   badgeLabel: true,
   badgeLabelAr: true,
+  // Card fact chips. BOUNDED-stale within the 5-minute recommendation cache.
+  facts: true,
   images: {
     take: 2, // primary + hover-reveal second image on recommendation cards
     orderBy: { position: 'asc' as const },

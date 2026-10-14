@@ -197,6 +197,7 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
               inStock: true,
               variants: p.variants,
               options: p.options,
+              facts: p.facts,
             }}
             isRtl={isRtl}
             currency={store.currency}

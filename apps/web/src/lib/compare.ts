@@ -23,6 +23,8 @@ export function compareStorageKey(): string {
 
 const MAX_COMPARE_ITEMS = 4;
 
+import type { ProductFact } from '@ebda/shared';
+
 export interface CompareProduct {
   id: string;
   name: string;
@@ -32,6 +34,8 @@ export interface CompareProduct {
   images: string[];
   description?: string;
   specifications?: Record<string, string>;
+  /** Spec rows snapshot (older saved lists lack it; the page just hides the rows). */
+  facts?: ProductFact[];
 }
 
 /** Read the current compare list from localStorage. Returns [] on error or server. */

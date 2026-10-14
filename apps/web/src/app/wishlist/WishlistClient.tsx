@@ -26,6 +26,7 @@ interface WishlistItem {
     images: string[];
     status: string;
     options?: TemplateProduct['options'];
+    facts?: TemplateProduct['facts'];
   };
 }
 
@@ -262,6 +263,7 @@ export default function WishlistClient() {
     images: item.product.images.map((url, i) => ({ id: `${item.id}-${i}`, url })),
     inStock: item.product.status === 'active',
     options: item.product.options,
+    facts: item.product.facts,
   }));
 
   const handleAddFromWishlist = async (productId: string) => {

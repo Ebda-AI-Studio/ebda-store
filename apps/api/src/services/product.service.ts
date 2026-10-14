@@ -9,7 +9,12 @@ import {
 } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { activeVariants, effectiveInventory } from '../lib/effective-inventory';
-import { slugify, slugifyWithFallback, AI_AUTOFILL_FIELD_NAMES } from '@ebda/shared';
+import {
+  slugify,
+  slugifyWithFallback,
+  AI_AUTOFILL_FIELD_NAMES,
+  type ProductFact,
+} from '@ebda/shared';
 import { redis } from './redis.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
@@ -277,6 +282,8 @@ interface CreateProductData {
    */
   badgeLabel?: string | null;
   badgeLabelAr?: string | null;
+  /** Whole-array replace; `undefined` leaves the stored facts alone. */
+  facts?: ProductFact[];
   categories?: string[];
   images?: { url: string; alt?: string }[];
   /** SEO meta — set per-product or via the AI sweep. `null` clears. */
@@ -481,6 +488,10 @@ export const STOREFRONT_PRODUCT_SELECT = {
   // and the card shows nothing.
   badgeLabel: true,
   badgeLabelAr: true,
+  // Spec rows: PDP table + card chips + compare rows. CACHE CLASS: BOUNDED-stale,
+  // rides the listing/PDP caches (busted by invalidateStoreProductCache on update;
+  // recommendation lists add their own 5-minute TTL).
+  facts: true,
   updatedAt: true,
   createdAt: true,
 } as const satisfies Prisma.ProductSelect;
@@ -772,6 +783,7 @@ export class ProductService {
         isBestSeller: data.isBestSeller ?? false,
         badgeLabel: data.badgeLabel ?? null,
         badgeLabelAr: data.badgeLabelAr ?? null,
+        ...(data.facts !== undefined ? { facts: data.facts } : {}),
         images: data.images
           ? {
               create: data.images.map((img, index) => ({
@@ -966,6 +978,7 @@ export class ProductService {
           // convention as nameAr / description / excerpt above.
           ...(data.badgeLabel !== undefined ? { badgeLabel: data.badgeLabel } : {}),
           ...(data.badgeLabelAr !== undefined ? { badgeLabelAr: data.badgeLabelAr } : {}),
+          ...(data.facts !== undefined ? { facts: data.facts } : {}),
           inventory: data.inventory,
           ...(data.lowStockThreshold !== undefined
             ? { lowStockThreshold: data.lowStockThreshold }

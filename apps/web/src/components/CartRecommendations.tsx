@@ -29,6 +29,7 @@ function toTpl(p: RecommendedProduct): TemplateProduct {
     images: p.images,
     inStock: true,
     options: p.options,
+    facts: p.facts,
   };
 }
 

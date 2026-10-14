@@ -13,6 +13,7 @@ import {
   minorToDecimalString,
   roundToMinor,
   REGION,
+  type ProductFact,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
@@ -30,6 +31,7 @@ import { EditSidebar } from './_components/EditSidebar';
 import { ProductFaqSection, type ProductFaqSectionHandle } from './_components/ProductFaqSection';
 import { AiFieldBadge } from './_components/AiFieldBadge';
 import { BalanceDescriptionButton } from './_components/BalanceDescriptionButton';
+import { FactsCard } from './_components/FactsCard';
 
 interface Product {
   id: string;
@@ -57,6 +59,8 @@ interface Product {
   /** Merchant-authored product card badge (EN / AR). null = no badge. */
   badgeLabel?: string | null;
   badgeLabelAr?: string | null;
+  /** Spec rows (fabric, care, karat...). */
+  facts?: ProductFact[];
   categories: { categoryId: string; category: { id: string; name: string } }[];
   images: { id: string; url: string; alt?: string; position: number }[];
   store: { id: string; name: string; slug: string };
@@ -80,6 +84,7 @@ export default function EditProductPage() {
   const t = useT('products.edit');
   const tSections = useT('products.edit.sections');
   const tFields = useT('products.edit.fields');
+  const tFacts = useT('products.edit.facts');
   const tStatusOptions = useT('products.edit.statusOptions');
   const tSeo = useT('products.edit.seoSection');
   const locale = useLocale();
@@ -101,6 +106,9 @@ export default function EditProductPage() {
   /** Template of the store — used to show per-theme recommended upload sizes. */
   const [storeTemplate, setStoreTemplate] = useState<TemplateId | undefined>();
   const [images, setImages] = useState<string[]>([]);
+  // Spec rows live beside formData (an array, not a string field); the page's
+  // PUT is the single writer, FactsCard only edits this state.
+  const [facts, setFacts] = useState<ProductFact[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -224,6 +232,7 @@ export default function EditProductPage() {
           discountValue: p.discountValue ?? null,
         });
 
+        setFacts(Array.isArray(p.facts) ? p.facts : []);
         setFormData({
           name: p.name || '',
           nameAr: p.nameAr || '',
@@ -460,6 +469,14 @@ export default function EditProductPage() {
         }
       }
 
+      // Drop untouched blank rows; a half-filled row is a merchant error, caught
+      // here instead of as an opaque API 400.
+      const factsPayload = facts.filter(f => f.key || f.keyAr || f.value || f.valueAr);
+      if (factsPayload.some(f => !(f.key || f.keyAr) || !(f.value || f.valueAr))) {
+        setError(tFacts('needBoth'));
+        return;
+      }
+
       const body: Record<string, unknown> = {
         name: formData.name,
         // Clearable free text (nameAr / description / descriptionAr / sku).
@@ -494,6 +511,7 @@ export default function EditProductPage() {
         metaDescriptionAeo: formData.metaDescriptionAeo || null,
         metaDescriptionAeoAr: formData.metaDescriptionAeoAr || null,
         images: images.map((url, i) => ({ url, position: i })),
+        facts: factsPayload,
       };
 
       if (formData.category) {
@@ -772,6 +790,8 @@ export default function EditProductPage() {
                 </div>
               </div>
             </div>
+
+            <FactsCard storeId={storeId} facts={facts} onChange={setFacts} />
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">
               <div className="mb-4 flex items-baseline justify-between gap-3 flex-wrap">

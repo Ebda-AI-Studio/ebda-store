@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { ResolvedZone } from './shared/section-typography';
-import type { CardFrameSize, CardFrameWidth } from '@ebda/shared';
+import type { CardFrameSize, CardFrameWidth, ProductFact } from '@ebda/shared';
 
 /**
  * Resolved per-store cart typography, passed from CartClient into the theme
@@ -51,6 +51,8 @@ export interface TemplateProduct {
    */
   badgeLabel?: string | null;
   badgeLabelAr?: string | null;
+  /** Spec rows; only the `onCard` ones surface as chips (<FactChips>). */
+  facts?: ProductFact[];
   inStock?: boolean;
   /**
    * Server-computed: inventory <= 0 AND allowBackorder. When true the product

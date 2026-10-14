@@ -44,6 +44,7 @@ import {
 } from '../shared/custom-badge';
 import { cn } from '@ebda/ui';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
+import { FactChips } from '../../components/commerce/FactChips';
 
 /**
  * Minimal Template - Product Card
@@ -433,6 +434,7 @@ function MinimalProductCard({
               <TaxInclusiveLabel className="block text-[10px] tracking-wide font-light text-muted-foreground/70" />
             )}
             <SwatchDots product={product} max={5} />
+            <FactChips product={product} className="mt-1" />
           </div>
         )}
       </Link>

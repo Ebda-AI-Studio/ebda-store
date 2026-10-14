@@ -924,6 +924,8 @@ model Product {
   badgeLabel           String?       @map("badge_label") @db.VarChar(32)
   badgeLabelAr         String?       @map("badge_label_ar") @db.VarChar(32)
   viewCount            Int           @default(0) @map("view_count")
+  // Ordered ProductFact[] (@ebda/shared productFactsSchema): spec rows shown as the PDP table, up to 2 card chips and compare rows. [] renders nothing.
+  facts                Json          @default("[]")
   // Short 1-2 sentence blurb, distinct from the full `description`. Written
   // by the bulk-ai-excerpt sweep (or manually) — surfaced anywhere a compact
   // summary is useful (search results, share cards). Bilingual EN+AR.

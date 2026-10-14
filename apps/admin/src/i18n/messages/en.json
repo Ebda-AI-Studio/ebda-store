@@ -751,6 +751,25 @@
         "failureFaqs": "FAQs (failed)",
         "genericFailed": "failed",
         "networkError": "Network error contacting AI"
+      },
+      "facts": {
+        "title": "Product details",
+        "hint": "Fabric, care, origin and more. Shown as a table on the product page.",
+        "presets": "Quick add",
+        "add": "Add detail",
+        "keyEn": "Name (English)",
+        "keyAr": "Name (Arabic)",
+        "valueEn": "Value (English)",
+        "valueAr": "Value (Arabic)",
+        "onCard": "Show on card",
+        "cardFull": "Only 2 details can show on the card.",
+        "translate": "AI translate",
+        "translating": "Translating…",
+        "translateFailed": "Translation failed. Try again.",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "remove": "Remove",
+        "needBoth": "Each detail needs a name and a value."
       }
     },
     "recommendations": {

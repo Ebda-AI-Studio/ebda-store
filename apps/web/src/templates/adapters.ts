@@ -43,6 +43,8 @@ export function toTemplateProduct(p: Product): TemplateProduct {
       : undefined,
     // Whitelist adapter: without this the card swatch dots never render.
     options: p.options,
+    // Whitelist adapter: without this the card fact chips never render.
+    facts: p.facts,
   };
 }
 

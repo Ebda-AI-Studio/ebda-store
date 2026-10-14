@@ -35,6 +35,7 @@ import { isProductNew } from '../shared/ProductCardCta';
 import { getCustomBadgeText } from '../shared/custom-badge';
 import { cx, BagIcon } from './ui';
 import { SwatchDots } from '../../components/commerce/SwatchDots';
+import { FactChips } from '../../components/commerce/FactChips';
 
 export interface DahabProductCardProps extends ProductCardProps {
   /** `sizes` hint for the image (grid density decides it). */
@@ -222,6 +223,7 @@ export default function DahabProductCard({
           </p>
         )}
         <SwatchDots product={product} max={5} />
+        <FactChips product={product} className="mt-1" />
       </div>
     </article>
   );

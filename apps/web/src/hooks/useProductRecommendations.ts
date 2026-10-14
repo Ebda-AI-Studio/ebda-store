@@ -34,6 +34,8 @@ export interface RecommendedProduct {
   variants?: Array<{ id: string; price: number }>;
   /** Swatch-bearing option values only (colour dots on the card). */
   options?: TemplateProduct['options'];
+  /** Fact chips on the card. */
+  facts?: TemplateProduct['facts'];
 }
 
 /** `loading` and `empty` are deliberately distinct from `error`: "nothing to

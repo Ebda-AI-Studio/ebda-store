@@ -132,6 +132,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         images: item.product.images.map(img => img.url),
         status: item.product.status,
         options: item.product.options,
+        facts: item.product.facts,
       },
     }));
 

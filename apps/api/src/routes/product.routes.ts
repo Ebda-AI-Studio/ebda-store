@@ -11,7 +11,7 @@ import { AppError } from '../middleware/error-handler';
 import { invalidateCachedPrefix } from '../lib/public-cache';
 import { parseOptionalBooleanQuery } from '../lib/query-params';
 import { EXCERPT_MAX_LENGTH } from '../lib/ai/product-excerpt-generator';
-import { PRODUCT_BADGE_LABEL_MAX_LENGTH } from '@ebda/shared';
+import { PRODUCT_BADGE_LABEL_MAX_LENGTH, productFactsSchema } from '@ebda/shared';
 
 const router = Router({ mergeParams: true });
 
@@ -90,6 +90,8 @@ const createProductSchema = z.object({
   // flags — the difference is that this one carries the merchant's own words.
   badgeLabel: badgeLabelSchema,
   badgeLabelAr: badgeLabelSchema,
+  // Spec rows (fabric, karat, ingredients...). Whole-array replace; omitted = untouched.
+  facts: productFactsSchema.optional(),
   // SEO meta — null clears, undefined leaves alone (Prisma convention).
   metaTitle: z.string().max(180).optional().nullable(),
   metaTitleAr: z.string().max(180).optional().nullable(),

@@ -108,6 +108,7 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
           images: p.images,
           inStock: true,
           options: p.options,
+          facts: p.facts,
         }))}
         title="You Might Also Like"
         titleAr="قد يعجبك أيضاً"

@@ -23,6 +23,8 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { VariantSelector } from '../../components/VariantSelector';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
+import type { ProductFact } from '@ebda/shared';
+import { FactsTable } from '../../components/commerce/FactsTable';
 import {
   CloseIcon,
   DAHAB_BTN_PRIMARY,
@@ -63,6 +65,8 @@ export interface DahabProductDetailProps {
   isWishlisted: boolean;
   onToggleWishlist: () => void;
   sku?: string | null;
+  /** Merchant spec rows, one tap away in an accordion. */
+  facts?: ProductFact[];
   /** Spec table, WhatsApp order button, share row — platform components. */
   specs?: ReactNode;
   extras?: ReactNode;
@@ -445,6 +449,11 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                       {t('Item code', 'كود القطعة')}: <span dir="ltr">{p.sku}</span>
                     </p>
                   )}
+                </Accordion>
+              )}
+              {p.facts && p.facts.length > 0 && (
+                <Accordion title={t('Product details', 'تفاصيل المنتج')}>
+                  <FactsTable facts={p.facts} className="" />
                 </Accordion>
               )}
               {p.specs && <Accordion title={t('Specifications', 'المواصفات')}>{p.specs}</Accordion>}
