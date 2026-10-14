@@ -6,6 +6,7 @@
  * one CartContext (the same cart the /cart page shows), so the two can
  * never disagree; prices are the server's numbers, formatted only.
  */
+import { VariantText } from '@ebda/ui';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCart } from '../../contexts/CartContext';
@@ -108,7 +109,9 @@ export function DahabCartDrawer({
         <ul className="divide-y divide-border px-5">
           {items.map(item => {
             const name = (isRtl && item.nameAr ? item.nameAr : item.name) || '';
-            const variant = isRtl && item.variantTitleAr ? item.variantTitleAr : item.variantTitle;
+            const variant =
+              (isRtl && item.variantTitleAr ? item.variantTitleAr : item.variantTitle) ||
+              item.variantTitleAr;
             return (
               <li key={item.id} className={cx('flex gap-4 py-5', item.unavailable && 'opacity-60')}>
                 <Link
@@ -127,7 +130,11 @@ export function DahabCartDrawer({
                       {formatPrice(item.price * item.quantity)}
                     </p>
                   </div>
-                  {variant && <p className="mt-1 text-xs text-muted-foreground">{variant}</p>}
+                  {variant && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      <VariantText title={variant} />
+                    </p>
+                  )}
                   <CartLineNote note={item.note} />
                   {item.unavailable && (
                     <p className="mt-1 text-xs text-destructive-ink">

@@ -4,13 +4,17 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 
 /**
- * Phone-only total + checkout bar for the cart page. Always shown when the cart
+ * Phone-only total + checkout bar for the cart page. `totalLabel` + `total` are one of the
+ * summary's own rows, verbatim (label, value and money format), so the always-visible bar can
+ * never quote a second price for the same cart (F1). Always shown when the cart
  * has items (no IntersectionObserver). `disabled` carries the cart's own
  * checkoutBlocked value (minimum order / unavailable lines) and `blockedMessage`
  * its message, so there is no second rule. Lifted above the 56px BottomTabBar
  * (UI rule 6) and reserves body space via `body[data-sticky-cart]`.
  */
 export function StickyCartTotal(p: {
+  /** The summary row the bar repeats ("Subtotal" while shipping is calculated at checkout). */
+  totalLabel: string;
   total: string;
   itemCount: number;
   itemCountLabel: string;
@@ -41,8 +45,15 @@ export function StickyCartTotal(p: {
       )}
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs text-muted-foreground">{p.itemCountLabel}</p>
-          <p className="text-sm font-semibold tabular-nums text-foreground">{p.total}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {p.totalLabel} · {p.itemCountLabel}
+          </p>
+          <p
+            data-testid="sticky-cart-total-value"
+            className="text-sm font-semibold tabular-nums text-foreground"
+          >
+            {p.total}
+          </p>
         </div>
         {p.disabled ? (
           <button

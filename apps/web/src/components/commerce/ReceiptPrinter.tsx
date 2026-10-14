@@ -16,8 +16,9 @@
  * the feed, so nothing below jumps when it ends; the receipt is real text the
  * whole time, so screen readers never wait for the animation.
  */
+import { VariantText } from '@ebda/ui';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { groupOrderLinesForDisplay, orderTaxPlacement } from '@ebda/shared';
+import { groupOrderLinesForDisplay, orderTaxPlacement, orderLineVariantTitle } from '@ebda/shared';
 import type { Order } from '@/lib/api';
 import type { StoreData } from '@/contexts/StoreContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -209,7 +210,11 @@ export function ReceiptPrinter({
                 aria-hidden="true"
                 data-testid="receipt-status-leaving"
                 className={`${styles.statusOut} col-start-1 row-start-1 flex items-center gap-2`}
-                onAnimationEnd={() => setLeaving(null)}
+                onAnimationEnd={e => {
+                  // Only this line's own fade: a bubbling animationend from a child
+                  // (the spinner icon) must not cut the crossfade short.
+                  if (e.target === e.currentTarget) setLeaving(null);
+                }}
               >
                 <StatusIcon kind={leaving} />
                 <span>{statusCopy(leaving, t)}</span>
@@ -266,6 +271,7 @@ export function ReceiptPrinter({
                       : (pickLocalizedName(row.item.product, isRtl) ?? t('Product', 'منتج'));
                   const amount =
                     row.kind === 'bundle' ? row.total : row.item.price * row.item.quantity;
+                  const variant = row.kind === 'item' ? orderLineVariantTitle(row.item, ar) : null;
                   return (
                     <li key={row.key} data-testid="receipt-line" className="flex gap-3">
                       <div className="min-w-0 flex-1">
@@ -275,15 +281,15 @@ export function ReceiptPrinter({
                           </span>{' '}
                           {name}
                         </p>
-                        {row.kind === 'item' && row.item.variantName && (
-                          <p className="mt-0.5 text-xs text-[#141414]/55">
-                            <bdi>{row.item.variantName}</bdi>
+                        {variant && (
+                          <p className={`mt-0.5 text-xs ${styles.inkMuted}`}>
+                            <VariantText title={variant} />
                           </p>
                         )}
                         {row.kind === 'item' && (
                           <CartLineNote
                             note={row.item.personalisation}
-                            className="mt-0.5 text-xs text-[#141414]/55"
+                            className={`mt-0.5 text-xs ${styles.inkMuted}`}
                           />
                         )}
                       </div>
@@ -302,11 +308,6 @@ export function ReceiptPrinter({
               <hr className={`${styles.rule} my-4 border-0`} />
 
               <dl className="space-y-1.5 text-xs">
-                <MetaRow label={t('Order no.', 'رقم الطلب')} ar={ar}>
-                  <span dir="ltr" className={styles.mono} data-testid="receipt-order-number">
-                    #{order.orderNumber}
-                  </span>
-                </MetaRow>
                 {payment && (
                   <MetaRow label={t('Payment', 'طريقة الدفع')} ar={ar}>
                     <span data-testid="receipt-payment-label">{payment}</span>
@@ -318,18 +319,18 @@ export function ReceiptPrinter({
                       timezone: store.timezone,
                       language,
                       numerals,
-                      style: 'short',
+                      style: 'medium',
                     })}
                   </Num>
                 </MetaRow>
               </dl>
 
               <div className="mt-6 flex flex-col items-center gap-1.5 pb-4">
-                <Barcode value={order.orderNumber} className="h-11 w-[78%] text-[#141414]" />
+                <Barcode value={order.orderNumber} className={`h-11 w-[78%] ${styles.ink}`} />
                 <p
                   data-testid="receipt-barcode-caption"
                   dir="ltr"
-                  className={`${styles.mono} text-xs tracking-[0.3em] text-[#141414]/60`}
+                  className={`${styles.mono} text-xs tracking-[0.3em] ${styles.inkSoft}`}
                 >
                   #{order.orderNumber}
                 </p>
@@ -428,7 +429,7 @@ function MoneyRow({ label, ar, children }: { label: string; ar: boolean; childre
     <div className="flex items-baseline justify-between gap-3 text-xs">
       <dt
         className={
-          ar ? 'text-[#141414]/60' : `${styles.mono} uppercase tracking-[0.08em] text-[#141414]/60`
+          ar ? styles.inkSoft : `${styles.mono} uppercase tracking-[0.08em] ${styles.inkSoft}`
         }
       >
         {label}

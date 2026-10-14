@@ -104,7 +104,7 @@ export function DeliveryChip({ leadTimeDays }: { leadTimeDays?: number | null })
       <div className="min-w-0">
         <p className="text-sm">{text}</p>
         {lead && (
-          <p className="text-[13px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {leadTimeText(lead, language === 'ar' ? 'ar' : 'en', localize)}
           </p>
         )}

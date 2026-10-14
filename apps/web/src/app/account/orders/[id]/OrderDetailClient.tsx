@@ -1,5 +1,6 @@
 'use client';
 
+import { VariantText } from '@ebda/ui';
 import { useState, useEffect, useCallback } from 'react';
 import { useLocalePrice } from '../../../../hooks/useLocalePrice';
 import Link from 'next/link';
@@ -18,6 +19,7 @@ import {
   orderTaxPlacement,
   storeNumerals,
   intlLocale,
+  orderLineVariantTitle,
 } from '@ebda/shared';
 import {
   orderStatusLabel,
@@ -108,6 +110,8 @@ interface OrderDetail {
     bundleName?: string | null;
     bundleNameAr?: string | null;
     variantName?: string | null;
+    /** Arabic variant snapshot (Ruling B0-41), rendered in Arabic with variantName fallback. */
+    variantNameAr?: string | null;
     /** The customer's personalisation text for this line. */
     personalisation?: string | null;
   }[];
@@ -514,9 +518,14 @@ export default function OrderDetailClient() {
                               </span>
                             )}
                           </span>
-                          {row.kind === 'item' && row.item.variantName && (
-                            <p className="text-xs text-muted-foreground">{row.item.variantName}</p>
-                          )}
+                          {row.kind === 'item' &&
+                            orderLineVariantTitle(row.item, language === 'ar') && (
+                              <p className="text-xs text-muted-foreground">
+                                <VariantText
+                                  title={orderLineVariantTitle(row.item, language === 'ar')!}
+                                />
+                              </p>
+                            )}
                           {row.kind === 'item' && <CartLineNote note={row.item.personalisation} />}
                         </div>
                       </div>
@@ -586,8 +595,10 @@ export default function OrderDetailClient() {
                       </span>
                     )}
                   </p>
-                  {row.kind === 'item' && row.item.variantName && (
-                    <p className="text-xs text-muted-foreground">{row.item.variantName}</p>
+                  {row.kind === 'item' && orderLineVariantTitle(row.item, language === 'ar') && (
+                    <p className="text-xs text-muted-foreground">
+                      <VariantText title={orderLineVariantTitle(row.item, language === 'ar')!} />
+                    </p>
                   )}
                   {row.kind === 'item' && <CartLineNote note={row.item.personalisation} />}
                   <p className="text-sm text-muted-foreground">

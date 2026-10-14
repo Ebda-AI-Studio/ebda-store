@@ -40,7 +40,7 @@ export function SwatchDots({
           <span
             key={v.id ?? v.value}
             data-testid="swatch-dot"
-            className="inline-block h-3 w-3 overflow-hidden rounded-full border border-foreground/15"
+            className="inline-block h-3 w-3 overflow-hidden rounded-full border border-foreground/35"
             style={s.imageUrl ? undefined : { backgroundColor: s.hex ?? undefined }}
           >
             {s.imageUrl && (

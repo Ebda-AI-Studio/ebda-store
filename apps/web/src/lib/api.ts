@@ -291,8 +291,10 @@ interface Order {
     quantity: number;
     price: number;
     product?: Product;
-    /** Snapshotted variant title (storefront orders since B0 Task 5). */
+    /** Snapshotted canonical (EN) variant title (storefront orders since B0 Task 5). */
     variantName?: string | null;
+    /** Snapshotted Arabic variant title (Ruling B0-41); null before it existed. */
+    variantNameAr?: string | null;
     /** The customer's personalisation text for this line. */
     personalisation?: string | null;
     /**

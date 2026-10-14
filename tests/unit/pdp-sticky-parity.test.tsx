@@ -5,12 +5,13 @@
  * `addDisabled`, one `addLabel`), including the required-personalisation gate.
  * Also pins the Dahab pinned bar's body flag.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import React from 'react';
 import { render, screen, cleanup, act, fireEvent } from '@testing-library/react';
 import { STORES } from '../fixtures/builder/homepage-data';
 
 const ctx = vi.hoisted(() => ({
+  addItem: null as unknown as ReturnType<typeof import('vitest').vi.fn>,
   store: null as unknown as Record<string, unknown>,
   ioCallback: (() => {}) as (e: unknown[]) => void,
   all: [] as Array<(e: unknown[]) => void>,
@@ -37,7 +38,7 @@ vi.mock('../../apps/web/src/contexts/LanguageContext', async importOriginal => {
   };
 });
 vi.mock('../../apps/web/src/contexts/CartContext', () => ({
-  useCart: () => ({ items: [], itemCount: 0, total: 0, addItem: vi.fn(async () => {}) }),
+  useCart: () => ({ items: [], itemCount: 0, total: 0, addItem: ctx.addItem }),
 }));
 vi.mock('../../apps/web/src/contexts/FeatureContext', () => ({
   useFeatures: () => ({ isEnabled: () => false }),
@@ -107,6 +108,10 @@ class IO {
   disconnect() {}
 }
 
+beforeEach(() => {
+  ctx.addItem = vi.fn(async () => true);
+});
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -133,55 +138,141 @@ async function renderPdp(p: Record<string, unknown>) {
   const { default: ProductDetailClient } =
     await import('../../apps/web/src/app/products/[slug]/ProductDetailClient');
   ctx.store = { ...STORES.A, template: 'minimal' };
+  ctx.all.length = 0;
   render(<ProductDetailClient initialProduct={p as never} />);
-  act(() => ctx.ioCallback([{ isIntersecting: false, boundingClientRect: { top: -10 } }]));
+  act(() =>
+    ctx.all.forEach(cb => cb([{ isIntersecting: false, boundingClientRect: { top: -10 } }]))
+  );
   const sticky = screen.getByTestId('sticky-atc');
   const stickyBtn = sticky.querySelector('button') as HTMLButtonElement;
-  // the main button is the other add button: same label text, outside the sticky bar
-  const main = screen
-    .getAllByRole('button')
-    .find(b => !sticky.contains(b) && b.textContent?.trim() === stickyBtn.textContent?.trim());
-  return { sticky, stickyBtn, main: main as HTMLButtonElement | undefined };
+  // The main button by its own hook, never by matching the sticky bar's label.
+  const main = screen.getByTestId('pdp-add') as HTMLButtonElement;
+  return { sticky, stickyBtn, main };
 }
+
+/** Both buttons carry exactly `label`, and the same disabled state. */
+function expectMirror(
+  main: HTMLButtonElement,
+  sticky: HTMLButtonElement,
+  label: string,
+  disabled: boolean
+) {
+  expect(main.textContent?.trim()).toBe(label);
+  expect(sticky.textContent?.trim()).toBe(label);
+  expect(main.disabled).toBe(disabled);
+  expect(sticky.disabled).toBe(disabled);
+}
+
+const requiredNote = {
+  personalisation: {
+    enabled: true,
+    required: true,
+    maxLength: 12,
+    label: 'Name',
+    labelAr: 'الاسم',
+  },
+};
 
 describe('default PDP sticky bar mirrors the main add button', () => {
   it('enabled product: same label, both enabled', async () => {
     const { stickyBtn, main } = await renderPdp(product());
-    expect(main).toBeTruthy();
-    expect(stickyBtn.textContent).toBe('Add to Cart');
-    expect(stickyBtn.disabled).toBe(false);
-    expect(main!.disabled).toBe(false);
+    expectMirror(main, stickyBtn, 'Add to Cart', false);
   });
 
-  it('required personalisation empty: both disabled; typing the note enables both', async () => {
-    const { stickyBtn, main } = await renderPdp(
-      product({
-        personalisation: {
-          enabled: true,
-          required: true,
-          maxLength: 12,
-          label: 'Name',
-          labelAr: 'الاسم',
-        },
-      })
-    );
-    expect(main).toBeTruthy();
-    expect(main!.disabled).toBe(true);
-    expect(stickyBtn.disabled).toBe(true);
+  it('required personalisation empty: both stay enabled-looking (the note is not a disabled reason)', async () => {
+    const { stickyBtn, main } = await renderPdp(product(requiredNote));
+    expectMirror(main, stickyBtn, 'Add to Cart', false);
     fireEvent.change(document.querySelector('input[maxlength]') as HTMLInputElement, {
       target: { value: 'Sara' },
     });
-    expect(main!.disabled).toBe(false);
-    expect(stickyBtn.disabled).toBe(false);
+    expectMirror(main, stickyBtn, 'Add to Cart', false);
   });
+
+  it.each(['main', 'sticky'] as const)(
+    'tap on the %s button with the note missing: focuses the field, reveals the hint, never adds',
+    async which => {
+      Element.prototype.scrollIntoView = vi.fn();
+      const { stickyBtn, main } = await renderPdp(product(requiredNote));
+      const input = document.querySelector('input[maxlength]') as HTMLInputElement;
+      expect(screen.getByTestId('personalisation-hint').textContent).toBe('');
+      await act(async () => {
+        fireEvent.click(which === 'main' ? main : stickyBtn);
+      });
+      expect(ctx.addItem).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(input);
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+      expect(screen.getByTestId('personalisation-hint').textContent).toBe('Fill in “Name” first');
+      // With the note typed, the same tap adds.
+      fireEvent.change(input, { target: { value: 'Sara' } });
+      await act(async () => {
+        fireEvent.click(which === 'main' ? main : stickyBtn);
+      });
+      expect(ctx.addItem).toHaveBeenCalledTimes(1);
+      expect(ctx.addItem.mock.calls[0][0]).toMatchObject({ note: 'Sara' });
+    }
+  );
 
   it('out of stock: same label and both disabled', async () => {
     const { stickyBtn, main } = await renderPdp(product({ inStock: false, inventory: 0 }));
-    expect(stickyBtn.textContent).toBe('Out of Stock');
-    expect(main).toBeTruthy();
-    expect(main!.disabled).toBe(true);
-    expect(stickyBtn.disabled).toBe(true);
+    expectMirror(main, stickyBtn, 'Out of Stock', true);
   });
+
+  it('pre-order (out of stock, accepts backorder): same label, both enabled', async () => {
+    const { stickyBtn, main } = await renderPdp(
+      product({ inStock: false, inventory: 0, acceptsBackorder: true })
+    );
+    expectMirror(main, stickyBtn, 'Pre-order', false);
+  });
+
+  it('variant required (nothing picked yet): same label, both disabled', async () => {
+    const { stickyBtn, main } = await renderPdp(
+      product({
+        options: [
+          { id: 'o1', name: 'Size', values: [{ value: 'S' }, { value: 'M' }] },
+          { id: 'o2', name: 'Color', values: [{ value: 'Rose' }, { value: 'Sand' }] },
+        ],
+        variants: [
+          { id: 'v1', price: 149000, inventory: 0, options: { Size: 'S', Color: 'Rose' } },
+          { id: 'v2', price: 149000, inventory: 3, options: { Size: 'M', Color: 'Sand' } },
+          { id: 'v3', price: 149000, inventory: 0, options: { Size: 'M', Color: 'Rose' } },
+          { id: 'v4', price: 149000, inventory: 0, options: { Size: 'S', Color: 'Sand' } },
+        ],
+      })
+    );
+    expectMirror(main, stickyBtn, 'Select Options', true);
+  });
+});
+
+describe('Dahab PDP: the main and pinned buttons share the note nudge', () => {
+  it.each(['pdp-add', 'dahab-pinned-add'])(
+    '%s with the note missing: enabled, focuses the field, never adds',
+    async testId => {
+      Element.prototype.scrollIntoView = vi.fn();
+      vi.stubGlobal('IntersectionObserver', IO);
+      vi.stubGlobal('localStorage', {
+        getItem: () => null,
+        setItem: () => {},
+        removeItem: () => {},
+      });
+      const { default: ProductDetailClient } =
+        await import('../../apps/web/src/app/products/[slug]/ProductDetailClient');
+      ctx.store = { ...STORES.A, template: 'dahab' };
+      render(<ProductDetailClient initialProduct={product(requiredNote) as never} />);
+      const btn = (await screen.findByTestId(testId)) as HTMLButtonElement;
+      expect(btn.disabled).toBe(false);
+      if (testId === 'dahab-pinned-add') {
+        // F10: solid ground, no glass, ease-out-quint.
+        const bar = btn.closest('.fixed') as HTMLElement;
+        expect(bar.className).not.toMatch(/backdrop-blur|bg-background\//);
+        expect(bar.className).toContain('ease-[cubic-bezier(0.22,1,0.36,1)]');
+      }
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      expect(ctx.addItem).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(document.querySelector('input[maxlength]'));
+    }
+  );
 });
 
 // DahabProductDetail's children create observers too; deliver the entry to all of them.

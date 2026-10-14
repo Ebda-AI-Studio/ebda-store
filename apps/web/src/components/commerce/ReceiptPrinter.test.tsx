@@ -54,7 +54,8 @@ const order: Order = {
       quantity: 1,
       price: 45000,
       product: product('Linen abaya', 'عباية كتان'),
-      variantName: 'Sand / M',
+      variantName: 'Sand / M / 54 cm',
+      variantNameAr: 'رملي / M / 54 سم',
       personalisation: 'Sara',
     },
     {
@@ -175,7 +176,10 @@ describe('ReceiptPrinter', () => {
   it('shows the variant and personalisation under its line', () => {
     render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
     const first = screen.getAllByTestId('receipt-line')[0];
-    expect(within(first).getByText('Sand / M')).toBeTruthy();
+    // Arabic snapshot in Arabic, each option value isolated in its own <bdi> (F8).
+    const bdis = Array.from(first.querySelectorAll('bdi')).map(b => b.textContent);
+    expect(bdis).toEqual(expect.arrayContaining(['رملي', 'M', '54 سم']));
+    expect(first.textContent).toContain('رملي · M · 54 سم');
     expect(first.textContent).toContain('✎ التخصيص: Sara');
     expect(within(first).getByText('عباية كتان', { exact: false })).toBeTruthy();
   });
@@ -348,7 +352,35 @@ describe('ReceiptPrinter', () => {
     const total = screen.getByTestId('receipt-total').textContent ?? '';
     expect(total).toMatch(/٩٥٠/);
     expect(total).not.toMatch(/[0-9]/);
-    expect(screen.getByTestId('receipt-order-number').textContent).toBe('#1043');
     expect(screen.getByTestId('receipt-barcode-caption').textContent).toBe('#1043');
+  });
+
+  it('english: canonical variant title, and the date reads day month year', () => {
+    lang = 'en';
+    render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    const first = screen.getAllByTestId('receipt-line')[0];
+    expect(first.textContent).toContain('Sand · M · 54 cm');
+    expect(document.body.textContent).toContain('15 Oct 2026');
+    expect(document.body.textContent).not.toContain('10/15/2026');
+  });
+
+  it('prints the order number once on the paper (barcode caption), no duplicate row', () => {
+    render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    expect(screen.queryByTestId('receipt-order-number')).toBeNull();
+    expect(screen.queryByText('رقم الطلب')).toBeNull();
+    expect(screen.getByTestId('receipt-barcode-caption').textContent).toBe('#1043');
+  });
+
+  it('a bubbling animationend from inside the leaving status line does not end the crossfade', () => {
+    render(<ReceiptPrinter order={order} paymentState="cod" store={store} />);
+    finishFeed();
+    const leaving = screen.getByTestId('receipt-status-leaving');
+    const child = leaving.querySelector('span')!;
+    fireEvent(child, new Event('animationend', { bubbles: true }));
+    fireEvent(child, new Event('webkitAnimationEnd', { bubbles: true }));
+    expect(screen.getByTestId('receipt-status-leaving')).toBeTruthy();
+    fireEvent(leaving, new Event('animationend', { bubbles: true }));
+    fireEvent(leaving, new Event('webkitAnimationEnd', { bubbles: true }));
+    expect(screen.queryByTestId('receipt-status-leaving')).toBeNull();
   });
 });

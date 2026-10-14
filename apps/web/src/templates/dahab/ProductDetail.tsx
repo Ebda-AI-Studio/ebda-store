@@ -79,6 +79,8 @@ export interface DahabProductDetailProps {
   sizeChart?: PublicSizeChart | null;
   note?: string;
   onNoteChange?: (v: string) => void;
+  /** Bumped by the page when add-to-cart was tapped with only the required note missing. */
+  noteNudge?: number;
   /** Spec table, WhatsApp order button, share row — platform components. */
   specs?: ReactNode;
   extras?: ReactNode;
@@ -122,7 +124,10 @@ function Gallery({
 
   if (images.length === 0)
     return (
-      <div aria-hidden="true" className="aspect-[4/5] w-full rounded-[var(--radius)] bg-card" />
+      <div
+        aria-hidden="true"
+        className="aspect-[4/5] w-full rounded-[var(--radius)] bg-card max-md:max-h-[52svh]"
+      />
     );
   const current = images[Math.min(selected, images.length - 1)];
 
@@ -146,7 +151,10 @@ function Gallery({
               type="button"
               onClick={() => setLightbox(true)}
               className={cx(
-                'relative aspect-[4/5] w-full shrink-0 snap-center bg-card',
+                // Phone gallery capped at 52svh (Ruling B0-40): a full-width 4:5 image is
+                // ~490px on a 390px phone and pushed the selectors and add-to-cart below the
+                // fold. object-cover crops the overflow, as before; desktop is unchanged.
+                'relative aspect-[4/5] max-h-[52svh] w-full shrink-0 snap-center bg-card',
                 img.id?.startsWith('variant-') && 'variant-image-fade'
               )}
               aria-label={t(`Open image ${i + 1} full screen`, `فتح الصورة ${i + 1} بملء الشاشة`)}
@@ -423,6 +431,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 config={p.personalisation}
                 value={p.note ?? ''}
                 onChange={p.onNoteChange}
+                nudge={p.noteNudge}
                 className="mt-8"
               />
             )}
@@ -451,6 +460,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
               </div>
               <button
                 type="button"
+                data-testid="pdp-add"
                 onClick={p.onAddToCart}
                 disabled={p.addDisabled || p.isAdding}
                 className={cx(DAHAB_BTN_PRIMARY, 'flex-1')}
@@ -530,7 +540,9 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
         aria-hidden={!pinBar}
         inert={!pinBar ? true : undefined}
         className={cx(
-          'fixed inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-md transition-transform duration-300 motion-reduce:transition-none md:hidden',
+          // Solid ground, no glass (taste bar bans glassmorphism); ease-out-quint like the
+          // default path's .sticky-bar-in (F10).
+          'fixed inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background px-4 py-3 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:hidden',
           pinBar ? 'translate-y-0' : 'translate-y-[calc(100%+56px+env(safe-area-inset-bottom))]'
         )}
       >
@@ -541,6 +553,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
           </div>
           <button
             type="button"
+            data-testid="dahab-pinned-add"
             onClick={p.onAddToCart}
             disabled={p.addDisabled || p.isAdding}
             className={cx(DAHAB_BTN_PRIMARY, 'px-6')}

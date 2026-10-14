@@ -33,6 +33,32 @@ export interface OrderSummaryBaseResult {
 }
 
 /**
+ * The money format every theme OrderSummary prints ("2,980 EGP"). Exported so a surface that
+ * repeats a summary figure (the cart's phone sticky total) prints it byte-identically.
+ */
+export function orderSummaryMoney(money: (piastres: number) => string, currency: string) {
+  return (p: number) => `${money(p)} ${currency}`;
+}
+
+/**
+ * The formatter the ACTIVE theme's OrderSummary prints money with. Most themes use
+ * `orderSummaryMoney` (via this hook's `fmt`); a theme whose summary prints with the
+ * storefront's `formatPrice` (Dahab: "EGP 2,980" / "2,980 ج.م") marks its component
+ * `moneyFormat = 'locale'`. No themed summary = the cart's fallback summary (formatPrice).
+ */
+export function summaryMoneyFormatter(
+  Summary: unknown,
+  money: (piastres: number) => string,
+  currency: string,
+  formatPrice: (piastres: number) => string
+): (piastres: number) => string {
+  if (!Summary || (Summary as { moneyFormat?: string }).moneyFormat === 'locale') {
+    return formatPrice;
+  }
+  return orderSummaryMoney(money, currency);
+}
+
+/**
  * Derive the shared computed values needed by every OrderSummary theme.
  * Call this at the top of each theme's OrderSummary component and
  * destructure the result directly into your JSX.
@@ -63,7 +89,7 @@ export function useOrderSummaryBase({
 
   return {
     isRtl,
-    fmt: (p: number) => `${money(p)} ${currency}`,
+    fmt: orderSummaryMoney(money, currency),
     ctaText: isRtl ? (ctaLabelAr ?? ctaLabel) : (ctaLabel ?? ctaLabelAr),
     summaryLabelBold: summaryColors?.bold !== false,
     labelColorStyle: summaryColors?.labelColor ? { color: summaryColors.labelColor } : undefined,

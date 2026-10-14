@@ -79,4 +79,20 @@ describe('SwatchDots', () => {
     expect(screen.getAllByTestId('swatch-dot')).toHaveLength(5);
     expect(screen.getByText('+7')).toBeTruthy();
   });
+
+  it('a black dot on an ink skin keeps a 35% foreground edge (F7, WCAG 1.4.11)', () => {
+    const p = {
+      options: [
+        {
+          name: 'Color',
+          _count: { values: 1 },
+          values: [{ id: 'b', value: 'Black', swatchHex: '#000000' }],
+        },
+      ],
+    };
+    render(<SwatchDots product={p as never} max={5} />);
+    const dot = screen.getByTestId('swatch-dot');
+    expect(dot.className).toContain('border-foreground/35');
+    expect(dot.className).not.toContain('border-foreground/15');
+  });
 });

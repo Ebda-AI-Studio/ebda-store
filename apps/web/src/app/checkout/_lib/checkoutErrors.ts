@@ -27,8 +27,9 @@ interface PersonalisationRefusal {
  * merchant requires a text (e.g. the name to embroider) has none, typically
  * because it was added before the field became required. The text can only be
  * typed on the product page, so the copy names the item and the field and the
- * alert links back to the cart. Arabic first; each name/label falls back to
- * the other language, never blank.
+ * alert links back to the cart. Arabic first; each product name falls back to
+ * the other language, never blank; a label missing in the active language reads
+ * as the platform default ("your personalisation" / "التخصيص").
  */
 export function personalisationRequiredCopy(
   code: string,
@@ -43,7 +44,10 @@ export function personalisationRequiredCopy(
   const pick = (en?: string | null, arText?: string | null) =>
     (ar ? arText || en : en || arText) || '';
   const parts = items
-    .map(p => ({ label: pick(p.label, p.labelAr), product: pick(p.name, p.nameAr) }))
+    // The product NAME is content (falls back across languages); the field LABEL is a
+    // control word inside a sentence, so it never borrows the other language (F4): an
+    // empty active-language label reads "your personalisation" / "التخصيص".
+    .map(p => ({ label: (ar ? p.labelAr : p.label) || '', product: pick(p.name, p.nameAr) }))
     .filter(p => p.product);
   if (parts.length === 0) {
     return t(

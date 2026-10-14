@@ -1,5 +1,6 @@
 'use client';
 
+import { VariantText } from '@ebda/ui';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { CartTableProps } from '../types';
@@ -61,7 +62,13 @@ export default function BoldCartTable({
                   </Link>
                   {(item.variantTitle || item.variantTitleAr) && (
                     <p className="mt-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      {isRtl && item.variantTitleAr ? item.variantTitleAr : item.variantTitle}
+                      <VariantText
+                        title={
+                          (isRtl && item.variantTitleAr
+                            ? item.variantTitleAr
+                            : item.variantTitle || item.variantTitleAr) ?? ''
+                        }
+                      />
                     </p>
                   )}
                   <CartLineNote note={item.note} />

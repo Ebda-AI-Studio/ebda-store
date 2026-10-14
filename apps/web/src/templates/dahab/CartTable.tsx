@@ -1,5 +1,6 @@
 'use client';
 
+import { VariantText } from '@ebda/ui';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { CartTableProps } from '../types';
@@ -28,7 +29,9 @@ export default function DahabCartTable({
     <ul className="divide-y divide-border border-y border-border" dir={isRtl ? 'rtl' : 'ltr'}>
       {items.map(item => {
         const name = (isRtl && item.nameAr ? item.nameAr : item.name) || '';
-        const variant = isRtl && item.variantTitleAr ? item.variantTitleAr : item.variantTitle;
+        const variant =
+          (isRtl && item.variantTitleAr ? item.variantTitleAr : item.variantTitle) ||
+          item.variantTitleAr;
         return (
           <li
             key={item.id}
@@ -52,7 +55,11 @@ export default function DahabCartTable({
                   >
                     {name}
                   </Link>
-                  {variant && <p className="mt-1 text-xs text-muted-foreground">{variant}</p>}
+                  {variant && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      <VariantText title={variant} />
+                    </p>
+                  )}
                   <CartLineNote note={item.note} />
                   {item.unavailable && <CartLineUnavailableNotice />}
                   <p

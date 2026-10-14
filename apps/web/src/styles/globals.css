@@ -1198,13 +1198,17 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
   body[data-sticky-cart='blocked'] {
     padding-bottom: calc(8rem + 4.25rem + 1.5rem);
   }
-  /* Floating widget (br/bl, bottom 80px, z-60) would sit inside the sticky bar's
-   * band: lift it clear of tab bar (56px) + bar (~68px) + gap. Not top positions. */
+  /* Floating widget (br/bl, bottom 80px, z-60) and the toast region (@ebda/ui Toast,
+   * bottom 72px) would sit inside the sticky bar's band (F2: "added to cart" covered the
+   * bar's name and price): lift both clear of tab bar (56px) + bar (~68px) + gap. */
   body[data-sticky-atc='1'] [data-floating-widget='bottom'],
-  body[data-sticky-cart='1'] [data-floating-widget='bottom'] {
+  body[data-sticky-cart='1'] [data-floating-widget='bottom'],
+  body[data-sticky-atc='1'] [data-toast-region],
+  body[data-sticky-cart='1'] [data-toast-region] {
     bottom: calc(140px + env(safe-area-inset-bottom));
   }
-  body[data-sticky-cart='blocked'] [data-floating-widget='bottom'] {
+  body[data-sticky-cart='blocked'] [data-floating-widget='bottom'],
+  body[data-sticky-cart='blocked'] [data-toast-region] {
     bottom: calc(164px + env(safe-area-inset-bottom));
   }
 }

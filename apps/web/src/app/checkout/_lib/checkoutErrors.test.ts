@@ -51,9 +51,9 @@ describe('personalisationRequiredCopy', () => {
     );
   });
 
-  it('falls back to the Arabic label on English, never blank', () => {
+  it('an Arabic-only label reads as the platform default in English, never Arabic or blank (F4)', () => {
     expect(personalisationRequiredCopy('PERSONALISATION_REQUIRED', details, tEn, 'en')).toBe(
-      'Add “الاسم للتطريز” for Linen Abaya on its product page.'
+      'Add “your personalisation” for Linen Abaya on its product page.'
     );
   });
 

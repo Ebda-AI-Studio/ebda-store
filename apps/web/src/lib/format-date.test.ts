@@ -26,3 +26,15 @@ describe('formatDate day preset (delivery window)', () => {
     );
   });
 });
+
+describe('formatDate medium preset (receipt date)', () => {
+  it('english is day month year, never month-first', () => {
+    expect(formatDate(d, { style: 'medium', language: 'en' })).toBe('21 Oct 2026');
+  });
+  it('arabic keeps western digits by default and arabic-indic when the store opts in', () => {
+    expect(formatDate(d, { style: 'medium', language: 'ar' })).toBe('21 أكتوبر 2026');
+    expect(formatDate(d, { style: 'medium', language: 'ar', numerals: 'arab' })).toBe(
+      '٢١ أكتوبر ٢٠٢٦'
+    );
+  });
+});

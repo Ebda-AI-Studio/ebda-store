@@ -99,6 +99,8 @@ function ToastContainer({
 }) {
   return (
     <div
+      // Hook for the storefront's sticky-bar lift (apps/web globals.css, UI rule 6).
+      data-toast-region
       className="fixed bottom-[calc(72px+env(safe-area-inset-bottom))] md:bottom-4 right-4 z-50 flex flex-col gap-2 w-auto max-w-[280px] sm:max-w-sm pointer-events-none"
       aria-live="polite"
       aria-relevant="additions removals"

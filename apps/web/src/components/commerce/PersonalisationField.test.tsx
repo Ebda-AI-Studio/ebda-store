@@ -38,14 +38,18 @@ describe('PersonalisationField', () => {
     expect(a.innerHTML + b.innerHTML + c.innerHTML).toBe('');
   });
 
-  it('shows the label, maxLength, counter and the required hint until filled', () => {
+  it('shows the label, maxLength and counter; the hint waits for a blur (F6)', () => {
     const onChange = vi.fn();
     const { rerender } = render(<PersonalisationField config={cfg} value="" onChange={onChange} />);
     const input = screen.getByLabelText(/الاسم للتطريز/) as HTMLInputElement;
     expect(input.maxLength).toBe(12);
     expect(input.required).toBe(true);
-    expect(screen.getByText('اكتب الاسم للتطريز الأول')).toBeTruthy();
+    // first paint: counter only, no "fill it in first" yet
+    expect(screen.queryByText('اكتب الاسم للتطريز الأول')).toBeNull();
     expect(screen.getByText('0/12')).toBeTruthy();
+    fireEvent.blur(input);
+    expect(screen.getByText('اكتب الاسم للتطريز الأول')).toBeTruthy();
+    expect(input.getAttribute('aria-invalid')).toBe('true');
     fireEvent.change(input, { target: { value: 'سارة' } });
     expect(onChange).toHaveBeenCalledWith('سارة');
     rerender(<PersonalisationField config={cfg} value="سارة" onChange={onChange} />);
@@ -53,10 +57,42 @@ describe('PersonalisationField', () => {
     expect(screen.getByText('4/12')).toBeTruthy();
   });
 
-  it('falls back to the Arabic label on an English storefront', () => {
+  it('a nudge focuses the field, scrolls it into view and reveals the hint', () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const { rerender } = render(
+      <PersonalisationField config={cfg} value="" onChange={() => {}} nudge={0} />
+    );
+    const input = screen.getByLabelText(/الاسم للتطريز/) as HTMLInputElement;
+    expect(document.activeElement).not.toBe(input);
+    rerender(<PersonalisationField config={cfg} value="" onChange={() => {}} nudge={1} />);
+    expect(document.activeElement).toBe(input);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('اكتب الاسم للتطريز الأول')).toBeTruthy();
+  });
+
+  it('english on an Arabic-only label: the platform default, never the Arabic label (F4)', () => {
     lang = 'en';
+    render(<PersonalisationField config={cfg} value="" onChange={() => {}} nudge={1} />);
+    expect(screen.getByLabelText(/^Personalisation/)).toBeTruthy();
+    expect(screen.queryByText(/الاسم للتطريز/)).toBeNull();
+    expect(screen.getByText('Fill in “Personalisation” first')).toBeTruthy();
+  });
+
+  it('arabic on an English-only label: التخصيص', () => {
+    render(
+      <PersonalisationField
+        config={{ ...cfg, label: 'Name', labelAr: '' }}
+        value=""
+        onChange={() => {}}
+      />
+    );
+    expect(screen.getByLabelText(/^التخصيص/)).toBeTruthy();
+  });
+
+  it('the input stays narrow from md up (F14)', () => {
     render(<PersonalisationField config={cfg} value="" onChange={() => {}} />);
-    expect(screen.getByLabelText(/الاسم للتطريز/)).toBeTruthy();
+    expect(screen.getByLabelText(/الاسم للتطريز/).className).toContain('md:max-w-sm');
   });
 });
 

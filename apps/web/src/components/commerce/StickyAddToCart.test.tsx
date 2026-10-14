@@ -88,6 +88,7 @@ describe('StickyAddToCart', () => {
 
 describe('StickyCartTotal', () => {
   const base = {
+    totalLabel: 'Subtotal',
     total: 'EGP 300',
     itemCountLabel: '2 items',
     href: '/checkout',

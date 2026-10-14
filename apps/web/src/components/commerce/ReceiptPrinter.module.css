@@ -62,6 +62,18 @@
 
 /* Thermal paper is paper in every skin: white, near-black ink. The bottom
    edge is torn into 8px teeth (a downward triangle per 16px tile). */
+/* Thermal-paper ink: the paper is white on every skin, so its ink is fixed too (not a
+ * store token). Classes, not arbitrary `text-[#…]` utilities (design.md, UI rule 7). */
+.ink {
+  color: #141414;
+}
+.inkMuted {
+  color: rgb(20 20 20 / 0.55);
+}
+.inkSoft {
+  color: rgb(20 20 20 / 0.6);
+}
+
 .paper {
   background: #ffffff;
   color: #141414;

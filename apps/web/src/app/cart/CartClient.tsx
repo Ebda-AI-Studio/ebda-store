@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Button, useToast, CartIcon } from '@ebda/ui';
+import { Button, useToast, CartIcon, VariantText } from '@ebda/ui';
 import { ShopChrome } from '../../components';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { useCart } from '../../contexts/CartContext';
@@ -15,6 +15,7 @@ import { api } from '@/lib/api';
 import { CartRecommendations } from '../../components/CartRecommendations';
 import { BundleLine } from '../../components/BundleLine';
 import { CartLineUnavailableNotice } from '../../templates/shared/CartLineUnavailable';
+import { summaryMoneyFormatter } from '../../templates/shared/useOrderSummaryBase';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import { couponQuoteBasis, couponQuoteCartItems } from '@/lib/coupon-quote-basis';
 import { productUnavailableCopy } from '@/lib/product-cart-errors';
@@ -27,7 +28,7 @@ import {
 import { useLastListing } from '../../hooks/useLastListing';
 import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
-import { resolveColor, checkMinimumOrder, computeOrderAmounts } from '@ebda/shared';
+import { resolveColor, checkMinimumOrder, computeOrderAmounts, REGION } from '@ebda/shared';
 import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
@@ -108,7 +109,7 @@ export default function CartClient() {
     cta: cartZoneStyle(cartCtaZone),
   };
   const { language, t } = useLanguage();
-  const { localize } = useNumerals();
+  const { localize, money } = useNumerals();
   const formatPrice = useLocalePrice();
   const continuShoppingHref = useLastListing();
 
@@ -370,11 +371,16 @@ export default function CartClient() {
   // uses, and that amount is informational only — NOT added to `total`.
   const taxRatePercent = store.taxRatePercent ?? 0;
   const taxIncludedInPrice = !!store.taxIncludedInPrice;
-  // Shipping is in the VAT base (ruling MONEYB-2) — the order's own formula.
+  // Shipping is in the VAT base (ruling MONEYB-2) — the order's own formula. On the cart the
+  // summary always reads shipping as "Calculated at checkout" (the per-area fee is only known
+  // once the shopper picks an area), so the cart's total must NOT already include a zone fee
+  // (F1: the summary said "calculated at checkout" while its total and the sticky bar added
+  // 50 EGP). Checkout recomputes with the real fee.
+  const CART_SHIPPING_PENDING = 0;
   const { tax, total } = computeOrderAmounts({
     subtotal,
     discount,
-    shipping,
+    shipping: CART_SHIPPING_PENDING,
     ratePercent: taxRatePercent,
     includedInPrice: taxIncludedInPrice,
   });
@@ -640,9 +646,13 @@ export default function CartClient() {
                                 </h3>
                                 {(item.variantTitle || item.variantTitleAr) && (
                                   <p className="mt-0.5 text-sm text-muted-foreground">
-                                    {language === 'ar' && item.variantTitleAr
-                                      ? item.variantTitleAr
-                                      : item.variantTitle}
+                                    <VariantText
+                                      title={
+                                        (language === 'ar' && item.variantTitleAr
+                                          ? item.variantTitleAr
+                                          : item.variantTitle || item.variantTitleAr) ?? ''
+                                      }
+                                    />
                                   </p>
                                 )}
                                 <CartLineNote
@@ -1225,9 +1235,17 @@ export default function CartClient() {
           )}
         </div>
       </div>
-      {/* Phone sticky total: same checkoutBlocked rule + message as the summary CTA. */}
+      {/* Phone sticky total: same checkoutBlocked rule + message as the summary CTA, and the
+          summary's own Subtotal row (label, value AND money format: a themed OrderSummary prints
+          "2,980 EGP", the fallback summary formatPrice) while shipping is still to be calculated. */}
       <StickyCartTotal
-        total={formatPrice(total)}
+        totalLabel={t('Subtotal', 'المجموع الفرعي')}
+        total={summaryMoneyFormatter(
+          T?.OrderSummary,
+          money,
+          store.currency ?? REGION.currency,
+          formatPrice
+        )(subtotal)}
         itemCount={cartCount}
         itemCountLabel={t(
           `${localize(cartCount)} ${cartCount === 1 ? 'item' : 'items'}`,
