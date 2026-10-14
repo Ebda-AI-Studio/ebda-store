@@ -1,6 +1,14 @@
 # Demo store photo credits
 
-The example stores on ebda.app are illustrations; no real shop or product is shown. Photos are openly licensed stock (found via Openverse), resized and cropped. CC BY photos require the attribution below.
+The example stores on ebda.app are illustrations; no real shop or product is shown.
+
+## Template looks (public/looks)
+
+The photos in the 15 template looks (Qamar, Souq, Jasmine, Lamma, Dahab) are illustrative and AI-generated with Cloudflare Workers AI FLUX.1 schnell (scripts/looks/gen.py, prompts in scripts/looks/prompts.py). They show no real shop, product or person and need no attribution.
+
+## Dahab story capture
+
+The remaining Dahab story capture uses openly licensed stock (found via Openverse), resized and cropped. CC BY photos require the attribution below.
 
 | File            | Photo                                                                                                                               | Author                                                    | Source   | License                                                       |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | -------- | ------------------------------------------------------------- |

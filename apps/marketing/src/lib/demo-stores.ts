@@ -1,10 +1,10 @@
 import type { Locale } from './site';
 
 /**
- * The ONE example store shown on ebda.app until the designed templates exist (builder
- * Phase 3; Ahmad 2026-10-07): Dahab, the jewellery store on night and gold, the brand's own
- * palette. scripts/storefront-capture seeds it into a local Ebda and captures the real
- * apps/web storefront for every device frame. No real merchant. Photos: public/demo/CREDITS.md.
+ * The one example store still captured from a real apps/web render: Dahab (jewellery on night
+ * and gold, the brand's own palette), used by the scroll story and its bottom bar. The five
+ * templates and their 15 looks shown in the looks section are NOT from here: they are generated
+ * by scripts/looks (illustrative AI photos, public/looks). No real merchant. Photos: public/demo/CREDITS.md.
  */
 export const TEMPLATE_IDS = ['dahab'] as const;
 export type TemplateId = (typeof TEMPLATE_IDS)[number];

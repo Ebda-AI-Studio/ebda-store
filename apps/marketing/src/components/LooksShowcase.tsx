@@ -1,0 +1,265 @@
+'use client';
+
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+} from 'react';
+import type { LooksCopy } from '../lib/content';
+import { LOOK_FONTS } from '../lib/looks-fonts';
+
+const LETTERS = ['A', 'B', 'C'] as const;
+const SPLIT = '<!--look-->';
+type Frag = { css: string; looks: string[] };
+
+/** /looks/<id>.html is `<style>` + one block per look, separated by <!--look-->. */
+function parse(html: string): Frag {
+  const [css, ...looks] = html.split(SPLIT);
+  return { css: css.replace(/^<style>|<\/style>$/g, ''), looks };
+}
+
+function fontHref(id: string): string | null {
+  const fams = LOOK_FONTS[id as keyof typeof LOOK_FONTS];
+  return fams
+    ? `https://fonts.googleapis.com/css2?${fams.map(f => `family=${f}`).join('&')}&display=swap`
+    : null;
+}
+
+/**
+ * Pick a template, see its three looks as scrollable phones. The first template's markup is
+ * rendered by the server; the others are fetched from /looks on first select. In-phone chips
+ * and toggles are plain delegated handlers; links inside the phones do nothing.
+ */
+export function LooksShowcase({
+  copy,
+  rtl,
+  initialHtml,
+}: {
+  copy: LooksCopy;
+  rtl: boolean;
+  initialHtml: string;
+}) {
+  const firstId = copy.templates[0].id;
+  const [active, setActive] = useState(firstId);
+  const [frags, setFrags] = useState<Record<string, Frag>>(() =>
+    initialHtml ? { [firstId]: parse(initialHtml) } : {}
+  );
+  const [failed, setFailed] = useState<string | null>(null);
+  const [current, setCurrent] = useState(0);
+  const [seen, setSeen] = useState(false);
+  const [switched, setSwitched] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const load = useCallback((id: string) => {
+    setFailed(null);
+    fetch(`/looks/${id}.html`)
+      .then(r => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
+      .then(t => setFrags(f => ({ ...f, [id]: parse(t) })))
+      .catch(() => setFailed(id));
+  }, []);
+
+  useEffect(() => {
+    if (!frags[active] && failed !== active) load(active);
+  }, [active, frags, failed, load]);
+
+  // Fonts: only once the section is near the screen (or a tab was chosen), once per template.
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return setSeen(true);
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setSeen(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: '600px 0px' }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  useEffect(() => {
+    const href = fontHref(active);
+    if (!seen || !href || document.querySelector(`link[data-looks-font="${active}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    link.dataset.looksFont = active;
+    document.head.appendChild(link);
+  }, [active, seen]);
+
+  // Which look the A/B/C switch shows follows the snap scroll.
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || typeof IntersectionObserver === 'undefined') return;
+    const items = [...track.children] as HTMLElement[];
+    const io = new IntersectionObserver(
+      entries => {
+        for (const e of entries)
+          if (e.isIntersecting && e.intersectionRatio > 0.6)
+            setCurrent(items.indexOf(e.target as HTMLElement));
+      },
+      { root: track, threshold: [0.6] }
+    );
+    items.forEach(i => io.observe(i));
+    return () => io.disconnect();
+  }, [active, frags]);
+
+  const select = (id: string, focus = false) => {
+    setSeen(true);
+    setSwitched(true);
+    setActive(id);
+    setCurrent(0);
+    trackRef.current?.scrollTo({ left: 0 });
+    if (focus) tabRefs.current[copy.templates.findIndex(t => t.id === id)]?.focus();
+  };
+
+  const onTabKey = (e: KeyboardEvent, i: number) => {
+    const n = copy.templates.length;
+    // In RTL the tab row is mirrored: the visual right arrow goes to the previous tab.
+    const fwd = rtl ? 'ArrowLeft' : 'ArrowRight';
+    const back = rtl ? 'ArrowRight' : 'ArrowLeft';
+    let next = -1;
+    if (e.key === fwd) next = (i + 1) % n;
+    else if (e.key === back) next = (i - 1 + n) % n;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = n - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    select(copy.templates[next].id, true);
+  };
+
+  const goTo = (i: number) => {
+    const el = trackRef.current?.children[i] as HTMLElement | undefined;
+    el?.scrollIntoView({ inline: 'start', block: 'nearest', behavior: 'smooth' });
+    setCurrent(i);
+  };
+
+  const onPhoneClick = (e: MouseEvent) => {
+    const t = e.target as HTMLElement;
+    const inPhone = t.closest('.scr');
+    if (!inPhone) return;
+    const chip = t.closest('.chip');
+    const cmp = t.closest('.cmp');
+    const day = t.closest('.day');
+    if (chip || day) {
+      const el = (chip ?? day) as HTMLElement;
+      const sel = chip ? '.chip' : '.day';
+      el.parentElement?.querySelectorAll(sel).forEach(x => x.classList.remove('on'));
+      el.classList.add('on');
+    } else if (cmp) {
+      cmp.setAttribute(
+        'aria-pressed',
+        cmp.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'
+      );
+    }
+    if (t.closest('a')) e.preventDefault();
+  };
+
+  const tpl = copy.templates.find(t => t.id === active) ?? copy.templates[0];
+  const items = copy.items[active];
+  const frag = frags[active];
+
+  return (
+    <div className="looks-wrap" ref={stageRef}>
+      <div className="looks-tabs" role="tablist" aria-label={copy.tablistLabel}>
+        {copy.templates.map((t, i) => (
+          <button
+            key={t.id}
+            ref={el => {
+              tabRefs.current[i] = el;
+            }}
+            type="button"
+            role="tab"
+            id={`looks-tab-${t.id}`}
+            aria-selected={t.id === active}
+            aria-controls="looks-panel"
+            tabIndex={t.id === active ? 0 : -1}
+            className="looks-tab"
+            onClick={() => select(t.id)}
+            onKeyDown={e => onTabKey(e, i)}
+          >
+            <span className="looks-tab-name">{t.name}</span>
+            <span className="looks-tab-kind">{t.kind}</span>
+          </button>
+        ))}
+      </div>
+
+      <div
+        id="looks-panel"
+        role="tabpanel"
+        aria-labelledby={`looks-tab-${active}`}
+        aria-busy={!frag && failed !== active}
+        className="looks-panel"
+      >
+        <p className="looks-kind">{tpl.kind}</p>
+        <div className="looks-switch" role="group" aria-label={copy.switchLabel}>
+          {items.map((it, i) => (
+            <button
+              key={LETTERS[i]}
+              type="button"
+              className="looks-switch-btn"
+              aria-pressed={current === i}
+              aria-label={`${copy.switchLabel} ${LETTERS[i]}: ${it.name}`}
+              onClick={() => goTo(i)}
+            >
+              {LETTERS[i]}
+            </button>
+          ))}
+        </div>
+        {frag && <style dangerouslySetInnerHTML={{ __html: frag.css }} />}
+        {frag ? (
+          <div
+            className={`looks-trio${switched ? ' looks-trio-in' : ''}`}
+            key={active}
+            ref={trackRef}
+            onClick={onPhoneClick}
+          >
+            {items.map((it, i) => (
+              <figure className="looks-item" key={LETTERS[i]}>
+                <div className="look-phone">
+                  <span className="look-badge">{copy.badge}</span>
+                  <div
+                    className="look-screen"
+                    dangerouslySetInnerHTML={{ __html: frag.looks[i] ?? '' }}
+                  />
+                </div>
+                <figcaption>
+                  <h3>
+                    <span className="look-letter" aria-hidden="true">
+                      {LETTERS[i]}
+                    </span>
+                    {it.name}
+                  </h3>
+                  <p className="look-who">{it.who}</p>
+                  <p className="look-idea">
+                    <b>{copy.ideaLabel}:</b> {it.idea}
+                  </p>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        ) : (
+          <div className="looks-empty" role="status">
+            {failed === active ? (
+              <>
+                <span>{copy.failed}</span>{' '}
+                <button type="button" className="btn btn-ghost" onClick={() => load(active)}>
+                  {copy.retry}
+                </button>
+              </>
+            ) : (
+              copy.loading
+            )}
+          </div>
+        )}
+      </div>
+      {copy.bilingualNote && <p className="muted looks-note">{copy.bilingualNote}</p>}
+    </div>
+  );
+}

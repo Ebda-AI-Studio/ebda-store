@@ -39,7 +39,7 @@ export const absoluteUrl = (p: string) =>
 export const SECTION_ORDER = [
   'story',
   'how',
-  'templates',
+  'looks',
   'breakout',
   'dahab',
   'features',
