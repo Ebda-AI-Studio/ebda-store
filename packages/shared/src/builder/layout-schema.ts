@@ -16,6 +16,21 @@ import { LEGACY_HOME_SECTION_KEYS } from './section-keys';
 // merging with defaults. Validating the parts that absolutely must be right
 // (numeric ranges, enum values) and letting unknown extras through keeps
 // the column forward-compatible.
+/**
+ * Optional hero background video URL. Reuses the same `isSafeUrl` scheme
+ * allowlist as `link`/`ctaHref`, then narrows it: a video is only ever loaded
+ * (never navigated to), so it must be https or a relative upload path, never
+ * http/mailto/tel. Empty string = cleared.
+ */
+const safeVideoUrl = z
+  .string()
+  .optional()
+  .refine(
+    v =>
+      v === undefined || v === '' || (isSafeUrl(v) && !/^\s*(?!https:)[a-z][a-z0-9+.-]*:/i.test(v)),
+    { message: 'Video must be an https URL or a relative upload path' }
+  );
+
 // Exported (not just used internally) so `tests/unit/hero-slide-schema.test.ts`
 // can assert the `link` / `ctaHref` scheme-allowlist behavior directly,
 // mirroring how `layoutSchema` is exported below for its parity test.
@@ -34,6 +49,12 @@ export const heroSlideSchema = z.object({
   // images that disappeared on refresh.
   imageMobile: z.string().optional(),
   imageMobileAr: z.string().optional(),
+  // Optional looping background video (Task 8). The slide image stays the
+  // poster. MUST be listed here or the parse step silently strips it (the
+  // imageMobile trap above). Lives inside the slide object so the R2 orphan
+  // sweep (scans layoutSettings + revision documents) sees the URL.
+  video: safeVideoUrl,
+  videoMobile: safeVideoUrl,
   alt: z.string().optional(),
   headline: z.string().optional(),
   headlineAr: z.string().optional(),

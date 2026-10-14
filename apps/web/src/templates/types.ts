@@ -401,6 +401,12 @@ export interface HeroBannerProps {
    */
   imageMobile?: string;
   imageMobileAr?: string;
+  /** Optional muted looping video overlaid on the image (the image is the poster). */
+  video?: string;
+  /** Mobile video; falls back to `video`. */
+  videoMobile?: string;
+  /** False when the slide is not the one showing (carousel): pauses its video. */
+  active?: boolean;
   alt?: string;
   headline?: string;
   headlineAr?: string;

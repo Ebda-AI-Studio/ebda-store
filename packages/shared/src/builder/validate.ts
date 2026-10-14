@@ -72,6 +72,7 @@ export interface ValidationResult {
 }
 
 const IMAGE_KEY_RE = /^(image|imageAr|imageMobile|imageMobileAr)$/;
+const VIDEO_KEY_RE = /^(video|videoMobile)$/;
 const URL_KEY_RE = /^(link|ctaHref|href|buttonLink)$/;
 const ALIGN_KEY_RE = /align$/i;
 
@@ -93,10 +94,14 @@ function scanValue(value: unknown, path: string, key: string, errors: BuilderIss
       errors.push(
         issue('STRING_TOO_LONG', path, 'Text is longer than 2 KB.', 'النص أطول من 2 كيلوبايت.')
       );
-    if ((IMAGE_KEY_RE.test(key) || URL_KEY_RE.test(key)) && value !== '') {
+    if (
+      (IMAGE_KEY_RE.test(key) || VIDEO_KEY_RE.test(key) || URL_KEY_RE.test(key)) &&
+      value !== ''
+    ) {
       const scheme = /^\s*([a-z][a-z0-9+.-]*):/i.exec(value)?.[1]?.toLowerCase();
       const imageOk = !IMAGE_KEY_RE.test(key) || !scheme || scheme === 'https' || scheme === 'http';
-      if (!isSafeUrl(value) || !imageOk)
+      const videoOk = !VIDEO_KEY_RE.test(key) || !scheme || scheme === 'https';
+      if (!isSafeUrl(value) || !imageOk || !videoOk)
         errors.push(
           issue(
             'UNSAFE_URL',

@@ -153,6 +153,10 @@ export const HERO_SLIDE_BLOCK: BlockDefinition = {
   settings: [
     s.image('image', 'Image', 'الصورة', { localized: true }),
     s.image('imageMobile', 'Mobile image', 'صورة الجوال', { localized: true }),
+    s.video('video', 'Background video (optional)', 'فيديو الخلفية (اختياري)', {
+      localized: false,
+    }),
+    s.video('videoMobile', 'Mobile video', 'فيديو الجوال'),
     s.text('alt', 'Image description', 'وصف الصورة'),
     s.text('headline', 'Headline', 'العنوان', { localized: true }),
     s.text('ctaText', 'Button text', 'نص الزر', { localized: true }),

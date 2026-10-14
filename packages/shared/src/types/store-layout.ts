@@ -95,6 +95,10 @@ export interface HeroSlide {
    */
   imageMobile?: string;
   imageMobileAr?: string;
+  /** Optional muted looping background video (R2 URL). The slide image is its poster. */
+  video?: string;
+  /** Mobile video; falls back to `video`. */
+  videoMobile?: string;
   alt?: string;
   /** Optional headline rendered as overlay — pack styles vary */
   headline?: string;
