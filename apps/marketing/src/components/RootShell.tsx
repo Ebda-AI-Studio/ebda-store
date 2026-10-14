@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { BRAND } from '@force/shared/brand';
 import { type Locale } from '../lib/site';
+import { EbdaTracking } from './EbdaTracking';
 import '@/app/globals.css';
 
 /** BRAND's font URL plus IBM Plex Sans Arabic 700 for the Arabic display headlines. */
@@ -44,7 +45,10 @@ export function RootShell({ locale, children }: { locale: Locale; children: Reac
           <link rel="stylesheet" href={FONTS_URL} />
         </noscript>
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <EbdaTracking />
+      </body>
     </html>
   );
 }

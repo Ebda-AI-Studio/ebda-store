@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { BRAND } from '@force/shared/brand';
 import { COPY } from '../lib/content';
+import { CookieSettingsButton } from './CookieSettingsButton';
 import { SECURITY_EMAIL, pagePath, type Locale } from '../lib/site';
 
 export function Footer({ locale }: { locale: Locale }) {
@@ -55,6 +56,9 @@ export function Footer({ locale }: { locale: Locale }) {
             </li>
             <li>
               <Link href={pagePath(locale, 'acceptable-use')}>{c.acceptableUse}</Link>
+            </li>
+            <li>
+              <CookieSettingsButton label={c.cookies} />
             </li>
           </ul>
           <p className="muted small">{c.legalVersion}</p>

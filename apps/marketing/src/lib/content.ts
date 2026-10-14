@@ -130,6 +130,7 @@ export interface Copy {
     legalNav: string;
     legal: string;
     privacy: string;
+    cookies: string;
     terms: string;
     merchant: string;
     acceptableUse: string;
@@ -424,6 +425,7 @@ export const COPY: Record<Locale, Copy> = {
       legalNav: 'روابط قانونية',
       legal: 'الإشعار القانوني',
       privacy: 'الخصوصية',
+      cookies: 'إعدادات الكوكيز',
       terms: 'الشروط',
       merchant: 'اتفاقية التاجر',
       acceptableUse: 'الاستخدام المقبول',
@@ -729,6 +731,7 @@ export const COPY: Record<Locale, Copy> = {
       legalNav: 'Legal links',
       legal: 'Legal notice',
       privacy: 'Privacy',
+      cookies: 'Cookie settings',
       terms: 'Terms',
       merchant: 'Merchant agreement',
       acceptableUse: 'Acceptable use',
