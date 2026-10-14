@@ -323,6 +323,14 @@ endpoints to read catalog data, enumerate abandoned carts, toggle DM ordering,
 and proxy bot analytics. Every one of these endpoints must be scoped to a single
 Force AI Store tenant. This section documents how that scoping is enforced.
 
+**Feature gate (Ruling WHATSAPP-OFF-1, 2026-10-14).** The WhatsApp Business API
+integration is flagged OFF for every store. After the bridge key resolves the
+tenant, `waBridgeAuth` also requires the store's `whatsapp` feature to resolve ON
+(`middleware/wa-feature-gate.ts`, fail closed) and answers
+`403 { code: 'FEATURE_DISABLED', feature: 'whatsapp' }` otherwise; the key-less
+`POST /wa-bridge/cart/redeem` makes the same check after verifying its signed
+token. A super-admin `StoreFeature` `whatsapp` override re-enables one store.
+
 ### The contract
 
 1. **Authentication is API-key based, not JWT-based.** WBS passes a per-store key
