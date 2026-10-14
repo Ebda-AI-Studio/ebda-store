@@ -11,7 +11,7 @@ Verification on 2026-10-10: both regressions passed, and the full builder suite 
 
 The fixture does not provide a notification WebSocket, so its connection errors remain test-environment noise. Host Node/Next deprecation and colour-environment warnings were also observed.
 
-Live QA separately found an inactive store previewing as 404. That resolver/preview issue is under investigation and is not fixed by this queue correction.
+Live QA separately found an inactive store previewing as 404. That resolver/preview issue is fixed separately, see "Inactive store previewing as 404" below.
 
 ## Placeholder copy cannot be published (editor bug 10)
 
@@ -53,3 +53,11 @@ Not changed: the hero (built from the store name). The trust strip's fixed copy 
 The strip used to show three fixed lines ("Fast Delivery", "Quality Guarantee", "24/7 Support") on every store: claims the merchant never wrote. Items are now the merchant's own: `trustStrip.items` (icon, title, subtitle, EN + AR) edited in the visual builder as `item` blocks, so add, remove and reorder reuse the hero-slide block machinery (`adapter.ts` `BLOCK_FIELDS`, registry `blocks`, `layout-schema.ts`).
 
 Discriminator, migration-free: `items` ABSENT = a store that predates this, keeps the three fixed defaults exactly as before; `items` PRESENT, even `[]` = merchant-owned, only their items render and none hides the strip (editor canvas shows the empty-section hint). New stores get `NEW_STORE_LAYOUT_SETTINGS` (`trustStrip.items: []`) in `stores.layout_settings` from `ProvisioningService.provisionStore` and `StoreService.create`. It is safe because an existing store's column either is `{}` or has a strip without `items`, and no code path ever wrote `items` before. Consequences: (1) a legacy store that deletes all its blocks gets `[]` and the strip hides, which is the merchant's intent; (2) a new store loses the template baseline's `trustStrip.bgColor` (raw strip wins wholesale in `resolveLayoutSettings`), so it uses the page background until a colour is picked; (3) the admin content-tab notice for `trust-strip` now says to add items under the section and no longer links to the classic builder.
+
+## Inactive store previewing as 404 (fixed, 2026-10-14)
+
+Root cause: the canvas loads `https://<store-host>/?_preview=N&_builder=<token>`. The storefront resolves the store from the Host via `GET /public/store/resolve`, which only returns active/suspended stores, and `getStoreOrNotFound()` (`apps/web/src/lib/store-resolver.ts`, called from `app/page.tsx`) calls `notFound()` on the miss before the token is ever consulted (the token was only checked later, by `/public/stores/:id/builder-preview`).
+
+Fix: middleware forwards `?_builder=` (only inside `?_preview`; any client-sent copy is stripped) as the request header `x-builder-preview-token`, and the resolver passes it to `/public/store/resolve` on a `no-store` fetch that skips the per-instance store map. The API (`resolveBuilderPreviewStoreId` in `apps/api/src/routes/public.routes.ts`) verifies it server-side: host -> store id (any status), then the Redis entry `builder-preview:<storeId>:<token>` must exist, so a token for store A cannot unlock store B and expired/forged tokens fail. Only then is the inactive store returned, bypassing `getCached`, with `Cache-Control: private, no-store` and `X-Robots-Tag: noindex`. No token or an invalid one keeps the unchanged public behaviour (inactive = 404).
+
+Not changed: `GET /public/stores/:storeId/layout` and the product/category endpoints the canvas may call stay active-only, so on an inactive store the legacy layout falls back to defaults and live-data sections render empty; the builder document itself comes from the token-authorized `builder-preview` endpoint. Tests: `tests/unit/builder-preview-inactive-store-resolve.test.ts`, `tests/unit/web-builder-preview-token.test.ts` (written, not yet run; CI runs them).

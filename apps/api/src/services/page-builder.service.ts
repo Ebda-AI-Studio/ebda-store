@@ -660,8 +660,7 @@ export { BUILDER_LIMITS };
 
 /** Redis TTL for a builder preview token (the Redis TTL floor is 120s). */
 export const PREVIEW_TOKEN_TTL_SECONDS = 3600;
-export const previewTokenKey = (storeId: string, token: string) =>
-  `builder-preview:${storeId}:${token}`;
+export { previewTokenKey } from '../lib/builder-preview-token';
 
 /**
  * The document the editor canvas renders for a preview token: the working

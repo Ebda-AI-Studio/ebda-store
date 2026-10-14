@@ -415,6 +415,7 @@ export const MIDDLEWARE_ASSERTED_HEADERS = [
   'x-store-domain',
   'x-store-identifier',
   'x-preview-draft',
+  'x-builder-preview-token',
   'x-original-host',
 ] as const;
 
@@ -470,7 +471,24 @@ export function middleware(request: NextRequest) {
   requestHeaders.set('x-original-host', hostname);
   propagateDraftHeader(requestHeaders, request, draftToken, isPreviewIframe);
 
-  return withDraftCookie(routeByHost(request, parsedHost, requestHeaders, isPreviewIframe));
+  // Visual-builder canvas (`/?_preview=…&_builder=<token>`): forward the token as
+  // a REQUEST header so the store resolver can present it to the API, which
+  // verifies it server-side before resolving a not-yet-active store. Gated on
+  // `_preview` exactly like app/page.tsx; the client-sent header was stripped
+  // above, so only this URL-derived value can reach the resolver.
+  const builderToken = request.nextUrl.searchParams.get('_builder');
+  const isBuilderCanvas = isPreviewIframe && !!builderToken;
+  if (isBuilderCanvas) requestHeaders.set('x-builder-preview-token', builderToken);
+
+  const response = withDraftCookie(
+    routeByHost(request, parsedHost, requestHeaders, isPreviewIframe)
+  );
+  if (isBuilderCanvas) {
+    // A canvas response may carry an unpublished store: never cacheable or indexable.
+    response.headers.set('Cache-Control', 'private, no-store');
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  }
+  return response;
 }
 
 /** Dispatch a classified, non-invalid host. */

@@ -254,6 +254,20 @@ export async function getStoreDomain(): Promise<string | null> {
 }
 
 /**
+ * The visual-builder canvas token for THIS request, or null.
+ *
+ * Set by middleware ONLY from `?_builder=` inside the `?_preview` iframe (any
+ * client-sent value is stripped first), so it is never present on a public
+ * visit. It is just a CLAIM: the API verifies it server-side (Redis entry bound
+ * to the store the host resolves to) before returning a not-yet-active store.
+ */
+export async function getBuilderPreviewToken(): Promise<string | null> {
+  const headersList = await headers();
+  const token = headersList.get('x-builder-preview-token');
+  return token && /^[A-Za-z0-9_-]{16,64}$/.test(token) ? token : null;
+}
+
+/**
  * Check if running on platform domain
  */
 export async function isPlatformDomain(): Promise<boolean> {
@@ -308,16 +322,24 @@ function parsePublicLocations(raw: unknown): StoreLocationPublic[] | undefined {
 /**
  * Fetch store from API by domain
  */
-async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null> {
+async function fetchStoreByDomain(
+  domain: string,
+  builderToken?: string
+): Promise<ResolvedStore | null> {
   try {
     const response = await fetch(`${API_URL}/public/store/resolve`, {
-      // Tagged so the API can purge THIS store's cached resolve on save
-      // (POST /api/revalidate → revalidateTag). `revalidate` stays as a slow
-      // fallback for stores that never get an explicit purge.
-      next: { revalidate: 15, tags: [`store-domain:${domain}`] },
+      // Builder canvas (token present): never cached by Next's data cache, so a
+      // not-yet-active store can never be replayed to a public request.
+      // Otherwise tagged so the API can purge THIS store's cached resolve on
+      // save (POST /api/revalidate → revalidateTag). `revalidate` stays as a
+      // slow fallback for stores that never get an explicit purge.
+      ...(builderToken
+        ? { cache: 'no-store' as const }
+        : { next: { revalidate: 15, tags: [`store-domain:${domain}`] } }),
       headers: {
         'Content-Type': 'application/json',
         'x-store-domain': domain,
+        ...(builderToken ? { 'x-builder-preview-token': builderToken } : {}),
       },
     });
 
@@ -463,7 +485,15 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
 /**
  * Resolve store from cache or API
  */
-async function resolveStoreByDomain(domain: string): Promise<ResolvedStore | null> {
+async function resolveStoreByDomain(
+  domain: string,
+  builderToken?: string | null
+): Promise<ResolvedStore | null> {
+  // Builder canvas: bypass the per-instance map in BOTH directions — a preview
+  // result must never be written under the key public requests read, and a
+  // cached public miss/hit must not stand in for the token-checked answer.
+  if (builderToken) return fetchStoreByDomain(domain, builderToken);
+
   // Check cache
   const cached = storeCache.get(domain);
   if (cached && cached.expires > Date.now()) {
@@ -669,7 +699,10 @@ export async function resolveStoreBySlug(slug: string): Promise<ResolvedStore | 
 export async function getStore(): Promise<ResolvedStore> {
   const domain = await getStoreDomain();
   if (domain) {
-    const { store, transient } = await lenientResolve(() => resolveStoreByDomain(domain));
+    const builderToken = await getBuilderPreviewToken();
+    const { store, transient } = await lenientResolve(() =>
+      resolveStoreByDomain(domain, builderToken)
+    );
     if (store) return store;
     return transient ? TRANSIENTLY_UNRESOLVED_STORE : DEFAULT_STORE;
   }
@@ -748,7 +781,7 @@ async function lenientResolve(
 export async function getStoreOrNotFound(): Promise<ResolvedStore> {
   const domain = await getStoreDomain();
   if (domain) {
-    const store = await resolveStoreByDomain(domain);
+    const store = await resolveStoreByDomain(domain, await getBuilderPreviewToken());
     if (!store) notFound();
     return store;
   }
