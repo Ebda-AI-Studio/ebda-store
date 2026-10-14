@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: true },
   icons: { icon: '/icon.svg', apple: '/apple-touch-icon.png' },
 };
-export const viewport: Viewport = { themeColor: '#0A0B0C', colorScheme: 'dark' };
+export const viewport: Viewport = { themeColor: '#FAFAFA', colorScheme: 'light' };
 
 /** 404 for every path (static export writes it to out/404.html), Arabic first with English. */
 export default function NotFound() {

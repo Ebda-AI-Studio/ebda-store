@@ -141,17 +141,6 @@ export interface Copy {
     cta: string;
     /** Secondary link: jumps to #looks. */
     secondary: string;
-    /** The one phone that cycles through the five templates' first look. */
-    phone: {
-      /** Accessible name of the cycling preview. */
-      label: string;
-      pause: string;
-      play: string;
-      /** aria-label of each vertical dot; `{name}` is the template name. */
-      show: string;
-      /** Visible caption mark: the preview is an illustration. */
-      badge: string;
-    };
   };
   /** The /about page: company line, story heading, contact heading. */
   aboutPage: {
@@ -274,13 +263,6 @@ export const COPY: Record<Locale, Copy> = {
       sub: `${PN.nameAr} بيديك لينك باسمك، ومنتجاتك، وطلباتك. كله من موبايلك.`,
       cta: 'ابدأ دلوقتي',
       secondary: 'شوف القوالب',
-      phone: {
-        label: 'معاينة بتتغيّر: أول شكل في كل قالب من القوالب الخمسة، بصور توضيحية',
-        pause: 'وقّف التغيير',
-        play: 'شغّل التغيير',
-        show: 'اعرض قالب {name}',
-        badge: 'صور توضيحية',
-      },
     },
     model3d: {
       title: 'خلّي عميلك يقلّب المنتج بإيده.',
@@ -661,13 +643,6 @@ export const COPY: Record<Locale, Copy> = {
       sub: `${PN.nameEn} gives you your own link, products and orders. All from your phone.`,
       cta: 'Start now',
       secondary: 'See the templates',
-      phone: {
-        label: 'A rotating preview: the first look of each of the five templates, illustrative',
-        pause: 'Pause the preview',
-        play: 'Play the preview',
-        show: 'Show the {name} template',
-        badge: 'Illustrative',
-      },
     },
     model3d: {
       title: 'Let shoppers turn it in their hands.',

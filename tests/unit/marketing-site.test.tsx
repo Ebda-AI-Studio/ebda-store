@@ -83,7 +83,7 @@ describe('marketing hero and structure', () => {
     // No English sentence on the Arabic hero any more (R-EBDA-COPY-1).
     expect(ar).not.toContain('Your business, your store');
   });
-  it('hero = h1 + sub naming the product + ONE signup CTA + a link to #looks + one phone (MKT-1)', () => {
+  it('hero = h1 + sub naming the product + ONE signup CTA + a link to #looks, and no phone (MKT-1, MKT-10)', () => {
     for (const [html, name, secondary] of [
       [ar, 'ابدأ ستور بيديك', 'شوف القوالب'],
       [en, 'Ebda Store gives you', 'See the templates'],
@@ -95,10 +95,8 @@ describe('marketing hero and structure', () => {
       expect(hero).toMatch(
         new RegExp(`<a href="#looks" class="btn btn-ghost btn-lg">${secondary}<`)
       );
-      // one phone, first frame is Qamar look A, rendered by the server (static for no-JS / reduced motion)
-      expect(hero.match(/class="look-phone"/g)).toHaveLength(1);
-      expect(hero).toContain('id="hp-qamar-a"');
-      expect(hero).not.toContain('id="ph-qamar-a"');
+      // MKT-10: the hero phone is gone; the phones live in the looks section, where visitors use them
+      expect(hero).not.toMatch(/look-phone|hero-phone|class="scr"|id="hp-/);
       // the retired hero furniture is gone: particles, poster, studio kicker, slug pill
       expect(hero).not.toMatch(/nile|hero-poster|hero-brand|slug-pill|<canvas/);
       expect(hero).not.toMatch(/ابدأ استوديو للذكاء|Ebda AI Studio/);
@@ -364,21 +362,20 @@ describe('marketing honesty', () => {
       expect(f).not.toMatch(/<svg[^>]*class="[^"]*illustration/);
     }
   });
-  it('shows the WhatsApp line in the header, FAQ and close: wa.me link plus the number as selectable text', () => {
+  it('shows WhatsApp as a button only in the header, FAQ and close: wa.me link, icon + label, no number written (MKT-11)', () => {
     for (const html of [ar, en]) {
-      const wa = (h: string) => h.match(/<span class="wa[ "][\s\S]*?<\/span><\/span>/g) ?? [];
       const header = html.match(/<header class="site-header".*?<\/header>/s)![0];
       const faq = html.match(/<section id="faq".*?<\/section>/s)![0];
       const close = html.match(/<section id="start".*?<\/section>/s)![0];
       for (const part of [header, faq, close]) {
         expect(part).toContain('href="https://wa.me/201207761882"');
-        expect(part).toContain(
-          '<span class="wa-num" dir="ltr" lang="en" translate="no">+20 120 776 1882</span>'
-        );
-        expect(wa(part).length).toBeGreaterThan(0);
+        expect(part).toMatch(/<a href="https:\/\/wa\.me\/201207761882"[^>]*aria-label="[^"]+"/);
+        expect(part).toContain('class="wa-icon"');
+        expect(part).toMatch(/class="wa-label">(واتساب|WhatsApp)</);
+        // the number is never rendered as text or inside an accessible name; only the wa.me href carries it
+        const noHref = part.replace(/href="https:\/\/wa\.me\/201207761882"/g, '');
+        expect(noHref).not.toMatch(/201207761882|120 776 1882|wa-num/);
       }
-      // the number is text, not only an icon: the link also carries it in its accessible name
-      expect(header).toMatch(/aria-label="[^"]*\+20 120 776 1882"/);
     }
     expect(ar).toContain('>واتساب<');
     expect(en).toContain('>WhatsApp<');
@@ -502,8 +499,8 @@ describe('marketing SEO and trust surface', () => {
       for (const page of LEGAL_SLUGS) {
         const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);
         expect(html).toContain(badge);
-        // the header's public WhatsApp line is a contact number, not a registration number
-        const withoutPhone = html.replace(/201207761882|\+20 120 776 1882/g, '');
+        // the WhatsApp button's wa.me href is the only long number on the page, and it is not a registration number
+        const withoutPhone = html.replace(/201207761882/g, '');
         expect(withoutPhone).not.toMatch(/\b\d{5,}\b/);
       }
     }

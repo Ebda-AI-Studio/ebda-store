@@ -238,29 +238,26 @@ html[lang='en'] .wm-name {
   align-items: center;
   gap: 6px;
   min-height: 44px;
+  padding-inline: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
   font-weight: 600;
   color: var(--fg);
-  text-decoration: underline;
-  text-decoration-color: var(--line-strong);
+  text-decoration: none;
+  vertical-align: middle;
 }
 .wa-link:hover {
-  color: var(--accent-text);
+  border-color: var(--fg);
+  background: var(--raise);
 }
 .wa-icon {
   flex: none;
-}
-.wa-num {
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  unicode-bidi: isolate;
-  user-select: text;
+  color: #0d7a43;
 }
 .wa-compact .wa-link {
-  text-decoration: none;
-  padding-inline: 4px;
+  padding-inline: 10px;
 }
-.wa-compact .wa-label,
-.wa-compact .wa-num {
+.wa-compact .wa-label {
   display: none;
 }
 .nav-menu .wa-label {
@@ -276,11 +273,6 @@ html[lang='en'] .wm-name {
 }
 @media (min-width: 1040px) {
   .wa-compact .wa-label {
-    display: inline;
-  }
-}
-@media (min-width: 1180px) {
-  .wa-compact .wa-num {
     display: inline;
   }
 }
@@ -363,29 +355,25 @@ html[lang='en'] .wm-name {
   flex-wrap: wrap;
   margin: 0;
 }
+.hero .actions {
+  justify-content: center;
+}
 
-/* hero: the headline, one primary action, and one phone that cycles through the five templates */
+/* hero (MKT-10): the headline, one primary action and a link to the looks. The phones live in #looks. */
 .hero {
   padding-block: clamp(28px, 5vw, 80px) clamp(40px, 7vw, 96px);
 }
 .hero-inner {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 32px;
-  align-items: center;
-}
-@media (min-width: 900px) {
-  .hero-inner {
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-    gap: 64px;
-  }
+  justify-items: center;
+  text-align: center;
 }
 .hero h1 {
   font-size: clamp(2.5rem, 7vw, 4.6rem);
   font-weight: 700;
   line-height: 1.12;
   letter-spacing: -0.03em;
-  max-width: 12ch;
+  max-width: 16ch;
   margin: 0 0 20px;
   text-wrap: balance;
 }
@@ -398,83 +386,12 @@ html[lang='ar'] .hero h1 {
   color: var(--muted);
   line-height: 1.6;
   margin: 0 0 28px;
-  max-width: 34ch;
-}
-.hero-phone {
-  justify-self: center;
-  width: min(320px, 100%);
-}
-.hero-phone .look-phone {
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
-    0 28px 40px -28px rgba(18, 19, 20, 0.45);
-}
-.hero-phone .look-screen {
-  height: clamp(440px, 68svh, 600px);
-  min-height: 0;
-}
-.hero-phone .look-screen[data-fade] {
-  animation: looks-in 0.3s ease-out;
-}
-.hero-phone-bar {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  margin-top: 10px;
-}
-.hero-phone-name {
-  margin: 0;
-  text-align: center;
-  line-height: 1.5;
-}
-.hero-phone-name span {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-.hero-phone-ctl {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.hero-phone-pause,
-.hero-phone-dot {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--fg);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-}
-.hero-phone-pause svg {
-  display: block;
-}
-.hero-phone-dots {
-  display: flex;
-}
-.hero-phone-dot::before {
-  content: '';
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--line-strong);
-  transition:
-    width 0.25s var(--ease),
-    background-color 0.25s var(--ease);
-}
-.hero-phone-dot[aria-current='true']::before {
-  width: 24px;
-  background: var(--fg);
+  max-width: 40ch;
 }
 @media (prefers-reduced-motion: no-preference) {
   .hero h1,
   .hero-sub,
-  .hero .actions,
-  .hero-phone {
+  .hero .actions {
     animation: rise 0.9s var(--ease) both;
   }
   .hero-sub {
@@ -482,9 +399,6 @@ html[lang='ar'] .hero h1 {
   }
   .hero .actions {
     animation-delay: 0.16s;
-  }
-  .hero-phone {
-    animation-delay: 0.2s;
   }
 }
 /* Translate only: the copy is visible from the first frame (never gated on opacity). */
