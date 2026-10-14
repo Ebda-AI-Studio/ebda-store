@@ -28,6 +28,8 @@ export interface OrderItemDetail {
   productId: string;
   productName: string;
   variantName: string | null;
+  /** The customer's personalisation text (e.g. the name to embroider). */
+  personalisation?: string | null;
   sku: string | null;
   quantity: number;
   price: number;

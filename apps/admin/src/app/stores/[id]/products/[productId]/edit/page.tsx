@@ -33,6 +33,13 @@ import { AiFieldBadge } from './_components/AiFieldBadge';
 import { BalanceDescriptionButton } from './_components/BalanceDescriptionButton';
 import { FactsCard } from './_components/FactsCard';
 import { FulfilmentCard, LEAD_TIME_MAX } from './_components/FulfilmentCard';
+import {
+  PersonalisationCard,
+  EMPTY_PERSONALISATION,
+  personalisationForm,
+  personalisationPayload,
+  type PersonalisationForm,
+} from './_components/PersonalisationCard';
 
 interface Product {
   id: string;
@@ -64,6 +71,8 @@ interface Product {
   badgeLabelAr?: string | null;
   /** Spec rows (fabric, care, karat...). */
   facts?: ProductFact[];
+  /** PDP personalisation field config (PersonalisationConfig); null = off. */
+  personalisation?: unknown;
   categories: { categoryId: string; category: { id: string; name: string } }[];
   images: { id: string; url: string; alt?: string; position: number }[];
   store: { id: string; name: string; slug: string };
@@ -89,6 +98,7 @@ export default function EditProductPage() {
   const tFields = useT('products.edit.fields');
   const tFacts = useT('products.edit.facts');
   const tFulfil = useT('products.edit.fulfilment');
+  const tPersonal = useT('products.edit.personalisation');
   const tStatusOptions = useT('products.edit.statusOptions');
   const tSeo = useT('products.edit.seoSection');
   const locale = useLocale();
@@ -113,6 +123,9 @@ export default function EditProductPage() {
   // Spec rows live beside formData (an array, not a string field); the page's
   // PUT is the single writer, FactsCard only edits this state.
   const [facts, setFacts] = useState<ProductFact[]>([]);
+  // Same single-writer shape: PersonalisationCard edits this, the PUT sends it.
+  const [personalisation, setPersonalisation] =
+    useState<PersonalisationForm>(EMPTY_PERSONALISATION);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -239,6 +252,7 @@ export default function EditProductPage() {
         });
 
         setFacts(Array.isArray(p.facts) ? p.facts : []);
+        setPersonalisation(personalisationForm(p.personalisation));
         setFormData({
           name: p.name || '',
           nameAr: p.nameAr || '',
@@ -496,6 +510,12 @@ export default function EditProductPage() {
         return;
       }
 
+      const personal = personalisationPayload(personalisation);
+      if ('error' in personal) {
+        setError(tPersonal(personal.error));
+        return;
+      }
+
       const body: Record<string, unknown> = {
         name: formData.name,
         // Clearable free text (nameAr / description / descriptionAr / sku).
@@ -532,6 +552,7 @@ export default function EditProductPage() {
         images: images.map((url, i) => ({ url, position: i })),
         facts: factsPayload,
         leadTimeDays,
+        personalisation: personal.value,
       };
 
       if (formData.category) {
@@ -812,6 +833,8 @@ export default function EditProductPage() {
             </div>
 
             <FactsCard storeId={storeId} facts={facts} onChange={setFacts} />
+
+            <PersonalisationCard value={personalisation} onChange={setPersonalisation} />
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">
               <div className="mb-4 flex items-baseline justify-between gap-3 flex-wrap">

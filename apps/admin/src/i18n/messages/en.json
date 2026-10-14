@@ -771,6 +771,18 @@
         "remove": "Remove",
         "needBoth": "Each detail needs a name and a value."
       },
+      "personalisation": {
+        "title": "Personalisation",
+        "hint": "The customer types a text for their piece on the product page, such as a name to embroider.",
+        "allow": "Allow personalisation",
+        "presets": "Quick labels",
+        "labelAr": "Label (Arabic)",
+        "labelEn": "Label (English)",
+        "maxLength": "Max characters",
+        "required": "Required before adding to cart",
+        "needLabel": "Personalisation needs a label in Arabic or English.",
+        "invalidMax": "Max characters must be a whole number from 1 to 200."
+      },
       "fulfilment": {
         "title": "Fulfilment",
         "hint": "Shows customers: arrives between … and … Leave empty if it ships right away.",
@@ -1310,6 +1322,9 @@
       "viewAll": "View all",
       "showLess": "Show less",
       "qty": "Qty",
+      "personalisation": "Personalisation",
+      "copyPersonalisation": "Copy personalisation",
+      "copied": "Copied",
       "platform": "Platform",
       "web": "Web",
       "mobile": "Mobile",

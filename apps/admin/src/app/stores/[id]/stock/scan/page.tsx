@@ -55,6 +55,7 @@ interface OrderItem {
   variantId: string | null;
   productName: string;
   variantName: string | null;
+  personalisation?: string | null;
   quantity: number;
   pickedQty: number;
   pickedAt: string | null;
@@ -576,6 +577,11 @@ function PickMode({ storeId }: { storeId: string }) {
                       <p className="font-medium">{item.productName}</p>
                       {item.variantName && (
                         <p className="text-xs text-muted-foreground">{item.variantName}</p>
+                      )}
+                      {item.personalisation && (
+                        <p className="text-xs font-medium text-foreground">
+                          ✎ <bdi>{item.personalisation}</bdi>
+                        </p>
                       )}
                     </div>
                   );

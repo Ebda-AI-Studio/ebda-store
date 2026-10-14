@@ -233,7 +233,44 @@ function ItemRow({ item, currency }: { item: OrderItemDetail; currency: string }
             {t('qty')}: {item.quantity} × {formatMoney(item.price, currency)}
           </span>
         </div>
+        {item.personalisation && <PersonalisationRow text={item.personalisation} />}
       </div>
     </li>
+  );
+}
+
+/**
+ * The customer's personalisation text, highlighted so the workshop cannot miss
+ * it, with a copy button (names are retyped into embroidery / engraving software).
+ */
+function PersonalisationRow({ text }: { text: string }) {
+  const t = useT('orders.detail');
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard blocked (insecure context / permissions) — the text stays selectable.
+    }
+  };
+  return (
+    <div className="mt-2 flex items-center gap-2 rounded-md bg-muted px-2.5 py-1.5 text-sm">
+      <span aria-hidden className="text-muted-foreground">
+        ✎
+      </span>
+      <span className="sr-only">{t('personalisation')}: </span>
+      <bdi className="min-w-0 flex-1 font-medium text-foreground select-all break-words">
+        {text}
+      </bdi>
+      <button
+        type="button"
+        onClick={copy}
+        className="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {copied ? t('copied') : t('copyPersonalisation')}
+      </button>
+    </div>
   );
 }
