@@ -36,12 +36,12 @@ export const absoluteUrl = (p: string) =>
 
 /** Section ids, in page order. Ruling MKT-1 (2026-10-14): the hero is rendered by Home itself, then
  *  looks first (the product is the proof), the story scroll (the four steps, shown once; Ahmad kept it on
- *  2026-10-14 and re-skinned it with the Dahab look), the 3D ring (replaced in P1), payments, features,
- *  pricing, FAQ, close. The studio story lives on /about, not on the home page. */
+ *  2026-10-14 and re-skinned it with the Dahab look), the live 3D product page (MKT-2, P1; it replaced
+ *  the procedural ring), payments, features, pricing, FAQ, close. The studio story lives on /about, not on the home page. */
 export const SECTION_ORDER = [
   'looks',
   'story',
-  'dahab',
+  'model3d',
   'payments',
   'features',
   'pricing',

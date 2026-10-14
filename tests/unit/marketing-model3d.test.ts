@@ -1,0 +1,116 @@
+/**
+ * The marketing 3D section (Ruling MKT-2): the committed assets are the ones the code expects
+ * (valid for the product's own validator, meshopt not Draco, small), the licence credit exists in
+ * CREDITS.md AND in the visible copy, the build-time QR codes are fresh, the phone skins mirror the
+ * looks they claim, and the viewer's Tailwind classes are all defined in the marketing CSS shim.
+ */
+import { describe, it, expect } from 'vitest';
+import { readFileSync, existsSync, statSync } from 'node:fs';
+import path from 'node:path';
+import { validateGlb } from '../../packages/shared/src/model3d';
+import {
+  MODEL3D,
+  MODEL3D_IDS,
+  arPageUrl,
+  qrPath,
+  stillBase,
+} from '../../apps/marketing/src/lib/model3d';
+import { qrTargets, renderQr } from '../../apps/marketing/src/lib/model3d-qr';
+import { COPY } from '../../apps/marketing/src/lib/content';
+
+const MK = path.resolve(__dirname, '../../apps/marketing');
+const pub = (p: string) => path.join(MK, 'public', p);
+
+describe('3D assets', () => {
+  for (const id of MODEL3D_IDS) {
+    it(`${id}: the GLB passes the product's validator, is meshopt + WebP (no Draco) and under 1.6 MB`, () => {
+      const file = pub(MODEL3D[id].glb);
+      expect(statSync(file).size).toBeLessThan(1.6 * 1024 * 1024);
+      const r = validateGlb(new Uint8Array(readFileSync(file)));
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(r.stats.extensionsUsed).toContain('EXT_meshopt_compression');
+      expect(r.stats.extensionsUsed).not.toContain('KHR_draco_mesh_compression');
+      // the colour swatches are the file's own KHR_materials_variants, by name
+      expect(r.gltfVariants).toEqual(MODEL3D[id].variants.map(v => v.id));
+    });
+  }
+  it('every still the section can show exists in both formats', () => {
+    const bases = new Set<string>();
+    for (const id of MODEL3D_IDS)
+      for (const v of MODEL3D[id].variants.length ? MODEL3D[id].variants.map(x => x.id) : [null])
+        bases.add(stillBase(id, v));
+    expect(bases.size).toBe(4); // three sneaker colourways + the lantern
+    for (const b of bases)
+      for (const ext of ['webp', 'avif']) expect(existsSync(pub(`${b}.${ext}`))).toBe(true);
+  });
+});
+
+describe('licence credits', () => {
+  it('CREDITS.md credits Shopify (CC BY 4.0) and Poly Haven (CC0)', () => {
+    const c = readFileSync(pub('demo/CREDITS.md'), 'utf8');
+    expect(c).toMatch(/qamar-sneaker\.glb.*Shopify.*CC BY 4\.0/);
+    expect(c).toMatch(/brass-diya-lantern\.glb.*Bhargav Kubal.*CC0/);
+  });
+  it('the visible credit next to the viewer names Shopify and links the licence, in both languages', () => {
+    for (const l of ['ar', 'en'] as const) {
+      const q = COPY[l].model3d.verticals.qamar.credit;
+      expect(q.text).toMatch(/Shopify/);
+      expect(q.text).toMatch(/CC BY 4\.0/);
+      expect(q.href).toBe('https://creativecommons.org/licenses/by/4.0/');
+    }
+  });
+});
+
+describe('desktop QR codes', () => {
+  it('are committed, fresh, and each encodes its locale + vertical page URL', async () => {
+    expect(qrTargets()).toHaveLength(6);
+    for (const t of qrTargets()) {
+      expect(readFileSync(pub(t.path), 'utf8')).toBe(await renderQr(t.url));
+    }
+    expect(arPageUrl('ar', 'souq')).toBe('https://ebda.app/?m=souq#model3d');
+    expect(arPageUrl('en', 'qamar')).toBe('https://ebda.app/en/?m=qamar#model3d');
+    expect(qrPath('en', 'lamma')).toBe('/3d/qr/lamma-en.svg');
+  });
+});
+
+describe('phone skins', () => {
+  it('mirror the custom properties of the look they claim (public/looks)', () => {
+    for (const id of MODEL3D_IDS) {
+      const { skin } = MODEL3D[id];
+      const html = readFileSync(pub(`looks/${id}.html`), 'utf8');
+      const sel = `#ph-${skin.look}{`;
+      const block = html.slice(html.indexOf(sel), html.indexOf('}', html.indexOf(sel)));
+      for (const [k, v] of [
+        ['bg', skin.bg],
+        ['ink', skin.ink],
+        ['mut', skin.mut],
+        ['ac', skin.ac],
+        ['fd', `'${skin.fd}'`],
+        ['fb', `'${skin.fb}'`],
+      ])
+        expect(block, `${id} --${k}`).toContain(`--${k}:${v}`);
+    }
+  });
+});
+
+describe('viewer CSS shim', () => {
+  it('defines every Tailwind class the product viewer renders, scoped to .m3d', () => {
+    const src = readFileSync(
+      path.resolve(__dirname, '../../packages/ui/src/model3d/ProductModelViewer.tsx'),
+      'utf8'
+    );
+    const css = readFileSync(path.join(MK, 'src/app/globals.css'), 'utf8');
+    const classes = new Set<string>();
+    for (const m of src.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g))
+      for (const c of (m[1] ?? m[2]).replace(/\$\{[^}]*\}/g, ' ').split(/\s+/))
+        if (c) classes.add(c);
+    // canvas.className = '...'
+    for (const m of src.matchAll(/canvas\.className = '([^']*)'/g))
+      for (const c of m[1].split(/\s+/)) if (c) classes.add(c);
+    expect(classes.size).toBeGreaterThan(30);
+    const esc = (c: string) => c.replace(/([.\[\]/:])/g, '\\$1');
+    const missing = [...classes].filter(c => !css.includes(`.m3d .${esc(c)}`));
+    expect(missing).toEqual([]);
+  });
+});
