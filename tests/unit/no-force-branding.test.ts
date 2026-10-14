@@ -106,6 +106,8 @@ const PHASE_B_PENDING: Record<string, string> = {
     'builder/templates/layout workstream (excluded)',
   'apps/web/src/templates/shared/product-card-badge-render.test.tsx':
     'builder/templates/layout workstream (excluded)',
+  'apps/web/src/templates/shared/looks-card-aspect-render.test.tsx':
+    'builder/templates/layout workstream (excluded)',
   'apps/web/src/templates/shared/product-card-defaults.ts':
     'builder/templates/layout workstream (excluded)',
   'apps/web/src/templates/shared/ProductCardCta.tsx':
