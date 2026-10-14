@@ -93,6 +93,35 @@ describe('SizeChartDialog', () => {
   });
 });
 
+describe('SizeChartDialog scroll lock', () => {
+  it('locks html/body scroll while open and restores the previous values on close', () => {
+    document.body.style.overflow = 'auto';
+    document.documentElement.style.overflow = '';
+    render(<SizeChartDialog chart={arOnly} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Size guide' }));
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.documentElement.style.overflow).toBe('hidden');
+    fireEvent.click(document.querySelector('dialog')!); // backdrop
+    expect(document.body.style.overflow).toBe('auto');
+    expect(document.documentElement.style.overflow).toBe('');
+    document.body.style.overflow = '';
+  });
+
+  it('the native close event (Esc) also restores, and unmounting while open restores', () => {
+    const { unmount } = render(<SizeChartDialog chart={arOnly} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Size guide' }));
+    const dialog = document.querySelector('dialog')!;
+    dialog.removeAttribute('open');
+    fireEvent(dialog, new Event('close'));
+    expect(document.body.style.overflow).toBe('');
+    fireEvent.click(screen.getByRole('button', { name: 'Size guide' }));
+    expect(document.body.style.overflow).toBe('hidden');
+    unmount();
+    expect(document.body.style.overflow).toBe('');
+    expect(document.documentElement.style.overflow).toBe('');
+  });
+});
+
 describe('SizeChartTable', () => {
   it('caption names the unit in the active language', () => {
     lang = 'ar';

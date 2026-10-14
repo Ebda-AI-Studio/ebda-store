@@ -30,6 +30,8 @@ describe('VariantSelector size guide', () => {
     expect(isSizeOption({ name: 'Size', nameAr: null })).toBe(true);
     expect(isSizeOption({ name: 'Ring size' })).toBe(true);
     expect(isSizeOption({ name: 'Option', nameAr: 'المقاس' })).toBe(true);
+    expect(isSizeOption({ name: 'Option', nameAr: 'الحجم' })).toBe(true);
+    expect(isSizeOption({ name: 'Option', nameAr: 'مقاسات' })).toBe(true);
     expect(isSizeOption({ name: 'Color', nameAr: 'اللون' })).toBe(false);
   });
 

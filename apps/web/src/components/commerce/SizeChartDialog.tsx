@@ -11,7 +11,7 @@
  * headers on the English storefront, never a blank cell. Measurement digits follow the store's
  * numeral setting through `localize`.
  */
-import { useId, useRef, type MouseEvent } from 'react';
+import { useEffect, useId, useRef, type MouseEvent } from 'react';
 import {
   sizeChartColumnLabel,
   sizeChartName,
@@ -112,20 +112,48 @@ export function SizeChartDialog({
   const { language, t } = useLanguage();
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  // A modal <dialog> does not stop the page behind it scrolling on iOS: lock html/body while it
+  // is open and put back exactly what was there before. `unlock` is idempotent and runs on every
+  // way out (the dialog's close event covers Esc and backdrop, plus unmount).
+  const restore = useRef<(() => void) | null>(null);
+  const unlock = () => {
+    restore.current?.();
+    restore.current = null;
+  };
+  useEffect(
+    () => () => {
+      restore.current?.();
+      restore.current = null;
+    },
+    []
+  );
   if (!chart) return null;
   const lang = language === 'ar' ? 'ar' : 'en';
 
+  const lock = () => {
+    if (restore.current) return;
+    const { documentElement: html, body } = document;
+    const prev = [html.style.overflow, body.style.overflow];
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    restore.current = () => {
+      html.style.overflow = prev[0];
+      body.style.overflow = prev[1];
+    };
+  };
   const open = () => {
     const d = ref.current;
     if (!d || d.open) return;
     if (typeof d.showModal === 'function') d.showModal();
     else d.setAttribute('open', '');
+    lock();
   };
   const close = () => {
     const d = ref.current;
     if (!d) return;
     if (typeof d.close === 'function') d.close();
     else d.removeAttribute('open');
+    unlock();
   };
   // A click on the dialog element itself (not its content box) is a click on the backdrop.
   const onDialogClick = (e: MouseEvent<HTMLDialogElement>) => {
@@ -147,6 +175,7 @@ export function SizeChartDialog({
         ref={ref}
         aria-labelledby={titleId}
         onClick={onDialogClick}
+        onClose={unlock}
         className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-[var(--radius)] border border-border bg-background p-0 text-foreground shadow-xl backdrop:bg-foreground/40"
       >
         <div className="p-5">

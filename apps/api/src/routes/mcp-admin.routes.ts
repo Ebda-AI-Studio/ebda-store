@@ -157,7 +157,7 @@ function isAdminWriteToolCall(req: Request): boolean {
   return Array.isArray(body) ? body.some(isWriteCallMessage) : isWriteCallMessage(body);
 }
 
-function rejectWriteBatches(req: Request, res: Response, next: NextFunction): void {
+export function rejectWriteBatches(req: Request, res: Response, next: NextFunction): void {
   if (Array.isArray(req.body) && req.body.some(isWriteCallMessage)) {
     res.status(400).json({
       jsonrpc: '2.0',

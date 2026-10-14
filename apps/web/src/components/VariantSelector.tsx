@@ -33,9 +33,12 @@ interface VariantSelectorProps {
   sizeGuide?: ReactNode;
 }
 
-/** An option the size guide belongs to: "Size", "Ring size", "المقاس", "مقاس"... */
+/**
+ * An option the size guide belongs to: "Size", "Ring size", "المقاس", "مقاسات", "الحجم"
+ * (`localizeOptionName` maps Size to الحجم)...
+ */
 export function isSizeOption(option: { name: string; nameAr?: string | null }): boolean {
-  return /size|مقاس/i.test(`${option.name} ${option.nameAr ?? ''}`);
+  return /size|مقاس|مقاسات|الحجم/i.test(`${option.name} ${option.nameAr ?? ''}`);
 }
 
 /** Metal colour dot for a gold-colour option value (`swatch` appearance). */

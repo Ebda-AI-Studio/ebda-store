@@ -58,8 +58,9 @@ export const SIZE_CHART_TEMPLATES: Record<TemplateKey, SizeChartDraft> = {
       ['58', '147'],
       ['60', '152'],
     ],
-    note: '',
-    noteAr: '',
+    // The size numbers are inches while the caption reads cm: say so in one line.
+    note: 'Abaya size = its length in inches',
+    noteAr: 'رقم المقاس هو طول العباية بالبوصة',
   },
   templateClothing: {
     name: 'Clothing',
