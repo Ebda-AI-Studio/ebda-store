@@ -24,7 +24,6 @@ const tokens = {
   '--font-ar': BRAND.fonts.stacks.arabic,
   '--font-sans': BRAND.fonts.stacks.sans,
   '--font-mono': BRAND.fonts.stacks.mono,
-  backgroundColor: BRAND.colors.night,
 } as CSSProperties;
 
 /** `<html>` shell per locale (Arabic RTL default, English LTR). */

@@ -34,27 +34,27 @@ export function pagePath(locale: Locale, page: PageSlug): string {
 export const absoluteUrl = (p: string) =>
   `${SITE_URL}${p === '/' ? '/' : p + '/'}`.replace(/\/\/$/, '/');
 
-/** Section ids, in page order. Ruling R-EBDA-COPY-1 (2026-10-07) and R-EBDA-COPY-5 replaced the 12-section
- *  order from docs/ebda/plans/domains-and-marketing-site.md with this shorter one. */
+/** Section ids, in page order. Ruling MKT-1 (2026-10-14): the hero is rendered by Home itself, then
+ *  looks first (the product is the proof), the story scroll (the four steps, shown once; Ahmad kept it on
+ *  2026-10-14 and re-skinned it with the Dahab look), the 3D ring (replaced in P1), payments, features,
+ *  pricing, FAQ, close. The studio story lives on /about, not on the home page. */
 export const SECTION_ORDER = [
-  'story',
-  'how',
   'looks',
-  'breakout',
+  'story',
   'dahab',
-  'features',
   'payments',
-  'about',
+  'features',
   'pricing',
   'faq',
   'start',
 ] as const;
 export type SectionId = (typeof SECTION_ORDER)[number];
 
-/** Top-nav items other than the wordmark and the two account actions. */
+/** Top-nav items other than the wordmark and the account actions, in page order. */
 export const NAV_ANCHORS = [
+  { key: 'looks', target: 'looks' },
+  { key: 'solutions', target: 'story' },
   { key: 'features', target: 'features' },
-  { key: 'solutions', target: 'how' },
   { key: 'pricing', target: 'pricing' },
   { key: 'resources', target: 'faq' },
 ] as const satisfies readonly { key: string; target: SectionId }[];

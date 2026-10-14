@@ -5,7 +5,7 @@
 Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billing saves 25%; 14-day free Growth trial; 0% commission on orders on every plan. Full plan comparison (orders, team, stores, abandoned carts, branding, API/MCP, analytics, support) is on the home page.
 
 ## Pages
-- [Home (Arabic, Egyptian colloquial)](https://ebda.app/): store story, five templates with three looks each shown in phone previews, features, payments and shipping, pricing and plan comparison, FAQ
+- [Home (Arabic, Egyptian colloquial)](https://ebda.app/): five templates with three looks each shown in phone previews, how it works in four steps, features, payments and shipping, pricing and plan comparison, FAQ
 - [Home (English)](https://ebda.app/en/): the same in English
 - [About Ebda AI Studio](https://ebda.app/about/) ([English](https://ebda.app/en/about/)): the company behind Ebda Store, the Ebda AI Studio story, contact
 - [Legal notice](https://ebda.app/legal/)
@@ -20,4 +20,4 @@ Pricing (EGP per month): Basic 1,490, Growth 3,490, Business 9,990; yearly billi
 - Shipping: Bosta, ShipBlu, Mylerz and Aramex, or the merchant's own delivery.
 - Also: AI product descriptions and Arabic/English translation, VAT for registered merchants, a dashboard installable on the phone with order notifications, analytics, wa.me WhatsApp order buttons.
 - Sign up: https://store.ebda.app/signup
-- Contact: ahlan@ebda.app; security reports: security@ebda.app
+- Contact: ahlan@ebda.app, WhatsApp +20 120 776 1882 (https://wa.me/201207761882); security reports: security@ebda.app

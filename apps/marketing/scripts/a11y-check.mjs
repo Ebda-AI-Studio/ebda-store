@@ -8,6 +8,8 @@ import { runA11y } from '@force/site-kit/gates/a11y';
 const pages = [
   '/',
   '/en/',
+  '/about/',
+  '/en/about/',
   '/legal/',
   '/privacy/',
   '/terms/',

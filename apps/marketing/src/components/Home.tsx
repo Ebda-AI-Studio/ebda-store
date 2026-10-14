@@ -2,7 +2,6 @@ import { Fragment } from 'react';
 import { BRAND } from '@force/shared/brand';
 import { COPY, type Provider } from '../lib/content';
 import { egp } from '../lib/demo-stores';
-import { HERO_POSTER_SVG } from '../lib/hero-poster';
 import { PLANS, PRICING_PLACEHOLDER, PRICING_PUBLISHED, comparisonRows } from '../lib/plans';
 import { initialLooksFragment } from '../lib/looks-initial';
 import { jsonLd } from '../lib/seo';
@@ -17,12 +16,11 @@ import {
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { JsonLd } from './JsonLd';
-import { About } from './About';
-import { Breakout } from './Breakout';
+import { HeroPhone } from './HeroPhone';
 import { LooksShowcase } from './LooksShowcase';
 import { Reveal, StoryScroll } from './Motion';
 import { Ring3D } from './ring/Ring3D';
-import { NileNight } from './NileNight';
+import { WhatsApp } from './WhatsApp';
 
 function ProviderIcon({ kind }: { kind: 'cash' | 'truck' }) {
   return (
@@ -81,34 +79,8 @@ export function Home({ locale }: { locale: Locale }) {
         phoneLabel={c.story.phoneLabel}
       />
     ),
-    how: () => (
-      <Section id="how" title={c.how.title} className="how">
-        <Reveal className="steps-wrap">
-          <ol className="steps4">
-            {c.how.steps.map((st, i) => (
-              <li key={st.t} className="step4" style={{ '--i': i } as React.CSSProperties}>
-                <span className="step4-n" aria-hidden="true">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <h3>{st.t}</h3>
-                <p>{st.d}</p>
-              </li>
-            ))}
-          </ol>
-        </Reveal>
-      </Section>
-    ),
-    about: () => (
-      <About
-        title={c.about.title}
-        paras={c.about.paras}
-        close={c.about.close}
-        markLabel={c.about.markLabel}
-      />
-    ),
-    breakout: () => <Breakout title={c.breakout.title} words={c.breakout.words} />,
     dahab: () => (
-      <Section id="dahab" title={c.dahab.title} className="dahab">
+      <Section id="dahab" title={c.dahab.title} className="dahab band-dark">
         <p className="lead">{c.dahab.lead}</p>
         <Ring3D l={c.dahab.ring} />
       </Section>
@@ -258,13 +230,18 @@ export function Home({ locale }: { locale: Locale }) {
     ),
     faq: () => (
       <Section id="faq" title={c.faq.title} className="faq-section">
-        <div className="faq">
-          {c.faq.items.map(i => (
-            <details key={i.q}>
-              <summary>{i.q}</summary>
-              <p>{i.a}</p>
-            </details>
-          ))}
+        <div className="faq-col">
+          <div className="faq">
+            {c.faq.items.map(i => (
+              <details key={i.q}>
+                <summary>{i.q}</summary>
+                <p>{i.a}</p>
+              </details>
+            ))}
+          </div>
+          <p className="faq-more">
+            {c.whatsapp.faq} <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} />
+          </p>
         </div>
       </Section>
     ),
@@ -275,9 +252,12 @@ export function Home({ locale }: { locale: Locale }) {
           <a href={SIGNUP_URL} className="btn btn-primary btn-lg">
             {c.start.cta}
           </a>
-          <a href={LOGIN_URL} className="btn btn-ghost btn-lg">
-            {c.start.login}
-          </a>
+        </p>
+        <p className="close-wa">
+          {c.whatsapp.close} <WhatsApp label={c.whatsapp.label} ariaLabel={c.whatsapp.aria} />
+        </p>
+        <p className="close-login">
+          <a href={LOGIN_URL}>{c.start.login}</a>
         </p>
         {FIRST_MERCHANT && (
           <p className="merchant" data-testid="first-merchant">
@@ -301,31 +281,24 @@ export function Home({ locale }: { locale: Locale }) {
       <Header locale={locale} />
       <main id="main">
         <section className="hero" aria-labelledby="hero-h">
-          <div
-            className="hero-poster"
-            aria-hidden="true"
-            dangerouslySetInnerHTML={{ __html: HERO_POSTER_SVG }}
-          />
-          <NileNight className="nile" mirror={rtl} />
           <div className="wrap hero-inner">
-            <p className="hero-brand">{c.hero.brand}</p>
-            <h1 id="hero-h">{c.hero.h1}</h1>
-            <p className="hero-sub">{c.hero.sub}</p>
-            <p className="actions">
-              <a href={SIGNUP_URL} className="btn btn-primary btn-lg">
-                {c.hero.cta}
-              </a>
-              <a href="#story" className="btn btn-ghost btn-lg">
-                {c.hero.secondary}
-              </a>
-            </p>
-            <p className="slug-pill">
-              <span className="muted">{c.hero.slugLabel}</span>
-              <span className="slug" dir="ltr">
-                <span className="slug-name">yourstore</span>
-                {BRAND.domains.storeSuffix}
-              </span>
-            </p>
+            <div className="hero-copy">
+              <h1 id="hero-h">{c.hero.h1}</h1>
+              <p className="hero-sub">{c.hero.sub}</p>
+              <p className="actions">
+                <a href={SIGNUP_URL} className="btn btn-primary btn-lg">
+                  {c.hero.cta}
+                </a>
+                <a href="#looks" className="btn btn-ghost btn-lg">
+                  {c.hero.secondary}
+                </a>
+              </p>
+            </div>
+            <HeroPhone
+              copy={c.hero.phone}
+              templates={c.looks.templates}
+              initialHtml={initialLooksFragment()}
+            />
           </div>
         </section>
         {SECTION_ORDER.map(id => (

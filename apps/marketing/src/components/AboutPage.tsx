@@ -15,6 +15,9 @@ export function AboutPage({ locale }: { locale: Locale }) {
         <header className="legal-head">
           <h1>{p.title}</h1>
           <p className="legal-notice">{p.company}</p>
+          <p className="about-line" lang={locale}>
+            {p.brandLine}
+          </p>
         </header>
         <article className="legal-doc">
           <section aria-labelledby="about-story-h">
