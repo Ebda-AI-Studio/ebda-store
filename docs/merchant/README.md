@@ -13,8 +13,9 @@ Welcome. This guide covers everything you need to set up and run your store on F
 4. [Delivery Areas & Fees — مناطق التوصيل والرسوم](./shipping-areas.md) — set per-area delivery fees with governorate → area cascade + bulk import/export
 5. [Orders (and the Orders app) — الطلبات](./orders.md) — manage orders, payment links, refunds, invoices, and payment alerts
 6. [Inventory: variant stock, adjustments & scanning — المخزون](./inventory.md) — variant stock totals, stock adjustments, and barcode Receive/Pick/Count
-7. [FAQ — الأسئلة الشائعة](./faq.md) — answers to the questions every merchant asks
-8. [Troubleshooting — حل المشاكل](./troubleshooting.md) — when something looks wrong
+7. [Product details — تفاصيل المنتج](./product-details.md) — swatches, facts, personalisation, delivery time, size guides, hero video
+8. [FAQ — الأسئلة الشائعة](./faq.md) — answers to the questions every merchant asks
+9. [Troubleshooting — حل المشاكل](./troubleshooting.md) — when something looks wrong
 
 ## Need help? — تحتاج مساعدة؟
 

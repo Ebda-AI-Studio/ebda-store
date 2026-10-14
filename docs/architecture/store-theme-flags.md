@@ -126,6 +126,26 @@ Two badges never stack on one corner, and the merchant is never asked to resolve
 
 **Known gap (deliberate, not shipped here):** the CSV product import (`PRODUCT_IMPORT_COLUMNS`) does not carry the badge — it also omits `excerpt`, `metaTitle` and `discountType`, so adding one field alone would be arbitrary. The **shared** (public) wishlist page renders its own bespoke markup rather than a card render path and therefore shows no badge; its projection also already drops `nameAr` and `discountType`, which is a pre-existing gap in a different system.
 
+## B0 card elements + sticky bars (2026-10-15)
+
+None of this is a `StoreTheme` flag (the ThemeTab ceiling stays 7): each element is **data-driven** and renders nothing until a merchant enters data. Detail: `docs/ebda/templates/platform-commerce.md`.
+
+**Card elements rendered from data, on every card path.** Below the price, a card now shows `SwatchDots` (option values with a swatch; at most 5, then `+N`) and `FactChips` (facts the merchant pinned with `onCard`; at most 2, value only). Taste bar (B0-4): nothing else is added to a card in B0. Both are wired on **all nine** card paths (`PecannbeeProductCard`, the five `{modern,elegant,classic,minimal,bold}/ProductCard.tsx`, `shared/ProductCarousel.tsx`, `ProductListItem`, `dahab/ProductCard.tsx`; `dahab/ProductCarousel.tsx` renders the Dahab card) **and on the four lists that hand-build a `TemplateProduct`** (`YouMightAlsoLike`, `CartRecommendations`, `FrequentlyBoughtTogether`, `WishlistClient`). The data reaches them through the same explicit allowlists as the custom badge, each of which was widened: `LISTING_SWATCH_OPTIONS_SELECT` (`apps/api/src/lib/listing-swatch-select.ts`) in `listPublic` (both selects) and `advancedSearch`, the recommendation service's `productSelect`, the wishlist route's projections, `STOREFRONT_PRODUCT_SELECT.facts`, `TemplateProduct.options` / `facts` with the `toTemplateProduct` adapter, and the four inline mappers. A field missing from any hop reaches no card. Gates: `tests/unit/product-facts-render-paths.test.ts` pins the render paths, `SwatchDots.test.tsx` and `tests/unit/commerce-product-facts.test.ts` pin the limits (5 dots then `+N`, 2 card facts).
+
+**Sticky-bar body flags (phones only).** Two components set a flag on `<body>` while they are visible, and `styles/globals.css` (inside the `max-width: 767px` block, before the "Looks (Phase S)" block, which `tests/unit/looks-fonts.test.ts` requires to be `[data-look]`-scoped) reads it:
+
+| Flag                               | Set by                                                                              | Effect                                                                                                  |
+| ---------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `body[data-sticky-atc="1"]`        | `StickyAddToCart` (default PDP) and Dahab's pinned bar in `dahab/ProductDetail.tsx` | `padding-bottom: calc(8rem + 4.25rem)` (the body's existing 128 px tab-bar space is kept, not replaced) |
+| `body[data-sticky-cart="1"]`       | `StickyCartTotal` on `CartClient`                                                   | same padding                                                                                            |
+| `body[data-sticky-cart="blocked"]` | `StickyCartTotal` when checkout is blocked and it shows its message                 | the same padding plus `1.5rem` for the message line                                                     |
+
+Both bars sit at `bottom-[calc(56px+env(safe-area-inset-bottom))]` (the same lift as the cookie banner and push prompt, UI rule 6; B0-6), `z-40`, `md:hidden`.
+
+**FloatingWidget lift.** The floating widget wrapper carries `data-floating-widget="bottom|top"`. While a sticky flag is set, a bottom widget is lifted to `bottom: calc(140px + env(safe-area-inset-bottom))`, or `164px` when `data-sticky-cart="blocked"` (trap two of the fixed-bottom recipe: without it the widget's default `bottom: 80px`, `z-60` sits inside the bar). Top positions are untouched. Verified live on `b0-minimal` with a WhatsApp widget (PDP, cart, blocked cart: no overlap).
+
+**The sticky add button never recomputes the rule.** `StickyAddToCart` takes `disabled` and `label` from the same `addDisabled` and `addLabel` values the main button uses (`ProductDetailClient.tsx`), pinned by `tests/unit/pdp-sticky-parity.test.tsx` (mutation-checked).
+
 ## PLP / PDP context (2026-06-24)
 
 - `ProductsClient.tsx` derives the active category into breadcrumb + H1 + contextual subtitle. PDP breadcrumb: `home / products / <category> / <product>`, category segment links to `/products?category=<slug>` (locale-aware, only with a primary category).

@@ -15,6 +15,10 @@
 - `docs/plans/2026-10-14-templates-and-editor-program.md` (Phase B).
 - Ahmad, 2026-10-14: the receipt-printer animation from Instagram reel `DecOpDXt1Fs` is used for every template (frame notes in Task 10).
 
+## Rulings made during execution
+
+Every decision that overrode this plan, rejected a review finding or accepted a residual was written at decision time and is now in `docs/RULINGS.md` under "2026-10-14 — Phase B0 platform commerce": B0-1..B0-5 (the ones written into this plan below), B0-6..B0-35 in the order they were made, T5-1..T5-3 and T9-1..T9-3 (the implementers' own), and B0-36..B0-39 (the Task 11 sweep: bulk import/export columns, the `storedemo` seed, MCP reads, the local-only E2E). Where this plan and a ruling disagree, the ruling wins; the two that change what the plan says are **B0-1a** (the delivery window counts business days and skips Friday, not calendar days) and **B0-6** (the sticky bar reuses the existing 56 px lift instead of `--bottom-tabbar-h`). The feature reference that describes what shipped is `docs/ebda/templates/platform-commerce.md`.
+
 ## Global Constraints
 
 - Arabic-first. Every storefront string goes through `t(en, ar)` / `LanguageContext.tsx`. Every merchant-entered field has an `Ar` twin. When the active locale's value is empty, fall back to the other language, never to blank.
