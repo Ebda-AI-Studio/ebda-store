@@ -87,20 +87,21 @@ function middleware(opts: MulterOptions, mode: Mode) {
   return async (req: ReqLike, _res: unknown, next: Next): Promise<void> => {
     const contentType = String(req.headers['content-type'] ?? '');
     if (!/^multipart\/form-data/i.test(contentType)) return next();
+    // Bound the buffered body before formData() sees it (see the file comment). With no
+    // `limits.files`, an `.array(name, max)` is still bounded by its own `max` files.
+    const modeMax = mode.kind === 'single' ? 1 : mode.max;
+    const cap =
+      opts.limits?.fileSize !== undefined
+        ? opts.limits.fileSize * Math.max(1, Math.min(modeMax, opts.limits.files ?? modeMax)) +
+          FRAMING_ALLOWANCE
+        : Infinity;
+    let seen = 0;
     try {
-      // Bound the buffered body before formData() sees it (see the file comment).
-      const cap =
-        opts.limits?.fileSize !== undefined
-          ? opts.limits.fileSize *
-              Math.max(1, Math.min(mode.kind === 'single' ? 1 : mode.max, opts.limits.files ?? 1)) +
-            FRAMING_ALLOWANCE
-          : Infinity;
       const declared = Number(req.headers['content-length']);
       if (Number.isFinite(declared) && declared > cap) {
         req.resume();
         throw new MulterError('LIMIT_FILE_SIZE', mode.name);
       }
-      let seen = 0;
       const counter = new Transform({
         transform(chunk: Buffer, _enc, cb) {
           seen += chunk.length;
@@ -149,6 +150,12 @@ function middleware(opts: MulterOptions, mode: Mode) {
       else req.files = files;
       next();
     } catch (err) {
+      // formData() may surface the counter's abort as its own TypeError ("failed to parse
+      // body"), losing the MulterError: the byte count is the truth, so map it back to 413.
+      if (seen > cap && !(err instanceof MulterError)) {
+        next(new MulterError('LIMIT_FILE_SIZE', mode.name));
+        return;
+      }
       next(err);
     }
   };

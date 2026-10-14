@@ -157,6 +157,33 @@ describe('pre-parse body cap (formData() buffers everything, so the route limit 
     expect((err as MulterError).code).toBe('LIMIT_FILE_SIZE');
   });
 
+  it('when formData() reports the abort as its own TypeError (workerd), it is still LIMIT_FILE_SIZE', async () => {
+    const Real = globalThis.Response;
+    class WorkerdLikeResponse {
+      constructor(private body: ReadableStream) {}
+      async formData(): Promise<FormData> {
+        const reader = this.body.getReader();
+        try {
+          while (!(await reader.read()).done) {
+            /* drain */
+          }
+        } catch {
+          /* workerd swallows the stream error ... */
+        }
+        throw new TypeError('Failed to parse body as FormData.'); // ... and reports its own
+      }
+    }
+    (globalThis as any).Response = WorkerdLikeResponse;
+    try {
+      const chunks = Array.from({ length: 4 }, () => Buffer.alloc(32 * 1024, 1));
+      const { err } = await rawRun(chunks, { 'content-type': 'multipart/form-data; boundary=x' });
+      expect(err).toBeInstanceOf(MulterError);
+      expect((err as MulterError).code).toBe('LIMIT_FILE_SIZE');
+    } finally {
+      globalThis.Response = Real;
+    }
+  });
+
   it('a lying (small) Content-Length does not bypass the counter', async () => {
     const chunks = Array.from({ length: 4 }, () => Buffer.alloc(32 * 1024, 1));
     const { err } = await rawRun(chunks, {
@@ -172,5 +199,15 @@ describe('pre-parse body cap (formData() buffers everything, so the route limit 
     const { req, err } = await run(upload.single('file'), form);
     expect(err).toBeUndefined();
     expect(req.file.size).toBe(900);
+  });
+
+  it('.array(name, max) with no limits.files is capped at max files, not one', async () => {
+    const arr = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100_000 } });
+    const form = new FormData();
+    // 270 KB: over a one-file cap (100 KB + framing), under the three-file cap.
+    for (let i = 0; i < 3; i++) form.append('files', file(`f${i}.png`, 'image/png', 90_000));
+    const { req, err } = await run(arr.array('files', 3), form);
+    expect(err).toBeUndefined();
+    expect(req.files).toHaveLength(3);
   });
 });

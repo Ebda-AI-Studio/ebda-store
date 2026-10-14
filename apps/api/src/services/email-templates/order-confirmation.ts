@@ -1,12 +1,25 @@
-import { orderAddressLines, orderTaxPlacement, taxInvoiceInfo } from '@ebda/shared';
+import {
+  orderAddressLines,
+  orderLineVariantTitle,
+  orderTaxPlacement,
+  taxInvoiceInfo,
+  variantTitleSegments,
+} from '@ebda/shared';
 import { escapeHtml, emailMoney } from './_util';
 import { waMeEmailBlock } from './_wa-me';
 import type { OrderEmailData } from '../email.service';
 
-/** Variant title and the customer's personalisation ("✎ Sara") under the item name, escaped. */
-function itemDetail(item: OrderEmailData['items'][number]): string {
-  const variant = item.variantName
-    ? `<br><span style="font-size: 12px; color: #64748b;">${escapeHtml(item.variantName)}</span>`
+/**
+ * Variant title (in the email's language, Ruling B0-41; each option value isolated so mixed
+ * Arabic/Latin values keep their order, F8) and the customer's personalisation ("✎ Sara")
+ * under the item name, escaped.
+ */
+function itemDetail(item: OrderEmailData['items'][number], locale: 'en' | 'ar'): string {
+  const title = orderLineVariantTitle(item, locale === 'ar');
+  const variant = title
+    ? `<br><span style="font-size: 12px; color: #64748b;">${variantTitleSegments(title)
+        .map(v => `<bdi>${escapeHtml(v)}</bdi>`)
+        .join(' &middot; ')}</span>`
     : '';
   const note = item.personalisation
     ? `<br><span style="font-size: 12px;">&#9998; <bdi>${escapeHtml(item.personalisation)}</bdi></span>`
@@ -145,7 +158,7 @@ export const orderConfirmationTemplate = {
       .map(
         item => `
       <tr>
-        <td>${escapeHtml(item.name)}${itemDetail(item)}</td>
+        <td>${escapeHtml(item.name)}${itemDetail(item, 'en')}</td>
         <td style="text-align: center;">${item.quantity}</td>
         <td style="text-align: end;">${emailMoney(item.price, d.currency, 'en')}</td>
       </tr>`
@@ -187,7 +200,7 @@ export const orderConfirmationTemplate = {
       .map(
         item => `
       <tr>
-        <td>${escapeHtml(item.nameAr || item.name)}${itemDetail(item)}</td>
+        <td>${escapeHtml(item.nameAr || item.name)}${itemDetail(item, 'ar')}</td>
         <td style="text-align: center;">${item.quantity}</td>
         <td style="text-align: end;">${emailMoney(item.price, d.currency, 'ar')}</td>
       </tr>`

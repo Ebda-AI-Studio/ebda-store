@@ -688,6 +688,7 @@ export async function getOrderPickProgress(
     variantId: string | null;
     productName: string;
     variantName: string | null;
+    variantNameAr: string | null;
     /** The customer's personalisation text; the picker needs it per line. */
     personalisation: string | null;
     quantity: number;
@@ -708,6 +709,7 @@ export async function getOrderPickProgress(
           variantId: true,
           productName: true,
           variantName: true,
+          variantNameAr: true,
           personalisation: true,
           quantity: true,
           pickedQty: true,

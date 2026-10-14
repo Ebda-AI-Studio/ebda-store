@@ -1737,7 +1737,11 @@ model OrderItem {
   productId         String  @map("product_id")
   variantId         String? @map("variant_id")
   productName       String  @map("product_name")
-  variantName       String? @map("variant_name") // e.g., "Large / Red"
+  variantName       String? @map("variant_name") // e.g., "Large / Red" — canonical (EN) title
+  // Arabic twin of variantName (the variant's titleAr at sale time). The storefront and the
+  // admin render it per locale with variantName as the fallback; fiscal documents and CSV
+  // exports keep variantName exactly as before. Null for orders placed before it existed.
+  variantNameAr     String? @map("variant_name_ar")
   // Snapshot of the cart line's personalisation note (e.g. the name to embroider).
   personalisation   String?
   sku               String?

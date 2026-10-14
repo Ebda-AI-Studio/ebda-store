@@ -122,11 +122,12 @@ describe('order-confirmation email: personalisation line', () => {
     },
   });
 
-  it('renders ✎ note + variant in both locales and escapes it', () => {
+  it('renders ✎ note + the variant in the email language (each value isolated) and escapes it', () => {
     const d = data([
       {
         name: 'Linen Abaya',
         variantName: 'M / Sand',
+        variantNameAr: 'وسط / رملي',
         personalisation: '<script>x</script>سارة',
         quantity: 1,
         price: 5000,
@@ -136,8 +137,18 @@ describe('order-confirmation email: personalisation line', () => {
       const html = orderConfirmationTemplate[lang](d, 'Shop');
       expect(html).toContain('&#9998; <bdi>&lt;script&gt;x&lt;/script&gt;سارة</bdi>');
       expect(html).not.toContain('<script>x</script>');
-      expect(html).toContain('M / Sand');
     }
+    const en = orderConfirmationTemplate.en(d, 'Shop');
+    expect(en).toContain('<bdi>M</bdi> &middot; <bdi>Sand</bdi>');
+    expect(en).not.toContain('رملي');
+    expect(orderConfirmationTemplate.ar(d, 'Shop')).toContain(
+      '<bdi>وسط</bdi> &middot; <bdi>رملي</bdi>'
+    );
+    // a pre-B0-41 line (no Arabic snapshot) falls back to the canonical title in Arabic
+    const old = data([{ name: 'Linen Abaya', variantName: 'M / Sand', quantity: 1, price: 5000 }]);
+    expect(orderConfirmationTemplate.ar(old, 'Shop')).toContain(
+      '<bdi>M</bdi> &middot; <bdi>Sand</bdi>'
+    );
   });
 
   it('adds nothing for a plain line', () => {

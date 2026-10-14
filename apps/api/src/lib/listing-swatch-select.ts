@@ -6,9 +6,13 @@ import type { Prisma } from '@ebda/database';
  * capped at 3 options x 8 values, so non-swatch stores add one empty batched
  * query per page.
  *
- * CACHE CLASS: BOUNDED-stale, riding the existing product listing cache. Every
+ * CACHE CLASS: BOUNDED-stale. On the product listing / PDP cache, every
  * option-value write already calls the product cache bust (Task 1), so a
  * swatch edit invalidates this payload on the same path as variant writes.
+ * The recommendation payloads (`recommendation.service.ts`, `CACHE_TTL_SECONDS`
+ * = 300) are NOT busted by that path: they ride their own 5-minute TTL, so a
+ * swatch edit can take up to 5 minutes to reach "you might also like" /
+ * "frequently bought together" cards. Wishlist reads are uncached.
  */
 export const LISTING_SWATCH_OPTIONS_SELECT = {
   orderBy: { position: 'asc' as const },

@@ -7,6 +7,8 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import request from 'supertest';
 import express, { type Express } from 'express';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import multer from 'multer';
 import stub from '../../apps/api/src/cf/stubs/multer-formdata';
 
@@ -88,5 +90,48 @@ describe('POST /uploads/video through the Workers multer stub', () => {
       .attach('file', MP4, { filename: 'b.mp4', contentType: 'video/mp4' });
     expect(r.status).toBeLessThan(500);
     expect(r.status).toBeGreaterThanOrEqual(400);
+  });
+
+  it('a CHUNKED body past the cap (no Content-Length) is 413, never a 500', async () => {
+    const server = app.listen(0);
+    try {
+      const { port } = server.address() as AddressInfo;
+      const boundary = 'b0chunked';
+      const res = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+        const req = http.request(
+          {
+            host: '127.0.0.1',
+            port,
+            path: url,
+            method: 'POST',
+            headers: {
+              'content-type': `multipart/form-data; boundary=${boundary}`,
+              'transfer-encoding': 'chunked',
+            },
+          },
+          r => {
+            let body = '';
+            r.on('data', c => (body += c));
+            r.on('end', () => resolve({ status: r.statusCode ?? 0, body }));
+          }
+        );
+        // The server may answer and close before the whole body is written.
+        req.on('error', e =>
+          (e as NodeJS.ErrnoException).code === 'EPIPE' ? undefined : reject(e)
+        );
+        req.write(
+          `--${boundary}\r\ncontent-disposition: form-data; name="file"; filename="big.mp4"\r\ncontent-type: video/mp4\r\n\r\n`
+        );
+        req.write(MP4);
+        const chunk = Buffer.alloc(256 * 1024);
+        for (let i = 0; i < 28; i++) req.write(chunk); // 7 MB > 6 MB + framing
+        req.end(`\r\n--${boundary}--\r\n`);
+      });
+      expect(res.status).toBe(413);
+      expect(JSON.parse(res.body).error.code).toBe('VIDEO_TOO_LARGE');
+      expect(upload).not.toHaveBeenCalled();
+    } finally {
+      server.close();
+    }
   });
 });

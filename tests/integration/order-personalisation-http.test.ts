@@ -2,8 +2,10 @@
  * B0 Task 5 (fix round 1), over HTTP against the running API (as `ebda_app`),
  * the way the storefront checkout calls it:
  *
- *  - `POST /public/orders` with `locale: 'ar'` snapshots the variant's ARABIC
- *    title on the order line (`variantName`), plus the line's personalisation.
+ *  - `POST /public/orders` snapshots the variant's title in BOTH languages on the
+ *    order line (Ruling B0-41): `variantName` = the canonical (EN) title that
+ *    fiscal documents and exports read, `variantNameAr` = the Arabic title the
+ *    Arabic storefront renders; plus the line's personalisation.
  *    Before the fix the storefront never sent `locale`, so this could not
  *    happen in production even though the service supported it.
  *  - A line that lost its required personalisation (added before the merchant
@@ -89,6 +91,7 @@ async function post(path: string, headers: Record<string, string>, body: unknown
           items: Array<{
             variantId: string | null;
             variantName: string | null;
+            variantNameAr: string | null;
             personalisation: string | null;
           }>;
         };
@@ -113,7 +116,7 @@ afterAll(async () => {
 });
 
 describe.skipIf(!hasDb)('POST /public/orders: locale + personalisation (B0 Task 5)', () => {
-  it('locale "ar" snapshots the Arabic variant title and the note on the order line', async () => {
+  it('snapshots both variant titles (EN canonical + Arabic) and the note on the order line', async () => {
     const { storeId, productId, variantId } = await seedStore(optional);
     const headers = {
       'Content-Type': 'application/json',
@@ -135,7 +138,8 @@ describe.skipIf(!hasDb)('POST /public/orders: locale + personalisation (B0 Task 
     });
     expect(res.status, JSON.stringify(res.body.error)).toBe(201);
     const line = res.body.data!.order.items.find(i => i.variantId === variantId)!;
-    expect(line.variantName).toBe('وسط / رملي');
+    expect(line.variantName).toBe('M / Sand');
+    expect(line.variantNameAr).toBe('وسط / رملي');
     expect(line.personalisation).toBe('سارة');
   });
 

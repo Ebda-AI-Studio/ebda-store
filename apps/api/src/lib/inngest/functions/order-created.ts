@@ -137,6 +137,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
           id: string;
           productName: string;
           variantName?: string | null;
+          variantNameAr?: string | null;
           personalisation?: string | null;
           quantity: number;
           price: number;
@@ -152,6 +153,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
               name: row.item.productName,
               nameAr: row.item.product?.nameAr ?? null,
               variantName: row.item.variantName ?? null,
+              variantNameAr: row.item.variantNameAr ?? null,
               personalisation: row.item.personalisation ?? null,
               quantity: row.item.quantity,
               price: row.item.price,

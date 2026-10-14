@@ -7,8 +7,8 @@
  * (COALESCE(note, '')), and every path that writes or merges a line (single
  * add, the bulk sync, the guest→login merge) carries the note as identity.
  * The note lands on the order line as `personalisation`, and the storefront
- * order now snapshots `variantName` (Arabic title when the buyer ordered in
- * Arabic).
+ * order now snapshots `variantName` (canonical EN title) and `variantNameAr`
+ * (Arabic title) whatever the buyer's language (Ruling B0-41).
  *
  * Adds go over HTTP through the store-scoped cart mount (`tenantContext`, the
  * ambient request transaction), so the concurrent-add case exercises the
@@ -214,7 +214,7 @@ describe.skipIf(!hasDb)('cart personalisation (line identity, enforcement, order
     ]);
   });
 
-  it('note and variantName land on the order line (Arabic title for an Arabic order)', async () => {
+  it('note and both variant titles land on the order line (an Arabic order)', async () => {
     const sessionId = cartSessionId('perso-order');
     await CartService.addItem(store.storeId, sessionId, productId, 1, undefined, variantId, 'Sara');
     await CartService.addItem(store.storeId, sessionId, productId, 1, undefined, variantId, 'Omar');
@@ -226,13 +226,16 @@ describe.skipIf(!hasDb)('cart personalisation (line identity, enforcement, order
     });
     const lines = order.items.filter(i => i.variantId === variantId);
     expect(lines.map(l => l.personalisation).sort()).toEqual(['Omar', 'Sara']);
-    expect(lines.every(l => l.variantName === 'وسط / رملي')).toBe(true);
+    // variantName stays the canonical title fiscal documents and exports read.
+    expect(lines.every(l => l.variantName === 'M / Sand')).toBe(true);
+    expect(lines.every(l => l.variantNameAr === 'وسط / رملي')).toBe(true);
     const plain = order.items.find(i => i.productId === plainId)!;
     expect(plain.personalisation).toBeNull();
     expect(plain.variantName).toBeNull();
+    expect(plain.variantNameAr).toBeNull();
   });
 
-  it('an English order snapshots the English variant title', async () => {
+  it('an English order snapshots the same two titles', async () => {
     const sessionId = cartSessionId('perso-order-en');
     await CartService.addItem(store.storeId, sessionId, productId, 1, undefined, variantId, 'Sara');
     const order = await OrderService.create(store.storeId, undefined, sessionId, {
@@ -241,6 +244,7 @@ describe.skipIf(!hasDb)('cart personalisation (line identity, enforcement, order
       locale: 'en',
     });
     expect(order.items[0].variantName).toBe('M / Sand');
+    expect(order.items[0].variantNameAr).toBe('وسط / رملي');
     expect(order.items[0].personalisation).toBe('Sara');
   });
 
