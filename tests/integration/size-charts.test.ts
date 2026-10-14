@@ -28,6 +28,7 @@ import categoryRoutes from '@api/routes/category.routes';
 import publicRoutes from '@api/routes/public.routes';
 import { tenantContext, publicStoreContext } from '@api/middleware/tenant-context';
 import { errorHandler } from '@api/middleware/error-handler';
+import { sanitizeInput } from '@api/middleware/security';
 import { config } from '@api/config';
 import { hasDb } from '../helpers/bundle-fixtures';
 
@@ -46,6 +47,9 @@ const asApp = <T>(fn: () => Promise<T>) =>
 function buildApp(): Express {
   const app = express();
   app.use(express.json());
+  // The global body sanitizer (app.ts) runs before every route; it used to turn `rows`
+  // (string[][]) into objects, so the chart routes must be proven behind it.
+  app.use(sanitizeInput);
   app.use((req: Request, res: Response, next: NextFunction) => {
     asApp(
       () =>

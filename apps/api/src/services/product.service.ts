@@ -1918,7 +1918,7 @@ export class ProductService {
     return {
       ...product,
       sizeChart,
-      categories: product.categories.map(pc => {
+      categories: (product.categories ?? []).map(pc => {
         const { sizeChart: _drop, ...category } = pc.category;
         return { ...pc, category };
       }),

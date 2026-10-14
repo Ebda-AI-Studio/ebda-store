@@ -48,3 +48,22 @@ describe('sanitizeInput large-content exemption', () => {
     expect(out.csvData).toContain('Foo,BAR');
   });
 });
+
+describe('sanitizeInput keeps array shapes (B0 Task 9)', () => {
+  it('an array of arrays stays an array of arrays, cells still cleaned', () => {
+    const out = run({
+      rows: [
+        ['S', ` 52${NUL} `],
+        ['M', '54'],
+      ],
+      deep: [[['x']]],
+      mixed: [{ a: [' b '] }, ['c']],
+    }) as unknown as Record<string, unknown>;
+    expect(out.rows).toEqual([
+      ['S', '52'],
+      ['M', '54'],
+    ]);
+    expect(out.deep).toEqual([[['x']]]);
+    expect(out.mixed).toEqual([{ a: ['b'] }, ['c']]);
+  });
+});

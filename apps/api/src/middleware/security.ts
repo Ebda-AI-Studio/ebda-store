@@ -1812,6 +1812,23 @@ function sanitizeString(str: string, enforceMaxLength = true): string {
   return cleaned.trim();
 }
 
+/**
+ * Arrays keep their shape at every depth. An array element that was itself an array used to go
+ * through `sanitizeObject`, which rebuilt `["S","52"]` as `{"0":"S","1":"52"}` — every
+ * array-of-arrays body (a size chart's `rows`, B0 Task 9) reached validation as objects.
+ */
+function sanitizeArray(arr: unknown[]): unknown[] {
+  return arr.map(item =>
+    Array.isArray(item)
+      ? sanitizeArray(item)
+      : typeof item === 'object' && item !== null
+        ? sanitizeObject(item as Record<string, unknown>)
+        : typeof item === 'string'
+          ? sanitizeString(item)
+          : item
+  );
+}
+
 function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
   const sanitized: Record<string, unknown> = {};
 
@@ -1819,13 +1836,7 @@ function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
     if (typeof value === 'string') {
       sanitized[key] = sanitizeString(value, !LARGE_CONTENT_KEYS.has(key));
     } else if (Array.isArray(value)) {
-      sanitized[key] = value.map(item =>
-        typeof item === 'object' && item !== null
-          ? sanitizeObject(item as Record<string, unknown>)
-          : typeof item === 'string'
-            ? sanitizeString(item)
-            : item
-      );
+      sanitized[key] = sanitizeArray(value);
     } else if (value && typeof value === 'object') {
       sanitized[key] = sanitizeObject(value as Record<string, unknown>);
     } else {
