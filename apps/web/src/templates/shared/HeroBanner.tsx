@@ -159,7 +159,7 @@ export function HeroBanner({
               srcMobile={videoMobile}
               mobileQuery="(max-width: 639px)"
               active={active}
-              className={imageObjectClass}
+              fit={isFramed ? 'contain' : 'cover'}
             >
               {posterPicture}
             </HeroVideo>

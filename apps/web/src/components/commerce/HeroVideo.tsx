@@ -28,8 +28,8 @@ export interface HeroVideoProps {
   /** Poster image URL, used only when no `children` are given: it is then both the base <img> and the video's poster. With children, the children ARE the poster and the video stays transparent until its first frame. */
   poster?: string;
   alt?: string;
-  /** Extra classes for the <video> (e.g. `object-contain` for a framed hero). */
-  className?: string;
+  /** How the video fills the box: must match the poster's fit (`contain` for a framed hero). */
+  fit?: 'cover' | 'contain';
   /** Media query that picks `srcMobile`. Match the slide's image art direction. */
   mobileQuery?: string;
   /** False pauses the video (slides of a carousel that are not showing). */
@@ -62,7 +62,7 @@ export function HeroVideo({
   srcMobile,
   poster,
   alt = '',
-  className = '',
+  fit = 'cover',
   mobileQuery = '(max-width: 767px)',
   active = true,
   children,
@@ -101,8 +101,12 @@ export function HeroVideo({
       v.pause();
       return;
     }
-    // Autoplay refused (data saver, low-power mode): keep the poster.
-    v.play().catch(() => setFailed(chosen));
+    // Autoplay refused or the source is unplayable: keep the poster. An
+    // AbortError only means a pause()/reload interrupted this play(), so ignore it.
+    v.play().catch((e: unknown) => {
+      const name = (e as { name?: string } | null)?.name;
+      if (name === 'NotAllowedError' || name === 'NotSupportedError') setFailed(chosen);
+    });
   }, [active, show, chosen]);
 
   return (
@@ -121,14 +125,16 @@ export function HeroVideo({
           muted
           loop
           playsInline
-          autoPlay
-          preload="metadata"
+          // An inactive carousel slide must not start loading or playing; it
+          // flips to autoplay/metadata when it becomes the active slide.
+          autoPlay={active}
+          preload={active ? 'metadata' : 'none'}
           disablePictureInPicture
           disableRemotePlayback
           aria-hidden="true"
           tabIndex={-1}
           onError={() => setFailed(chosen)}
-          className={`pointer-events-none absolute inset-0 h-full w-full object-cover ${className}`.trim()}
+          className={`pointer-events-none absolute inset-0 h-full w-full ${fit === 'contain' ? 'object-contain' : 'object-cover'}`}
         />
       )}
     </>

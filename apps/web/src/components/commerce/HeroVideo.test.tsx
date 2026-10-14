@@ -104,7 +104,9 @@ describe('HeroVideo', () => {
 
   it('removes the video when autoplay is refused', async () => {
     mockEnv();
-    HTMLMediaElement.prototype.play = vi.fn().mockRejectedValue(new Error('NotAllowed'));
+    HTMLMediaElement.prototype.play = vi
+      .fn()
+      .mockRejectedValue(new DOMException('refused', 'NotAllowedError'));
     render(<HeroVideo src={SRC} poster={POSTER} alt="Hero" />);
     await vi.waitFor(() => expect(document.querySelector('video')).toBeNull());
   });
@@ -114,5 +116,44 @@ describe('HeroVideo', () => {
     render(<HeroVideo src={SRC} poster={POSTER} active={false} />);
     expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
     expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+  });
+
+  it('framed hero: video is object-contain and never object-cover', () => {
+    mockEnv();
+    render(<HeroVideo src={SRC} poster={POSTER} fit="contain" />);
+    const cls = document.querySelector('video')!.className;
+    expect(cls).toContain('object-contain');
+    expect(cls).not.toContain('object-cover');
+  });
+
+  it('an AbortError from play() (interrupted by pause) keeps the video mounted', async () => {
+    mockEnv();
+    HTMLMediaElement.prototype.play = vi
+      .fn()
+      .mockRejectedValue(new DOMException('interrupted', 'AbortError'));
+    render(<HeroVideo src={SRC} poster={POSTER} />);
+    await new Promise(r => setTimeout(r, 20));
+    expect(document.querySelector('video')).not.toBeNull();
+  });
+
+  it('NotSupportedError removes the video', async () => {
+    mockEnv();
+    HTMLMediaElement.prototype.play = vi
+      .fn()
+      .mockRejectedValue(new DOMException('bad codec', 'NotSupportedError'));
+    render(<HeroVideo src={SRC} poster={POSTER} />);
+    await vi.waitFor(() => expect(document.querySelector('video')).toBeNull());
+  });
+
+  it('an inactive slide has no autoplay and preload=none, and starts when it becomes active', () => {
+    mockEnv();
+    const { rerender } = render(<HeroVideo src={SRC} poster={POSTER} active={false} />);
+    const v = document.querySelector('video')!;
+    expect(v.autoplay).toBe(false);
+    expect(v.getAttribute('preload')).toBe('none');
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+    rerender(<HeroVideo src={SRC} poster={POSTER} active />);
+    expect(document.querySelector('video')!.getAttribute('preload')).toBe('metadata');
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
   });
 });
