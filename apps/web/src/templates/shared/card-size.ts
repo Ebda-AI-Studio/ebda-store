@@ -305,7 +305,7 @@ export function cardImageAspectClass(aspect: CardImageAspect | undefined): strin
  * :root by themeToCssVars.
  */
 export function lookImageAspectClass(look: string | null | undefined): string {
-  return getLook(look) ? 'aspect-[var(--image-ratio)]' : '';
+  return getLook(look) ? 'aspect-[var(--image-ratio,4/5)]' : '';
 }
 
 /**

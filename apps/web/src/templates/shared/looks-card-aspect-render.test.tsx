@@ -107,7 +107,7 @@ function render(
     )
   );
 }
-const RATIO = 'aspect-[var(--image-ratio)]';
+const RATIO = 'aspect-[var(--image-ratio,4/5)]';
 
 describe.each(CARDS)('%s: look image ratio', (_n, Card) => {
   it('legacy store: no look class', () => {

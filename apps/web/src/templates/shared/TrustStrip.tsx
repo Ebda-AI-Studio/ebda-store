@@ -112,7 +112,7 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
   const layout = settings?.layout ?? store.theme?.trustStripLayout ?? 'horizontal';
   const size = settings?.size ?? store.theme?.trustStripSize ?? 'md';
   // `settings` already extends SectionPaddingMaxWidthVisibility — read spacing directly.
-  const { wrapperClass, innerContainerClass } = sectionSpacingClasses(settings);
+  const { wrapperClass, innerContainerClass } = sectionSpacingClasses(settings, store.look);
   const listClass =
     layout === 'vertical' ? 'grid grid-cols-1 gap-6' : 'grid grid-cols-3 gap-2 sm:gap-8';
 

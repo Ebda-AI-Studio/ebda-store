@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useStore } from '../../contexts/StoreContext';
 import { sectionSpacingClasses } from './section-spacing';
 import type { SectionPaddingMaxWidthVisibility } from '@force/shared';
 
@@ -46,10 +47,11 @@ export function BrandStoryBlock({
   spacingSettings,
 }: BrandStoryBlockProps) {
   const { isRtl } = useLanguage();
+  const { store } = useStore();
   const text = isRtl ? (bodyAr ?? body) : (body ?? bodyAr);
   if (!image && !text) return null;
 
-  const { wrapperClass, innerContainerClass } = sectionSpacingClasses(spacingSettings);
+  const { wrapperClass, innerContainerClass } = sectionSpacingClasses(spacingSettings, store.look);
 
   return (
     <section

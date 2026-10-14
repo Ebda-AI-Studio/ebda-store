@@ -75,6 +75,10 @@ import path from 'node:path';
 describe('globals.css look rules', () => {
   const css = readFileSync(path.join(__dirname, '../../apps/web/src/styles/globals.css'), 'utf8');
   const looksCss = css.slice(css.indexOf('Looks (Phase S)'));
+  it('spacing scales only on the default marker, never on the class triple', () => {
+    expect(looksCss).toMatch(/\[data-look\] \.sp-top-default/);
+    expect(looksCss).not.toMatch(/\.py-12|\.pt-12|\.pb-12/);
+  });
   it('no global card-image or [data-section] rule (merchant presets win)', () => {
     expect(looksCss).not.toMatch(/group\\\/img/);
     expect(looksCss).not.toMatch(/\[data-section\]/);

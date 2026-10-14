@@ -57,7 +57,7 @@ export function ImageTextSection({
   const button = pick(settings.buttonText, settings.buttonTextAr);
   const image = pick(settings.image, settings.imageAr);
   const alt = pick(settings.alt, settings.altAr);
-  const spacing = sectionSpacingClasses(settings);
+  const spacing = sectionSpacingClasses(settings, store.look);
   const edit = (key: string) =>
     editorMode ? { 'data-builder-setting': ar ? `${key}Ar` : key } : {};
   const imageFirst = (settings.imagePosition ?? 'start') === 'start';

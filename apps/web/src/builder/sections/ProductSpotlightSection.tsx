@@ -53,7 +53,7 @@ export function ProductSpotlightSection({
   const pick = (en?: string, a?: string) => (ar ? a || en : en || a) || '';
   const edit = (key: string): Record<string, string> | undefined =>
     editorMode ? { 'data-builder-setting': ar ? `${key}Ar` : key } : undefined;
-  const spacing = sectionSpacingClasses(settings);
+  const spacing = sectionSpacingClasses(settings, store.look);
   const heading = pick(settings.heading, settings.headingAr);
   const body = pick(settings.body, settings.bodyAr);
   const image = pick(settings.image, settings.imageAr);

@@ -34,7 +34,7 @@ export function TrustBadgesSection({
   const ar = language === 'ar';
   const pick = (en?: unknown, a?: unknown) =>
     ((ar ? (a as string) || (en as string) : (en as string) || (a as string)) ?? '').trim();
-  const spacing = sectionSpacingClasses(settings);
+  const spacing = sectionSpacingClasses(settings, store.look);
   const badges = blocks
     .filter(b => b.type === 'badge' && b.hidden !== true)
     .map(b => ({
