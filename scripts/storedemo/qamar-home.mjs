@@ -1,3 +1,6 @@
+// Voice (quality bar §2, Ahmad's ruling e): labels and buttons use neutral noun forms (the verbal
+// noun "تسوّق", never the feminine imperative "تسوقي"); full sentences are in the store's
+// Egyptian voice and never address the shopper by gender. One register per page.
 // The Qamar showroom home document (Phase B1 Task 6): a SUPERSET of every Qamar section, built from
 // registry presets plus CONTENT settings only. Design keys (presentation, layout, columns...) come
 // from the look's section mix at render (Ruling B1-8) or from `applyLook` on a merchant store.
@@ -67,7 +70,7 @@ export function buildQamarHome(base, ctx) {
         headline: 'Linen for the Cairo summer',
         headlineAr: 'كتان لصيف القاهرة',
         ctaText: 'Shop abayas',
-        ctaTextAr: 'تسوقي العبايات',
+        ctaTextAr: 'تسوّق العبايات',
         ctaHref: '/products?category=abayas',
       }),
     ],
@@ -84,7 +87,6 @@ export function buildQamarHome(base, ctx) {
         headline: 'Dressed for the rooftop',
         headlineAr: 'لبس السطوح',
         ctaText: 'Shop the looks',
-        // Neutral noun form on a button (quality bar §2, ruling e).
         ctaTextAr: 'تسوّق اللوكات',
         ctaHref: '/products',
       })
@@ -102,7 +104,7 @@ export function buildQamarHome(base, ctx) {
         headline: 'For the night of the wedding',
         headlineAr: 'لليلة الفرح',
         ctaText: 'Shop evening wear',
-        ctaTextAr: 'تسوقي فساتين السهرة',
+        ctaTextAr: 'تسوّق فساتين السهرة',
         ctaHref: '/products?category=dresses',
       }),
     ],
@@ -133,7 +135,7 @@ export function buildQamarHome(base, ctx) {
   );
   const categories = node('category-grid', 'categories', {
     title: 'Shop by category',
-    titleAr: 'تسوقي حسب القسم',
+    titleAr: 'تسوّق حسب القسم',
   });
   const newIn = node('featured-collection', 'new-in', {
     heading: 'New in',
@@ -153,7 +155,7 @@ export function buildQamarHome(base, ctx) {
     body: 'Every piece is cut in our workshop and finished by hand. Delivery across Egypt, cash on delivery.',
     bodyAr: 'كل قطعة بتتقص في ورشتنا وبتتشطب باليد. توصيل لكل مصر، والدفع عند الاستلام.',
     buttonText: 'Shop everything',
-    buttonTextAr: 'تسوقي كل حاجة',
+    buttonTextAr: 'كل المنتجات',
     buttonLink: '/products',
   });
   const abayas = node('product-carousel', 'abayas', {
@@ -166,7 +168,7 @@ export function buildQamarHome(base, ctx) {
   const occasions = node(
     'collection-list',
     'occasions',
-    { heading: 'Shop by occasion', headingAr: 'تسوقي حسب المناسبة' },
+    { heading: 'Shop by occasion', headingAr: 'تسوّق حسب المناسبة' },
     QAMAR_OCCASIONS.map((o, i) => ({
       id: `occasion-${i + 1}`,
       type: 'collection',

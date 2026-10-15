@@ -394,6 +394,14 @@ describe('showroom seed: the Lookbook shop-the-look node', async () => {
     expect(at.sections.some(s => s.type === 'shop-the-look')).toBe(false);
   });
 
+  it('one Arabic register: no gendered imperative anywhere in the demo copy (quality bar §2)', async () => {
+    // @ts-expect-error plain .mjs data module
+    const cat = await import('../../scripts/qamar-demo/catalogue.mjs');
+    const text = JSON.stringify([doc, cat]);
+    expect(text).not.toMatch(/(تسوقي|اختاري|اطلبي|خليكي|شوفي|جربي|اكتشفي)/);
+    expect(text).toContain('تسوّق حسب القسم');
+  });
+
   it('refuses to seed a look whose piece is missing from the catalogue', () => {
     expect(() =>
       buildQamarHome(layoutToDefinition(resolveLayoutSettings({}, 'qamar')), {

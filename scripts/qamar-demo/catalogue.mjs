@@ -84,7 +84,7 @@ export const QAMAR_SIZE_CHARTS = {
       ['XXL', '112', '94', '120'],
     ],
     note: 'Between two sizes, take the larger one.',
-    noteAr: 'لو بين مقاسين، اختاري الأكبر.',
+    noteAr: 'لو بين مقاسين، المقاس الأكبر أريح.',
   },
 };
 
@@ -219,7 +219,7 @@ export const QAMAR_PRODUCTS = [
     description:
       'Dusty rose satin gown with long sleeves. Out of stock now: order it and we ship it as soon as the next run is ready.',
     descriptionAr:
-      'فستان ستان وردي هادي بأكمام طويلة. خلصان دلوقتي: اطلبيه ونشحنه أول ما الدفعة الجاية تجهز.',
+      'فستان ستان وردي هادي بأكمام طويلة. خلصان دلوقتي: ينفع يتطلب ونشحنه أول ما الدفعة الجاية تجهز.',
     options: [SIZES(['S', 'M', 'L', 'XL', 'XXL'])],
     backorder: true,
     stock: 0,
