@@ -2097,9 +2097,19 @@
       "tier": "unit",
       "why": "the guest-to-login cart sync (addItems) resolves variants against EVERY product in the payload, so [{A, vB}, {B}] writes an (A, vB) line: product A carrying product B's size, stock and price, and it also bypasses the VARIANT_REQUIRED skip (C-01 fix round, W1a review #1)",
       "source": "apps/api/src/services/cart.service.ts",
-      "find": "      if (item.variantId && variantById.get(item.variantId)?.productId !== item.productId) {",
-      "replace": "      if (item.variantId && !variantById.has(item.variantId)) {",
+      "find": "        if (found.productId !== item.productId) {",
+      "replace": "        if (false) {",
       "test": "tests/unit/cart-variant-required.test.ts"
+    },
+    {
+      "id": "order-admin-refuses-inactive-variant",
+      "domain": "data integrity",
+      "tier": "unit",
+      "why": "an admin manual order resolves the chosen variantId against every variant row, so a size the merchant DISABLED is sold anyway: an order line and a stock decrement on a variant every other surface reads as 0 / not for sale (W1a re-review, order.service.ts createAdminOrder)",
+      "source": "apps/api/src/services/order.service.ts",
+      "find": "        if (variant.isActive === false) {",
+      "replace": "        if (false) {",
+      "test": "tests/unit/order.test.ts"
     }
   ]
 }

@@ -178,3 +178,28 @@ describe('CartService.addItems — a variant must belong to ITS line (W1a review
     expect(m.productVariant.findMany.mock.calls[0][0].select).toMatchObject({ productId: true });
   });
 });
+
+describe('CartService.addItems — the skip log names WHY (W1a re-review minor 3)', () => {
+  it('a disabled / unknown variant logs VARIANT_UNAVAILABLE; a foreign one VARIANT_PRODUCT_MISMATCH', async () => {
+    const { default: logger } = await import('@api/lib/logger');
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined as never);
+    m.product.findMany.mockResolvedValue([
+      { ...SIZED_PARENT, id: 'prod-A', _count: { variants: 2 } },
+      { ...SIZED_PARENT, id: 'prod-B', _count: { variants: 2 } },
+    ]);
+    // The lookup is `isActive: true`: the disabled var-A-off never comes back.
+    m.productVariant.findMany.mockResolvedValue([
+      { id: 'var-B', productId: 'prod-B', inventory: 9, allowBackorder: false },
+    ]);
+
+    await CartService.addItems('store-1', 'sess-1', [
+      { productId: 'prod-A', variantId: 'var-A-off', quantity: 1 },
+      { productId: 'prod-A', variantId: 'var-B', quantity: 1 },
+    ]);
+
+    const codes = warn.mock.calls.map(c => (c[0] as { code?: string }).code);
+    expect(codes).toEqual(['VARIANT_UNAVAILABLE', 'VARIANT_PRODUCT_MISMATCH']);
+    expect(m.cartItem.create).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});

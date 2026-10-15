@@ -771,13 +771,26 @@ export class CartService {
       // The variant must belong to THIS line's product. The lookup above only
       // proves it belongs to SOME product in the payload, so `[{A, vB}, {B}]`
       // wrote an (A, vB) line carrying B's size, stock and price (W1a review #1).
-      // Skipped, like an invalid variant; store id + code only in the log.
-      if (item.variantId && variantById.get(item.variantId)?.productId !== item.productId) {
-        logger.warn(
-          { storeId, code: 'VARIANT_PRODUCT_MISMATCH' },
-          '[cart.addItems] skipped a line whose variant is not its product'
-        );
-        return [];
+      // Skipped, like an invalid variant; store id + code only in the log. A
+      // variant the lookup did not return (disabled, deleted, or not of any
+      // product in the payload) logs its own code: a disabled size is a normal
+      // catalogue change, a mismatch is a malformed or tampered payload.
+      if (item.variantId) {
+        const found = variantById.get(item.variantId);
+        if (!found) {
+          logger.warn(
+            { storeId, code: 'VARIANT_UNAVAILABLE' },
+            '[cart.addItems] skipped a line whose variant is disabled or gone'
+          );
+          return [];
+        }
+        if (found.productId !== item.productId) {
+          logger.warn(
+            { storeId, code: 'VARIANT_PRODUCT_MISMATCH' },
+            '[cart.addItems] skipped a line whose variant is not its product'
+          );
+          return [];
+        }
       }
       const r = resolveLineNote(product.personalisation, item.note);
       return 'error' in r ? [] : [{ ...item, note: r.note }];
