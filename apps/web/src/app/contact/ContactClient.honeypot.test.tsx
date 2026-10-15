@@ -55,6 +55,7 @@ describe('storefront contact form (FU46-1)', () => {
     const { container } = render(<ContactClient />);
     const trap = container.querySelector('input[name="company_site"]') as HTMLInputElement;
     expect(trap).not.toBeNull();
+    expect(trap.closest('[aria-hidden="true"]')).not.toBeNull();
     expect(trap.tabIndex).toBe(-1);
     expect(trap.getAttribute('autocomplete')).toBe('off');
   });
