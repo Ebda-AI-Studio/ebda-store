@@ -145,6 +145,10 @@ export function Sheet({
   const openRef = useRef(open);
   openRef.current = open;
   const onNativeClose = () => {
+    // A `close` queued by an owner close that was followed by a re-open before the
+    // event fired: the dialog is open again, so this event is stale — ignore it
+    // (settling now would unlock the page under the re-opened sheet).
+    if (ref.current?.open) return;
     settle();
     if (openRef.current) onCloseRef.current();
   };

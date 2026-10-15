@@ -155,6 +155,19 @@ describe('Sheet', () => {
     expect(document.body.style.overflow).toBe('hidden');
   });
 
+  it('a stale close event after close-then-reopen is ignored (fix round 2)', () => {
+    render(<Harness />);
+    const trigger = screen.getByRole('button', { name: 'فتح' });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('button', { name: 'إغلاق' })); // owner closes…
+    fireEvent.click(trigger); // …and reopens before the queued `close` event fires
+    const d = dialog();
+    expect(d.hasAttribute('open')).toBe(true);
+    fireEvent(d, new Event('close')); // the stale event arrives now
+    expect(d.hasAttribute('open')).toBe(true);
+    expect(document.body.style.overflow).toBe('hidden');
+  });
+
   it('uses showModal / close when the browser has them', () => {
     const showModal = vi.fn(function (this: HTMLDialogElement) {
       this.setAttribute('open', '');
