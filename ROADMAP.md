@@ -124,6 +124,10 @@ These items are sequenced from `docs/HANDOFF-2026-06-01.md`. Priority order is a
 - [ ] **Page Builder discount fields** — B1–B4: compare-price → active discount, percentage/dinar dropdown, live preview cell in the product form; requires schema change (discount type/value on product model) + storefront price resolution logic
 - [ ] **Settings → Page Builder full consolidation** — A1 Footer Links, A2 Storefront Navigation, A3 Branding social/SEO de-dup, A4 Category Pages access restoration, A5 page-builder preview covers all unsaved changes (currently homepage + layout only)
 - [ ] **Search program** (`docs/plans/2026-10-15-semantic-search.md`) — P0 in review: Arabic-normalised trigram search on storefront, typeahead and admin product search, merchant-set search words, searches-with-no-results insights; P1 AI search terms + embeddings (hybrid ranking, off until the eval bar holds), P2 customer/order search, P3 catalogue import. Rulings SEARCH-\* in `docs/RULINGS.md`
+  - **Launch gates (privacy; each must be closed before the storefront search goes live for real shoppers):**
+  - [ ] **SEARCH-T5-8** — move the storefront → API search term out of the URL (POST body or a request header) so Cloudflare Workers invocation logs never hold a typed phone/email; then update `docs/privacy/data-map.md` § Cloudflare Workers Logs and `docs/RETENTION.md`.
+  - [ ] **SEARCH-T5-9 residual** — the ad pixels' own PageView reads `/search?q=<term>` from the page URL (the Search event parameter is already gated by `isPersonalDataTerm`); Ahmad to re-confirm this residual is accepted for launch or ask for it to be closed.
+  - [ ] **wa-bridge tenant context** — `apps/api/src/routes/wa-bridge.routes.ts` never establishes a tenant context, so every product query there is refused/empty under strict RLS + the tenant guard. Harmless while WhatsApp is OFF (Ruling WHATSAPP-OFF-1); MUST be fixed with an `ebda_app` integration test before the `whatsapp` flag is ever turned on for any store.
 
 ### Infrastructure
 
