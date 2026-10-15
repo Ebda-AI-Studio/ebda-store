@@ -260,7 +260,11 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         'layout',
         'Layout',
         'التخطيط',
-        [opt('grid', 'Grid', 'شبكة'), opt('horizontal', 'Scrolling row', 'صف متحرك')],
+        [
+          opt('grid', 'Grid', 'شبكة'),
+          opt('horizontal', 'Scrolling row', 'صف متحرك'),
+          opt('chips', 'Text chips', 'أزرار نصية'),
+        ],
         {
           responsive: ['mobile'],
         }
@@ -488,6 +492,10 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
       s.textarea('body', 'Text', 'النص', { localized: true }),
       s.text('buttonText', 'Button text', 'نص الزر', { localized: true }),
       s.url('buttonLink', 'Button link', 'رابط الزر'),
+      s.select('layout', 'Layout', 'التخطيط', [
+        opt('split', 'Side by side', 'جنب بعض'),
+        opt('full-bleed', 'Full-width image', 'صورة بعرض الشاشة'),
+      ]),
       s.select('imagePosition', 'Image side', 'جهة الصورة', [
         opt('start', 'Start (right in Arabic)', 'البداية (يمين في العربية)'),
         opt('end', 'End (left in Arabic)', 'النهاية (يسار في العربية)'),

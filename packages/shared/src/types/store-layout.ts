@@ -213,7 +213,7 @@ export interface HeroSettings extends SectionBgOverride, SectionPaddingMaxWidthV
   dividers?: SectionDividers;
 }
 
-export type CategoriesLayout = 'grid' | 'horizontal';
+export type CategoriesLayout = 'grid' | 'horizontal' | 'chips';
 export type CategoriesCaption = 'below' | 'overlay';
 
 /**

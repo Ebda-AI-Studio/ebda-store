@@ -40,6 +40,7 @@ import {
 import { TrustBadgesSection, type TrustBadgesSettings } from '../sections/TrustBadgesSection';
 import { resolveSectionProducts } from '../sections/section-products';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
+import { CategoryChips } from '../../templates/shared/CategoryChips';
 import {
   sectionSpacingClasses,
   sectionVisibilityClass,
@@ -550,7 +551,11 @@ export function PageRenderer({
                       renderGrid(caption, vis)
                     );
                   const kindFor = (lay: typeof layout.categories.layout) =>
-                    lay === 'horizontal' && T.CategoryStrip ? 'strip' : 'grid';
+                    lay === 'chips'
+                      ? 'chips'
+                      : lay === 'horizontal' && T.CategoryStrip
+                        ? 'strip'
+                        : 'grid';
                   const desktopKind = kindFor(layout.categories.layout);
                   const mobileKind = kindFor(
                     layout.categories.layoutMobile ?? layout.categories.layout
@@ -558,8 +563,24 @@ export function PageRenderer({
                   const desktopCaption = layout.categories.captionPosition;
                   const mobileCaption =
                     layout.categories.captionPositionMobile ?? layout.categories.captionPosition;
-                  const renderKind = (kind: 'strip' | 'grid', caption: Caption, vis?: string) =>
-                    kind === 'strip' ? renderStrip(caption, vis) : renderGrid(caption, vis);
+                  const renderKind = (
+                    kind: 'strip' | 'grid' | 'chips',
+                    caption: Caption,
+                    vis?: string
+                  ) =>
+                    kind === 'chips' ? (
+                      <div className={vis}>
+                        <CategoryChips
+                          categories={common.categories}
+                          urlPrefix={common.urlPrefix}
+                          isRtl={isRtl}
+                        />
+                      </div>
+                    ) : kind === 'strip' ? (
+                      renderStrip(caption, vis)
+                    ) : (
+                      renderGrid(caption, vis)
+                    );
                   // Render once when desktop + mobile resolve to the SAME layout AND
                   // caption; otherwise render both trees + toggle with md: so each
                   // breakpoint gets its own layout + caption independently.

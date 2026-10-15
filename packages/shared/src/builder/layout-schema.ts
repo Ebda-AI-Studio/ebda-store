@@ -192,11 +192,11 @@ const layoutSchemaInternal = z
     }),
     categories: z.object({
       enabled: z.boolean(),
-      layout: z.enum(['grid', 'horizontal']),
+      layout: z.enum(['grid', 'horizontal', 'chips']),
       // 2026-05-16: split into per-breakpoint settings (see store-layout.ts
       // CategoriesSettings). Mobile overrides are optional — fall back to
       // the legacy single field when unset.
-      layoutMobile: z.enum(['grid', 'horizontal']).optional(),
+      layoutMobile: z.enum(['grid', 'horizontal', 'chips']).optional(),
       captionPosition: z.enum(['below', 'overlay']),
       captionPositionMobile: z.enum(['below', 'overlay']).optional(),
       desktopColumns: z.union([z.literal(2), z.literal(3), z.literal(4)]),

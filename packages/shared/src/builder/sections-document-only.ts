@@ -39,6 +39,7 @@ export const imageTextSchema = z
     buttonText: text(60),
     buttonTextAr: text(60),
     buttonLink: safeLink,
+    layout: z.enum(['split', 'full-bleed']).optional(),
     // Logical, never left/right: `start` mirrors to the right in Arabic.
     imagePosition: z.enum(['start', 'end']).optional(),
     imageAspect: z.enum(['square', 'portrait', 'landscape']).optional(),

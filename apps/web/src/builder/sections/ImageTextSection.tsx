@@ -29,10 +29,20 @@ export interface ImageTextSettings extends SectionPaddingMaxWidthVisibility {
   buttonText?: string;
   buttonTextAr?: string;
   buttonLink?: string;
+  layout?: 'split' | 'full-bleed';
   imagePosition?: 'start' | 'end';
   imageAspect?: 'square' | 'portrait' | 'landscape';
   bgColor?: string;
 }
+
+/**
+ * The solid scrim behind full-bleed text (Ruling B1-2, amendment C15). Not an edge-only
+ * gradient: the whole photo is darkened evenly so the text reads wherever it sits, whatever
+ * the photo. Worst case (a pure-white photo) is rgba(0,0,0,.6) over #fff = #666, and white
+ * text on that is 5.74:1. Task 4's contrast test imports these.
+ */
+export const FULL_BLEED_SCRIM = { color: '#000000', opacity: 0.6 } as const;
+export const FULL_BLEED_TEXT = '#FFFFFF';
 
 const ASPECT: Record<NonNullable<ImageTextSettings['imageAspect']>, string> = {
   square: 'aspect-square',
@@ -72,6 +82,58 @@ export function ImageTextSection({
   const textColumnClass = showImageColumn
     ? `${imageFirst ? 'md:order-2' : 'md:order-1'} text-start`
     : 'text-start md:col-span-2';
+
+  if ((settings.layout ?? 'split') === 'full-bleed' && image) {
+    return (
+      <section
+        data-section="image-text"
+        data-layout="full-bleed"
+        className="relative w-full overflow-hidden"
+        style={sectionBgStyle(settings.bgColor, store.theme)}
+      >
+        <img
+          src={image}
+          alt={alt}
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0"
+          style={{
+            backgroundColor: FULL_BLEED_SCRIM.color,
+            opacity: FULL_BLEED_SCRIM.opacity,
+          }}
+        />
+        <div className="relative flex min-h-[60svh] w-full items-end">
+          <div
+            className={`${spacing.innerContainerClass} pb-10 text-start`}
+            style={{ color: FULL_BLEED_TEXT }}
+          >
+            {heading && (
+              <h2 className="font-display text-3xl sm:text-4xl" {...edit('heading')}>
+                {heading}
+              </h2>
+            )}
+            {body && (
+              <p className="mt-2 max-w-prose text-base leading-relaxed" {...edit('body')}>
+                {body}
+              </p>
+            )}
+            {button && (
+              <a
+                href={storeUrl(sanitizeUrl(settings.buttonLink, '/products'))}
+                className="mt-5 inline-flex min-h-[44px] items-center rounded-[var(--radius)] bg-white px-5 text-sm font-medium text-black"
+                {...edit('buttonText')}
+              >
+                {button}
+              </a>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section

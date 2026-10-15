@@ -17,18 +17,17 @@ export const LOOKS: readonly LookDefinition[] = [
     skin: 'qamar',
     status: 'designed',
     chrome: { header: { logoPlacement: 'start' } },
-    // Ruling B1-3. Task 3 adds category-grid `layout: 'chips'` and image-text
-    // `layout: 'full-bleed'` with their schema values (plan amendment C1). The carousel
-    // preset is `newest`, never a demo category slug (C7).
+    // Ruling B1-3. Category row as text chips, image break full-bleed (plan amendment C1).
+    // The carousel preset is `newest`, never a demo category slug (C7).
     sections: [
       { type: 'hero', design: { presentation: 'full-bleed' } },
-      { type: 'category-grid' },
+      { type: 'category-grid', design: { layout: 'chips', layoutMobile: 'chips' } },
       {
         type: 'featured-collection',
         design: { columns: 4, mobileColumns: 2 },
         preset: { productSource: 'newest', limit: 8, heading: 'New in', headingAr: 'وصل حديثًا' },
       },
-      { type: 'image-text' },
+      { type: 'image-text', design: { layout: 'full-bleed' } },
       { type: 'product-carousel', preset: { productSource: 'newest', limit: 12 } },
       { type: 'brand-story' },
     ],
