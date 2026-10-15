@@ -37,10 +37,10 @@ export const NORMALIZE_VECTORS: ReadonlyArray<readonly [string, string]> = [
   ['٠١٢٣٤٥٦٧٨٩', '0123456789'], // all Arabic-Indic digits
   ['۰۱۲۳۴۵۶۷۸۹', '0123456789'], // all Persian digits
   ['ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'], // full uppercase alphabet
-  // Whitespace pin (A1): only [ \t\n\r ] collapse and only U+0020 is trimmed at the edges.
+  // Whitespace pin (A1): only [ \t\n\r\u00A0] collapse and only U+0020 is trimmed at the edges.
   // Other Unicode spaces are NOT touched, so SQL btrim(x, ' ') matches byte for byte.
-  [' x ', ' x '], // thin space survives (String#trim would strip it)
-  ['　x　', '　x　'], // ideographic space survives
-  ['  x\t\ny\r', 'x y'], // NBSP/tab/LF/CR collapse; trailing collapsed space trimmed
-  ['﻿x', '﻿x'], // BOM is not whitespace here
+  ['\u2009x\u2009', '\u2009x\u2009'], // thin space survives (String#trim would strip it)
+  ['\u3000x\u3000', '\u3000x\u3000'], // ideographic space survives
+  ['\u00A0 x\t\ny\r', 'x y'], // NBSP/tab/LF/CR collapse; trailing collapsed space trimmed
+  ['\uFEFFx', '\uFEFFx'], // BOM is not whitespace here
 ];

@@ -5,7 +5,7 @@
  * normalize() and NO locale lowercasing: Postgres cannot reproduce either
  * immutably, so parity would break (Ruling SEARCH-2).
  *
- * Whitespace: only the explicit class [ \t\n\r ] collapses to one U+0020,
+ * Whitespace: only the explicit class [ \t\n\r\u00A0] collapses to one U+0020,
  * and the edge trim removes ONLY U+0020 (SQL `btrim(x, ' ')`). We deliberately
  * do NOT use String#trim(), which also strips U+2009, U+3000, U+FEFF, etc.
  */
@@ -21,9 +21,9 @@ const FOLD = new Map<string, string>();
 }
 
 // tashkeel U+064B..U+065F, dagger alef U+0670, tatweel U+0640
-const STRIP = /[ً-ٰٟـ]/g;
+const STRIP = /[\u064B-\u065F\u0670\u0640]/g;
 // explicit set (NOT \s): Postgres' [[:space:]] is locale-dependent
-const SPACES = /[ \t\n\r ]+/g;
+const SPACES = /[ \t\n\r\u00A0]+/g;
 const EDGE_SPACE = /^ +| +$/g;
 
 export function normalizeArabicSearch(input: string): string {
