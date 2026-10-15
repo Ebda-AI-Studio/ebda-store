@@ -4,6 +4,10 @@
 
 @layer base {
   :root {
+    /* Real height of the mobile BottomTabBar (68px content + 1px top border), excluding the
+       safe-area inset. The tab bar sizes itself with it; every fixed-bottom bar lifts by it. */
+    --bottom-tab-h: 69px;
+
     /* ==========================================
        STOREFRONT THEME SYSTEM
        All templates MUST use these CSS variables
@@ -1187,7 +1191,7 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
 }
 
 /* Sticky mobile bars (PDP add-to-cart, cart total). UI rule 6: space is reserved on
- * <body> (never the chrome wrapper). Body already carries pb-32 for the 56px
+ * <body> (never the chrome wrapper). Body already carries pb-32 for the
  * BottomTabBar, so the bar (4.25rem) is added on top of that, not instead of it. */
 @media (max-width: 767px) {
   body[data-sticky-atc='1'],
@@ -1200,7 +1204,7 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
   }
   /* Floating widget (br/bl, bottom 80px, z-60) and the toast region (@ebda/ui Toast,
    * bottom 72px) would sit inside the sticky bar's band (F2: "added to cart" covered the
-   * bar's name and price): lift both clear of tab bar (56px) + bar (~68px) + gap. */
+   * bar's name and price): lift both clear of tab bar (--bottom-tab-h) + bar (~61px) + gap. */
   body[data-sticky-atc='1'] [data-floating-widget='bottom'],
   body[data-sticky-cart='1'] [data-floating-widget='bottom'],
   body[data-sticky-atc='1'] [data-toast-region],

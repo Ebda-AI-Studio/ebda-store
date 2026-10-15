@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, act, cleanup, fireEvent } from '@testing-library/react';
 import { useRef } from 'react';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 let ioCallback: (
   entries: Array<{ isIntersecting: boolean; boundingClientRect?: { top: number } }>
@@ -42,25 +44,61 @@ afterEach(() => {
 });
 
 describe('StickyAddToCart', () => {
-  it('appears only when the main button scrolls out of view', () => {
+  it('is hidden before the observer reports, then follows the real position', () => {
     vi.stubGlobal('IntersectionObserver', IO);
     render(<Harness />);
+    // no flash: nothing shown until the first observer callback says where the button is
     expect(screen.queryByTestId('sticky-atc')).toBeNull();
-    act(() => ioCallback([{ isIntersecting: false }]));
+    expect(document.body.dataset.stickyAtc).toBeUndefined();
+    // button IN view on load -> stays hidden
+    act(() => ioCallback([{ isIntersecting: true, boundingClientRect: { top: 400 } }]));
+    expect(screen.queryByTestId('sticky-atc')).toBeNull();
+  });
+
+  it('shows from first paint when the button starts below the fold (B0-49)', () => {
+    vi.stubGlobal('IntersectionObserver', IO);
+    render(<Harness />);
+    act(() => ioCallback([{ isIntersecting: false, boundingClientRect: { top: 1100 } }]));
     expect(screen.getByTestId('sticky-atc')).toBeTruthy();
     expect(document.body.dataset.stickyAtc).toBe('1');
-    act(() => ioCallback([{ isIntersecting: true }]));
+  });
+
+  it('shows when scrolled past, and hides again while the button is visible', () => {
+    vi.stubGlobal('IntersectionObserver', IO);
+    render(<Harness />);
+    act(() => ioCallback([{ isIntersecting: false, boundingClientRect: { top: -50 } }]));
+    expect(screen.getByTestId('sticky-atc')).toBeTruthy();
+    act(() => ioCallback([{ isIntersecting: true, boundingClientRect: { top: 300 } }]));
     expect(screen.queryByTestId('sticky-atc')).toBeNull();
     expect(document.body.dataset.stickyAtc).toBeUndefined();
   });
 
-  it('stays hidden while the button is still below the fold', () => {
-    vi.stubGlobal('IntersectionObserver', IO);
+  it('stays hidden without IntersectionObserver', () => {
+    vi.stubGlobal('IntersectionObserver', undefined);
     render(<Harness />);
-    act(() => ioCallback([{ isIntersecting: false, boundingClientRect: { top: 900 } }]));
     expect(screen.queryByTestId('sticky-atc')).toBeNull();
-    act(() => ioCallback([{ isIntersecting: false, boundingClientRect: { top: -50 } }]));
-    expect(screen.getByTestId('sticky-atc')).toBeTruthy();
+  });
+
+  it('lifts by the shared tab-bar var, not a literal 56px, on both PDP paths', () => {
+    const dir = path.resolve(__dirname, '../..');
+    const files = [
+      'components/commerce/StickyAddToCart.tsx',
+      'components/commerce/StickyCartTotal.tsx',
+      'templates/dahab/ProductDetail.tsx',
+    ];
+    for (const f of files) {
+      const src = readFileSync(path.join(dir, f), 'utf8');
+      expect(src, f).toContain('var(--bottom-tab-h)');
+      expect(src, f).not.toMatch(/calc\(56px/);
+    }
+    // the Dahab pinned bar shares the one off-screen rule with the default path
+    const dahab = readFileSync(path.join(dir, 'templates/dahab/ProductDetail.tsx'), 'utf8');
+    expect(dahab).toContain('useAnchorOffscreen(buyRef)');
+    const tab = readFileSync(path.join(dir, 'templates/shared/BottomTabBar.tsx'), 'utf8');
+    expect(tab).toContain('--bottom-tab-h');
+    expect(readFileSync(path.join(dir, 'styles/globals.css'), 'utf8')).toMatch(
+      /--bottom-tab-h:\s*69px/
+    );
   });
 
   it('removes the body flag on unmount', () => {

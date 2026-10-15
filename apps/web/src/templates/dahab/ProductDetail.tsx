@@ -25,6 +25,7 @@ import { VariantSelector } from '../../components/VariantSelector';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import type { ProductFact } from '@ebda/shared';
 import { FactsTable } from '../../components/commerce/FactsTable';
+import { useAnchorOffscreen } from '../../components/commerce/useAnchorOffscreen';
 import { DeliveryChip } from '../../components/commerce/DeliveryChip';
 import { PersonalisationField } from '../../components/commerce/PersonalisationField';
 import { SizeChartDialog } from '../../components/commerce/SizeChartDialog';
@@ -311,19 +312,8 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
   const { t } = useLanguage();
   const { localize } = useNumerals();
   const buyRef = useRef<HTMLDivElement>(null);
-  const [pinBar, setPinBar] = useState(false);
-
-  // Pin the phone buy bar once the main button has scrolled above the viewport.
-  useEffect(() => {
-    const el = buyRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver(
-      ([entry]) => setPinBar(!entry.isIntersecting && entry.boundingClientRect.top < 0),
-      { threshold: 0 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+  // Phone buy bar: shown from first paint whenever the main button is off-screen (B0-49).
+  const pinBar = useAnchorOffscreen(buyRef);
 
   // Body-level space for the pinned bar (UI rule 6), same flag as StickyAddToCart.
   useEffect(() => {
@@ -542,8 +532,10 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
         className={cx(
           // Solid ground, no glass (taste bar bans glassmorphism); ease-out-quint like the
           // default path's .sticky-bar-in (F10).
-          'fixed inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background px-4 py-3 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:hidden',
-          pinBar ? 'translate-y-0' : 'translate-y-[calc(100%+56px+env(safe-area-inset-bottom))]'
+          'fixed inset-x-0 bottom-[calc(var(--bottom-tab-h)+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background px-4 py-3 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:hidden',
+          pinBar
+            ? 'translate-y-0'
+            : 'translate-y-[calc(100%+var(--bottom-tab-h)+env(safe-area-inset-bottom))]'
         )}
       >
         <div className="flex items-center gap-3">

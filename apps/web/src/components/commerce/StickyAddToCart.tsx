@@ -1,16 +1,17 @@
 'use client';
 
 import { useEffect, type RefObject } from 'react';
-import { useInView } from './useInView';
+import { useAnchorOffscreen } from './useAnchorOffscreen';
 
 /**
- * Phone-only add-to-cart bar, shown while the main add-to-cart row is out of
- * view. It owns NO add logic: `onAdd` and `disabled` are the page's own handler
+ * Phone-only add-to-cart bar, shown from first paint whenever the main
+ * add-to-cart row is out of view, below the fold or scrolled past (B0-49), so the
+ * action is always reachable. It owns NO add logic: `onAdd` and `disabled` are the page's own handler
  * and the page's single `addDisabled` value (required personalisation lives in
  * that value), so there is never a second add path.
  *
- * Fixed-bottom recipe (UI rule 6): lifted above the 56px BottomTabBar with the
- * same `bottom-[calc(56px+env(safe-area-inset-bottom))]` the cookie banner uses,
+ * Fixed-bottom recipe (UI rule 6): lifted exactly above the BottomTabBar
+ * (`--bottom-tab-h`, the same var the tab bar sizes itself with) plus the safe-area inset,
  * and it reserves body space via `body[data-sticky-atc]` (globals.css).
  */
 export function StickyAddToCart(p: {
@@ -21,7 +22,7 @@ export function StickyAddToCart(p: {
   disabled?: boolean;
   onAdd: () => void;
 }) {
-  const show = !useInView(p.anchorRef);
+  const show = useAnchorOffscreen(p.anchorRef);
   useEffect(() => {
     if (show) document.body.dataset.stickyAtc = '1';
     else delete document.body.dataset.stickyAtc;
@@ -33,7 +34,7 @@ export function StickyAddToCart(p: {
   return (
     <div
       data-testid="sticky-atc"
-      className="sticky-bar-in fixed inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background px-4 py-2 md:hidden"
+      className="sticky-bar-in fixed inset-x-0 bottom-[calc(var(--bottom-tab-h)+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background px-4 py-2 md:hidden"
     >
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">

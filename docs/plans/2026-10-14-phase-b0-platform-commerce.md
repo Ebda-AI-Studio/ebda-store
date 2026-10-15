@@ -58,14 +58,7 @@ Reference: Instagram reel `DeeZGosSon1`, "Taste". When anyone can build anything
 
   The merchant's existing `badgeLabel` stays the only badge.
 
-- **PDP above the fold on a 390px phone.** It shows these, in this order, and nothing more:
-  - the gallery;
-  - the title;
-  - the price;
-  - the selectors;
-  - personalisation, when it is enabled;
-  - the add-to-cart button;
-  - the delivery chip.
+- **PDP fold on a 390px phone (amended by B0-49).** The first screen shows the gallery, the title, the price and the first option selector. Personalisation, the add-to-cart button and the delivery chip follow in that order; on products with several options they sit below the fold. The add-to-cart action is always reachable: the sticky bar shows from first paint whenever the main button is off-screen, in either direction (below the fold or scrolled past), and is hidden while the main button is visible.
 
   Facts and the size chart sit below, or one tap away.
 
