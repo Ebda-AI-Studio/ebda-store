@@ -16,7 +16,7 @@ def pp(subject, style=ATELIER, bg="plain white studio wall"):
 
 
 def worn(garment, style=ATELIER, bg="plain white studio wall"):
-    # Head cropped out of frame: fewer face artefacts, the garment is the subject.
+    # Front view, full figure in a matching headscarf (the back views of round 1 were rejected).
     return pp(f"front view of an adult Egyptian woman in a matching headscarf wearing {garment}, full-length, "
               "long sleeves, calm natural pose, arms relaxed at her sides", style, bg)
 
@@ -95,7 +95,7 @@ add('lookbook-3', worn("a black abaya open over an indigo dress", LOOKBOOK, "emp
 # ---- shop-the-look (Task 7)
 add('look-1', worn("a dusty rose linen abaya and a chiffon headscarf draped on the shoulders", LOOKBOOK, "rooftop golden hour"))
 add('look-2', worn("a deep teal satin midi dress with a champagne silk shawl", LOOKBOOK, "rooftop terrace at dusk"))
-add('look-3', worn("an ivory kaftan with oxblood embroidery and an olive cotton scarf", LOOKBOOK, "warm rooftop light"))
+add('look-3', worn("an ivory kaftan with oxblood embroidery and a tobacco brown cotton scarf", LOOKBOOK, "warm rooftop light"))
 
 # ---- occasions (Vitrine bands, Task 8)
 add('occasion-wedding', pp("a champagne beaded gown on a mannequin beside a vase of white roses", VITRINE, "boutique interior"), 'wide')

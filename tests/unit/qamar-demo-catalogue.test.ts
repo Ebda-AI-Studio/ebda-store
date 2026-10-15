@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { existsSync, statSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { productFactsSchema, personalisationConfigSchema, sizeChartSchema } from '@ebda/shared';
+// @ts-expect-error plain .mjs script
+import { variantSku, combos } from '../../scripts/storedemo/seed.mjs';
 import {
   QAMAR_PRODUCTS,
   QAMAR_CATEGORIES,
@@ -109,15 +111,15 @@ describe('qamar demo catalogue exercises every B0 feature', () => {
         expect(slugs.has(c), `${p.slug} ${c}`).toBe(true);
     }
   });
-  it('variant SKUs from full value slugs never collide (C17)', () => {
-    const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  it("variant SKUs from full value slugs never collide (C17, the seed's own functions)", () => {
     for (const p of PRODUCTS) {
       if (!p.options) continue;
-      const combos = p.options.reduce<string[][]>(
-        (acc, o) => acc.flatMap(a => o.values.map(v => [...a, v.value])),
-        [[]]
+      const skus = (combos(p.options) as Value[][]).map(c =>
+        variantSku(
+          p.slug,
+          c.map(v => v.value)
+        )
       );
-      const skus = combos.map(c => [p.slug, ...c].map(slug).join('-').toUpperCase());
       expect(new Set(skus).size, p.slug).toBe(skus.length);
     }
   });

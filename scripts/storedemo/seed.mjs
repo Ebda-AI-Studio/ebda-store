@@ -25,7 +25,12 @@
 // merchant overrides, and a showroom must show the look itself.
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { QAMAR_CATEGORIES, QAMAR_PRODUCTS, QAMAR_SIZE_CHARTS } from '../qamar-demo/catalogue.mjs';
+import {
+  QAMAR_CATEGORIES,
+  QAMAR_OCCASIONS,
+  QAMAR_PRODUCTS,
+  QAMAR_SIZE_CHARTS,
+} from '../qamar-demo/catalogue.mjs';
 import { buildQamarHome } from './qamar-home.mjs';
 
 export { buildQamarHome };
@@ -222,7 +227,7 @@ async function seedCatalogue(prisma, Prisma, storeId, base) {
 
       const catIds = new Map();
       for (const [position, c] of QAMAR_CATEGORIES.entries()) {
-        const occasion = ['wedding', 'engagement', 'evening'].includes(c.slug);
+        const occasion = QAMAR_OCCASIONS.some(o => o.slug === c.slug);
         const data = {
           name: c.name,
           nameAr: c.nameAr,
@@ -277,7 +282,8 @@ async function seedCatalogue(prisma, Prisma, storeId, base) {
             data: p.images.map((f, position) => ({
               productId: product.id,
               url: url(f),
-              alt: p.name,
+              // The store is Arabic-first (defaultLanguage ar); the column is single-language.
+              alt: p.nameAr || p.name,
               position,
             })),
           });
@@ -318,6 +324,18 @@ async function seedCatalogue(prisma, Prisma, storeId, base) {
           valueIds.push(ids);
         }
         const soldOut = new Set((p.soldOut ?? []).map(t => t.join('|')));
+        const liveSkus = combos(p.options).map(c =>
+          variantSku(
+            p.slug,
+            c.map(v => v.value)
+          )
+        );
+        // A SKU that left the catalogue is deactivated, never deleted (cart lines may point at
+        // it) and never left active with stock (review minor).
+        await tx.productVariant.updateMany({
+          where: { productId: product.id, sku: { notIn: liveSkus } },
+          data: { isActive: false },
+        });
         for (const [vPos, combo] of combos(p.options).entries()) {
           const values = combo.map(v => v.value);
           const sku = variantSku(p.slug, values);
@@ -511,7 +529,7 @@ async function run() {
             name: `Qamar ${l.name.en}`,
             nameAr: `قمر ${l.name.ar}`,
             template: l.skin,
-            theme: { arabicNumerals: true },
+            theme: {},
             isDemo: false,
             status: 'active',
             currency: 'EGP',
@@ -534,11 +552,22 @@ async function run() {
         console.log(`seeded ${slug} (${s.id}) on ${lookId}: home ${applied}`);
       }
     }
+  } catch (err) {
+    // Set the failure code HERE, before the forced exit below: an imported API module may install
+    // an uncaughtException/unhandledRejection handler, so a rethrow alone could still end in 0.
+    process.exitCode = 1;
+    console.error('seed failed:', err);
   } finally {
-    await prisma.$disconnect();
+    await prisma.$disconnect().catch(() => {});
     // The API modules leave a Redis client and timers open; this is a one-shot script.
     setTimeout(() => process.exit(process.exitCode ?? 0), 50);
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await run();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await run().catch(err => {
+    // A throw before the main try (imports, client creation) must fail the command too.
+    console.error('seed failed:', err);
+    process.exit(1);
+  });
+}

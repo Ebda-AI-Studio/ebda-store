@@ -186,3 +186,6 @@ apps/*/.wrangler.preview.jsonc
 
 # Qamar demo raw generator output (B1 Task 6); only encoded assets/ are committed
 scripts/qamar-demo/img-src/
+scripts/qamar-demo/__pycache__/
+# local-only copy of the demo assets for the dev stack (docs/ebda/templates/demo-store.md)
+apps/web/public/__qamar-demo/
