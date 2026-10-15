@@ -383,7 +383,9 @@ export default function NewOrderPage() {
           t('errors.createFailed'),
           apiError?.code === 'VARIANT_REQUIRED'
             ? t('errors.variantRequired')
-            : (apiError?.message ?? '')
+            : apiError?.code === 'VARIANT_INACTIVE'
+              ? t('errors.variantInactive')
+              : (apiError?.message ?? '')
         );
         return;
       }

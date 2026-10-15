@@ -1284,7 +1284,8 @@
         "unknownError": "Unknown error",
         "overrideReasonRequired": "Enter a reason (at least 3 characters) to override the coupon rules",
         "variantsLoadFailed": "Couldn't load this product's sizes and options. Try again.",
-        "variantRequired": "Pick a size or option for every product that has them."
+        "variantRequired": "Pick a size or option for every product that has them.",
+        "variantInactive": "A size on this order is disabled. Re-enable it on the product page or pick another size."
       },
       "toast": {
         "created": "Order {orderNumber} created"

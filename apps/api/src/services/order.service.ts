@@ -2776,6 +2776,17 @@ export class OrderService {
             `Variant ${it.variantId} not found for product ${product.name}`
           );
         }
+        // A disabled variant is not for sale on any path (inventory model):
+        // checkout, the cart and payment links already refuse it; a manual
+        // order wrote a line for it and decremented its stock (W1a re-review).
+        if (variant.isActive === false) {
+          throw new AppError(
+            409,
+            'VARIANT_INACTIVE',
+            `Variant ${variant.title ?? it.variantId} of ${product.name} is disabled`,
+            { productId: product.id, variantId: it.variantId, productName: product.name }
+          );
+        }
         if (typeof variant.price === 'number') unitPrice = variant.price;
         variantSku = variant.sku ?? undefined;
         variantTitle = variant.title ?? undefined;

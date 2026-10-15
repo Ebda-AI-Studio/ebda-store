@@ -95,6 +95,11 @@ The public storefront is a special case that needs no helper:
 `inventory` with the variant-aware aggregate (active variants only, and a
 disabled variant's own `inStock` is `false`), so every `apps/web` surface
 reading `p.inventory` is correct as-is.
+Whether something can be BOUGHT (stock OR backorder) is one more rule on top of
+those flags, and the storefront has exactly one copy of it:
+`apps/web/src/lib/can-buy-now.ts` (`canBuyNow` / `inStockNow`), read by the
+variant pills, the PDP buttons, every card path, the delivery line and JSON-LD
+availability (X-02; `tests/unit/can-buy-now.test.tsx` bans a second copy).
 
 ## Writing stock
 
@@ -132,6 +137,9 @@ Consequences worth stating explicitly:
   PO line naming one is refused at draft time and again at receive time
   (409 `VARIANT_INACTIVE`) — its units would otherwise book AP and cost for
   stock every surface reads as 0. The merchant re-enables the variant first.
+  An admin manual order naming one is refused the same way (409
+  `VARIANT_INACTIVE`, `createAdminOrder`); checkout, the cart and payment
+  links already sold only active variants.
   A reorder suggestion for a variant drafts its PO at the variant's cost.
   (Formerly a known gap — product-level suggestions for a VARIANT product
   drafted POs with no variant to receive into. Resolved 2026-10-01: the scan
