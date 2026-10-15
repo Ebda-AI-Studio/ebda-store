@@ -254,6 +254,10 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         opt('none', 'None', 'بدون'),
         opt('line', 'Hairline', 'خط رفيع'),
       ]),
+      s.select('textAnchor', 'Text position', 'موضع النص', [
+        opt('center', 'Centre', 'في المنتصف'),
+        opt('bottom-start', 'Bottom corner', 'في الركن السفلي'),
+      ]),
       ...styleSettings(),
     ],
   }),

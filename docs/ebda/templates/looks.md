@@ -4,12 +4,12 @@ A **look** is a named design direction: colour roles, fonts, radius, density, im
 
 Looks are **data**, not code: they live in `@ebda/shared` (`packages/shared/src/looks/`) over the shared section registry and token set, and never fork commerce components (Ruling LOOKS-1).
 
-| File          | Owns                                                                                          |
-| ------------- | --------------------------------------------------------------------------------------------- |
-| `types.ts`    | `LookId`, `LookTokens`, `LookDefinition`, `LOOK_TOKEN_KEYS` (the StoreTheme keys a look owns) |
-| `registry.ts` | the 15 `LOOKS`, `getLook`, `looksForTemplate`                                                 |
-| `compose.ts`  | `lookTheme`, `composeStoreTheme`, `overriddenLookKeys`                                        |
-| `fonts.ts`    | `LOOK_FONT_SPECS`, `lookFontsHref` (the Google Fonts link for a look)                         |
+| File          | Owns                                                                                                                                                                                                                                            |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `types.ts`    | `LookId`, `LookTokens`, `LookDefinition`, `LOOK_TOKEN_KEYS` (the StoreTheme keys every look sets), `LOOK_UI_TOKEN_KEYS` (optional UI tokens: `wordmarkSize`, `overPhotoChrome`, `receiptStyle`; set only by looks that need them, Ruling B1-47) |
+| `registry.ts` | the 15 `LOOKS`, `getLook`, `looksForTemplate`                                                                                                                                                                                                   |
+| `compose.ts`  | `lookTheme`, `composeStoreTheme`, `overriddenLookKeys`                                                                                                                                                                                          |
+| `fonts.ts`    | `LOOK_FONT_SPECS`, `lookFontsHref` (the Google Fonts link for a look)                                                                                                                                                                           |
 
 ## The 15 looks
 
@@ -88,7 +88,7 @@ A store with `look = null` (or an unknown look id) gets no `data-look` attribute
 
 - **Content is always kept** (Ruling LOOKS-3). Switching never deletes products, text or images.
 - **`design: 'keep'`** leaves every key in `stores.theme`; the merchant's edited colours still win and show as overrides.
-- **`design: 'reset'`** deletes every `LOOK_TOKEN_KEYS` key from `stores.theme` and from the draft/builder theme, so the new look's tokens show.
+- **`design: 'reset'`** deletes every `LOOK_OWNED_THEME_KEYS` key (`LOOK_TOKEN_KEYS` + `LOOK_UI_TOKEN_KEYS`) from `stores.theme` and from the draft/builder theme, so the new look's tokens show.
 - **Builder first.** `applyFamilyForLook` runs before any store write because it can refuse (409/422). A refusal throws before `stores` is touched. Routes under `/stores/:id` run in `storeScopeContext`, where each query is its own transaction, so the builder step and the store update are **not atomic**: if the store update fails after a publish, a retry converges (the store is no longer fresh, so it takes the draft path).
 - **Publish vs draft.** Only a genuinely fresh store publishes: `layout_settings` null/empty/equal to `NEW_STORE_LAYOUT_SETTINGS` and no draft revision exists. Sections that fail `validatePublishReadiness` (placeholder copy, a hero slide without an image) are dropped first, the rest goes live, and the merchant adds the dropped ones in the editor. If no section survives the drop, nothing is published: the whole family is saved as a draft (an empty live home is never published). Every other store gets the new family as a **draft** and presses publish. If a fresh store's publish is still refused, it stays a draft with a logged warning rather than failing the switch (Rulings LOOKS-8..10).
 - **Demo stores.** `applyLook` has no demo-specific branch. A demo store (`is_demo`) is a showroom: it previews looks via `?look=` and refuses every order (`403 DEMO_STORE` from `assertOrderAllowed`); see `docs/ebda/templates/demo-store.md`.
@@ -107,7 +107,7 @@ Store emails, invoices (printable and email), campaign mail and the setup guide 
 
 `overriddenLookKeys(theme, look)` returns the look-owned keys the merchant has stored with a value that differs from the look. The builder's `ThemeSettingsPanel` shows an "edited" badge on each and a reset button. Reset is **draft-first** (Ruling LOOKS-11): flush pending autosave, remove the key from the draft theme (omit it, never `null`) via `replaceDocument` + `saveDraftNow`, then `PUT /stores/:id/theme { key: null }` to remove it from live only if live holds it. Resetting only live would be undone on the next publish; resetting only the draft would leave live untouched until then.
 
-`PUT /stores/:id/theme` treats `null` as "delete this key" (see `docs/architecture/store-theme-flags.md`). It also refuses (400) any `density`, `imageRatio` or `motion` value outside `LOOK_DENSITIES` / `LOOK_IMAGE_RATIOS` / `LOOK_MOTIONS` (`packages/shared/src/looks/types.ts`); `null` still deletes the key.
+`PUT /stores/:id/theme` treats `null` as "delete this key" (see `docs/architecture/store-theme-flags.md`). It also refuses (400) any `density`, `imageRatio`, `motion`, `wordmarkSize`, `overPhotoChrome` or `receiptStyle` value outside `LOOK_DENSITIES` / `LOOK_IMAGE_RATIOS` / `LOOK_MOTIONS` / `LOOK_WORDMARK_SIZES` / `LOOK_OVER_PHOTO_CHROMES` / `LOOK_RECEIPT_STYLES` (`packages/shared/src/looks/types.ts`); `null` still deletes the key.
 
 ## Demo preview
 
@@ -122,7 +122,7 @@ Full flow and caching in `docs/ebda/templates/demo-store.md`; the contract:
 ## Adding or changing a look
 
 1. **Registry entry.** Add or edit the `LookDefinition` in `packages/shared/src/looks/registry.ts` (id `<template>.<name>`, matching `^(qamar|souq|jasmine|lamma|dahab)\.[a-z]+$` and the `stores_look_format` CHECK; bilingual `name`/`forWhom`/`idea`; tokens as hex; `skin`; `status: 'designed'`). Fonts must be in `LOOK_FONT_SPECS` (`fonts.ts`) so `lookFontsHref` can load them.
-2. **Contrast test.** `tests/unit/looks-contrast.test.ts` runs over every registry entry: every text pair >= 4.5:1, nothing under 12px, no cream/sand page background. `looks-registry.test.ts` checks completeness (ar + en strings, A/B/C unique per template) and that `Object.keys(lookTheme(l))` equals `LOOK_TOKEN_KEYS`. Run `npx vitest run tests/unit/looks-*.test.ts`.
+2. **Contrast test.** `tests/unit/looks-contrast.test.ts` runs over every registry entry: every text pair >= 4.5:1, nothing under 12px, no cream/sand page background. `looks-registry.test.ts` checks completeness (ar + en strings, A/B/C unique per template) and that `Object.keys(lookTheme(l))` equals `LOOK_TOKEN_KEYS` plus the UI tokens the look declares (`looks-compose.test.ts`). Run `npx vitest run tests/unit/looks-*.test.ts`.
 3. **Thumbnail.** `node apps/admin/scripts/look-thumbs.mjs [lookId ...]` renders `apps/admin/public/looks/<lookId>.webp` for the admin `LookPicker` from the marketing fragments (needs macOS Chrome, `sips`, `cwebp`).
 4. **Status `built`.** Flip `status` to `'built'` only after Ahmad has reviewed the look in a browser and its skin/sections ship. That is what makes the showroom list and preview it.
 5. **Docs.** Update the table above in the same change.

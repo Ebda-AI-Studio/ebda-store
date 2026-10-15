@@ -9,6 +9,19 @@ export const LOOK_MOTIONS = ['none', 'subtle', 'expressive'] as const;
 export type Density = (typeof LOOK_DENSITIES)[number];
 export type ImageRatio = (typeof LOOK_IMAGE_RATIOS)[number];
 export type Motion = (typeof LOOK_MOTIONS)[number];
+/**
+ * Look UI tokens (W2a token plumbing, fix-waves W2 #1). Optional on a look: a look that does not
+ * set one emits nothing, so its stores (and every store with no look) render exactly as before.
+ * - `wordmarkSize`: the text wordmark size in the header and the checkout/success header (T-01).
+ * - `overPhotoChrome`: material of controls that sit on a product photo (`soft` disc, `bare` glyph).
+ * - `receiptStyle`: the order receipt housing (`device` slab today, `framed` paper in the page ink).
+ */
+export const LOOK_WORDMARK_SIZES = ['lg', 'xl'] as const;
+export const LOOK_OVER_PHOTO_CHROMES = ['soft', 'bare'] as const;
+export const LOOK_RECEIPT_STYLES = ['device', 'framed'] as const;
+export type WordmarkSize = (typeof LOOK_WORDMARK_SIZES)[number];
+export type OverPhotoChrome = (typeof LOOK_OVER_PHOTO_CHROMES)[number];
+export type ReceiptStyle = (typeof LOOK_RECEIPT_STYLES)[number];
 
 /** Colour roles as hex; converted to HSL triplets by lookTheme(). */
 export interface LookTokens {
@@ -26,6 +39,10 @@ export interface LookTokens {
   density: Density;
   imageRatio: ImageRatio;
   motion: Motion;
+  /** Optional UI tokens (see LOOK_UI_TOKEN_KEYS); absent = the skin's own behaviour. */
+  wordmarkSize?: WordmarkSize;
+  overPhotoChrome?: OverPhotoChrome;
+  receiptStyle?: ReceiptStyle;
 }
 
 export interface LookDefinition {
@@ -69,6 +86,7 @@ export interface LookChrome {
 export const LOOK_DESIGN_KEYS = [
   'presentation',
   'frame',
+  'textAnchor',
   'layout',
   'layoutMobile',
   'captionPosition',
@@ -115,3 +133,17 @@ export const LOOK_TOKEN_KEYS = [
   'imageRatio',
   'motion',
 ] as const satisfies readonly (keyof StoreTheme)[];
+
+/**
+ * Optional look-owned StoreTheme keys (W2a). A look emits one only when it sets it, so a stored
+ * value is still a merchant override (precedence merchant > look > skin, composeStoreTheme) and
+ * a design reset clears it like any LOOK_TOKEN_KEYS key.
+ */
+export const LOOK_UI_TOKEN_KEYS = [
+  'wordmarkSize',
+  'overPhotoChrome',
+  'receiptStyle',
+] as const satisfies readonly (keyof StoreTheme)[];
+
+/** Every StoreTheme key a look owns: the always-set tokens plus the optional UI tokens. */
+export const LOOK_OWNED_THEME_KEYS = [...LOOK_TOKEN_KEYS, ...LOOK_UI_TOKEN_KEYS] as const;

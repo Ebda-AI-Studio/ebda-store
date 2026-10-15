@@ -28,6 +28,9 @@ import {
   storeSlugIssueCode,
   LOOK_DENSITIES,
   LOOK_IMAGE_RATIOS,
+  LOOK_OVER_PHOTO_CHROMES,
+  LOOK_RECEIPT_STYLES,
+  LOOK_WORDMARK_SIZES,
   LOOK_MOTIONS,
   deliveryDaysSchema,
   deliveryOffDaysSchema,
@@ -258,6 +261,9 @@ const themeSchema = z
       density: LOOK_DENSITIES,
       imageRatio: LOOK_IMAGE_RATIOS,
       motion: LOOK_MOTIONS,
+      wordmarkSize: LOOK_WORDMARK_SIZES,
+      overPhotoChrome: LOOK_OVER_PHOTO_CHROMES,
+      receiptStyle: LOOK_RECEIPT_STYLES,
     };
     for (const [key, values] of Object.entries(allowed)) {
       if (!(key in data) || data[key] === null) continue;

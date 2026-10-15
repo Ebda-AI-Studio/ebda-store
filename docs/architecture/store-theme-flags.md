@@ -66,10 +66,20 @@ Looks (`docs/ebda/templates/looks.md`) own a set of `StoreTheme` keys, `LOOK_TOK
 
 All three are optional and absent from `DEFAULT_THEME` (Ruling LOOKS-6): a legacy store (`stores.look` null) emits none of the look CSS variables and renders byte-identical.
 
+**Optional look UI tokens (W2a, Ruling B1-47).** `LOOK_UI_TOKEN_KEYS` are look-owned too, but a look sets them only when it needs them (`lookTheme` emits nothing for an unset one), so every store with no look, and every look that leaves them out, renders exactly as before. `LOOK_OWNED_THEME_KEYS` = `LOOK_TOKEN_KEYS` + these; it is what a `reset` switch deletes and what `overriddenLookKeys` checks.
+
+| Key               | Type                   | Default | Owner / consumer                                                                                                               |
+| ----------------- | ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `wordmarkSize`    | `'lg' \| 'xl'`         | unset   | header text wordmark + the checkout/success header (`templates/shared/wordmark.ts`); `lg` 24px, `xl` 24/30px; Qamar looks only |
+| `overPhotoChrome` | `'soft' \| 'bare'`     | unset   | over-photo controls (wishlist heart): `bare` = an ink glyph with a 44px hit area, no disc. Read by the card in W2b (L-12)      |
+| `receiptStyle`    | `'device' \| 'framed'` | unset   | order receipt housing: `framed` = paper in the page ink, no slab. Read by `ReceiptPrinter` in W3 (K-07)                        |
+
+The theme PUT refuses any other value for these three (`null` deletes). A hero's text position is NOT a theme key: it is the hero section's design key `textAnchor` (`'center' | 'bottom-start'`), set by a look's mix and editable per section (Ruling B1-47).
+
 - **`composeStoreTheme({ template, look, theme })`** (`@ebda/shared`) is the single compose path for every resolver site: `DEFAULT_THEME < TEMPLATE_THEMES[skin] < look tokens < stores.theme`. Do not spread `getTemplateTheme(...)` and `stores.theme` by hand; an unknown/null `look` is ignored.
 - **`PUT /stores/:id/theme` null-deletes.** `StoreService.updateTheme` shallow-merges the payload into the stored theme, and a `null` value DELETES that key (it is never persisted as `null`). That is how a merchant resets one look override back to the look's value. No admin surface wrote an intentional null before this (audited 2026-10-14). Builder reset also removes the key from the draft theme first (Ruling LOOKS-11).
 - **`overriddenLookKeys(theme, look)`** lists look-owned keys whose stored value differs from the look; it drives the override badges in the builder's `ThemeSettingsPanel`.
-- Switching look is `PUT /stores/:id/look` (`StoreService.applyLook`): `design: 'keep'` leaves overrides, `'reset'` deletes every `LOOK_TOKEN_KEYS` key from `stores.theme` and the draft theme.
+- Switching look is `PUT /stores/:id/look` (`StoreService.applyLook`): `design: 'keep'` leaves overrides, `'reset'` deletes every `LOOK_OWNED_THEME_KEYS` key from `stores.theme` and the draft theme.
 
 ## Product-card CTA + OOS-label + name-case (2026-06-24)
 

@@ -230,6 +230,18 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     expect(s.look).toBe(LOOK_ID);
   });
 
+  it('reset: also drops the optional look UI tokens a merchant stored (W2a)', async () => {
+    const m = await seedMerchant('reset-ui', {
+      wordmarkSize: 'xl',
+      overPhotoChrome: 'soft',
+      receiptStyle: 'device',
+      showQuickAdd: true,
+    });
+    const res = await put(m.storeId, m.token, { lookId: LOOK_ID, design: 'reset' });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect((await row(m.storeId)).theme).toEqual({ showQuickAdd: true });
+  });
+
   it('theme PUT: density / imageRatio / motion accept only their known values (null deletes)', async () => {
     const m = await seedMerchant('look-keys', { density: 'airy', motion: 'subtle' });
     const putTheme = (body: Record<string, unknown>) =>
@@ -244,6 +256,9 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
       { motion: 'wild' },
       { density: 3 },
       { motion: '' },
+      { wordmarkSize: 'huge' },
+      { overPhotoChrome: 'glass' },
+      { receiptStyle: 'thermal' },
     ]) {
       const res = await putTheme(bad);
       expect(res.status, JSON.stringify(bad)).toBe(400);
@@ -252,6 +267,14 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     const ok = await putTheme({ density: 'compact', imageRatio: '3/4', motion: null });
     expect(ok.status, JSON.stringify(ok.body)).toBe(200);
     expect((await row(m.storeId)).theme).toEqual({ density: 'compact', imageRatio: '3/4' });
+    const ui = await putTheme({ wordmarkSize: 'lg', overPhotoChrome: 'bare', receiptStyle: null });
+    expect(ui.status, JSON.stringify(ui.body)).toBe(200);
+    expect((await row(m.storeId)).theme).toEqual({
+      density: 'compact',
+      imageRatio: '3/4',
+      wordmarkSize: 'lg',
+      overPhotoChrome: 'bare',
+    });
   });
 
   it('unknown look: 400 INVALID_LOOK and the store is unchanged', async () => {

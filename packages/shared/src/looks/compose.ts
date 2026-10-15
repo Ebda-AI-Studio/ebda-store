@@ -2,7 +2,7 @@ import type { StoreTheme, TemplateId } from '../types/store-theme';
 import { getTemplateTheme } from '../types/store-theme';
 import { hexToHsl as h } from '../utils/color';
 import { getLook } from './registry';
-import { LOOK_TOKEN_KEYS, type LookDefinition } from './types';
+import { LOOK_OWNED_THEME_KEYS, type LookDefinition } from './types';
 
 /**
  * The StoreTheme keys a look sets. Colour values are bare HSL triplets (the
@@ -38,6 +38,10 @@ export function lookTheme(look: LookDefinition): Partial<StoreTheme> {
     density: t.density,
     imageRatio: t.imageRatio,
     motion: t.motion,
+    // Optional UI tokens: emitted only when the look sets them (absent = skin behaviour).
+    ...(t.wordmarkSize ? { wordmarkSize: t.wordmarkSize } : {}),
+    ...(t.overPhotoChrome ? { overPhotoChrome: t.overPhotoChrome } : {}),
+    ...(t.receiptStyle ? { receiptStyle: t.receiptStyle } : {}),
   };
 }
 
@@ -66,8 +70,8 @@ export function composeStoreTheme(i: {
 export function overriddenLookKeys(
   theme: Record<string, unknown> | null | undefined,
   look: LookDefinition
-): (typeof LOOK_TOKEN_KEYS)[number][] {
+): (typeof LOOK_OWNED_THEME_KEYS)[number][] {
   if (!theme) return [];
   const base = lookTheme(look) as Record<string, unknown>;
-  return LOOK_TOKEN_KEYS.filter(k => theme[k] !== undefined && theme[k] !== base[k]);
+  return LOOK_OWNED_THEME_KEYS.filter(k => theme[k] !== undefined && theme[k] !== base[k]);
 }

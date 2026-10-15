@@ -6,7 +6,14 @@
 import { deriveBrandRoles } from '../utils/brand-roles';
 import { statusInkVars } from '../utils/status-ink';
 import { colorToHslTriplet } from '../utils/color';
-import type { Density, ImageRatio, Motion } from '../looks/types';
+import type {
+  Density,
+  ImageRatio,
+  Motion,
+  OverPhotoChrome,
+  ReceiptStyle,
+  WordmarkSize,
+} from '../looks/types';
 import { getLook } from '../looks/registry';
 import { resolveLookFonts } from '../looks/fonts';
 
@@ -141,6 +148,11 @@ export interface StoreTheme {
   density?: Density;
   imageRatio?: ImageRatio;
   motion?: Motion;
+  // Optional look UI tokens (W2a): absent on legacy stores and on looks that do not set them, so
+  // every consumer keeps its current rendering unless the composed theme carries a value.
+  wordmarkSize?: WordmarkSize;
+  overPhotoChrome?: OverPhotoChrome;
+  receiptStyle?: ReceiptStyle;
 
   // Per-store homepage section background preset — see BackgroundPreset
   // for behavior. Optional; missing or 'none' means flat-surface (no

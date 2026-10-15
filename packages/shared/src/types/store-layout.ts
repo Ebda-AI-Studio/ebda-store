@@ -231,6 +231,13 @@ export interface HeroSettings extends SectionBgOverride, SectionPaddingMaxWidthV
    * (whole image, letterboxed). Ignored unless `presentation === 'framed'`.
    */
   frame?: 'none' | 'line';
+  /**
+   * W2a (L-04): where the copy sits on a cropped hero. `'bottom-start'` puts the headline, line
+   * and button at the bottom inline-start corner on a gradient scrim that covers only the text
+   * block (>= 60% of the photo stays clear); absent / `'center'` = the centred overlay as before.
+   * Atelier's and Vitrine's mixes set `'bottom-start'`; a merchant can pick either.
+   */
+  textAnchor?: 'center' | 'bottom-start';
   /** Per-section typography overrides — wins over global typography zones. */
   typography?: SectionTypographyOverride;
   /** Per-section divider overrides — see SectionDividers. Default undefined (off). */

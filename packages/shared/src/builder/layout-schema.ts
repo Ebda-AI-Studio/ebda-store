@@ -187,6 +187,8 @@ const layoutSchemaInternal = z
       // Ruling B1-41: an opt-in hairline drawn inside a FRAMED hero (Vitrine's mix sets 'line');
       // with it the photo fills the frame. Absent / 'none' = the framed hero as before.
       frame: z.enum(['none', 'line']).optional(),
+      // W2a (L-04): copy at the bottom-start corner on a text-block scrim. Absent = centred.
+      textAnchor: z.enum(['center', 'bottom-start']).optional(),
       // 2026-05-18 Sprint 3: per-section bg color. Must be listed or Zod
       // silently strips it on every PUT — same trap class as imageMobile.
       bgColor: colorValue,

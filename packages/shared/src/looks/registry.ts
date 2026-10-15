@@ -65,6 +65,12 @@ export const LOOKS: readonly LookDefinition[] = [
       density: 'airy',
       imageRatio: '3/4',
       motion: 'subtle',
+      // W2a token plumbing (fix-waves W2 #1): a wordmark that leads the header (T-01), over-photo
+      // controls as a bare glyph (L-12, read by the card in W2b) and the receipt as framed paper
+      // in the page ink (K-07, W3).
+      wordmarkSize: 'lg',
+      overPhotoChrome: 'bare',
+      receiptStyle: 'framed',
     },
   }),
   L({
@@ -115,6 +121,8 @@ export const LOOKS: readonly LookDefinition[] = [
       density: 'regular',
       imageRatio: '4/5',
       motion: 'expressive',
+      // T-01: the wordmark leads the header (it was 12px tracked caps).
+      wordmarkSize: 'lg',
     },
   }),
   L({
@@ -164,6 +172,8 @@ export const LOOKS: readonly LookDefinition[] = [
       density: 'regular',
       imageRatio: '3/4',
       motion: 'subtle',
+      // The centred Ruqaa wordmark at its current size (24/30px), now also on checkout/success.
+      wordmarkSize: 'xl',
     },
   }),
   L({
