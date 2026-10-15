@@ -48,6 +48,92 @@ describe('redactSensitiveQuery', () => {
   });
 });
 
+describe("apostrophes never end a value (encodeURIComponent leaves ' raw; Franco-Arabic uses it)", () => {
+  // Final review C1: a value that stopped at `'` leaked everything after it.
+  const enc = encodeURIComponent;
+  it.each([
+    [`/search?q=O'Brien%20${PHONE}`, '/search?q=[Filtered]'],
+    [`/search?page=2&q='${PHONE}`, '/search?page=2&q=[Filtered]'],
+    [
+      `/api/v1/public/search/suggest?q=${enc("o'brien@mail.com")}`,
+      '/api/v1/public/search/suggest?q=[Filtered]',
+    ],
+    [`/search?q=${enc(`3'ada2 ${PHONE}`)}&sort=newest`, '/search?q=[Filtered]&sort=newest'],
+    [`/search?q=${enc(`7'aled ${PHONE}`)}`, '/search?q=[Filtered]'],
+    [`/products?search=${enc(`ma7'zan 3'ali ${PHONE}`)}`, '/products?search=[Filtered]'],
+  ])('%s', (input, out) => {
+    expect(redactSensitiveQuery(input)).toBe(out);
+    expect(redactSensitiveQuery(input)).not.toContain(PHONE.slice(3));
+  });
+
+  it('element-chain href with an apostrophe inside the quoted value', () => {
+    const chain = `a:attr__href="/search?q=o'brien%20${PHONE}"nth-child="1"`;
+    expect(redactSensitiveQuery(chain)).toBe('a:attr__href="/search?q=[Filtered]"nth-child="1"');
+  });
+
+  it('every SDK surface: request.url, query_string forms, breadcrumbs, spans, transaction', () => {
+    const v = `O'Brien%20${PHONE}`;
+    const event = {
+      transaction: `GET /search?q=${v}`,
+      request: { url: `https://shop.ebda.app/search?q=${v}`, query_string: `q='${PHONE}&page=1` },
+      breadcrumbs: [
+        { category: 'navigation', data: { from: '/', to: `/search?q=3'${PHONE}` } },
+        { category: 'fetch', data: { url: `https://api.ebda.app/suggest?q=7'${PHONE}` } },
+      ],
+      spans: [
+        {
+          description: `GET /x?search=${v}`,
+          data: { 'url.full': `/x?search=${v}`, 'http.query': `?q='${PHONE}` },
+        },
+      ],
+    };
+    expect(JSON.stringify(scrubSentryEvent(event))).not.toContain(PHONE);
+    const pairs = scrubSentryEvent({ request: { query_string: [['q', `O'Brien ${PHONE}`]] } });
+    expect(JSON.stringify(pairs)).not.toContain(PHONE);
+    const obj = scrubSentryEvent({ request: { query_string: { q: `'${PHONE}` } } });
+    expect(JSON.stringify(obj)).not.toContain(PHONE);
+    const crumb = scrubSentryBreadcrumb({
+      category: 'fetch',
+      data: { url: `/suggest?q=o'brien%40x.com` },
+    });
+    expect(crumb.data.url).toBe('/suggest?q=[Filtered]');
+  });
+
+  it('posthog $current_url and $elements_chain', () => {
+    const out = scrubPostHogCapture({
+      event: '$autocapture',
+      properties: {
+        $current_url: `https://shop.ebda.app/search?q=3'${PHONE}`,
+        $elements_chain: `a:attr__href="/search?q=O'Brien%20${PHONE}"nth-child="1"`,
+      },
+    })!;
+    expect(JSON.stringify(out)).not.toContain(PHONE);
+  });
+});
+
+describe('array keys (q[] / q%5B%5D / q[0])', () => {
+  it.each([
+    [`/x?q[]=${PHONE}&page=1`, '/x?q[]=[Filtered]&page=1'],
+    [`/x?q%5B%5D=${PHONE}`, '/x?q%5B%5D=[Filtered]'],
+    [`/x?search[0]=${PHONE}`, '/x?search[0]=[Filtered]'],
+  ])('%s', (input, out) => expect(redactSensitiveQuery(input)).toBe(out));
+
+  it('query_string pairs and object with an array key', () => {
+    expect(
+      scrubSentryEvent({ request: { query_string: [['q[]', PHONE]] } }).request.query_string
+    ).toEqual([['q[]', '[Filtered]']]);
+    expect(
+      scrubSentryEvent({ request: { query_string: { 'q[]': PHONE } } }).request.query_string
+    ).toEqual({
+      'q[]': '[Filtered]',
+    });
+  });
+
+  it('look-alike array keys stay', () => {
+    expect(redactSensitiveQuery('/x?qq[]=1&page[]=2')).toBe('/x?qq[]=1&page[]=2');
+  });
+});
+
 describe('scrubSentryEvent', () => {
   it('removes a phone typed into ?search= from every place an SDK puts the URL', () => {
     const event = {

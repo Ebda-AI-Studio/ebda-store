@@ -29,24 +29,34 @@ export const REDACTED_QUERY_VALUE = '[Filtered]';
 
 const SENSITIVE = new Set<string>(SENSITIVE_QUERY_PARAMS);
 // `?key=value` / `&key=value` anywhere in a string (absolute or relative URL, a log message);
-// also a bare query string `key=value&…` at the very start. A value stops at a quote so a
+// also a bare query string `key=value&…` at the very start. A value stops at a DOUBLE quote so a
 // PostHog `$elements_chain` string (`a:attr__href="/search?q=abc"nth-child="1"`) is not swallowed
-// whole by its first `key="` pair, which would hide the inner `?q=`.
-const PARAM_RE = /(^|[?&])([^=&#?\s]+)=([^&#\s"']*)/g;
+// whole by its first `key="` pair, which would hide the inner `?q=`. Never at an apostrophe:
+// `encodeURIComponent` leaves `'` raw, and Franco-Arabic search terms use it as a letter (`3'` =
+// غ, `7'` = خ), so `?q=O'Brien%2001012345678` must redact whole. A raw `"` cannot occur inside a
+// value (encodeURIComponent / URLSearchParams / the WHATWG URL parser all encode it).
+const PARAM_RE = /(^|[?&])([^=&#?\s]+)=([^&#\s"]*)/g;
 
-function decodeKey(key: string): string {
+/** Lower-cased, decoded key with any array suffix (`q[]`, `q[0]`) removed. */
+function normalizeKey(key: string): string {
+  let k: string;
   try {
-    return decodeURIComponent(key.replace(/\+/g, ' ')).toLowerCase();
+    k = decodeURIComponent(key.replace(/\+/g, ' '));
   } catch {
-    return key.toLowerCase();
+    k = key;
   }
+  return k.toLowerCase().replace(/\[[^\]]*\]$/, '');
+}
+
+function isSensitiveKey(key: string): boolean {
+  return SENSITIVE.has(normalizeKey(key));
 }
 
 /** Replace the value of every sensitive query parameter in `text` with `[Filtered]`. */
 export function redactSensitiveQuery(text: string): string {
   if (typeof text !== 'string' || !text.includes('=')) return text;
   return text.replace(PARAM_RE, (whole, lead: string, key: string, value: string) => {
-    if (!value || !SENSITIVE.has(decodeKey(key))) return whole;
+    if (!value || !isSensitiveKey(key)) return whole;
     return `${lead}${key}=${REDACTED_QUERY_VALUE}`;
   });
 }
@@ -81,7 +91,7 @@ function scrubValue(value: unknown, depth: number, seen: WeakSet<object>): unkno
       value.length === 2 &&
       typeof value[0] === 'string' &&
       typeof value[1] === 'string' &&
-      SENSITIVE.has(value[0].toLowerCase())
+      isSensitiveKey(value[0])
     ) {
       return put(value, 1, REDACTED_QUERY_VALUE, value);
     }
@@ -104,7 +114,7 @@ function scrubValue(value: unknown, depth: number, seen: WeakSet<object>): unkno
     const q = qs as Record<string, unknown>;
     let q2: Record<string, unknown> = q;
     for (const key of Object.keys(q)) {
-      if (SENSITIVE.has(key.toLowerCase()) && q[key]) q2 = put(q2, key, REDACTED_QUERY_VALUE, q);
+      if (isSensitiveKey(key) && q[key]) q2 = put(q2, key, REDACTED_QUERY_VALUE, q);
     }
     if (q2 !== q) out = put(out, 'query_string', q2, obj);
   }

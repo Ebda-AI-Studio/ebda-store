@@ -111,7 +111,9 @@ Full per-table matrix (retention days, exact columns, cron IDs) lives in
   fire. Cost if wrong: a phone number typed into search reaches an ad network for a consenting
   shopper.
 - Related: the PostHog `$elements_chain` string (`a:attr__href="/search?q=…"`) is scrubbed too;
-  a query value stops at a quote so the inner `?q=` is no longer swallowed by the first pair.
+  a query value stops at a double quote (never at an apostrophe, which `encodeURIComponent`
+  leaves raw and Franco-Arabic terms use as a letter) so the inner `?q=` is not swallowed by the
+  first pair.
 
 ## 4. Two intentional "won't erase" categories — and why
 
