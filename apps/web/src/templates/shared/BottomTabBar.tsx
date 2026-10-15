@@ -11,6 +11,7 @@ import type { BottomBarSettings, StoreTheme } from '@ebda/shared';
 import { resolveColor, DEFAULT_THEME } from '@ebda/shared';
 import { CartIcon } from '@ebda/ui';
 import type { NavItem } from '../types';
+import { Sheet } from '../../components/ui/Sheet';
 
 /**
  * Sprint 3 (2026-05-17): Mobile sticky bottom tab bar with 4 destinations
@@ -295,59 +296,38 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
     </nav>
   );
 
-  // Slide-up nav drawer anchored above the bar. Lists the store's full
+  // Nav drawer on the shared Sheet primitive (R-04): Escape, focus in/trap/
+  // return to the Menu tab, scroll lock, a 44px close. It lists the store's full
   // navigation (Products / Categories / About / Contact / Locations / custom).
-  // z-50 sits above the bar (z-40); the backdrop closes on tap.
   const drawer = (
-    <div
-      className={`fixed inset-0 z-50 md:hidden transition-opacity duration-[var(--duration-fast)] ${
-        menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-      }`}
-      aria-hidden={!menuOpen}
-      // Closed sheet: invisible AND out of the tab order (axe aria-hidden-focus;
-      // its links were still reachable by keyboard while hidden).
-      inert={!menuOpen ? true : undefined}
+    <Sheet
+      open={menuOpen}
+      onClose={() => setMenuOpen(false)}
+      side="bottom"
+      id="bottom-nav-menu-drawer"
+      dir={isRtl ? 'rtl' : 'ltr'}
+      title={menuLabel}
+      closeLabel={isRtl ? 'إغلاق القائمة' : 'Close menu'}
+      className="bg-[hsl(var(--bg-section-alt))] text-foreground md:hidden"
+      style={resolvedBg ? { backgroundColor: resolvedBg } : undefined}
+      titleClassName="text-xs font-semibold uppercase tracking-wider text-foreground/50"
+      bodyClassName="mx-auto w-full max-w-md px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
     >
-      <button
-        type="button"
-        aria-label={isRtl ? 'إغلاق القائمة' : 'Close menu'}
-        tabIndex={menuOpen ? 0 : -1}
-        onClick={() => setMenuOpen(false)}
-        className="absolute inset-0 h-full w-full bg-black/40 backdrop-blur-sm"
-      />
-      <div
-        id="bottom-nav-menu-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-label={menuLabel}
-        dir={isRtl ? 'rtl' : 'ltr'}
-        className={`absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-foreground/10 bg-[hsl(var(--bg-section-alt))] pb-[calc(var(--bottom-tab-h)+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-[var(--duration-fast)] ${
-          menuOpen ? 'translate-y-0' : 'translate-y-full'
-        }`}
-        style={resolvedBg ? { backgroundColor: resolvedBg } : undefined}
-      >
-        <div className="mx-auto flex max-w-md flex-col px-4 pt-3">
-          <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-foreground/20" aria-hidden />
-          <span className="mb-1 text-xs font-semibold uppercase tracking-wider text-foreground/50">
-            {menuLabel}
-          </span>
-          <ul className="flex flex-col">
-            {navigation.map(item => (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  prefetch={false}
-                  onClick={() => setMenuOpen(false)}
-                  className="block border-b border-foreground/5 py-3 text-sm font-medium text-foreground hover:text-[hsl(var(--primary))]"
-                >
-                  {isRtl ? (item.labelAr ?? item.label) : item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </div>
+      <ul className="flex flex-col">
+        {navigation.map(item => (
+          <li key={item.href}>
+            <Link
+              href={item.href}
+              prefetch={false}
+              onClick={() => setMenuOpen(false)}
+              className="block border-b border-foreground/5 py-3 text-sm font-medium text-foreground hover:text-[hsl(var(--primary))]"
+            >
+              {isRtl ? (item.labelAr ?? item.label) : item.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Sheet>
   );
 
   // Portal to body so no transformed ancestor can trap the fixed positioning.
