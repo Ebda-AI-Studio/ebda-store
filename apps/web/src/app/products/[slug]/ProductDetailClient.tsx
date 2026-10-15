@@ -754,6 +754,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   className="w-full"
                   personalisation={waPersonalisation}
                   disabled={noteMissing}
+                  onBlocked={() => setNoteNudge(n => n + 1)}
                 />
                 <ShareProductRow
                   productName={displayName}
@@ -1197,6 +1198,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 className="mt-6 w-full sm:w-auto"
                 personalisation={waPersonalisation}
                 disabled={noteMissing}
+                onBlocked={() => setNoteNudge(n => n + 1)}
               />
               <ShareProductRow
                 productName={language === 'ar' && product.nameAr ? product.nameAr : product.name}

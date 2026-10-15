@@ -112,9 +112,23 @@ beforeEach(() => {
   ctx.addItem = vi.fn(async () => true);
 });
 
+// jsdom has no scrollIntoView: tests install a mock on the prototype, put it back after each.
+const realScrollIntoView = Element.prototype.scrollIntoView;
+function mockScrollIntoView() {
+  const fn = vi.fn();
+  Element.prototype.scrollIntoView = fn;
+  return fn;
+}
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  if (realScrollIntoView === undefined) {
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  } else {
+    Element.prototype.scrollIntoView = realScrollIntoView;
+  }
 });
 
 const product = (over: Record<string, unknown> = {}) => ({
@@ -191,7 +205,7 @@ describe('default PDP sticky bar mirrors the main add button', () => {
   it.each(['main', 'sticky'] as const)(
     'tap on the %s button with the note missing: focuses the field, reveals the hint, never adds',
     async which => {
-      Element.prototype.scrollIntoView = vi.fn();
+      const scrollSpy = mockScrollIntoView();
       const { stickyBtn, main } = await renderPdp(product(requiredNote));
       const input = document.querySelector('input[maxlength]') as HTMLInputElement;
       expect(screen.getByTestId('personalisation-hint').textContent).toBe('');
@@ -200,7 +214,7 @@ describe('default PDP sticky bar mirrors the main add button', () => {
       });
       expect(ctx.addItem).not.toHaveBeenCalled();
       expect(document.activeElement).toBe(input);
-      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+      expect(scrollSpy).toHaveBeenCalled();
       expect(screen.getByTestId('personalisation-hint').textContent).toBe('Fill in “Name” first');
       // With the note typed, the same tap adds.
       fireEvent.change(input, { target: { value: 'Sara' } });
@@ -247,7 +261,7 @@ describe('Dahab PDP: the main and pinned buttons share the note nudge', () => {
   it.each(['pdp-add', 'dahab-pinned-add'])(
     '%s with the note missing: enabled, focuses the field, never adds',
     async testId => {
-      Element.prototype.scrollIntoView = vi.fn();
+      mockScrollIntoView();
       vi.stubGlobal('IntersectionObserver', IO);
       vi.stubGlobal('localStorage', {
         getItem: () => null,
@@ -271,6 +285,44 @@ describe('Dahab PDP: the main and pinned buttons share the note nudge', () => {
       });
       expect(ctx.addItem).not.toHaveBeenCalled();
       expect(document.activeElement).toBe(document.querySelector('input[maxlength]'));
+    }
+  );
+});
+
+describe('WhatsApp order button with the required note missing nudges the field (both PDP paths)', () => {
+  it.each(['minimal', 'dahab'])(
+    '%s: tap focuses the field, reveals the hint, opens nothing',
+    async template => {
+      const scrollSpy = mockScrollIntoView();
+      vi.stubGlobal('IntersectionObserver', IO);
+      vi.stubGlobal('localStorage', {
+        getItem: () => null,
+        setItem: () => {},
+        removeItem: () => {},
+      });
+      const { default: ProductDetailClient } =
+        await import('../../apps/web/src/app/products/[slug]/ProductDetailClient');
+      ctx.store = { ...STORES.A, template, whatsapp: '+201012345678' };
+      render(<ProductDetailClient initialProduct={product(requiredNote) as never} />);
+      const wa = (await screen.findByTestId('wa-me-product')) as HTMLElement;
+      // Still marked disabled for assistive tech, but a real tappable control with no link target.
+      expect(wa.getAttribute('aria-disabled')).toBe('true');
+      expect(wa.getAttribute('href')).toBeNull();
+      const input = document.querySelector('input[maxlength]') as HTMLInputElement;
+      expect(screen.getByTestId('personalisation-hint').textContent).toBe('');
+      await act(async () => {
+        fireEvent.click(wa);
+      });
+      expect(document.activeElement).toBe(input);
+      expect(scrollSpy).toHaveBeenCalled();
+      expect(screen.getByTestId('personalisation-hint').textContent).toBe('Fill in “Name” first');
+      expect(ctx.addItem).not.toHaveBeenCalled();
+      // With the note typed it becomes the plain wa.me link.
+      fireEvent.change(input, { target: { value: 'Sara' } });
+      const link = screen.getByTestId('wa-me-product');
+      expect(link.tagName).toBe('A');
+      expect(link.getAttribute('href')).toContain('https://wa.me/');
+      expect(link.getAttribute('aria-disabled')).toBeNull();
     }
   );
 });

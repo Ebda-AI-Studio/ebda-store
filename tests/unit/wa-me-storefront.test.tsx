@@ -86,6 +86,15 @@ describe('storefront wa.me buttons', () => {
     expect(out).toContain('pointer-events-none');
   });
 
+  it('product page: with onBlocked a disabled button is a tappable aria-disabled button, not an inert link', () => {
+    setup();
+    const out = html(<WaMeProductButton product={product} disabled onBlocked={() => {}} />);
+    expect(out).toContain('<button');
+    expect(out).toContain('aria-disabled="true"');
+    expect(out).not.toContain('href=');
+    expect(out).not.toContain('pointer-events-none');
+  });
+
   it('no number → no button on any surface', () => {
     for (const whatsapp of [undefined, '', '12345', '+966501234567']) {
       setup({ whatsapp });
