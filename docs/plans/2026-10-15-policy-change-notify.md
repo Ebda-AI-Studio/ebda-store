@@ -60,7 +60,7 @@
 | `packages/shared/src/legal/index.ts` (new) | Registry, types, validation, pending computation, URL/date helpers. Pure; imports only `../brand`. |
 | `packages/shared/src/__tests__/legal-policies.test.ts` (new) | Registry invariants + helpers. |
 | `apps/marketing/src/components/LegalPage.tsx`, `lib/legal-{types,en,ar}.ts` | Render date/version from the registry. |
-| `packages/database/prisma/schema.prisma`, `migrations/20261015100000_legal_acceptances_and_notices/` | Models, tables, RLS. |
+| `packages/database/prisma/schema.prisma`, `migrations/20261017000100_legal_acceptances_and_notices/` | Models, tables, RLS. |
 | `packages/database/src/tenant-guard.ts` (+ generated snapshot) | Classify the 3 models. |
 | `apps/api/src/services/legal-notice.service.ts` (new) | Signup rows, pending/ack, recipients, fan-out batches, send request, overview. |
 | `apps/api/src/routes/legal-policy.routes.ts` (new) | `meLegalNoticeRoutes` + `adminLegalPolicyRoutes`. |
@@ -734,8 +734,8 @@ git commit -m "feat(marketing): legal pages render date and version from the pol
 
 **Files:**
 - Modify: `packages/database/prisma/schema.prisma` (User relations near line 98; new models after `model SystemSetting`, line ~2108)
-- Create: `packages/database/prisma/migrations/20261015100000_legal_acceptances_and_notices/migration.sql`
-- Create: `packages/database/prisma/migrations/20261015100000_legal_acceptances_and_notices/rollback.sql`
+- Create: `packages/database/prisma/migrations/20261017000100_legal_acceptances_and_notices/migration.sql`
+- Create: `packages/database/prisma/migrations/20261017000100_legal_acceptances_and_notices/rollback.sql`
 - Modify: `packages/database/src/tenant-guard.ts:106-124` (`USER_KEYED_MODELS`, `GLOBAL_MODELS`)
 - Regenerate: `packages/database/src/tenant-guard-schema.generated.ts`
 - Modify: `tests/integration/rls-ebda-app.test.ts:81-86` (`DOCUMENTED_NON_RLS`) and `:1537` (`USER_KEYED`)
@@ -981,7 +981,7 @@ model LegalNoticeDelivery {
 `migration.sql`:
 
 ```sql
--- 20261015100000_legal_acceptances_and_notices (Ruling LEGAL-4)
+-- 20261017000100_legal_acceptances_and_notices (Ruling LEGAL-4)
 --
 --   legal_acceptances        NEW, user-keyed. What each user accepted (signup click-wrap, dashboard
 --                            "Got it"). Append-only for ebda_app: UPDATE/DELETE revoked below; the
@@ -1068,7 +1068,7 @@ REVOKE UPDATE, DELETE ON "legal_acceptances" FROM ebda_app;
 `rollback.sql`:
 
 ```sql
--- Rollback of 20261015100000_legal_acceptances_and_notices: drops the three tables (the
+-- Rollback of 20261017000100_legal_acceptances_and_notices: drops the three tables (the
 -- acceptance history is lost; take a pg_dump of them first). Then revert the PR so
 -- schema.prisma no longer declares the models, and `prisma migrate resolve --rolled-back`.
 DROP TABLE IF EXISTS "legal_notice_deliveries";
@@ -1146,7 +1146,7 @@ Expected: the migration applies; all tests PASS (the guard-models test now has t
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/database/prisma/schema.prisma packages/database/prisma/migrations/20261015100000_legal_acceptances_and_notices packages/database/src/tenant-guard.ts packages/database/src/tenant-guard-schema.generated.ts tests/integration/rls-ebda-app.test.ts tests/integration/legal-tables-rls.test.ts
+git add packages/database/prisma/schema.prisma packages/database/prisma/migrations/20261017000100_legal_acceptances_and_notices packages/database/src/tenant-guard.ts packages/database/src/tenant-guard-schema.generated.ts tests/integration/rls-ebda-app.test.ts tests/integration/legal-tables-rls.test.ts
 git commit -m "feat(db): legal acceptance and notice tables under user-keyed rls"
 ```
 
