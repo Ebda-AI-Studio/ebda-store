@@ -130,7 +130,7 @@ row itself is readable only in the super-admin viewer.
 **Storefront search log (`search_query_daily`).** A row is a normalised search term and daily
 counts for one store; it is never linked to a user, session, IP, user agent or order, and keeps no
 time of day. Phone / email / national-id / order-number / id / link shaped terms are dropped before
-insert (`isPersonalDataTerm` in `apps/api/src/services/search-log.service.ts`), but free text can
+insert (`isPersonalDataTerm` in `@ebda/shared` `search/personal-data-term.ts`), but free text can
 still contain a name or a place a shopper typed. There is no subject key, so a per-customer erasure
 or export cannot find such a row and none is attempted (Ruling SEARCH-T5-6); the merchant view (admin
 `/stores/[id]/insights/searches` and the "searches with no results" card on Analytics, both
