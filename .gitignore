@@ -183,3 +183,6 @@ apps/api/.wrangler.deploy.jsonc
 # Isolated preview stack configs (scripts/preview/preview-config.mjs)
 apps/*/.wrangler.preview.jsonc
 .playwright-mcp/
+
+# Qamar demo raw generator output (B1 Task 6); only encoded assets/ are committed
+scripts/qamar-demo/img-src/

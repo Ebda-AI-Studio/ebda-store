@@ -193,3 +193,7 @@ Only the `ebda-{api,web,admin}-preview` Workers carry these; production never se
 - `CF_ENV_NAME` — `"preview"` on the preview web/admin Workers (Sentry environment name in `sentry-worker-entry.ts`).
 - `STOREFRONT_FRAME_ANCESTORS` — set to `https://admin-preview.ebda.app` for the preview storefront build and Worker, so the preview admin's builder canvas may frame it.
 - `NEXT_PUBLIC_API_URL` — the preview builds bake `https://api-preview.ebda.app/api/v1` (web) / `https://api-preview.ebda.app` (admin); the storefront CSP `connect-src` now admits a non-production API origin taken from this value (`apps/web/next.config.js`), production is unchanged.
+
+## Demo showroom seed (`scripts/storedemo/seed.mjs`, B1)
+
+- `QAMAR_DEMO_ASSET_BASE` (default `https://media.ebda.app/demo/qamar`) — where the Qamar demo photos and hero clip are served from; every `product_images.url`, swatch image and home-document image is `<base>/<file>`. With `--yes-production` any other value is refused (Ruling B1-16). Locally use a relative base (`/__qamar-demo`, files copied into an untracked `apps/web/public/__qamar-demo/`); an `http://` base works for images but the hero clip is then omitted (the hero video schema takes only https or relative URLs). Docs: `docs/ebda/templates/demo-store.md`.
