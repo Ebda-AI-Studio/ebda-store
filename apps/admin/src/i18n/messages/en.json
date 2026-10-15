@@ -9237,6 +9237,14 @@
       "back": "Back to Ebda Store"
     }
   },
+  "legalNotice": {
+    "title": "We updated our policies",
+    "effective": "Takes effect {date}.",
+    "read": "Read the policy",
+    "gotIt": "Got it",
+    "saving": "Saving…",
+    "ackFailed": "Could not save. Please try again."
+  },
   "looks": {
     "picker": {
       "tabs": "Store templates",
