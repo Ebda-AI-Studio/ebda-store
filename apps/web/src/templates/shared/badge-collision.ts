@@ -53,3 +53,29 @@ export function avoidReservedCorner<H extends string>({
   if (v !== 'top' || !hReserved) return { v, h };
   return otherHReserved ? { v: 'bottom', h } : { v: 'top', h: otherH };
 }
+
+/**
+ * X-01 (Lookbook/Vitrine taste gate 2026-10-15): the sold-out marker's corner —
+ * ONE answer for the ribbon itself (`OutOfStockRibbon`) and for the sale chip's
+ * pin (`pinDefaultDiscountBadge`), so the two can plan around each other.
+ *
+ * The marker's home is the logical top-START corner. A card whose wishlist heart
+ * (or compare / remove button) sits there used to paint the ribbon UNDER the
+ * heart; it now moves to top-END, and to the bottom edge when both top corners
+ * hold a button.
+ */
+export function soldOutCorner({
+  topStartReserved = false,
+  topEndReserved = false,
+}: {
+  topStartReserved?: boolean;
+  topEndReserved?: boolean;
+}): { v: CornerV; h: 'start' | 'end' } {
+  return avoidReservedCorner<'start' | 'end'>({
+    v: 'top',
+    h: 'start',
+    otherH: 'end',
+    hReserved: topStartReserved,
+    otherHReserved: topEndReserved,
+  });
+}

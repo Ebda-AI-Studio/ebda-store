@@ -8,7 +8,7 @@ import type { StoreTheme } from '@ebda/shared';
 import { resolveColor } from '@ebda/shared';
 import type { CtaShape, CtaSize } from './card-size';
 import { ctaShapeClass, ctaSizeClass, labelShapeClass, oosPlacementClass } from './card-size';
-import { avoidReservedCorner } from './badge-collision';
+import { avoidReservedCorner, soldOutCorner } from './badge-collision';
 
 /**
  * Shared platform-level CTA used by EVERY theme's ProductCard.
@@ -445,11 +445,11 @@ export function OutOfStockRibbon({
     );
   }
 
-  // Default diagonal ribbon (full back-compat).
-  // RTL: corner ribbon flips to start-side (which is visually the
-  // right edge of the card). The -45deg rotation also flips sign so
-  // the text reads correctly from the corner outward.
-  const rotation = isRtl ? 45 : -45;
+  // Default diagonal ribbon. Its corner comes from `soldOutCorner` (X-01): the
+  // logical top-start corner, or top-end when the card's heart / compare button
+  // sits at top-start (it used to paint UNDER the heart), or a pill on the
+  // bottom edge when both top corners hold a button. The sale chip's pin reads
+  // the same answer, so the two never share a corner either.
   // theme.oosRibbonColor: value-preserving theme token (2026-07-12). Default
   // (undefined) resolves to the exact original hardcoded terracotta so every
   // EXISTING store renders byte-identical; new stores are seeded a neutral
@@ -457,19 +457,38 @@ export function OutOfStockRibbon({
   const ribbonBg =
     (theme?.oosRibbonColor && theme && resolveColor(theme.oosRibbonColor, theme)) ??
     'hsl(15 60% 33%)';
+  const label = isRtl ? 'نفدت الكمية' : 'Out of Stock';
+  const corner = soldOutCorner({ topStartReserved, topEndReserved });
+  if (corner.v === 'bottom') {
+    return (
+      <span
+        className={`pointer-events-none absolute z-10 px-2 py-0.5 text-xs font-bold uppercase tracking-normal text-white shadow-sm ${oosPlacementClass('bottom-start')} ${className}`}
+        style={{ backgroundColor: ribbonBg }}
+        data-oos-corner="bottom-start"
+        aria-hidden
+      >
+        {label}
+      </span>
+    );
+  }
+  // The band leans out of its corner: -45deg on the physical LEFT corner, +45deg
+  // on the right (start is the right corner in Arabic).
+  const physicalLeft = (corner.h === 'start') !== isRtl;
+  const rotation = physicalLeft ? -45 : 45;
   return (
     <div
-      className={`pointer-events-none absolute top-0 start-0 z-10 h-[88px] w-[88px] overflow-hidden ${className}`}
+      className={`pointer-events-none absolute top-0 ${corner.h === 'start' ? 'start-0' : 'end-0'} z-10 h-[88px] w-[88px] overflow-hidden ${className}`}
+      data-oos-corner={`top-${corner.h}`}
       aria-hidden
     >
       <span
-        className="absolute top-[18px] start-[-34px] w-[160px] py-1 text-center text-xs font-bold uppercase tracking-wider text-white shadow-md"
+        className={`absolute top-[18px] ${corner.h === 'start' ? 'start-[-34px]' : 'end-[-34px]'} w-[160px] py-1 text-center text-xs font-bold uppercase tracking-wider text-white shadow-md`}
         style={{
           backgroundColor: ribbonBg,
           transform: `rotate(${rotation}deg)`,
         }}
       >
-        {isRtl ? 'نفدت الكمية' : 'Out of Stock'}
+        {label}
       </span>
     </div>
   );

@@ -1,7 +1,7 @@
 import type { StoreTheme } from '@ebda/shared';
 import { resolveColor } from '@ebda/shared';
 import { DISCOUNT_BADGE_DEFAULT_POSITION, type DiscountBadgePosition } from './discount-badge';
-import { avoidReservedCorner, type CornerV } from './badge-collision';
+import { avoidReservedCorner, soldOutCorner, type CornerV } from './badge-collision';
 
 /**
  * Custom (merchant-authored) product badge — the free-text chip a merchant
@@ -330,15 +330,21 @@ export function pinDefaultDiscountBadge({
       : (customBadgeCorner === 'top-left') !== isRtl
         ? 'start'
         : 'end';
-  // Deepest occupant of each logical top corner.
-  const startDepth: TopDepth = !orderable
-    ? 3
-    : topStartReserved
-      ? 2
-      : newOrBrandBadgeReserved || customAt === 'start'
-        ? 1
-        : 0;
-  const endDepth: TopDepth = topEndReserved ? 2 : customAt === 'end' ? 1 : 0;
+  // Deepest occupant of each logical top corner. A sold-out card's ribbon takes
+  // the corner `soldOutCorner` gives it (top-start, or top-end when a button
+  // holds top-start — X-01), the same answer OutOfStockRibbon renders from.
+  const ribbon = orderable ? null : soldOutCorner({ topStartReserved, topEndReserved });
+  const ribbonAt = ribbon && ribbon.v === 'top' ? ribbon.h : null;
+  const startDepth: TopDepth =
+    ribbonAt === 'start'
+      ? 3
+      : topStartReserved
+        ? 2
+        : newOrBrandBadgeReserved || customAt === 'start'
+          ? 1
+          : 0;
+  const endDepth: TopDepth =
+    ribbonAt === 'end' ? 3 : topEndReserved ? 2 : customAt === 'end' ? 1 : 0;
 
   let side: 'start' | 'end';
   let depth: TopDepth;
