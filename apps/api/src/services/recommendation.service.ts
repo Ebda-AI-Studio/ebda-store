@@ -16,6 +16,9 @@ const CACHE_TTL_SECONDS = 300; // 5 minutes
 const FBT_WINDOW_DAYS = 90;
 const FBT_MIN_THRESHOLD = 2;
 const FBT_LOCK_TTL_SECONDS = 300;
+// Cart cross-sell: slots shown, and how many scored candidates are read to fill them.
+const CART_RECS_SHOWN = 4;
+const CART_RECS_CANDIDATES = 12;
 
 // Minimal product shape returned in recommendation lists
 const productSelect = {
@@ -301,10 +304,12 @@ class RecommendationService {
       }
     }
 
-    // Sort by reference count, take top 4
+    // Sort by reference count. Read up to 12 candidates and keep the first 4
+    // a shopper can actually buy: a sold-out pick (no backorder) used to take
+    // one of the 4 slots as a dead card (W1a review, item 4).
     const sortedIds = Array.from(scoreMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
+      .slice(0, CART_RECS_CANDIDATES)
       .map(([id]) => id);
 
     if (!sortedIds.length) return [];
@@ -323,7 +328,9 @@ class RecommendationService {
     return sortedIds
       .map(id => products.find((p: any) => p.id === id))
       .filter(Boolean)
-      .map(p => enrichStockFlags(p!));
+      .map(p => enrichStockFlags(p!))
+      .filter(p => p.inStock || p.acceptsBackorder)
+      .slice(0, CART_RECS_SHOWN);
   }
 
   // ----------------------------------------

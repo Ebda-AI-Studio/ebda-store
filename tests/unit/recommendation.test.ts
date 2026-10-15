@@ -219,6 +219,42 @@ describe('getCartRecommendations', () => {
 // Product Recommendations Structure
 // ============================================================
 
+describe('getCartRecommendations — sold-out picks take no slot (W1a fix round)', () => {
+  const mockPrisma = prisma as any;
+  beforeEach(() => vi.clearAllMocks());
+
+  it('skips sold-out candidates and still fills 4 slots in score order; backorderable ones stay', async () => {
+    const ids = ['r1', 'r2', 'r3', 'r4', 'r5', 'r6'];
+    mockPrisma.productRelation.findMany.mockResolvedValue(
+      ids.map(t => ({ sourceProductId: 'in-cart', targetProductId: t }))
+    );
+    mockPrisma.frequentlyBoughtTogether.findMany.mockResolvedValue([]);
+    const stock = (id: string, inventory: number, allowBackorder = false) => ({
+      ...mockProductShape(id),
+      inventory,
+      allowBackorder,
+      lowStockThreshold: 5,
+      variants: [],
+    });
+    mockPrisma.product.findMany.mockResolvedValue([
+      stock('r1', 0), // sold out
+      stock('r2', 3),
+      stock('r3', 0, true), // backorder: buyable
+      stock('r4', 0), // sold out
+      stock('r5', 9),
+      stock('r6', 2),
+    ]);
+
+    const result = (await recommendationService.getCartRecommendations(storeId, [
+      'in-cart',
+    ])) as any[];
+
+    expect(result.map(p => p.id)).toEqual(['r2', 'r3', 'r5', 'r6']);
+    // more candidates than slots are read, so the sold-out ones can be replaced
+    expect(mockPrisma.product.findMany.mock.calls[0][0].where.id.in.length).toBe(6);
+  });
+});
+
 describe('getProductRecommendations', () => {
   const mockPrisma = prisma as any;
   const mockRedis = redis as any;
