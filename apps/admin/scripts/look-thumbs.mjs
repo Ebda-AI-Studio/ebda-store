@@ -18,8 +18,9 @@
  *
  * Deterministic: 390x844 phone, Arabic, reduced motion, cookie banner pre-dismissed, fixed chrome
  * (tab bar, sticky bars, dev overlay) hidden, a 390x488 clip from the top of the header (the demo
- * announcement above it is left out). When the look's signature section (SIGNATURE below) would
- * fall outside the clip, the clip moves down just enough to show it whole. Uses the repo's
+ * announcement above it is left out). When the look's signature (SIGNATURE below) would fall
+ * outside the clip, the clip moves down just enough to show it, never past its `keep` element
+ * (Vitrine: the first band's label, never cutting the hero headline). Uses the repo's
  * Playwright (root devDependency) in this mode only.
  */
 import { execFileSync } from 'node:child_process';
@@ -63,10 +64,14 @@ const todo = only.length ? looks.filter(l => only.includes(l.id)) : looks;
 mkdirSync(outDir, { recursive: true });
 
 /** The section that makes a look recognisable; the clip always shows it whole when present. */
-// Atelier and Lookbook read from their first screen (hero / collage under the header); Vitrine's
-// occasion bands sit below the fold, so its clip moves down to the first band.
+// Atelier and Lookbook read from their first screen (hero / collage under the header). Vitrine's
+// occasion bands sit below the fold: its clip moves down until the first band's label shows, but
+// never past the hero headline (`keep`), so the window and the first occasion read together.
 const SIGNATURE = {
-  'qamar.vitrine': '[data-tile-shape="band"] li',
+  'qamar.vitrine': {
+    show: '[data-tile-shape="band"] li .font-display',
+    keep: '[data-section="hero"] h1',
+  },
 };
 
 async function fromStorefront(list) {
@@ -99,9 +104,13 @@ async function fromStorefront(list) {
             if (getComputedStyle(el).position === 'fixed') el.style.display = 'none';
           const header = document.querySelector('header');
           const top = header ? header.getBoundingClientRect().top + window.scrollY : 0;
-          const sig = sel ? document.querySelector(sel) : null;
-          const bottom = sig ? sig.getBoundingClientRect().bottom + window.scrollY : 0;
-          return Math.round(Math.max(top, bottom - h));
+          const abs = el => (el ? el.getBoundingClientRect() : null);
+          const show = abs(sel && document.querySelector(sel.show));
+          const keep = abs(sel && document.querySelector(sel.keep));
+          let y = top;
+          if (show) y = Math.max(y, show.bottom + window.scrollY + 16 - h);
+          if (keep) y = Math.min(y, keep.top + window.scrollY - 16);
+          return Math.round(Math.max(top, y));
         },
         { sel: SIGNATURE[look.id] ?? null, h: SHOT_H }
       );
