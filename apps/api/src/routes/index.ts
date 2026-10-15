@@ -4,6 +4,7 @@ import merchantSignupRoutes from './merchant-signup.routes';
 import onboardingRoutes from './onboarding.routes';
 import setupGuideRoutes from './setup-guide.routes';
 import mfaRoutes from './mfa.routes';
+import { meLegalNoticeRoutes } from './legal-policy.routes';
 import storeRoutes from './store.routes';
 import blogRoutes from './blog.routes';
 import locationsRoutes from './locations.routes';
@@ -131,6 +132,8 @@ router.use('/auth', authRoutes);
 // Mounted under /auth/mfa so the full path is /api/v1/auth/mfa/*.
 // Must come AFTER auth routes and BEFORE any catch-all.
 router.use('/auth/mfa', mfaRoutes);
+// Legal policy notices for the signed-in merchant (Ruling LEGAL-4): user-level, no store scope.
+router.use('/me/legal-notices', meLegalNoticeRoutes);
 
 // Payment routes
 router.use('/payments', paymentRoutes);
