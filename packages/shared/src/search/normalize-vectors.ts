@@ -1,6 +1,6 @@
 /**
  * THE contract for Arabic search folding. `normalizeArabicSearch` (TS) and
- * `public.ebda_ar_norm` (SQL, migration 20261018000100) are BOTH tested against
+ * `public.ebda_ar_norm` (SQL, migration 20261019000100) are BOTH tested against
  * every row (packages/shared/src/search/__tests__ + tests/integration/search-normalize-parity.test.ts).
  * Change a rule => change it in both and add a row here.
  * Rows are real Egyptian shopper spellings (hamza dropped, ta-marbuta as ha, ya without dots).

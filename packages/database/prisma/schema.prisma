@@ -896,6 +896,11 @@ model Product {
   slug                 String
   description          String?
   descriptionAr        String?       @map("description_ar")
+  // Extra words shoppers type for this product: Egyptian dialect, Franco-Arabic, English
+  // ("جزمة, كوتشي, 3abaya, sneakers"). Comma-separated, merchant-editable, AI-filled when empty
+  // (P1, AI_AUTOFILL_FIELDS). Searched through public.ebda_product_search_doc /
+  // ebda_product_name_doc (expression trigram indexes, migration 20261019000100) — never shown on the storefront.
+  searchTerms          String?       @map("search_terms")
   price                Int // Price in piastres (1 EGP = 100 piastres)
   compareAtPrice       Int?          @map("compare_at_price")
   costPrice            Int?          @map("cost_price")

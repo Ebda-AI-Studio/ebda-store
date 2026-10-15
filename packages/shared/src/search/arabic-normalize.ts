@@ -1,6 +1,6 @@
 /**
  * Arabic + English search folding. TS twin of SQL `public.ebda_ar_norm`
- * (migration 20261018000100_search_normalisation). The two MUST stay identical:
+ * (migration 20261019000100_search_normalisation). The two MUST stay identical:
  * both are tested against NORMALIZE_VECTORS. Deliberately NO Unicode
  * normalize() and NO locale lowercasing: Postgres cannot reproduce either
  * immutably, so parity would break (Ruling SEARCH-2).

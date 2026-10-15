@@ -116,7 +116,7 @@ describe.skipIf(!hasDb)('public product search floor', () => {
     expect(and.length).toBeLessThanOrEqual(8);
   });
 
-  it('pg_trgm GIN indexes exist on all four searched columns', async () => {
+  it('pg_trgm GIN indexes exist on all four searched columns and the two normalised docs', async () => {
     const rows = await prisma.$queryRaw<Array<{ indexname: string }>>`
       SELECT indexname FROM pg_indexes
       WHERE tablename = 'products' AND indexdef ILIKE '%gin_trgm_ops%'
@@ -126,7 +126,9 @@ describe.skipIf(!hasDb)('public product search floor', () => {
       'products_description_ar_trgm_idx',
       'products_description_trgm_idx',
       'products_name_ar_trgm_idx',
+      'products_name_doc_trgm_idx',
       'products_name_trgm_idx',
+      'products_search_doc_trgm_idx',
     ]);
   });
 });

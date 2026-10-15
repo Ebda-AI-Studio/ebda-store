@@ -821,7 +821,41 @@ describe('users / addresses / store_staff: identity-keyed policies', () => {
 // ---------------------------------------------------------------------------
 // The SECURITY DEFINER functions
 // ---------------------------------------------------------------------------
+/**
+ * Pure text helpers that index EXPRESSIONS call (search normalisation, migration
+ * 20261019000100). They read no table, so they are deliberately NOT definers: they run with the
+ * caller's rights, and a SET search_path clause would stop the planner inlining them. Being on
+ * this list is not an exemption from checks: each must be non-definer, IMMUTABLE, LANGUAGE sql,
+ * and ebda_app must be able to execute it. Any other ebda_* function must pass the definer
+ * hygiene below.
+ */
+const PURE_IMMUTABLE_EBDA_FNS = new Set([
+  'ebda_ar_norm',
+  'ebda_product_search_doc',
+  'ebda_product_name_doc',
+]);
+
 describe('SECURITY DEFINER functions: hygiene', () => {
+  it('the pure immutable ebda_* helpers are invoker-rights, IMMUTABLE, sql, executable by ebda_app', async () => {
+    const fns = await owner.$queryRaw<
+      Array<{ proname: string; secdef: boolean; vol: string; lang: string; app_exec: boolean }>
+    >`
+      SELECT p.proname::text AS proname, p.prosecdef AS secdef, p.provolatile::text AS vol,
+             l.lanname::text AS lang, has_function_privilege('ebda_app', p.oid, 'EXECUTE') AS app_exec
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_language l ON l.oid = p.prolang
+      WHERE n.nspname = 'public' AND p.proname = ANY(${[...PURE_IMMUTABLE_EBDA_FNS]})`;
+    expect(fns.map(f => f.proname).sort()).toEqual([...PURE_IMMUTABLE_EBDA_FNS].sort());
+    for (const f of fns) {
+      expect({
+        fn: f.proname,
+        secdef: f.secdef,
+        vol: f.vol,
+        lang: f.lang,
+        exec: f.app_exec,
+      }).toEqual({ fn: f.proname, secdef: false, vol: 'i', lang: 'sql', exec: true });
+    }
+  });
+
   it('every ebda_* function is SECURITY DEFINER with a pinned search_path, owner-run, EXECUTE for ebda_app only', async () => {
     const fns = await owner.$queryRaw<
       Array<{
@@ -839,6 +873,7 @@ describe('SECURITY DEFINER functions: hygiene', () => {
     expect(fns.length).toBeGreaterThanOrEqual(25);
     const bad: string[] = [];
     for (const f of fns) {
+      if (PURE_IMMUTABLE_EBDA_FNS.has(f.proname)) continue; // checked by the test above
       if (!f.secdef) bad.push(`${f.proname}: not SECURITY DEFINER`);
       if (!(f.cfg ?? []).some(c => /^search_path=pg_catalog, public, pg_temp$/.test(c)))
         bad.push(`${f.proname}: search_path not pinned (${(f.cfg ?? []).join(',')})`);
