@@ -85,7 +85,7 @@ export function AcceptedPaymentBadges({
           aria-label={t(badge.label, badge.labelAr)}
           className={
             variant === 'dahab'
-              ? 'flex h-7 items-center rounded-[3px] border border-foreground/20 px-2.5 text-[11px] font-medium text-foreground/70'
+              ? 'flex h-7 items-center rounded-[3px] border border-foreground/20 px-2.5 text-xs font-medium text-foreground/70'
               : 'flex h-8 items-center rounded-md bg-muted px-3 text-xs font-medium text-muted-foreground'
           }
         >

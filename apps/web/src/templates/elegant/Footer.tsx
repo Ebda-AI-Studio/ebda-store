@@ -160,7 +160,7 @@ export default function ElegantFooter({
                     </button>
                   </form>
                   {errorMsg && (
-                    <p className="mt-3 text-[10px] tracking-wide text-destructive" role="alert">
+                    <p className="mt-3 text-xs tracking-wide text-destructive" role="alert">
                       {errorMsg}
                     </p>
                   )}

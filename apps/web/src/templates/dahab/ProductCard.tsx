@@ -155,7 +155,7 @@ export default function DahabProductCard({
           {badge && (
             <span
               className={cx(
-                'absolute start-3 top-3 rounded-[2px] px-2 py-1 text-[11px] font-medium leading-none',
+                'absolute start-3 top-3 rounded-[2px] px-2 py-1 text-xs font-medium leading-none',
                 orderable
                   ? 'bg-background/85 text-primary backdrop-blur-sm'
                   : 'bg-background/85 text-muted-foreground'

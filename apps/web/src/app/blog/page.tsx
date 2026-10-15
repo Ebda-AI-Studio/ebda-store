@@ -65,7 +65,7 @@ export default function BlogIndexPage() {
       >
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
           <header className="mb-8">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(var(--accent-soft))]">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[hsl(var(--accent-soft))]">
               {isRtl ? 'مقالات' : 'Stories'}
             </p>
             <h1 className="mt-1 text-3xl sm:text-4xl font-bold text-foreground tracking-tight">

@@ -164,7 +164,7 @@ export default function DahabHeader({
           >
             <BagIcon className="h-[22px] w-[22px]" />
             {cartItemCount > 0 && (
-              <span className="absolute end-1 top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground tabular-nums">
+              <span className="absolute end-1 top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-xs font-semibold leading-none text-primary-foreground tabular-nums">
                 {localize(cartItemCount)}
               </span>
             )}

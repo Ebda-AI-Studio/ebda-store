@@ -383,7 +383,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 {p.badges.map(b => (
                   <li
                     key={b}
-                    className="rounded-[2px] border border-primary/40 px-2 py-1 text-[11px] leading-none text-primary"
+                    className="rounded-[2px] border border-primary/40 px-2 py-1 text-xs leading-none text-primary"
                   >
                     {b}
                   </li>

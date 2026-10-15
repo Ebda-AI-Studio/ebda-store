@@ -63,7 +63,7 @@ export default function ElegantCategoryCard({
 
         {/* View button that appears on hover */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-700">
-          <span className="px-7 py-3 bg-background/95 backdrop-blur-sm text-foreground text-[11px] tracking-[0.32em] uppercase font-medium">
+          <span className="px-7 py-3 bg-background/95 backdrop-blur-sm text-foreground text-xs tracking-[0.32em] uppercase font-medium">
             {isRtl ? 'عرض' : 'View'}
           </span>
         </div>
@@ -113,7 +113,7 @@ export default function ElegantCategoryCard({
             {displayName}
           </h3>
           {category.productCount !== undefined && (
-            <p className="text-[11px] text-muted-foreground/80 mt-2 tracking-[0.22em] uppercase">
+            <p className="text-xs text-muted-foreground/80 mt-2 tracking-[0.22em] uppercase">
               {category.productCount} {countUnit}
             </p>
           )}

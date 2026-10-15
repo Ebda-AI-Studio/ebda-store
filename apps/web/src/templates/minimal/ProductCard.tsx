@@ -235,7 +235,7 @@ function MinimalProductCard({
               implicit gating in caller order. */}
           {product.inStock !== false && isProductNew(product) && (
             <span
-              className="absolute top-2 start-2 z-10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-[hsl(var(--primary))] bg-background"
+              className="absolute top-2 start-2 z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-[hsl(var(--primary))] bg-background"
               aria-label={isRtl ? 'منتج جديد' : 'New product'}
             >
               {isRtl ? 'جديد' : 'NEW'}
@@ -253,7 +253,7 @@ function MinimalProductCard({
           {customBadgeText && (
             <span
               className={cn(
-                'pointer-events-none absolute z-10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white',
+                'pointer-events-none absolute z-10 px-2 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-white',
                 customBadgePositionCls
               )}
               style={{ backgroundColor: customBadgeColor, color: customBadgeTextColor }}
@@ -358,7 +358,7 @@ function MinimalProductCard({
               onAddToCart={handleAddToCart}
               variant="ghost"
               className={cn(
-                'max-w-full overflow-hidden text-ellipsis bg-transparent text-[10px] tracking-[0.14em] uppercase font-light text-foreground',
+                'max-w-full overflow-hidden text-ellipsis bg-transparent text-xs tracking-[0.14em] uppercase font-normal text-foreground',
                 'underline underline-offset-4 decoration-foreground/30 hover:decoration-foreground',
                 'hover:bg-transparent hover:text-foreground transition-colors duration-300',
                 'py-1 h-auto cursor-pointer'
@@ -422,14 +422,14 @@ function MinimalProductCard({
               merchant-configurable via productCardDefaults.discountBadge.color. */}
             {priceVisible && hasSale && discountBadgeText && (
               <p
-                className="text-[10px] tracking-[0.25em] uppercase font-semibold"
+                className="text-xs tracking-[0.25em] uppercase font-semibold"
                 style={{ color: discountBadgeColor }}
               >
                 {discountBadgeText}
               </p>
             )}
             {priceVisible && (
-              <TaxInclusiveLabel className="block text-[10px] tracking-wide font-light text-muted-foreground/70" />
+              <TaxInclusiveLabel className="block text-xs tracking-wide font-normal text-muted-foreground/70" />
             )}
             <SwatchDots product={product} max={5} />
             <FactChips product={product} className="mt-1" />

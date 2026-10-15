@@ -95,7 +95,7 @@ export function ShareProductRow({ productName, url, className = '' }: ShareProdu
           aria-label={isRtl ? 'نسخ الرابط' : 'Copy link'}
           // Touch hitbox: visual height stays 36px; before:-inset-y-2 grows
           // the vertical tap target to ~44px without changing rendered size.
-          className="relative before:absolute before:-inset-y-2 before:inset-x-0 before:content-[''] inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-foreground/5 hover:bg-foreground/10 text-foreground/80 hover:text-foreground transition-colors px-3 text-[11px] font-medium"
+          className="relative before:absolute before:-inset-y-2 before:inset-x-0 before:content-[''] inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-foreground/5 hover:bg-foreground/10 text-foreground/80 hover:text-foreground transition-colors px-3 text-xs font-medium"
         >
           {copied ? (
             <>

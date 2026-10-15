@@ -141,7 +141,7 @@ export default function LocationsClient({
         <section dir={isRtl ? 'rtl' : 'ltr'} className="py-12 sm:py-16 lg:py-20" style={density}>
           <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
             <header className="mb-8">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground/50">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-foreground/50">
                 {t('Branches', 'الفروع')}
               </p>
               <h1
@@ -179,7 +179,7 @@ export default function LocationsClient({
                   <div key={group.country}>
                     {/* Country chip + hairline */}
                     <div className="mb-4 flex items-center gap-3">
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-foreground/50">
+                      <span className="text-xs font-semibold uppercase tracking-[0.1em] text-foreground/50">
                         {group.country}
                       </span>
                       <div className="h-px flex-1 bg-border" />

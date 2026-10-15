@@ -159,7 +159,7 @@ export default function BoldHeader({
                 <CartIcon className="w-5 h-5" aria-hidden="true" />
                 {cartItemCount > 0 && (
                   <span
-                    className={`absolute -top-0.5 -end-0.5 bg-primary text-primary-foreground text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 transition-transform duration-200 ${cartPulse ? 'scale-125' : 'scale-100'}`}
+                    className={`absolute -top-0.5 -end-0.5 bg-primary text-primary-foreground text-xs font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 transition-transform duration-200 ${cartPulse ? 'scale-125' : 'scale-100'}`}
                   >
                     {cartItemCount > 99 ? '99+' : cartItemCount}
                   </span>

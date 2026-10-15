@@ -319,7 +319,7 @@ function ClassicProductCard({
                 size="sm"
                 absolute
                 position={isRtl ? 'top-right' : 'top-left'}
-                className="font-serif tracking-widest uppercase bg-foreground text-background rounded-none text-[10px]"
+                className="font-serif tracking-widest uppercase bg-foreground text-background rounded-none text-xs"
                 label={isRtl ? 'جديد' : 'New'}
               />
             )

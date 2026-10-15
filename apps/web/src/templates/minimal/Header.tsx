@@ -92,7 +92,7 @@ export default function MinimalHeader({
               <Link
                 key={item.href}
                 href={item.href}
-                className="text-[11px] tracking-[0.18em] ui-caps-toggle font-light text-muted-foreground hover:text-foreground transition-colors duration-200"
+                className="text-xs tracking-[0.18em] ui-caps-toggle font-normal text-muted-foreground hover:text-foreground transition-colors duration-200"
               >
                 {isRtl && item.labelAr ? item.labelAr : item.label}
               </Link>
@@ -163,7 +163,10 @@ export default function MinimalHeader({
             >
               <CartIcon className="w-4 h-4" strokeWidth={1} aria-hidden="true" />
               {cartItemCount > 0 && (
-                <span className="absolute -top-1.5 -end-1.5 text-[9px] font-light text-foreground">
+                <span
+                  aria-hidden="true"
+                  className="absolute top-1 end-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-foreground px-1 text-xs font-medium leading-none text-background tabular-nums"
+                >
                   {cartItemCount}
                 </span>
               )}
@@ -281,7 +284,7 @@ export default function MinimalHeader({
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="text-[11px] tracking-[0.18em] ui-caps-toggle font-light text-muted-foreground hover:text-foreground transition-colors duration-200"
+                    className="text-xs tracking-[0.18em] ui-caps-toggle font-normal text-muted-foreground hover:text-foreground transition-colors duration-200"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {isRtl && item.labelAr ? item.labelAr : item.label}

@@ -249,12 +249,12 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
                 >
                   {tab.icon}
                   {tab.key === 'cart' && itemCount > 0 && (
-                    <span className="absolute -top-1 -end-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
+                    <span className="absolute -top-1 -end-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-xs tabular-nums font-bold text-white">
                       {itemCount > 99 ? '99+' : itemCount}
                     </span>
                   )}
                 </span>
-                <span className="text-[10px] font-medium leading-none">{label}</span>
+                <span className="text-xs font-medium leading-none">{label}</span>
               </Link>
             </li>
           );
@@ -288,7 +288,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
             >
               {menuIcon}
             </span>
-            <span className="text-[10px] font-medium leading-none">{menuLabel}</span>
+            <span className="text-xs font-medium leading-none">{menuLabel}</span>
           </button>
         </li>
       </ul>

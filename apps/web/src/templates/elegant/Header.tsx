@@ -202,7 +202,7 @@ export default function ElegantHeader({
             >
               <CartIcon className="w-5 h-5" strokeWidth={1} aria-hidden="true" />
               {cartItemCount > 0 && (
-                <span className="absolute -top-2 -end-2 bg-foreground text-background text-[9px] font-medium w-4 h-4 rounded-full flex items-center justify-center">
+                <span className="absolute -top-2 -end-2 bg-foreground text-background text-xs font-medium h-[18px] min-w-[18px] px-1 rounded-full tabular-nums flex items-center justify-center">
                   {cartItemCount > 9 ? '9+' : cartItemCount}
                 </span>
               )}

@@ -351,7 +351,7 @@ function ElegantProductCard({
                 variant="new"
                 isRtl={isRtl}
                 size="sm"
-                className="text-[9px] tracking-[0.2em] uppercase rounded-none bg-foreground text-background font-normal"
+                className="text-xs tracking-[0.2em] uppercase rounded-none bg-foreground text-background font-normal"
                 label={isRtl ? 'جديد' : 'New'}
               />
             </ProductBadgeGroup>
@@ -363,7 +363,7 @@ function ElegantProductCard({
           {hasSale && discountBadgeAllowed && discountBadgeText && (
             <span
               className={cn(
-                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-[9px] font-normal tracking-[0.2em] uppercase text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
+                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-normal tracking-[0.2em] uppercase text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
                 discountBadgePositionCls
               )}
               style={{ backgroundColor: discountBadgeColor }}
@@ -377,7 +377,7 @@ function ElegantProductCard({
           {customBadgeText && (
             <span
               className={cn(
-                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-[9px] font-normal tracking-[0.2em] uppercase text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)]',
+                'pointer-events-none absolute z-10 rounded-full px-2.5 py-1 text-xs font-normal tracking-[0.2em] uppercase text-white shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)]',
                 customBadgePositionCls
               )}
               style={{ backgroundColor: customBadgeColor, color: customBadgeTextColor }}
@@ -407,7 +407,7 @@ function ElegantProductCard({
               onAddToCart={handleAddToCart}
               variant="ghost"
               className={cn(
-                'w-full max-w-full overflow-hidden text-ellipsis px-2 py-4 text-[10px] tracking-[0.12em] sm:tracking-[0.25em] uppercase font-normal rounded-none cursor-pointer',
+                'w-full max-w-full overflow-hidden text-ellipsis px-2 py-4 text-xs tracking-[0.12em] sm:tracking-[0.25em] uppercase font-normal rounded-none cursor-pointer',
                 'hover:bg-foreground hover:text-background transition-colors duration-300'
               )}
               labels={{
@@ -463,7 +463,7 @@ function ElegantProductCard({
               />
             )}
             {priceVisible && (
-              <TaxInclusiveLabel className="block text-[10px] tracking-[0.2em] uppercase text-muted-foreground/60" />
+              <TaxInclusiveLabel className="block text-xs tracking-[0.2em] uppercase text-muted-foreground/60" />
             )}
             <SwatchDots product={product} max={5} className="justify-center" />
             <FactChips product={product} className="mt-1 justify-center" />

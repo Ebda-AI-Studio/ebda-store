@@ -436,7 +436,7 @@ export function OutOfStockRibbon({
 
     return (
       <span
-        className={`pointer-events-none absolute z-10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-normal shadow-sm ${collisionGuardCls} ${placementCls} ${shapeCls} ${className}`}
+        className={`pointer-events-none absolute z-10 px-2 py-0.5 text-xs font-bold uppercase tracking-normal shadow-sm ${collisionGuardCls} ${placementCls} ${shapeCls} ${className}`}
         style={{ backgroundColor: bgColor, color: textColor }}
         aria-hidden
       >
@@ -463,7 +463,7 @@ export function OutOfStockRibbon({
       aria-hidden
     >
       <span
-        className="absolute top-[18px] start-[-34px] w-[160px] py-1 text-center text-[10px] font-bold uppercase tracking-wider text-white shadow-md"
+        className="absolute top-[18px] start-[-34px] w-[160px] py-1 text-center text-xs font-bold uppercase tracking-wider text-white shadow-md"
         style={{
           backgroundColor: ribbonBg,
           transform: `rotate(${rotation}deg)`,
