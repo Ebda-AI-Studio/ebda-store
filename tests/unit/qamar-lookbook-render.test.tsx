@@ -473,32 +473,59 @@ describe('one section-heading alignment per page on qamar (T-03)', async () => {
   });
 });
 
-describe('product grids never end on an orphan row (quality bar L-05)', async () => {
-  const { orphanRowClass } =
+describe('product grids centre an incomplete last row and never hide a product (L-05, B1-40)', async () => {
+  const { centredGrid, FeaturedCollectionSection } =
     await import('../../apps/web/src/builder/sections/FeaturedCollectionSection');
-  const cols = { base: 2, md: 3, lg: 4 };
-  const visible = (count: number, bp: 'base' | 'md' | 'lg') =>
-    Array.from({ length: count }, (_, i) => orphanRowClass(i, count, cols)).filter(c => {
-      if (!c) return true;
-      const part = c.split(' ')[bp === 'base' ? 0 : bp === 'md' ? 1 : 2];
-      return !part.endsWith('hidden');
-    }).length;
-  it('every breakpoint shows whole rows only', () => {
-    for (const n of [2, 3, 4, 5, 6, 7, 8, 9, 12])
-      for (const [bp, c] of Object.entries(cols) as ['base' | 'md' | 'lg', number][]) {
-        const v = visible(n, bp);
-        expect(v % c === 0 || v === n, `${n} items @${bp}`).toBe(true);
-        expect(v, `${n} items @${bp}`).toBeGreaterThan(0);
-      }
-  });
-  it('8 new-in cards: 8 on a phone, 6 at 820, 8 at 1280; 12 divides everywhere (no wrapper)', () => {
-    expect([visible(8, 'base'), visible(8, 'md'), visible(8, 'lg')]).toEqual([8, 6, 8]);
-    expect(Array.from({ length: 12 }, (_, i) => orphanRowClass(i, 12, cols))).toEqual(
-      Array(12).fill(undefined)
+  const { toTemplateProduct } = await import('../../apps/web/src/templates/adapters');
+  const many = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      ...PRODUCTS[0],
+      id: `m${i}`,
+      slug: `pick-${i}`,
+      name: `Pick ${i}`,
+    }));
+  const render = (n: number, settings: Record<string, unknown> = {}) =>
+    renderToStaticMarkup(
+      <FeaturedCollectionSection
+        settings={{ productSource: 'manual', columns: 4, mobileColumns: 2, ...settings } as any}
+        products={many(n).map(p => toTemplateProduct(p as any))}
+        pack="qamar"
+        onAddToCart={async () => {}}
+      />
     );
+  const cards = (html: string) => html.match(/href="\/products\/pick-\d+"/g)?.length ?? 0;
+
+  it('3 hand-picked products on a 2-column phone grid: all 3 render, the last one centred', () => {
+    const html = render(3);
+    expect(new Set(html.match(/pick-\d+/g)).size).toBe(3);
+    expect(cards(html)).toBeGreaterThanOrEqual(3);
+    expect(html).not.toMatch(/\bhidden\b[^"]*"[^>]*>\s*<[^>]*pick/);
+    // two tracks per card; the third card starts at track 2 of 4 (centred) on a phone
+    expect(html).toContain('grid-cols-4 md:grid-cols-6 lg:grid-cols-8');
+    const items = [...html.matchAll(/<div class="(col-span-2[^"]*)">/g)].map(m => m[1]);
+    expect(items).toHaveLength(3);
+    expect(items[2]).toMatch(/(^| )col-start-2( |$)/);
+    expect(items[0]).toMatch(/lg:col-start-2/); // 3 of 4 on desktop: the row is centred too
   });
-  it('a grid shorter than one row shows whole', () => {
-    expect(visible(3, 'lg')).toBe(3);
+
+  it('7 picks render 7; no card is ever hidden or spans full width', () => {
+    const html = render(7);
+    expect(new Set(html.match(/pick-\d+/g)).size).toBe(7);
+    expect(html).not.toMatch(/col-span-full|md:hidden|lg:hidden|class="hidden/);
+  });
+
+  it('a count that fills every breakpoint renders the plain grid, unchanged', () => {
+    expect(centredGrid(12, { base: 2, md: 3, lg: 4 })).toBeNull();
+    const html = render(12);
+    expect(html).toContain('grid-cols-2 md:grid-cols-3 lg:grid-cols-4');
+    expect(html).not.toContain('col-span-2');
+  });
+
+  it('the shifted card resets its start at a breakpoint where its row is full', () => {
+    const g = centredGrid(5, { base: 2, md: 3, lg: 4 })!; // phone 2+2+1, md 3+2, lg 4+1
+    expect(g.item(4)).toBe('col-span-2 col-start-2 md:col-start-auto lg:col-start-4');
+    expect(g.item(3)).toBe('col-span-2 md:col-start-2 lg:col-start-auto');
+    expect(g.item(0)).toBe('col-span-2');
   });
 });
 

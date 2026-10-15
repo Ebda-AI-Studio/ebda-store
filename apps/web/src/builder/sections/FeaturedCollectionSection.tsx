@@ -39,26 +39,68 @@ const DESKTOP: Record<number, string> = {
   5: 'lg:grid-cols-5',
 };
 
+/** Columns at each breakpoint: phone (1|2), md (2|3), lg (the section's columns). */
+export interface GridColumns {
+  base: number;
+  md: number;
+  lg: number;
+}
+
+// Literal class tables (Tailwind scans literals): the centring grid has TWO tracks per card.
+const HALF_GRID = {
+  base: { 1: 'grid-cols-2', 2: 'grid-cols-4' } as Record<number, string>,
+  md: { 2: 'md:grid-cols-4', 3: 'md:grid-cols-6' } as Record<number, string>,
+  lg: {
+    2: 'lg:grid-cols-4',
+    3: 'lg:grid-cols-6',
+    4: 'lg:grid-cols-8',
+    5: 'lg:grid-cols-10',
+  } as Record<number, string>,
+};
+const START = {
+  base: { 2: 'col-start-2' } as Record<number, string>,
+  md: { 2: 'md:col-start-2', 3: 'md:col-start-3' } as Record<number, string>,
+  lg: {
+    2: 'lg:col-start-2',
+    3: 'lg:col-start-3',
+    4: 'lg:col-start-4',
+    5: 'lg:col-start-5',
+  } as Record<number, string>,
+};
+const AUTO = { base: '', md: 'md:col-start-auto', lg: 'lg:col-start-auto' };
+const BPS = ['base', 'md', 'lg'] as const;
+
 /**
- * Quality bar L-05: a product grid never ends on an orphan row. Per breakpoint, cards past the
- * last FULL row are hidden (a grid shorter than one row shows whole). Only cards that must hide
- * somewhere get a `display: contents` wrapper, so a count that divides every breakpoint's column
- * count renders exactly the markup it always did. Tailwind literals: hidden contents md:hidden
- * md:contents lg:hidden lg:contents.
+ * Quality bar L-05 (Ruling B1-40 as re-ruled): a product grid never ends on an orphan row, and
+ * NEVER hides a product. When some breakpoint has an incomplete last row, the grid switches to
+ * two tracks per card (`col-span-2`, so every card keeps the merchant's column width) and the
+ * first card of that last row starts `columns - remainder` tracks in: the incomplete row is
+ * centred (logical lines, so it centres in Arabic too). A count that fills every breakpoint
+ * returns null and the grid renders exactly as before.
  */
-export function orphanRowClass(
-  index: number,
+export function centredGrid(
   count: number,
-  columns: { base: number; md: number; lg: number }
-): string | undefined {
-  const shown = (c: number) => (count >= c ? Math.floor(count / c) * c : count);
-  const vis = [index < shown(columns.base), index < shown(columns.md), index < shown(columns.lg)];
-  if (vis.every(Boolean)) return undefined;
-  return [
-    vis[0] ? 'contents' : 'hidden',
-    vis[1] ? 'md:contents' : 'md:hidden',
-    vis[2] ? 'lg:contents' : 'lg:hidden',
-  ].join(' ');
+  columns: GridColumns
+): { grid: string; item: (index: number) => string } | null {
+  const rem = (c: number) => count % c;
+  if (BPS.every(bp => rem(columns[bp]) === 0)) return null;
+  const grid = BPS.map(bp => HALF_GRID[bp][columns[bp]]).join(' ');
+  return {
+    grid,
+    item: (index: number) => {
+      const cls = ['col-span-2'];
+      let shifted = false;
+      for (const bp of BPS) {
+        const c = columns[bp];
+        const r = rem(c);
+        if (r !== 0 && index === count - r) {
+          cls.push(START[bp][c - r + 1]);
+          shifted = true;
+        } else if (shifted && AUTO[bp]) cls.push(AUTO[bp]);
+      }
+      return cls.join(' ');
+    },
+  };
 }
 
 export function FeaturedCollectionSection({
@@ -84,6 +126,11 @@ export function FeaturedCollectionSection({
   const spacing = sectionSpacingClasses(settings, store.look);
   if (products.length === 0) return null;
   const cols = settings.columns ?? 4;
+  const centred = centredGrid(products.length, {
+    base: settings.mobileColumns === 1 ? 1 : 2,
+    md: cols >= 3 ? 3 : 2,
+    lg: DESKTOP[cols] ? cols : 4,
+  });
   const button = pick(settings.buttonText, settings.buttonTextAr);
   const link = settings.buttonLink
     ? storeUrl(sanitizeUrl(settings.buttonLink, '/products'))
@@ -112,9 +159,13 @@ export function FeaturedCollectionSection({
         <div
           className={[
             'grid gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-10',
-            settings.mobileColumns === 1 ? 'grid-cols-1' : 'grid-cols-2',
-            cols >= 3 ? 'md:grid-cols-3' : 'md:grid-cols-2',
-            DESKTOP[cols] ?? DESKTOP[4],
+            centred
+              ? centred.grid
+              : [
+                  settings.mobileColumns === 1 ? 'grid-cols-1' : 'grid-cols-2',
+                  cols >= 3 ? 'md:grid-cols-3' : 'md:grid-cols-2',
+                  DESKTOP[cols] ?? DESKTOP[4],
+                ].join(' '),
           ].join(' ')}
         >
           {products.map((p, i) => {
@@ -129,13 +180,8 @@ export function FeaturedCollectionSection({
                 onAddToCart={onAddToCart}
               />
             );
-            const trim = orphanRowClass(i, products.length, {
-              base: settings.mobileColumns === 1 ? 1 : 2,
-              md: cols >= 3 ? 3 : 2,
-              lg: DESKTOP[cols] ? cols : 4,
-            });
-            return trim ? (
-              <div key={p.id} className={trim} data-orphan-trim>
+            return centred ? (
+              <div key={p.id} className={centred.item(i)}>
                 {card}
               </div>
             ) : (
