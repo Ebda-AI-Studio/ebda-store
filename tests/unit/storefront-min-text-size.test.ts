@@ -13,6 +13,8 @@ import { join, relative } from 'node:path';
 
 const ROOT = join(__dirname, '../..');
 const WEB = join(ROOT, 'apps/web/src');
+// The shared UI package renders on the storefront too (ProductBadge on every modern card).
+const UI = join(ROOT, 'packages/ui/src');
 
 const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap(n => {
@@ -29,11 +31,12 @@ const UNDER_12 = [
   /fontSize:\s*['"`]?(?:[0-9]|1[01])(?:\.\d+)?(?:px)?['"`]?\s*[,}]/,
 ];
 
-const files = walk(WEB);
+const files = [...walk(WEB), ...walk(UI)];
 
 describe('R-03: storefront text is never under 12px', () => {
-  it('scans the storefront', () => {
+  it('scans the storefront and packages/ui', () => {
     expect(files.length).toBeGreaterThan(200);
+    expect(files.some(f => f.includes('packages/ui/src/components/ProductBadge.tsx'))).toBe(true);
   });
 
   it('no class, inline style or CSS rule sets text under 12px', () => {
