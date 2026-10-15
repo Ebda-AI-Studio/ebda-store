@@ -154,6 +154,7 @@ export function BulkImportWizard({
           <li>{t('step3')}</li>
           <li>{t('step4')}</li>
           <li>{t('step5')}</li>
+          <li>{t('step6')}</li>
         </ol>
         <div className="mt-4">
           <Button variant="outline" size="sm" onClick={onDownloadTemplate}>

@@ -11,7 +11,7 @@
 
 import { useId } from 'react';
 import { Textarea } from '@ebda/ui';
-import { SEARCH_TERMS_MAX_LENGTH } from '@ebda/shared';
+import { SEARCH_TERMS_MAX_LENGTH, analyzeSearchTerms } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 
 interface Props {
@@ -26,7 +26,11 @@ export function SearchTermsField({ value, onChange, namespace }: Props) {
   const id = useId();
   const hintId = `${id}-hint`;
   const countId = `${id}-count`;
-  const nearLimit = value.length >= SEARCH_TERMS_MAX_LENGTH * 0.9;
+  // Same shared cleaner the server runs, so the warning matches what will be saved.
+  const { dropped, truncated } = analyzeSearchTerms(value);
+  const atLimit = value.length >= SEARCH_TERMS_MAX_LENGTH;
+  const nearLimit = !atLimit && value.length >= SEARCH_TERMS_MAX_LENGTH * 0.9;
+  const status = atLimit ? t('searchTermsAtLimit') : nearLimit ? t('searchTermsNearLimit') : '';
 
   return (
     <div>
@@ -45,14 +49,28 @@ export function SearchTermsField({ value, onChange, namespace }: Props) {
         <p id={hintId} className="text-xs text-muted-foreground">
           {t('searchTermsHint')}
         </p>
-        <p
-          id={countId}
-          dir="ltr"
-          className={`shrink-0 text-xs tabular-nums ${nearLimit ? 'text-destructive-ink' : 'text-muted-foreground'}`}
-        >
+        <p id={countId} dir="ltr" className="shrink-0 text-xs tabular-nums text-muted-foreground">
           {String(value.length)} / {String(SEARCH_TERMS_MAX_LENGTH)}
         </p>
       </div>
+      {/* Polite live region, always mounted so the change is announced: it only has
+          text at 90% and at the limit. Visible text, so the state is not colour-only. */}
+      <p
+        aria-live="polite"
+        className={`mt-1 text-xs ${atLimit ? 'font-medium text-destructive-ink' : 'text-muted-foreground'}`}
+      >
+        {status ? `\u26A0 ${status}` : ''}
+      </p>
+      {(dropped > 0 || truncated > 0) && (
+        <p role="status" className="mt-1 text-xs font-medium text-destructive-ink">
+          {dropped > 0 && (
+            <span className="block">{t('searchTermsDropped', { count: String(dropped) })}</span>
+          )}
+          {truncated > 0 && (
+            <span className="block">{t('searchTermsTruncated', { count: String(truncated) })}</span>
+          )}
+        </p>
+      )}
     </div>
   );
 }

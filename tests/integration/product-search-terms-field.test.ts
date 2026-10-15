@@ -7,6 +7,8 @@
  * 400 / row error, NEVER the DB CHECK's 500.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import express, { type NextFunction, type Request, type Response } from 'express';
+import request from 'supertest';
 import { prisma, runInTenantContext } from '@ebda/database';
 import { SEARCH_TERMS_MAX_LENGTH } from '@ebda/shared';
 import { hasDb } from '../helpers/bundle-fixtures';
@@ -19,6 +21,27 @@ const { ProductService } = await import('../../apps/api/src/services/product.ser
 const { BulkService } = await import('../../apps/api/src/services/bulk.service');
 const { createProductSchemaChecked, updateProductSchema } =
   await import('../../apps/api/src/routes/product.routes');
+
+vi.mock('@api/middleware/auth', async importOriginal => {
+  const actual = await importOriginal<typeof import('@api/middleware/auth')>();
+  return {
+    ...actual,
+    authenticate: (req: any, _res: any, next: any) => {
+      req.user = { userId: 'admin-1', role: 'store_admin' };
+      next();
+    },
+    authorize:
+      (..._roles: string[]) =>
+      (_req: any, _res: any, next: any) =>
+        next(),
+  };
+});
+vi.mock('@api/middleware/require-mfa', () => ({
+  requireMfaEnrolled: (_req: any, _res: any, next: any) => next(),
+}));
+vi.mock('@api/middleware/store-access', () => ({
+  requireStoreAccess: (_req: any, _res: any, next: any) => next(),
+}));
 
 const run = `${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
 let storeId: string;
@@ -168,6 +191,40 @@ describe.skipIf(!hasDb)('search terms: stored, searchable, every writer capped',
       const exported = await inStore(() => BulkService.exportProducts(storeId));
       expect(exported.split('\n')[0]).toContain('searchTerms');
       expect(exported).toContain('كوتشي');
+    });
+  });
+
+  describe('HTTP: ZodError on searchTerms is a 400, never the DB CHECK 500', () => {
+    it('PUT/POST with 501 chars -> 400; 500 chars -> 200 and stored <= 500', async () => {
+      const { default: productRoutes } = await import('@api/routes/product.routes');
+      const { errorHandler } = await import('@api/middleware/error-handler');
+      const app = express();
+      app.use(express.json());
+      app.use('/api/v1/stores/:storeId/products', productRoutes);
+      app.use((err: unknown, req: Request, res: Response, next: NextFunction) =>
+        errorHandler(err as any, req, res, next)
+      );
+      const created = await request(app)
+        .post(`/api/v1/stores/${storeId}/products`)
+        .send({ name: 'Http', price: 1000, searchTerms: 'ع'.repeat(501) });
+      expect(created.status).toBe(400);
+      const p = await inStore(() =>
+        ProductService.create(
+          storeId,
+          createProductSchemaChecked.parse({ name: 'Http2', price: 1000 })
+        )
+      );
+      const over = await request(app)
+        .put(`/api/v1/stores/${storeId}/products/${p.id}`)
+        .send({ searchTerms: 'ع'.repeat(501) });
+      expect(over.status).toBe(400);
+      const ok = await request(app)
+        .put(`/api/v1/stores/${storeId}/products/${p.id}`)
+        .send({ searchTerms: 'ع'.repeat(500) });
+      expect(ok.status).toBe(200);
+      expect((await termsOf(p.id))!.searchTerms!.length).toBeLessThanOrEqual(
+        SEARCH_TERMS_MAX_LENGTH
+      );
     });
   });
 });

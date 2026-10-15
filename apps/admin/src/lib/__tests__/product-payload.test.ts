@@ -11,6 +11,8 @@
  * must keep sending `undefined` (there is nothing to clear on a create).
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { productTextFields, type ProductTextFieldsForm } from '../product-payload';
 
 const FIELDS = [
@@ -168,5 +170,23 @@ describe('productTextFields — the card badge', () => {
   it('sends a badge typed on the create form', () => {
     const payload = productTextFields(form({ badgeLabel: ' Offer ' }), 'create');
     expect(payload.badgeLabel).toBe('Offer');
+  });
+});
+
+describe('searchTerms on the edit page', () => {
+  it('emptied or whitespace-only field serialises as an explicit null (clears the column)', () => {
+    for (const searchTerms of ['', '   ']) {
+      const body = JSON.parse(JSON.stringify(productTextFields(form({ searchTerms }), 'update')));
+      expect(body).toHaveProperty('searchTerms', null);
+    }
+  });
+
+  it('the edit page builds its PUT body through productTextFields(formData, "update")', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../../app/stores/[id]/products/[productId]/edit/page.tsx'),
+      'utf8'
+    );
+    expect(src).toContain("...productTextFields(formData, 'update')");
+    expect(src).toMatch(/searchTerms: p\.searchTerms \|\| ''/);
   });
 });

@@ -1021,6 +1021,8 @@ export class BulkService {
         await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
           for (const { rowIndex, row, slug, existing } of batch) {
             try {
+              // Blank = leave alone (bulk cannot clear; documented in the import help).
+              const cleanedSearchTerms = cleanSearchTerms(row.searchTerms);
               const productFields = {
                 name: row.name,
                 nameAr: row.nameAr || null,
@@ -1048,9 +1050,7 @@ export class BulkService {
                 metaDescriptionAr: row.metaDescriptionAr || null,
                 // A blank/absent column leaves curated search words alone on
                 // update (older exports have no such column) and is null on create.
-                ...(cleanSearchTerms(row.searchTerms)
-                  ? { searchTerms: cleanSearchTerms(row.searchTerms) }
-                  : {}),
+                ...(cleanedSearchTerms ? { searchTerms: cleanedSearchTerms } : {}),
               };
 
               let productId: string;

@@ -702,7 +702,11 @@
         "badgeLabelHint": "Free text shown as a chip on this product's card and page. Leave empty for no badge. Max 32 characters.",
         "searchTerms": "Search words",
         "searchTermsPlaceholder": "e.g. sneakers, kotshi, 3abaya",
-        "searchTermsHint": "Other words shoppers type for this product, separated by commas: Egyptian spellings, Franco (3abaya), English. Not shown in the store."
+        "searchTermsHint": "Other words shoppers type for this product, separated by commas: Egyptian spellings, Franco (3abaya), English. Not shown in the store. Up to 30 words, 60 characters each, 500 in total.",
+        "searchTermsTruncated": "Words that will be cut to 60 characters: {count}",
+        "searchTermsDropped": "Words that will not be saved (over the limit): {count}",
+        "searchTermsAtLimit": "Limit reached",
+        "searchTermsNearLimit": "Almost at the limit"
       },
       "statusOptions": {
         "draft": "Draft",
@@ -940,7 +944,11 @@
         "badgeLabelHint": "Free text shown as a chip on this product's card and page. Leave empty for no badge. Max 32 characters.",
         "searchTerms": "Search words",
         "searchTermsPlaceholder": "e.g. sneakers, kotshi, 3abaya",
-        "searchTermsHint": "Other words shoppers type for this product, separated by commas: Egyptian spellings, Franco (3abaya), English. Not shown in the store.",
+        "searchTermsHint": "Other words shoppers type for this product, separated by commas: Egyptian spellings, Franco (3abaya), English. Not shown in the store. Up to 30 words, 60 characters each, 500 in total.",
+        "searchTermsTruncated": "Words that will be cut to 60 characters: {count}",
+        "searchTermsDropped": "Words that will not be saved (over the limit): {count}",
+        "searchTermsAtLimit": "Limit reached",
+        "searchTermsNearLimit": "Almost at the limit",
         "mediaHint": "Drag and drop images here, or click to select",
         "mediaSizeHint": "Recommended 1000×1000 (square). Up to 10MB per file — we auto-compress for the storefront.",
         "price": "Price (EGP)",
@@ -3928,6 +3936,7 @@
       "step3": "Prices are in EGP, e.g. 250 or 250.50 (two decimals at most)",
       "step4": "For multiple categories/tags/images, separate with commas within quotes",
       "step5": "Upload the completed CSV file and click Import",
+      "step6": "Search words column (searchTerms): a blank cell keeps the product's existing words. To clear search words, use the product edit page.",
       "downloadTemplate": "Download Template",
       "uploadTitle": "Upload CSV or XLSX File",
       "uploadPrompt": "Click to upload a CSV or XLSX file",
