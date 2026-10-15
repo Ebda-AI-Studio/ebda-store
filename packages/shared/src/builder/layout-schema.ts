@@ -55,6 +55,9 @@ export const heroSlideSchema = z.object({
   // sweep (scans layoutSettings + revision documents) sees the URL.
   video: safeVideoUrl,
   videoMobile: safeVideoUrl,
+  // Where a cropped (object-cover) hero keeps its subject: top keeps a model's head in frame on
+  // the wide desktop crop (Ruling B1-32). MUST be listed or the parse step silently strips it.
+  focus: z.enum(['top', 'center', 'bottom']).optional(),
   alt: z.string().optional(),
   headline: z.string().optional(),
   headlineAr: z.string().optional(),

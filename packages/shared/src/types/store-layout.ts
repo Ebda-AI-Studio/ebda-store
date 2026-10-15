@@ -74,6 +74,18 @@ export interface SectionDividers {
   belowHeading?: import('./store-theme').DividerSettings;
 }
 
+/** Where a cropped hero image keeps its subject (Ruling B1-32). */
+export type HeroFocus = 'top' | 'center' | 'bottom';
+/** CSS object-position for a hero focus; `center` (or unset) is the browser default. */
+export const HERO_FOCUS_POSITION: Record<HeroFocus, string> = {
+  top: '50% 0%',
+  center: '50% 50%',
+  bottom: '50% 100%',
+};
+export function heroObjectPosition(focus: HeroFocus | undefined | null): string | undefined {
+  return focus && focus !== 'center' ? HERO_FOCUS_POSITION[focus] : undefined;
+}
+
 export interface HeroSlide {
   /**
    * Desktop image — R2 URL. Recommended 1920×800 (aspect 2.4:1) so the
@@ -99,6 +111,8 @@ export interface HeroSlide {
   video?: string;
   /** Mobile video; falls back to `video`. */
   videoMobile?: string;
+  /** Image focus for the cropped hero (object-position): `top` keeps a head in frame (B1-32). */
+  focus?: HeroFocus;
   alt?: string;
   /** Optional headline rendered as overlay — pack styles vary */
   headline?: string;

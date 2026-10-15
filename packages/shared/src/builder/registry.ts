@@ -157,6 +157,11 @@ export const HERO_SLIDE_BLOCK: BlockDefinition = {
       localized: false,
     }),
     s.video('videoMobile', 'Mobile video', 'فيديو الجوال'),
+    s.select('focus', 'Image focus', 'تركيز الصورة', [
+      opt('center', 'Centre', 'الوسط'),
+      opt('top', 'Top (keeps heads in frame)', 'أعلى (يحافظ على الرأس)'),
+      opt('bottom', 'Bottom', 'أسفل'),
+    ]),
     s.text('alt', 'Image description', 'وصف الصورة'),
     s.text('headline', 'Headline', 'العنوان', { localized: true }),
     s.text('ctaText', 'Button text', 'نص الزر', { localized: true }),

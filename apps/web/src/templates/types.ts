@@ -404,6 +404,8 @@ export interface HeroProps {
  */
 export interface HeroBannerProps {
   image: string;
+  /** Image focus for the cropped hero (Ruling B1-32): `top` keeps a model's head in frame. */
+  focus?: import('@ebda/shared').HeroFocus;
   imageAr?: string;
   /**
    * Optional mobile-specific image. Recommended 1200×675 (16:9) per

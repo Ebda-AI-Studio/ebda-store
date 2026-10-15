@@ -8,7 +8,7 @@ import { useFeatures } from '../../contexts/FeatureContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { API_URL } from '../../lib/api';
 
-import { REGION } from '@ebda/shared';
+import { REGION, localizedStoreName } from '@ebda/shared';
 // ==========================================
 // Referral Tracking (run once per session)
 // ==========================================
@@ -192,7 +192,7 @@ function AffiliatePageContent() {
             <p className="text-muted-foreground">
               {t(
                 `Partner with ${store?.name || 'us'} and earn commissions for every sale you refer.`,
-                `كن شريكاً مع ${store?.name || 'نا'} واكسب عمولات على كل عملية بيع تحيلها.`
+                `كن شريكاً مع ${localizedStoreName(store, 'ar') || 'نا'} واكسب عمولات على كل عملية بيع تحيلها.`
               )}
             </p>
           </div>

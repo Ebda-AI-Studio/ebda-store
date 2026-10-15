@@ -30,6 +30,8 @@ export interface HeroVideoProps {
   alt?: string;
   /** How the video fills the box: must match the poster's fit (`contain` for a framed hero). */
   fit?: 'cover' | 'contain';
+  /** CSS object-position matching the poster's focus (B1-32). */
+  position?: string;
   /** Media query that picks `srcMobile`. Match the slide's image art direction. */
   mobileQuery?: string;
   /** False pauses the video (slides of a carousel that are not showing). */
@@ -63,6 +65,7 @@ export function HeroVideo({
   poster,
   alt = '',
   fit = 'cover',
+  position,
   mobileQuery = '(max-width: 767px)',
   active = true,
   children,
@@ -134,6 +137,7 @@ export function HeroVideo({
           tabIndex={-1}
           onError={() => setFailed(chosen)}
           className={`pointer-events-none absolute inset-0 h-full w-full ${fit === 'contain' ? 'object-contain' : 'object-cover'}`}
+          style={position ? { objectPosition: position } : undefined}
         />
       )}
     </>

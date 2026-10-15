@@ -43,6 +43,8 @@ export function buildQamarHome(base, ctx) {
     [
       slide('atelier-1', {
         image: img(QAMAR_PAGE_IMAGES.heroAtelier),
+        // The model stands at the top of the still: keep her head in the wide desktop crop (B1-32).
+        focus: 'top',
         ...(video ? { video } : {}),
         alt: 'A woman in a dusty rose linen abaya beside a clothing rail',
         headline: 'Linen for the Cairo summer',

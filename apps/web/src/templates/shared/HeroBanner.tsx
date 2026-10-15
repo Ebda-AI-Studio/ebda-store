@@ -4,7 +4,7 @@ import type React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { cn } from '@ebda/ui';
-import { IMAGE_STANDARDS, sanitizeUrl } from '@ebda/shared';
+import { IMAGE_STANDARDS, heroObjectPosition, sanitizeUrl } from '@ebda/shared';
 import type { HeroBannerProps } from '../types';
 import { getPackStyles } from './pack-styles';
 import { responsiveFontSize } from './section-typography';
@@ -33,6 +33,7 @@ export function HeroBanner({
   imageMobileAr,
   video,
   videoMobile,
+  focus,
   active = true,
   alt = '',
   headline,
@@ -119,6 +120,8 @@ export function HeroBanner({
     ? 'relative w-full overflow-hidden rounded-2xl bg-muted aspect-[var(--hero-m-aspect)] max-h-[45vh] sm:aspect-[1920/700] sm:max-h-none'
     : 'relative w-full overflow-hidden bg-muted aspect-[var(--hero-m-aspect)] max-h-[45vh] sm:aspect-[1920/700] sm:max-h-none';
   const imageObjectClass = isFramed ? 'object-contain' : 'object-cover';
+  // Focus only matters when the image is cropped (full-bleed cover), B1-32.
+  const objectPosition = isFramed ? undefined : heroObjectPosition(focus);
 
   const posterPicture = desktopSrc ? (
     <picture>
@@ -139,6 +142,7 @@ export function HeroBanner({
         // container, letterbox bars fill with the neutral bg above.
         // Pick by `presentation` prop / merchant admin toggle.
         className={imageObjectClass}
+        style={objectPosition ? { objectPosition } : undefined}
       />
     </picture>
   ) : null;
@@ -160,6 +164,7 @@ export function HeroBanner({
               mobileQuery="(max-width: 639px)"
               active={active}
               fit={isFramed ? 'contain' : 'cover'}
+              position={objectPosition}
             >
               {posterPicture}
             </HeroVideo>

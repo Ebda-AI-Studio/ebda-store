@@ -1,6 +1,6 @@
 'use client';
 
-import { storeNumerals } from '@ebda/shared';
+import { storeNumerals, localizedStoreName } from '@ebda/shared';
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -358,7 +358,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
   };
 
   // Derive the store name for display - fallback gracefully
-  const storeName = store?.name || t('Store', 'المتجر');
+  const storeName = localizedStoreName(store, language) || t('Store', 'المتجر');
 
   return (
     <section className="mt-16 border-t border-border pt-12">
