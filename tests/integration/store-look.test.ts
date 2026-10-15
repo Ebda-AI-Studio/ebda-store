@@ -14,7 +14,7 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { prisma, withRlsBypass, createPrismaClient, runWithRequestDb } from '@ebda/database';
-import { definitionToLayout, getLook } from '@ebda/shared';
+import { definitionToLayout, getLook, sectionFromPreset } from '@ebda/shared';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import storeRoutes from '@api/routes/store.routes';
 import { tenantContext } from '@api/middleware/tenant-context';
@@ -297,6 +297,58 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     expect(revs.filter(r => r.status === 'draft')).toHaveLength(1);
     expect(invalidated.filter(k => k === `public:store:${m.storeId}`)).toHaveLength(1);
     expect(invalidated).toContain(`public:store:${m.slug}`);
+  });
+
+  it("a switch resets the outgoing look's design keys, and design:'keep' keeps the merchant's own (C6/C8)", async () => {
+    const draftDoc = async (storeId: string) =>
+      (await prisma.storePageRevision.findFirstOrThrow({
+        where: { storeId, pageKey: 'home', status: 'draft' },
+        select: { id: true, document: true },
+      })) as {
+        id: string;
+        document: { sections: { type: string; settings: Record<string, unknown> }[] };
+      };
+    const hero = (doc: { sections: { type: string; settings: Record<string, unknown> }[] }) =>
+      doc.sections.find(x => x.type === 'hero')!.settings;
+    const heroDefault = sectionFromPreset('hero', 0, 'hero').settings.presentation;
+
+    // Untouched: Atelier's full-bleed hero goes back to the default on Atelier -> Vitrine.
+    const a = await seedMerchant('mixa');
+    expect((await put(a.storeId, a.token, { lookId: LOOK_ID, design: 'keep' })).status).toBe(200);
+    expect(
+      (await put(a.storeId, a.token, { lookId: 'qamar.atelier', design: 'keep' })).status
+    ).toBe(200);
+    const onAtelier = await draftDoc(a.storeId);
+    expect(onAtelier.document.sections.map(x => x.type)).toEqual(
+      getLook('qamar.atelier')!.sections!.map(x => x.type)
+    );
+    expect(hero(onAtelier.document).presentation).toBe('full-bleed');
+    expect(
+      (await put(a.storeId, a.token, { lookId: 'qamar.vitrine', design: 'keep' })).status
+    ).toBe(200);
+    expect(hero((await draftDoc(a.storeId)).document).presentation).toBe(heroDefault);
+
+    // Merchant-edited: the hand-set hero presentation survives a keep switch.
+    const b = await seedMerchant('mixb');
+    expect((await put(b.storeId, b.token, { lookId: LOOK_ID, design: 'keep' })).status).toBe(200);
+    expect(
+      (await put(b.storeId, b.token, { lookId: 'qamar.atelier', design: 'keep' })).status
+    ).toBe(200);
+    const draft = await draftDoc(b.storeId);
+    const edited = {
+      ...draft.document,
+      sections: draft.document.sections.map(x =>
+        x.type === 'hero' ? { ...x, settings: { ...x.settings, presentation: 'framed' } } : x
+      ),
+    };
+    await withRlsBypass(tx =>
+      tx.storePageRevision.update({ where: { id: draft.id }, data: { document: edited as object } })
+    );
+    expect(
+      (await put(b.storeId, b.token, { lookId: 'qamar.vitrine', design: 'keep' })).status
+    ).toBe(200);
+    expect(hero((await draftDoc(b.storeId)).document).presentation).toBe('framed');
+    await awaitDeferredWork(5000);
   });
 
   it('legacy store with customised layout_settings and no builder revision: DRAFT only, layout + R2 untouched', async () => {

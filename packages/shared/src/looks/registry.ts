@@ -14,8 +14,24 @@ export const LOOKS: readonly LookDefinition[] = [
     id: 'qamar.atelier',
     template: 'qamar',
     letter: 'A',
-    skin: 'minimal',
+    skin: 'qamar',
     status: 'designed',
+    chrome: { header: { logoPlacement: 'start' } },
+    // Ruling B1-3. Task 3 adds category-grid `layout: 'chips'` and image-text
+    // `layout: 'full-bleed'` with their schema values (plan amendment C1). The carousel
+    // preset is `newest`, never a demo category slug (C7).
+    sections: [
+      { type: 'hero', design: { presentation: 'full-bleed', mode: 'single' } },
+      { type: 'category-grid' },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2 },
+        preset: { productSource: 'newest', limit: 8, heading: 'New in', headingAr: 'وصل حديثًا' },
+      },
+      { type: 'image-text' },
+      { type: 'product-carousel', preset: { productSource: 'newest', limit: 12 } },
+      { type: 'brand-story' },
+    ],
     name: { ar: 'أتيليه', en: 'Atelier' },
     forWhom: { ar: 'لبوتيك هدومه بتتكلم لوحدها.', en: 'For a boutique whose clothes speak alone.' },
     idea: {
@@ -46,7 +62,7 @@ export const LOOKS: readonly LookDefinition[] = [
     id: 'qamar.lookbook',
     template: 'qamar',
     letter: 'B',
-    skin: 'minimal',
+    skin: 'qamar',
     status: 'designed',
     name: { ar: 'لوك بوك', en: 'Lookbook' },
     forWhom: {
@@ -74,7 +90,7 @@ export const LOOKS: readonly LookDefinition[] = [
     id: 'qamar.vitrine',
     template: 'qamar',
     letter: 'C',
-    skin: 'minimal',
+    skin: 'qamar',
     status: 'designed',
     name: { ar: 'فاترينة', en: 'Vitrine' },
     forWhom: { ar: 'لهدوم المناسبات: فرح وخطوبة وسهرة.', en: 'For occasion wear.' },

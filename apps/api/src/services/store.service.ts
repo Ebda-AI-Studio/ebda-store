@@ -989,7 +989,8 @@ export class StoreService {
       look.template,
       userId,
       opts.design === 'reset' ? LOOK_TOKEN_KEYS : [],
-      look.id
+      look.id,
+      opts.design
     );
     // Re-read the theme in the same transaction as this write (not a stale copy from before the
     // builder step): a publish above may have merged a pending theme patch into it, and that

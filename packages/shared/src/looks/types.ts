@@ -40,7 +40,48 @@ export interface LookDefinition {
   skin: TemplateId;
   /** 'designed' = tokens + mix only; 'built' = skin + sections shipped and reviewed (demo bar lists only built). */
   status: 'designed' | 'built';
+  /** The look's home section mix, in page order (Ruling B1-3). Absent = the template family's mix. */
+  sections?: readonly LookSectionSpec[];
+  /** Chrome choices the look's skin reads (Ruling B1-4). */
+  chrome?: LookChrome;
 }
+
+/** One section of a look's home mix (Ruling B1-3). */
+export interface LookSectionSpec {
+  /** A SECTION_REGISTRY type with group 'template'. */
+  type: string;
+  /** Design keys (LOOK_DESIGN_KEYS only), applied to an existing section too. */
+  design?: Record<string, unknown>;
+  /** Starting settings for a section the store does not have yet (never applied to an existing one). */
+  preset?: Record<string, unknown>;
+}
+
+/** Chrome choices a skin reads from the look (Ruling B1-4). */
+export interface LookChrome {
+  header: { logoPlacement: 'start' | 'centre' };
+}
+
+/** Settings a look's `design` may set: layout/variant/background/spacing, never content. */
+export const LOOK_DESIGN_KEYS = [
+  'presentation',
+  'mode',
+  'layout',
+  'layoutMobile',
+  'captionPosition',
+  'desktopColumns',
+  'mobileColumns',
+  'columns',
+  'tileShape',
+  'imagePosition',
+  'imageAspect',
+  'cardShape',
+  'cardAspect',
+  'cardGap',
+  'showCardFrame',
+  'bgColor',
+  'paddingTop',
+  'paddingBottom',
+] as const;
 
 /** StoreTheme keys a look owns. A stored value for one of these is a merchant override. */
 export const LOOK_TOKEN_KEYS = [
