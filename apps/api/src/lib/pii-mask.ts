@@ -40,6 +40,117 @@ export function maskEmail(email: string | null | undefined): string | null {
   return `${email.slice(0, 1)}***${email.slice(at)}`;
 }
 
+/** Longest free text `scrubEmails` looks at; the rest is dropped BEFORE matching (bounded cost). */
+export const SCRUB_EMAILS_MAX = 2000;
+
+/**
+ * Every spelling of "@" a mail provider (or an HTML/URL/JSON/MIME rendering of its text) may
+ * use, for DETECTION: `@`, fullwidth U+FF20, small U+FE6B, `%40` (also double-encoded
+ * `%2540`), `&#64` / `&#x40` (semicolon optional), `&commat;`, `&amp;`-wrapped entities,
+ * quoted-printable `=40` (only before a domain-looking run: `limit=40` stays text), and the
+ * escapes `\u0040`, `\x40`, `%u0040`.
+ */
+const AT_SRC = [
+  '@',
+  '\uFF20',
+  '\uFE6B',
+  '%(?:25)*40',
+  '%u0040',
+  '&(?:amp;)*(?:#0*64(?!\\d)|#x0*40(?![0-9a-f])|commat)(?:;)?',
+  '\\\\u0*0040',
+  '\\\\x40',
+  '=40(?=[\\p{L}\\p{M}\\p{N}-]+\\.[\\p{L}\\p{M}\\p{N}])',
+].join('|');
+const AT_FORMS = new RegExp(AT_SRC, 'iu');
+const AT_ENCODED = new RegExp(AT_SRC, 'giu');
+/** `local @ domain`: spaces around any "@" form are dropped so the pair is read as one address. */
+const SPACED_AT = new RegExp(`(?<=\\S)[\\p{Zs}\\t]*(?:${AT_SRC})[\\p{Zs}\\t]*(?=\\S)`, 'giu');
+/**
+ * A quoted local part (`"john doe"@x.com`, escaped quotes, any length): it may hold spaces, so
+ * tokens alone miss it. Linear: the two alternatives of the body cannot match the same char.
+ */
+const QUOTED_LOCAL = new RegExp(`"(?:[^"\\\\\\r\\n]|\\\\.)*"(?=[\\p{Zs}\\t]*(?:${AT_SRC}))`, 'giu');
+/** The ONLY address shape we split: dot-atom local part, dotted domain, one "@". */
+const CLEAN_ADDRESS =
+  /^([\p{L}\p{M}\p{N}._+*-]+)@([\p{L}\p{M}\p{N}-]+(?:\.[\p{L}\p{M}\p{N}-]+)+)$/u;
+
+/** Case-insensitive replace-all with no index arithmetic (lowercasing `İ` changes the length). */
+function caseInsensitiveReplaceAll(text: string, needle: string, by: string): string {
+  if (!needle) return text;
+  const re = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu');
+  return text.replace(re, () => by);
+}
+
+/**
+ * One whitespace-free token that carries an "@" form. FAIL CLOSED: the token is split into
+ * addresses only when every comma/semicolon-separated piece is either free of "@" or, once its
+ * wrapping punctuation (`<>()[]"'`, `mailto:`, a trailing `.`/`:`) is set aside, a CLEAN_ADDRESS.
+ * Anything a mail parser could read differently (two "@", a quoted or commented local part,
+ * `a(x)@b.com`, `x<a@b.com>`, an "@" with no dotted domain) is replaced WHOLE by `***`, so no
+ * local-part character beyond the first survives a split we are not sure of.
+ */
+function maskAddressToken(tok: string): string {
+  const norm = tok.replace(AT_ENCODED, '@');
+  const pieces = norm.split(/([,;])/);
+  const out: string[] = [];
+  for (const piece of pieces) {
+    if (piece === ',' || piece === ';' || !piece.includes('@')) {
+      out.push(piece);
+      continue;
+    }
+    const lead = /^[<(["']*(?:mailto:)?/i.exec(piece)![0];
+    const trail = /[>)\]"'.:!?]*$/.exec(piece.slice(lead.length))![0];
+    const core = piece.slice(lead.length, piece.length - trail.length);
+    const m = CLEAN_ADDRESS.exec(core);
+    if (!m) return '***';
+    out.push(`${lead}${Array.from(m[1])[0]}***@${m[2]}${trail}`);
+  }
+  return out.join('');
+}
+
+/**
+ * Email addresses in free text (provider error text) replaced by their masked form, before it is
+ * stored or shown. Hardened after commit security scans (parser differential, local-part split):
+ *  1. the input is cut to SCRUB_EMAILS_MAX BEFORE any matching, so cost is bounded;
+ *  2. the `known` recipient addresses are replaced first, exact and case-insensitive;
+ *  3. spaces around an "@" form are dropped (`jane.doe @ gmail.com` is one address), then a
+ *     quoted local part (`"john doe"@x.com`, escaped quotes, any length) is masked whole;
+ *  4. every whitespace-delimited token holding any "@" form (see AT_SRC: fullwidth, `%2540`,
+ *     `&#64`, `=40`, `\\x40` ..., incl. `mailto:` and unicode/IDN) goes through maskAddressToken, which keeps
+ *     only `x***@domain` for an unambiguous address and otherwise masks the WHOLE token.
+ * One linear pass over tokens: no nested quantifiers, no backtracking blow-up. Broad and
+ * fail-closed on purpose: a false positive costs a masked word, a miss costs an address.
+ */
+export function scrubEmails(
+  text: string,
+  known: ReadonlyArray<string | null | undefined> = []
+): string {
+  let s = text.length > SCRUB_EMAILS_MAX ? text.slice(0, SCRUB_EMAILS_MAX) : text;
+  for (const k of known) {
+    if (k && k.trim()) s = caseInsensitiveReplaceAll(s, k.trim(), maskEmail(k.trim()) ?? '***');
+  }
+  s = s.replace(SPACED_AT, m => m.trim());
+  s = s.replace(QUOTED_LOCAL, '"***"');
+  return s.replace(/\S+/g, tok => (AT_FORMS.test(tok) ? maskAddressToken(tok) : tok));
+}
+
+/**
+ * `203.0.113.45` -> `203.0.113.*`; `2001:db8:1:2:3:4:5:6` -> `2001:db8:1:2:*`; an IPv4-mapped
+ * IPv6 (`::ffff:203.0.113.45`) is masked as its IPv4. Enough to recognise a network on a
+ * super-admin evidence screen, not to single out a device. Empty/nullish input returns null.
+ */
+export function maskIp(ip: string | null | undefined): string | null {
+  if (typeof ip !== 'string' || ip.trim() === '') return null;
+  const v = ip.trim().replace(/^::ffff:/i, '');
+  const v4 = /^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/.exec(v);
+  if (v4) return `${v4[1]}.*`;
+  if (v.includes(':')) {
+    const groups = v.split(':').filter(Boolean).slice(0, 4);
+    return groups.length > 0 ? `${groups.join(':')}:*` : '*';
+  }
+  return '*';
+}
+
 /**
  * A recipient field that may be one address or a list (`EmailOptions.to`).
  * Each address is masked with `maskEmail`. Empty/nullish input returns null.

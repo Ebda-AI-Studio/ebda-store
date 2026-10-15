@@ -1,4 +1,10 @@
 import { BRAND } from '@ebda/shared/brand';
+import {
+  LEGAL_POLICIES,
+  LEGAL_DOC_KEYS,
+  currentLegalVersion,
+  formatLegalDate,
+} from '@ebda/shared/legal';
 import { LEGAL_AR } from './legal-ar';
 import { LEGAL_EN } from './legal-en';
 import type { LegalPages } from './legal-types';
@@ -6,6 +12,14 @@ import type { Locale } from './site';
 
 const CO = BRAND.company;
 const PN = BRAND.product;
+
+/**
+ * When any legal document last changed: the footer states this date only. No version: the five
+ * documents version independently, so one number would be wrong for most pages (Ruling LEGAL-4).
+ */
+const LEGAL_UPDATED = LEGAL_DOC_KEYS.map(
+  key => currentLegalVersion(LEGAL_POLICIES, key).publishedAt
+).reduce((a, b) => (b > a ? b : a));
 
 /** A payment or shipping provider; `logo` is a file in public/logos/ (none = our own icon). */
 export interface Provider {
@@ -632,7 +646,7 @@ export const COPY: Record<Locale, Copy> = {
       merchant: 'اتفاقية التاجر',
       acceptableUse: 'الاستخدام المقبول',
       contact: 'تواصل: ahlan@ebda.app',
-      legalVersion: 'الإصدار 1.0 من الوثائق القانونية · 2026-10-07.',
+      legalVersion: `آخر تحديث للوثائق القانونية: ${formatLegalDate(LEGAL_UPDATED, 'ar')}.`,
       about: 'عن ابدأ استوديو للذكاء الاصطناعي',
       credits: 'حقوق الصور والموديلات',
       ownership: `ابدأ ستور منتج من ${CO.shortNameAr}. © 2026 ${CO.shortNameAr}. جميع الحقوق محفوظة.`,
@@ -1021,7 +1035,7 @@ export const COPY: Record<Locale, Copy> = {
       merchant: 'Merchant agreement',
       acceptableUse: 'Acceptable use',
       contact: 'Contact: ahlan@ebda.app',
-      legalVersion: 'Legal documents version 1.0 · 2026-10-07.',
+      legalVersion: `Legal documents updated ${formatLegalDate(LEGAL_UPDATED, 'en')}.`,
       about: 'About Ebda AI Studio',
       credits: 'Credits',
       ownership: `Ebda Store is a product of ${CO.shortNameEn}. © 2026 ${CO.shortNameEn}. All rights reserved.`,

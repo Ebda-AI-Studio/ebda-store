@@ -7,6 +7,7 @@ import { Button, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { apiGet, apiPut, apiDelete } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { LegalAcceptancesPanel } from '../../../components/legal/LegalAcceptancesPanel';
 
 interface UserDetail {
   id: string;
@@ -289,6 +290,10 @@ export default function UserDetailPage() {
               </div>
             </div>
           )}
+
+          <div className="mt-6">
+            <LegalAcceptancesPanel userId={userId} />
+          </div>
         </div>
 
         {/* Edit Form */}
@@ -433,9 +438,12 @@ export default function UserDetailPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between border-t border-border pt-6">
-                <p className="text-xs text-muted-foreground">
-                  {t('userIdLabel')} <span className="font-mono">{user.id}</span>
+              <div className="flex items-center justify-between gap-3 border-t border-border pt-6">
+                <p className="min-w-0 break-all text-xs text-muted-foreground">
+                  {t('userIdLabel')}{' '}
+                  <span dir="ltr" className="font-mono" style={{ unicodeBidi: 'isolate' }}>
+                    {user.id}
+                  </span>
                 </p>
                 <button
                   type="button"

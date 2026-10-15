@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { AdminFeatureProvider } from '../../../hooks/useFeatures';
 import { useNotifications } from '../../../contexts/NotificationContext';
 import { BillingStatusBanner } from '../../../components/billing/BillingStatusBanner';
+import { LegalNoticeBanner } from '../../../components/legal/LegalNoticeBanner';
 
 /**
  * Store-level layout.
@@ -33,6 +34,7 @@ export default function StoreLayout({ children }: { children: ReactNode }) {
   return (
     <AdminFeatureProvider storeId={storeId}>
       {storeId && <BillingStatusBanner storeId={storeId} />}
+      {storeId && <LegalNoticeBanner storeId={storeId} />}
       {children}
     </AdminFeatureProvider>
   );

@@ -952,3 +952,15 @@ export async function fiscalArchive(storeId: string): Promise<FiscalArchiveRow[]
     retainUntil: r.retain_until,
   }));
 }
+
+/**
+ * Compensate a failed enqueue: delete the caller's own, just-created, still-unacted-on
+ * `legal_notice_sends` row (see the migration for the exact guard). Must run as the acting
+ * super admin (asPlatformOperator). Returns rows deleted: 1 = withdrawn, 0 = refused (the
+ * send may already have started).
+ */
+export async function withdrawLegalNoticeSend(sendId: string): Promise<number> {
+  const rows = await prisma.$queryRaw<Array<{ n: number }>>`
+    SELECT public.ebda_withdraw_legal_notice_send(${sendId}) AS n`;
+  return Number(rows[0]?.n ?? 0);
+}

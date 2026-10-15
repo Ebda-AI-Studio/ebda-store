@@ -98,6 +98,8 @@ model User {
   triggeredAffiliateEvents AffiliateEvent[]        @relation("AffiliateEventTriggeredBy")
   triggeredOrderEvents     OrderEvent[]            @relation("OrderEventActor")
   staffMemberships         StoreStaff[]            @relation("StaffUser")
+  legalAcceptances         LegalAcceptance[]
+  legalNoticeDeliveries    LegalNoticeDelivery[]
 
   // Composite unique (storeId, email) — one customer account per email per
   // store. Admins (storeId NULL) are not subject to this constraint thanks
@@ -2159,6 +2161,66 @@ model SystemSetting {
 
   @@index([category])
   @@map("system_settings")
+}
+
+// ==========================================
+// Legal: policy acceptance + material-change notices (Ruling LEGAL-4)
+// Versions live in code (packages/shared/src/legal LEGAL_POLICIES); these tables record
+// what each user accepted and which versions were announced.
+// ==========================================
+
+/// One row per user per accepted document version. Append-only for ebda_app (UPDATE/DELETE
+/// revoked in the migration). source: 'signup' (click-wrap) | 'notice_ack' (dashboard "Got it").
+model LegalAcceptance {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  docKey     String   @map("doc_key")
+  version    String
+  acceptedAt DateTime @default(now()) @map("accepted_at")
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  source     String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, docKey, version])
+  @@map("legal_acceptances")
+}
+
+/// One row per announced (material) version: written by the super-admin "Send notice".
+/// Platform-global (no user data): the banner reads it for every merchant.
+model LegalNoticeSend {
+  id             String   @id @default(uuid())
+  docKey         String   @map("doc_key")
+  version        String
+  sentAt         DateTime @default(now()) @map("sent_at")
+  /// The super_admin who pressed "Send notice" (not a FK: the record outlives the account).
+  sentBy         String   @map("sent_by")
+  /// Set by the fan-out once recipients are materialized.
+  recipientCount Int?     @map("recipient_count")
+
+  @@unique([docKey, version])
+  @@map("legal_notice_sends")
+}
+
+/// The email fan-out ledger: one row per recipient per announced version. A row leaves
+/// 'queued' (-> 'sending') BEFORE the mail is sent, so a retry never mails twice.
+/// status: queued | sending | sent | failed
+model LegalNoticeDelivery {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  docKey    String   @map("doc_key")
+  version   String
+  status    String   @default("queued")
+  error     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, docKey, version])
+  @@index([docKey, version, status])
+  @@map("legal_notice_deliveries")
 }
 
 // ==========================================

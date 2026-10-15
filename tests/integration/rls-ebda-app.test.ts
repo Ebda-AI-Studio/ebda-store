@@ -1536,7 +1536,13 @@ describe('runWithRequestDb binds a client per request', () => {
 // 20261008000100_tenant_defence_contract)
 // ---------------------------------------------------------------------------
 describe('stores and the user-keyed token tables are under strict RLS too (R-EBDA-005)', () => {
-  const USER_KEYED = ['refresh_tokens', 'verification_tokens', 'onesignal_subscriptions'];
+  const USER_KEYED = [
+    'refresh_tokens',
+    'verification_tokens',
+    'onesignal_subscriptions',
+    'legal_acceptances',
+    'legal_notice_deliveries',
+  ];
 
   it('every forced table outside the global allowlist has at least one policy, ebda_app only', async () => {
     const rows = await owner.$queryRaw<

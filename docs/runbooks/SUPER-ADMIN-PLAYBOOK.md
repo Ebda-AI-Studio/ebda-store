@@ -106,6 +106,18 @@ Force AI WhatsApp is a **separate product** with its own 3-tier plan system on t
   record only", which writes `refund_reconciled` and stops the alerts
   (issue 2002).
 
+## How to publish a legal policy change
+
+Follow `docs/runbooks/legal-policy-change.md`: edit the text + bump `LEGAL_POLICIES` in one PR,
+deploy marketing AND the API, then for a material version press **Send notice** on
+**Policy updates** (`/policy-updates`). It emails every store owner once (bilingual, Arabic first)
+and shows a banner until they press "Got it". It cannot be sent twice, and a fee change cannot be
+sent with less than 30 days to its effective date (send it the day it deploys). Watch the counts
+and the failed list. A run that stalls or did not start: **Resume**; failed emails: fix the cause,
+then **Retry failed** (runbook § Recover a stalled or failed run; nobody is mailed twice). A row
+stuck in `sending` for 15+ minutes is never re-sent: check Resend and contact the merchant. Who
+accepted what: Users -> the merchant -> **Policy acceptances**. Rulings LEGAL-4/5/6.
+
 ## Where the code lives
 
 | What                                 | Path                                                                         |

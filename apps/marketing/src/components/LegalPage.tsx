@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LEGAL_POLICIES, currentLegalVersion, formatLegalDate } from '@ebda/shared/legal';
 import { COPY } from '../lib/content';
 import { HOME, type LegalSlug, type Locale } from '../lib/site';
 import type { LegalPages } from '../lib/legal-types';
@@ -19,6 +20,7 @@ const DOC_KEY: Record<
 export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug }) {
   const c = COPY[locale].legalPages;
   const doc = c[DOC_KEY[page]];
+  const current = currentLegalVersion(LEGAL_POLICIES, DOC_KEY[page]);
   return (
     <>
       <Header locale={locale} page={page} />
@@ -26,8 +28,11 @@ export function LegalPage({ locale, page }: { locale: Locale; page: LegalSlug })
         <header className="legal-head">
           <h1>{doc.title}</h1>
           <p className="legal-meta">
-            {c.updated.label} <time dateTime="2026-10-07">{c.updated.date}</time> ·{' '}
-            {c.updated.version}
+            {c.updated.label}{' '}
+            <time dateTime={current.publishedAt}>
+              {formatLegalDate(current.publishedAt, locale)}
+            </time>{' '}
+            · {c.updated.versionLabel} {current.version}
           </p>
           <p className="legal-notice">{c.notice}</p>
         </header>

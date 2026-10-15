@@ -4,14 +4,16 @@ import type { LegalPages } from './legal-types';
 const OP = BRAND.company.shortNameEn;
 
 /**
- * English legal text, version 1.0 (2026-10-07). Original wording written from the
- * common protective structure of SaaS store-builder terms; not reviewed by counsel.
+ * English legal text. Version, publish date and effective date of each document live in
+ * LEGAL_POLICIES (packages/shared/src/legal); bump it in the same PR as any text change
+ * (docs/runbooks/legal-policy-change.md). Original wording written from the common protective
+ * structure of SaaS store-builder terms; not reviewed by counsel.
  */
 export const LEGAL_EN: LegalPages = {
-  updated: { label: 'Last updated', date: '7 October 2026', version: 'Version 1.0' },
+  updated: { label: 'Last updated', versionLabel: 'Version' },
   toc: 'On this page',
   notice:
-    'Version 1.0 of this document. We may update it as described in the "Changes" section. The Arabic text is the primary text.',
+    'We may update this document as described in its "Changes" section. The Arabic text is the primary text.',
   back: 'Back to home',
   legal: {
     title: 'Legal notice',

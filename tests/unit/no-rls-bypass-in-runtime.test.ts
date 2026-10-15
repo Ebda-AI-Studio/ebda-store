@@ -99,6 +99,8 @@ describe('no RLS bypass in the API runtime', () => {
         'super-admin provider activation: the store owner to email the decision to',
       'apps/api/src/routes/provider-activation.routes.ts':
         'super-admin provider activation queue: every store, one transaction each',
+      'apps/api/src/services/legal-notice.service.ts':
+        'legal-notice fan-out: every store owner, as the super admin who pressed Send notice',
     };
     const offenders: string[] = [];
     const used = new Set<string>();

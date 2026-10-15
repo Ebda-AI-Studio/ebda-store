@@ -32,6 +32,10 @@
       "types": "./src/brand/index.ts",
       "default": "./src/brand/index.ts"
     },
+    "./legal": {
+      "types": "./src/legal/index.ts",
+      "default": "./src/legal/index.ts"
+    },
     "./plan-limits": {
       "types": "./src/schemas/plan-limits.ts",
       "default": "./src/schemas/plan-limits.ts"

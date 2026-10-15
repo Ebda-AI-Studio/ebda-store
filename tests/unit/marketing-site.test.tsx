@@ -18,6 +18,23 @@ import {
   LOGIN_URL,
   SIGNUP_URL,
 } from '../../apps/marketing/src/lib/site';
+import {
+  LEGAL_POLICIES,
+  LEGAL_DOC_TITLE,
+  LEGAL_DOC_SLUG,
+  currentLegalVersion,
+  formatLegalDate,
+  type LegalDocKey,
+} from '../../packages/shared/src/legal';
+import { COPY } from '../../apps/marketing/src/lib/content';
+
+const DOC_OF: Record<(typeof LEGAL_SLUGS)[number], LegalDocKey> = {
+  legal: 'legal',
+  privacy: 'privacy',
+  terms: 'terms',
+  'merchant-agreement': 'merchant',
+  'acceptable-use': 'acceptableUse',
+};
 
 const pub = (f: string) =>
   readFileSync(path.resolve(__dirname, '../../apps/marketing/public', f), 'utf8');
@@ -494,13 +511,14 @@ describe('marketing SEO and trust surface', () => {
   it('llms.txt and og assets exist; legal pages show their version with no registration numbers', () => {
     expect(pub('llms.txt')).toMatch(/^# Ebda/);
     expect(pub('og.png').length).toBeGreaterThan(1000);
-    for (const [locale, badge] of [
-      ['ar', 'الإصدار 1.0'],
-      ['en', 'Version 1.0'],
+    for (const [locale, word] of [
+      ['ar', 'الإصدار'],
+      ['en', 'Version'],
     ] as const) {
       for (const page of LEGAL_SLUGS) {
+        const cur = currentLegalVersion(LEGAL_POLICIES, DOC_OF[page]);
         const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);
-        expect(html).toContain(badge);
+        expect(html).toContain(`${word} ${cur.version}`);
         // the WhatsApp button's wa.me href is the only long number on the page, and it is not a registration number
         const withoutPhone = html.replace(/201207761882/g, '');
         expect(withoutPhone).not.toMatch(/\b\d{5,}\b/);
@@ -511,11 +529,50 @@ describe('marketing SEO and trust surface', () => {
     for (const locale of ['ar', 'en'] as const)
       for (const page of LEGAL_SLUGS) {
         const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);
-        expect(html).toContain('2026-10-07');
         expect(html).toContain('ahlan@ebda.app');
         expect(html).not.toMatch(/\[[^\]]*\]/);
         expect(html.match(/<section/g)!.length).toBeGreaterThanOrEqual(5);
       }
+  });
+  it("each legal page's date and version equal LEGAL_POLICIES, in ar and en (Ruling LEGAL-4)", () => {
+    for (const locale of ['ar', 'en'] as const)
+      for (const page of LEGAL_SLUGS) {
+        const cur = currentLegalVersion(LEGAL_POLICIES, DOC_OF[page]);
+        const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />).toLowerCase();
+        expect(html).toContain(
+          `<time datetime="${cur.publishedAt}">${formatLegalDate(cur.publishedAt, locale).toLowerCase()}</time>`
+        );
+      }
+  });
+  it('the legal copy holds no date or version literal, and the registry titles/slugs match the pages', () => {
+    for (const locale of ['ar', 'en'] as const) {
+      const lp = COPY[locale].legalPages;
+      expect(Object.keys(lp.updated).sort()).toEqual(['label', 'versionLabel']);
+      expect(lp.notice).not.toMatch(/\d/);
+      for (const page of LEGAL_SLUGS) {
+        const key = DOC_OF[page];
+        expect(LEGAL_DOC_TITLE[key][locale]).toBe(lp[key].title);
+        expect(LEGAL_DOC_SLUG[key]).toBe(page);
+      }
+    }
+  });
+  it('footer.legalVersion states the newest legal update date from LEGAL_POLICIES, no version (A3, M5)', () => {
+    // Independent of content.ts: every document's current publishedAt, sorted, newest last.
+    const latest = (Object.keys(LEGAL_POLICIES) as LegalDocKey[])
+      .map(k => currentLegalVersion(LEGAL_POLICIES, k).publishedAt)
+      .sort()
+      .at(-1)!;
+    for (const locale of ['ar', 'en'] as const) {
+      const t = COPY[locale].footer.legalVersion;
+      expect(t).toContain(formatLegalDate(latest, locale));
+      expect(t).not.toMatch(/version|الإصدار|\b\d+\.\d+\b/i);
+      expect(t).not.toMatch(/[٠-٩]/);
+    }
+    const src = readFileSync(
+      path.resolve(__dirname, '../../apps/marketing/src/lib/content.ts'),
+      'utf8'
+    );
+    expect(src).not.toMatch(/legalVersion:\s*['"`][^'"`]*\d/);
   });
   it('sitemap lists every legal page in both locales', async () => {
     const { default: sitemap } = await import('../../apps/marketing/src/app/sitemap');

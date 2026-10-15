@@ -121,6 +121,7 @@ try {
           name: 'E2E Merchant',
           phone: '012 3456 7890',
           formToken,
+          acceptedLegal: true,
         },
       }),
       200,

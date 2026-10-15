@@ -7,6 +7,7 @@ import { apiPost, apiGet } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
 import { useT } from '@/i18n/useT';
 import { withNumerals } from '@ebda/shared';
+import { LegalAcceptancesPanel } from '../../../components/legal/LegalAcceptancesPanel';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -525,6 +526,7 @@ export default function SecurityPage() {
             )}
           </>
         )}
+        <LegalAcceptancesPanel />
       </div>
     </AdminLayout>
   );

@@ -4,8 +4,11 @@ export interface LegalDoc {
 }
 
 export interface LegalPages {
-  /** "Last updated" line: label before the date, the date as shown, and the version. */
-  updated: { label: string; date: string; version: string };
+  /**
+   * Labels of the "last updated" line. The date and the version themselves come from
+   * LEGAL_POLICIES in @ebda/shared/legal (Ruling LEGAL-4), never from this copy.
+   */
+  updated: { label: string; versionLabel: string };
   /** One-line note under the title (which text is authoritative, how changes happen). */
   notice: string;
   /** Heading of the in-page table of contents. */

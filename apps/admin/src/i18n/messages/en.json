@@ -6061,6 +6061,7 @@
       "navPlatformBillingEvents": "Billing ledger (platform)",
       "navPlatformTaxVerification": "VAT verification (platform)",
       "navPlatformTaxArchive": "Tax archive (platform)",
+      "navPlatformPolicyUpdates": "Policy updates",
       "navPlatformSettings": "Platform settings",
       "navPlatformProviderActivation": "Activation requests (platform)"
     },
@@ -8979,7 +8980,8 @@
         "formExpired": "This form expired. Please submit again",
         "rateLimited": "Too many attempts. Please try again in a little while.",
         "generic": "We could not create your account. Please try again.",
-        "phoneRequired": "Enter your mobile number."
+        "phoneRequired": "Enter your mobile number.",
+        "legalRequired": "Accept the terms and policies to create your account."
       },
       "sent": {
         "title": "Check your email",
@@ -8995,6 +8997,11 @@
         "chip": "Selected plan: {plan} · {interval} — 14-day Growth trial",
         "monthly": "monthly",
         "yearly": "annual"
+      },
+      "legal": {
+        "prefix": "I agree to the ",
+        "sep": ", the ",
+        "lastSep": " and the "
       }
     },
     "verify": {
@@ -9230,6 +9237,15 @@
       "footer": "Your store. Your brand.",
       "back": "Back to Ebda Store"
     }
+  },
+  "legalNotice": {
+    "title": "We updated our policies",
+    "effective": "Takes effect {date}.",
+    "read": "Read the policy",
+    "gotIt": "Got it",
+    "saving": "Saving…",
+    "ackFailed": "Could not save. Please try again.",
+    "readAria": "Read the {title}"
   },
   "looks": {
     "picker": {
@@ -10168,6 +10184,78 @@
       "productHint": "Shoppers get a “Size guide” button next to the size picker.",
       "categoryHint": "Products in this category use this chart unless they have their own.",
       "manage": "Manage size charts"
+    }
+  },
+  "policyUpdates": {
+    "title": "Policy updates",
+    "subtitle": "Legal documents, their current versions, and the notices sent to merchants.",
+    "loading": "Loading…",
+    "loadFailed": "Could not load the policy list.",
+    "version": "Version {version}",
+    "published": "Published {date}.",
+    "effective": "Takes effect {date}.",
+    "material": "Material change.",
+    "notMaterial": "Not material: no notice needed.",
+    "feeChange": "Affects fees (30 days' notice).",
+    "accepted": "Accepted by {n} accounts.",
+    "sentAt": "Notice sent {date}.",
+    "deliveries": "Emails: {sent} sent, {failed} failed, {queued} waiting, of {total}.",
+    "stuck": "{n} stuck while sending for over 15 minutes: they will not finish or retry by themselves. The owner may or may not have the email; check before contacting them.",
+    "failedTitle": "Failed emails",
+    "failedMore": "Showing the latest {shown} of {total}.",
+    "failedRow": "{email}: {reason} ({time} UTC)",
+    "sendNotice": "Send notice",
+    "confirmTitle": "Send this notice to every merchant?",
+    "confirmBody": "Every store owner gets an email, and a banner appears in their dashboard until they press Got it. This cannot be undone or sent twice.",
+    "confirmSend": "Yes, send it",
+    "cancel": "Cancel",
+    "sending": "Sending…",
+    "sendStarted": "Notice sent. Emails are going out now.",
+    "alreadySent": "A notice for this version was already sent.",
+    "sendUncertain": "The notice is recorded, but we could not confirm its emails started. Check this page before trying again.",
+    "noRun": "The email run did not start (no recipients 10 minutes after Send). Press Resume.",
+    "sendFailed": "Could not start the send. Nothing was sent. Try again.",
+    "tooLate": "Too late to announce this fee change: it needs 30 days' notice before it takes effect. Move its effective date later in the code and redeploy.",
+    "starting": "Starting the email run…",
+    "inProgress": "Sending… {n} left.",
+    "stalled": "The email run stopped with {n} owners still waiting. Press Resume.",
+    "resume": "Resume",
+    "retryFailed": "Retry failed ({n})",
+    "resumeTitle": "Resume the email run?",
+    "resumeBody": "Only owners who have not been emailed yet get the email. Nobody is emailed twice.",
+    "resumeConfirm": "Yes, resume",
+    "retryTitle": "Email the owners whose email failed?",
+    "retryBody": "Only failed emails are sent again. Owners who already got it are not emailed twice.",
+    "retryConfirm": "Yes, retry",
+    "resumeStarted": "Email run resumed.",
+    "retryStarted": "Retrying {n} emails.",
+    "retryNone": "Nothing to retry: no email is marked failed now.",
+    "actionFailed": "Could not start the email run. Try again.",
+    "notCurrent": "This version is no longer the current one, so it cannot be sent, resumed or retried. Reload the page.",
+    "unknownTitle": "May have been delivered: check before re-sending",
+    "unknownHint": "{n} emails timed out and the provider may still have delivered them. Retry failed does not send these again. Check with the owner first.",
+    "unknownRow": "{email} ({time} UTC)"
+  },
+  "legalAcceptances": {
+    "adminTitle": "Policy acceptances",
+    "mineTitle": "Policies you accepted",
+    "mineHint": "The legal documents you agreed to, and when.",
+    "loading": "Loading…",
+    "loadFailed": "Could not load the acceptance records.",
+    "empty": "No acceptance recorded.",
+    "version": "Version {version}",
+    "at": "{time} UTC",
+    "ip": "IP {ip}",
+    "source": {
+      "signup": "At signup",
+      "notice_ack": "Acknowledged the notice"
+    },
+    "deliveriesTitle": "Notice emails",
+    "status": {
+      "queued": "Waiting",
+      "sending": "Sending",
+      "sent": "Sent",
+      "failed": "Failed"
     }
   }
 }

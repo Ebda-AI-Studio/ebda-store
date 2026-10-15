@@ -93,6 +93,7 @@ describe.skipIf(!hasDb)('self-serve merchant onboarding', () => {
         // The signup schema requires a phone (already true on main); unique per call.
         phone: `010${crypto.randomInt(10_000_000, 99_999_999)}`,
         formToken: tok.body.data.token,
+        acceptedLegal: true,
         ...extra,
       });
   }

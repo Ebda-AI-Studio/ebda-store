@@ -53,6 +53,8 @@ export type NavLabels = {
   platformProviderActivation: string;
   /** Six-year fiscal-document archive across all stores, deleted ones too (super_admin only) */
   platformTaxArchive: string;
+  /** Legal documents + material-change notices (super_admin only, Ruling LEGAL-4) */
+  platformPolicyUpdates: string;
   /** Platform-wide settings, e.g. Ebda's own VAT (super_admin only) */
   platformSettings: string;
   // Super-admin store-scoped item
@@ -123,6 +125,12 @@ export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
       name: labels.platformTaxArchive,
       href: '/tax-archive',
       icon: 'M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5 M10 11.25h4 M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z',
+    },
+    {
+      // Document-check icon — legal policy versions and merchant notices.
+      name: labels.platformPolicyUpdates,
+      href: '/policy-updates',
+      icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
     },
     {
       // Cog icon — platform-wide settings (Ebda's own VAT).

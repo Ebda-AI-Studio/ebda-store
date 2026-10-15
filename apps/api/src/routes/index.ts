@@ -4,6 +4,11 @@ import merchantSignupRoutes from './merchant-signup.routes';
 import onboardingRoutes from './onboarding.routes';
 import setupGuideRoutes from './setup-guide.routes';
 import mfaRoutes from './mfa.routes';
+import {
+  meLegalNoticeRoutes,
+  meLegalAcceptanceRoutes,
+  adminLegalPolicyRoutes,
+} from './legal-policy.routes';
 import storeRoutes from './store.routes';
 import blogRoutes from './blog.routes';
 import locationsRoutes from './locations.routes';
@@ -131,6 +136,9 @@ router.use('/auth', authRoutes);
 // Mounted under /auth/mfa so the full path is /api/v1/auth/mfa/*.
 // Must come AFTER auth routes and BEFORE any catch-all.
 router.use('/auth/mfa', mfaRoutes);
+// Legal policy notices for the signed-in merchant (Ruling LEGAL-4): user-level, no store scope.
+router.use('/me/legal-notices', meLegalNoticeRoutes);
+router.use('/me/legal-acceptances', meLegalAcceptanceRoutes);
 
 // Payment routes
 router.use('/payments', paymentRoutes);
@@ -166,6 +174,10 @@ router.use('/admin', tenantContext, adminAnswerEngineRoutes);
 // carries its own authenticate → requireMfaEnrolled → authorize('super_admin').
 router.use('/admin', platformTaxRoutes);
 router.use('/admin', fiscalArchiveRoutes);
+
+// Super-admin policy updates (Ruling LEGAL-4). BEFORE adminRoutes' catch-all MFA gate; it
+// carries its own authenticate -> MFA -> super_admin chain.
+router.use('/admin', adminLegalPolicyRoutes);
 
 // Provider activation queue (PROVIDERS-ACTIVATION). Same reachability rule as the tax routes: before
 // adminRoutes' catch-all MFA gate; it carries its own authenticate → MFA → super_admin chain.
