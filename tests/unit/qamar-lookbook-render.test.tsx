@@ -473,6 +473,35 @@ describe('one section-heading alignment per page on qamar (T-03)', async () => {
   });
 });
 
+describe('product grids never end on an orphan row (quality bar L-05)', async () => {
+  const { orphanRowClass } =
+    await import('../../apps/web/src/builder/sections/FeaturedCollectionSection');
+  const cols = { base: 2, md: 3, lg: 4 };
+  const visible = (count: number, bp: 'base' | 'md' | 'lg') =>
+    Array.from({ length: count }, (_, i) => orphanRowClass(i, count, cols)).filter(c => {
+      if (!c) return true;
+      const part = c.split(' ')[bp === 'base' ? 0 : bp === 'md' ? 1 : 2];
+      return !part.endsWith('hidden');
+    }).length;
+  it('every breakpoint shows whole rows only', () => {
+    for (const n of [2, 3, 4, 5, 6, 7, 8, 9, 12])
+      for (const [bp, c] of Object.entries(cols) as ['base' | 'md' | 'lg', number][]) {
+        const v = visible(n, bp);
+        expect(v % c === 0 || v === n, `${n} items @${bp}`).toBe(true);
+        expect(v, `${n} items @${bp}`).toBeGreaterThan(0);
+      }
+  });
+  it('8 new-in cards: 8 on a phone, 6 at 820, 8 at 1280; 12 divides everywhere (no wrapper)', () => {
+    expect([visible(8, 'base'), visible(8, 'md'), visible(8, 'lg')]).toEqual([8, 6, 8]);
+    expect(Array.from({ length: 12 }, (_, i) => orphanRowClass(i, 12, cols))).toEqual(
+      Array(12).fill(undefined)
+    );
+  });
+  it('a grid shorter than one row shows whole', () => {
+    expect(visible(3, 'lg')).toBe(3);
+  });
+});
+
 describe('qamar display headings are not shrunk/grown by the Arabic font-size-adjust', () => {
   it('h1-h3 and .font-display reset it under the qamar pack; the collage motion has a reduced-motion end state', async () => {
     const { readFileSync } = await import('node:fs');

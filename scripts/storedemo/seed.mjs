@@ -249,6 +249,14 @@ async function seedCatalogue(prisma, Prisma, storeId, base) {
 
       const productIdBySlug = new Map();
       let variantCount = 0;
+      // "New in" (`productSource: newest`) lists only products flagged `isNew`: flag the first
+      // NEW_IN_COUNT products that have a photo (12 fills 2, 3 and 4 columns with no orphan row).
+      const NEW_IN_COUNT = 12;
+      const newIn = new Set(
+        QAMAR_PRODUCTS.filter(p => p.images.length > 0)
+          .slice(0, NEW_IN_COUNT)
+          .map(p => p.slug)
+      );
       for (const [i, p] of QAMAR_PRODUCTS.entries()) {
         const hasVariants = Boolean(p.options?.length);
         const data = {
@@ -264,6 +272,8 @@ async function seedCatalogue(prisma, Prisma, storeId, base) {
           inventory: hasVariants ? 0 : (p.stock ?? 25),
           allowBackorder: !hasVariants && p.backorder === true,
           featured: i < 4,
+          isNew: newIn.has(p.slug),
+          newArrivalPosition: i,
           facts: (p.facts ?? []).map(f => ({ ...f, onCard: f.onCard === true })),
           leadTimeDays: p.leadTimeDays ?? null,
           personalisation: p.personalisation
