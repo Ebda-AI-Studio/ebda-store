@@ -1,5 +1,6 @@
 'use client';
 
+import { signedText } from '@/lib/bidi';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button, Select } from '@ebda/ui';
@@ -420,7 +421,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
                     value: order.id,
                     label: `#${order.orderNumber}${
                       firstName
-                        ? ` \u2014 ${firstName}${rows.length > 1 ? ` (+${rows.length - 1} more)` : ''}`
+                        ? ` \u2014 ${firstName}${rows.length > 1 ? ` (${t(`${signedText('+', rows.length - 1)} more`, `${signedText('+', rows.length - 1)} أخرى`)})` : ''}`
                         : ''
                     }`,
                   };

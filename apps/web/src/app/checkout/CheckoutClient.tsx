@@ -1,5 +1,6 @@
 'use client';
 
+import { signedText } from '@/lib/bidi';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import dynamic from 'next/dynamic';
@@ -653,7 +654,10 @@ export default function CheckoutClient() {
             const hasFee = (cod.fixedFee || 0) > 0 || (cod.percentBps || 0) > 0;
             const pct = cod.percentBps ? `${Number((cod.percentBps / 100).toFixed(2))}%` : '';
             const fixed = cod.fixedFee ? formatPrice(cod.fixedFee) : '';
-            const feeText = hasFee ? ` (+${[fixed, pct].filter(Boolean).join(' + ')})` : '';
+            // Each signed part travels with its sign in an LTR isolate (R-02): a
+            // bare "(+30 ج.م)" painted as "(30+ ج.م)" on the Arabic option.
+            const feeParts = [fixed, pct].filter(Boolean).map(part => signedText('+', part));
+            const feeText = hasFee ? ` (${feeParts.join(' ')})` : '';
             allProviders.push({
               id: 'cod',
               name: `${cod.displayName || 'Cash on Delivery'}${feeText}`,

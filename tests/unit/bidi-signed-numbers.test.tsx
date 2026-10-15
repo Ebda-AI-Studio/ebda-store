@@ -97,7 +97,9 @@ describe('R-02: no bare signed expression in the storefront', () => {
       return /\.(tsx|ts)$/.test(n) && !/\.test\./.test(n) ? [p] : [];
     });
   // JSX text "-{x}", "−{x}", "+{x}" and template literals `-${x}`, `−${x}`, `+${x}`.
-  const BANNED = [/(^|[>}\s])[-−+]\{[A-Za-z(]/, /`[-−+]\$\{/];
+  // Inside a template a sign after "(" is the same neutral (the COD fee "(+30 ج.م)"):
+  // `(+${fee})`. A sign after a SPACE is not matched: CSS (`0px -${n}px`) uses it.
+  const BANNED = [/(^|[>}\s])[-−+]\{[A-Za-z(]/, /[`(][-−+]\$\{/];
 
   it('scans the storefront', () => {
     expect(walk(WEB).length).toBeGreaterThan(200);
@@ -121,6 +123,9 @@ describe('R-02: no bare signed expression in the storefront', () => {
     expect(t('<span>+{total - max}</span>')).toBe(true);
     expect(t('return `-${pct}%`;')).toBe(true);
     expect(t('<Num>{`−${formatPrice(x)}`}</Num>')).toBe(true);
+    expect(t("const feeText = ` (+${[fixed, pct].join(' + ')})`;")).toBe(true);
+    expect(t('` (+${rows.length - 1} more)`')).toBe(true);
+    expect(t('rootMargin: `0px 0px -${measure()}px 0px`,')).toBe(false);
     expect(t('className="-mt-2"')).toBe(false);
     expect(t('a = b - {x}')).toBe(false);
   });
