@@ -42,3 +42,21 @@ export function autoSelection<V extends SelectableVariant>(
   if (!only) return {};
   return Object.fromEntries(optionNames.map(name => [name, only.options[name]]));
 }
+
+/**
+ * A product with variants but NO option groups (W1a fix round, minor 1): there
+ * is no picker to choose from, so the PDP treats it like a single-variant
+ * product. Pick the first buyable variant (untracked or inventory > 0), else
+ * the first one, which then reads sold out (the button disables on its stock),
+ * never a dead tap that nudges a picker that is not on the page.
+ */
+export function variantWithoutPicker<V extends SelectableVariant>(
+  variants: readonly V[] | null | undefined,
+  optionNames: readonly string[]
+): V | null {
+  if (!variants || variants.length === 0 || optionNames.length > 0) return null;
+  return (
+    variants.find(v => v.inventory === undefined || v.inventory === null || v.inventory > 0) ??
+    variants[0]
+  );
+}

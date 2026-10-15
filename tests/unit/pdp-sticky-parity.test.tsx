@@ -281,7 +281,8 @@ describe('default PDP sticky bar mirrors the main add button', () => {
       expect(scrollSpy).toHaveBeenCalled();
       expect(hint.textContent).toBe('Choose Size');
       expect(sizeGroup.getAttribute('aria-describedby')).toBe(hint.id);
-      expect(sizeGroup.getAttribute('aria-invalid')).toBe('true');
+      // no aria-invalid: not an allowed attribute on role=group (ARIA 1.2)
+      expect(sizeGroup.hasAttribute('aria-invalid')).toBe(false);
       expect(sizeGroup.className).toContain('ring-2');
 
       // Size picked, colour still missing: the next tap goes to Color.
@@ -303,6 +304,51 @@ describe('default PDP sticky bar mirrors the main add button', () => {
       });
       expect(ctx.addItem).toHaveBeenCalledTimes(1);
       expect(ctx.addItem.mock.calls[0][0]).toMatchObject({ variantId: 'v2' });
+    }
+  );
+});
+
+describe('the task bar keeps a way to the cart (W1a fix round, minor 3)', () => {
+  it('default PDP: the sticky bar carries a cart link (the tab bar it replaces was the phone cart entry)', async () => {
+    const { sticky } = await renderPdp(product());
+    const link = sticky.querySelector('[data-testid="sticky-atc-cart"]') as HTMLAnchorElement;
+    expect(link).toBeTruthy();
+    expect(link.getAttribute('href')).toBe('/cart');
+    expect(link.getAttribute('aria-label')).toBe('Cart');
+  });
+
+  it('Dahab: the pinned bar carries one too', async () => {
+    vi.stubGlobal('IntersectionObserver', IO);
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+    const { default: ProductDetailClient } =
+      await import('../../apps/web/src/app/products/[slug]/ProductDetailClient');
+    ctx.store = { ...STORES.A, template: 'dahab' };
+    render(<ProductDetailClient initialProduct={product() as never} />);
+    const link = (await screen.findByTestId('dahab-pinned-cart')) as HTMLAnchorElement;
+    expect(link.getAttribute('href')).toBe('/cart');
+    expect(link.getAttribute('aria-label')).toBe('Cart');
+  });
+});
+
+describe('variants but NO option groups (W1a fix round, minor 1)', () => {
+  it.each(['main', 'sticky'] as const)(
+    'the %s button adds the first buyable variant (no picker to nudge, never a dead tap)',
+    async which => {
+      const { stickyBtn, main } = await renderPdp(
+        product({
+          options: [],
+          variants: [
+            { id: 'v-out', price: 149000, inventory: 0, options: {} },
+            { id: 'v-ok', price: 149000, inventory: 4, options: {} },
+          ],
+        })
+      );
+      expectMirror(main, stickyBtn, 'Add to Cart', false);
+      await act(async () => {
+        fireEvent.click(which === 'main' ? main : stickyBtn);
+      });
+      expect(ctx.addItem).toHaveBeenCalledTimes(1);
+      expect(ctx.addItem.mock.calls[0][0]).toMatchObject({ variantId: 'v-ok' });
     }
   );
 });

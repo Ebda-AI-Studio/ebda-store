@@ -220,7 +220,6 @@ export function VariantSelector({
             role="group"
             aria-labelledby={labelId}
             aria-describedby={hintId}
-            aria-invalid={isNudged ? true : undefined}
             tabIndex={-1}
             data-option-group={option.name}
             data-nudged={isNudged ? '' : undefined}

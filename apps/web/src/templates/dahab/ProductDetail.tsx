@@ -32,6 +32,7 @@ import { PersonalisationField } from '../../components/commerce/PersonalisationF
 import { SizeChartDialog } from '../../components/commerce/SizeChartDialog';
 import type { PublicSizeChart } from '@ebda/shared';
 import {
+  BagIcon,
   CloseIcon,
   DAHAB_BTN_PRIMARY,
   HeartIcon,
@@ -85,6 +86,10 @@ export interface DahabProductDetailProps {
   noteNudge?: number;
   /** Bumped by the page when add-to-cart was tapped with an option still unset (C-02). */
   optionNudge?: number;
+  /** Cart link for the pinned bar, which replaces the tab bar while pinned (C-04). */
+  cartHref?: string;
+  cartCount?: number;
+  cartLabel?: string;
   /** Spec table, WhatsApp order button, share row — platform components. */
   specs?: ReactNode;
   extras?: ReactNode;
@@ -548,6 +553,21 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
         )}
       >
         <div className="flex items-center gap-3">
+          {p.cartHref && (
+            <Link
+              href={p.cartHref}
+              aria-label={p.cartLabel}
+              data-testid="dahab-pinned-cart"
+              className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius)] border border-border text-foreground"
+            >
+              <BagIcon className="h-[22px] w-[22px]" aria-hidden="true" />
+              {(p.cartCount ?? 0) > 0 && (
+                <span className="absolute -end-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-semibold leading-none text-primary-foreground tabular-nums">
+                  {localize(p.cartCount ?? 0)}
+                </span>
+              )}
+            </Link>
+          )}
           <div className="min-w-0 flex-1">
             <p className="line-clamp-1 text-[13px] text-foreground/80 [overflow-wrap:anywhere]">
               {p.name}

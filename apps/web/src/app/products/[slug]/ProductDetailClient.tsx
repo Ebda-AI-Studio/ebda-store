@@ -27,7 +27,7 @@ import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
 import { recordFocusProduct, getLastListing } from '@/lib/last-listing';
 import { VariantSelector } from '../../../components/VariantSelector';
-import { autoSelectVariant } from '@/lib/single-variant';
+import { autoSelectVariant, variantWithoutPicker } from '@/lib/single-variant';
 import { useTemplateComponents } from '../../../hooks/useTemplateComponents';
 import { useNumerals } from '../../../hooks/useNumerals';
 import { toTemplateProduct } from '../../../templates/adapters';
@@ -183,12 +183,26 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // A product with exactly one tappable variant starts with it selected — the
   // same rule VariantSelector uses for its initial pick — so the server render
   // already has Add to Cart enabled instead of flipping on after hydration.
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(() =>
-    autoSelectVariant(
-      initialProduct?.variants,
-      (initialProduct?.options ?? []).map(o => o.name)
-    )
-  );
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(() => {
+    const names = (initialProduct?.options ?? []).map(o => o.name);
+    return (
+      autoSelectVariant(initialProduct?.variants, names) ??
+      variantWithoutPicker(initialProduct?.variants, names)
+    );
+  });
+  // Variants but no option groups: no picker will ever set a variant, so the
+  // page holds one (also when the product loads client-side). Without this the
+  // buy button nudged a selector that is not on the page: a dead tap.
+  useEffect(() => {
+    if (selectedVariant || !product) return;
+    const v = variantWithoutPicker(
+      product.variants,
+      (product.options ?? []).map(o => o.name)
+    );
+    if (v) setSelectedVariant(v);
+    // Keyed on the product only; selectedVariant is read to skip, not to react.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product]);
 
   // True once the shopper has tapped an option pill. An auto-selected single
   // variant (above) must not swap the gallery to its own image: the owner's
@@ -233,7 +247,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     setSelectedImage(prev => (prev === idx ? prev : idx));
   };
   const { success: toastSuccess, error: toastError } = useToast();
-  const { addItem } = useCart();
+  const { addItem, itemCount: cartCount } = useCart();
   // Issue 1 fix (2026-05-28): destructure ctxLayout so we can merge it
   // with the server-side prop layout and forward to ShopChrome — the footer
   // bgColor (and other chrome overrides) were not applied on the PDP because
@@ -602,6 +616,12 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     : outOfStock
       ? t('Out of Stock', 'غير متوفر')
       : t('Add to Cart', translations['Add to Cart']);
+  // The task bar replaces the tab bar (C-04), the only phone cart entry on most
+  // skins, so the bar carries its own cart link (W1a fix round, minor 3).
+  const cartLinkLabel =
+    cartCount > 0
+      ? t(`Cart, ${cartCount} items`, `السلة، ${localize(cartCount)} قطع`)
+      : t('Cart', 'السلة');
   const priceText =
     pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
       ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
@@ -735,6 +755,9 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   ? t('Out of stock', 'غير متوفر')
                   : t('Add to bag', 'إضافة للسلة')
             }
+            cartHref={storeUrl('/cart')}
+            cartCount={cartCount}
+            cartLabel={cartLinkLabel}
             isWishlisted={isWishlisted}
             onToggleWishlist={handleToggleWishlist}
             sku={product.sku}
@@ -1318,6 +1341,10 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
         label={addLabel}
         disabled={addDisabled || isAdding}
         onAdd={handleAddToCart}
+        cartHref={storeUrl('/cart')}
+        cartCount={cartCount}
+        cartCountText={localize(cartCount)}
+        cartLabel={cartLinkLabel}
       />
     </ShopChrome>
   );
