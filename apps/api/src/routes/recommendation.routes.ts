@@ -265,15 +265,15 @@ publicRouter.get(
             .filter(Boolean)
         : [];
 
+      // The feature gates the "only buyable picks" filter inside the service, so a
+      // feature-off store never shows a sold-out recommendation (fix round 2).
+      const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
       const recommendations = await recommendationService.getCartRecommendations(
         storeId,
-        productIds
+        productIds,
+        backorderOn
       );
-      const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
-      res.json({
-        success: true,
-        data: { recommendations: gateBackorderPayload(recommendations, backorderOn) },
-      });
+      res.json({ success: true, data: { recommendations } });
     } catch (error) {
       next(error);
     }

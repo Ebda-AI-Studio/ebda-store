@@ -8,6 +8,7 @@
  *  - Untracked stock (`trackInventory: false`) is always in stock.
  */
 import { describe, it, expect } from 'vitest';
+import { Prisma } from '@ebda/database';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -74,17 +75,80 @@ describe('the storefront flags agree with the server', () => {
   });
 });
 
+describe('gateBackorderPayload leaves non-plain values alone (fix round 2, re-review Critical)', () => {
+  const createdAt = new Date('2026-10-14T10:00:00.000Z');
+  const reviewedAt = new Date('2026-10-10T08:30:00.000Z');
+  const body = {
+    product: {
+      id: 'p1',
+      acceptsBackorder: true,
+      lowStock: false,
+      availableQty: 0,
+      createdAt,
+      price: new Prisma.Decimal('149.50'),
+      blob: Buffer.from('x'),
+      reviews: [{ id: 'r1', rating: 5, createdAt: reviewedAt, author: { name: 'سارة' } }],
+      variants: [
+        {
+          id: 'v1',
+          acceptsBackorder: true,
+          lowStock: false,
+          availableQty: 0,
+          updatedAt: createdAt,
+        },
+        { id: 'v2', acceptsBackorder: false, inStock: true },
+      ],
+    },
+  };
+
+  it('keeps Date / Decimal / Buffer instances and nested reviews intact, gates the flags', () => {
+    const out = gateBackorderPayload(body, false);
+    expect(out.product.createdAt).toBe(createdAt);
+    expect(out.product.createdAt).toBeInstanceOf(Date);
+    expect(out.product.price).toBe(body.product.price);
+    expect(Prisma.Decimal.isDecimal(out.product.price)).toBe(true);
+    expect(out.product.blob).toBe(body.product.blob);
+    expect(out.product.reviews).toBe(body.product.reviews); // untouched subtree keeps identity
+    expect(out.product.reviews[0].createdAt).toBeInstanceOf(Date);
+    expect(out.product.acceptsBackorder).toBe(false);
+    expect(out.product.variants[0]).toMatchObject({ acceptsBackorder: false, availableQty: null });
+    expect(out.product.variants[0].updatedAt).toBe(createdAt);
+    expect(out.product.variants[1]).toBe(body.product.variants[1]);
+    // JSON is what ships: the dates survive serialisation as ISO strings.
+    expect(JSON.parse(JSON.stringify(out)).product.createdAt).toBe(createdAt.toISOString());
+    // The input is never mutated.
+    expect(body.product.acceptsBackorder).toBe(true);
+  });
+
+  it('a payload with nothing to gate comes back as the same reference', () => {
+    const plain = { products: [{ id: 'a', acceptsBackorder: false, createdAt }] };
+    expect(gateBackorderPayload(plain, false)).toBe(plain);
+  });
+});
+
 describe('every server backorder decision goes through lineAllowsBackorder / isOrderable', () => {
   const ROOT = join(__dirname, '../..');
   it.each([
     'apps/api/src/services/cart.service.ts',
     'apps/api/src/services/order.service.ts',
     'apps/api/src/routes/wa-bridge.routes.ts',
+    'apps/api/src/routes/analytics.routes.ts',
   ])('%s has no hand-rolled `variant ? variant.allowBackorder : product.allowBackorder`', f => {
     const src = readFileSync(join(ROOT, f), 'utf8');
     expect(src).not.toMatch(/\?\s*variant\.allowBackorder\s*:/);
     expect(src).not.toMatch(/variant\?\.allowBackorder\s*\?\?/);
     expect(src).not.toMatch(/\|\|\s*v\.allowBackorder\b/);
     expect(src).not.toMatch(/\|\|\s*p\.allowBackorder,/);
+  });
+});
+
+describe('admin reporting says "accepts backorder" only when the cart would (fix round 2)', () => {
+  it('analytics derives the flag through lineAllowsBackorder + the store feature', () => {
+    const src = readFileSync(
+      join(__dirname, '../..', 'apps/api/src/routes/analytics.routes.ts'),
+      'utf8'
+    );
+    expect(src).toMatch(/lineAllowsBackorder\(p, null, backorderOn\)/);
+    expect(src).not.toMatch(/productFlags\.map\(p => \[p\.id, p\.allowBackorder\]\)/);
   });
 });

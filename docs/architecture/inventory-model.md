@@ -112,6 +112,12 @@ and the public routes apply the feature AFTER the cache read with `gateBackorder
 (`trackInventory: false`) reads `inStock: true` in the payload, as `isOrderable` and the
 cart already treated it. Proof over HTTP as `ebda_app`:
 `tests/integration/backorder-variant-inherits.test.ts`.
+The gate walks only plain objects and arrays (a `Date`, `Decimal` or `Buffer` is passed
+through untouched) and copies only what it changes. Staleness (Ruling FU46-W1b-6): the
+public listing/PDP edge copy (60s + 300s stale) and the AI feed's edge window can show the
+pre-change backorder state after the feature flips, as can the storefront's PDP data
+cache (`revalidate: 60`, tag `products:<store>`, which a feature flip does not purge); BOUNDED-stale, because the cart and
+checkout re-read the feature and decide.
 
 ## Writing stock
 

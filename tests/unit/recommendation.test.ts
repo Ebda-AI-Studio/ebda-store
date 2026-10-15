@@ -252,6 +252,16 @@ describe('getCartRecommendations — sold-out picks take no slot (W1a fix round)
     expect(result.map(p => p.id)).toEqual(['r2', 'r3', 'r5', 'r6']);
     // more candidates than slots are read, so the sold-out ones can be replaced
     expect(mockPrisma.product.findMany.mock.calls[0][0].where.id.in.length).toBe(6);
+
+    // Store backorder feature OFF (W1b fix round 2): the backorderable sold-out
+    // pick is NOT buyable, so it takes no slot either (never a sold-out card).
+    const off = (await recommendationService.getCartRecommendations(
+      storeId,
+      ['in-cart'],
+      false
+    )) as any[];
+    expect(off.map(p => p.id)).toEqual(['r2', 'r5', 'r6']);
+    expect(off.every(p => p.acceptsBackorder === false)).toBe(true);
   });
 });
 

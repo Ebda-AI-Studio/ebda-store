@@ -91,6 +91,7 @@ async function seed(opts: { feature: boolean }) {
 afterAll(async () => {
   if (!hasDb) return;
   const storeIds = created.storeIds;
+  await prisma.review.deleteMany({ where: { storeId: { in: storeIds } } });
   await prisma.backorderLine.deleteMany({ where: { storeId: { in: storeIds } } });
   await prisma.inventoryHistory.deleteMany({ where: { storeId: { in: storeIds } } });
   await prisma.orderItem.deleteMany({ where: { order: { storeId: { in: storeIds } } } });
@@ -197,5 +198,68 @@ describe.skipIf(!hasDb)('backorder: one rule for the storefront and the server',
       body: JSON.stringify({ productId: untracked.id, quantity: 1 }),
     });
     expect(add.status, await add.text()).toBeLessThan(300);
+  });
+
+  it('feature OFF: the gated payload keeps its dates (logged-in PDP with a review, AI feed)', async () => {
+    // Re-review Critical (fix round 2): the gate rebuilt every object, so a Date
+    // came out as {} — the "New" badge and review dates broke, the feed 500ed.
+    const { storeId, sized } = await seed({ feature: false });
+    await prisma.storeFeature.create({
+      data: { storeId, featureKey: 'agent_feed', enabled: true },
+    });
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const customer = await prisma.user.create({
+      data: {
+        email: `bo-review-${suffix}@test.local`,
+        passwordHash: 'x',
+        firstName: 'Nour',
+        lastName: 'R',
+        role: 'customer',
+        storeId,
+      },
+    });
+    created.userIds.push(customer.id);
+    const order = await prisma.order.create({
+      data: {
+        storeId,
+        orderNumber: `BO-REV-${suffix}`,
+        customerId: customer.id,
+        subtotal: 2500,
+        total: 2500,
+        status: 'delivered' as never,
+        shippingAddress: DEFAULT_TEST_SHIPPING_ADDRESS as never,
+        billingAddress: DEFAULT_TEST_SHIPPING_ADDRESS as never,
+      },
+    });
+    await prisma.review.create({
+      data: {
+        storeId,
+        productId: sized.id,
+        orderId: order.id,
+        customerId: customer.id,
+        rating: 5,
+        body: 'ممتازة',
+        status: 'published',
+        verifiedPurchase: true,
+      },
+    });
+
+    // Logged-in = the uncached path (real Date objects reach the gate).
+    const res = await fetch(`${API_BASE}/public/products/${sized.slug}`, {
+      headers: { 'x-store-id': storeId, authorization: 'Bearer not-a-session' },
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
+    const body = (await res.json()) as {
+      data: { product: { createdAt: unknown; reviews?: Array<{ createdAt: unknown }> } };
+    };
+    const iso = /^\d{4}-\d{2}-\d{2}T/;
+    expect(String(body.data.product.createdAt)).toMatch(iso); // the "New" badge reads this
+    expect(body.data.product.reviews?.length).toBe(1);
+    expect(String(body.data.product.reviews![0].createdAt)).toMatch(iso);
+
+    const feed = await fetch(`${API_BASE}/public/feed/products.json`, {
+      headers: { 'x-store-id': storeId },
+    });
+    expect(feed.status, (await feed.clone().text()).slice(0, 300)).toBe(200);
   });
 });

@@ -4,7 +4,7 @@ import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
-import { enrichStockFlags } from '../lib/effective-inventory';
+import { enrichStockFlags, gateBackorder } from '../lib/effective-inventory';
 
 // ==========================================
 // Recommendation Service
@@ -242,7 +242,17 @@ class RecommendationService {
   // ----------------------------------------
   // getCartRecommendations (not cached)
   // ----------------------------------------
-  async getCartRecommendations(storeId: string, productIds: string[]) {
+  /**
+   * `backorderFeatureEnabled` (default true = the old behaviour): with the store's
+   * `inventory.backorder` feature OFF a sold-out backorderable product is not
+   * buyable, so it is gated BEFORE the "keep only buyable picks" filter — a
+   * feature-off store never fills a recommendation slot with a sold-out card.
+   */
+  async getCartRecommendations(
+    storeId: string,
+    productIds: string[],
+    backorderFeatureEnabled = true
+  ) {
     if (!productIds.length) return [];
 
     const scoreMap = new Map<string, number>();
@@ -329,7 +339,7 @@ class RecommendationService {
     return sortedIds
       .map(id => products.find((p: any) => p.id === id))
       .filter(Boolean)
-      .map(p => enrichStockFlags(p!))
+      .map(p => gateBackorder(enrichStockFlags(p!), backorderFeatureEnabled))
       .filter(p => p.inStock || p.acceptsBackorder)
       .slice(0, CART_RECS_SHOWN);
   }

@@ -301,6 +301,11 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // needing Accept-Language Vary.
     // The store's backorder feature is applied AFTER the cache read (an
     // entitlement never rides the cached payload — the product_3d precedent).
+    // CACHE CLASS (Ruling FU46-W1b-6): the backorder gate is per request, but the
+    // edge copy below is not — after the store's `inventory.backorder` feature flips,
+    // an edge-cached listing/PDP can show the old pre-order state for up to
+    // sMaxAge 60s + staleWhileRevalidate 300s. BOUNDED-stale by design: the cart and
+    // checkout re-read the feature uncached (lineAllowsBackorder) and stay authoritative.
     const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
     setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({
@@ -352,6 +357,11 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
         : product;
 
     // Backorder feature after the cache read, like product_3d above (X-02 fix round).
+    // CACHE CLASS (Ruling FU46-W1b-6): the backorder gate is per request, but the
+    // edge copy below is not — after the store's `inventory.backorder` feature flips,
+    // an edge-cached listing/PDP can show the old pre-order state for up to
+    // sMaxAge 60s + staleWhileRevalidate 300s. BOUNDED-stale by design: the cart and
+    // checkout re-read the feature uncached (lineAllowsBackorder) and stay authoritative.
     const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
     setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({
@@ -472,6 +482,9 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
     const live = inputs.bundles.filter(b => withinSaleWindow(b, now));
     // Same backorder gate as the storefront (X-02 fix round): availability in the
     // AI feed must agree with what the cart accepts.
+    // CACHE CLASS (Ruling FU46-W1b-6): the gated feed rides its own edge window (set
+    // below); an AI agent can read the old pre-order state until it expires.
+    // BOUNDED-stale: a cart built from it is re-checked by the cart and checkout.
     const backorderOn = await featureService.isFeatureEnabled(storeId, 'inventory.backorder');
     const feed = buildProductFeed(
       store,

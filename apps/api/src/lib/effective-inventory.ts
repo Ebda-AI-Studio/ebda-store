@@ -150,13 +150,36 @@ export function gateBackorder<
  */
 export function gateBackorderPayload<T>(body: T, backorderFeatureEnabled: boolean): T {
   if (backorderFeatureEnabled) return body;
+  // Walk ONLY arrays and plain objects. A Date, a Prisma Decimal, a Buffer or any
+  // class instance is returned as the same reference: rebuilding it from its own
+  // enumerable keys turned a `createdAt` Date into `{}` (and the PDP's
+  // review dates and the "New" badge with it). Copy-on-write: an untouched
+  // subtree keeps its identity.
+  const isPlain = (v: object): boolean => {
+    const proto = Object.getPrototypeOf(v);
+    return proto === Object.prototype || proto === null;
+  };
   const walk = (v: unknown, depth: number): unknown => {
     if (depth > 8 || v === null || typeof v !== 'object') return v;
-    if (Array.isArray(v)) return v.map(x => walk(x, depth + 1));
+    if (Array.isArray(v)) {
+      let changed = false;
+      const next = v.map(x => {
+        const y = walk(x, depth + 1);
+        if (y !== x) changed = true;
+        return y;
+      });
+      return changed ? next : v;
+    }
+    if (!isPlain(v)) return v;
     const o = v as Record<string, unknown>;
-    const out: Record<string, unknown> = {};
-    for (const [k, x] of Object.entries(o)) out[k] = walk(x, depth + 1);
-    return typeof o.acceptsBackorder === 'boolean' ? gateBackorder(out as never, false) : out;
+    let out: Record<string, unknown> | null = null;
+    for (const [k, x] of Object.entries(o)) {
+      const y = walk(x, depth + 1);
+      if (y !== x) (out ??= { ...o })[k] = y;
+    }
+    const base = out ?? o;
+    if (base.acceptsBackorder === true) return gateBackorder(base as never, false);
+    return base;
   };
   return walk(body, 0) as T;
 }
