@@ -1,4 +1,5 @@
 import { BRAND } from '@ebda/shared/brand';
+import { LEGAL_POLICIES, LEGAL_DOC_KEYS, currentLegalVersion } from '@ebda/shared/legal';
 import { LEGAL_AR } from './legal-ar';
 import { LEGAL_EN } from './legal-en';
 import type { LegalPages } from './legal-types';
@@ -6,6 +7,11 @@ import type { Locale } from './site';
 
 const CO = BRAND.company;
 const PN = BRAND.product;
+
+/** The newest published legal document: the footer line states its version and date (Ruling LEGAL-4). */
+const LATEST_LEGAL = LEGAL_DOC_KEYS.map(key => currentLegalVersion(LEGAL_POLICIES, key)).reduce(
+  (a, b) => (b.publishedAt > a.publishedAt ? b : a)
+);
 
 /** A payment or shipping provider; `logo` is a file in public/logos/ (none = our own icon). */
 export interface Provider {
@@ -632,7 +638,7 @@ export const COPY: Record<Locale, Copy> = {
       merchant: 'اتفاقية التاجر',
       acceptableUse: 'الاستخدام المقبول',
       contact: 'تواصل: ahlan@ebda.app',
-      legalVersion: 'الإصدار 1.0 من الوثائق القانونية · 2026-10-07.',
+      legalVersion: `الإصدار ${LATEST_LEGAL.version} من الوثائق القانونية · ${LATEST_LEGAL.publishedAt}.`,
       about: 'عن ابدأ استوديو للذكاء الاصطناعي',
       credits: 'حقوق الصور والموديلات',
       ownership: `ابدأ ستور منتج من ${CO.shortNameAr}. © 2026 ${CO.shortNameAr}. جميع الحقوق محفوظة.`,
@@ -1021,7 +1027,7 @@ export const COPY: Record<Locale, Copy> = {
       merchant: 'Merchant agreement',
       acceptableUse: 'Acceptable use',
       contact: 'Contact: ahlan@ebda.app',
-      legalVersion: 'Legal documents version 1.0 · 2026-10-07.',
+      legalVersion: `Legal documents version ${LATEST_LEGAL.version} · ${LATEST_LEGAL.publishedAt}.`,
       about: 'About Ebda AI Studio',
       credits: 'Credits',
       ownership: `Ebda Store is a product of ${CO.shortNameEn}. © 2026 ${CO.shortNameEn}. All rights reserved.`,
