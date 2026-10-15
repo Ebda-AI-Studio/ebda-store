@@ -97,19 +97,23 @@ Full per-table matrix (retention days, exact columns, cron IDs) lives in
   request header) so it never enters invocation logs, then re-check this section. Cost if wrong:
   a shopper's typed phone number retained in operator-only logs for up to the retention window.
 
-### Client-side ad pixels read the search URL (accepted residual, Ruling SEARCH-T5-9)
+### Ad pixels receive the search term (accepted residual, Ruling SEARCH-T5-9)
 
-- **What:** the merchant's own pixels on storefronts (Meta, TikTok, Snap, Pinterest, X) and
-  Meta on the marketing site read the page URL themselves. A `/search?q=<term>` page view can
-  therefore reach the ad network, after the shopper has given marketing consent, with whatever
-  the shopper typed (including a phone number or email typed by mistake).
-- **Why accepted for now:** it is consent-gated, configured by the merchant, and the standard
-  behaviour of every commerce platform's pixels. Our own capture paths (PostHog, Sentry, the
-  search log) scrub or drop these terms; the pixels are third-party code we do not control.
-- **Follow-up before launch:** when the term is PII-shaped (same `isPersonalDataTerm` test as
-  the search log), replace the visible URL's `q` with `history.replaceState` before the pixels
-  fire. Cost if wrong: a phone number typed into search reaches an ad network for a consenting
-  shopper.
+- **What is sent:** after the shopper gives marketing consent, the storefront's search page calls
+  `trackSearch` (`apps/web/src/components/MarketingPixels.tsx`), which SENDS the typed term as an
+  event parameter to the merchant's own pixels: Meta (`Search`, `search_string`), TikTok
+  (`Search`, `query`), Snap (`SEARCH`, `search_string`), Google gtag / GA4 / Ads (`search`,
+  `search_term`) and Pinterest (`search`, `search_query`). X (`Search`) carries no term.
+- **What is withheld:** when the term is personal-data shaped (`isPersonalDataTerm` from
+  `@ebda/shared`, the same test the first-party search log uses: a phone or national id in any
+  digit script, an email, an order number, an id/token, a link), the Search event still fires but
+  WITHOUT the term.
+- **Residual:** a term that is not PII-shaped (a name, a street) still reaches those networks for
+  a consenting shopper. The pixels' own PageView also reads the page URL (`/search?q=<term>`)
+  themselves; that copy is outside our code and is not gated here. Cost if wrong: a name typed
+  into search reaches the merchant's ad networks for consenting shoppers.
+- **Why accepted:** consent-gated, merchant-configured, and the standard behaviour of commerce
+  pixels; our own capture paths (PostHog, Sentry, the search log) scrub or drop these terms.
 - Related: the PostHog `$elements_chain` string (`a:attr__href="/search?q=…"`) is scrubbed too;
   a query value stops at a double quote (never at an apostrophe, which `encodeURIComponent`
   leaves raw and Franco-Arabic terms use as a letter) so the inner `?q=` is not swallowed by the
