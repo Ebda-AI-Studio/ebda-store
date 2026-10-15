@@ -1277,6 +1277,8 @@ model SearchQueryDaily {
   zeroResults     Int      @default(0) @map("zero_results")
   lastResultCount Int      @default(0) @map("last_result_count")
   // Day granularity on purpose (no exact search time): written by search-log.service only.
+  // Deliberately NOT `@updatedAt`: that would stamp an exact time (Ruling SEARCH-T5-6). The raw
+  // SQL upsert is the only writer and sets the Cairo day; a Prisma `update` would NOT touch it.
   updatedAt       DateTime @default(dbgenerated("CURRENT_DATE")) @map("updated_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
