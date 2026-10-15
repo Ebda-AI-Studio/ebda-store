@@ -1190,10 +1190,26 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
   max-width: 38rem;
 }
 
-/* Sticky mobile bars (PDP add-to-cart, cart total). UI rule 6: space is reserved on
- * <body> (never the chrome wrapper). Body already carries pb-32 for the
- * BottomTabBar, so the bar (4.25rem) is added on top of that, not instead of it. */
+/* Sticky mobile bars (PDP add-to-cart, Dahab pinned bar, cart total). UI rule 6: space is
+ * reserved on <body> (never the chrome wrapper). Body already carries pb-32 for the
+ * BottomTabBar, so the bar (4.25rem) is added on top of that, not instead of it.
+ *
+ * C-04 (Qamar taste audit): at most ONE fixed-bottom layer. A task bar REPLACES the tab bar
+ * while it shows (useStickyBarHeight marks <html data-task-bar>); the two used to stack and
+ * cover the PDP's first selector and the cart's promo field. Every fixed bar feeds
+ * `scroll-padding-bottom`: the tab bar by --bottom-tab-h, a task bar by its measured
+ * --sticky-bar-h (safe-area padding included), so focus / scrollIntoView never park a field
+ * under a bar. */
 @media (max-width: 767px) {
+  html {
+    scroll-padding-bottom: calc(var(--bottom-tab-h) + env(safe-area-inset-bottom) + 0.75rem);
+  }
+  html[data-task-bar] {
+    scroll-padding-bottom: calc(var(--sticky-bar-h, 61px) + 0.75rem);
+  }
+  html[data-task-bar] [data-bottom-tab-bar] {
+    display: none;
+  }
   body[data-sticky-atc='1'],
   body[data-sticky-cart='1'] {
     padding-bottom: calc(8rem + 4.25rem);
@@ -1204,23 +1220,20 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
   }
   /* Floating widget (br/bl, bottom 80px, z-60) and the toast region (@ebda/ui Toast,
    * bottom 72px) would sit inside the sticky bar's band (F2: "added to cart" covered the
-   * bar's name and price): lift both clear of tab bar (--bottom-tab-h) + the bar's REAL
-   * height (--sticky-bar-h, published by useStickyBarHeight so the taller Dahab bar and the
-   * cart's blocked line are covered) + a 10px gap. The fallbacks are the default bar (61px)
-   * and the cart bar with its blocked line (85px) for the frame before the hook runs. */
+   * bar's name and price): lift both clear of the bar's REAL height (--sticky-bar-h,
+   * published by useStickyBarHeight so the taller Dahab bar and the cart's blocked line are
+   * covered; it includes the safe-area padding) + a 10px gap. No tab-bar term: the tab bar
+   * is hidden while a task bar shows (C-04). The fallbacks are the default bar (61px) and
+   * the cart bar with its blocked line (85px) for the frame before the hook runs. */
   body[data-sticky-atc='1'] [data-floating-widget='bottom'],
   body[data-sticky-cart='1'] [data-floating-widget='bottom'],
   body[data-sticky-atc='1'] [data-toast-region],
   body[data-sticky-cart='1'] [data-toast-region] {
-    bottom: calc(
-      var(--bottom-tab-h) + var(--sticky-bar-h, 61px) + 10px + env(safe-area-inset-bottom)
-    );
+    bottom: calc(var(--sticky-bar-h, 61px) + 10px);
   }
   body[data-sticky-cart='blocked'] [data-floating-widget='bottom'],
   body[data-sticky-cart='blocked'] [data-toast-region] {
-    bottom: calc(
-      var(--bottom-tab-h) + var(--sticky-bar-h, 85px) + 10px + env(safe-area-inset-bottom)
-    );
+    bottom: calc(var(--sticky-bar-h, 85px) + 10px);
   }
 }
 

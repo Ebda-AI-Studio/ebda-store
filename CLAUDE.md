@@ -84,7 +84,7 @@ Canonical editors, all StoreTheme flags, the product-card CTA/OOS system, PLP fa
 3. **Theme flags ride StoreTheme JSON; Store columns only when API-gated** (routes 404 / Prisma WHERE / external services).
 4. **ThemeTab ceiling = 7 toggles** — the next merchant-facing toggle gets a dedicated `/stores/[id]/<feature>` page under the right sidebar group.
 5. **Admin pages mirror storefront top-to-bottom flow** (never alphabetical or grouped-by-control-type; `groupHeading` clusters + nested sub-controls). → `feedback-admin-mirrors-storefront-flow`
-6. **Fixed-bottom UI two-trap recipe**: reserve space on `<body>` (NOT the chrome wrapper); lift any other fixed-bottom UI via `bottom-[calc(<bar>px+env(safe-area-inset-bottom))]`. → `feedback-fixed-bottom-ui-stacking`
+6. **Fixed-bottom UI two-trap recipe**: reserve space on `<body>` (NOT the chrome wrapper); lift any other fixed-bottom UI via `bottom-[calc(<bar>px+env(safe-area-inset-bottom))]`. **At most ONE fixed-bottom bar on a phone (C-04)**: a task bar replaces the tab bar via `useStickyBarHeight` (`<html data-task-bar>`), never stacks on it; every bar feeds `html { scroll-padding-bottom }` (gate: `tests/unit/fixed-bottom-single-layer.test.ts`, `npm run test:fixed-bars`). → `feedback-fixed-bottom-ui-stacking`
 7. **data-zone + Tailwind size classes required** for Typography overrides — never `text-[Xpx]`.
 8. **Editorial-hairline divider language is THE separator idiom** (two `bg-foreground/30` lines flanking centered text; `SectionKicker`/`SectionHeading`/`SectionDivider`) — reuse, don't invent new separators.
 9. **Scan existing storefront patterns before inventing one** — reuse the canonical components and the theme-flag registry.

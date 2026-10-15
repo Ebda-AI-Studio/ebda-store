@@ -10,8 +10,10 @@ import { useStickyBarHeight } from './useStickyBarHeight';
  * never quote a second price for the same cart (F1). Always shown when the cart
  * has items (no IntersectionObserver). `disabled` carries the cart's own
  * checkoutBlocked value (minimum order / unavailable lines) and `blockedMessage`
- * its message, so there is no second rule. Lifted exactly above the BottomTabBar
- * (`--bottom-tab-h` + safe-area, UI rule 6) and reserves body space via `body[data-sticky-cart]`.
+ * its message, so there is no second rule. C-04: while it shows it REPLACES the BottomTabBar
+ * (`useStickyBarHeight` marks `<html data-task-bar>`), sitting at the bottom edge with the
+ * safe-area inset in its own padding, and its height feeds `scroll-padding-bottom` so the
+ * promo field is never focused under it. Reserves body space via `body[data-sticky-cart]`.
  */
 export function StickyCartTotal(p: {
   /** The summary row the bar repeats: its "Total" (after discounts; shipping is added at checkout). */
@@ -42,7 +44,7 @@ export function StickyCartTotal(p: {
     <div
       ref={barRef}
       data-testid="sticky-cart-total"
-      className="sticky-bar-in fixed inset-x-0 bottom-[calc(var(--bottom-tab-h)+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background px-4 py-2 md:hidden"
+      className="sticky-bar-in fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:hidden"
     >
       {p.disabled && p.blockedMessage && (
         <p className="mb-1.5 text-xs text-muted-foreground">{p.blockedMessage}</p>

@@ -331,9 +331,11 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8" data-zone="products">
+      {/* Hidden below md (C-04): on a phone the fold is gallery, title, price, the first
+          selector and the buy button; the trail is chrome that pushes them down. */}
       <nav
         aria-label={t('Breadcrumb', 'مسار التصفح')}
-        className="mb-6 text-[13px] text-muted-foreground"
+        className="mb-6 hidden text-[13px] text-muted-foreground md:block"
       >
         <ol className="flex flex-wrap items-center gap-1.5">
           <li>
@@ -539,10 +541,10 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
         className={cx(
           // Solid ground, no glass (taste bar bans glassmorphism); ease-out-quint like the
           // default path's .sticky-bar-in (F10).
-          'fixed inset-x-0 bottom-[calc(var(--bottom-tab-h)+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background px-4 py-3 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:hidden',
-          pinBar
-            ? 'translate-y-0'
-            : 'translate-y-[calc(100%+var(--bottom-tab-h)+env(safe-area-inset-bottom))]'
+          // C-04: it REPLACES the tab bar while pinned (useStickyBarHeight marks
+          // <html data-task-bar>), so it sits at the bottom edge, safe-area inside.
+          'fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:hidden',
+          pinBar ? 'translate-y-0' : 'translate-y-full'
         )}
       >
         <div className="flex items-center gap-3">

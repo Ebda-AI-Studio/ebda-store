@@ -816,8 +816,9 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
           style={pdpDensity}
           data-zone="products"
         >
-          {/* Breadcrumb */}
-          <nav className="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
+          {/* Breadcrumb. Hidden below md (C-04): on a phone the fold is gallery, title,
+              price, the first selector and the buy button; the trail pushes them down. */}
+          <nav className="mb-8 hidden items-center gap-2 text-sm text-muted-foreground md:flex">
             <Link href={storeUrl('/')} className="hover:text-primary">
               {t('Home', translations['Home'])}
             </Link>

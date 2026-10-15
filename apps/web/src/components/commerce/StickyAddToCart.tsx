@@ -11,9 +11,10 @@ import { useStickyBarHeight } from './useStickyBarHeight';
  * and the page's single `addDisabled` value (required personalisation lives in
  * that value), so there is never a second add path.
  *
- * Fixed-bottom recipe (UI rule 6): lifted exactly above the BottomTabBar
- * (`--bottom-tab-h`, the same var the tab bar sizes itself with) plus the safe-area inset,
- * and it reserves body space via `body[data-sticky-atc]` (globals.css).
+ * Fixed-bottom recipe (UI rule 6) + C-04: while it shows it REPLACES the BottomTabBar
+ * (`useStickyBarHeight` marks `<html data-task-bar>`, globals.css hides the tab bar), so it
+ * sits at the bottom edge with the safe-area inset inside its own padding, publishes its
+ * height for `scroll-padding-bottom`, and reserves body space via `body[data-sticky-atc]`.
  */
 export function StickyAddToCart(p: {
   anchorRef: RefObject<HTMLElement | null>;
@@ -38,7 +39,7 @@ export function StickyAddToCart(p: {
     <div
       ref={barRef}
       data-testid="sticky-atc"
-      className="sticky-bar-in fixed inset-x-0 bottom-[calc(var(--bottom-tab-h)+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background px-4 py-2 md:hidden"
+      className="sticky-bar-in fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:hidden"
     >
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">

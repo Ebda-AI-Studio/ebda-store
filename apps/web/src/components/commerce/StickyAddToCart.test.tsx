@@ -101,7 +101,7 @@ describe('StickyAddToCart', () => {
     expect(screen.queryByTestId('sticky-atc')).toBeNull();
   });
 
-  it('lifts by the shared tab-bar var, not a literal 56px, on both PDP paths', () => {
+  it('C-04: every task bar sits at the bottom edge (it REPLACES the tab bar), never stacked on it', () => {
     const dir = path.resolve(__dirname, '../..');
     const files = [
       'components/commerce/StickyAddToCart.tsx',
@@ -110,31 +110,73 @@ describe('StickyAddToCart', () => {
     ];
     for (const f of files) {
       const src = readFileSync(path.join(dir, f), 'utf8');
-      expect(src, f).toContain('var(--bottom-tab-h)');
+      // No lift above the tab bar: the tab bar is hidden while a task bar shows.
+      expect(src, f).not.toMatch(/bottom-\[calc\(var\(--bottom-tab-h\)/);
       expect(src, f).not.toMatch(/calc\(56px/);
+      expect(src, f).toMatch(/fixed inset-x-0 bottom-0 /);
+      // the safe-area inset lives in the bar's own padding
+      expect(src, f).toContain('env(safe-area-inset-bottom))]');
+      expect(src, f).toContain('useStickyBarHeight(');
     }
     // the Dahab pinned bar shares the one off-screen rule with the default path
     const dahab = readFileSync(path.join(dir, 'templates/dahab/ProductDetail.tsx'), 'utf8');
     expect(dahab).toContain('useAnchorOffscreen(buyRef)');
     const tab = readFileSync(path.join(dir, 'templates/shared/BottomTabBar.tsx'), 'utf8');
     expect(tab).toContain('--bottom-tab-h');
+    expect(tab).toContain('data-bottom-tab-bar');
     expect(readFileSync(path.join(dir, 'styles/globals.css'), 'utf8')).toMatch(
       /--bottom-tab-h:\s*69px/
     );
   });
 
-  it('publishes the bar height for the toast/widget lift and clears it on unmount', () => {
+  it('C-04: while shown it marks <html data-task-bar> and publishes its height on <html>; both clear on hide and unmount', () => {
     vi.stubGlobal('IntersectionObserver', IO);
     const off = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(61);
+    const root = document.documentElement;
     try {
       const { unmount } = render(<Harness />);
+      expect(root.dataset.taskBar).toBeUndefined();
       act(() => ioCallback([{ isIntersecting: false }]));
-      expect(document.body.style.getPropertyValue('--sticky-bar-h')).toBe('61px');
+      expect(root.dataset.taskBar).toBe('1');
+      expect(root.style.getPropertyValue('--sticky-bar-h')).toBe('61px');
+      // main button back on screen: the bar hides and the tab bar returns
+      act(() => ioCallback([{ isIntersecting: true }]));
+      expect(root.dataset.taskBar).toBeUndefined();
+      expect(root.style.getPropertyValue('--sticky-bar-h')).toBe('');
+      act(() => ioCallback([{ isIntersecting: false }]));
       unmount();
-      expect(document.body.style.getPropertyValue('--sticky-bar-h')).toBe('');
+      expect(root.dataset.taskBar).toBeUndefined();
+      expect(root.style.getPropertyValue('--sticky-bar-h')).toBe('');
     } finally {
       off.mockRestore();
     }
+  });
+
+  it('C-04: the cart total bar marks <html data-task-bar> while the cart has items', () => {
+    const root = document.documentElement;
+    const { rerender, unmount } = render(
+      <StickyCartTotal
+        totalLabel="Total"
+        total="EGP 100"
+        itemCount={1}
+        itemCountLabel="1 item"
+        href="/checkout"
+        label="Checkout"
+      />
+    );
+    expect(root.dataset.taskBar).toBe('1');
+    rerender(
+      <StickyCartTotal
+        totalLabel="Total"
+        total="EGP 0"
+        itemCount={0}
+        itemCountLabel="0 items"
+        href="/checkout"
+        label="Checkout"
+      />
+    );
+    expect(root.dataset.taskBar).toBeUndefined();
+    unmount();
   });
 
   it('removes the body flag on unmount', () => {

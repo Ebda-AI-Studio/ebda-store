@@ -22,8 +22,10 @@ import type { NavItem } from '../types';
  *  - Mobile-only (`md:hidden`) — desktop has the top header.
  *  - Shown on PDP too — the cart MUST stay reachable on mobile (the header
  *    cart icon is `hidden md:inline-flex`, so the tab bar is the ONLY mobile
- *    cart entry point). There is no page-level sticky add-to-cart bar on the
- *    PDP, so nothing stacks. (Re-add a PDP guard only if a sticky bar lands.)
+ *    cart entry point). EXCEPT while a task bar is up (PDP buy bar, Dahab
+ *    pinned bar, cart total bar): it REPLACES this bar instead of stacking on
+ *    it (C-04). The task bar marks `<html data-task-bar>` and globals.css hides
+ *    `[data-bottom-tab-bar]`; the bar is back the moment the task bar hides.
  *  - Hidden on /checkout + /auth — those flows use MinimalChrome and
  *    shouldn't pull users back into shopping mid-purchase.
  *
@@ -206,6 +208,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
     <nav
       aria-label={isRtl ? 'شريط التنقل' : 'Bottom navigation'}
       dir={isRtl ? 'rtl' : 'ltr'}
+      data-bottom-tab-bar
       className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-[hsl(var(--bg-section-alt))] border-t border-foreground/10 pb-[env(safe-area-inset-bottom)]"
       style={resolvedBg ? { backgroundColor: resolvedBg } : undefined}
     >
