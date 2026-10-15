@@ -171,7 +171,7 @@ function Combobox({
           onFocus={handleInputFocus}
           onKeyDown={handleKeyDown}
           // text-base prevents iOS Safari auto-zoom on focus (any <16px triggers it)
-          className="flex-1 py-2 text-base sm:text-sm bg-transparent outline-none disabled:cursor-not-allowed placeholder:text-muted-foreground"
+          className="min-w-0 flex-1 py-2 text-base sm:text-sm bg-transparent outline-none disabled:cursor-not-allowed placeholder:text-muted-foreground"
           autoComplete="off"
         />
         {/* Clear button — shown when a value is selected */}

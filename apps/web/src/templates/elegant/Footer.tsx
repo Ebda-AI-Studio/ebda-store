@@ -140,7 +140,7 @@ export default function ElegantFooter({
                       onChange={e => setEmail(e.target.value)}
                       placeholder={isRtl ? 'البريد الإلكتروني' : 'Enter your email'}
                       aria-label={isRtl ? 'البريد الإلكتروني' : 'Email address'}
-                      className="h-12 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-sm tracking-wide placeholder:text-muted-foreground/50 transition-colors duration-500"
+                      className="h-12 min-w-0 flex-1 px-6 bg-background border border-border focus:border-foreground focus:outline-none text-sm tracking-wide placeholder:text-muted-foreground/50 transition-colors duration-500"
                       dir={isRtl ? 'rtl' : 'ltr'}
                       required
                       disabled={submitting}
