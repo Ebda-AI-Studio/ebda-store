@@ -1060,7 +1060,14 @@ class ApiClient {
     });
   }
 
-  async submitContact(data: { name: string; email: string; subject: string; message: string }) {
+  async submitContact(data: {
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+    /** Honeypot (`CONTACT_HONEYPOT_FIELD`): always '' from a real person. */
+    company_site?: string;
+  }) {
     return this.request<{ message: string }>('/public/contact', {
       method: 'POST',
       body: JSON.stringify(data),

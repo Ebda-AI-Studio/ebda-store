@@ -7,6 +7,7 @@ import { useStore } from '../../contexts/StoreContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { resolveAddressHref } from '../../templates/shared/display-helpers';
 import { api } from '@/lib/api';
+import { CONTACT_HONEYPOT_FIELD } from '@ebda/shared';
 
 export default function ContactClient() {
   const { store } = useStore();
@@ -18,6 +19,7 @@ export default function ContactClient() {
     email: '',
     subject: '',
     message: '',
+    [CONTACT_HONEYPOT_FIELD]: '',
   });
 
   // Match the same address-link resolution the storefront footer uses, so
@@ -47,13 +49,28 @@ export default function ContactClient() {
       const result = await api.submitContact(formData);
 
       if (result.success) {
-        success('Message sent!', "We'll get back to you as soon as possible.");
-        setFormData({ name: '', email: '', subject: '', message: '' });
+        success(
+          t('Message sent!', 'تم إرسال رسالتك'),
+          t("We'll get back to you as soon as possible.", 'هنرد عليك في أقرب وقت.')
+        );
+        setFormData({
+          name: '',
+          email: '',
+          subject: '',
+          message: '',
+          [CONTACT_HONEYPOT_FIELD]: '',
+        });
       } else {
-        showError('Failed to send message', result.error?.message || 'Please try again later.');
+        showError(
+          t('Failed to send message', 'الرسالة ما اتبعتتش'),
+          result.error?.message || t('Please try again later.', 'جرّب تاني بعد شوية.')
+        );
       }
     } catch {
-      showError('Failed to send message', 'Please try again later.');
+      showError(
+        t('Failed to send message', 'الرسالة ما اتبعتتش'),
+        t('Please try again later.', 'جرّب تاني بعد شوية.')
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -76,6 +93,30 @@ export default function ContactClient() {
 
         <div className="mt-12 rounded-xl border bg-card p-6 shadow-sm sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                width: 1,
+                height: 1,
+                overflow: 'hidden',
+                clip: 'rect(0 0 0 0)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <label htmlFor="contact-company-site">Company website</label>
+              <input
+                id="contact-company-site"
+                name={CONTACT_HONEYPOT_FIELD}
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+                value={formData[CONTACT_HONEYPOT_FIELD]}
+                onChange={e =>
+                  setFormData(prev => ({ ...prev, [CONTACT_HONEYPOT_FIELD]: e.target.value }))
+                }
+              />
+            </div>
             <div className="grid gap-6 sm:grid-cols-2">
               <Input
                 label={t('Your Name', '\u0627\u0644\u0627\u0633\u0645')}
