@@ -4,13 +4,29 @@
 
 **Goal:** Make Ebda storefront and admin search find what Egyptian shoppers and merchants actually type (hamza/ta-marbuta/ya variants, diacritics, Arabic-Indic digits, Egyptian dialect, Franco-Arabic, English, phone numbers in any form). Measure what fails, using a privacy-safe search log that merchants can see.
 
-**Architecture:** P0 folds Arabic text in ONE immutable SQL function (`public.ebda_ar_norm`), mirrored byte-for-byte in TypeScript (`normalizeArabicSearch`) and pinned by one shared vector set. Every product search runs over trigram GIN *expression* indexes on that function. P1 adds merchant-editable, AI-filled `search_terms`, bge-m3 embeddings in a pgvector child table under strict RLS, and reciprocal-rank fusion of lexical and vector results. P2 moves admin customer, order and phone search into SQL behind the same folding and adds a ⌘K palette. P3 adds catalogue import from photos and PDFs with Gemini vision, plus a review screen.
+**Architecture:** P0 folds Arabic text in ONE immutable SQL function (`public.ebda_ar_norm`), mirrored byte-for-byte in TypeScript (`normalizeArabicSearch`) and pinned by one shared vector set. Every product search runs over trigram GIN _expression_ indexes on that function. P1 adds merchant-editable, AI-filled `search_terms`, bge-m3 embeddings in a pgvector child table under strict RLS, and reciprocal-rank fusion of lexical and vector results. P2 moves admin customer, order and phone search into SQL behind the same folding and adds a ⌘K palette. P3 adds catalogue import from photos and PDFs with Gemini vision, plus a review screen.
 
 **Tech Stack:** Postgres 16 on Neon (pg_trgm installed, pgvector new), Prisma 6.19 (`@prisma/adapter-pg`, raw SQL for expression and vector predicates), Express on Cloudflare Workers (`ebda-api`), Workers AI `@cf/baai/bge-m3`, Inngest, Gemini `gemini-flash-lite-latest`, Next.js 16 admin and storefront, vitest, k6.
 
 **Spec:** `.superpowers/shared/semantic-search-research.md` (the research brief, 2026-10-15) plus Ahmad's brief of 2026-10-15 ("do the whole thing we need this type of searching and optimizing"). The phase list in that brief is binding where it differs from the research sketch.
 
 ---
+
+## Coordinator amendments (binding; override task text where they conflict)
+
+Preflight (22 findings) — every suggested ruling in `.superpowers/sdd/2026-10-15-semantic-search/progress.md` § Preflight scan items 1–22 is ADOPTED as written; implementers read that list for their task. Highlights:
+
+- **E1** migrations renumbered at PR-cut time to sort after the newest migration on main + open branches (P0 → 20261019000100/000200; P1–P3 shift by a day each).
+- **E2 (T5)** search log writes go through `deferAfterTenantCommit('search-log', () => recordSearch(...))`; **E3** `isPersonalDataTerm` normalises digits first.
+- **E10 (T12)** keyword leg uses the 1000 cap; fuse only the head, append the keyword tail; **E11** query embedding raced against ~400 ms with keyword-only fallback (ruling: the one sanctioned synchronous third-party call in a GET).
+- **E8 (T3)** every product-search surface (bulk.routes.ts:125, bundle.routes.ts:387, bulk.service.ts:325, promotion.service.ts:54, wa-bridge.routes.ts:186) goes through `searchProductIds(..., 'admin')`.
+- **E18–E20** email search via ILIKE (trigram); order search returns two truncated flags; ⌘K lookups keep `storeId` and include guest customers (key = email/phone).
+- **E22** snippet corrections exactly as in item 22.
+
+Ahmad 2026-10-15 additions:
+
+- **E23 (NEW task in P2, after T18) — admin settings search:** ⌘K and the admin search box find ANY admin page AND individual setting (e.g. "واتساب", "الشحن", "أيام بدون توصيل", "delivery days", "change logo", "دليل المقاسات") in Arabic and English including everyday synonyms and the Arabic normaliser from T1, and deep-link to the exact control (scroll + highlight). Build it from a typed settings registry (route, section anchor, ar/en label, keywords) generated/validated against the admin i18n keys and the app router so a new setting without a registry entry fails a test. Role-aware (staff vs owner vs super-admin pages), feature-flag aware (no hidden/disabled features). Tests + docs.
+- **E24 (P3)** no real catalogues exist: Task 22's evaluation uses 10 SYNTHETIC Arabic catalogue pages generated from the Qamar demo catalogue (photo-grid page, PDF price list, handwritten-style price tag, mixed ar/en, Arabic-Indic digits), clearly labelled synthetic; Baidu Unlimited-OCR is run ONLY locally (Ahmad's Mac Studio, Apple Silicon/MPS if it works; otherwise the comparison records "not run" with the reason) and NEVER in production; production import uses Gemini vision.
 
 ## Global Constraints
 
@@ -50,34 +66,34 @@
 
 ## File Structure
 
-| File | Phase | Responsibility |
-|---|---|---|
-| `packages/shared/src/search/arabic-normalize.ts` | P0 | `normalizeArabicSearch`, `searchTokens`, `escapeLike`. The TS twin of `ebda_ar_norm`. |
-| `packages/shared/src/search/normalize-vectors.ts` | P0 | The ONE vector set both implementations are tested against |
-| `packages/shared/src/search/phone-search.ts` | P2 | `phoneSearchDigits`: Egyptian phone query → national digits |
-| `packages/database/prisma/migrations/20261018000100_search_normalisation/` | P0 | `ebda_ar_norm`, doc functions, `products.search_terms`, 2 expression trgm indexes |
-| `packages/database/prisma/migrations/20261018000200_search_query_daily/` | P0 | Search log table + RLS |
-| `apps/api/src/services/product-search.service.ts` | P0→P1 | `searchProductIds` (lexical), later `rankedSearch` (hybrid) |
-| `apps/api/src/services/search-log.service.ts` | P0 | `recordSearch`, `isPersonalDataTerm` |
-| `apps/api/src/routes/search-insights.routes.ts` | P0 | Admin read API for the search log |
-| `apps/admin/src/app/stores/[id]/insights/searches/page.tsx` | P0 | "What shoppers searched" page |
-| `apps/admin/src/app/stores/[id]/analytics/_components/ZeroResultSearchesCard.tsx` | P0 | Overview card |
-| `apps/api/src/lib/ai/product-search-terms-generator.ts` | P1 | Gemini dialect/Franco/EN terms |
-| `packages/database/prisma/migrations/20261019000100_product_embeddings/` | P1 | pgvector + `product_embeddings` + `ebda_product_embed_doc` |
-| `apps/api/src/lib/search/embedding-provider.ts` | P1 | Workers AI binding, REST fallback, null provider |
-| `apps/api/src/lib/search/rrf.ts` | P1 | Reciprocal rank fusion |
-| `apps/api/src/services/product-index.service.ts` | P1 | Stale detection + embed + upsert |
-| `apps/api/src/lib/inngest/functions/search-product-index.ts` | P1 | Debounced per-store indexer + cron backstop |
-| `apps/api/src/lib/search/reindex.ts` | P1 | `requestStoreReindex` (fire-and-forget event) |
-| `tests/search-eval/` | P1 | 200-query eval set + harness |
-| `loadtests/scenarios/storefront-search.js` | P1 | k6 p95 gate |
-| `packages/database/prisma/migrations/20261020000100_admin_search_norm/` | P2 | phone/name expression indexes on users + guest orders |
-| `apps/api/src/services/admin-search.service.ts` | P2 | customers, orders, products for ⌘K |
-| `apps/admin/src/components/CommandPalette.tsx` | P2 | Record results section |
-| `packages/database/prisma/migrations/20261021000100_catalog_import/` | P3 | `catalog_import_jobs`, `catalog_import_items` |
-| `apps/api/src/services/catalog-import.service.ts` + Inngest fn | P3 | Vision extraction → items |
-| `apps/admin/src/app/stores/[id]/bulk/catalog-import/[jobId]/page.tsx` | P3 | Review → create drafts |
-| `scripts/eval/catalog-ocr-head-to-head.ts` | P3 | Offline Gemini vs Unlimited-OCR (never imported by apps) |
+| File                                                                              | Phase | Responsibility                                                                        |
+| --------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------- |
+| `packages/shared/src/search/arabic-normalize.ts`                                  | P0    | `normalizeArabicSearch`, `searchTokens`, `escapeLike`. The TS twin of `ebda_ar_norm`. |
+| `packages/shared/src/search/normalize-vectors.ts`                                 | P0    | The ONE vector set both implementations are tested against                            |
+| `packages/shared/src/search/phone-search.ts`                                      | P2    | `phoneSearchDigits`: Egyptian phone query → national digits                           |
+| `packages/database/prisma/migrations/20261018000100_search_normalisation/`        | P0    | `ebda_ar_norm`, doc functions, `products.search_terms`, 2 expression trgm indexes     |
+| `packages/database/prisma/migrations/20261018000200_search_query_daily/`          | P0    | Search log table + RLS                                                                |
+| `apps/api/src/services/product-search.service.ts`                                 | P0→P1 | `searchProductIds` (lexical), later `rankedSearch` (hybrid)                           |
+| `apps/api/src/services/search-log.service.ts`                                     | P0    | `recordSearch`, `isPersonalDataTerm`                                                  |
+| `apps/api/src/routes/search-insights.routes.ts`                                   | P0    | Admin read API for the search log                                                     |
+| `apps/admin/src/app/stores/[id]/insights/searches/page.tsx`                       | P0    | "What shoppers searched" page                                                         |
+| `apps/admin/src/app/stores/[id]/analytics/_components/ZeroResultSearchesCard.tsx` | P0    | Overview card                                                                         |
+| `apps/api/src/lib/ai/product-search-terms-generator.ts`                           | P1    | Gemini dialect/Franco/EN terms                                                        |
+| `packages/database/prisma/migrations/20261019000100_product_embeddings/`          | P1    | pgvector + `product_embeddings` + `ebda_product_embed_doc`                            |
+| `apps/api/src/lib/search/embedding-provider.ts`                                   | P1    | Workers AI binding, REST fallback, null provider                                      |
+| `apps/api/src/lib/search/rrf.ts`                                                  | P1    | Reciprocal rank fusion                                                                |
+| `apps/api/src/services/product-index.service.ts`                                  | P1    | Stale detection + embed + upsert                                                      |
+| `apps/api/src/lib/inngest/functions/search-product-index.ts`                      | P1    | Debounced per-store indexer + cron backstop                                           |
+| `apps/api/src/lib/search/reindex.ts`                                              | P1    | `requestStoreReindex` (fire-and-forget event)                                         |
+| `tests/search-eval/`                                                              | P1    | 200-query eval set + harness                                                          |
+| `loadtests/scenarios/storefront-search.js`                                        | P1    | k6 p95 gate                                                                           |
+| `packages/database/prisma/migrations/20261020000100_admin_search_norm/`           | P2    | phone/name expression indexes on users + guest orders                                 |
+| `apps/api/src/services/admin-search.service.ts`                                   | P2    | customers, orders, products for ⌘K                                                    |
+| `apps/admin/src/components/CommandPalette.tsx`                                    | P2    | Record results section                                                                |
+| `packages/database/prisma/migrations/20261021000100_catalog_import/`              | P3    | `catalog_import_jobs`, `catalog_import_items`                                         |
+| `apps/api/src/services/catalog-import.service.ts` + Inngest fn                    | P3    | Vision extraction → items                                                             |
+| `apps/admin/src/app/stores/[id]/bulk/catalog-import/[jobId]/page.tsx`             | P3    | Review → create drafts                                                                |
+| `scripts/eval/catalog-ocr-head-to-head.ts`                                        | P3    | Offline Gemini vs Unlimited-OCR (never imported by apps)                              |
 
 **Verified facts this plan relies on** (measured by reading the repo or docs on 2026-10-15):
 
@@ -96,6 +112,7 @@
 ## Task 1: Shared Arabic search normaliser (TypeScript)
 
 **Files:**
+
 - Create: `packages/shared/src/search/arabic-normalize.ts`
 - Create: `packages/shared/src/search/normalize-vectors.ts`
 - Create: `packages/shared/src/search/index.ts`
@@ -104,6 +121,7 @@
 - Test: `packages/shared/src/search/__tests__/arabic-normalize.test.ts`
 
 **Interfaces:**
+
 - Produces: `normalizeArabicSearch(input: string): string`, `searchTokens(input: string, max?: number): string[]` (default max 8), `escapeLike(token: string): string`, `NORMALIZE_VECTORS: ReadonlyArray<readonly [input: string, expected: string]>`, `AR_FOLD_FROM: string`, `AR_FOLD_TO: string`
 
 - [ ] **Step 1: Write the vector set (the contract both implementations obey)**
@@ -153,7 +171,13 @@ export const NORMALIZE_VECTORS: ReadonlyArray<readonly [string, string]> = [
 ```ts
 // packages/shared/src/search/__tests__/arabic-normalize.test.ts
 import { describe, it, expect } from 'vitest';
-import { normalizeArabicSearch, searchTokens, escapeLike, AR_FOLD_FROM, AR_FOLD_TO } from '../arabic-normalize';
+import {
+  normalizeArabicSearch,
+  searchTokens,
+  escapeLike,
+  AR_FOLD_FROM,
+  AR_FOLD_TO,
+} from '../arabic-normalize';
 import { NORMALIZE_VECTORS } from '../normalize-vectors';
 
 describe('normalizeArabicSearch', () => {
@@ -213,10 +237,8 @@ Expected: FAIL with `Cannot find module '../arabic-normalize'`
  * immutably, so parity would break (Ruling SEARCH-2).
  */
 // alef forms -> ا ; ى ی ئ -> ي ; ؤ -> و ; ة -> ه ; Persian kaf -> ك ; then ASCII upper, then digits
-export const AR_FOLD_FROM =
-  'أإآٱىیئؤةکABCDEFGHIJKLMNOPQRSTUVWXYZ٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹';
-export const AR_FOLD_TO =
-  'اااايييوهكabcdefghijklmnopqrstuvwxyz01234567890123456789';
+export const AR_FOLD_FROM = 'أإآٱىیئؤةکABCDEFGHIJKLMNOPQRSTUVWXYZ٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹';
+export const AR_FOLD_TO = 'اااايييوهكabcdefghijklmnopqrstuvwxyz01234567890123456789';
 
 const FOLD = new Map<string, string>();
 {
@@ -280,6 +302,7 @@ EOF
 ## Task 2: SQL normaliser, `search_terms` column, expression trigram indexes
 
 **Files:**
+
 - Create: `packages/database/prisma/migrations/20261018000100_search_normalisation/migration.sql`
 - Create: `packages/database/prisma/migrations/20261018000100_search_normalisation/rollback.sql`
 - Modify: `packages/database/prisma/schema.prisma` (model `Product`: add `searchTerms`)
@@ -287,6 +310,7 @@ EOF
 - Test: `tests/integration/search-normalize-parity.test.ts`
 
 **Interfaces:**
+
 - Consumes: `NORMALIZE_VECTORS` (Task 1)
 - Produces (SQL): `public.ebda_ar_norm(text) → text`, `public.ebda_product_search_doc(name, name_ar, search_terms, description, description_ar) → text`, `public.ebda_product_name_doc(name, name_ar, search_terms) → text`. Indexes `products_search_doc_trgm_idx` and `products_name_doc_trgm_idx`. Column `products.search_terms TEXT NULL`, Prisma `searchTerms String? @map("search_terms")`.
 
@@ -301,7 +325,9 @@ import { hasDb } from '../helpers/bundle-fixtures';
 
 describe.skipIf(!hasDb)('ebda_ar_norm parity with normalizeArabicSearch', () => {
   it.each(NORMALIZE_VECTORS)('SQL and TS agree on %j', async input => {
-    const [row] = await prisma.$queryRaw<Array<{ n: string | null }>>`SELECT public.ebda_ar_norm(${input}) AS n`;
+    const [row] = await prisma.$queryRaw<
+      Array<{ n: string | null }>
+    >`SELECT public.ebda_ar_norm(${input}) AS n`;
     expect(row.n).toBe(normalizeArabicSearch(input));
   });
 
@@ -317,7 +343,10 @@ describe.skipIf(!hasDb)('ebda_ar_norm parity with normalizeArabicSearch', () => 
     const rows = await prisma.$queryRaw<Array<{ relname: string; valid: boolean }>>`
       SELECT c.relname, i.indisvalid AS valid FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
       WHERE c.relname IN ('products_search_doc_trgm_idx','products_name_doc_trgm_idx')`;
-    expect(rows.map(r => r.relname).sort()).toEqual(['products_name_doc_trgm_idx', 'products_search_doc_trgm_idx']);
+    expect(rows.map(r => r.relname).sort()).toEqual([
+      'products_name_doc_trgm_idx',
+      'products_search_doc_trgm_idx',
+    ]);
     expect(rows.every(r => r.valid)).toBe(true);
   });
 
@@ -451,12 +480,14 @@ EOF
 ## Task 3: Product search through the normalised indexes (storefront list, typeahead, admin list, advanced search)
 
 **Files:**
+
 - Create: `apps/api/src/services/product-search.service.ts`
 - Modify: `apps/api/src/services/product.service.ts:57-75` (`buildProductSearchAnd` becomes an id-set filter), `:557` (admin `list`), `:1386` (`listPublic`), `:2144` (`advancedSearch`), `:2311-2352` (`getSuggestSuggestions`), `:2367+` (`getSearchSuggestions`)
 - Modify: every test importing `buildProductSearchAnd` (`grep -rln buildProductSearchAnd tests apps`)
 - Test: `tests/integration/product-search-normalised.test.ts`
 
 **Interfaces:**
+
 - Consumes: `searchTokens`, `escapeLike` (Task 1); the SQL doc functions (Task 2)
 - Produces:
   - `searchProductIds(storeId: string, raw: string, opts: { scope: 'storefront' | 'admin'; field?: 'doc' | 'name'; limit?: number }): Promise<string[]>`. Ids ordered by name similarity desc. Empty when there are no tokens. Storefront scope = `status='active' AND deleted_at IS NULL`; admin scope = `deleted_at IS NULL` and also matches SKU.
@@ -482,12 +513,21 @@ let otherStoreId: string;
 const ids: Record<string, string> = {};
 
 async function mkStore(slug: string) {
-  const owner = await prisma.user.create({ data: { email: `ps-${slug}@t.local`, role: 'store_admin' } });
+  const owner = await prisma.user.create({
+    data: { email: `ps-${slug}@t.local`, role: 'store_admin' },
+  });
   return (await prisma.store.create({ data: { name: slug, slug, ownerId: owner.id } })).id;
 }
 async function mk(store: string, key: string, data: Record<string, unknown>) {
   const p = await prisma.product.create({
-    data: { storeId: store, slug: `${key}-${run}`, price: 1000, status: 'active', name: key, ...data },
+    data: {
+      storeId: store,
+      slug: `${key}-${run}`,
+      price: 1000,
+      status: 'active',
+      name: key,
+      ...data,
+    },
   });
   ids[key] = p.id;
 }
@@ -498,7 +538,11 @@ describe.skipIf(!hasDb)('normalised product search', () => {
     otherStoreId = await mkStore(`ps-b-${run}`);
     await mk(storeId, 'shoes', { name: 'Leather shoes', nameAr: 'أحذية جلد طبيعي' });
     await mk(storeId, 'pasta', { name: 'Pasta', nameAr: 'مكرونة إيطالي' });
-    await mk(storeId, 'abaya', { name: 'Abaya', nameAr: 'عباية سوداء', searchTerms: '3abaya, عبايه' });
+    await mk(storeId, 'abaya', {
+      name: 'Abaya',
+      nameAr: 'عباية سوداء',
+      searchTerms: '3abaya, عبايه',
+    });
     await mk(storeId, 'pct', { name: 'Sale 50% off bundle' });
     await mk(storeId, 'size', { name: 'Shirt', nameAr: 'قميص مقاس 42' });
     await mk(storeId, 'draft', { name: 'Draft shoes', nameAr: 'أحذية', status: 'draft' });
@@ -541,7 +585,10 @@ describe.skipIf(!hasDb)('normalised product search', () => {
     expect(await q('mug-77')).toEqual([]);
   });
   it('typeahead (name field) does not match description-only words', async () => {
-    await prisma.product.update({ where: { id: ids.pasta }, data: { description: 'contains durum wheat' } });
+    await prisma.product.update({
+      where: { id: ids.pasta },
+      data: { description: 'contains durum wheat' },
+    });
     expect(await q('durum', 'storefront', 'name')).toEqual([]);
     expect(await q('durum')).toEqual([ids.pasta]);
   });
@@ -633,15 +680,25 @@ export async function buildProductSearchWhere(
 5. `getSuggestSuggestions`: replace the `suggestTokens` block and the `AND:` arm with an id lookup that keeps the existing `featured desc, name asc` order:
 
 ```ts
-    const matchIds = await searchProductIds(storeId, trimmed, { scope: 'storefront', field: 'name', limit: 200 });
-    if (matchIds.length === 0) return { suggestions: [] as Array<unknown> };
-    const products = await prisma.product.findMany({
-      where: { storeId, status: 'active', deletedAt: null, id: { in: matchIds } },
-      select: { id: true, slug: true, name: true, nameAr: true, price: true,
-        images: { select: { url: true }, orderBy: { position: 'asc' }, take: 1 } },
-      orderBy: [{ featured: 'desc' }, { name: 'asc' }],
-      take,
-    });
+const matchIds = await searchProductIds(storeId, trimmed, {
+  scope: 'storefront',
+  field: 'name',
+  limit: 200,
+});
+if (matchIds.length === 0) return { suggestions: [] as Array<unknown> };
+const products = await prisma.product.findMany({
+  where: { storeId, status: 'active', deletedAt: null, id: { in: matchIds } },
+  select: {
+    id: true,
+    slug: true,
+    name: true,
+    nameAr: true,
+    price: true,
+    images: { select: { url: true }, orderBy: { position: 'asc' }, take: 1 },
+  },
+  orderBy: [{ featured: 'desc' }, { name: 'asc' }],
+  take,
+});
 ```
 
 6. `getSearchSuggestions`: replace its `OR: [{ name: { contains: query … } }, …]` with `id: { in: await searchProductIds(storeId, query, { scope: 'storefront', field: 'name', limit: 50 }) }`.
@@ -669,6 +726,7 @@ EOF
 ## Task 4: Merchant-editable "search words" field
 
 **Files:**
+
 - Modify: `apps/api/src/routes/product.routes.ts:~96` (`createProductSchema`)
 - Modify: `apps/api/src/services/product.service.ts` (`CreateProductData`/`UpdateProductData` near `:290`, `create` data near `:811`, `update` data near `:1010`)
 - Modify: `apps/admin/src/app/stores/[id]/products/[productId]/edit/page.tsx` (form state, load, save payload, field)
@@ -678,6 +736,7 @@ EOF
 - Test: `packages/shared/src/search/__tests__/search-terms.test.ts`, `tests/integration/product-search-terms-field.test.ts`
 
 **Interfaces:**
+
 - Produces: `SEARCH_TERMS_MAX_LENGTH = 500`, `SEARCH_TERMS_MAX_COUNT = 30`, `cleanSearchTerms(raw: string | null | undefined): string | null` (split on `,` or `،` or newline, trim, dedupe case-insensitively after `normalizeArabicSearch`, cap the count, join with `, `, empty → null). Zod field `searchTerms: z.string().max(SEARCH_TERMS_MAX_LENGTH).nullable().optional().transform(cleanSearchTerms)`.
 
 - [ ] **Step 1: Write the failing unit test**
@@ -780,7 +839,10 @@ it('PUT searchTerms is cleaned, stored, and searchable', async () => {
   await runInTenantContext(storeId, () =>
     ProductService.update(storeId, ids.shoes, { searchTerms: 'كوتشي، كوتشى , sneakers' } as never)
   );
-  const row = await prisma.product.findUnique({ where: { id: ids.shoes }, select: { searchTerms: true } });
+  const row = await prisma.product.findUnique({
+    where: { id: ids.shoes },
+    select: { searchTerms: true },
+  });
   expect(row!.searchTerms).toBe('كوتشي, sneakers');
   expect(await q('sneakers')).toEqual([ids.shoes]);
 });
@@ -809,6 +871,7 @@ EOF
 ## Task 5: Search-query log (privacy-safe daily aggregate) + retention
 
 **Files:**
+
 - Create: `packages/database/prisma/migrations/20261018000200_search_query_daily/migration.sql`
 - Modify: `packages/database/prisma/schema.prisma` (new model `SearchQueryDaily`, back-relation `searchQueryDaily SearchQueryDaily[]` on `Store`)
 - Create: `apps/api/src/services/search-log.service.ts`
@@ -818,6 +881,7 @@ EOF
 - Test: `tests/unit/search-log-privacy.test.ts`, `tests/integration/search-log.test.ts`
 
 **Interfaces:**
+
 - Produces: `isPersonalDataTerm(norm: string): boolean`, `recordSearch(storeId: string, rawTerm: string, resultCount: number): Promise<boolean>` (fail-open; false when skipped), `SEARCH_LOG_RETENTION_DAYS = 90`, Prisma model `SearchQueryDaily { id, storeId, date, term, searches, zeroResults, lastResultCount, updatedAt }`.
 - Viewer (every-data-needs-UI): Task 6 page `/stores/[id]/insights/searches` + overview card.
 
@@ -830,7 +894,11 @@ import { isPersonalDataTerm } from '../../apps/api/src/services/search-log.servi
 
 describe('isPersonalDataTerm', () => {
   it.each([
-    'ahmed@example.com', '01012345678', '+20 101 234 5678', '٠١٠١٢٣٤٥٦٧٨', '0020 1012345678',
+    'ahmed@example.com',
+    '01012345678',
+    '+20 101 234 5678',
+    '٠١٠١٢٣٤٥٦٧٨',
+    '0020 1012345678',
     '29801011234567', // national-id shaped (14 digits)
   ])('drops %j', t => expect(isPersonalDataTerm(t)).toBe(true));
   it.each(['جزمه 42', 'iphone 15 pro', 'مقاس 44', 'sku-1234', 'كوتشي'])('keeps %j', t =>
@@ -921,14 +989,20 @@ export function isPersonalDataTerm(norm: string): boolean {
  * breaks a search. Runs in its own store scope (withStore) so it is independent of
  * the request transaction; called via cfWaitUntil, after the response.
  */
-export async function recordSearch(storeId: string, rawTerm: string, resultCount: number): Promise<boolean> {
+export async function recordSearch(
+  storeId: string,
+  rawTerm: string,
+  resultCount: number
+): Promise<boolean> {
   const term = normalizeArabicSearch(rawTerm).slice(0, 100);
   if (term.length < 2 || isPersonalDataTerm(term)) return false;
   const zero = resultCount === 0 ? 1 : 0;
   const date = regionDayStart(new Date());
   try {
-    await withStore(storeId, tx =>
-      tx.$executeRaw`
+    await withStore(
+      storeId,
+      tx =>
+        tx.$executeRaw`
         INSERT INTO search_query_daily (id, store_id, date, term, searches, zero_results, last_result_count, updated_at)
         VALUES (gen_random_uuid(), ${storeId}, ${date}, ${term}, 1, ${zero}, ${resultCount}, now())
         ON CONFLICT (store_id, date, term) DO UPDATE SET
@@ -939,7 +1013,10 @@ export async function recordSearch(storeId: string, rawTerm: string, resultCount
     );
     return true;
   } catch (err) {
-    logger.warn({ err: err instanceof Error ? err.message : 'unknown', storeId }, '[SEARCH-LOG] skipped');
+    logger.warn(
+      { err: err instanceof Error ? err.message : 'unknown', storeId },
+      '[SEARCH-LOG] skipped'
+    );
     return false;
   }
 }
@@ -948,12 +1025,12 @@ export async function recordSearch(storeId: string, rawTerm: string, resultCount
 In `public.routes.ts` list route, right after `const result = await getCached(...)` and before `setEdgeCache`:
 
 ```ts
-    // First-party search log (search program P0): page 1 of a real query only, so paging
-    // does not double count. After the response; fail-open. Typeahead is NOT logged (keystrokes).
-    if (effectiveSearch && (!page || page === '1') && !validCursor) {
-      const total = (result as { meta?: { total?: number } }).meta?.total ?? 0;
-      cfWaitUntil(recordSearch(storeId, effectiveSearch, total));
-    }
+// First-party search log (search program P0): page 1 of a real query only, so paging
+// does not double count. After the response; fail-open. Typeahead is NOT logged (keystrokes).
+if (effectiveSearch && (!page || page === '1') && !validCursor) {
+  const total = (result as { meta?: { total?: number } }).meta?.total ?? 0;
+  cfWaitUntil(recordSearch(storeId, effectiveSearch, total));
+}
 ```
 
 Add `import { cfWaitUntil } from '../cf/bindings';` and `import { recordSearch } from '../services/search-log.service';`. Every request reaches the Worker: a Worker response is not stored by the CF CDN, and `s-maxage` is ignored by browsers. So a cached `getCached` hit is still counted, which is intended: it counts searches, not DB reads [i, measured in Step 7].
@@ -962,15 +1039,22 @@ Retention, in `data-retention.ts`:
 
 ```ts
 export const searchLogPurge: InngestFunction.Any = inngest.createFunction(
-  { id: 'search-log-purge-weekly', name: 'Purge storefront search log rows older than 90 days',
-    retries: 1, triggers: [{ cron: '0 5 * * 0' }] },
+  {
+    id: 'search-log-purge-weekly',
+    name: 'Purge storefront search log rows older than 90 days',
+    retries: 1,
+    triggers: [{ cron: '0 5 * * 0' }],
+  },
   async ({ step }) => {
     const cutoff = new Date(Date.now() - SEARCH_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000);
     const purged = await step.run('purge', async () => {
       let n = 0;
       for (const { value } of await acrossStores(storeId =>
-        prisma.searchQueryDaily.deleteMany({ where: { storeId, date: { lt: cutoff } } }).then(r => r.count)
-      )) n += value;
+        prisma.searchQueryDaily
+          .deleteMany({ where: { storeId, date: { lt: cutoff } } })
+          .then(r => r.count)
+      ))
+        n += value;
       return n;
     });
     logger.info({ cutoff, purged }, 'search-log-purge: completed');
@@ -994,19 +1078,30 @@ describe.skipIf(!hasDb)('recordSearch', () => {
   let storeId: string;
   const run = `${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
   beforeAll(async () => {
-    const owner = await prisma.user.create({ data: { email: `sl-${run}@t.local`, role: 'store_admin' } });
-    storeId = (await prisma.store.create({ data: { name: 'sl', slug: `sl-${run}`, ownerId: owner.id } })).id;
+    const owner = await prisma.user.create({
+      data: { email: `sl-${run}@t.local`, role: 'store_admin' },
+    });
+    storeId = (
+      await prisma.store.create({ data: { name: 'sl', slug: `sl-${run}`, ownerId: owner.id } })
+    ).id;
   });
   it('aggregates spelling variants into one normalised row and counts zero results', async () => {
     expect(await recordSearch(storeId, 'أحذية', 0)).toBe(true);
     expect(await recordSearch(storeId, 'احذيه', 3)).toBe(true);
     const rows = await prisma.searchQueryDaily.findMany({ where: { storeId } });
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ term: 'احذيه', searches: 2, zeroResults: 1, lastResultCount: 3 });
+    expect(rows[0]).toMatchObject({
+      term: 'احذيه',
+      searches: 2,
+      zeroResults: 1,
+      lastResultCount: 3,
+    });
   });
   it('never stores a phone', async () => {
     expect(await recordSearch(storeId, '٠١٠١٢٣٤٥٦٧٨', 0)).toBe(false);
-    expect(await prisma.searchQueryDaily.count({ where: { storeId, term: { contains: '0101' } } })).toBe(0);
+    expect(
+      await prisma.searchQueryDaily.count({ where: { storeId, term: { contains: '0101' } } })
+    ).toBe(0);
   });
 });
 ```
@@ -1039,6 +1134,7 @@ EOF
 ## Task 6: Admin "What shoppers searched" page + "searches with no results" card
 
 **Files:**
+
 - Create: `apps/api/src/routes/search-insights.routes.ts`; mount in `apps/api/src/routes/index.ts` next to `insightsRoutes` (`router.use('/stores', tenantContext, searchInsightsRoutes);`)
 - Create: `packages/shared/src/search/search-insights.ts` (response types; export from `search/index.ts`)
 - Create: `apps/admin/src/app/stores/[id]/insights/searches/page.tsx`
@@ -1047,6 +1143,7 @@ EOF
 - Test: `tests/integration/search-insights-route.test.ts`, `apps/admin/src/app/stores/[id]/insights/searches/page.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `SearchQueryDaily` (Task 5)
 - Produces: `GET /api/v1/stores/:storeId/search-insights?days=7|30|90&filter=zero|all` → `SearchInsightsResponse = { days: number; totals: { searches: number; zeroResultSearches: number; zeroResultRate: number | null }; terms: Array<{ term: string; searches: number; zeroResults: number; lastResultCount: number }> }`. `zeroResultRate` is null when searches = 0 (unknown is never rendered as 0%). Top 50 terms, ordered by `zeroResults desc` (filter=zero) or `searches desc`.
 
@@ -1055,7 +1152,12 @@ EOF
 ```ts
 // packages/shared/src/search/search-insights.ts
 export type SearchInsightsFilter = 'zero' | 'all';
-export interface SearchInsightsTerm { term: string; searches: number; zeroResults: number; lastResultCount: number }
+export interface SearchInsightsTerm {
+  term: string;
+  searches: number;
+  zeroResults: number;
+  lastResultCount: number;
+}
 export interface SearchInsightsResponse {
   days: number;
   totals: { searches: number; zeroResultSearches: number; zeroResultRate: number | null };
@@ -1073,17 +1175,27 @@ export interface SearchInsightsResponse {
 it('returns zero-result terms first with a null rate when nothing was searched', async () => {
   const empty = await request(app).get(`/api/v1/stores/${emptyStoreId}/search-insights?days=30`);
   expect(empty.status).toBe(200);
-  expect(empty.body.data.totals).toEqual({ searches: 0, zeroResultSearches: 0, zeroResultRate: null });
+  expect(empty.body.data.totals).toEqual({
+    searches: 0,
+    zeroResultSearches: 0,
+    zeroResultRate: null,
+  });
 
   await recordSearch(storeId, 'كوتشي', 0);
   await recordSearch(storeId, 'كوتشي', 0);
   await recordSearch(storeId, 'تيشرت', 5);
-  const res = await request(app).get(`/api/v1/stores/${storeId}/search-insights?days=30&filter=zero`);
-  expect(res.body.data.terms).toEqual([{ term: 'كوتشي', searches: 2, zeroResults: 2, lastResultCount: 0 }]);
+  const res = await request(app).get(
+    `/api/v1/stores/${storeId}/search-insights?days=30&filter=zero`
+  );
+  expect(res.body.data.terms).toEqual([
+    { term: 'كوتشي', searches: 2, zeroResults: 2, lastResultCount: 0 },
+  ]);
   expect(res.body.data.totals.zeroResultRate).toBeCloseTo(2 / 3);
 });
 it('rejects days outside 7|30|90', async () => {
-  expect((await request(app).get(`/api/v1/stores/${storeId}/search-insights?days=400`)).status).toBe(400);
+  expect(
+    (await request(app).get(`/api/v1/stores/${storeId}/search-insights?days=400`)).status
+  ).toBe(400);
 });
 ```
 
@@ -1132,7 +1244,10 @@ router.get(
           where: parsed.data.filter === 'zero' ? { ...where, zeroResults: { gt: 0 } } : where,
           _sum: { searches: true, zeroResults: true },
           _max: { lastResultCount: true },
-          orderBy: parsed.data.filter === 'zero' ? { _sum: { zeroResults: 'desc' } } : { _sum: { searches: 'desc' } },
+          orderBy:
+            parsed.data.filter === 'zero'
+              ? { _sum: { zeroResults: 'desc' } }
+              : { _sum: { searches: 'desc' } },
           take: 50,
         }),
       ]);
@@ -1140,7 +1255,11 @@ router.get(
       const zero = agg._sum.zeroResults ?? 0;
       const data: SearchInsightsResponse = {
         days,
-        totals: { searches, zeroResultSearches: zero, zeroResultRate: searches === 0 ? null : zero / searches },
+        totals: {
+          searches,
+          zeroResultSearches: zero,
+          zeroResultRate: searches === 0 ? null : zero / searches,
+        },
         terms: grouped.map(g => ({
           term: g.term,
           searches: g._sum.searches ?? 0,
@@ -1185,7 +1304,9 @@ export function ZeroResultSearchesCard({ storeId }: { storeId: string }) {
     <section className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-foreground">{t('cardTitle')}</h2>
-        <Link href={`/stores/${storeId}/insights/searches`} className="text-xs text-primary">{t('viewAll')}</Link>
+        <Link href={`/stores/${storeId}/insights/searches`} className="text-xs text-primary">
+          {t('viewAll')}
+        </Link>
       </div>
       {failed ? (
         <p className="mt-3 text-xs text-muted-foreground">{t('loadFailed')}</p>
@@ -1208,7 +1329,7 @@ export function ZeroResultSearchesCard({ storeId }: { storeId: string }) {
 }
 ```
 
-`hubs.ts`: add `insightsSearches: string;` to the labels type and `{ label: labels.insightsSearches, href: \`/stores/${storeId}/insights/searches\` }` after `insightsProducts`. `AdminLayout.tsx`: add `insightsSearches: t('hubTabs.insightsSearches'),`.
+`hubs.ts`: add `insightsSearches: string;` to the labels type and `{ label: labels.insightsSearches, href: \`/stores/${storeId}/insights/searches\` }`after`insightsProducts`. `AdminLayout.tsx`: add `insightsSearches: t('hubTabs.insightsSearches'),`.
 
 i18n (ar shown; en mirrors it):
 `hubTabs.insightsSearches`: "عمليات البحث" / "Searches". `insights.searches`: `title` "العملاء بيدوروا على إيه" / "What shoppers searched", `cardTitle` "عمليات بحث من غير نتايج (آخر 7 أيام)" / "Searches with no results (last 7 days)", `viewAll` "عرض الكل" / "View all", `cardEmpty` "مفيش عمليات بحث من غير نتايج" / "No searches without results", `empty` "لسه مفيش عمليات بحث متسجلة" / "No searches recorded yet", `term` "الكلمة" / "Term", `searches` "مرات البحث" / "Searches", `zeroResults` "من غير نتايج" / "No results", `addTerm` "أضف كلمة بحث لمنتج" / "Add as a product search word", `onlyZero` "من غير نتايج بس" / "No results only", `all` "الكل" / "All", `rate` "نسبة البحث من غير نتايج" / "No-result rate", `loadFailed` "تعذر التحميل" / "Could not load".
@@ -1269,6 +1390,7 @@ EOF
 ## Task 8: AI-generated search terms through the autofill engine
 
 **Files:**
+
 - Create: `apps/api/src/lib/ai/product-search-terms-generator.ts`
 - Modify: `packages/shared/src/types/ai-autofill.ts` (`AI_AUTOFILL_FIELDS` + 1 entry)
 - Modify: `apps/api/src/services/ai.service.ts:59` (`Feature` union + `'search-terms'`)
@@ -1278,6 +1400,7 @@ EOF
 - Test: `tests/unit/product-search-terms-generator.test.ts`, `tests/unit/ai-autofill-search-terms.test.ts`, `packages/shared/src/types/__tests__/ai-autofill.test.ts` (extend)
 
 **Interfaces:**
+
 - Consumes: `cleanSearchTerms` (Task 4), `assertAiQuota`, `recordUsage`, `GeminiFailoverClient`, `parseAiJson`, `rethrowAsAppError`
 - Produces: `generateProductSearchTerms(input: { storeId: string; storeName: string; product: { name: string; nameAr?: string | null; description?: string | null; descriptionAr?: string | null }; categoryNames: string[] }, apiKey: string, modelName: string): Promise<string | null>`, `buildSearchTermsPrompt(input): string`. Autofill field `searchTerms` with sources `['name','nameAr','description','descriptionAr']`.
 
@@ -1294,34 +1417,47 @@ vi.mock('../../apps/api/src/lib/ai/gemini-keys', () => ({
 const recordUsage = vi.fn(async () => undefined);
 vi.mock('../../apps/api/src/services/ai.service', () => ({ recordUsage }));
 const assertAiQuota = vi.fn(async () => undefined);
-vi.mock('../../apps/api/src/lib/ai-quota', () => ({ assertAiQuota, isAiQuotaCapError: () => false }));
+vi.mock('../../apps/api/src/lib/ai-quota', () => ({
+  assertAiQuota,
+  isAiQuotaCapError: () => false,
+}));
 
-const { generateProductSearchTerms, buildSearchTermsPrompt } = await import(
-  '../../apps/api/src/lib/ai/product-search-terms-generator'
-);
+const { generateProductSearchTerms, buildSearchTermsPrompt } =
+  await import('../../apps/api/src/lib/ai/product-search-terms-generator');
 const input = {
-  storeId: 's1', storeName: 'متجر',
+  storeId: 's1',
+  storeName: 'متجر',
   product: { name: 'Black abaya', nameAr: 'عباية سوداء', description: null, descriptionAr: null },
   categoryNames: ['ملابس حريمي'],
 };
 
 describe('generateProductSearchTerms', () => {
-  beforeEach(() => { generateContent.mockReset(); recordUsage.mockClear(); assertAiQuota.mockClear(); });
+  beforeEach(() => {
+    generateContent.mockReset();
+    recordUsage.mockClear();
+    assertAiQuota.mockClear();
+  });
 
   it('prompt asks for Egyptian dialect, Franco-Arabic and English and forbids brand invention', () => {
     const p = buildSearchTermsPrompt(input);
-    expect(p).toMatch(/Egyptian/); expect(p).toMatch(/Franco/); expect(p).toMatch(/3abaya/);
+    expect(p).toMatch(/Egyptian/);
+    expect(p).toMatch(/Franco/);
+    expect(p).toMatch(/3abaya/);
     expect(p).toMatch(/Do not invent brand/);
   });
 
   it('checks bulk quota, records usage, returns cleaned comma list', async () => {
     generateContent.mockResolvedValue({
-      response: { text: () => '{"terms":["عبايه","3abaya","abaya","عباية","",  "خمار"]}',
-        usageMetadata: { promptTokenCount: 50, candidatesTokenCount: 20 } },
+      response: {
+        text: () => '{"terms":["عبايه","3abaya","abaya","عباية","",  "خمار"]}',
+        usageMetadata: { promptTokenCount: 50, candidatesTokenCount: 20 },
+      },
     });
     const out = await generateProductSearchTerms(input, 'k', 'gemini-flash-lite-latest');
     expect(assertAiQuota).toHaveBeenCalledWith({ storeId: 's1', bulk: true });
-    expect(recordUsage).toHaveBeenCalledWith('s1', 'search-terms', 50, 20, false, { model: 'gemini-flash-lite-latest' });
+    expect(recordUsage).toHaveBeenCalledWith('s1', 'search-terms', 50, 20, false, {
+      model: 'gemini-flash-lite-latest',
+    });
     expect(out).toBe('عبايه, 3abaya, abaya, خمار'); // عباية folds onto عبايه → deduped
   });
 
@@ -1357,7 +1493,12 @@ import { assertAiQuota } from '../ai-quota';
 export interface SearchTermsInput {
   storeId: string;
   storeName: string;
-  product: { name: string; nameAr?: string | null; description?: string | null; descriptionAr?: string | null };
+  product: {
+    name: string;
+    nameAr?: string | null;
+    description?: string | null;
+    descriptionAr?: string | null;
+  };
   categoryNames: string[];
 }
 
@@ -1395,8 +1536,14 @@ export async function generateProductSearchTerms(
     rethrowAsAppError(err, 'AI search terms failed');
   }
   const usage = result.response.usageMetadata;
-  await recordUsage(input.storeId, 'search-terms', usage?.promptTokenCount ?? 0,
-    usage?.candidatesTokenCount ?? 0, false, { model: modelName });
+  await recordUsage(
+    input.storeId,
+    'search-terms',
+    usage?.promptTokenCount ?? 0,
+    usage?.candidatesTokenCount ?? 0,
+    false,
+    { model: modelName }
+  );
   const parsed = parseAiJson<{ terms?: unknown }>(result.response.text());
   if (!parsed || !Array.isArray(parsed.terms)) return null;
   return cleanSearchTerms(parsed.terms.filter((t): t is string => typeof t === 'string').join(','));
@@ -1425,10 +1572,14 @@ vi.mock('../../apps/api/src/lib/ai/product-search-terms-generator', () => ({
 it('fills empty searchTerms and stamps it ai', async () => {
   productRow = { ...baseProduct, searchTerms: null, aiFieldSources: {} };
   await fillProductFields('s1', 'p1', { op: 'create' });
-  expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({
-    data: expect.objectContaining({ searchTerms: 'جزمه, gazma, shoes',
-      aiFieldSources: expect.objectContaining({ searchTerms: 'ai' }) }),
-  }));
+  expect(updateSpy).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        searchTerms: 'جزمه, gazma, shoes',
+        aiFieldSources: expect.objectContaining({ searchTerms: 'ai' }),
+      }),
+    })
+  );
 });
 it('never overwrites merchant words', async () => {
   productRow = { ...baseProduct, searchTerms: 'كوتشي', aiFieldSources: { searchTerms: 'human' } };
@@ -1449,25 +1600,35 @@ Then, in `ai-autofill.ts` `AI_AUTOFILL_FIELDS`, append:
 In `fillProductFields`, before `// Categorize ONLY when…`:
 
 ```ts
-    if (canWrite('searchTerms', product.searchTerms) && (effName?.trim() || effNameAr?.trim())) {
-      const catNames = product.categories.length
-        ? (await prisma.category.findMany({
-            where: { storeId, id: { in: product.categories.map(c => c.categoryId) } },
-            select: { name: true, nameAr: true },
-          })).flatMap(c => [c.nameAr, c.name].filter((v): v is string => !!v))
-        : [];
-      const terms = await generateProductSearchTerms(
-        { storeId, storeName: store?.nameAr || store?.name || '',
-          product: { name: effName ?? '', nameAr: effNameAr, description: effDescription, descriptionAr: effDescriptionAr },
-          categoryNames: catNames },
-        getGeminiApiKey(),
-        process.env.GEMINI_MODEL || 'gemini-flash-lite-latest'
-      );
-      if (terms) {
-        writes.searchTerms = terms;
-        stampedSources.searchTerms = 'ai';
-      }
-    }
+if (canWrite('searchTerms', product.searchTerms) && (effName?.trim() || effNameAr?.trim())) {
+  const catNames = product.categories.length
+    ? (
+        await prisma.category.findMany({
+          where: { storeId, id: { in: product.categories.map(c => c.categoryId) } },
+          select: { name: true, nameAr: true },
+        })
+      ).flatMap(c => [c.nameAr, c.name].filter((v): v is string => !!v))
+    : [];
+  const terms = await generateProductSearchTerms(
+    {
+      storeId,
+      storeName: store?.nameAr || store?.name || '',
+      product: {
+        name: effName ?? '',
+        nameAr: effNameAr,
+        description: effDescription,
+        descriptionAr: effDescriptionAr,
+      },
+      categoryNames: catNames,
+    },
+    getGeminiApiKey(),
+    process.env.GEMINI_MODEL || 'gemini-flash-lite-latest'
+  );
+  if (terms) {
+    writes.searchTerms = terms;
+    stampedSources.searchTerms = 'ai';
+  }
+}
 ```
 
 `getGeminiApiKey` is whatever accessor `bulk-ai-tags.ts` passes as `apiKey` (it reads `config.gemini…`). Copy that exact expression and import from `bulk-ai-tags.ts`; do not create a new accessor. The block sits inside the existing try, so a quota-cap error is logged as "deferring" and the remaining writes still persist. The 3-day `ai-autofill-sweep` fills `searchTerms` for every existing product with no extra code: that is the backfill for terms. **STOP-4 applies before it runs at scale in production.**
@@ -1499,12 +1660,14 @@ EOF
 ## Task 9: pgvector in every Postgres + `product_embeddings` table
 
 **Files:**
+
 - Modify: `.github/workflows/ci.yml` (5× `image: postgres:16-alpine` → `image: pgvector/pgvector:0.8.0-pg16`), `.github/workflows/cf-api-deploy.yml:18`, `docker-compose.yml:7`
 - Create: `packages/database/prisma/migrations/20261019000100_product_embeddings/migration.sql`
 - Modify: `packages/database/prisma/schema.prisma` (model `ProductEmbedding`; back-relations on `Product` and `Store`)
 - Test: `tests/integration/product-embeddings-schema.test.ts`
 
 **Interfaces:**
+
 - Produces (SQL): extension `vector`; table `product_embeddings(product_id PK FK→products ON DELETE CASCADE, store_id FK→stores CASCADE, model text, content_hash text, embedding halfvec(1024), embedded_at timestamptz)`; index `(store_id)` and `(store_id, embedded_at)`; `public.ebda_product_embed_doc(name, name_ar, search_terms, description, description_ar) → text` (IMMUTABLE: raw (un-normalised) text, HTML tags stripped, each description capped at 1500 chars). Prisma: `ProductEmbedding { productId, storeId, model, contentHash, embedding Unsupported("halfvec(1024)"), embeddedAt }`.
 - Viewer: Task 12 adds "indexed N of M products" to the searches page header.
 
@@ -1520,20 +1683,25 @@ import { hasDb } from '../helpers/bundle-fixtures';
 
 describe.skipIf(!hasDb)('product_embeddings', () => {
   it('pgvector supports halfvec and cosine distance', async () => {
-    const [r] = await prisma.$queryRaw<Array<{ d: number }>>`SELECT ('[1,0]'::halfvec(2) <=> '[0,1]'::halfvec(2))::float8 AS d`;
+    const [r] = await prisma.$queryRaw<
+      Array<{ d: number }>
+    >`SELECT ('[1,0]'::halfvec(2) <=> '[0,1]'::halfvec(2))::float8 AS d`;
     expect(r.d).toBeCloseTo(1);
   });
   it('is RLS-forced with the strict policy', async () => {
     const [r] = await prisma.$queryRaw<Array<{ f: boolean; p: bigint }>>`
       SELECT c.relforcerowsecurity AS f, (SELECT count(*) FROM pg_policies WHERE tablename='product_embeddings') AS p
       FROM pg_class c WHERE c.relname='product_embeddings'`;
-    expect(r.f).toBe(true); expect(Number(r.p)).toBe(1);
+    expect(r.f).toBe(true);
+    expect(Number(r.p)).toBe(1);
   });
   it('embed doc strips html, keeps arabic as written, caps description', async () => {
     const long = 'x'.repeat(4000);
     const [r] = await prisma.$queryRaw<Array<{ d: string }>>`
       SELECT public.ebda_product_embed_doc('Shoes', 'أحذية', '3abaya', ${'<p>جلد <b>طبيعي</b></p>'}, ${long}) AS d`;
-    expect(r.d).toContain('أحذية'); expect(r.d).toContain('جلد طبيعي'); expect(r.d).not.toContain('<b>');
+    expect(r.d).toContain('أحذية');
+    expect(r.d).toContain('جلد طبيعي');
+    expect(r.d).not.toContain('<b>');
     expect(r.d.length).toBeLessThan(1500 + 200);
   });
 });
@@ -1640,6 +1808,7 @@ EOF
 ## Task 10: Embedding provider (Workers AI binding, REST fallback, null) + wrangler binding
 
 **Files:**
+
 - Create: `apps/api/src/lib/search/embedding-provider.ts`
 - Modify: `apps/api/src/cf/bindings.ts` (`AiBindingLike`, `AI?: AiBindingLike` in `CfBindings`)
 - Modify: `apps/api/wrangler.jsonc` (`"ai": { "binding": "AI" }` after `services`)
@@ -1648,10 +1817,11 @@ EOF
 - Test: `tests/unit/embedding-provider.test.ts`, `tests/unit/workerd-smoke-config.test.ts`
 
 **Interfaces:**
+
 - Produces: `EMBED_MODEL = '@cf/baai/bge-m3'`, `EMBED_DIMS = 1024`, `interface EmbeddingProvider { model: string; embed(texts: string[]): Promise<number[][]> }`, `getEmbeddingProvider(): EmbeddingProvider | null` (binding, then REST when `CF_AI_ACCOUNT_ID` + `CF_AI_API_TOKEN` are set, else null), `setEmbeddingProviderForTests(p: EmbeddingProvider | null | undefined): void`, `toHalfvecLiteral(v: number[]): string`, `semanticSearchEnabled(): boolean` (`SEARCH_SEMANTIC_ENABLED === 'true'` AND a provider exists).
 
 - [ ] **Step 1: Measure the real output shape (once, manually; costs < $0.0001).** With wrangler logged in to the Ebda account, run `cd apps/api && npx wrangler ai models --json | node -e "const m=JSON.parse(require('fs').readFileSync(0));console.log(JSON.stringify(m.find(x=>x.name==='@cf/baai/bge-m3'),null,1))"`. Then run `curl -s https://api.cloudflare.com/client/v4/accounts/$CF_AI_ACCOUNT_ID/ai/run/@cf/baai/bge-m3 -H "Authorization: Bearer $CF_AI_API_TOKEN" -d '{"text":["أحذية جلد","3abaya"]}' | node -e "const r=JSON.parse(require('fs').readFileSync(0)).result;console.log(r.shape, r.data.length, r.data[0].length)"`.
-Expected: `[ 2, 1024 ] 2 1024`. If the shape key or dims differ, change `EMBED_DIMS`, the migration's `halfvec(1024)` (still unmerged) and this task's parser before continuing, and record the measurement in Ruling SEARCH-7. Without the credentials this is a STOP for Ahmad, and the task continues against the fake provider.
+      Expected: `[ 2, 1024 ] 2 1024`. If the shape key or dims differ, change `EMBED_DIMS`, the migration's `halfvec(1024)` (still unmerged) and this task's parser before continuing, and record the measurement in Ruling SEARCH-7. Without the credentials this is a STOP for Ahmad, and the task continues against the fake provider.
 
 - [ ] **Step 2: Write the failing test**
 
@@ -1659,10 +1829,18 @@ Expected: `[ 2, 1024 ] 2 1024`. If the shape key or dims differ, change `EMBED_D
 // tests/unit/embedding-provider.test.ts
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { setCfBindings, clearCfBindings } from '../../apps/api/src/cf/bindings';
-import { getEmbeddingProvider, toHalfvecLiteral, EMBED_DIMS, semanticSearchEnabled }
-  from '../../apps/api/src/lib/search/embedding-provider';
+import {
+  getEmbeddingProvider,
+  toHalfvecLiteral,
+  EMBED_DIMS,
+  semanticSearchEnabled,
+} from '../../apps/api/src/lib/search/embedding-provider';
 
-afterEach(() => { clearCfBindings(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+afterEach(() => {
+  clearCfBindings();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 const vec = () => Array.from({ length: EMBED_DIMS }, (_, i) => i / EMBED_DIMS);
 
 describe('embedding provider', () => {
@@ -1674,16 +1852,24 @@ describe('embedding provider', () => {
     expect(out[0]).toHaveLength(EMBED_DIMS);
   });
   it('rejects a wrong-dimension answer loudly', async () => {
-    setCfBindings({ HYPERDRIVE: { connectionString: '' }, AI: { run: async () => ({ data: [[1, 2]] }) } } as never);
+    setCfBindings({
+      HYPERDRIVE: { connectionString: '' },
+      AI: { run: async () => ({ data: [[1, 2]] }) },
+    } as never);
     await expect(getEmbeddingProvider()!.embed(['x'])).rejects.toThrow(/expected 1024/);
   });
   it('falls back to REST when only credentials exist', async () => {
-    vi.stubEnv('CF_AI_ACCOUNT_ID', 'acc'); vi.stubEnv('CF_AI_API_TOKEN', 'tok');
-    const f = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ success: true, result: { data: [vec()] } }))
-    );
+    vi.stubEnv('CF_AI_ACCOUNT_ID', 'acc');
+    vi.stubEnv('CF_AI_API_TOKEN', 'tok');
+    const f = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ success: true, result: { data: [vec()] } }))
+      );
     await getEmbeddingProvider()!.embed(['x']);
-    expect(String(f.mock.calls[0][0])).toBe('https://api.cloudflare.com/client/v4/accounts/acc/ai/run/@cf/baai/bge-m3');
+    expect(String(f.mock.calls[0][0])).toBe(
+      'https://api.cloudflare.com/client/v4/accounts/acc/ai/run/@cf/baai/bge-m3'
+    );
   });
   it('null provider and disabled semantic search when nothing is configured', () => {
     expect(getEmbeddingProvider()).toBeNull();
@@ -1724,9 +1910,11 @@ export interface EmbeddingProvider {
 }
 
 function check(data: unknown, n: number): number[][] {
-  if (!Array.isArray(data) || data.length !== n) throw new Error(`embedding: expected ${n} vectors`);
+  if (!Array.isArray(data) || data.length !== n)
+    throw new Error(`embedding: expected ${n} vectors`);
   for (const v of data) {
-    if (!Array.isArray(v) || v.length !== EMBED_DIMS) throw new Error(`embedding: expected ${EMBED_DIMS} dims`);
+    if (!Array.isArray(v) || v.length !== EMBED_DIMS)
+      throw new Error(`embedding: expected ${EMBED_DIMS} dims`);
   }
   return data as number[][];
 }
@@ -1750,11 +1938,14 @@ const restProvider = (): EmbeddingProvider | null => {
   return {
     model: EMBED_MODEL,
     async embed(texts) {
-      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acct}/ai/run/${EMBED_MODEL}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: texts }),
-      });
+      const res = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${acct}/ai/run/${EMBED_MODEL}`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: texts }),
+        }
+      );
       if (!res.ok) throw new Error(`embedding REST ${res.status}`);
       const body = (await res.json()) as { result?: { data?: unknown } };
       return check(body.result?.data, texts.length);
@@ -1841,6 +2032,7 @@ EOF
 ## Task 11: Indexer: stale detection, every write path, backfill + backstop cron
 
 **Files:**
+
 - Create: `apps/api/src/services/product-index.service.ts`
 - Create: `apps/api/src/lib/search/reindex.ts`
 - Create: `apps/api/src/lib/inngest/functions/search-product-index.ts`; register both exports in `functions/index.ts`
@@ -1848,6 +2040,7 @@ EOF
 - Test: `tests/integration/product-index.test.ts`, `tests/unit/reindex-write-paths.test.ts`
 
 **Interfaces:**
+
 - Consumes: `getEmbeddingProvider`, `toHalfvecLiteral`, `EMBED_MODEL` (Task 10); `ebda_product_embed_doc` (Task 9); `deferAfterTenantCommit` (`lib/after-tenant-commit.ts`)
 - Produces:
   - `findStaleProducts(storeId: string, limit: number): Promise<Array<{ id: string; doc: string; hash: string }>>`
@@ -1858,19 +2051,19 @@ EOF
 
 **Write-path enumeration (text-affecting product writes, verified 2026-10-15):**
 
-| # | Site | Emits today | After this task |
-|---|---|---|---|
-| 1 | `ProductService.create` `product.service.ts:783` (+ MCP `admin-write.tools.ts:116`) | `product.upserted` | covered by trigger |
-| 2 | `ProductService.update` `:982` (+ MCP `:136`) | `product.upserted` | covered by trigger |
-| 3 | bulk import create/update `bulk.service.ts:1026,1049` | nothing | `requestStoreReindex(storeId,'bulk-import')` |
-| 4 | `bulk-ai-translate.ts:267` | nothing | `requestStoreReindex(storeId,'bulk-ai-translate')` |
-| 5 | autofill fill `ai-autofill.service.ts:271` (writes name/nameAr/description*/searchTerms) | nothing | `requestStoreReindex(storeId,'ai-autofill')` |
-| 6 | balance `:516` / revert `:569` | nothing | `requestStoreReindex(storeId,'ai-balance')` |
-| 7 | hand-back clear `ai.routes.ts:2044` | nothing | `requestStoreReindex(storeId,'ai-handback')` |
-| 8 | soft delete `product.service.ts:1088`, bulk delete `bulk.service.ts:1306` | — | none needed: query joins `deleted_at IS NULL` |
-| 9 | status/price/inventory/flags (`bulkUpdate`, inventory, accounting, refunds, variant `hasVariants`) | — | none: not in the embed doc |
-| 10 | variant writes (`variant.service.ts`) | — | none: option values are not in the doc (Ruling SEARCH-9) |
-| — | any path missed above | — | `search-index-backstop` finds it by content hash within 6 h |
+| #   | Site                                                                                               | Emits today        | After this task                                             |
+| --- | -------------------------------------------------------------------------------------------------- | ------------------ | ----------------------------------------------------------- |
+| 1   | `ProductService.create` `product.service.ts:783` (+ MCP `admin-write.tools.ts:116`)                | `product.upserted` | covered by trigger                                          |
+| 2   | `ProductService.update` `:982` (+ MCP `:136`)                                                      | `product.upserted` | covered by trigger                                          |
+| 3   | bulk import create/update `bulk.service.ts:1026,1049`                                              | nothing            | `requestStoreReindex(storeId,'bulk-import')`                |
+| 4   | `bulk-ai-translate.ts:267`                                                                         | nothing            | `requestStoreReindex(storeId,'bulk-ai-translate')`          |
+| 5   | autofill fill `ai-autofill.service.ts:271` (writes name/nameAr/description\*/searchTerms)          | nothing            | `requestStoreReindex(storeId,'ai-autofill')`                |
+| 6   | balance `:516` / revert `:569`                                                                     | nothing            | `requestStoreReindex(storeId,'ai-balance')`                 |
+| 7   | hand-back clear `ai.routes.ts:2044`                                                                | nothing            | `requestStoreReindex(storeId,'ai-handback')`                |
+| 8   | soft delete `product.service.ts:1088`, bulk delete `bulk.service.ts:1306`                          | —                  | none needed: query joins `deleted_at IS NULL`               |
+| 9   | status/price/inventory/flags (`bulkUpdate`, inventory, accounting, refunds, variant `hasVariants`) | —                  | none: not in the embed doc                                  |
+| 10  | variant writes (`variant.service.ts`)                                                              | —                  | none: option values are not in the doc (Ruling SEARCH-9)    |
+| —   | any path missed above                                                                              | —                  | `search-index-backstop` finds it by content hash within 6 h |
 
 - [ ] **Step 1: Write the failing integration test (fake provider, real DB)**
 
@@ -1880,8 +2073,10 @@ import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { createHash } from 'node:crypto';
 import { prisma, runInStoreScope } from '@ebda/database';
 import { hasDb } from '../helpers/bundle-fixtures';
-const { setEmbeddingProviderForTests, EMBED_DIMS } = await import('../../apps/api/src/lib/search/embedding-provider');
-const { indexStore, findStaleProducts, storeIndexStatus } = await import('../../apps/api/src/services/product-index.service');
+const { setEmbeddingProviderForTests, EMBED_DIMS } =
+  await import('../../apps/api/src/lib/search/embedding-provider');
+const { indexStore, findStaleProducts, storeIndexStatus } =
+  await import('../../apps/api/src/services/product-index.service');
 
 /** Deterministic fake: same text → same vector; counts calls. */
 export function fakeProvider() {
@@ -1902,17 +2097,27 @@ export function fakeProvider() {
 }
 
 describe.skipIf(!hasDb)('indexStore', () => {
-  let storeId: string; let pid: string;
+  let storeId: string;
+  let pid: string;
   const run = `${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
   beforeAll(async () => {
-    const owner = await prisma.user.create({ data: { email: `ix-${run}@t.local`, role: 'store_admin' } });
-    storeId = (await prisma.store.create({ data: { name: 'ix', slug: `ix-${run}`, ownerId: owner.id } })).id;
-    pid = (await prisma.product.create({ data: { storeId, slug: `p-${run}`, name: 'Shoes', nameAr: 'أحذية', price: 100 } })).id;
+    const owner = await prisma.user.create({
+      data: { email: `ix-${run}@t.local`, role: 'store_admin' },
+    });
+    storeId = (
+      await prisma.store.create({ data: { name: 'ix', slug: `ix-${run}`, ownerId: owner.id } })
+    ).id;
+    pid = (
+      await prisma.product.create({
+        data: { storeId, slug: `p-${run}`, name: 'Shoes', nameAr: 'أحذية', price: 100 },
+      })
+    ).id;
   });
   afterEach(() => setEmbeddingProviderForTests(undefined));
 
   it('embeds stale products once, then is a no-op until the text changes', async () => {
-    const f = fakeProvider(); setEmbeddingProviderForTests(f.provider);
+    const f = fakeProvider();
+    setEmbeddingProviderForTests(f.provider);
     expect((await runInStoreScope(storeId, () => indexStore(storeId))).embedded).toBe(1);
     expect((await runInStoreScope(storeId, () => indexStore(storeId))).embedded).toBe(0);
     await prisma.product.update({ where: { id: pid }, data: { searchTerms: 'gazma' } });
@@ -1930,16 +2135,24 @@ describe.skipIf(!hasDb)('indexStore', () => {
   });
   it('no provider → skipped, nothing written, no throw', async () => {
     setEmbeddingProviderForTests(null);
-    expect(await runInStoreScope(storeId, () => indexStore(storeId))).toMatchObject({ skipped: 'no-provider' });
+    expect(await runInStoreScope(storeId, () => indexStore(storeId))).toMatchObject({
+      skipped: 'no-provider',
+    });
   });
   it('status counts', async () => {
     setEmbeddingProviderForTests(fakeProvider().provider);
     await runInStoreScope(storeId, () => indexStore(storeId));
-    expect(await runInStoreScope(storeId, () => storeIndexStatus(storeId))).toEqual({ products: 1, indexed: 1, stale: 0 });
+    expect(await runInStoreScope(storeId, () => storeIndexStatus(storeId))).toEqual({
+      products: 1,
+      indexed: 1,
+      stale: 0,
+    });
   });
   it('hard delete cascades the embedding', async () => {
     await prisma.product.delete({ where: { id: pid } });
-    expect(await prisma.$queryRaw<unknown[]>`SELECT 1 FROM product_embeddings WHERE product_id = ${pid}`).toHaveLength(0);
+    expect(
+      await prisma.$queryRaw<unknown[]>`SELECT 1 FROM product_embeddings WHERE product_id = ${pid}`
+    ).toHaveLength(0);
   });
 });
 ```
@@ -1955,7 +2168,11 @@ Expected: FAIL, module not found.
 // apps/api/src/services/product-index.service.ts
 import { prisma } from '@ebda/database';
 import { regionDayStart } from '@ebda/shared';
-import { getEmbeddingProvider, toHalfvecLiteral, EMBED_MODEL } from '../lib/search/embedding-provider';
+import {
+  getEmbeddingProvider,
+  toHalfvecLiteral,
+  EMBED_MODEL,
+} from '../lib/search/embedding-provider';
 import logger from '../lib/logger';
 
 const DOC = `public.ebda_product_embed_doc(p.name, p.name_ar, p.search_terms, p.description, p.description_ar)`;
@@ -1969,18 +2186,23 @@ export async function findStaleProducts(storeId: string, limit: number) {
       WHERE p.store_id = $1 AND p.deleted_at IS NULL AND length(${DOC}) > 0
         AND (e.product_id IS NULL OR e.model <> $2 OR e.content_hash <> md5(${DOC}))
       ORDER BY p.updated_at DESC LIMIT $3`,
-    storeId, EMBED_MODEL, limit
+    storeId,
+    EMBED_MODEL,
+    limit
   );
 }
 
 export async function storeIndexStatus(storeId: string) {
-  const [r] = await prisma.$queryRawUnsafe<Array<{ products: bigint; indexed: bigint; stale: bigint }>>(
+  const [r] = await prisma.$queryRawUnsafe<
+    Array<{ products: bigint; indexed: bigint; stale: bigint }>
+  >(
     `SELECT count(*) AS products,
             count(e.product_id) AS indexed,
             count(*) FILTER (WHERE e.product_id IS NULL OR e.model <> $2 OR e.content_hash <> md5(${DOC})) AS stale
        FROM products p LEFT JOIN product_embeddings e ON e.product_id = p.id
       WHERE p.store_id = $1 AND p.deleted_at IS NULL`,
-    storeId, EMBED_MODEL
+    storeId,
+    EMBED_MODEL
   );
   return { products: Number(r.products), indexed: Number(r.indexed), stale: Number(r.stale) };
 }
@@ -1990,9 +2212,13 @@ export async function storeIndexStatus(storeId: string) {
  * scope (runInStoreScope): every statement is its own transaction, never one held across the
  * Workers AI call. Daily per-store cap counted from product_embeddings.embedded_at.
  */
-export async function indexStore(storeId: string, opts: { batchSize?: number; maxDocs?: number } = {}) {
+export async function indexStore(
+  storeId: string,
+  opts: { batchSize?: number; maxDocs?: number } = {}
+) {
   const provider = getEmbeddingProvider();
-  if (!provider) return { embedded: 0, remaining: false, capped: false, skipped: 'no-provider' as const };
+  if (!provider)
+    return { embedded: 0, remaining: false, capped: false, skipped: 'no-provider' as const };
   const since = regionDayStart(new Date());
   const [{ n }] = await prisma.$queryRaw<Array<{ n: bigint }>>`
     SELECT count(*) AS n FROM product_embeddings WHERE store_id = ${storeId} AND embedded_at >= ${since}`;
@@ -2032,7 +2258,10 @@ export async function requestStoreReindex(storeId: string, reason: string): Prom
       await inngest.send({ name: 'search/store.reindex-requested', data: { storeId, reason } });
     } catch (err) {
       // Not a lost write: search-index-backstop finds stale rows by content hash within 6 h.
-      logger.warn({ err, storeId, reason }, '[search-index] enqueue failed; backstop will catch it');
+      logger.warn(
+        { err, storeId, reason },
+        '[search-index] enqueue failed; backstop will catch it'
+      );
     }
   });
 }
@@ -2056,7 +2285,10 @@ export const searchProductIndex: InngestFunction.Any = inngest.createFunction(
     concurrency: { key: 'event.data.storeId', limit: 1 },
     debounce: { key: 'event.data.storeId', period: '20s' },
     retries: 3,
-    triggers: [{ event: 'product.upserted' as any }, { event: 'search/store.reindex-requested' as any }],
+    triggers: [
+      { event: 'product.upserted' as any },
+      { event: 'search/store.reindex-requested' as any },
+    ],
   },
   async ({ event, step }) => {
     const { storeId } = event.data as { storeId?: string };
@@ -2064,7 +2296,9 @@ export const searchProductIndex: InngestFunction.Any = inngest.createFunction(
     let more = true;
     let round = 0;
     while (more && round < 20) {
-      const r = await step.run(`index-${round}`, () => runInStoreScope(storeId, () => indexStore(storeId)));
+      const r = await step.run(`index-${round}`, () =>
+        runInStoreScope(storeId, () => indexStore(storeId))
+      );
       more = r.remaining && !r.capped && !r.skipped;
       round++;
     }
@@ -2073,17 +2307,27 @@ export const searchProductIndex: InngestFunction.Any = inngest.createFunction(
 );
 
 export const searchIndexBackstop: InngestFunction.Any = inngest.createFunction(
-  { id: 'search-index-backstop', name: 'Search: find stores with stale embeddings', retries: 1,
-    triggers: [{ cron: '17 */6 * * *' }] },
+  {
+    id: 'search-index-backstop',
+    name: 'Search: find stores with stale embeddings',
+    retries: 1,
+    triggers: [{ cron: '17 */6 * * *' }],
+  },
   async ({ step }) => {
     if (!getEmbeddingProvider()) return { skipped: 'no-provider' };
     const stores = await step.run('find', async () =>
       (await acrossStores(id => findStaleProducts(id, 1).then(r => r.length > 0)))
-        .filter(s => s.value).map(s => s.storeId)
+        .filter(s => s.value)
+        .map(s => s.storeId)
     );
     if (stores.length) {
-      await step.sendEvent('fan-out', stores.map(storeId => ({
-        name: 'search/store.reindex-requested', data: { storeId, reason: 'backstop' } })));
+      await step.sendEvent(
+        'fan-out',
+        stores.map(storeId => ({
+          name: 'search/store.reindex-requested',
+          data: { storeId, reason: 'backstop' },
+        }))
+      );
     }
     logger.info({ stores: stores.length }, '[search-index-backstop] done');
     return { stores: stores.length };
@@ -2117,7 +2361,10 @@ it('no other file writes name/nameAr/description/descriptionAr/searchTerms on pr
   const hits = execSync(
     `grep -rlE "product\\.(update|updateMany|create|upsert)\\(" apps/api/src --include=*.ts | xargs grep -lE "(name|nameAr|description|descriptionAr|searchTerms)\\s*:" || true`,
     { encoding: 'utf8' }
-  ).split('\n').filter(Boolean).filter(f => !f.includes('__tests__'));
+  )
+    .split('\n')
+    .filter(Boolean)
+    .filter(f => !f.includes('__tests__'));
   const allowed = new Set([...WRITERS, 'apps/api/src/services/product.service.ts']);
   expect(hits.filter(h => !allowed.has(h))).toEqual([]);
 });
@@ -2150,6 +2397,7 @@ EOF
 ## Task 12: Hybrid ranking (lexical + vector RRF), zero-result fallback, relevance order
 
 **Files:**
+
 - Create: `apps/api/src/lib/search/rrf.ts`
 - Modify: `apps/api/src/services/product-search.service.ts` (+ `semanticProductIds`, `rankedSearch`, query-embedding cache)
 - Modify: `apps/api/src/services/product.service.ts` (`listPublic`: when `search` is present and `sort` is absent, use the ranked path)
@@ -2159,6 +2407,7 @@ EOF
 - Test: `tests/unit/rrf.test.ts`, `tests/integration/hybrid-search.test.ts`
 
 **Interfaces:**
+
 - Consumes: `searchProductIds` (Task 3), `getEmbeddingProvider`, `semanticSearchEnabled` (Task 10), `storeIndexStatus` (Task 11)
 - Produces: `rrfFuse(lists: string[][], k?: number): string[]`; `semanticProductIds(storeId: string, raw: string, limit?: number): Promise<string[]>` (returns `[]` when disabled or on any provider error); `rankedSearch(storeId: string, raw: string): Promise<string[]>` (≤ 200 ids, fused order); `SearchInsightsResponse.index?: { products: number; indexed: number; stale: number; semanticEnabled: boolean }`
 
@@ -2169,7 +2418,12 @@ EOF
 import { it, expect } from 'vitest';
 import { rrfFuse } from '../../apps/api/src/lib/search/rrf';
 it('rewards items found by both legs and keeps single-leg items', () => {
-  expect(rrfFuse([['a', 'b', 'c'], ['c', 'd']])).toEqual(['c', 'a', 'b', 'd']);
+  expect(
+    rrfFuse([
+      ['a', 'b', 'c'],
+      ['c', 'd'],
+    ])
+  ).toEqual(['c', 'a', 'b', 'd']);
 });
 it('empty legs', () => {
   expect(rrfFuse([[], ['x']])).toEqual(['x']);
@@ -2182,8 +2436,11 @@ it('empty legs', () => {
 /** Reciprocal rank fusion (Cormack et al. 2009), k=60. Ties break by id for determinism. */
 export function rrfFuse(lists: string[][], k = 60): string[] {
   const score = new Map<string, number>();
-  for (const list of lists) list.forEach((id, i) => score.set(id, (score.get(id) ?? 0) + 1 / (k + i + 1)));
-  return [...score.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).map(([id]) => id);
+  for (const list of lists)
+    list.forEach((id, i) => score.set(id, (score.get(id) ?? 0) + 1 / (k + i + 1)));
+  return [...score.entries()]
+    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+    .map(([id]) => id);
 }
 ```
 
@@ -2206,24 +2463,34 @@ it('zero lexical hits → vector leg still returns the product', async () => {
   const ids = await runInTenantContext(storeId, () => rankedSearch(storeId, doc));
   expect(ids[0]).toBe(pid);
 });
-it('never returns another store\'s product (ebda_app client, RLS + explicit store_id)', async () => {
+it("never returns another store's product (ebda_app client, RLS + explicit store_id)", async () => {
   const appDb = createPrismaClient({ connectionString: process.env.EBDA_APP_DATABASE_URL! });
-  const ids = await runWithRequestDb(() => appDb, () =>
-    runInTenantContext(storeId, () => semanticProductIds(storeId, await docOf(foreignPid))));
+  const ids = await runWithRequestDb(
+    () => appDb,
+    () => runInTenantContext(storeId, () => semanticProductIds(storeId, await docOf(foreignPid)))
+  );
   expect(ids).not.toContain(foreignPid);
 });
 it('falls back to lexical when the provider throws', async () => {
-  setEmbeddingProviderForTests({ model: '@cf/baai/bge-m3', embed: async () => { throw new Error('5xx'); } });
+  setEmbeddingProviderForTests({
+    model: '@cf/baai/bge-m3',
+    embed: async () => {
+      throw new Error('5xx');
+    },
+  });
   const ids = await runInTenantContext(storeId, () => rankedSearch(storeId, 'احذيه'));
   expect(ids).toEqual([pid]);
 });
 it('disabled flag → lexical only, provider never called', async () => {
   process.env.SEARCH_SEMANTIC_ENABLED = 'false';
-  const spy = vi.fn(); setEmbeddingProviderForTests({ model: 'm', embed: spy });
+  const spy = vi.fn();
+  setEmbeddingProviderForTests({ model: 'm', embed: spy });
   await runInTenantContext(storeId, () => rankedSearch(storeId, 'احذيه'));
   expect(spy).not.toHaveBeenCalled();
 });
-it('soft-deleted and draft products never come back from the vector leg', async () => { /* soft-delete pid2, assert absent */ });
+it('soft-deleted and draft products never come back from the vector leg', async () => {
+  /* soft-delete pid2, assert absent */
+});
 ```
 
 Read how `tests/integration/store-creation-tenant-guard.test.ts` builds its `ebda_app` client URL and binds it per request, and use exactly that (env name, `runWithRequestDb` import path). Do not invent `EBDA_APP_DATABASE_URL` if that file uses another name.
@@ -2237,7 +2504,11 @@ Expected: FAIL, `rankedSearch` is not exported.
 // additions to apps/api/src/services/product-search.service.ts
 import { normalizeArabicSearch } from '@ebda/shared';
 import { BoundedMap } from '../lib/bounded-map';
-import { getEmbeddingProvider, semanticSearchEnabled, toHalfvecLiteral } from '../lib/search/embedding-provider';
+import {
+  getEmbeddingProvider,
+  semanticSearchEnabled,
+  toHalfvecLiteral,
+} from '../lib/search/embedding-provider';
 import { rrfFuse } from '../lib/search/rrf';
 import logger from '../lib/logger';
 
@@ -2259,7 +2530,11 @@ async function queryVector(raw: string): Promise<number[] | null> {
   return v;
 }
 
-export async function semanticProductIds(storeId: string, raw: string, limit = LEG): Promise<string[]> {
+export async function semanticProductIds(
+  storeId: string,
+  raw: string,
+  limit = LEG
+): Promise<string[]> {
   if (!semanticSearchEnabled() || !raw.trim()) return [];
   try {
     const v = await queryVector(raw);
@@ -2274,7 +2549,10 @@ export async function semanticProductIds(storeId: string, raw: string, limit = L
       LIMIT ${limit}`;
     return rows.map(r => r.id);
   } catch (err) {
-    logger.warn({ err: err instanceof Error ? err.message : 'unknown', storeId }, '[search] vector leg failed; lexical only');
+    logger.warn(
+      { err: err instanceof Error ? err.message : 'unknown', storeId },
+      '[search] vector leg failed; lexical only'
+    );
     return [];
   }
 }
@@ -2296,24 +2574,35 @@ Before running the integration test, measure the store-filtered KNN plan. Run `E
 In `listPublic`, before the existing `if (search)` block:
 
 ```ts
-    if (search && (!sort || sort === 'relevance')) {
-      const ranked = await rankedSearch(storeId, search);
-      // Apply every other filter (category, price, featured, option facets) to the ranked set,
-      // then page through it in rank order.
-      where.id = { in: ranked };
-      const allowed = new Set(
-        (await prisma.product.findMany({ where, select: { id: true } })).map(r => r.id)
-      );
-      const ordered = ranked.filter(id => allowed.has(id));
-      const pageIds = ordered.slice((pageNum - 1) * take, pageNum * take);
-      const rows = await prisma.product.findMany({ where: { storeId, id: { in: pageIds } }, select: publicProductSelect });
-      const byId = new Map(rows.map(r => [r.id, r]));
-      return {
-        products: pageIds.map(id => byId.get(id)).filter(Boolean).map(withAvailability),
-        meta: { page: pageNum, limit: take, total: ordered.length, totalPages: Math.ceil(ordered.length / take) },
-        ...(await facetsFor(whereBeforeOptions)),
-      };
-    }
+if (search && (!sort || sort === 'relevance')) {
+  const ranked = await rankedSearch(storeId, search);
+  // Apply every other filter (category, price, featured, option facets) to the ranked set,
+  // then page through it in rank order.
+  where.id = { in: ranked };
+  const allowed = new Set(
+    (await prisma.product.findMany({ where, select: { id: true } })).map(r => r.id)
+  );
+  const ordered = ranked.filter(id => allowed.has(id));
+  const pageIds = ordered.slice((pageNum - 1) * take, pageNum * take);
+  const rows = await prisma.product.findMany({
+    where: { storeId, id: { in: pageIds } },
+    select: publicProductSelect,
+  });
+  const byId = new Map(rows.map(r => [r.id, r]));
+  return {
+    products: pageIds
+      .map(id => byId.get(id))
+      .filter(Boolean)
+      .map(withAvailability),
+    meta: {
+      page: pageNum,
+      limit: take,
+      total: ordered.length,
+      totalPages: Math.ceil(ordered.length / take),
+    },
+    ...(await facetsFor(whereBeforeOptions)),
+  };
+}
 ```
 
 `pageNum`, `take`, the public select constant, the availability mapper and the facet computation already exist in `listPublic` under their own names. Read `:1330-1520` and use those exact identifiers. Do not create new ones (the snippet's names stand in for them and must be replaced 1:1 before compiling). Facets must come from the same pre-option `where` snapshot the existing path uses, so the sidebar counts stay identical. Adding `'relevance'` to `sortValue`'s accepted values in `public.routes.ts` is a one-line change; the cache key already includes the sort.
@@ -2345,12 +2634,14 @@ EOF
 ## Task 13: 200-query eval set + scored harness with a pass bar
 
 **Files:**
+
 - Create: `tests/search-eval/catalogue.ts` (50 Egyptian products × 4 query forms = 200 queries)
 - Create: `tests/search-eval/run.ts` (harness; `npm run search:eval`)
 - Create: `tests/unit/search-eval-scoring.test.ts`
 - Modify: `package.json` (`"search:eval": "tsx tests/search-eval/run.ts"`)
 
 **Interfaces:**
+
 - Produces: `EVAL_PRODUCTS: Array<{ key: string; nameAr: string; name: string; q: { msa: string; dialect: string; franco: string; en: string } }>`, `recallAt(ranked: string[], target: string, k: number): 0 | 1`, `reciprocalRank(ranked: string[], target: string): number`, harness exit code 1 below the bar.
 - **Pass bar (Ruling SEARCH-10):** hybrid recall@10 ≥ 0.90 overall and ≥ 0.80 on each of dialect and franco; MRR ≥ 0.70; hybrid must not be worse than lexical-only on msa or en (Δ ≥ −0.02). It must beat lexical-only by ≥ +0.15 recall@10 on dialect + franco combined, or semantic is not earning its cost: the report says so and **STOP-3** stays off.
 
@@ -2359,56 +2650,311 @@ EOF
 ```ts
 // tests/search-eval/catalogue.ts
 export const EVAL_PRODUCTS = [
-  { key: 'abaya', nameAr: 'عباية كريب سوداء', name: 'Black crepe abaya', q: { msa: 'عباءة سوداء', dialect: 'عبايه سودا', franco: '3abaya soda', en: 'black abaya' } },
-  { key: 'sneakers', nameAr: 'حذاء رياضي رجالي', name: "Men's sport shoes", q: { msa: 'حذاء رياضي', dialect: 'كوتشي رجالي', franco: 'kotshy', en: 'sneakers men' } },
-  { key: 'boots', nameAr: 'بوت جلد حريمي', name: "Women's leather boots", q: { msa: 'حذاء طويل جلد', dialect: 'بوت جلد حريمي', franco: 'boot geld', en: 'leather boots' } },
-  { key: 'slippers', nameAr: 'شبشب منزلي', name: 'House slippers', q: { msa: 'نعال منزلي', dialect: 'شبشب بيتي', franco: 'shebsheb', en: 'slippers' } },
-  { key: 'handbag', nameAr: 'حقيبة يد جلد', name: 'Leather handbag', q: { msa: 'حقيبة يد', dialect: 'شنطه ايد', franco: 'shanta', en: 'handbag' } },
-  { key: 'backpack', nameAr: 'حقيبة ظهر مدرسية', name: 'School backpack', q: { msa: 'حقيبة ظهر', dialect: 'شنطه مدرسه', franco: 'shantet madrasa', en: 'school bag' } },
-  { key: 'galabeya', nameAr: 'جلابية قطن رجالي', name: "Men's cotton galabeya", q: { msa: 'جلباب رجالي', dialect: 'جلابيه قطن', franco: 'galabeya', en: 'galabiya' } },
-  { key: 'isdal', nameAr: 'إسدال صلاة', name: 'Prayer isdal', q: { msa: 'ثوب صلاة', dialect: 'اسدال صلاه', franco: 'esdal', en: 'prayer dress' } },
-  { key: 'hijab', nameAr: 'طرحة شيفون', name: 'Chiffon hijab', q: { msa: 'حجاب شيفون', dialect: 'طرحه شيفون', franco: 'tar7a', en: 'hijab' } },
-  { key: 'tshirt', nameAr: 'تيشيرت قطن بيزك', name: 'Basic cotton t-shirt', q: { msa: 'قميص قطني قصير', dialect: 'تيشرت', franco: 'tshirt', en: 't-shirt' } },
-  { key: 'jeans', nameAr: 'بنطلون جينز سليم', name: 'Slim jeans', q: { msa: 'سروال جينز', dialect: 'بنطلون جينز', franco: 'bantalon jeans', en: 'jeans' } },
-  { key: 'pajama', nameAr: 'بيجامة شتوي', name: 'Winter pajamas', q: { msa: 'ملابس نوم شتوية', dialect: 'بيجامه شتوي', franco: 'bejama', en: 'pajamas' } },
-  { key: 'socks', nameAr: 'شراب قطن', name: 'Cotton socks', q: { msa: 'جوارب قطن', dialect: 'شراب', franco: 'shrab', en: 'socks' } },
-  { key: 'underwear', nameAr: 'طقم داخلي رجالي', name: "Men's underwear set", q: { msa: 'ملابس داخلية', dialect: 'هدوم داخليه', franco: 'hdoom dakhleya', en: 'underwear' } },
-  { key: 'perfume', nameAr: 'برفان عود', name: 'Oud perfume', q: { msa: 'عطر عود', dialect: 'برفيوم عود', franco: 'parfan 3od', en: 'oud perfume' } },
-  { key: 'bakhoor', nameAr: 'بخور معطر', name: 'Scented incense', q: { msa: 'بخور', dialect: 'بخور للبيت', franco: 'bo5oor', en: 'incense' } },
-  { key: 'lipstick', nameAr: 'روج مات', name: 'Matte lipstick', q: { msa: 'أحمر شفاه', dialect: 'روج', franco: 'rouge', en: 'lipstick' } },
-  { key: 'kohl', nameAr: 'كحل عيون أسود', name: 'Black kohl eyeliner', q: { msa: 'كحل', dialect: 'كحل اسود', franco: 'ko7l', en: 'eyeliner' } },
-  { key: 'shampoo', nameAr: 'شامبو للشعر الجاف', name: 'Shampoo for dry hair', q: { msa: 'منظف شعر', dialect: 'شامبو شعر ناشف', franco: 'shampoo sha3r', en: 'dry hair shampoo' } },
-  { key: 'moisturizer', nameAr: 'كريم مرطب للوجه', name: 'Face moisturizer', q: { msa: 'مرطب بشرة', dialect: 'كريم للوش', franco: 'kreem lel wesh', en: 'moisturizer' } },
-  { key: 'koshari', nameAr: 'كشري مصري', name: 'Egyptian koshari', q: { msa: 'طبق كشري', dialect: 'كشري', franco: 'koshary', en: 'koshari' } },
-  { key: 'pasta', nameAr: 'مكرونة إسباجتي', name: 'Spaghetti pasta', q: { msa: 'معكرونة', dialect: 'مكرونه', franco: 'makarona', en: 'spaghetti' } },
-  { key: 'rice', nameAr: 'أرز مصري', name: 'Egyptian rice', q: { msa: 'أرز', dialect: 'رز', franco: 'roz', en: 'rice' } },
-  { key: 'foul', nameAr: 'فول مدمس', name: 'Fava beans', q: { msa: 'فول', dialect: 'فول مدمس', franco: 'fool', en: 'fava beans' } },
-  { key: 'taameya', nameAr: 'طعمية مجمدة', name: 'Frozen falafel', q: { msa: 'فلافل', dialect: 'طعميه', franco: 'ta3meya', en: 'falafel' } },
-  { key: 'feteer', nameAr: 'فطير مشلتت', name: 'Feteer meshaltet', q: { msa: 'فطيرة', dialect: 'فطير', franco: 'feteer', en: 'layered pastry' } },
-  { key: 'kunafa', nameAr: 'كنافة بالقشطة', name: 'Kunafa with cream', q: { msa: 'كنافة', dialect: 'كنافه بالقشطه', franco: 'konafa', en: 'kunafa' } },
-  { key: 'basbousa', nameAr: 'بسبوسة بالمكسرات', name: 'Basbousa with nuts', q: { msa: 'حلوى السميد', dialect: 'بسبوسه', franco: 'basbosa', en: 'semolina cake' } },
-  { key: 'dates', nameAr: 'تمر سيوي', name: 'Siwa dates', q: { msa: 'تمور', dialect: 'بلح', franco: 'bala7', en: 'dates' } },
-  { key: 'tea', nameAr: 'شاي أسود ناعم', name: 'Fine black tea', q: { msa: 'شاي', dialect: 'شاي كشري', franco: 'shay', en: 'black tea' } },
-  { key: 'coffee', nameAr: 'بن محوج', name: 'Spiced ground coffee', q: { msa: 'قهوة مطحونة', dialect: 'بن محوج', franco: 'bon', en: 'ground coffee' } },
-  { key: 'honey', nameAr: 'عسل نحل طبيعي', name: 'Natural bee honey', q: { msa: 'عسل', dialect: 'عسل نحل', franco: '3asal', en: 'honey' } },
-  { key: 'phonecase', nameAr: 'جراب موبايل سيليكون', name: 'Silicone phone case', q: { msa: 'غطاء هاتف', dialect: 'جراب موبايل', franco: 'grab mobile', en: 'phone case' } },
-  { key: 'charger', nameAr: 'شاحن سريع ٢٠ وات', name: '20W fast charger', q: { msa: 'شاحن هاتف', dialect: 'شاحن سريع 20', franco: 'sha7en', en: 'fast charger' } },
-  { key: 'earbuds', nameAr: 'سماعة بلوتوث', name: 'Bluetooth earbuds', q: { msa: 'سماعات لاسلكية', dialect: 'سماعه بلوتوث', franco: 'sama3a', en: 'earbuds' } },
-  { key: 'powerbank', nameAr: 'باور بانك ١٠٠٠٠', name: 'Power bank 10000', q: { msa: 'بطارية متنقلة', dialect: 'باور بانك', franco: 'power bank', en: 'portable battery' } },
-  { key: 'watch', nameAr: 'ساعة يد رجالي', name: "Men's wristwatch", q: { msa: 'ساعة', dialect: 'ساعه ايد', franco: 'sa3a', en: 'watch' } },
-  { key: 'ring', nameAr: 'خاتم فضة', name: 'Silver ring', q: { msa: 'خاتم فضي', dialect: 'دبله فضه', franco: '5atem', en: 'silver ring' } },
-  { key: 'necklace', nameAr: 'سلسلة ذهب عيار ٢١', name: '21k gold necklace', q: { msa: 'قلادة ذهب', dialect: 'سلسله دهب', franco: 'selsela dahab', en: 'gold necklace' } },
-  { key: 'kettle', nameAr: 'غلاية كهربائية', name: 'Electric kettle', q: { msa: 'غلاية ماء', dialect: 'كاتل', franco: 'kettle', en: 'kettle' } },
-  { key: 'blender', nameAr: 'خلاط كهربائي', name: 'Electric blender', q: { msa: 'خلاط', dialect: 'خلاط عصير', franco: '5alat', en: 'blender' } },
-  { key: 'pot', nameAr: 'حلة جرانيت', name: 'Granite pot', q: { msa: 'قدر طبخ', dialect: 'حله', franco: '7alla', en: 'cooking pot' } },
-  { key: 'mug', nameAr: 'مج سيراميك', name: 'Ceramic mug', q: { msa: 'كوب سيراميك', dialect: 'مج', franco: 'mug', en: 'coffee mug' } },
-  { key: 'blanket', nameAr: 'بطانية شتوي', name: 'Winter blanket', q: { msa: 'غطاء سرير', dialect: 'بطانيه', franco: 'bataneya', en: 'blanket' } },
-  { key: 'bedsheet', nameAr: 'ملاية سرير قطن', name: 'Cotton bed sheet', q: { msa: 'شرشف سرير', dialect: 'ملايه', franco: 'malaya', en: 'bed sheet' } },
-  { key: 'curtain', nameAr: 'ستارة بلاك أوت', name: 'Blackout curtain', q: { msa: 'ستارة', dialect: 'ستاره', franco: 'setara', en: 'curtain' } },
-  { key: 'stroller', nameAr: 'عربية أطفال', name: 'Baby stroller', q: { msa: 'عربة أطفال', dialect: 'عربيه بيبي', franco: '3arabeyet baby', en: 'stroller' } },
-  { key: 'diapers', nameAr: 'حفاضات مقاس ٤', name: 'Diapers size 4', q: { msa: 'حفاضات', dialect: 'بامبرز مقاس 4', franco: 'pampers', en: 'diapers' } },
-  { key: 'toycar', nameAr: 'عربية ريموت للأطفال', name: 'Remote control car', q: { msa: 'سيارة لعبة', dialect: 'عربيه ريموت', franco: '3arabeya remote', en: 'rc car' } },
-  { key: 'notebook', nameAr: 'كشكول ١٠٠ ورقة', name: '100-page notebook', q: { msa: 'دفتر', dialect: 'كشكول', franco: 'koshkol', en: 'notebook' } },
+  {
+    key: 'abaya',
+    nameAr: 'عباية كريب سوداء',
+    name: 'Black crepe abaya',
+    q: { msa: 'عباءة سوداء', dialect: 'عبايه سودا', franco: '3abaya soda', en: 'black abaya' },
+  },
+  {
+    key: 'sneakers',
+    nameAr: 'حذاء رياضي رجالي',
+    name: "Men's sport shoes",
+    q: { msa: 'حذاء رياضي', dialect: 'كوتشي رجالي', franco: 'kotshy', en: 'sneakers men' },
+  },
+  {
+    key: 'boots',
+    nameAr: 'بوت جلد حريمي',
+    name: "Women's leather boots",
+    q: { msa: 'حذاء طويل جلد', dialect: 'بوت جلد حريمي', franco: 'boot geld', en: 'leather boots' },
+  },
+  {
+    key: 'slippers',
+    nameAr: 'شبشب منزلي',
+    name: 'House slippers',
+    q: { msa: 'نعال منزلي', dialect: 'شبشب بيتي', franco: 'shebsheb', en: 'slippers' },
+  },
+  {
+    key: 'handbag',
+    nameAr: 'حقيبة يد جلد',
+    name: 'Leather handbag',
+    q: { msa: 'حقيبة يد', dialect: 'شنطه ايد', franco: 'shanta', en: 'handbag' },
+  },
+  {
+    key: 'backpack',
+    nameAr: 'حقيبة ظهر مدرسية',
+    name: 'School backpack',
+    q: { msa: 'حقيبة ظهر', dialect: 'شنطه مدرسه', franco: 'shantet madrasa', en: 'school bag' },
+  },
+  {
+    key: 'galabeya',
+    nameAr: 'جلابية قطن رجالي',
+    name: "Men's cotton galabeya",
+    q: { msa: 'جلباب رجالي', dialect: 'جلابيه قطن', franco: 'galabeya', en: 'galabiya' },
+  },
+  {
+    key: 'isdal',
+    nameAr: 'إسدال صلاة',
+    name: 'Prayer isdal',
+    q: { msa: 'ثوب صلاة', dialect: 'اسدال صلاه', franco: 'esdal', en: 'prayer dress' },
+  },
+  {
+    key: 'hijab',
+    nameAr: 'طرحة شيفون',
+    name: 'Chiffon hijab',
+    q: { msa: 'حجاب شيفون', dialect: 'طرحه شيفون', franco: 'tar7a', en: 'hijab' },
+  },
+  {
+    key: 'tshirt',
+    nameAr: 'تيشيرت قطن بيزك',
+    name: 'Basic cotton t-shirt',
+    q: { msa: 'قميص قطني قصير', dialect: 'تيشرت', franco: 'tshirt', en: 't-shirt' },
+  },
+  {
+    key: 'jeans',
+    nameAr: 'بنطلون جينز سليم',
+    name: 'Slim jeans',
+    q: { msa: 'سروال جينز', dialect: 'بنطلون جينز', franco: 'bantalon jeans', en: 'jeans' },
+  },
+  {
+    key: 'pajama',
+    nameAr: 'بيجامة شتوي',
+    name: 'Winter pajamas',
+    q: { msa: 'ملابس نوم شتوية', dialect: 'بيجامه شتوي', franco: 'bejama', en: 'pajamas' },
+  },
+  {
+    key: 'socks',
+    nameAr: 'شراب قطن',
+    name: 'Cotton socks',
+    q: { msa: 'جوارب قطن', dialect: 'شراب', franco: 'shrab', en: 'socks' },
+  },
+  {
+    key: 'underwear',
+    nameAr: 'طقم داخلي رجالي',
+    name: "Men's underwear set",
+    q: { msa: 'ملابس داخلية', dialect: 'هدوم داخليه', franco: 'hdoom dakhleya', en: 'underwear' },
+  },
+  {
+    key: 'perfume',
+    nameAr: 'برفان عود',
+    name: 'Oud perfume',
+    q: { msa: 'عطر عود', dialect: 'برفيوم عود', franco: 'parfan 3od', en: 'oud perfume' },
+  },
+  {
+    key: 'bakhoor',
+    nameAr: 'بخور معطر',
+    name: 'Scented incense',
+    q: { msa: 'بخور', dialect: 'بخور للبيت', franco: 'bo5oor', en: 'incense' },
+  },
+  {
+    key: 'lipstick',
+    nameAr: 'روج مات',
+    name: 'Matte lipstick',
+    q: { msa: 'أحمر شفاه', dialect: 'روج', franco: 'rouge', en: 'lipstick' },
+  },
+  {
+    key: 'kohl',
+    nameAr: 'كحل عيون أسود',
+    name: 'Black kohl eyeliner',
+    q: { msa: 'كحل', dialect: 'كحل اسود', franco: 'ko7l', en: 'eyeliner' },
+  },
+  {
+    key: 'shampoo',
+    nameAr: 'شامبو للشعر الجاف',
+    name: 'Shampoo for dry hair',
+    q: {
+      msa: 'منظف شعر',
+      dialect: 'شامبو شعر ناشف',
+      franco: 'shampoo sha3r',
+      en: 'dry hair shampoo',
+    },
+  },
+  {
+    key: 'moisturizer',
+    nameAr: 'كريم مرطب للوجه',
+    name: 'Face moisturizer',
+    q: { msa: 'مرطب بشرة', dialect: 'كريم للوش', franco: 'kreem lel wesh', en: 'moisturizer' },
+  },
+  {
+    key: 'koshari',
+    nameAr: 'كشري مصري',
+    name: 'Egyptian koshari',
+    q: { msa: 'طبق كشري', dialect: 'كشري', franco: 'koshary', en: 'koshari' },
+  },
+  {
+    key: 'pasta',
+    nameAr: 'مكرونة إسباجتي',
+    name: 'Spaghetti pasta',
+    q: { msa: 'معكرونة', dialect: 'مكرونه', franco: 'makarona', en: 'spaghetti' },
+  },
+  {
+    key: 'rice',
+    nameAr: 'أرز مصري',
+    name: 'Egyptian rice',
+    q: { msa: 'أرز', dialect: 'رز', franco: 'roz', en: 'rice' },
+  },
+  {
+    key: 'foul',
+    nameAr: 'فول مدمس',
+    name: 'Fava beans',
+    q: { msa: 'فول', dialect: 'فول مدمس', franco: 'fool', en: 'fava beans' },
+  },
+  {
+    key: 'taameya',
+    nameAr: 'طعمية مجمدة',
+    name: 'Frozen falafel',
+    q: { msa: 'فلافل', dialect: 'طعميه', franco: 'ta3meya', en: 'falafel' },
+  },
+  {
+    key: 'feteer',
+    nameAr: 'فطير مشلتت',
+    name: 'Feteer meshaltet',
+    q: { msa: 'فطيرة', dialect: 'فطير', franco: 'feteer', en: 'layered pastry' },
+  },
+  {
+    key: 'kunafa',
+    nameAr: 'كنافة بالقشطة',
+    name: 'Kunafa with cream',
+    q: { msa: 'كنافة', dialect: 'كنافه بالقشطه', franco: 'konafa', en: 'kunafa' },
+  },
+  {
+    key: 'basbousa',
+    nameAr: 'بسبوسة بالمكسرات',
+    name: 'Basbousa with nuts',
+    q: { msa: 'حلوى السميد', dialect: 'بسبوسه', franco: 'basbosa', en: 'semolina cake' },
+  },
+  {
+    key: 'dates',
+    nameAr: 'تمر سيوي',
+    name: 'Siwa dates',
+    q: { msa: 'تمور', dialect: 'بلح', franco: 'bala7', en: 'dates' },
+  },
+  {
+    key: 'tea',
+    nameAr: 'شاي أسود ناعم',
+    name: 'Fine black tea',
+    q: { msa: 'شاي', dialect: 'شاي كشري', franco: 'shay', en: 'black tea' },
+  },
+  {
+    key: 'coffee',
+    nameAr: 'بن محوج',
+    name: 'Spiced ground coffee',
+    q: { msa: 'قهوة مطحونة', dialect: 'بن محوج', franco: 'bon', en: 'ground coffee' },
+  },
+  {
+    key: 'honey',
+    nameAr: 'عسل نحل طبيعي',
+    name: 'Natural bee honey',
+    q: { msa: 'عسل', dialect: 'عسل نحل', franco: '3asal', en: 'honey' },
+  },
+  {
+    key: 'phonecase',
+    nameAr: 'جراب موبايل سيليكون',
+    name: 'Silicone phone case',
+    q: { msa: 'غطاء هاتف', dialect: 'جراب موبايل', franco: 'grab mobile', en: 'phone case' },
+  },
+  {
+    key: 'charger',
+    nameAr: 'شاحن سريع ٢٠ وات',
+    name: '20W fast charger',
+    q: { msa: 'شاحن هاتف', dialect: 'شاحن سريع 20', franco: 'sha7en', en: 'fast charger' },
+  },
+  {
+    key: 'earbuds',
+    nameAr: 'سماعة بلوتوث',
+    name: 'Bluetooth earbuds',
+    q: { msa: 'سماعات لاسلكية', dialect: 'سماعه بلوتوث', franco: 'sama3a', en: 'earbuds' },
+  },
+  {
+    key: 'powerbank',
+    nameAr: 'باور بانك ١٠٠٠٠',
+    name: 'Power bank 10000',
+    q: { msa: 'بطارية متنقلة', dialect: 'باور بانك', franco: 'power bank', en: 'portable battery' },
+  },
+  {
+    key: 'watch',
+    nameAr: 'ساعة يد رجالي',
+    name: "Men's wristwatch",
+    q: { msa: 'ساعة', dialect: 'ساعه ايد', franco: 'sa3a', en: 'watch' },
+  },
+  {
+    key: 'ring',
+    nameAr: 'خاتم فضة',
+    name: 'Silver ring',
+    q: { msa: 'خاتم فضي', dialect: 'دبله فضه', franco: '5atem', en: 'silver ring' },
+  },
+  {
+    key: 'necklace',
+    nameAr: 'سلسلة ذهب عيار ٢١',
+    name: '21k gold necklace',
+    q: { msa: 'قلادة ذهب', dialect: 'سلسله دهب', franco: 'selsela dahab', en: 'gold necklace' },
+  },
+  {
+    key: 'kettle',
+    nameAr: 'غلاية كهربائية',
+    name: 'Electric kettle',
+    q: { msa: 'غلاية ماء', dialect: 'كاتل', franco: 'kettle', en: 'kettle' },
+  },
+  {
+    key: 'blender',
+    nameAr: 'خلاط كهربائي',
+    name: 'Electric blender',
+    q: { msa: 'خلاط', dialect: 'خلاط عصير', franco: '5alat', en: 'blender' },
+  },
+  {
+    key: 'pot',
+    nameAr: 'حلة جرانيت',
+    name: 'Granite pot',
+    q: { msa: 'قدر طبخ', dialect: 'حله', franco: '7alla', en: 'cooking pot' },
+  },
+  {
+    key: 'mug',
+    nameAr: 'مج سيراميك',
+    name: 'Ceramic mug',
+    q: { msa: 'كوب سيراميك', dialect: 'مج', franco: 'mug', en: 'coffee mug' },
+  },
+  {
+    key: 'blanket',
+    nameAr: 'بطانية شتوي',
+    name: 'Winter blanket',
+    q: { msa: 'غطاء سرير', dialect: 'بطانيه', franco: 'bataneya', en: 'blanket' },
+  },
+  {
+    key: 'bedsheet',
+    nameAr: 'ملاية سرير قطن',
+    name: 'Cotton bed sheet',
+    q: { msa: 'شرشف سرير', dialect: 'ملايه', franco: 'malaya', en: 'bed sheet' },
+  },
+  {
+    key: 'curtain',
+    nameAr: 'ستارة بلاك أوت',
+    name: 'Blackout curtain',
+    q: { msa: 'ستارة', dialect: 'ستاره', franco: 'setara', en: 'curtain' },
+  },
+  {
+    key: 'stroller',
+    nameAr: 'عربية أطفال',
+    name: 'Baby stroller',
+    q: { msa: 'عربة أطفال', dialect: 'عربيه بيبي', franco: '3arabeyet baby', en: 'stroller' },
+  },
+  {
+    key: 'diapers',
+    nameAr: 'حفاضات مقاس ٤',
+    name: 'Diapers size 4',
+    q: { msa: 'حفاضات', dialect: 'بامبرز مقاس 4', franco: 'pampers', en: 'diapers' },
+  },
+  {
+    key: 'toycar',
+    nameAr: 'عربية ريموت للأطفال',
+    name: 'Remote control car',
+    q: { msa: 'سيارة لعبة', dialect: 'عربيه ريموت', franco: '3arabeya remote', en: 'rc car' },
+  },
+  {
+    key: 'notebook',
+    nameAr: 'كشكول ١٠٠ ورقة',
+    name: '100-page notebook',
+    q: { msa: 'دفتر', dialect: 'كشكول', franco: 'koshkol', en: 'notebook' },
+  },
 ] as const;
 ```
 
@@ -2444,47 +2990,98 @@ it('200 queries, unique keys', () => {
 import { prisma, runInStoreScope, runInTenantContext } from '@ebda/database';
 import { EVAL_PRODUCTS } from './catalogue';
 
-export const recallAt = (r: string[], t: string, k: number): 0 | 1 => (r.slice(0, k).includes(t) ? 1 : 0);
-export const reciprocalRank = (r: string[], t: string) => { const i = r.indexOf(t); return i < 0 ? 0 : 1 / (i + 1); };
+export const recallAt = (r: string[], t: string, k: number): 0 | 1 =>
+  r.slice(0, k).includes(t) ? 1 : 0;
+export const reciprocalRank = (r: string[], t: string) => {
+  const i = r.indexOf(t);
+  return i < 0 ? 0 : 1 / (i + 1);
+};
 
 async function main() {
-  const { searchProductIds, rankedSearch } = await import('../../apps/api/src/services/product-search.service');
+  const { searchProductIds, rankedSearch } =
+    await import('../../apps/api/src/services/product-search.service');
   const { indexStore } = await import('../../apps/api/src/services/product-index.service');
   const run = Date.now().toString(36);
-  const owner = await prisma.user.create({ data: { email: `eval-${run}@t.local`, role: 'store_admin' } });
-  const store = await prisma.store.create({ data: { name: 'eval', slug: `eval-${run}`, ownerId: owner.id } });
+  const owner = await prisma.user.create({
+    data: { email: `eval-${run}@t.local`, role: 'store_admin' },
+  });
+  const store = await prisma.store.create({
+    data: { name: 'eval', slug: `eval-${run}`, ownerId: owner.id },
+  });
   const idOf: Record<string, string> = {};
   for (const p of EVAL_PRODUCTS) {
-    idOf[p.key] = (await prisma.product.create({ data: { storeId: store.id, slug: `${p.key}-${run}`,
-      name: p.name, nameAr: p.nameAr, price: 1000, status: 'active' } })).id;
+    idOf[p.key] = (
+      await prisma.product.create({
+        data: {
+          storeId: store.id,
+          slug: `${p.key}-${run}`,
+          name: p.name,
+          nameAr: p.nameAr,
+          price: 1000,
+          status: 'active',
+        },
+      })
+    ).id;
   }
-  while ((await runInStoreScope(store.id, () => indexStore(store.id, { maxDocs: 100 }))).remaining) { /* drain */ }
+  while (
+    (await runInStoreScope(store.id, () => indexStore(store.id, { maxDocs: 100 }))).remaining
+  ) {
+    /* drain */
+  }
 
   const forms = ['msa', 'dialect', 'franco', 'en'] as const;
   const score: Record<string, { lexR: number; hyR: number; hyMrr: number; n: number }> = {};
   for (const f of forms) score[f] = { lexR: 0, hyR: 0, hyMrr: 0, n: 0 };
-  for (const p of EVAL_PRODUCTS) for (const f of forms) {
-    const target = idOf[p.key];
-    const lex = await runInTenantContext(store.id, () => searchProductIds(store.id, p.q[f], { scope: 'storefront', limit: 50 }));
-    const hy = await runInTenantContext(store.id, () => rankedSearch(store.id, p.q[f]));
-    const s = score[f]; s.n++; s.lexR += recallAt(lex, target, 10); s.hyR += recallAt(hy, target, 10); s.hyMrr += reciprocalRank(hy, target);
-  }
-  let overallR = 0, overallMrr = 0, ok = true;
+  for (const p of EVAL_PRODUCTS)
+    for (const f of forms) {
+      const target = idOf[p.key];
+      const lex = await runInTenantContext(store.id, () =>
+        searchProductIds(store.id, p.q[f], { scope: 'storefront', limit: 50 })
+      );
+      const hy = await runInTenantContext(store.id, () => rankedSearch(store.id, p.q[f]));
+      const s = score[f];
+      s.n++;
+      s.lexR += recallAt(lex, target, 10);
+      s.hyR += recallAt(hy, target, 10);
+      s.hyMrr += reciprocalRank(hy, target);
+    }
+  let overallR = 0,
+    overallMrr = 0,
+    ok = true;
   for (const f of forms) {
-    const s = score[f]; const lex = s.lexR / s.n, hy = s.hyR / s.n, mrr = s.hyMrr / s.n;
-    overallR += hy / 4; overallMrr += mrr / 4;
-    console.log(`${f.padEnd(8)} lexical@10=${lex.toFixed(2)} hybrid@10=${hy.toFixed(2)} MRR=${mrr.toFixed(2)}`);
+    const s = score[f];
+    const lex = s.lexR / s.n,
+      hy = s.hyR / s.n,
+      mrr = s.hyMrr / s.n;
+    overallR += hy / 4;
+    overallMrr += mrr / 4;
+    console.log(
+      `${f.padEnd(8)} lexical@10=${lex.toFixed(2)} hybrid@10=${hy.toFixed(2)} MRR=${mrr.toFixed(2)}`
+    );
     if ((f === 'dialect' || f === 'franco') && hy < 0.8) ok = false;
     if ((f === 'msa' || f === 'en') && hy - lex < -0.02) ok = false;
   }
-  const lift = (score.dialect.hyR + score.franco.hyR - score.dialect.lexR - score.franco.lexR) / (score.dialect.n + score.franco.n);
-  console.log(`overall hybrid@10=${overallR.toFixed(2)} MRR=${overallMrr.toFixed(2)} dialect+franco lift=${lift.toFixed(2)}`);
+  const lift =
+    (score.dialect.hyR + score.franco.hyR - score.dialect.lexR - score.franco.lexR) /
+    (score.dialect.n + score.franco.n);
+  console.log(
+    `overall hybrid@10=${overallR.toFixed(2)} MRR=${overallMrr.toFixed(2)} dialect+franco lift=${lift.toFixed(2)}`
+  );
   if (overallR < 0.9 || overallMrr < 0.7) ok = false;
-  if (lift < 0.15) { console.log('SEMANTIC NOT EARNING ITS COST: keep SEARCH_SEMANTIC_ENABLED off (Ruling SEARCH-10)'); ok = false; }
+  if (lift < 0.15) {
+    console.log(
+      'SEMANTIC NOT EARNING ITS COST: keep SEARCH_SEMANTIC_ENABLED off (Ruling SEARCH-10)'
+    );
+    ok = false;
+  }
   await prisma.store.delete({ where: { id: store.id } });
   process.exit(ok ? 0 : 1);
 }
-if (process.argv[1]?.endsWith('run.ts')) main().catch(e => { console.error(e); process.exit(2); });
+if (process.argv[1]?.endsWith('run.ts'))
+  main().catch(e => {
+    console.error(e);
+    process.exit(2);
+  });
 ```
 
 The products are seeded WITHOUT search terms on purpose: the eval measures the raw model. Then do a second run with AI search terms filled (Task 8 generator on all 50; costs about 50 Gemini calls, under the bulk quota). Report both tables in PR 4. Tune `SEARCH_VECTOR_MAX_DISTANCE` (try 0.45/0.55/0.65) on the first run and record the winner in `docs/ENVIRONMENT.md` and Ruling SEARCH-10.
@@ -2510,6 +3107,7 @@ EOF
 ## Task 14: Load test: storefront search p95 < 500 ms
 
 **Files:**
+
 - Create: `loadtests/scenarios/storefront-search.js`
 - Modify: `loadtests/README.md` (one section)
 
@@ -2523,12 +3121,40 @@ EOF
 import http from 'k6/http';
 import { check } from 'k6';
 
-const TERMS = ['احذيه', 'عبايه سودا', '3abaya', 'كوتشي', 'شنطه', 'مكرونه', 'phone case', 'سماعه بلوتوث',
-  'بيجامه', 'روج', 'كشكول', 'بطانيه', 'جراب موبايل', 'ساعه', 'برفيوم', 'تيشرت', 'jeans', 'رز', 'بلح', 'كنافه'];
+const TERMS = [
+  'احذيه',
+  'عبايه سودا',
+  '3abaya',
+  'كوتشي',
+  'شنطه',
+  'مكرونه',
+  'phone case',
+  'سماعه بلوتوث',
+  'بيجامه',
+  'روج',
+  'كشكول',
+  'بطانيه',
+  'جراب موبايل',
+  'ساعه',
+  'برفيوم',
+  'تيشرت',
+  'jeans',
+  'رز',
+  'بلح',
+  'كنافه',
+];
 
 export const options = {
-  scenarios: { search: { executor: 'constant-arrival-rate', rate: 30, timeUnit: '1s', duration: '2m',
-    preAllocatedVUs: 40, maxVUs: 120 } },
+  scenarios: {
+    search: {
+      executor: 'constant-arrival-rate',
+      rate: 30,
+      timeUnit: '1s',
+      duration: '2m',
+      preAllocatedVUs: 40,
+      maxVUs: 120,
+    },
+  },
   thresholds: {
     'http_req_duration{kind:search}': ['p(95)<500'],
     'http_req_duration{kind:suggest}': ['p(95)<300'],
@@ -2537,16 +3163,22 @@ export const options = {
 };
 
 export default function () {
-  const term = TERMS[Math.floor(Math.random() * TERMS.length)] + (Math.random() < 0.5 ? '' : ` ${__ITER % 97}`);
+  const term =
+    TERMS[Math.floor(Math.random() * TERMS.length)] +
+    (Math.random() < 0.5 ? '' : ` ${__ITER % 97}`);
   const base = __ENV.BASE_URL;
   const store = __ENV.STORE_ID;
   if (Math.random() < 0.7) {
-    const r = http.get(`${base}/public/products?search=${encodeURIComponent(term)}`,
-      { headers: { 'x-store-id': store }, tags: { kind: 'search' } });
+    const r = http.get(`${base}/public/products?search=${encodeURIComponent(term)}`, {
+      headers: { 'x-store-id': store },
+      tags: { kind: 'search' },
+    });
     check(r, { 'search 200': x => x.status === 200 });
   } else {
-    const r = http.get(`${base}/public/${store}/search/suggest?q=${encodeURIComponent(term.slice(0, 4))}`,
-      { tags: { kind: 'suggest' } });
+    const r = http.get(
+      `${base}/public/${store}/search/suggest?q=${encodeURIComponent(term.slice(0, 4))}`,
+      { tags: { kind: 'suggest' } }
+    );
     check(r, { 'suggest 200': x => x.status === 200 });
   }
 }
@@ -2581,12 +3213,14 @@ EOF
 ## Task 15: Phone + name normalisation in SQL with expression indexes
 
 **Files:**
+
 - Create: `packages/shared/src/search/phone-search.ts` (+ export) and `packages/shared/src/search/__tests__/phone-search.test.ts`
 - Create: `packages/database/prisma/migrations/20261020000100_admin_search_norm/migration.sql` + `rollback.sql`
 - Modify: `docs/DB-INDEX-MIGRATIONS.md` (drift list)
 - Test: `tests/integration/admin-search-norm.test.ts`
 
 **Interfaces:**
+
 - Produces: `phoneSearchDigits(q: string): string | null` (Latin digits only after folding; strips a leading `0020`/`+20`/`20`/`0` when ≥ 9 digits remain; null when fewer than 4 digits). SQL: `public.ebda_digits(text) → text` (Arabic-Indic and Persian → Latin, every non-digit dropped). Indexes: `users_phone_digits_trgm_idx` on `public.ebda_digits(phone)`, `users_name_norm_trgm_idx` on `public.ebda_ar_norm(coalesce(first_name,'') || ' ' || coalesce(last_name,''))`, `orders_guest_phone_digits_trgm_idx` on `public.ebda_digits(shipping_address ->> 'phone') WHERE customer_id IS NULL`, `orders_guest_name_norm_trgm_idx` on `public.ebda_ar_norm(coalesce(shipping_address->>'firstName','') || ' ' || coalesce(shipping_address->>'lastName','')) WHERE customer_id IS NULL`.
 
 - [ ] **Step 1: Failing unit test**
@@ -2596,8 +3230,14 @@ EOF
 import { it, expect } from 'vitest';
 import { phoneSearchDigits } from '../phone-search';
 it.each([
-  ['01012345678', '1012345678'], ['+20 101 234 5678', '1012345678'], ['00201012345678', '1012345678'],
-  ['٠١٠١٢٣٤٥٦٧٨', '1012345678'], ['010-1234', '0101234'], ['5678', '5678'], ['12', null], ['احمد', null],
+  ['01012345678', '1012345678'],
+  ['+20 101 234 5678', '1012345678'],
+  ['00201012345678', '1012345678'],
+  ['٠١٠١٢٣٤٥٦٧٨', '1012345678'],
+  ['010-1234', '0101234'],
+  ['5678', '5678'],
+  ['12', null],
+  ['احمد', null],
 ])('%j -> %j', (q, out) => expect(phoneSearchDigits(q)).toBe(out));
 ```
 
@@ -2664,12 +3304,14 @@ EOF
 ## Task 16: Customers search in SQL (list, export, typeahead)
 
 **Files:**
+
 - Create: `apps/api/src/services/admin-search.service.ts`
 - Modify: `apps/api/src/services/customer-aggregate.service.ts` (`aggregateCustomersUncached(storeId, scope?)`, new `aggregateCustomersMatching(storeId, search)`)
 - Modify: `apps/api/src/routes/customers.routes.ts:67-100` (`applyCustomerListFilters` loses its in-memory search; the list and export call `aggregateCustomersMatching` when `search` is set), `:605-700` (`/customers/search` uses the service; fixes the unescaped LIKE)
 - Test: `tests/integration/customers-search-sql.test.ts`
 
 **Interfaces:**
+
 - Consumes: `phoneSearchDigits`, `searchTokens`, `escapeLike`, SQL from Task 15
 - Produces:
   - `matchingCustomers(storeId: string, q: string): Promise<{ userIds: string[]; guestOrderIds: string[]; truncated: boolean }>`. Registered users = users with an order in this store OR `users.store_id = storeId` whose normalised name contains every token, or whose email ILIKE (escaped), or whose digits contain `phoneSearchDigits(q)`. Guests = orders with `customer_id IS NULL` in this store, matched on the shipping_address name/email/phone. Caps: 1000 users, 20000 guest orders.
@@ -2685,13 +3327,19 @@ it.each([
   ['٠١٠١٢٣٤٥٦٧٨', 'same, Arabic-Indic digits'],
   ['منى', 'guest منى (shipping_address only)'],
   ['01123456789', 'guest phone stored as "0112 345 6789" (legacy, unnormalised)'],
-])('%s finds %s', async (q, _label) => { /* assert the expected customer key is in the result */ });
+])('%s finds %s', async (q, _label) => {
+  /* assert the expected customer key is in the result */
+});
 it('a customer beyond the 20k aggregation cap is still found', async () => {
   // seed 1 matching order older than 20,001 non-matching orders (bulk insert via createMany in a
   // per-call store); aggregateCustomersMatching must return it, the old in-memory filter could not.
 });
-it('"%" matches nothing (escaped)', async () => { /* /customers/search?q=%25 → [] */ });
-it('staff cannot filter by segment (403 unchanged)', async () => { /* regression on applyCustomerListFilters */ });
+it('"%" matches nothing (escaped)', async () => {
+  /* /customers/search?q=%25 → [] */
+});
+it('staff cannot filter by segment (403 unchanged)', async () => {
+  /* regression on applyCustomerListFilters */
+});
 ```
 
 Write each case fully, with the seeds inline, following `tests/integration/order-search-guest-contact.test.ts` (per-call `run` id, `finally` cleanup). The `/* … */` bodies above say what each case asserts; the implementer writes the full code in this step, and none may be left as a comment.
@@ -2715,9 +3363,17 @@ export async function matchingCustomers(storeId: string, q: string) {
   if (tokens.length === 0 && !digits) return { userIds: [], guestOrderIds: [], truncated: false };
 
   const nameU = tokens.length
-    ? Prisma.sql`(${Prisma.join(tokens.map(t => Prisma.sql`public.ebda_ar_norm(coalesce(u.first_name,'') || ' ' || coalesce(u.last_name,'')) LIKE ${`%${escapeLike(t)}%`}`), ' AND ')})`
+    ? Prisma.sql`(${Prisma.join(
+        tokens.map(
+          t =>
+            Prisma.sql`public.ebda_ar_norm(coalesce(u.first_name,'') || ' ' || coalesce(u.last_name,'')) LIKE ${`%${escapeLike(t)}%`}`
+        ),
+        ' AND '
+      )})`
     : Prisma.sql`false`;
-  const phoneU = digits ? Prisma.sql`public.ebda_digits(u.phone) LIKE ${`%${digits}%`}` : Prisma.sql`false`;
+  const phoneU = digits
+    ? Prisma.sql`public.ebda_digits(u.phone) LIKE ${`%${digits}%`}`
+    : Prisma.sql`false`;
   const emailU = email ? Prisma.sql`lower(u.email) LIKE ${email}` : Prisma.sql`false`;
   const users = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT u.id FROM users u
@@ -2726,10 +3382,20 @@ export async function matchingCustomers(storeId: string, q: string) {
     LIMIT ${CUSTOMER_MATCH_USER_CAP + 1}`;
 
   const nameG = tokens.length
-    ? Prisma.sql`(${Prisma.join(tokens.map(t => Prisma.sql`public.ebda_ar_norm(coalesce(o.shipping_address->>'firstName','') || ' ' || coalesce(o.shipping_address->>'lastName','')) LIKE ${`%${escapeLike(t)}%`}`), ' AND ')})`
+    ? Prisma.sql`(${Prisma.join(
+        tokens.map(
+          t =>
+            Prisma.sql`public.ebda_ar_norm(coalesce(o.shipping_address->>'firstName','') || ' ' || coalesce(o.shipping_address->>'lastName','')) LIKE ${`%${escapeLike(t)}%`}`
+        ),
+        ' AND '
+      )})`
     : Prisma.sql`false`;
-  const phoneG = digits ? Prisma.sql`public.ebda_digits(o.shipping_address->>'phone') LIKE ${`%${digits}%`}` : Prisma.sql`false`;
-  const emailG = email ? Prisma.sql`lower(o.shipping_address->>'email') LIKE ${email}` : Prisma.sql`false`;
+  const phoneG = digits
+    ? Prisma.sql`public.ebda_digits(o.shipping_address->>'phone') LIKE ${`%${digits}%`}`
+    : Prisma.sql`false`;
+  const emailG = email
+    ? Prisma.sql`lower(o.shipping_address->>'email') LIKE ${email}`
+    : Prisma.sql`false`;
   const guests = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT o.id FROM orders o
     WHERE o.store_id = ${storeId} AND o.customer_id IS NULL AND o.deleted_at IS NULL
@@ -2739,7 +3405,8 @@ export async function matchingCustomers(storeId: string, q: string) {
   return {
     userIds: users.slice(0, CUSTOMER_MATCH_USER_CAP).map(r => r.id),
     guestOrderIds: guests.slice(0, CUSTOMER_MATCH_GUEST_ORDER_CAP).map(r => r.id),
-    truncated: users.length > CUSTOMER_MATCH_USER_CAP || guests.length > CUSTOMER_MATCH_GUEST_ORDER_CAP,
+    truncated:
+      users.length > CUSTOMER_MATCH_USER_CAP || guests.length > CUSTOMER_MATCH_GUEST_ORDER_CAP,
   };
 }
 ```
@@ -2782,10 +3449,12 @@ EOF
 ## Task 17: Orders search: number, phone in any form, Arabic names
 
 **Files:**
+
 - Modify: `apps/api/src/services/order.service.ts:201-300` (the two-step `orderSearchWhere` / `guestOrderIdsMatching`)
 - Test: extend `tests/integration/order-search-indexes.test.ts` and `tests/integration/order-search-guest-contact.test.ts`
 
 **Interfaces:**
+
 - Consumes: `matchingCustomers` (Task 16)
 - Produces: unchanged `OrderListWhere.search` contract. The customer-id step uses `matchingCustomers(storeId, term).userIds` (normalised name + digit phone + email). The guest step uses `.guestOrderIds`. The order-number arm stays `order_number ILIKE` with an escaped pattern, plus a digits-only arm when the term is ≥ 4 digits (`#١٢٣٤` finds `EB-1234`).
 
@@ -2816,6 +3485,7 @@ EOF
 ## Task 18: ⌘K palette: products, orders, customers
 
 **Files:**
+
 - Create: `apps/api/src/routes/admin-search.routes.ts` (`GET /stores/:storeId/search?q=`), mounted with `tenantContext` like the other `/stores` routers
 - Create: `packages/shared/src/search/admin-search.ts` (`AdminSearchResponse`)
 - Modify: `apps/admin/src/components/CommandPalette.tsx` (debounced record search below the navigation items)
@@ -2823,6 +3493,7 @@ EOF
 - Test: `tests/integration/admin-search-route.test.ts`, `apps/admin/src/components/__tests__/CommandPalette.records.test.tsx`
 
 **Interfaces:**
+
 - Produces: `AdminSearchResponse = { products: Array<{ id: string; name: string; nameAr: string | null; sku: string | null }>; orders: Array<{ id: string; orderNumber: string; customerName: string; total: number }>; customers: Array<{ key: string; name: string; phone: string; isGuest: boolean }> }`, 5 of each. Route chain: `authenticate → authorize('store_admin','super_admin','staff') → requireStoreAccess`. Staff see products and orders; customers only if staff may read `/customers`, which matches `customers.routes.ts` `adminMiddleware` (it includes `staff`).
 
 - [ ] **Step 1: Failing route test:** `q='احذيه'` returns the product; `q='0101 234 5678'` returns the customer and their order; a query shorter than 2 chars returns three empty arrays; another store's records never come back. The test builds the app with this router and the auth mocks copied from an existing `tests/integration/*-route*.test.ts`.
@@ -2843,11 +3514,17 @@ import { matchingCustomers } from '../services/admin-search.service';
 import { OrderService } from '../services/order.service';
 
 const router = Router();
-router.get('/:storeId/search', authenticate, authorize('store_admin', 'super_admin', 'staff'), requireStoreAccess,
+router.get(
+  '/:storeId/search',
+  authenticate,
+  authorize('store_admin', 'super_admin', 'staff'),
+  requireStoreAccess,
   async (req, res, next) => {
     try {
       const storeId = req.params.storeId;
-      const q = String(req.query.q ?? '').trim().slice(0, 100);
+      const q = String(req.query.q ?? '')
+        .trim()
+        .slice(0, 100);
       const empty: AdminSearchResponse = { products: [], orders: [], customers: [] };
       if (q.length < 2) return void res.json({ success: true, data: empty });
       const [productIds, cust, orders] = await Promise.all([
@@ -2856,25 +3533,42 @@ router.get('/:storeId/search', authenticate, authorize('store_admin', 'super_adm
         OrderService.list(storeId, { search: q, page: 1, limit: 5 }),
       ]);
       const [products, users] = await Promise.all([
-        prisma.product.findMany({ where: { storeId, id: { in: productIds } }, select: { id: true, name: true, nameAr: true, sku: true } }),
-        prisma.user.findMany({ where: { id: { in: cust.userIds.slice(0, 5) } }, select: { id: true, firstName: true, lastName: true, phone: true } }),
+        prisma.product.findMany({
+          where: { storeId, id: { in: productIds } },
+          select: { id: true, name: true, nameAr: true, sku: true },
+        }),
+        prisma.user.findMany({
+          where: { id: { in: cust.userIds.slice(0, 5) } },
+          select: { id: true, firstName: true, lastName: true, phone: true },
+        }),
       ]);
       const data: AdminSearchResponse = {
         products: productIds.map(id => products.find(p => p.id === id)!).filter(Boolean),
-        orders: orders.orders.map(o => ({ id: o.id, orderNumber: o.orderNumber,
-          customerName: [o.customer?.firstName, o.customer?.lastName].filter(Boolean).join(' '), total: o.total })),
-        customers: users.map(u => ({ key: u.id, name: [u.firstName, u.lastName].filter(Boolean).join(' '),
-          phone: u.phone ?? '', isGuest: false })),
+        orders: orders.orders.map(o => ({
+          id: o.id,
+          orderNumber: o.orderNumber,
+          customerName: [o.customer?.firstName, o.customer?.lastName].filter(Boolean).join(' '),
+          total: o.total,
+        })),
+        customers: users.map(u => ({
+          key: u.id,
+          name: [u.firstName, u.lastName].filter(Boolean).join(' '),
+          phone: u.phone ?? '',
+          isGuest: false,
+        })),
       };
       res.json({ success: true, data });
-    } catch (err) { next(err); }
-  });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 export default router;
 ```
 
 Read `OrderService.list`'s real signature and return field names (`grep -n "static async list" -A15 apps/api/src/services/order.service.ts`) and match them exactly; the `orders.orders`, `customer`, `total` names above must be replaced 1:1. The `prisma.user.findMany` by id runs under the request's tenant context. If the RLS check in Task 16 showed that `users` is not readable that way, fetch the 5 customers through `orders` the way Task 16 settled it, and reuse that helper rather than duplicating it.
 
-- [ ] **Step 3: Palette.** Add state `records: AdminSearchResponse | null` and an effect that, 200 ms after `query` changes and if `query.trim().length >= 2`, calls `apiGet<AdminSearchResponse>(\`/api/v1/stores/${storeId}/search?q=${encodeURIComponent(query)}\`)`. `storeId` comes from `useParams()` (the palette mounts inside store routes; when there is no `id` param, skip the effect). Abort stale requests with an `AbortController` whose `signal` goes to `apiGet` (check that `lib/api.ts` accepts `init`; if not, keep a request counter and drop out-of-order replies). Render three groups under the navigation list, headed `t('products')`, `t('orders')` and `t('customers')`, and wire them into the same keyboard `active` index. On Enter or click, navigate to `/stores/${storeId}/products/${id}/edit`, `/stores/${storeId}/orders/${id}` and `/stores/${storeId}/customers/${encodeURIComponent(key)}`. Check that each route exists with `ls apps/admin/src/app/stores/[id]/{products/[productId]/edit,orders,customers}`. While loading show `t('searching')`, and with zero records show `t('noRecords')`. i18n ar: `منتجات` / `طلبات` / `عملاء` / `بيدور…` / `مفيش نتايج`.
+- [ ] **Step 3: Palette.** Add state `records: AdminSearchResponse | null` and an effect that, 200 ms after `query` changes and if `query.trim().length >= 2`, calls `apiGet<AdminSearchResponse>(\`/api/v1/stores/${storeId}/search?q=${encodeURIComponent(query)}\`)`. `storeId`comes from`useParams()`(the palette mounts inside store routes; when there is no`id`param, skip the effect). Abort stale requests with an`AbortController`whose`signal`goes to`apiGet`(check that`lib/api.ts`accepts`init`; if not, keep a request counter and drop out-of-order replies). Render three groups under the navigation list, headed `t('products')`, `t('orders')`and`t('customers')`, and wire them into the same keyboard `active`index. On Enter or click, navigate to`/stores/${storeId}/products/${id}/edit`, `/stores/${storeId}/orders/${id}`and`/stores/${storeId}/customers/${encodeURIComponent(key)}`. Check that each route exists with `ls apps/admin/src/app/stores/[id]/{products/[productId]/edit,orders,customers}`. While loading show `t('searching')`, and with zero records show `t('noRecords')`. i18n ar: `منتجات`/`طلبات`/`عملاء`/`بيدور…`/`مفيش نتايج`.
 
 Component test: mock `apiGet`, type `احمد`, advance timers 200 ms, and assert that the customer row renders and that ArrowDown + Enter calls `router.push` with the customer URL.
 
@@ -2906,11 +3600,13 @@ EOF
 ## Task 19: Catalogue import tables
 
 **Files:**
+
 - Create: `packages/database/prisma/migrations/20261021000100_catalog_import/migration.sql`
 - Modify: `packages/database/prisma/schema.prisma` (`CatalogImportJob`, `CatalogImportItem`, back-relations on `Store`)
 - Test: `tests/integration/catalog-import-schema.test.ts`
 
 **Interfaces:**
+
 - Produces: `CatalogImportJob { id, storeId, status: 'queued'|'processing'|'review'|'failed'|'done', sourceUrls Json (string[]), pageCount Int, itemCount Int, error String?, createdBy String?, createdAt, updatedAt }`; `CatalogImportItem { id, jobId, storeId, page Int, name String, nameAr String?, description String?, descriptionAr String?, price Int? (piastres), sku String?, confidence Float, status: 'pending'|'accepted'|'rejected'|'created', productId String?, createdAt, updatedAt }`. FKs: job→store CASCADE, item→job CASCADE, item→store CASCADE, item.productId→products SET NULL. Both tables get the strict RLS policy.
 - Viewer: Task 21 review screen + the jobs list on the Bulk page.
 
@@ -2933,6 +3629,7 @@ EOF
 ## Task 20: Upload + Gemini vision extraction on Inngest
 
 **Files:**
+
 - Create: `apps/api/src/services/catalog-import.service.ts`
 - Create: `apps/api/src/lib/inngest/functions/catalog-import-extract.ts` (register in `functions/index.ts`)
 - Create: `apps/api/src/routes/catalog-import.routes.ts` (mount under `/stores` with `tenantContext`)
@@ -2940,6 +3637,7 @@ EOF
 - Test: `tests/unit/catalog-import-extract.test.ts`, `tests/integration/catalog-import-route.test.ts`
 
 **Interfaces:**
+
 - Produces: `POST /api/v1/stores/:storeId/catalog-import` (multipart `files[]`, ≤ 10 files, each ≤ 10 MB, `image/jpeg|png|webp|application/pdf`) → 202 `{ jobId }`; `GET /api/v1/stores/:storeId/catalog-import` (last 20 jobs); `GET …/:jobId` (job + items); `extractCatalogPage({ storeId, mimeType, base64 }): Promise<ExtractedItem[]>`, where `ExtractedItem = { name: string; nameAr: string | null; description: string | null; descriptionAr: string | null; priceEgp: number | null; sku: string | null; confidence: number }`; event `catalog-import/extract` `{ storeId, jobId }`.
 - Caps: env `CATALOG_IMPORT_DAILY_JOBS_PER_STORE` (default 5) is checked in the route (counts today's jobs; 429 above it). Every Gemini call goes through `assertAiQuota({ storeId, bulk: true })`. At most 30 pages per job (PDF pages are read by Gemini natively as `application/pdf`, so one call per file, capped by the `pageCount` estimate `≤ 30`).
 
@@ -2979,6 +3677,7 @@ EOF
 ## Task 21: Review screen → create draft products
 
 **Files:**
+
 - Modify: `apps/api/src/routes/catalog-import.routes.ts` (+ `PATCH …/:jobId/items/:itemId`, `POST …/:jobId/create-drafts`)
 - Modify: `apps/admin/src/app/stores/[id]/bulk/_components/BulkTabs.tsx` (tab "من صور أو PDF" / "From photos or PDF") + new `_components/CatalogImportPanel.tsx` (upload + job list)
 - Create: `apps/admin/src/app/stores/[id]/bulk/catalog-import/[jobId]/page.tsx` (review table)
@@ -2986,6 +3685,7 @@ EOF
 - Test: `tests/integration/catalog-import-create-drafts.test.ts`, `apps/admin/src/app/stores/[id]/bulk/catalog-import/[jobId]/page.test.tsx`
 
 **Interfaces:**
+
 - Produces: `PATCH` body `{ name?, nameAr?, description?, descriptionAr?, price?: number | null, sku?, status?: 'accepted'|'rejected' }` (Zod; `price` in piastres). `POST create-drafts` creates a product with `ProductService.create(storeId, { name, nameAr, description, descriptionAr, price: price ?? 0, sku, status: 'draft' })` for each `accepted` item whose `productId` is null. It sets the item to `created` + `productId` and returns `{ created: number }`. Because it goes through `ProductService.create`, it fires `product.upserted` → autofill (translation, search terms) + search indexing for free.
 
 - [ ] **Step 1: Failing test.**
@@ -3015,11 +3715,13 @@ EOF
 ## Task 22: Offline head-to-head: Gemini vision vs Baidu Unlimited-OCR (optional evaluation, never runtime)
 
 **Files:**
+
 - Create: `scripts/eval/catalog-ocr-head-to-head.ts`
 - Create: `scripts/eval/catalog-ocr-pages/README.md` (where to put the 10 pages + the hand-written truth file; the pages themselves are NOT committed: they are merchant material)
 - Create: `tests/unit/no-eval-scripts-in-runtime.test.ts`
 
 **Interfaces:**
+
 - Input: `scripts/eval/catalog-ocr-pages/*.{jpg,png,pdf}` (10 real Arabic catalogue pages Ahmad provides, **STOP-6**) and `truth.json`, which maps each file to `[{ name, priceEgp }]` and is hand-written by Ahmad or the implementer from the page.
 - Output: a table per page and overall: item recall (name match after `normalizeArabicSearch` + Levenshtein ≤ 2), price accuracy (exact), and wall time. Gemini goes through `extractCatalogPage`. Unlimited-OCR goes through `UNLIMITED_OCR_URL` (an HF Space or Baidu Cloud endpoint Ahmad picks) whose markdown output is turned into items by the SAME Gemini text-only structuring call, so only the OCR stage differs. Results go to `scripts/eval/catalog-ocr-results-<date>.md`, to be summarised in Ruling SEARCH-14.
 
@@ -3030,7 +3732,10 @@ EOF
 import { execSync } from 'node:child_process';
 import { it, expect } from 'vitest';
 it('apps never import scripts/eval or reference UNLIMITED_OCR_URL', () => {
-  const out = execSync(`grep -rlE "scripts/eval|UNLIMITED_OCR_URL" apps packages --include=*.ts --include=*.tsx || true`, { encoding: 'utf8' });
+  const out = execSync(
+    `grep -rlE "scripts/eval|UNLIMITED_OCR_URL" apps packages --include=*.ts --include=*.tsx || true`,
+    { encoding: 'utf8' }
+  );
   expect(out.trim()).toBe('');
 });
 ```
@@ -3062,19 +3767,19 @@ EOF
 
 ## STOP points (Ahmad only; the implementer stops and reports the unblock condition)
 
-| ID | When | What Ahmad does | Unblock evidence |
-|---|---|---|---|
-| STOP-1 | Before deploying PR 1 | Run the two `CREATE INDEX CONCURRENTLY` (and the functions + `ADD COLUMN`) from migration `20261018000100`'s header on production `DIRECT_URL`; check `NOT indisvalid` = 0 rows | psql output pasted in the PR |
-| STOP-2 | Before deploying PR 3 | Read-only `SELECT name, default_version, installed_version FROM pg_available_extensions WHERE name='vector'` on production; need ≥ 0.7 (halfvec). The migration then creates it during `cf-api-deploy.yml` | Query output in the PR |
-| STOP-3 | Before deploying PR 3 | Accept Workers AI billing on the Ebda Cloudflare account (bge-m3 $0.0118/M input tokens; free daily neurons first) and dispatch `cf-api-deploy.yml` with the `ai` binding | `wrangler deployments list --name ebda-api` + the dashboard showing the binding |
-| STOP-3b | After Task 13's bar is met on the eval + backfill done | Set `SEARCH_SEMANTIC_ENABLED=true` on `ebda-api` (wrangler var) | `/health` + one Arabic search returning a semantic-only hit |
-| STOP-4 | Before the first production backfill (autofill sweep filling `searchTerms` for every product = Gemini bulk quota; the indexer embedding every product = Workers AI) | Approve the run window and the caps (`SEARCH_EMBED_STORE_DAILY_CAP`, `AI_DAILY_REQUEST_CAP` interactive reserve) | A written go in the PR; then the searches page shows "N of M" climbing |
-| STOP-5 | Before deploying PR 5 | Pre-build the 4 `users`/`orders` expression indexes CONCURRENTLY on `DIRECT_URL`, off-peak; check none INVALID | psql output in the PR |
-| STOP-6 | For Task 22 | Provide 10 real Arabic catalogue pages (with the merchant's consent) + pick the Unlimited-OCR endpoint (HF Space or Baidu Cloud) and its key | Files present locally, not committed |
+| ID      | When                                                                                                                                                                | What Ahmad does                                                                                                                                                                                            | Unblock evidence                                                                |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| STOP-1  | Before deploying PR 1                                                                                                                                               | Run the two `CREATE INDEX CONCURRENTLY` (and the functions + `ADD COLUMN`) from migration `20261018000100`'s header on production `DIRECT_URL`; check `NOT indisvalid` = 0 rows                            | psql output pasted in the PR                                                    |
+| STOP-2  | Before deploying PR 3                                                                                                                                               | Read-only `SELECT name, default_version, installed_version FROM pg_available_extensions WHERE name='vector'` on production; need ≥ 0.7 (halfvec). The migration then creates it during `cf-api-deploy.yml` | Query output in the PR                                                          |
+| STOP-3  | Before deploying PR 3                                                                                                                                               | Accept Workers AI billing on the Ebda Cloudflare account (bge-m3 $0.0118/M input tokens; free daily neurons first) and dispatch `cf-api-deploy.yml` with the `ai` binding                                  | `wrangler deployments list --name ebda-api` + the dashboard showing the binding |
+| STOP-3b | After Task 13's bar is met on the eval + backfill done                                                                                                              | Set `SEARCH_SEMANTIC_ENABLED=true` on `ebda-api` (wrangler var)                                                                                                                                            | `/health` + one Arabic search returning a semantic-only hit                     |
+| STOP-4  | Before the first production backfill (autofill sweep filling `searchTerms` for every product = Gemini bulk quota; the indexer embedding every product = Workers AI) | Approve the run window and the caps (`SEARCH_EMBED_STORE_DAILY_CAP`, `AI_DAILY_REQUEST_CAP` interactive reserve)                                                                                           | A written go in the PR; then the searches page shows "N of M" climbing          |
+| STOP-5  | Before deploying PR 5                                                                                                                                               | Pre-build the 4 `users`/`orders` expression indexes CONCURRENTLY on `DIRECT_URL`, off-peak; check none INVALID                                                                                             | psql output in the PR                                                           |
+| STOP-6  | For Task 22                                                                                                                                                         | Provide 10 real Arabic catalogue pages (with the merchant's consent) + pick the Unlimited-OCR endpoint (HF Space or Baidu Cloud) and its key                                                               | Files present locally, not committed                                            |
 
 ## Rulings + assumptions (append to `docs/RULINGS.md` in the PR that implements them)
 
-- **Ruling SEARCH-1:** Lexical search runs on trigram GIN *expression* indexes over an IMMUTABLE normaliser, not a generated column. Evidence: Prisma would read a generated column on every product select, and P1 would need a table rewrite to change it, whereas an expression index adds nothing to row payloads. Cost if wrong: every query must repeat the exact function call to hit the index; a hand-written variant silently seq-scans (pinned by the EXPLAIN test in Task 2).
+- **Ruling SEARCH-1:** Lexical search runs on trigram GIN _expression_ indexes over an IMMUTABLE normaliser, not a generated column. Evidence: Prisma would read a generated column on every product select, and P1 would need a table rewrite to change it, whereas an expression index adds nothing to row payloads. Cost if wrong: every query must repeat the exact function call to hit the index; a hand-written variant silently seq-scans (pinned by the EXPLAIN test in Task 2).
 - **Ruling SEARCH-2:** The fold uses no Unicode `normalize()` and no locale lowercasing (ASCII A-Z only), in both TS and SQL. Evidence: neither is reproducible as an IMMUTABLE Postgres function, so they would break parity. Cost if wrong: uppercase accented Latin (É) and presentation-form Arabic ligatures are not folded; both are rare in Egyptian queries.
 - **Ruling SEARCH-3:** `products.search_terms` ships in P0 as a manual field, before AI fills it. Evidence: it fixes the doc functions' signature, so P1 needs no index rebuild, and merchants can add "3abaya" from day one. Cost if wrong: an empty column on most rows until P1, which costs nothing.
 - **Ruling SEARCH-4:** The search log stores a normalised term + counts per Cairo day, with no identity; phone/email/ID-shaped terms are dropped; retention is 90 days. Evidence: what merchants need is "what wasn't found", not who searched. Cost if wrong: no per-session funnel analysis (out of scope).
@@ -3090,6 +3795,7 @@ EOF
 - **Ruling SEARCH-14:** Unlimited-OCR is evaluated offline only and never enters runtime. Evidence: it needs a CUDA GPU host (a second runtime and ops surface), and Gemini vision already runs on Inngest. Cost if wrong: if it clearly beats Gemini on long Arabic PDFs, a GPU path is a separate decision with its own plan.
 
 **Assumptions labelled:**
+
 - [m] Everything in "Verified facts".
 - [i] Per-store catalogues are under 20k products. The query embed adds about 30-80 ms. Logging every list search is fine because Worker responses are not CDN-cached (Task 5 Step 7 measures it).
 - [g] The cost of AI search terms (≈ one Flash Lite call per product per content change); Task 8 Step 6 and STOP-4 bound it.
