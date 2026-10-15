@@ -40,9 +40,15 @@ export function geminiKeyCount(): number {
   return getGeminiKeys().length;
 }
 
-// key value -> epoch ms until which it is skipped. Keyed by value (not index) so
-// a re-ordered list keeps its memory; the value itself is never logged.
+// bench id -> epoch ms until which it is skipped. Keyed by key VALUE (not index) so
+// a re-ordered list keeps its memory; the value itself is never logged. A scoped call
+// (e.g. Google Search grounding, which has its own quota) benches `<scope>\0<key>`
+// only, so its 429 never benches the key for plain calls.
 const exhaustedUntil = new Map<string, number>();
+
+function benchId(key: string, scope?: string): string {
+  return scope ? `${scope}\u0000${key}` : key;
+}
 
 export function resetGeminiKeyState(): void {
   exhaustedUntil.clear();
@@ -86,10 +92,13 @@ export function cooldownFor(err: unknown, now: number): number {
  * Run `fn` with each usable key in order until one does not hit a quota error.
  * Non-quota errors propagate immediately (a 400 on key 1 is a 400 on key 2).
  * When every key is benched, throws a 429-shaped error without calling Google.
+ * `benchScope` isolates the bench for calls with a separate quota (search grounding):
+ * a quota error there benches only that scope, never the key for unscoped calls.
  */
 export async function withGeminiFailover<T>(
   fn: (apiKey: string, keyIndex: number) => Promise<T>,
-  firstKey?: string
+  firstKey?: string,
+  opts?: { benchScope?: string }
 ): Promise<T> {
   const keys = getGeminiKeys(firstKey);
   if (keys.length === 0) {
@@ -99,10 +108,11 @@ export async function withGeminiFailover<T>(
   let tried = 0;
   for (let i = 0; i < keys.length; i++) {
     const now = Date.now();
-    const until = exhaustedUntil.get(keys[i]);
+    const id = benchId(keys[i], opts?.benchScope);
+    const until = exhaustedUntil.get(id);
     if (until !== undefined) {
       if (until > now) continue;
-      exhaustedUntil.delete(keys[i]);
+      exhaustedUntil.delete(id);
     }
     tried++;
     try {
@@ -110,12 +120,18 @@ export async function withGeminiFailover<T>(
     } catch (err) {
       if (!isGeminiQuotaError(err)) throw err;
       lastErr = err;
-      exhaustedUntil.set(keys[i], cooldownFor(err, now));
-      logger.warn({ keyIndex: i, keyCount: keys.length }, 'gemini key hit quota, failing over');
+      exhaustedUntil.set(id, cooldownFor(err, now));
+      logger.warn(
+        { keyIndex: i, keyCount: keys.length, scope: opts?.benchScope },
+        'gemini key hit quota, failing over'
+      );
     }
   }
   if (tried === 0) {
-    logger.warn({ keyCount: keys.length }, 'all gemini keys benched, not calling Google');
+    logger.warn(
+      { keyCount: keys.length, scope: opts?.benchScope },
+      'all gemini keys benched, not calling Google'
+    );
     throw Object.assign(new Error('all Gemini keys are rate limited (RESOURCE_EXHAUSTED)'), {
       status: 429,
     });
