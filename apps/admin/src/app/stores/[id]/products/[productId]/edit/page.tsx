@@ -963,10 +963,7 @@ export default function EditProductPage() {
                         {formatPrice(regularFils)}
                       </span>{' '}
                       <span className="ml-1 text-sm font-medium text-success-ink">
-                        {tFields('discountOff').replace(
-                          '{pct}',
-                          pctOff.toFixed(1).replace(/\.0$/, '')
-                        )}
+                        {tFields('discountOff', { pct: pctOff.toFixed(1).replace(/\.0$/, '') })}
                       </span>
                     </p>
                   </div>

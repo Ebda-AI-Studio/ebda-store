@@ -20,12 +20,14 @@ function* sources(dir: string): Generator<string> {
 }
 
 describe('admin i18n placeholders', () => {
-  it("no t('key').replace('{var}', ...) in the admin app", () => {
+  it("no <translator>('key').replace('{var}', ...) in the admin app", () => {
     const offenders: string[] = [];
     for (const file of sources(ROOT)) {
       const src = readFileSync(file, 'utf8');
+      // ANY translator name (t, tFields, tc, tCommon, ...), with or without a values arg:
+      // the callee is an identifier called with a string key, then `.replace('{var}'`.
       for (const m of src.matchAll(
-        /\bt\(\s*['"][\w.]+['"]\s*\)\s*\.replace\(\s*['"]\{\w+\}['"]/g
+        /\b\w+\(\s*['"][\w.]+['"]\s*(?:,[^()]*)?\)\s*\.replace\(\s*['"]\{\w+\}['"]/g
       )) {
         offenders.push(`${path.relative(ROOT, file)}:${src.slice(0, m.index).split('\n').length}`);
       }
