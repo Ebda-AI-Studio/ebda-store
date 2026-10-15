@@ -126,4 +126,37 @@ describe('policy updates page', () => {
     expect((await screen.findByText(/^stuck:/)).textContent).toContain('"n":"2"');
     expect(screen.getByText(/deliveries:/).textContent).not.toContain('sending');
   });
+
+  it('shows a distinct message when the withdrawal failed, and a no-run line for a send with no recipients yet', async () => {
+    apiGet.mockResolvedValue({
+      data: { policies: [row('terms', true)] },
+      error: null,
+    });
+    apiPost.mockResolvedValue({
+      data: null,
+      error: { status: 502, code: 'WITHDRAW_FAILED', message: 'x' },
+    });
+    render(<PolicyUpdatesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'sendNotice' }));
+    fireEvent.click(screen.getByRole('button', { name: 'confirmSend' }));
+    expect(await screen.findByText('sendUncertain')).toBeTruthy();
+    expect(screen.queryByText('sendFailed')).toBeNull();
+  });
+
+  it('labels a send whose recipients were never materialised', async () => {
+    apiGet.mockResolvedValue({
+      data: {
+        policies: [
+          row('terms', true, {
+            sentAt: '2026-10-21T10:00:00.000Z',
+            sentBy: 'u',
+            recipientCount: null,
+          }),
+        ],
+      },
+      error: null,
+    });
+    render(<PolicyUpdatesPage />);
+    expect(await screen.findByText('noRun')).toBeTruthy();
+  });
 });

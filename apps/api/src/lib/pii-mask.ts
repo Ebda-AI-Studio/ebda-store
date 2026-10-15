@@ -40,6 +40,11 @@ export function maskEmail(email: string | null | undefined): string | null {
   return `${email.slice(0, 1)}***${email.slice(at)}`;
 }
 
+/** Every email-shaped substring in free text replaced by its masked form (provider error text). */
+export function scrubEmails(text: string): string {
+  return text.replace(/[^\s@<>"',;()]+@[^\s@<>"',;()]+/g, m => maskEmail(m) ?? '***');
+}
+
 /**
  * A recipient field that may be one address or a list (`EmailOptions.to`).
  * Each address is masked with `maskEmail`. Empty/nullish input returns null.

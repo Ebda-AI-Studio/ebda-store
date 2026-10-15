@@ -40,6 +40,7 @@ vi.mock('@ebda/database', () => ({
   asPlatformOperator: (_op: string, fn: () => unknown) => fn(),
   withUser: (_u: string, fn: (tx: unknown) => unknown) => fn({}),
   prisma: {
+    $queryRaw: async () => (h.sendRow ? [{ id: 'send-1' }] : []),
     legalNoticeSend: {
       findUnique: async () => (h.sendRow ? { id: 'send-1' } : null),
       update: async () => ({}),

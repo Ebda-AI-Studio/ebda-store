@@ -29,6 +29,9 @@ import {
 } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
 import { inngest } from '../lib/inngest/client';
+import { withdrawLegalNoticeSend } from '../lib/definer';
+import { maskEmail, scrubEmails } from '../lib/pii-mask';
+import { sendAlert } from './alerts.service';
 import { isP2002 } from '../lib/prisma-errors';
 import logger from '../lib/logger';
 import { awaitCampaignSendSlot } from '../lib/campaign-send-pacer';
@@ -246,30 +249,28 @@ export async function materializeDeliveries(
   docKey: string,
   version: string
 ): Promise<{ ok: true; recipientCount: number } | { ok: false; reason: string }> {
-  const send = await asPlatformOperator(operatorId, () =>
-    prisma.legalNoticeSend.findUnique({
-      where: { docKey_version: { docKey, version } },
-      select: { id: true },
-    })
-  );
-  if (!send) return { ok: false, reason: 'SEND_ROW_MISSING' };
   const userIds = await listNoticeRecipients(operatorId);
-  for (let i = 0; i < userIds.length; i += 500) {
-    const slice = userIds.slice(i, i + 500);
-    await asPlatformOperator(operatorId, () =>
-      prisma.legalNoticeDelivery.createMany({
-        data: slice.map(userId => ({ userId, docKey, version })),
+  // ONE transaction: lock the send row FIRST, then insert. The enqueue-failure withdrawal
+  // (ebda_withdraw_legal_notice_send) takes the same lock, so it either deletes the row before
+  // we get here (we abort, nobody is mailed) or waits for us and then sees our deliveries
+  // and refuses to delete.
+  return asPlatformOperator(operatorId, async () => {
+    const locked = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM public.legal_notice_sends
+       WHERE doc_key = ${docKey} AND version = ${version} FOR UPDATE`;
+    if (locked.length === 0) return { ok: false as const, reason: 'SEND_ROW_MISSING' };
+    for (let i = 0; i < userIds.length; i += 500) {
+      await prisma.legalNoticeDelivery.createMany({
+        data: userIds.slice(i, i + 500).map(userId => ({ userId, docKey, version })),
         skipDuplicates: true,
-      })
-    );
-  }
-  await asPlatformOperator(operatorId, () =>
-    prisma.legalNoticeSend.update({
+      });
+    }
+    await prisma.legalNoticeSend.update({
       where: { docKey_version: { docKey, version } },
       data: { recipientCount: userIds.length },
-    })
-  );
-  return { ok: true, recipientCount: userIds.length };
+    });
+    return { ok: true as const, recipientCount: userIds.length };
+  });
 }
 
 async function markDelivery(
@@ -356,8 +357,9 @@ export async function sendNextBatch(
         ...content,
       });
     } catch (err) {
-      error = String((err as Error)?.message ?? err).slice(0, ERROR_MAX);
-      logger.warn({ err, userId, docKey, version }, '[LEGAL-NOTICE] send failed');
+      error = scrubEmails(String((err as Error)?.message ?? err)).slice(0, ERROR_MAX);
+      // No raw recipient address in logs (the drain is off-platform): the scrubbed reason only.
+      logger.warn({ reason: error, userId, docKey, version }, '[LEGAL-NOTICE] send failed');
     }
     // Outside the try: if this mark throws, the step retries and the row stays `sending`
     // (never re-sent), instead of a delivered mail being recorded as failed.
@@ -396,13 +398,6 @@ export async function failQueuedDeliveries(
 
 /** Failed deliveries listed per version (the count above is exact; the list is capped). */
 export const FAILED_DELIVERIES_LIST_MAX = 100;
-
-/** `ahmad@example.com` -> `a***@example.com`: enough to recognise, never a full address. */
-export function maskEmail(email: string): string {
-  const at = email.lastIndexOf('@');
-  if (at <= 0) return '***';
-  return `${Array.from(email.slice(0, at))[0]}***${email.slice(at)}`;
-}
 
 export interface FailedDeliveryRow {
   maskedEmail: string;
@@ -462,8 +457,8 @@ export async function policyOverview(operatorId: string): Promise<LegalPolicyOve
           });
           const emailOf = new Map(users.map(u => [u.id, u.email]));
           failedDeliveries = failed.map(f => ({
-            maskedEmail: maskEmail(emailOf.get(f.userId) ?? ''),
-            error: f.error,
+            maskedEmail: maskEmail(emailOf.get(f.userId)) ?? '***',
+            error: f.error ? scrubEmails(f.error).slice(0, ERROR_MAX) : null,
             at: f.updatedAt.toISOString(),
           }));
         }
@@ -539,12 +534,40 @@ export async function requestNoticeSend(
       data: { docKey, version, sentBy: operatorId },
     });
   } catch (err) {
-    logger.error({ err, docKey, version }, '[LEGAL-NOTICE] enqueue failed, removing the send row');
-    // DELETE is revoked on this table; the definer function checks the operator is a super admin.
-    await asPlatformOperator(
-      operatorId,
-      () => prisma.$executeRaw`SELECT public.ebda_withdraw_legal_notice_send(${row.id})`
-    ).catch(e => logger.error({ err: e, docKey, version }, '[LEGAL-NOTICE] compensation failed'));
+    logger.error(
+      { err, docKey, version },
+      '[LEGAL-NOTICE] enqueue failed, withdrawing the send row'
+    );
+    let withdrawn = 0;
+    let withdrawError: unknown = null;
+    try {
+      withdrawn = await asPlatformOperator(operatorId, () => withdrawLegalNoticeSend(row.id));
+    } catch (e) {
+      withdrawError = e;
+    }
+    if (withdrawn !== 1) {
+      // The row stays announced (banner on) and the send may or may not have started: never
+      // tell the operator "nothing was sent".
+      logger.error(
+        { err: withdrawError, docKey, version, withdrawn },
+        '[LEGAL-NOTICE] could not withdraw the send row after an enqueue failure'
+      );
+      await sendAlert({
+        level: 'p1',
+        source: 'legal.notice.withdraw_failed',
+        title: 'Legal notice announced but its email run may not have started',
+        body:
+          `Enqueueing the ${docKey}@${version} notice failed and the send row could not be ` +
+          `withdrawn (${withdrawError ? 'withdraw errored' : "refused: deliveries already exist or the row is not the caller's fresh one"}). ` +
+          `Merchants may see the banner without an email run. Check the Policy updates page.`,
+        context: { docKey, version, withdrawn },
+      }).catch(() => undefined);
+      throw new AppError(
+        502,
+        'WITHDRAW_FAILED',
+        'The notice is recorded but its email run could not be confirmed. Check the Policy updates page before retrying.'
+      );
+    }
     throw new AppError(
       502,
       'ENQUEUE_FAILED',

@@ -10211,6 +10211,8 @@
     "sending": "Sending…",
     "sendStarted": "Notice sent. Emails are going out now.",
     "alreadySent": "A notice for this version was already sent.",
+    "sendUncertain": "The notice is recorded, but we could not confirm its emails started. Check this page before trying again.",
+    "noRun": "No email run recorded yet. If this stays so, the send did not start: check manually.",
     "sendFailed": "Could not start the send. Nothing was sent. Try again."
   }
 }

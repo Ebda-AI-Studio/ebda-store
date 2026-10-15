@@ -59,7 +59,13 @@ function PolicyUpdatesInner() {
     setSending(false);
     setConfirming(null);
     setMessage(
-      error ? (error.status === 409 ? t('alreadySent') : t('sendFailed')) : t('sendStarted')
+      !error
+        ? t('sendStarted')
+        : error.status === 409
+          ? t('alreadySent')
+          : error.code === 'WITHDRAW_FAILED'
+            ? t('sendUncertain')
+            : t('sendFailed')
     );
     await load();
   };
@@ -112,8 +118,11 @@ function PolicyUpdatesInner() {
                 })}
               </p>
             )}
+            {row.send && row.send.recipientCount === null && (
+              <p className="mt-1 text-xs text-destructive-ink">{t('noRun')}</p>
+            )}
             {row.send && row.deliveries.sending > 0 && (
-              <p role="alert" className="mt-1 text-xs text-destructive-ink">
+              <p className="mt-1 text-xs text-destructive-ink">
                 {t('stuck', { n: String(row.deliveries.sending) })}
               </p>
             )}
@@ -128,11 +137,11 @@ function PolicyUpdatesInner() {
                     })}
                   </p>
                 )}
-                <ul className="mt-1 space-y-1 text-xs" dir="ltr">
+                <ul className="mt-1 space-y-1 text-xs">
                   {row.failedDeliveries?.map((f, i) => (
                     <li key={`${f.maskedEmail}-${i}`}>
                       {t('failedRow', {
-                        email: f.maskedEmail,
+                        email: `\u2066${f.maskedEmail}\u2069`,
                         reason: f.error ?? '-',
                         time: `${f.at.slice(0, 16).replace('T', ' ')} UTC`,
                       })}

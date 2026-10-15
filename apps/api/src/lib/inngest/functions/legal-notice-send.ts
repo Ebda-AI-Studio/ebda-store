@@ -91,7 +91,10 @@ const legalNoticeSendFn = inngest.createFunction(
       const d = (event?.data?.event?.data ?? {}) as SendData;
       if (!d.docKey || !d.version || !d.sentBy) return;
       const n = await failQueuedDeliveries(d.sentBy, d.docKey, d.version, 'SEND_JOB_FAILED');
-      logger.error({ ...d, marked: n }, '[LEGAL-NOTICE] send job failed');
+      logger.error(
+        { docKey: d.docKey, version: d.version, sentBy: d.sentBy, marked: n },
+        '[LEGAL-NOTICE] send job failed'
+      );
     },
   },
   async ({ event, step }) =>

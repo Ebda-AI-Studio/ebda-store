@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import {
   createPrismaClient,
+  asPlatformOperator,
   prisma,
   runWithRequestDb,
   withUser,
@@ -20,7 +21,11 @@ import { inngest } from '@api/lib/inngest/client';
 import { adminLegalPolicyRoutes } from '@api/routes/legal-policy.routes';
 import { errorHandler } from '@api/middleware/error-handler';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
-import { __setLegalPoliciesForTests } from '@api/services/legal-notice.service';
+import { withdrawLegalNoticeSend } from '@api/lib/definer';
+import {
+  __setLegalPoliciesForTests,
+  materializeDeliveries,
+} from '@api/services/legal-notice.service';
 
 // The admin routes require MFA enrolment; the gate itself is covered elsewhere.
 vi.mock('@api/middleware/require-mfa', () => ({
@@ -71,6 +76,7 @@ describe.skipIf(!hasDb)('super-admin policy updates', () => {
   let app: Express;
   let op = '';
   let merchant = '';
+  let op2 = '';
   let send = vi.spyOn(inngest, 'send');
 
   const mkUser = async (tag: string, role: 'store_admin' | 'super_admin') =>
@@ -112,6 +118,7 @@ describe.skipIf(!hasDb)('super-admin policy updates', () => {
     app.use(errorHandler);
     op = await mkUser('op', 'super_admin');
     merchant = await mkUser('m', 'store_admin');
+    op2 = await mkUser('op2', 'super_admin');
   });
   beforeEach(async () => {
     await wipe();
@@ -120,7 +127,7 @@ describe.skipIf(!hasDb)('super-admin policy updates', () => {
   afterAll(async () => {
     await wipe();
     __setLegalPoliciesForTests(null);
-    await owner.user.deleteMany({ where: { id: { in: [op, merchant] } } });
+    await owner.user.deleteMany({ where: { id: { in: [op, op2, merchant] } } });
     await owner.$disconnect();
   });
 
@@ -219,19 +226,123 @@ describe.skipIf(!hasDb)('super-admin policy updates', () => {
     }
   });
 
-  it('the withdraw function (enqueue compensation) refuses anyone but an active super admin', async () => {
-    expect((await call('post', op, 'super_admin', sendUrl('terms', V))).status).toBe(202);
-    const row = await owner.legalNoticeSend.findFirstOrThrow({
-      where: { docKey: 'terms', version: V },
+  describe('ebda_withdraw_legal_notice_send (enqueue compensation)', () => {
+    const mkSend = async (sentBy: string) =>
+      (await owner.legalNoticeSend.create({ data: { docKey: 'terms', version: V, sentBy } })).id;
+    const withdraw = (actor: string, id: string) =>
+      asApp(() => asPlatformOperator(actor, () => withdrawLegalNoticeSend(id)));
+    const left = () => owner.legalNoticeSend.count({ where: { docKey: 'terms', version: V } });
+
+    it("deletes the caller's own fresh, untouched row and returns 1", async () => {
+      const id = await mkSend(op);
+      expect(await withdraw(op, id)).toBe(1);
+      expect(await left()).toBe(0);
     });
-    await expect(
-      asApp(() =>
-        withUser(
-          merchant,
-          () => prisma.$executeRaw`SELECT public.ebda_withdraw_legal_notice_send(${row.id})`
-        )
-      )
-    ).rejects.toThrow(/super_admin required/);
-    expect(await owner.legalNoticeSend.count({ where: { docKey: 'terms', version: V } })).toBe(1);
+
+    it('refuses a non-super-admin and a contextless call', async () => {
+      const id = await mkSend(op);
+      await expect(
+        asApp(() => withUser(merchant, () => withdrawLegalNoticeSend(id)))
+      ).rejects.toThrow(/super_admin required/);
+      await expect(asApp(() => withdrawLegalNoticeSend(id))).rejects.toThrow();
+      expect(await left()).toBe(1);
+    });
+
+    it('never withdraws a send that has deliveries', async () => {
+      const id = await mkSend(op);
+      await owner.legalNoticeDelivery.create({
+        data: { userId: merchant, docKey: 'terms', version: V },
+      });
+      try {
+        expect(await withdraw(op, id)).toBe(0);
+        expect(await left()).toBe(1);
+      } finally {
+        await owner.legalNoticeDelivery.deleteMany({ where: { docKey: 'terms', version: V } });
+      }
+    });
+
+    it('never withdraws a send that has materialised recipients', async () => {
+      const id = await mkSend(op);
+      await owner.legalNoticeSend.update({ where: { id }, data: { recipientCount: 3 } });
+      expect(await withdraw(op, id)).toBe(0);
+      expect(await left()).toBe(1);
+    });
+
+    it('another super admin cannot withdraw it', async () => {
+      const id = await mkSend(op);
+      expect(await withdraw(op2, id)).toBe(0);
+      expect(await left()).toBe(1);
+    });
+
+    it('an old row cannot be withdrawn', async () => {
+      const id = await mkSend(op);
+      await owner.$executeRaw`UPDATE legal_notice_sends SET sent_at = now() - interval '11 minutes' WHERE id = ${id}`;
+      expect(await withdraw(op, id)).toBe(0);
+      expect(await left()).toBe(1);
+    });
+  });
+
+  it('when the compensation is refused the answer is 502 WITHDRAW_FAILED and the row stays', async () => {
+    send.mockImplementationOnce((async () => {
+      // the fan-out had already started when the enqueue "failed"
+      await owner.legalNoticeDelivery.create({
+        data: { userId: merchant, docKey: 'terms', version: V },
+      });
+      throw new Error('timeout after accept');
+    }) as never);
+    try {
+      const res = await call('post', op, 'super_admin', sendUrl('terms', V));
+      expect(res.status).toBe(502);
+      expect(res.body.error.code).toBe('WITHDRAW_FAILED');
+      expect(await owner.legalNoticeSend.count({ where: { docKey: 'terms', version: V } })).toBe(1);
+    } finally {
+      await owner.legalNoticeDelivery.deleteMany({ where: { docKey: 'terms', version: V } });
+    }
+  });
+
+  it('materializeDeliveries aborts cleanly when the send row was withdrawn while it waited', async () => {
+    const id = (
+      await owner.legalNoticeSend.create({ data: { docKey: 'terms', version: V, sentBy: op } })
+    ).id;
+    let release: () => void = () => undefined;
+    const held = new Promise<void>(r => (release = r));
+    let locked: () => void = () => undefined;
+    const lockTaken = new Promise<void>(r => (locked = r));
+    const holder = owner.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM legal_notice_sends WHERE id = ${id} FOR UPDATE`;
+      locked();
+      await held;
+      await tx.$executeRaw`DELETE FROM legal_notice_sends WHERE id = ${id}`;
+    });
+    await lockTaken;
+    const mat = asApp(() => materializeDeliveries(op, 'terms', V));
+    await new Promise(r => setTimeout(r, 400));
+    release();
+    await holder;
+    expect(await mat).toEqual({ ok: false, reason: 'SEND_ROW_MISSING' });
+    expect(await owner.legalNoticeDelivery.count({ where: { docKey: 'terms', version: V } })).toBe(
+      0
+    );
+  });
+
+  it('the failed-deliveries list scrubs email addresses out of the provider text', async () => {
+    expect((await call('post', op, 'super_admin', sendUrl('terms', V))).status).toBe(202);
+    await owner.legalNoticeDelivery.create({
+      data: {
+        userId: merchant,
+        docKey: 'terms',
+        version: V,
+        status: 'failed',
+        error: 'Resend: mailbox full for jane.doe@gmail.com (550)',
+      },
+    });
+    try {
+      const res = await call('get', op, 'super_admin', '/api/v1/admin/legal-policies');
+      const body = JSON.stringify(res.body);
+      expect(body).not.toContain('jane.doe');
+      expect(body).toContain('j***@gmail.com');
+    } finally {
+      await owner.legalNoticeDelivery.deleteMany({ where: { docKey: 'terms', version: V } });
+    }
   });
 });
