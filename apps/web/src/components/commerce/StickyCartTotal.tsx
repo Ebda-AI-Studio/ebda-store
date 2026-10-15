@@ -13,7 +13,7 @@ import Link from 'next/link';
  * (UI rule 6) and reserves body space via `body[data-sticky-cart]`.
  */
 export function StickyCartTotal(p: {
-  /** The summary row the bar repeats ("Subtotal" while shipping is calculated at checkout). */
+  /** The summary row the bar repeats: its "Total" (after discounts; shipping is added at checkout). */
   totalLabel: string;
   total: string;
   itemCount: number;

@@ -1236,16 +1236,18 @@ export default function CartClient() {
         </div>
       </div>
       {/* Phone sticky total: same checkoutBlocked rule + message as the summary CTA, and the
-          summary's own Subtotal row (label, value AND money format: a themed OrderSummary prints
-          "2,980 EGP", the fallback summary formatPrice) while shipping is still to be calculated. */}
+          summary's own Total row (label, value AND money format: a themed OrderSummary prints
+          "2,980 EGP", the fallback summary formatPrice). That total is net of the promo discount
+          and carries no zone fee while shipping reads "calculated at checkout", so the bar never
+          quotes the pre-discount subtotal. */}
       <StickyCartTotal
-        totalLabel={t('Subtotal', 'المجموع الفرعي')}
+        totalLabel={t('Total', 'الإجمالي')}
         total={summaryMoneyFormatter(
           T?.OrderSummary,
           money,
           store.currency ?? REGION.currency,
           formatPrice
-        )(subtotal)}
+        )(total)}
         itemCount={cartCount}
         itemCountLabel={t(
           `${localize(cartCount)} ${cartCount === 1 ? 'item' : 'items'}`,

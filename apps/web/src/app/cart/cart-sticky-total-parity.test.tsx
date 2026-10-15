@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
  * F1: the cart's phone sticky bar must quote the SAME figure, label and money format as the
- * cart summary. While shipping reads "calculated at checkout", the bar repeats the summary's
- * Subtotal row, and the cart's total never already carries a zone fee.
+ * cart summary. The bar repeats the summary's Total row: net of the promo discount, and never
+ * already carrying a zone fee while shipping reads "calculated at checkout".
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import React from 'react';
@@ -60,6 +60,8 @@ afterEach(() => {
 });
 
 const SUBTOTAL = 298000;
+const DISCOUNT = 30000;
+const TOTAL = SUBTOTAL - DISCOUNT;
 const money = (m: number) => formatMoney(m, 'ar', { hideSymbol: true, numerals });
 
 describe.each([
@@ -69,7 +71,7 @@ describe.each([
   ['elegant', Elegant],
   ['bold', Bold],
   ['dahab', Dahab],
-] as const)('%s cart: sticky bar value == summary subtotal value', (_n, Summary) => {
+] as const)('%s cart: sticky bar value == summary total value (after discount)', (_n, Summary) => {
   for (const [l, n] of [
     ['ar', 'latn'],
     ['ar', 'arab'],
@@ -82,17 +84,18 @@ describe.each([
       const { container } = render(
         <Summary
           subtotal={SUBTOTAL}
+          discount={DISCOUNT}
           shipping={5000}
           shippingPending
-          total={SUBTOTAL}
+          total={TOTAL}
           currency="EGP"
           isRtl={l === 'ar'}
         />
       );
       render(
         <StickyCartTotal
-          totalLabel={l === 'ar' ? 'المجموع الفرعي' : 'Subtotal'}
-          total={summaryMoneyFormatter(Summary, money, 'EGP', fp)(SUBTOTAL)}
+          totalLabel={l === 'ar' ? 'الإجمالي' : 'Total'}
+          total={summaryMoneyFormatter(Summary, money, 'EGP', fp)(TOTAL)}
           itemCount={2}
           itemCountLabel="2"
           href="/checkout"
@@ -100,13 +103,14 @@ describe.each([
         />
       );
       const bar = screen.getByTestId('sticky-cart-total-value').textContent!;
-      // The summary prints this exact string as its Subtotal value.
+      const fmt = summaryMoneyFormatter(Summary, money, 'EGP', fp);
+      // The summary prints this exact string as its Total value.
       expect(container.textContent).toContain(bar);
-      expect(container.textContent).toContain(l === 'ar' ? 'المجموع الفرعي' : 'Subtotal');
-      // and never the subtotal plus the pending 50 EGP fee
-      expect(container.textContent).not.toContain(
-        summaryMoneyFormatter(Summary, money, 'EGP', fp)(SUBTOTAL + 5000)
-      );
+      expect(bar).toBe(fmt(TOTAL));
+      expect(container.textContent).toContain(l === 'ar' ? 'الإجمالي' : 'Total');
+      // never the pre-discount subtotal, and never the total plus the pending 50 EGP fee
+      expect(bar).not.toBe(fmt(SUBTOTAL));
+      expect(container.textContent).not.toContain(fmt(TOTAL + 5000));
     });
   }
 });
@@ -120,11 +124,11 @@ describe('CartClient wiring', () => {
     );
     expect(src).toMatch(/const CART_SHIPPING_PENDING = 0;/);
   });
-  it('the sticky bar repeats the summary Subtotal row in the summary money format', () => {
+  it('the sticky bar repeats the summary Total row (after discounts) in the summary money format', () => {
     const bar = src.slice(src.indexOf('<StickyCartTotal'));
-    expect(bar).toMatch(/totalLabel=\{t\('Subtotal', 'المجموع الفرعي'\)\}/);
+    expect(bar).toMatch(/totalLabel=\{t\('Total', 'الإجمالي'\)\}/);
     expect(bar).toMatch(
-      /summaryMoneyFormatter\(\s*T\?\.OrderSummary,\s*money,\s*store\.currency \?\? REGION\.currency,\s*formatPrice\s*\)\(subtotal\)/
+      /summaryMoneyFormatter\(\s*T\?\.OrderSummary,\s*money,\s*store\.currency \?\? REGION\.currency,\s*formatPrice\s*\)\(total\)/
     );
   });
 });
