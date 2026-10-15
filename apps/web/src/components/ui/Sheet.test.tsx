@@ -134,6 +134,27 @@ describe('Sheet', () => {
     expect(dialog().querySelectorAll('a, button').length).toBe(0);
   });
 
+  it('the browser closing the dialog itself still unlocks, returns focus and tells the owner', () => {
+    document.body.style.overflow = 'auto';
+    render(<Harness />);
+    const trigger = screen.getByRole('button', { name: 'فتح' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(document.body.style.overflow).toBe('hidden');
+    // Android back / a non-cancelable close watcher: the dialog closes natively,
+    // no Escape keydown, no owner click. The Harness never unmounts (cookie modal shape).
+    const d = dialog();
+    d.removeAttribute('open');
+    fireEvent(d, new Event('close'));
+    expect(document.body.style.overflow).toBe('auto');
+    expect(document.documentElement.style.overflow).toBe('');
+    expect(document.activeElement).toBe(trigger);
+    // The owner flipped to closed: a second open works as new.
+    fireEvent.click(trigger);
+    expect(dialog().hasAttribute('open')).toBe(true);
+    expect(document.body.style.overflow).toBe('hidden');
+  });
+
   it('uses showModal / close when the browser has them', () => {
     const showModal = vi.fn(function (this: HTMLDialogElement) {
       this.setAttribute('open', '');

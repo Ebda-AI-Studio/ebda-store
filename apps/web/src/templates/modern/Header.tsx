@@ -6,6 +6,7 @@ import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { Sheet } from '../../components/ui/Sheet';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 
@@ -294,47 +295,22 @@ export default function ModernHeader({
         </div>
       </header>
 
-      {/* Mobile Menu Overlay — item 5 (2026-07-12): shared enter/exit curve
-          (220ms in / 160ms out, motion-safe via motion-reduce:duration-0). */}
-      <div
-        className={`fixed inset-0 z-40 md:hidden transition-opacity ease-out motion-reduce:duration-0 ${isMenuOpen ? 'opacity-100 pointer-events-auto duration-[220ms]' : 'opacity-0 pointer-events-none duration-[160ms]'}`}
-        onClick={() => setIsMenuOpen(false)}
-        aria-hidden="true"
+      {/* Mobile menu drawer on the shared Sheet primitive (R-04 fix round): Escape,
+          backdrop tap, focus in / trap / return to the hamburger, scroll lock; a
+          closed drawer holds no tabbable links. */}
+      <Sheet
+        open={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        side="end"
+        dir={isRtl ? 'rtl' : 'ltr'}
+        title={t('Menu', 'القائمة')}
+        closeLabel={t('Close menu', 'إغلاق القائمة')}
+        className="md:hidden bg-background text-foreground"
+        headerClassName="border-b border-border !py-2"
+        titleClassName="font-semibold text-foreground"
+        closeClassName="text-muted-foreground hover:text-foreground hover:bg-muted"
+        bodyClassName=""
       >
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      </div>
-
-      {/* Mobile Menu Drawer — capped at 320px so on a 320px screen the
-          overlay still has a touch-target outside the panel for dismiss.
-          Item 5 (2026-07-12): same enter/exit curve as the overlay above. */}
-      <div
-        className={`fixed top-0 end-0 z-50 h-full w-[85vw] max-w-xs bg-background shadow-2xl md:hidden transition-transform ease-out motion-reduce:duration-0 overscroll-contain ${isMenuOpen ? 'translate-x-0 duration-[220ms]' : isRtl ? '-translate-x-full duration-[160ms]' : 'translate-x-full duration-[160ms]'}`}
-        aria-label={t('Navigation menu', 'قائمة التنقل')}
-      >
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <span className="font-semibold text-foreground">{isRtl ? 'القائمة' : 'Menu'}</span>
-          <button
-            type="button"
-            onClick={() => setIsMenuOpen(false)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted transition-colors duration-300 ease-out cursor-pointer"
-            aria-label={t('Close menu', 'إغلاق')}
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
         <nav className="p-4 flex flex-col gap-1" dir={isRtl ? 'rtl' : 'ltr'}>
           {navigation.map(item => (
             <Link
@@ -347,7 +323,7 @@ export default function ModernHeader({
             </Link>
           ))}
         </nav>
-      </div>
+      </Sheet>
     </>
   );
 }

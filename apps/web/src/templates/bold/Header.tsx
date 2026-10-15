@@ -7,6 +7,7 @@ import { StoreLogo } from '../shared/StoreLogo';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
+import { Sheet } from '../../components/ui/Sheet';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 
@@ -261,48 +262,22 @@ export default function BoldHeader({
         </div>
       </header>
 
-      {/* Mobile Menu Overlay — item 5 (2026-07-12): shared enter/exit curve
-          (220ms in / 160ms out, motion-safe via motion-reduce:duration-0). */}
-      <div
-        className={`fixed inset-0 z-40 md:hidden transition-opacity ease-out motion-reduce:duration-0 ${isMenuOpen ? 'opacity-100 pointer-events-auto duration-[220ms]' : 'opacity-0 pointer-events-none duration-[160ms]'}`}
-        onClick={() => setIsMenuOpen(false)}
-        aria-hidden="true"
+      {/* Mobile menu drawer on the shared Sheet primitive (R-04 fix round): Escape,
+          backdrop tap, focus in / trap / return to the hamburger, scroll lock; a
+          closed drawer holds no tabbable links. */}
+      <Sheet
+        open={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        side="end"
+        dir={isRtl ? 'rtl' : 'ltr'}
+        title={t('Menu', 'القائمة')}
+        closeLabel={t('Close menu', 'إغلاق القائمة')}
+        className="md:hidden bg-gray-950 text-white border-s border-white/10"
+        headerClassName="border-b border-white/10 !py-2"
+        titleClassName="font-black ui-caps-toggle tracking-wider text-white text-sm"
+        closeClassName="text-white/70 hover:text-white hover:bg-white/10"
+        bodyClassName=""
       >
-        <div className="absolute inset-0 bg-black/60" />
-      </div>
-
-      {/* Mobile Menu Drawer — capped at 320px so on a 320px screen the
-          overlay still has a touch-target outside the panel for dismiss.
-          Item 5 (2026-07-12): same enter/exit curve as the overlay above. */}
-      <div
-        className={`fixed top-0 end-0 z-50 h-full w-[85vw] max-w-xs bg-gray-950 border-s border-white/10 md:hidden transition-transform ease-out motion-reduce:duration-0 overscroll-contain ${isMenuOpen ? 'translate-x-0 duration-[220ms]' : isRtl ? '-translate-x-full duration-[160ms]' : 'translate-x-full duration-[160ms]'}`}
-        aria-label={t('Navigation menu', 'قائمة التنقل')}
-      >
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <span className="font-black ui-caps-toggle tracking-wider text-white text-sm">
-            {isRtl ? 'القائمة' : 'Menu'}
-          </span>
-          <button
-            onClick={() => setIsMenuOpen(false)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
-            aria-label={t('Close menu', 'إغلاق')}
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
         <nav className="p-4 flex flex-col gap-1" dir={isRtl ? 'rtl' : 'ltr'}>
           {navigation.map(item => (
             <Link
@@ -315,7 +290,7 @@ export default function BoldHeader({
             </Link>
           ))}
         </nav>
-      </div>
+      </Sheet>
     </>
   );
 }

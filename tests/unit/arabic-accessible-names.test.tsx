@@ -143,6 +143,29 @@ describe('R-05: no Latin-only accessible name on an Arabic page', () => {
     }
   );
 
+  it.each(['bold', 'modern'] as const)(
+    '%s header menu (R-04 fix round): a Sheet; closed holds no links, Escape returns focus',
+    async skin => {
+      const mod = await import(`../../apps/web/src/templates/${skin}/Header.tsx`);
+      const Header = mod.default;
+      const { container } = render(
+        <Header branding={branding} navigation={navigation} isRtl cartItemCount={0} urlPrefix="" />
+      );
+      const dialogEl = container.querySelector('dialog')!;
+      expect(dialogEl).not.toBeNull();
+      expect(dialogEl.querySelectorAll('a').length).toBe(0); // closed: nothing tabbable
+      const burger = container.querySelector('button[aria-expanded]') as HTMLButtonElement;
+      burger.focus();
+      fireEvent.click(burger);
+      expect(dialogEl.hasAttribute('open')).toBe(true);
+      expect(dialogEl.querySelectorAll('a').length).toBe(navigation.length);
+      expect(latinOnlyNames(dialogEl)).toEqual([]);
+      fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+      expect(dialogEl.hasAttribute('open')).toBe(false);
+      expect(document.activeElement).toBe(burger);
+    }
+  );
+
   it('bottom tab bar, menu drawer open', async () => {
     const { BottomTabBar } = await import('../../apps/web/src/templates/shared/BottomTabBar');
     render(<BottomTabBar navigation={navigation} />);

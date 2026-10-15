@@ -566,6 +566,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         onClose={() => setIsOpen(false)}
         side="bottom"
         id="products-filter-sheet"
+        focusClose
         title={t('Filters', 'فلاتر')}
         closeLabel={t('Close', 'إغلاق')}
         className="bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] lg:hidden"

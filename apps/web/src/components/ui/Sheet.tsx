@@ -53,6 +53,9 @@ export interface SheetProps {
   footerClassName?: string;
   /** The `::backdrop` scrim. */
   backdropClassName?: string;
+  /** Focus the close button on open instead of the first control in the body
+   *  (a sheet that opens on a form control would show a focus ring on it). */
+  focusClose?: boolean;
 }
 
 const FOCUSABLE =
@@ -60,12 +63,12 @@ const FOCUSABLE =
 
 const SIDE_CLASS: Record<SheetSide, string> = {
   bottom:
-    'mb-0 mt-auto w-full max-w-full max-h-[85vh] rounded-t-[var(--radius)] motion-safe:open:animate-in motion-safe:open:slide-in-from-bottom motion-safe:open:duration-300',
+    'mb-0 mt-auto w-full max-w-full max-h-[85dvh] rounded-t-[var(--radius)] pb-[env(safe-area-inset-bottom)] motion-safe:open:animate-in motion-safe:open:slide-in-from-bottom motion-safe:open:duration-300',
   start:
     'ms-0 me-auto h-full max-h-full w-[min(420px,88vw)] max-w-full motion-safe:open:animate-in motion-safe:open:slide-in-from-left rtl:motion-safe:open:slide-in-from-right motion-safe:open:duration-300',
   end: 'me-0 ms-auto h-full max-h-full w-[min(420px,88vw)] max-w-full motion-safe:open:animate-in motion-safe:open:slide-in-from-right rtl:motion-safe:open:slide-in-from-left motion-safe:open:duration-300',
   center:
-    'm-auto w-[calc(100%-2rem)] max-w-lg max-h-[85vh] rounded-[var(--radius)] motion-safe:open:animate-in motion-safe:open:fade-in motion-safe:open:duration-200',
+    'm-auto w-[calc(100%-2rem)] max-w-lg max-h-[85dvh] rounded-[var(--radius)] motion-safe:open:animate-in motion-safe:open:fade-in motion-safe:open:duration-200',
 };
 
 export function Sheet({
@@ -86,6 +89,7 @@ export function Sheet({
   bodyClassName = 'px-5 pb-4',
   footerClassName = 'border-t border-border px-5 py-3',
   backdropClassName = 'backdrop:bg-foreground/40',
+  focusClose = false,
 }: SheetProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -124,12 +128,26 @@ export function Sheet({
         d.querySelector<HTMLElement>(`[data-sheet-body] :is(${FOCUSABLE})`) ??
         d.querySelector<HTMLElement>(FOCUSABLE);
       first?.focus();
-    } else if (!open && d.open) {
-      if (typeof d.close === 'function') d.close();
-      else d.removeAttribute('open');
+    } else if (!open) {
+      if (d.open) {
+        if (typeof d.close === 'function') d.close();
+        else d.removeAttribute('open');
+      }
+      // Idempotent: also settles a dialog the BROWSER already closed.
       settle();
     }
   }, [open, settle]);
+
+  // The browser can close the dialog itself (Android back / a close watcher
+  // that makes `cancel` non-cancelable, a future `<form method="dialog">`):
+  // its `close` event unlocks the page, gives focus back and tells the owner,
+  // even when the owner never unmounts it (the cookie modal).
+  const openRef = useRef(open);
+  openRef.current = open;
+  const onNativeClose = () => {
+    settle();
+    if (openRef.current) onCloseRef.current();
+  };
 
   // Unmounted while open (route change, owner gone): unlock and give focus back.
   useEffect(() => () => settle(), [settle]);
@@ -176,6 +194,7 @@ export function Sheet({
       dir={dir}
       aria-labelledby={titleId}
       onCancel={onCancel}
+      onClose={onNativeClose}
       onKeyDown={onKeyDown}
       onClick={onClick}
       data-sheet={side}
@@ -195,6 +214,7 @@ export function Sheet({
               onClick={requestClose}
               aria-label={closeLabel}
               data-sheet-close
+              data-autofocus={focusClose ? '' : undefined}
               className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${closeClassName}`}
             >
               <svg
