@@ -8,7 +8,7 @@ import Link from 'next/link';
 import type { ProductCardProps } from '../types';
 import type { TemplateId, ProductCardSize } from '@ebda/shared';
 import { getProductCardTextSizes, resolveColor } from '@ebda/shared';
-import { cn, CartIcon } from '@ebda/ui';
+import { cn } from '@ebda/ui';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { useNumerals } from '../../hooks/useNumerals';
@@ -31,7 +31,7 @@ import { productCardPropsEqual } from './product-card-memo';
 import DahabProductCard from '../dahab/ProductCard';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
-import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
+import { AdaptiveAddButton, OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
 import { getDiscountBadgeColor } from './discount-badge';
 import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from './custom-badge';
@@ -551,11 +551,10 @@ function PecannbeeProductCardImpl({
           >
             {(isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ?? (isRtl ? 'عرض' : 'View')}
           </Link>
-        ) : (
+        ) : !orderable ? (
           <button
             type="button"
-            disabled={!orderable || isAdding}
-            onClick={handleAdd}
+            disabled
             data-cta="button"
             className={cn(
               `mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`,
@@ -574,24 +573,37 @@ function PecannbeeProductCardImpl({
               ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
             }}
           >
-            {!orderable ? (
-              isRtl ? (
-                (resolvedCtaLabelTextAr ?? 'نفدت الكمية')
-              ) : (
-                (resolvedCtaLabelTextEn ?? 'Out Of Stock')
-              )
-            ) : (
-              <>
-                {isAdding ? (
-                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                ) : (
-                  <CartIcon className="h-4 w-4" aria-hidden={true} />
-                )}
-                {(isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
-                  (isRtl ? 'إضافة للسلة' : 'Add to Cart')}
-              </>
-            )}
+            {isRtl
+              ? (resolvedCtaLabelTextAr ?? 'نفدت الكمية')
+              : (resolvedCtaLabelTextEn ?? 'Out Of Stock')}
           </button>
+        ) : (
+          <AdaptiveAddButton
+            disabled={isAdding}
+            loading={isAdding}
+            showIcon
+            onClick={handleAdd}
+            label={
+              (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
+              (isRtl ? 'إضافة للسلة' : 'Add to Cart')
+            }
+            className={cn(
+              `mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`,
+              ctaExtraCls
+            )}
+            style={{
+              fontFamily: productCtaZone?.fontFamily,
+              fontSize: responsiveFontSize(productCtaZone?.fontSize),
+              fontWeight: productCtaZone?.fontWeight,
+              color:
+                resolvedText ??
+                guardedCtaColor(productCtaZone?.color, styles.productCardCta, store.theme),
+              letterSpacing: productCtaZone?.letterSpacing,
+              lineHeight: productCtaZone?.lineHeight,
+              textTransform: productCtaZone?.textTransform as React.CSSProperties['textTransform'],
+              ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
+            }}
+          />
         )}
       </div>
     </article>

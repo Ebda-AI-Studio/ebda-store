@@ -392,7 +392,7 @@ function MinimalProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`${textSizes.name} tracking-[0.18em] ${nameCase === 'uppercase' ? 'uppercase' : ''} font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug [overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em]`}
+                className={`${textSizes.name} tracking-normal sm:tracking-[0.18em] ${nameCase === 'uppercase' ? 'uppercase' : ''} font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug [overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em]`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}

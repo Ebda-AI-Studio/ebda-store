@@ -133,7 +133,7 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryCaption:
       'text-base font-extralight tracking-[0.22em] ui-caps-toggle text-muted-foreground group-hover:text-foreground transition-colors duration-[var(--duration-slow)]',
     productCardName:
-      'tracking-[0.18em] [overflow-wrap:anywhere] font-extralight text-muted-foreground group-hover:text-foreground transition-colors duration-[var(--duration-slow)]',
+      'tracking-normal sm:tracking-[0.18em] [overflow-wrap:anywhere] font-extralight text-muted-foreground group-hover:text-foreground transition-colors duration-[var(--duration-slow)]',
     productCardPrice: 'tracking-wide font-extralight text-muted-foreground',
     productCardBody: 'text-center',
     productCardCta:
@@ -190,7 +190,7 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryCaption:
       'text-base font-extralight ui-caps-toggle tracking-[0.28em] text-foreground/75 group-hover:text-foreground transition-colors duration-[var(--duration-slower)]',
     productCardName:
-      'font-light tracking-[0.22em] [overflow-wrap:anywhere] text-foreground/75 group-hover:text-foreground transition-colors duration-[var(--duration-slower)]',
+      'font-light tracking-normal sm:tracking-[0.22em] [overflow-wrap:anywhere] text-foreground/75 group-hover:text-foreground transition-colors duration-[var(--duration-slower)]',
     productCardPrice: 'font-light tracking-wide text-foreground',
     productCardBody: 'text-center',
     productCardCta:

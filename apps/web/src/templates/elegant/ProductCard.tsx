@@ -438,7 +438,7 @@ function ElegantProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`${textSizes.name} tracking-[0.15em] ${nameCase === 'uppercase' ? 'uppercase' : ''} text-foreground/80 group-hover:text-foreground transition-colors duration-300 [overflow-wrap:anywhere] line-clamp-1 min-h-[1.5em]`}
+                className={`${textSizes.name} tracking-normal sm:tracking-[0.15em] ${nameCase === 'uppercase' ? 'uppercase' : ''} text-foreground/80 group-hover:text-foreground transition-colors duration-300 [overflow-wrap:anywhere] line-clamp-1 min-h-[1.5em]`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}

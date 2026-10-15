@@ -359,11 +359,11 @@ export type CtaSize = 'sm' | 'md' | 'lg';
 export function ctaSizeClass(size?: CtaSize): string {
   switch (size) {
     case 'sm':
-      return 'min-h-8 px-2.5 py-1 text-xs';
+      return 'min-h-8 px-2.5 py-1 text-xs sm:px-2.5 sm:text-xs';
     case 'md':
-      return 'min-h-10 px-4 py-2 text-sm';
+      return 'min-h-10 px-2.5 py-2 text-xs sm:px-4 sm:text-sm';
     case 'lg':
-      return 'min-h-12 px-6 py-3 text-base';
+      return 'min-h-12 px-3 py-3 text-sm sm:px-6 sm:text-base';
     default:
       return '';
   }

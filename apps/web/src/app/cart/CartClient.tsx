@@ -638,7 +638,7 @@ export default function CartClient() {
                                   </span>
                                 )}
                                 <h3
-                                  className="mt-0.5 text-lg font-bold text-foreground sm:text-xl"
+                                  className="mt-0.5 text-lg font-bold text-foreground [overflow-wrap:anywhere] sm:text-xl"
                                   data-zone="productName"
                                   style={cartZoneStyle(cartNameZone)}
                                 >

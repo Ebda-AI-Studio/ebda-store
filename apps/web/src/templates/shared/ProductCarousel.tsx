@@ -22,7 +22,7 @@ import {
   ctaShapeClass,
   ctaSizeClass,
 } from './card-size';
-import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
+import { AdaptiveAddButton, OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { smoothScrollLeftTo, smoothScrollLeftBy } from '@/lib/smooth-scroll';
 import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
@@ -780,19 +780,16 @@ function SharedProductCarousel({
                         ) : (
                           !showQuickAdd &&
                           onAddToCart && (
-                            <button
-                              type="button"
+                            <AdaptiveAddButton
                               onClick={() => onAddToCart(product.id)}
                               className={cn(
                                 `block w-full text-center cursor-pointer ${styles.productCardCta}`,
                                 ctaExtraCls
                               )}
-                              data-zone="productCta"
-                              data-cta="button"
+                              dataZone="productCta"
                               style={ctaStyle}
-                            >
-                              {ctaAddLabel}
-                            </button>
+                              label={ctaAddLabel}
+                            />
                           )
                         );
                       })()}

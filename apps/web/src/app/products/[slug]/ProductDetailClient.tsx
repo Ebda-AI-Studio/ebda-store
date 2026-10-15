@@ -1022,7 +1022,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   Hardcoded text-3xl / text-2xl removed — size is purely zone-driven.
                   See design.md § "PDP name ≥ price invariant". */}
               <h1
-                className="font-bold text-foreground"
+                className="font-bold text-foreground [overflow-wrap:anywhere]"
                 data-zone="productName"
                 style={zoneStyle(pdpNameZone, pdpScale)}
               >

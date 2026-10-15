@@ -1,8 +1,9 @@
 'use client';
 
 import type React from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AddToCartButton, cn } from '@ebda/ui';
+import { AddToCartButton, CartIcon, cn } from '@ebda/ui';
 import type { StoreTheme } from '@ebda/shared';
 import { resolveColor } from '@ebda/shared';
 import type { CtaShape, CtaSize } from './card-size';
@@ -32,6 +33,108 @@ import { avoidReservedCorner } from './badge-collision';
  * Task 3 (B1): ctaShape, ctaSize, ctaColor, ctaTextColor, ctaLabelTextEn,
  * ctaLabelTextAr, oosDimColor, theme — all optional, additive.
  */
+/**
+ * FU46 D7: a card narrow enough that the full "Add to cart" label would
+ * ellipsize (the 3-col elegant PLP, the ~88px recommendation cards at 320-360)
+ * swaps to the existing icon-only cart button instead. Detection is by
+ * measurement, not breakpoint: the card width depends on the grid, not the
+ * viewport. `needed` remembers the full label's width so the label comes back
+ * when the box grows (rotation, resize) without flapping.
+ */
+export function useCompactCta() {
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const needed = useRef(0);
+  const [compact, setCompact] = useState(false);
+
+  const evaluate = useCallback(() => {
+    const el = ref.current;
+    const parent = el?.parentElement;
+    if (!el || !parent) return;
+    const cs = getComputedStyle(parent);
+    const available =
+      parent.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+    if (!compact) {
+      if (el.scrollWidth > el.clientWidth + 1) {
+        needed.current = el.scrollWidth;
+        setCompact(true);
+      }
+    } else if (needed.current > 0 && available >= needed.current + 4) {
+      setCompact(false);
+    }
+  }, [compact]);
+
+  useEffect(() => {
+    evaluate();
+    const parent = ref.current?.parentElement;
+    if (!parent || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(evaluate);
+    ro.observe(parent);
+    return () => ro.disconnect();
+  }, [evaluate, compact]);
+
+  return { ref, compact };
+}
+
+const COMPACT_CTA_CLS = 'mx-auto h-11 min-h-0 w-11 min-w-0 shrink-0 px-0 py-0';
+
+interface AdaptiveAddButtonProps {
+  label: string;
+  className?: string;
+  style?: React.CSSProperties;
+  onClick?: (e: React.MouseEvent) => void;
+  disabled?: boolean;
+  loading?: boolean;
+  /** Show the cart icon beside the label (Pecannbee card); the carousel is text-only. */
+  showIcon?: boolean;
+  dataZone?: string;
+}
+
+/**
+ * The raw add-to-cart `<button>` of the Pecannbee card and the shared carousel
+ * (they do not go through ProductCardCta). Same fit rule as ProductCardCta:
+ * when the label would ellipsize in this box, show the cart icon alone with
+ * the label as its accessible name.
+ */
+export function AdaptiveAddButton({
+  label,
+  className,
+  style,
+  onClick,
+  disabled,
+  loading,
+  showIcon,
+  dataZone,
+}: AdaptiveAddButtonProps) {
+  const { ref, compact } = useCompactCta();
+  const icon = loading ? (
+    <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+  ) : (
+    <CartIcon className="h-4 w-4" aria-hidden={true} />
+  );
+  return (
+    <button
+      ref={ref}
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={compact ? cn(className, COMPACT_CTA_CLS) : className}
+      style={style}
+      aria-label={compact ? label : undefined}
+      data-zone={dataZone}
+      data-cta={compact ? 'add-compact' : 'button'}
+    >
+      {compact ? (
+        icon
+      ) : (
+        <>
+          {showIcon ? icon : null}
+          {label}
+        </>
+      )}
+    </button>
+  );
+}
+
 interface ProductCardCtaProps {
   productId: string;
   inStock?: boolean;
@@ -90,6 +193,9 @@ export function ProductCardCta({
   viewOnly = false,
 }: ProductCardCtaProps) {
   const router = useRouter();
+  const { ref: ctaRef, compact: compactRaw } = useCompactCta();
+  // An out-of-stock label must stay words: a disabled cart icon reads as "broken".
+  const compact = compactRaw && inStock !== false;
 
   // Build additive shape + size classes — '' when unset so theme classes win.
   const shapeClass = ctaShapeClass(ctaShape);
@@ -128,6 +234,7 @@ export function ProductCardCta({
           e.stopPropagation();
           router.push(viewHref);
         }}
+        ref={ctaRef}
         aria-label={viewLabel}
         data-cta="view-variants"
         className={finalCls}
@@ -151,10 +258,13 @@ export function ProductCardCta({
 
   // cn()/tailwind-merge so extraCls (ctaShape/ctaSize) wins over the theme
   // button's hardcoded rounded-*/size utilities.
-  const finalClassName = cn(className, extraCls);
+  const finalClassName = compact ? cn(className, COMPACT_CTA_CLS) : cn(className, extraCls);
 
   return (
     <AddToCartButton
+      ref={ctaRef}
+      iconOnly={compact}
+      data-cta={compact ? 'add-compact' : undefined}
       productId={productId}
       inStock={inStock}
       quantityInCart={quantityInCart}

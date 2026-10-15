@@ -382,7 +382,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
               </ul>
             )}
             <h1
-              className="font-display text-balance text-[clamp(1.85rem,1.4rem+1.6vw,2.75rem)] leading-[1.12] text-foreground rtl:leading-[1.45]"
+              className="font-display text-balance text-[clamp(1.85rem,1.4rem+1.6vw,2.75rem)] leading-[1.12] text-foreground [overflow-wrap:anywhere] rtl:leading-[1.45]"
               data-zone="productName"
             >
               {p.name}
@@ -544,7 +544,9 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
       >
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
-            <p className="line-clamp-1 text-[13px] text-foreground/80">{p.name}</p>
+            <p className="line-clamp-1 text-[13px] text-foreground/80 [overflow-wrap:anywhere]">
+              {p.name}
+            </p>
             <p className="text-[15px] tabular-nums text-primary">{p.priceText}</p>
           </div>
           <button
