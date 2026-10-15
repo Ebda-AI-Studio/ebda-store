@@ -5,8 +5,9 @@
  * variant) and, as of Task 5 of the product-bundles feature, `CartBundle`
  * (a bundle, at a store-defined discount over its component prices). A
  * bundle is NEVER expanded into `cart_items` — `cart_items` carries two
- * PARTIAL UNIQUE INDEXES, `(cart_id, product_id)` WHERE `variant_id IS NULL`
- * and `(cart_id, product_id, variant_id)` WHERE `variant_id IS NOT NULL` —
+ * PARTIAL UNIQUE INDEXES, `(cart_id, product_id, COALESCE(note,''))` WHERE
+ * `variant_id IS NULL` and `(cart_id, product_id, variant_id, COALESCE(note,''))`
+ * WHERE `variant_id IS NOT NULL` (migration 20261016000500_personalisation) —
  * so expanding a bundle into that table would violate one of those indexes
  * the moment a customer already had one of the bundle's own products in
  * their cart, 500ing on a live store. `CartBundle` is its own table for
@@ -23,6 +24,29 @@ import { withSavepoint } from '../lib/savepoint';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
 import { resolveBundle, type ResolvedBundle } from './bundle.service';
+import { activePersonalisation, cleanNote, stripNote } from '@ebda/shared';
+
+/**
+ * Resolve a customer's personalisation note against the product's config.
+ * Off / no config → the note is dropped (null) so it can never split a line
+ * on a product that does not take one. On → required and maxLength enforced
+ * here, server-side; the PDP's disabled button is only a convenience.
+ * Returns the error code instead of throwing so the bulk sync can skip a line.
+ */
+export function resolveLineNote(
+  personalisation: unknown,
+  raw: unknown
+): { note: string | null } | { error: 'PERSONALISATION_REQUIRED' | 'PERSONALISATION_TOO_LONG' } {
+  const cfg = activePersonalisation(personalisation);
+  if (!cfg) return { note: null };
+  // Length is checked on the full (stripped, trimmed) text BEFORE the 200 cap:
+  // capping first silently cut a 250-char note to 200 and accepted it when
+  // maxLength was 200.
+  const full = stripNote(raw);
+  if (!full) return cfg.required ? { error: 'PERSONALISATION_REQUIRED' } : { note: null };
+  if (full.length > cfg.maxLength) return { error: 'PERSONALISATION_TOO_LONG' };
+  return { note: cleanNote(full) };
+}
 
 /**
  * A bundle line in a cart response. Priced live — `unitPrice`/`total`/
@@ -328,7 +352,8 @@ export class CartService {
     productId: string,
     quantity: number = 1,
     customerId?: string,
-    variantId?: string
+    variantId?: string,
+    rawNote?: string | null
   ) {
     // Get or create cart first (outside transaction since getOrCreate has its own retry logic)
     const cart = await this.getOrCreate(storeId, sessionId, customerId);
@@ -370,6 +395,19 @@ export class CartService {
         throw new AppError(404, 'NOT_FOUND', 'Product not found or unavailable');
       }
 
+      // The note is part of the line identity: (cart, product, variant, note).
+      const resolvedNote = resolveLineNote(product.personalisation, rawNote);
+      if ('error' in resolvedNote) {
+        throw new AppError(
+          400,
+          resolvedNote.error,
+          resolvedNote.error === 'PERSONALISATION_REQUIRED'
+            ? 'Personalisation text is required for this product'
+            : 'Personalisation text is too long'
+        );
+      }
+      const note = resolvedNote.note;
+
       // Resolve the chosen variant — it must belong to this product and
       // be active. Variant stock + backorder override the product values,
       // and the line is keyed by (cartId, productId, variantId) so each
@@ -389,10 +427,12 @@ export class CartService {
       const effectiveAllowBackorder =
         backorderFeatureEnabled && (variant ? variant.allowBackorder : product.allowBackorder);
 
-      // Same product+variant line if it already exists (null variantId for
-      // base-product lines merges only with other base-product lines).
+      // Same product+variant+note line if it already exists (null variantId for
+      // base-product lines merges only with other base-product lines; `note: null`
+      // matches IS NULL, which agrees with the COALESCE(note,'') unique index
+      // because cleanNote never stores an empty string).
       const existingItem = await tx.cartItem.findFirst({
-        where: { cartId: cart.id, productId, variantId: variantId ?? null },
+        where: { cartId: cart.id, productId, variantId: variantId ?? null, note },
       });
 
       if (existingItem) {
@@ -432,7 +472,7 @@ export class CartService {
         // P2002 too — on the re-run findFirst sees the winner's row and the
         // existing-branch above merges the quantity.
         await tx.cartItem.create({
-          data: { cartId: cart.id, productId, variantId: variantId ?? null, quantity },
+          data: { cartId: cart.id, productId, variantId: variantId ?? null, note, quantity },
         });
       }
     };
@@ -641,7 +681,7 @@ export class CartService {
   static async addItems(
     storeId: string,
     sessionId: string,
-    items: Array<{ productId: string; quantity: number; variantId?: string }>,
+    items: Array<{ productId: string; quantity: number; variantId?: string; note?: string | null }>,
     customerId?: string
   ) {
     const cart = await this.getOrCreate(storeId, sessionId, customerId);
@@ -665,7 +705,13 @@ export class CartService {
     // order creation — the same defect the audit reported one step later.
     const products = await prisma.product.findMany({
       where: { id: { in: productIds }, storeId, status: 'active', deletedAt: null },
-      select: { id: true, inventory: true, trackInventory: true, allowBackorder: true },
+      select: {
+        id: true,
+        inventory: true,
+        trackInventory: true,
+        allowBackorder: true,
+        personalisation: true,
+      },
     });
     const productById = new Map(products.map(p => [p.id, p]));
 
@@ -679,8 +725,22 @@ export class CartService {
         })
       : [];
     const variantById = new Map(variants.map(v => [v.id, v]));
-    const lineKey = (productId: string, variantId?: string | null) =>
-      `${productId}::${variantId ?? ''}`;
+    // A line is (product, variant, note) — two notes on one item are two lines.
+    const lineKey = (productId: string, variantId?: string | null, note?: string | null) =>
+      JSON.stringify([productId, variantId ?? null, note ?? null]);
+
+    // Resolve each note against its product's config BEFORE aggregating, so two
+    // payload lines whose raw notes clean to the same text merge. A line that
+    // breaks the product's rule (required-but-empty, too long) is SKIPPED, the
+    // same way an invalid variant is below: this is the guest→login sync, and
+    // failing the whole request would lose the customer's entire cart because
+    // the merchant tightened one product's rule since the add.
+    const resolvedItems = items.flatMap(item => {
+      const product = productById.get(item.productId);
+      if (!product) return [];
+      const r = resolveLineNote(product.personalisation, item.note);
+      return 'error' in r ? [] : [{ ...item, note: r.note }];
+    });
 
     // #1790: aggregate the payload by lineKey BEFORE the write loop. Without
     // this, two lines in the SAME sync payload for a product/variant with no
@@ -691,9 +751,9 @@ export class CartService {
     // its quantities already summed — matching the "one line per
     // product+variant" invariant the cart's own unique index enforces.
     const aggregatedItems = Array.from(
-      items
+      resolvedItems
         .reduce((acc, item) => {
-          const key = lineKey(item.productId, item.variantId);
+          const key = lineKey(item.productId, item.variantId, item.note);
           const merged = acc.get(key);
           if (merged) {
             merged.quantity += item.quantity;
@@ -701,7 +761,7 @@ export class CartService {
             acc.set(key, { ...item });
           }
           return acc;
-        }, new Map<string, { productId: string; quantity: number; variantId?: string }>())
+        }, new Map<string, { productId: string; quantity: number; variantId?: string; note: string | null }>())
         .values()
     );
 
@@ -714,7 +774,7 @@ export class CartService {
         where: { cartId: cart.id, productId: { in: productIds } },
       });
       const existingByLine = new Map(
-        existingItems.map(i => [lineKey(i.productId, i.variantId), i])
+        existingItems.map(i => [lineKey(i.productId, i.variantId, i.note), i])
       );
 
       for (const item of aggregatedItems) {
@@ -725,7 +785,7 @@ export class CartService {
         if (item.variantId && !variantById.has(item.variantId)) continue;
         const variant = item.variantId ? variantById.get(item.variantId)! : null;
 
-        const existing = existingByLine.get(lineKey(item.productId, item.variantId));
+        const existing = existingByLine.get(lineKey(item.productId, item.variantId, item.note));
         const targetQuantity = (existing?.quantity ?? 0) + item.quantity;
 
         const availableInventory = variant ? variant.inventory : product.inventory;
@@ -760,6 +820,7 @@ export class CartService {
               cartId: cart.id,
               productId: item.productId,
               variantId: item.variantId ?? null,
+              note: item.note,
               quantity: item.quantity,
             },
           });
@@ -994,12 +1055,15 @@ export class CartService {
 
     const targetCart = userCart;
 
-    // Merge items — match on BOTH productId and variantId so a red-large variant
-    // and a red-small variant (same product, different variants) stay as separate
-    // lines instead of incorrectly merging into one.
+    // Merge items — match on productId, variantId AND note so a red-large variant
+    // and a red-small variant (same product, different variants), or "Sara" and
+    // "Omar" on the same abaya, stay as separate lines instead of merging into one.
     for (const guestItem of guestCart.items) {
       const existingItem = userCart?.items.find(
-        item => item.productId === guestItem.productId && item.variantId === guestItem.variantId
+        item =>
+          item.productId === guestItem.productId &&
+          (item.variantId ?? null) === (guestItem.variantId ?? null) &&
+          (item.note ?? null) === (guestItem.note ?? null)
       );
 
       if (existingItem) {
@@ -1015,6 +1079,7 @@ export class CartService {
             cartId: targetCart.id,
             productId: guestItem.productId,
             variantId: guestItem.variantId ?? null,
+            note: guestItem.note ?? null,
             quantity: guestItem.quantity,
           },
         });

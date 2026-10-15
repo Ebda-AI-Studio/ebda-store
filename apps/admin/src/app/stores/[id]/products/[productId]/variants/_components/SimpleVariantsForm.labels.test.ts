@@ -25,8 +25,8 @@ describe('SimpleVariantsForm row labels (#1222)', () => {
     expect(source).toMatch(/sr-only/);
   });
 
-  it('every one of the 7 column labels (6 inputs + the Image caption) uses the conditional class', () => {
+  it('every one of the 8 column labels (6 inputs + the Image and Swatch-photo captions) uses the conditional class', () => {
     const labelClassUses = [...source.matchAll(/className=\{labelClass\}/g)].length;
-    expect(labelClassUses).toBe(7);
+    expect(labelClassUses).toBe(8);
   });
 });

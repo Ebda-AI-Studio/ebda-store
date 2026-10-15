@@ -46,6 +46,23 @@ describe('restoreCartShape', () => {
     expect(restored.items).toEqual([]);
   });
 
+  it('keeps personalised lines apart and restores their note', () => {
+    const line = (personalisation: string | null, quantity = 1) => ({
+      productId: 'p-abaya',
+      variantId: 'v-m',
+      quantity,
+      bundleId: null,
+      bundleGroupId: null,
+      personalisation,
+    });
+    const restored = restoreCartShape([line('Sara'), line('Omar'), line('Sara', 2), line(null)]);
+    expect(restored.items).toEqual([
+      { productId: 'p-abaya', variantId: 'v-m', quantity: 3, note: 'Sara' },
+      { productId: 'p-abaya', variantId: 'v-m', quantity: 1, note: 'Omar' },
+      { productId: 'p-abaya', variantId: 'v-m', quantity: 1 },
+    ]);
+  });
+
   it('keeps genuinely loose lines, aggregated by (productId, variantId)', () => {
     const restored = restoreCartShape([
       box('grp-a', 'p-dates'),

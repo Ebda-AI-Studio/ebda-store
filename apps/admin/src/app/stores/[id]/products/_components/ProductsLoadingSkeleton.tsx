@@ -24,7 +24,7 @@ export function ProductsLoadingSkeleton() {
   ];
 
   return (
-    <AdminLayout title={t('title')} subtitle={t('loading')}>
+    <AdminLayout title={t('title', { storeName: t('fallbackThisStore') })} subtitle={t('loading')}>
       <div className="space-y-6">
         {/* Skeleton filters */}
         <div className="flex items-center justify-between">

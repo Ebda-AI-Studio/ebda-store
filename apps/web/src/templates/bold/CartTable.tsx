@@ -1,9 +1,11 @@
 'use client';
 
+import { VariantText } from '@ebda/ui';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { CartTableProps } from '../types';
 import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
+import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 
@@ -60,9 +62,16 @@ export default function BoldCartTable({
                   </Link>
                   {(item.variantTitle || item.variantTitleAr) && (
                     <p className="mt-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      {isRtl && item.variantTitleAr ? item.variantTitleAr : item.variantTitle}
+                      <VariantText
+                        title={
+                          (isRtl && item.variantTitleAr
+                            ? item.variantTitleAr
+                            : item.variantTitle || item.variantTitleAr) ?? ''
+                        }
+                      />
                     </p>
                   )}
+                  <CartLineNote note={item.note} />
                   {item.unavailable && <CartLineUnavailableNotice />}
                   <p
                     className="mt-1 text-sm font-bold uppercase tracking-wider text-primary tabular-nums"

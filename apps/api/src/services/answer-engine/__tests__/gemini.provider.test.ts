@@ -28,13 +28,19 @@ vi.mock('../../../config', () => ({
 }));
 
 import logger from '../../../lib/logger';
+import { resetGeminiKeyState } from '../../../lib/ai/gemini-keys';
 import { GeminiAnswerEngineProvider, resetGeminiGroundingWarnOnce } from '../gemini.provider';
 
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
 
 function jsonResponse(status: number, body: unknown) {
-  return { ok: status >= 200 && status < 300, status, json: async () => body };
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: new Headers(),
+    json: async () => body,
+  };
 }
 
 describe('GeminiAnswerEngineProvider', () => {
@@ -44,11 +50,23 @@ describe('GeminiAnswerEngineProvider', () => {
     mockAssertAiQuota.mockReset().mockResolvedValue(undefined);
     mockRecordUsage.mockReset().mockResolvedValue(undefined);
     resetGeminiGroundingWarnOnce();
+    resetGeminiKeyState();
+    // One key only (the mocked config key): a developer shell's real GEMINI_API_KEY* would
+    // otherwise add failover keys and change how many fetches a 429 produces.
+    for (const k of [
+      'GOOGLE_GENERATIVE_AI_KEY',
+      'GEMINI_API_KEY',
+      'GEMINI_API_KEY_2',
+      'GEMINI_API_KEY_3',
+    ]) {
+      vi.stubEnv(k, '');
+    }
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('parses citedUrls from a grounded response and sets grounded=true', async () => {
@@ -258,7 +276,34 @@ describe('GeminiAnswerEngineProvider', () => {
     await provider.query('store-1', 'prompt two');
     await provider.query('store-1', 'prompt three');
 
-    expect(warnSpy).toHaveBeenCalledTimes(1);
+    // Count only the grounding-unavailable warning; key-failover warnings are separate.
+    const groundingWarns = warnSpy.mock.calls.filter(
+      c => typeof c[1] === 'string' && c[1].includes('search grounding unavailable')
+    );
+    expect(groundingWarns).toHaveLength(1);
+  });
+
+  it('a grounded 429 benches only grounded calls: later queries still get the ungrounded answer (B0-51)', async () => {
+    const mockFetch = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      if (body.tools) return jsonResponse(429, { error: { message: 'quota' } });
+      return jsonResponse(200, { candidates: [{ content: { parts: [{ text: 'plain' }] } }] });
+    });
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    const provider = new GeminiAnswerEngineProvider();
+    const first = await provider.query('store-1', 'one');
+    const second = await provider.query('store-1', 'two');
+
+    expect(first.text).toBe('plain');
+    expect(second.text).toBe('plain');
+    expect(second.groundingUnavailableReason).toBe('http_429');
+    // Query two skips Google for the benched grounded call and goes straight to the plain call.
+    const toolCalls = mockFetch.mock.calls.filter(
+      c => JSON.parse((c[1] as RequestInit).body as string).tools
+    );
+    expect(toolCalls).toHaveLength(1);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 
   it('propagates a real error (non-grounding-unavailable status) rather than silently degrading', async () => {

@@ -3,6 +3,7 @@ import { redis } from './redis.service';
 import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';
 import { readInStoreContext } from '../lib/store-scoped-read';
+import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
 
 // ==========================================
 // Recommendation Service
@@ -29,6 +30,8 @@ const productSelect = {
   // as "the badge works everywhere except the recommendation strips".
   badgeLabel: true,
   badgeLabelAr: true,
+  // Card fact chips. BOUNDED-stale within the 5-minute recommendation cache.
+  facts: true,
   images: {
     take: 2, // primary + hover-reveal second image on recommendation cards
     orderBy: { position: 'asc' as const },
@@ -40,6 +43,10 @@ const productSelect = {
   // (no variant chosen) which either errors out or creates ambiguous
   // cart lines. Same gap fixed earlier on listPublic in commit `8c55a73`.
   variants: { select: { id: true, price: true } },
+  // Colour dots on the recommendation cards (same payload as the listing).
+  // CACHE CLASS: BOUNDED-stale; these lists sit behind the 5-minute
+  // CACHE_TTL_SECONDS cache, so a swatch edit shows within that window.
+  options: LISTING_SWATCH_OPTIONS_SELECT,
 };
 
 // FBT cron handle

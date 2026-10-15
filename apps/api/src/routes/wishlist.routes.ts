@@ -5,6 +5,7 @@ import { authenticate, customerUserId } from '../middleware/auth';
 import { userContext } from '../middleware/tenant-context';
 
 import { fromMinor } from '@ebda/shared';
+import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
 const router = Router();
 
 // Helper to get store ID from request header
@@ -83,6 +84,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
                   orderBy: { position: 'asc' },
                   take: 1,
                 },
+                // Colour dots on the wishlist cards (same payload as the listing).
+                options: LISTING_SWATCH_OPTIONS_SELECT,
               },
             },
           },
@@ -102,6 +105,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
                     orderBy: { position: 'asc' },
                     take: 1,
                   },
+                  options: LISTING_SWATCH_OPTIONS_SELECT,
                 },
               },
             },
@@ -127,6 +131,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         badgeLabelAr: item.product.badgeLabelAr,
         images: item.product.images.map(img => img.url),
         status: item.product.status,
+        options: item.product.options,
+        facts: item.product.facts,
       },
     }));
 

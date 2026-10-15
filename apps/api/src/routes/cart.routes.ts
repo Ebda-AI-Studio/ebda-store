@@ -18,6 +18,8 @@ const addToCartSchema = z.object({
   productId: z.string().uuid(),
   quantity: z.number().int().min(1).default(1),
   variantId: z.string().uuid().optional(),
+  // Personalisation text. 400 before cleaning; cleanNote caps the stored text at 200.
+  note: z.string().max(400).optional(),
 });
 
 const bulkSyncSchema = z.object({
@@ -27,6 +29,7 @@ const bulkSyncSchema = z.object({
         productId: z.string().uuid(),
         quantity: z.number().int().min(1),
         variantId: z.string().uuid().optional(),
+        note: z.string().max(400).optional(),
       })
     )
     .max(100),
@@ -82,7 +85,8 @@ router.post('/items', async (req: Request, res: Response, next: NextFunction) =>
       data.productId,
       data.quantity,
       customerId,
-      data.variantId
+      data.variantId,
+      data.note
     );
 
     res.status(201).json({

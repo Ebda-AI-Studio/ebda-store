@@ -75,6 +75,19 @@ const CASES: Array<[string, () => Error]> = [
     () =>
       new Prisma.PrismaClientInitializationError("Can't reach database server", 'test', 'P1001'),
   ],
+  [
+    'MulterError LIMIT_FILE_SIZE (413)',
+    () =>
+      Object.assign(new Error('File too large'), { name: 'MulterError', code: 'LIMIT_FILE_SIZE' }),
+  ],
+  [
+    'MulterError LIMIT_UNEXPECTED_FILE (400)',
+    () =>
+      Object.assign(new Error('Unexpected field'), {
+        name: 'MulterError',
+        code: 'LIMIT_UNEXPECTED_FILE',
+      }),
+  ],
   ['plain Error', () => new Error('boom')],
 ];
 

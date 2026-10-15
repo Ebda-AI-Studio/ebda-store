@@ -32,8 +32,10 @@
  *    unreleased and the order stuck `pending`, which is strictly worse than
  *    the mispricing this function exists to fix. Omit the argument to trust
  *    every id (used by the pure tests).
- *  - Genuinely loose lines aggregate by `(productId, variantId)`, because
- *    `cart_items` carries a partial unique index on that pair and a bundle
+ *  - Genuinely loose lines aggregate by `(productId, variantId, personalisation)`,
+ *    because `cart_items` carries a partial unique index on (product, variant,
+ *    COALESCE(note,'')) — "Sara" and "Omar" on one abaya come back as two lines
+ *    with their notes, never merged into one unnamed line — and a bundle
  *    order can legitimately produce two `OrderItem` rows for one product
  *    (two boxes sharing a component, or a box plus a loose line of the same
  *    product).
@@ -48,11 +50,15 @@ export interface RestorableOrderItem {
   quantity: number;
   bundleId?: string | null;
   bundleGroupId?: string | null;
+  /** The line's personalisation snapshot; restored as the cart line's `note`. */
+  personalisation?: string | null;
 }
 
+type RestoredItem = { productId: string; variantId?: string; quantity: number; note?: string };
+
 export interface RestoredCart {
-  /** Loose `CartItem` rows, aggregated by (productId, variantId). */
-  items: Array<{ productId: string; variantId?: string; quantity: number }>;
+  /** Loose `CartItem` rows, aggregated by (productId, variantId, note). */
+  items: RestoredItem[];
   /** One `CartBundle` row per distinct bundle, quantity = number of boxes. */
   bundles: Array<{ bundleId: string; quantity: number }>;
 }
@@ -61,7 +67,7 @@ export function restoreCartShape(
   orderItems: RestorableOrderItem[],
   liveBundleIds?: ReadonlySet<string>
 ): RestoredCart {
-  const looseByKey = new Map<string, { productId: string; variantId?: string; quantity: number }>();
+  const looseByKey = new Map<string, RestoredItem>();
   const boxesByBundle = new Map<string, Set<string>>();
 
   for (const item of orderItems) {
@@ -74,7 +80,8 @@ export function restoreCartShape(
       continue;
     }
 
-    const key = `${item.productId}::${item.variantId ?? ''}`;
+    const note = item.personalisation || null;
+    const key = JSON.stringify([item.productId, item.variantId ?? null, note]);
     const existing = looseByKey.get(key);
     if (existing) {
       existing.quantity += item.quantity;
@@ -83,6 +90,7 @@ export function restoreCartShape(
         productId: item.productId,
         variantId: item.variantId ?? undefined,
         quantity: item.quantity,
+        ...(note ? { note } : {}),
       });
     }
   }

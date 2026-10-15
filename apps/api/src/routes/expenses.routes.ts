@@ -3,6 +3,7 @@ import multer from 'multer';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { AppError } from '../middleware/error-handler';
 import { requireFeature } from '../middleware/feature-gate';
 import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
 import { StorageService } from '../services/storage.service';
@@ -31,7 +32,13 @@ const receiptUpload = multer({
     if (allowed.has(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error(`Unsupported file type: ${file.mimetype}. Allowed: jpeg, png, webp`));
+      cb(
+        new AppError(
+          400,
+          'INVALID_FILE_TYPE',
+          `Unsupported file type: ${file.mimetype}. Allowed: jpeg, png, webp`
+        )
+      );
     }
   },
 });

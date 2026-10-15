@@ -38,6 +38,8 @@ import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
+import { SwatchDots } from '../../components/commerce/SwatchDots';
+import { FactChips } from '../../components/commerce/FactChips';
 
 /**
  * Bold Template - Product Card
@@ -405,6 +407,8 @@ function BoldProductCard({
             {priceVisible && (
               <TaxInclusiveLabel className="block text-xs uppercase tracking-wide text-muted-foreground" />
             )}
+            <SwatchDots product={product} max={5} />
+            <FactChips product={product} className="mt-1" />
           </div>
         )}
       </Link>

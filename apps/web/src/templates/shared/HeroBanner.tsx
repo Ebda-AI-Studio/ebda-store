@@ -9,6 +9,7 @@ import type { HeroBannerProps } from '../types';
 import { getPackStyles } from './pack-styles';
 import { responsiveFontSize } from './section-typography';
 import { HeroBannerLink } from './HeroBannerLink';
+import { HeroVideo } from '../../components/commerce/HeroVideo';
 
 /**
  * Single hero banner — full-bleed image, optional headline overlay + CTA.
@@ -30,6 +31,9 @@ export function HeroBanner({
   imageAr,
   imageMobile,
   imageMobileAr,
+  video,
+  videoMobile,
+  active = true,
   alt = '',
   headline,
   headlineAr,
@@ -116,6 +120,29 @@ export function HeroBanner({
     : 'relative w-full overflow-hidden bg-muted aspect-[var(--hero-m-aspect)] max-h-[45vh] sm:aspect-[1920/700] sm:max-h-none';
   const imageObjectClass = isFramed ? 'object-contain' : 'object-cover';
 
+  const posterPicture = desktopSrc ? (
+    <picture>
+      <source media="(max-width: 639px)" srcSet={mobileSrc} />
+      <Image
+        src={desktopSrc}
+        alt={alt}
+        fill
+        priority={priority}
+        loading={priority ? undefined : 'lazy'}
+        sizes="100vw"
+        // object-cover (full-bleed): backend auto-resize lands every new
+        // upload at the exact container aspect (16:9 mobile / 1920×700
+        // desktop) via sharp before R2, so cover trims zero pixels for
+        // post-auto-resize uploads. Pre-feature legacy assets may crop
+        // slightly.
+        // object-contain (framed): whole image displays inside the
+        // container, letterbox bars fill with the neutral bg above.
+        // Pick by `presentation` prop / merchant admin toggle.
+        className={imageObjectClass}
+      />
+    </picture>
+  ) : null;
+
   const heroSection = (
     // Mobile: aspect-[var(--hero-m-aspect)] (value supplied via style) + 45vh ceiling.
     // Desktop (sm:): sm:aspect-[1920/700] overrides the base class via media query —
@@ -123,28 +150,22 @@ export function HeroBanner({
     // trap). sm:max-h-none removes the mobile ceiling. overflow-hidden clips both.
     <section className={containerBaseClass} style={mobileAspectStyle} dir={isRtl ? 'rtl' : 'ltr'}>
       <HeroBannerLink link={link} label={bannerLabel} urlPrefix={urlPrefix}>
-        {desktopSrc && (
-          <picture>
-            <source media="(max-width: 639px)" srcSet={mobileSrc} />
-            <Image
-              src={desktopSrc}
-              alt={alt}
-              fill
-              priority={priority}
-              loading={priority ? undefined : 'lazy'}
-              sizes="100vw"
-              // object-cover (full-bleed): backend auto-resize lands every new
-              // upload at the exact container aspect (16:9 mobile / 1920×700
-              // desktop) via sharp before R2, so cover trims zero pixels for
-              // post-auto-resize uploads. Pre-feature legacy assets may crop
-              // slightly.
-              // object-contain (framed): whole image displays inside the
-              // container, letterbox bars fill with the neutral bg above.
-              // Pick by `presentation` prop / merchant admin toggle.
-              className={imageObjectClass}
-            />
-          </picture>
-        )}
+        {desktopSrc &&
+          (video ? (
+            // The poster picture stays the base layer (and the LCP element);
+            // HeroVideo only overlays a muted looping video after hydration.
+            <HeroVideo
+              src={video}
+              srcMobile={videoMobile}
+              mobileQuery="(max-width: 639px)"
+              active={active}
+              fit={isFramed ? 'contain' : 'cover'}
+            >
+              {posterPicture}
+            </HeroVideo>
+          ) : (
+            posterPicture
+          ))}
 
         {showOverlay && (
           <div

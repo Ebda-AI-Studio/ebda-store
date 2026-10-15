@@ -4,7 +4,8 @@
  * the cart page and the checkout summary all agree with the server subtotal.
  */
 import { describe, it, expect } from 'vitest';
-import { cartTotals, mapServerItem } from './cart-lines';
+import { cartTotals, mapServerItem, sameLine } from './cart-lines';
+import { toSyncPayload } from './cart-hydration';
 
 const server = (extra: Record<string, unknown> = {}) => ({
   id: 'l1',
@@ -44,5 +45,34 @@ describe('cartTotals', () => {
         []
       )
     ).toEqual({ itemCount: 5, total: 19000 });
+  });
+});
+
+describe('sameLine (personalisation is part of the line identity)', () => {
+  const base = { productId: 'p1', variantId: 'v1' };
+  it('splits lines that differ only by note', () => {
+    expect(sameLine({ ...base, note: 'Sara' }, { ...base, note: 'Omar' })).toBe(false);
+    expect(sameLine({ ...base, note: 'Sara' }, { ...base })).toBe(false);
+  });
+  it('merges the same note, and treats missing/undefined variant + note alike', () => {
+    expect(sameLine({ ...base, note: 'Sara' }, { ...base, note: 'Sara' })).toBe(true);
+    expect(sameLine({ productId: 'p1' }, { productId: 'p1', variantId: undefined })).toBe(true);
+    expect(sameLine({ ...base }, { ...base, variantId: 'v2' })).toBe(false);
+  });
+});
+
+describe('note round-trips through the cart helpers', () => {
+  it('mapServerItem carries the note; null becomes undefined', () => {
+    expect(mapServerItem(server({ note: 'سارة' })).note).toBe('سارة');
+    expect(mapServerItem(server({ note: null })).note).toBeUndefined();
+  });
+  it('toSyncPayload keeps the note so the guest sync cannot merge two names', () => {
+    const line = (note?: string) =>
+      ({ id: 'x', productId: 'p1', quantity: 1, name: 'A', price: 1, slug: 'a', note }) as never;
+    expect(toSyncPayload([line('Sara'), line('Omar'), line()])).toEqual([
+      { productId: 'p1', quantity: 1, variantId: undefined, note: 'Sara' },
+      { productId: 'p1', quantity: 1, variantId: undefined, note: 'Omar' },
+      { productId: 'p1', quantity: 1, variantId: undefined },
+    ]);
   });
 });

@@ -417,6 +417,7 @@ export class InvoiceService {
                 }
                 <div class="item-meta">
                   <div class="item-name">${escapeHtml(displayName)}${item.variantName ? ` &middot; ${escapeHtml(item.variantName)}` : ''}</div>
+                  ${item.personalisation ? `<div class="item-note">&#9998; <bdi>${escapeHtml(item.personalisation)}</bdi></div>` : ''}
                   ${item.sku ? `<div class="item-sku">${escapeHtml(item.sku)}</div>` : ''}
                 </div>
               </div>
@@ -585,6 +586,7 @@ export class InvoiceService {
     .item-thumb-placeholder { background: var(--line-soft); }
     .item-meta { min-width: 0; }
     .item-name { font-weight: 500; color: var(--ink); }
+    .item-note { font-size: 12px; color: var(--ink); margin-top: 2px; }
     .item-sku { font-size: 11px; color: var(--ink-mute); margin-top: 2px; font-variant-numeric: tabular-nums; }
 
     /* Totals */

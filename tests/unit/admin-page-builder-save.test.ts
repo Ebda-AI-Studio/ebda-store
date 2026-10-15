@@ -39,6 +39,48 @@ describe('admin page-builder save via draft + publish', () => {
     );
   });
 
+  it('a hero slide holding video/videoMobile (no UI in the legacy editor) keeps them through save', async () => {
+    // The legacy SlidesEditor edits a slide via `{ ...s, ...patch }` and the
+    // section via `{ ...s, slides }`, so unknown fields ride along; this proves
+    // the save path (layout -> adapter document -> draft PUT) keeps them too.
+    const withVideo = resolveLayoutSettings(
+      {
+        hero: {
+          enabled: true,
+          mode: 'single',
+          autoplayMs: 5000,
+          slides: [
+            {
+              image: 'https://media.ebda.app/p.webp',
+              video: 'https://media.ebda.app/a.mp4',
+              videoMobile: 'https://media.ebda.app/a-m.mp4',
+            },
+          ],
+        },
+      },
+      'modern'
+    );
+    api.apiGet.mockResolvedValue({ data: null, error: null });
+    api.apiPut.mockResolvedValue({ data: { rev: 8 }, error: null });
+    api.apiPost.mockResolvedValue({ data: { rev: 8 }, error: null });
+    // simulate the editor's headline edit on that slide
+    const edited = {
+      ...withVideo,
+      hero: {
+        ...withVideo.hero,
+        slides: withVideo.hero.slides.map(s => ({ ...s, headline: 'Edited' })),
+      },
+    };
+    await saveLayoutAsPage('s1', edited, 7);
+    const sent = api.apiPut.mock.calls[0][1].definition;
+    const hero = sent.sections.find((s: { type: string }) => s.type === 'hero');
+    expect(hero.blocks[0].settings).toMatchObject({
+      headline: 'Edited',
+      video: 'https://media.ebda.app/a.mp4',
+      videoMobile: 'https://media.ebda.app/a-m.mp4',
+    });
+  });
+
   it('drafts the adapter document at the loaded rev, then publishes the draft rev', async () => {
     api.apiGet.mockResolvedValue({ data: null, error: null });
     api.apiPut.mockResolvedValue({ data: { rev: 8 }, error: null });

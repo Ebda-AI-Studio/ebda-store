@@ -107,6 +107,8 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
           badgeLabelAr: p.badgeLabelAr ?? undefined,
           images: p.images,
           inStock: true,
+          options: p.options,
+          facts: p.facts,
         }))}
         title="You Might Also Like"
         titleAr="قد يعجبك أيضاً"

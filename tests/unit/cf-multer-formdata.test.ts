@@ -1,7 +1,10 @@
 /** The `multer` replacement used on Workers (apps/api/src/cf/stubs/multer-formdata.ts), on Request.formData(). */
 import { describe, it, expect } from 'vitest';
 import { Readable } from 'node:stream';
-import multer, { MulterError } from '../../apps/api/src/cf/stubs/multer-formdata';
+import multer, {
+  MulterError,
+  FRAMING_ALLOWANCE,
+} from '../../apps/api/src/cf/stubs/multer-formdata';
 
 async function run(
   mw: (req: any, res: unknown, next: (e?: unknown) => void) => Promise<void>,
@@ -110,5 +113,101 @@ describe('multer on Request.formData()', () => {
     expect(multer.memoryStorage()).toBeTruthy();
     expect(new MulterError('LIMIT_FILE_SIZE', 'f').message).toBe('File too large');
     expect(multer.MulterError).toBe(MulterError);
+  });
+});
+
+describe('pre-parse body cap (formData() buffers everything, so the route limit must not be trusted)', () => {
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024, files: 1 } });
+  const CAP = 1024 + FRAMING_ALLOWANCE;
+
+  function rawRun(chunks: Buffer[], headers: Record<string, string>) {
+    const req: any = Object.assign(Readable.from(chunks), { headers });
+    return new Promise<{ req: any; err: unknown }>(resolve => {
+      void upload.single('file')(req, {}, (err?: unknown) => resolve({ req, err }));
+    });
+  }
+
+  it('an oversize Content-Length is rejected as LIMIT_FILE_SIZE without reading the body', async () => {
+    let pulled = 0;
+    const req: any = Object.assign(
+      new Readable({
+        read() {
+          pulled++;
+          this.push(null);
+        },
+      }),
+      {
+        headers: {
+          'content-type': 'multipart/form-data; boundary=x',
+          'content-length': String(CAP + 1),
+        },
+      }
+    );
+    const err = await new Promise<unknown>(resolve => void upload.single('file')(req, {}, resolve));
+    expect(err).toBeInstanceOf(MulterError);
+    expect((err as MulterError).code).toBe('LIMIT_FILE_SIZE');
+    expect(pulled).toBe(0);
+  });
+
+  it('a chunked body past the cap with NO Content-Length errors as LIMIT_FILE_SIZE', async () => {
+    const chunk = Buffer.alloc(32 * 1024, 1);
+    const chunks = Array.from({ length: 4 }, () => chunk); // 128 KB > CAP
+    const { err } = await rawRun(chunks, { 'content-type': 'multipart/form-data; boundary=x' });
+    expect(err).toBeInstanceOf(MulterError);
+    expect((err as MulterError).code).toBe('LIMIT_FILE_SIZE');
+  });
+
+  it('when formData() reports the abort as its own TypeError (workerd), it is still LIMIT_FILE_SIZE', async () => {
+    const Real = globalThis.Response;
+    class WorkerdLikeResponse {
+      constructor(private body: ReadableStream) {}
+      async formData(): Promise<FormData> {
+        const reader = this.body.getReader();
+        try {
+          while (!(await reader.read()).done) {
+            /* drain */
+          }
+        } catch {
+          /* workerd swallows the stream error ... */
+        }
+        throw new TypeError('Failed to parse body as FormData.'); // ... and reports its own
+      }
+    }
+    (globalThis as any).Response = WorkerdLikeResponse;
+    try {
+      const chunks = Array.from({ length: 4 }, () => Buffer.alloc(32 * 1024, 1));
+      const { err } = await rawRun(chunks, { 'content-type': 'multipart/form-data; boundary=x' });
+      expect(err).toBeInstanceOf(MulterError);
+      expect((err as MulterError).code).toBe('LIMIT_FILE_SIZE');
+    } finally {
+      globalThis.Response = Real;
+    }
+  });
+
+  it('a lying (small) Content-Length does not bypass the counter', async () => {
+    const chunks = Array.from({ length: 4 }, () => Buffer.alloc(32 * 1024, 1));
+    const { err } = await rawRun(chunks, {
+      'content-type': 'multipart/form-data; boundary=x',
+      'content-length': '10',
+    });
+    expect((err as MulterError).code).toBe('LIMIT_FILE_SIZE');
+  });
+
+  it('a body under the cap still parses', async () => {
+    const form = new FormData();
+    form.set('file', file('ok.png', 'image/png', 900));
+    const { req, err } = await run(upload.single('file'), form);
+    expect(err).toBeUndefined();
+    expect(req.file.size).toBe(900);
+  });
+
+  it('.array(name, max) with no limits.files is capped at max files, not one', async () => {
+    const arr = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100_000 } });
+    const form = new FormData();
+    // 270 KB: over a one-file cap (100 KB + framing), under the three-file cap.
+    for (let i = 0; i < 3; i++) form.append('files', file(`f${i}.png`, 'image/png', 90_000));
+    const { req, err } = await run(arr.array('files', 3), form);
+    expect(err).toBeUndefined();
+    expect(req.files).toHaveLength(3);
   });
 });

@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { ResolvedZone } from './shared/section-typography';
-import type { CardFrameSize, CardFrameWidth } from '@ebda/shared';
+import type { CardFrameSize, CardFrameWidth, ProductFact } from '@ebda/shared';
 
 /**
  * Resolved per-store cart typography, passed from CartClient into the theme
@@ -51,6 +51,8 @@ export interface TemplateProduct {
    */
   badgeLabel?: string | null;
   badgeLabelAr?: string | null;
+  /** Spec rows; only the `onCard` ones surface as chips (<FactChips>). */
+  facts?: ProductFact[];
   inStock?: boolean;
   /**
    * Server-computed: inventory <= 0 AND allowBackorder. When true the product
@@ -66,6 +68,23 @@ export interface TemplateProduct {
    * lives behind the detail page.
    */
   variants?: Array<{ price?: number | null; compareAtPrice?: number | null }>;
+  /**
+   * Swatch-bearing option values only (the API listing select ships just those).
+   * Feeds `<SwatchDots>` on every card; absent/empty renders nothing.
+   */
+  options?: Array<{
+    name: string;
+    nameAr?: string | null;
+    /** Total swatch-bearing values (the row list is capped), for the card's +N. */
+    _count?: { values: number };
+    values: Array<{
+      id?: string;
+      value: string;
+      valueAr?: string | null;
+      swatchHex?: string | null;
+      swatchImageUrl?: string | null;
+    }>;
+  }>;
 }
 
 /**
@@ -382,6 +401,12 @@ export interface HeroBannerProps {
    */
   imageMobile?: string;
   imageMobileAr?: string;
+  /** Optional muted looping video overlaid on the image (the image is the poster). */
+  video?: string;
+  /** Mobile video; falls back to `video`. */
+  videoMobile?: string;
+  /** False when the slide is not the one showing (carousel): pauses its video. */
+  active?: boolean;
   alt?: string;
   headline?: string;
   headlineAr?: string;
@@ -848,6 +873,8 @@ export interface CartTableItem {
   /** Resolved variant label (e.g. "Red / Large") for display on the cart row. */
   variantTitle?: string;
   variantTitleAr?: string;
+  /** Personalisation text; render `CartLineNote` under the variant line. */
+  note?: string;
   /**
    * #1766 — the product was deleted. Render `CartLineUnavailableNotice`, keep
    * remove enabled, disable the quantity steppers; the line is not in the total.

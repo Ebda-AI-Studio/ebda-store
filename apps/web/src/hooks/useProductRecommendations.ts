@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { API_URL } from '@/lib/api';
+import type { TemplateProduct } from '../templates/types';
 
 /**
  * Shared recommendation fetching for the product-detail sections.
@@ -31,6 +32,10 @@ export interface RecommendedProduct {
   images: Array<{ id: string; url: string; alt?: string }>;
   /** Variants of this product — empty/missing means a simple SKU. */
   variants?: Array<{ id: string; price: number }>;
+  /** Swatch-bearing option values only (colour dots on the card). */
+  options?: TemplateProduct['options'];
+  /** Fact chips on the card. */
+  facts?: TemplateProduct['facts'];
 }
 
 /** `loading` and `empty` are deliberately distinct from `error`: "nothing to

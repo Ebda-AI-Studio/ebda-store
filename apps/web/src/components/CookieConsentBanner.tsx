@@ -52,7 +52,7 @@ export function CookieConsentBanner() {
       aria-modal="false"
       aria-labelledby="cookie-banner-title"
       aria-describedby="cookie-banner-body"
-      className="fixed bottom-[calc(56px+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 z-[100] border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-lg"
+      className="fixed bottom-[calc(var(--bottom-tab-h)+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 z-[100] border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-lg"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">

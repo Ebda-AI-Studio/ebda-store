@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { HeroBannerProps, HeroProps, HeroSliderProps } from '../types';
 import { resolveBannerLink } from '../shared/hero-banner-link-utils';
+import { HeroVideo } from '../../components/commerce/HeroVideo';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { DAHAB_BTN_PRIMARY, DAHAB_CONTAINER, cx, pick } from './ui';
 
@@ -40,21 +41,38 @@ function Slide({
   const ctaHref = resolveBannerLink(slide.ctaHref || slide.link, urlPrefix);
   const wholeLink = !cta ? resolveBannerLink(slide.link, urlPrefix) : null;
 
+  const posterPicture = (
+    <picture>
+      {imageMobile && imageMobile !== image && (
+        <source media="(max-width: 1023px)" srcSet={imageMobile} />
+      )}
+      <img
+        src={image}
+        alt={slide.alt || headline || ''}
+        loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : 'auto'}
+        decoding={priority ? 'sync' : 'async'}
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+    </picture>
+  );
+
   const body = (
     <>
-      <picture>
-        {imageMobile && imageMobile !== image && (
-          <source media="(max-width: 1023px)" srcSet={imageMobile} />
-        )}
-        <img
-          src={image}
-          alt={slide.alt || headline || ''}
-          loading={priority ? 'eager' : 'lazy'}
-          fetchPriority={priority ? 'high' : 'auto'}
-          decoding={priority ? 'sync' : 'async'}
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      </picture>
+      {slide.video ? (
+        // The poster picture is the base layer and the LCP element; the video
+        // only overlays it after hydration (muted, looping, reduced-motion safe).
+        <HeroVideo
+          src={slide.video}
+          srcMobile={slide.videoMobile}
+          mobileQuery="(max-width: 1023px)"
+          active={active}
+        >
+          {posterPicture}
+        </HeroVideo>
+      ) : (
+        posterPicture
+      )}
       {/* Night falls from the inline start so the copy always sits on dark. */}
       <div
         aria-hidden="true"

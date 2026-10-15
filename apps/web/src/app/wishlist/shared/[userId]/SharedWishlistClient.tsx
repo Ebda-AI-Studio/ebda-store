@@ -88,6 +88,10 @@ export default function SharedWishlistClient({ userId }: Props) {
       const response = await api.addToCart(productId, 1);
       if (response.success) {
         router.push(storeUrl('/cart'));
+      } else if (response.error?.code === 'PERSONALISATION_REQUIRED') {
+        // The merchant requires a personalisation note, typed on the PDP only.
+        const slug = items.find(i => i.product.id === productId)?.product.slug;
+        if (slug) router.push(storeUrl(`/products/${slug}`));
       } else {
         setActionError(
           (response.error as { message?: string })?.message ||

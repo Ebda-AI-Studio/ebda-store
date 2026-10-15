@@ -1769,9 +1769,11 @@ export async function auditLog(entry: AuditLogEntry) {
 // ==========================================
 
 export function sanitizeInput(req: Request, _res: Response, next: NextFunction) {
-  // Recursively sanitize strings in body
+  // Recursively sanitize strings in body. A top-level ARRAY body (a JSON-RPC batch on the MCP
+  // route) stays an array: through sanitizeObject it became {"0":...} and the route's
+  // Array.isArray(req.body) batch check could never be true.
   if (req.body && typeof req.body === 'object') {
-    req.body = sanitizeObject(req.body);
+    req.body = Array.isArray(req.body) ? sanitizeArray(req.body) : sanitizeObject(req.body);
   }
 
   // Sanitize query params
@@ -1812,20 +1814,39 @@ function sanitizeString(str: string, enforceMaxLength = true): string {
   return cleaned.trim();
 }
 
+/**
+ * Arrays keep their shape at every depth, including a top-level array body. An array that went
+ * through `sanitizeObject` was rebuilt as an object (`["S","52"]` -> `{"0":"S","1":"52"}`): a
+ * size chart's `rows` (B0 Task 9) and an MCP JSON-RPC batch both reached their routes as objects.
+ */
+function sanitizeArray(arr: unknown[]): unknown[] {
+  return arr.map(item =>
+    Array.isArray(item)
+      ? sanitizeArray(item)
+      : typeof item === 'object' && item !== null
+        ? sanitizeObject(item as Record<string, unknown>)
+        : typeof item === 'string'
+          ? sanitizeString(item)
+          : item
+  );
+}
+
+/**
+ * Keys never copied out of a request, at any depth. `sanitized['__proto__'] = value` on a plain
+ * object REPLACES its prototype (prototype pollution of the result), and `constructor` /
+ * `prototype` are the other two pollution vectors. No request field uses these names.
+ */
+const POLLUTION_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
   const sanitized: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(obj)) {
+    if (POLLUTION_KEYS.has(key)) continue;
     if (typeof value === 'string') {
       sanitized[key] = sanitizeString(value, !LARGE_CONTENT_KEYS.has(key));
     } else if (Array.isArray(value)) {
-      sanitized[key] = value.map(item =>
-        typeof item === 'object' && item !== null
-          ? sanitizeObject(item as Record<string, unknown>)
-          : typeof item === 'string'
-            ? sanitizeString(item)
-            : item
-      );
+      sanitized[key] = sanitizeArray(value);
     } else if (value && typeof value === 'object') {
       sanitized[key] = sanitizeObject(value as Record<string, unknown>);
     } else {

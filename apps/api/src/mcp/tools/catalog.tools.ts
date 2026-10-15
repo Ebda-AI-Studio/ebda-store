@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpStore } from '../resolve-store';
+import { activePersonalisation } from '@ebda/shared';
 import { ProductService } from '../../services/product.service';
 import { ok } from './tool-result';
 
@@ -24,6 +25,48 @@ import { ok } from './tool-result';
  *     price, ... }`. Mapped to `title` in the tool's own output for a
  *     stable agent-facing contract independent of the internal rename.
  */
+/**
+ * B0 commerce fields on the public product detail, narrowed for an agent. An agent that cannot
+ * see `personalisation` cannot know a product needs a name before `add_to_cart` will accept it.
+ * Every key is omitted when the merchant entered nothing, like the other optional fields.
+ */
+export function commerceDetail(p: any) {
+  const personalisation = activePersonalisation(p.personalisation);
+  const facts = Array.isArray(p.facts) ? p.facts : [];
+  const chart = p.sizeChart;
+  return {
+    facts: facts.length
+      ? facts.map((f: any) => ({
+          name: f.key,
+          name_ar: f.keyAr || undefined,
+          value: f.value,
+          value_ar: f.valueAr || undefined,
+        }))
+      : undefined,
+    personalisation: personalisation
+      ? {
+          required: personalisation.required,
+          label: personalisation.label || undefined,
+          label_ar: personalisation.labelAr || undefined,
+          max_length: personalisation.maxLength,
+        }
+      : undefined,
+    lead_time_days: typeof p.leadTimeDays === 'number' ? p.leadTimeDays : undefined,
+    size_chart: chart
+      ? {
+          name: chart.name || undefined,
+          name_ar: chart.nameAr || undefined,
+          unit: chart.unit,
+          columns: (chart.columns ?? []).map((c: any) => ({
+            label: c.label || undefined,
+            label_ar: c.labelAr || undefined,
+          })),
+          rows: chart.rows,
+        }
+      : undefined,
+  };
+}
+
 function toSummary(p: any, currency: string) {
   return {
     id: p.id,
@@ -89,6 +132,7 @@ export function registerCatalogTools(server: McpServer, store: McpStore): void {
         availability: p.inStock === false ? 'out_of_stock' : 'in_stock',
         variants: (p.variants ?? []).map((v: any) => ({ id: v.id, title: v.name, price: v.price })),
         images: (p.images ?? []).map((i: any) => i.url),
+        ...commerceDetail(p),
       });
     }
   );

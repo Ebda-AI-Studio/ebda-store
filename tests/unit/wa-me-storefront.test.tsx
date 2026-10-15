@@ -66,6 +66,35 @@ describe('storefront wa.me buttons', () => {
     expect(out).toContain('Ask or share on WhatsApp');
   });
 
+  it('product page: carries the typed personalisation ("✎ label: note") into the message', () => {
+    setup({}, 'ar');
+    const out = html(
+      <WaMeProductButton
+        product={product}
+        priceMinor={49900}
+        personalisation={{ label: 'الاسم للتطريز', note: 'سارة' }}
+      />
+    );
+    expect(hrefOf(out)).toContain('قميص كتان — 499 ج.م\n✎ الاسم للتطريز: سارة\nhttps://');
+  });
+
+  it('product page: a required, empty personalisation disables the button like add-to-cart', () => {
+    setup();
+    const out = html(<WaMeProductButton product={product} disabled />);
+    expect(out).toContain('aria-disabled="true"');
+    expect(out).not.toContain('href=');
+    expect(out).toContain('pointer-events-none');
+  });
+
+  it('product page: with onBlocked a disabled button is a tappable aria-disabled button, not an inert link', () => {
+    setup();
+    const out = html(<WaMeProductButton product={product} disabled onBlocked={() => {}} />);
+    expect(out).toContain('<button');
+    expect(out).toContain('aria-disabled="true"');
+    expect(out).not.toContain('href=');
+    expect(out).not.toContain('pointer-events-none');
+  });
+
   it('no number → no button on any surface', () => {
     for (const whatsapp of [undefined, '', '12345', '+966501234567']) {
       setup({ whatsapp });

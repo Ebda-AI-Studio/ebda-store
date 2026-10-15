@@ -13,6 +13,7 @@ import {
   minorToDecimalString,
   roundToMinor,
   REGION,
+  type ProductFact,
 } from '@ebda/shared';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
@@ -30,6 +31,16 @@ import { EditSidebar } from './_components/EditSidebar';
 import { ProductFaqSection, type ProductFaqSectionHandle } from './_components/ProductFaqSection';
 import { AiFieldBadge } from './_components/AiFieldBadge';
 import { BalanceDescriptionButton } from './_components/BalanceDescriptionButton';
+import { FactsCard } from './_components/FactsCard';
+import { FulfilmentCard, LEAD_TIME_MAX } from './_components/FulfilmentCard';
+import type { SizeChartOption } from '@/components/SizeChartSelect';
+import {
+  PersonalisationCard,
+  EMPTY_PERSONALISATION,
+  personalisationForm,
+  personalisationPayload,
+  type PersonalisationForm,
+} from './_components/PersonalisationCard';
 
 interface Product {
   id: string;
@@ -50,6 +61,10 @@ interface Product {
   sku?: string;
   inventory: number;
   lowStockThreshold?: number;
+  /** Made-to-order business days; null = ready to ship. */
+  leadTimeDays?: number | null;
+  /** Own size chart; null = inherit the category's. */
+  sizeChartId?: string | null;
   status: string;
   isFeatured: boolean;
   isNew: boolean;
@@ -57,6 +72,10 @@ interface Product {
   /** Merchant-authored product card badge (EN / AR). null = no badge. */
   badgeLabel?: string | null;
   badgeLabelAr?: string | null;
+  /** Spec rows (fabric, care, karat...). */
+  facts?: ProductFact[];
+  /** PDP personalisation field config (PersonalisationConfig); null = off. */
+  personalisation?: unknown;
   categories: { categoryId: string; category: { id: string; name: string } }[];
   images: { id: string; url: string; alt?: string; position: number }[];
   store: { id: string; name: string; slug: string };
@@ -80,6 +99,9 @@ export default function EditProductPage() {
   const t = useT('products.edit');
   const tSections = useT('products.edit.sections');
   const tFields = useT('products.edit.fields');
+  const tFacts = useT('products.edit.facts');
+  const tFulfil = useT('products.edit.fulfilment');
+  const tPersonal = useT('products.edit.personalisation');
   const tStatusOptions = useT('products.edit.statusOptions');
   const tSeo = useT('products.edit.seoSection');
   const locale = useLocale();
@@ -98,9 +120,16 @@ export default function EditProductPage() {
   // a reload.
   const [aiSources, setAiSources] = useState<Record<string, 'ai' | 'human'>>({});
   const [categories, setCategories] = useState<Category[]>([]);
+  const [sizeCharts, setSizeCharts] = useState<SizeChartOption[]>([]);
   /** Template of the store — used to show per-theme recommended upload sizes. */
   const [storeTemplate, setStoreTemplate] = useState<TemplateId | undefined>();
   const [images, setImages] = useState<string[]>([]);
+  // Spec rows live beside formData (an array, not a string field); the page's
+  // PUT is the single writer, FactsCard only edits this state.
+  const [facts, setFacts] = useState<ProductFact[]>([]);
+  // Same single-writer shape: PersonalisationCard edits this, the PUT sends it.
+  const [personalisation, setPersonalisation] =
+    useState<PersonalisationForm>(EMPTY_PERSONALISATION);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +155,10 @@ export default function EditProductPage() {
     inventory: '',
     // Per-product low-stock threshold — drives the LOW STOCK badge + alerts.
     lowStockThreshold: '',
+    // Made-to-order business days as the raw input string; '' = ready to ship (sent as null).
+    leadTimeDays: '',
+    // Own size chart id; '' = inherit the category's (sent as null).
+    sizeChartId: '',
     status: 'draft',
     isFeatured: false,
     isNew: false,
@@ -170,14 +203,17 @@ export default function EditProductPage() {
         setLoading(true);
         setNotFound(false);
 
-        const [productResult, categoriesResult, storeResult] = await Promise.all([
+        const [productResult, categoriesResult, storeResult, sizeChartsResult] = await Promise.all([
           apiGet<{ product?: Product } & Product>(
             `/api/v1/stores/${storeId}/products/${productId}`
           ),
           apiGet<{ categories: Category[] }>(`/api/v1/stores/${storeId}/categories`),
           // Fetch store template for per-theme upload-size hint (non-critical).
           apiGet<{ store: { template?: TemplateId } }>(`/api/v1/admin/stores/${storeId}`),
+          // Size-guide picker options (non-critical: the picker just lists none on failure).
+          apiGet<{ sizeCharts: SizeChartOption[] }>(`/api/v1/stores/${storeId}/size-charts`),
         ]);
+        setSizeCharts(sizeChartsResult.data?.sizeCharts ?? []);
         if (storeResult.data?.store?.template) {
           setStoreTemplate(storeResult.data.store.template);
         }
@@ -224,6 +260,8 @@ export default function EditProductPage() {
           discountValue: p.discountValue ?? null,
         });
 
+        setFacts(Array.isArray(p.facts) ? p.facts : []);
+        setPersonalisation(personalisationForm(p.personalisation));
         setFormData({
           name: p.name || '',
           nameAr: p.nameAr || '',
@@ -240,6 +278,9 @@ export default function EditProductPage() {
             p.lowStockThreshold === undefined || p.lowStockThreshold === null
               ? ''
               : String(p.lowStockThreshold),
+          leadTimeDays:
+            p.leadTimeDays === undefined || p.leadTimeDays === null ? '' : String(p.leadTimeDays),
+          sizeChartId: p.sizeChartId ?? '',
           status: p.status || 'draft',
           isFeatured: p.isFeatured || false,
           isNew: p.isNew || false,
@@ -460,6 +501,31 @@ export default function EditProductPage() {
         }
       }
 
+      // Drop untouched blank rows; a half-filled row is a merchant error, caught
+      // here instead of as an opaque API 400.
+      const factsPayload = facts.filter(f => f.key || f.keyAr || f.value || f.valueAr);
+      if (factsPayload.some(f => !(f.key || f.keyAr) || !(f.value || f.valueAr))) {
+        setError(tFacts('needBoth'));
+        return;
+      }
+
+      // Whole days 0..60, or empty (= ready to ship, sent as null so a stored value clears).
+      const leadRaw = formData.leadTimeDays.trim();
+      const leadTimeDays = leadRaw === '' ? null : Number(leadRaw);
+      if (
+        leadTimeDays !== null &&
+        (!Number.isInteger(leadTimeDays) || leadTimeDays < 0 || leadTimeDays > LEAD_TIME_MAX)
+      ) {
+        setError(tFulfil('invalid', { max: LEAD_TIME_MAX }));
+        return;
+      }
+
+      const personal = personalisationPayload(personalisation);
+      if ('error' in personal) {
+        setError(tPersonal(personal.error));
+        return;
+      }
+
       const body: Record<string, unknown> = {
         name: formData.name,
         // Clearable free text (nameAr / description / descriptionAr / sku).
@@ -494,6 +560,10 @@ export default function EditProductPage() {
         metaDescriptionAeo: formData.metaDescriptionAeo || null,
         metaDescriptionAeoAr: formData.metaDescriptionAeoAr || null,
         images: images.map((url, i) => ({ url, position: i })),
+        facts: factsPayload,
+        leadTimeDays,
+        personalisation: personal.value,
+        sizeChartId: formData.sizeChartId || null,
       };
 
       if (formData.category) {
@@ -773,6 +843,10 @@ export default function EditProductPage() {
               </div>
             </div>
 
+            <FactsCard storeId={storeId} facts={facts} onChange={setFacts} />
+
+            <PersonalisationCard value={personalisation} onChange={setPersonalisation} />
+
             <div className="rounded-xl border bg-card p-6 shadow-sm">
               <div className="mb-4 flex items-baseline justify-between gap-3 flex-wrap">
                 <h2 className="text-lg font-semibold text-foreground">{tSections('media')}</h2>
@@ -889,10 +963,7 @@ export default function EditProductPage() {
                         {formatPrice(regularFils)}
                       </span>{' '}
                       <span className="ml-1 text-sm font-medium text-success-ink">
-                        {tFields('discountOff').replace(
-                          '{pct}',
-                          pctOff.toFixed(1).replace(/\.0$/, '')
-                        )}
+                        {tFields('discountOff', { pct: pctOff.toFixed(1).replace(/\.0$/, '') })}
                       </span>
                     </p>
                   </div>
@@ -949,6 +1020,15 @@ export default function EditProductPage() {
                 />
               </div>
             </div>
+
+            <FulfilmentCard
+              value={formData.leadTimeDays}
+              onChange={v => updateField('leadTimeDays', v)}
+              storeId={storeId}
+              sizeCharts={sizeCharts}
+              sizeChartId={formData.sizeChartId}
+              onSizeChartChange={v => updateField('sizeChartId', v)}
+            />
 
             {/* SEO meta — what shows up on Google + social shares.
                 "Generate with AI" now fills SEO + AEO meta AND drafts FAQs

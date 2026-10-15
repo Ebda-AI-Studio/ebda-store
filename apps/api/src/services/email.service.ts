@@ -239,6 +239,12 @@ export interface OrderEmailData {
     name: string;
     /** Live product's Arabic name; Arabic template prefers it over `name`. */
     nameAr?: string | null;
+    /** Snapshotted variant title ("Large / Red"). */
+    variantName?: string | null;
+    /** Arabic variant snapshot (Ruling B0-41); the Arabic template prefers it. */
+    variantNameAr?: string | null;
+    /** The customer's personalisation text, rendered as "✎ text" under the name. */
+    personalisation?: string | null;
     quantity: number;
     price: number;
   }>;

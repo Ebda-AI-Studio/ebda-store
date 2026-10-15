@@ -333,6 +333,14 @@ export const R2_REFERENCE_COLUMNS: readonly R2ReferenceColumn[] = [
     kind: 'url',
     why: 'per-variant image upload',
   },
+  {
+    model: 'ProductOptionValue',
+    field: 'swatchImageUrl',
+    table: 'product_option_values',
+    column: 'swatch_image_url',
+    kind: 'url',
+    why: 'option-value swatch photo upload',
+  },
   // ── Product 3D models (docs/plans/2026-10-07-product-3d-viewer.md) ─────────
   {
     model: 'ProductModel',

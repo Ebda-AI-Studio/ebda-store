@@ -260,14 +260,11 @@ export function MassEditModal({
         return;
       }
 
-      let desc = t('massEdit.toast.successDescription').replace('{updated}', String(data.updated));
+      let desc = t('massEdit.toast.successDescription', { updated: String(data.updated) });
       if (data.skippedVariantProducts > 0) {
         desc +=
           ' ' +
-          t('massEdit.toast.skippedDescription').replace(
-            '{skipped}',
-            String(data.skippedVariantProducts)
-          );
+          t('massEdit.toast.skippedDescription', { skipped: String(data.skippedVariantProducts) });
       }
       toastSuccess(t('massEdit.toast.successTitle'), desc);
       onSuccess();
@@ -331,7 +328,7 @@ export function MassEditModal({
 
   // ── render ───────────────────────────────────────────────────────────────
 
-  const modalTitle = t('massEdit.title').replace('{count}', String(selectedProducts.length));
+  const modalTitle = t('massEdit.title', { count: String(selectedProducts.length) });
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={modalTitle}>
@@ -521,22 +518,20 @@ export function MassEditModal({
             <>
               {simpleSelectedProducts.length > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  {t('massEdit.simpleProductsNote').replace(
-                    '{count}',
-                    String(simpleSelectedProducts.length)
-                  )}
+                  {t('massEdit.simpleProductsNote', {
+                    count: String(simpleSelectedProducts.length),
+                  })}
                 </p>
               )}
               {isCapped && (
                 <p className="text-xs text-warning-ink">
-                  {t('massEdit.variantCap').replace('{cap}', String(VARIANT_LOAD_CAP))}
+                  {t('massEdit.variantCap', { cap: String(VARIANT_LOAD_CAP) })}
                 </p>
               )}
               <p className="text-xs text-muted-foreground">
-                {t('massEdit.variantProductsNote').replace(
-                  '{count}',
-                  String(Math.min(variantSelectedProducts.length, VARIANT_LOAD_CAP))
-                )}
+                {t('massEdit.variantProductsNote', {
+                  count: String(Math.min(variantSelectedProducts.length, VARIANT_LOAD_CAP)),
+                })}
               </p>
 
               {loadingVariants ? (

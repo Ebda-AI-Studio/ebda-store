@@ -891,3 +891,55 @@ describe('builder publish -> storefront route serves the published document', { 
     );
   });
 });
+
+describe('hero slide video survives draft -> publish -> public read', () => {
+  it('video and videoMobile are not stripped by any layer (the imageMobile trap)', async () => {
+    const storeId = await freshStore('herovid');
+    const slide = {
+      image: 'https://media.ebda.app/s/poster.webp',
+      imageMobile: 'https://media.ebda.app/s/poster-m.webp',
+      video: 'https://media.ebda.app/s/a.mp4',
+      videoMobile: 'https://media.ebda.app/s/a-m.mp4',
+    };
+    const doc = withRealCopy(
+      docFor({ hero: { enabled: true, mode: 'single', autoplayMs: 5000, slides: [slide] } })
+    );
+    const saved = await inStore(storeId, () =>
+      saveDraft({ storeId, pageKey: HOME, baseRev: 0, definition: doc, userId: null })
+    );
+    expect(saved).toMatchObject({ ok: true, value: { rev: 1 } });
+    const pub = await inStore(storeId, () => publishDraft({ storeId, pageKey: HOME, baseRev: 1 }));
+    expect(pub).toMatchObject({ ok: true });
+    const stored = await layoutOf(storeId);
+    expect((stored.hero as { slides: unknown[] }).slides[0]).toMatchObject({
+      video: slide.video,
+      videoMobile: slide.videoMobile,
+    });
+    const read = await getPublishedDefinition(
+      storeId,
+      resolveLayoutSettings(stored, 'modern'),
+      'modern'
+    );
+    const heroNode = read.definition.sections.find(s => s.type === 'hero')!;
+    expect(heroNode.blocks![0].settings).toMatchObject({
+      video: slide.video,
+      videoMobile: slide.videoMobile,
+    });
+  });
+
+  it('a javascript: video is a 422 on the draft', async () => {
+    const storeId = await freshStore('herovidbad');
+    const doc = docFor({
+      hero: {
+        enabled: true,
+        mode: 'single',
+        autoplayMs: 5000,
+        slides: [{ image: '/a.webp', video: 'javascript:alert(1)' }],
+      },
+    });
+    const r = await inStore(storeId, () =>
+      saveDraft({ storeId, pageKey: HOME, baseRev: 0, definition: doc, userId: null })
+    );
+    expect(r).toMatchObject({ ok: false, status: 422 });
+  });
+});

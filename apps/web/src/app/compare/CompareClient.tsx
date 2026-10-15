@@ -10,6 +10,8 @@ import { useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { compareStorageKey } from '../../lib/compare';
+import type { ProductFact } from '@ebda/shared';
+import { compareFactRows } from '../../lib/compare-facts';
 
 interface CompareProduct {
   id: string;
@@ -20,6 +22,7 @@ interface CompareProduct {
   images: string[];
   description?: string;
   specifications?: Record<string, string>;
+  facts?: ProductFact[];
 }
 
 // Load compare products from localStorage
@@ -41,7 +44,7 @@ export default function CompareClient() {
   const [isLoading] = useState(false);
   const { addItem } = useCart();
   const storeUrl = useStoreUrl();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { money } = useNumerals();
 
   function handleAddToCart(product: CompareProduct) {
@@ -141,6 +144,9 @@ export default function CompareClient() {
       Object.keys(p.specifications).forEach(key => allSpecs.add(key));
     }
   });
+
+  // One row per distinct (EN, AR) fact name pair; "—" where a product lacks it.
+  const factRows = compareFactRows(products, language === 'ar' ? 'ar' : 'en');
 
   return (
     <ShopChrome>
@@ -266,6 +272,18 @@ export default function CompareClient() {
                     <td key={product.id} className="p-4 text-center text-sm">
                       {product.specifications?.[spec] || (
                         <span className="text-muted-foreground/70">-</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {factRows.map(row => (
+                <tr key={`fact-${row.id}`} className="border-t">
+                  <td className="p-4 font-medium text-muted-foreground">{row.label}</td>
+                  {products.map(product => (
+                    <td key={product.id} className="p-4 text-center text-sm">
+                      {row.values[product.id] || (
+                        <span className="text-muted-foreground/70">&mdash;</span>
                       )}
                     </td>
                   ))}

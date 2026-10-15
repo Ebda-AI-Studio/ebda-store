@@ -16,7 +16,7 @@
  */
 import { intlLocale, type Numerals } from '@ebda/shared';
 
-export type FormatDateStyle = 'short' | 'long' | 'datetime';
+export type FormatDateStyle = 'short' | 'medium' | 'long' | 'datetime' | 'day';
 
 export interface FormatDateOptions {
   /** Store IANA timezone (e.g. 'Africa/Cairo'). Falls back to Africa/Cairo. */
@@ -49,6 +49,14 @@ function presetOptions(style: FormatDateStyle): Intl.DateTimeFormatOptions {
   switch (style) {
     case 'short':
       return { year: 'numeric', month: 'numeric', day: 'numeric' };
+    case 'medium':
+      // "15 Oct 2026" / "١٥ أكتوبر ٢٠٢٦": no month-first numeric date for an Egyptian
+      // reader. Parts are re-joined day month year (see `format`).
+      return { day: 'numeric', month: 'short', year: 'numeric' };
+    case 'day':
+      // No year, e.g. "Wed 21 Oct" / "الأربعاء ٢١ أكتوبر": for near-term dates like a delivery
+      // window. Parts are re-joined weekday day month (see `format`), so no locale comma.
+      return { weekday: 'short', day: 'numeric', month: 'short' };
     case 'datetime':
       return {
         year: 'numeric',
@@ -80,21 +88,29 @@ export function formatDate(input: string | number | Date, opts: FormatDateOption
   if (!date) return '';
 
   const locale = resolveLocale(opts.language, opts.numerals);
-  const timeZone = opts.timezone || DEFAULT_TIMEZONE;
-  const options: Intl.DateTimeFormatOptions = {
-    ...presetOptions(opts.style ?? 'long'),
-    timeZone,
+  const style = opts.style ?? 'long';
+  const format = (timeZone: string): string => {
+    const dtf = new Intl.DateTimeFormat(locale, { ...presetOptions(style), timeZone });
+    if (style !== 'day' && style !== 'medium') return dtf.format(date);
+    // Fixed weekday-day-month (or day-month-year) order with single spaces: en-US would
+    // say "Wed, Oct 21" / "Oct 15, 2026".
+    const parts = dtf.formatToParts(date);
+    const order =
+      style === 'day'
+        ? (['weekday', 'day', 'month'] as const)
+        : (['day', 'month', 'year'] as const);
+    return order
+      .map(t => parts.find(p => p.type === t)?.value)
+      .filter(Boolean)
+      .join(' ');
   };
 
   try {
-    return new Intl.DateTimeFormat(locale, options).format(date);
+    return format(opts.timezone || DEFAULT_TIMEZONE);
   } catch {
     // An invalid IANA zone (typo in admin settings) would otherwise crash
     // every page that renders a date. Fall back silently to the default.
-    return new Intl.DateTimeFormat(locale, {
-      ...presetOptions(opts.style ?? 'long'),
-      timeZone: DEFAULT_TIMEZONE,
-    }).format(date);
+    return format(DEFAULT_TIMEZONE);
   }
 }
 

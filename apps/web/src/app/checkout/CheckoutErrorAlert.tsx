@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 /**
@@ -32,9 +33,12 @@ import { useLanguage } from '../../contexts/LanguageContext';
 export function CheckoutErrorAlert({
   message,
   onClear,
+  action,
 }: {
   message: string | null;
   onClear: () => void;
+  /** Optional way out of the error (e.g. back to the cart). */
+  action?: { href: string; label: string };
 }) {
   const { t } = useLanguage();
   const ref = useRef<HTMLDivElement>(null);
@@ -76,6 +80,14 @@ export function CheckoutErrorAlert({
           <p className="mt-1 text-sm text-destructive-ink" dir="auto">
             {message}
           </p>
+          {action && (
+            <Link
+              href={action.href}
+              className="mt-2 inline-block text-sm font-medium text-destructive-ink underline"
+            >
+              {action.label}
+            </Link>
+          )}
         </div>
         <button
           type="button"

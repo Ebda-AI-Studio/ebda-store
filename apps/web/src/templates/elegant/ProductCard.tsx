@@ -38,6 +38,8 @@ import {
   getCustomBadgeTextColor,
   resolveCardBadges,
 } from '../shared/custom-badge';
+import { SwatchDots } from '../../components/commerce/SwatchDots';
+import { FactChips } from '../../components/commerce/FactChips';
 
 /**
  * Elegant Template - Product Card
@@ -463,6 +465,8 @@ function ElegantProductCard({
             {priceVisible && (
               <TaxInclusiveLabel className="block text-[10px] tracking-[0.2em] uppercase text-muted-foreground/60" />
             )}
+            <SwatchDots product={product} max={5} className="justify-center" />
+            <FactChips product={product} className="mt-1 justify-center" />
           </div>
         )}
       </Link>

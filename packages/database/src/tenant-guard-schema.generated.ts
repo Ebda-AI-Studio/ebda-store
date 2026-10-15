@@ -116,6 +116,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       codRemittances: 'CodRemittance',
       pageRevisions: 'StorePageRevision',
       productModels: 'ProductModel',
+      sizeCharts: 'SizeChart',
       productModelBindings: 'ProductModelBinding',
       affiliates: 'Affiliate',
       affiliateReferrals: 'AffiliateReferral',
@@ -256,6 +257,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       parent: 'Category',
       children: 'Category',
       products: 'ProductCategory',
+      sizeChart: 'SizeChart',
     },
   },
   {
@@ -293,6 +295,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       dailyViews: 'ProductDailyView',
       bundleItems: 'BundleItem',
       model3d: 'ProductModel',
+      sizeChart: 'SizeChart',
     },
   },
   {
@@ -386,6 +389,16 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       store: 'Store',
       product: 'Product',
       bindings: 'ProductModelBinding',
+    },
+  },
+  {
+    name: 'SizeChart',
+    table: 'size_charts',
+    storeId: true,
+    relations: {
+      store: 'Store',
+      products: 'Product',
+      categories: 'Category',
     },
   },
   {

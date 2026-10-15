@@ -103,3 +103,39 @@ describe('heroSlideSchema — link (banner link)', () => {
     }
   });
 });
+
+describe('heroSlideSchema — video / videoMobile (hero video)', () => {
+  it('round-trips an https video and a relative mobile video unchanged', () => {
+    const slide = {
+      ...baseSlide,
+      video: 'https://media.ebda.app/s/a.mp4',
+      videoMobile: '/uploads/a-m.mp4',
+    };
+    const result = heroSlideSchema.safeParse(slide);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.video).toBe('https://media.ebda.app/s/a.mp4');
+      expect(result.data.videoMobile).toBe('/uploads/a-m.mp4');
+    }
+  });
+
+  it('accepts omitted and cleared (empty string) video', () => {
+    expect(heroSlideSchema.safeParse(baseSlide).success).toBe(true);
+    expect(heroSlideSchema.safeParse({ ...baseSlide, video: '', videoMobile: '' }).success).toBe(
+      true
+    );
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'data:video/mp4;base64,AAAA',
+    'http://x.r2.dev/a.mp4',
+    'mailto:a@b.co',
+    'tel:+20100',
+    'blob:https://x/1',
+    'example.com/a.mp4',
+  ])('rejects video %s', bad => {
+    expect(heroSlideSchema.safeParse({ ...baseSlide, video: bad }).success).toBe(false);
+    expect(heroSlideSchema.safeParse({ ...baseSlide, videoMobile: bad }).success).toBe(false);
+  });
+});

@@ -8,6 +8,7 @@ import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
 import { BundleLine } from '../../components/BundleLine';
+import { CartLineNote } from '../../components/commerce/CartLineNote';
 import type { CheckoutCartItem, CheckoutCartBundle, Coupon } from './types';
 
 /** Loyalty redemption control state, threaded from CheckoutClient. Present
@@ -200,6 +201,7 @@ export function OrderSummary({
                 <h3 className="text-base font-semibold text-foreground">
                   {productLabel(item.product)}
                 </h3>
+                <CartLineNote note={item.note} />
                 <p className="mt-auto text-sm font-medium text-muted-foreground">
                   {formatPrice(item.price * item.quantity)}
                 </p>

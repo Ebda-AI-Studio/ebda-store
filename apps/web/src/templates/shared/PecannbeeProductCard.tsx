@@ -38,6 +38,8 @@ import { getCustomBadgeColor, getCustomBadgeTextColor, resolveCardBadges } from 
 
 import { fromMinor } from '@ebda/shared';
 import { REGION } from '@ebda/shared';
+import { SwatchDots } from '../../components/commerce/SwatchDots';
+import { FactChips } from '../../components/commerce/FactChips';
 interface PecannbeeProductCardProps extends ProductCardProps {
   pack?: TemplateId;
   /**
@@ -513,6 +515,8 @@ function PecannbeeProductCardImpl({
               </div>
             )}
             {priceVisible && <TaxInclusiveLabel className="block text-xs text-muted-foreground" />}
+            <SwatchDots product={product} max={5} className="mt-1" />
+            <FactChips product={product} className="mt-1" />
           </>
         )}
 

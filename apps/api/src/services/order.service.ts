@@ -15,6 +15,7 @@ import {
   fromMinor,
   minorToDecimalString,
   normalizePhoneForStorage,
+  activePersonalisation,
   REGION,
 } from '@ebda/shared';
 import { FiscalDocumentService } from './fiscal-document.service';
@@ -718,6 +719,38 @@ export class OrderService {
         'PRODUCT_NO_LONGER_AVAILABLE',
         'A product in your cart is no longer available. Remove it and try again.',
         { productIds: missingProductIds }
+      );
+    }
+
+    // A required personalisation is re-checked HERE, not only at add-to-cart:
+    // a line added before the merchant made the field required (or merged in
+    // from a guest cart) carries no note, and the workshop cannot make it.
+    // Names + labels travel in `details` so the checkout can say which item
+    // and what to write, in the shopper's language.
+    const missingPersonalisation = cart.items.flatMap(item => {
+      const cfg = activePersonalisation(item.product.personalisation);
+      const note = item.note;
+      return cfg?.required && !note
+        ? [
+            {
+              productId: item.productId,
+              name: item.product.name,
+              nameAr: item.product.nameAr ?? null,
+              label: cfg.label,
+              labelAr: cfg.labelAr,
+            },
+          ]
+        : [];
+    });
+    if (missingPersonalisation.length > 0) {
+      throw new AppError(
+        400,
+        'PERSONALISATION_REQUIRED',
+        `Personalisation is required for: ${missingPersonalisation.map(m => m.name).join(', ')}`,
+        {
+          productIds: missingPersonalisation.map(m => m.productId),
+          products: missingPersonalisation,
+        }
       );
     }
 
@@ -1545,6 +1578,17 @@ export class OrderService {
                   // already carries variantId; we just have to copy it.
                   variantId: (item as { variantId?: string | null }).variantId ?? null,
                   productName: item.product.name,
+                  // Snapshot the chosen variant's title in BOTH languages (Ruling
+                  // B0-41): `variantName` stays the canonical title every fiscal
+                  // document, CSV export and pre-B0 reader expects; `variantNameAr`
+                  // is what the Arabic storefront and admin render (falling back
+                  // to `variantName`). Storefront orders never wrote it before, so
+                  // admin/invoice/email showed no size or colour for a variant
+                  // line; createAdminOrder already did.
+                  variantName: item.variant?.title ?? null,
+                  variantNameAr: item.variant?.titleAr || null,
+                  // The customer's personalisation text (cart line note).
+                  personalisation: item.note ?? null,
                   sku: item.product.sku,
                   quantity: item.quantity,
                   // Charge the chosen variant's price (fall back to the parent
@@ -2715,6 +2759,7 @@ export class OrderService {
       let unitPrice = product.price;
       let variantSku: string | undefined;
       let variantTitle: string | undefined;
+      let variantTitleAr: string | null = null;
       if (it.variantId) {
         const variant = product.variants.find(v => v.id === it.variantId);
         if (!variant) {
@@ -2727,6 +2772,7 @@ export class OrderService {
         if (typeof variant.price === 'number') unitPrice = variant.price;
         variantSku = variant.sku ?? undefined;
         variantTitle = variant.title ?? undefined;
+        variantTitleAr = variant.titleAr || null;
       }
       const quantity = Math.max(1, Math.floor(it.quantity));
       const lineTotal = unitPrice * quantity;
@@ -2736,6 +2782,7 @@ export class OrderService {
         sku: variantSku ?? product.sku ?? undefined,
         variantId: it.variantId,
         variantTitle,
+        variantTitleAr,
         unitPrice,
         // Admin manual orders never snapshotted cost at all, so every line
         // they created had no COGS and no profit. Same rule as checkout.
@@ -3017,6 +3064,7 @@ export class OrderService {
               // admin manual order with a variant line failed since the
               // phone-order MVP (2ba38332) — found by the cost-snapshot test.
               variantName: r.variantTitle,
+              variantNameAr: r.variantTitleAr,
               price: r.unitPrice,
               costPrice: r.costPrice,
               quantity: r.quantity,

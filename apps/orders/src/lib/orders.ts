@@ -38,6 +38,10 @@ export interface OrderLineItem {
   productId?: string;
   productName: string;
   variantName?: string | null;
+  /** Arabic variant snapshot (Ruling B0-41); null on orders placed before it existed. */
+  variantNameAr?: string | null;
+  /** The customer's personalisation text (e.g. the name to embroider). */
+  personalisation?: string | null;
   sku?: string | null;
   quantity: number;
   price?: number;

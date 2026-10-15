@@ -150,6 +150,7 @@ export function HeroSlider({
               isRtl={isRtl}
               pack={pack}
               priority={i === 0}
+              active={i === activeIndex}
               presentation={presentation}
               headingZone={headingZone}
               urlPrefix={urlPrefix}

@@ -43,29 +43,57 @@ function WaLink({
   prominent,
   className = '',
   testId,
+  disabled,
+  onBlocked,
 }: {
   href: string;
   label: string;
   prominent?: boolean;
   className?: string;
   testId: string;
+  /** Rendered but not followable (no href), e.g. a required personalisation is empty. */
+  disabled?: boolean;
+  /**
+   * With `disabled`: the blocked tap does something (the PDP nudges the empty field) instead of
+   * being inert, so it renders a real button, still `aria-disabled`, and stays tappable.
+   */
+  onBlocked?: () => void;
 }) {
+  const classes = (extra: string) =>
+    extra +
+    (prominent
+      ? 'inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-5 py-3 text-base font-semibold text-white shadow-sm hover:brightness-95'
+      : 'inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted') +
+    ` ${className}`;
+  const glyph = (
+    <WhatsappGlyphIcon
+      className={`h-5 w-5 shrink-0 ${prominent ? '' : 'rounded-full bg-[#25D366] p-0.5'}`}
+    />
+  );
+  if (disabled && onBlocked) {
+    return (
+      <button
+        type="button"
+        data-testid={testId}
+        aria-disabled="true"
+        onClick={onBlocked}
+        className={classes('opacity-50 ')}
+      >
+        {glyph}
+        {label}
+      </button>
+    );
+  }
   return (
     <a
-      href={href}
+      href={disabled ? undefined : href}
       target="_blank"
       rel="noopener noreferrer"
       data-testid={testId}
-      className={
-        (prominent
-          ? 'inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-5 py-3 text-base font-semibold text-white shadow-sm hover:brightness-95'
-          : 'inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted') +
-        ` ${className}`
-      }
+      aria-disabled={disabled || undefined}
+      className={classes(disabled ? 'pointer-events-none opacity-50 ' : '')}
     >
-      <WhatsappGlyphIcon
-        className={`h-5 w-5 shrink-0 ${prominent ? '' : 'rounded-full bg-[#25D366] p-0.5'}`}
-      />
+      {glyph}
       {label}
     </a>
   );
@@ -76,10 +104,19 @@ export function WaMeProductButton({
   product,
   priceMinor,
   className = '',
+  personalisation,
+  disabled,
+  onBlocked,
 }: {
   product: { slug: string; name: string; nameAr?: string | null };
   priceMinor?: number | null;
   className?: string;
+  /** The customer's typed text, carried into the WhatsApp message. */
+  personalisation?: { label: string; note: string } | null;
+  /** Same gate as add-to-cart's required-personalisation rule. */
+  disabled?: boolean;
+  /** Tap while `disabled`: the PDP's `noteMissing` nudge (scroll to + focus the field). */
+  onBlocked?: () => void;
 }) {
   const { store, locale, t, visibility } = useWaMe();
   if (!visibility.productShare) return null;
@@ -88,6 +125,7 @@ export function WaMeProductButton({
     productName: locale === 'ar' && product.nameAr ? product.nameAr : product.name,
     priceMinor,
     url: productUrl(store, product.slug),
+    personalisation,
   });
   const href = waMeLink(store.whatsapp, text);
   if (!href) return null;
@@ -96,6 +134,8 @@ export function WaMeProductButton({
       href={href}
       testId="wa-me-product"
       className={className}
+      disabled={disabled}
+      onBlocked={onBlocked}
       label={t('Ask or share on WhatsApp', 'اسأل أو شارك على واتساب')}
     />
   );

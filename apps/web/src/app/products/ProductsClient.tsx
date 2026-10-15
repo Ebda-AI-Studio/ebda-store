@@ -493,6 +493,7 @@ export default function ProductsClient({
       price: product.price,
       compareAtPrice: product.compareAtPrice,
       images: product.images?.map(img => img.url) ?? [],
+      facts: product.facts,
     });
     if (result === 'max_reached') {
       warning(

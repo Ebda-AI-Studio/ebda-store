@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod';
 import { ProductService } from '../services/product.service';
+import { SizeChartService } from '../services/size-chart.service';
 import { CartService } from '../services/cart.service';
 import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
@@ -93,6 +94,8 @@ const addCartItemSchema = z.object({
   productId: z.string().uuid(),
   quantity: z.number().int().min(1).default(1),
   variantId: z.string().uuid().optional(),
+  // Personalisation text. 400 before cleaning; cleanNote caps the stored text at 200.
+  note: z.string().max(400).optional(),
 });
 
 const updateCartItemSchema = z.object({
@@ -355,6 +358,26 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
 });
 
 /**
+ * GET /public/size-charts — every size chart of the resolved store, for the storefront
+ * `/size-guide` page (B0 Task 9). The PDP gets its own resolved chart inside the product payload.
+ * CACHE CLASS: BOUNDED-stale display content. No Redis layer: one indexed query, fronted by the
+ * storefront's `products:<store>` data-cache tag, which every chart write purges through
+ * invalidateStoreProductCaches; the 60s edge cache is the same residual as the PDP.
+ */
+router.get('/size-charts', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = await getStoreIdFromRequest(req);
+    const sizeCharts = await readInStoreContext(storeId, () =>
+      SizeChartService.listPublic(storeId)
+    );
+    setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
+    res.json({ success: true, data: { sizeCharts } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * GET /public/feed/products.json — AI Product Feed (agent_feed; all paid plans).
  * Fail-closed: 404 when the feature is not enabled for the store, so the
  * URL does not reveal the add-on's existence on stores that didn't buy it.
@@ -544,7 +567,7 @@ router.post('/cart/items', cartLimiter, async (req: Request, res: Response, next
       return;
     }
 
-    const { productId, quantity, variantId } = addCartItemSchema.parse(req.body);
+    const { productId, quantity, variantId, note } = addCartItemSchema.parse(req.body);
     const storeId = await getStoreIdFromRequest(req);
     const cart = await CartService.addItem(
       storeId,
@@ -552,7 +575,8 @@ router.post('/cart/items', cartLimiter, async (req: Request, res: Response, next
       productId,
       quantity,
       undefined,
-      variantId
+      variantId,
+      note
     );
 
     res.json({
@@ -575,6 +599,7 @@ const syncCartSchema = z.object({
         productId: z.string().uuid(),
         quantity: z.number().int().min(1),
         variantId: z.string().uuid().optional(),
+        note: z.string().max(400).optional(),
       })
     )
     .max(100),

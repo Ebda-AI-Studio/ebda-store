@@ -1,5 +1,6 @@
 'use client';
 
+import { VariantText } from '@ebda/ui';
 import { useState, useEffect, useCallback } from 'react';
 import { useLocalePrice } from '../../../../hooks/useLocalePrice';
 import Link from 'next/link';
@@ -18,6 +19,7 @@ import {
   orderTaxPlacement,
   storeNumerals,
   intlLocale,
+  orderLineVariantTitle,
 } from '@ebda/shared';
 import {
   orderStatusLabel,
@@ -27,6 +29,7 @@ import {
   paymentMethodLabel,
 } from '@/lib/order-labels';
 import { WaMeOrderQuestionButton } from '../../../../templates/shared/WaMeButtons';
+import { CartLineNote } from '../../../../components/commerce/CartLineNote';
 
 interface OrderDetail {
   id: string;
@@ -106,6 +109,11 @@ interface OrderDetail {
     bundleGroupId?: string | null;
     bundleName?: string | null;
     bundleNameAr?: string | null;
+    variantName?: string | null;
+    /** Arabic variant snapshot (Ruling B0-41), rendered in Arabic with variantName fallback. */
+    variantNameAr?: string | null;
+    /** The customer's personalisation text for this line. */
+    personalisation?: string | null;
   }[];
   payments: {
     id: string;
@@ -501,14 +509,25 @@ export default function OrderDetailClient() {
                             </div>
                           )}
                         </div>
-                        <span className="font-medium text-foreground">
-                          {name}
-                          {row.kind === 'bundle' && (
-                            <span className="ms-2 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                              {t('Bundle', '\u0628\u0627\u0642\u0629')}
-                            </span>
-                          )}
-                        </span>
+                        <div>
+                          <span className="font-medium text-foreground">
+                            {name}
+                            {row.kind === 'bundle' && (
+                              <span className="ms-2 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                {t('Bundle', '\u0628\u0627\u0642\u0629')}
+                              </span>
+                            )}
+                          </span>
+                          {row.kind === 'item' &&
+                            orderLineVariantTitle(row.item, language === 'ar') && (
+                              <p className="text-xs text-muted-foreground">
+                                <VariantText
+                                  title={orderLineVariantTitle(row.item, language === 'ar')!}
+                                />
+                              </p>
+                            )}
+                          {row.kind === 'item' && <CartLineNote note={row.item.personalisation} />}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-4 text-center text-foreground">{quantity}</td>
@@ -576,6 +595,12 @@ export default function OrderDetailClient() {
                       </span>
                     )}
                   </p>
+                  {row.kind === 'item' && orderLineVariantTitle(row.item, language === 'ar') && (
+                    <p className="text-xs text-muted-foreground">
+                      <VariantText title={orderLineVariantTitle(row.item, language === 'ar')!} />
+                    </p>
+                  )}
+                  {row.kind === 'item' && <CartLineNote note={row.item.personalisation} />}
                   <p className="text-sm text-muted-foreground">
                     {row.kind === 'bundle'
                       ? `${t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: ${quantity}`

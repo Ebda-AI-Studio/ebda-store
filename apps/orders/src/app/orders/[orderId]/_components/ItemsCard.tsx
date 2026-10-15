@@ -2,7 +2,12 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { groupOrderLinesForDisplay, type OrderDisplayLine } from '@ebda/shared';
+import {
+  groupOrderLinesForDisplay,
+  orderLineVariantTitle,
+  variantTitleSegments,
+  type OrderDisplayLine,
+} from '@ebda/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMoney, fmt } from '@/lib/format';
 import type { OrderDetail, OrderLineItem } from '@/lib/orders';
@@ -182,6 +187,8 @@ function ItemRow({ item, currency }: { item: OrderLineItem; currency?: string })
   // order_items only snapshots the English productName; in Arabic, prefer the
   // live product's name_ar (falls back to the snapshot when absent / deleted).
   const displayName = locale === 'ar' ? item.product?.nameAr || item.productName : item.productName;
+  // Per the app locale, with fallback (Ruling B0-41); one <bdi> per option value (F8).
+  const variantName = orderLineVariantTitle(item, locale === 'ar');
 
   return (
     <li className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
@@ -215,14 +222,57 @@ function ItemRow({ item, currency }: { item: OrderLineItem; currency?: string })
           </p>
         </div>
         <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-          {item.variantName && <span>{item.variantName}</span>}
-          {item.variantName && <span aria-hidden>·</span>}
+          {variantName && (
+            <span>
+              {variantTitleSegments(variantName).map((part, i) => (
+                <span key={i}>
+                  {i > 0 && ' · '}
+                  <bdi>{part}</bdi>
+                </span>
+              ))}
+            </span>
+          )}
+          {variantName && <span aria-hidden>·</span>}
           <span>
             {t.detail.qty}: {item.quantity}
             {item.price != null && <> × {formatMoney(item.price, currency)}</>}
           </span>
         </div>
+        {item.personalisation && <PersonalisationRow text={item.personalisation} />}
       </div>
     </li>
+  );
+}
+
+/** The customer's personalisation text, highlighted for the workshop, with copy. */
+function PersonalisationRow({ text }: { text: string }) {
+  const { t } = useLanguage();
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard blocked — the text stays selectable.
+    }
+  };
+  return (
+    <div className="mt-2 flex items-center gap-2 rounded-md bg-muted px-2.5 py-1.5 text-sm">
+      <span aria-hidden className="text-muted-foreground">
+        ✎
+      </span>
+      <span className="sr-only">{t.detail.personalisation}: </span>
+      <bdi className="min-w-0 flex-1 select-all break-words font-medium text-foreground">
+        {text}
+      </bdi>
+      <button
+        type="button"
+        onClick={copy}
+        className="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {copied ? t.detail.copied : t.detail.copy}
+      </button>
+    </div>
   );
 }

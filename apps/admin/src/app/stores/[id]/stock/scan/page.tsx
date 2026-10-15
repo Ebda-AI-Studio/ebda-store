@@ -19,14 +19,30 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
+import { useFeatures } from '@/hooks/useFeatures';
+import { useLocale } from 'next-intl';
+import { VariantText } from '@ebda/ui';
 import { apiGet, apiPost } from '@/lib/api';
-import { withNumerals } from '@ebda/shared';
+import { orderLineVariantTitle, withNumerals } from '@ebda/shared';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
 type Mode = 'receive' | 'pick' | 'count';
+
+/**
+ * The text for a failed scan request. A 403 FEATURE_DISABLED (`inventory.barcode` is not on this
+ * store's plan) is a plan state, not a missing record, so it must not read "order/barcode not
+ * found". Every error site on this page goes through here.
+ */
+function scanErrorText(
+  t: (key: string) => string,
+  error: { code: string } | null | undefined,
+  fallbackKey: string
+): string {
+  return error?.code === 'FEATURE_DISABLED' ? t('featureNotOnPlan') : t(fallbackKey);
+}
 
 interface LookupResult {
   type: 'product' | 'variant';
@@ -55,6 +71,8 @@ interface OrderItem {
   variantId: string | null;
   productName: string;
   variantName: string | null;
+  variantNameAr?: string | null;
+  personalisation: string | null;
   quantity: number;
   pickedQty: number;
   pickedAt: string | null;
@@ -307,7 +325,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
         `/api/v1/stores/${storeId}/inventory/lookup?barcode=${encodeURIComponent(bc)}`
       );
       if (error || !data) {
-        setLookupErr(t('barcodeNotFound'));
+        setLookupErr(scanErrorText(t, error, 'barcodeNotFound'));
       } else {
         setLookup(data);
       }
@@ -334,7 +352,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
     );
     setSubmitting(false);
     if (error || !data) {
-      setSubmitErr(t('receiving.errorGeneric'));
+      setSubmitErr(scanErrorText(t, error, 'receiving.errorGeneric'));
     } else {
       setResult(data);
       setLookup(null);
@@ -383,7 +401,9 @@ function ReceiveMode({ storeId }: { storeId: string }) {
           <div>
             <p className="font-semibold text-sm">{lookup.productName}</p>
             {lookup.variantTitle && (
-              <p className="text-xs text-muted-foreground">{lookup.variantTitle}</p>
+              <p className="text-xs text-muted-foreground">
+                <VariantText title={lookup.variantTitle} />
+              </p>
             )}
             <p className="text-xs text-muted-foreground mt-0.5">
               {lookup.sku ? `SKU: ${lookup.sku}` : ''}
@@ -434,6 +454,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
 // ─────────────────────────────────────────────────────────────────────────────
 function PickMode({ storeId }: { storeId: string }) {
   const t = useT('stock.scan');
+  const locale = useLocale();
   const cameraSupported = useBarcodeDetectorSupported();
   const [orderInput, setOrderInput] = useState('');
   const [order, setOrder] = useState<OrderPickProgress | null>(null);
@@ -462,7 +483,7 @@ function PickMode({ storeId }: { storeId: string }) {
     }>(`/api/v1/stores/${storeId}/orders?search=${encodeURIComponent(wanted)}&limit=20`);
     const match = data?.orders?.find(o => o.orderNumber.toLowerCase() === wanted.toLowerCase());
     if (error || !match) {
-      setOrderErr(t('orderNotFound'));
+      setOrderErr(scanErrorText(t, error, 'orderNotFound'));
       setOrderLoading(false);
       return;
     }
@@ -472,7 +493,7 @@ function PickMode({ storeId }: { storeId: string }) {
     );
     setOrderLoading(false);
     if (progErr || !progress) {
-      setOrderErr(t('orderNotFound'));
+      setOrderErr(scanErrorText(t, progErr, 'orderNotFound'));
     } else {
       setOrder(progress);
     }
@@ -492,7 +513,7 @@ function PickMode({ storeId }: { storeId: string }) {
       );
       setPicking(false);
       if (error || !data) {
-        setPickErr(t('picking.itemNotFound'));
+        setPickErr(scanErrorText(t, error, 'picking.itemNotFound'));
       } else {
         setPickResult(data);
         setBarcode('');
@@ -574,8 +595,15 @@ function PickMode({ storeId }: { storeId: string }) {
                   return (
                     <div className={done ? 'opacity-60' : ''}>
                       <p className="font-medium">{item.productName}</p>
-                      {item.variantName && (
-                        <p className="text-xs text-muted-foreground">{item.variantName}</p>
+                      {orderLineVariantTitle(item, locale === 'ar') && (
+                        <p className="text-xs text-muted-foreground">
+                          <VariantText title={orderLineVariantTitle(item, locale === 'ar')!} />
+                        </p>
+                      )}
+                      {item.personalisation && (
+                        <p className="text-xs font-medium text-foreground">
+                          ✎ <bdi>{item.personalisation}</bdi>
+                        </p>
                       )}
                     </div>
                   );
@@ -726,7 +754,7 @@ function CountMode({ storeId }: { storeId: string }) {
         `/api/v1/stores/${storeId}/inventory/lookup?barcode=${encodeURIComponent(bc)}`
       );
       if (error || !data) {
-        setLineErr(t('barcodeNotFound'));
+        setLineErr(scanErrorText(t, error, 'barcodeNotFound'));
         setLookupResult(null);
       } else {
         setLookupResult(data);
@@ -750,7 +778,7 @@ function CountMode({ storeId }: { storeId: string }) {
     );
     setSubmittingLine(false);
     if (error || !data) {
-      setLineErr(t('counting.errorGeneric'));
+      setLineErr(scanErrorText(t, error, 'counting.errorGeneric'));
     } else {
       // Refresh session
       await loadSession(activeSession.id);
@@ -782,7 +810,7 @@ function CountMode({ storeId }: { storeId: string }) {
     }>(`/api/v1/stores/${storeId}/inventory/count-sessions/${activeSession.id}/reconcile`, {});
     setReconciling(false);
     if (error || !data) {
-      setReconcileErr(t('counting.errorGeneric'));
+      setReconcileErr(scanErrorText(t, error, 'counting.errorGeneric'));
     } else {
       setReconcileResult(data);
       await loadSession(activeSession.id);
@@ -903,7 +931,9 @@ function CountMode({ storeId }: { storeId: string }) {
               <div>
                 <p className="font-semibold text-sm">{lookupResult.productName}</p>
                 {lookupResult.variantTitle && (
-                  <p className="text-xs text-muted-foreground">{lookupResult.variantTitle}</p>
+                  <p className="text-xs text-muted-foreground">
+                    <VariantText title={lookupResult.variantTitle} />
+                  </p>
                 )}
                 <p className="text-xs text-muted-foreground">
                   System qty: {lookupResult.inventory}
@@ -944,7 +974,9 @@ function CountMode({ storeId }: { storeId: string }) {
                 <>
                   <p className="font-medium text-xs">{line.productName}</p>
                   {line.variantTitle && (
-                    <p className="text-xs text-muted-foreground">{line.variantTitle}</p>
+                    <p className="text-xs text-muted-foreground">
+                      <VariantText title={line.variantTitle} />
+                    </p>
                   )}
                 </>
               ),
@@ -1048,6 +1080,11 @@ export default function BarcodeScanPage() {
   const storeId = params?.id as string;
   const t = useT('stock.scan');
   const [mode, setMode] = useState<Mode>('receive');
+  // Every inventory/* endpoint this page calls is requireFeature('inventory.barcode'): without it
+  // the scanner would draw fully and never work (count mode's lists and "start session" fail
+  // silently). Gate the whole page; scanErrorText stays as the backstop for a mid-session change.
+  const { isEnabled, isLoading: featuresLoading } = useFeatures();
+  const barcodeEnabled = isEnabled('inventory.barcode');
 
   const modes: { key: Mode; label: string }[] = [
     { key: 'receive', label: t('modeReceive') },
@@ -1057,47 +1094,63 @@ export default function BarcodeScanPage() {
 
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
-      <div className="max-w-lg mx-auto space-y-5">
-        {/* Mode selector */}
-        <div className="flex rounded-xl border border-border bg-muted/20 p-1 gap-1">
-          {modes.map(m => (
-            <button
-              key={m.key}
-              type="button"
-              onClick={() => setMode(m.key)}
-              className={[
-                'flex-1 min-h-[44px] rounded-lg text-sm font-medium transition-colors',
-                mode === m.key
-                  ? 'bg-background shadow-sm text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              ].join(' ')}
-            >
-              {m.label}
-            </button>
-          ))}
+      {featuresLoading ? (
+        <div className="max-w-lg mx-auto space-y-3" data-testid="scan-features-skeleton">
+          <div className="h-12 animate-pulse rounded-xl bg-muted/40" />
+          <div className="h-32 animate-pulse rounded-xl bg-muted/30" />
         </div>
-
-        {/* What this page does — bilingual explainer of the 3 modes */}
-        <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground space-y-1.5">
-          <p className="font-semibold text-foreground">{t('helpTitle')}</p>
-          <p>
-            <span className="font-medium text-foreground">{t('modeReceive')}:</span>{' '}
-            {t('helpReceive')}
-          </p>
-          <p>
-            <span className="font-medium text-foreground">{t('modePick')}:</span> {t('helpPick')}
-          </p>
-          <p>
-            <span className="font-medium text-foreground">{t('modeCount')}:</span> {t('helpCount')}
-          </p>
-          <p className="pt-1 border-t border-border/60">{t('helpCamera')}</p>
+      ) : !barcodeEnabled ? (
+        <div
+          role="status"
+          data-testid="scan-feature-off"
+          className="max-w-lg mx-auto rounded-xl border border-border bg-muted/20 p-5 text-sm leading-relaxed text-foreground"
+        >
+          {t('featureNotOnPlan')}
         </div>
+      ) : (
+        <div className="max-w-lg mx-auto space-y-5">
+          {/* Mode selector */}
+          <div className="flex rounded-xl border border-border bg-muted/20 p-1 gap-1">
+            {modes.map(m => (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => setMode(m.key)}
+                className={[
+                  'flex-1 min-h-[44px] rounded-lg text-sm font-medium transition-colors',
+                  mode === m.key
+                    ? 'bg-background shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                ].join(' ')}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
 
-        {/* Mode content */}
-        {mode === 'receive' && <ReceiveMode storeId={storeId} />}
-        {mode === 'pick' && <PickMode storeId={storeId} />}
-        {mode === 'count' && <CountMode storeId={storeId} />}
-      </div>
+          {/* What this page does — bilingual explainer of the 3 modes */}
+          <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground space-y-1.5">
+            <p className="font-semibold text-foreground">{t('helpTitle')}</p>
+            <p>
+              <span className="font-medium text-foreground">{t('modeReceive')}:</span>{' '}
+              {t('helpReceive')}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">{t('modePick')}:</span> {t('helpPick')}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">{t('modeCount')}:</span>{' '}
+              {t('helpCount')}
+            </p>
+            <p className="pt-1 border-t border-border/60">{t('helpCamera')}</p>
+          </div>
+
+          {/* Mode content */}
+          {mode === 'receive' && <ReceiveMode storeId={storeId} />}
+          {mode === 'pick' && <PickMode storeId={storeId} />}
+          {mode === 'count' && <CountMode storeId={storeId} />}
+        </div>
+      )}
     </AdminLayout>
   );
 }

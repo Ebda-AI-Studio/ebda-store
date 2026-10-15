@@ -68,8 +68,10 @@ export function groupOrderLinesForDisplay<T extends OrderLineBase>(
           kind: 'bundle',
           key: item.bundleGroupId,
           bundleGroupId: item.bundleGroupId,
-          name: item.bundleName ?? 'Bundle',
-          nameAr: item.bundleNameAr ?? null,
+          // A box with no snapshotted name in either language still reads in the
+          // shopper's language: 'Bundle' / 'باقة', never an English word in Arabic.
+          name: item.bundleName || item.bundleNameAr || 'Bundle',
+          nameAr: item.bundleNameAr || (item.bundleName ? null : 'باقة'),
           quantity: 1,
           total: item.price * item.quantity,
           lines: [item],
@@ -87,4 +89,32 @@ export function groupOrderLinesForDisplay<T extends OrderLineBase>(
   }
 
   return result;
+}
+
+/**
+ * An order line's variant title in the reader's language (Ruling B0-41): `variantNameAr`
+ * (the Arabic snapshot) when reading Arabic, else `variantName` (the canonical title), each
+ * falling back to the other. Customer-facing surfaces pass the shopper's language; admin,
+ * the orders PWA and pick lists pass the admin locale. Fiscal documents and CSV exports do
+ * NOT use this: they print `variantName` exactly as before.
+ */
+export function orderLineVariantTitle(
+  item: { variantName?: string | null; variantNameAr?: string | null },
+  ar: boolean
+): string | null {
+  return (
+    (ar ? item.variantNameAr || item.variantName : item.variantName || item.variantNameAr) || null
+  );
+}
+
+/**
+ * A variant title ("وردي / M / 54 سم") split into its option values, for rendering each
+ * value in its own `<bdi>` (see `VariantText` in @ebda/ui). As one bidi run, mixed Arabic and
+ * Latin values reorder: "وردي / M / 54 سم" displayed as "وردي / 54 / M سم" (F8).
+ */
+export function variantTitleSegments(title: string): string[] {
+  return title
+    .split(' / ')
+    .map(s => s.trim())
+    .filter(Boolean);
 }

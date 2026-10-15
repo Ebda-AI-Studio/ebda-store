@@ -43,6 +43,8 @@ const PAGE_KEYWORDS: Record<string, string> = {
     'design layout sections hero homepage builder تصميم تخطيط أقسام الصفحة الرئيسية بانر منشئ',
   products: 'catalog items inventory skus goods منتجات سلع بضائع كتالوج',
   categories: 'collections groups فئات تصنيفات مجموعات أقسام',
+  'size-charts':
+    'size guide chart measurements fit abaya ring دليل المقاسات جدول مقاسات مقاس قياسات عباية خاتم',
   content: 'pages static about contact صفحات محتوى من نحن اتصل',
   blog: 'posts articles news مدونة مقالات أخبار',
   'floating-widget': 'chat button float whatsapp زر عائم دردشة',

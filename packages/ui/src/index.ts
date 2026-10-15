@@ -20,6 +20,7 @@ export * from './components/AddToCartButton';
 export * from './components/ProductBadge';
 export * from './components/Rating';
 export * from './components/Breadcrumb';
+export * from './components/VariantText';
 
 // Theme System
 export * from './theme';

@@ -120,6 +120,20 @@ export interface StoreSettings {
    */
   checkoutDelivery?: CheckoutDeliverySettings;
   /**
+   * Optional store-wide delivery estimate in BUSINESS days (the `deliveryOffDays` skipped, Friday by default), integers 0-30,
+   * min <= max. The PDP "delivers by" chip uses it only when no active shipping zone carries
+   * day numbers (area-rate stores). `null` is the CLEARED form: the server's settings merge is
+   * shallow, so the admin sends an explicit null to remove it (same as `orderInvoiceEmail`).
+   */
+  deliveryDays?: { min: number; max: number } | null;
+  /**
+   * Optional per-store courier calendar: weekdays with NO delivery, `Date#getUTCDay` numbers
+   * (0=Sun ... 6=Sat). Unset/null = Friday only; `[]` = delivers every day; unique ints, at
+   * most 6 (one working day minimum). Applies to the delivery estimate for zones AND the
+   * `deliveryDays` fallback. `null` clears (shallow settings merge), like `deliveryDays`.
+   */
+  deliveryOffDays?: number[] | null;
+  /**
    * Optional, opt-in per-store minimum order value in PIASTRES (1 EGP = 1000
    * piastres). When set to a positive number, a customer cannot place an order
    * whose items subtotal (before shipping/tax) falls below it. `0` or

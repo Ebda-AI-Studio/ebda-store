@@ -8,6 +8,7 @@ import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiGet } from '../../../../../../lib/api';
 import { formatPrice } from '../../../../../../lib/format';
 import { SimpleVariantsForm } from './_components/SimpleVariantsForm';
+import { OptionSwatchesEditor } from './_components/OptionSwatchesEditor';
 import type { Option, Variant, ProductInfo } from './_components/types';
 
 export default function ProductVariantsPage() {
@@ -129,6 +130,17 @@ export default function ProductVariantsPage() {
         variants={variants}
         onSaved={fetchVariants}
       />
+      {options.length >= 2 && (
+        <OptionSwatchesEditor
+          key={options
+            .flatMap(o => o.values.map(v => `${v.id}${v.swatchHex ?? ''}${v.swatchImageUrl ?? ''}`))
+            .join()}
+          storeId={storeId}
+          productId={productId}
+          options={options}
+          onSaved={fetchVariants}
+        />
+      )}
     </AdminLayout>
   );
 }

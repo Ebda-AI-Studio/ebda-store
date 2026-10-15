@@ -28,6 +28,7 @@ import {
   getGeminiKeys,
   resetGeminiKeyState,
   cooldownFor,
+  withGeminiFailover,
 } from '@api/lib/ai/gemini-keys';
 
 const quota = () => Object.assign(new Error('[429] RESOURCE_EXHAUSTED'), { status: 429 });
@@ -142,5 +143,49 @@ describe('gemini key failover', () => {
     const dump = JSON.stringify(log.warn.mock.calls);
     expect(dump).not.toContain('SECRET-KEY');
     expect(log.warn.mock.calls[0][0]).toMatchObject({ keyIndex: 0 });
+  });
+
+  it('a scoped quota error benches the key for that scope only (Ruling B0-51)', async () => {
+    const seen: string[] = [];
+    const quotaFn = async (k: string) => {
+      seen.push(k);
+      throw quota();
+    };
+    await expect(
+      withGeminiFailover(quotaFn, undefined, { benchScope: 'grounding' })
+    ).rejects.toMatchObject({ status: 429 });
+    expect(seen).toEqual(['SECRET-KEY-ONE', 'SECRET-KEY-TWO']);
+
+    // Plain calls still use key one: the grounding bench did not touch it.
+    seen.length = 0;
+    const plain = await withGeminiFailover(async k => {
+      seen.push(k);
+      return 'ok';
+    });
+    expect(plain).toBe('ok');
+    expect(seen).toEqual(['SECRET-KEY-ONE']);
+
+    // Grounded calls stay benched: no Google call at all.
+    seen.length = 0;
+    await expect(
+      withGeminiFailover(quotaFn, undefined, { benchScope: 'grounding' })
+    ).rejects.toMatchObject({ status: 429 });
+    expect(seen).toEqual([]);
+  });
+
+  it('an unscoped quota error still benches the key for unscoped calls', async () => {
+    await expect(
+      withGeminiFailover(async () => {
+        throw quota();
+      })
+    ).rejects.toMatchObject({ status: 429 });
+    const seen: string[] = [];
+    await expect(
+      withGeminiFailover(async k => {
+        seen.push(k);
+        return 'x';
+      })
+    ).rejects.toMatchObject({ status: 429 });
+    expect(seen).toEqual([]);
   });
 });

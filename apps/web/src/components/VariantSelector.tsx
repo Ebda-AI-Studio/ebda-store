@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import Image from 'next/image';
 import type { ProductVariant, ProductOption } from '@/lib/api';
 import { useLanguage } from '../contexts/LanguageContext';
 import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
 import { autoSelection } from '@/lib/single-variant';
+import { swatchOf } from '@ebda/shared';
 
 interface VariantSelectorProps {
   variants: ProductVariant[];
@@ -25,6 +26,19 @@ interface VariantSelectorProps {
    * colours. Presentation only — selection and availability logic is shared.
    */
   appearance?: 'pill' | 'swatch';
+  /**
+   * Size-guide trigger (B0 Task 9). Rendered beside the label of the option named like a size
+   * (`isSizeOption`), else once under the selector. Omitted = nothing renders.
+   */
+  sizeGuide?: ReactNode;
+}
+
+/**
+ * An option the size guide belongs to: "Size", "Ring size", "المقاس", "مقاسات", "الحجم"
+ * (`localizeOptionName` maps Size to الحجم)...
+ */
+export function isSizeOption(option: { name: string; nameAr?: string | null }): boolean {
+  return /size|مقاس|مقاسات|الحجم/i.test(`${option.name} ${option.nameAr ?? ''}`);
 }
 
 /** Metal colour dot for a gold-colour option value (`swatch` appearance). */
@@ -44,6 +58,7 @@ export function VariantSelector({
   onSelectionChange,
   swatchColor,
   appearance = 'pill',
+  sizeGuide,
 }: VariantSelectorProps) {
   const swatch = appearance === 'swatch';
   const { t, isRtl } = useLanguage();
@@ -112,15 +127,17 @@ export function VariantSelector({
   }
 
   /**
-   * Return the imageUrl to preview next to a given option value pill, if
-   * any. Picks the first variant matching `[optionName] = value` that has
-   * an `imageUrl` set so the customer can see "200g" looks different from
-   * "50g" before committing to a full selection. Returns undefined when
-   * no matching variant has an image — caller hides the thumbnail.
+   * Thumbnail for a value pill, only when it is TRUE of the value: every
+   * variant that carries `[optionName] = value` shares the same non-null
+   * imageUrl. A single-axis "200g" qualifies; on a multi-axis product one
+   * Rose/S/52 photo must not appear on the "S" and "52" chips. Returns
+   * undefined otherwise, and the caller hides the thumbnail.
    */
   function getThumbnailForValue(optionName: string, value: string): string | undefined {
-    const match = variants.find(v => v.options[optionName] === value && v.imageUrl);
-    return match?.imageUrl;
+    const matching = variants.filter(v => v.options[optionName] === value);
+    const first = matching[0]?.imageUrl;
+    if (!first) return undefined;
+    return matching.every(v => v.imageUrl === first) ? first : undefined;
   }
 
   // Find the currently matched variant for live price/stock display
@@ -129,6 +146,8 @@ export function VariantSelector({
   const currentVariant = allPicked
     ? (variants.find(v => optionNames.every(name => v.options[name] === selected[name])) ?? null)
     : null;
+  // The guide sits by the first size-like option; with none, under the whole selector.
+  const sizeGuideOption = sizeGuide ? options.find(isSizeOption)?.name : undefined;
 
   return (
     <div className="mt-6 space-y-5">
@@ -149,6 +168,9 @@ export function VariantSelector({
               return localizeOptionValue(selectedValue, found?.valueAr, isRtl);
             })()
           : null;
+        // An option with >=1 swatch value renders round swatches; values with
+        // neither hex nor image fall back to a text chip (never an empty circle).
+        const swatchOption = option.values.some(v => swatchOf(v));
         return (
           <div key={option.name}>
             <div className="flex items-center gap-2 mb-2">
@@ -162,9 +184,13 @@ export function VariantSelector({
               {selectedDisplay && (
                 <span className="text-sm text-muted-foreground">{selectedDisplay}</span>
               )}
+              {option.name === sizeGuideOption && (
+                <span className="-my-3 ms-auto">{sizeGuide}</span>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
-              {option.values.map(({ value, valueAr }) => {
+              {option.values.map(({ value, valueAr, swatchHex, swatchImageUrl }) => {
+                const sw = swatchOption ? swatchOf({ swatchHex, swatchImageUrl }) : null;
                 const isSelected = selected[option.name] === value;
                 const available = isValueAvailable(option.name, value);
                 const thumbnail = getThumbnailForValue(option.name, value);
@@ -173,6 +199,59 @@ export function VariantSelector({
                 // localised ("185 Gram" → "185 جرام"); else English.
                 const pillLabel = localizeOptionValue(value, valueAr, isRtl);
                 const metal = swatch ? metalSwatchColor(value, valueAr) : null;
+                if (sw) {
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => handleSelect(option.name, value)}
+                      disabled={!available}
+                      aria-pressed={isSelected}
+                      aria-label={
+                        available ? pillLabel : `${pillLabel}, ${t('Sold out', 'نفدت الكمية')}`
+                      }
+                      title={!available ? t('Out of Stock', 'غير متوفر') : pillLabel}
+                      className={[
+                        'relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full before:absolute before:-inset-1.5 before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        isSelected
+                          ? 'ring-2 ring-foreground ring-offset-2 ring-offset-background'
+                          : 'ring-1 ring-foreground/35',
+                        available ? '' : 'cursor-not-allowed opacity-50',
+                      ].join(' ')}
+                    >
+                      <span
+                        data-swatch-hex={sw.hex ?? undefined}
+                        className="block h-full w-full overflow-hidden rounded-full"
+                        style={sw.imageUrl ? undefined : { backgroundColor: sw.hex ?? undefined }}
+                      >
+                        {sw.imageUrl && (
+                          <img src={sw.imageUrl} alt="" className="h-full w-full object-cover" />
+                        )}
+                      </span>
+                      {!available && (
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-0 text-foreground/50"
+                        >
+                          <svg
+                            className="h-full w-full"
+                            viewBox="0 0 100 100"
+                            preserveAspectRatio="none"
+                          >
+                            <line
+                              x1="14"
+                              y1="86"
+                              x2="86"
+                              y2="14"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            />
+                          </svg>
+                        </span>
+                      )}
+                    </button>
+                  );
+                }
                 return (
                   <button
                     key={value}
@@ -188,7 +267,7 @@ export function VariantSelector({
                               ? 'border-primary text-foreground ring-1 ring-inset ring-primary'
                               : available
                                 ? 'border-border text-foreground/85 hover:border-primary/60'
-                                : 'cursor-not-allowed border-border text-muted-foreground opacity-50',
+                                : 'cursor-not-allowed border-border text-muted-foreground line-through opacity-50',
                           ].join(' ')
                         : [
                             'relative min-w-[2.75rem] rounded-lg border px-3 py-2 text-sm font-medium transition-all',
@@ -197,7 +276,7 @@ export function VariantSelector({
                               ? 'border-primary bg-primary text-white shadow-md shadow-primary/25'
                               : available
                                 ? 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted'
-                                : 'cursor-not-allowed border-border bg-muted text-muted-foreground opacity-50',
+                                : 'cursor-not-allowed border-border bg-muted text-muted-foreground line-through opacity-50',
                           ].join(' ')
                     }
                   >
@@ -261,6 +340,8 @@ export function VariantSelector({
           </div>
         );
       })}
+
+      {sizeGuide && !sizeGuideOption && <div className="-mt-2">{sizeGuide}</div>}
 
       {/* Feedback panel only shows when something is wrong: variant
           out of stock, or no variant matches the picked combo. The

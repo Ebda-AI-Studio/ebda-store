@@ -55,6 +55,7 @@ export function cartView(cartId: string, cart: any, currency: string) {
       itemId: item.id,
       productId: item.productId,
       variantId: item.variantId ?? undefined,
+      note: item.note ?? undefined,
       title: item.product?.name,
       title_ar: item.product?.nameAr ?? undefined,
       quantity: item.quantity,
@@ -94,9 +95,12 @@ export function registerCartTools(server: McpServer, store: McpStore): void {
         productId: z.string().min(1).max(MCP_ID_MAX_CHARS),
         variantId: z.string().min(1).max(MCP_ID_MAX_CHARS).optional(),
         quantity: z.number().int().min(1).max(999),
+        // Personalisation text (e.g. a name to embroider) for products that take one;
+        // a product with personalisation off ignores it. 400 here, cleaned + capped at 200.
+        note: z.string().max(400).optional(),
       },
     },
-    async ({ cartId, productId, variantId, quantity }, extra) => {
+    async ({ cartId, productId, variantId, quantity, note }, extra) => {
       // WRITE GATE. `add_to_cart` commits no money and no inventory, but it
       // creates unbounded Cart/CartItem rows for an unauthenticated caller AND
       // it is the only way to mint the cartId `place_order` consumes — so it
@@ -131,7 +135,8 @@ export function registerCartTools(server: McpServer, store: McpStore): void {
           productId,
           quantity,
           undefined,
-          variantId
+          variantId,
+          note
         );
         return ok(cartView(sessionId, cart, store.currency));
       } catch (err) {

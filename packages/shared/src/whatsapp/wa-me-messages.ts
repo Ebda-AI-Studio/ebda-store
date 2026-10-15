@@ -122,10 +122,17 @@ export function buildProductShareMessage(i: {
   /** MINOR units; omitted → no price line. */
   priceMinor?: number | null;
   url: string;
+  /** The text the customer typed for this piece (e.g. the name to embroider). */
+  personalisation?: { label: string; note: string } | null;
 }): string {
   const price = typeof i.priceMinor === 'number' ? formatMoney(i.priceMinor, i.locale) : '';
   const head = price ? `${i.productName} — ${price}` : i.productName;
-  return i.locale === 'ar' ? `شوف ده: ${head}\n${i.url}` : `Check this out: ${head}\n${i.url}`;
+  const note = i.personalisation?.note
+    ? `\n✎ ${i.personalisation.label}: ${i.personalisation.note}`
+    : '';
+  return i.locale === 'ar'
+    ? `شوف ده: ${head}${note}\n${i.url}`
+    : `Check this out: ${head}${note}\n${i.url}`;
 }
 
 /** Merchant shares their store link (setup-guide "share" item). */

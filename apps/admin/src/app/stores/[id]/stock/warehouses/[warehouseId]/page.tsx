@@ -9,7 +9,7 @@ import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
 import { useFeatures } from '@/hooks/useFeatures';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
-import { Button, useToast } from '@ebda/ui';
+import { Button, VariantText, useToast } from '@ebda/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -300,7 +300,9 @@ export default function WarehouseStockPage() {
               {
                 header: t('colVariant'),
                 cell: row => (
-                  <span className="text-muted-foreground">{row.variantTitle ?? '—'}</span>
+                  <span className="text-muted-foreground">
+                    {row.variantTitle ? <VariantText title={row.variantTitle} /> : '—'}
+                  </span>
                 ),
               },
               {
@@ -428,7 +430,12 @@ export default function WarehouseStockPage() {
             <h2 className="mb-1 text-base font-semibold">{t('adjustTitle')}</h2>
             <p className="mb-4 text-sm text-muted-foreground">
               {adjustModal.row.productName}
-              {adjustModal.row.variantTitle ? ` / ${adjustModal.row.variantTitle}` : ''}
+              {adjustModal.row.variantTitle && (
+                <>
+                  {' · '}
+                  <VariantText title={adjustModal.row.variantTitle} />
+                </>
+              )}
             </p>
 
             <div className="space-y-4">

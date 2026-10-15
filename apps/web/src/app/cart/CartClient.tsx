@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Button, useToast, CartIcon } from '@ebda/ui';
+import { Button, useToast, CartIcon, VariantText } from '@ebda/ui';
 import { ShopChrome } from '../../components';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { useCart } from '../../contexts/CartContext';
@@ -15,6 +15,7 @@ import { api } from '@/lib/api';
 import { CartRecommendations } from '../../components/CartRecommendations';
 import { BundleLine } from '../../components/BundleLine';
 import { CartLineUnavailableNotice } from '../../templates/shared/CartLineUnavailable';
+import { summaryMoneyFormatter } from '../../templates/shared/useOrderSummaryBase';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import { couponQuoteBasis, couponQuoteCartItems } from '@/lib/coupon-quote-basis';
 import { productUnavailableCopy } from '@/lib/product-cart-errors';
@@ -27,8 +28,10 @@ import {
 import { useLastListing } from '../../hooks/useLastListing';
 import { useNumerals } from '../../hooks/useNumerals';
 import { formatTaxRowLabel } from '../../lib/tax-display';
-import { resolveColor, checkMinimumOrder, computeOrderAmounts } from '@ebda/shared';
+import { resolveColor, checkMinimumOrder, computeOrderAmounts, REGION } from '@ebda/shared';
 import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
+import { CartLineNote } from '../../components/commerce/CartLineNote';
+import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
 
 export default function CartClient() {
   const {
@@ -106,7 +109,7 @@ export default function CartClient() {
     cta: cartZoneStyle(cartCtaZone),
   };
   const { language, t } = useLanguage();
-  const { localize } = useNumerals();
+  const { localize, money } = useNumerals();
   const formatPrice = useLocalePrice();
   const continuShoppingHref = useLastListing();
 
@@ -368,11 +371,16 @@ export default function CartClient() {
   // uses, and that amount is informational only — NOT added to `total`.
   const taxRatePercent = store.taxRatePercent ?? 0;
   const taxIncludedInPrice = !!store.taxIncludedInPrice;
-  // Shipping is in the VAT base (ruling MONEYB-2) — the order's own formula.
+  // Shipping is in the VAT base (ruling MONEYB-2) — the order's own formula. On the cart the
+  // summary always reads shipping as "Calculated at checkout" (the per-area fee is only known
+  // once the shopper picks an area), so the cart's total must NOT already include a zone fee
+  // (F1: the summary said "calculated at checkout" while its total and the sticky bar added
+  // 50 EGP). Checkout recomputes with the real fee.
+  const CART_SHIPPING_PENDING = 0;
   const { tax, total } = computeOrderAmounts({
     subtotal,
     discount,
-    shipping,
+    shipping: CART_SHIPPING_PENDING,
     ratePercent: taxRatePercent,
     includedInPrice: taxIncludedInPrice,
   });
@@ -570,6 +578,7 @@ export default function CartClient() {
                         image: item.image,
                         variantTitle: item.variantTitle,
                         variantTitleAr: item.variantTitleAr,
+                        note: item.note,
                         unavailable: item.unavailable,
                       }))}
                       isRtl={language === 'ar'}
@@ -637,11 +646,19 @@ export default function CartClient() {
                                 </h3>
                                 {(item.variantTitle || item.variantTitleAr) && (
                                   <p className="mt-0.5 text-sm text-muted-foreground">
-                                    {language === 'ar' && item.variantTitleAr
-                                      ? item.variantTitleAr
-                                      : item.variantTitle}
+                                    <VariantText
+                                      title={
+                                        (language === 'ar' && item.variantTitleAr
+                                          ? item.variantTitleAr
+                                          : item.variantTitle || item.variantTitleAr) ?? ''
+                                      }
+                                    />
                                   </p>
                                 )}
+                                <CartLineNote
+                                  note={item.note}
+                                  className="mt-0.5 text-sm text-muted-foreground"
+                                />
                                 {item.unavailable && <CartLineUnavailableNotice />}
                                 <p
                                   className="mt-1 text-base font-bold text-muted-foreground sm:text-lg"
@@ -830,7 +847,7 @@ export default function CartClient() {
                                 onChange={e => setPromoCode(e.target.value)}
                                 placeholder={t('Enter code', 'أدخل الكود')}
                                 disabled={promoApplied}
-                                className="h-11 flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                                className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
                               />
                               <button
                                 onClick={applyPromoCode}
@@ -921,7 +938,7 @@ export default function CartClient() {
                                     '\u0623\u062f\u062e\u0644 \u0627\u0644\u0643\u0648\u062f'
                                   )}
                                   disabled={promoApplied}
-                                  className="h-11 flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:text-sm"
+                                  className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:text-sm"
                                 />
                                 <button
                                   type="button"
@@ -1218,6 +1235,29 @@ export default function CartClient() {
           )}
         </div>
       </div>
+      {/* Phone sticky total: same checkoutBlocked rule + message as the summary CTA, and the
+          summary's own Total row (label, value AND money format: a themed OrderSummary prints
+          "2,980 EGP", the fallback summary formatPrice). That total is net of the promo discount
+          and carries no zone fee while shipping reads "calculated at checkout", so the bar never
+          quotes the pre-discount subtotal. */}
+      <StickyCartTotal
+        totalLabel={t('Total', 'الإجمالي')}
+        total={summaryMoneyFormatter(
+          T?.OrderSummary,
+          money,
+          store.currency ?? REGION.currency,
+          formatPrice
+        )(total)}
+        itemCount={cartCount}
+        itemCountLabel={t(
+          `${localize(cartCount)} ${cartCount === 1 ? 'item' : 'items'}`,
+          `${localize(cartCount)} منتج`
+        )}
+        href={storeUrl('/checkout')}
+        label={t('Checkout', 'إتمام الطلب')}
+        disabled={checkoutBlocked}
+        blockedMessage={checkoutBlockedMessage}
+      />
     </ShopChrome>
   );
 }

@@ -8,6 +8,8 @@ import { StorageService } from '../services/storage.service';
 import { resizeToAspect, enforceMaxDimensions } from '../services/image-resize.service';
 import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/security';
 import { runInTenantContext } from '@ebda/database';
+import { AppError } from '../middleware/error-handler';
+import { sniffVideo, VIDEO_MAX_BYTES } from '../lib/video-sniff';
 
 /**
  * Run a function under the tenant RLS context if a storeId is known,
@@ -45,7 +47,7 @@ const upload = multer({
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error(`Invalid file type: ${file.mimetype}`));
+      cb(new AppError(400, 'INVALID_FILE_TYPE', `Invalid file type: ${file.mimetype}`));
     }
   },
 });
@@ -275,6 +277,153 @@ router.post(
         success: true,
         data: result,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ── Video (page-builder hero loops) ─────────────────────────────────────────
+// Separate multer + endpoint: image routes must never start accepting video.
+// Declared mime AND magic bytes must agree (see lib/video-sniff.ts).
+const VIDEO_FOLDERS = new Set(['hero', 'builder']);
+const VIDEO_TYPES = ['video/mp4', 'video/webm'] as const;
+
+const videoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: VIDEO_MAX_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if ((VIDEO_TYPES as readonly string[]).includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new AppError(400, 'INVALID_VIDEO_TYPE', 'Only video/mp4 and video/webm are accepted'));
+    }
+  },
+});
+
+/** multer's size error -> 413, other MulterErrors -> 400, the filter's AppError -> its own status. */
+function receiveVideo(req: Request, res: Response, next: NextFunction): void {
+  videoUpload.single('file')(req, res, (err?: unknown) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      res.status(413).json({
+        success: false,
+        error: { code: 'VIDEO_TOO_LARGE', message: 'Video is larger than 6 MB' },
+      });
+      return;
+    }
+    if (err instanceof multer.MulterError) {
+      // LIMIT_UNEXPECTED_FILE / LIMIT_FILE_COUNT (a second file, a wrong field): the client's fault.
+      res.status(400).json({ success: false, error: { code: err.code, message: err.message } });
+      return;
+    }
+    if (err instanceof AppError) {
+      res
+        .status(err.statusCode)
+        .json({ success: false, error: { code: err.code, message: err.message } });
+      return;
+    }
+    next(err);
+  });
+}
+
+/**
+ * POST /uploads/video?folder=hero|builder&storeId=<id>
+ * One mp4/webm (<= 6 MB) into stores/<storeId>/<folder>/. Returns the same
+ * `{ success, data: { url, key, size, contentType } }` shape as /image.
+ */
+router.post(
+  '/video',
+  authenticate,
+  requirePermission('products:write'),
+  uploadLimiter,
+  dailyUploadLimiter,
+  receiveVideo,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const file = req.file;
+      if (!file) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'NO_FILE', message: 'No file uploaded' },
+        });
+        return;
+      }
+      if (file.buffer.length === 0) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'EMPTY_FILE', message: 'The uploaded file is empty' },
+        });
+        return;
+      }
+      if (file.buffer.length > VIDEO_MAX_BYTES) {
+        res.status(413).json({
+          success: false,
+          error: { code: 'VIDEO_TOO_LARGE', message: 'Video is larger than 6 MB' },
+        });
+        return;
+      }
+
+      const resolved = await resolveFolderAndStore(req);
+      if (!resolved.ok) {
+        res.status(resolved.status).json({ success: false, error: resolved.error });
+        return;
+      }
+      if (!VIDEO_FOLDERS.has(resolved.folder)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_FOLDER',
+            message: `Video uploads are limited to: ${Array.from(VIDEO_FOLDERS).join(', ')}`,
+          },
+        });
+        return;
+      }
+
+      const sniffed = sniffVideo(file.buffer);
+      if (!sniffed || sniffed !== file.mimetype) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_VIDEO_CONTENT',
+            message: 'File content does not match a valid mp4/webm video',
+          },
+        });
+        return;
+      }
+
+      // Store under the SNIFFED type's extension, never the client's filename ext.
+      const ext = sniffed === 'video/mp4' ? '.mp4' : '.webm';
+      const base = file.originalname.replace(/\.[^.]*$/, '') || 'video';
+
+      const result = await withOptionalTenantContext(resolved.storeId, async () => {
+        const uploaded = await StorageService.upload(file.buffer, `${base}${ext}`, {
+          folder: resolved.folder,
+          storeId: resolved.storeId,
+          contentType: sniffed,
+          allowedTypes: [...VIDEO_TYPES],
+          maxSize: VIDEO_MAX_BYTES,
+          cacheControl: 'public, max-age=31536000, immutable',
+        });
+
+        await auditLog({
+          action: 'file.uploaded',
+          userId: req.user!.userId,
+          resourceType: 'file',
+          resourceId: uploaded.key,
+          details: {
+            filename: file.originalname,
+            size: uploaded.size,
+            contentType: uploaded.contentType,
+          },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+
+        return uploaded;
+      });
+
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }
@@ -568,7 +717,13 @@ const fontUpload = multer({
     if (allowedTypes.has(file.mimetype) || allowedExts.test(file.originalname)) {
       cb(null, true);
     } else {
-      cb(new Error(`Invalid font file: ${file.originalname} (${file.mimetype})`));
+      cb(
+        new AppError(
+          400,
+          'INVALID_FONT_TYPE',
+          `Invalid font file: ${file.originalname} (${file.mimetype})`
+        )
+      );
     }
   },
 });

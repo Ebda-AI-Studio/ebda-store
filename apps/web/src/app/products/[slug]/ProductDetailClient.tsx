@@ -48,6 +48,15 @@ import { Model3dToggle, ProductModel3dPanel } from '../../../components/ProductM
 import { captureEvent } from '../../../components/PostHogProvider';
 import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
 import { REGION } from '@ebda/shared';
+import { FactsTable } from '../../../components/commerce/FactsTable';
+import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
+import { SizeChartDialog } from '../../../components/commerce/SizeChartDialog';
+import { StickyAddToCart } from '../../../components/commerce/StickyAddToCart';
+import {
+  PersonalisationField,
+  personalisationMissing,
+} from '../../../components/commerce/PersonalisationField';
+import { activePersonalisation, cleanNote } from '@ebda/shared';
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
 const FrequentlyBoughtTogether = dynamic(() =>
@@ -160,6 +169,11 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const [isLoading, setIsLoading] = useState(!initialProduct);
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  // Per-item personalisation text (e.g. the name to embroider). Part of the cart line identity.
+  const [note, setNote] = useState('');
+  // Bumped when a tap on add-to-cart is blocked ONLY by the empty required note:
+  // PersonalisationField then scrolls to, focuses and explains itself (no add).
+  const [noteNudge, setNoteNudge] = useState(0);
   const [selectedImage, setSelectedImage] = useState(0);
   const [isAdding, setIsAdding] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -200,6 +214,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // swipe, and smooth-scroll to the slide when the index is set externally
   // (thumbnail click / variant image).
   const galleryRef = useRef<HTMLDivElement>(null);
+  // Anchor for the phone sticky add-to-cart bar: the main buy row.
+  const buyRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = galleryRef.current;
     if (!el) return;
@@ -413,6 +429,11 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
       return;
     }
 
+    if (personalisationMissing(product.personalisation, note)) {
+      setNoteNudge(n => n + 1);
+      return;
+    }
+
     setIsAdding(true);
     const added = await addItem(
       {
@@ -426,6 +447,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
         category: product.categories?.[0]?.category?.name,
         // Pass the variantId so the backend can track the correct SKU
         variantId: selectedVariant?.id,
+        note: cleanNote(note) ?? undefined,
       },
       quantity
     );
@@ -556,6 +578,41 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const canBackorder =
     outOfStock &&
     (selectedVariant ? selectedVariant.acceptsBackorder : product.acceptsBackorder) === true;
+  // THE add-to-cart disabled rule. Every buy button on this page (default button,
+  // Dahab main + pinned bar, any sticky bar) reads this one value. A missing
+  // required note is NOT a disabled reason: it is the separate `noteMissing`
+  // signal, and every button's tap goes through handleAddToCart, which nudges
+  // the field instead of adding (F6, the sticky bar's dead button). So a required
+  // personalisation still can never be skipped by a second button.
+  const noteMissing = personalisationMissing(product.personalisation, note);
+  const addDisabled = (outOfStock && !canBackorder) || variantRequired;
+  // ONE source for the buy label and the price text: the main button, the Dahab
+  // pinned bar and the default sticky bar all read these.
+  const addLabel = variantRequired
+    ? t('Select Options', 'اختر الخيارات')
+    : canBackorder
+      ? t('Pre-order', 'اطلب مسبقاً')
+      : outOfStock
+        ? t('Out of Stock', 'غير متوفر')
+        : t('Add to Cart', translations['Add to Cart']);
+  const priceText =
+    pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
+      ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
+      : formatPrice(displayPrice);
+  // The WhatsApp order/ask button carries the typed note and follows the SAME
+  // required-personalisation gate as add-to-cart.
+  const personalisationCfg = activePersonalisation(product.personalisation);
+  const typedNote = cleanNote(note);
+  const waPersonalisation =
+    personalisationCfg && typedNote
+      ? {
+          // A control label inside a sentence: never the other language (F4).
+          label:
+            (language === 'ar' ? personalisationCfg.labelAr : personalisationCfg.label)?.trim() ||
+            t('Personalisation', 'التخصيص'),
+          note: typedNote,
+        }
+      : null;
 
   // Custom (merchant-authored) badge on the PDP. A badge that shows on the
   // card and then vanishes on the product's own page is the same defect as
@@ -635,11 +692,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             returnsHref={storeUrl('/returns')}
             excerpt={displayExcerpt}
             description={displayDescription}
-            priceText={
-              pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
-                ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
-                : formatPrice(displayPrice)
-            }
+            priceText={priceText}
             compareText={
               pricing.mode === 'single' && displayCompare && displayCompare > displayPrice
                 ? formatPrice(displayCompare)
@@ -662,7 +715,11 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             }
             onAddToCart={handleAddToCart}
             isAdding={isAdding}
-            addDisabled={(outOfStock && !canBackorder) || variantRequired}
+            addDisabled={addDisabled}
+            personalisation={product.personalisation}
+            note={note}
+            onNoteChange={setNote}
+            noteNudge={noteNudge}
             addLabel={
               variantRequired
                 ? t('Choose options', 'اختيار المقاس')
@@ -675,6 +732,9 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             isWishlisted={isWishlisted}
             onToggleWishlist={handleToggleWishlist}
             sku={product.sku}
+            facts={product.facts}
+            leadTimeDays={product.leadTimeDays}
+            sizeChart={product.sizeChart}
             specs={
               (product as { specifications?: unknown }).specifications ? (
                 <SpecTable
@@ -688,7 +748,14 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             }
             extras={
               <>
-                <WaMeProductButton product={product} priceMinor={displayPrice} className="w-full" />
+                <WaMeProductButton
+                  product={product}
+                  priceMinor={displayPrice}
+                  className="w-full"
+                  personalisation={waPersonalisation}
+                  disabled={noteMissing}
+                  onBlocked={() => setNoteNudge(n => n + 1)}
+                />
                 <ShareProductRow
                   productName={displayName}
                   url={typeof window !== 'undefined' ? window.location.href : ''}
@@ -840,7 +907,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     {images.map((img, index) => (
                       <div
                         key={img.id || index}
-                        className="relative h-full w-full shrink-0 snap-center"
+                        className={`relative h-full w-full shrink-0 snap-center${img.id?.startsWith('variant-') ? ' variant-image-fade' : ''}`}
                       >
                         <Image
                           src={img.url}
@@ -917,29 +984,37 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
 
             {/* Product Info */}
             <div className="md:col-span-7">
-              <div className="mb-4 flex items-center gap-2">
-                {categoryName && <Badge variant="secondary">{categoryName}</Badge>}
-                {/* Custom badge — the merchant's own words, same chip the
+              {/* The category chip moved below the buy block (taste bar: on a 390px phone
+                  the fold is gallery, title, price, selectors, personalisation, add to cart,
+                  delivery chip, and nothing more). Only the merchant's own badge, the
+                  discount and the draft marker stay up here, and only when one exists. */}
+              {(pdpCustomBadgeText || discountBadgeText || product.status === 'draft') && (
+                <div className="mb-4 flex items-center gap-2">
+                  {/* Custom badge — the merchant's own words, same chip the
                     product cards show. Inline color so a merchant's
                     productCardDefaults.customBadge.color carries onto the PDP
                     instead of the badge silently reverting to the primary
                     token here. */}
-                {pdpCustomBadgeText && (
-                  <Badge
-                    className="text-white"
-                    style={{ backgroundColor: pdpCustomBadgeColor, color: pdpCustomBadgeTextColor }}
-                  >
-                    {pdpCustomBadgeText}
-                  </Badge>
-                )}
-                {/* Discount badge — BUG 1 fix: helper text (EGP or pct).
+                  {pdpCustomBadgeText && (
+                    <Badge
+                      className="text-white"
+                      style={{
+                        backgroundColor: pdpCustomBadgeColor,
+                        color: pdpCustomBadgeTextColor,
+                      }}
+                    >
+                      {pdpCustomBadgeText}
+                    </Badge>
+                  )}
+                  {/* Discount badge — BUG 1 fix: helper text (EGP or pct).
                     Waits for variant selection on variant products
                     (displayCompare is null until a variant is picked). */}
-                {discountBadgeText && <Badge variant="destructive">{discountBadgeText}</Badge>}
-                {product.status === 'draft' && (
-                  <Badge variant="outline">{t('Draft', 'مسودة')}</Badge>
-                )}
-              </div>
+                  {discountBadgeText && <Badge variant="destructive">{discountBadgeText}</Badge>}
+                  {product.status === 'draft' && (
+                    <Badge variant="outline">{t('Draft', 'مسودة')}</Badge>
+                  )}
+                </div>
+              )}
 
               {/* PDP NAME-vs-PRICE rule: name carries the zone that drives size; price
                   mirrors the zone on its own span (not the parent div) so the Tailwind
@@ -967,9 +1042,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   data-zone="productPrice"
                   style={zoneStyle(pdpPriceZone, pdpScale)}
                 >
-                  {pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
-                    ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
-                    : formatPrice(displayPrice)}
+                  {priceText}
                 </span>
                 {pricing.mode === 'single' && displayCompare && displayCompare > displayPrice && (
                   <span className="text-lg text-muted-foreground line-through">
@@ -979,20 +1052,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               </div>
               <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
 
-              {displayDescription && (
-                // whitespace-pre-line: the admin edits this in a <Textarea>, so
-                // a merchant's line breaks are stored — but HTML collapses
-                // them, which ran every paragraph together into one block and
-                // read as "only the first line saved". Matches how FAQ answers
-                // and how-to guides already render merchant prose. Still plain
-                // text (React escapes it), so no HTML injection surface.
-                <p className="mt-6 max-w-prose whitespace-pre-line text-muted-foreground leading-relaxed">
-                  {displayDescription}
-                </p>
-              )}
-
               {/* Variant Selector */}
-              {hasVariants && hasOptions && (
+              {hasVariants && hasOptions ? (
                 <VariantSelector
                   variants={productVariants}
                   options={productOptions}
@@ -1000,8 +1061,21 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   onShopperSelect={() => setShopperPickedVariant(true)}
                   onSelectionChange={setPickedOptions}
                   swatchColor={model3d ? swatchColor : undefined}
+                  sizeGuide={
+                    product.sizeChart ? <SizeChartDialog chart={product.sizeChart} /> : undefined
+                  }
                 />
+              ) : (
+                // No selector to sit beside: the guide gets its own line (renders nothing without a chart).
+                <SizeChartDialog chart={product.sizeChart} className="mt-4" />
               )}
+
+              <PersonalisationField
+                config={product.personalisation}
+                value={note}
+                onChange={setNote}
+                nudge={noteNudge}
+              />
 
               {/* Quantity & Add to Cart */}
               <div className="mt-8 space-y-4">
@@ -1054,21 +1128,16 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   </div>
                 )}
 
-                <div className="flex gap-4">
+                <div className="flex gap-4" ref={buyRef}>
                   <Button
                     size="lg"
                     className="flex-1"
+                    data-testid="pdp-add"
                     onClick={handleAddToCart}
                     isLoading={isAdding}
-                    disabled={(outOfStock && !canBackorder) || variantRequired}
+                    disabled={addDisabled}
                   >
-                    {variantRequired
-                      ? t('Select Options', 'اختر الخيارات')
-                      : canBackorder
-                        ? t('Pre-order', 'اطلب مسبقاً')
-                        : outOfStock
-                          ? t('Out of Stock', 'غير متوفر')
-                          : t('Add to Cart', translations['Add to Cart'])}
+                    {addLabel}
                   </Button>
 
                   <Button
@@ -1092,7 +1161,26 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     </svg>
                   </Button>
                 </div>
+                <DeliveryChip leadTimeDays={product.leadTimeDays} />
               </div>
+
+              {/* Below the buy block: the category chip and the description (fold rule above). */}
+              {categoryName && (
+                <div className="mt-6">
+                  <Badge variant="secondary">{categoryName}</Badge>
+                </div>
+              )}
+              {displayDescription && (
+                // whitespace-pre-line: the admin edits this in a <Textarea>, so
+                // a merchant's line breaks are stored — but HTML collapses
+                // them, which ran every paragraph together into one block and
+                // read as "only the first line saved". Matches how FAQ answers
+                // and how-to guides already render merchant prose. Still plain
+                // text (React escapes it), so no HTML injection surface.
+                <p className="mt-4 max-w-prose whitespace-pre-line text-muted-foreground leading-relaxed">
+                  {displayDescription}
+                </p>
+              )}
 
               {/* SKU */}
               {product.sku && (
@@ -1101,10 +1189,16 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 </div>
               )}
 
+              {/* Spec rows: below the buy box on purpose (PDP above-the-fold budget). */}
+              <FactsTable facts={product.facts} />
+
               <WaMeProductButton
                 product={product}
                 priceMinor={displayPrice}
                 className="mt-6 w-full sm:w-auto"
+                personalisation={waPersonalisation}
+                disabled={noteMissing}
+                onBlocked={() => setNoteNudge(n => n + 1)}
               />
               <ShareProductRow
                 productName={language === 'ar' && product.nameAr ? product.nameAr : product.name}
@@ -1208,6 +1302,15 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
           )}
         </div>
       </div>
+      {/* Phone sticky bar: SAME handler + SAME addDisabled/label as the main button. */}
+      <StickyAddToCart
+        anchorRef={buyRef}
+        title={displayName}
+        price={priceText}
+        label={addLabel}
+        disabled={addDisabled || isAdding}
+        onAdd={handleAddToCart}
+      />
     </ShopChrome>
   );
 }

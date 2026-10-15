@@ -51,6 +51,8 @@ export interface PickResult {
   productId: string;
   variantId: string | null;
   productName: string;
+  /** The picked line's personalisation text, so the picker knows which name this unit is. */
+  personalisation: string | null;
   qtyOrdered: number;
   pickedQtyBefore: number;
   pickedQtyAfter: number;
@@ -274,8 +276,12 @@ export async function pickOrderItemByBarcode(
     throw new AppError(404, 'BARCODE_NOT_FOUND', `Barcode not found: ${barcode}`);
   }
 
-  // Find the matching order item
-  const orderItem = await prisma.orderItem.findFirst({
+  // Find the matching order item. One product/variant can sit on SEVERAL lines
+  // of one order — personalised lines ("Sara" / "Omar" on the same abaya), or a
+  // loose line plus a bundle component — so take the first line still short of
+  // its quantity. A bare findFirst capped every scan at the first line and the
+  // order could never reach fully-picked.
+  const candidates = await prisma.orderItem.findMany({
     where: {
       orderId,
       productId: lookup.productId,
@@ -288,10 +294,13 @@ export async function pickOrderItemByBarcode(
       productId: true,
       variantId: true,
       productName: true,
+      personalisation: true,
       quantity: true,
       pickedQty: true,
     },
+    orderBy: { id: 'asc' },
   });
+  const orderItem = candidates.find(c => c.pickedQty < c.quantity) ?? candidates[0];
 
   if (!orderItem) {
     throw new AppError(
@@ -344,6 +353,7 @@ export async function pickOrderItemByBarcode(
     productId: orderItem.productId,
     variantId: orderItem.variantId,
     productName: orderItem.productName,
+    personalisation: orderItem.personalisation,
     qtyOrdered: orderItem.quantity,
     pickedQtyBefore,
     pickedQtyAfter: newPickedQty,
@@ -678,6 +688,9 @@ export async function getOrderPickProgress(
     variantId: string | null;
     productName: string;
     variantName: string | null;
+    variantNameAr: string | null;
+    /** The customer's personalisation text; the picker needs it per line. */
+    personalisation: string | null;
     quantity: number;
     pickedQty: number;
     pickedAt: Date | null;
@@ -696,6 +709,8 @@ export async function getOrderPickProgress(
           variantId: true,
           productName: true,
           variantName: true,
+          variantNameAr: true,
+          personalisation: true,
           quantity: true,
           pickedQty: true,
           pickedAt: true,

@@ -25,6 +25,14 @@ export default defineConfig({
     ignoreHTTPSErrors: false,
   },
   projects: [
+    // B0 commerce flow against the LOCAL seeded stack (tests/smoke/commerce-b0.spec.ts).
+    // It skips itself when that stack is unreachable, so a smoke run against a deployed
+    // environment is unaffected.
+    {
+      name: 'commerce-b0',
+      testMatch: /commerce-b0\.spec\.ts$/,
+      use: { ...devices['Desktop Chrome'] },
+    },
     // Chromium (Desktop Chrome)
     {
       name: 'storefront',

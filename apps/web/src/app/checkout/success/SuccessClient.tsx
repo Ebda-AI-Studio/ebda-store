@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useLocalePrice } from '../../../hooks/useLocalePrice';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@ebda/ui';
@@ -15,9 +14,9 @@ import { useCart } from '../../../contexts/CartContext';
 import { trackPurchase } from '../../../components/MarketingPixels';
 import { firePurchasePixelOnce } from '../../../lib/purchase-pixel-guard';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { formatDate } from '@/lib/format-date';
 import { useLastListing } from '../../../hooks/useLastListing';
-import { groupOrderLinesForDisplay, fromMinor, REGION, storeNumerals } from '@ebda/shared';
+import { ReceiptPrinter, type PaymentState } from '../../../components/commerce/ReceiptPrinter';
+import { fromMinor, REGION } from '@ebda/shared';
 
 // Payment verification outcome that drives the truthful headline/icon.
 //   verifying → we're asking the API to confirm with the gateway
@@ -27,7 +26,7 @@ import { groupOrderLinesForDisplay, fromMinor, REGION, storeNumerals } from '@eb
 //   cod       → cash on delivery (no gateway to verify)
 //   awaiting  → InstaPay: the customer transfers, the merchant confirms (no gateway)
 //   unknown   → verify couldn't run (no orderId / network) — neutral copy
-type PaymentState = 'verifying' | 'paid' | 'pending' | 'failed' | 'cod' | 'awaiting' | 'unknown';
+// (The type lives with ReceiptPrinter, whose status line renders it.)
 
 function SuccessContent() {
   const searchParams = useSearchParams();
@@ -46,11 +45,10 @@ function SuccessContent() {
   const continueShoppingHref = useLastListing();
   const { store } = useStore();
   const { clearCart } = useCart();
-  const { t, language } = useLanguage();
-  const formatPrice = useLocalePrice();
+  const { t } = useLanguage();
 
   const [order, setOrder] = useState<Order | null>(null);
-  const [, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [paymentState, setPaymentState] = useState<PaymentState>(
     isCod ? 'cod' : isInstapay || fawryRef ? 'awaiting' : 'verifying'
   );
@@ -181,20 +179,32 @@ function SuccessContent() {
                   'تم تأكيد دفعتك وسيتم شحن طلبك قريباً.'
                 );
 
+  // The receipt printer owns the confirmation moment (Task 10 ruling): while
+  // it renders (loading or loaded) the hero icon and the COD banner step aside,
+  // since its status line says the same thing. If the order could not be
+  // loaded there is no receipt to carry the message, so they come back.
+  const showReceipt = order !== null || isLoading;
+
   return (
     <MinimalChrome>
       <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="text-center">
           {/* Status icon \u2014 reflects the VERIFIED payment state, not an
               unconditional checkmark. */}
-          {paymentState === 'verifying' ||
-          paymentState === 'pending' ||
-          paymentState === 'awaiting' ? (
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-warning/15">
+          {showReceipt ? null : paymentState === 'verifying' ||
+            paymentState === 'pending' ||
+            paymentState === 'awaiting' ? (
+            <div
+              data-testid="success-hero-icon"
+              className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-warning/15"
+            >
               <div className="h-9 w-9 animate-spin rounded-full border-4 border-warning border-t-transparent" />
             </div>
           ) : paymentState === 'failed' ? (
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--destructive,0_84%_60%))]/15">
+            <div
+              data-testid="success-hero-icon"
+              className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--destructive,0_84%_60%))]/15"
+            >
               <svg
                 className="h-10 w-10 text-[hsl(var(--destructive,0_84%_60%))]"
                 fill="none"
@@ -210,7 +220,10 @@ function SuccessContent() {
               </svg>
             </div>
           ) : (
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-success/20">
+            <div
+              data-testid="success-hero-icon"
+              className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-success/20"
+            >
               <svg
                 className="h-10 w-10 text-success-ink"
                 fill="none"
@@ -227,11 +240,16 @@ function SuccessContent() {
             </div>
           )}
 
-          <h1 className="mt-6 text-3xl font-bold text-foreground">{heading}</h1>
+          <h1 className={`${showReceipt ? '' : 'mt-6 '}text-3xl font-bold text-foreground`}>
+            {heading}
+          </h1>
           <p className="mt-2 text-lg text-muted-foreground">{subCopy}</p>
 
-          {isCod && (
-            <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
+          {isCod && !showReceipt && (
+            <div
+              data-testid="success-cod-banner"
+              className="mt-4 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3"
+            >
               <p className="text-sm font-medium text-warning-ink">
                 {t(
                   'Cash on Delivery — Pay when your order arrives',
@@ -256,170 +274,21 @@ function SuccessContent() {
             <WaMeCodConfirmButton order={order} className="mx-auto mt-6 max-w-md" />
           )}
 
-          <div className="mt-8 rounded-xl border bg-card p-6 shadow-sm text-left">
-            <div className="flex items-center justify-between border-b pb-4">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  {t('Order number', '\u0631\u0642\u0645 \u0627\u0644\u0637\u0644\u0628')}
-                </p>
-                <p className="text-lg font-semibold text-foreground">
-                  {order
-                    ? `#${order.orderNumber}`
-                    : orderId
-                      ? `#${orderId.slice(0, 8)}...`
-                      : t(
-                          'Processing',
-                          '\u062c\u0627\u0631\u064a \u0627\u0644\u0645\u0639\u0627\u0644\u062c\u0629'
-                        )}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">
-                  {t('Date', '\u0627\u0644\u062a\u0627\u0631\u064a\u062e')}
-                </p>
-                <p className="text-foreground">
-                  {formatDate(order?.createdAt ?? new Date(), {
-                    timezone: store.timezone,
-                    language,
-                    numerals: storeNumerals(store?.theme),
-                    style: 'short',
-                  })}
-                </p>
-              </div>
-            </div>
-
-            {/* Order Items \u2014 bundle boxes collapse to ONE row each (see
-                groupOrderLinesForDisplay); a customer must never see the
-                per-component allocated prices that fund that one price. */}
-            {order?.items && order.items.length > 0 && (
-              <div className="divide-y py-4">
-                {groupOrderLinesForDisplay(order.items).map(row =>
-                  row.kind === 'bundle' ? (
-                    <div key={row.key} className="flex items-center justify-between py-3">
-                      <div>
-                        <p className="font-medium text-foreground">
-                          {language === 'ar' && row.nameAr ? row.nameAr : row.name}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: {row.quantity}
-                        </p>
-                      </div>
-                      <p className="font-medium text-foreground">{formatPrice(row.total)}</p>
-                    </div>
-                  ) : (
-                    <div key={row.key} className="flex items-center justify-between py-3">
-                      <div>
-                        <p className="font-medium text-foreground">
-                          {row.item.product?.name || 'Product'}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: {row.item.quantity}
-                        </p>
-                      </div>
-                      <p className="font-medium text-foreground">
-                        {formatPrice(row.item.price * row.item.quantity)}
-                      </p>
-                    </div>
-                  )
-                )}
-                <div className="flex items-center justify-between pt-3">
-                  <p className="font-semibold text-foreground">
-                    {t('Total', '\u0627\u0644\u0645\u062c\u0645\u0648\u0639')}
-                  </p>
-                  <p className="font-bold text-primary">{formatPrice(order.total)}</p>
-                </div>
-              </div>
-            )}
-
-            {!order?.items && (
-              <div className="py-4">
-                <p className="text-sm text-muted-foreground">
-                  {t(
-                    'Your order has been received. You can track its status anytime from your account.',
-                    'تم استلام طلبك. يمكنك متابعة حالته في أي وقت من حسابك.'
-                  )}
-                </p>
-              </div>
-            )}
-
-            <div className="border-t pt-4">
-              <h3 className="font-medium text-foreground">
-                {t("What's next?", '\u0645\u0627 \u0627\u0644\u062a\u0627\u0644\u064a\u061f')}
-              </h3>
-              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2">
-                  <svg
-                    className="h-4 w-4 text-primary"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                  {t('Order received', 'تم استلام الطلب')}
-                </li>
-                <li className="flex items-center gap-2">
-                  <svg
-                    className="h-4 w-4 text-muted-foreground/70"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  {t(
-                    'Processing your order',
-                    '\u062c\u0627\u0631\u064a \u0645\u0639\u0627\u0644\u062c\u0629 \u0637\u0644\u0628\u0643'
-                  )}
-                </li>
-                <li className="flex items-center gap-2">
-                  <svg
-                    className="h-4 w-4 text-muted-foreground/70"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                    />
-                  </svg>
-                  {t('Order shipped', 'تم شحن الطلب')}
-                </li>
-                <li className="flex items-center gap-2">
-                  <svg
-                    className="h-4 w-4 text-muted-foreground/70"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                    />
-                  </svg>
-                  {t(
-                    'Delivered to your doorstep',
-                    '\u062a\u0645 \u0627\u0644\u062a\u0648\u0635\u064a\u0644 \u0625\u0644\u0649 \u0628\u0627\u0628 \u0645\u0646\u0632\u0644\u0643'
-                  )}
-                </li>
-              </ul>
-            </div>
-          </div>
+          {showReceipt ? (
+            <ReceiptPrinter
+              order={order}
+              paymentState={paymentState}
+              store={store}
+              loading={isLoading}
+            />
+          ) : (
+            <p className="mt-8 text-sm text-muted-foreground">
+              {t(
+                'Your order has been received. You can track its status anytime from your account.',
+                'تم استلام طلبك. يمكنك متابعة حالته في أي وقت من حسابك.'
+              )}
+            </p>
+          )}
 
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center">
             {paymentState === 'failed' && orderId ? (

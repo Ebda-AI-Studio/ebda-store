@@ -226,7 +226,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
               <Link
                 href={tab.href}
                 prefetch={false}
-                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[56px] transition-colors ${
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[calc(var(--bottom-tab-h)-1px)] transition-colors ${
                   active
                     ? resolvedActive
                       ? ''
@@ -266,7 +266,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
             aria-expanded={menuOpen}
             aria-controls="bottom-nav-menu-drawer"
             aria-label={menuLabel}
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[56px] transition-colors ${
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[calc(var(--bottom-tab-h)-1px)] transition-colors ${
               menuOpen
                 ? resolvedActive
                   ? ''
@@ -318,7 +318,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
         aria-modal="true"
         aria-label={menuLabel}
         dir={isRtl ? 'rtl' : 'ltr'}
-        className={`absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-foreground/10 bg-[hsl(var(--bg-section-alt))] pb-[calc(56px+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-[var(--duration-fast)] ${
+        className={`absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-foreground/10 bg-[hsl(var(--bg-section-alt))] pb-[calc(var(--bottom-tab-h)+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-[var(--duration-fast)] ${
           menuOpen ? 'translate-y-0' : 'translate-y-full'
         }`}
         style={resolvedBg ? { backgroundColor: resolvedBg } : undefined}

@@ -53,10 +53,12 @@ describe('CartClient — same function, shipping in the base', () => {
     );
   });
 
-  it('passes shipping and the includedInPrice flag', () => {
+  it('passes the (pending, zero) shipping and the includedInPrice flag', () => {
+    // On the cart shipping reads "calculated at checkout", so no zone fee is in the
+    // total yet (F1); checkout passes the real fee.
     const call = cartClient.slice(cartClient.indexOf('computeOrderAmounts({'));
     expect(call).toMatch(
-      /^computeOrderAmounts\(\{\s*subtotal,\s*discount,\s*shipping,\s*ratePercent: taxRatePercent,\s*includedInPrice: taxIncludedInPrice,\s*\}\)/
+      /^computeOrderAmounts\(\{\s*subtotal,\s*discount,\s*shipping: CART_SHIPPING_PENDING,\s*ratePercent: taxRatePercent,\s*includedInPrice: taxIncludedInPrice,\s*\}\)/
     );
   });
 });

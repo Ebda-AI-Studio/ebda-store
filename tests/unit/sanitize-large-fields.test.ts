@@ -48,3 +48,57 @@ describe('sanitizeInput large-content exemption', () => {
     expect(out.csvData).toContain('Foo,BAR');
   });
 });
+
+describe('sanitizeInput keeps array shapes (B0 Task 9)', () => {
+  it('an array of arrays stays an array of arrays, cells still cleaned', () => {
+    const out = run({
+      rows: [
+        ['S', ` 52${NUL} `],
+        ['M', '54'],
+      ],
+      deep: [[['x']]],
+      mixed: [{ a: [' b '] }, ['c']],
+    }) as unknown as Record<string, unknown>;
+    expect(out.rows).toEqual([
+      ['S', '52'],
+      ['M', '54'],
+    ]);
+    expect(out.deep).toEqual([[['x']]]);
+    expect(out.mixed).toEqual([{ a: ['b'] }, ['c']]);
+  });
+});
+
+describe('sanitizeInput: top-level arrays and prototype keys (B0 Task 9 fix round 1)', () => {
+  function runAny(body: unknown) {
+    const req = { body, query: {} } as any;
+    sanitizeInput(req, {} as any, () => {});
+    return req.body as unknown;
+  }
+
+  it('a top-level array body stays an array at every depth', () => {
+    expect(runAny([1, [2, 3], ' x '])).toEqual([1, [2, 3], 'x']);
+    expect(Array.isArray(runAny([{ a: 1 }]))).toBe(true);
+  });
+
+  it('__proto__ / constructor / prototype keys are dropped at every depth, nothing is polluted', () => {
+    const parsed = JSON.parse(
+      '{"a":[{"__proto__":{"polluted":"yes"},"constructor":{"prototype":{"polluted":"yes"}},"ok":1}],' +
+        '"__proto__":{"polluted":"yes"},"prototype":{"x":1},"nested":{"constructor":"c","keep":"k"}}'
+    );
+    const out = runAny(parsed) as Record<string, any>;
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect(Object.getPrototypeOf(out.a[0])).toBe(Object.prototype);
+    expect(Object.prototype.hasOwnProperty.call(out, '__proto__')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(out, 'prototype')).toBe(false);
+    expect(Object.keys(out.a[0])).toEqual(['ok']);
+    expect(out.nested).toEqual({ keep: 'k' });
+    expect(out.polluted).toBeUndefined();
+    expect(Object.getPrototypeOf({})).toBe(Object.prototype);
+    expect(({} as any).polluted).toBeUndefined();
+  });
+
+  it('markup is left for output escaping; control characters are stripped inside nested arrays', () => {
+    const out = runAny({ rows: [[`<b>S</b>${NUL}`, `5${BEL}2​`]] }) as Record<string, any>;
+    expect(out.rows).toEqual([['<b>S</b>', '52']]);
+  });
+});

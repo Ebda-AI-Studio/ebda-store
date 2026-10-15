@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { CartService } from '@api/services/cart.service';
+import { CartService, resolveLineNote } from '@api/services/cart.service';
 import { prisma } from '@ebda/database';
 
 // Mock Prisma
@@ -276,6 +276,7 @@ describe('CartService', () => {
           cartId: mockCart.id,
           productId: 'prod-123',
           variantId: null,
+          note: null,
           quantity: 2,
         },
       });
@@ -504,7 +505,13 @@ describe('CartService', () => {
       await CartService.addItem(mockStoreId, mockSessionId, 'prod-123', 3);
 
       expect(prisma.cartItem.create).toHaveBeenCalledWith({
-        data: { cartId: mockCart.id, productId: 'prod-123', variantId: null, quantity: 3 },
+        data: {
+          cartId: mockCart.id,
+          productId: 'prod-123',
+          variantId: null,
+          note: null,
+          quantity: 3,
+        },
       });
     });
   });
@@ -597,6 +604,7 @@ describe('CartService', () => {
           cartId: mockUserCart.id,
           productId: 'prod-2',
           variantId: null,
+          note: null,
           quantity: 1,
         },
       });
@@ -660,5 +668,39 @@ describe('CartService', () => {
 
       expect(prisma.cart.delete).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('resolveLineNote (personalisation enforcement)', () => {
+  const cfg = (over: Record<string, unknown> = {}) => ({
+    enabled: true,
+    label: 'Name',
+    labelAr: '',
+    maxLength: 200,
+    required: false,
+    ...over,
+  });
+
+  it('checks maxLength on the FULL note, before the 200 cap', () => {
+    // maxLength 200 + a 250-char note: capping first would accept it as 200 chars.
+    expect(resolveLineNote(cfg(), 'x'.repeat(250))).toEqual({ error: 'PERSONALISATION_TOO_LONG' });
+    expect(resolveLineNote(cfg(), 'x'.repeat(200))).toEqual({ note: 'x'.repeat(200) });
+    expect(resolveLineNote(cfg({ maxLength: 12 }), 'x'.repeat(13))).toEqual({
+      error: 'PERSONALISATION_TOO_LONG',
+    });
+  });
+
+  it('counts the visible text, not invisible characters or padding', () => {
+    expect(resolveLineNote(cfg({ maxLength: 4 }), '  ‏Sara​  ')).toEqual({
+      note: 'Sara',
+    });
+  });
+
+  it('required + empty (or only invisible chars) is refused; off drops the note', () => {
+    expect(resolveLineNote(cfg({ required: true }), '‎؜ ')).toEqual({
+      error: 'PERSONALISATION_REQUIRED',
+    });
+    expect(resolveLineNote(cfg({ enabled: false }), 'Sara')).toEqual({ note: null });
+    expect(resolveLineNote(null, 'Sara')).toEqual({ note: null });
   });
 });

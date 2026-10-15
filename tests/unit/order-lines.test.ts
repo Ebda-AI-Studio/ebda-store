@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { groupOrderLinesForDisplay, type OrderLineBase } from '@ebda/shared';
+import {
+  groupOrderLinesForDisplay,
+  orderLineVariantTitle,
+  variantTitleSegments,
+  type OrderLineBase,
+} from '@ebda/shared';
 
 interface Line extends OrderLineBase {
   productName: string;
@@ -90,5 +95,44 @@ describe('groupOrderLinesForDisplay', () => {
   it('mixes bundle groups and loose items, preserving first-appearance order', () => {
     const rows = groupOrderLinesForDisplay([soap, dates, honey, nuts]);
     expect(rows.map(r => r.kind)).toEqual(['item', 'bundle']);
+  });
+
+  it('a box with no snapshotted name falls back bilingually (Bundle / باقة)', () => {
+    const rows = groupOrderLinesForDisplay([{ ...dates, bundleName: null, bundleNameAr: null }]);
+    const bundle = rows[0];
+    if (bundle.kind !== 'bundle') throw new Error('expected a bundle row');
+    expect(bundle.name).toBe('Bundle');
+    expect(bundle.nameAr).toBe('باقة');
+  });
+
+  it('a box with only an Arabic name shows it in both languages', () => {
+    const rows = groupOrderLinesForDisplay([{ ...dates, bundleName: '', bundleNameAr: 'صندوق' }]);
+    const bundle = rows[0];
+    if (bundle.kind !== 'bundle') throw new Error('expected a bundle row');
+    expect(bundle.name).toBe('صندوق');
+    expect(bundle.nameAr).toBe('صندوق');
+  });
+});
+
+describe('orderLineVariantTitle (Ruling B0-41)', () => {
+  const both = { variantName: 'Rose / M / 54', variantNameAr: 'وردي / M / 54 سم' };
+  it('Arabic snapshot in Arabic, canonical in English', () => {
+    expect(orderLineVariantTitle(both, true)).toBe('وردي / M / 54 سم');
+    expect(orderLineVariantTitle(both, false)).toBe('Rose / M / 54');
+  });
+  it('falls back across languages, never blank; null when there is no variant', () => {
+    expect(orderLineVariantTitle({ variantName: 'Rose / M', variantNameAr: null }, true)).toBe(
+      'Rose / M'
+    );
+    expect(orderLineVariantTitle({ variantName: '', variantNameAr: 'وردي' }, false)).toBe('وردي');
+    expect(orderLineVariantTitle({ variantName: null, variantNameAr: null }, true)).toBeNull();
+  });
+});
+
+describe('variantTitleSegments (F8)', () => {
+  it('splits a title into its option values, trimmed, no empties', () => {
+    expect(variantTitleSegments('وردي / M / 54 سم')).toEqual(['وردي', 'M', '54 سم']);
+    expect(variantTitleSegments(' Rose /  / M ')).toEqual(['Rose', 'M']);
+    expect(variantTitleSegments('One Size')).toEqual(['One Size']);
   });
 });

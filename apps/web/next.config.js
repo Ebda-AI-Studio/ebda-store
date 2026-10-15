@@ -156,6 +156,10 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://onesignal.com https://*.onesignal.com",
               "font-src 'self' https://fonts.gstatic.com data:",
               "img-src 'self' data: https: blob:",
+              // Builder hero/section <video> (uploaded via POST /uploads/video into the
+              // R2 public bucket). Without this a <video> falls back to default-src
+              // 'self' and the R2 file is blocked. Same media hosts as connect-src.
+              "media-src 'self' https://*.r2.dev https://media.ebda.app blob:",
               // media.ebda.app: the R2 public bucket's custom domain — the PDP 3D
               // viewer fetch()es the product's .glb from it (an <img> needs no
               // connect-src, a fetch does). docs/plans/2026-10-07-product-3d-viewer.md.

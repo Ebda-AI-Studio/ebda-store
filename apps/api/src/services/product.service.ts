@@ -9,12 +9,24 @@ import {
 } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
 import { activeVariants, effectiveInventory } from '../lib/effective-inventory';
-import { slugify, slugifyWithFallback, AI_AUTOFILL_FIELD_NAMES } from '@ebda/shared';
+import {
+  slugify,
+  slugifyWithFallback,
+  AI_AUTOFILL_FIELD_NAMES,
+  type ProductFact,
+  type PersonalisationConfig,
+} from '@ebda/shared';
 import { redis } from './redis.service';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { cleanupRemovedImages } from './r2-cleanup.service';
+import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
 import { PUBLIC_MODEL3D_SELECT, toPublicModel3d } from './product-model.service';
+import {
+  assertSizeChartInStore,
+  resolvePdpSizeChart,
+  SIZE_CHART_PUBLIC_SELECT,
+} from './size-chart.service';
 import { inngest } from '../lib/inngest/client';
 import { stampHumanEdits, enqueueRecommendationsSweepForNewProduct } from './ai-autofill.service';
 import { recordSlugRedirect } from './slug-redirect.service';
@@ -276,6 +288,14 @@ interface CreateProductData {
    */
   badgeLabel?: string | null;
   badgeLabelAr?: string | null;
+  /** Whole-array replace; `undefined` leaves the stored facts alone. */
+  facts?: ProductFact[];
+  /** Made-to-order business days; `null` clears, `undefined` leaves alone. */
+  leadTimeDays?: number | null;
+  /** PDP personalisation field config; `null` clears, `undefined` leaves alone. */
+  personalisation?: PersonalisationConfig | null;
+  /** Own size chart (same store, checked); `null` = inherit the category's, `undefined` leaves alone. */
+  sizeChartId?: string | null;
   categories?: string[];
   images?: { url: string; alt?: string }[];
   /** SEO meta — set per-product or via the AI sweep. `null` clears. */
@@ -480,9 +500,26 @@ export const STOREFRONT_PRODUCT_SELECT = {
   // and the card shows nothing.
   badgeLabel: true,
   badgeLabelAr: true,
+  // Spec rows: PDP table + card chips + compare rows. CACHE CLASS: BOUNDED-stale,
+  // rides the listing/PDP caches (busted by invalidateStoreProductCache on update;
+  // recommendation lists add their own 5-minute TTL).
+  facts: true,
+  // Made-to-order days for the PDP delivers-by chip. CACHE CLASS: BOUNDED-stale, rides the
+  // PDP cache; invalidateStoreProductCache (called on every product update) busts it.
+  leadTimeDays: true,
+  // PDP personalisation field config (label, maxLength, required). CACHE CLASS: BOUNDED-stale,
+  // rides the PDP cache; invalidateStoreProductCache (every product update) busts it. Display
+  // only: CartService.addItem re-reads the column uncached to enforce required/maxLength.
+  personalisation: true,
   updatedAt: true,
   createdAt: true,
 } as const satisfies Prisma.ProductSelect;
+
+/** Json column write: `null` must become SQL NULL (Prisma.DbNull), `undefined` leaves it alone. */
+function personalisationWrite(v: PersonalisationConfig | null | undefined) {
+  if (v === undefined) return {};
+  return { personalisation: v === null ? Prisma.DbNull : v };
+}
 
 export class ProductService {
   static async list(storeId: string, options: ListProductsOptions = {}) {
@@ -717,6 +754,7 @@ export class ProductService {
     // Plan ceiling (SP5): one more product must fit the store's maxProducts.
     await assertWithinLimit(storeId, 'maxProducts');
     await this.assertCategoriesInStore(storeId, data.categories);
+    await assertSizeChartInStore(storeId, data.sizeChartId);
     // slugifyWithFallback, never bare slugify: a name that slugifies to '' (no
     // letters/digits, or a product created before its name was filled in) gave
     // baseSlug = '', so the de-duplication loop below produced '', '-1', '-2'.
@@ -771,6 +809,10 @@ export class ProductService {
         isBestSeller: data.isBestSeller ?? false,
         badgeLabel: data.badgeLabel ?? null,
         badgeLabelAr: data.badgeLabelAr ?? null,
+        ...(data.facts !== undefined ? { facts: data.facts } : {}),
+        ...(data.leadTimeDays !== undefined ? { leadTimeDays: data.leadTimeDays } : {}),
+        ...personalisationWrite(data.personalisation),
+        ...(data.sizeChartId !== undefined ? { sizeChartId: data.sizeChartId } : {}),
         images: data.images
           ? {
               create: data.images.map((img, index) => ({
@@ -822,6 +864,7 @@ export class ProductService {
 
   static async update(storeId: string, productId: string, data: UpdateProductData) {
     await this.assertCategoriesInStore(storeId, data.categories);
+    await assertSizeChartInStore(storeId, data.sizeChartId);
     const product = await this.getById(storeId, productId);
 
     // Money guard: a fixed discount must never exceed the price (would store a
@@ -965,6 +1008,10 @@ export class ProductService {
           // convention as nameAr / description / excerpt above.
           ...(data.badgeLabel !== undefined ? { badgeLabel: data.badgeLabel } : {}),
           ...(data.badgeLabelAr !== undefined ? { badgeLabelAr: data.badgeLabelAr } : {}),
+          ...(data.facts !== undefined ? { facts: data.facts } : {}),
+          ...(data.leadTimeDays !== undefined ? { leadTimeDays: data.leadTimeDays } : {}),
+          ...personalisationWrite(data.personalisation),
+          ...(data.sizeChartId !== undefined ? { sizeChartId: data.sizeChartId } : {}),
           inventory: data.inventory,
           ...(data.lowStockThreshold !== undefined
             ? { lowStockThreshold: data.lowStockThreshold }
@@ -1455,6 +1502,7 @@ export class ProductService {
           lowStockThreshold: true,
           images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
           categories: { include: { category: true } },
+          options: LISTING_SWATCH_OPTIONS_SELECT,
           store: { select: { id: true, name: true, slug: true } },
           variants: {
             select: {
@@ -1558,6 +1606,7 @@ export class ProductService {
         lowStockThreshold: true,
         images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
         categories: { include: { category: true } },
+        options: LISTING_SWATCH_OPTIONS_SELECT,
         store: { select: { id: true, name: true, slug: true } },
         // Variants are needed by the storefront card components to (a)
         // pick between the inline "Add to cart" and "View" CTAs, and
@@ -1636,8 +1685,15 @@ export class ProductService {
     ...STOREFRONT_PRODUCT_SELECT,
     lowStockThreshold: true,
     images: { orderBy: { position: 'asc' } },
-    categories: { include: { category: true } },
+    // Each category carries its size chart so the PDP can inherit it (`resolvePdpSizeChart`);
+    // the nested chart is stripped from the payload again in `withSizeChart`.
+    categories: {
+      include: { category: { include: { sizeChart: { select: SIZE_CHART_PUBLIC_SELECT } } } },
+    },
     store: { select: { id: true, name: true, slug: true } },
+    // PDP size guide. CACHE CLASS: BOUNDED-stale, rides the PDP cache; every chart write and every
+    // product/category write that changes `sizeChartId` calls invalidateStoreProductCaches.
+    sizeChart: { select: SIZE_CHART_PUBLIC_SELECT },
     faqs: {
       select: {
         id: true,
@@ -1721,7 +1777,13 @@ export class ProductService {
         id: string;
         name: string;
         nameAr: string | null;
-        values: Array<{ value: string; valueAr: string | null }>;
+        values: Array<{
+          id: string;
+          value: string;
+          valueAr: string | null;
+          swatchHex: string | null;
+          swatchImageUrl: string | null;
+        }>;
       }>;
       variants?: Array<{
         id: string;
@@ -1749,7 +1811,13 @@ export class ProductService {
       id: o.id,
       name: o.name,
       nameAr: o.nameAr,
-      values: o.values.map(v => ({ value: v.value, valueAr: v.valueAr ?? undefined })),
+      values: o.values.map(v => ({
+        id: v.id,
+        value: v.value,
+        valueAr: v.valueAr ?? undefined,
+        swatchHex: v.swatchHex,
+        swatchImageUrl: v.swatchImageUrl,
+      })),
     }));
 
     const reshapedVariants = (
@@ -1835,6 +1903,28 @@ export class ProductService {
     };
   }
 
+  /**
+   * Flatten the PDP size chart: `sizeChart` = the product's own chart, else its category's, else
+   * null. The per-category chart used for the fallback is dropped from `categories` so the
+   * payload carries the table once.
+   */
+  private static withSizeChart<
+    T extends {
+      sizeChart: unknown;
+      categories: Array<{ category: { sizeChart: unknown } & Record<string, unknown> }>;
+    },
+  >(product: T) {
+    const sizeChart = resolvePdpSizeChart(product);
+    return {
+      ...product,
+      sizeChart,
+      categories: (product.categories ?? []).map(pc => {
+        const { sizeChart: _drop, ...category } = pc.category;
+        return { ...pc, category };
+      }),
+    };
+  }
+
   static async getPublicBySlug(storeId: string, slug: string) {
     const product = await prisma.product.findFirst({
       where: { storeId, slug, status: 'active', deletedAt: null },
@@ -1859,7 +1949,7 @@ export class ProductService {
     };
 
     return {
-      ...this.publicDetailWithStock(product),
+      ...this.publicDetailWithStock(this.withSizeChart(product)),
       model3d: toPublicModel3d(product.model3d),
       ratingStats,
     };
@@ -1889,7 +1979,7 @@ export class ProductService {
     };
 
     return {
-      ...this.publicDetailWithStock(product),
+      ...this.publicDetailWithStock(this.withSizeChart(product)),
       model3d: toPublicModel3d(product.model3d),
       ratingStats,
     };
@@ -2156,6 +2246,7 @@ export class ProductService {
         include: {
           images: { orderBy: { position: 'asc' }, take: 2 },
           categories: { include: { category: { select: { id: true, name: true, slug: true } } } },
+          options: LISTING_SWATCH_OPTIONS_SELECT,
           reviews: {
             where: { status: 'published' },
             select: { rating: true },

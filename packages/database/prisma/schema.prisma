@@ -471,6 +471,7 @@ model Store {
   codRemittances           CodRemittance[]
   pageRevisions            StorePageRevision[]
   productModels            ProductModel[]
+  sizeCharts               SizeChart[]
   productModelBindings     ProductModelBinding[]
   affiliates               Affiliate[]
   affiliateReferrals       AffiliateReferral[]
@@ -864,20 +865,24 @@ model Category {
   // sweep. Storefront coalesces at render time: AEO > SEO > null.
   metaDescriptionAeo   String?   @map("meta_description_aeo")
   metaDescriptionAeoAr String?   @map("meta_description_aeo_ar")
+  // Size chart every product in this category inherits unless it has its own. null = none.
+  sizeChartId          String?   @map("size_chart_id")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
   deletedAt            DateTime? @map("deleted_at") // Soft delete support
 
   // Relations
-  store    Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  parent   Category?         @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children Category[]        @relation("CategoryHierarchy")
-  products ProductCategory[]
+  store     Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  parent    Category?         @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children  Category[]        @relation("CategoryHierarchy")
+  products  ProductCategory[]
+  sizeChart SizeChart?        @relation(fields: [sizeChartId], references: [id], onDelete: SetNull)
 
   @@unique([storeId, slug])
   @@index([storeId])
   @@index([parentId])
   @@index([isActive])
+  @@index([sizeChartId])
   @@map("categories")
 }
 
@@ -924,6 +929,14 @@ model Product {
   badgeLabel           String?       @map("badge_label") @db.VarChar(32)
   badgeLabelAr         String?       @map("badge_label_ar") @db.VarChar(32)
   viewCount            Int           @default(0) @map("view_count")
+  // Ordered ProductFact[] (@ebda/shared productFactsSchema): spec rows shown as the PDP table, up to 2 card chips and compare rows. [] renders nothing.
+  facts                Json          @default("[]")
+  // Made-to-order business days added to the delivery estimate (PDP "delivers by" chip). null = ready to ship. CHECK 0..60.
+  leadTimeDays         Int?          @map("lead_time_days")
+  // PersonalisationConfig (@ebda/shared personalisationConfigSchema): the PDP text field the customer fills per line ("Name to embroider"). null / enabled:false = no field.
+  personalisation      Json?
+  // Own size chart for the PDP size guide; null = inherit the category's chart (if any).
+  sizeChartId          String?       @map("size_chart_id")
   // Short 1-2 sentence blurb, distinct from the full `description`. Written
   // by the bulk-ai-excerpt sweep (or manually) — surfaced anywhere a compact
   // summary is useful (search results, share cards). Bilingual EN+AR.
@@ -994,6 +1007,7 @@ model Product {
   dailyViews           ProductDailyView[]
   bundleItems          BundleItem[]
   model3d              ProductModel?
+  sizeChart            SizeChart?                 @relation(fields: [sizeChartId], references: [id], onDelete: SetNull)
 
   @@unique([storeId, slug])
   @@unique([storeId, sku]) // Prevent duplicate SKUs within a store (null values are excluded)
@@ -1017,6 +1031,7 @@ model Product {
   // Barcode lookup index — barcode scan resolves within a store scope.
   // Added 2026-06-15 for inventory.barcode Enterprise feature.
   @@index([storeId, barcode])
+  @@index([sizeChartId])
   @@map("products")
 }
 
@@ -1146,12 +1161,15 @@ model ProductOption {
 
 // Option values like "Small", "Red"
 model ProductOptionValue {
-  id        String   @id @default(uuid())
-  optionId  String   @map("option_id")
-  value     String // e.g., "Small", "Red"
-  valueAr   String?  @map("value_ar")
-  position  Int      @default(0)
-  createdAt DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid())
+  optionId       String   @map("option_id")
+  value          String // e.g., "Small", "Red"
+  valueAr        String?  @map("value_ar")
+  // Storefront swatch: a hex dot and/or a fabric/photo thumbnail (image wins).
+  swatchHex      String?  @map("swatch_hex")
+  swatchImageUrl String?  @map("swatch_image_url")
+  position       Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
 
   option          ProductOption          @relation(fields: [optionId], references: [id], onDelete: Cascade)
   variants        ProductVariantOption[]
@@ -1235,6 +1253,33 @@ model ProductModel {
   @@map("product_models")
 }
 
+// Size chart (B0 Task 9): a merchant-authored measurements table shown in the PDP size guide
+// and on /size-guide. UI: admin /stores/[id]/size-charts (editor), product FulfilmentCard and
+// category form pickers; storefront SizeChartDialog + /size-guide. Shape: @ebda/shared sizeChartSchema.
+model SizeChart {
+  id         String     @id @default(uuid())
+  storeId    String     @map("store_id")
+  name       String     @default("")
+  nameAr     String     @default("") @map("name_ar")
+  // 'cm' | 'in' (CHECK constraint).
+  unit       String     @default("cm")
+  // [{ label, labelAr }], 2..10.
+  columns    Json
+  // string[][], 1..30 rows, one cell per column.
+  rows       Json
+  note       String     @default("")
+  noteAr     String     @default("") @map("note_ar")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  store      Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products   Product[]
+  categories Category[]
+
+  @@index([storeId])
+  @@map("size_charts")
+}
+
 // Option value -> 3D finish (material colour/metal, or a glTF variant).
 // UI: the mapping table in the admin "3D model" card.
 model ProductModelBinding {
@@ -1307,6 +1352,8 @@ model CartItem {
   productId String   @map("product_id")
   variantId String?  @map("variant_id")
   quantity  Int      @default(1)
+  // Customer personalisation text (cleanNote: trimmed, control/bidi chars stripped, <=200). Part of the line identity.
+  note      String?
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1314,13 +1361,14 @@ model CartItem {
   product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variant ProductVariant? @relation(fields: [variantId], references: [id])
 
-  // Uniqueness is enforced by two PARTIAL unique indexes created in migration
-  // 20260622000000_cart_item_null_variant_unique.sql — one WHERE variant_id IS NULL
-  // (cart_id, product_id) and one WHERE variant_id IS NOT NULL
-  // (cart_id, product_id, variant_id). A combined @@unique here would generate a
-  // single index that Postgres treats as non-enforcing when variant_id is NULL,
-  // which is the bug this migration fixes. Prisma drift-check is satisfied because
-  // the raw migration drops the old index and replaces it; no @@unique means Prisma
+  // Uniqueness is enforced by two PARTIAL unique EXPRESSION indexes, rebuilt in
+  // migration 20261016000500_personalisation (originally 20260622000000_cart_item_null_variant_unique):
+  //   cart_items_line_no_variant   (cart_id, product_id, COALESCE(note, ''))             WHERE variant_id IS NULL
+  //   cart_items_line_with_variant (cart_id, product_id, variant_id, COALESCE(note, '')) WHERE variant_id IS NOT NULL
+  // So a line is (cart, product, variant, note): "Sara" and "Omar" on the same item are two lines.
+  // A combined @@unique here would generate a single index that Postgres treats as
+  // non-enforcing when variant_id (or note) is NULL — hence the partials + COALESCE.
+  // Prisma cannot express partial/expression indexes; no @@unique means Prisma
   // will not try to recreate the old combined index.
   @@index([cartId])
   @@index([productId])
@@ -1689,7 +1737,13 @@ model OrderItem {
   productId         String  @map("product_id")
   variantId         String? @map("variant_id")
   productName       String  @map("product_name")
-  variantName       String? @map("variant_name") // e.g., "Large / Red"
+  variantName       String? @map("variant_name") // e.g., "Large / Red" — canonical (EN) title
+  // Arabic twin of variantName (the variant's titleAr at sale time). The storefront and the
+  // admin render it per locale with variantName as the fallback; fiscal documents and CSV
+  // exports keep variantName exactly as before. Null for orders placed before it existed.
+  variantNameAr     String? @map("variant_name_ar")
+  // Snapshot of the cart line's personalisation note (e.g. the name to embroider).
+  personalisation   String?
   sku               String?
   quantity          Int
   price             Int

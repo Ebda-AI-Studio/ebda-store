@@ -6,7 +6,15 @@ import Link from 'next/link';
 import { Button } from '@ebda/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
-import { buildCheckoutDeliverySettings } from '../../../../lib/checkout-delivery-payload';
+import {
+  buildCheckoutDeliverySettings,
+  parseDeliveryDaysInput,
+  offDaysForSave,
+  offDaysFromSettings,
+  hasSavedOffDays,
+  hasInvalidOffDays,
+} from '../../../../lib/checkout-delivery-payload';
+import { DeliveryOffDaysField } from '../../../../components/DeliveryOffDaysField';
 import { useT } from '@/i18n/useT';
 import type { CheckoutDeliverySettings, CheckoutDeliveryWindow } from '@ebda/shared';
 
@@ -43,6 +51,15 @@ export default function CheckoutDeliveryPage() {
   // Per-store, opt-in owner order-invoice email. Every order in this store
   // auto-emails the rendered invoice to this address. Empty = disabled.
   const [orderInvoiceEmail, setOrderInvoiceEmail] = useState('');
+  // Store-wide delivery estimate in business days, as the raw strings typed.
+  // Both empty = none; saving sends an explicit null to clear a stored value.
+  const [deliveryDaysMin, setDeliveryDaysMin] = useState('');
+  const [deliveryDaysMax, setDeliveryDaysMax] = useState('');
+  // Weekdays with no delivery (chip selection). Unset in the store = the platform default (Friday).
+  const [deliveryOffDays, setDeliveryOffDays] = useState<number[]>([5]);
+  // Whether the store already holds a saved choice: the untouched default is never written.
+  const [offDaysSaved, setOffDaysSaved] = useState(false);
+  const [offDaysInvalid, setOffDaysInvalid] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -73,6 +90,12 @@ export default function CheckoutDeliveryPage() {
       setOrderInvoiceEmail(
         typeof settings.orderInvoiceEmail === 'string' ? settings.orderInvoiceEmail : ''
       );
+      const dd = settings.deliveryDays as { min?: unknown; max?: unknown } | null | undefined;
+      setDeliveryDaysMin(typeof dd?.min === 'number' ? String(dd.min) : '');
+      setDeliveryDaysMax(typeof dd?.max === 'number' ? String(dd.max) : '');
+      setDeliveryOffDays(offDaysFromSettings(settings.deliveryOffDays));
+      setOffDaysSaved(hasSavedOffDays(settings.deliveryOffDays));
+      setOffDaysInvalid(hasInvalidOffDays(settings.deliveryOffDays));
     } catch (err) {
       console.error('Failed to fetch checkout delivery settings:', err);
     } finally {
@@ -85,6 +108,16 @@ export default function CheckoutDeliveryPage() {
   }, [fetchSettings]);
 
   const handleSave = useCallback(async () => {
+    const days = parseDeliveryDaysInput(deliveryDaysMin, deliveryDaysMax);
+    if (!days.ok) {
+      setMessage({ type: 'error', text: t('deliveryDaysInvalid') });
+      return;
+    }
+    const off = offDaysForSave(deliveryOffDays, offDaysSaved, offDaysInvalid);
+    if (!off.ok) {
+      setMessage({ type: 'error', text: t('deliveryOffDaysAllOff') });
+      return;
+    }
     setIsSaving(true);
     setMessage(null);
     try {
@@ -94,9 +127,15 @@ export default function CheckoutDeliveryPage() {
           config,
           minimumOrderMajor,
           orderInvoiceEmail,
+          deliveryDays: days.value,
+          deliveryOffDays: off.value,
         }),
       });
       if (!error) {
+        if (off.value !== undefined) {
+          setOffDaysSaved(off.value !== null);
+          setOffDaysInvalid(false);
+        }
         setMessage({ type: 'success', text: t('successMessage') });
       } else {
         setMessage({ type: 'error', text: error.message || t('failedMessage') });
@@ -106,7 +145,19 @@ export default function CheckoutDeliveryPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [storeId, existingSettings, config, minimumOrderMajor, orderInvoiceEmail, t]);
+  }, [
+    storeId,
+    existingSettings,
+    config,
+    minimumOrderMajor,
+    orderInvoiceEmail,
+    deliveryDaysMin,
+    deliveryDaysMax,
+    deliveryOffDays,
+    offDaysSaved,
+    offDaysInvalid,
+    t,
+  ]);
 
   const patchNote = (next: Partial<CheckoutDeliverySettings['note']>) =>
     setConfig(prev => ({ ...prev, note: { ...prev.note, ...next } }));
@@ -161,7 +212,7 @@ export default function CheckoutDeliveryPage() {
           <button
             type="button"
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || deliveryOffDays.length >= 7}
             className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {isSaving ? t('saving') : t('save')}
@@ -335,6 +386,66 @@ export default function CheckoutDeliveryPage() {
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
             />
           </label>
+        </section>
+
+        {/* Store-wide delivery estimate (business days): the storefront "arrives between"
+            line falls back to it when no shipping zone carries a day estimate (area-rate
+            stores). Both empty = hidden. */}
+        <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">{t('deliveryDaysTitle')}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t('deliveryDaysHint')}</p>
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex w-28 flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                {t('deliveryDaysMin')}
+              </span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={30}
+                step={1}
+                value={deliveryDaysMin}
+                onChange={e => setDeliveryDaysMin(e.target.value)}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="flex w-28 flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                {t('deliveryDaysMax')}
+              </span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={30}
+                step={1}
+                value={deliveryDaysMax}
+                onChange={e => setDeliveryDaysMax(e.target.value)}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setDeliveryDaysMin('');
+                setDeliveryDaysMax('');
+              }}
+              disabled={deliveryDaysMin === '' && deliveryDaysMax === ''}
+              className="rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-muted disabled:opacity-40"
+            >
+              {t('deliveryDaysClear')}
+            </button>
+          </div>
+          <div className="space-y-2 border-t border-border pt-3">
+            <div>
+              <h3 className="text-xs font-semibold text-foreground">{t('deliveryOffDaysTitle')}</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t('deliveryOffDaysHint')}</p>
+            </div>
+            <DeliveryOffDaysField value={deliveryOffDays} onChange={setDeliveryOffDays} />
+          </div>
         </section>
 
         {/* Owner order-invoice email — opt-in per-store. Every order in this

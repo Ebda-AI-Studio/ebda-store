@@ -194,30 +194,36 @@ export class GeminiAnswerEngineProvider implements AnswerEngineProvider {
     tools: Record<string, unknown>[]
   ): Promise<GeminiCallResult> {
     // Key failover (RULINGS GEMINI-FAILOVER-1): a 429 on one key retries with the next.
+    // Search grounding has its own quota, so a grounded call benches only the 'grounding'
+    // scope: its 429 never stops the ungrounded fallback in query() (Ruling B0-51).
     let res: Response;
     try {
-      res = await withGeminiFailover(async apiKey => {
-        const r = await fetch(`${GEMINI_API_BASE}/${MODEL}:generateContent`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
-          },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            ...(tools.length ? { tools } : {}),
-          }),
-        });
-        if (r.status === 429) {
-          const ra = Number(r.headers.get('retry-after'));
-          throw Object.assign(new Error('RESOURCE_EXHAUSTED'), {
-            status: 429,
-            retryAfterSeconds: Number.isFinite(ra) && ra > 0 ? ra : undefined,
-            response: r,
+      res = await withGeminiFailover(
+        async apiKey => {
+          const r = await fetch(`${GEMINI_API_BASE}/${MODEL}:generateContent`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey,
+            },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              ...(tools.length ? { tools } : {}),
+            }),
           });
-        }
-        return r;
-      }, config.googleAiKey);
+          if (r.status === 429) {
+            const ra = Number(r.headers.get('retry-after'));
+            throw Object.assign(new Error('RESOURCE_EXHAUSTED'), {
+              status: 429,
+              retryAfterSeconds: Number.isFinite(ra) && ra > 0 ? ra : undefined,
+              response: r,
+            });
+          }
+          return r;
+        },
+        config.googleAiKey,
+        tools.length ? { benchScope: 'grounding' } : undefined
+      );
     } catch (err) {
       if (!isGeminiQuotaError(err)) throw err;
       const r = (err as { response?: Response }).response;

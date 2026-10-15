@@ -4,6 +4,10 @@
 
 @layer base {
   :root {
+    /* Real height of the mobile BottomTabBar (68px content + 1px top border), excluding the
+       safe-area inset. The tab bar sizes itself with it; every fixed-bottom bar lifts by it. */
+    --bottom-tab-h: 69px;
+
     /* ==========================================
        STOREFRONT THEME SYSTEM
        All templates MUST use these CSS variables
@@ -588,6 +592,24 @@
   }
 }
 
+/* PDP gallery: a swatch/variant pick that swaps in the variant photo fades it
+   in over 200ms (ease-out-quint). Only under no-preference, so reduced motion
+   shows the end state instantly. The element is keyed `variant-<id>`, so it
+   mounts fresh on each pick and never animates on first paint (LCP). */
+@media (prefers-reduced-motion: no-preference) {
+  .variant-image-fade {
+    animation: variantImageFade 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+@keyframes variantImageFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* Animations */
 @keyframes fadeIn {
   from {
@@ -1166,6 +1188,54 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
 }
 [data-pack='dahab'] [data-section='newsletter'] > div {
   max-width: 38rem;
+}
+
+/* Sticky mobile bars (PDP add-to-cart, cart total). UI rule 6: space is reserved on
+ * <body> (never the chrome wrapper). Body already carries pb-32 for the
+ * BottomTabBar, so the bar (4.25rem) is added on top of that, not instead of it. */
+@media (max-width: 767px) {
+  body[data-sticky-atc='1'],
+  body[data-sticky-cart='1'] {
+    padding-bottom: calc(8rem + 4.25rem);
+  }
+  /* Cart bar with its blocked-message line (~24px taller). */
+  body[data-sticky-cart='blocked'] {
+    padding-bottom: calc(8rem + 4.25rem + 1.5rem);
+  }
+  /* Floating widget (br/bl, bottom 80px, z-60) and the toast region (@ebda/ui Toast,
+   * bottom 72px) would sit inside the sticky bar's band (F2: "added to cart" covered the
+   * bar's name and price): lift both clear of tab bar (--bottom-tab-h) + the bar's REAL
+   * height (--sticky-bar-h, published by useStickyBarHeight so the taller Dahab bar and the
+   * cart's blocked line are covered) + a 10px gap. The fallbacks are the default bar (61px)
+   * and the cart bar with its blocked line (85px) for the frame before the hook runs. */
+  body[data-sticky-atc='1'] [data-floating-widget='bottom'],
+  body[data-sticky-cart='1'] [data-floating-widget='bottom'],
+  body[data-sticky-atc='1'] [data-toast-region],
+  body[data-sticky-cart='1'] [data-toast-region] {
+    bottom: calc(
+      var(--bottom-tab-h) + var(--sticky-bar-h, 61px) + 10px + env(safe-area-inset-bottom)
+    );
+  }
+  body[data-sticky-cart='blocked'] [data-floating-widget='bottom'],
+  body[data-sticky-cart='blocked'] [data-toast-region] {
+    bottom: calc(
+      var(--bottom-tab-h) + var(--sticky-bar-h, 85px) + 10px + env(safe-area-inset-bottom)
+    );
+  }
+}
+
+/* Sticky bar entrance: ease-out-quint, 300ms. The global reduced-motion rule
+ * above collapses it to the end state instantly. */
+@keyframes stickyBarIn {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.sticky-bar-in {
+  animation: stickyBarIn 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* ==========================================================================

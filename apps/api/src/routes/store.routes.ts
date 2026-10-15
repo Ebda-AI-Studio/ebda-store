@@ -29,6 +29,8 @@ import {
   LOOK_DENSITIES,
   LOOK_IMAGE_RATIOS,
   LOOK_MOTIONS,
+  deliveryDaysSchema,
+  deliveryOffDaysSchema,
 } from '@ebda/shared';
 import {
   maskMarketingPixelSecrets,
@@ -60,15 +62,86 @@ function parseStoreBody<S extends z.ZodTypeAny>(schema: S, body: unknown): z.inf
   throw result.error;
 }
 
+/**
+ * Store-wide delivery estimate (`settings.deliveryDays`, business days): null clears, anything
+ * else must satisfy the shared schema. Applied on EVERY route that can write `settings`
+ * (create + update); super-admin provisioning uses a strict object that drops the key.
+ */
+function addDeliveryDaysIssues(
+  settings: Record<string, unknown> | undefined,
+  ctx: z.RefinementCtx
+) {
+  const dd = settings?.deliveryDays;
+  if (dd === undefined || dd === null) return;
+  const parsed = deliveryDaysSchema.safeParse(dd);
+  if (parsed.success) return;
+  for (const issue of parsed.error.issues) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['deliveryDays', ...issue.path],
+      message: issue.message,
+    });
+  }
+}
+
+/** `settings.deliveryOffDays` (weekdays with no delivery): null clears; else the shared schema. */
+function addDeliveryOffDaysIssues(
+  settings: Record<string, unknown> | undefined,
+  ctx: z.RefinementCtx
+) {
+  const od = settings?.deliveryOffDays;
+  if (od === undefined || od === null) return;
+  const parsed = deliveryOffDaysSchema.safeParse(od);
+  if (parsed.success) return;
+  for (const issue of parsed.error.issues) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['deliveryOffDays', ...issue.path],
+      message: issue.message,
+    });
+  }
+}
+
+/**
+ * Everything the open `settings` blob must satisfy, on EVERY route that writes it (create AND
+ * update — a check on update only leaves POST /stores as the bypass):
+ * - `contact.addressUrl` renders into `<a href>`: a `javascript:`/`data:` value is stored XSS;
+ * - `deliveryDays` and `deliveryOffDays` (above);
+ * - `floatingWidget` button links render as `<a href>`; the dedicated route validates them, so
+ *   this generic path must too (S2).
+ * All other keys pass through unvalidated (existing behaviour).
+ */
+function addSettingsIssues(settings: Record<string, unknown> | undefined, ctx: z.RefinementCtx) {
+  const contact = settings?.contact;
+  if (contact && typeof contact === 'object') {
+    const addressUrl = (contact as Record<string, unknown>).addressUrl;
+    if (addressUrl !== undefined && addressUrl !== null && addressUrl !== '') {
+      if (!isSafeUrl(addressUrl)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['contact', 'addressUrl'],
+          message:
+            'Link must be a relative path or use http(s)/mailto/tel — javascript: is not allowed',
+        });
+      }
+    }
+  }
+  addDeliveryDaysIssues(settings, ctx);
+  addDeliveryOffDaysIssues(settings, ctx);
+  for (const issue of floatingWidgetLinkIssues(settings)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: issue.path, message: issue.message });
+  }
+}
+
 // Validation schemas
-const createStoreSchema = z.object({
+export const createStoreSchema = z.object({
   name: z.string().min(1).max(100),
   // `<slug>.ebda.app`: lowercase a-z0-9/hyphen, 3-40 chars, no leading/trailing/
   // double hyphen, and never a reserved label (`app`, `api`, `www`, …). One
   // definition in @ebda/shared — the same list the host parser and resolver use.
   slug: storeSlugSchema.optional(),
   domain: z.string().optional(),
-  settings: z.record(z.string(), z.any()).optional(),
+  settings: z.record(z.string(), z.any()).superRefine(addSettingsIssues).optional(),
 });
 
 const heroNullableStr = (maxLen: number) =>
@@ -121,35 +194,8 @@ export const updateStoreSchema = createStoreSchema.partial().extend({
   // 0 is a valid, meaningful value ("returns not accepted"), so no .positive().
   returnWindowDays: z.number().int().min(0).max(3650).nullable().optional(),
   returnFeesPaidBy: z.enum(['merchant', 'customer']).nullable().optional(),
-  // Override `settings` with a version that validates the `contact.addressUrl`
-  // sub-field. The field is rendered into `<a href>` on the storefront, so a
-  // `javascript:`/`data:` value stored here is stored-XSS. All other keys in
-  // the JSONB blob pass through unvalidated (existing behaviour).
-  settings: z
-    .record(z.string(), z.any())
-    .superRefine((settings, ctx) => {
-      const contact = settings?.contact;
-      if (contact && typeof contact === 'object') {
-        const addressUrl = (contact as Record<string, unknown>).addressUrl;
-        if (addressUrl !== undefined && addressUrl !== null && addressUrl !== '') {
-          if (!isSafeUrl(addressUrl)) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ['contact', 'addressUrl'],
-              message:
-                'Link must be a relative path or use http(s)/mailto/tel — javascript: is not allowed',
-            });
-          }
-        }
-      }
-      // The same open `settings` blob also carries `floatingWidget`, whose button
-      // links render as `<a href>`; the dedicated route validates them, so this
-      // generic path must too (S2 — otherwise it is the bypass).
-      for (const issue of floatingWidgetLinkIssues(settings)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: issue.path, message: issue.message });
-      }
-    })
-    .optional(),
+  // Same `settings` checks as create (`addSettingsIssues`).
+  settings: z.record(z.string(), z.any()).superRefine(addSettingsIssues).optional(),
 });
 
 const lookBody = z

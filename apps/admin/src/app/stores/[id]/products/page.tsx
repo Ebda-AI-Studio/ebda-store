@@ -305,7 +305,7 @@ export default function StoreProductsPage() {
       {selectedMap.size > 0 && (
         <div className="fixed bottom-6 start-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-xl">
           <span className="text-sm font-medium text-foreground whitespace-nowrap">
-            {t('selectionBar.selected').replace('{count}', String(selectedMap.size))}
+            {t('selectionBar.selected', { count: String(selectedMap.size) })}
           </span>
           <button
             onClick={() => setIsMassEditOpen(true)}

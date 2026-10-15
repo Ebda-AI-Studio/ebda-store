@@ -5,6 +5,7 @@ import { ImageUpload } from '../../../../components/ImageUpload';
 import { AITranslateMissingButton } from '../../../../components/AITranslateMissingButton';
 import { apiPost } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { SizeChartSelect, type SizeChartOption } from '../../../../components/SizeChartSelect';
 
 interface CategoryFormData {
   name: string;
@@ -20,6 +21,8 @@ interface CategoryFormData {
   metaDescriptionAeo?: string;
   metaDescriptionAeoAr?: string;
   showOnHomeStrip?: boolean;
+  /** Size chart the category's products inherit; '' = none (sent as null). */
+  sizeChartId?: string;
 }
 
 interface CategoryFormProps {
@@ -35,6 +38,8 @@ interface CategoryFormProps {
   slugify: (text: string) => string;
   /** Tenant scope so the category cover lands under `stores/<storeId>/categories/...`. */
   storeId: string;
+  /** Size-guide picker options. */
+  sizeCharts: SizeChartOption[];
 }
 
 export type { CategoryFormData };
@@ -51,6 +56,7 @@ export function CategoryForm({
   onClose,
   slugify,
   storeId,
+  sizeCharts,
 }: CategoryFormProps) {
   const t = useT('categories.form');
   const [seoGenerating, setSeoGenerating] = useState(false);
@@ -265,6 +271,17 @@ export function CategoryForm({
             className="h-5 w-5 cursor-pointer accent-primary"
           />
         </label>
+
+        {/* Size guide inherited by this category's products on the PDP (B0 Task 9). */}
+        <div className="max-w-sm">
+          <SizeChartSelect
+            kind="category"
+            storeId={storeId}
+            charts={sizeCharts}
+            value={form.sizeChartId ?? ''}
+            onChange={v => onFormChange(prev => ({ ...prev, sizeChartId: v }))}
+          />
+        </div>
 
         {/* SEO meta — what shows up on Google + social shares for this category. */}
         <div className="rounded-lg border border-border p-4">

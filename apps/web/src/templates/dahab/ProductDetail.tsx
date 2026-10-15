@@ -9,8 +9,8 @@
  *
  * Desktop: gallery (7 cols, hover-zoom, click for full screen) beside a
  * sticky buying column (5 cols). Phones: a swipe gallery, then the column,
- * plus a bar that pins "Add to bag" to the bottom once the main button
- * scrolls away. Details / delivery / returns sit in native <details>
+ * plus a bar that pins "Add to bag" to the bottom whenever the main button
+ * is off-screen in either direction (B0-49). Details / delivery / returns sit in native <details>
  * accordions. `mediaSlot` is the hook for the 3D/AR viewer (PR #35, not
  * merged at the time of writing): whatever is passed renders under the
  * gallery.
@@ -23,6 +23,14 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { VariantSelector } from '../../components/VariantSelector';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
+import type { ProductFact } from '@ebda/shared';
+import { FactsTable } from '../../components/commerce/FactsTable';
+import { useAnchorOffscreen } from '../../components/commerce/useAnchorOffscreen';
+import { useStickyBarHeight } from '../../components/commerce/useStickyBarHeight';
+import { DeliveryChip } from '../../components/commerce/DeliveryChip';
+import { PersonalisationField } from '../../components/commerce/PersonalisationField';
+import { SizeChartDialog } from '../../components/commerce/SizeChartDialog';
+import type { PublicSizeChart } from '@ebda/shared';
 import {
   CloseIcon,
   DAHAB_BTN_PRIMARY,
@@ -63,6 +71,18 @@ export interface DahabProductDetailProps {
   isWishlisted: boolean;
   onToggleWishlist: () => void;
   sku?: string | null;
+  /** Merchant spec rows, one tap away in an accordion. */
+  facts?: ProductFact[];
+  /** Made-to-order business days; feeds the delivers-by chip under the buy button. */
+  leadTimeDays?: number | null;
+  /** Raw PersonalisationConfig; the field renders above the buy row only when enabled. */
+  personalisation?: unknown;
+  /** Resolved size chart (product's, else category's); the size-guide button hides without one. */
+  sizeChart?: PublicSizeChart | null;
+  note?: string;
+  onNoteChange?: (v: string) => void;
+  /** Bumped by the page when add-to-cart was tapped with only the required note missing. */
+  noteNudge?: number;
   /** Spec table, WhatsApp order button, share row — platform components. */
   specs?: ReactNode;
   extras?: ReactNode;
@@ -106,7 +126,10 @@ function Gallery({
 
   if (images.length === 0)
     return (
-      <div aria-hidden="true" className="aspect-[4/5] w-full rounded-[var(--radius)] bg-card" />
+      <div
+        aria-hidden="true"
+        className="aspect-[4/5] w-full rounded-[var(--radius)] bg-card max-md:max-h-[52svh]"
+      />
     );
   const current = images[Math.min(selected, images.length - 1)];
 
@@ -129,7 +152,13 @@ function Gallery({
               key={img.id ?? i}
               type="button"
               onClick={() => setLightbox(true)}
-              className="relative aspect-[4/5] w-full shrink-0 snap-center bg-card"
+              className={cx(
+                // Phone gallery capped at 52svh (Ruling B0-40): a full-width 4:5 image is
+                // ~490px on a 390px phone and pushed the selectors and add-to-cart below the
+                // fold. object-cover crops the overflow, as before; desktop is unchanged.
+                'relative aspect-[4/5] max-h-[52svh] w-full shrink-0 snap-center bg-card',
+                img.id?.startsWith('variant-') && 'variant-image-fade'
+              )}
               aria-label={t(`Open image ${i + 1} full screen`, `فتح الصورة ${i + 1} بملء الشاشة`)}
             >
               <Image
@@ -200,12 +229,16 @@ function Gallery({
           aria-label={t('Open full screen', 'فتح بملء الشاشة')}
         >
           <Image
+            key={current.id?.startsWith('variant-') ? current.id : 'main'}
             src={current.url}
             alt={current.alt || name}
             fill
             sizes="(min-width: 1024px) 50vw, 60vw"
             priority
-            className="object-cover transition-transform duration-200 ease-out motion-reduce:transition-none"
+            className={cx(
+              'object-cover transition-transform duration-200 ease-out motion-reduce:transition-none',
+              current.id?.startsWith('variant-') && 'variant-image-fade'
+            )}
             style={
               zoom
                 ? { transform: 'scale(1.9)', transformOrigin: `${zoom.x}% ${zoom.y}%` }
@@ -280,19 +313,19 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
   const { t } = useLanguage();
   const { localize } = useNumerals();
   const buyRef = useRef<HTMLDivElement>(null);
-  const [pinBar, setPinBar] = useState(false);
+  // Phone buy bar: shown from first paint whenever the main button is off-screen (B0-49).
+  const pinBar = useAnchorOffscreen(buyRef);
+  const pinBarRef = useRef<HTMLDivElement>(null);
+  useStickyBarHeight(pinBarRef, pinBar);
 
-  // Pin the phone buy bar once the main button has scrolled above the viewport.
+  // Body-level space for the pinned bar (UI rule 6), same flag as StickyAddToCart.
   useEffect(() => {
-    const el = buyRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver(
-      ([entry]) => setPinBar(!entry.isIntersecting && entry.boundingClientRect.top < 0),
-      { threshold: 0 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+    if (!pinBar) return;
+    document.body.dataset.stickyAtc = '1';
+    return () => {
+      delete document.body.dataset.stickyAtc;
+    };
+  }, [pinBar]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8" data-zone="products">
@@ -373,13 +406,26 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
               </p>
             )}
 
-            {p.variants.length > 0 && p.options.length > 0 && (
+            {p.variants.length > 0 && p.options.length > 0 ? (
               <VariantSelector
                 variants={p.variants}
                 options={p.options}
                 onVariantSelect={p.onVariantSelect}
                 onShopperSelect={p.onShopperSelect}
                 appearance="swatch"
+                sizeGuide={p.sizeChart ? <SizeChartDialog chart={p.sizeChart} /> : undefined}
+              />
+            ) : (
+              <SizeChartDialog chart={p.sizeChart} className="mt-4" />
+            )}
+
+            {p.onNoteChange && (
+              <PersonalisationField
+                config={p.personalisation}
+                value={p.note ?? ''}
+                onChange={p.onNoteChange}
+                nudge={p.noteNudge}
+                className="mt-8"
               />
             )}
 
@@ -407,6 +453,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
               </div>
               <button
                 type="button"
+                data-testid="pdp-add"
                 onClick={p.onAddToCart}
                 disabled={p.addDisabled || p.isAdding}
                 className={cx(DAHAB_BTN_PRIMARY, 'flex-1')}
@@ -427,6 +474,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 <HeartIcon className="h-5 w-5" filled={p.isWishlisted} />
               </button>
             </div>
+            <DeliveryChip leadTimeDays={p.leadTimeDays} />
             {p.stockText && <p className="mt-3 text-[13px] text-muted-foreground">{p.stockText}</p>}
 
             <div className="mt-8 border-t border-border">
@@ -438,6 +486,11 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                       {t('Item code', 'كود القطعة')}: <span dir="ltr">{p.sku}</span>
                     </p>
                   )}
+                </Accordion>
+              )}
+              {p.facts && p.facts.length > 0 && (
+                <Accordion title={t('Product details', 'تفاصيل المنتج')}>
+                  <FactsTable facts={p.facts} className="" />
                 </Accordion>
               )}
               {p.specs && <Accordion title={t('Specifications', 'المواصفات')}>{p.specs}</Accordion>}
@@ -475,13 +528,18 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
         </div>
       </div>
 
-      {/* Phones: pinned buy bar once the main button is out of view. */}
+      {/* Phones: pinned buy bar whenever the main button is off-screen, either direction (B0-49). */}
       <div
+        ref={pinBarRef}
         aria-hidden={!pinBar}
         inert={!pinBar ? true : undefined}
         className={cx(
-          'fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur-md transition-transform duration-300 motion-reduce:transition-none md:hidden',
-          pinBar ? 'translate-y-0' : 'translate-y-full'
+          // Solid ground, no glass (taste bar bans glassmorphism); ease-out-quint like the
+          // default path's .sticky-bar-in (F10).
+          'fixed inset-x-0 bottom-[calc(var(--bottom-tab-h)+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background px-4 py-3 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:hidden',
+          pinBar
+            ? 'translate-y-0'
+            : 'translate-y-[calc(100%+var(--bottom-tab-h)+env(safe-area-inset-bottom))]'
         )}
       >
         <div className="flex items-center gap-3">
@@ -491,6 +549,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
           </div>
           <button
             type="button"
+            data-testid="dahab-pinned-add"
             onClick={p.onAddToCart}
             disabled={p.addDisabled || p.isAdding}
             className={cx(DAHAB_BTN_PRIMARY, 'px-6')}

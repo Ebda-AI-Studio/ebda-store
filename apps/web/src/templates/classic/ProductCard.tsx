@@ -38,6 +38,8 @@ import {
   getCustomBadgeTextColor,
   resolveCardBadges,
 } from '../shared/custom-badge';
+import { SwatchDots } from '../../components/commerce/SwatchDots';
+import { FactChips } from '../../components/commerce/FactChips';
 
 /**
  * Classic Template - Product Card
@@ -399,6 +401,8 @@ function ClassicProductCard({
             {priceVisible && (
               <TaxInclusiveLabel className="mt-1 block font-serif text-xs text-muted-foreground/70" />
             )}
+            <SwatchDots product={product} max={5} className="mt-1 justify-center" />
+            <FactChips product={product} className="mt-1 justify-center" />
           </div>
         )}
       </Link>

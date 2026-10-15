@@ -10,6 +10,8 @@ export interface ServerCartItem {
   productId: string;
   quantity: number;
   variantId?: string | null;
+  /** Personalisation text (cleaned server-side); part of the line identity. */
+  note?: string | null;
   product: {
     id: string;
     name: string;
@@ -39,8 +41,25 @@ export function mapServerItem(item: ServerCartItem): CartItem {
     variantId: item.variantId ?? undefined,
     variantTitle: item.variant?.title ?? undefined,
     variantTitleAr: item.variant?.titleAr ?? undefined,
+    note: item.note ?? undefined,
     unavailable: item.unavailable === true ? true : undefined,
   };
+}
+
+/**
+ * One cart line = (product, variant, personalisation note). "Sara" and "Omar"
+ * on the same abaya are two lines; the same note merges. Mirrors the server's
+ * unique index (cart_id, product_id, variant_id, COALESCE(note, '')).
+ */
+export function sameLine(
+  a: Pick<CartItem, 'productId' | 'variantId' | 'note'>,
+  b: Pick<CartItem, 'productId' | 'variantId' | 'note'>
+): boolean {
+  return (
+    a.productId === b.productId &&
+    (a.variantId ?? null) === (b.variantId ?? null) &&
+    (a.note ?? null) === (b.note ?? null)
+  );
 }
 
 /**

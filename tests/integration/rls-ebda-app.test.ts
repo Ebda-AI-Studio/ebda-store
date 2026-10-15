@@ -455,6 +455,8 @@ describe('every table with a store_id column is under STRICT, FORCED RLS (auto-e
     // Product 3D models (2026-10-07) — both tables carry store_id, so the
     // forced/strict/contextless assertions below cover them automatically.
     expect(tables).toEqual(expect.arrayContaining(['product_models', 'product_model_bindings']));
+    // Size charts (B0 Task 9, 2026-10-16) — same automatic coverage.
+    expect(tables).toContain('size_charts');
     const [{ n }] = await owner.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(*) AS n FROM public.store_page_revisions`;
     expect(Number(n)).toBeGreaterThanOrEqual(2); // not vacuously empty for the 0-row assertion below

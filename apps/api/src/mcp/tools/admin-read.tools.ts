@@ -231,6 +231,11 @@ export function registerAdminReadTools(server: McpServer, store: McpStore): void
         costPrice: p.costPrice ?? undefined,
         barcode: p.barcode ?? undefined,
         weight: p.weight ?? undefined,
+        // B0 commerce fields: the same shapes `admin_update_product` accepts (read-write parity).
+        facts: Array.isArray(p.facts) && p.facts.length ? p.facts : undefined,
+        leadTimeDays: p.leadTimeDays ?? undefined,
+        personalisation: p.personalisation ?? undefined,
+        sizeChartId: p.sizeChartId ?? undefined,
         variants: (p.variants ?? []).map((v: any) => ({
           id: v.id,
           // ProductVariant's Prisma field is `title`, not `name` — mapped to

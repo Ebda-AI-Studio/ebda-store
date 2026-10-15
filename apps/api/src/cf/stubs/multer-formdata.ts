@@ -11,10 +11,16 @@
  * Same behaviours: non-multipart requests pass through untouched; `fileFilter` runs per file;
  * `limits.fileSize` / `limits.files` raise a `MulterError` with multer's codes via `next(err)`;
  * text fields land on `req.body`; a file on an unexpected field is `LIMIT_UNEXPECTED_FILE`.
- * Like memoryStorage, the whole file is held in memory (and `formData()` buffers the body, so the
- * 10 MB route limits are what bound it).
+ * Like memoryStorage, the whole file is held in memory. `formData()` buffers the WHOLE body before
+ * any per-file check can run, so the route limits alone do NOT bound memory: the body is capped
+ * BEFORE parsing at `fileSize * files + FRAMING_ALLOWANCE` (Content-Length pre-check, plus a
+ * byte-counting transform for chunked bodies or a lying Content-Length). Exceeding it raises the
+ * same `MulterError('LIMIT_FILE_SIZE')` real multer raises, so handlers map it to 413 unchanged.
  */
-import { Readable } from 'node:stream';
+import { Readable, Transform } from 'node:stream';
+
+/** Multipart boundaries, headers and text fields around the files. */
+export const FRAMING_ALLOWANCE = 64 * 1024;
 
 type Next = (err?: unknown) => void;
 
@@ -81,10 +87,35 @@ function middleware(opts: MulterOptions, mode: Mode) {
   return async (req: ReqLike, _res: unknown, next: Next): Promise<void> => {
     const contentType = String(req.headers['content-type'] ?? '');
     if (!/^multipart\/form-data/i.test(contentType)) return next();
+    // Bound the buffered body before formData() sees it (see the file comment). With no
+    // `limits.files`, an `.array(name, max)` is still bounded by its own `max` files.
+    const modeMax = mode.kind === 'single' ? 1 : mode.max;
+    const cap =
+      opts.limits?.fileSize !== undefined
+        ? opts.limits.fileSize * Math.max(1, Math.min(modeMax, opts.limits.files ?? modeMax)) +
+          FRAMING_ALLOWANCE
+        : Infinity;
+    let seen = 0;
     try {
-      const form = await new Response(Readable.toWeb(req) as unknown as ReadableStream, {
-        headers: { 'content-type': contentType },
-      }).formData();
+      const declared = Number(req.headers['content-length']);
+      if (Number.isFinite(declared) && declared > cap) {
+        req.resume();
+        throw new MulterError('LIMIT_FILE_SIZE', mode.name);
+      }
+      const counter = new Transform({
+        transform(chunk: Buffer, _enc, cb) {
+          seen += chunk.length;
+          if (seen > cap) cb(new MulterError('LIMIT_FILE_SIZE', mode.name));
+          else cb(null, chunk);
+        },
+      });
+      req.on('error', e => counter.destroy(e));
+      const form = await new Response(
+        Readable.toWeb(req.pipe(counter)) as unknown as ReadableStream,
+        {
+          headers: { 'content-type': contentType },
+        }
+      ).formData();
       const body: Record<string, unknown> = {};
       const files: UploadedFile[] = [];
       const maxFiles = mode.kind === 'single' ? 1 : mode.max;
@@ -119,6 +150,12 @@ function middleware(opts: MulterOptions, mode: Mode) {
       else req.files = files;
       next();
     } catch (err) {
+      // formData() may surface the counter's abort as its own TypeError ("failed to parse
+      // body"), losing the MulterError: the byte count is the truth, so map it back to 413.
+      if (seen > cap && !(err instanceof MulterError)) {
+        next(new MulterError('LIMIT_FILE_SIZE', mode.name));
+        return;
+      }
       next(err);
     }
   };
