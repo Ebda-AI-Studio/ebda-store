@@ -371,4 +371,50 @@ describe('ProductCardCta swaps to the icon-only button when the label would elli
     expect(container.querySelector('[data-cta="add-compact"]')).toBeNull();
     expect(container.textContent).toContain('Add to cart');
   });
+
+  it('the compact button drops the pack/ctaSize sm: padding so the icon is centred at every width', async () => {
+    stubMetrics({ scrollWidth: 120, clientWidth: 80, parentWidth: 80 });
+    const { container } = rtlRender(
+      React.createElement(
+        AdaptiveAddButton as never,
+        {
+          label: 'Add to cart',
+          className: getPackStyles('elegant').productCardCta,
+        } as never
+      )
+    );
+    await act(async () => {});
+    const tokens = classes(container.querySelector('[data-cta="add-compact"]'));
+    expect(tokens).toContain('sm:px-0');
+    expect(tokens).not.toContain('sm:px-5');
+    expect(tokens).toContain('px-0');
+  });
+
+  it('swaps before paint (layout effect): the first committed render is already compact', () => {
+    stubMetrics({ scrollWidth: 120, clientWidth: 80, parentWidth: 80 });
+    // no `await act(async)` microtask turn: a layout effect has already flushed inside render()
+    const { container } = rtlRender(
+      React.createElement(AdaptiveAddButton as never, { label: 'Add to cart' } as never)
+    );
+    expect(container.querySelector('[data-cta="add-compact"]')).not.toBeNull();
+  });
+
+  it('re-measures when a webfont finishes loading after mount', async () => {
+    const m = stubMetrics({ scrollWidth: 60, clientWidth: 80, parentWidth: 80 });
+    let resolveReady: () => void = () => {};
+    const ready = new Promise<void>(r => (resolveReady = r));
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      value: { ready, addEventListener: () => {}, removeEventListener: () => {} },
+    });
+    restore.push(() => delete (document as unknown as Record<string, unknown>).fonts);
+    const { container } = rtlRender(
+      React.createElement(AdaptiveAddButton as never, { label: 'Add to cart' } as never)
+    );
+    await act(async () => {});
+    expect(container.querySelector('[data-cta="add-compact"]')).toBeNull(); // fits with the fallback font
+    m.scrollWidth = 120; // the real font is wider
+    await act(async () => resolveReady());
+    expect(container.querySelector('[data-cta="add-compact"]')).not.toBeNull();
+  });
 });

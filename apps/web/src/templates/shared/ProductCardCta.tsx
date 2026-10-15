@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AddToCartButton, CartIcon, cn } from '@ebda/ui';
 import type { StoreTheme } from '@ebda/shared';
@@ -41,6 +41,8 @@ import { avoidReservedCorner } from './badge-collision';
  * viewport. `needed` remembers the full label's width so the label comes back
  * when the box grows (rotation, resize) without flapping.
  */
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
 export function useCompactCta() {
   const ref = useRef<HTMLButtonElement | null>(null);
   const needed = useRef(0);
@@ -63,19 +65,34 @@ export function useCompactCta() {
     }
   }, [compact]);
 
-  useEffect(() => {
+  // Layout effect: the swap lands before first paint, so a cramped card never
+  // shows the ellipsized label for a frame. (useEffect on the server: no warning.)
+  useIsomorphicLayoutEffect(() => {
     evaluate();
     const parent = ref.current?.parentElement;
-    if (!parent || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(evaluate);
-    ro.observe(parent);
-    return () => ro.disconnect();
+    let cancelled = false;
+    const reevaluate = () => {
+      if (!cancelled) evaluate();
+    };
+    // A webfont that lands after mount changes the label width: measure again.
+    const fonts = typeof document !== 'undefined' ? document.fonts : undefined;
+    fonts?.ready?.then(reevaluate).catch(() => {});
+    fonts?.addEventListener?.('loadingdone', reevaluate);
+    const ro =
+      parent && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(reevaluate) : null;
+    if (parent) ro?.observe(parent);
+    return () => {
+      cancelled = true;
+      fonts?.removeEventListener?.('loadingdone', reevaluate);
+      ro?.disconnect();
+    };
   }, [evaluate, compact]);
 
   return { ref, compact };
 }
 
-const COMPACT_CTA_CLS = 'mx-auto h-11 min-h-0 w-11 min-w-0 shrink-0 px-0 py-0';
+// `sm:px-0` too: tailwind-merge keeps variant-prefixed padding from the pack / ctaSize.
+const COMPACT_CTA_CLS = 'mx-auto h-11 min-h-0 w-11 min-w-0 shrink-0 px-0 py-0 sm:px-0';
 
 interface AdaptiveAddButtonProps {
   label: string;
