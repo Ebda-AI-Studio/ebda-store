@@ -12,6 +12,7 @@ import { featureService } from '../services/feature.service';
 import { invalidateCached } from '../lib/public-cache';
 import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
+import { searchProductIds } from '../services/product-search.service';
 import { auditLog } from '../middleware/security';
 import { syncSubscriptionFromLegacyPlan } from '../services/plan-sync';
 import {
@@ -1409,12 +1410,6 @@ router.get(
 
       const where: Prisma.ProductWhereInput = {};
       if (status) where.status = status as ProductStatus;
-      if (search) {
-        where.OR = [
-          { name: { contains: search as string, mode: 'insensitive' } },
-          { sku: { contains: search as string, mode: 'insensitive' } },
-        ];
-      }
 
       // products is RLS-protected; this is a cross-store super-admin list, so it
       // is read store by store and merged (see lib/cross-store.ts). The `storeId`
@@ -1426,7 +1421,17 @@ router.get(
 
         orderKey: (row: { createdAt: Date }) => row.createdAt,
         fetch: async window => {
-          const scoped: Prisma.ProductWhereInput = { ...where, storeId: currentStoreId() };
+          const sid = currentStoreId();
+          const scoped: Prisma.ProductWhereInput = { ...where, storeId: sid };
+          // Arabic-normalised names/terms/descriptions + SKU, per visited store.
+          if (search) {
+            scoped.id = {
+              in: await searchProductIds(sid, search as string, {
+                scope: 'admin',
+                includeDeleted: true,
+              }),
+            };
+          }
           const [rows, count] = await Promise.all([
             prisma.product.findMany({
               where: scoped,

@@ -9,9 +9,10 @@
 import fs from 'fs';
 import path from 'path';
 import { describe, it, expect } from 'vitest';
-import { prisma } from '@ebda/database';
+import { prisma, Prisma } from '@ebda/database';
 import { AR_FOLD_FROM, AR_FOLD_TO, NORMALIZE_VECTORS, normalizeArabicSearch } from '@ebda/shared';
 import { hasDb } from '../helpers/bundle-fixtures';
+import { productSearchSql } from '../../apps/api/src/services/product-search.service';
 
 const MIGRATION = path.resolve(
   __dirname,
@@ -119,18 +120,21 @@ describe.skipIf(!hasDb)('ebda_ar_norm parity with normalizeArabicSearch', () => 
   it('functions are IMMUTABLE (required for index expressions)', async () => {
     const rows = await prisma.$queryRaw<Array<{ proname: string; provolatile: string }>>`
       SELECT proname, provolatile FROM pg_proc
-      WHERE proname IN ('ebda_ar_norm','ebda_product_search_doc','ebda_product_name_doc')`;
+      WHERE pronamespace = 'public'::regnamespace
+        AND proname IN ('ebda_ar_norm','ebda_product_search_doc','ebda_product_name_doc')`;
     expect(rows).toHaveLength(3);
     for (const r of rows) expect(r.provolatile).toBe('i');
   });
 
-  it('both expression indexes exist and are valid', async () => {
+  it('the three expression indexes exist and are valid', async () => {
     const rows = await prisma.$queryRaw<Array<{ relname: string; valid: boolean }>>`
       SELECT c.relname, i.indisvalid AS valid FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
-      WHERE c.relname IN ('products_search_doc_trgm_idx','products_name_doc_trgm_idx')`;
+      WHERE c.relname IN ('products_search_doc_trgm_idx','products_name_doc_trgm_idx',
+                          'products_sku_norm_trgm_idx')`;
     expect(rows.map(r => r.relname).sort()).toEqual([
       'products_name_doc_trgm_idx',
       'products_search_doc_trgm_idx',
+      'products_sku_norm_trgm_idx',
     ]);
     expect(rows.every(r => r.valid)).toBe(true);
   });
@@ -156,4 +160,67 @@ describe.skipIf(!hasDb)('ebda_ar_norm parity with normalizeArabicSearch', () => 
     expect(plans[0]).toContain('products_search_doc_trgm_idx');
     expect(plans[1]).toContain('products_name_doc_trgm_idx');
   });
+
+  /**
+   * The statements product-search.service actually runs (storefront list, typeahead, admin with
+   * the SKU arm) must use the expression indexes too: a predicate written differently from its
+   * index expression, or an unindexed OR arm, silently falls back to a sequential scan. The table
+   * is filled (inside the rolled-back transaction) with one store's rows carrying ~330-char
+   * descriptions, so the store_id btree + per-row normalisation filter loses by volume, then
+   * ANALYZEd. (With empty descriptions the planner under-costs that filter and picks the store_id
+   * index at 20k rows; measured: BitmapOr runs in ~1.7 ms on this fill.)
+   */
+  it('the planner uses the indexes for the storefront, typeahead and admin search statements', async () => {
+    const ROLLBACK = Symbol('rollback');
+    const tag = `pl${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
+    const plans: Record<string, string> = {};
+    await prisma
+      .$transaction(
+        async tx => {
+          const owner = await tx.user.create({
+            data: {
+              email: `${tag}@x.test`,
+              passwordHash: 'x',
+              firstName: 'Pl',
+              lastName: 'Owner',
+              role: 'store_admin',
+            },
+          });
+          const store = await tx.store.create({
+            data: { name: tag, slug: tag, ownerId: owner.id },
+          });
+          await tx.$executeRaw`
+          INSERT INTO public.products
+            (id, store_id, name, name_ar, sku, description, slug, price, status, updated_at)
+          SELECT ${tag} || '-' || g, ${store.id}, md5('n' || g), md5('a' || g), md5('s' || g),
+                 repeat(md5('d' || g) || ' ', 10), ${tag} || '-' || g, 1000, 'active', now()
+          FROM generate_series(1, 20000) g`;
+          await tx.$executeRaw`ANALYZE public.products`;
+          await tx.$executeRaw`SET LOCAL enable_seqscan = off`;
+          const cases = {
+            storefront: productSearchSql(store.id, 'احذيه', { scope: 'storefront' }),
+            typeahead: productSearchSql(store.id, 'احذيه', { scope: 'storefront', field: 'name' }),
+            admin: productSearchSql(store.id, 'mug-٧٧', { scope: 'admin' }),
+          };
+          for (const [k, sql] of Object.entries(cases)) {
+            const rows = await tx.$queryRaw<Array<{ 'QUERY PLAN': string }>>(
+              Prisma.sql`EXPLAIN (COSTS OFF) ${sql!}`
+            );
+            plans[k] = rows.map(p => p['QUERY PLAN']).join('\n');
+          }
+          throw ROLLBACK;
+        },
+        // Filling 20k rows maintains three GIN indexes: well past the 5 s interactive default.
+        { timeout: 60_000, maxWait: 10_000 }
+      )
+      .catch(e => {
+        if (e !== ROLLBACK) throw e;
+      });
+    expect(plans.storefront).toContain('products_search_doc_trgm_idx');
+    expect(plans.typeahead).toContain('products_name_doc_trgm_idx');
+    expect(plans.admin).toContain('products_search_doc_trgm_idx');
+    expect(plans.admin).toContain('products_sku_norm_trgm_idx');
+    expect(plans.admin).toContain('BitmapOr');
+    for (const plan of Object.values(plans)) expect(plan).not.toContain('Seq Scan');
+  }, 90_000);
 });

@@ -18,6 +18,7 @@ import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { haversineKm } from '../lib/haversine';
 import { retryOnWriteConflict } from '../lib/db-retry';
+import { searchProductIds } from './product-search.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -443,9 +444,13 @@ export class WarehouseService {
     };
 
     if (options?.search) {
+      // Product side: Arabic-normalised names/terms/descriptions + SKU (product-search.service).
+      const productIds = await searchProductIds(storeId, options.search, {
+        scope: 'admin',
+        includeDeleted: true,
+      });
       where.OR = [
-        { product: { name: { contains: options.search, mode: 'insensitive' } } },
-        { product: { sku: { contains: options.search, mode: 'insensitive' } } },
+        { productId: { in: productIds } },
         { variant: { sku: { contains: options.search, mode: 'insensitive' } } },
       ];
     }

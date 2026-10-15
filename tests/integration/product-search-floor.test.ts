@@ -11,8 +11,8 @@
  * Fix under test:
  *   - a search shorter than 2 chars short-circuits to an empty result with
  *     no DB or cache touch (mirrors /search/suggest's >= 2 floor);
- *   - the term is length-capped and `buildProductSearchAnd` caps the token
- *     count so a crafted query cannot expand into hundreds of ILIKE clauses;
+ *   - the term is length-capped and `searchTokens` (@ebda/shared) caps the
+ *     token count so a crafted query cannot expand into hundreds of LIKE clauses;
  *   - pg_trgm GIN indexes exist on products.name/name_ar/description/
  *     description_ar so the ILIKE is index-backed (all four OR arms must be
  *     indexable or the planner still seq-scans).
@@ -22,7 +22,7 @@ import express from 'express';
 import request from 'supertest';
 import { prisma, withRlsBypass } from '@ebda/database';
 import publicRoutes from '@api/routes/public.routes';
-import { buildProductSearchAnd } from '@api/services/product.service';
+import { searchTokens } from '@ebda/shared';
 
 const hasDb =
   !!process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost:5432/test_db');
@@ -112,11 +112,11 @@ describe.skipIf(!hasDb)('public product search floor', () => {
 
   it('a crafted many-token search is capped, not expanded into hundreds of ILIKE clauses', () => {
     const crafted = Array.from({ length: 50 }, (_, i) => `tok${i}`).join(' ');
-    const and = buildProductSearchAnd(crafted, false);
-    expect(and.length).toBeLessThanOrEqual(8);
+    expect(searchTokens(crafted)).toHaveLength(8);
+    expect(searchTokens('a b c d e f g h i j')).toHaveLength(8);
   });
 
-  it('pg_trgm GIN indexes exist on all four searched columns and the two normalised docs', async () => {
+  it('pg_trgm GIN indexes exist on all four searched columns, the two normalised docs and the SKU', async () => {
     const rows = await prisma.$queryRaw<Array<{ indexname: string }>>`
       SELECT indexname FROM pg_indexes
       WHERE tablename = 'products' AND indexdef ILIKE '%gin_trgm_ops%'
@@ -129,6 +129,7 @@ describe.skipIf(!hasDb)('public product search floor', () => {
       'products_name_doc_trgm_idx',
       'products_name_trgm_idx',
       'products_search_doc_trgm_idx',
+      'products_sku_norm_trgm_idx',
     ]);
   });
 });

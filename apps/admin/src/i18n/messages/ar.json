@@ -479,6 +479,7 @@
       },
       "pagination": {
         "showing": "عرض {from} إلى {to} من {total} منتج",
+        "truncated": "هذه أقرب النتائج فقط، أضف كلمة لتضييق البحث",
         "previous": "السابق",
         "next": "التالي",
         "perPage": "في الصفحة"

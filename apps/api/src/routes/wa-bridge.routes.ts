@@ -28,6 +28,7 @@ import { prisma } from '@ebda/database';
 import { groupOrderLinesForDisplay, BRAND_MARKETING_URL } from '@ebda/shared';
 import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
+import { searchProductIds } from '../services/product-search.service';
 import { isWhatsappEnabled, FEATURE_DISABLED_BODY } from '../middleware/wa-feature-gate';
 import { makeRateLimitStore, rateLimitRedisClient } from '../middleware/security';
 import {
@@ -174,18 +175,20 @@ router.get('/products/search', waBridgeAuth, async (req: Request, res: Response)
     const { q, page, limit } = parse.data;
     const storeId = req.bridgeStore!.id;
 
-    // Case-insensitive contains on name + nameAr, plus exact SKU match.
+    // Arabic-normalised word-AND over names, search terms, descriptions and SKU
+    // (product-search.service, admin scope; `status` below keeps it to active).
+    // The id set covers every page up to this one (+1 for hasMore).
     // Fetch limit+1 to cheaply determine hasMore without a COUNT query.
+    const matchIds = await searchProductIds(storeId, q, {
+      scope: 'admin',
+      limit: page * limit + 1,
+    });
     const products = await prisma.product.findMany({
       where: {
         storeId,
         status: 'active',
         deletedAt: null,
-        OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { nameAr: { contains: q, mode: 'insensitive' } },
-          { sku: { equals: q } },
-        ],
+        id: { in: matchIds },
       },
       select: {
         id: true,

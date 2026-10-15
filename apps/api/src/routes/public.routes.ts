@@ -204,9 +204,9 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // AND into the cache key — so unique sub-floor terms ('a', 'aa', 'qx'…)
     // bypassed every cache layer and ran a fresh scan per request. A term
     // under the floor short-circuits to an empty page with NO DB or cache
-    // touch; longer terms are capped at 100 chars (token count is capped in
-    // buildProductSearchAnd) so a crafted query cannot expand into hundreds
-    // of ILIKE clauses.
+    // touch; longer terms are capped at 100 chars (token count is capped at 8
+    // in searchTokens, @ebda/shared) so a crafted query cannot expand into
+    // hundreds of LIKE clauses (product-search.service).
     const rawSearch = typeof search === 'string' ? search.trim() : '';
     if (rawSearch.length === 1) {
       const floorPage = page ? parseInt(page as string) || 1 : 1;

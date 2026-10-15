@@ -3,6 +3,7 @@ import { csvField, minorToDecimalString, slugifyWithFallback } from '@ebda/share
 import { AppError } from '../middleware/error-handler';
 import { recordSlugRedirect } from './slug-redirect.service';
 import { assertWithinLimit } from './plan-limit.service';
+import { PRODUCT_SEARCH_MAX_LIMIT, searchProductIds } from './product-search.service';
 import {
   bundleFkViolationKind,
   planBundlePinnedVariantSkips,
@@ -320,11 +321,14 @@ export class BulkService {
     }
 
     if (options?.search) {
-      where.OR = [
-        { name: { contains: options.search, mode: 'insensitive' } },
-        { nameAr: { contains: options.search, mode: 'insensitive' } },
-        { sku: { contains: options.search, mode: 'insensitive' } },
-      ];
+      // Arabic-normalised names/terms/descriptions + SKU (product-search.service).
+      where.id = {
+        in: await searchProductIds(storeId, options.search, {
+          scope: 'admin',
+          includeDeleted: !!options.includeDeleted,
+          limit: PRODUCT_SEARCH_MAX_LIMIT,
+        }),
+      };
     }
 
     // Hard ceiling to prevent OOM on very large stores.

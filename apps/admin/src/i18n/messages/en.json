@@ -479,6 +479,7 @@
       },
       "pagination": {
         "showing": "Showing {from} to {to} of {total} products",
+        "truncated": "these are the closest matches only, add a word to narrow the search",
         "previous": "Previous",
         "next": "Next",
         "perPage": "Per page"

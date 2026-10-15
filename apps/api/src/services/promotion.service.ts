@@ -7,6 +7,7 @@
  */
 import { prisma } from '@ebda/database';
 import { AppError } from '../middleware/error-handler';
+import { searchNameIds } from './product-search.service';
 
 interface CreatePromotionData {
   name: string;
@@ -49,10 +50,8 @@ export class PromotionService {
     }
 
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { nameAr: { contains: search, mode: 'insensitive' } },
-      ];
+      // Arabic-normalised name + nameAr word-AND (product-search.service searchNameIds).
+      where.id = { in: await searchNameIds('promotions', storeId, search) };
     }
 
     const [promotions, total] = await Promise.all([
