@@ -1,6 +1,28 @@
 import type { MetadataRoute } from 'next';
 import { headers } from 'next/headers';
+import { API_URL } from '../lib/api';
 import { getSiteUrl } from '../lib/structured-data';
+
+/**
+ * Whether the store that owns this host is the demo showroom (`isDemo`, Ruling B1-14). Asks the
+ * same `/public/store/resolve` the storefront resolves with (plan amendment C14). Any failure to
+ * ask answers "no": robots.txt then stays what it was, and the page's own `noindex` meta (root
+ * metadata) still covers the showroom.
+ */
+async function isDemoHost(storeHost: string): Promise<boolean> {
+  if (!storeHost) return false;
+  try {
+    const res = await fetch(`${API_URL}/public/store/resolve`, {
+      next: { revalidate: 3600 },
+      headers: { 'Content-Type': 'application/json', 'x-store-domain': storeHost },
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data?.data?.store?.isDemo === true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Host-aware robots.txt. The `sitemap:` directive must point at the
@@ -12,10 +34,17 @@ import { getSiteUrl } from '../lib/structured-data';
  * Without this, robots.txt on the custom domain would advertise
  * the platform sitemap, telling Google to index platform URLs even
  * for merchants who only want their own domain indexed.
+ *
+ * The demo showroom (`storedemo`) disallows everything and advertises no sitemap (B1-14).
  */
 export default async function robots(): Promise<MetadataRoute.Robots> {
-  const host = (await headers()).get('host')?.toLowerCase();
+  const h = await headers();
+  const host = h.get('host')?.toLowerCase();
   const base = host ? `https://${host}` : getSiteUrl();
+
+  if (await isDemoHost(h.get('x-store-domain')?.toLowerCase() ?? '')) {
+    return { rules: [{ userAgent: '*', disallow: '/' }] };
+  }
 
   return {
     rules: {

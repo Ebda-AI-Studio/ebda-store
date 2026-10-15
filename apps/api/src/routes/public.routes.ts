@@ -25,7 +25,8 @@ import {
 import { recordProductView } from '../services/view-ingest.service';
 import { claimSearcherSearch, recordSearch } from '../services/search-log.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
-import { getStoreIdFromRequest } from '../utils/store-helpers';
+import { getStoreIdFromRequest, resolvePublicStoreId } from '../utils/store-helpers';
+import { assertNotDemoStore } from '../services/plan-limit.service';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
 import { gateBackorderPayload } from '../lib/effective-inventory';
@@ -1971,6 +1972,8 @@ router.post(
 
       const data = subscribeSchema.parse(req.body);
       const storeId = await getStoreIdFromRequest(req);
+      // Ruling B1-13: the demo showroom keeps no subscriber list.
+      await assertNotDemoStore(storeId);
       const normalizedEmail = data.email.trim().toLowerCase();
 
       const existing = await prisma.newsletterSubscriber.findUnique({

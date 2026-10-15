@@ -5,6 +5,7 @@ import { Button, Input, Textarea, useToast } from '@ebda/ui';
 import { ShopChrome } from '../../components';
 import { useStore } from '../../contexts/StoreContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
+import { demoRefusalText } from '../../lib/demo-refusal';
 import { resolveAddressHref } from '../../templates/shared/display-helpers';
 import { api } from '@/lib/api';
 import { CONTACT_HONEYPOT_FIELD } from '@ebda/shared';
@@ -61,10 +62,13 @@ export default function ContactClient() {
           [CONTACT_HONEYPOT_FIELD]: '',
         });
       } else {
-        showError(
-          t('Failed to send message', 'لم تُرسَل الرسالة'),
-          result.error?.message || t('Please try again later.', 'حاول مرة أخرى بعد قليل.')
-        );
+        const demo = demoRefusalText(result.error, t);
+        if (demo) showError(t('Demo store', translations['Demo store']), demo);
+        else
+          showError(
+            t('Failed to send message', 'لم تُرسَل الرسالة'),
+            result.error?.message || t('Please try again later.', 'حاول مرة أخرى بعد قليل.')
+          );
       }
     } catch {
       showError(

@@ -221,7 +221,8 @@ export function buildStorefrontMetadata(
       ...(twitterHandle ? { site: twitterHandle, creator: twitterHandle } : {}),
     },
     robots:
-      store.status === 'suspended'
+      // The demo showroom is never indexed (Ruling B1-14): it is a preview of looks, not a shop.
+      store.status === 'suspended' || store.isDemo
         ? {
             // Suspended stores render the branded maintenance page on every
             // route — explicitly tell crawlers not to index that as the

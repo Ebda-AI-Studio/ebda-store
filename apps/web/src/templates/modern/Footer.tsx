@@ -8,6 +8,7 @@ import { useState } from 'react';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { footerRootPaint } from '../shared/footer-ink';
+import { demoRefusalText } from '../../lib/demo-refusal';
 import { api } from '../../lib/api';
 import {
   footerBranchesHeading,
@@ -83,7 +84,10 @@ export default function ModernFooter({
         setSubscribed(true);
         setEmail('');
       } else {
-        setErrorMsg(isRtl ? 'تعذر الاشتراك، حاول لاحقاً' : 'Could not subscribe, please try again');
+        setErrorMsg(
+          demoRefusalText(result.error, (en, ar) => (isRtl ? ar : en)) ||
+            (isRtl ? 'تعذر الاشتراك، حاول لاحقاً' : 'Could not subscribe, please try again')
+        );
       }
     } catch {
       setErrorMsg(isRtl ? 'تعذر الاشتراك، حاول لاحقاً' : 'Could not subscribe, please try again');

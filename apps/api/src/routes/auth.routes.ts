@@ -25,6 +25,7 @@ import { redis } from '../services/redis.service';
 import { AppError } from '../middleware/error-handler';
 import { maskEmail } from '../lib/pii-mask';
 import { passwordSchema } from '../services/merchant-signup.service';
+import { assertNotDemoStore } from '../services/plan-limit.service';
 
 const router = Router();
 
@@ -209,6 +210,8 @@ const emailLookupSchema = z.object({
 router.post('/register', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = registerSchema.parse(req.body);
+    // Ruling B1-13: no customer accounts on the demo showroom.
+    if (data.storeId) await assertNotDemoStore(data.storeId);
     const result = await AuthService.register({
       ...data,
       storeId: data.storeId ?? null,

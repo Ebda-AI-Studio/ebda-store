@@ -319,6 +319,13 @@ export const translations = {
   'Items in this look': 'قطع اللوك',
   'Look total': 'مجموع اللوك',
 
+  // Demo showroom bar (Rulings B1-11/B1-12) and its refusals (B1-13).
+  'Demo store': 'متجر تجريبي',
+  Template: 'القالب',
+  Look: 'الشكل',
+  'Choose a look': 'اختار شكل',
+  'This is a demo store: this is turned off here': 'ده متجر تجريبي — الخاصية دي مقفولة هنا',
+
   // Route error fallback — Try Again while the refresh is in flight.
   'Retrying…': 'جارٍ إعادة المحاولة…',
 } as const;

@@ -20,6 +20,7 @@ import { allowedParentOrigins } from '../builder/preview/allowed-parent-origins'
 import { emitZoneCss } from '../lib/emit-zone-css';
 import { buildThemeStyleTag } from '../lib/theme-css';
 import { canBuyNow, inStockNow } from '../lib/can-buy-now';
+import { demoHomeDefinition } from '../lib/demo-home';
 
 /**
  * Homepage body — extracted 2026-07-12 (tenant-cacheable routing, Phase 1)
@@ -433,10 +434,20 @@ export async function HomePageBody({
     fetchLayoutSettings(store.id, draftToken),
     builderToken ? fetchBuilderPreview(store.id, builderToken) : Promise.resolve(undefined),
   ]);
+  // Demo showroom (Ruling B1-8): the published superset document rendered through the current
+  // look's section mix. The SAME object for every non-demo store, so this is a no-op there.
+  const homeDefinition = builderDefinition
+    ? undefined
+    : demoHomeDefinition(store, draftBundle.definition);
+  const demoMixed = !builderDefinition && homeDefinition !== draftBundle.definition;
   // Builder canvas: the DRAFT drives everything the page fetches and the
   // chrome reads (a draft carousel must load its own products), projected
-  // onto the legacy shape the fetchers understand.
-  const layout = builderDefinition ? definitionToLayout(builderDefinition) : draftBundle.layout;
+  // onto the legacy shape the fetchers understand. The demo mix is projected the same way.
+  const layout = builderDefinition
+    ? definitionToLayout(builderDefinition)
+    : demoMixed && homeDefinition
+      ? definitionToLayout(homeDefinition)
+      : draftBundle.layout;
   // Draft typography + theme override CSS — emitted in body so source order
   // beats the head-emitted committed-store typography. Only present when the
   // admin live-preview iframe passes ?_layoutDraft=<token> AND the draft
@@ -453,7 +464,7 @@ export async function HomePageBody({
         featured: featuredPromise,
         categories: categoriesPromise,
       },
-      documentSectionRefs(builderDefinition ?? draftBundle.definition)
+      documentSectionRefs(builderDefinition ?? homeDefinition)
     );
 
   const siteUrl = storeAbsoluteUrl(store, '');
@@ -544,7 +555,7 @@ export async function HomePageBody({
           extraProducts={extraProducts}
           storeName={store.name}
           layout={layout}
-          definition={draftBundle.definition}
+          definition={homeDefinition}
         />
       )}
     </>

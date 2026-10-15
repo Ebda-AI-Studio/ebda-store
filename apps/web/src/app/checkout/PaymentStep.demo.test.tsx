@@ -33,10 +33,13 @@ describe('PaymentStep on a demo store', () => {
     const { container, getByText } = render(<PaymentStep {...props} isDemo />);
     expect(getByText('هذا متجر تجريبي — الطلبات مغلقة')).toBeTruthy();
     expect(container.querySelector('button[type="submit"]')).toBeNull();
+    // No "no payment methods, contact the owner" alert next to it: the demo notice is the answer.
+    expect(container.querySelector('[role="alert"]')).toBeNull();
   });
   it('a normal store keeps the pay button and no notice', () => {
     const { container } = render(<PaymentStep {...props} />);
     expect(container.querySelector('button[type="submit"]')).not.toBeNull();
     expect(container.querySelector('[data-demo-checkout-notice]')).toBeNull();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('طرق دفع');
   });
 });

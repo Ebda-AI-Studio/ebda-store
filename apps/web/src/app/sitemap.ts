@@ -21,6 +21,8 @@ const STORE_STATIC_PAGES: Array<{ path: string; priority: number; freq: 'monthly
 type StoreListEntry = {
   id: string;
   slug: string;
+  /** The demo showroom (Ruling B1-14): listed nowhere. */
+  isDemo?: boolean;
 };
 
 type ProductEntry = {
@@ -65,7 +67,7 @@ async function resolveStoreByHost(host: string): Promise<StoreListEntry | null> 
     const data = await res.json();
     const store = data?.data?.store;
     if (!store?.id || !store?.slug) return null;
-    return { id: store.id, slug: store.slug };
+    return { id: store.id, slug: store.slug, isDemo: store.isDemo === true };
   } catch (error) {
     if (error instanceof SitemapSourceUnavailableError) throw error;
     throw new SitemapSourceUnavailableError('host resolve → network error');
@@ -244,6 +246,7 @@ async function buildTenantSitemap(
  *       `/<slug>/…` — that path-based layout is gone.
  *   - a store host that resolves to no store
  *     → 404, never another store's URLs
+ *   - the demo showroom (`isDemo`) → an empty sitemap (noindex, Ruling B1-14)
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
@@ -258,5 +261,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // last-good copy).
   const tenant = await resolveStoreByHost(storeHost);
   if (!tenant) notFound();
+  // The demo showroom is noindex (Ruling B1-14): nothing to submit.
+  if (tenant.isDemo) return [];
   return buildTenantSitemap(storeHost, tenant.id, now);
 }

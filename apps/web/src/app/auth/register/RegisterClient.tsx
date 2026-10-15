@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
 import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { demoRefusalText } from '../../../lib/demo-refusal';
 
 export default function RegisterClient() {
   const { isLoading, error, setError, submit } = useAuthFormSubmit();
@@ -46,7 +47,11 @@ export default function RegisterClient() {
         });
 
         if (!result.success) {
-          throw new Error(result.error?.message || t('Failed to register', 'فشل إنشاء الحساب'));
+          throw new Error(
+            demoRefusalText(result.error, t) ||
+              result.error?.message ||
+              t('Failed to register', 'فشل إنشاء الحساب')
+          );
         }
 
         // T1-4: register no longer returns tokens. The API responds the same way

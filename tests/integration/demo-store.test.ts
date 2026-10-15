@@ -7,8 +7,12 @@
  *   OrderService.createAdminOrder merchant phone/manual orders
  *   payment-links.routes          WhatsApp payment link (calls assertOrderAllowed before any write)
  * A non-demo store is unaffected.
+ *
+ * Ruling B1-13 (+ plan amendment C13): the showroom also refuses every public write that collects
+ * visitor PII (customer register with its storeId, newsletter subscribe, contact form, affiliate
+ * apply, push subscribe) with the same 403 DEMO_STORE, writing nothing and sending nothing.
  */
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, beforeAll, vi } from 'vitest';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
@@ -19,7 +23,12 @@ import { errorHandler } from '@api/middleware/error-handler';
 import { config } from '@api/config';
 import { AppError } from '@api/middleware/error-handler';
 import { OrderService } from '@api/services/order.service';
-import { assertOrderAllowed } from '@api/services/plan-limit.service';
+import { assertOrderAllowed, assertNotDemoStore } from '@api/services/plan-limit.service';
+import authRoutes from '@api/routes/auth.routes';
+import publicRoutes from '@api/routes/public.routes';
+import { publicAffiliateRoutes } from '@api/routes/affiliate.routes';
+import { publicNotificationRoutes } from '@api/routes/notification.routes';
+import { inngest } from '@api/lib/inngest/client';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import {
   hasDb,
@@ -205,5 +214,166 @@ describe.skipIf(!hasDb)('demo store refuses orders', () => {
     await expect(
       prisma.$transaction(async () => assertOrderAllowed(crypto.randomUUID()))
     ).rejects.toMatchObject({ statusCode: 404 });
+  });
+});
+
+describe.skipIf(!hasDb)('demo store refuses visitor PII writes (B1-13)', () => {
+  let app: express.Express;
+  let demo: Awaited<ReturnType<typeof seed>>;
+  let shop: Awaited<ReturnType<typeof seed>>;
+  const run = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  beforeAll(async () => {
+    demo = await seed(true);
+    shop = await seed(false);
+    // Both stores carry the features, so on the demo ONLY is_demo can refuse.
+    await withRlsBypass(async tx => {
+      for (const storeId of [demo.storeId, shop.storeId])
+        for (const featureKey of ['affiliate', 'push_notifications'])
+          await tx.storeFeature.create({ data: { storeId, featureKey, enabled: true } });
+    });
+    app = express();
+    app.use(express.json());
+    app.use('/api/v1/auth', authRoutes);
+    app.use('/api/v1/public', publicRoutes);
+    app.use('/api/v1/public', publicAffiliateRoutes);
+    app.use('/api/v1/public', publicNotificationRoutes);
+    app.use(errorHandler);
+  });
+
+  afterAll(async () => {
+    vi.restoreAllMocks();
+    await withRlsBypass(async tx => {
+      const ids = { in: [demo.storeId, shop.storeId] };
+      await tx.newsletterSubscriber.deleteMany({ where: { storeId: ids } });
+      await tx.affiliate.deleteMany({ where: { storeId: ids } });
+      await tx.pushSubscription.deleteMany({ where: { storeId: ids } });
+      await tx.user.deleteMany({ where: { storeId: ids, role: 'customer' } });
+    });
+  });
+
+  const register = (storeId: string, email: string) =>
+    request(app).post('/api/v1/auth/register').send({
+      email,
+      password: 'Demo-store-pass-2026!',
+      firstName: 'Mona',
+      lastName: 'Adel',
+      storeId,
+    });
+  const newsletter = (storeId: string, email: string) =>
+    request(app)
+      .post('/api/v1/public/newsletter/subscribe')
+      .set('X-Store-ID', storeId)
+      .send({ email, language: 'ar', source: 'section' });
+  const contact = (storeId: string, email: string) =>
+    request(app)
+      .post('/api/v1/public/contact')
+      .set('X-Store-ID', storeId)
+      .send({ name: 'Mona', email, subject: 'Sizes', message: 'Do you have the gown in 40?' });
+  const affiliate = (storeId: string, email: string) =>
+    request(app).post(`/api/v1/public/${storeId}/affiliates/apply`).send({ name: 'Mona', email });
+  const push = (storeId: string, tag: string) =>
+    request(app)
+      .post(`/api/v1/public/${storeId}/push/subscribe`)
+      .send({
+        endpoint: `https://push.example.test/${tag}`,
+        keys: { p256dh: 'p256dh-key', auth: 'auth-key' },
+      });
+
+  const users = (storeId: string, email: string) =>
+    withRlsBypass(tx => tx.user.count({ where: { storeId, email } }));
+  const subscribers = (storeId: string, email: string) =>
+    withRlsBypass(tx => tx.newsletterSubscriber.count({ where: { storeId, email } }));
+  const affiliates = (storeId: string) =>
+    withRlsBypass(tx => tx.affiliate.count({ where: { storeId } }));
+  const pushes = (storeId: string) =>
+    withRlsBypass(tx => tx.pushSubscription.count({ where: { storeId } }));
+
+  const expectDemoRefusal = (res: request.Response) => {
+    expect(res.status, JSON.stringify(res.body)).toBe(403);
+    expect(res.body.error.code).toBe('DEMO_STORE');
+    expect(res.body.error.details).toMatchObject({
+      messageAr: 'ده متجر تجريبي — الخاصية دي مقفولة هنا',
+      messageEn: 'This is a demo store: this is turned off here',
+    });
+  };
+
+  it('register with the demo storeId: 403 DEMO_STORE, no user row', async () => {
+    const email = `demo-reg-${run()}@example.com`;
+    expectDemoRefusal(await register(demo.storeId, email));
+    expect(await users(demo.storeId, email)).toBe(0);
+  });
+
+  it('newsletter subscribe on the demo: 403 DEMO_STORE, no subscriber row', async () => {
+    const email = `demo-nl-${run()}@example.com`;
+    expectDemoRefusal(await newsletter(demo.storeId, email));
+    expect(await subscribers(demo.storeId, email)).toBe(0);
+  });
+
+  it('contact on the demo: 403 DEMO_STORE, nothing queued', async () => {
+    const send = vi.spyOn(inngest, 'send');
+    send.mockClear();
+    expectDemoRefusal(await contact(demo.storeId, `demo-ct-${run()}@example.com`));
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('affiliate apply on the demo: 403 DEMO_STORE (before the feature gate), no affiliate row', async () => {
+    expectDemoRefusal(await affiliate(demo.storeId, `demo-af-${run()}@example.com`));
+    expect(await affiliates(demo.storeId)).toBe(0);
+  });
+
+  it('push subscribe on the demo: 403 DEMO_STORE, no subscription row', async () => {
+    expectDemoRefusal(await push(demo.storeId, `demo-${run()}`));
+    expect(await pushes(demo.storeId)).toBe(0);
+  });
+
+  it('a merchant store takes all five as before', async () => {
+    const tag = run();
+    const reg = await register(shop.storeId, `shop-reg-${tag}@example.com`);
+    expect(reg.status, JSON.stringify(reg.body)).toBe(200);
+    expect(await users(shop.storeId, `shop-reg-${tag}@example.com`)).toBe(1);
+
+    const nl = await newsletter(shop.storeId, `shop-nl-${tag}@example.com`);
+    expect(nl.status, JSON.stringify(nl.body)).toBe(200);
+    expect(await subscribers(shop.storeId, `shop-nl-${tag}@example.com`)).toBe(1);
+
+    const send = vi.spyOn(inngest, 'send');
+    send.mockClear();
+    const ct = await contact(shop.storeId, `shop-ct-${tag}@example.com`);
+    expect(ct.status, JSON.stringify(ct.body)).toBe(200);
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ name: 'contact/form.submitted' }));
+
+    const af = await affiliate(shop.storeId, `shop-af-${tag}@example.com`);
+    expect(af.body?.error?.code).not.toBe('DEMO_STORE');
+    expect(af.status, JSON.stringify(af.body)).toBe(201);
+
+    const ps = await push(shop.storeId, `shop-${tag}`);
+    expect(ps.status, JSON.stringify(ps.body)).toBe(201);
+    expect(await pushes(shop.storeId)).toBe(1);
+  });
+
+  it('contact with no resolvable store keeps today’s behaviour (queued, 200)', async () => {
+    const send = vi.spyOn(inngest, 'send');
+    send.mockClear();
+    const res = await request(app)
+      .post('/api/v1/public/contact')
+      .send({
+        name: 'Mona',
+        email: `nostore-${run()}@example.com`,
+        subject: 'Hi',
+        message: 'Hello',
+      });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('assertNotDemoStore reads is_demo under the ebda_app role (strict RLS)', async () => {
+    await expect(asApp(() => assertNotDemoStore(demo.storeId))).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'DEMO_STORE',
+    });
+    await expect(asApp(() => assertNotDemoStore(shop.storeId))).resolves.toBeUndefined();
+    // An unknown store is not this guard's business: the caller keeps its own not-found path.
+    await expect(asApp(() => assertNotDemoStore(crypto.randomUUID()))).resolves.toBeUndefined();
   });
 });

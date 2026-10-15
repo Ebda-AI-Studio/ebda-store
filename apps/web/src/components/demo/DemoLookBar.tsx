@@ -1,8 +1,9 @@
 'use client';
 
+import { useEffect } from 'react';
 import { LOOKS, type LookTemplate } from '@ebda/shared';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useLanguage } from '../../contexts/LanguageContext';
+import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { defaultIsLookBuilt, type IsLookBuilt } from '../../lib/demo-look';
 
 /** Template display names (the five looks families). */
@@ -14,12 +15,21 @@ const TEMPLATE_NAMES: Record<LookTemplate, { en: string; ar: string }> = {
   dahab: { en: 'Dahab', ar: 'دهب' },
 };
 
+const SELECT_CLASS =
+  'min-h-11 rounded border border-background/40 bg-foreground px-2 text-sm text-background focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-background';
+
 /**
- * Showroom bar for the demo store (`store.isDemo`): picks a BUILT look to preview. Selecting one
- * loads `?look=<id>` on the same path (full document load) (other query params kept); the server applies it
- * through the normal composition path (see `lib/demo-look.ts`). Designed-only looks are never
- * listed, so with every look still 'designed' the bar renders nothing. `isBuilt` is injectable
- * for tests (default: the registry's `status === 'built'`).
+ * Showroom bar for the demo store (`store.isDemo`): template, then one of its BUILT looks
+ * (Ruling B1-12, MKT-3 wording). A template with no built look is not listed, and with no built
+ * look at all the bar renders nothing. `isBuilt` is injectable for tests (default: the
+ * registry's `status === 'built'`).
+ *
+ * Choosing loads `?look=<id>` on the same path (full document load; other query params kept); the
+ * server applies it through the normal composition path (`lib/demo-look.ts`). Nothing is ever
+ * written: the preview lives in the URL only (LOOKS-12 forbids a cookie). While a preview is
+ * showing, a same-origin link click carries `look=<id>` to the next page (Ruling B1-11), so a
+ * product opened from a Lookbook preview renders Lookbook too. Programmatic navigations
+ * (`router.push`, e.g. cart → checkout) still drop it; checkout is refused on the demo anyway.
  */
 export function DemoLookBar({
   activeLook,
@@ -31,13 +41,43 @@ export function DemoLookBar({
   const { language, t } = useLanguage();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const lang = language === 'ar' ? 'ar' : 'en';
+
+  // The look this page is previewing: the URL asked for it AND the server applied it (a look
+  // that is not built is ignored server-side, so `activeLook` is then the store's own look).
+  const previewLook =
+    activeLook && searchParams?.get('look') === activeLook && isBuilt(activeLook)
+      ? activeLook
+      : null;
+
+  useEffect(() => {
+    if (!previewLook) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
+        return;
+      const a = (e.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download')) return;
+      const url = new URL(a.href, window.location.href);
+      if (url.origin !== window.location.origin || url.searchParams.get('look') === previewLook)
+        return;
+      url.searchParams.set('look', previewLook);
+      e.preventDefault();
+      // Full document load: the look is applied in the root layout (data-look, CSS vars, fonts).
+      window.location.assign(url.pathname + url.search + url.hash);
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [previewLook]);
 
   const built = LOOKS.filter(l => isBuilt(l.id));
   if (built.length === 0) return null;
 
   const templates = [...new Set(built.map(l => l.template))];
+  const current = built.find(l => l.id === activeLook);
+  const activeTemplate = current?.template ?? templates[0];
+  const looks = built.filter(l => l.template === activeTemplate);
 
-  const select = (lookId: string) => {
+  const go = (lookId: string) => {
     const params = new URLSearchParams(searchParams?.toString() ?? '');
     params.set('look', lookId);
     // Full document load, not router.push: a search-param-only App Router navigation re-renders
@@ -46,37 +86,58 @@ export function DemoLookBar({
     window.location.assign(`${pathname}?${params.toString()}`);
   };
 
+  const label = 'flex items-center gap-2';
+  // Labels are visible from sm up; on a phone the two selects carry them as accessible names.
+  const labelText = 'sr-only sm:not-sr-only';
+
   return (
     <div
       data-demo-look-bar
-      className="sticky top-0 z-50 flex flex-wrap items-center justify-center gap-3 border-b bg-foreground px-4 py-2 text-xs text-background"
+      role="region"
+      aria-label={t('Demo store', translations['Demo store'])}
+      className="border-b border-background/20 bg-foreground text-background"
     >
-      <span className="font-medium">متجر تجريبي · Demo store</span>
-      <label className="flex items-center gap-2">
-        <span>{t('Look', 'الشكل')}</span>
-        <select
-          className="min-h-8 rounded border border-background/30 bg-foreground px-2 text-background"
-          value={activeLook ?? ''}
-          onChange={e => select(e.target.value)}
-        >
-          {!activeLook || !built.some(l => l.id === activeLook) ? (
-            <option value="" disabled>
-              {t('Choose a look', 'اختر شكلاً')}
-            </option>
-          ) : null}
-          {templates.map(tpl => (
-            <optgroup key={tpl} label={TEMPLATE_NAMES[tpl][language === 'ar' ? 'ar' : 'en']}>
-              {built
-                .filter(l => l.template === tpl)
-                .map(l => (
-                  <option key={l.id} value={l.id}>
-                    {l.name[language === 'ar' ? 'ar' : 'en']}
-                  </option>
-                ))}
-            </optgroup>
-          ))}
-        </select>
-      </label>
+      <div className="mx-auto flex max-w-screen-xl flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-1 text-xs sm:text-sm">
+        <span className="font-medium">{t('Demo store', translations['Demo store'])}</span>
+        <label className={label}>
+          <span className={labelText}>{t('Template', translations['Template'])}</span>
+          <select
+            data-demo-template
+            className={SELECT_CLASS}
+            value={activeTemplate}
+            onChange={e => {
+              const first = built.find(l => l.template === e.target.value);
+              if (first) go(first.id);
+            }}
+          >
+            {templates.map(tpl => (
+              <option key={tpl} value={tpl}>
+                {TEMPLATE_NAMES[tpl][lang]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={label}>
+          <span className={labelText}>{t('Look', translations['Look'])}</span>
+          <select
+            data-demo-look
+            className={SELECT_CLASS}
+            value={current ? current.id : ''}
+            onChange={e => go(e.target.value)}
+          >
+            {current ? null : (
+              <option value="" disabled>
+                {t('Choose a look', translations['Choose a look'])}
+              </option>
+            )}
+            {looks.map(l => (
+              <option key={l.id} value={l.id}>
+                {l.name[lang]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
     </div>
   );
 }

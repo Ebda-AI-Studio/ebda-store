@@ -136,7 +136,9 @@ export default function PaymentStep({
               )}
             </div>
           ) : (
-            paymentProviders.length === 0 && (
+            // The demo store has no order to pay for: its notice below says so, not this alert.
+            paymentProviders.length === 0 &&
+            !isDemo && (
               <div
                 role="alert"
                 className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-foreground"

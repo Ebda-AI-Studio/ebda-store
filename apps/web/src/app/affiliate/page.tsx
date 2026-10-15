@@ -6,6 +6,7 @@ import { useStore } from '../../contexts/StoreContext';
 import { ShopChrome } from '../../components';
 import { useFeatures } from '../../contexts/FeatureContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { demoRefusalText } from '../../lib/demo-refusal';
 import { API_URL } from '../../lib/api';
 
 import { REGION } from '@ebda/shared';
@@ -111,6 +112,7 @@ function AffiliatePageContent() {
 
       if (!res.ok || !json.success) {
         const msg =
+          demoRefusalText(json?.error, t) ||
           json?.error?.message ||
           t('Something went wrong. Please try again.', 'حدث خطأ ما. يرجى المحاولة مرة أخرى.');
         setError(msg);
