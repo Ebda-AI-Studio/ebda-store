@@ -10,24 +10,11 @@ import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useCart } from '../../contexts/CartContext';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import type { TemplateProduct } from '../../templates/types';
+import { wishlistToTemplateProduct, type WishlistCardProduct } from '../../templates/adapters';
 
 interface WishlistItem {
   id: string;
-  product: {
-    id: string;
-    name: string;
-    slug: string;
-    price: number;
-    compareAtPrice?: number;
-    discountType?: 'percentage' | 'fixed' | null;
-    discountValue?: number | null;
-    badgeLabel?: string | null;
-    badgeLabelAr?: string | null;
-    images: string[];
-    status: string;
-    options?: TemplateProduct['options'];
-    facts?: TemplateProduct['facts'];
-  };
+  product: WishlistCardProduct;
 }
 
 export default function WishlistClient() {
@@ -173,8 +160,11 @@ export default function WishlistClient() {
       const response = await api.addToCart(productId, 1);
       if (response.success) {
         router.push(storeUrl('/cart'));
-      } else if (response.error?.code === 'PERSONALISATION_REQUIRED') {
-        // The merchant requires a personalisation note, typed on the PDP only.
+      } else if (
+        response.error?.code === 'PERSONALISATION_REQUIRED' ||
+        response.error?.code === 'VARIANT_REQUIRED'
+      ) {
+        // A personalisation note or a size/colour: both are chosen on the PDP only.
         const slug = items.find(i => i.product.id === productId)?.product.slug;
         if (slug) router.push(storeUrl(`/products/${slug}`));
       } else {
@@ -254,21 +244,9 @@ export default function WishlistClient() {
     );
   }
 
-  const wishlistTemplateProducts: TemplateProduct[] = items.map(item => ({
-    id: item.product.id,
-    name: item.product.name,
-    slug: item.product.slug,
-    price: item.product.price,
-    compareAtPrice: item.product.compareAtPrice,
-    discountType: item.product.discountType ?? undefined,
-    discountValue: item.product.discountValue ?? undefined,
-    badgeLabel: item.product.badgeLabel ?? undefined,
-    badgeLabelAr: item.product.badgeLabelAr ?? undefined,
-    images: item.product.images.map((url, i) => ({ id: `${item.id}-${i}`, url })),
-    inStock: item.product.status === 'active',
-    options: item.product.options,
-    facts: item.product.facts,
-  }));
+  const wishlistTemplateProducts: TemplateProduct[] = items.map(item =>
+    wishlistToTemplateProduct(item.id, item.product)
+  );
 
   const handleAddFromWishlist = async (productId: string) => {
     await addToCart(productId);

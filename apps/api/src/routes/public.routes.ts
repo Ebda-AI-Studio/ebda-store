@@ -51,7 +51,7 @@ import { PaymentService } from '../services/payment-providers/payment.factory';
 import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
 import type { PaymentProvider } from '../services/payment-providers/types';
 
-import { fromMinor } from '@ebda/shared';
+import { WISHLIST_CARD_VARIANTS_SELECT, wishlistCardProduct } from '../lib/wishlist-card';
 const router = Router();
 
 // Apply public rate limiter to all routes — per-IP first, then the
@@ -1249,6 +1249,9 @@ router.get(
                     orderBy: { position: 'asc' },
                     take: 1,
                   },
+                  // The shared list's button is "choose options" for a sized
+                  // product, never a one-tap add (C-01).
+                  variants: WISHLIST_CARD_VARIANTS_SELECT,
                 },
               },
             },
@@ -1274,17 +1277,7 @@ router.get(
 
       const items = wishlist.items.map(item => ({
         id: item.id,
-        product: {
-          id: item.product.id,
-          name: item.product.name,
-          slug: item.product.slug,
-          price: fromMinor(item.product.price),
-          compareAtPrice: item.product.compareAtPrice
-            ? fromMinor(item.product.compareAtPrice)
-            : undefined,
-          images: item.product.images.map(img => img.url),
-          status: item.product.status,
-        },
+        product: wishlistCardProduct(item.product),
       }));
 
       res.json({

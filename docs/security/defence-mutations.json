@@ -2070,6 +2070,26 @@
       "find": "  return cur.material && sent.some(s => s.docKey === docKey && s.version === cur.version);",
       "replace": "  return sent.some(s => s.docKey === docKey && s.version === cur.version);",
       "test": "tests/unit/legal-notice-eligibility.test.ts"
+    },
+    {
+      "id": "cart-add-variant-required",
+      "domain": "data integrity",
+      "tier": "unit",
+      "why": "a quick-add with no variantId on a product that HAS variants falls back to the parent's inventory column (0 by the inventory model): an in-stock sized product is refused as out of stock, and with backorder on a SIZELESS cart line is written that checkout then sells (C-01, 2026-10-15). The storefront card CTA is only a hint; this is the gate",
+      "source": "apps/api/src/services/cart.service.ts",
+      "find": "      if (!variantId && product._count.variants > 0) {",
+      "replace": "      if (false) {",
+      "test": "tests/unit/cart-variant-required.test.ts"
+    },
+    {
+      "id": "cart-sync-skips-variant-parent",
+      "domain": "data integrity",
+      "tier": "unit",
+      "why": "the guest-to-login cart sync (addItems) carries a variant product with no variantId across as a sizeless line, so the same gap the addItem gate closes reopens one login later (C-01, Ruling FU46-W1a-2: skipped, not failed, like an invalid variant)",
+      "source": "apps/api/src/services/cart.service.ts",
+      "find": "      if (!item.variantId && product._count.variants > 0) return [];",
+      "replace": "",
+      "test": "tests/unit/cart-variant-required.test.ts"
     }
   ]
 }

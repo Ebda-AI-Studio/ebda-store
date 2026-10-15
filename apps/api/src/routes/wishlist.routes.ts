@@ -4,8 +4,8 @@ import { prisma } from '@ebda/database';
 import { authenticate, customerUserId } from '../middleware/auth';
 import { userContext } from '../middleware/tenant-context';
 
-import { fromMinor } from '@ebda/shared';
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
+import { WISHLIST_CARD_VARIANTS_SELECT, wishlistCardProduct } from '../lib/wishlist-card';
 const router = Router();
 
 // Helper to get store ID from request header
@@ -86,6 +86,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
                 },
                 // Colour dots on the wishlist cards (same payload as the listing).
                 options: LISTING_SWATCH_OPTIONS_SELECT,
+                // Card CTA: "choose options" vs quick-add vs sold-out (C-01).
+                variants: WISHLIST_CARD_VARIANTS_SELECT,
               },
             },
           },
@@ -106,6 +108,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
                     take: 1,
                   },
                   options: LISTING_SWATCH_OPTIONS_SELECT,
+                  variants: WISHLIST_CARD_VARIANTS_SELECT,
                 },
               },
             },
@@ -116,24 +119,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     const items = wishlist.items.map(item => ({
       id: item.id,
-      product: {
-        id: item.product.id,
-        name: item.product.name,
-        slug: item.product.slug,
-        price: fromMinor(item.product.price), // Convert piastres to EGP
-        compareAtPrice: item.product.compareAtPrice
-          ? fromMinor(item.product.compareAtPrice)
-          : undefined,
-        // Merchant-authored card badge — the wishlist grid renders through
-        // T.ProductGrid → the theme ProductCards, so this projection must
-        // carry it or the badge silently disappears on this one surface.
-        badgeLabel: item.product.badgeLabel,
-        badgeLabelAr: item.product.badgeLabelAr,
-        images: item.product.images.map(img => img.url),
-        status: item.product.status,
-        options: item.product.options,
-        facts: item.product.facts,
-      },
+      product: wishlistCardProduct(item.product),
     }));
 
     res.json({
@@ -229,6 +215,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
               orderBy: { position: 'asc' },
               take: 1,
             },
+            options: LISTING_SWATCH_OPTIONS_SELECT,
+            variants: WISHLIST_CARD_VARIANTS_SELECT,
           },
         },
       },
@@ -239,19 +227,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       data: {
         item: {
           id: item.id,
-          product: {
-            id: item.product.id,
-            name: item.product.name,
-            slug: item.product.slug,
-            price: fromMinor(item.product.price),
-            compareAtPrice: item.product.compareAtPrice
-              ? fromMinor(item.product.compareAtPrice)
-              : undefined,
-            badgeLabel: item.product.badgeLabel,
-            badgeLabelAr: item.product.badgeLabelAr,
-            images: item.product.images.map(img => img.url),
-            status: item.product.status,
-          },
+          product: wishlistCardProduct(item.product),
         },
       },
     });

@@ -27,12 +27,23 @@ import { resolveBundle, type ResolvedBundle } from './bundle.service';
 import { activePersonalisation, cleanNote, stripNote } from '@ebda/shared';
 
 /**
+ * Bilingual copy for the VARIANT_REQUIRED refusal (a quick-add of a product
+ * that has variants, with no variant chosen). Exported for the storefront
+ * tests; the storefront itself sends the shopper to the PDP.
+ */
+export const VARIANT_REQUIRED_MESSAGE = {
+  en: 'Choose the options for this product before adding it to the cart',
+  ar: 'اختر خيارات المنتج قبل إضافته إلى السلة',
+} as const;
+
+/**
  * Resolve a customer's personalisation note against the product's config.
  * Off / no config → the note is dropped (null) so it can never split a line
  * on a product that does not take one. On → required and maxLength enforced
  * here, server-side; the PDP's disabled button is only a convenience.
  * Returns the error code instead of throwing so the bulk sync can skip a line.
  */
+
 export function resolveLineNote(
   personalisation: unknown,
   raw: unknown
@@ -389,10 +400,28 @@ export class CartService {
       // add-to-cart path — the bulk `addItems` sibling below had the same hole.
       const product = await tx.product.findFirst({
         where: { id: productId, storeId, status: 'active', deletedAt: null },
+        // Variant count for the VARIANT_REQUIRED gate below. Every variant row,
+        // disabled ones included: a product whose variants are all disabled is
+        // still a variant product, not a plain SKU.
+        include: { _count: { select: { variants: true } } },
       });
 
       if (!product) {
         throw new AppError(404, 'NOT_FOUND', 'Product not found or unavailable');
+      }
+
+      // A product with variants is bought as ONE of its variants, never as the
+      // bare parent (C-01, 2026-10-15). Without this gate a quick-add with no
+      // variantId fell back to the parent's `inventory` column, which the
+      // inventory model holds at 0 for a variant product: an in-stock sized
+      // product failed as "not enough inventory", and with backorder on it
+      // wrote a SIZELESS line that checkout then sold. The storefront card is
+      // only a hint; this is the gate.
+      if (!variantId && product._count.variants > 0) {
+        throw new AppError(400, 'VARIANT_REQUIRED', VARIANT_REQUIRED_MESSAGE.en, {
+          messageEn: VARIANT_REQUIRED_MESSAGE.en,
+          messageAr: VARIANT_REQUIRED_MESSAGE.ar,
+        });
       }
 
       // The note is part of the line identity: (cart, product, variant, note).
@@ -711,6 +740,7 @@ export class CartService {
         trackInventory: true,
         allowBackorder: true,
         personalisation: true,
+        _count: { select: { variants: true } },
       },
     });
     const productById = new Map(products.map(p => [p.id, p]));
@@ -738,6 +768,10 @@ export class CartService {
     const resolvedItems = items.flatMap(item => {
       const product = productById.get(item.productId);
       if (!product) return [];
+      // A variant product with no variant chosen is skipped, the same way an
+      // invalid variant is below (the VARIANT_REQUIRED gate in addItem, applied
+      // with this path's skip-don't-fail policy — Ruling FU46-W1a-2).
+      if (!item.variantId && product._count.variants > 0) return [];
       const r = resolveLineNote(product.personalisation, item.note);
       return 'error' in r ? [] : [{ ...item, note: r.note }];
     });

@@ -228,6 +228,9 @@ describe('getProductRecommendations', () => {
     // No cached value by default
     mockRedis.get.mockResolvedValue(null);
     mockRedis.set.mockResolvedValue(undefined);
+    // clearAllMocks keeps implementations: without this an FBT row set by an
+    // earlier describe (ids only, no product1/product2) leaks in here.
+    mockPrisma.frequentlyBoughtTogether.findMany.mockResolvedValue([]);
   });
 
   it('returns object with crossSell, upsell, and alsoLike arrays', async () => {
@@ -275,6 +278,54 @@ describe('getProductRecommendations', () => {
       position: 2,
       id: 'prod-222',
     });
+  });
+
+  it('C-01: every list carries stock flags + variants from enrichStockFlags, not the raw column', async () => {
+    const sized = {
+      ...mockProductShape('prod-sized'),
+      inventory: 0, // parent column of a variant product (the inventory model)
+      allowBackorder: false,
+      lowStockThreshold: 5,
+      variants: [
+        {
+          id: 'v1',
+          price: 10,
+          compareAtPrice: null,
+          inventory: 4,
+          allowBackorder: false,
+          isActive: true,
+        },
+      ],
+    };
+    const soldOut = {
+      ...mockProductShape('prod-out'),
+      inventory: 0,
+      allowBackorder: false,
+      lowStockThreshold: 5,
+      variants: [],
+    };
+    mockPrisma.productRelation.findMany
+      .mockResolvedValueOnce([{ id: 'r1', targetProduct: sized, position: 0 }])
+      .mockResolvedValueOnce([{ id: 'r2', targetProduct: soldOut, position: 0 }]);
+    mockPrisma.productCategory.findMany.mockResolvedValue([]);
+
+    const result = await recommendationService.getProductRecommendations(storeId, 'prod-c01');
+    const [cross] = result.crossSell as any[];
+    const [up] = result.upsell as any[];
+    expect(cross).toMatchObject({ inStock: true, acceptsBackorder: false, inventory: 4 });
+    expect(cross.variants).toHaveLength(1);
+    expect(cross.variants[0]).not.toHaveProperty('isActive');
+    expect(cross).not.toHaveProperty('lowStockThreshold');
+    expect(up).toMatchObject({ inStock: false, acceptsBackorder: false });
+
+    // and the projection asks for what enrichStockFlags needs
+    const select = mockPrisma.productRelation.findMany.mock.calls[0][0].select.targetProduct.select;
+    expect(select).toMatchObject({
+      inventory: true,
+      allowBackorder: true,
+      lowStockThreshold: true,
+    });
+    expect(select.variants.select).toMatchObject({ inventory: true, isActive: true, price: true });
   });
 
   it('returns result from cache when cache hit', async () => {
@@ -335,6 +386,7 @@ describe('Cache key format', () => {
     mockRedis.set.mockResolvedValue(undefined);
     mockPrisma.productRelation.findMany.mockResolvedValue([]);
     mockPrisma.productCategory.findMany.mockResolvedValue([]);
+    mockPrisma.frequentlyBoughtTogether.findMany.mockResolvedValue([]);
   });
 
   it('uses format recommendations:product:{storeId}:{productId}', async () => {

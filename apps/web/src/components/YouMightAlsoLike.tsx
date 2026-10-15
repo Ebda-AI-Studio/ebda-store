@@ -8,6 +8,7 @@ import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStore, useStoreUrl, useStoreTemplate } from '../contexts/StoreContext';
 import { ProductCarousel } from '../templates/shared/ProductCarousel';
+import { recommendedToTemplateProduct } from '../templates/adapters';
 import { Skeleton } from '@ebda/ui';
 import { SectionRetryNotice } from './SectionRetryNotice';
 
@@ -94,22 +95,7 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
           heading capped at 20px, cards forced compact (xs). Reuses the canonical
           ProductCarousel so per-store frame/shape settings still apply. */}
       <ProductCarousel
-        products={products.map(p => ({
-          id: p.id,
-          name: p.name,
-          nameAr: p.nameAr,
-          slug: p.slug,
-          price: p.price,
-          compareAtPrice: p.compareAtPrice,
-          discountType: p.discountType ?? undefined,
-          discountValue: p.discountValue ?? undefined,
-          badgeLabel: p.badgeLabel ?? undefined,
-          badgeLabelAr: p.badgeLabelAr ?? undefined,
-          images: p.images,
-          inStock: true,
-          options: p.options,
-          facts: p.facts,
-        }))}
+        products={products.map(recommendedToTemplateProduct)}
         title="You Might Also Like"
         titleAr="قد يعجبك أيضاً"
         headingZone={{ fontSize: '20px' }}

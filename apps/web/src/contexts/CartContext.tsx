@@ -295,15 +295,26 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           setBundles(
             ((res.data.cart.bundles as ServerCartBundle[] | undefined) ?? []).map(mapServerBundle)
           );
-        } else if (res.error?.code === 'PERSONALISATION_REQUIRED') {
+        } else if (
+          res.error?.code === 'PERSONALISATION_REQUIRED' ||
+          res.error?.code === 'VARIANT_REQUIRED'
+        ) {
           // A quick-add (product card, carousel, wishlist) on a product whose
-          // merchant requires personalisation: the text can only be typed on the
-          // PDP, so send the shopper there instead of a dead-end error toast.
+          // merchant requires personalisation, or that has sizes/colours (the
+          // cart API refuses a bare variant parent, C-01): both are chosen on
+          // the PDP, so send the shopper there instead of a dead-end error toast.
           await refetchCart().catch(() => {});
-          toast.info(
-            t('Personalise it first', 'اكتب التخصيص الأول'),
-            t('Add your text on the product page.', 'اكتبه في صفحة المنتج.')
-          );
+          if (res.error?.code === 'VARIANT_REQUIRED') {
+            toast.info(
+              t('Choose your options first', 'اختر الخيارات أولاً'),
+              t('Pick them on the product page.', 'اخترها في صفحة المنتج.')
+            );
+          } else {
+            toast.info(
+              t('Personalise it first', 'اكتب التخصيص الأول'),
+              t('Add your text on the product page.', 'اكتبه في صفحة المنتج.')
+            );
+          }
           // Plain navigation, not useRouter: this provider also renders outside
           // the app router (tests, the layout render harnesses).
           if (item.slug && typeof window !== 'undefined') {

@@ -35,19 +35,25 @@ describe('product facts reach every surface', () => {
   it('dahab PDP renders <FactsTable>', () => {
     expect(read('apps/web/src/templates/dahab/ProductDetail.tsx')).toContain('<FactsTable');
   });
+  it('every card mapper in templates/adapters.ts passes facts through its whitelist', () => {
+    // toTemplateProduct, recommendedToTemplateProduct, wishlistToTemplateProduct.
+    expect(read('apps/web/src/templates/adapters.ts').match(/facts:\s*p\.facts/g)).toHaveLength(3);
+  });
   it.each([
-    'apps/web/src/templates/adapters.ts',
-    'apps/web/src/components/YouMightAlsoLike.tsx',
-    'apps/web/src/components/CartRecommendations.tsx',
-    'apps/web/src/components/FrequentlyBoughtTogether.tsx',
-    'apps/web/src/app/wishlist/WishlistClient.tsx',
-  ])('%s passes facts through its whitelist', f => {
-    expect(read(f)).toMatch(/facts:\s*(p|item\.product)\.facts/);
+    ['apps/web/src/components/YouMightAlsoLike.tsx', 'recommendedToTemplateProduct'],
+    ['apps/web/src/components/CartRecommendations.tsx', 'recommendedToTemplateProduct'],
+    ['apps/web/src/components/FrequentlyBoughtTogether.tsx', 'recommendedToTemplateProduct'],
+    ['apps/web/src/app/wishlist/WishlistClient.tsx', 'wishlistToTemplateProduct'],
+  ])('%s builds its cards through %s (no hand-built whitelist)', (f, mapper) => {
+    expect(read(f)).toContain(mapper);
   });
   it('the API ships facts on the PDP/listing, recommendation and wishlist payloads', () => {
     expect(read('apps/api/src/services/product.service.ts')).toMatch(/\n {2}facts: true,/);
     expect(read('apps/api/src/services/recommendation.service.ts')).toMatch(/\n {2}facts: true,/);
-    expect(read('apps/api/src/routes/wishlist.routes.ts')).toContain('facts: item.product.facts');
+    expect(read('apps/api/src/lib/wishlist-card.ts')).toContain('facts: p.facts');
+    expect(read('apps/api/src/routes/wishlist.routes.ts')).toContain(
+      'wishlistCardProduct(item.product)'
+    );
   });
   it('compare list stores and shows facts', () => {
     expect(read('apps/web/src/app/products/ProductsClient.tsx')).toContain('facts: product.facts');

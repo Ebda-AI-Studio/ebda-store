@@ -1,11 +1,8 @@
 'use client';
 
 import { pickLocalizedName } from '../templates/shared/display-helpers';
-import {
-  useProductRecommendations,
-  selectCrossSell,
-  type RecommendedProduct,
-} from '../hooks/useProductRecommendations';
+import { useProductRecommendations, selectCrossSell } from '../hooks/useProductRecommendations';
+import { recommendedToTemplateProduct, needsOptions, cardInStock } from '../templates/adapters';
 import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStore, useStoreUrl, useStoreTemplate } from '../contexts/StoreContext';
@@ -53,9 +50,9 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
   const productCardDefaults = layout?.productCardDefaults;
 
   // Variant-parent products can't be added to cart silently from a
-  // recommendation card. Helper shared by single-add and add-all.
-  const hasVariants = (p: RecommendedProduct): boolean =>
-    Array.isArray(p.variants) && p.variants.length > 0;
+  // recommendation card (the cart API refuses it: VARIANT_REQUIRED). The
+  // shared rule, so the button and the card agree.
+  const hasVariants = needsOptions;
 
   const { products, status, refetch } = useProductRecommendations(
     storeId,
@@ -106,8 +103,11 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
   };
 
   const handleAddAllToCart = async () => {
-    const simple = products.filter(p => !hasVariants(p));
-    const needVariant = products.filter(p => hasVariants(p));
+    // Sold-out pieces (no backorder) are left out: the card shows them sold
+    // out, so "add all" must not try them and toast a refusal.
+    const orderable = products.filter(p => cardInStock(p) || p.acceptsBackorder === true);
+    const simple = orderable.filter(p => !hasVariants(p));
+    const needVariant = orderable.filter(p => hasVariants(p));
 
     // Sequential awaits so each addItem sees the post-previous-add cart state.
     for (const p of simple) {
@@ -182,23 +182,7 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
         {products.map(p => (
           <PecannbeeProductCard
             key={p.id}
-            product={{
-              id: p.id,
-              name: p.name,
-              nameAr: p.nameAr,
-              slug: p.slug,
-              price: p.price,
-              compareAtPrice: p.compareAtPrice,
-              discountType: p.discountType ?? undefined,
-              discountValue: p.discountValue ?? undefined,
-              badgeLabel: p.badgeLabel ?? undefined,
-              badgeLabelAr: p.badgeLabelAr ?? undefined,
-              images: p.images,
-              inStock: true,
-              variants: p.variants,
-              options: p.options,
-              facts: p.facts,
-            }}
+            product={recommendedToTemplateProduct(p)}
             isRtl={isRtl}
             currency={store.currency}
             pack={templateId}

@@ -15,6 +15,7 @@ import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { resolveColor } from '@ebda/shared';
 import { cn, CartIcon } from '@ebda/ui';
 import { OosImageDim, OutOfStockRibbon } from '../../templates/shared/ProductCardCta';
+import { cardInStock, needsOptions } from '../../templates/adapters';
 import { ctaShapeClass, ctaSizeClass } from '../../templates/shared/card-size';
 import { getDiscountBadgeColor } from '../../templates/shared/discount-badge';
 import {
@@ -57,11 +58,14 @@ export function ProductListItem({
   const pricing = getProductPricing(product, undefined, 'card');
   // BUG 1 fix: use helper for correct EGP/pct badge text.
   const discountBadgeText = getDiscountBadgeText(product, isRtl, undefined, undefined, numerals);
-  // Task 13: orderable = truly in-stock OR backorder allowed. Derived from
-  // inventory because ProductListItem uses a richer inventory check (undefined
-  // means variant-managed stock → treat as orderable). OOS + backorder = orderable.
-  const orderable =
-    product.inventory === undefined || product.inventory > 0 || product.acceptsBackorder === true;
+  // Task 13: orderable = truly in-stock OR backorder allowed. OOS + backorder =
+  // orderable. Stock reads the server's variant-aware `inStock` first (the
+  // shared card rule, templates/adapters.ts cardInStock).
+  const orderable = cardInStock(product) || product.acceptsBackorder === true;
+  // C-01: a sized product is chosen on its PDP. This row used to render the
+  // add button for every product, so a list-view tap added a sizeless line (and
+  // a sold-out product's tap failed with an error toast).
+  const hasVariants = needsOptions(product);
 
   // Task 3 B3/B4: read CTA + OOS defaults from productCardDefaults.
   const defaults = layout?.productCardDefaults;
@@ -288,7 +292,7 @@ export function ProductListItem({
                 When ctaMode==='viewOnly', show a View label instead of Add to cart.
                 The entire ProductListItem is wrapped in a Link so no nested anchor
                 is needed — a span with the same visual chrome suffices. */}
-            {viewOnly ? (
+            {viewOnly || hasVariants ? (
               <span
                 className={cn(
                   'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white pointer-events-none',
@@ -301,6 +305,21 @@ export function ProductListItem({
               >
                 {ctaViewLabel}
               </span>
+            ) : !orderable ? (
+              <button
+                type="button"
+                disabled
+                className={cn(
+                  'flex h-10 items-center gap-2 rounded-xl bg-muted px-4 text-sm font-medium text-muted-foreground cursor-not-allowed',
+                  ctaExtraCls
+                )}
+                onClick={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              >
+                {t('Out of Stock', translations['Out of Stock'])}
+              </button>
             ) : (
               <button
                 className={cn(

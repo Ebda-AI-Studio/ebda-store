@@ -69,10 +69,17 @@ beforeEach(() => {
     trackInventory: true,
     inventory: 50,
     allowBackorder: false,
+    _count: { variants: 0 },
   });
   (prisma.cartItem.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
   (prisma.product.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
-    { id: 'prod-1', trackInventory: true, inventory: 50, allowBackorder: false },
+    {
+      id: 'prod-1',
+      trackInventory: true,
+      inventory: 50,
+      allowBackorder: false,
+      _count: { variants: 0 },
+    },
   ]);
   (prisma.productVariant.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 });
@@ -125,6 +132,7 @@ describe('CartService.addItem — transaction scoping', () => {
       trackInventory: true,
       inventory: 1,
       allowBackorder: false,
+      _count: { variants: 0 },
     });
 
     await expect(CartService.addItem('store-1', 'sess-1', 'prod-1', 5)).rejects.toThrow(
@@ -196,7 +204,13 @@ describe('CartService.addItems — transaction scoping', () => {
   it('still enforces inventory on the ambient path', async () => {
     hasTenantContextMock.mockReturnValue(true);
     (prisma.product.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { id: 'prod-1', trackInventory: true, inventory: 1, allowBackorder: false },
+      {
+        id: 'prod-1',
+        trackInventory: true,
+        inventory: 1,
+        allowBackorder: false,
+        _count: { variants: 0 },
+      },
     ]);
 
     await expect(

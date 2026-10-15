@@ -1228,7 +1228,12 @@ export default function CartClient() {
                 store.id &&
                 store.id !== 'demo' && (
                   <div className="mt-8">
-                    <CartRecommendations storeId={store.id} productIds={cartItems.map(i => i.id)} />
+                    <CartRecommendations
+                      storeId={store.id}
+                      // Product ids, not cart-line ids (the API looks up
+                      // relations by product; line ids matched nothing).
+                      productIds={[...new Set(cartItems.map(i => i.productId))]}
+                    />
                   </div>
                 )}
             </>

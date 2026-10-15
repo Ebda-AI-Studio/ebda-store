@@ -4,6 +4,7 @@ import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';
 import { readInStoreContext } from '../lib/store-scoped-read';
 import { LISTING_SWATCH_OPTIONS_SELECT } from '../lib/listing-swatch-select';
+import { enrichStockFlags } from '../lib/effective-inventory';
 
 // ==========================================
 // Recommendation Service
@@ -24,6 +25,22 @@ const productSelect = {
   slug: true,
   price: true,
   compareAtPrice: true,
+  // The web mapper already forwards these to the discount badge; without them
+  // a fixed-amount sale read as a percentage on the recommendation cards only.
+  discountType: true,
+  discountValue: true,
+  // Stock (C-01, 2026-10-15). The cards decide quick-add vs "choose options"
+  // vs sold-out from `inStock` / `acceptsBackorder` / `variants`, which
+  // `enrichStockFlags` derives from these exactly as the listing does; the
+  // storefront used to hard-code `inStock: true` because nothing here said
+  // otherwise. `lowStockThreshold` is read and stripped by enrichStockFlags.
+  // CACHE CLASS: BOUNDED-stale (the 5-minute CACHE_TTL_SECONDS below). The
+  // card is a hint; the cart API re-reads stock uncached and refuses an
+  // oversell, so the residual is a sold-out card that still offers the add
+  // for at most 5 minutes and then gets a refusal toast.
+  inventory: true,
+  allowBackorder: true,
+  lowStockThreshold: true,
   // Merchant-authored card badge. The FBT grid and the "You might also like"
   // strip render through PecannbeeProductCard / ProductCarousel — the same
   // canonical card components as the PLP — so a badge omitted here shows up
@@ -42,7 +59,19 @@ const productSelect = {
   // without this, the FBT "Add all" button silently adds the parent SKU
   // (no variant chosen) which either errors out or creates ambiguous
   // cart lines. Same gap fixed earlier on listPublic in commit `8c55a73`.
-  variants: { select: { id: true, price: true } },
+  // `isActive` is read (a disabled variant is not stock) and stripped by
+  // enrichStockFlags. Every variant row comes back, disabled ones included: a
+  // product whose variants are all disabled is still a variant product.
+  variants: {
+    select: {
+      id: true,
+      price: true,
+      compareAtPrice: true,
+      inventory: true,
+      allowBackorder: true,
+      isActive: true,
+    },
+  },
   // Colour dots on the recommendation cards (same payload as the listing).
   // CACHE CLASS: BOUNDED-stale; these lists sit behind the 5-minute
   // CACHE_TTL_SECONDS cache, so a swatch edit shows within that window.
@@ -91,7 +120,7 @@ class RecommendationService {
       crossSell = manualCrossSell.map(r => ({
         relationId: r.id,
         position: r.position,
-        ...r.targetProduct,
+        ...enrichStockFlags(r.targetProduct),
       }));
     } else {
       // AI recommendations — second priority after manual cross-sells.
@@ -120,7 +149,7 @@ class RecommendationService {
         crossSell = aiRecRows.map(r => ({
           aiScore: r.score,
           aiReason: r.reason,
-          ...r.targetProduct,
+          ...enrichStockFlags(r.targetProduct),
         }));
       } else {
         // FBT fallback — used when no AI recs exist for this product yet.
@@ -144,7 +173,7 @@ class RecommendationService {
           const isSource = row.productId1 === productId;
           return {
             coOccurrenceCount: row.coOccurrenceCount,
-            ...(isSource ? row.product2 : row.product1),
+            ...enrichStockFlags(isSource ? row.product2 : row.product1),
           };
         });
       }
@@ -164,7 +193,7 @@ class RecommendationService {
     const upsell = upsellRows.map(r => ({
       relationId: r.id,
       position: r.position,
-      ...r.targetProduct,
+      ...enrichStockFlags(r.targetProduct),
     }));
 
     // 4. Also Like: products from same categories
@@ -195,7 +224,7 @@ class RecommendationService {
         take: 6,
         select: productSelect,
       });
-      alsoLike = alsoLikeRows;
+      alsoLike = alsoLikeRows.map(p => enrichStockFlags(p));
     }
 
     const result = { crossSell, upsell, alsoLike };
@@ -291,7 +320,10 @@ class RecommendationService {
     });
 
     // Preserve score order
-    return sortedIds.map(id => products.find((p: any) => p.id === id)).filter(Boolean);
+    return sortedIds
+      .map(id => products.find((p: any) => p.id === id))
+      .filter(Boolean)
+      .map(p => enrichStockFlags(p!));
   }
 
   // ----------------------------------------
