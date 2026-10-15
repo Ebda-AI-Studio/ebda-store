@@ -8,5 +8,8 @@ import { useStore } from '../../contexts/StoreContext';
 export default function QamarHeader(props: HeaderProps) {
   const { store } = useStore();
   const placement = getLook(store?.look)?.chrome?.header.logoPlacement ?? 'start';
-  return <MinimalHeader {...props} logoPlacement={placement} />;
+  // The composed theme's wordmark size: merchant > look > skin (W2a T-01).
+  return (
+    <MinimalHeader {...props} logoPlacement={placement} wordmarkSize={store?.theme?.wordmarkSize} />
+  );
 }

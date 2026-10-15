@@ -197,6 +197,12 @@ export interface HeaderProps {
    */
   logoPlacement?: 'start' | 'centre';
   /**
+   * Text wordmark size from the look (`wordmarkSize`, W2a T-01), passed only by the Qamar skin.
+   * With it the store name renders through `wordmarkClass` and the nav at 14px untracked;
+   * undefined = the theme's own wordmark and nav, unchanged.
+   */
+  wordmarkSize?: import('@ebda/shared').WordmarkSize;
+  /**
    * Resolved pre-header utility bar config. Only consumed by packs that
    * render a utility bar (Elegant + Classic). When undefined, the pack
    * falls back to its built-in defaults so legacy stores don't lose

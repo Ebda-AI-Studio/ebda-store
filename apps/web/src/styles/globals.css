@@ -1332,6 +1332,34 @@ html[dir='rtl'] [data-pack='qamar'] .font-display {
   line-height: 1.4;
   letter-spacing: 0;
 }
+/* Decision (a), quality bar T-01/T-05 (W2a): a Qamar store never letter-spaces or uppercases its
+   chrome (nav, footer headings, labels, the announcement, SHARE, eyebrows): the tracked-caps
+   label is the "editorial lane" fingerprint. Shared components keep their classes; this resets
+   them under the qamar skin only. A merchant who turned on "Uppercase headings" keeps uppercase
+   (without the tracking). */
+[data-pack='qamar']
+  :is(
+    .ui-caps-toggle,
+    .uppercase,
+    .tracking-wide,
+    .tracking-wider,
+    .tracking-widest,
+    [class*='tracking-[0.'],
+    [class*='tracking-[.']
+  ) {
+  letter-spacing: normal;
+  text-transform: none;
+}
+[data-pack='qamar'] [data-ui-uppercase='true'] .ui-caps-toggle {
+  text-transform: uppercase;
+}
+/* Decision (a) / quality bar T-02: a display face is never set inside filter UI. The filter
+   panel's group headings take the body face on a Qamar store in both languages (Cormorant and
+   Playfair were painting 16-18px labels; Ruqaa the Arabic ones). Out-specifies the look's
+   `html[lang] [data-look] h3` display rule. */
+html[lang] [data-pack='qamar'] [data-zone='filters'] :is(h2, h3, h4, legend) {
+  font-family: var(--font-body, inherit);
+}
 /* Every heading a look paints in its display face ([data-look] h1-h3) is reset too, not only
    `.font-display`: a tall display face (Lookbook's Lalezar) under the Arabic 0.5 adjust rendered
    the PDP title and the look names at ~2.5x their size (Task 7 shots). */

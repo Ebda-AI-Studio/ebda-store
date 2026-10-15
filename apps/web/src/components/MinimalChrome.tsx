@@ -6,6 +6,7 @@ import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { StoreLogo } from '../templates/shared/StoreLogo';
 import { pickLocalizedName } from '../templates/shared/display-helpers';
+import { wordmarkClass } from '../templates/shared/wordmark';
 
 interface MinimalChromeProps {
   children: ReactNode;
@@ -54,7 +55,18 @@ export function MinimalChrome({
                 // separate hardcoded bounding box.
                 <StoreLogo src={store.logo} alt={storeName} priority />
               ) : (
-                <span className="text-2xl font-bold text-primary sm:text-3xl">{storeName}</span>
+                // A look that sizes its wordmark (W2a T-01) shows the SAME wordmark here as in the
+                // storefront header; every other store keeps this bold primary name.
+                <span
+                  className={
+                    store.theme?.wordmarkSize
+                      ? wordmarkClass(store.theme.wordmarkSize)
+                      : 'text-2xl font-bold text-primary sm:text-3xl'
+                  }
+                  data-zone={store.theme?.wordmarkSize ? 'storeName' : undefined}
+                >
+                  {storeName}
+                </span>
               )}
             </Link>
             {displayLabel && (

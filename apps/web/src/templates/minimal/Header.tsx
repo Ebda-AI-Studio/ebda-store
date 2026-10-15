@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { CartIcon } from '@ebda/ui';
 import { StoreLogo } from '../shared/StoreLogo';
+import { WORDMARK_NAV_LINK_CLASS, wordmarkClass } from '../shared/wordmark';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
@@ -20,6 +21,7 @@ export default function MinimalHeader({
   urlPrefix = '',
   headerBgColor,
   logoPlacement,
+  wordmarkSize,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -57,6 +59,10 @@ export default function MinimalHeader({
 
   // Only the qamar skin passes logoPlacement; undefined keeps the markup byte-identical.
   const isCentre = logoPlacement === 'centre';
+  // Only the qamar skin passes wordmarkSize (W2a T-01); undefined keeps the markup byte-identical.
+  const navLinkClass = wordmarkSize
+    ? WORDMARK_NAV_LINK_CLASS
+    : 'text-xs tracking-[0.18em] ui-caps-toggle font-normal text-muted-foreground hover:text-foreground transition-colors duration-200';
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
 
@@ -94,12 +100,14 @@ export default function MinimalHeader({
             ) : (
               <span
                 className={
-                  isCentre
-                    ? 'block max-w-full truncate text-2xl sm:text-3xl font-display text-foreground'
-                    : 'text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground'
+                  wordmarkSize
+                    ? wordmarkClass(wordmarkSize)
+                    : isCentre
+                      ? 'block max-w-full truncate text-2xl sm:text-3xl font-display text-foreground'
+                      : 'text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground'
                 }
                 data-zone="storeName"
-                title={isCentre ? displayName : undefined}
+                title={isCentre || wordmarkSize ? displayName : undefined}
               >
                 {displayName}
               </span>
@@ -115,11 +123,7 @@ export default function MinimalHeader({
             }
           >
             {navigation.map(item => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-xs tracking-[0.18em] ui-caps-toggle font-normal text-muted-foreground hover:text-foreground transition-colors duration-200"
-              >
+              <Link key={item.href} href={item.href} className={navLinkClass}>
                 {isRtl && item.labelAr ? item.labelAr : item.label}
               </Link>
             ))}
@@ -319,7 +323,7 @@ export default function MinimalHeader({
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="text-xs tracking-[0.18em] ui-caps-toggle font-normal text-muted-foreground hover:text-foreground transition-colors duration-200"
+                    className={navLinkClass}
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {isRtl && item.labelAr ? item.labelAr : item.label}

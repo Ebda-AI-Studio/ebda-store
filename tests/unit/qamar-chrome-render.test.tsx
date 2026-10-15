@@ -129,3 +129,91 @@ describe('minimal header is unchanged for every non-Qamar caller (C16)', () => {
     });
   }
 });
+
+// W2a T-01 + decision (a): the look sizes the wordmark (composed theme `wordmarkSize`), the nav is
+// 14px untracked, and the checkout/success chrome shows the SAME wordmark.
+const { composeStoreTheme } = await import('@ebda/shared');
+const { WORDMARK_NAV_LINK_CLASS, wordmarkClass } =
+  await import('../../apps/web/src/templates/shared/wordmark');
+const { MinimalChrome } = await import('../../apps/web/src/components/MinimalChrome');
+const globalsCss = (await import('node:fs')).readFileSync(
+  path.resolve(__dirname, '../../apps/web/src/styles/globals.css'),
+  'utf8'
+);
+
+describe('look-sized wordmark (W2a T-01)', () => {
+  const withTheme = (look: string, theme: Record<string, unknown> = {}) => {
+    ctx.store = {
+      ...ctx.store,
+      template: 'qamar',
+      look,
+      theme: composeStoreTheme({ template: 'qamar', look, theme }),
+    };
+    ctx.language = 'en';
+  };
+
+  it('Atelier: 24px display wordmark, never tracked or uppercased; nav 14px untracked', () => {
+    withTheme('qamar.atelier');
+    const html = renderToStaticMarkup(<QamarHeader branding={branding} navigation={nav} />);
+    const mark = html.match(/<span[^>]*data-zone="storeName"[^>]*>/)![0];
+    expect(mark).toContain(wordmarkClass('lg'));
+    expect(mark).toContain('text-2xl');
+    expect(mark).not.toMatch(/tracking-\[|ui-caps-toggle|uppercase/);
+    const link = html.match(/<a[^>]*href="\/shop"[^>]*>/)![0];
+    expect(link).toContain(WORDMARK_NAV_LINK_CLASS);
+    expect(link).toContain('text-sm');
+    expect(link).not.toMatch(/text-\[11px\]|tracking-\[/);
+  });
+  it('the wordmark is >= 1.25x the largest other header text (24px vs nav 14px)', () => {
+    // text-2xl = 1.5rem = 24px, text-sm = 0.875rem = 14px
+    expect(24 / 14).toBeGreaterThanOrEqual(1.25);
+    expect(wordmarkClass('lg')).toMatch(/(^| )text-2xl( |$)/);
+    expect(WORDMARK_NAV_LINK_CLASS).toMatch(/(^| )text-sm( |$)/);
+  });
+  it('Vitrine keeps its centred 24/30px wordmark through the token', () => {
+    withTheme('qamar.vitrine');
+    const html = renderToStaticMarkup(<QamarHeader branding={branding} />);
+    expect(html).toContain(wordmarkClass('xl'));
+    expect(html).toContain('text-2xl sm:text-3xl');
+  });
+  it('a merchant value beats the look (merchant > look)', () => {
+    withTheme('qamar.atelier', { wordmarkSize: 'xl' });
+    expect(renderToStaticMarkup(<QamarHeader branding={branding} />)).toContain(
+      wordmarkClass('xl')
+    );
+  });
+  it('the plain minimal header (no prop) keeps its tracked wordmark and nav', () => {
+    ctx.store = { ...ctx.store, template: 'minimal', look: null, theme: {} };
+    const html = renderToStaticMarkup(<MinimalHeader branding={branding} navigation={nav} />);
+    expect(html).toContain('text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground');
+    expect(html).toContain('text-[11px] tracking-[0.18em] ui-caps-toggle');
+  });
+  it('checkout/success chrome renders the same wordmark on a look store, the old one otherwise', () => {
+    withTheme('qamar.atelier');
+    ctx.store = { ...ctx.store, name: 'Qamar Demo', logo: null };
+    const look = renderToStaticMarkup(<MinimalChrome>x</MinimalChrome>);
+    expect(look).toContain(wordmarkClass('lg'));
+    ctx.store = { ...ctx.store, template: 'minimal', look: null, theme: {} };
+    const legacy = renderToStaticMarkup(<MinimalChrome>x</MinimalChrome>);
+    expect(legacy).toContain('text-2xl font-bold text-primary sm:text-3xl');
+    expect(legacy).not.toContain('data-zone="storeName"');
+  });
+});
+
+describe('qamar type rules in globals.css (decision (a), T-02)', () => {
+  const css = globalsCss;
+  it('no letter-spaced or uppercased chrome under the qamar skin', () => {
+    const at = css.indexOf("[data-pack='qamar']\n  :is(\n    .ui-caps-toggle,");
+    expect(at).toBeGreaterThan(-1);
+    const block = css.slice(at, css.indexOf('}', at));
+    for (const sel of ['.uppercase', '.tracking-widest', "[class*='tracking-[0.']"])
+      expect(block).toContain(sel);
+    expect(block).toContain('letter-spacing: normal;');
+    expect(block).toContain('text-transform: none;');
+  });
+  it('filter group headings take the body face on qamar stores', () => {
+    expect(css).toMatch(
+      /html\[lang\] \[data-pack='qamar'\] \[data-zone='filters'\] :is\(h2, h3, h4, legend\) \{\s*font-family: var\(--font-body, inherit\);/
+    );
+  });
+});
