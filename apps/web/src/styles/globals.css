@@ -1272,6 +1272,20 @@ html[dir='rtl'] [data-pack='dahab'] [data-section='newsletter'] h2 {
   color: var(--footer-ink);
 }
 
+/* Qamar (Phase B1): the look's faces (loaded by the looks system, never a new host) carry the
+   voice. Arabic display faces are never letter-spaced and need open leading for tashkeel and
+   tall ascenders; weight is left to the face (several look faces ship one weight, so forcing
+   700 would fake-bold them). */
+html[dir='rtl'] [data-pack='qamar'] h1,
+html[dir='rtl'] [data-pack='qamar'] h2,
+html[dir='rtl'] [data-pack='qamar'] h3,
+html[dir='rtl'] [data-pack='qamar'] .font-display {
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+[data-pack='qamar'] .font-display {
+  font-size-adjust: none;
+}
 /* ==========================================================================
    Looks (Phase S). EVERY rule here is scoped under [data-look], which the
    root layout sets on <body> only for stores with a valid look. Legacy

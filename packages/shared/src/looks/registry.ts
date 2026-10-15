@@ -91,6 +91,7 @@ export const LOOKS: readonly LookDefinition[] = [
     letter: 'C',
     skin: 'qamar',
     status: 'designed',
+    chrome: { header: { logoPlacement: 'centre' } },
     name: { ar: 'فاترينة', en: 'Vitrine' },
     forWhom: { ar: 'لهدوم المناسبات: فرح وخطوبة وسهرة.', en: 'For occasion wear.' },
     idea: { ar: 'تسوّق حسب المناسبة.', en: 'Occasion-first navigation.' },

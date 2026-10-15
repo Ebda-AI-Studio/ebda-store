@@ -1,7 +1,7 @@
 // Qamar template (قمر) - fashion & boutiques, Phase B1 (Ruling B1-1).
-// Owns chrome only (Header lands in Task 5); every commerce surface is the
+// Owns chrome only (the Header wrapper); every commerce surface is the
 // shared/minimal component, styled by the look's tokens and PACK_STYLES.qamar.
-export { default as Header } from '../minimal/Header';
+export { default as Header } from './Header';
 export { default as Footer } from '../minimal/Footer';
 export { default as Hero } from '../minimal/Hero';
 export { default as ProductCard } from '../minimal/ProductCard';

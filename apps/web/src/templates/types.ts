@@ -192,6 +192,11 @@ export interface HeaderProps {
    */
   headerBgColor?: string;
   /**
+   * Wordmark placement, set only by the Qamar skin from the look's chrome data
+   * (Ruling B1-4). Undefined = the theme's own layout, unchanged.
+   */
+  logoPlacement?: 'start' | 'centre';
+  /**
    * Resolved pre-header utility bar config. Only consumed by packs that
    * render a utility bar (Elegant + Classic). When undefined, the pack
    * falls back to its built-in defaults so legacy stores don't lose

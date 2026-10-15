@@ -19,6 +19,7 @@ export default function MinimalHeader({
   onSearch,
   urlPrefix = '',
   headerBgColor,
+  logoPlacement,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -54,6 +55,8 @@ export default function MinimalHeader({
     }
   };
 
+  // Only the qamar skin passes logoPlacement; undefined keeps the markup byte-identical.
+  const isCentre = logoPlacement === 'centre';
   const displayName = isRtl && branding.nameAr ? branding.nameAr : branding.name;
   const displayLogo = isRtl && branding.logoAr ? branding.logoAr : branding.logo;
 
@@ -64,22 +67,33 @@ export default function MinimalHeader({
       }`}
       style={headerBgColor ? { backgroundColor: headerBgColor } : undefined}
       dir={isRtl ? 'rtl' : 'ltr'}
+      data-logo-placement={logoPlacement}
     >
       <div className="container mx-auto px-6">
-        <div className="relative flex items-center justify-between py-3">
+        <div
+          className={
+            isCentre
+              ? 'relative grid grid-cols-[1fr_auto_1fr] items-center py-3'
+              : 'relative flex items-center justify-between py-3'
+          }
+        >
           {/* Logo — absolute-centered on mobile (visual middle of the
               row regardless of asymmetric hamburger/actions widths),
               normal flex item on lg+. Ahmad 2026-05-16 platform rule:
               every theme's logo MUST center on mobile. */}
           <Link
             href={urlPrefix || '/'}
-            className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center flex-shrink-0 max-w-[65%] md:max-w-none"
+            className={`absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center flex-shrink-0 max-w-[65%] md:max-w-none${isCentre ? ' md:col-start-2' : ''}`}
           >
             {displayLogo ? (
               <StoreLogo src={displayLogo} alt={displayName} priority />
             ) : (
               <span
-                className="text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground"
+                className={
+                  isCentre
+                    ? 'text-2xl sm:text-3xl font-display text-foreground'
+                    : 'text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground'
+                }
                 data-zone="storeName"
               >
                 {displayName}
@@ -88,7 +102,13 @@ export default function MinimalHeader({
           </Link>
 
           {/* Desktop nav — centered absolutely */}
-          <nav className="hidden lg:flex items-center gap-10 absolute left-1/2 -translate-x-1/2">
+          <nav
+            className={
+              isCentre
+                ? 'hidden lg:flex items-center gap-8 col-start-1 justify-self-start'
+                : 'hidden lg:flex items-center gap-10 absolute left-1/2 -translate-x-1/2'
+            }
+          >
             {navigation.map(item => (
               <Link
                 key={item.href}
@@ -101,7 +121,13 @@ export default function MinimalHeader({
           </nav>
 
           {/* Actions */}
-          <div className="flex items-center gap-2">
+          <div
+            className={
+              isCentre
+                ? 'flex items-center gap-2 col-start-3 justify-self-end'
+                : 'flex items-center gap-2'
+            }
+          >
             {/* Desktop-only search toggle — mobile has a persistent search
                 bar below the logo row so a toggle here would be redundant. */}
             <button
