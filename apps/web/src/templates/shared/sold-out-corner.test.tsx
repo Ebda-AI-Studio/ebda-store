@@ -13,10 +13,11 @@ import { soldOutCorner } from './badge-collision';
 import { pinDefaultDiscountBadge } from './custom-badge';
 
 const languageState = { language: 'en' as 'en' | 'ar' };
+const layoutState = { layout: undefined as unknown };
 vi.mock('../../contexts/StoreContext', () => ({
   useStore: () => ({
     store: { id: 's', name: 'S', slug: 's', currency: 'EGP', theme: {} },
-    layout: undefined,
+    layout: layoutState.layout,
   }),
   useStoreUrl: () => (p: string) => p,
   useStoreTemplate: () => 'modern',
@@ -133,5 +134,57 @@ describe('X-01 on the cards', () => {
     const el = container.querySelector('[data-oos-corner]')!;
     expect(el.getAttribute('data-oos-corner')).toBe('top-start');
     expect(el.className).toContain('start-0');
+  });
+});
+
+describe('X-01 (fix round): a MERCHANT-placed sale chip and the sold-out marker never stack', () => {
+  const OOS_ON_SALE = {
+    id: 'p2',
+    name: 'Linen',
+    nameAr: 'كتان',
+    slug: 'linen',
+    price: 5000,
+    compareAtPrice: 8000,
+    images: [{ id: 'i', url: 'https://example.test/a.jpg', alt: 'a' }],
+    inStock: false,
+  };
+  afterEach(() => {
+    layoutState.layout = undefined;
+  });
+
+  it.each(['en', 'ar'] as const)(
+    'shared card (%s): heart at start + merchant chip at the end corner → the marker drops to the bottom',
+    async lang => {
+      languageState.language = lang;
+      // The END corner physically: right in English, left in Arabic.
+      layoutState.layout = {
+        productCardDefaults: {
+          discountBadge: { position: lang === 'en' ? 'top-right' : 'top-left' },
+        },
+      };
+      const { PecannbeeProductCard } = await import('./PecannbeeProductCard');
+      const { container } = render(
+        <PecannbeeProductCard
+          product={OOS_ON_SALE as never}
+          isRtl={lang === 'ar'}
+          onAddToWishlist={() => {}}
+        />
+      );
+      expect(container.querySelector('[data-oos-corner]')?.getAttribute('data-oos-corner')).toBe(
+        'bottom-start'
+      );
+    }
+  );
+
+  it('classic card: merchant chip at the START corner → the ribbon takes the end corner', async () => {
+    languageState.language = 'en';
+    layoutState.layout = { productCardDefaults: { discountBadge: { position: 'top-left' } } };
+    const { default: ClassicProductCard } = await import('../classic/ProductCard');
+    const { container } = render(
+      <ClassicProductCard product={OOS_ON_SALE as never} isRtl={false} />
+    );
+    expect(container.querySelector('[data-oos-corner]')?.getAttribute('data-oos-corner')).toBe(
+      'top-end'
+    );
   });
 });

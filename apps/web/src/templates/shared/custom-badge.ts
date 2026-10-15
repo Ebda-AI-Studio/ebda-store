@@ -481,6 +481,13 @@ export interface ResolvedCardBadges {
    * the same single-owner reason.
    */
   discountBadgePositionCls: string;
+  /**
+   * X-01 (fix round): the LOGICAL top corner the rendered discount chip
+   * occupies, or null (no chip / bottom edge). The sold-out marker reserves it,
+   * so a MERCHANT-placed sale chip and the ribbon never stack either (the
+   * pinned default chip already plans around the ribbon).
+   */
+  discountTopCorner: 'start' | 'end' | null;
 }
 
 /**
@@ -666,9 +673,25 @@ export function resolveCardBadges({
     return bottomCornerClass(avoided.h, stack, lifted, belowStackedChip);
   }
 
+  const discountRenders = discountVisible && discountBadgeAllowed && discountOccupiesCorner;
+  const discountPhysicalTop: PhysicalH | null = !discountRenders
+    ? null
+    : pinnedDiscount
+      ? (pinnedDiscount.corner.split('-')[1] as PhysicalH)
+      : avoidedDiscount.v === 'top'
+        ? avoidedDiscount.h
+        : null;
+  const discountTopCorner =
+    discountPhysicalTop === null
+      ? null
+      : (discountPhysicalTop === 'left') !== isRtl
+        ? ('start' as const)
+        : ('end' as const);
+
   return {
     customBadgeText,
     discountBadgeAllowed,
+    discountTopCorner,
     customBadgePositionCls: classFor(avoidedCustom, stacked),
     // Rule 4 only ever lifts the CUSTOM chip (stack=false here) — the
     // discount chip stays at its base row so the two never both move.

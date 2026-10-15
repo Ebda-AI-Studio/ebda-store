@@ -168,6 +168,7 @@ function ElegantProductCard({
     discountBadgeAllowed,
     customBadgePositionCls,
     discountBadgePositionCls,
+    discountTopCorner,
   } = resolveCardBadges({
     discountVisible: Boolean(hasSale && discountBadgeText),
     product,
@@ -274,7 +275,7 @@ function ElegantProductCard({
             oosLabelColor={resolvedOosLabelColor}
             oosLabelTextColor={resolvedOosLabelTextColor}
             theme={store.theme}
-            topStartReserved={Boolean(onToggleCompare)}
+            topStartReserved={Boolean(onToggleCompare) || discountTopCorner === 'start'}
             topEndReserved
           />
           {onToggleCompare && (

@@ -171,6 +171,7 @@ function ModernProductCard({
     discountBadgeAllowed,
     customBadgePositionCls,
     discountBadgePositionCls,
+    discountTopCorner,
   } = resolveCardBadges({
     discountVisible: Boolean(discountBadgeText),
     product,
@@ -353,8 +354,11 @@ function ModernProductCard({
             oosLabelColor={resolvedOosLabelColor}
             oosLabelTextColor={resolvedOosLabelTextColor}
             theme={store.theme}
-            topStartReserved={Boolean(onToggleCompare)}
-            topEndReserved={Boolean(onRemoveFromWishlist || onAddToWishlist !== undefined)}
+            topStartReserved={Boolean(onToggleCompare) || discountTopCorner === 'start'}
+            topEndReserved={
+              Boolean(onRemoveFromWishlist || onAddToWishlist !== undefined) ||
+              discountTopCorner === 'end'
+            }
           />
 
           {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS

@@ -155,6 +155,7 @@ function BoldProductCard({
     discountBadgeAllowed,
     customBadgePositionCls,
     discountBadgePositionCls,
+    discountTopCorner,
   } = resolveCardBadges({
     discountVisible: Boolean(discountBadgeText),
     product,
@@ -215,8 +216,8 @@ function BoldProductCard({
             oosLabelColor={resolvedOosLabelColor}
             oosLabelTextColor={resolvedOosLabelTextColor}
             theme={store.theme}
-            topStartReserved={Boolean(onToggleCompare)}
-            topEndReserved={Boolean(onRemoveFromWishlist)}
+            topStartReserved={Boolean(onToggleCompare) || discountTopCorner === 'start'}
+            topEndReserved={Boolean(onRemoveFromWishlist) || discountTopCorner === 'end'}
           />
           {onToggleCompare && (
             <CompareButton

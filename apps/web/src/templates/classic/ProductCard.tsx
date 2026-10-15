@@ -157,6 +157,7 @@ function ClassicProductCard({
     discountBadgeAllowed,
     customBadgePositionCls,
     discountBadgePositionCls,
+    discountTopCorner,
   } = resolveCardBadges({
     discountVisible: Boolean(hasSale && discountBadgeText),
     product,
@@ -354,8 +355,8 @@ function ClassicProductCard({
             oosLabelColor={resolvedOosLabelColor}
             oosLabelTextColor={resolvedOosLabelTextColor}
             theme={store.theme}
-            topStartReserved={Boolean(onToggleCompare)}
-            topEndReserved={Boolean(onRemoveFromWishlist)}
+            topStartReserved={Boolean(onToggleCompare) || discountTopCorner === 'start'}
+            topEndReserved={Boolean(onRemoveFromWishlist) || discountTopCorner === 'end'}
           />
           {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS
               badge (z-10) and above the product image. */}

@@ -372,6 +372,7 @@ function SharedProductCarousel({
                 discountBadgeAllowed,
                 customBadgePositionCls,
                 discountBadgePositionCls,
+                discountTopCorner,
               } = resolveCardBadges({
                 discountVisible: Boolean(onSale && discountBadgeText),
                 product,
@@ -454,6 +455,8 @@ function SharedProductCarousel({
                           oosLabelColor={resolvedOosLabelColor}
                           oosLabelTextColor={resolvedOosLabelTextColor}
                           theme={store.theme}
+                          topStartReserved={discountTopCorner === 'start'}
+                          topEndReserved={discountTopCorner === 'end'}
                         />
                         {/* Image overlay tint when out-of-stock. z-[5] sits under
                             the OOS badge (z-10) and above the product image. */}
