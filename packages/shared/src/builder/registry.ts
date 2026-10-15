@@ -789,7 +789,10 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         maxCount: 6,
         propsSchema: shopTheLookBlockSchema,
         settings: [
-          s.image('image', 'Photo', 'الصورة', { localized: true }),
+          // LB-04: the photo is the promise; it shows every piece listed below.
+          s.image('image', 'Photo (shows every piece)', 'الصورة (تظهر فيها كل القطع)', {
+            localized: true,
+          }),
           s.text('alt', 'Photo description', 'وصف الصورة', { localized: true }),
           s.text('title', 'Look name', 'اسم اللوك', { localized: true }),
           {

@@ -91,12 +91,21 @@ export const LOOKS: readonly LookDefinition[] = [
         type: 'category-grid',
         // A scrolling photo row at every width; when the catalogue is short the platform strip
         // centres itself instead of leaving an empty tail (CategoryStrip, quality bar L-05).
-        design: { layout: 'horizontal', layoutMobile: 'horizontal', captionPosition: 'below' },
+        // LB-01 (W2a): merchant photos are shot on white, so the categories and the new-in grid
+        // sit on ONE light band (the inverse surface: the page ink as ground, indigo text);
+        // indigo keeps the header, hero, looks, reviews and footer.
+        design: {
+          layout: 'horizontal',
+          layoutMobile: 'horizontal',
+          captionPosition: 'below',
+          bgColor: 'token:inverse',
+          // LB-06: the row and the new-in grid share one band; no dead band under the captions.
+          paddingBottom: 'tight',
+        },
       },
       {
         type: 'featured-collection',
-        // Surface bands alternate: page (hero), card (looks), page (categories), card (new in).
-        design: { columns: 4, mobileColumns: 2, bgColor: 'token:card' },
+        design: { columns: 4, mobileColumns: 2, bgColor: 'token:inverse' },
         preset: { productSource: 'newest', limit: 8, heading: 'New in', headingAr: 'وصل حديثًا' },
       },
       { type: 'testimonials' },

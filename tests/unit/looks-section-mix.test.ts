@@ -157,7 +157,8 @@ describe('look section mix', () => {
     it('Lookbook → Atelier drops Lookbook-only design keys back to the section default', () => {
       for (const design of ['keep', 'reset'] as const) {
         const onLookbook = applyTemplateFamily(base(), 'qamar', lookbook);
-        expect(byType(onLookbook, 'featured-collection').settings.bgColor).toBe('token:card');
+        // LB-01 (W2a): Lookbook's new-in sits on the inverse band
+        expect(byType(onLookbook, 'featured-collection').settings.bgColor).toBe('token:inverse');
         expect(byType(onLookbook, 'hero').settings.presentation).toBe('collage');
         expect(byType(onLookbook, 'category-grid').settings.layout).toBe('horizontal');
         expect(byType(onLookbook, 'category-grid').settings.layoutMobile).toBe('horizontal');

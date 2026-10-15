@@ -93,9 +93,20 @@ add('lookbook-2', worn("a saffron yellow modest long dress", LOOKBOOK, "rooftop 
 add('lookbook-3', worn("a black abaya open over an indigo dress", LOOKBOOK, "empty rooftop at golden hour, clean sky"))
 
 # ---- shop-the-look (Task 7)
-add('look-1', worn("a dusty rose linen abaya and a chiffon headscarf draped on the shoulders", LOOKBOOK, "rooftop golden hour"))
-add('look-2', worn("a deep teal satin midi dress with a champagne silk shawl", LOOKBOOK, "rooftop terrace at dusk"))
-add('look-3', worn("an ivory kaftan with oxblood embroidery and a tobacco brown cotton scarf", LOOKBOOK, "warm rooftop light"))
+# LB-04 (W2a): every look photo shows EVERY piece its shop-the-look panel lists, from the front
+# (round 1 had two back views and a piece missing). The panel's pieces are named in the prompt.
+def look(pieces, bg):
+    return pp("front view facing the camera, face visible, of an adult Egyptian woman, full-length, "
+              f"wearing {pieces}, calm natural pose, arms relaxed", LOOKBOOK, bg)
+
+
+add('look-1', look("a dusty rose linen abaya, a burgundy chiffon headscarf, and a pale gold silk shawl draped "
+                   "over one shoulder", "rooftop golden hour"))
+add('look-2', look("a deep teal satin long-sleeved midi dress, a long open-front black abaya worn open over it, "
+                   "and a pale gold silk shawl as her headscarf", "rooftop terrace at dusk"))
+add('look-3', look("a chocolate brown headscarf, a long black abaya worn wide open like a coat, and under it a "
+                   "white kaftan with dark red embroidery at the neckline visible down the front",
+                   "warm rooftop light"))
 
 # ---- occasions (Vitrine bands, Task 8)
 add('occasion-wedding', pp("a champagne beaded gown on a mannequin beside a vase of white roses", VITRINE, "boutique interior"), 'wide')

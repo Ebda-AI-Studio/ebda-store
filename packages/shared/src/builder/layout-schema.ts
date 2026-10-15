@@ -91,7 +91,9 @@ export const heroSlideSchema = z.object({
 export const colorValue = z
   .string()
   .regex(
-    /^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|token:(primary|secondary|accent|card|muted|foreground|border)|)$/,
+    // `token:inverse` (W2a, LB-01): a section band in the page ink with the page colour as its
+    // text; set by a look's mix, never offered in a colour picker (sectionBgStyle re-scopes ink).
+    /^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|token:(primary|secondary|accent|card|muted|foreground|border|inverse)|)$/,
     'Must be a hex color or token:<brand-color>'
   )
   .optional();

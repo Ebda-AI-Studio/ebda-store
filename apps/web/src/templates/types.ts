@@ -662,6 +662,11 @@ export interface CategoryStripProps {
    *  'overlay' (label over the image bottom with a gradient scrim). Resolved
    *  per breakpoint by HomePageContent. Default 'below'. */
   captionPosition?: import('@ebda/shared').CategoriesCaption;
+  /**
+   * The section wrapper's background (`layout.categories.bgColor`), forwarded to SectionHeading so
+   * the heading contrasts with the band it sits on (W2a, LB-01), as CategoryGrid already does.
+   */
+  sectionBgColor?: string;
 }
 
 /**

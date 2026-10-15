@@ -125,6 +125,14 @@ export type ColorToken = (typeof COLOR_TOKENS)[number];
 const TOKEN_PREFIX = 'token:';
 
 /**
+ * A section background a look's mix may set (W2a, LB-01): the band takes the page INK as its
+ * colour and the page colour as its text (`sectionBgStyle` re-scopes the ink variables inside
+ * it), so a dark look can put white-ground merchant photos on a light band. Not a COLOR_TOKENS
+ * entry: no colour picker offers it; resolveColor paints it as `token:foreground`.
+ */
+export const INVERSE_SURFACE = 'token:inverse';
+
+/**
  * Maps the short token name (used in colorValue strings and COLOR_TOKENS)
  * to the corresponding StoreTheme field name. StoreTheme uses the `*Color`
  * suffix convention while CSS variables use the bare token name.
@@ -148,6 +156,8 @@ const TOKEN_TO_THEME_KEY: Record<ColorToken, keyof StoreTheme> = {
 export function resolveColor(value: ColorValue | undefined, theme: StoreTheme): string | undefined {
   if (!value) return undefined;
 
+  // The inverse section band (W2a, LB-01) is painted in the page ink.
+  if (value === INVERSE_SURFACE) return resolveColor('token:foreground', theme);
   if (value.startsWith(TOKEN_PREFIX)) {
     const key = value.slice(TOKEN_PREFIX.length) as ColorToken;
     if (!(COLOR_TOKENS as readonly string[]).includes(key)) return undefined;

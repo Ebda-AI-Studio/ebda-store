@@ -23,6 +23,7 @@ export {
   parseColorToRgb,
   relativeLuminance,
   COLOR_TOKENS,
+  INVERSE_SURFACE,
   footerLogoContrastFilter,
   colorToHslTriplet,
   rgbToHslTriplet,

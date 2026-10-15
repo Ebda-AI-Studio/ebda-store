@@ -12,17 +12,18 @@ import { QAMAR_LOOKS_STORY, QAMAR_OCCASIONS, QAMAR_PAGE_IMAGES } from '../qamar-
 
 /** Alt text for the three look photos (read back from the assets), by look id. */
 const LOOK_ALT = {
+  // LB-04 (W2a): front views that show every piece the panel lists.
   'look-1': {
-    alt: 'A woman seen from behind on a Cairo rooftop in a rose linen abaya and a draped chiffon scarf',
-    altAr: 'ست من ضهرها على سطح في القاهرة لابسة عباية كتان وردي وطرحة شيفون',
+    alt: 'A woman on a Cairo rooftop in a rose linen abaya, a burgundy chiffon headscarf and a gold silk shawl',
+    altAr: 'ست على سطح في القاهرة لابسة عباية كتان وردي وطرحة شيفون نبيتي وشال حرير دهبي',
   },
   'look-2': {
-    alt: 'A woman seen from behind at dusk in a teal satin dress with a silk shawl over her shoulders',
-    altAr: 'ست من ضهرها وقت المغرب لابسة فستان ساتان تركواز وشال حرير على كتافها',
+    alt: 'A woman at dusk in a teal satin dress under an open black abaya, a gold silk shawl as her headscarf',
+    altAr: 'ست وقت المغرب لابسة فستان ساتان تركواز وعباية سودا مفتوحة وشال حرير دهبي على راسها',
   },
   'look-3': {
-    alt: 'A woman at sunset in an ivory kaftan with burgundy embroidery and a layered scarf',
-    altAr: 'ست وقت الغروب لابسة قفطان أوف وايت بتطريز نبيتي وطرحة طبقات',
+    alt: 'A woman at sunset in an embroidered ivory kaftan under an open black abaya, with a brown cotton headscarf',
+    altAr: 'ست وقت الغروب لابسة قفطان أوف وايت مطرز تحت عباية سودا مفتوحة وطرحة قطن بني',
   },
 };
 
@@ -146,7 +147,7 @@ export function buildQamarHome(base, ctx) {
     headingAr: 'وصل حديثًا',
     productSource: 'newest',
     limit: 8,
-    buttonText: 'View all',
+    buttonText: 'See all',
     buttonTextAr: 'عرض الكل',
     buttonLink: '/products?sort=newest',
   });

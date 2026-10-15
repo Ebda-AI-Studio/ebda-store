@@ -17,7 +17,7 @@ import {
 } from './card-size';
 import type { CategoryStripProps } from '../types';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor } from '@ebda/shared';
+import { getLook, resolveColor } from '@ebda/shared';
 import { responsiveFontSize } from './section-typography';
 
 /**
@@ -61,9 +61,11 @@ export function CategoryStrip({
   categoryLabelZone,
   dividers,
   captionPosition,
+  sectionBgColor,
 }: CategoryStripProps) {
   // Hooks must be called unconditionally (before any early return).
   const { store } = useStore();
+  const onLook = !!getLook(store?.look);
   const styles = getPackStyles(pack);
   const isOverlay = captionPosition === 'overlay';
   // Item 4 (2026-07-12): see ProductCarousel.tsx — suppresses the inner
@@ -95,6 +97,10 @@ export function CategoryStrip({
           kickerZone={kickerZone}
           subtitleZone={subtitleZone}
           seeAllZone={seeAllZone}
+          // The strip's own band colour (W2a, LB-01): on a look store the heading contrasts with
+          // the section it sits on, as the grid's already does, not with the page behind it.
+          // Legacy stores keep their pinned markup (characterization); follow-up for them.
+          sectionBgColor={onLook ? sectionBgColor : undefined}
         />
         <ul
           // touch-pan-x + overscroll-x-contain: iOS-stuck-scroll fix
@@ -103,7 +109,9 @@ export function CategoryStrip({
           // `safe center` (quality bar L-05): a row that fits is centred instead of ending in an
           // empty tail; a row that overflows falls back to start, so scrolling is unchanged and a
           // row that already fills renders exactly as before.
-          className={`-mx-4 flex snap-x snap-mandatory ${gridGapClass(cardGap)} overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-6 [justify-content:safe_center]`}
+          // scroll-ps-4 (LB-06, W2a, look stores): snapping the first tile keeps the 16px
+          // inline-start gutter, so the row starts aligned with the heading and only the end peeks.
+          className={`-mx-4 flex snap-x snap-mandatory ${onLook ? 'scroll-ps-4 ' : ''}${gridGapClass(cardGap)} overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-6 [justify-content:safe_center]`}
           style={{ scrollbarWidth: 'thin' }}
         >
           {categories.map((cat, i) => {

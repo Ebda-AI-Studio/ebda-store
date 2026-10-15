@@ -7,6 +7,8 @@
  * where a pack defines one (Dahab) and the body face everywhere else.
  */
 import Link from 'next/link';
+import { useStore } from '../../contexts/StoreContext';
+import { getPackStyles } from '../../templates/shared/pack-styles';
 
 export function SectionHeader({
   title,
@@ -27,6 +29,11 @@ export function SectionHeader({
   editLink?: Record<string, string>;
   center?: boolean;
 }) {
+  // LB-05 (W2a): on the qamar skin this row speaks the skin's one "view all" voice (the same
+  // classes as SectionHeading's link, no chevron) over one hairline colour, so a Qamar page never
+  // shows two link styles or two rule colours. Every other skin is unchanged.
+  const { store } = useStore();
+  const qamar = store?.template === 'qamar';
   if (!title && !subtitle && !linkLabel) return null;
   return (
     <div className={center ? 'mb-8 text-center sm:mb-10' : 'mb-8 sm:mb-10'}>
@@ -54,29 +61,39 @@ export function SectionHeader({
         {linkLabel && linkHref && !center && (
           <Link
             href={linkHref}
-            className="inline-flex min-h-[44px] items-center gap-1 text-sm text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            className={
+              qamar
+                ? `inline-flex min-h-[44px] items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${getPackStyles('qamar').sectionSeeAll}`
+                : 'inline-flex min-h-[44px] items-center gap-1 text-sm text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm'
+            }
             {...editLink}
           >
             {linkLabel}
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              className="h-3.5 w-3.5 rtl:-scale-x-100"
-              aria-hidden="true"
-            >
-              <path d="m9 6 6 6-6 6" />
-            </svg>
+            {!qamar && (
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                className="h-3.5 w-3.5 rtl:-scale-x-100"
+                aria-hidden="true"
+              >
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            )}
           </Link>
         )}
       </div>
       <div
         aria-hidden="true"
         className={
-          center
-            ? 'mx-auto mt-5 h-px max-w-[180px] bg-gradient-to-r from-transparent via-primary/60 to-transparent'
-            : 'mt-5 h-px bg-gradient-to-r from-primary/50 via-border to-transparent rtl:bg-gradient-to-l'
+          qamar
+            ? center
+              ? 'mx-auto mt-5 h-px max-w-[180px] bg-border'
+              : 'mt-5 h-px bg-border'
+            : center
+              ? 'mx-auto mt-5 h-px max-w-[180px] bg-gradient-to-r from-transparent via-primary/60 to-transparent'
+              : 'mt-5 h-px bg-gradient-to-r from-primary/50 via-border to-transparent rtl:bg-gradient-to-l'
         }
       />
     </div>

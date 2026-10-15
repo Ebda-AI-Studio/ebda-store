@@ -214,7 +214,8 @@ describe('occasion bands', () => {
     setStore('qamar');
     const html = bands(blocks, { tileShape: 'arch' });
     expect(html).not.toContain('data-tile-shape');
-    expect(html).not.toContain('bg-border');
+    // no band tone fill (the qamar header's own hairline is `bg-border` since W2a LB-05)
+    expect(html).not.toMatch(/<a[^>]*class="[^"]*bg-border/);
   });
 });
 
