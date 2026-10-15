@@ -64,7 +64,11 @@ describe('LegalAcceptancesPanel', () => {
     expect(screen.getByText('سياسة الخصوصية')).toBeTruthy();
     expect(screen.getByText('source.notice_ack')).toBeTruthy();
     expect(screen.getByText('source.signup')).toBeTruthy();
-    expect(screen.getByText('at:{"time":"\u20662026-11-02 09:15\u2069"}')).toBeTruthy();
+    expect(
+      screen.getByText('at:{"time":"\u20662026\u2060-\u206011\u2060-\u206002\u00a009:15\u2069"}', {
+        normalizer: x => x,
+      })
+    ).toBeTruthy();
     expect(screen.getByText('ip:{"ip":"\u2066203.0.113.*\u2069"}')).toBeTruthy();
     expect(screen.getByText('deliveriesTitle')).toBeTruthy();
     expect(screen.getByText('status.sent')).toBeTruthy();

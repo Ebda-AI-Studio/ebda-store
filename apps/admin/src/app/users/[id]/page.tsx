@@ -438,8 +438,8 @@ export default function UserDetailPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between border-t border-border pt-6">
-                <p className="text-xs text-muted-foreground">
+              <div className="flex items-center justify-between gap-3 border-t border-border pt-6">
+                <p className="min-w-0 break-all text-xs text-muted-foreground">
                   {t('userIdLabel')} <span className="font-mono">{user.id}</span>
                 </p>
                 <button

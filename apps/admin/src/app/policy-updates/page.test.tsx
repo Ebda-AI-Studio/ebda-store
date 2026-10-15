@@ -128,7 +128,9 @@ describe('policy updates page', () => {
     render(<PolicyUpdatesPage />);
     expect(await screen.findByText('failedTitle')).toBeTruthy();
     expect(screen.getByText(/a\*\*\*@example\.com/).textContent).toContain('SEND_JOB_FAILED');
-    expect(screen.getByText(/a\*\*\*@example\.com/).textContent).toContain('2026-10-21 10:05');
+    expect(screen.getByText(/a\*\*\*@example\.com/).textContent).toContain(
+      '2026\u2060-\u206010\u2060-\u206021\u00a010:05'
+    );
     expect((await screen.findByText(/^stuck:/)).textContent).toContain('"n":"2"');
     expect(screen.getByText(/deliveries:/).textContent).not.toContain('sending');
   });

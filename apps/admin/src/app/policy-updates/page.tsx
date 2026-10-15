@@ -43,7 +43,9 @@ interface PolicyRow {
 type Action = 'send' | 'resume' | 'retry';
 
 /** "2026-10-21 10:05": Latin digits, UTC (the "UTC" label lives in the i18n message). */
-const utcStamp = (iso: string) => iso.slice(0, 16).replace('T', ' ');
+// No line break inside the stamp: non-breaking space, word joiners around the date hyphens.
+const utcStamp = (iso: string) =>
+  iso.slice(0, 16).replace('T', '\u00a0').replace(/-/g, '\u2060-\u2060');
 
 function PolicyUpdatesInner() {
   const t = useT('policyUpdates');
@@ -198,8 +200,9 @@ function PolicyUpdatesInner() {
                       <li key={`${f.maskedEmail}-${i}`} className="break-words">
                         {t('failedRow', {
                           email: `⁦${f.maskedEmail}⁩`,
-                          reason: f.error ?? '-',
-                          time: `⁦${utcStamp(f.at)}⁩`,
+                          // First-strong isolate: provider text is usually Latin inside Arabic copy.
+                          reason: `\u2068${f.error ?? '-'}\u2069`,
+                          time: utcStamp(f.at),
                         })}
                       </li>
                     ))}

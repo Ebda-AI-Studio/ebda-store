@@ -33,7 +33,9 @@ interface Delivery {
 }
 
 /** "2026-10-21 10:05" (LTR-isolated where it is interpolated into Arabic copy). */
-const utcStamp = (iso: string) => iso.slice(0, 16).replace('T', ' ');
+// No line break inside the stamp: non-breaking space, word joiners around the date hyphens.
+const utcStamp = (iso: string) =>
+  iso.slice(0, 16).replace('T', '\u00a0').replace(/-/g, '\u2060-\u2060');
 const KNOWN_SOURCES = ['signup', 'notice_ack'];
 const KNOWN_STATUSES = ['queued', 'sending', 'sent', 'failed'];
 
