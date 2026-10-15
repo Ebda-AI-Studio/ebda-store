@@ -1545,6 +1545,9 @@
           "frameLabel": "خط الإطار",
           "frameNone": "بدون",
           "frameLine": "خط رفيع",
+          "textAnchorLabel": "موضع النص",
+          "textAnchorCenter": "في المنتصف",
+          "textAnchorBottomStart": "في الركن السفلي",
           "autoplay": "مدة العرض التلقائي (ms)",
           "slides": {
             "title": "الشرائح",

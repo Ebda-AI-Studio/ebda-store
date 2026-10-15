@@ -412,7 +412,11 @@ describe('vitrine look data', () => {
     expect(v.tokens.line).toBe('#D8B96A');
     expect(v.chrome?.header.logoPlacement).toBe('centre');
     expect(v.sections!.map(s => s.type).slice(0, 2)).toEqual(['hero', 'collection-list']);
-    expect(v.sections![0].design).toEqual({ presentation: 'framed', frame: 'line' });
+    expect(v.sections![0].design).toEqual({
+      presentation: 'framed',
+      frame: 'line',
+      textAnchor: 'bottom-start',
+    });
     expect(v.sections![0].design).not.toHaveProperty('mode'); // C6: hero mode is content
     expect(v.sections![1].design).toMatchObject({ tileShape: 'band' });
     expect(v.sections!.find(s => s.type === 'testimonials')!.design).toEqual({ layout: 'single' });

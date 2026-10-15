@@ -27,6 +27,7 @@ export function HeroSlider({
   pack,
   presentation = 'full-bleed',
   frameLine,
+  textAnchor,
   headingZone,
   urlPrefix,
 }: HeroSliderProps) {
@@ -82,6 +83,7 @@ export function HeroSlider({
         priority
         presentation={presentation}
         frameLine={frameLine}
+        textAnchor={textAnchor}
         headingZone={headingZone}
         urlPrefix={urlPrefix}
       />
@@ -155,6 +157,8 @@ export function HeroSlider({
               active={i === activeIndex}
               presentation={presentation}
               frameLine={frameLine}
+              textAnchor={textAnchor}
+              inSlider
               headingZone={headingZone}
               urlPrefix={urlPrefix}
             />
@@ -164,7 +168,12 @@ export function HeroSlider({
 
       {/* Pagination dots */}
       <div
-        className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2"
+        // Copy anchored bottom-start: the dots move to the inline-end corner, off the button.
+        className={
+          textAnchor === 'bottom-start'
+            ? 'absolute bottom-4 end-4 z-20 flex items-center gap-2'
+            : 'absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2'
+        }
         role="tablist"
         aria-label={isRtl ? 'شرائح البانر الرئيسي' : 'Hero slides'}
       >

@@ -277,6 +277,23 @@ export const QAMAR_HERO_SCRIM = {
   edge: 0.3,
 } as const;
 
+/**
+ * The anchored hero copy scrim (W2a, quality bar L-04): a band behind the bottom-start text block
+ * only, solid at `alpha` behind the text and fading to clear over `fade` above it, on every skin
+ * (the copy on the photo is white whatever the look). Pinned by tests/unit/hero-text-anchor.test.tsx
+ * BY IMPORT: white text over this scrim over a white photo is >= 4.5:1.
+ */
+export const HERO_TEXT_SCRIM = {
+  /** #141414 as an rgb() channel list */
+  rgb: '20 20 20',
+  hex: '#141414',
+  alpha: 0.72,
+  fade: '2rem',
+  /** Inline mask: solid under the copy column (max-w-xl + padding), clear past `reach`. */
+  solidTo: 'min(100%, 40rem)',
+  reach: 'min(100%, 60rem)',
+} as const;
+
 export function getPackStyles(pack: TemplateId | undefined): PackStyles {
   return PACK_STYLES[pack ?? 'modern'] ?? PACK_STYLES.modern;
 }

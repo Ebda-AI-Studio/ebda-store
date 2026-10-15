@@ -455,6 +455,7 @@ export function PageRenderer({
                 pack={templateId}
                 presentation={bannerPresentation}
                 frameLine={heroFrameLine}
+                textAnchor={layout.hero.textAnchor}
                 headingZone={heroHeadingZone}
                 urlPrefix={storeUrl('')}
               />
@@ -469,6 +470,7 @@ export function PageRenderer({
                   pack={templateId}
                   presentation={bannerPresentation}
                   frameLine={heroFrameLine}
+                  textAnchor={layout.hero.textAnchor}
                   headingZone={heroHeadingZone}
                   urlPrefix={storeUrl('')}
                 />

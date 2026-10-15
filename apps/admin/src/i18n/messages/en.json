@@ -1545,6 +1545,9 @@
           "frameLabel": "Frame line",
           "frameNone": "None",
           "frameLine": "Hairline",
+          "textAnchorLabel": "Text position",
+          "textAnchorCenter": "Centre",
+          "textAnchorBottomStart": "Bottom corner",
           "autoplay": "Autoplay interval (ms)",
           "slides": {
             "title": "Slides",

@@ -20,7 +20,8 @@ export const LOOKS: readonly LookDefinition[] = [
     // Ruling B1-3. Category row as text chips, image break full-bleed (plan amendment C1).
     // The carousel preset is `newest`, never a demo category slug (C7).
     sections: [
-      { type: 'hero', design: { presentation: 'full-bleed' } },
+      // L-04: the copy sits at the bottom-start corner, off the model (W2a).
+      { type: 'hero', design: { presentation: 'full-bleed', textAnchor: 'bottom-start' } },
       // A chip row is navigation, not a showcase: tight above, no padding below, so it sits
       // right under the hero instead of in 200px of air (STOP 1 critique).
       {
@@ -136,7 +137,11 @@ export const LOOKS: readonly LookDefinition[] = [
     // bands, the window of new pieces, one customer line. No hero `mode` (plan amendment C6): the
     // merchant's slider/single choice is content and survives a look switch.
     sections: [
-      { type: 'hero', design: { presentation: 'framed', frame: 'line' } },
+      // VT-02: the copy leaves the window display (the dress) clear (W2a).
+      {
+        type: 'hero',
+        design: { presentation: 'framed', frame: 'line', textAnchor: 'bottom-start' },
+      },
       {
         type: 'collection-list',
         design: { tileShape: 'band' },

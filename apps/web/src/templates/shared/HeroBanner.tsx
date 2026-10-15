@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { cn } from '@ebda/ui';
 import { IMAGE_STANDARDS, heroObjectPosition, sanitizeUrl } from '@ebda/shared';
 import type { HeroBannerProps } from '../types';
-import { getPackStyles } from './pack-styles';
+import { HERO_TEXT_SCRIM, getPackStyles } from './pack-styles';
 import { responsiveFontSize } from './section-typography';
 import { HeroBannerLink } from './HeroBannerLink';
 import { translations } from '../../contexts/LanguageContext';
@@ -50,6 +50,8 @@ export function HeroBanner({
   priority = true,
   presentation = 'full-bleed',
   frameLine = false,
+  textAnchor,
+  inSlider = false,
   headingZone,
   urlPrefix,
 }: HeroBannerProps) {
@@ -84,6 +86,12 @@ export function HeroBanner({
   const cta = isRtl ? (ctaTextAr ?? ctaText) : (ctaText ?? ctaTextAr);
   const showOverlay = !!(text || subtitleText || cta);
   const styles = getPackStyles(pack);
+  // W2a (L-04): copy anchored at the bottom-start corner. A single banner moves the copy under
+  // the photo below `xl` (a 4:3 phone hero or a 1920/700 tablet hero is too short to hold a
+  // headline and a button over less than 40% of the photo); a slide keeps fixed geometry, so its
+  // copy stays on the photo at every width.
+  const anchored = textAnchor === 'bottom-start' && showOverlay;
+  const stacked = anchored && !inSlider;
 
   // Store-slug prefix (relative internal links only — see urlPrefix doc on
   // HeroBannerProps) so the CTA keeps store context on a platform host.
@@ -154,6 +162,100 @@ export function HeroBanner({
     </picture>
   ) : null;
 
+  // The anchored copy block (W2a, L-04). On the photo it sits on HERO_TEXT_SCRIM: a band that is
+  // solid behind the text and fades out over `fade` above it, so the scrim covers the text block
+  // only and the rest of the photo stays clear. Under the photo (`stacked`, below xl) it is page
+  // text: the theme's ink, the primary button. The merchant's headline colour (typography zone)
+  // applies on the photo only; on the page the headline keeps the page ink.
+  const scrimRgb = `rgb(${HERO_TEXT_SCRIM.rgb} / ${HERO_TEXT_SCRIM.alpha})`;
+  // The band also fades out toward the inline end (mask), so it shades the text's corner and not
+  // a full-width strip of the photo: solid under the copy column, clear past HERO_TEXT_SCRIM.reach.
+  const scrimMask = `linear-gradient(to ${isRtl ? 'left' : 'right'}, #000 0%, #000 ${HERO_TEXT_SCRIM.solidTo}, transparent ${HERO_TEXT_SCRIM.reach})`;
+  const scrimStyle = {
+    backgroundImage: `linear-gradient(to top, ${scrimRgb} 0%, ${scrimRgb} calc(100% - ${HERO_TEXT_SCRIM.fade}), rgb(${HERO_TEXT_SCRIM.rgb} / 0) 100%)`,
+    maskImage: scrimMask,
+    WebkitMaskImage: scrimMask,
+    '--hero-ink': heroColor,
+  } as React.CSSProperties;
+  const anchoredCopy = anchored ? (
+    <div
+      data-part="hero-copy"
+      data-anchor={stacked ? 'stacked' : 'corner'}
+      className={cn(
+        stacked
+          ? cn(
+              'relative pb-6 pt-5 xl:absolute xl:inset-x-0 xl:bottom-0 xl:z-10 xl:overflow-hidden xl:px-10 xl:pb-7 xl:pt-8',
+              // Framed: the page container already pads the copy; the scrim follows the frame.
+              isFramed
+                ? `px-1 sm:px-0 ${drawFrame ? 'xl:rounded-b-[var(--radius)]' : 'xl:rounded-b-2xl'}`
+                : 'px-5 sm:px-8'
+            )
+          : 'absolute inset-x-0 bottom-0 z-10 px-5 pb-5 pt-8 sm:px-10 sm:pb-7',
+        'text-start'
+      )}
+      // The scrim paints only where the copy is on the photo.
+      style={stacked ? ({ '--hero-ink': heroColor } as React.CSSProperties) : scrimStyle}
+    >
+      {stacked && (
+        <span
+          aria-hidden="true"
+          data-part="hero-scrim"
+          className="pointer-events-none absolute inset-0 hidden xl:block"
+          style={scrimStyle}
+        />
+      )}
+      <div className="relative max-w-xl">
+        {text && (
+          <h1
+            className={cn(
+              styles.heroHeadline,
+              'text-balance',
+              stacked
+                ? 'text-3xl sm:text-4xl md:text-4xl lg:text-4xl text-foreground xl:text-[color:var(--hero-ink)]'
+                : 'text-2xl sm:text-4xl md:text-4xl lg:text-4xl text-[color:var(--hero-ink)]',
+              'drop-shadow-none'
+            )}
+            data-zone="heroHeadline"
+            style={{
+              fontFamily: headingZone?.fontFamily,
+              fontSize: responsiveFontSize(headingZone?.fontSize),
+              fontWeight: headingZone?.fontWeight,
+              letterSpacing: headingZone?.letterSpacing,
+              lineHeight: headingZone?.lineHeight,
+              textTransform: headingZone?.textTransform as React.CSSProperties['textTransform'],
+            }}
+          >
+            {text}
+          </h1>
+        )}
+        {subtitleText && (
+          <p
+            className={cn(
+              'mt-2 text-base',
+              stacked ? 'text-muted-foreground xl:text-white/90' : 'text-white/90'
+            )}
+          >
+            {subtitleText}
+          </p>
+        )}
+        {cta && ctaHref && (
+          <Link
+            href={resolvedCtaHref}
+            className={cn(
+              'relative z-10 mt-4 inline-flex min-h-[44px] items-center justify-center rounded-[var(--radius)] px-7 py-3 text-sm font-medium transition-colors',
+              stacked
+                ? 'bg-primary text-primary-foreground hover:bg-primary/90 xl:bg-white xl:text-[#141414] xl:hover:bg-white/90'
+                : 'bg-white text-[#141414] hover:bg-white/90'
+            )}
+            data-cta="button"
+          >
+            {cta}
+          </Link>
+        )}
+      </div>
+    </div>
+  ) : null;
+
   const heroSection = (
     // Mobile: aspect-[var(--hero-m-aspect)] (value supplied via style) + 45vh ceiling.
     // Desktop (sm:): sm:aspect-[1920/700] overrides the base class via media query —
@@ -184,7 +286,7 @@ export function HeroBanner({
             posterPicture
           ))}
 
-        {showOverlay && (
+        {showOverlay && !anchored && (
           <div
             className={`absolute inset-0 flex items-center justify-center ${styles.heroOverlay}`}
           >
@@ -233,6 +335,7 @@ export function HeroBanner({
             </div>
           </div>
         )}
+        {anchored && !stacked && anchoredCopy}
       </HeroBannerLink>
       {drawFrame && (
         // Vitrine's hairline (Rulings B1-5, B1-7): the line colour inset from the frame edge,
@@ -246,9 +349,20 @@ export function HeroBanner({
     </section>
   );
 
-  return isFramed ? (
-    <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">{heroSection}</div>
+  // A stacked copy block follows the photo in flow (below xl) and is laid over its bottom from xl,
+  // so the photo keeps its exact aspect and crop at every width.
+  const withCopy = stacked ? (
+    <div className="relative" data-hero-anchor="bottom-start">
+      {heroSection}
+      {anchoredCopy}
+    </div>
   ) : (
     heroSection
+  );
+
+  return isFramed ? (
+    <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">{withCopy}</div>
+  ) : (
+    withCopy
   );
 }

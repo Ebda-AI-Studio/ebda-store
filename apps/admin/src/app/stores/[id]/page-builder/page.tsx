@@ -648,6 +648,28 @@ export default function StoreLayoutPage() {
                     </div>
                   </>
                 )}
+                {/* W2a (L-04): where the copy sits. Bottom corner keeps the photo clear. */}
+                {layout.hero.presentation !== 'collage' && (
+                  <>
+                    <div className="mb-2 text-xs font-medium text-muted-foreground">
+                      {t('sections.hero.textAnchorLabel')}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      <ModeButton
+                        active={(layout.hero.textAnchor ?? 'center') === 'center'}
+                        onClick={() => updateSection('hero', s => ({ ...s, textAnchor: 'center' }))}
+                        label={t('sections.hero.textAnchorCenter')}
+                      />
+                      <ModeButton
+                        active={layout.hero.textAnchor === 'bottom-start'}
+                        onClick={() =>
+                          updateSection('hero', s => ({ ...s, textAnchor: 'bottom-start' }))
+                        }
+                        label={t('sections.hero.textAnchorBottomStart')}
+                      />
+                    </div>
+                  </>
+                )}
                 {/* Autoplay only matters in slider mode — hide it entirely
                     when the merchant has picked the static single banner so
                     the form doesn't expose an irrelevant control. */}

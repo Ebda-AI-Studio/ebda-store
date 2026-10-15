@@ -104,7 +104,8 @@ export function buildQamarHome(base, ctx) {
         // wide desktop crop, where the 16:9 still loses ~40% of its height (B1-32).
         focus: 'top',
         alt: 'An evening gown in a boutique window at dusk',
-        headline: 'For the night of the wedding',
+        // VT-02: idiomatic English for «لليلة الفرح» (the literal line read as a translation).
+        headline: 'Dressed for the wedding',
         headlineAr: 'لليلة الفرح',
         ctaText: 'Shop evening wear',
         ctaTextAr: 'تسوّق فساتين السهرة',

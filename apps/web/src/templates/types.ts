@@ -469,6 +469,15 @@ export interface HeroBannerProps {
    */
   frameLine?: boolean;
   /**
+   * Hero section design key `textAnchor` (W2a, quality bar L-04). `'bottom-start'`: on a single
+   * banner the copy sits under the photo below `xl` and at the bottom-start corner from `xl`, on a
+   * scrim that covers the text block only (`HERO_TEXT_SCRIM`); in a slider it is always at the
+   * corner. Absent / `'center'` = the centred overlay as before.
+   */
+  textAnchor?: 'center' | 'bottom-start';
+  /** Set by HeroSlider: the slide has fixed geometry, so the copy can never move under the photo. */
+  inSlider?: boolean;
+  /**
    * Per-section typography zone override for the hero headline h1.
    * Resolved via resolveSectionZone() in HomePageContent and applied as
    * inline styles on the <h1> inside HeroBanner. Closes the wiring gap
@@ -499,6 +508,8 @@ export interface HeroSliderProps {
   presentation?: 'full-bleed' | 'framed';
   /** See HeroBannerProps.frameLine. */
   frameLine?: boolean;
+  /** See HeroBannerProps.textAnchor — applies to every slide. */
+  textAnchor?: 'center' | 'bottom-start';
   /**
    * Per-section typography zone override for the hero headline h1.
    * Forwarded to each HeroBanner slide. Closes the wiring gap identified
