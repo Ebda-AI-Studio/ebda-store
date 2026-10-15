@@ -19,15 +19,11 @@ const calls: string[] = [];
 vi.mock('@api/middleware/auth', () => ({
   authenticate: (req: any, _res: any, next: any) => {
     calls.push('authenticate');
-    req.user = { userId: 'admin-1', role: 'store_admin' };
+    req.user = { userId: 'user-1', role: req.header('x-test-role') ?? 'store_admin' };
     next();
   },
-  authorize:
-    (...roles: string[]) =>
-    (_req: any, _res: any, next: any) => {
-      calls.push(`authorize:${roles.join(',')}`);
-      next();
-    },
+  // rbac.ts imports it; the route no longer uses it (Ruling SEARCH-T6-1).
+  authorize: () => (_req: any, _res: any, next: any) => next(),
 }));
 vi.mock('@api/middleware/require-mfa', () => ({
   requireMfaEnrolled: (_req: any, _res: any, next: any) => {
@@ -192,14 +188,28 @@ describe.skipIf(!hasDb)('GET /stores/:storeId/search-insights', () => {
     }
   );
 
-  it('runs authenticate → MFA → authorize(store_admin, super_admin) → requireStoreAccess, in that order', async () => {
+  it.each([
+    ['store_admin', 200],
+    ['super_admin', 200],
+    ['staff', 200], // staff hold analytics:read (Ruling SEARCH-T6-1)
+    ['customer', 403], // no analytics:read
+  ])('role %s gets %i', async (role, status) => {
+    const storeId = await seedStore(`role-${role}`);
+    const res = await request(app)
+      .get(`/api/v1/stores/${storeId}/search-insights?days=7`)
+      .set('x-test-role', role);
+    expect(res.status).toBe(status);
+  });
+
+  it('runs authenticate → MFA → permission → requireStoreAccess, in that order', async () => {
     const storeId = await seedStore('chain');
     await get(storeId, '?days=7');
-    expect(calls).toEqual([
-      'authenticate',
-      'mfa',
-      'authorize:store_admin,super_admin',
-      'storeAccess',
-    ]);
+    expect(calls).toEqual(['authenticate', 'mfa', 'storeAccess']);
+    calls.length = 0;
+    // The permission check sits BEFORE store access: a refused role never reaches it.
+    await request(app)
+      .get(`/api/v1/stores/${storeId}/search-insights?days=7`)
+      .set('x-test-role', 'customer');
+    expect(calls).toEqual(['authenticate', 'mfa']);
   });
 });

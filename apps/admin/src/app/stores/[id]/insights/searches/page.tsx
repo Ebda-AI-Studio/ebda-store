@@ -25,7 +25,7 @@ function percent(rate: number | null | undefined): string {
 }
 
 const pill = (active: boolean) =>
-  `rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+  `inline-flex min-h-11 items-center rounded-full border px-4 text-xs font-medium transition-colors ${
     active
       ? 'border-primary bg-primary text-primary-foreground'
       : 'border-border text-muted-foreground hover:text-foreground'
@@ -40,19 +40,32 @@ export default function InsightsSearchesPage() {
   const [filter, setFilter] = useState<SearchInsightsFilter>('zero');
   const [data, setData] = useState<SearchInsightsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!storeId) return;
+    // A newer window/filter must never be overwritten by an older, slower response.
+    let stale = false;
     setError(null);
+    setLoading(true);
     apiGet<SearchInsightsResponse>(
       `/api/v1/stores/${storeId}/search-insights?days=${days}&filter=${filter}`
     )
       .then(({ data: d, error: apiError }) => {
+        if (stale) return;
         if (apiError) setError(apiError.message ?? '');
         else if (d) setData(d);
       })
-      .catch(() => setError(''));
+      .catch(() => {
+        if (!stale) setError('');
+      })
+      .finally(() => {
+        if (!stale) setLoading(false);
+      });
+    return () => {
+      stale = true;
+    };
   }, [storeId, days, filter, reloadKey]);
 
   if (error !== null) {
@@ -85,7 +98,7 @@ export default function InsightsSearchesPage() {
           href={productsHref(row.term)}
           dir="auto"
           aria-label={t('openTerm', { term: row.term })}
-          className="font-medium text-foreground hover:underline"
+          className="inline-flex min-h-11 items-center font-medium text-foreground hover:underline"
         >
           {row.term}
         </Link>
@@ -101,7 +114,7 @@ export default function InsightsSearchesPage() {
       alignEnd: true,
       cell: row => (
         <span
-          className={`font-mono tabular-nums ${row.zeroResults > 0 ? 'text-amber-600 font-semibold' : 'text-muted-foreground'}`}
+          className={`font-mono tabular-nums ${row.zeroResults > 0 ? 'text-amber-700 dark:text-amber-500 font-semibold' : 'text-muted-foreground'}`}
         >
           {row.zeroResults}
         </span>
@@ -116,11 +129,14 @@ export default function InsightsSearchesPage() {
       ),
     },
     {
-      header: '',
+      header: <span className="sr-only">{t('actions')}</span>,
       mobileActions: true,
       cell: row =>
         row.zeroResults > 0 ? (
-          <Link href={productsHref(row.term)} className="text-xs font-medium text-primary">
+          <Link
+            href={productsHref(row.term)}
+            className="inline-flex min-h-11 items-center text-xs font-medium text-primary"
+          >
             {t('addTerm')}
           </Link>
         ) : null,
@@ -131,7 +147,7 @@ export default function InsightsSearchesPage() {
 
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
-      <div className="max-w-6xl space-y-6">
+      <div className="max-w-6xl space-y-6" aria-busy={loading}>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <div role="group" aria-label={t('range')} className="flex gap-2">
             {RANGES.map(r => (
@@ -179,17 +195,19 @@ export default function InsightsSearchesPage() {
           </div>
         </dl>
 
-        <DataTable<SearchInsightsTerm>
-          ariaLabel={t('title')}
-          columns={columns}
-          rows={data.terms}
-          rowKey={row => row.term}
-          emptyState={
-            <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
-              {nothingSearched ? t('empty') : t('emptyZero')}
-            </div>
-          }
-        />
+        <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+          <DataTable<SearchInsightsTerm>
+            ariaLabel={t('title')}
+            columns={columns}
+            rows={data.terms}
+            rowKey={row => row.term}
+            emptyState={
+              <div className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">
+                {nothingSearched ? t('empty') : t('emptyZero')}
+              </div>
+            }
+          />
+        </div>
         <p className="text-xs text-muted-foreground">{t('floorNote')}</p>
       </div>
     </AdminLayout>

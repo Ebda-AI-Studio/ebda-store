@@ -51,6 +51,7 @@ describe('ZeroResultSearchesCard', () => {
     });
     render(<ZeroResultSearchesCard storeId="store-1" />);
     expect(await screen.findByText('cardEmpty')).toBeTruthy();
+    expect(screen.getByText('floorNote')).toBeTruthy(); // the ≥2 floor is explained on the card too
     cleanup();
     h.apiGet.mockResolvedValue({ error: { message: 'x' } });
     render(<ZeroResultSearchesCard storeId="store-1" />);

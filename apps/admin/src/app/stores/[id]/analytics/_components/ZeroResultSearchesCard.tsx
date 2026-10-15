@@ -20,7 +20,10 @@ export function ZeroResultSearchesCard({ storeId }: { storeId: string }) {
     <section className="rounded-lg border border-border bg-card p-4 mt-6">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-foreground">{t('cardTitle')}</h2>
-        <Link href={`/stores/${storeId}/insights/searches`} className="text-xs text-primary">
+        <Link
+          href={`/stores/${storeId}/insights/searches`}
+          className="inline-flex min-h-11 items-center text-xs text-primary"
+        >
           {t('viewAll')}
         </Link>
       </div>
@@ -29,16 +32,27 @@ export function ZeroResultSearchesCard({ storeId }: { storeId: string }) {
       ) : !data ? (
         <div className="mt-3 h-16 animate-pulse rounded bg-muted" />
       ) : data.terms.length === 0 ? (
-        <p className="mt-3 text-xs text-muted-foreground">{t('cardEmpty')}</p>
+        <>
+          <p className="mt-3 text-xs text-muted-foreground">{t('cardEmpty')}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t('floorNote')}</p>
+        </>
       ) : (
         <ul className="mt-3 space-y-1">
           {data.terms.slice(0, 5).map(r => (
             <li key={r.term} className="flex justify-between gap-3 text-sm">
               <span dir="auto">{r.term}</span>
-              <span className="text-muted-foreground tabular-nums">{r.zeroResults}</span>
+              <span
+                className="text-muted-foreground tabular-nums"
+                aria-label={t('cardCountLabel', { count: r.zeroResults })}
+              >
+                {r.zeroResults}
+              </span>
             </li>
           ))}
         </ul>
+      )}
+      {data && data.terms.length > 0 && (
+        <p className="mt-3 text-xs text-muted-foreground">{t('floorNote')}</p>
       )}
     </section>
   );

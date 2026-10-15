@@ -7,14 +7,16 @@
  * today), the ≥2-searches privacy floor (Ruling SEARCH-T5-6) and the store scope. Never query
  * `search_query_daily` from here: the floor would be bypassed.
  *
- * Auth: authenticate → MFA → store_admin|super_admin → requireStoreAccess. No analytics-tier
- * gate: finding what shoppers could not find is a core search tool, not a paid report
- * (Ruling SEARCH-5).
+ * Auth: authenticate → MFA → requirePermission('analytics:read') → requireStoreAccess, the same
+ * gate as the /analytics routes (Ruling SEARCH-T6-1: aggregated, k>=2, no shopper data, so staff
+ * who may read analytics may read this). No analytics-tier gate: finding what shoppers could not
+ * find is a core search tool, not a paid report (Ruling SEARCH-5).
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import type { SearchInsightsResponse } from '@ebda/shared';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate } from '../middleware/auth';
+import { requirePermission } from '../middleware/rbac';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { AppError } from '../middleware/error-handler';
@@ -31,7 +33,7 @@ router.get(
   '/:storeId/search-insights',
   authenticate,
   requireMfaEnrolled,
-  authorize('store_admin', 'super_admin'),
+  requirePermission('analytics:read'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

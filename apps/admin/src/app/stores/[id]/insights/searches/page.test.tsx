@@ -91,4 +91,21 @@ describe('Insights → Searches page', () => {
       )
     );
   });
+
+  it('ignores a stale response that arrives after a newer request', async () => {
+    let resolveSlow: (v: unknown) => void = () => {};
+    h.apiGet
+      .mockResolvedValueOnce({ data: WITH_TERMS })
+      .mockImplementationOnce(() => new Promise(r => (resolveSlow = r)))
+      .mockResolvedValueOnce({ data: { ...WITH_TERMS, terms: [WITH_TERMS.terms[1]] } });
+    render(<SearchesPage />);
+    await screen.findAllByText('كوتشي');
+    fireEvent.click(screen.getByText('days7')); // slow, will be superseded
+    fireEvent.click(screen.getByText('all'));
+    await waitFor(() => expect(screen.queryByText('كوتشي')).toBeNull());
+    resolveSlow({ data: WITH_TERMS }); // the older answer lands late
+    await new Promise(r => setTimeout(r, 20));
+    expect(screen.queryByText('كوتشي')).toBeNull();
+    expect(screen.getAllByText('تيشرت').length).toBeGreaterThan(0);
+  });
 });
