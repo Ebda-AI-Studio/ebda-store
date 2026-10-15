@@ -6,6 +6,8 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
+import { act } from 'react';
+import { hydrateRoot } from 'react-dom/client';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const uploadVideo = vi.hoisted(() => vi.fn(async () => 'https://media.test/x.mp4'));
@@ -57,14 +59,59 @@ describe('VideoField', () => {
     expect(v.controls).toBe(false);
   });
 
-  it('reduced motion is known on the FIRST render: the preview never paints with autoplay', () => {
+  it('server render never reads window: no matchMedia call, and none at all without a window', () => {
     mockMotion(true);
-    // renderToString runs no effects: it is exactly the first render's markup.
+    const spy = vi.fn(window.matchMedia);
+    window.matchMedia = spy as unknown as typeof window.matchMedia;
     const html = renderToString(
       <VideoField storeId="s1" tag="" value="https://media.test/x.mp4" onChange={vi.fn()} />
     );
     expect(html).toContain('<video');
-    expect(html).not.toMatch(/<video[^>]*autoplay/i);
+    expect(spy).not.toHaveBeenCalled();
+    // A real server has no `window` at all.
+    vi.stubGlobal('window', undefined);
+    try {
+      expect(() =>
+        renderToString(
+          <VideoField storeId="s1" tag="" value="https://media.test/x.mp4" onChange={vi.fn()} />
+        )
+      ).not.toThrow();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('hydrating server markup under reduced motion ends with no autoplay and controls on', async () => {
+    mockMotion(true);
+    const server = renderToString(
+      <VideoField storeId="s1" tag="" value="https://media.test/x.mp4" onChange={vi.fn()} />
+    );
+    const host = document.createElement('div');
+    host.innerHTML = server;
+    document.body.appendChild(host);
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      await act(async () => {
+        root = hydrateRoot(
+          host,
+          <VideoField storeId="s1" tag="" value="https://media.test/x.mp4" onChange={vi.fn()} />
+        );
+      });
+      const v = host.querySelector('video') as HTMLVideoElement;
+      expect(v.autoplay).toBe(false);
+      expect(v.controls).toBe(true);
+      // No hydration mismatch on the props this field derives from reduced motion. (React's own
+      // unrelated `muted` SSR warning is ignored.)
+      const mismatches = errors.mock.calls.filter(c =>
+        /autoPlay|autoplay|controls/.test(String(c[1]))
+      );
+      expect(mismatches).toEqual([]);
+    } finally {
+      act(() => root?.unmount());
+      host.remove();
+      errors.mockRestore();
+    }
   });
 
   it('under prefers-reduced-motion: no autoplay, controls shown', () => {

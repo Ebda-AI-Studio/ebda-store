@@ -7,10 +7,29 @@
  * here first so a 40 MB file never leaves the browser; the API enforces the
  * same limits and sniffs the bytes.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState, useSyncExternalStore } from 'react';
 import { useT } from '@/i18n/useT';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { VIDEO_ACCEPT, checkVideoFile, formatMegabytes } from '@/lib/video-upload';
+
+const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
+
+function readReducedMotion(): boolean {
+  try {
+    return window.matchMedia?.(REDUCED_MOTION)?.matches ?? false;
+  } catch {
+    return false;
+  }
+}
+
+function subscribeReducedMotion(onChange: () => void): () => void {
+  const mq = typeof window === 'undefined' ? undefined : window.matchMedia?.(REDUCED_MOTION);
+  if (!mq) return () => undefined;
+  mq.addEventListener?.('change', onChange);
+  return () => mq.removeEventListener?.('change', onChange);
+}
+
+const serverReducedMotion = () => false;
 
 export function VideoField({
   storeId,
@@ -28,23 +47,15 @@ export function VideoField({
   const inputRef = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [bytes, setBytes] = useState<number | null>(null);
-  // Reduced motion: no autoplay, show the first frame with controls instead. Read on the
-  // FIRST render (lazy init), not in an effect: an effect runs after paint, so the preview
-  // painted once with autoplay on before switching it off.
-  const [reduceMotion, setReduceMotion] = useState(() => {
-    try {
-      return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    if (!mq) return;
-    const on = (e: MediaQueryListEvent) => setReduceMotion(e.matches);
-    mq.addEventListener?.('change', on);
-    return () => mq.removeEventListener?.('change', on);
-  }, []);
+  // Reduced motion: no autoplay, show the first frame with controls instead. A store, not
+  // render-time `window` access: the server render (and hydration) uses `false`, a client-only
+  // render reads the real value on its FIRST render, and a hydrated page re-renders with the
+  // real value, so nothing reads `window` where there is none and there is no hydration mismatch.
+  const reduceMotion = useSyncExternalStore(
+    subscribeReducedMotion,
+    readReducedMotion,
+    serverReducedMotion
+  );
 
   const pick = async (file: File | undefined) => {
     if (!file) return;
