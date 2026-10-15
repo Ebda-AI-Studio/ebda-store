@@ -11,6 +11,7 @@ import { getEbdaTracker } from '../../lib/ebda-tracker';
 import { useAuth } from '../../lib/auth';
 import { validateSignup, type SignupFields } from '../../lib/onboarding-validation';
 import { useT } from '@/i18n/useT';
+import { legalPolicyUrl } from '@ebda/shared';
 import { STATIC_PLANS } from '../../components/billing/plans';
 import { isTrialPlanCode, storePlan, type PlanSelection } from '../../components/billing/types';
 
@@ -38,6 +39,9 @@ export default function SignupPage() {
   // too fast is refused) and a honeypot input real people never see or fill.
   const [formToken, setFormToken] = useState('');
   const [honeypot, setHoneypot] = useState('');
+  // Click-wrap (Ruling LEGAL-4): required; the API refuses a signup without it too.
+  const [agreed, setAgreed] = useState(false);
+  const [legalError, setLegalError] = useState(false);
 
   // The plan picked on the marketing site arrives as ?plan=<id>&interval=month|year.
   // Validate it, keep it for the onboarding plan step, and show it back.
@@ -81,7 +85,8 @@ export default function SignupPage() {
     setFormError('');
     const found = validateSignup(fields);
     setErrors(found);
-    if (Object.keys(found).length > 0) return;
+    setLegalError(!agreed);
+    if (Object.keys(found).length > 0 || !agreed) return;
 
     setSubmitting(true);
     const email = fields.email.trim();
@@ -96,6 +101,7 @@ export default function SignupPage() {
       language: document.documentElement.dir === 'rtl' ? 'ar' : 'en',
       formToken,
       company_site: honeypot,
+      acceptedLegal: true,
       ...(tracking ? { tracking } : {}),
     });
     setSubmitting(false);
@@ -270,6 +276,67 @@ export default function SignupPage() {
             error={errors.password ? tErr(errors.password) : undefined}
           />
           <p className="mt-1 text-xs text-muted-foreground">{t('passwordHelp')}</p>
+        </div>
+        <div>
+          <label htmlFor="signup-legal" className="flex items-start gap-2 text-sm text-foreground">
+            <input
+              id="signup-legal"
+              name="acceptedLegal"
+              type="checkbox"
+              required
+              checked={agreed}
+              onChange={e => {
+                setAgreed(e.target.checked);
+                setLegalError(false);
+              }}
+              aria-invalid={legalError || undefined}
+              aria-describedby={legalError ? 'signup-legal-error' : undefined}
+              className="mt-0.5 h-4 w-4 shrink-0"
+            />
+            <span>
+              {t('legal.prefix')}
+              <a
+                href={legalPolicyUrl('terms', locale)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary-ink underline"
+              >
+                {t('legal.terms')}
+              </a>
+              {t('legal.sep')}
+              <a
+                href={legalPolicyUrl('privacy', locale)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary-ink underline"
+              >
+                {t('legal.privacy')}
+              </a>
+              {t('legal.sep')}
+              <a
+                href={legalPolicyUrl('merchant', locale)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary-ink underline"
+              >
+                {t('legal.merchant')}
+              </a>
+              {t('legal.lastSep')}
+              <a
+                href={legalPolicyUrl('acceptableUse', locale)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary-ink underline"
+              >
+                {t('legal.acceptableUse')}
+              </a>
+            </span>
+          </label>
+          {legalError && (
+            <p id="signup-legal-error" role="alert" className="mt-1 text-sm text-destructive-ink">
+              {tErr('legalRequired')}
+            </p>
+          )}
         </div>
         <Button type="submit" className="w-full" disabled={submitting}>
           {submitting ? t('submitting') : t('submit')}

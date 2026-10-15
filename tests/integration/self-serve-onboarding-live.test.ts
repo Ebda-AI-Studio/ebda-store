@@ -104,6 +104,7 @@ describe.skipIf(!hasDb || !logReadable)('self-serve onboarding over HTTP (ebda_a
         name: 'Live Merchant',
         phone: '012 3456 7890',
         formToken: tokenRes.body!.data.token,
+        acceptedLegal: true,
       },
     });
     expect(signup.status).toBe(200);

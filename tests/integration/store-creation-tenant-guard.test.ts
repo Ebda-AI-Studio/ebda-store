@@ -116,6 +116,7 @@ describe.skipIf(!hasDb)('store creation under the tenant guard + strict RLS (ebd
         name: 'Mona Hassan',
         phone: `010${crypto.randomInt(10_000_000, 99_999_999)}`,
         formToken: tok.body.data.token,
+        acceptedLegal: true,
       });
     expect(signup.status).toBe(200);
     const token = tokenFromCapturedMail(latestCapturedMailTo(email));

@@ -78,6 +78,7 @@ describe.skipIf(!hasDb)('merchant password reset (Ebda Store)', () => {
         phone: `010${crypto.randomInt(10_000_000, 99_999_999)}`,
         language,
         formToken: tok.body.data.token,
+        acceptedLegal: true,
       });
     expect(res.status).toBe(200);
     const vtoken = tokenFromCapturedMail(latestCapturedMailTo(email));

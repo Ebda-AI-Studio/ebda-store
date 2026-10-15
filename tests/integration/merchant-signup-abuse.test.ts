@@ -70,6 +70,7 @@ function body(email: string, extra: Record<string, unknown> = {}) {
     name: 'Mona Hassan',
     phone: '01012345678',
     formToken: tokenAged(10_000),
+    acceptedLegal: true,
     ...extra,
   };
 }

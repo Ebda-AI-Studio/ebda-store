@@ -54,10 +54,30 @@ function fill(values: Partial<Record<'name' | 'email' | 'phone' | 'password', st
     fireEvent.change(screen.getByLabelText(map[k as keyof typeof map]), { target: { value: v } });
   }
 }
-const submit = () =>
+const submit = (opts: { agree?: boolean } = {}) => {
+  const box = screen.getByRole('checkbox') as HTMLInputElement;
+  if ((opts.agree ?? true) && !box.checked) fireEvent.click(box);
   fireEvent.click(screen.getByRole('button', { name: 'onboarding.signup.submit' }));
+};
 
 describe('signup page', () => {
+  it('blocks submit until the policies are accepted, and links each policy on ebda.app', async () => {
+    render(<SignupPage />);
+    fill({ name: 'Mona', email: 'mona@x.com', phone: '01012345678', password: 'Str0ng!Passw0rd' });
+    submit({ agree: false });
+    expect(await screen.findByText('onboarding.signup.errors.legalRequired')).toBeTruthy();
+    expect(apiPost).not.toHaveBeenCalled();
+    const hrefs = screen.getAllByRole('link').map(a => a.getAttribute('href'));
+    expect(hrefs).toEqual(
+      expect.arrayContaining([
+        'https://ebda.app/en/terms/',
+        'https://ebda.app/en/privacy/',
+        'https://ebda.app/en/merchant-agreement/',
+        'https://ebda.app/en/acceptable-use/',
+      ])
+    );
+  });
+
   it('blocks an empty mobile number before submitting', async () => {
     render(<SignupPage />);
     fill({ name: 'Mona', email: 'mona@x.com', phone: '', password: 'Str0ng!Passw0rd' });
@@ -100,6 +120,7 @@ describe('signup page', () => {
       // Abuse controls: the server-signed form token and an EMPTY honeypot.
       formToken: 'tok-1',
       company_site: '',
+      acceptedLegal: true,
     });
   });
 

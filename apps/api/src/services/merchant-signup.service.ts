@@ -20,6 +20,7 @@ import { ensureAdminUser, findUserIdByEmail } from '../lib/definer';
 import { AuthService } from './auth.service';
 import { sendMerchantDuplicateSignupNotice } from './platform-mailer';
 import { buildAcquisition, signupTrackingSchema } from './ebda-ads.service';
+import { signupAcceptanceRows } from './legal-notice.service';
 
 /** Same password policy as `/auth/register` (also used by `/auth/reset-password`). */
 export const passwordSchema = z
@@ -58,6 +59,13 @@ export const merchantSignupSchema = z.object({
    * Sent by the form only when the visitor allowed tracking; stored on `users.acquisition`.
    */
   tracking: signupTrackingSchema.optional(),
+  /**
+   * Click-wrap (Ruling LEGAL-4): the visitor ticked "I agree to the Terms, Privacy Policy,
+   * Merchant Agreement and Acceptable Use Policy". Required: a signup without it is refused.
+   */
+  acceptedLegal: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the terms and policies to create an account' }),
+  }),
 });
 
 export type MerchantSignupInput = z.infer<typeof merchantSignupSchema>;
@@ -100,7 +108,14 @@ export class MerchantSignupService {
       : null;
 
     if (existing && existing.role === 'store_admin' && !existing.emailVerified) {
-      // Signed up before but never verified (lost mail): treat as a resend.
+      // Signed up before but never verified (lost mail): treat as a resend. They just
+      // accepted the current policies again; record it (a no-op when already recorded).
+      await withUser(existing.id, tx =>
+        tx.legalAcceptance.createMany({
+          data: signupAcceptanceRows(existing.id, request),
+          skipDuplicates: true,
+        })
+      );
       return this.resendVerification(existing.email);
     }
 
@@ -130,16 +145,21 @@ export class MerchantSignupService {
     // Phone and language are not part of the definer's contract: set them as the
     // new user (its own row, under its own user scope).
     const acquisition = buildAcquisition(input.tracking, request);
-    await withUser(created.id, tx =>
-      tx.user.update({
+    // Profile + click-wrap acceptance in ONE transaction, as the new user (Ruling LEGAL-4).
+    await withUser(created.id, async tx => {
+      await tx.user.update({
         where: { id: created.id },
         data: {
           phone,
           language: language ?? 'ar',
           ...(acquisition ? { acquisition: acquisition as unknown as Prisma.InputJsonValue } : {}),
         },
-      })
-    );
+      });
+      await tx.legalAcceptance.createMany({
+        data: signupAcceptanceRows(created.id, request),
+        skipDuplicates: true,
+      });
+    });
     const user = {
       id: created.id,
       email: created.email,

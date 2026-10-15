@@ -21,6 +21,7 @@ vi.mock('@ebda/database', () => ({
           return {};
         },
       },
+      legalAcceptance: { createMany: async () => ({ count: 5 }) },
     }),
 }));
 vi.mock('@api/lib/definer', () => ({
@@ -48,6 +49,7 @@ const base = {
   password: 'Str0ng!Passw0rd',
   phone: '01012345678',
   language: 'ar' as const,
+  acceptedLegal: true as const,
 };
 const tracking = {
   attribution: { first_seen: 1, utm_source: 'meta', utm_campaign: 'launch', fbclid: 'abc' },
