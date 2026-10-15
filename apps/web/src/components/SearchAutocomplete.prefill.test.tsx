@@ -59,3 +59,48 @@ describe('SearchAutocomplete prefilled query', () => {
     expect(searchSuggest).toHaveBeenCalledWith('shoes');
   });
 });
+
+describe('SearchAutocomplete committed query changes without a remount (final review M1)', () => {
+  it('stays closed when the URL query changes /search?q=a → /search?q=b while mounted', async () => {
+    vi.useFakeTimers();
+    // Same order SearchClient renders in: committedQuery updates first, then its effect syncs
+    // the input (searchTerm) to the new value.
+    const { rerender, container } = render(
+      <SearchAutocomplete query="احذيه" committedQuery="احذيه" />
+    );
+    rerender(<SearchAutocomplete query="احذيه" committedQuery="شنط" />);
+    rerender(<SearchAutocomplete query="شنط" committedQuery="شنط" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(searchSuggest).not.toHaveBeenCalled();
+    expect(container.textContent).toBe('');
+  });
+
+  // Fresh terms: SUGGEST_CACHE is module-level, an earlier test's term would be a cache hit.
+  it('a new committed query closes a dropdown the visitor had opened, and editing reopens it', async () => {
+    vi.useFakeTimers();
+    const { rerender, container } = render(
+      <SearchAutocomplete query="كوتشي" committedQuery="كوتشي" />
+    );
+    rerender(<SearchAutocomplete query="كوتشي ا" committedQuery="كوتشي" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(searchSuggest).toHaveBeenCalledWith('كوتشي ا');
+    expect(container.textContent).not.toBe('');
+    searchSuggest.mockClear();
+    rerender(<SearchAutocomplete query="كوتشي ا" committedQuery="جزم" />);
+    rerender(<SearchAutocomplete query="جزم" committedQuery="جزم" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(searchSuggest).not.toHaveBeenCalled();
+    expect(container.textContent).toBe('');
+    rerender(<SearchAutocomplete query="جزم ج" committedQuery="جزم" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(searchSuggest).toHaveBeenCalledWith('جزم ج');
+  });
+});

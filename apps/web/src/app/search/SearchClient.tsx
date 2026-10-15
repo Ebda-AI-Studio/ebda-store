@@ -246,7 +246,11 @@ function SearchContent() {
                 the page content below the input. Selecting a suggestion
                 navigates to the product page (handled inside the component);
                 the on-page results list continues to be driven by searchTerm. */}
-            <SearchAutocomplete query={searchTerm} onSelect={() => {}} />
+            <SearchAutocomplete
+              query={searchTerm}
+              committedQuery={committedQuery}
+              onSelect={() => {}}
+            />
           </div>
         </form>
 

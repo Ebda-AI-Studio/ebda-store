@@ -22,6 +22,10 @@ interface SearchAutocompleteProps {
   /** Called when the user picks a suggestion (so the parent can close the
    *  expanded search row, clear focus, etc.). Optional. */
   onSelect?: () => void;
+  /** The committed query the page already shows results for (`/search?q=…`). The dropdown stays
+   *  closed for that untouched term, also when it changes client-side without a remount (the
+   *  header search navigating `/search?q=a` → `/search?q=b`). Defaults to `query` at mount. */
+  committedQuery?: string;
 }
 
 // ─── Module-level cache ──────────────────────────────────────────────────────
@@ -48,7 +52,7 @@ function cacheSet(key: string, value: SearchSuggestion[]) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps) {
+export function SearchAutocomplete({ query, onSelect, committedQuery }: SearchAutocompleteProps) {
   const storeUrl = useStoreUrl();
   const { language, t } = useLanguage();
   const { money } = useNumerals();
@@ -67,8 +71,23 @@ export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps)
   // The query the parent mounted us with (/search?q=… prefills the input). Suggestions for that
   // untouched term would open a dropdown over the first row of the results the page already
   // shows, so we stay closed until the visitor edits the field (PR 1 visual gate).
-  const mountedQueryRef = useRef(query.trim());
+  const mountedQueryRef = useRef((committedQuery ?? query).trim());
   const editedRef = useRef(false);
+
+  // A new committed query (URL changed while we stayed mounted) is a fresh prefill: forget the
+  // edit, drop any pending fetch, and close, so the new results are not covered either.
+  useEffect(() => {
+    if (committedQuery === undefined) return;
+    const next = committedQuery.trim();
+    if (next === mountedQueryRef.current) return;
+    mountedQueryRef.current = next;
+    editedRef.current = false;
+    latestQueryRef.current = '';
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setIsOpen(false);
+    setSuggestions(null);
+    setActiveIndex(-1);
+  }, [committedQuery]);
 
   // ── Fetch suggestions ──────────────────────────────────────────────────────
 
