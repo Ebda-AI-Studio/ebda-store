@@ -241,10 +241,11 @@ export default function StatementDetailPage() {
     const r = data;
     if (r) {
       setAutoMatchMsg(
-        t('autoMatchResult')
-          .replace('{matched}', String(r.matched))
-          .replace('{unmatched}', String(r.unmatched))
-          .replace('{ambiguous}', String(r.ambiguous))
+        t('autoMatchResult', {
+          matched: String(r.matched),
+          unmatched: String(r.unmatched),
+          ambiguous: String(r.ambiguous),
+        })
       );
     }
     setRefreshKey(k => k + 1);

@@ -238,7 +238,7 @@ export default function BackordersPage() {
       className: 'w-28',
       cell: line => (
         <span className="text-muted-foreground text-xs">
-          {t('daysWaitingValue').replace('{days}', String(daysWaiting(line.createdAt)))}
+          {t('daysWaitingValue', { days: String(daysWaiting(line.createdAt)) })}
         </span>
       ),
     },
