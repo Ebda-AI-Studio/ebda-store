@@ -11,13 +11,20 @@ Rulings LEGAL-4, LEGAL-5, LEGAL-6. The policy TEXT lives in `apps/marketing/src/
    - `version`: next number (`1.0` -> `1.1`; `2.0` for a rewrite).
    - `publishedAt`: the merge/deploy date (YYYY-MM-DD). It becomes "Last updated" on the page.
    - `effectiveAt`: when it binds. For a **fee change** at least 30 days after `publishedAt`
-     (the unit test refuses less).
+     (the unit test refuses less) AND at least 30 days after the day you will press **Send
+     notice**: the API refuses a fee-change Send with less than 30 days left (422
+     `NOTICE_TOO_LATE`, Ruling LEGAL-5(j)). Give yourself slack (e.g. 35+ days) and send the day
+     it deploys. Non-fee material changes have no minimum.
    - `material`: `true` if a merchant would reasonably want to know (fees, liability, data use,
      termination, new obligations). Typos and formatting are `false`.
    - `feeChange`: `true` only if fees change (implies `material: true`).
    - `summary.ar` / `summary.en`: one or two plain sentences on WHAT changed.
-3. If the change adds a sub-processor, update the Privacy Policy first (Ruling LEGAL-3).
-4. `npx vitest run packages/shared/src/__tests__/legal-policies.test.ts tests/unit/marketing-site.test.tsx`.
+3. Do NOT publish a follow-up version of a document while its previous material notice is still
+   being acknowledged: only the CURRENT version can be pending, so a newer version (even a
+   non-material typo fix) silently ends the older notice for everyone who has not pressed
+   "Got it" yet (Ruling LEGAL-5(k)). Wait for the notice window (its `effectiveAt`) to pass.
+4. If the change adds a sub-processor, update the Privacy Policy first (Ruling LEGAL-3).
+5. `npx vitest run packages/shared/src/__tests__/legal-policies.test.ts tests/unit/marketing-site.test.tsx`.
 
 ## 2. Merge and deploy
 
@@ -28,7 +35,7 @@ Merge. `cf-marketing-deploy.yml` republishes ebda.app. The API must also run the
     curl -s https://ebda.app/en/terms/ | grep -o '<time[^<]*</time>'
     curl -s https://api.ebda.app/health   # commit == main tip
 
-## 3. Announce (material versions only)
+## 3. Announce (material versions only) — the SAME day it deploys
 
 Super admin -> **Policy updates** (`store.ebda.app/policy-updates`) -> the document shows the new
 version with **Send notice** -> confirm. This emails every store owner once (owners of non-deleted,
@@ -36,34 +43,45 @@ non-demo stores, role store_admin; suspended/inactive owners included) and shows
 dashboard until they press "Got it". It cannot be sent twice (409). The email is bilingual, Arabic
 first, for everyone (Ruling LEGAL-6), and carries no unsubscribe link by design.
 
+A fee change whose `effectiveAt` is less than 30 days away shows "Too late to announce" instead of
+the button (and the API answers 422 `NOTICE_TOO_LATE`): move `effectiveAt` later, redeploy, send.
+
 ## 4. Watch the run
 
-The page shows per-version counts (queued / sending / sent / failed) and a list of failed
-deliveries (masked email, reason, time). Refresh to follow it.
+The page shows per-version counts and the failed deliveries (masked email, reason, time UTC; the
+newest 100 are listed, the count above them is exact). Refresh to follow it. What the page says:
 
-- `queued`: waiting for the job. While the job runs this drains.
-- `sent` / `failed`: final.
-- `sending` ("stuck"): the row was claimed and the job died or crashed around the send. **It never
-  finishes or retries by itself** (at-most-once, Ruling LEGAL-5(a)). Check each one manually
-  (Resend dashboard by recipient/time); contact the merchant directly if the mail did not go out.
-- `queued` that does not drain after the run ended: the job stopped before reaching them (see
-  LEGAL-5(f): the sender was demoted/deleted mid-run). A P1 alert fires. There is no automated
-  re-send; a re-run needs an engineer.
-- Banner is the second channel: every merchant with a SENT, material, current, unacknowledged
-  version sees it regardless of email outcome.
+| Page state                                                            | Meaning                                                                                                                                                                                                                             |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Starting the email run…"                                             | Send was pressed less than 10 minutes ago; recipients not listed yet. Normal.                                                                                                                                                       |
+| "Sending… N left."                                                    | `queued` rows (the page's "waiting") are draining, and/or a row is mid-send. Normal.                                                                                                                                                |
+| "The email run did not start" (red, **Resume**)                       | No recipients 10 minutes after Send: the job never materialised them.                                                                                                                                                               |
+| "The email run stopped with N owners still waiting" (red, **Resume**) | Rows still `queued` and nothing has moved for 15 minutes (e.g. the sender was demoted mid-run, LEGAL-5(f)).                                                                                                                         |
+| "N stuck while sending for over 15 minutes" (red)                     | Claimed (`sending`) 15+ minutes ago: the job died around the send. **Never** re-sent or finished by itself (at-most-once, LEGAL-5(a)). Check each in the Resend dashboard by time; contact the merchant if the mail did not go out. |
+| "Failed emails" + **Retry failed (N)**                                | Final failures, with their reason.                                                                                                                                                                                                  |
+
+The banner is the second channel: every merchant with a SENT, material, current, unacknowledged
+version sees it regardless of email outcome. Alerts (P1, Telegram): `legal.notice.failures` (any
+delivery failed in a run, with the count), `legal.notice.mailer_not_configured`,
+`legal.notice.window_exhausted`, `legal.notice.job_failed` (the job died and its queued rows could
+not even be marked), `legal.notice.withdraw_failed`. Each names the document and this runbook.
 
 ### Failure reasons (`error` on a failed delivery)
 
-| Reason                  | Meaning                                                                                                                                                                                                                                        |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SEND_WINDOW_EXHAUSTED` | The job hit its 900-step cap; the rest were marked failed and a P1 (`legal.notice.window_exhausted`) was raised.                                                                                                                               |
-| `SEND_JOB_FAILED`       | The Inngest job died after retries; `onFailure` marked the unsent rows failed.                                                                                                                                                                 |
-| `RESEND_NOT_CONFIGURED` | Production without a Resend key: the send throws instead of marking mail `sent`. Fix the env, then handle the failed rows.                                                                                                                     |
-| `USER_GONE`             | The recipient's account no longer exists when its turn came.                                                                                                                                                                                   |
-| `SEND_ROW_MISSING`      | The send row was withdrawn/missing when the fan-out materialised recipients; nobody was mailed.                                                                                                                                                |
-| `WITHDRAW_FAILED`       | (API 502, not a delivery row.) Enqueue failed AND the compensating withdraw refused (the run may have started): a P1 `legal.notice.withdraw_failed` fires and the page shows "send uncertain". Check the counts before pressing anything else. |
+| Reason                  | Meaning                                                                                                                                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SEND_WINDOW_EXHAUSTED` | The job hit its 900-step cap; the rest were marked failed (P1 `legal.notice.window_exhausted`). Retry failed.                                                                                                   |
+| `SEND_JOB_FAILED`       | The Inngest job died after retries; `onFailure` marked the unsent rows failed. Retry failed.                                                                                                                    |
+| `RESEND_NOT_CONFIGURED` | Production without a Resend key. Checked ONCE at the start of each run: every queued row is failed at once, nobody is mailed, P1 `legal.notice.mailer_not_configured`. Fix `RESEND_API_KEY`, then Retry failed. |
+| `USER_GONE`             | The account was deleted (or no longer exists) when its turn came. Not mailed.                                                                                                                                   |
+| `NOT_RECIPIENT`         | The account is no longer a store owner (`store_admin`) when its turn came. Not mailed.                                                                                                                          |
+| `RETRY_ENQUEUE_FAILED`  | A Retry failed could not start its run; the rows went back to failed. Press Retry failed again.                                                                                                                 |
+| any other text          | The provider's error, emails scrubbed (fail-closed) and cut to 300 characters.                                                                                                                                  |
 
-Provider error text on a failed row is scrubbed of email addresses and truncated.
+Not delivery reasons, for the record: `SEND_ROW_MISSING` is a job SKIP result (the run's send row was
+withdrawn or replaced; nobody was mailed, no row written), and `WITHDRAW_FAILED` is an API 502 on
+Send (the enqueue failed AND the compensating withdraw refused; P1 `legal.notice.withdraw_failed`,
+page says "send uncertain": read the counts, then Resume if it is stalled).
 
 ### Pacing and limits
 
@@ -74,14 +92,43 @@ Provider error text on a failed row is scrubbed of email addresses and truncated
   that gets no pacer slot ends and the work continues in a later step.
 - The step loop is capped at 900 steps: roughly 18,000 recipients is an UPPER bound, and fewer if
   steps defer. The cap leftover is failed with `SEND_WINDOW_EXHAUSTED`.
-- Recipients are materialised in ONE transaction (30 s timeout), which also caps reach. Fine at
-  today's scale; revisit before the merchant count is in the thousands.
+- Recipients are materialised ONCE per send, in ONE transaction (30 s timeout), which also caps
+  reach. Fine at today's scale; revisit before the merchant count is in the thousands.
 
-## 5. Verify
+## 5. Recover a stalled or failed run
+
+Everything is on the Policy updates page; both buttons confirm in the page, are audited
+(`legal.notice_resumed`, `legal.notice_retry_failed` in Audit logs) and act as YOU (you must be an
+active super admin). Neither can mail anyone twice: every row is claimed `queued -> sending` before
+its mail, and `sending`/`sent` rows are never touched.
+
+1. **Stalled / did not start** -> press **Resume**. It re-emits the email run for the same send row.
+   If recipients were never listed, they are listed now; otherwise only rows still `queued` are
+   mailed.
+2. **Failed emails** -> fix the cause first (e.g. `RESEND_API_KEY`), then press **Retry failed (N)**.
+   It moves that version's `failed` rows back to `queued` (an UPDATE; DELETE is revoked on the
+   table) and resumes. If it says "Nothing to retry", nothing is marked failed now.
+3. **Stuck while sending** -> no button by design (the mail may have gone out). Check Resend; for an
+   owner who did not get it, contact them directly. The banner still reaches them.
+4. Refresh until the counts settle; a new failure raises a new P1.
+
+Only if the admin UI is unavailable: the same, by hand. Use the OWNER connection (under the app
+role RLS shows no rows), `neonctl connection-string … --role-name <owner>`:
+
+    -- failed -> queued, for ONE version; never touch 'sending' or 'sent'
+    UPDATE legal_notice_deliveries SET status='queued', error=NULL, updated_at=now()
+     WHERE doc_key='terms' AND version='1.1' AND status='failed';
+    SELECT id FROM legal_notice_sends WHERE doc_key='terms' AND version='1.1';
+
+then send the event `legal/notice.send-requested` from the Inngest dashboard with
+`{"sendId":"<that id>","docKey":"terms","version":"1.1","sentBy":"<an ACTIVE super admin's user id>"}`.
+
+## 6. Verify
 
 - The page shows "N sent, 0 failed ... of N" once the run finishes.
 - A test merchant sees the banner on any store page; "Got it" removes it everywhere.
-- Read-only SQL on production:
+- Evidence of who accepted what: super admin -> **Users** -> the merchant -> **Policy acceptances**
+  (document, version, at signup / acknowledged, time UTC, masked IP, and the notice emails). The
+  merchant sees their own under Account -> Security -> **Policies you accepted**.
+- Read-only SQL on production needs the OWNER connection (as `ebda_app` RLS returns 0 rows):
   `SELECT status, count(*) FROM legal_notice_deliveries WHERE doc_key='terms' AND version='1.1' GROUP BY 1;`
-- Failed rows are also listed on the Policy updates page; re-sending is not automated
-  (Ruling LEGAL-5): handle individually.
