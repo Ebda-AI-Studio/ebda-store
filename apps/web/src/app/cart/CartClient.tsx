@@ -33,6 +33,7 @@ import { resolveColor, checkMinimumOrder, computeOrderAmounts, REGION } from '@e
 import { AcceptedPaymentBadges } from '../../components/AcceptedPaymentBadges';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { StickyCartTotal } from '../../components/commerce/StickyCartTotal';
+import { Breadcrumbs } from '../../components/Breadcrumbs';
 
 export default function CartClient() {
   const {
@@ -428,22 +429,17 @@ export default function CartClient() {
       <div className="flex-1" style={cartBgStyle}>
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8" style={cartDensity}>
           {/* Breadcrumb */}
-          <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-            <Link href={storeUrl('/')} className="transition-colors hover:text-primary">
-              {t('Home', translations['Home'])}
-            </Link>
-            <svg
-              className={`h-4 w-4 ${language === 'ar' ? 'rotate-180' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            <span className="text-foreground">
-              {t('Shopping Cart', '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642')}
-            </span>
-          </nav>
+          <Breadcrumbs
+            items={[
+              { label: t('Home', translations['Home']), href: storeUrl('/') },
+              {
+                label: t(
+                  'Shopping Cart',
+                  '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
+                ),
+              },
+            ]}
+          />
 
           <h1
             className="text-3xl font-bold tracking-tight text-foreground"

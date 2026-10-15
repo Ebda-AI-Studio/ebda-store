@@ -2,7 +2,6 @@
 
 import { pickLocalizedName } from '../../templates/shared/display-helpers';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
   api,
@@ -40,6 +39,7 @@ import { ProductsPagination } from './ProductsPagination';
 import { recordLastListing, consumeFocusProduct } from '@/lib/last-listing';
 
 import { roundToMinor } from '@ebda/shared';
+import { Breadcrumbs } from '../../components/Breadcrumbs';
 /**
  * How many products the user can choose to load per PLP page. Capped at 96
  * because larger pages start to hurt mobile data + LCP without much UX win.
@@ -563,42 +563,23 @@ export default function ProductsClient({
           data-zone="products"
         >
           {/* Breadcrumb */}
-          <nav
-            className="mb-6 flex items-center gap-2 text-sm text-muted-foreground"
+          <Breadcrumbs
             style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpBreadcrumbColorStyle }}
-          >
-            <Link href={storeUrl('/')} className="transition-colors hover:text-primary">
-              {t('Home', translations['Home'])}
-            </Link>
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            {categoryFilter && (
-              <>
-                <Link
-                  href={storeUrl('/products')}
-                  onClick={() => setCategoryFilter('')}
-                  className="transition-colors hover:text-primary"
-                >
-                  {t('Products', translations['Products'])}
-                </Link>
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </>
-            )}
-            <span
-              className="text-foreground"
-              style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpBreadcrumbColorStyle }}
-            >
-              {t(ctxEn, ctxAr)}
-            </span>
-          </nav>
+            currentStyle={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpBreadcrumbColorStyle }}
+            items={[
+              { label: t('Home', translations['Home']), href: storeUrl('/') },
+              ...(categoryFilter
+                ? [
+                    {
+                      label: t('Products', translations['Products']),
+                      href: storeUrl('/products'),
+                      onClick: () => setCategoryFilter(''),
+                    },
+                  ]
+                : []),
+              { label: t(ctxEn, ctxAr) },
+            ]}
+          />
 
           {/* Header */}
           <div className="mb-8">

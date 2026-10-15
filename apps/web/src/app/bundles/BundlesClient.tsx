@@ -8,6 +8,7 @@ import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { ShopChrome } from '../../components';
 import { recordLastListing } from '@/lib/last-listing';
 import { BundleCard } from './BundleCard';
+import { Breadcrumbs } from '../../components/Breadcrumbs';
 
 interface BundlesClientProps {
   /** Server-fetched, already `isPurchasable`-filtered bundle list — covers
@@ -72,15 +73,12 @@ export default function BundlesClient({ bundles: initialBundles }: BundlesClient
       <div className="flex-1">
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8" data-zone="products">
           {/* Breadcrumb */}
-          <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-            <Link href={storeUrl('/')} className="transition-colors hover:text-primary">
-              {t('Home', translations['Home'])}
-            </Link>
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            <span className="text-foreground">{t('Bundles', 'الباقات')}</span>
-          </nav>
+          <Breadcrumbs
+            items={[
+              { label: t('Home', translations['Home']), href: storeUrl('/') },
+              { label: t('Bundles', 'الباقات') },
+            ]}
+          />
 
           <div className="mb-8">
             <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">

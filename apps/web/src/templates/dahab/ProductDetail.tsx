@@ -22,6 +22,7 @@ import type { ProductOption, ProductVariant } from '@/lib/api';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
 import { VariantSelector } from '../../components/VariantSelector';
+import { Breadcrumbs } from '../../components/Breadcrumbs';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import type { ProductFact } from '@ebda/shared';
 import { FactsTable } from '../../components/commerce/FactsTable';
@@ -39,7 +40,6 @@ import {
   MinusIcon,
   PlusIcon,
   ZoomIcon,
-  ChevronIcon,
   cx,
 } from './ui';
 
@@ -338,32 +338,17 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
     <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8" data-zone="products">
       {/* Hidden below md (C-04): on a phone the fold is gallery, title, price, the first
           selector and the buy button; the trail is chrome that pushes them down. */}
-      <nav
-        aria-label={t('Breadcrumb', 'مسار التصفح')}
-        className="mb-6 hidden text-[13px] text-muted-foreground md:block"
-      >
-        <ol className="flex flex-wrap items-center gap-1.5">
-          <li>
-            <Link href={p.homeHref} className="hover:text-primary">
-              {t('Home', 'الرئيسية')}
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <ChevronIcon className="h-3 w-3" />
-          </li>
-          <li>
-            <Link href={p.categoryHref ?? p.productsHref} className="hover:text-primary">
-              {p.categoryName ?? t('All pieces', 'كل القطع')}
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <ChevronIcon className="h-3 w-3" />
-          </li>
-          <li aria-current="page" className="line-clamp-1 text-foreground/80">
-            {p.name}
-          </li>
-        </ol>
-      </nav>
+      <Breadcrumbs
+        className="mb-6 hidden text-[13px] md:block"
+        items={[
+          { label: t('Home', 'الرئيسية'), href: p.homeHref },
+          {
+            label: p.categoryName ?? t('All pieces', 'كل القطع'),
+            href: p.categoryHref ?? p.productsHref,
+          },
+          { label: p.name },
+        ]}
+      />
 
       <div className="grid gap-8 md:grid-cols-12 md:gap-10 lg:gap-16">
         <div className="md:col-span-7">

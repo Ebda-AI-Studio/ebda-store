@@ -50,6 +50,7 @@ import { DahabProductDetail } from '../../../templates/dahab/ProductDetail';
 import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
+import { Breadcrumbs } from '../../../components/Breadcrumbs';
 import { SizeChartDialog } from '../../../components/commerce/SizeChartDialog';
 import { StickyAddToCart } from '../../../components/commerce/StickyAddToCart';
 import {
@@ -852,48 +853,23 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
         >
           {/* Breadcrumb. Hidden below md (C-04): on a phone the fold is gallery, title,
               price, the first selector and the buy button; the trail pushes them down. */}
-          <nav className="mb-8 hidden items-center gap-2 text-sm text-muted-foreground md:flex">
-            <Link href={storeUrl('/')} className="hover:text-primary">
-              {t('Home', translations['Home'])}
-            </Link>
-            <span>/</span>
-            <Link
-              href={storeUrl('/products')}
-              className="hover:text-primary flex items-center gap-1"
-            >
-              <svg
-                className={`h-3.5 w-3.5 ${language === 'ar' ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-              {t('Products', translations['Products'])}
-            </Link>
-            <span>/</span>
-            {/* Category segment — links back to the PLP filtered to this
-                product's primary category (home / products / <category> /
-                <product>). Locale-aware label; only renders when the product
-                has a category. */}
-            {categoryName && cat0?.category?.slug && (
-              <>
-                <Link
-                  href={storeUrl(`/products?category=${cat0.category.slug}`)}
-                  className="hover:text-primary"
-                >
-                  {categoryName}
-                </Link>
-                <span>/</span>
-              </>
-            )}
-            <span className="text-foreground">{displayName}</span>
-          </nav>
+          <Breadcrumbs
+            className="mb-8 hidden text-sm md:block"
+            items={[
+              { label: t('Home', translations['Home']), href: storeUrl('/') },
+              { label: t('Products', translations['Products']), href: storeUrl('/products') },
+              // Category segment: back to the PLP filtered to the primary category.
+              ...(categoryName && cat0?.category?.slug
+                ? [
+                    {
+                      label: categoryName,
+                      href: storeUrl(`/products?category=${cat0.category.slug}`),
+                    },
+                  ]
+                : []),
+              { label: displayName },
+            ]}
+          />
 
           {/* Product Details */}
           <div className="grid gap-8 md:grid-cols-12">
