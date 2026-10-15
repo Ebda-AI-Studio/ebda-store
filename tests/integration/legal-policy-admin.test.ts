@@ -511,6 +511,84 @@ describe.skipIf(!hasDb)('super-admin policy updates', () => {
       }
     });
 
+    it('Retry failed EXCLUDES TIMEOUT_UNKNOWN rows (may have been delivered); the overview lists them separately', async () => {
+      expect((await call('post', op, 'super_admin', sendUrl('terms', V))).status).toBe(202);
+      const a = await mkUser('ta', 'store_admin');
+      try {
+        await owner.legalNoticeDelivery.createMany({
+          data: [
+            { userId: merchant, docKey: 'terms', version: V, status: 'failed', error: 'boom' },
+            { userId: a, docKey: 'terms', version: V, status: 'failed', error: 'TIMEOUT_UNKNOWN' },
+          ],
+        });
+        const before = (
+          await call('get', op, 'super_admin', '/api/v1/admin/legal-policies')
+        ).body.data.policies.find((r: { docKey: string }) => r.docKey === 'terms');
+        expect(before.deliveries.failed).toBe(1);
+        expect(before.unknownOutcome).toBe(1);
+        expect(before.failedDeliveries).toHaveLength(1);
+        expect(before.unknownDeliveries).toHaveLength(1);
+        expect(before.unknownDeliveries[0]).toMatchObject({ error: 'TIMEOUT_UNKNOWN' });
+
+        send.mockClear();
+        const r = await call('post', op, 'super_admin', url('retry-failed'));
+        expect(r.status).toBe(202);
+        expect(r.body.data.requeued).toBe(1);
+        const rows = await owner.legalNoticeDelivery.findMany({
+          where: { docKey: 'terms', version: V },
+          select: { userId: true, status: true, error: true },
+        });
+        const by = Object.fromEntries(rows.map(x => [x.userId, x]));
+        expect(by[merchant]).toMatchObject({ status: 'queued', error: null });
+        expect(by[a]).toMatchObject({ status: 'failed', error: 'TIMEOUT_UNKNOWN' });
+        // Only unknown-outcome rows left: a second press requeues nothing and emits nothing.
+        await owner.legalNoticeDelivery.deleteMany({
+          where: { userId: merchant, docKey: 'terms', version: V },
+        });
+        send.mockClear();
+        const again = await call('post', op, 'super_admin', url('retry-failed'));
+        expect(again.body.data.requeued).toBe(0);
+        expect(send).not.toHaveBeenCalled();
+      } finally {
+        await owner.legalNoticeDelivery.deleteMany({ where: { docKey: 'terms', version: V } });
+        await owner.user.delete({ where: { id: a } });
+      }
+    });
+
+    it('Resume and Retry failed refuse a superseded version with 409 NOT_CURRENT (no event, no row change)', async () => {
+      expect((await call('post', op, 'super_admin', sendUrl('terms', V))).status).toBe(202);
+      await owner.legalNoticeDelivery.create({
+        data: { userId: merchant, docKey: 'terms', version: V, status: 'failed', error: 'boom' },
+      });
+      try {
+        // A newer terms version makes V superseded.
+        const NEWER = '99.1';
+        __setLegalPoliciesForTests({
+          ...FIXTURE,
+          terms: {
+            history: [
+              ...FIXTURE.terms.history,
+              { ...FIXTURE.terms.history[FIXTURE.terms.history.length - 1], version: NEWER },
+            ],
+          },
+        });
+        send.mockClear();
+        for (const path of ['resume', 'retry-failed'] as const) {
+          const r = await call('post', op, 'super_admin', url(path));
+          expect(r.status).toBe(409);
+          expect(r.body.error.code).toBe('NOT_CURRENT');
+        }
+        expect(send).not.toHaveBeenCalled();
+        const row = await owner.legalNoticeDelivery.findFirstOrThrow({
+          where: { docKey: 'terms', version: V, userId: merchant },
+        });
+        expect(row).toMatchObject({ status: 'failed', error: 'boom' });
+      } finally {
+        __setLegalPoliciesForTests(FIXTURE);
+        await owner.legalNoticeDelivery.deleteMany({ where: { docKey: 'terms', version: V } });
+      }
+    });
+
     it('a Retry whose enqueue fails puts the rows back to failed: no orphan queued rows', async () => {
       expect((await call('post', op, 'super_admin', sendUrl('terms', V))).status).toBe(202);
       await owner.legalNoticeDelivery.create({

@@ -440,7 +440,10 @@ export default function UserDetailPage() {
 
               <div className="flex items-center justify-between gap-3 border-t border-border pt-6">
                 <p className="min-w-0 break-all text-xs text-muted-foreground">
-                  {t('userIdLabel')} <span className="font-mono">{user.id}</span>
+                  {t('userIdLabel')}{' '}
+                  <span dir="ltr" className="font-mono" style={{ unicodeBidi: 'isolate' }}>
+                    {user.id}
+                  </span>
                 </p>
                 <button
                   type="button"

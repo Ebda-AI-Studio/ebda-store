@@ -269,6 +269,34 @@ describe('sendNextBatch (A4: slot with a budget BEFORE the claim)', () => {
     expect(h.rows.find(x => x.userId === 'u2')?.status).toBe('sent');
   });
 
+  it.each([
+    ['a request timeout', new Error('Resend send failed: request timed out')],
+    ['a socket timeout code', Object.assign(new Error('fetch failed'), { code: 'ETIMEDOUT' })],
+    [
+      'an aborted request',
+      Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }),
+    ],
+    ['a dropped connection', new Error('read ECONNRESET')],
+  ])('%s is recorded as TIMEOUT_UNKNOWN (the mail may have been delivered)', async (_l, err) => {
+    seed('u1');
+    h.sendLegalNoticeEmail.mockImplementation(async () => {
+      throw err;
+    });
+    const r = await service.sendNextBatch('op-1', 'terms', V);
+    expect(r).toMatchObject({ sent: 0, failed: 1 });
+    expect(h.rows[0]).toMatchObject({ status: 'failed', error: 'TIMEOUT_UNKNOWN' });
+  });
+
+  it('an ordinary provider rejection keeps its scrubbed message, not TIMEOUT_UNKNOWN', () => {
+    expect(service.isUnknownOutcomeError(new Error('Resend send failed: invalid to address'))).toBe(
+      false
+    );
+    expect(service.isUnknownOutcomeError(new Error('Resend send failed: rate limited (429)'))).toBe(
+      false
+    );
+    expect(service.isUnknownOutcomeError('timeout')).toBe(true);
+  });
+
   it('never re-sends a row already in sending (a crash after the mail went out)', async () => {
     seed('u1');
     h.rows[0].status = 'sending';

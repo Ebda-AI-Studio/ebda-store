@@ -41,6 +41,52 @@ describe('scrubEmails', () => {
     expect(out).toContain('***');
   });
 
+  // Residual forms from the final re-review: the "@" is spelled in a way the detector missed.
+  it.each([
+    ['fullwidth ＠ (U+FF20)', 'to jane.doe\uFF20gmail.com failed', 'jane.doe'],
+    ['small ﹫ (U+FE6B)', 'to jane.doe\uFE6Bgmail.com failed', 'jane.doe'],
+    ['double-encoded %2540', 'GET ?to=jane.doe%2540gmail.com', 'jane.doe'],
+    ['triple-encoded %252540', 'GET ?to=jane.doe%252540gmail.com', 'jane.doe'],
+    ['&#64 without the semicolon', 'recipient jane.doe&#64gmail.com', 'jane.doe'],
+    ['&#x40 without the semicolon', 'recipient jane.doe&#x40gmail.com', 'jane.doe'],
+    ['&amp;#64; (entity of an entity)', 'recipient jane.doe&amp;#64;gmail.com', 'jane.doe'],
+    ['quoted-printable =40', 'body jane.doe=40gmail.com end', 'jane.doe'],
+    ['RFC 2047 encoded word', 'From: =?utf-8?Q?jane.doe=40gmail.com?=', 'jane.doe'],
+    ['JSON-escaped \\u0040', 'raw jane.doe\\u0040gmail.com', 'jane.doe'],
+    ['escaped \\x40', 'raw jane.doe\\x40gmail.com', 'jane.doe'],
+    ['space before @', 'to jane.doe @gmail.com bounced', 'jane.doe'],
+    ['spaces around @', 'to jane.doe @ gmail.com bounced', 'jane.doe'],
+    ['spaces around a fullwidth ＠', 'to jane.doe \uFF20 gmail.com bounced', 'jane.doe'],
+    ['quoted local with escaped quotes', 'bad "john \\"q\\" doe"@example.com here', 'john'],
+    [
+      'quoted local part over 64 characters',
+      `bad "${'secret word '.repeat(8)}"@example.com here`,
+      'secret word',
+    ],
+  ])('masks %s', (_label, input, secret) => {
+    const out = scrubEmails(input);
+    expect(leaks(out, secret)).toEqual([]);
+    expect(out).toContain('***');
+  });
+
+  it('keeps the masked shape for a spaced address and leaves ordinary "=40" text alone', () => {
+    expect(scrubEmails('to jane.doe @ gmail.com bounced')).toBe('to j***@gmail.com bounced');
+    expect(scrubEmails('limit=40 rows, price=40.5, id=400')).toBe(
+      'limit=40 rows, price=40.5, id=400'
+    );
+  });
+
+  it('a quoted local part is replaced WHOLE, with its domain, by ***', () => {
+    expect(scrubEmails('bad "john \\"q\\" doe"@example.com here')).toBe('bad *** here');
+  });
+
+  it('Turkish İ: matching the known recipient does not drift indices or drop trailing text', () => {
+    const out = scrubEmails('İİİİİİ JANE.DOE@GMAIL.COM x', ['jane.doe@gmail.com']);
+    expect(out).toBe('İİİİİİ j***@gmail.com x');
+    expect(scrubEmails('İstanbul İİ x@y.zz tail', ['x@y.zz'])).toBe('İstanbul İİ x***@y.zz tail');
+    expect(scrubEmails('İİİİİİ user@mail.com tail')).toBe('İİİİİİ u***@mail.com tail');
+  });
+
   it('the known recipient is redacted exactly and case-insensitively even when not email-shaped there', () => {
     const out = scrubEmails('Rejected: JANE.Doe@Gmail.com / user jane.doe@gmail.com', [
       'jane.doe@gmail.com',
@@ -57,6 +103,10 @@ describe('scrubEmails', () => {
     const t0 = performance.now();
     scrubEmails(nasty);
     scrubEmails('%40'.repeat(300_000));
+    scrubEmails('"'.repeat(300_000));
+    scrubEmails(`"${'\\"'.repeat(300_000)}@`);
+    scrubEmails(` ${'@ '.repeat(300_000)}`);
+    scrubEmails('%25'.repeat(300_000));
     expect(performance.now() - t0).toBeLessThan(200);
   });
 

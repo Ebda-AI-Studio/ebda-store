@@ -246,4 +246,67 @@ describe('policy updates page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'confirmSend' }));
     expect(await screen.findByText('tooLate')).toBeTruthy();
   });
+
+  it('lists TIMEOUT_UNKNOWN rows separately as "may have been delivered", not under failed', async () => {
+    apiGet.mockResolvedValue({
+      data: {
+        policies: [
+          {
+            ...row('terms', true, SENT),
+            deliveries: { queued: 0, sending: 0, sent: 3, failed: 0 },
+            failedDeliveries: [],
+            unknownOutcome: 2,
+            unknownDeliveries: [
+              {
+                maskedEmail: 'a***@example.com',
+                error: 'TIMEOUT_UNKNOWN',
+                at: '2026-10-21T10:05:00.000Z',
+              },
+              {
+                maskedEmail: 'b***@example.com',
+                error: 'TIMEOUT_UNKNOWN',
+                at: '2026-10-21T10:06:00.000Z',
+              },
+            ],
+          },
+        ],
+      },
+      error: null,
+    });
+    render(<PolicyUpdatesPage />);
+    expect(await screen.findByText('unknownTitle')).toBeTruthy();
+    expect(screen.getByText(/^unknownHint:/).textContent).toContain('"n":"2"');
+    expect(screen.getByText(/a\*\*\*@example\.com/)).toBeTruthy();
+    expect(screen.queryByText('failedTitle')).toBeNull();
+    // nothing retryable: no Retry failed button
+    expect(screen.queryByRole('button', { name: /^retryFailed/ })).toBeNull();
+  });
+
+  it.each(['resume', 'retry'] as const)(
+    '%s on a superseded version shows the NOT_CURRENT message',
+    async action => {
+      const failed = {
+        ...row('terms', true, SENT),
+        deliveries: { queued: 0, sending: 0, sent: 1, failed: 1 },
+        stalled: true,
+        failedDeliveries: [
+          { maskedEmail: 'a***@example.com', error: 'x', at: '2026-10-21T10:05:00.000Z' },
+        ],
+      };
+      apiGet.mockResolvedValue({ data: { policies: [failed] }, error: null });
+      apiPost.mockResolvedValue({
+        data: null,
+        error: { status: 409, code: 'NOT_CURRENT', message: 'x' },
+      });
+      render(<PolicyUpdatesPage />);
+      fireEvent.click(
+        await screen.findByRole('button', { name: action === 'resume' ? 'resume' : /^retryFailed/ })
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: action === 'resume' ? 'resumeConfirm' : 'retryConfirm' })
+      );
+      expect(await screen.findByText('notCurrent')).toBeTruthy();
+      expect(screen.queryByText('actionFailed')).toBeNull();
+    }
+  );
 });

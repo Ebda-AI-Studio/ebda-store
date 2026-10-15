@@ -43,26 +43,42 @@ export function maskEmail(email: string | null | undefined): string | null {
 /** Longest free text `scrubEmails` looks at; the rest is dropped BEFORE matching (bounded cost). */
 export const SCRUB_EMAILS_MAX = 2000;
 
-/** Every spelling of "@" a mail provider (or an HTML/URL rendering of its text) may use. */
-const AT_FORMS = /@|%40|&#0*64;|&#x0*40;|&commat;/i;
-const AT_ENCODED = /%40|&#0*64;|&#x0*40;|&commat;/gi;
-/** A quoted local part (`"john doe"@x.com`): it may hold spaces, so tokens alone miss it. */
-const QUOTED_LOCAL = /"[^"\r\n]{1,64}"(?=\s*(?:@|%40|&#0*64;|&#x0*40;|&commat;))/gi;
+/**
+ * Every spelling of "@" a mail provider (or an HTML/URL/JSON/MIME rendering of its text) may
+ * use, for DETECTION: `@`, fullwidth U+FF20, small U+FE6B, `%40` (also double-encoded
+ * `%2540`), `&#64` / `&#x40` (semicolon optional), `&commat;`, `&amp;`-wrapped entities,
+ * quoted-printable `=40` (only before a domain-looking run: `limit=40` stays text), and the
+ * escapes `\u0040`, `\x40`, `%u0040`.
+ */
+const AT_SRC = [
+  '@',
+  '\uFF20',
+  '\uFE6B',
+  '%(?:25)*40',
+  '%u0040',
+  '&(?:amp;)*(?:#0*64(?!\\d)|#x0*40(?![0-9a-f])|commat)(?:;)?',
+  '\\\\u0*0040',
+  '\\\\x40',
+  '=40(?=[\\p{L}\\p{M}\\p{N}-]+\\.[\\p{L}\\p{M}\\p{N}])',
+].join('|');
+const AT_FORMS = new RegExp(AT_SRC, 'iu');
+const AT_ENCODED = new RegExp(AT_SRC, 'giu');
+/** `local @ domain`: spaces around any "@" form are dropped so the pair is read as one address. */
+const SPACED_AT = new RegExp(`(?<=\\S)[\\p{Zs}\\t]*(?:${AT_SRC})[\\p{Zs}\\t]*(?=\\S)`, 'giu');
+/**
+ * A quoted local part (`"john doe"@x.com`, escaped quotes, any length): it may hold spaces, so
+ * tokens alone miss it. Linear: the two alternatives of the body cannot match the same char.
+ */
+const QUOTED_LOCAL = new RegExp(`"(?:[^"\\\\\\r\\n]|\\\\.)*"(?=[\\p{Zs}\\t]*(?:${AT_SRC}))`, 'giu');
 /** The ONLY address shape we split: dot-atom local part, dotted domain, one "@". */
 const CLEAN_ADDRESS =
   /^([\p{L}\p{M}\p{N}._+*-]+)@([\p{L}\p{M}\p{N}-]+(?:\.[\p{L}\p{M}\p{N}-]+)+)$/u;
 
+/** Case-insensitive replace-all with no index arithmetic (lowercasing `İ` changes the length). */
 function caseInsensitiveReplaceAll(text: string, needle: string, by: string): string {
   if (!needle) return text;
-  const hay = text.toLowerCase();
-  const n = needle.toLowerCase();
-  let out = '';
-  let from = 0;
-  for (let i = hay.indexOf(n); i !== -1; i = hay.indexOf(n, from)) {
-    out += text.slice(from, i) + by;
-    from = i + n.length;
-  }
-  return out + text.slice(from);
+  const re = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu');
+  return text.replace(re, () => by);
 }
 
 /**
@@ -97,9 +113,10 @@ function maskAddressToken(tok: string): string {
  * stored or shown. Hardened after commit security scans (parser differential, local-part split):
  *  1. the input is cut to SCRUB_EMAILS_MAX BEFORE any matching, so cost is bounded;
  *  2. the `known` recipient addresses are replaced first, exact and case-insensitive;
- *  3. a quoted local part (`"john doe"@x.com`) is masked whole;
- *  4. every whitespace-delimited token holding any "@" form (`@`, `%40`, `&#64;`, `&#x40;`,
- *     `&commat;`, incl. `mailto:` and unicode/IDN) goes through maskAddressToken, which keeps
+ *  3. spaces around an "@" form are dropped (`jane.doe @ gmail.com` is one address), then a
+ *     quoted local part (`"john doe"@x.com`, escaped quotes, any length) is masked whole;
+ *  4. every whitespace-delimited token holding any "@" form (see AT_SRC: fullwidth, `%2540`,
+ *     `&#64`, `=40`, `\\x40` ..., incl. `mailto:` and unicode/IDN) goes through maskAddressToken, which keeps
  *     only `x***@domain` for an unambiguous address and otherwise masks the WHOLE token.
  * One linear pass over tokens: no nested quantifiers, no backtracking blow-up. Broad and
  * fail-closed on purpose: a false positive costs a masked word, a miss costs an address.
@@ -112,6 +129,7 @@ export function scrubEmails(
   for (const k of known) {
     if (k && k.trim()) s = caseInsensitiveReplaceAll(s, k.trim(), maskEmail(k.trim()) ?? '***');
   }
+  s = s.replace(SPACED_AT, m => m.trim());
   s = s.replace(QUOTED_LOCAL, '"***"');
   return s.replace(/\S+/g, tok => (AT_FORMS.test(tok) ? maskAddressToken(tok) : tok));
 }

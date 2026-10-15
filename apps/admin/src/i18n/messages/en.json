@@ -10230,7 +10230,11 @@
     "resumeStarted": "Email run resumed.",
     "retryStarted": "Retrying {n} emails.",
     "retryNone": "Nothing to retry: no email is marked failed now.",
-    "actionFailed": "Could not start the email run. Try again."
+    "actionFailed": "Could not start the email run. Try again.",
+    "notCurrent": "This version is no longer the current one, so it cannot be sent, resumed or retried. Reload the page.",
+    "unknownTitle": "May have been delivered: check before re-sending",
+    "unknownHint": "{n} emails timed out and the provider may still have delivered them. Retry failed does not send these again. Check with the owner first.",
+    "unknownRow": "{email} ({time} UTC)"
   },
   "legalAcceptances": {
     "adminTitle": "Policy acceptances",

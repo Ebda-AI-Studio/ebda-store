@@ -75,6 +75,7 @@ not even be marked), `legal.notice.withdraw_failed`. Each names the document and
 | `RESEND_NOT_CONFIGURED` | Production without a Resend key. Checked ONCE at the start of each run: every queued row is failed at once, nobody is mailed, P1 `legal.notice.mailer_not_configured`. Fix `RESEND_API_KEY`, then Retry failed. |
 | `USER_GONE`             | The account was deleted (or no longer exists) when its turn came. Not mailed.                                                                                                                                   |
 | `NOT_RECIPIENT`         | The account is no longer a store owner (`store_admin`) when its turn came. Not mailed.                                                                                                                          |
+| `TIMEOUT_UNKNOWN`       | The provider call timed out or the connection dropped: the mail MAY have been delivered. Listed apart on the page ("may have been delivered: check before re-sending"). Retry failed NEVER re-sends these.      |
 | `RETRY_ENQUEUE_FAILED`  | A Retry failed could not start its run; the rows went back to failed. Press Retry failed again.                                                                                                                 |
 | any other text          | The provider's error, emails scrubbed (fail-closed) and cut to 300 characters.                                                                                                                                  |
 
@@ -108,16 +109,25 @@ its mail, and `sending`/`sent` rows are never touched.
 2. **Failed emails** -> fix the cause first (e.g. `RESEND_API_KEY`), then press **Retry failed (N)**.
    It moves that version's `failed` rows back to `queued` (an UPDATE; DELETE is revoked on the
    table) and resumes. If it says "Nothing to retry", nothing is marked failed now.
-3. **Stuck while sending** -> no button by design (the mail may have gone out). Check Resend; for an
+3. **May have been delivered (`TIMEOUT_UNKNOWN`)** -> the page lists these separately and Retry
+   failed skips them. Check Resend (search the recipient, or the Emails log around the stamp). If
+   it was not delivered, contact the owner directly; do not edit the row. Do NOT work around the
+   skip with the manual SQL below unless you have checked Resend first.
+4. **Stuck while sending** -> no button by design (the mail may have gone out). Check Resend; for an
    owner who did not get it, contact them directly. The banner still reaches them.
-4. Refresh until the counts settle; a new failure raises a new P1.
+5. Refresh until the counts settle; a new failure raises a new P1.
+
+Resume and Retry failed only work on a document's CURRENT version: for a superseded version the
+API answers 409 `NOT_CURRENT` and the page says so. A superseded notice cannot be acknowledged by
+merchants any more, so it is not re-mailed.
 
 Only if the admin UI is unavailable: the same, by hand. Use the OWNER connection (under the app
 role RLS shows no rows), `neonctl connection-string … --role-name <owner>`:
 
     -- failed -> queued, for ONE version; never touch 'sending' or 'sent'
     UPDATE legal_notice_deliveries SET status='queued', error=NULL, updated_at=now()
-     WHERE doc_key='terms' AND version='1.1' AND status='failed';
+     WHERE doc_key='terms' AND version='1.1' AND status='failed'
+       AND error IS DISTINCT FROM 'TIMEOUT_UNKNOWN';
     SELECT id FROM legal_notice_sends WHERE doc_key='terms' AND version='1.1';
 
 then send the event `legal/notice.send-requested` from the Inngest dashboard with

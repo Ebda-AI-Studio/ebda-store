@@ -35,6 +35,9 @@ interface PolicyRow {
   noRun?: boolean;
   stalled?: boolean;
   failedDeliveries?: Array<{ maskedEmail: string; error: string | null; at: string }>;
+  /** TIMEOUT_UNKNOWN rows: the mail may have been delivered; never retried by the page. */
+  unknownOutcome?: number;
+  unknownDeliveries?: Array<{ maskedEmail: string; error: string | null; at: string }>;
   acceptedCount: number;
   canSend: boolean;
   sendBlocked?: 'NOTICE_TOO_LATE' | null;
@@ -82,13 +85,15 @@ function PolicyUpdatesInner() {
       setMessage(
         error.code === 'NOTICE_TOO_LATE'
           ? t('tooLate')
-          : action !== 'send'
-            ? t('actionFailed')
-            : error.status === 409
-              ? t('alreadySent')
-              : error.code === 'WITHDRAW_FAILED'
-                ? t('sendUncertain')
-                : t('sendFailed')
+          : error.code === 'NOT_CURRENT'
+            ? t('notCurrent')
+            : action !== 'send'
+              ? t('actionFailed')
+              : error.status === 409
+                ? t('alreadySent')
+                : error.code === 'WITHDRAW_FAILED'
+                  ? t('sendUncertain')
+                  : t('sendFailed')
       );
     } else if (action === 'send') {
       setMessage(t('sendStarted'));
@@ -202,6 +207,24 @@ function PolicyUpdatesInner() {
                           email: `⁦${f.maskedEmail}⁩`,
                           // First-strong isolate: provider text is usually Latin inside Arabic copy.
                           reason: `\u2068${f.error ?? '-'}\u2069`,
+                          time: utcStamp(f.at),
+                        })}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {row.send && (row.unknownDeliveries?.length ?? 0) > 0 && (
+                <div className="mt-2" data-testid="unknown-outcome">
+                  <h3 className="text-sm font-medium">{t('unknownTitle')}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {t('unknownHint', { n: String(row.unknownOutcome ?? 0) })}
+                  </p>
+                  <ul className="mt-1 space-y-1 text-xs">
+                    {row.unknownDeliveries?.map((f, i) => (
+                      <li key={`${f.maskedEmail}-${i}`} className="break-words">
+                        {t('unknownRow', {
+                          email: `\u2066${f.maskedEmail}\u2069`,
                           time: utcStamp(f.at),
                         })}
                       </li>

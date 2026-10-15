@@ -307,6 +307,24 @@ async function markDelivery(
   );
 }
 
+/**
+ * Failure reason for a send whose outcome we cannot know: the request timed out or the
+ * connection died after the provider may have accepted it. The mail MAY have been delivered,
+ * so "Retry failed" never re-sends these rows (Ruling LEGAL-5); a super admin checks first.
+ */
+export const TIMEOUT_UNKNOWN = 'TIMEOUT_UNKNOWN';
+const UNKNOWN_OUTCOME_RE =
+  /time(?:d)?[ -]?out|ETIMEDOUT|ESOCKETTIMEDOUT|ECONNRESET|EPIPE|socket hang up|aborted|AbortError|UND_ERR_(?:HEADERS|BODY|SOCKET)/i;
+
+/** True for a timeout / dropped-connection error: the send may or may not have gone out. */
+export function isUnknownOutcomeError(err: unknown): boolean {
+  const e = err as { name?: unknown; code?: unknown; message?: unknown; cause?: unknown } | null;
+  const parts = [e?.name, e?.code, e?.message, (e?.cause as { code?: unknown } | undefined)?.code]
+    .filter(x => typeof x === 'string')
+    .join(' ');
+  return UNKNOWN_OUTCOME_RE.test(parts || String(err));
+}
+
 /** Provider text, emails scrubbed, cut to ERROR_MAX. Pre-sliced so a huge message is cheap (M9). */
 function deliveryError(err: unknown, recipient?: string): string {
   const msg = String((err as Error)?.message ?? err);
@@ -395,7 +413,7 @@ export async function sendNextBatch(
         ...content,
       });
     } catch (err) {
-      error = deliveryError(err, user!.email);
+      error = isUnknownOutcomeError(err) ? TIMEOUT_UNKNOWN : deliveryError(err, user!.email);
       // No raw recipient address in logs (the drain is off-platform): the scrubbed reason only.
       logger.warn({ reason: error, userId, docKey, version }, '[LEGAL-NOTICE] send failed');
     }
@@ -478,6 +496,12 @@ export interface LegalPolicyOverviewRow {
   stalled: boolean;
   /** Newest first, capped at FAILED_DELIVERIES_LIST_MAX (A11: no SQL-only runbook step). */
   failedDeliveries: FailedDeliveryRow[];
+  /**
+   * Rows that failed with TIMEOUT_UNKNOWN: the mail MAY have been delivered. NOT counted in
+   * `deliveries.failed`, NOT requeued by Retry failed; listed separately, newest first.
+   */
+  unknownOutcome: number;
+  unknownDeliveries: FailedDeliveryRow[];
   acceptedCount: number;
   /** Material, current, not yet announced, and (fee change) still 30 days out. */
   canSend: boolean;
@@ -502,6 +526,8 @@ export async function policyOverview(
       const send = sends.find(s => s.docKey === docKey && s.version === version) ?? null;
       const deliveries = { queued: 0, sending: 0, sent: 0, failed: 0 };
       let failedDeliveries: FailedDeliveryRow[] = [];
+      let unknownDeliveries: FailedDeliveryRow[] = [];
+      let unknownOutcome = 0;
       let stuckSending = 0;
       let noRun = false;
       let stalled = false;
@@ -531,6 +557,10 @@ export async function policyOverview(
           noRun ||
           (deliveries.queued > 0 && now.getTime() - lastActivity > LEGAL_NOTICE_STUCK_AFTER_MS);
         if (deliveries.failed > 0) {
+          unknownOutcome = await prisma.legalNoticeDelivery.count({
+            where: { docKey, version, status: 'failed', error: TIMEOUT_UNKNOWN },
+          });
+          deliveries.failed -= unknownOutcome;
           const failed = await prisma.legalNoticeDelivery.findMany({
             where: { docKey, version, status: 'failed' },
             orderBy: { updatedAt: 'desc' },
@@ -542,13 +572,15 @@ export async function policyOverview(
             select: { id: true, email: true },
           });
           const emailOf = new Map(users.map(u => [u.id, u.email]));
-          failedDeliveries = failed.map(f => ({
+          const toRow = (f: (typeof failed)[number]): FailedDeliveryRow => ({
             maskedEmail: maskEmail(emailOf.get(f.userId)) ?? '***',
             error: f.error
               ? scrubEmails(f.error, [emailOf.get(f.userId)]).slice(0, ERROR_MAX)
               : null,
             at: f.updatedAt.toISOString(),
-          }));
+          });
+          failedDeliveries = failed.filter(f => f.error !== TIMEOUT_UNKNOWN).map(toRow);
+          unknownDeliveries = failed.filter(f => f.error === TIMEOUT_UNKNOWN).map(toRow);
         }
       }
       const acceptedCount = await prisma.legalAcceptance.count({ where: { docKey, version } });
@@ -570,6 +602,8 @@ export async function policyOverview(
         noRun,
         stalled,
         failedDeliveries,
+        unknownOutcome,
+        unknownDeliveries,
         acceptedCount,
         canSend: current.material && !send && !sendBlocked,
         sendBlocked,
@@ -695,6 +729,14 @@ async function findSendRow(
   version: string
 ): Promise<{ id: string }> {
   if (!isLegalDocKey(docKey)) throw new AppError(404, 'NOT_FOUND', 'Unknown legal document');
+  // A superseded version can no longer be acknowledged by merchants: never re-mail it.
+  if (currentLegalVersion(activePolicies, docKey).version !== version) {
+    throw new AppError(
+      409,
+      'NOT_CURRENT',
+      'This version is no longer the current version of the document'
+    );
+  }
   const send = await asPlatformOperator(operatorId, () =>
     prisma.legalNoticeSend.findUnique({
       where: { docKey_version: { docKey, version } },
@@ -740,7 +782,14 @@ export async function retryFailedDeliveries(
   const send = await findSendRow(operatorId, docKey, version);
   const moved = await asPlatformOperator(operatorId, async () => {
     const failed = await prisma.legalNoticeDelivery.findMany({
-      where: { docKey, version, status: 'failed' },
+      // TIMEOUT_UNKNOWN rows may have been delivered: never re-sent here. NOT IN would drop
+      // NULL errors, hence the explicit OR.
+      where: {
+        docKey,
+        version,
+        status: 'failed',
+        OR: [{ error: null }, { error: { not: TIMEOUT_UNKNOWN } }],
+      },
       select: { userId: true },
     });
     const ids = failed.map(f => f.userId);
