@@ -12,6 +12,7 @@ import {
   offDaysForSave,
   offDaysFromSettings,
   hasSavedOffDays,
+  hasInvalidOffDays,
 } from '../../../../lib/checkout-delivery-payload';
 import { DeliveryOffDaysField } from '../../../../components/DeliveryOffDaysField';
 import { useT } from '@/i18n/useT';
@@ -58,6 +59,7 @@ export default function CheckoutDeliveryPage() {
   const [deliveryOffDays, setDeliveryOffDays] = useState<number[]>([5]);
   // Whether the store already holds a saved choice: the untouched default is never written.
   const [offDaysSaved, setOffDaysSaved] = useState(false);
+  const [offDaysInvalid, setOffDaysInvalid] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -93,6 +95,7 @@ export default function CheckoutDeliveryPage() {
       setDeliveryDaysMax(typeof dd?.max === 'number' ? String(dd.max) : '');
       setDeliveryOffDays(offDaysFromSettings(settings.deliveryOffDays));
       setOffDaysSaved(hasSavedOffDays(settings.deliveryOffDays));
+      setOffDaysInvalid(hasInvalidOffDays(settings.deliveryOffDays));
     } catch (err) {
       console.error('Failed to fetch checkout delivery settings:', err);
     } finally {
@@ -110,7 +113,7 @@ export default function CheckoutDeliveryPage() {
       setMessage({ type: 'error', text: t('deliveryDaysInvalid') });
       return;
     }
-    const off = offDaysForSave(deliveryOffDays, offDaysSaved);
+    const off = offDaysForSave(deliveryOffDays, offDaysSaved, offDaysInvalid);
     if (!off.ok) {
       setMessage({ type: 'error', text: t('deliveryOffDaysAllOff') });
       return;
@@ -129,7 +132,10 @@ export default function CheckoutDeliveryPage() {
         }),
       });
       if (!error) {
-        if (off.value !== undefined) setOffDaysSaved(true);
+        if (off.value !== undefined) {
+          setOffDaysSaved(off.value !== null);
+          setOffDaysInvalid(false);
+        }
         setMessage({ type: 'success', text: t('successMessage') });
       } else {
         setMessage({ type: 'error', text: error.message || t('failedMessage') });
@@ -149,6 +155,7 @@ export default function CheckoutDeliveryPage() {
     deliveryDaysMax,
     deliveryOffDays,
     offDaysSaved,
+    offDaysInvalid,
     t,
   ]);
 

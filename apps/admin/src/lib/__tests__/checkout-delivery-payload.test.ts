@@ -19,6 +19,7 @@ import {
   parseDeliveryOffDaysInput,
   offDaysForSave,
   hasSavedOffDays,
+  hasInvalidOffDays,
   offDaysFromSettings,
   DELIVERY_WEEK_ORDER,
   type CheckoutDeliveryForm,
@@ -212,6 +213,25 @@ describe('offDaysForSave (the default is not pinned)', () => {
     expect(offDaysForSave([5], true)).toEqual({ ok: true, value: [5] });
     expect(offDaysForSave([6, 5], false)).toEqual({ ok: true, value: [5, 6] });
     expect(offDaysForSave([], false)).toEqual({ ok: true, value: [] });
+  });
+  it('resets an invalid stored value to the default (null) so it cannot block every save', () => {
+    expect(hasInvalidOffDays('friday')).toBe(true);
+    expect(hasInvalidOffDays([9])).toBe(true);
+    expect(hasInvalidOffDays(undefined)).toBe(false);
+    expect(hasInvalidOffDays(null)).toBe(false);
+    expect(hasInvalidOffDays([5])).toBe(false);
+    expect(offDaysForSave([5], false, true)).toEqual({ ok: true, value: null });
+    // an explicit non-default choice still overwrites it
+    expect(offDaysForSave([6], false, true)).toEqual({ ok: true, value: [6] });
+    expect(
+      buildCheckoutDeliverySettings({
+        existingSettings: { deliveryOffDays: 'friday' },
+        config: {} as never,
+        minimumOrderMajor: '',
+        orderInvoiceEmail: '',
+        deliveryOffDays: null,
+      }).deliveryOffDays
+    ).toBeNull();
   });
   it('still refuses all seven', () => {
     expect(offDaysForSave([0, 1, 2, 3, 4, 5, 6], true)).toEqual({ ok: false });

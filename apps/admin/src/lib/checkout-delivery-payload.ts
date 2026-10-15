@@ -81,17 +81,28 @@ export function parseDeliveryOffDaysInput(
  */
 export function offDaysForSave(
   selected: number[],
-  hasSavedValue: boolean
-): { ok: true; value: number[] | undefined } | { ok: false } {
+  hasSavedValue: boolean,
+  hasInvalidStoredValue = false
+): { ok: true; value: number[] | null | undefined } | { ok: false } {
   const parsed = parseDeliveryOffDaysInput(selected);
   if (!parsed.ok) return parsed;
   const isDefault =
     parsed.value.length === DEFAULT_DELIVERY_OFF_DAYS.length &&
     parsed.value.every((d, i) => d === DEFAULT_DELIVERY_OFF_DAYS[i]);
-  return { ok: true, value: isDefault && !hasSavedValue ? undefined : parsed.value };
+  if (isDefault && !hasSavedValue) {
+    // A stored value the schema rejects would be spread back and fail every save of the page
+    // (invoice email, zones, ...): reset it to the default (null) instead of leaving it.
+    return { ok: true, value: hasInvalidStoredValue ? null : undefined };
+  }
+  return { ok: true, value: parsed.value };
 }
 
 /** True when the store has a valid saved `deliveryOffDays` (so the chips show a stored choice). */
+/** True when `deliveryOffDays` is present but not a valid array (script write, future import). */
+export function hasInvalidOffDays(raw: unknown): boolean {
+  return raw !== undefined && raw !== null && !deliveryOffDaysSchema.safeParse(raw).success;
+}
+
 export function hasSavedOffDays(raw: unknown): boolean {
   return deliveryOffDaysSchema.safeParse(raw).success && raw !== undefined && raw !== null;
 }
