@@ -147,7 +147,7 @@ function ProductSkeleton() {
   return (
     <div className="grid gap-8 lg:grid-cols-2 animate-pulse">
       <div className="space-y-4">
-        <div className="aspect-square rounded-2xl bg-muted" />
+        <div className="aspect-square rounded-[var(--radius)] bg-muted" />
       </div>
       <div className="space-y-4">
         <div className="h-6 w-24 rounded bg-muted" />
@@ -893,7 +893,7 @@ export default function ProductDetailClient({
             {/* Images */}
             <div className="space-y-4 md:col-span-5">
               <div
-                className={`relative ${pdpAspectClass} mx-auto max-w-[280px] sm:max-w-[400px] lg:max-w-[600px] overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10`}
+                className={`relative ${pdpAspectClass} mx-auto max-w-[280px] sm:max-w-[400px] lg:max-w-[600px] overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-primary/5 to-primary/10`}
               >
                 {model3d && (
                   <Model3dToggle

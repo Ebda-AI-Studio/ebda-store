@@ -251,7 +251,7 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // is dark on every look (a `foreground` scrim is LIGHT on Lookbook). Pinned by
     // tests/unit/qamar-looks-contrast.test.ts through QAMAR_HERO_SCRIM.
     heroOverlay:
-      'bg-[radial-gradient(ellipse_at_center,rgb(20_20_20/0.55)_0%,rgb(20_20_20/0.2)_75%)]',
+      'bg-[radial-gradient(ellipse_at_center,rgb(20_20_20/0.65)_0%,rgb(20_20_20/0.65)_60%,rgb(20_20_20/0.3)_100%)]',
     heroHeadline: 'font-display text-3xl sm:text-5xl md:text-6xl font-bold leading-[1.2]',
     heroCta:
       'rounded-[var(--radius)] bg-background px-8 py-3.5 text-sm font-medium text-foreground hover:bg-background/90 min-h-[44px]',
@@ -261,7 +261,13 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
 };
 
 /** The qamar hero scrim, as painted by `PACK_STYLES.qamar.heroOverlay` (centre = under the text). */
-export const QAMAR_HERO_SCRIM = { color: '#141414', centre: 0.55, edge: 0.2 } as const;
+export const QAMAR_HERO_SCRIM = {
+  color: '#141414',
+  /** held flat from the centre to `plateau` (the headline + subheadline block), then fades */
+  centre: 0.65,
+  plateau: 60,
+  edge: 0.3,
+} as const;
 
 export function getPackStyles(pack: TemplateId | undefined): PackStyles {
   return PACK_STYLES[pack ?? 'modern'] ?? PACK_STYLES.modern;

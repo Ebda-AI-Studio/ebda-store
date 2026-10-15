@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { LOOKS, contrastRatio, composeStoreTheme, deriveBrandRoles, hexToHsl } from '@ebda/shared';
 import {
   FULL_BLEED_SCRIM,
@@ -63,15 +65,26 @@ describe('qamar hero scrim keeps the white headline legible over a white photo',
   const [r, g, b] = [1, 3, 5].map(i => parseInt(QAMAR_HERO_SCRIM.color.slice(i, i + 2), 16));
   it('the class paints exactly the constant', () => {
     expect(getPackStyles('qamar').heroOverlay).toContain(
-      `rgb(${r}_${g}_${b}/${QAMAR_HERO_SCRIM.centre})_0%`
+      `rgb(${r}_${g}_${b}/${QAMAR_HERO_SCRIM.centre})_0%,rgb(${r}_${g}_${b}/${QAMAR_HERO_SCRIM.centre})_${QAMAR_HERO_SCRIM.plateau}%`
     );
     expect(getPackStyles('qamar').heroOverlay).toContain(
-      `rgb(${r}_${g}_${b}/${QAMAR_HERO_SCRIM.edge})_75%`
+      `rgb(${r}_${g}_${b}/${QAMAR_HERO_SCRIM.edge})_100%`
     );
   });
   it('white over the centre scrim on a white pixel is >= 3:1 (large text)', () => {
     const bg = over(QAMAR_HERO_SCRIM.color, QAMAR_HERO_SCRIM.centre, '#FFFFFF');
     expect(contrastRatio(bg, '#FFFFFF')).toBeGreaterThanOrEqual(3);
+  });
+  it('the subheadline (normal text, HeroBanner `text-white/90`) is >= 4.5:1 over the plateau on a white pixel', () => {
+    const bg = over(QAMAR_HERO_SCRIM.color, QAMAR_HERO_SCRIM.centre, '#FFFFFF');
+    const sub = over('#FFFFFF', 0.9, bg);
+    expect(contrastRatio(bg, sub)).toBeGreaterThanOrEqual(4.5);
+    // HeroBanner still paints the subheadline as white/90 (the measured pair)
+    const src = readFileSync(
+      path.resolve(__dirname, '../../apps/web/src/templates/shared/HeroBanner.tsx'),
+      'utf8'
+    );
+    expect(src).toMatch(/text-white\/90 drop-shadow/);
   });
 });
 
