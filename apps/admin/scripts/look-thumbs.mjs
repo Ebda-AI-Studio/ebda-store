@@ -8,6 +8,19 @@
  *   node apps/admin/scripts/look-thumbs.mjs [lookId ...]
  *
  * Needs macOS Google Chrome, `sips` and `cwebp` (brew install webp). No npm dependencies.
+ *
+ * Storefront mode (a BUILT look, Ruling B1-46): capture the real storefront instead of the mock,
+ * from a local seeded store per look (`scripts/storedemo/seed.mjs --local-look-stores` seeds
+ * qamar-atelier / qamar-lookbook / qamar-vitrine; `{slug}` = the look id with '.' -> '-'):
+ *
+ *   node apps/admin/scripts/look-thumbs.mjs --from-storefront 'http://{slug}.localhost:3100' \
+ *     qamar.atelier qamar.lookbook qamar.vitrine
+ *
+ * Deterministic: 390x844 phone, Arabic, reduced motion, cookie banner pre-dismissed, fixed chrome
+ * (tab bar, sticky bars, dev overlay) hidden, a 390x488 clip from the top of the header (the demo
+ * announcement above it is left out). When the look's signature section (SIGNATURE below) would
+ * fall outside the clip, the clip moves down just enough to show it whole. Uses the repo's
+ * Playwright (root devDependency) in this mode only.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -41,9 +54,81 @@ const fontsFor = template => {
   return [...block.matchAll(/'([^']+)'/g)].map(m => m[1]);
 };
 
-const only = process.argv.slice(2);
+const args = process.argv.slice(2);
+const sfAt = args.indexOf('--from-storefront');
+const storefront = sfAt >= 0 ? args[sfAt + 1] : null;
+if (sfAt >= 0 && !storefront) throw new Error('--from-storefront needs a base URL with {slug}');
+const only = args.filter((a, i) => sfAt < 0 || (i !== sfAt && i !== sfAt + 1));
 const todo = only.length ? looks.filter(l => only.includes(l.id)) : looks;
 mkdirSync(outDir, { recursive: true });
+
+/** The section that makes a look recognisable; the clip always shows it whole when present. */
+// Atelier and Lookbook read from their first screen (hero / collage under the header); Vitrine's
+// occasion bands sit below the fold, so its clip moves down to the first band.
+const SIGNATURE = {
+  'qamar.vitrine': '[data-tile-shape="band"] li',
+};
+
+async function fromStorefront(list) {
+  const { createRequire } = await import('node:module');
+  const { chromium } = createRequire(join(repo, 'package.json'))('playwright');
+  const consent = encodeURIComponent(JSON.stringify({ v: 1, marketing: false, analytics: false }));
+  const work = mkdtempSync(join(tmpdir(), 'look-thumbs-sf-'));
+  const browser = await chromium.launch();
+  try {
+    for (const look of list) {
+      const url = new URL(storefront.replace('{slug}', look.id.replace('.', '-')));
+      const ctx = await browser.newContext({
+        viewport: { width: PHONE_W, height: 844 },
+        deviceScaleFactor: 2,
+        isMobile: true,
+        hasTouch: true,
+        reducedMotion: 'reduce',
+      });
+      await ctx.addCookies([
+        { name: 'force-language', value: 'ar', domain: url.hostname, path: '/' },
+        { name: 'force-cookie-consent', value: consent, domain: url.hostname, path: '/' },
+      ]);
+      const page = await ctx.newPage();
+      await page.goto(url.href, { waitUntil: 'networkidle', timeout: 180000 });
+      await page.evaluate(() => document.fonts?.ready);
+      const y = await page.evaluate(
+        ({ sel, h }) => {
+          document.querySelectorAll('nextjs-portal').forEach(el => el.remove());
+          for (const el of document.querySelectorAll('body *'))
+            if (getComputedStyle(el).position === 'fixed') el.style.display = 'none';
+          const header = document.querySelector('header');
+          const top = header ? header.getBoundingClientRect().top + window.scrollY : 0;
+          const sig = sel ? document.querySelector(sel) : null;
+          const bottom = sig ? sig.getBoundingClientRect().bottom + window.scrollY : 0;
+          return Math.round(Math.max(top, bottom - h));
+        },
+        { sel: SIGNATURE[look.id] ?? null, h: SHOT_H }
+      );
+      await page.waitForTimeout(400);
+      const png = join(work, `${look.id}.png`);
+      await page.screenshot({
+        path: png,
+        clip: { x: 0, y, width: PHONE_W, height: SHOT_H },
+        fullPage: true,
+      });
+      await ctx.close();
+      execFileSync('sips', ['--resampleWidth', String(THUMB_W), png], { stdio: 'ignore' });
+      execFileSync('cwebp', ['-quiet', '-q', QUALITY, png, '-o', join(outDir, `${look.id}.webp`)]);
+      console.log('wrote', `${look.id}.webp`, `(storefront, clip y=${y})`);
+    }
+  } finally {
+    await browser.close();
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+if (storefront) {
+  // Only built looks have a storefront to capture: name them, never "all 15".
+  if (!only.length) throw new Error('--from-storefront needs the look ids to capture');
+  await fromStorefront(todo);
+  process.exit(0);
+}
 const work = mkdtempSync(join(tmpdir(), 'look-thumbs-'));
 const imgBase = pathToFileURL(join(marketing, 'public/looks/img')).href;
 
