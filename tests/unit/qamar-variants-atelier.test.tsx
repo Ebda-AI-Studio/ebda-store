@@ -127,6 +127,9 @@ describe('Atelier mix', () => {
     expect(mix.find(x => x.type === 'category-grid')?.design).toEqual({
       layout: 'chips',
       layoutMobile: 'chips',
+      // STOP 1 critique (B1-26): a chip row sits right under the hero, not in 200px of air.
+      paddingTop: 'tight',
+      paddingBottom: 'none',
     });
     expect(mix.find(x => x.type === 'image-text')?.design).toEqual({ layout: 'full-bleed' });
   });

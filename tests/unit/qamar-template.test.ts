@@ -27,6 +27,12 @@ describe('qamar skin id', () => {
   it('has a theme, a baseline and a template entry', () => {
     expect(TEMPLATE_THEMES.qamar).toBeDefined();
     expect(TEMPLATE_LAYOUT_BASELINES.qamar).toBeDefined();
+    // Muted footer links on a primary-coloured footer fail AA on every Qamar look (B1-25).
+    expect(TEMPLATE_LAYOUT_BASELINES.qamar.footer?.bgColor).toBeUndefined();
+    expect(TEMPLATE_LAYOUT_BASELINES.minimal.footer?.bgColor).toBe('token:primary');
+    // The photo is the card on every surface (B1-1, B1-25); minimal keeps its frame.
+    expect(TEMPLATE_LAYOUT_BASELINES.qamar.productCardDefaults?.showCardFrame).toBe(false);
+    expect(TEMPLATE_LAYOUT_BASELINES.minimal.productCardDefaults?.showCardFrame).toBe(true);
     expect(TEMPLATES.find(t => t.id === 'qamar')?.nameAr).toBe('قمر');
     // The skin theme is the neutral base under a look: true white page, ink text, no dividers.
     const t = getTemplateTheme('qamar');
@@ -63,5 +69,16 @@ describe('qamar skin id', () => {
     expect(svc).toContain(
       "const validTemplates = ['modern', 'classic', 'minimal', 'bold', 'elegant', 'dahab'];"
     );
+  });
+});
+
+describe('qamar PDP title (STOP 1 critique)', () => {
+  const css = readFileSync(path.join(root, 'apps/web/src/styles/globals.css'), 'utf8');
+  it('sizes the PDP title only under the qamar pack, at >= 1.5rem', () => {
+    const m = css.match(/\[data-pack='qamar'\] h1\[data-zone='productName'\] \{([^}]*)\}/);
+    expect(m, 'qamar-scoped rule').not.toBeNull();
+    expect(m![1]).toMatch(/font-size: clamp\(1\.5rem,/);
+    // Every other skin keeps its PDP title untouched (byte-identical constraint).
+    expect(css).not.toMatch(/(^|\n)h1\[data-zone='productName'\]/);
   });
 });

@@ -1286,6 +1286,15 @@ html[dir='rtl'] [data-pack='qamar'] .font-display {
 [data-pack='qamar'] .font-display {
   font-size-adjust: none;
 }
+/* PDP title (STOP 1 critique): the shared h1 carries no size class, so it fell to the body size
+   (15px Arabic, 17px Latin), smaller than its own price. Qamar gives it the display voice at a
+   real title size. A merchant's productName zone size is an inline style and still wins. */
+[data-pack='qamar'] h1[data-zone='productName'] {
+  font-family: var(--font-display, inherit);
+  font-size: clamp(1.5rem, 1.25rem + 1vw, 2.25rem);
+  line-height: 1.3;
+  font-weight: 600;
+}
 /* ==========================================================================
    Looks (Phase S). EVERY rule here is scoped under [data-look], which the
    root layout sets on <body> only for stores with a valid look. Legacy

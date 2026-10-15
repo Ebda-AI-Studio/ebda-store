@@ -4,6 +4,7 @@ import {
   FULL_BLEED_SCRIM,
   FULL_BLEED_TEXT,
 } from '../../apps/web/src/builder/sections/ImageTextSection';
+import { getPackStyles, QAMAR_HERO_SCRIM } from '../../apps/web/src/templates/shared/pack-styles';
 
 const qamar = LOOKS.filter(l => l.template === 'qamar');
 // Every text pair a Qamar skin paints, beyond the generic set in looks-contrast.test.ts.
@@ -53,6 +54,25 @@ describe('full-bleed panel keeps white text legible over the worst photo pixel (
         const panel = over(FULL_BLEED_SCRIM.color, FULL_BLEED_SCRIM.opacity, photo);
         expect(contrastRatio(panel, FULL_BLEED_TEXT)).toBeGreaterThanOrEqual(4.5);
       });
+});
+
+// STOP 1 critique: the qamar hero headline is white (HeroBanner's fallback) and was painted over
+// a transparent centre, so it vanished on a light Atelier photo. The scrim is ink, densest at the
+// centre where the headline sits; the headline is large text (>= 24px bold), so AA is 3:1.
+describe('qamar hero scrim keeps the white headline legible over a white photo', () => {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(QAMAR_HERO_SCRIM.color.slice(i, i + 2), 16));
+  it('the class paints exactly the constant', () => {
+    expect(getPackStyles('qamar').heroOverlay).toContain(
+      `rgb(${r}_${g}_${b}/${QAMAR_HERO_SCRIM.centre})_0%`
+    );
+    expect(getPackStyles('qamar').heroOverlay).toContain(
+      `rgb(${r}_${g}_${b}/${QAMAR_HERO_SCRIM.edge})_75%`
+    );
+  });
+  it('white over the centre scrim on a white pixel is >= 3:1 (large text)', () => {
+    const bg = over(QAMAR_HERO_SCRIM.color, QAMAR_HERO_SCRIM.centre, '#FFFFFF');
+    expect(contrastRatio(bg, '#FFFFFF')).toBeGreaterThanOrEqual(3);
+  });
 });
 
 // C28 / Task 7: the Lookbook hero overlay is a dark scrim under light text. No hero

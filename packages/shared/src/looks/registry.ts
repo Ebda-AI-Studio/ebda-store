@@ -21,7 +21,17 @@ export const LOOKS: readonly LookDefinition[] = [
     // The carousel preset is `newest`, never a demo category slug (C7).
     sections: [
       { type: 'hero', design: { presentation: 'full-bleed' } },
-      { type: 'category-grid', design: { layout: 'chips', layoutMobile: 'chips' } },
+      // A chip row is navigation, not a showcase: tight above, no padding below, so it sits
+      // right under the hero instead of in 200px of air (STOP 1 critique).
+      {
+        type: 'category-grid',
+        design: {
+          layout: 'chips',
+          layoutMobile: 'chips',
+          paddingTop: 'tight',
+          paddingBottom: 'none',
+        },
+      },
       {
         type: 'featured-collection',
         design: { columns: 4, mobileColumns: 2 },
