@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
+import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -127,7 +128,7 @@ function ElegantProductCard({
   // BUG 1 fix: helper text for correct EGP/pct badge.
   const discountBadgeText = getDiscountBadgeText(product, isRtl, undefined, undefined, numerals);
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
-  const orderable = product.inStock !== false || product.acceptsBackorder === true;
+  const orderable = canBuyNow(product);
 
   const frameCls =
     `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`.trim();

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { canBuyNow } from '@/lib/can-buy-now';
 import { isOnSale } from '../../../../lib/product-pricing';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -11,7 +12,7 @@ import { useStore, useStoreUrl } from '../../../../contexts/StoreContext';
 import { useLanguage } from '../../../../contexts/LanguageContext';
 
 import { useLocalePrice } from '../../../../hooks/useLocalePrice';
-import { cardInStock, needsOptions } from '../../../../templates/adapters';
+import { needsOptions } from '../../../../templates/adapters';
 interface WishlistProduct {
   id: string;
   name: string;
@@ -33,7 +34,7 @@ interface WishlistItem {
 
 /** Same stock rule as every product card (templates/adapters.ts). */
 function isOrderable(p: WishlistProduct): boolean {
-  return p.status === 'active' && (cardInStock(p) || p.acceptsBackorder === true);
+  return canBuyNow(p);
 }
 
 interface Props {

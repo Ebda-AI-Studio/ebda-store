@@ -22,6 +22,7 @@
  * master toggle are honoured.
  */
 import { useEffect, useState } from 'react';
+import { canBuyNow } from '@/lib/can-buy-now';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ProductCardProps } from '../types';
@@ -70,7 +71,7 @@ export default function DahabProductCard({
   const secondary = product.images?.[1];
   const pricing = getProductPricing(product, undefined, 'card');
   const inStock = product.inStock !== false;
-  const orderable = inStock || product.acceptsBackorder === true;
+  const orderable = canBuyNow(product);
   const hasVariants = (product.variants?.length ?? 0) > 0;
   const priceVisible = showCardPrice !== false && store.theme?.showPriceOnCards !== false;
   const nameVisible = showCardName !== false;
@@ -101,7 +102,7 @@ export default function DahabProductCard({
     ? t('Choose options', 'اختيار المقاس')
     : !orderable
       ? t('Sold out', 'نفدت الكمية')
-      : product.acceptsBackorder && !inStock
+      : orderable && !inStock
         ? t('Pre-order', 'طلب مسبق')
         : t('Add to bag', 'إضافة للسلة');
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { pickLocalizedName } from './display-helpers';
+import { canBuyNow } from '@/lib/can-buy-now';
 import type React from 'react';
 import { resolveProductCardCtaOosDefaults } from './product-card-defaults';
 import Image from 'next/image';
@@ -356,7 +357,7 @@ function SharedProductCarousel({
               const hasVariants = !!product.variants && product.variants.length > 0;
               const inStock = product.inStock !== false;
               // Task 13: backorder-aware orderable signal.
-              const orderable = inStock || product.acceptsBackorder === true;
+              const orderable = canBuyNow(product);
               const showNewBadge = inStock && isProductNew(product);
               // Issue #1609 — mirror the EXACT expression the quick-add
               // button below renders on, so a badge only lifts for a

@@ -1,6 +1,7 @@
 'use client';
 
 import { pickLocalizedName } from '../../templates/shared/display-helpers';
+import { canBuyNow } from '@/lib/can-buy-now';
 import Link from 'next/link';
 import { resolveProductCardCtaOosDefaults } from '../../templates/shared/product-card-defaults';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
@@ -15,7 +16,7 @@ import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { resolveColor } from '@ebda/shared';
 import { cn, CartIcon } from '@ebda/ui';
 import { OosImageDim, OutOfStockRibbon } from '../../templates/shared/ProductCardCta';
-import { cardInStock, needsOptions } from '../../templates/adapters';
+import { needsOptions } from '../../templates/adapters';
 import { ctaShapeClass, ctaSizeClass } from '../../templates/shared/card-size';
 import { getDiscountBadgeColor } from '../../templates/shared/discount-badge';
 import {
@@ -60,8 +61,8 @@ export function ProductListItem({
   const discountBadgeText = getDiscountBadgeText(product, isRtl, undefined, undefined, numerals);
   // Task 13: orderable = truly in-stock OR backorder allowed. OOS + backorder =
   // orderable. Stock reads the server's variant-aware `inStock` first (the
-  // shared card rule, templates/adapters.ts cardInStock).
-  const orderable = cardInStock(product) || product.acceptsBackorder === true;
+  // shared card rule, lib/can-buy-now.ts canBuyNow).
+  const orderable = canBuyNow(product);
   // C-01: a sized product is chosen on its PDP. This row used to render the
   // add button for every product, so a list-view tap added a sizeless line (and
   // a sold-out product's tap failed with an error toast).

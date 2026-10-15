@@ -51,6 +51,7 @@ import { REGION } from '@ebda/shared';
 import { FactsTable } from '../../../components/commerce/FactsTable';
 import { DeliveryChip } from '../../../components/commerce/DeliveryChip';
 import { Breadcrumbs } from '../../../components/Breadcrumbs';
+import { canBuyNow, inStockNow } from '../../../lib/can-buy-now';
 import { SizeChartDialog } from '../../../components/commerce/SizeChartDialog';
 import { StickyAddToCart } from '../../../components/commerce/StickyAddToCart';
 import {
@@ -599,16 +600,19 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // variant product's PDP either falsely show OOS or (when null) never show the
   // OOS label. The API's inStock already aggregates variant stock and respects
   // untracked inventory. (Fixed 2026-06-27.)
-  const outOfStock = selectedVariant ? selectedVariant.inventory === 0 : product.inStock === false;
+  //
+  // ONE rule for every buy surface on this page — the selector, both buttons, the
+  // sticky bars, the OOS ribbon and the delivery line (X-02/X-03): `canBuyNow`
+  // (stock OR backorder). `outOfStock` is only the on-hand half, for the wording.
+  const outOfStock = !inStockNow(product, selectedVariant);
+  const buyableNow = canBuyNow(product, selectedVariant);
   // Backorder: when the product (or selected variant) accepts backorders, an
   // out-of-stock item stays orderable — the cart + order API already honor
   // allowBackorder (product.service.ts enrichStockFlags → acceptsBackorder).
   // The storefront previously hard-disabled Add-to-Cart at 0 inventory,
   // silently blocking the backorder feature merchants paid for (Ebda audit
   // 2026-06-14).
-  const canBackorder =
-    outOfStock &&
-    (selectedVariant ? selectedVariant.acceptsBackorder : product.acceptsBackorder) === true;
+  const canBackorder = outOfStock && buyableNow;
   // THE add-to-cart disabled rule. Every buy button on this page (default button,
   // Dahab main + pinned bar, any sticky bar) reads this one value. A missing
   // required note is NOT a disabled reason: it is the separate `noteMissing`
@@ -619,7 +623,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // `disabled` means the item cannot be bought (C-02). An option still to
   // choose is recoverable, so it never disables or relabels the button; the
   // tap nudges the selector instead (handleAddToCart).
-  const addDisabled = outOfStock && !canBackorder;
+  const addDisabled = !buyableNow;
   // ONE source for the buy label and the price text: the main button, the Dahab
   // pinned bar and the default sticky bar all read these. The real verb at
   // every step: no "Select options" placeholder label.
@@ -666,7 +670,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const { customBadgeText: pdpCustomBadgeText } = resolveCardBadges({
     product,
     isRtl: language === 'ar',
-    orderable: !outOfStock || canBackorder,
+    orderable: buyableNow,
     customPosition: resolvedLayout?.productCardDefaults?.customBadge?.position,
     discountPosition: resolvedLayout?.productCardDefaults?.discountBadge?.position,
     discountOccupiesCorner: false,
@@ -965,13 +969,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     Sits OVER the swipe track so it stays put while images scroll. */}
                 {!show3d && (
                   <OosImageDim
-                    orderable={!outOfStock || canBackorder}
+                    orderable={buyableNow}
                     oosDimColor={productCardDefaults?.oosDimColor}
                     theme={store?.theme}
                   />
                 )}
                 <OutOfStockRibbon
-                  inStock={!outOfStock || canBackorder}
+                  inStock={buyableNow}
                   isRtl={language === 'ar'}
                   oosLabel={productCardDefaults?.oosLabel}
                   oosLabelTextEn={productCardDefaults?.oosLabelTextEn}
@@ -1130,9 +1134,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   </div>
                   {effectiveInventory !== undefined && effectiveInventory !== null && (
                     <span className="text-sm text-muted-foreground">
-                      {effectiveInventory > 0
+                      {/* From the same stock answer as the button (X-02): a variant
+                          product's own inventory is 0, and a pre-order is not "out". */}
+                      {!outOfStock
                         ? t('In Stock', 'متوفر')
-                        : t('Out of Stock', 'غير متوفر')}
+                        : canBackorder
+                          ? t('Available to pre-order', 'متاح للطلب المسبق')
+                          : t('Out of Stock', 'غير متوفر')}
                     </span>
                   )}
                 </div>

@@ -1,8 +1,9 @@
 'use client';
 
 import { pickLocalizedName } from '../templates/shared/display-helpers';
+import { canBuyNow } from '@/lib/can-buy-now';
 import { useProductRecommendations, selectCrossSell } from '../hooks/useProductRecommendations';
-import { recommendedToTemplateProduct, needsOptions, cardInStock } from '../templates/adapters';
+import { recommendedToTemplateProduct, needsOptions } from '../templates/adapters';
 import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStore, useStoreUrl, useStoreTemplate } from '../contexts/StoreContext';
@@ -105,7 +106,7 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
   const handleAddAllToCart = async () => {
     // Sold-out pieces (no backorder) are left out: the card shows them sold
     // out, so "add all" must not try them and toast a refusal.
-    const orderable = products.filter(p => cardInStock(p) || p.acceptsBackorder === true);
+    const orderable = products.filter(p => canBuyNow(p));
     const simple = orderable.filter(p => !hasVariants(p));
     const needVariant = orderable.filter(p => hasVariants(p));
 

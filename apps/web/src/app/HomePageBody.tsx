@@ -18,6 +18,7 @@ import { BuilderPreviewShell } from '../builder/preview/BuilderPreviewShell';
 import { allowedParentOrigins } from '../builder/preview/allowed-parent-origins';
 import { emitZoneCss } from '../lib/emit-zone-css';
 import { buildThemeStyleTag } from '../lib/theme-css';
+import { inStockNow } from '../lib/can-buy-now';
 
 /**
  * Homepage body — extracted 2026-07-12 (tenant-cacheable routing, Phase 1)
@@ -473,7 +474,7 @@ export async function HomePageBody({
             image: p.images?.[0]?.url ?? null,
             price: p.price,
             currency: store.currency,
-            inStock: p.inventory === undefined || p.inventory > 0,
+            inStock: inStockNow(p),
           })),
           'Featured Products'
         )

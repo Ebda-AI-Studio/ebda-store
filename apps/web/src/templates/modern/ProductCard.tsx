@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
+import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from '../shared/product-card-defaults';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -115,7 +116,7 @@ function ModernProductCard({
   // the merchant hasn't supplied an Arabic translation.
   const displayName = isRtl && product.nameAr ? product.nameAr : product.name;
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
-  const orderable = product.inStock !== false || product.acceptsBackorder === true;
+  const orderable = canBuyNow(product);
 
   if (process.env.NODE_ENV !== 'production' && !product.images?.[0]?.url) {
     console.warn(`[ProductCard] Missing image for product "${product.name}" (id: ${product.id})`);

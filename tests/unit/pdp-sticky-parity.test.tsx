@@ -78,7 +78,8 @@ vi.mock('../../apps/web/src/components/ProductModel3d', () => ({
   ProductModel3dPanel: () => null,
 }));
 vi.mock('../../apps/web/src/components/commerce/DeliveryChip', () => ({
-  DeliveryChip: () => null,
+  // A marker, so X-03 can see whether the delivery line renders at all.
+  DeliveryChip: () => <span data-testid="delivery-chip" />,
 }));
 vi.mock('../../apps/web/src/templates/shared/ShareProductRow', () => ({
   ShareProductRow: () => null,
@@ -500,5 +501,61 @@ describe('Dahab pinned bar body flag', () => {
     act(() => fireAll([{ isIntersecting: false, boundingClientRect: { top: -10 } }]));
     unmount();
     expect(document.body.dataset.stickyAtc).toBeUndefined();
+  });
+});
+
+/**
+ * X-02 / X-03 (Lookbook/Vitrine taste gate): one `canBuyNow` for the selector,
+ * both buttons and the delivery line, on both PDP paths.
+ */
+const backorderSized = {
+  options: [{ id: 'o1', name: 'Size', values: [{ value: 'S' }, { value: 'M' }] }],
+  variants: [
+    // S is sold out but the merchant takes backorders on it: a pre-order.
+    {
+      id: 'v1',
+      price: 149000,
+      inventory: 0,
+      inStock: false,
+      acceptsBackorder: true,
+      options: { Size: 'S' },
+    },
+    { id: 'v2', price: 149000, inventory: 3, inStock: true, options: { Size: 'M' } },
+  ],
+};
+
+describe('X-02: a sold-out size that accepts backorder stays pickable (pre-order)', () => {
+  it.each(['minimal', 'dahab'] as const)('%s PDP', async template => {
+    vi.stubGlobal('IntersectionObserver', IO);
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+    const { default: ProductDetailClient } =
+      await import('../../apps/web/src/app/products/[slug]/ProductDetailClient');
+    ctx.store = { ...STORES.A, template };
+    render(<ProductDetailClient initialProduct={product(backorderSized) as never} />);
+    const s = (await screen.findAllByRole('button', { name: /^S\b/ }))[0] as HTMLButtonElement;
+    expect(s.disabled).toBe(false);
+    fireEvent.click(s);
+    const main = (
+      template === 'dahab'
+        ? screen.getAllByRole('button', { name: 'Pre-order' })[0]
+        : screen.getByTestId('pdp-add')
+    ) as HTMLButtonElement;
+    expect(main.textContent?.trim()).toBe('Pre-order');
+    expect(main.disabled).toBe(false);
+    // No "Out of Stock" panel under the selector for a buyable pre-order.
+    expect(screen.queryByText('Out of Stock')).toBeNull();
+    expect(screen.queryAllByTestId('delivery-chip').length).toBeGreaterThan(0);
+  });
+
+  it('a sold-out size WITHOUT backorder is still disabled', async () => {
+    const noBackorder = {
+      ...backorderSized,
+      variants: backorderSized.variants.map(v =>
+        v.id === 'v1' ? { ...v, acceptsBackorder: false } : v
+      ),
+    };
+    await renderPdp(product(noBackorder));
+    const s = screen.getAllByRole('button', { name: /^S\b/ })[0] as HTMLButtonElement;
+    expect(s.disabled).toBe(true);
   });
 });

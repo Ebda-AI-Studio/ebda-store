@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+import { canBuyNow } from '@/lib/can-buy-now';
 import { resolveProductCardCtaOosDefaults } from './product-card-defaults';
 import { memo, useState } from 'react';
 import Image from 'next/image';
@@ -138,7 +139,7 @@ function PecannbeeProductCardImpl({
   const inStock = product.inStock !== false;
   // Task 13: backorder-aware orderable signal. OOS products with backorder
   // allowed are still orderable — CTA stays pressable, no OOS label shown.
-  const orderable = inStock || product.acceptsBackorder === true;
+  const orderable = canBuyNow(product);
   const onSale = isOnSale(product);
   // BUG 1 fix: use getDiscountBadgeText so fixed-EGP discounts render correctly.
   const discountBadgeText = getDiscountBadgeText(product, isRtl, undefined, undefined, numerals);

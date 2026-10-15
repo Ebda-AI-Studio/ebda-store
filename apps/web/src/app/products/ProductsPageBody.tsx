@@ -13,6 +13,7 @@ import {
 import { breadcrumbJsonLd, itemList, storeAbsoluteUrl } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
 import ProductsClient from './ProductsClient';
+import { inStockNow } from '../../lib/can-buy-now';
 
 /**
  * Products (PLP) page body — extracted 2026-07-12 (tenant-cacheable
@@ -166,6 +167,7 @@ export async function ProductsPageBody({
               images: Array<{ url: string }>;
               price: number;
               inventory?: number;
+              inStock?: boolean;
             }>
           )
             .slice(0, 50)
@@ -175,7 +177,7 @@ export async function ProductsPageBody({
               image: p.images?.[0]?.url ?? null,
               price: p.price,
               currency: store.currency,
-              inStock: p.inventory === undefined || p.inventory > 0,
+              inStock: inStockNow(p),
             })),
           'All Products'
         )

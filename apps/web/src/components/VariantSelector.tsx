@@ -6,6 +6,7 @@ import type { ProductVariant, ProductOption } from '@/lib/api';
 import { useLanguage } from '../contexts/LanguageContext';
 import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
 import { autoSelection } from '@/lib/single-variant';
+import { canBuyNow } from '@/lib/can-buy-now';
 import { swatchOf } from '@ebda/shared';
 
 interface VariantSelectorProps {
@@ -144,9 +145,10 @@ export function VariantSelector({
   }
 
   /**
-   * Determine whether a particular option value is currently available.
-   * A value is available if at least one variant with that value still has
-   * inventory > 0 (or inventory is undefined, meaning untracked).
+   * Determine whether a particular option value can be picked: at least one
+   * variant with that value (and every option already chosen) can be bought
+   * now — in stock OR accepting backorders (X-02). A sold-out size of a
+   * backorderable product stays pickable; the buy button then says "Pre-order".
    */
   function isValueAvailable(optionName: string, value: string): boolean {
     // Build a partial selection with the candidate value applied
@@ -156,9 +158,7 @@ export function VariantSelector({
       const matches = Object.entries(partialSelection).every(
         ([name, val]) => v.options[name] === val
       );
-      if (!matches) return false;
-      // Treat null/undefined inventory as in-stock (untracked)
-      return v.inventory === undefined || v.inventory === null || v.inventory > 0;
+      return matches && canBuyNow(null, v);
     });
   }
 
@@ -421,7 +421,7 @@ export function VariantSelector({
           price/inventory of a valid variant is reflected in the main
           product price + qty stepper area on ProductDetailClient, so a
           duplicate display here was just visual noise. */}
-      {allPicked && currentVariant && (currentVariant.inventory ?? 1) <= 0 && (
+      {allPicked && currentVariant && !canBuyNow(null, currentVariant) && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
           <span className="font-medium text-destructive-ink">{t('Out of Stock', 'غير متوفر')}</span>
         </div>
