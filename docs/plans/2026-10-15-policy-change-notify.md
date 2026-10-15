@@ -20,6 +20,10 @@
 6. **Docs.** ENVIRONMENT (only the existing pacer variable gains a sentence), `Ruling LEGAL-4` (+ residuals as `LEGAL-5`) in `docs/RULINGS.md`, the merchant FAQ, and a "how to publish a policy change" runbook.
 7. **Never-stale reads.** The pending-notice read is not cached anywhere (`Cache-Control: no-store`, no Redis/KV/bounded-map). Ack and send therefore need no invalidation.
 
+## Coordinator amendments (binding; override the task text where they conflict)
+
+- **A1 — one bilingual email, Arabic first.** Legacy accounts carry the column default `users.language = 'en'`, so the stored language cannot be trusted for a legal notice. Task 7 sends ONE email per user containing the full Arabic block (`dir="rtl"`) followed by the full English block, with a bilingual subject (`تحديث في سياسات إبدأ · Ebda policy update`). Drop the `language` parameter from `sendLegalNoticeEmail` and the `user.language` read in the fan-out; tests assert both blocks are present and Arabic comes first. LEGAL-5(d) is replaced by: "the notice email is bilingual (Arabic first) for every recipient (Ruling LEGAL-6)". Add `Ruling LEGAL-6 — legal notice emails are bilingual, Arabic first, regardless of users.language (legacy default 'en' makes the stored value unreliable). Cost if wrong: a longer email.`
+
 ## Global Constraints
 
 - Arabic-first: every merchant-facing string ships in `ar` and `en`; the email and banner pick the reader's language, fallback `ar`.
