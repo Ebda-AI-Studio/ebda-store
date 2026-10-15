@@ -469,7 +469,8 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 <HeartIcon className="h-5 w-5" filled={p.isWishlisted} />
               </button>
             </div>
-            <DeliveryChip leadTimeDays={p.leadTimeDays} />
+            {/* X-03: a delivery date only for something that can be bought now. */}
+            {!p.addDisabled && <DeliveryChip leadTimeDays={p.leadTimeDays} />}
             {p.stockText && <p className="mt-3 text-[13px] text-muted-foreground">{p.stockText}</p>}
 
             <div className="mt-8 border-t border-border">

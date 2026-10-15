@@ -559,3 +559,30 @@ describe('X-02: a sold-out size that accepts backorder stays pickable (pre-order
     expect(s.disabled).toBe(true);
   });
 });
+
+describe('X-03: the delivery-date line only on something that can be bought now', () => {
+  it('in stock: shown', async () => {
+    await renderPdp(product());
+    expect(screen.queryAllByTestId('delivery-chip')).toHaveLength(1);
+  });
+  it('sold out, no backorder: hidden', async () => {
+    await renderPdp(product({ inStock: false, inventory: 0 }));
+    expect(screen.queryAllByTestId('delivery-chip')).toHaveLength(0);
+  });
+  it('sold out, accepts backorder: shown (a pre-order still ships)', async () => {
+    await renderPdp(product({ inStock: false, inventory: 0, acceptsBackorder: true }));
+    expect(screen.queryAllByTestId('delivery-chip')).toHaveLength(1);
+  });
+  it('Dahab, sold out, no backorder: hidden', async () => {
+    vi.stubGlobal('IntersectionObserver', IO);
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+    const { default: ProductDetailClient } =
+      await import('../../apps/web/src/app/products/[slug]/ProductDetailClient');
+    ctx.store = { ...STORES.A, template: 'dahab' };
+    render(
+      <ProductDetailClient initialProduct={product({ inStock: false, inventory: 0 }) as never} />
+    );
+    await screen.findByTestId('dahab-pinned-cart');
+    expect(screen.queryAllByTestId('delivery-chip')).toHaveLength(0);
+  });
+});

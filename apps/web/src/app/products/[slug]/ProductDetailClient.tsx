@@ -1189,7 +1189,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     </svg>
                   </Button>
                 </div>
-                <DeliveryChip leadTimeDays={product.leadTimeDays} />
+                {/* X-03: a delivery date only for something that can be bought now. */}
+                {buyableNow && <DeliveryChip leadTimeDays={product.leadTimeDays} />}
               </div>
 
               {/* Below the buy block: the category chip and the description (fold rule above). */}
