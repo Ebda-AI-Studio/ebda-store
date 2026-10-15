@@ -837,6 +837,7 @@ enum StoreTemplate {
   bold
   elegant
   dahab
+  qamar
 }
 
 // ==========================================

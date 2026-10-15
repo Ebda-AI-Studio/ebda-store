@@ -557,7 +557,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         // server-rendered body so the first paint already has it (the chrome
         // itself loads on the client). Only Dahab sets it: other stores' markup
         // is unchanged.
-        data-pack={store.template === 'dahab' ? 'dahab' : undefined}
+        data-pack={
+          store.template === 'dahab' || store.template === 'qamar' ? store.template : undefined
+        }
         // Looks (Phase S): scopes every look rule in globals.css; absent for legacy stores.
         data-look={look?.dataLook}
       >

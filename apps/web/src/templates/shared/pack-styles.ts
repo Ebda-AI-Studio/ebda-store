@@ -230,6 +230,29 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     testimonialCard: 'border-t border-primary/40 bg-transparent pt-6',
     testimonialAuthor: 'text-sm text-muted-foreground',
   },
+  qamar: {
+    // Phase B1 (Ruling B1-1): the clothes are the interface. No card surface, no
+    // border, no lift: the 3:4 photo carries the card. Type voice comes from the
+    // look's --font-display/--font-body (looks.md), so these classes carry weight
+    // and colour only.
+    card: 'bg-transparent',
+    categoryFrame: 'bg-transparent',
+    categoryCaption: 'text-sm font-medium text-foreground',
+    productCardName: 'font-normal text-foreground leading-snug',
+    productCardPrice: 'font-medium text-foreground',
+    productCardCta:
+      'whitespace-nowrap rounded-[var(--radius)] bg-primary px-5 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors duration-[var(--motion-duration,150ms)] min-h-[44px]',
+    sectionHeading:
+      'font-display text-2xl sm:text-3xl md:text-4xl font-bold text-foreground leading-[1.25] text-balance',
+    sectionSeeAll:
+      'text-sm font-medium text-foreground/70 hover:text-foreground underline-offset-4 hover:underline',
+    heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/0 to-foreground/35',
+    heroHeadline: 'font-display text-3xl sm:text-5xl md:text-6xl font-bold leading-[1.2]',
+    heroCta:
+      'rounded-[var(--radius)] bg-background px-8 py-3.5 text-sm font-medium text-foreground hover:bg-background/90 min-h-[44px]',
+    testimonialCard: 'bg-transparent p-0',
+    testimonialAuthor: 'text-sm font-medium text-muted-foreground',
+  },
 };
 
 export function getPackStyles(pack: TemplateId | undefined): PackStyles {

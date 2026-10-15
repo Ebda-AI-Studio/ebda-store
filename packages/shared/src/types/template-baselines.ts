@@ -191,7 +191,7 @@ export function buildTemplateBaseline(identity: TemplateIdentity): StoreLayoutSe
 
 /** Per-template identities. elegant = the calibrated base (no delta). */
 export const TEMPLATE_IDENTITIES: Record<
-  Exclude<TemplateId, 'elegant' | 'dahab'>,
+  Exclude<TemplateId, 'elegant' | 'dahab' | 'qamar'>,
   TemplateIdentity
 > = {
   // Modern — clean airy grid: rounded-square category tiles, caption below, framed.
@@ -315,6 +315,8 @@ export const TEMPLATE_LAYOUT_BASELINES: Record<TemplateId, StoreLayoutSettings> 
   minimal: buildTemplateBaseline(TEMPLATE_IDENTITIES.minimal),
   bold: buildTemplateBaseline(TEMPLATE_IDENTITIES.bold),
   dahab: buildDahabBaseline(),
+  // The look owns the card ratio on a look store (LOOKS-15); minimal is the fallback.
+  qamar: buildTemplateBaseline(TEMPLATE_IDENTITIES.minimal),
 };
 
 /** Safe lookup. Unknown id → the bare global default (back-compat behavior). */

@@ -13,7 +13,7 @@ import { resolveLookFonts } from '../looks/fonts';
 /**
  * Available store templates
  */
-export type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' | 'dahab';
+export type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant' | 'dahab' | 'qamar';
 
 /**
  * Font family options for store themes
@@ -642,6 +642,22 @@ export const TEMPLATE_THEMES: Record<TemplateId, Partial<StoreTheme>> = {
   // Egyptian goldsmith's own pairing — so it reads as night, not as a
   // generic near-black. Every pair below is checked for WCAG AA in
   // tests/unit/dahab-theme-contrast.test.ts.
+  // Qamar (fashion & boutiques, Phase B1): a neutral base. Every Qamar store has a
+  // look, and the look's tokens (packages/shared/src/looks/registry.ts) own colour,
+  // type, radius, density, image ratio and motion. Dividers off: the looks separate
+  // sections by space and bands, never hairline-flanked labels on every section.
+  qamar: {
+    primaryColor: '0 0% 8%',
+    primaryForeground: '0 0% 100%',
+    backgroundColor: '0 0% 100%',
+    foregroundColor: '0 0% 8%',
+    fontFamily: 'default',
+    borderRadius: 'none',
+    backgroundPreset: 'none',
+    showBrandStory: false,
+    showTrustStrip: false,
+    dividers: { ...DEFAULT_DIVIDER_SETTINGS, enabled: false },
+  },
   dahab: {
     primaryColor: '39 49% 58%', // gold #C9A35E
     primaryForeground: '222 29% 8%', // night
@@ -742,6 +758,16 @@ export const TEMPLATES: TemplateInfo[] = [
     thumbnail: '/templates/dahab.png',
     tags: ['jewellery', 'handmade', 'gifts'],
     bestFor: 'Jewellery, handmade and premium gifts',
+  },
+  {
+    id: 'qamar',
+    name: 'Qamar',
+    nameAr: 'قمر',
+    description: 'Fashion and boutiques: Atelier, Lookbook and Vitrine looks',
+    descriptionAr: 'أزياء وبوتيكات: أتيليه ولوك بوك وفاترينة',
+    thumbnail: '/looks/qamar.atelier.webp',
+    tags: ['fashion', 'abayas', 'boutique'],
+    bestFor: 'Fashion, abayas and boutiques',
   },
 ];
 
