@@ -30,6 +30,19 @@ import { orderLineVariantTitle, withNumerals } from '@ebda/shared';
 
 type Mode = 'receive' | 'pick' | 'count';
 
+/**
+ * The text for a failed scan request. A 403 FEATURE_DISABLED (`inventory.barcode` is not on this
+ * store's plan) is a plan state, not a missing record, so it must not read "order/barcode not
+ * found". Every error site on this page goes through here.
+ */
+function scanErrorText(
+  t: (key: string) => string,
+  error: { code: string } | null | undefined,
+  fallbackKey: string
+): string {
+  return error?.code === 'FEATURE_DISABLED' ? t('featureNotOnPlan') : t(fallbackKey);
+}
+
 interface LookupResult {
   type: 'product' | 'variant';
   productId: string;
@@ -311,7 +324,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
         `/api/v1/stores/${storeId}/inventory/lookup?barcode=${encodeURIComponent(bc)}`
       );
       if (error || !data) {
-        setLookupErr(t('barcodeNotFound'));
+        setLookupErr(scanErrorText(t, error, 'barcodeNotFound'));
       } else {
         setLookup(data);
       }
@@ -338,7 +351,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
     );
     setSubmitting(false);
     if (error || !data) {
-      setSubmitErr(t('receiving.errorGeneric'));
+      setSubmitErr(scanErrorText(t, error, 'receiving.errorGeneric'));
     } else {
       setResult(data);
       setLookup(null);
@@ -469,7 +482,7 @@ function PickMode({ storeId }: { storeId: string }) {
     }>(`/api/v1/stores/${storeId}/orders?search=${encodeURIComponent(wanted)}&limit=20`);
     const match = data?.orders?.find(o => o.orderNumber.toLowerCase() === wanted.toLowerCase());
     if (error || !match) {
-      setOrderErr(t('orderNotFound'));
+      setOrderErr(scanErrorText(t, error, 'orderNotFound'));
       setOrderLoading(false);
       return;
     }
@@ -479,7 +492,7 @@ function PickMode({ storeId }: { storeId: string }) {
     );
     setOrderLoading(false);
     if (progErr || !progress) {
-      setOrderErr(t('orderNotFound'));
+      setOrderErr(scanErrorText(t, progErr, 'orderNotFound'));
     } else {
       setOrder(progress);
     }
@@ -499,7 +512,7 @@ function PickMode({ storeId }: { storeId: string }) {
       );
       setPicking(false);
       if (error || !data) {
-        setPickErr(t('picking.itemNotFound'));
+        setPickErr(scanErrorText(t, error, 'picking.itemNotFound'));
       } else {
         setPickResult(data);
         setBarcode('');
@@ -740,7 +753,7 @@ function CountMode({ storeId }: { storeId: string }) {
         `/api/v1/stores/${storeId}/inventory/lookup?barcode=${encodeURIComponent(bc)}`
       );
       if (error || !data) {
-        setLineErr(t('barcodeNotFound'));
+        setLineErr(scanErrorText(t, error, 'barcodeNotFound'));
         setLookupResult(null);
       } else {
         setLookupResult(data);
@@ -764,7 +777,7 @@ function CountMode({ storeId }: { storeId: string }) {
     );
     setSubmittingLine(false);
     if (error || !data) {
-      setLineErr(t('counting.errorGeneric'));
+      setLineErr(scanErrorText(t, error, 'counting.errorGeneric'));
     } else {
       // Refresh session
       await loadSession(activeSession.id);
@@ -796,7 +809,7 @@ function CountMode({ storeId }: { storeId: string }) {
     }>(`/api/v1/stores/${storeId}/inventory/count-sessions/${activeSession.id}/reconcile`, {});
     setReconciling(false);
     if (error || !data) {
-      setReconcileErr(t('counting.errorGeneric'));
+      setReconcileErr(scanErrorText(t, error, 'counting.errorGeneric'));
     } else {
       setReconcileResult(data);
       await loadSession(activeSession.id);
