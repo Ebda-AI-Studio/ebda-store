@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { MINUS, SignedAmount } from '@/lib/bidi';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -1024,7 +1025,7 @@ export default function CartClient() {
                                   {promoType === 'percentage' ? `${promoValue}%` : promoName})
                                 </span>
                                 <span className="font-medium text-success-ink">
-                                  -{formatPrice(discount)}
+                                  <SignedAmount sign={MINUS} value={formatPrice(discount)} />
                                 </span>
                               </div>
                             )}

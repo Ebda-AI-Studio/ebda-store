@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { MINUS, SignedAmount } from '@/lib/bidi';
 import type { OrderSummaryProps } from '../types';
 import { useOrderSummaryBase } from '../shared/useOrderSummaryBase';
 
@@ -71,7 +72,7 @@ export default function ElegantOrderSummary({
               {discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}
             </dt>
             <dd className="tracking-wide tabular-nums" style={typography?.price}>
-              −{fmt(discount)}
+              <SignedAmount sign={MINUS} value={fmt(discount)} />
             </dd>
           </div>
         )}

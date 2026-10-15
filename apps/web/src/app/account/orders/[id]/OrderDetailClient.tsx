@@ -1,6 +1,7 @@
 'use client';
 
 import { VariantText } from '@ebda/ui';
+import { MINUS, SignedAmount } from '@/lib/bidi';
 import { useState, useEffect, useCallback } from 'react';
 import { useLocalePrice } from '../../../../hooks/useLocalePrice';
 import Link from 'next/link';
@@ -664,7 +665,9 @@ export default function OrderDetailClient() {
                         {t('Coupon', '\u0643\u0648\u0628\u0648\u0646')}
                         {order.couponCode ? ` (${order.couponCode})` : ''}
                       </span>
-                      <span className="text-success-ink">-{formatPrice(couponPortion)}</span>
+                      <span className="text-success-ink">
+                        <SignedAmount sign={MINUS} value={formatPrice(couponPortion)} />
+                      </span>
                     </div>
                   )}
                   {promotionPortion > 0 && (
@@ -673,7 +676,9 @@ export default function OrderDetailClient() {
                         {t('Promotion', '\u0639\u0631\u0636 \u062a\u0631\u0648\u064a\u062c\u064a')}
                         {promotionName ? ` (${promotionName})` : ''}
                       </span>
-                      <span className="text-success-ink">-{formatPrice(promotionPortion)}</span>
+                      <span className="text-success-ink">
+                        <SignedAmount sign={MINUS} value={formatPrice(promotionPortion)} />
+                      </span>
                     </div>
                   )}
                   {loyaltyPortion > 0 && (
@@ -689,7 +694,9 @@ export default function OrderDetailClient() {
                             )})`
                           : ''}
                       </span>
-                      <span className="text-success-ink">-{formatPrice(loyaltyPortion)}</span>
+                      <span className="text-success-ink">
+                        <SignedAmount sign={MINUS} value={formatPrice(loyaltyPortion)} />
+                      </span>
                     </div>
                   )}
                   {otherDiscount > 0 && (
@@ -697,7 +704,9 @@ export default function OrderDetailClient() {
                       <span className="text-muted-foreground">
                         {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
                       </span>
-                      <span className="text-success-ink">-{formatPrice(otherDiscount)}</span>
+                      <span className="text-success-ink">
+                        <SignedAmount sign={MINUS} value={formatPrice(otherDiscount)} />
+                      </span>
                     </div>
                   )}
                 </>
@@ -751,7 +760,9 @@ export default function OrderDetailClient() {
                   <span className="text-muted-foreground">
                     {t('Paid from wallet', 'مدفوع من المحفظة')}
                   </span>
-                  <span className="text-success-ink">-{formatPrice(order.walletAmount ?? 0)}</span>
+                  <span className="text-success-ink">
+                    <SignedAmount sign={MINUS} value={formatPrice(order.walletAmount ?? 0)} />
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-foreground">{t('Amount due', 'المبلغ المستحق')}</span>

@@ -20,6 +20,7 @@ import { VariantText } from '@ebda/ui';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { groupOrderLinesForDisplay, orderTaxPlacement, orderLineVariantTitle } from '@ebda/shared';
 import type { Order } from '@/lib/api';
+import { MINUS, signedText } from '@/lib/bidi';
 import type { StoreData } from '@/contexts/StoreContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocalePrice } from '@/hooks/useLocalePrice';
@@ -370,7 +371,7 @@ function Totals({
       )}
       {(order.discount ?? 0) > 0 && (
         <MoneyRow label={t('Discount', 'الخصم')} ar={ar}>
-          <Num>{`−${formatPrice(order.discount ?? 0)}`}</Num>
+          <Num>{signedText(MINUS, formatPrice(order.discount ?? 0))}</Num>
         </MoneyRow>
       )}
       {typeof order.shipping === 'number' && (
@@ -406,7 +407,7 @@ function Totals({
       {wallet > 0 && (
         <>
           <MoneyRow label={t('From wallet', 'من المحفظة')} ar={ar}>
-            <Num>{`−${formatPrice(wallet)}`}</Num>
+            <Num>{signedText(MINUS, formatPrice(wallet))}</Num>
           </MoneyRow>
           {/* The rest is owed only when nobody charged it yet (COD, transfer);
               on a paid order the gateway already took it. */}
