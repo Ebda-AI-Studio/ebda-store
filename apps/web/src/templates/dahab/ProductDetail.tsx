@@ -9,8 +9,8 @@
  *
  * Desktop: gallery (7 cols, hover-zoom, click for full screen) beside a
  * sticky buying column (5 cols). Phones: a swipe gallery, then the column,
- * plus a bar that pins "Add to bag" to the bottom once the main button
- * scrolls away. Details / delivery / returns sit in native <details>
+ * plus a bar that pins "Add to bag" to the bottom whenever the main button
+ * is off-screen in either direction (B0-49). Details / delivery / returns sit in native <details>
  * accordions. `mediaSlot` is the hook for the 3D/AR viewer (PR #35, not
  * merged at the time of writing): whatever is passed renders under the
  * gallery.
@@ -26,6 +26,7 @@ import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import type { ProductFact } from '@ebda/shared';
 import { FactsTable } from '../../components/commerce/FactsTable';
 import { useAnchorOffscreen } from '../../components/commerce/useAnchorOffscreen';
+import { useStickyBarHeight } from '../../components/commerce/useStickyBarHeight';
 import { DeliveryChip } from '../../components/commerce/DeliveryChip';
 import { PersonalisationField } from '../../components/commerce/PersonalisationField';
 import { SizeChartDialog } from '../../components/commerce/SizeChartDialog';
@@ -314,6 +315,8 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
   const buyRef = useRef<HTMLDivElement>(null);
   // Phone buy bar: shown from first paint whenever the main button is off-screen (B0-49).
   const pinBar = useAnchorOffscreen(buyRef);
+  const pinBarRef = useRef<HTMLDivElement>(null);
+  useStickyBarHeight(pinBarRef, pinBar);
 
   // Body-level space for the pinned bar (UI rule 6), same flag as StickyAddToCart.
   useEffect(() => {
@@ -525,8 +528,9 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
         </div>
       </div>
 
-      {/* Phones: pinned buy bar once the main button is out of view. */}
+      {/* Phones: pinned buy bar whenever the main button is off-screen, either direction (B0-49). */}
       <div
+        ref={pinBarRef}
         aria-hidden={!pinBar}
         inert={!pinBar ? true : undefined}
         className={cx(

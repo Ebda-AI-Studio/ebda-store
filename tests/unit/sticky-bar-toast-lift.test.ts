@@ -26,13 +26,37 @@ describe('toast lift above the sticky bars', () => {
   });
 
   it.each([
-    ["body[data-sticky-atc='1'] [data-toast-region]", '140px'],
-    ["body[data-sticky-cart='1'] [data-toast-region]", '140px'],
-    ["body[data-sticky-cart='blocked'] [data-toast-region]", '164px'],
-  ])('%s lifts to %s, same as the floating widget', (selector, px) => {
-    expect(blockFor(selector)).toContain(`bottom: calc(${px} + env(safe-area-inset-bottom))`);
-    const widget = selector.replace('[data-toast-region]', "[data-floating-widget='bottom']");
-    expect(blockFor(widget)).toBe(blockFor(selector));
+    ["body[data-sticky-atc='1'] [data-toast-region]", '61px'],
+    ["body[data-sticky-cart='1'] [data-toast-region]", '61px'],
+    ["body[data-sticky-cart='blocked'] [data-toast-region]", '85px'],
+  ])(
+    '%s lifts by tab bar + the measured bar height (fallback %s), same as the widget',
+    (selector, px) => {
+      const flat = blockFor(selector).replace(/\s+/g, ' ');
+      expect(flat).toContain(
+        `calc( var(--bottom-tab-h) + var(--sticky-bar-h, ${px}) + 10px + env(safe-area-inset-bottom) )`
+      );
+      const widget = selector.replace('[data-toast-region]', "[data-floating-widget='bottom']");
+      expect(blockFor(widget)).toBe(blockFor(selector));
+    }
+  );
+
+  it('the Dahab bar (73px) never overlaps the toast: the lift tracks the published height', () => {
+    // 69 tab + 73 bar + 10 gap = 152 > the old fixed 140, which overlapped by ~2px (Minor 1).
+    const dahabBar = 12 * 2 + 48 + 1;
+    expect(dahabBar).toBe(73);
+    const hook = readFileSync(
+      join(R, 'apps/web/src/components/commerce/useStickyBarHeight.ts'),
+      'utf8'
+    );
+    expect(hook).toContain("setProperty('--sticky-bar-h'");
+    for (const f of [
+      'apps/web/src/components/commerce/StickyAddToCart.tsx',
+      'apps/web/src/components/commerce/StickyCartTotal.tsx',
+      'apps/web/src/templates/dahab/ProductDetail.tsx',
+    ]) {
+      expect(readFileSync(join(R, f), 'utf8'), f).toContain('useStickyBarHeight(');
+    }
   });
 
   it('the lift lives in the phone-only media block', () => {

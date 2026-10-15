@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useStickyBarHeight } from './useStickyBarHeight';
 
 /**
  * Phone-only total + checkout bar for the cart page. `totalLabel` + `total` are one of the
@@ -34,9 +35,12 @@ export function StickyCartTotal(p: {
       delete document.body.dataset.stickyCart;
     };
   }, [show, flag]);
+  const barRef = useRef<HTMLDivElement>(null);
+  useStickyBarHeight(barRef, show);
   if (!show) return null;
   return (
     <div
+      ref={barRef}
       data-testid="sticky-cart-total"
       className="sticky-bar-in fixed inset-x-0 bottom-[calc(var(--bottom-tab-h)+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background px-4 py-2 md:hidden"
     >

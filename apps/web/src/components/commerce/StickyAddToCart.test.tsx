@@ -8,9 +8,11 @@ import path from 'node:path';
 let ioCallback: (
   entries: Array<{ isIntersecting: boolean; boundingClientRect?: { top: number } }>
 ) => void = () => {};
+let ioOptions: IntersectionObserverInit | undefined;
 class IO {
-  constructor(cb: typeof ioCallback) {
+  constructor(cb: typeof ioCallback, opts?: IntersectionObserverInit) {
     ioCallback = cb;
+    ioOptions = opts;
   }
   observe() {}
   disconnect() {}
@@ -53,6 +55,26 @@ describe('StickyAddToCart', () => {
     // button IN view on load -> stays hidden
     act(() => ioCallback([{ isIntersecting: true, boundingClientRect: { top: 400 } }]));
     expect(screen.queryByTestId('sticky-atc')).toBeNull();
+  });
+
+  it('treats the area under the fixed tab bar as off-screen (bottom rootMargin = tab + safe area)', () => {
+    vi.stubGlobal('IntersectionObserver', IO);
+    // the probe element resolves calc(var(--bottom-tab-h) + env(safe-area-inset-bottom)):
+    // 69px tab + 34px home-indicator inset on an iPhone
+    const rect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ height: 103 } as DOMRect);
+    try {
+      render(<Harness />);
+      expect(ioOptions?.rootMargin).toBe('0px 0px -103px 0px');
+      // fully inside the reachable area, so a half-covered button still gets the bar
+      expect(ioOptions?.threshold).toBe(1);
+      // the button sits in the covered band: the observer reports it outside the shrunken root
+      act(() => ioCallback([{ isIntersecting: false, boundingClientRect: { top: 780 } }]));
+      expect(screen.getByTestId('sticky-atc')).toBeTruthy();
+    } finally {
+      rect.mockRestore();
+    }
   });
 
   it('shows from first paint when the button starts below the fold (B0-49)', () => {
@@ -99,6 +121,20 @@ describe('StickyAddToCart', () => {
     expect(readFileSync(path.join(dir, 'styles/globals.css'), 'utf8')).toMatch(
       /--bottom-tab-h:\s*69px/
     );
+  });
+
+  it('publishes the bar height for the toast/widget lift and clears it on unmount', () => {
+    vi.stubGlobal('IntersectionObserver', IO);
+    const off = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(61);
+    try {
+      const { unmount } = render(<Harness />);
+      act(() => ioCallback([{ isIntersecting: false }]));
+      expect(document.body.style.getPropertyValue('--sticky-bar-h')).toBe('61px');
+      unmount();
+      expect(document.body.style.getPropertyValue('--sticky-bar-h')).toBe('');
+    } finally {
+      off.mockRestore();
+    }
   });
 
   it('removes the body flag on unmount', () => {

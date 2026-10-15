@@ -106,17 +106,17 @@ Rules that apply to all of them:
 
 ## 6. Sticky add-to-cart and cart-total bars
 
-**What.** On a phone, a bar fixed above the tab bar: on the PDP it carries the product title, price and the add-to-cart button once the main button has scrolled out of view; on the cart it carries the summary's Subtotal (label, value and money format, verbatim: shipping is "calculated at checkout" on the cart, so the cart total carries no zone fee, F1), the item count and a checkout button.
+**What.** On a phone, a bar fixed above the tab bar: on the PDP it carries the product title, price and the add-to-cart button whenever the main button is off-screen in either direction (below the fold or scrolled past, B0-49), where "on screen" means above the tab bar (the observer's bottom edge is pulled up by `--bottom-tab-h` plus the safe-area inset, so a button hidden under the tab bar counts as off-screen); on the cart it carries the summary's Subtotal (label, value and money format, verbatim: shipping is "calculated at checkout" on the cart, so the cart total carries no zone fee, F1), the item count and a checkout button.
 
 **Where the merchant edits it.** Nowhere: it is platform behaviour. No toggle (B0-4).
 
 **Where it renders.** `StickyAddToCart` on the default PDP (`md:hidden`). Dahab keeps its existing pinned bar; B0 fixed its overlap with the tab bar and made it set the same body flag. `StickyCartTotal` on `CartClient` (it repeats the summary's Total row, after discounts); when checkout is blocked (below the minimum order, an unavailable line) it shows the existing `checkoutBlockedMessage` and the button is disabled. The sticky add button takes `addDisabled` and the label from the main button (one value, never recomputed), pinned by `tests/unit/pdp-sticky-parity.test.tsx`. The WhatsApp order button (`WaMeProductButton`, both PDP paths) shares the same `noteMissing` nudge: with a required note empty it is an `aria-disabled` button whose tap scrolls to and focuses the field, never an inert link.
 
-**Body flags and lift.** `body[data-sticky-atc="1"]`, `body[data-sticky-cart="1"]` and `body[data-sticky-cart="blocked"]` reserve page space (8rem + 4.25rem, plus 1.5rem when blocked) and lift the floating widget AND the toast region (`data-toast-region`, F2; see `docs/architecture/store-theme-flags.md`). The bar uses the existing 56 px tab-bar lift (B0-6). It slides in over 300 ms (ease-out-quint, Dahab's pinned bar too, on a solid background, F10); reduced motion shows it at once. The cookie banner (z-100) may cover a bar until it is answered (B0-42).
+**Body flags and lift.** `body[data-sticky-atc="1"]`, `body[data-sticky-cart="1"]` and `body[data-sticky-cart="blocked"]` reserve page space (8rem + 4.25rem, plus 1.5rem when blocked) and lift the floating widget AND the toast region (`data-toast-region`, F2; see `docs/architecture/store-theme-flags.md`). The bar lifts by `--bottom-tab-h` (69 px) plus the safe-area inset (B0-6), and the widget/toast lift is `--bottom-tab-h` + the bar's measured height (`--sticky-bar-h`, published by `useStickyBarHeight`; default 61 px, 85 px blocked) + 10 px, so the taller Dahab bar and the cart's blocked line are cleared too. It slides in over 300 ms (ease-out-quint, Dahab's pinned bar too, on a solid background, F10); reduced motion shows it at once. The cookie banner (z-100) may cover a bar until it is answered (B0-42).
 
 **Data.** None.
 
-**Limits.** Phones only. The PDP bar appears only after the main button leaves the top of the viewport, never on first paint (B0-21: it attaches once).
+**Limits.** Phones only. The PDP bar shows from first paint when the main button starts below the fold or under the tab bar, and never when it is reachable (B0-49; B0-21: it attaches once).
 
 **Rulings.** B0-6, B0-21, B0-42.
 

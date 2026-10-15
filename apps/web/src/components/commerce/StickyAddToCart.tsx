@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { useAnchorOffscreen } from './useAnchorOffscreen';
+import { useStickyBarHeight } from './useStickyBarHeight';
 
 /**
  * Phone-only add-to-cart bar, shown from first paint whenever the main
@@ -23,6 +24,8 @@ export function StickyAddToCart(p: {
   onAdd: () => void;
 }) {
   const show = useAnchorOffscreen(p.anchorRef);
+  const barRef = useRef<HTMLDivElement>(null);
+  useStickyBarHeight(barRef, show);
   useEffect(() => {
     if (show) document.body.dataset.stickyAtc = '1';
     else delete document.body.dataset.stickyAtc;
@@ -33,6 +36,7 @@ export function StickyAddToCart(p: {
   if (!show) return null;
   return (
     <div
+      ref={barRef}
       data-testid="sticky-atc"
       className="sticky-bar-in fixed inset-x-0 bottom-[calc(var(--bottom-tab-h)+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background px-4 py-2 md:hidden"
     >

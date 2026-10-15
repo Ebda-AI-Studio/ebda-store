@@ -360,6 +360,15 @@ describe('Dahab pinned bar body flag', () => {
     ctx.all.length = 0;
     const { unmount } = render(<DahabProductDetail {...(props as never)} />);
     expect(document.body.dataset.stickyAtc).toBeUndefined();
+    // B0-49: button BELOW the fold on load -> the pinned bar is usable from first paint
+    act(() => fireAll([{ isIntersecting: false, boundingClientRect: { top: 1100 } }]));
+    expect(document.body.dataset.stickyAtc).toBe('1');
+    const pinned = screen.getByTestId('dahab-pinned-add').closest('[aria-hidden]') as HTMLElement;
+    expect(pinned.getAttribute('aria-hidden')).toBe('false');
+    expect(pinned.hasAttribute('inert')).toBe(false);
+    act(() => fireAll([{ isIntersecting: true, boundingClientRect: { top: 400 } }]));
+    expect(document.body.dataset.stickyAtc).toBeUndefined();
+    expect(pinned.getAttribute('aria-hidden')).toBe('true');
     act(() => fireAll([{ isIntersecting: false, boundingClientRect: { top: -10 } }]));
     expect(document.body.dataset.stickyAtc).toBe('1');
     act(() => fireAll([{ isIntersecting: true, boundingClientRect: { top: 100 } }]));
