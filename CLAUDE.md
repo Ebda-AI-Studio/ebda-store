@@ -53,7 +53,7 @@ Refuse: "ship on one tenant first, roll out later", "setting for store X only", 
 
 1. API cookies are scoped to the API domain — Next middleware CANNOT read them; **all auth protection is client-side** via `AuthProvider`. Do NOT add cookie checks to Next middleware (redirect loops).
 2. `credentials: 'include'` + `Access-Control-Allow-Credentials: true`; cookies `SameSite=None; Secure`.
-3. Rotating refresh tokens (2026-06-09): `token` (30min access JWT, `jti` denylist + `tv` bulk revocation) + `refresh_token` (365d, DB-backed `refresh_tokens`, rotation with reuse-detection → family revoke). `/auth/refresh` accepts JSON body OR cookie, rotates both; both frontends silently refresh on 401 and retry once (single-flight). MFA composes: `login()` returns a challenge token; only `issueSessionFor` mints the real pair. `revokeAllSessions` bumps `tv` AND revokes all refresh tokens.
+3. Rotating refresh tokens (2026-06-09): `token` (30min access JWT, `jti` denylist + `tv` bulk revocation) + `refresh_token` (365d, DB-backed `refresh_tokens`, rotation with reuse-detection → family revoke). `/auth/refresh` accepts JSON body OR cookie, rotates both; no token at all → 401 `NO_REFRESH_TOKEN` (FU46-2); both frontends silently refresh on 401 and retry once (single-flight). MFA composes: `login()` returns a challenge token; only `issueSessionFor` mints the real pair. `revokeAllSessions` bumps `tv` AND revokes all refresh tokens.
 
 **Single source of truth:** `AuthProvider` (`lib/auth.tsx`) is the ONLY auth checker; `StoreContext` owns store data (don't fetch `/admin/stores` or store info elsewhere); API calls via `apiGet/apiPost/apiPut/apiDelete` from `lib/api.ts` (raw fetch only for downloads/server components).
 

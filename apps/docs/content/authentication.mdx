@@ -21,7 +21,7 @@ Ebda Store has three ways of identifying a caller. Which one applies depends on 
 Authorization: Bearer <access-token>
 ```
 
-`POST /api/v1/auth/refresh` exchanges the refresh cookie for a new access token. Browsers handle this transparently. Sign-in is rate limited and an account is locked for 15 minutes after 5 failed attempts (see [Rate limits](/rate-limits/)).
+`POST /api/v1/auth/refresh` exchanges the refresh cookie for a new access token. Browsers handle this transparently. A call with no refresh token at all (no cookie, no body) answers `401` with `code: "NO_REFRESH_TOKEN"`. Sign-in is rate limited and an account is locked for 15 minutes after 5 failed attempts (see [Rate limits](/rate-limits/)).
 
 Multi-factor authentication (TOTP) is optional for merchants and enforced for platform super-admin accounts, which get `403 MFA_SETUP_REQUIRED` on protected routes until they enrol.
 

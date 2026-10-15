@@ -98,19 +98,21 @@ describe('POST /auth/refresh — dead session cookies are cleared (#1531)', () =
     mockRefreshTokens.mockReset();
   });
 
-  it('a `token` cookie with no refresh token: 400 AND both session cookies cleared', async () => {
+  it('a `token` cookie with no refresh token: 401 NO_REFRESH_TOKEN AND both session cookies cleared', async () => {
     const c = call({ token: 'stale-access-jwt' });
     await c.run();
-    expect(c.recorded.status).toBe(400);
+    expect(c.recorded.status).toBe(401);
+    expect(c.recorded.body).toMatchObject({ error: { code: 'NO_REFRESH_TOKEN' } });
     expect(c.cleared.sort()).toEqual(['refresh_token', 'token']);
     expect(mockRefreshTokens).not.toHaveBeenCalled();
   });
 
-  it('no session cookie at all: 400 with NO Set-Cookie (a cookieless guest is left alone)', async () => {
+  it('no session cookie at all: 401 NO_REFRESH_TOKEN with NO Set-Cookie (a cookieless guest is left alone)', async () => {
     for (const cookies of [undefined, {}, { sessionId: 'x' }]) {
       const c = call(cookies);
       await c.run();
-      expect(c.recorded.status).toBe(400);
+      expect(c.recorded.status).toBe(401);
+      expect(c.recorded.body).toMatchObject({ error: { code: 'NO_REFRESH_TOKEN' } });
       expect(c.cleared).toEqual([]);
     }
   });

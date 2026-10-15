@@ -118,6 +118,40 @@ describe('iOS shopper with the refresh cookie alive and localStorage evicted (#1
     expect(calls(fetchMock).filter(u => u.includes('/payments/create'))).toHaveLength(2);
     expect(calls(fetchMock).filter(u => u.includes('/auth/refresh'))).toHaveLength(1);
   });
+
+  // FU46-2: the route now answers a no-token refresh as 401 NO_REFRESH_TOKEN.
+  // Same client fact as the legacy 400: retried ONCE, one refresh, no loop.
+  it('a refresh 401 NO_REFRESH_TOKEN retries the CSRF-403 once without looping', async () => {
+    const fetchMock = vi.fn(async (url: unknown) =>
+      String(url).includes('/auth/refresh')
+        ? res(401, { success: false, error: { code: 'NO_REFRESH_TOKEN' } })
+        : res(403, CSRF_403)
+    );
+    globalThis.fetch = fetchMock as never;
+    const { api } = await import('@web/lib/api');
+
+    const result = await api.post('/payments/create', { orderId: 'o1' });
+
+    expect(result.success).toBe(false);
+    expect(calls(fetchMock).filter(u => u.includes('/payments/create'))).toHaveLength(2);
+    expect(calls(fetchMock).filter(u => u.includes('/auth/refresh'))).toHaveLength(1);
+  });
+
+  it('a 401 on a read whose refresh answers 401 NO_REFRESH_TOKEN does not loop', async () => {
+    const fetchMock = vi.fn(async (url: unknown) =>
+      String(url).includes('/auth/refresh')
+        ? res(401, { success: false, error: { code: 'NO_REFRESH_TOKEN' } })
+        : res(401, { success: false, error: { code: 'UNAUTHORIZED' } })
+    );
+    globalThis.fetch = fetchMock as never;
+    const { api } = await import('@web/lib/api');
+
+    const result = await api.get('/auth/me');
+
+    expect(result.success).toBe(false);
+    expect(calls(fetchMock).filter(u => u.includes('/auth/refresh')).length).toBeLessThanOrEqual(1);
+    expect(calls(fetchMock).filter(u => u.includes('/auth/me')).length).toBeLessThanOrEqual(2);
+  });
 });
 
 describe('issue 2170 — the cookie fallback tells the storefront its stored token is dead', () => {

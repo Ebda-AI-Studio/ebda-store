@@ -426,7 +426,7 @@ const COOKIE_ROTATED = 'cookie-rotated';
 
 /**
  * Returned by refreshAccessToken() when the server REJECTED the refresh (401)
- * or found no refresh token to rotate (400, #2148). NOT a token and NOT a
+ * or found no refresh token to rotate (401 NO_REFRESH_TOKEN; 400 before FU46-2, #2148). NOT a token and NOT a
  * success. The server clears any auth cookies on both answers (auth.routes.ts
  * POST /auth/refresh), so the browser is now genuinely
  * cookieless — the state in which csrfProtection's no-cookie branch lets a
@@ -639,7 +639,7 @@ class ApiClient {
       // ITP evicts localStorage while the server-set cookie survives, and
       // bailing out here left that shopper with no way to re-mint a CSRF token
       // (every checkout write 403'd until a manual re-login). The
-      // /auth/refresh route accepts either and answers 400 when neither is
+      // /auth/refresh route accepts either and answers 401 NO_REFRESH_TOKEN (400 before FU46-2) when neither is
       // present, which lands on the same `null` the old bail returned.
       // And when the browser holds DEAD session cookies, that 400 now clears
       // them, so the next checkout write takes the cookieless guest path (#1531).
@@ -664,12 +664,13 @@ class ApiClient {
           body: JSON.stringify(storedRefreshToken ? { refreshToken: storedRefreshToken } : {}),
         });
         if (res.status === 429) throw new RefreshThrottledError();
-        // 401 (the presented token failed) and 400 (no refresh token was
-        // presented at all) are the SAME fact for this browser: the server
+        // 401 (the presented token failed, or none was presented: NO_REFRESH_TOKEN
+        // since FU46-2) and 400 (the same no-token answer from an API deployed
+        // before FU46-2) are the SAME fact for this browser: the server
         // holds no session for it, and on either answer it has cleared any
         // auth cookies the browser still carried (#1531 — the 400 branch now
-        // clears dead `token`/`refresh_token` cookies too). The route's ONLY
-        // 400 is that no-token branch. Reading the 400 as a plain failure
+        // clears dead `token`/`refresh_token` cookies too). The 400 branch is kept
+        // for API/web deploy skew. Reading the 400 as a plain failure
         // (`null`) left a CSRF-403 un-retried, so the shopper's first write
         // after the heal still failed — the heal only took effect on the NEXT
         // request (#2148) — and it kept stale evidence alive, buying one
