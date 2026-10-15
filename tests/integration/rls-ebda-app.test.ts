@@ -826,7 +826,10 @@ describe('users / addresses / store_staff: identity-keyed policies', () => {
  * 20261019000100). They read no table, so they are deliberately NOT definers: they run with the
  * caller's rights, and a SET search_path clause would stop the planner inlining them. Being on
  * this list is not an exemption from checks: each must be non-definer, IMMUTABLE, LANGUAGE sql,
- * and ebda_app must be able to execute it. Any other ebda_* function must pass the definer
+ * and ebda_app must be able to execute it, and it must carry NO `SET search_path` in proconfig
+ * (that would stop inlining, so the index could no longer match the query). EXECUTE deliberately
+ * stays granted to PUBLIC (Ruling SEARCH-15): they read no table and return only a fold of their
+ * argument, so there is nothing to withhold. Any other ebda_* function must pass the definer
  * hygiene below.
  */
 const PURE_IMMUTABLE_EBDA_FNS = new Set([
@@ -838,10 +841,18 @@ const PURE_IMMUTABLE_EBDA_FNS = new Set([
 describe('SECURITY DEFINER functions: hygiene', () => {
   it('the pure immutable ebda_* helpers are invoker-rights, IMMUTABLE, sql, executable by ebda_app', async () => {
     const fns = await owner.$queryRaw<
-      Array<{ proname: string; secdef: boolean; vol: string; lang: string; app_exec: boolean }>
+      Array<{
+        proname: string;
+        secdef: boolean;
+        vol: string;
+        lang: string;
+        app_exec: boolean;
+        cfg: string[] | null;
+      }>
     >`
       SELECT p.proname::text AS proname, p.prosecdef AS secdef, p.provolatile::text AS vol,
-             l.lanname::text AS lang, has_function_privilege('ebda_app', p.oid, 'EXECUTE') AS app_exec
+             l.lanname::text AS lang, has_function_privilege('ebda_app', p.oid, 'EXECUTE') AS app_exec,
+             p.proconfig AS cfg
       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_language l ON l.oid = p.prolang
       WHERE n.nspname = 'public' AND p.proname = ANY(${[...PURE_IMMUTABLE_EBDA_FNS]})`;
     expect(fns.map(f => f.proname).sort()).toEqual([...PURE_IMMUTABLE_EBDA_FNS].sort());
@@ -852,7 +863,15 @@ describe('SECURITY DEFINER functions: hygiene', () => {
         vol: f.vol,
         lang: f.lang,
         exec: f.app_exec,
-      }).toEqual({ fn: f.proname, secdef: false, vol: 'i', lang: 'sql', exec: true });
+        searchPath: (f.cfg ?? []).filter(c => c.startsWith('search_path=')),
+      }).toEqual({
+        fn: f.proname,
+        secdef: false,
+        vol: 'i',
+        lang: 'sql',
+        exec: true,
+        searchPath: [],
+      });
     }
   });
 

@@ -34,6 +34,7 @@ time the statement (`\timing on`). Reference points on a local PG 16 (the two `p
 | btree `ai_usage (created_at, cached_hit)`     | 25,000  | 13 ms   |
 | GIN expression `products_search_doc_trgm_idx` | 20,000  | 3.6 s   |
 | GIN expression `products_name_doc_trgm_idx`   | 20,000  | 0.27 s  |
+| GIN expression `products_sku_norm_trgm_idx`   | 20,000  | 0.10 s  |
 
 Write every index statement as `IF NOT EXISTS` (or `IF EXISTS` for drops), whichever path is taken.
 That keeps the migration file the single source of truth and makes it a no-op on a database where
@@ -67,8 +68,11 @@ refer to.
 
 ### Pre-build: search normalisation (`20261019000100_search_normalisation`)
 
-`products` is live, so the two expression indexes are pre-built before the deploy that carries this
-migration (plan STOP-1). In psql on `DIRECT_URL`, autocommit, off-peak:
+**Pre-launch this is waived (Ruling SEARCH-16):** `products` is empty before launch, so the plain
+`CREATE INDEX` in the migration builds instantly and the pre-build is skipped. Post-launch, a change
+to these indexes (or to `ebda_ar_norm`, which needs a `REINDEX INDEX CONCURRENTLY`) follows this
+procedure: pre-build before the deploy that carries the migration. In psql on `DIRECT_URL`,
+autocommit, off-peak:
 
 1. `CREATE EXTENSION IF NOT EXISTS pg_trgm;`
 2. The three `CREATE OR REPLACE FUNCTION` statements (`public.ebda_ar_norm`,
@@ -92,6 +96,18 @@ migration (plan STOP-1). In psql on `DIRECT_URL`, autocommit, off-peak:
 The migration then re-runs every statement as `IF NOT EXISTS` / `CREATE OR REPLACE`, which is a
 no-op. Rollback: the migration's `rollback.sql` (drops the two indexes; keeps the column and the
 functions).
+
+The follow-up `20261019000200_search_sku_index_and_terms_cap` adds the admin SKU arm's index and the
+`search_terms` length cap. Post-launch, pre-build the index the same way and add the CHECK as
+`NOT VALID`, then `VALIDATE CONSTRAINT` (it takes only a SHARE UPDATE EXCLUSIVE lock):
+
+```sql
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "products_sku_norm_trgm_idx" ON "products" USING gin
+  (public.ebda_ar_norm(coalesce("sku", '')) gin_trgm_ops);
+ALTER TABLE "products" ADD CONSTRAINT "products_search_terms_len_chk"
+  CHECK (char_length("search_terms") <= 500) NOT VALID;
+ALTER TABLE "products" VALIDATE CONSTRAINT "products_search_terms_len_chk";
+```
 
 ## Drops
 
@@ -124,8 +140,10 @@ with a comment on the owning model. As a result, `prisma migrate diff` and `migr
 - `users_{first_name,last_name,email,phone}_trgm_idx`
 - `orders_guest_{first_name,last_name,email,phone}_trgm_idx` (partial, on the `shipping_address ->> '<key>'`
   expression; Prisma cannot declare either)
-- `products_{search_doc,name_doc}_trgm_idx` (EXPRESSION indexes on `public.ebda_product_*_doc`; changing
-  `ebda_ar_norm` requires `REINDEX INDEX CONCURRENTLY` of both)
+- `products_{search_doc,name_doc}_trgm_idx` (EXPRESSION indexes on `public.ebda_product_*_doc`) and
+  `products_sku_norm_trgm_idx` (on `public.ebda_ar_norm(coalesce(sku, ''))`); changing `ebda_ar_norm`
+  requires `REINDEX INDEX CONCURRENTLY` of all three. The `products_search_terms_len_chk` CHECK is not
+  in the Prisma schema either; never accept a drop of it.
 
 **Never accept that drop.** Each one backs a leading-wildcard ILIKE search. A BitmapOr needs every
 arm of an OR indexed, so dropping any one of them returns its whole search to a sequential scan.

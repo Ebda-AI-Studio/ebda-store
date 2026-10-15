@@ -22,8 +22,9 @@
 --   because the prerequisite below pre-builds them CONCURRENTLY and every statement here is
 --   IF NOT EXISTS / CREATE OR REPLACE. No lock_timeout (docs/DB-INDEX-MIGRATIONS.md).
 --
--- >>> PRODUCTION PREREQUISITE (do NOT skip; plan STOP-1): `products` is a live table. Before this
--- reaches production, run on DIRECT_URL in psql autocommit (no BEGIN), off-peak:
+-- >>> PRODUCTION PREREQUISITE (post-launch only; pre-launch waived, Ruling SEARCH-16 — products is
+-- empty before launch, so the plain CREATE INDEX below builds instantly). Once `products` is live,
+-- an equivalent migration first runs on DIRECT_URL in psql autocommit (no BEGIN), off-peak:
 --   1. CREATE EXTENSION IF NOT EXISTS pg_trgm;
 --   2. the three CREATE OR REPLACE FUNCTION statements below, verbatim;
 --   3. ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "search_terms" TEXT;

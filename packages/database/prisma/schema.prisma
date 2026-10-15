@@ -900,6 +900,7 @@ model Product {
   // ("جزمة, كوتشي, 3abaya, sneakers"). Comma-separated, merchant-editable, AI-filled when empty
   // (P1, AI_AUTOFILL_FIELDS). Searched through public.ebda_product_search_doc /
   // ebda_product_name_doc (expression trigram indexes, migration 20261019000100) — never shown on the storefront.
+  // DB CHECK products_search_terms_len_chk: at most 500 characters (migration 20261019000200).
   searchTerms          String?       @map("search_terms")
   price                Int // Price in piastres (1 EGP = 100 piastres)
   compareAtPrice       Int?          @map("compare_at_price")
