@@ -48,11 +48,18 @@ export function composeStoreTheme(i: {
   theme?: Record<string, unknown> | null;
 }): StoreTheme {
   const look = getLook(i.look);
-  return {
+  const stored = (i.theme ?? {}) as Partial<StoreTheme>;
+  const out: StoreTheme = {
     ...getTemplateTheme(i.template),
     ...(look ? lookTheme(look) : {}),
-    ...((i.theme ?? {}) as Partial<StoreTheme>),
+    ...stored,
   };
+  // Ruling B1-43: form fields draw with --input. On a store with no look, a saved border colour
+  // (Branding editor, site settings, an older palette) with no saved input colour keeps the
+  // fields on that border, exactly as they drew before the border-input sweep.
+  if (!look && stored.borderColor && stored.inputColor === undefined)
+    out.inputColor = stored.borderColor;
+  return out;
 }
 
 /** Look-owned keys the merchant has stored with a value that differs from the look. */

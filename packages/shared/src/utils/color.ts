@@ -525,6 +525,8 @@ export interface CoreBrandTokens {
   cardColor: string;
   mutedColor: string;
   borderColor: string;
+  /** Form-field boundary: the palette's hairline, so fields keep the border colour (B1-43). */
+  inputColor: string;
   primaryForeground: string;
   secondaryForeground: string;
   accentForeground: string;
@@ -691,6 +693,7 @@ export function deriveCoreBrandTokens(seeds: {
       cardColor: cardTriplet,
       mutedColor: mutedTriplet,
       borderColor: borderTriplet,
+      inputColor: borderTriplet,
       primaryForeground: autoFgTriplet(primary),
       secondaryForeground: secondaryFg,
       accentForeground: hexToTriple(primary), // brand text on the light wash
@@ -740,6 +743,7 @@ export function deriveCoreBrandTokens(seeds: {
     cardColor: hexToTriple(cardHex),
     mutedColor: mutedTriplet,
     borderColor: borderTriplet,
+    inputColor: borderTriplet,
     primaryForeground: autoFgTriplet(primary),
     secondaryForeground: autoFgTriplet(secondaryHex),
     accentForeground: autoFgTriplet(accentHex),

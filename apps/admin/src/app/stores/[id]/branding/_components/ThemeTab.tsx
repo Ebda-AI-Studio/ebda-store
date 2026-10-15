@@ -123,9 +123,9 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         mutedColor: derived.mutedColor,
         mutedForeground: derived.mutedForeground,
         borderColor: derived.borderColor,
-        // Form fields draw with --input (quality bar K-05): keep it on the palette's hairline so a
-        // palette store's fields keep the colour they had before the border-input sweep (B1-43).
-        inputColor: derived.borderColor,
+        // Form fields draw with --input (quality bar K-05); the palette keeps it on its hairline
+        // so a palette store's fields keep the colour they had before the sweep (B1-43).
+        inputColor: derived.inputColor,
         primaryForeground: derived.primaryForeground,
         secondaryForeground: derived.secondaryForeground,
         accentForeground: derived.accentForeground,

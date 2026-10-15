@@ -13,6 +13,7 @@ import {
   contrastRatio,
   composeStoreTheme,
   getTemplateTheme,
+  deriveCoreBrandTokens,
   TEMPLATE_THEMES,
   type TemplateId,
 } from '@ebda/shared';
@@ -35,6 +36,52 @@ describe('a store without a look: --input equals --border on every skin (fields 
       const t = getTemplateTheme(id);
       expect(t.inputColor).toBe(t.borderColor);
     });
+});
+
+describe('stores with saved colours keep their field colour (N1)', () => {
+  it('both palette writers: an applied palette yields inputColor === borderColor', () => {
+    for (const seeds of [
+      { primary: '#1F4E54' }, // SmartPaletteModal (legacy mode, light)
+      { primary: '#1F4E54', neutral: '#111111' }, // legacy mode, dark neutral
+      { primary: '#9E5E5E', secondary: '#1F4E54' }, // Branding editor (new mode)
+    ]) {
+      const t = deriveCoreBrandTokens(seeds);
+      expect(t.inputColor, JSON.stringify(seeds)).toBe(t.borderColor);
+    }
+  });
+
+  it('no look + a saved custom border colour: fields draw in that border (as before the sweep)', () => {
+    for (const id of Object.keys(TEMPLATE_THEMES) as TemplateId[]) {
+      const t = composeStoreTheme({ template: id, theme: { borderColor: '12 40% 30%' } });
+      expect(t.inputColor, id).toBe('12 40% 30%');
+      expect(t.borderColor, id).toBe('12 40% 30%');
+    }
+    // an unregistered look id renders as legacy too
+    expect(
+      composeStoreTheme({
+        template: 'minimal',
+        look: 'qamar.removed',
+        theme: { borderColor: '1 2% 3%' },
+      }).inputColor
+    ).toBe('1 2% 3%');
+  });
+
+  it('an explicitly saved input colour wins; a look store keeps its muted input', () => {
+    expect(
+      composeStoreTheme({
+        template: 'minimal',
+        theme: { borderColor: '12 40% 30%', inputColor: '0 0% 40%' },
+      }).inputColor
+    ).toBe('0 0% 40%');
+    const v = LOOKS.find(l => l.id === 'qamar.vitrine')!;
+    const t = composeStoreTheme({
+      template: 'qamar',
+      look: v.id,
+      theme: { borderColor: '45 60% 70%' },
+    });
+    expect(t.inputColor).not.toBe('45 60% 70%');
+    expect(contrastRatio(v.tokens.page, hsl(t.inputColor))).toBeGreaterThanOrEqual(3);
+  });
 });
 
 /** className text of every <input>, <textarea>, <select> opening tag in a .tsx file. */
