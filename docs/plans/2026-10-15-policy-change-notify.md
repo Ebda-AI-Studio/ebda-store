@@ -23,6 +23,22 @@
 ## Coordinator amendments (binding; override the task text where they conflict)
 
 - **A1 — one bilingual email, Arabic first.** Legacy accounts carry the column default `users.language = 'en'`, so the stored language cannot be trusted for a legal notice. Task 7 sends ONE email per user containing the full Arabic block (`dir="rtl"`) followed by the full English block, with a bilingual subject (`تحديث في سياسات إبدأ · Ebda policy update`). Drop the `language` parameter from `sendLegalNoticeEmail` and the `user.language` read in the fan-out; tests assert both blocks are present and Arabic comes first. LEGAL-5(d) is replaced by: "the notice email is bilingual (Arabic first) for every recipient (Ruling LEGAL-6)". Add `Ruling LEGAL-6 — legal notice emails are bilingual, Arabic first, regardless of users.language (legacy default 'en' makes the stored value unreliable). Cost if wrong: a longer email.`
+- **A2 (T3)** — the "contextless sees none" subtest runs on an UNGUARDED ebda_app client (as `rls-ebda-app.test.ts` does); RLS is what it proves, not the code guard.
+- **A3 (T2)** — `apps/marketing/src/lib/content.ts` `footer.legalVersion` (ar + en, ~:635 / ~:1024) renders from `LEGAL_POLICIES` (no hard-coded version/date) and is covered by the copy-literal/date test; that test must fail before the change.
+- **A4 (T7)** — wait for the send slot WITH a time budget BEFORE claiming a row `queued→sending`; no slot → end the step and continue in a later step (as campaign-send does); adjust `maxBatches`/`BATCH_CAP_REACHED` to match. Add unit tests for `onFailure` and the fail-leftover path (pattern: `campaign-send-job.test.ts`).
+- **A5 (T5)** — mount `rejectImpersonated` after `authenticate` on `POST /me/legal-notices/ack` (and GET), with a test that an impersonating super admin gets refused.
+- **A6 (T5)** — ack accepts only items that are SENT, MATERIAL and CURRENT; an already-acked such item is a 200 no-op; anything else (incl. `privacy@1.0` from signup) is 422 `NOT_PENDING`. Test with a fixture user that HAS signup rows.
+- **A7 (T7)** — apply A1 everywhere: no `language` param on `sendLegalNoticeEmail`; `LegalNoticeEmailData` carries ar AND en values; one Arabic-then-English body; no `language` in the fan-out user select; tests assert both blocks present, Arabic first (replace the English-subject and "language honoured" asserts).
+- **A8 (T7)** — subject built from `BRAND.product.nameAr` / `BRAND.product.nameEn`, never typed by hand. Shell `renderBrandedShell({ defaultLanguage: 'ar' })`; the English block carries `dir="ltr"`.
+- **A9 (T9 + Decision 5 + Global Constraints line about language)** — read them as A1: LEGAL-4(4) says bilingual Arabic-first, LEGAL-5(d) replaced, LEGAL-6 added; commit message mentions legal-4/5/6.
+- **A10 (T3)** — plain DDL (no IF NOT EXISTS) matches repo convention (B0 size_charts); record that in the migration header comment.
+- **A11 (T8)** — every data needs a UI: the Policy updates page lists failed deliveries per version (masked email + error + time). No SQL-only runbook step.
+- **A12 (T9 Step 6)** — the live probe posts a FULL signup body with `acceptedLegal:false` and the honeypot filled: deployed → 400 `VALIDATION_ERROR`; not deployed → generic 200 and no account. Never create a real account.
+- **A13 (T9)** — LEGAL-4/5/6 go next to LEGAL-1..3 in `docs/RULINGS.md` (≈ line 5718), not under the B0 heading.
+- **A14 (T4/T5/T8 tests)** — T4 runs `admin-i18n-keys-resolve.test.ts`; T4 adds a test for the acceptance write on the unverified-resend path; T8 re-runs the signup unit tests after `legal-notice.service.ts` imports the Inngest client.
+- **A15 (T4/T5)** — one shared helper builds an acceptance row (UA truncation + shape); both signup and ack use it.
+- **A16 (minor)** — no unused `_drop` (lint clean); the T2 date test must fail first; T3's expected failure is a runtime TypeError; line refs are approximate — find by symbol.
+- **A17 (env)** — run `npm ci` (npm 10) in the worktree before Task 1; build `packages/shared` and `packages/database` and `db:generate` as the repo requires.
 
 ## Global Constraints
 
