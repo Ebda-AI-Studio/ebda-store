@@ -405,20 +405,44 @@ describe('showroom seed: the Lookbook shop-the-look node', async () => {
   });
 });
 
-describe('section headings read on a dark look page (Lookbook category row, found in the shots)', async () => {
+describe('section headings measure contrast against the PAINTED page (resolveBackgroundPreset)', async () => {
   const { SectionHeading } = await import('../../apps/web/src/templates/shared/SectionHeading');
-  const heading = (theme: Record<string, unknown>) => {
+  const { composeStoreTheme } = await import('@ebda/shared');
+  const heading = (theme: Record<string, unknown>, zoneColor?: string) => {
     ctx.store = { ...STORES.A, template: 'qamar', currency: 'EGP', theme };
-    const html = renderToStaticMarkup(<SectionHeading title="Shop by category" isRtl={false} />);
+    const html = renderToStaticMarkup(
+      <SectionHeading
+        title="Shop by category"
+        isRtl={false}
+        headingZone={zoneColor ? { color: zoneColor } : undefined}
+      />
+    );
     setStore();
     return html.match(/data-zone="sectionTitle"[^>]*style="color:(#[0-9a-f]{6})"/i)?.[1];
   };
-  it('a dark page colour gets a light heading', () => {
-    expect(heading({ bgPage: '231 36% 18%' })).toBe('#ffffff');
-    expect(heading({ backgroundColor: '#1E2340' })).toBe('#ffffff');
+  it('the Lookbook theme (a dark bgPage/bgSectionAlt pair) gets a light heading', () => {
+    const t = composeStoreTheme({ template: 'qamar', look: 'qamar.lookbook', theme: {} });
+    expect(heading(t as unknown as Record<string, unknown>)).toBe('#ffffff');
+    expect(heading({ bgPage: '231 36% 18%', bgSectionAlt: '231 40% 25%' })).toBe('#ffffff');
+  });
+  it('(a) a legacy dark backgroundColor with no pair paints a WHITE page: heading stays dark', () => {
+    expect(heading({ backgroundColor: '231 36% 18%' })).toBe('#000000');
+    expect(heading({ bgPage: '231 36% 18%' })).toBe('#000000'); // half a pair is ignored too
+  });
+  it('(b) a stale near-white zone colour on an off-white page is still corrected', () => {
+    expect(heading({ bgPage: '36 33% 96%', bgSectionAlt: '36 33% 91%' }, '#ffffff')).toBe(
+      '#000000'
+    );
+    expect(heading({ backgroundPreset: 'warmSand' }, '#ffffff')).toBe('#000000');
+  });
+  it('a real tint is honoured; a light tint on a dark look page is honoured', () => {
+    expect(heading({}, '#6e1f2a')).toBe('#6e1f2a');
+    expect(heading({ bgPage: '231 36% 18%', bgSectionAlt: '231 40% 25%' }, '#f4f1fa')).toBe(
+      '#f4f1fa'
+    );
   });
   it('a light page, or a theme with no page colour, keeps the dark heading (unchanged)', () => {
-    expect(heading({ bgPage: '0 0% 100%' })).toBe('#000000');
+    expect(heading({ bgPage: '0 0% 100%', bgSectionAlt: '0 0% 98%' })).toBe('#000000');
     expect(heading({})).toBe('#000000');
   });
 });

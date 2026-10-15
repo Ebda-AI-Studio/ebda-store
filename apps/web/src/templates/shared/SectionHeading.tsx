@@ -8,6 +8,7 @@ import {
   resolveColor,
   pickReadableForeground,
   contrastRatio,
+  resolveBackgroundPreset,
 } from '@ebda/shared';
 import { getPackStyles } from './pack-styles';
 import type { ResolvedZone } from './section-typography';
@@ -117,7 +118,7 @@ export function SectionHeading({
   // Anchor B (PDP-4 / YML-1): GUARANTEE a readable heading color — invert at
   // render time, never via a CSS --section-fg cascade (audit 2026-06-05).
   //
-  // The background is the section bg when provided, else the store's page colour (else #ffffff).
+  // The background is the section bg when provided, else the painted page colour (below).
   // A saved/explicit color is honoured ONLY when it actually reads against that
   // bg (contrast >= 2:1, see floor note below). If it doesn't — e.g. a
   // stale white/light heading color on a white page (the wadyaljuz "قد يعجبك
@@ -125,17 +126,18 @@ export function SectionHeading({
   // heading is never invisible. This keeps a deliberate light-on-dark pick
   // (white on a brand-colored section reads fine) while self-correcting the
   // unreadable ones. The mechanical rule: the heading is ALWAYS legible.
-  // No section bg: the section paints the page colour (`--bg-page`, else `--background`), so
-  // measure against the store's own page colour when the theme carries one. A dark look
-  // (Qamar Lookbook, page #1E2340) otherwise got a BLACK heading on its dark page. Stores with
-  // no page colour on the theme keep the white assumption (unchanged output).
-  const pageRaw = store.theme?.bgPage || store.theme?.backgroundColor;
-  const pageBg =
-    pageRaw &&
-    (pageRaw.startsWith('#') || pageRaw.startsWith('hsl(') ? pageRaw : `hsl(${pageRaw})`);
+  // No section bg: the section paints `--bg-page`, which is EXACTLY
+  // `resolveBackgroundPreset(theme).bgPage` (StoreContext `themeToCssVars`): the theme's
+  // bgPage/bgSectionAlt pair when both are set (every look sets them), else the backgroundPreset
+  // (white by default, whatever `backgroundColor` says). Measure against what is painted, so a
+  // dark look page (Qamar Lookbook, #1E2340) gets a light heading and a legacy store with a dark
+  // `backgroundColor` but a white painted page keeps its dark heading.
+  const paintedPage = store.theme
+    ? `hsl(${resolveBackgroundPreset(store.theme).bgPage})`
+    : undefined;
   const resolvedBg: string =
     resolveColor(sectionBgColor, store.theme) ??
-    (pageBg && pickReadableForeground(pageBg) ? pageBg : '#ffffff');
+    (paintedPage && pickReadableForeground(paintedPage) ? paintedPage : '#ffffff');
   const ensureReadable = (zoneColor: string | undefined): string | undefined => {
     const auto = pickReadableForeground(resolvedBg) ?? '#000000';
     if (!zoneColor) return sectionBgColor ? auto : undefined; // no explicit pick → auto-contrast
@@ -147,7 +149,13 @@ export function SectionHeading({
     // essentially the same color as the background (contrast < 1.06 ≈
     // white-on-white) — to keep the stale-color safety without blocking a real tint.
     const concrete = resolveColor(zoneColor, store.theme) ?? zoneColor;
-    return contrastRatio(resolvedBg, concrete) >= 1.06 ? zoneColor : auto;
+    // On a LIGHT bg, invisible against the painted bg OR against white (the reference this floor
+    // was tuned on): a stale near-white pick on an off-white page (#FAF7F2 ≈ 1.07:1) is still
+    // corrected, exactly as when this measured against white alone. On a dark bg (a dark look),
+    // only the painted bg counts, so a merchant's light tint there is honoured.
+    const vsBg = contrastRatio(resolvedBg, concrete);
+    const seen = auto === '#000000' ? Math.min(vsBg, contrastRatio('#ffffff', concrete)) : vsBg;
+    return seen >= 1.06 ? zoneColor : auto;
   };
   // When there is no explicit color AND no section bg, fall back to a guaranteed
   // dark default rather than inheriting (which on a white page can resolve to an
