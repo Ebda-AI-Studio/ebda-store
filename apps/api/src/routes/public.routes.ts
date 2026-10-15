@@ -23,7 +23,7 @@ import {
   viewIngestLimiter,
 } from '../middleware/security';
 import { recordProductView } from '../services/view-ingest.service';
-import { recordSearch } from '../services/search-log.service';
+import { claimSearcherSearch, recordSearch } from '../services/search-log.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
 import logger from '../lib/logger';
@@ -304,7 +304,15 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
       const total = (result as { meta?: { total?: number } }).meta?.total ?? 0;
       // The FULL raw term: the log folds it, checks it whole for personal data, and only then
       // cuts it to 100 characters (a phone past char 100 is caught, not half-stored).
-      void deferAfterTenantCommit('search-log', () => recordSearch(storeId, rawSearch, total));
+      // Distinct searchers (Ruling SEARCH-T5-6): a sort/category change or a retry re-fetches
+      // page 1; the same searcher counts a term once per window (salted daily HMAC of IP+UA,
+      // kept only as a short-lived Redis key; fail-open counts once).
+      const searcher = { ip: req.ip ?? '', userAgent: String(req.headers['user-agent'] ?? '') };
+      void deferAfterTenantCommit('search-log', async () =>
+        (await claimSearcherSearch(storeId, rawSearch, searcher))
+          ? recordSearch(storeId, rawSearch, total)
+          : false
+      );
     }
 
     // Edge-cacheable: product list is identical for all anonymous

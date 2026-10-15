@@ -173,8 +173,14 @@ describe.skipIf(!hasDb)('recordSearch on ebda_app (guard + strict RLS)', () => {
 
 describe.skipIf(!hasDb)('GET /public/products logs through the real HTTP path', () => {
   const app = buildApp();
+  // A fresh user agent per request: each call is a different searcher, so the distinct-searcher
+  // dedupe (Ruling SEARCH-T5-6, covered in search-log-distinct-searchers.test.ts) never merges
+  // them whether or not Redis is up.
   const get = async (storeId: string, qs: string) => {
-    const res = await request(app).get(`/api/v1/public/products?${qs}`).set('x-store-id', storeId);
+    const res = await request(app)
+      .get(`/api/v1/public/products?${qs}`)
+      .set('x-store-id', storeId)
+      .set('user-agent', `search-log-test/${uid()}`);
     await awaitDeferredWork(5000);
     return res;
   };

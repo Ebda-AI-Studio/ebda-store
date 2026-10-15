@@ -8,7 +8,8 @@
  * dropped before the insert. Free text CAN still contain a name or a place a shopper typed
  * (`احمد محمد`, `شارع التحرير`): that cannot be filtered by shape and is accepted under Ruling
  * SEARCH-T5-6 (unlinked, one store's merchant only, 90 days; `getSearchInsights` shows only
- * terms searched at least SEARCH_LOG_MIN_SEARCHES_SHOWN times).
+ * terms searched at least SEARCH_LOG_MIN_SEARCHES_SHOWN times, each searcher counting a term once
+ * per SEARCH_LOG_SEARCHER_DEDUPE_TTL_S: `claimSearcherSearch`).
  *
  * Writer: `GET /public/products` (page 1 of a real query) through
  * `deferAfterTenantCommit('search-log', ...)`: after the request transaction commits, in a
@@ -22,9 +23,12 @@
  * random strings can add at most that many rows per store per day (and can starve that day's
  * NEW terms: Ruling SEARCH-T5-4).
  */
+import { createHmac } from 'node:crypto';
 import { acrossStores, storeDirectory, withStore } from '@ebda/database';
 import { foldSearchLogTerm, isPersonalDataTerm, REGION, zonedIsoDay } from '@ebda/shared';
+import { derivedSecret } from '../lib/derived-secret';
 import logger from '../lib/logger';
+import { redis } from './redis.service';
 import { withSavepoint } from '../lib/savepoint';
 
 export const SEARCH_LOG_RETENTION_DAYS = 90;
@@ -36,12 +40,21 @@ export const SEARCH_LOG_TERM_MAX = 100;
 const SEARCH_LOG_RAW_MAX = 1000;
 /**
  * k-anonymity floor for the read API: a term is listed only when it was searched at least this
- * many times in the window, so a one-off pasted name or address is never shown (Ruling
- * SEARCH-T5-6). Totals still count every search.
+ * many times in the window by DISTINCT searchers (`claimSearcherSearch` dedupes one searcher's
+ * re-fetches), so a one-off pasted name or address is never shown (Ruling SEARCH-T5-6). Totals
+ * still count every counted search.
  */
 export const SEARCH_LOG_MIN_SEARCHES_SHOWN = 2;
 
 const INT4_MAX = 2_147_483_647;
+
+/**
+ * Distinct-searcher dedupe window (Ruling SEARCH-T5-6, revised 2026-10-16): one searcher counts a
+ * term once per 30 minutes, so a sort / category change or a retry (each re-fetches page 1)
+ * does not count again. ≥ the repo's 120s Redis TTL floor.
+ */
+export const SEARCH_LOG_SEARCHER_DEDUPE_TTL_S = 30 * 60;
+const SEARCHER_KEY_PREFIX = 'search-log:seen:';
 
 // The personal-data gate lives in `@ebda/shared` (`search/personal-data-term.ts`) so the
 // storefront's ad-pixel Search event uses the SAME test (Ruling SEARCH-T5-9). Re-exported here
@@ -60,6 +73,52 @@ export function searchLogTerm(rawTerm: string): string | null {
   if ([...norm].length < 2 || isPersonalDataTerm(norm)) return null;
   // Cap by code point, then re-trim: the cut can leave a trailing space.
   return [...norm].slice(0, SEARCH_LOG_TERM_MAX).join('').replace(/ +$/, '');
+}
+
+/**
+ * The short-lived Redis dedupe key for (store, searcher, term) on one Cairo day. The searcher is
+ * a salted, daily-rotated HMAC of (IP + user agent): the salt is a key derived from
+ * ENCRYPTION_KEY, and the day is part of the MAC input, so the same visitor hashes differently
+ * tomorrow. The key holds only that hex digest (no IP, user agent or term) and lives in Redis for
+ * SEARCH_LOG_SEARCHER_DEDUPE_TTL_S; it is never written to `search_query_daily` or a log line.
+ */
+export function searcherDedupeKey(
+  storeId: string,
+  storedTerm: string,
+  searcher: { ip: string; userAgent: string },
+  now: Date = new Date()
+): string {
+  const day = searchLogDay(now);
+  const mac = createHmac('sha256', derivedSecret('ebda:search-searcher-salt:v1'))
+    .update([day, storeId, searcher.ip, searcher.userAgent, storedTerm].join('\u0000'))
+    .digest('hex');
+  return `${SEARCHER_KEY_PREFIX}${mac}`;
+}
+
+/**
+ * True when this search should be counted: the first page-1 request for this term by this
+ * searcher in the dedupe window. Fail-open (Redis down, no key material): true, the search is
+ * counted once for that request. A term the log would not store anyway returns true without
+ * touching Redis (`recordSearch` drops it).
+ */
+export async function claimSearcherSearch(
+  storeId: string,
+  rawTerm: string,
+  searcher: { ip: string; userAgent: string },
+  now: Date = new Date()
+): Promise<boolean> {
+  const term = searchLogTerm(rawTerm);
+  if (term === null) return true;
+  const client = redis.getClient();
+  if (!client || !redis.isAvailable()) return true;
+  try {
+    const key = searcherDedupeKey(storeId, term, searcher, now);
+    const res = await client.set(key, '1', 'EX', SEARCH_LOG_SEARCHER_DEDUPE_TTL_S, 'NX');
+    return res === 'OK';
+  } catch (err) {
+    logger.warn({ storeId, code: errCode(err) }, '[SEARCH-LOG] searcher dedupe unavailable');
+    return true;
+  }
 }
 
 /** The region (Africa/Cairo, DST-aware) calendar day containing `now`, as `YYYY-MM-DD`. */
