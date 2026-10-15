@@ -55,6 +55,10 @@ in `apps/web/.../checkout/_lib/deliveryWindows.ts` (`getNowMinutesInTimezone` de
 store-local minutes). Example — window A order-by 14:00, window B order-by 19:00: at 13:59
 both available (today); 14:01 only B; 18:59 only B; 19:01 → tomorrow, both.
 
+## `deliveryOffDays?: number[] | null`
+
+Weekdays with no delivery, `Date#getUTCDay` numbers (0=Sun ... 6=Sat). Unset/null = `[5]` (Friday). `[]` = delivers every day. Unique integers 0-6, at most 6 entries. The storefront "delivers by" estimate (`deliveryWindow({ offDays })`) skips these days for zone estimates and for the `deliveryDays` fallback. Edited on Admin → Delivery ("Days with no delivery"); null clears (shallow merge). Public (`lib/public-store-settings.ts`). Ruling B0-48.
+
 ## Editing / adding a setting
 
 The admin delivery page reads the full `settings` object and re-saves it via

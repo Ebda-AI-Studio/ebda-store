@@ -8261,11 +8261,21 @@
       "invoiceEmailLabel": "Invoice recipient email",
       "invoiceEmailPlaceholder": "owner@example.com",
       "deliveryDaysTitle": "Delivery time (business days)",
-      "deliveryDaysHint": "Shown on product pages as \"Arrives between … and …\" when your shipping zones carry no day estimate. Fridays are skipped. Leave empty to hide.",
+      "deliveryDaysHint": "Shown on product pages as \"Arrives between … and …\" when your shipping zones carry no day estimate. Leave empty to hide. Days with no delivery (below) are skipped.",
       "deliveryDaysMin": "From (days)",
       "deliveryDaysMax": "To (days)",
       "deliveryDaysClear": "Clear",
-      "deliveryDaysInvalid": "Enter both numbers as whole days from 0 to 30, with From no larger than To."
+      "deliveryDaysInvalid": "Enter both numbers as whole days from 0 to 30, with From no larger than To.",
+      "deliveryOffDaysTitle": "Days with no delivery",
+      "deliveryOffDaysHint": "The delivery estimate on product pages skips these days, for shipping zones and for the time above. Friday is off by default. Select every day your courier does not deliver.",
+      "deliveryOffDaysAllOff": "Keep at least one delivery day. Turn one of the days back on to save.",
+      "deliveryOffDay0": "Sunday",
+      "deliveryOffDay1": "Monday",
+      "deliveryOffDay2": "Tuesday",
+      "deliveryOffDay3": "Wednesday",
+      "deliveryOffDay4": "Thursday",
+      "deliveryOffDay5": "Friday",
+      "deliveryOffDay6": "Saturday"
     }
   },
   "customerGroups": {

@@ -16,6 +16,9 @@ import {
   buildCheckoutDeliverySettings,
   majorInputToMinor,
   parseDeliveryDaysInput,
+  parseDeliveryOffDaysInput,
+  offDaysFromSettings,
+  DELIVERY_WEEK_ORDER,
   type CheckoutDeliveryForm,
 } from '../checkout-delivery-payload';
 
@@ -157,5 +160,44 @@ describe('parseDeliveryDaysInput', () => {
     ]) {
       expect(parseDeliveryDaysInput(a, b)).toEqual({ ok: false });
     }
+  });
+});
+
+describe('store deliveryOffDays (days with no delivery)', () => {
+  const base = { config: CONFIG, minimumOrderMajor: '', orderInvoiceEmail: '' };
+
+  it('serializes [] (delivers every day) and the chosen days, never dropping the key', () => {
+    expect(serialize({ ...base, existingSettings: STORED, deliveryOffDays: [] })).toHaveProperty(
+      'deliveryOffDays',
+      []
+    );
+    expect(
+      serialize({ ...base, existingSettings: STORED, deliveryOffDays: [5, 6] }).deliveryOffDays
+    ).toEqual([5, 6]);
+  });
+
+  it('sends an explicit null to clear and leaves the stored value on undefined', () => {
+    const stored = { ...STORED, deliveryOffDays: [6] };
+    const cleared = serialize({ ...base, existingSettings: stored, deliveryOffDays: null });
+    expect(serverMerge(stored, cleared).deliveryOffDays).toBeNull();
+    expect(serialize({ ...base, existingSettings: stored }).deliveryOffDays).toEqual([6]);
+  });
+
+  it('reads unset, null and malformed as the Friday default', () => {
+    for (const raw of [undefined, null, 'x', [9], [1, 1]]) {
+      expect(offDaysFromSettings(raw)).toEqual([5]);
+    }
+    expect(offDaysFromSettings([])).toEqual([]);
+    expect(offDaysFromSettings([6, 5])).toEqual([6, 5]);
+  });
+
+  it('refuses all seven days off, normalises order and drops duplicates', () => {
+    expect(parseDeliveryOffDaysInput([0, 1, 2, 3, 4, 5, 6])).toEqual({ ok: false });
+    expect(parseDeliveryOffDaysInput([6, 5, 5])).toEqual({ ok: true, value: [5, 6] });
+    expect(parseDeliveryOffDaysInput([])).toEqual({ ok: true, value: [] });
+  });
+
+  it('lists the chips Saturday-first', () => {
+    expect([...DELIVERY_WEEK_ORDER]).toEqual([6, 0, 1, 2, 3, 4, 5]);
   });
 });

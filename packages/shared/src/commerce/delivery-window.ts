@@ -15,6 +15,19 @@ export const deliveryDaysSchema = z
   .refine(d => d.min <= d.max, { message: 'min must be <= max', path: ['max'] });
 export type DeliveryDays = z.infer<typeof deliveryDaysSchema>;
 
+/**
+ * Per-store courier calendar (`Store.settings.deliveryOffDays`): weekdays with NO delivery, as
+ * `Date#getUTCDay` numbers (0=Sun ... 6=Sat). Unset/null = Friday only (Egypt's weekend, the
+ * behaviour before this setting existed); `[]` = delivers every day. Unique ints 0-6 and at
+ * least one working day (max 6 entries). Cleared with an explicit `null` (shallow settings merge).
+ */
+export const DEFAULT_DELIVERY_OFF_DAYS: readonly number[] = [5];
+export const deliveryOffDaysSchema = z
+  .array(z.number().int().min(0).max(6))
+  .max(6, { message: 'at least one delivery day is required' })
+  .refine(d => new Set(d).size === d.length, { message: 'days must be unique' });
+export type DeliveryOffDays = z.infer<typeof deliveryOffDaysSchema>;
+
 type Zone = {
   isActive: boolean;
   estimatedDaysMin: number | null;
@@ -24,7 +37,6 @@ type Zone = {
 
 const DAY = 86_400_000;
 const DEFAULT_TZ = 'Africa/Cairo';
-const FRIDAY = 5; // Date#getUTCDay
 
 /** A usable IANA zone: a typo in store settings falls back to Cairo instead of throwing. */
 function safeZone(timeZone: string): string {
@@ -75,10 +87,11 @@ function wallToInstant(
 
 /**
  * Add `n` business days in the store timezone. Steps whole CALENDAR days (never 24h, which
- * drifts an hour across Egypt's DST switch), skips Fridays (Egypt's weekend; couriers work
- * Saturdays), and keeps the wall-clock time of day. Zero days from a Friday moves to Saturday.
+ * drifts an hour across Egypt's DST switch), skips the store's off days (default Friday,
+ * Egypt's weekend; couriers work Saturdays), and keeps the wall-clock time of day. Zero days
+ * from an off day moves to the next working day.
  */
-function addBusinessDays(from: Date, n: number, timeZone: string): Date {
+function addBusinessDays(from: Date, n: number, timeZone: string, off: ReadonlySet<number>): Date {
   const tz = safeZone(timeZone);
   const w = wallClock(from.getTime(), tz);
   const ms = ((from.getTime() % 1000) + 1000) % 1000;
@@ -86,9 +99,9 @@ function addBusinessDays(from: Date, n: number, timeZone: string): Date {
   let cal = Date.UTC(w.y, w.mo - 1, w.d, 12);
   for (let i = 0; i < n; i++) {
     cal += DAY;
-    while (new Date(cal).getUTCDay() === FRIDAY) cal += DAY;
+    while (off.has(new Date(cal).getUTCDay())) cal += DAY;
   }
-  if (new Date(cal).getUTCDay() === FRIDAY) cal += DAY;
+  while (off.has(new Date(cal).getUTCDay())) cal += DAY;
   const c = new Date(cal);
   return new Date(
     wallToInstant(
@@ -108,8 +121,8 @@ function addBusinessDays(from: Date, n: number, timeZone: string): Date {
 /**
  * "Delivers by" window for a product: fastest active zone that has numbers (min of the
  * mins, and that zone's max), else the store-wide `fallback`, plus the product's
- * made-to-order lead time. Everything is in business days (Fridays skipped, read in the
- * store timezone). Returns null when nothing has numbers, so the UI hides the chip
+ * made-to-order lead time. Everything is in business days (the store's off days skipped, Friday
+ * by default; read in the store timezone). Returns null when nothing has numbers, so the UI hides the chip
  * instead of printing "0 days" or "NaN".
  */
 export function deliveryWindow(a: {
@@ -119,6 +132,11 @@ export function deliveryWindow(a: {
   fallback?: { min: number; max: number } | null;
   /** IANA store timezone; defaults to Africa/Cairo. */
   timeZone?: string;
+  /**
+   * Weekdays with no delivery (`getUTCDay` numbers). null/undefined/invalid = Friday only;
+   * applies to zone estimates and the fallback alike (it is the store's courier calendar).
+   */
+  offDays?: number[] | null;
 }): { from: Date; to: Date } | null {
   const ranges = a.zones
     .filter(z => z.isActive)
@@ -138,8 +156,10 @@ export function deliveryWindow(a: {
 
   const lead = Math.max(0, a.leadTimeDays ?? 0);
   const tz = a.timeZone || DEFAULT_TZ;
+  const parsedOff = deliveryOffDaysSchema.safeParse(a.offDays);
+  const off = new Set<number>(parsedOff.success ? parsedOff.data : DEFAULT_DELIVERY_OFF_DAYS);
   return {
-    from: addBusinessDays(a.now, range.min + lead, tz),
-    to: addBusinessDays(a.now, range.max + lead, tz),
+    from: addBusinessDays(a.now, range.min + lead, tz, off),
+    to: addBusinessDays(a.now, range.max + lead, tz, off),
   };
 }

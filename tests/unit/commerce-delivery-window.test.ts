@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deliveryWindow, deliveryDaysSchema } from '@ebda/shared';
+import { deliveryWindow, deliveryDaysSchema, deliveryOffDaysSchema } from '@ebda/shared';
 
 // Wednesday 14 Oct 2026, 10:00Z (13:00 in Cairo). Egypt's weekend day is Friday;
 // couriers work Saturdays, so "business days" skip Fridays only.
@@ -184,6 +184,83 @@ describe('deliveryDaysSchema', () => {
       'x',
     ]) {
       expect(deliveryDaysSchema.safeParse(bad).success).toBe(false);
+    }
+  });
+});
+
+describe('deliveryWindow offDays (per-store courier calendar)', () => {
+  const zones = [{ isActive: true, estimatedDaysMin: 1, estimatedDaysMax: 3 }];
+  const run = (offDays?: number[] | null, from: Date = now) =>
+    deliveryWindow({ now: from, leadTimeDays: null, zones, offDays });
+
+  it('unset, null and invalid all keep the Friday default', () => {
+    const base = run();
+    expect(base).toEqual({ from: at('2026-10-15'), to: at('2026-10-18') });
+    expect(run(null)).toEqual(base);
+    expect(run([5])).toEqual(base);
+    expect(run([9] as number[])).toEqual(base);
+  });
+
+  it('[5, 6] skips Friday and Saturday', () => {
+    // Wed +1 = Thu 15; +3 skips Fri 16, Sat 17 -> Sun 18, Mon 19.
+    expect(run([5, 6])).toEqual({ from: at('2026-10-15'), to: at('2026-10-19') });
+  });
+
+  it('[] counts every day, Friday included', () => {
+    expect(run([])).toEqual({ from: at('2026-10-15'), to: at('2026-10-17') });
+  });
+
+  it('an off-day start rolls forward to the next working day on zero days', () => {
+    const z = [{ isActive: true, estimatedDaysMin: 0, estimatedDaysMax: 0 }];
+    const sat = at('2026-10-17');
+    expect(deliveryWindow({ now: sat, leadTimeDays: null, zones: z, offDays: [5, 6] })).toEqual({
+      from: at('2026-10-18'),
+      to: at('2026-10-18'),
+    });
+    expect(deliveryWindow({ now: sat, leadTimeDays: null, zones: z, offDays: [] })).toEqual({
+      from: sat,
+      to: sat,
+    });
+  });
+
+  it('applies to the deliveryDays fallback too', () => {
+    const w = deliveryWindow({
+      now,
+      leadTimeDays: null,
+      zones: [],
+      fallback: { min: 2, max: 2 },
+      offDays: [4],
+    });
+    // Wed +2 with Thursday off: Fri 16, Sat 17.
+    expect(w).toEqual({ from: at('2026-10-17'), to: at('2026-10-17') });
+  });
+
+  it('keeps the Cairo wall-clock time across the DST end when Friday delivers', () => {
+    const start = new Date('2026-10-28T20:30:00Z');
+    const w = deliveryWindow({
+      now: start,
+      leadTimeDays: null,
+      zones: [{ isActive: true, estimatedDaysMin: 2, estimatedDaysMax: 2 }],
+      offDays: [],
+    })!;
+    const cairo = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'Africa/Cairo',
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(w.from);
+    expect(cairo).toBe('2026-10-30 23:30');
+  });
+});
+
+describe('deliveryOffDaysSchema', () => {
+  it('accepts unique weekdays, an empty list and up to six days', () => {
+    for (const ok of [[], [5], [5, 6], [0, 1, 2, 3, 4, 5]]) {
+      expect(deliveryOffDaysSchema.safeParse(ok).success).toBe(true);
+    }
+  });
+  it('rejects 7 entries, out-of-range, duplicates and non-integers', () => {
+    for (const bad of [[0, 1, 2, 3, 4, 5, 6], [7], [-1], [5, 5], [1.5], ['5'], 5, {}]) {
+      expect(deliveryOffDaysSchema.safeParse(bad).success).toBe(false);
     }
   });
 });

@@ -131,4 +131,29 @@ describe('DeliveryChip', () => {
     await new Promise(r => setTimeout(r, 20));
     expect(container.innerHTML).toBe('');
   });
+
+  it('skips only Friday by default and honours the store deliveryOffDays', async () => {
+    lang = 'en';
+    zones = [zone({ estimatedDaysMin: 1, estimatedDaysMax: 3 })];
+    const first = render(<DeliveryChip leadTimeDays={null} />);
+    // Wed 14 +3 business days, Friday off: Thu 15 - Sun 18.
+    expect((await screen.findByTestId('delivery-chip')).textContent).toBe(
+      'Arrives Thu 15 Oct – Sun 18 Oct'
+    );
+    first.unmount();
+    storeId = `store-${++n}`;
+    settings = { deliveryOffDays: [] };
+    render(<DeliveryChip leadTimeDays={null} />);
+    expect((await screen.findByTestId('delivery-chip')).textContent).toBe(
+      'Arrives Thu 15 Oct – Sat 17 Oct'
+    );
+  });
+
+  it('ignores a malformed deliveryOffDays and keeps the Friday default', async () => {
+    lang = 'en';
+    zones = [zone({ estimatedDaysMin: 1, estimatedDaysMax: 3 })];
+    settings = { deliveryOffDays: [0, 1, 2, 3, 4, 5, 6] };
+    render(<DeliveryChip leadTimeDays={null} />);
+    expect((await screen.findByTestId('delivery-chip')).textContent).toContain('Sun 18 Oct');
+  });
 });

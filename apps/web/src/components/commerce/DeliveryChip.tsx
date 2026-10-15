@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { deliveryDaysSchema, deliveryWindow } from '@ebda/shared';
+import { deliveryDaysSchema, deliveryOffDaysSchema, deliveryWindow } from '@ebda/shared';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useStore } from '@/contexts/StoreContext';
 import { useStoreNumerals, useNumerals } from '@/hooks/useNumerals';
@@ -30,8 +30,8 @@ function leadTimeText(n: number, lang: 'ar' | 'en', localize: (v: number) => str
 
 /**
  * "Arrives Sun 19 Oct – Tue 21 Oct" under the add-to-cart button, plus one muted line when
- * the product is made to order. Business days (Fridays skipped) from the store's active
- * shipping zones, else the store-wide `settings.deliveryDays`. Hides itself when neither
+ * the product is made to order. Business days (the store's `deliveryOffDays` skipped, Friday by default) from the
+ * store's active shipping zones, else the store-wide `settings.deliveryDays`. Hides itself when neither
  * has numbers (never "0 days"). Ink/muted tokens only: the accent belongs to the CTA.
  */
 export function DeliveryChip({ leadTimeDays }: { leadTimeDays?: number | null }) {
@@ -56,8 +56,9 @@ export function DeliveryChip({ leadTimeDays }: { leadTimeDays?: number | null })
 
   if (!zones || !now) return null;
 
-  const rawFallback = (store.settings as { deliveryDays?: unknown } | undefined)?.deliveryDays;
-  const parsed = deliveryDaysSchema.safeParse(rawFallback);
+  const sets = store.settings as { deliveryDays?: unknown; deliveryOffDays?: unknown } | undefined;
+  const parsed = deliveryDaysSchema.safeParse(sets?.deliveryDays);
+  const offParsed = deliveryOffDaysSchema.safeParse(sets?.deliveryOffDays);
   const lead = typeof leadTimeDays === 'number' && leadTimeDays > 0 ? leadTimeDays : null;
   const w = deliveryWindow({
     now,
@@ -70,6 +71,7 @@ export function DeliveryChip({ leadTimeDays }: { leadTimeDays?: number | null })
     })),
     fallback: parsed.success ? parsed.data : null,
     timeZone: store.timezone,
+    offDays: offParsed.success ? offParsed.data : null,
   });
   if (!w) return null;
 

@@ -9,7 +9,10 @@ import { apiGet, apiPut } from '../../../../lib/api';
 import {
   buildCheckoutDeliverySettings,
   parseDeliveryDaysInput,
+  parseDeliveryOffDaysInput,
+  offDaysFromSettings,
 } from '../../../../lib/checkout-delivery-payload';
+import { DeliveryOffDaysField } from '../../../../components/DeliveryOffDaysField';
 import { useT } from '@/i18n/useT';
 import type { CheckoutDeliverySettings, CheckoutDeliveryWindow } from '@ebda/shared';
 
@@ -50,6 +53,8 @@ export default function CheckoutDeliveryPage() {
   // Both empty = none; saving sends an explicit null to clear a stored value.
   const [deliveryDaysMin, setDeliveryDaysMin] = useState('');
   const [deliveryDaysMax, setDeliveryDaysMax] = useState('');
+  // Weekdays with no delivery (chip selection). Unset in the store = Friday only.
+  const [deliveryOffDays, setDeliveryOffDays] = useState<number[]>([5]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -83,6 +88,7 @@ export default function CheckoutDeliveryPage() {
       const dd = settings.deliveryDays as { min?: unknown; max?: unknown } | null | undefined;
       setDeliveryDaysMin(typeof dd?.min === 'number' ? String(dd.min) : '');
       setDeliveryDaysMax(typeof dd?.max === 'number' ? String(dd.max) : '');
+      setDeliveryOffDays(offDaysFromSettings(settings.deliveryOffDays));
     } catch (err) {
       console.error('Failed to fetch checkout delivery settings:', err);
     } finally {
@@ -100,6 +106,11 @@ export default function CheckoutDeliveryPage() {
       setMessage({ type: 'error', text: t('deliveryDaysInvalid') });
       return;
     }
+    const off = parseDeliveryOffDaysInput(deliveryOffDays);
+    if (!off.ok) {
+      setMessage({ type: 'error', text: t('deliveryOffDaysAllOff') });
+      return;
+    }
     setIsSaving(true);
     setMessage(null);
     try {
@@ -110,6 +121,7 @@ export default function CheckoutDeliveryPage() {
           minimumOrderMajor,
           orderInvoiceEmail,
           deliveryDays: days.value,
+          deliveryOffDays: off.value,
         }),
       });
       if (!error) {
@@ -130,6 +142,7 @@ export default function CheckoutDeliveryPage() {
     orderInvoiceEmail,
     deliveryDaysMin,
     deliveryDaysMax,
+    deliveryOffDays,
     t,
   ]);
 
@@ -186,7 +199,7 @@ export default function CheckoutDeliveryPage() {
           <button
             type="button"
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || deliveryOffDays.length >= 7}
             className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {isSaving ? t('saving') : t('save')}
@@ -412,6 +425,13 @@ export default function CheckoutDeliveryPage() {
             >
               {t('deliveryDaysClear')}
             </button>
+          </div>
+          <div className="space-y-2 border-t border-border pt-3">
+            <div>
+              <h3 className="text-xs font-semibold text-foreground">{t('deliveryOffDaysTitle')}</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t('deliveryOffDaysHint')}</p>
+            </div>
+            <DeliveryOffDaysField value={deliveryOffDays} onChange={setDeliveryOffDays} />
           </div>
         </section>
 

@@ -41,6 +41,7 @@ export const PUBLIC_SETTINGS_KEYS = [
   'checkoutLabelAr',
   'checkoutDelivery',
   'deliveryDays',
+  'deliveryOffDays',
   'minimumOrderFils',
   'acceptedPaymentMethods',
 ] as const;

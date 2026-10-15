@@ -159,3 +159,35 @@ describe('PUT /stores/:id: settings.deliveryDays', () => {
     expect(update.mock.calls[1][1].settings).toEqual({ deliveryDays: null });
   });
 });
+
+const BAD_OFF_DAYS = [[0, 1, 2, 3, 4, 5, 6], [7], [-1], [5, 5], [1.5], ['5'], 'friday'];
+
+describe('settings.deliveryOffDays (create + update)', () => {
+  it.each(BAD_OFF_DAYS)('POST rejects %j', async bad => {
+    const res = await request(app)
+      .post('/stores')
+      .send({ name: 'Shop', settings: { deliveryOffDays: bad } });
+    expect(res.status).toBe(400);
+    expect(create).not.toHaveBeenCalled();
+  });
+  it.each(BAD_OFF_DAYS)('PUT rejects %j', async bad => {
+    const res = await request(app)
+      .put(`/stores/${STORE_ID}`)
+      .send({ settings: { deliveryOffDays: bad } });
+    expect(res.status).toBe(400);
+    expect(update).not.toHaveBeenCalled();
+  });
+  it('accepts weekdays, [] (delivers every day) and an explicit null on both writers', async () => {
+    for (const deliveryOffDays of [[5, 6], [], null]) {
+      const post = await request(app)
+        .post('/stores')
+        .send({ name: 'Shop', settings: { deliveryOffDays } });
+      expect(post.status).toBe(201);
+      const put = await request(app)
+        .put(`/stores/${STORE_ID}`)
+        .send({ settings: { deliveryOffDays } });
+      expect(put.status).toBe(200);
+    }
+    expect(update.mock.calls[2][1].settings).toEqual({ deliveryOffDays: null });
+  });
+});

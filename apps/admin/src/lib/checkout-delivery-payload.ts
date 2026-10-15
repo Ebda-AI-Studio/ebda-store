@@ -1,4 +1,10 @@
-import { deliveryDaysSchema, type CheckoutDeliverySettings, type DeliveryDays } from '@ebda/shared';
+import {
+  deliveryDaysSchema,
+  deliveryOffDaysSchema,
+  DEFAULT_DELIVERY_OFF_DAYS,
+  type CheckoutDeliverySettings,
+  type DeliveryDays,
+} from '@ebda/shared';
 import { textFieldValue } from './form-text';
 
 import { roundToMinor } from '@ebda/shared';
@@ -50,6 +56,23 @@ export function parseDeliveryDaysInput(
   return parsed.success ? { ok: true, value: parsed.data } : { ok: false };
 }
 
+/** Weekday numbers (`getUTCDay`) in the Egyptian week order the chips show: Sat Sun ... Fri. */
+export const DELIVERY_WEEK_ORDER = [6, 0, 1, 2, 3, 4, 5] as const;
+
+/** The stored `deliveryOffDays` as the chip selection: unset/null/invalid = Friday only. */
+export function offDaysFromSettings(raw: unknown): number[] {
+  const parsed = deliveryOffDaysSchema.safeParse(raw);
+  return parsed.success ? [...parsed.data] : [...DEFAULT_DELIVERY_OFF_DAYS];
+}
+
+/** The chip selection as the payload value: all seven off is refused (no working day). */
+export function parseDeliveryOffDaysInput(
+  selected: number[]
+): { ok: true; value: number[] } | { ok: false } {
+  const parsed = deliveryOffDaysSchema.safeParse([...new Set(selected)].sort((a, b) => a - b));
+  return parsed.success ? { ok: true, value: parsed.data } : { ok: false };
+}
+
 export interface CheckoutDeliveryForm {
   /** The store's current `settings` JSON, spread through untouched. */
   existingSettings: Record<string, unknown>;
@@ -60,6 +83,8 @@ export interface CheckoutDeliveryForm {
   orderInvoiceEmail: string;
   /** Store-wide delivery estimate; `null` clears it, `undefined` leaves the stored value. */
   deliveryDays?: DeliveryDays | null;
+  /** Weekdays with no delivery; `[]` = every day, `null` clears to the Friday default, `undefined` leaves it. */
+  deliveryOffDays?: number[] | null;
 }
 
 export function buildCheckoutDeliverySettings(form: CheckoutDeliveryForm): Record<string, unknown> {
@@ -73,5 +98,6 @@ export function buildCheckoutDeliverySettings(form: CheckoutDeliveryForm): Recor
     orderInvoiceEmail: textFieldValue(form.orderInvoiceEmail.trim(), 'update'),
     // null is the cleared form (see orderInvoiceEmail); undefined keeps the spread-through value.
     ...(form.deliveryDays !== undefined ? { deliveryDays: form.deliveryDays } : {}),
+    ...(form.deliveryOffDays !== undefined ? { deliveryOffDays: form.deliveryOffDays } : {}),
   };
 }

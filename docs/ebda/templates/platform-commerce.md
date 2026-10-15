@@ -72,7 +72,7 @@ Rules that apply to all of them:
 
 **Where it renders.** `DeliveryChip` on both PDPs: under the buy buttons on the default PDP, under the button row on Dahab. It is hidden when there is no usable estimate, never "0 days" or "NaN". Not on cards (B0-4).
 
-**How the date is computed.** `deliveryWindow` (`packages/shared/src/commerce/delivery-window.ts`): the fastest active zone with estimates (`estimatedDaysMin`/`Max`, else `estimatedDays`), else the store-wide fallback; plus `leadTimeDays`. BUSINESS days, Friday skipped (B0-1a), in the store timezone (default `Africa/Cairo`), stepping calendar days across the DST switch. Zones come from `GET /stores/public/:id/shipping`, cached per store per session. Dates use the new `day` preset of `formatDate` ("Wed 21 Oct" / "الأربعاء 21 أكتوبر").
+**How the date is computed.** `deliveryWindow` (`packages/shared/src/commerce/delivery-window.ts`): the fastest active zone with estimates (`estimatedDaysMin`/`Max`, else `estimatedDays`), else the store-wide fallback; plus `leadTimeDays`. BUSINESS days, skipping the store's days with no delivery (`settings.deliveryOffDays`, Friday by default; B0-1a superseded by B0-48; section 12), in the store timezone (default `Africa/Cairo`), stepping calendar days across the DST switch. Zones come from `GET /stores/public/:id/shipping`, cached per store per session. Dates use the new `day` preset of `formatDate` ("Wed 21 Oct" / "الأربعاء 21 أكتوبر").
 
 **Data.** `Product.leadTimeDays Int?` with a DB CHECK 0..60 (`lead_time_days`). Public payload ships it through `STOREFRONT_PRODUCT_SELECT`.
 
@@ -198,3 +198,13 @@ Rules that apply to all of them:
 **Limits.** 0-30 business days. A malformed stored value hides the chip.
 
 **Rulings.** B0-5, B0-16.
+
+## 12. Per-store days with no delivery (`settings.deliveryOffDays`)
+
+**What.** The delivery estimate used to skip Friday only. The courier calendar is now a store setting. It applies to zone estimates AND the `deliveryDays` fallback, since it is the store's calendar and not the fallback's.
+
+**Where the merchant edits it.** Admin → **Delivery** → "أيام بدون توصيل" / "Days with no delivery": seven toggle chips, Saturday first (Egyptian week), Friday selected by default. Selecting all seven disables Save and says why.
+
+**Data.** `Store.settings.deliveryOffDays?: number[] | null`, weekday numbers as `Date#getUTCDay` (0=Sun ... 6=Sat). Unset/null = `[5]` (Friday, the previous behaviour: no existing store changes). `[]` = delivers every day. Unique integers 0-6, at most 6 entries (`deliveryOffDaysSchema` in `delivery-window.ts`, reused by the API). No migration. Shallow merge, so clearing sends an explicit `null`. Validated by `addSettingsIssues` on `POST /stores` and `PUT /stores/:id`; whitelisted in `lib/public-store-settings.ts`; passed to `deliveryWindow({ offDays })` by `DeliveryChip` (both PDPs render that one component). A malformed stored value falls back to Friday.
+
+**Rulings.** B0-48.

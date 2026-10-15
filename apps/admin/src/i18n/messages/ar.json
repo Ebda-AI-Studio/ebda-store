@@ -8261,11 +8261,21 @@
       "invoiceEmailLabel": "بريد مستلم الفاتورة",
       "invoiceEmailPlaceholder": "owner@example.com",
       "deliveryDaysTitle": "مدة التوصيل (أيام عمل)",
-      "deliveryDaysHint": "تظهر في صفحة المنتج: يوصلك بين … و … لو مناطق الشحن مفيهاش مدة. الجمعة مش بتتحسب. سيبها فاضية عشان تتخفي.",
+      "deliveryDaysHint": "تظهر في صفحة المنتج: يوصلك بين … و … لو مناطق الشحن مفيهاش مدة. سيبها فاضية عشان تتخفي. الأيام اللي مفيهاش توصيل (تحت) مش بتتحسب.",
       "deliveryDaysMin": "من (أيام)",
       "deliveryDaysMax": "إلى (أيام)",
       "deliveryDaysClear": "مسح",
-      "deliveryDaysInvalid": "اكتب الرقمين كأيام صحيحة من 0 لـ 30، و«من» مش أكبر من «إلى»."
+      "deliveryDaysInvalid": "اكتب الرقمين كأيام صحيحة من 0 لـ 30، و«من» مش أكبر من «إلى».",
+      "deliveryOffDaysTitle": "أيام بدون توصيل",
+      "deliveryOffDaysHint": "تاريخ التوصيل في صفحة المنتج بيتخطى الأيام دي، سواء من مناطق الشحن أو من المدة اللي فوق. الجمعة مقفولة تلقائيًا. اختار كل يوم المندوب مبيوصلش فيه.",
+      "deliveryOffDaysAllOff": "لازم يفضل يوم توصيل واحد على الأقل. شغّل يوم تاني عشان تقدر تحفظ.",
+      "deliveryOffDay0": "الأحد",
+      "deliveryOffDay1": "الاثنين",
+      "deliveryOffDay2": "الثلاثاء",
+      "deliveryOffDay3": "الأربعاء",
+      "deliveryOffDay4": "الخميس",
+      "deliveryOffDay5": "الجمعة",
+      "deliveryOffDay6": "السبت"
     }
   },
   "customerGroups": {

@@ -30,6 +30,7 @@ import {
   LOOK_IMAGE_RATIOS,
   LOOK_MOTIONS,
   deliveryDaysSchema,
+  deliveryOffDaysSchema,
 } from '@ebda/shared';
 import {
   maskMarketingPixelSecrets,
@@ -83,11 +84,29 @@ function addDeliveryDaysIssues(
   }
 }
 
+/** `settings.deliveryOffDays` (weekdays with no delivery): null clears; else the shared schema. */
+function addDeliveryOffDaysIssues(
+  settings: Record<string, unknown> | undefined,
+  ctx: z.RefinementCtx
+) {
+  const od = settings?.deliveryOffDays;
+  if (od === undefined || od === null) return;
+  const parsed = deliveryOffDaysSchema.safeParse(od);
+  if (parsed.success) return;
+  for (const issue of parsed.error.issues) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['deliveryOffDays', ...issue.path],
+      message: issue.message,
+    });
+  }
+}
+
 /**
  * Everything the open `settings` blob must satisfy, on EVERY route that writes it (create AND
  * update — a check on update only leaves POST /stores as the bypass):
  * - `contact.addressUrl` renders into `<a href>`: a `javascript:`/`data:` value is stored XSS;
- * - `deliveryDays` (above);
+ * - `deliveryDays` and `deliveryOffDays` (above);
  * - `floatingWidget` button links render as `<a href>`; the dedicated route validates them, so
  *   this generic path must too (S2).
  * All other keys pass through unvalidated (existing behaviour).
@@ -108,6 +127,7 @@ function addSettingsIssues(settings: Record<string, unknown> | undefined, ctx: z
     }
   }
   addDeliveryDaysIssues(settings, ctx);
+  addDeliveryOffDaysIssues(settings, ctx);
   for (const issue of floatingWidgetLinkIssues(settings)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: issue.path, message: issue.message });
   }
