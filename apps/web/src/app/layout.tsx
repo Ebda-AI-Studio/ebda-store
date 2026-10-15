@@ -638,26 +638,35 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     </Suspense>
                   </FeatureProvider>
                 )}
-                {/* Cookie consent UI — always mounted (banner self-hides
-                when the user has already decided; modal opens via the
-                footer "Cookie preferences" link or banner Customize). */}
-                <CookieConsentBanner />
-                <CookiePreferencesModal />
-                {/* SSR-rendered compliance fallback (GDPR Art. 7(3) —
-                  link must be reachable in initial HTML for no-JS
-                  visitors + crawlers). Visible on regular pages, hidden
-                  on loading screens via the [data-loading] body marker
-                  set by loading.tsx files. Ahmad 2026-05-16: 'return
-                  [the cookies] but keep it out of any loading screen as
-                  the rest of items'. */}
-                <div
-                  data-zone="cookieFallback"
-                  className="border-t border-border/30 bg-background [body:has([data-loading])_&]:hidden"
-                >
-                  <div className="container mx-auto px-4 py-3 text-center">
-                    <CookiePreferencesLink className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
-                  </div>
-                </div>
+                {/* No store resolved (unknown/inactive host, platform host, transient
+                  fallback): the page is the generic Ebda 404 / retry body. It sets no
+                  tracking, so there is nothing to consent to, and the banner's default-
+                  theme orange must not be the only colour on an Ebda-branded page
+                  (Ruling SUBDOMAIN-404-1). */}
+                {store.id !== 'demo' && (
+                  <>
+                    {/* Cookie consent UI — always mounted (banner self-hides
+                  when the user has already decided; modal opens via the
+                  footer "Cookie preferences" link or banner Customize). */}
+                    <CookieConsentBanner />
+                    <CookiePreferencesModal />
+                    {/* SSR-rendered compliance fallback (GDPR Art. 7(3) —
+                    link must be reachable in initial HTML for no-JS
+                    visitors + crawlers). Visible on regular pages, hidden
+                    on loading screens via the [data-loading] body marker
+                    set by loading.tsx files. Ahmad 2026-05-16: 'return
+                    [the cookies] but keep it out of any loading screen as
+                    the rest of items'. */}
+                    <div
+                      data-zone="cookieFallback"
+                      className="border-t border-border/30 bg-background [body:has([data-loading])_&]:hidden"
+                    >
+                      <div className="container mx-auto px-4 py-3 text-center">
+                        <CookiePreferencesLink className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" />
+                      </div>
+                    </div>
+                  </>
+                )}
               </PostHogProvider>
             </ConsentProvider>
           </LanguageProvider>
