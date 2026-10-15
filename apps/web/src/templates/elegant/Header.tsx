@@ -202,9 +202,7 @@ export default function ElegantHeader({
             >
               <CartIcon className="w-5 h-5" strokeWidth={1} aria-hidden="true" />
               {cartItemCount > 0 && (
-                <span
-                  className={`absolute -top-2 ${isRtl ? '-left-2' : '-right-2'} bg-foreground text-background text-[9px] font-medium w-4 h-4 rounded-full flex items-center justify-center`}
-                >
+                <span className="absolute -top-2 -end-2 bg-foreground text-background text-[9px] font-medium w-4 h-4 rounded-full flex items-center justify-center">
                   {cartItemCount > 9 ? '9+' : cartItemCount}
                 </span>
               )}
@@ -231,7 +229,7 @@ export default function ElegantHeader({
         <div className="hidden pb-4 -mt-2" data-zone="mobile-search">
           <form onSubmit={handleSearch} className="relative">
             <svg
-              className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} w-5 h-5 text-foreground/40 pointer-events-none`}
+              className="absolute top-1/2 -translate-y-1/2 start-3 w-5 h-5 text-foreground/40 pointer-events-none"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -249,7 +247,7 @@ export default function ElegantHeader({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={isRtl ? 'بحث' : 'Search'}
-              className={`w-full ${isRtl ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-3 bg-transparent border-b border-border focus:outline-none focus:border-foreground text-base sm:text-sm tracking-[0.08em] placeholder:text-muted-foreground/50 transition-colors duration-500`}
+              className="w-full ps-11 pe-4 py-3 bg-transparent border-b border-border focus:outline-none focus:border-foreground text-base sm:text-sm tracking-[0.08em] placeholder:text-muted-foreground/50 transition-colors duration-500"
               dir={isRtl ? 'rtl' : 'ltr'}
               aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
             />

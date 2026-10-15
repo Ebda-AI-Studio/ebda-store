@@ -22,17 +22,16 @@ import { BRAND, BRAND_MARKETING_URL } from '@ebda/shared';
  * close the visible white-space gap above the credit on short footers.
  */
 export function PoweredByForce({ hidden = false }: { hidden?: boolean }) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   // Plan decision made server-side: the API resolves `remove_branding` from the
   // store's plan (Growth + Business) or a super-admin override and ships it in
   // `enabledFeatures`; ShopChrome turns that into this prop. Absent/unknown ->
   // keep the attribution (fail toward showing it).
   if (hidden) return null;
-  const align = language === 'ar' ? 'text-right' : 'text-left';
   return (
     <div
       data-zone="afterFooter"
-      className={`mt-3 border-t border-border/40 pt-3 text-sm sm:text-base tracking-wide text-muted-foreground/70 ${align}`}
+      className={`mt-3 border-t border-border/40 pt-3 text-sm sm:text-base tracking-wide text-muted-foreground/70 text-start`}
     >
       <a
         href={BRAND_MARKETING_URL}

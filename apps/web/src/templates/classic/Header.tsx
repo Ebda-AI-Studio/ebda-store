@@ -67,7 +67,7 @@ export default function ClassicHeader({
       {showUtilityBar && (
         <div className="hidden md:block bg-foreground text-background py-2">
           <div className="container mx-auto px-4 flex items-center justify-end text-xs tracking-wide">
-            <div className={`flex items-center gap-6 ${isRtl ? 'flex-row-reverse' : ''}`}>
+            <div className="flex items-center gap-6">
               {utilityBarLinks.map(link => (
                 <Link
                   key={`${link.label}-${link.href}`}
@@ -121,9 +121,7 @@ export default function ClassicHeader({
           </button>
 
           {/* Desktop: left nav */}
-          <nav
-            className={`hidden md:flex items-center gap-8 flex-1 ${isRtl ? 'justify-end flex-row-reverse' : 'justify-start'}`}
-          >
+          <nav className="hidden md:flex items-center gap-8 flex-1 justify-start">
             {leftNav.map(item => (
               <Link
                 key={item.href}
@@ -157,9 +155,7 @@ export default function ClassicHeader({
           </Link>
 
           {/* Desktop: right nav */}
-          <nav
-            className={`hidden md:flex items-center gap-8 flex-1 ${isRtl ? 'justify-start flex-row-reverse' : 'justify-end'}`}
-          >
+          <nav className="hidden md:flex items-center gap-8 flex-1 justify-end">
             {rightNav.map(item => (
               <Link
                 key={item.href}
@@ -171,7 +167,7 @@ export default function ClassicHeader({
             ))}
 
             {/* Action icons */}
-            <div className={`flex items-center gap-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
+            <div className="flex items-center gap-4">
               <button
                 onClick={() => document.getElementById('classic-search-input')?.focus()}
                 className="cursor-pointer text-foreground/60 hover:text-foreground transition-colors duration-500"
@@ -224,9 +220,7 @@ export default function ClassicHeader({
               >
                 <CartIcon className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
                 {cartItemCount > 0 && (
-                  <span
-                    className={`absolute -top-2 ${isRtl ? '-left-2' : '-right-2'} bg-foreground text-background text-[10px] font-serif w-4 h-4 rounded-full flex items-center justify-center`}
-                  >
+                  <span className="absolute -top-2 -end-2 bg-foreground text-background text-[10px] font-serif w-4 h-4 rounded-full flex items-center justify-center">
                     {cartItemCount > 9 ? '9+' : cartItemCount}
                   </span>
                 )}
@@ -238,7 +232,7 @@ export default function ClassicHeader({
               to free row width for the centered logo. Only Cart visible
               here. Platform rule: Account hidden on mobile across all
               themes. */}
-          <div className={`flex md:hidden items-center gap-1 ${isRtl ? 'flex-row-reverse' : ''}`}>
+          <div className="flex md:hidden items-center gap-1">
             <Link
               href={`${urlPrefix}/cart`}
               className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500 cursor-pointer"
@@ -246,9 +240,7 @@ export default function ClassicHeader({
             >
               <CartIcon className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
               {cartItemCount > 0 && (
-                <span
-                  className={`absolute -top-2 ${isRtl ? '-left-2' : '-right-2'} bg-foreground text-background text-[10px] font-serif w-4 h-4 rounded-full flex items-center justify-center`}
-                >
+                <span className="absolute -top-2 -end-2 bg-foreground text-background text-[10px] font-serif w-4 h-4 rounded-full flex items-center justify-center">
                   {cartItemCount}
                 </span>
               )}
@@ -263,7 +255,7 @@ export default function ClassicHeader({
       <div className="hidden border-t border-border/40 py-3" data-zone="mobile-search">
         <form onSubmit={handleSearch} className="relative container mx-auto px-4">
           <svg
-            className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-7' : 'left-7'} w-5 h-5 text-muted-foreground pointer-events-none`}
+            className="absolute top-1/2 -translate-y-1/2 start-7 w-5 h-5 text-muted-foreground pointer-events-none"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -281,7 +273,7 @@ export default function ClassicHeader({
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={isRtl ? 'بحث' : 'Search'}
-            className={`w-full ${isRtl ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-2.5 border border-border bg-transparent font-serif text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500 rounded`}
+            className="w-full ps-11 pe-4 py-2.5 border border-border bg-transparent font-serif text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500 rounded"
             dir={isRtl ? 'rtl' : 'ltr'}
             aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
           />

@@ -94,7 +94,7 @@ export default function ModernAnnouncementBar({
       {dismissible && (
         <button
           onClick={handleDismiss}
-          className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'left-3' : 'right-3'} p-1 rounded-full hover:bg-white/20 transition-colors cursor-pointer`}
+          className="absolute top-1/2 -translate-y-1/2 end-3 p-1 rounded-full hover:bg-white/20 transition-colors cursor-pointer"
           aria-label={isRtl ? 'إغلاق' : 'Dismiss'}
         >
           <svg

@@ -220,7 +220,7 @@ function ModernProductCard({
         <div
           className={cn(
             'absolute top-3 z-20 flex flex-col gap-2 transition-[opacity,transform] duration-300',
-            isRtl ? 'left-3' : 'right-3',
+            'end-3',
             'opacity-100 translate-x-0',
             'lg:opacity-0 lg:translate-x-3',
             isHovered && 'lg:opacity-100 lg:translate-x-0'
@@ -439,7 +439,7 @@ function ModernProductCard({
                 <h3
                   id={`prod-${product.id}-name`}
                   data-zone="productName"
-                  className={`font-semibold ${textSizes.name} text-foreground group-hover:text-primary transition-colors duration-300 ease-out [overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em] leading-snug tracking-tight ${isRtl ? 'text-right' : ''}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+                  className={`font-semibold ${textSizes.name} text-foreground group-hover:text-primary transition-colors duration-300 ease-out [overflow-wrap:anywhere] line-clamp-2 min-h-[2.5em] leading-snug tracking-tight${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                   itemProp="name"
                 >
                   {isRtl && product.nameAr ? product.nameAr : product.name}

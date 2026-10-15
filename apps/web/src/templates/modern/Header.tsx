@@ -115,7 +115,7 @@ export default function ModernHeader({
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className={`hidden md:flex items-center gap-1 ${isRtl ? 'flex-row-reverse' : ''}`}>
+            <nav className="hidden md:flex items-center gap-1">
               {navigation.map(item => (
                 <Link
                   key={item.href}
@@ -128,7 +128,7 @@ export default function ModernHeader({
             </nav>
 
             {/* Actions */}
-            <div className={`flex items-center gap-1 ${isRtl ? 'flex-row-reverse' : ''}`}>
+            <div className="flex items-center gap-1">
               {/* Search Button — desktop-only. On mobile the search bar is
                   always visible as its own row below this one (pecannbee
                   target layout), so the toggle button there would be
@@ -212,7 +212,7 @@ export default function ModernHeader({
                 <CartIcon className="w-5 h-5" aria-hidden="true" />
                 {cartItemCount > 0 && (
                   <span
-                    className={`absolute -top-0.5 ${isRtl ? '-left-0.5' : '-right-0.5'} bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 transition-transform duration-200 ${cartPulse ? 'scale-125' : 'scale-100'}`}
+                    className={`absolute -top-0.5 -end-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 transition-transform duration-200 ${cartPulse ? 'scale-125' : 'scale-100'}`}
                   >
                     {cartItemCount > 99 ? '99+' : cartItemCount}
                   </span>
@@ -231,7 +231,7 @@ export default function ModernHeader({
           <div className="hidden pb-3 border-t border-border/40 pt-3" data-zone="mobile-search">
             <form onSubmit={handleSearch} className="relative">
               <svg
-                className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} w-5 h-5 text-muted-foreground pointer-events-none`}
+                className="absolute top-1/2 -translate-y-1/2 start-3 w-5 h-5 text-muted-foreground pointer-events-none"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -249,7 +249,7 @@ export default function ModernHeader({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder={isRtl ? 'ابحث...' : 'Search'}
-                className={`w-full ${isRtl ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-3 bg-muted rounded-full border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out`}
+                className="w-full ps-11 pe-4 py-3 bg-muted rounded-full border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 aria-label={isRtl ? 'بحث عن المنتجات' : 'Search products'}
               />
@@ -310,7 +310,7 @@ export default function ModernHeader({
           overlay still has a touch-target outside the panel for dismiss.
           Item 5 (2026-07-12): same enter/exit curve as the overlay above. */}
       <div
-        className={`fixed top-0 ${isRtl ? 'left-0' : 'right-0'} z-50 h-full w-[85vw] max-w-xs bg-background shadow-2xl md:hidden transition-transform ease-out motion-reduce:duration-0 overscroll-contain ${isMenuOpen ? 'translate-x-0 duration-[220ms]' : isRtl ? '-translate-x-full duration-[160ms]' : 'translate-x-full duration-[160ms]'}`}
+        className={`fixed top-0 end-0 z-50 h-full w-[85vw] max-w-xs bg-background shadow-2xl md:hidden transition-transform ease-out motion-reduce:duration-0 overscroll-contain ${isMenuOpen ? 'translate-x-0 duration-[220ms]' : isRtl ? '-translate-x-full duration-[160ms]' : 'translate-x-full duration-[160ms]'}`}
         aria-label={isRtl ? 'قائمة التنقل' : 'Navigation menu'}
       >
         <div className="flex items-center justify-between p-4 border-b border-border">

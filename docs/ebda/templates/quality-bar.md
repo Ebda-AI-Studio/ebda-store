@@ -18,15 +18,15 @@ Every template (Qamar, Souq, Jasmine, Lamma, Dahab) and every look inside it mus
 
 ## 2. Arabic and RTL
 
-| Rule                                                                                                                                                           | Check                         |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| Never `isRtl ? 'flex-row-reverse'`. Direction comes from `dir`; spacing uses logical utilities only. [R-01]                                                    | lint [gate pending]           |
-| Signed numbers, percentages, ranges and codes inside Arabic text are `<bdi>`-isolated, and minus is U+2212. [R-02]                                             | test (render under `dir=rtl`) |
-| Arabic never gets letter-spacing or uppercase (`globals.css` `:lang(ar)` rule stays). Arabic-capable text never uses `leading-none` or `leading-tight`. [R-07] | lint + zoomed shot            |
-| Directional icons mirror through one utility; non-directional icons never mirror. Carousels progress from inline-start in both directions. [R-08, R-09]        | lint + shot                   |
-| Counted nouns go through the one plural helper (`Intl.PluralRules`, six Arabic forms). Number + noun concatenation is banned. [Y-01]                           | test + lint                   |
-| One Arabic register and one form of address per page. Platform control labels use neutral noun forms. [Y-02, ruling pending (e)]                               | critique                      |
-| Every accessible name, title and alt goes through `t()`. There are no Latin-only names on an Arabic page. [R-05]                                               | test                          |
+| Rule                                                                                                                                                                                         | Check                                             |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Never `isRtl ? 'flex-row-reverse'` (or an `order-*`, logical or physical side utility picked by a language ternary). Direction comes from `dir`; spacing uses logical utilities only. [R-01] | lint: `tests/unit/rtl-no-double-reversal.test.ts` |
+| Signed numbers, percentages, ranges and codes inside Arabic text are `<bdi>`-isolated, and minus is U+2212. [R-02]                                                                           | test (render under `dir=rtl`)                     |
+| Arabic never gets letter-spacing or uppercase (`globals.css` `:lang(ar)` rule stays). Arabic-capable text never uses `leading-none` or `leading-tight`. [R-07]                               | lint + zoomed shot                                |
+| Directional icons mirror through one utility; non-directional icons never mirror. Carousels progress from inline-start in both directions. [R-08, R-09]                                      | lint + shot                                       |
+| Counted nouns go through the one plural helper (`Intl.PluralRules`, six Arabic forms). Number + noun concatenation is banned. [Y-01]                                                         | test + lint                                       |
+| One Arabic register and one form of address per page. Platform control labels use neutral noun forms. [Y-02, ruling pending (e)]                                                             | critique                                          |
+| Every accessible name, title and alt goes through `t()`. There are no Latin-only names on an Arabic page. [R-05]                                                                             | test                                              |
 
 ## 3. Accessibility
 

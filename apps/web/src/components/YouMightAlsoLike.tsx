@@ -16,11 +16,11 @@ import { SectionRetryNotice } from './SectionRetryNotice';
  *  (width baseline matches `ProductCarousel`'s xs card — see design.md
  *  "Carousel item (homepage strip)") — avoids the pop-in layout shift the
  *  previous `return null` caused while `isLoading` was true. */
-function YouMightAlsoLikeSkeleton({ isRtl }: { isRtl: boolean }) {
+function YouMightAlsoLikeSkeleton() {
   return (
     <div className="mt-16" aria-hidden="true">
       <Skeleton className="mb-4 h-6 w-48" />
-      <div className={`flex gap-3 overflow-hidden sm:gap-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
+      <div className="flex gap-3 overflow-hidden sm:gap-4">
         {[1, 2, 3, 4, 5].map(i => (
           <div key={i} className="w-[44vw] flex-shrink-0 sm:w-[28vw] md:w-[22vw]">
             <Skeleton className="aspect-square w-full rounded-xl" />
@@ -57,7 +57,7 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
     selectMergedRecommendations
   );
 
-  if (status === 'loading') return <YouMightAlsoLikeSkeleton isRtl={isRtl} />;
+  if (status === 'loading') return <YouMightAlsoLikeSkeleton />;
   if (status === 'error') {
     return (
       <div className="mt-16">

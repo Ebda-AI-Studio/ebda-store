@@ -214,7 +214,7 @@ function ElegantProductCard({
           onClick={handleWishlist}
           className={cn(
             'absolute top-4 z-20 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-opacity duration-300 cursor-pointer',
-            isRtl ? 'left-4' : 'right-4',
+            'end-4',
             'opacity-100 lg:opacity-0',
             (isHovered || isWishlisted) && 'lg:opacity-100'
           )}

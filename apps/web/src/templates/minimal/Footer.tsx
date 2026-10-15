@@ -106,7 +106,7 @@ export default function MinimalFooter({
 
           {/* Navigation links — horizontal, minimal */}
           {allLinks.length > 0 && (
-            <nav className={`flex flex-wrap gap-x-6 gap-y-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+            <nav className="flex flex-wrap gap-x-6 gap-y-2">
               {allLinks.map(({ label, href }) => (
                 <a
                   key={href}
@@ -122,7 +122,7 @@ export default function MinimalFooter({
           {/* Social — only render the row when at least one social link is
               configured, so empty stores don't show a hollow column. */}
           {socialLinks.length > 0 && (
-            <div className={`flex items-center gap-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
+            <div className="flex items-center gap-4">
               {socialLinks.map(s => (
                 <a
                   key={s.key}
@@ -145,7 +145,7 @@ export default function MinimalFooter({
           {/* Branches — opt-in, only rendered when the toggle is on AND at
               least one published location exists. */}
           {showBranches && (
-            <div className={`flex flex-col gap-3 ${isRtl ? 'items-end' : 'items-start'}`}>
+            <div className={`flex flex-col gap-3 items-start`}>
               <h4 className="text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground">
                 {footerBranchesHeading(isRtl)}
               </h4>

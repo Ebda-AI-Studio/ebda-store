@@ -385,9 +385,7 @@ function MinimalProductCard({
 
         {/* Text — PC-1: name/price sizes from textSizes; PC-2: pad from textSizes.pad. */}
         {showLabel !== false && (nameVisible || priceVisible) && (
-          <div
-            className={`flex flex-col gap-2 ${textSizes.pad} ${isRtl ? 'text-right' : 'text-left'}`}
-          >
+          <div className={`flex flex-col gap-2 ${textSizes.pad} text-start`}>
             {nameVisible && (
               <h3
                 id={`prod-${product.id}-name`}
