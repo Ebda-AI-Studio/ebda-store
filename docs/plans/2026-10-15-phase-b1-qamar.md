@@ -72,7 +72,7 @@ Appended to `docs/RULINGS.md` under a new heading `## 2026-10-15 — Phase B1 Qa
 
 | File                                                                                                                                                                                                                                                                                                          | Responsibility                                                             | Task               |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------ |
-| `packages/database/prisma/schema.prisma` (enum `StoreTemplate`) + `packages/database/prisma/migrations/20261017000100_store_template_qamar/migration.sql`                                                                                                                                                     | enum value `qamar`                                                         | 1                  |
+| `packages/database/prisma/schema.prisma` (enum `StoreTemplate`) + `packages/database/prisma/migrations/20261018000100_store_template_qamar/migration.sql`                                                                                                                                                     | enum value `qamar`                                                         | 1                  |
 | `packages/shared/src/types/store-theme.ts`                                                                                                                                                                                                                                                                    | `TemplateId` + `TEMPLATE_THEMES.qamar` + `TEMPLATES` entry                 | 1                  |
 | `packages/shared/src/types/template-baselines.ts`, `image-standards.ts`                                                                                                                                                                                                                                       | `qamar` baseline / image hint                                              | 1                  |
 | `apps/web/src/templates/{index.ts,shared/pack-styles.ts}`, `apps/web/src/lib/serverTemplate.ts`, `apps/web/src/app/layout.tsx`                                                                                                                                                                                | skin registration, `data-pack='qamar'`                                     | 1                  |
@@ -102,7 +102,7 @@ Order and STOP points: Tasks 1–6 build the platform + Atelier → **STOP 1 (Ta
 **Files:**
 
 - Modify: `packages/database/prisma/schema.prisma:830-837` (enum `StoreTemplate`)
-- Create: `packages/database/prisma/migrations/20261017000100_store_template_qamar/migration.sql`
+- Create: `packages/database/prisma/migrations/20261018000100_store_template_qamar/migration.sql`
 - Modify: `packages/shared/src/types/store-theme.ts:16` (`TemplateId`), `:613` (`TEMPLATE_THEMES`), `TEMPLATES` array
 - Modify: `packages/shared/src/types/template-baselines.ts:193-195` (`Exclude<…>`), `:311-318`
 - Modify: `packages/shared/src/types/image-standards.ts` (only if a `Record<TemplateId>` is required there — it is `Partial`, so no entry needed; verify with typecheck)
@@ -139,7 +139,7 @@ describe('qamar skin id', () => {
     expect(schema).toMatch(/enum StoreTemplate \{[^}]*\bqamar\b[^}]*\}/s);
     const mig = path.join(
       root,
-      'packages/database/prisma/migrations/20261017000100_store_template_qamar/migration.sql'
+      'packages/database/prisma/migrations/20261018000100_store_template_qamar/migration.sql'
     );
     expect(existsSync(mig)).toBe(true);
     const sql = readFileSync(mig, 'utf8');
@@ -183,7 +183,7 @@ Expected: FAIL (`enum StoreTemplate` has no `qamar`; `TEMPLATE_THEMES.qamar` und
 
 - [ ] **Step 3: Write minimal implementation**
 
-`packages/database/prisma/migrations/20261017000100_store_template_qamar/migration.sql`:
+`packages/database/prisma/migrations/20261018000100_store_template_qamar/migration.sql`:
 
 ```sql
 -- Qamar storefront skin (Phase B1, Ruling B1-1): one more value on the store
@@ -317,7 +317,7 @@ Run the homepage characterization snapshots: `npx vitest run tests/unit -t chara
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/database/prisma/schema.prisma packages/database/prisma/migrations/20261017000100_store_template_qamar/migration.sql packages/shared/src/types/store-theme.ts packages/shared/src/types/template-baselines.ts apps/web/src/templates/index.ts apps/web/src/templates/qamar/index.ts apps/web/src/templates/shared/pack-styles.ts apps/web/src/lib/serverTemplate.ts apps/web/src/app/layout.tsx apps/api/src/services/provisioning.service.ts docs/ROLLBACK.md tests/unit/qamar-template.test.ts
+git add packages/database/prisma/schema.prisma packages/database/prisma/migrations/20261018000100_store_template_qamar/migration.sql packages/shared/src/types/store-theme.ts packages/shared/src/types/template-baselines.ts apps/web/src/templates/index.ts apps/web/src/templates/qamar/index.ts apps/web/src/templates/shared/pack-styles.ts apps/web/src/lib/serverTemplate.ts apps/web/src/app/layout.tsx apps/api/src/services/provisioning.service.ts docs/ROLLBACK.md tests/unit/qamar-template.test.ts
 git commit -m "$(cat <<'EOF'
 feat(templates): add the qamar skin id (enum, theme, baseline, web maps)
 
@@ -2247,7 +2247,7 @@ EOF
 
 - [ ] **Step 1: Open the PR (no merge)**
 
-`git push -u origin feat/b1-qamar` (the pre-push hook runs; never `--no-verify`), then `gh pr create` with a body listing: the finish line from the spec, the 23 rulings by id, the migration (`20261017000100_store_template_qamar`, additive), the gates with counts, the screenshots folder, and "Production steps after merge need Ahmad: API deploy (runs the migration), R2 upload, `--yes-production` seed". PR body ends with the Claude Code footer.
+`git push -u origin feat/b1-qamar` (the pre-push hook runs; never `--no-verify`), then `gh pr create` with a body listing: the finish line from the spec, the 23 rulings by id, the migration (`20261018000100_store_template_qamar`, additive), the gates with counts, the screenshots folder, and "Production steps after merge need Ahmad: API deploy (runs the migration), R2 upload, `--yes-production` seed". PR body ends with the Claude Code footer.
 
 - [ ] **Step 2: STOP 2 — Ahmad approves the merge.** CI green is necessary, not sufficient.
 
