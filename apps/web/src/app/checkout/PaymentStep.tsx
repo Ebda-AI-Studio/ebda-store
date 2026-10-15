@@ -104,109 +104,110 @@ export default function PaymentStep({
         </p>
       </div>
 
-      {/* Payment Methods */}
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-foreground">
-          {t('Payment Method', translations['Payment Method'])}
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t('Select your preferred payment method', 'اختر طريقة الدفع المفضلة')}
-        </p>
+      {/* Payment Methods. Not on a demo store (there is nothing to choose; the demo notice below
+          is the answer), unless loading the methods failed: that error and its retry still show. */}
+      {(!isDemo || paymentConfigError) && (
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground">
+            {t('Payment Method', translations['Payment Method'])}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t('Select your preferred payment method', 'اختر طريقة الدفع المفضلة')}
+          </p>
 
-        <div className="mt-6 space-y-3">
-          {paymentConfigError ? (
-            <div
-              role="alert"
-              className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-foreground"
-            >
-              <span>
-                {t(
-                  "Couldn't load payment methods. Please check your connection and retry.",
-                  'تعذّر تحميل طرق الدفع. يرجى التحقق من اتصالك وإعادة المحاولة.'
-                )}
-              </span>
-              {onRetryPaymentConfig && (
-                <button
-                  type="button"
-                  onClick={onRetryPaymentConfig}
-                  className="flex-shrink-0 font-medium text-primary underline"
-                >
-                  {t('Retry', 'إعادة المحاولة')}
-                </button>
-              )}
-            </div>
-          ) : (
-            // The demo store has no order to pay for: its notice below says so, not this alert.
-            paymentProviders.length === 0 &&
-            !isDemo && (
+          <div className="mt-6 space-y-3">
+            {paymentConfigError ? (
               <div
                 role="alert"
-                className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-foreground"
+                className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-foreground"
               >
-                {t(
-                  'No payment methods are configured for this store. Please contact the store owner.',
-                  'لا توجد طرق دفع مُعدّة لهذا المتجر. يرجى التواصل مع صاحب المتجر.'
+                <span>
+                  {t(
+                    "Couldn't load payment methods. Please check your connection and retry.",
+                    'تعذّر تحميل طرق الدفع. يرجى التحقق من اتصالك وإعادة المحاولة.'
+                  )}
+                </span>
+                {onRetryPaymentConfig && (
+                  <button
+                    type="button"
+                    onClick={onRetryPaymentConfig}
+                    className="flex-shrink-0 font-medium text-primary underline"
+                  >
+                    {t('Retry', 'إعادة المحاولة')}
+                  </button>
                 )}
               </div>
-            )
-          )}
-          {/* Render payment providers dynamically. We never fall back to
-              DEFAULT_PAYMENT_PROVIDERS here — that list was a visual mock
-              and showed payment options the backend would 400 on. */}
-          {paymentProviders.map(provider => {
-            // Get display info - use API data or fallback to defaults
-            const defaultInfo = DEFAULT_PAYMENT_PROVIDERS.find(p => p.id === provider.id);
-            const displayName =
-              language === 'ar'
-                ? provider.nameAr || provider.name || defaultInfo?.name || provider.id
-                : provider.name || defaultInfo?.name || provider.id;
-            const displayDescription =
-              language === 'ar'
-                ? provider.descriptionAr || provider.description || defaultInfo?.description || ''
-                : provider.description || defaultInfo?.description || '';
-
-            return (
-              <label
-                key={provider.id}
-                className={`flex items-center gap-4 rounded-lg border p-4 cursor-pointer transition ${
-                  selectedProvider === provider.id
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-border/80'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value={provider.id}
-                  checked={selectedProvider === provider.id}
-                  onChange={e => onSelectProvider(e.target.value)}
-                  className="h-4 w-4 text-primary focus:ring-primary"
-                />
-                <div className="flex-1">
-                  <span className="font-medium text-foreground">{displayName}</span>
-                  {displayDescription && (
-                    <p className="text-sm text-muted-foreground">{displayDescription}</p>
+            ) : (
+              paymentProviders.length === 0 && (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-foreground"
+                >
+                  {t(
+                    'No payment methods are configured for this store. Please contact the store owner.',
+                    'لا توجد طرق دفع مُعدّة لهذا المتجر. يرجى التواصل مع صاحب المتجر.'
                   )}
                 </div>
-                {/* Render icon from logo URL or use default icon */}
-                {provider.logo ? (
-                  <div className="flex h-8 w-12 items-center justify-center">
-                    <Image
-                      src={provider.logo}
-                      alt={displayName}
-                      width={48}
-                      height={32}
-                      className="object-contain"
-                    />
+              )
+            )}
+            {/* Render payment providers dynamically. We never fall back to
+              DEFAULT_PAYMENT_PROVIDERS here — that list was a visual mock
+              and showed payment options the backend would 400 on. */}
+            {paymentProviders.map(provider => {
+              // Get display info - use API data or fallback to defaults
+              const defaultInfo = DEFAULT_PAYMENT_PROVIDERS.find(p => p.id === provider.id);
+              const displayName =
+                language === 'ar'
+                  ? provider.nameAr || provider.name || defaultInfo?.name || provider.id
+                  : provider.name || defaultInfo?.name || provider.id;
+              const displayDescription =
+                language === 'ar'
+                  ? provider.descriptionAr || provider.description || defaultInfo?.description || ''
+                  : provider.description || defaultInfo?.description || '';
+
+              return (
+                <label
+                  key={provider.id}
+                  className={`flex items-center gap-4 rounded-lg border p-4 cursor-pointer transition ${
+                    selectedProvider === provider.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-border/80'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value={provider.id}
+                    checked={selectedProvider === provider.id}
+                    onChange={e => onSelectProvider(e.target.value)}
+                    className="h-4 w-4 text-primary focus:ring-primary"
+                  />
+                  <div className="flex-1">
+                    <span className="font-medium text-foreground">{displayName}</span>
+                    {displayDescription && (
+                      <p className="text-sm text-muted-foreground">{displayDescription}</p>
+                    )}
                   </div>
-                ) : (
-                  getPaymentIcon(provider.id)
-                )}
-              </label>
-            );
-          })}
+                  {/* Render icon from logo URL or use default icon */}
+                  {provider.logo ? (
+                    <div className="flex h-8 w-12 items-center justify-center">
+                      <Image
+                        src={provider.logo}
+                        alt={displayName}
+                        width={48}
+                        height={32}
+                        className="object-contain"
+                      />
+                    </div>
+                  ) : (
+                    getPaymentIcon(provider.id)
+                  )}
+                </label>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Delivery block (info note + window picker) — always immediately
           above the Pay button, in every state. */}

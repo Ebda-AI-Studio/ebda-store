@@ -15,8 +15,13 @@ const TEMPLATE_NAMES: Record<LookTemplate, { en: string; ar: string }> = {
   dahab: { en: 'Dahab', ar: 'دهب' },
 };
 
-const SELECT_CLASS =
-  'min-h-11 rounded border border-background/40 bg-foreground px-2 text-sm text-background focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-background';
+/**
+ * The bar is the INVERSE surface (page colour on ink), so the select boundary is the page colour
+ * at 70%: >= 3:1 against the bar on every look (WCAG 1.4.11, pinned by DemoLookBar.test). The
+ * `--input` token is tuned for fields on the page, not on ink, and measured 1.57-2.76:1 here.
+ */
+export const DEMO_BAR_SELECT_CLASS =
+  'min-h-11 rounded border border-background/70 bg-foreground px-2 text-sm text-background focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-background';
 
 /**
  * Showroom bar for the demo store (`store.isDemo`): template, then one of its BUILT looks
@@ -103,7 +108,7 @@ export function DemoLookBar({
           <span className={labelText}>{t('Template', translations['Template'])}</span>
           <select
             data-demo-template
-            className={SELECT_CLASS}
+            className={DEMO_BAR_SELECT_CLASS}
             value={activeTemplate}
             onChange={e => {
               const first = built.find(l => l.template === e.target.value);
@@ -121,7 +126,7 @@ export function DemoLookBar({
           <span className={labelText}>{t('Look', translations['Look'])}</span>
           <select
             data-demo-look
-            className={SELECT_CLASS}
+            className={DEMO_BAR_SELECT_CLASS}
             value={current ? current.id : ''}
             onChange={e => go(e.target.value)}
           >

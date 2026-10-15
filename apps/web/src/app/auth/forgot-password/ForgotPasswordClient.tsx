@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
 import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { demoRefusalText } from '../../../lib/demo-refusal';
 
 export default function ForgotPasswordClient() {
   const { isLoading, error, submit } = useAuthFormSubmit();
@@ -22,7 +23,9 @@ export default function ForgotPasswordClient() {
     const ok = await submit(async () => {
       const result = await api.forgotPassword(email, store?.id);
       if (!result.success) {
-        throw new Error(result.error?.message || 'Failed to send reset email');
+        throw new Error(
+          demoRefusalText(result.error, t) || result.error?.message || 'Failed to send reset email'
+        );
       }
     }, 'Failed to send reset email');
     if (ok) setIsSubmitted(true);

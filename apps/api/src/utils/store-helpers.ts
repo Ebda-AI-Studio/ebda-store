@@ -69,6 +69,30 @@ async function lookupPublicStoreId(req: Request): Promise<string | undefined> {
   return undefined;
 }
 
+/**
+ * The store whose storefront sent this request, read from the browser's `Origin` host (exact
+ * slug / verified custom domain, the same definer as the header path). Undefined for a platform
+ * origin, a store-less or malformed one, or a script that sends none. Used where a route must
+ * still recognise the store when the client omitted the store headers (the demo contact refusal,
+ * Ruling B1-13); never for authorisation, since a script can forge or drop `Origin`.
+ */
+export async function storeIdFromOrigin(req: Request): Promise<string | undefined> {
+  const origin = req.headers.origin;
+  if (typeof origin !== 'string' || !origin) return undefined;
+  let host: string;
+  try {
+    host = new URL(origin).host;
+  } catch {
+    return undefined;
+  }
+  const lookup = storeLookupForHost(host);
+  if (!lookup) return undefined;
+  const id = await resolveStoreId(
+    lookup.by === 'slug' ? { slug: lookup.slug } : { domain: lookup.domain }
+  );
+  return id ?? undefined;
+}
+
 export async function getStoreIdFromRequest(req: Request): Promise<string> {
   const storeId = await resolvePublicStoreId(req);
   if (storeId) return storeId;

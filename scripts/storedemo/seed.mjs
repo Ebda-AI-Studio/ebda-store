@@ -404,10 +404,12 @@ async function seedCatalogue(prisma, Prisma, storeId, base) {
             'An illustrative Egyptian boutique: abayas, kaftans, scarves and evening dresses, cut in Heliopolis.',
           descriptionAr:
             'بوتيك مصري توضيحي: عبايات وقفاطين وطرح وفساتين سهرة، متفصلة في مصر الجديدة.',
+          // "Demo store" is said once, by the demo bar above it (DemoLookBar); this line only
+          // labels the photos (Task 9 review).
           announcementBar: {
             enabled: true,
-            text: 'Demo store · illustrative photos',
-            textAr: 'متجر تجريبي · الصور توضيحية',
+            text: 'Illustrative photos',
+            textAr: 'الصور توضيحية',
           },
           settings: {
             ...((store?.settings && typeof store.settings === 'object' && store.settings) || {}),

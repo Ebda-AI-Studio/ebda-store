@@ -29,6 +29,7 @@ import publicRoutes from '@api/routes/public.routes';
 import { publicAffiliateRoutes } from '@api/routes/affiliate.routes';
 import { publicNotificationRoutes } from '@api/routes/notification.routes';
 import { inngest } from '@api/lib/inngest/client';
+import { storeHost } from '@ebda/shared';
 import { awaitDeferredWork } from '@api/lib/after-tenant-commit';
 import {
   hasDb,
@@ -226,8 +227,12 @@ describe.skipIf(!hasDb)('demo store refuses visitor PII writes (B1-13)', () => {
   beforeAll(async () => {
     demo = await seed(true);
     shop = await seed(false);
-    // Both stores carry the features, so on the demo ONLY is_demo can refuse.
+    // Both stores carry the features, so on the demo ONLY is_demo can refuse. Short slugs so
+    // `<slug>.ebda.app` is a valid store host (the fixture slug is over the 40-char limit).
     await withRlsBypass(async tx => {
+      const tag = Math.random().toString(36).slice(2, 10);
+      await tx.store.update({ where: { id: demo.storeId }, data: { slug: `t9d-${tag}` } });
+      await tx.store.update({ where: { id: shop.storeId }, data: { slug: `t9s-${tag}` } });
       for (const storeId of [demo.storeId, shop.storeId])
         for (const featureKey of ['affiliate', 'push_notifications'])
           await tx.storeFeature.create({ data: { storeId, featureKey, enabled: true } });
@@ -249,6 +254,9 @@ describe.skipIf(!hasDb)('demo store refuses visitor PII writes (B1-13)', () => {
       await tx.affiliate.deleteMany({ where: { storeId: ids } });
       await tx.pushSubscription.deleteMany({ where: { storeId: ids } });
       await tx.user.deleteMany({ where: { storeId: ids, role: 'customer' } });
+      await tx.refreshToken.deleteMany({
+        where: { userId: { in: [demo.ownerId, shop.ownerId] }, token: { startsWith: 'reset:' } },
+      });
     });
   });
 
@@ -365,6 +373,102 @@ describe.skipIf(!hasDb)('demo store refuses visitor PII writes (B1-13)', () => {
       });
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  const slugOf = (storeId: string) =>
+    withRlsBypass(tx =>
+      tx.store.findUniqueOrThrow({ where: { id: storeId }, select: { slug: true } })
+    ).then(r => r.slug);
+
+  it('contact on the demo HOST is refused without any store id: x-store-domain, or only the Origin', async () => {
+    const host = storeHost(await slugOf(demo.storeId));
+    const send = vi.spyOn(inngest, 'send');
+    send.mockClear();
+    const body = {
+      name: 'Mona',
+      email: `demo-host-${run()}@example.com`,
+      subject: 'Hi',
+      message: 'x',
+    };
+    expectDemoRefusal(
+      await request(app).post('/api/v1/public/contact').set('x-store-domain', host).send(body)
+    );
+    expectDemoRefusal(
+      await request(app).post('/api/v1/public/contact').set('Origin', `https://${host}`).send(body)
+    );
+    expect(send).not.toHaveBeenCalled();
+    // A merchant host's Origin still sends (the Origin fallback is demo-specific in effect).
+    const shopHost = storeHost(await slugOf(shop.storeId));
+    const ok = await request(app)
+      .post('/api/v1/public/contact')
+      .set('Origin', `https://${shopHost}`)
+      .send(body);
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  const resetRows = (userId: string) =>
+    withRlsBypass(tx =>
+      tx.refreshToken.count({ where: { userId, token: { startsWith: 'reset:' } } })
+    );
+  const ownerEmail = (userId: string) =>
+    withRlsBypass(tx =>
+      tx.user.findUniqueOrThrow({ where: { id: userId }, select: { email: true } })
+    ).then(u => u.email);
+
+  it('forgot-password and resend-verification with the demo storeId: 403 DEMO_STORE', async () => {
+    const email = `demo-fp-${run()}@example.com`;
+    expectDemoRefusal(
+      await request(app).post('/api/v1/auth/forgot-password').send({ email, storeId: demo.storeId })
+    );
+    expectDemoRefusal(
+      await request(app)
+        .post('/api/v1/auth/resend-verification')
+        .send({ email, storeId: demo.storeId })
+    );
+  });
+
+  it('the demo owner is never mailed: forgot-password answers the generic 200 and issues no reset token', async () => {
+    const before = await resetRows(demo.ownerId);
+    const res = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: await ownerEmail(demo.ownerId) });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.data.message).toBe(
+      'If an account exists with this email, a reset link has been sent.'
+    );
+    expect(await resetRows(demo.ownerId)).toBe(before);
+    // A merchant owner on the same path DOES get a reset token (the skip is demo-specific).
+    const shopBefore = await resetRows(shop.ownerId);
+    const shopRes = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: await ownerEmail(shop.ownerId) });
+    expect(shopRes.status).toBe(200);
+    expect(await resetRows(shop.ownerId)).toBe(shopBefore + 1);
+  });
+
+  it('the demo owner gets the generic resend answer (nothing about the account)', async () => {
+    await withRlsBypass(tx =>
+      tx.user.update({ where: { id: demo.ownerId }, data: { emailVerified: false } })
+    );
+    try {
+      const res = await request(app)
+        .post('/api/v1/auth/resend-verification')
+        .send({ email: await ownerEmail(demo.ownerId) });
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      const unknown = await request(app)
+        .post('/api/v1/auth/resend-verification')
+        .send({ email: `nobody-${run()}@example.com` });
+      expect(res.body.data).toEqual(unknown.body.data);
+      const tokens = await withRlsBypass(tx =>
+        tx.verificationToken.count({ where: { userId: demo.ownerId } })
+      );
+      expect(tokens).toBe(0);
+    } finally {
+      await withRlsBypass(tx =>
+        tx.user.update({ where: { id: demo.ownerId }, data: { emailVerified: true } })
+      );
+    }
   });
 
   it('assertNotDemoStore reads is_demo under the ebda_app role (strict RLS)', async () => {

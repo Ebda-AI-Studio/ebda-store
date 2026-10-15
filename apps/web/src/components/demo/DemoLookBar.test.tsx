@@ -36,7 +36,8 @@ beforeAll(() => {
   });
 });
 
-import { DemoLookBar } from './DemoLookBar';
+import { DemoLookBar, DEMO_BAR_SELECT_CLASS } from './DemoLookBar';
+import { LOOKS } from '@ebda/shared';
 import { DemoCheckoutNotice } from './DemoCheckoutNotice';
 
 afterEach(() => {
@@ -123,6 +124,30 @@ describe('DemoLookBar: template, then look', () => {
     expect(screen.getByLabelText('القالب')).toBeTruthy();
     expect(screen.getByLabelText('الشكل')).toBeTruthy();
     expect(screen.getByRole('option', { name: 'لوك بوك' })).toBeTruthy();
+  });
+
+  it('the select boundary is >= 3:1 against the bar on every look (WCAG 1.4.11)', () => {
+    // The bar is bg-foreground (the look's ink); the border is the page colour at N% over it.
+    const alpha = Number(/\bborder-background\/(\d+)\b/.exec(DEMO_BAR_SELECT_CLASS)?.[1]) / 100;
+    expect(alpha).toBeGreaterThan(0);
+    const rgb = (hex: string) => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    const lum = (c: number[]) => {
+      const [r, g, b] = c.map(v => {
+        const x = v / 255;
+        return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const ratio = (a: number[], b: number[]) => {
+      const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+      return (x + 0.05) / (y + 0.05);
+    };
+    for (const look of LOOKS) {
+      const bar = rgb(look.tokens.ink);
+      const page = rgb(look.tokens.page);
+      const border = page.map((v, i) => v * alpha + bar[i] * (1 - alpha));
+      expect(ratio(border, bar), look.id).toBeGreaterThanOrEqual(3);
+    }
   });
 
   it('every control is at least 44px tall and has a visible focus outline', () => {

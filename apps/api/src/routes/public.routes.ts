@@ -25,7 +25,7 @@ import {
 import { recordProductView } from '../services/view-ingest.service';
 import { claimSearcherSearch, recordSearch } from '../services/search-log.service';
 import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
-import { getStoreIdFromRequest, resolvePublicStoreId } from '../utils/store-helpers';
+import { getStoreIdFromRequest } from '../utils/store-helpers';
 import { assertNotDemoStore } from '../services/plan-limit.service';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';

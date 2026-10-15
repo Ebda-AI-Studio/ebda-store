@@ -72,6 +72,10 @@ vi.mock('@api/services/redis.service', () => ({
 
 vi.mock('@api/lib/cors-cache', () => ({ isPlatformOrigin: vi.fn(() => true) }));
 
+// Ruling B1-13: the routes refuse the demo store first; not this suite's concern (it is pinned in
+// tests/integration/demo-store.test.ts), and the real guard needs the database this suite mocks.
+vi.mock('@api/services/plan-limit.service', () => ({ assertNotDemoStore: vi.fn(async () => {}) }));
+
 import authRoutes from '@api/routes/auth.routes';
 
 interface RouteLayer {

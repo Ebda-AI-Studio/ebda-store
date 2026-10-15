@@ -965,7 +965,16 @@ router.post(
   // multiply the mails one inbox receives.
   authEmailAddressLimiter,
   resetEmailLimiter,
-  async (req: Request, res: Response, _next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
+    // Ruling B1-13: no account mail from the demo showroom (its storeId is refused outright;
+    // the answer does not depend on the email, so it reveals nothing about any account).
+    try {
+      const demoScope = (req.body ?? {}).storeId;
+      if (typeof demoScope === 'string') await assertNotDemoStore(demoScope);
+    } catch (error) {
+      next(error);
+      return;
+    }
     try {
       const { email, storeId } = req.body ?? {};
 
@@ -1142,6 +1151,15 @@ router.post(
   // also takes a caller-supplied storeId and sends one mail per account.
   authEmailAddressLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
+    // Ruling B1-13: no account mail from the demo showroom (its storeId is refused outright;
+    // the answer does not depend on the email, so it reveals nothing about any account).
+    try {
+      const demoScope = (req.body ?? {}).storeId;
+      if (typeof demoScope === 'string') await assertNotDemoStore(demoScope);
+    } catch (error) {
+      next(error);
+      return;
+    }
     try {
       const { email, storeId } = req.body ?? {};
 

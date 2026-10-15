@@ -3,7 +3,7 @@
 All images and the hero clip in this folder are AI-generated illustrative samples (FLUX.1 schnell on
 Cloudflare Workers AI, 2026-10-15; clip: ffmpeg zoompan over `hero-atelier.webp`, `make-video.sh`).
 They are not a real merchant's products (Ruling TPL-3). Prompts: `prompts.py`. The storefront labels
-them illustrative in the demo announcement bar ("الصور توضيحية / illustrative photos").
+them illustrative in the demo announcement bar ("الصور توضيحية / Illustrative photos").
 
 Every file was read back (viewed) before commit; files with lettering, watermarks, a wrong garment or an
 off-palette colour were regenerated (Ruling B1-9).
