@@ -443,8 +443,9 @@ describe('custom badge — out of stock on the two non-grid paths', () => {
   });
 
   it('ProductListItem: suppressed, and the row equals the no-label OOS render', () => {
-    // ProductListItem derives `orderable` from `inventory`, not `inStock`.
-    const oos = { ...ON_SALE, inventory: 0 };
+    // ProductListItem reads the server's `inStock` first (C-01, the shared card
+    // rule); a sold-out listing payload carries both flags.
+    const oos = { ...ON_SALE, inStock: false, inventory: 0 };
     expect(renderListItem({ ...oos, ...LABEL })).toBe(renderListItem(oos));
   });
 });
