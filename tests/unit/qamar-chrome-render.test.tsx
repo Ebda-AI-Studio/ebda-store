@@ -67,14 +67,14 @@ describe('qamar header', () => {
     setLook('qamar.vitrine');
     const html = renderToStaticMarkup(<QamarHeader branding={branding} navigation={nav} />);
     expect(html).toContain('data-logo-placement="centre"');
-    expect(html).toContain('grid-cols-[1fr_auto_1fr]');
+    expect(html).toContain('grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]');
     expect(html).toContain('قمر');
   });
   it('keeps the wordmark at the start for Atelier', () => {
     setLook('qamar.atelier');
     const html = renderToStaticMarkup(<QamarHeader branding={branding} />);
     expect(html).toContain('data-logo-placement="start"');
-    expect(html).not.toContain('grid-cols-[1fr_auto_1fr]');
+    expect(html).not.toContain('grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]');
   });
   it('an unknown or absent look falls back to start, never throws', () => {
     setLook('qamar.gone');
@@ -91,6 +91,16 @@ describe('qamar header', () => {
     expect(renderToStaticMarkup(<QamarHeader branding={branding} />)).toContain('قمر');
     setLook('qamar.atelier', 'en');
     expect(renderToStaticMarkup(<QamarHeader branding={branding} />)).toContain('Qamar Demo');
+  });
+  it('caps and truncates a very long Arabic name so it cannot reach the actions', () => {
+    setLook('qamar.vitrine', 'ar');
+    const longName = 'متجر قمر للأزياء والمناسبات الراقية والأنيقة جدا';
+    const html = renderToStaticMarkup(<QamarHeader branding={{ ...branding, nameAr: longName }} />);
+    expect(html).toContain('grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]');
+    expect(html).toContain('max-w-[calc(100%-13rem)]');
+    expect(html).toContain('min-w-0');
+    expect(html).toMatch(/class="[^"]*\btruncate\b[^"]*"[^>]*title="/);
+    expect(html).toContain(`title="${longName}"`);
   });
   it('keeps cart, search and menu accessible in centre mode', () => {
     setLook('qamar.vitrine', 'en');

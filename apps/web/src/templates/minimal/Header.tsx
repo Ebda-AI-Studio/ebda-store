@@ -73,7 +73,7 @@ export default function MinimalHeader({
         <div
           className={
             isCentre
-              ? 'relative grid grid-cols-[1fr_auto_1fr] items-center py-3'
+              ? 'relative grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center py-3'
               : 'relative flex items-center justify-between py-3'
           }
         >
@@ -83,7 +83,11 @@ export default function MinimalHeader({
               every theme's logo MUST center on mobile. */}
           <Link
             href={urlPrefix || '/'}
-            className={`absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center flex-shrink-0 max-w-[65%] md:max-w-none${isCentre ? ' md:col-start-2' : ''}`}
+            className={`absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center flex-shrink-0 ${
+              isCentre
+                ? 'min-w-0 max-w-[calc(100%-13rem)] md:max-w-[40vw] md:col-start-2'
+                : 'max-w-[65%] md:max-w-none'
+            }`}
           >
             {displayLogo ? (
               <StoreLogo src={displayLogo} alt={displayName} priority />
@@ -91,10 +95,11 @@ export default function MinimalHeader({
               <span
                 className={
                   isCentre
-                    ? 'text-2xl sm:text-3xl font-display text-foreground'
+                    ? 'block max-w-full truncate text-2xl sm:text-3xl font-display text-foreground'
                     : 'text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground'
                 }
                 data-zone="storeName"
+                title={isCentre ? displayName : undefined}
               >
                 {displayName}
               </span>
