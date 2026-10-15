@@ -100,6 +100,9 @@ export function buildQamarHome(base, ctx) {
     [
       slide('vitrine-1', {
         image: img(QAMAR_PAGE_IMAGES.heroVitrine),
+        // Vitrine fills its frame (frame: 'line'): keep the gown's neckline and shoulders in the
+        // wide desktop crop, where the 16:9 still loses ~40% of its height (B1-32).
+        focus: 'top',
         alt: 'An evening gown in a boutique window at dusk',
         headline: 'For the night of the wedding',
         headlineAr: 'لليلة الفرح',

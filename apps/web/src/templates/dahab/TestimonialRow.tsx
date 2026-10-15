@@ -3,7 +3,7 @@
 import type { TestimonialRowProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { DAHAB_CONTAINER, DahabSectionHeading, pick } from './ui';
-import { SingleTestimonial } from '../shared/TestimonialRow';
+import { SingleTestimonial, authorLabel } from '../shared/TestimonialRow';
 
 function Stars({ rating, label }: { rating: number; label: string }) {
   return (
@@ -70,7 +70,7 @@ export function DahabTestimonialRow({
               <p>{r.comment}</p>
             </blockquote>
             <p dir="auto" className="mt-6 text-sm text-muted-foreground">
-              {r.authorName}
+              {authorLabel(r.authorName, isRtl)}
               {r.authorCity ? `، ${r.authorCity}`.replace('،', isRtl ? '،' : ',') : ''}
             </p>
           </li>

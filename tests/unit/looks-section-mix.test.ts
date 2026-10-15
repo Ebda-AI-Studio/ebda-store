@@ -138,6 +138,7 @@ describe('look section mix', () => {
         const doc = applyTemplateFamily(onLookbook, 'qamar', vitrine, { from: lookbook, design });
         expect(doc.sections.map(s => s.type)).toEqual(vitrine.sections!.map(s => s.type));
         expect(byType(doc, 'hero').settings.presentation, design).toBe('framed');
+        expect(byType(doc, 'hero').settings.frame, design).toBe('line');
         expect(byType(doc, 'hero').settings.mode, design).toBe(
           byType(onLookbook, 'hero').settings.mode
         );
@@ -205,6 +206,77 @@ describe('look section mix', () => {
         expect(byType(doc, 'shop-the-look').settings.bgColor, design).toBe('token:card');
       }
     });
+  });
+
+  it('Vitrine → Lookbook with keep: an EDITED occasion list stays, an untouched one leaves (B1-45)', () => {
+    const vitrine = getLook('qamar.vitrine')!;
+    const lookbook = getLook('qamar.lookbook')!;
+    const onVitrine = applyTemplateFamily(base(), 'qamar', vitrine);
+    const edited: PageDefinition = {
+      ...onVitrine,
+      sections: onVitrine.sections.map(n =>
+        n.type === 'collection-list'
+          ? {
+              ...n,
+              blocks: [
+                {
+                  id: 'o1',
+                  type: 'collection',
+                  settings: { categorySlug: 'wedding', tone: 'primary' },
+                },
+              ],
+            }
+          : n
+      ),
+    };
+    const kept = applyTemplateFamily(edited, 'qamar', lookbook, { from: vitrine, design: 'keep' });
+    const list = kept.sections.find(n => n.type === 'collection-list')!;
+    expect(list.blocks).toEqual(edited.sections.find(n => n.type === 'collection-list')!.blocks);
+    // after the incoming mix, never in the middle of it
+    expect(kept.sections.map(n => n.type).slice(0, lookbook.sections!.length)).toEqual(
+      lookbook.sections!.map(x => x.type)
+    );
+    expect(validateDefinitionSync(kept).ok).toBe(true);
+    // reset, or an untouched list, leaves the draft (it stays in revision history)
+    const reset = applyTemplateFamily(edited, 'qamar', lookbook, {
+      from: vitrine,
+      design: 'reset',
+    });
+    expect(reset.sections.some(n => n.type === 'collection-list')).toBe(false);
+    const untouched = applyTemplateFamily(onVitrine, 'qamar', lookbook, {
+      from: vitrine,
+      design: 'keep',
+    });
+    expect(untouched.sections.some(n => n.type === 'collection-list')).toBe(false);
+    // a changed SETTING (no blocks) also counts as edited
+    const renamed: PageDefinition = {
+      ...onVitrine,
+      sections: onVitrine.sections.map(n =>
+        n.type === 'collection-list'
+          ? { ...n, settings: { ...n.settings, headingAr: 'مناسباتنا' } }
+          : n
+      ),
+    };
+    const kept2 = applyTemplateFamily(renamed, 'qamar', lookbook, {
+      from: vitrine,
+      design: 'keep',
+    });
+    expect(kept2.sections.find(n => n.type === 'collection-list')?.settings.headingAr).toBe(
+      'مناسباتنا'
+    );
+  });
+
+  it('Vitrine → Atelier resets the frame line (look-owned, B1-41)', () => {
+    for (const design of ['keep', 'reset'] as const) {
+      const onVitrine = applyTemplateFamily(base(), 'qamar', getLook('qamar.vitrine'));
+      expect(byType(onVitrine, 'hero').settings.frame).toBe('line');
+      const doc = applyTemplateFamily(onVitrine, 'qamar', getLook('qamar.atelier'), {
+        from: getLook('qamar.vitrine'),
+        design,
+      });
+      expect(byType(doc, 'hero').settings.frame, design).toBe(defaultsOf('hero').frame);
+      expect(byType(doc, 'hero').settings.presentation, design).toBe('full-bleed');
+    }
   });
 
   describe("look switch keeps the merchant's own design edits with design:'keep' (C8, TPL-1)", () => {

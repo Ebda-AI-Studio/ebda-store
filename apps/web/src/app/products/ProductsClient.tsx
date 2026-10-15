@@ -259,9 +259,13 @@ export default function ProductsClient({
     categoryFilter === 'best-sellers'
       ? 'الأكثر مبيعاً'
       : (pickLocalizedName(activeCategory, true) ?? translations['All Products']);
-  // Arabic reads "تصفح الدراجية" (with the definite article ال), not "تصفح دراجية".
-  // Prepend ال for the subtitle phrase unless the name already carries it.
-  const ctxArDefinite = ctxAr.startsWith('ال') ? ctxAr : `ال${ctxAr}`;
+  // Subtitle = the category's own description in the shopper's language, or nothing. Never a
+  // generated "Browse X" line (quality bar Y-06: empty means absent; Ruling B1-44).
+  const subtitle = (
+    (language === 'ar'
+      ? activeCategory?.descriptionAr || activeCategory?.description
+      : activeCategory?.description || activeCategory?.descriptionAr) ?? ''
+  ).trim();
 
   // Cart-id → quantity is consumed by ProductListItem (list view). The grid
   // view's PecannbeeProductCard handles its own optimistic add state.
@@ -589,17 +593,14 @@ export default function ProductsClient({
             >
               {t(ctxEn, ctxAr)}
             </h1>
-            <p
-              className="mt-2 text-muted-foreground"
-              style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpSubheadingColorStyle }}
-            >
-              {categoryFilter
-                ? t(`Browse ${ctxEn}`, `\u062a\u0635\u0641\u062d ${ctxArDefinite}`)
-                : t(
-                    'Browse our collection of premium products',
-                    '\u062a\u0635\u0641\u062d \u0645\u062c\u0645\u0648\u0639\u062a\u0646\u0627 \u0645\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0627\u0644\u0645\u0645\u064a\u0632\u0629'
-                  )}
-            </p>
+            {subtitle && (
+              <p
+                className="mt-2 max-w-[60ch] text-muted-foreground"
+                style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpSubheadingColorStyle }}
+              >
+                {subtitle}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-8 lg:flex-row">

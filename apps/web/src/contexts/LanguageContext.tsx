@@ -308,6 +308,9 @@ export const translations = {
   'Only you see this in the editor. Visitors do not see an empty section.':
     'أنت وحدك ترى هذا في المحرر. لا يرى الزوار قسماً فارغاً.',
 
+  // Testimonial attribution when the review has no customer name (API sends null). Neutral noun.
+  Customer: 'عميل',
+
   // Accessible name of a whole-slide hero link with no headline or alt (HeroBanner, HeroCollage).
   'View more': 'عرض المزيد',
 

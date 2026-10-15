@@ -225,6 +225,12 @@ export interface HeroSettings extends SectionBgOverride, SectionPaddingMaxWidthV
    * preserves the existing full-bleed default for back-compat.
    */
   presentation?: 'full-bleed' | 'framed' | 'collage';
+  /**
+   * Ruling B1-41: `'line'` draws a hairline in the line colour inside a FRAMED hero, drawn in once,
+   * and the photo fills the frame (cover + focus). Absent / `'none'` = framed as before
+   * (whole image, letterboxed). Ignored unless `presentation === 'framed'`.
+   */
+  frame?: 'none' | 'line';
   /** Per-section typography overrides — wins over global typography zones. */
   typography?: SectionTypographyOverride;
   /** Per-section divider overrides — see SectionDividers. Default undefined (off). */

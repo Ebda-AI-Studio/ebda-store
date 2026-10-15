@@ -68,6 +68,7 @@ export interface LookChrome {
  */
 export const LOOK_DESIGN_KEYS = [
   'presentation',
+  'frame',
   'layout',
   'layoutMobile',
   'captionPosition',

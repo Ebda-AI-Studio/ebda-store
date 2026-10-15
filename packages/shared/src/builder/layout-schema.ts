@@ -184,6 +184,9 @@ const layoutSchemaInternal = z
       // the zod silent-strip trap (layout-schema-parity.test.ts). Keep in sync with HeroSettings.
       // 'collage' (Phase B1, Ruling B1-2): three overlapping photos + one headline, any skin.
       presentation: z.enum(['full-bleed', 'framed', 'collage']).optional(),
+      // Ruling B1-41: an opt-in hairline drawn inside a FRAMED hero (Vitrine's mix sets 'line');
+      // with it the photo fills the frame. Absent / 'none' = the framed hero as before.
+      frame: z.enum(['none', 'line']).optional(),
       // 2026-05-18 Sprint 3: per-section bg color. Must be listed or Zod
       // silently strips it on every PUT — same trap class as imageMobile.
       bgColor: colorValue,

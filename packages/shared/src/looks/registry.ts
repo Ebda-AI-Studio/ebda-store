@@ -128,7 +128,7 @@ export const LOOKS: readonly LookDefinition[] = [
     // bands, the window of new pieces, one customer line. No hero `mode` (plan amendment C6): the
     // merchant's slider/single choice is content and survives a look switch.
     sections: [
-      { type: 'hero', design: { presentation: 'framed' } },
+      { type: 'hero', design: { presentation: 'framed', frame: 'line' } },
       {
         type: 'collection-list',
         design: { tileShape: 'band' },

@@ -1542,6 +1542,9 @@
           "fitFitHint": "The whole image is shown inside the banner without cropping (it may have side bars). Best when your image is smaller or a different shape than recommended.",
           "fitCollage": "Collage (3 photos)",
           "fitCollageHint": "Three slide photos overlap with one headline and button beside them. Needs at least 3 slides with images; with fewer it shows as a full banner.",
+          "frameLabel": "Frame line",
+          "frameNone": "None",
+          "frameLine": "Hairline",
           "autoplay": "Autoplay interval (ms)",
           "slides": {
             "title": "Slides",

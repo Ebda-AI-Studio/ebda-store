@@ -3,6 +3,13 @@
 import { SectionHeading } from './SectionHeading';
 import { getPackStyles } from './pack-styles';
 import type { TestimonialItem, TestimonialRowProps } from '../types';
+import { translations } from '../../contexts/LanguageContext';
+
+/** The review's author, or the localized "Customer" when the API has no name (null). */
+export function authorLabel(name: string | null | undefined, isRtl?: boolean): string {
+  const n = (name ?? '').trim();
+  return n || (isRtl ? translations.Customer : 'Customer');
+}
 
 /** The quote shown by `layout: 'single'`: the first one short enough to set large, else the first. */
 export function pickSingleTestimonial(list: TestimonialItem[]): TestimonialItem | undefined {
@@ -43,7 +50,7 @@ export function SingleTestimonial({
         {arabicText ? '»' : '”'}
       </blockquote>
       <figcaption dir="auto" className="mt-5 text-sm text-muted-foreground">
-        {quote.authorName}
+        {authorLabel(quote.authorName, isRtl)}
         {quote.authorCity ? `${isRtl ? '، ' : ', '}${quote.authorCity}` : ''}
       </figcaption>
     </figure>
@@ -103,7 +110,7 @@ export function TestimonialRow({
                 {t.comment}
               </p>
               <footer className="mt-7 border-t border-foreground/10 pt-5">
-                <p className={styles.testimonialAuthor}>{t.authorName}</p>
+                <p className={styles.testimonialAuthor}>{authorLabel(t.authorName, isRtl)}</p>
                 {t.authorCity && (
                   <p className="text-sm text-muted-foreground mt-1.5">{t.authorCity}</p>
                 )}

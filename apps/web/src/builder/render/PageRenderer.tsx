@@ -74,7 +74,7 @@ interface HomepageTestimonial {
   rating: number;
   title: string | null;
   comment: string;
-  authorName: string;
+  authorName: string | null;
   authorCity: string | null;
   createdAt: string;
 }
@@ -353,9 +353,9 @@ export function PageRenderer({
     layout.hero.enabled &&
     layout.hero.presentation === 'collage' &&
     heroSlidesWithImage(layout.hero.slides).length >= 3;
-  // A framed hero draws its hairline on a store with a REGISTERED look only (Ruling B1-41): a
-  // legacy store, or a stored look id that is no longer registered, renders as before.
-  const heroFrameLine = !!getLook(store.look);
+  // Opt-in hero design key (Ruling B1-41): only a hero set to `frame: 'line'` (Vitrine's mix, or a
+  // merchant's pick) draws the hairline and fills its frame; every other framed hero is unchanged.
+  const heroFrameLine = layout.hero.frame === 'line';
   const bannerPresentation =
     layout.hero.presentation === 'collage' ? 'full-bleed' : layout.hero.presentation;
   const sliderEligible =

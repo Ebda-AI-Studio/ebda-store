@@ -374,6 +374,35 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
       await awaitDeferredWork(5000);
     });
 
+    it('Atelier -> the REAL Vitrine mix: bands, one quote and the frame line pass saveDraft under ebda_app', async () => {
+      const injected = lookMix['qamar.vitrine'];
+      delete lookMix['qamar.vitrine'];
+      try {
+        const v = await seedMerchant('vitrine-real');
+        await ok(v, LOOK_ID);
+        await ok(v, 'qamar.atelier');
+        await ok(v, 'qamar.vitrine');
+        const draft = (await docOf(v.storeId, 'draft')).document;
+        expect(draft.appliedLook).toBe('qamar.vitrine');
+        expect(sec(draft, 'hero')).toMatchObject({ presentation: 'framed', frame: 'line' });
+        expect(sec(draft, 'collection-list')).toMatchObject({
+          tileShape: 'band',
+          headingAr: 'تسوّق حسب المناسبة',
+        });
+        expect(sec(draft, 'testimonials').layout).toBe('single');
+        // content seeded by Atelier is kept (B1-3): only design keys follow Vitrine
+        expect(sec(draft, 'featured-collection')).toMatchObject({
+          headingAr: 'وصل حديثًا',
+          columns: 4,
+          mobileColumns: 2,
+        });
+        expect((await row(v.storeId)).look).toBe('qamar.vitrine');
+        await awaitDeferredWork(5000);
+      } finally {
+        lookMix['qamar.vitrine'] = injected;
+      }
+    });
+
     it('keep: a hand-set hero presentation survives the switch', async () => {
       const b = await seedMerchant('mixb');
       await ok(b, LOOK_ID);

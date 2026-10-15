@@ -628,6 +628,26 @@ export default function StoreLayoutPage() {
                       ? t('sections.hero.fitFillHint')
                       : t('sections.hero.fitFitHint')}
                 </p>
+                {/* Ruling B1-41: the opt-in hairline frame, offered only for a framed hero. */}
+                {layout.hero.presentation === 'framed' && (
+                  <>
+                    <div className="mb-2 text-xs font-medium text-muted-foreground">
+                      {t('sections.hero.frameLabel')}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      <ModeButton
+                        active={(layout.hero.frame ?? 'none') === 'none'}
+                        onClick={() => updateSection('hero', s => ({ ...s, frame: 'none' }))}
+                        label={t('sections.hero.frameNone')}
+                      />
+                      <ModeButton
+                        active={layout.hero.frame === 'line'}
+                        onClick={() => updateSection('hero', s => ({ ...s, frame: 'line' }))}
+                        label={t('sections.hero.frameLine')}
+                      />
+                    </div>
+                  </>
+                )}
                 {/* Autoplay only matters in slider mode — hide it entirely
                     when the merchant has picked the static single banner so
                     the form doesn't expose an irrelevant control. */}

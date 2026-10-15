@@ -16,6 +16,8 @@ import {
   getLook,
   getSectionDefinition,
   getTemplateTheme,
+  LOOKS,
+  LOOK_DESIGN_KEYS,
 } from '@ebda/shared';
 import { CATEGORIES, STORES, TESTIMONIALS } from '../fixtures/builder/homepage-data';
 
@@ -68,6 +70,19 @@ const { TestimonialRow, pickSingleTestimonial } =
   await import('../../apps/web/src/templates/shared/TestimonialRow');
 const { DahabTestimonialRow } = await import('../../apps/web/src/templates/dahab/TestimonialRow');
 const { HeroBanner } = await import('../../apps/web/src/templates/shared/HeroBanner');
+const { testimonialAuthorName } = await import('../../apps/api/src/lib/testimonial-author');
+
+/** The object in a nested messages tree that holds `key`. */
+const findKey = (o: any, key: string): any => {
+  if (o && typeof o === 'object') {
+    if (key in o) return o;
+    for (const v of Object.values(o)) {
+      const r = findKey(v, key);
+      if (r) return r;
+    }
+  }
+  return undefined;
+};
 
 const setStore = (template: 'minimal' | 'dahab' | 'qamar', language: 'ar' | 'en' = 'ar') => {
   ctx.language = language;
@@ -158,6 +173,16 @@ describe('occasion bands', () => {
       expect(html).not.toContain('قطعة');
     });
 
+  it('each band link shows keyboard focus in its own text colour, inset (R-11)', () => {
+    setStore('qamar');
+    const links = [...bands().matchAll(/<a [^>]*class="([^"]*)"/g)].map(m => m[1]);
+    expect(links).toHaveLength(3);
+    for (const c of links)
+      expect(c).toContain(
+        'focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-current'
+      );
+  });
+
   it('a block with no tone cycles primary, accent, line', () => {
     setStore('qamar');
     const html = bands(blocks.map(b => ({ ...b, settings: { ...b.settings, tone: undefined } })));
@@ -227,6 +252,39 @@ describe('single customer line', () => {
     expect(ar).toContain('“Fresh and fast.”');
   });
 
+  it('a review with no name reads the localized "Customer" in every layout (R-05)', () => {
+    const anon = [{ ...TESTIMONIALS[0], authorName: null }];
+    for (const isRtl of [true, false]) {
+      const label = isRtl ? 'عميل' : 'Customer';
+      const single = renderToStaticMarkup(
+        <TestimonialRow testimonials={anon as any} isRtl={isRtl} layout="single" />
+      );
+      expect(single).toContain(`>${label}</figcaption>`);
+      const row = renderToStaticMarkup(<TestimonialRow testimonials={anon as any} isRtl={isRtl} />);
+      expect(row).toContain(`>${label}</p>`);
+      setStore('dahab', isRtl ? 'ar' : 'en');
+      const dahab = renderToStaticMarkup(
+        <DahabTestimonialRow testimonials={anon as any} isRtl={isRtl} />
+      );
+      expect(dahab).toContain(label);
+      expect(single + row + dahab).not.toMatch(isRtl ? />Customer</ : />عميل</);
+    }
+  });
+
+  it('the API sends null, never a Latin literal or a bare dot, for a missing name', () => {
+    expect(testimonialAuthorName(null)).toBeNull();
+    expect(testimonialAuthorName({ firstName: '', lastName: '' })).toBeNull();
+    expect(testimonialAuthorName({ firstName: '  ', lastName: 'Sami' })).toBeNull();
+    expect(testimonialAuthorName({ firstName: 'نهى', lastName: 'سامي' })).toBe('نهى س.');
+    expect(testimonialAuthorName({ firstName: 'Mona', lastName: null })).toBe('Mona');
+    const route = readFileSync(
+      path.resolve(__dirname, '../../apps/api/src/routes/public-store-layout.routes.ts'),
+      'utf8'
+    );
+    expect(route).toContain('authorName: testimonialAuthorName(r.customer)');
+    expect(route).not.toMatch(/:\s*'Customer'/);
+  });
+
   it('picks the first quote short enough to set large', () => {
     const long = { ...TESTIMONIALS[0], id: 'long', comment: 'x'.repeat(400) };
     expect(pickSingleTestimonial([long, TESTIMONIALS[1]] as any)?.id).toBe('t2');
@@ -268,7 +326,7 @@ describe('framed hero hairline (Rulings B1-5, B1-7, B1-41)', () => {
       <HeroBanner image="a.webp" headline="Night" isRtl pack="qamar" presentation="framed" {...p} />
     );
 
-  it('a look store gets the drawn hairline in the line colour, decorative', () => {
+  it("frame: 'line' draws the hairline in the line colour, decorative", () => {
     const html = hero({ frameLine: true });
     expect(html).toContain('data-frame-draw=""');
     expect(html).toMatch(
@@ -281,7 +339,7 @@ describe('framed hero hairline (Rulings B1-5, B1-7, B1-41)', () => {
     expect(html).not.toContain('object-contain');
   });
 
-  it('a legacy framed hero (no look) and a full-bleed hero render as before', () => {
+  it('a framed hero without the frame line, and a full-bleed hero, render as before', () => {
     for (const html of [hero({}), hero({ frameLine: false })]) {
       expect(html).not.toContain('data-frame-draw');
       expect(html).not.toContain('frame-line');
@@ -291,13 +349,46 @@ describe('framed hero hairline (Rulings B1-5, B1-7, B1-41)', () => {
     expect(hero({ presentation: 'full-bleed', frameLine: true })).not.toContain('frame-line');
   });
 
-  it('the renderer turns it on for registered-look stores only', () => {
+  it("the renderer turns it on from the hero's own opt-in key, never from the look (B1-41)", () => {
     const src = readFileSync(
       path.resolve(__dirname, '../../apps/web/src/builder/render/PageRenderer.tsx'),
       'utf8'
     );
-    expect(src).toContain('const heroFrameLine = !!getLook(store.look);');
+    expect(src).toContain("const heroFrameLine = layout.hero.frame === 'line';");
     expect(src.match(/frameLine=\{heroFrameLine\}/g)?.length).toBe(2);
+  });
+
+  it('schema, both editors and the look carry the opt-in key', () => {
+    const h = storeLayoutSchema.shape.hero;
+    const base = { enabled: true, mode: 'single', autoplayMs: 5000, slides: [] };
+    expect(h.safeParse({ ...base, presentation: 'framed', frame: 'line' }).success).toBe(true);
+    expect(h.safeParse({ ...base, frame: 'gold' }).success).toBe(false);
+    const sel = getSectionDefinition('hero')!.settings.find(x => x.id === 'frame') as {
+      options: { value: unknown }[];
+      labelAr: string;
+    };
+    expect(sel.options.map(o => o.value)).toEqual(['none', 'line']);
+    expect(sel.labelAr).toContain('خط الإطار');
+    expect(LOOK_DESIGN_KEYS).toContain('frame');
+    const classic = readFileSync(
+      path.resolve(__dirname, '../../apps/admin/src/app/stores/[id]/page-builder/page.tsx'),
+      'utf8'
+    );
+    expect(classic).toContain("updateSection('hero', s => ({ ...s, frame: 'line' }))");
+    for (const lang of ['en', 'ar']) {
+      const m = JSON.parse(
+        readFileSync(
+          path.resolve(__dirname, `../../apps/admin/src/i18n/messages/${lang}.json`),
+          'utf8'
+        )
+      );
+      const hero = m.layout?.sections?.hero ?? findKey(m, 'frameLabel');
+      expect(hero.frameLabel && hero.frameNone && hero.frameLine, lang).toBeTruthy();
+    }
+    // only Vitrine's mix sets it
+    for (const l of LOOKS)
+      for (const sec of l.sections ?? [])
+        if ((sec.design ?? {}).frame !== undefined) expect(l.id).toBe('qamar.vitrine');
   });
 
   it('the draw is 600ms ease-out-quint, from the centre, motion-safe only', () => {
@@ -321,7 +412,7 @@ describe('vitrine look data', () => {
     expect(v.tokens.line).toBe('#D8B96A');
     expect(v.chrome?.header.logoPlacement).toBe('centre');
     expect(v.sections!.map(s => s.type).slice(0, 2)).toEqual(['hero', 'collection-list']);
-    expect(v.sections![0].design).toMatchObject({ presentation: 'framed' });
+    expect(v.sections![0].design).toEqual({ presentation: 'framed', frame: 'line' });
     expect(v.sections![0].design).not.toHaveProperty('mode'); // C6: hero mode is content
     expect(v.sections![1].design).toMatchObject({ tileShape: 'band' });
     expect(v.sections!.find(s => s.type === 'testimonials')!.design).toEqual({ layout: 'single' });

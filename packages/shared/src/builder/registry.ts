@@ -250,6 +250,10 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         opt('framed', 'Framed', 'داخل إطار'),
         opt('collage', 'Collage (3 photos)', 'كولاج (3 صور)'),
       ]),
+      s.select('frame', 'Frame line (framed only)', 'خط الإطار (داخل إطار فقط)', [
+        opt('none', 'None', 'بدون'),
+        opt('line', 'Hairline', 'خط رفيع'),
+      ]),
       ...styleSettings(),
     ],
   }),

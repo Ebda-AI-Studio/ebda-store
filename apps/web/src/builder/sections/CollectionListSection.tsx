@@ -104,6 +104,7 @@ export function CollectionListSection({
         ? (raw as BandTone)
         : TONE_CYCLE[i % TONE_CYCLE.length];
     };
+    const tones = tiles.map((tile, i) => toneOf(tile.id, i));
     return (
       <section
         data-section="collection-list"
@@ -124,14 +125,12 @@ export function CollectionListSection({
         )}
         <ul>
           {tiles.map((tile, i) => (
-            <li
-              key={tile.id}
-              data-tone={toneOf(tile.id, i)}
-              className={BAND_TONES[toneOf(tile.id, i)]}
-            >
+            <li key={tile.id} data-tone={tones[i]} className={BAND_TONES[tones[i]]}>
+              {/* Focus ring in the band's own text colour (its on-token, >= 4.5:1 on the fill by
+                  K-02), inset so it never sits on the neighbouring band (R-11). */}
               <Link
                 href={tile.href}
-                className="mx-auto grid max-w-7xl grid-cols-[1fr_auto] items-center gap-4 px-4 py-5 transition-opacity duration-150 active:opacity-80 sm:px-6 lg:px-8"
+                className="mx-auto grid max-w-7xl grid-cols-[1fr_auto] items-center gap-4 px-4 py-5 transition-opacity duration-150 active:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-current sm:px-6 lg:px-8"
               >
                 <span className="font-display text-3xl [text-wrap:balance] sm:text-4xl">
                   {tile.label}

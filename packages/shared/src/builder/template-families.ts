@@ -277,5 +277,34 @@ export function applyTemplateFamily(
       pool.splice(pool.indexOf(n), 1);
     }
   }
+  // Ruling B1-45 (C8, TPL-1): on a look SWITCH with `keep`, a section the incoming mix does not use
+  // stays on the draft (after the mix, in its order) when the merchant edited it; an untouched
+  // section the outgoing look added leaves the draft (it stays in revision history).
+  if (opts.design === 'keep' && opts.from) {
+    const kept = pool.filter(
+      n => getSectionDefinition(n.type)?.group === 'template' && editedSinceLook(n, opts)
+    );
+    if (kept.length) doc = { ...doc, sections: [...doc.sections, ...kept] };
+  }
   return doc;
+}
+
+/**
+ * Whether a section holds anything beyond what the outgoing look (or the skin baseline) gave it:
+ * a changed setting, or blocks other than its preset's.
+ */
+function editedSinceLook(n: SectionNode, opts: ApplyLookOptions): boolean {
+  const spec = opts.from?.sections?.find(o => o.type === n.type);
+  const design = spec?.design ?? {};
+  const preset = sectionFromPreset(n.type, 0, n.id);
+  const seeds = [
+    { ...preset.settings, ...(spec?.preset ?? {}), ...design },
+    { ...sectionDefaults(n.type, opts.fromSkin ?? opts.toSkin), ...design },
+  ];
+  const untouched = (seed: Record<string, unknown>) =>
+    [...new Set([...Object.keys(seed), ...Object.keys(n.settings)])].every(k =>
+      sameValue(n.settings[k], seed[k])
+    );
+  if (!seeds.some(untouched)) return true;
+  return !sameValue(n.blocks ?? [], preset.blocks ?? []);
 }
