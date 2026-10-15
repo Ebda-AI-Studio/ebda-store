@@ -108,14 +108,9 @@ export class MerchantSignupService {
       : null;
 
     if (existing && existing.role === 'store_admin' && !existing.emailVerified) {
-      // Signed up before but never verified (lost mail): treat as a resend. They just
-      // accepted the current policies again; record it (a no-op when already recorded).
-      await withUser(existing.id, tx =>
-        tx.legalAcceptance.createMany({
-          data: signupAcceptanceRows(existing.id, request),
-          skipDuplicates: true,
-        })
-      );
+      // Signed up before but never verified (lost mail): treat as a resend. Records NO
+      // acceptance: nothing here proves the submitter owns the account (the password is
+      // never checked), so the owner's original signup rows stand untouched.
       return this.resendVerification(existing.email);
     }
 

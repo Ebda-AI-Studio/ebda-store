@@ -98,7 +98,7 @@ describe('signup click-wrap', () => {
     }
   });
 
-  it('records the acceptance on the unverified-resend path too, as the existing user', async () => {
+  it('writes NO acceptance on the unverified-resend path (ownership is unproven)', async () => {
     state.existing = {
       id: 'u-existing',
       email: 'a@b.co',
@@ -112,14 +112,21 @@ describe('signup click-wrap', () => {
       merchantSignupSchema.parse({ ...base, acceptedLegal: true }),
       { ip: '203.0.113.9', userAgent: 'UA/2' }
     );
-    const create = txLog.find(l => l.op === 'legalAcceptance.createMany')!;
-    expect(create).toBeTruthy();
-    expect(create.args.skipDuplicates).toBe(true);
-    const rows = create.args.data as Array<Record<string, unknown>>;
-    expect(rows).toHaveLength(LEGAL_DOC_KEYS.length);
-    expect(rows.every(r => r.userId === 'u-existing' && r.source === 'signup')).toBe(true);
-    // The resend path never runs the new-account profile write.
+    // Neither the new-account profile write nor ANY legal_acceptances operation ran, so the
+    // owner's original rows are untouched.
+    expect(txLog.filter(l => l.op.startsWith('legalAcceptance'))).toEqual([]);
     expect(txLog.some(l => l.op === 'user.update')).toBe(false);
+  });
+
+  it('never splits a surrogate pair when truncating the user-agent', () => {
+    const ua = 'x'.repeat(LEGAL_UA_MAX - 1) + '\u{1F600}tail';
+    const [row] = signupAcceptanceRows('u1', { userAgent: ua });
+    const stored = row.userAgent as string;
+    expect(Array.from(stored)).toHaveLength(LEGAL_UA_MAX);
+    expect(stored.endsWith('\u{1F600}')).toBe(true);
+    expect(stored).not.toMatch(
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
+    );
   });
 
   it('the shared row builder truncates a long user-agent and nulls absent ip/UA', () => {

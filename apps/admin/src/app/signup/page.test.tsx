@@ -16,7 +16,8 @@ vi.mock('../../lib/api', () => ({ apiPost, apiGet }));
 vi.mock('../../lib/auth', () => ({
   useAuth: () => ({ isAuthenticated: false, isLoading: false }),
 }));
-vi.mock('next-intl', () => ({ useLocale: () => 'en' }));
+const localeRef = vi.hoisted(() => ({ value: 'en' }));
+vi.mock('next-intl', () => ({ useLocale: () => localeRef.value }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }));
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
@@ -39,6 +40,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  localeRef.value = 'en';
   cleanup();
   vi.clearAllMocks();
 });
@@ -60,13 +62,17 @@ const submit = (opts: { agree?: boolean } = {}) => {
   fireEvent.click(screen.getByRole('button', { name: 'onboarding.signup.submit' }));
 };
 
+const LEGAL_PATHS =
+  /^https:\/\/ebda\.app(\/en)?\/(terms|privacy|merchant-agreement|acceptable-use|legal)\/$/;
+
 describe('signup page', () => {
-  it('blocks submit until the policies are accepted, and links each policy on ebda.app', async () => {
+  it('blocks submit until the policies are accepted, focuses the checkbox, and links all five documents', async () => {
     render(<SignupPage />);
     fill({ name: 'Mona', email: 'mona@x.com', phone: '01012345678', password: 'Str0ng!Passw0rd' });
     submit({ agree: false });
     expect(await screen.findByText('onboarding.signup.errors.legalRequired')).toBeTruthy();
     expect(apiPost).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(screen.getByRole('checkbox'));
     const hrefs = screen.getAllByRole('link').map(a => a.getAttribute('href'));
     expect(hrefs).toEqual(
       expect.arrayContaining([
@@ -74,8 +80,33 @@ describe('signup page', () => {
         'https://ebda.app/en/privacy/',
         'https://ebda.app/en/merchant-agreement/',
         'https://ebda.app/en/acceptable-use/',
+        'https://ebda.app/en/legal/',
       ])
     );
+    expect(screen.getByText('Terms of service')).toBeTruthy();
+    expect(screen.getByText('Legal notice')).toBeTruthy();
+  });
+
+  it('links the Arabic documents with their Arabic titles in the ar locale', () => {
+    localeRef.value = 'ar';
+    render(<SignupPage />);
+    const links = screen
+      .getAllByRole('link')
+      .filter(a => LEGAL_PATHS.test(a.getAttribute('href') ?? ''));
+    expect(links.map(a => a.getAttribute('href'))).toEqual([
+      'https://ebda.app/terms/',
+      'https://ebda.app/privacy/',
+      'https://ebda.app/merchant-agreement/',
+      'https://ebda.app/acceptable-use/',
+      'https://ebda.app/legal/',
+    ]);
+    expect(links.map(a => a.textContent)).toEqual([
+      'شروط الخدمة',
+      'سياسة الخصوصية',
+      'اتفاقية التاجر',
+      'سياسة الاستخدام المقبول',
+      'الإشعار القانوني',
+    ]);
   });
 
   it('blocks an empty mobile number before submitting', async () => {

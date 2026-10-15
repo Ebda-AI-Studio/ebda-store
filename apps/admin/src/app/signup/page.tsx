@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -11,9 +11,18 @@ import { getEbdaTracker } from '../../lib/ebda-tracker';
 import { useAuth } from '../../lib/auth';
 import { validateSignup, type SignupFields } from '../../lib/onboarding-validation';
 import { useT } from '@/i18n/useT';
-import { legalPolicyUrl } from '@ebda/shared';
+import { LEGAL_DOC_TITLE, legalPolicyUrl, type LegalDocKey } from '@ebda/shared';
 import { STATIC_PLANS } from '../../components/billing/plans';
 import { isTrialPlanCode, storePlan, type PlanSelection } from '../../components/billing/types';
+
+/** Every document the API records at signup is shown and linked here (LEGAL_DOC_KEYS, reading order). */
+const SIGNUP_LEGAL_DOCS: readonly LegalDocKey[] = [
+  'terms',
+  'privacy',
+  'merchant',
+  'acceptableUse',
+  'legal',
+];
 
 export default function SignupPage() {
   const t = useT('onboarding.signup');
@@ -42,6 +51,7 @@ export default function SignupPage() {
   // Click-wrap (Ruling LEGAL-4): required; the API refuses a signup without it too.
   const [agreed, setAgreed] = useState(false);
   const [legalError, setLegalError] = useState(false);
+  const legalRef = useRef<HTMLInputElement>(null);
 
   // The plan picked on the marketing site arrives as ?plan=<id>&interval=month|year.
   // Validate it, keep it for the onboarding plan step, and show it back.
@@ -86,6 +96,7 @@ export default function SignupPage() {
     const found = validateSignup(fields);
     setErrors(found);
     setLegalError(!agreed);
+    if (!agreed && Object.keys(found).length === 0) legalRef.current?.focus();
     if (Object.keys(found).length > 0 || !agreed) return;
 
     setSubmitting(true);
@@ -281,6 +292,7 @@ export default function SignupPage() {
           <label htmlFor="signup-legal" className="flex items-start gap-2 text-sm text-foreground">
             <input
               id="signup-legal"
+              ref={legalRef}
               name="acceptedLegal"
               type="checkbox"
               required
@@ -295,41 +307,19 @@ export default function SignupPage() {
             />
             <span>
               {t('legal.prefix')}
-              <a
-                href={legalPolicyUrl('terms', locale)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary-ink underline"
-              >
-                {t('legal.terms')}
-              </a>
-              {t('legal.sep')}
-              <a
-                href={legalPolicyUrl('privacy', locale)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary-ink underline"
-              >
-                {t('legal.privacy')}
-              </a>
-              {t('legal.sep')}
-              <a
-                href={legalPolicyUrl('merchant', locale)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary-ink underline"
-              >
-                {t('legal.merchant')}
-              </a>
-              {t('legal.lastSep')}
-              <a
-                href={legalPolicyUrl('acceptableUse', locale)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary-ink underline"
-              >
-                {t('legal.acceptableUse')}
-              </a>
+              {SIGNUP_LEGAL_DOCS.map((key, i) => (
+                <Fragment key={key}>
+                  {i > 0 && t(i === SIGNUP_LEGAL_DOCS.length - 1 ? 'legal.lastSep' : 'legal.sep')}
+                  <a
+                    href={legalPolicyUrl(key, locale)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary-ink underline"
+                  >
+                    {LEGAL_DOC_TITLE[key][locale]}
+                  </a>
+                </Fragment>
+              ))}
             </span>
           </label>
           {legalError && (

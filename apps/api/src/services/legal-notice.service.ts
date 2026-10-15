@@ -20,6 +20,12 @@ import {
 /** Longest user-agent stored on an acceptance row. */
 export const LEGAL_UA_MAX = 512;
 
+/** Cut at a code-point boundary so a surrogate pair is never split. */
+function truncateByCodePoints(value: string, max: number): string {
+  if (value.length <= max) return value;
+  return Array.from(value).slice(0, max).join('');
+}
+
 export type LegalAcceptanceSource = 'signup' | 'notice_ack';
 
 let activePolicies: LegalPolicies = LEGAL_POLICIES;
@@ -52,7 +58,7 @@ export function buildAcceptanceRow(
     version,
     acceptedAt: now,
     ip: request.ip ?? null,
-    userAgent: request.userAgent ? request.userAgent.slice(0, LEGAL_UA_MAX) : null,
+    userAgent: request.userAgent ? truncateByCodePoints(request.userAgent, LEGAL_UA_MAX) : null,
     source,
   };
 }
