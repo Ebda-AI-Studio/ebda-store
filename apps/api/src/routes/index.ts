@@ -76,6 +76,7 @@ import paymentLinksRoutes from './payment-links.routes';
 import financeRoutes from './finance.routes';
 import smartLayerRoutes from './smart-layer.routes';
 import insightsRoutes from './insights.routes';
+import searchInsightsRoutes from './search-insights.routes';
 import suppliersRoutes from './suppliers.routes';
 import purchaseOrdersRoutes from './purchase-orders.routes';
 import stockAdjustmentsRoutes from './stock-adjustments.routes';
@@ -481,6 +482,9 @@ router.use('/stores', tenantContext, smartLayerRoutes);
 // `generateInsightNarration` calls Gemini in-request — an external AI call
 // has no place inside a 30s RLS transaction.
 router.use('/stores', tenantContext, insightsRoutes);
+
+// Storefront search insights (search program Task 6): reads through getSearchInsights (k>=2 floor).
+router.use('/stores', tenantContext, searchInsightsRoutes);
 
 // Supplier CRUD (Batch 2 accounting).
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): service

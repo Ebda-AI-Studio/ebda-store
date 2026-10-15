@@ -15,6 +15,7 @@ import { LowStockAlertsCard } from './_components/LowStockAlertsCard';
 import { RecentOrdersCard } from './_components/RecentOrdersCard';
 import { RevenueChart } from './_components/RevenueChart';
 import { TopProductsTable } from './_components/TopProductsTable';
+import { ZeroResultSearchesCard } from './_components/ZeroResultSearchesCard';
 import type { ChartType, Period, ResolvedDateRange } from './_components/types';
 import { useAnalytics } from './_hooks/useAnalytics';
 
@@ -110,6 +111,8 @@ export default function AnalyticsPage() {
             <RecentOrdersCard orders={recentOrders} />
             <LowStockAlertsCard products={lowStockProducts} />
           </div>
+
+          <ZeroResultSearchesCard storeId={storeId} />
         </>
       )}
     </AdminLayout>

@@ -124,8 +124,9 @@ counts for one store; it is never linked to a user, session, IP, user agent or o
 time of day. Phone / email / national-id / order-number / id / link shaped terms are dropped before
 insert (`isPersonalDataTerm` in `apps/api/src/services/search-log.service.ts`), but free text can
 still contain a name or a place a shopper typed. There is no subject key, so a per-customer erasure
-or export cannot find such a row and none is attempted (Ruling SEARCH-T5-6); the merchant view lists
-only terms searched at least twice in the window, and every row ages out after 90 days. A store
+or export cannot find such a row and none is attempted (Ruling SEARCH-T5-6); the merchant view (admin
+`/stores/[id]/insights/searches` and the "searches with no results" card on Analytics, both
+through `getSearchInsights`) lists only terms searched at least twice in the window, and every row ages out after 90 days. A store
 deletion removes it (FK `ON DELETE CASCADE`, proven in `tests/integration/search-log.test.ts`).
 
 ## Export path

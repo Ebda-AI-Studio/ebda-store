@@ -65,6 +65,7 @@ export type HubLabels = {
   insightsFunnel: string;
   insightsSegments: string;
   insightsProducts: string;
+  insightsSearches: string;
   // Marketing tabs
   aiTools: string;
   aiUsage: string;
@@ -193,6 +194,7 @@ export const HUBS: HubDefinition[] = [
       { label: labels.insightsFunnel, href: `/stores/${storeId}/insights/funnel` },
       { label: labels.insightsSegments, href: `/stores/${storeId}/insights/segments` },
       { label: labels.insightsProducts, href: `/stores/${storeId}/insights/products` },
+      { label: labels.insightsSearches, href: `/stores/${storeId}/insights/searches` },
     ],
   },
   {
