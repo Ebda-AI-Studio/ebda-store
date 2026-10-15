@@ -71,27 +71,27 @@
 
 ## File structure
 
-| File | Responsibility |
-|---|---|
-| `packages/shared/src/legal/index.ts` (new) | Registry, types, validation, pending computation, URL/date helpers. Pure; imports only `../brand`. |
-| `packages/shared/src/__tests__/legal-policies.test.ts` (new) | Registry invariants + helpers. |
-| `apps/marketing/src/components/LegalPage.tsx`, `lib/legal-{types,en,ar}.ts` | Render date/version from the registry. |
-| `packages/database/prisma/schema.prisma`, `migrations/20261017000100_legal_acceptances_and_notices/` | Models, tables, RLS. |
-| `packages/database/src/tenant-guard.ts` (+ generated snapshot) | Classify the 3 models. |
-| `apps/api/src/services/legal-notice.service.ts` (new) | Signup rows, pending/ack, recipients, fan-out batches, send request, overview. |
-| `apps/api/src/routes/legal-policy.routes.ts` (new) | `meLegalNoticeRoutes` + `adminLegalPolicyRoutes`. |
-| `apps/api/src/services/email-templates/legal-notice.ts` (new), `platform-mailer.ts` | The email. |
-| `apps/api/src/lib/inngest/functions/legal-notice-send.ts` (new) | The fan-out function. |
-| `apps/admin/src/components/legal/LegalNoticeBanner.tsx` (new) | The banner. |
-| `apps/admin/src/app/policy-updates/page.tsx` (new) | Super-admin page. |
-| `apps/admin/src/app/signup/page.tsx` | Click-wrap. |
-| `docs/runbooks/legal-policy-change.md` (new), `docs/RULINGS.md`, `docs/merchant/faq.md`, `docs/runbooks/SUPER-ADMIN-PLAYBOOK.md`, `docs/ENVIRONMENT.md` | Docs. |
+| File                                                                                                                                                    | Responsibility                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `packages/shared/src/legal/index.ts` (new)                                                                                                              | Registry, types, validation, pending computation, URL/date helpers. Pure; imports only `../brand`. |
+| `packages/shared/src/__tests__/legal-policies.test.ts` (new)                                                                                            | Registry invariants + helpers.                                                                     |
+| `apps/marketing/src/components/LegalPage.tsx`, `lib/legal-{types,en,ar}.ts`                                                                             | Render date/version from the registry.                                                             |
+| `packages/database/prisma/schema.prisma`, `migrations/20261017000100_legal_acceptances_and_notices/`                                                    | Models, tables, RLS.                                                                               |
+| `packages/database/src/tenant-guard.ts` (+ generated snapshot)                                                                                          | Classify the 3 models.                                                                             |
+| `apps/api/src/services/legal-notice.service.ts` (new)                                                                                                   | Signup rows, pending/ack, recipients, fan-out batches, send request, overview.                     |
+| `apps/api/src/routes/legal-policy.routes.ts` (new)                                                                                                      | `meLegalNoticeRoutes` + `adminLegalPolicyRoutes`.                                                  |
+| `apps/api/src/services/email-templates/legal-notice.ts` (new), `platform-mailer.ts`                                                                     | The email.                                                                                         |
+| `apps/api/src/lib/inngest/functions/legal-notice-send.ts` (new)                                                                                         | The fan-out function.                                                                              |
+| `apps/admin/src/components/legal/LegalNoticeBanner.tsx` (new)                                                                                           | The banner.                                                                                        |
+| `apps/admin/src/app/policy-updates/page.tsx` (new)                                                                                                      | Super-admin page.                                                                                  |
+| `apps/admin/src/app/signup/page.tsx`                                                                                                                    | Click-wrap.                                                                                        |
+| `docs/runbooks/legal-policy-change.md` (new), `docs/RULINGS.md`, `docs/merchant/faq.md`, `docs/runbooks/SUPER-ADMIN-PLAYBOOK.md`, `docs/ENVIRONMENT.md` | Docs.                                                                                              |
 
 ### Test environment (used by every integration step)
 
 ```bash
 # A local Postgres 16 with the CI database name; migrate it and give ebda_app a login (CI does the same).
-export DATABASE_URL=postgresql://test:test@localhost:5432/force_test
+export DATABASE_URL=postgresql://test:${TEST_DB_PASSWORD}@localhost:5432/force_test
 export DIRECT_URL=$DATABASE_URL
 export NODE_ENV=test
 npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
@@ -103,6 +103,7 @@ psql "$DATABASE_URL" -c "ALTER ROLE ebda_app LOGIN PASSWORD 'ci-only-app-pw'"
 ### Task 1: Versioned legal policy registry in `@ebda/shared`
 
 **Files:**
+
 - Create: `packages/shared/src/legal/index.ts`
 - Create: `packages/shared/src/__tests__/legal-policies.test.ts`
 - Modify: `packages/shared/src/index.ts` (add the export next to `export * from './setup-guide';`, line 33)
@@ -110,6 +111,7 @@ psql "$DATABASE_URL" -c "ALTER ROLE ebda_app LOGIN PASSWORD 'ci-only-app-pw'"
 - Modify: `vitest.shared.ts` (`workspaceAliases`, add the `@ebda/shared/legal` alias)
 
 **Interfaces:**
+
 - Consumes: `BRAND.domains.marketing` from `packages/shared/src/brand`.
 - Produces (exact names, used by Tasks 2, 4, 5, 6, 7, 8):
   - `LEGAL_DOC_KEYS: readonly ['legal','privacy','terms','acceptableUse','merchant']`, `type LegalDocKey`
@@ -208,7 +210,13 @@ describe('validateLegalPolicies', () => {
   });
   it("refuses a fee change with less than 30 days' notice, accepts exactly 30", () => {
     const fee = (effectiveAt: string) =>
-      v({ version: '1.1', publishedAt: '2026-11-01', effectiveAt, material: true, feeChange: true });
+      v({
+        version: '1.1',
+        publishedAt: '2026-11-01',
+        effectiveAt,
+        material: true,
+        feeChange: true,
+      });
     expect(validateLegalPolicies(withTerms([v(), fee('2026-11-30')]))).toContain(
       "terms@1.1: a fee change needs 30 days' notice"
     );
@@ -218,7 +226,12 @@ describe('validateLegalPolicies', () => {
     const errors = validateLegalPolicies(
       withTerms([
         v(),
-        v({ version: '1.1', publishedAt: '2026-11-01', effectiveAt: '2026-12-01', feeChange: true }),
+        v({
+          version: '1.1',
+          publishedAt: '2026-11-01',
+          effectiveAt: '2026-12-01',
+          feeChange: true,
+        }),
       ])
     );
     expect(errors).toContain('terms@1.1: a fee change is always material');
@@ -289,9 +302,9 @@ describe('computePendingNotices', () => {
     expect(computePendingNotices(p, sent, sent)).toEqual([]);
   });
   it('a sent NON-material or NON-current version is never pending', () => {
-    expect(computePendingNotices(LEGAL_POLICIES, [{ docKey: 'privacy', version: '1.0' }], [])).toEqual(
-      []
-    );
+    expect(
+      computePendingNotices(LEGAL_POLICIES, [{ docKey: 'privacy', version: '1.0' }], [])
+    ).toEqual([]);
     expect(computePendingNotices(p, [{ docKey: 'terms', version: '1.0' }], [])).toEqual([]);
   });
 });
@@ -442,7 +455,8 @@ export function validateLegalPolicies(
       if (e.feeChange && eff < pub + LEGAL_FEE_NOTICE_DAYS * DAY_MS) {
         errors.push(`${at}: a fee change needs ${LEGAL_FEE_NOTICE_DAYS} days' notice`);
       }
-      if (!e.summary.ar.trim() || !e.summary.en.trim()) errors.push(`${at}: summary needs ar and en`);
+      if (!e.summary.ar.trim() || !e.summary.en.trim())
+        errors.push(`${at}: summary needs ar and en`);
       const prev = history[i - 1];
       if (prev) {
         if (compareLegalVersions(e.version, prev.version) <= 0) {
@@ -558,6 +572,7 @@ git commit -m "feat(legal): versioned legal policy registry in shared"
 ### Task 2: Marketing pages render date and version from the registry
 
 **Files:**
+
 - Modify: `apps/marketing/src/lib/legal-types.ts:7-10`
 - Modify: `apps/marketing/src/lib/legal-en.ts:6-14`
 - Modify: `apps/marketing/src/lib/legal-ar.ts:6-13`
@@ -566,6 +581,7 @@ git commit -m "feat(legal): versioned legal policy registry in shared"
 - Test: `tests/unit/marketing-site.test.tsx` (replace the two tests at lines 494-519 and add two)
 
 **Interfaces:**
+
 - Consumes: `LEGAL_POLICIES`, `currentLegalVersion`, `formatLegalDate`, `LEGAL_DOC_TITLE`, `LEGAL_DOC_SLUG`, `type LegalDocKey` (Task 1).
 - Produces: `LegalPages.updated` is now `{ label: string; versionLabel: string }`.
 
@@ -618,7 +634,7 @@ Replace the test `'llms.txt and og assets exist; legal pages show their version 
 Replace `expect(html).toContain('2026-10-07');` in `'every legal page (both locales) is versioned, names the contact, and has no placeholders'` with:
 
 ```ts
-        expect(html).toContain(currentLegalVersion(LEGAL_POLICIES, DOC_OF[page]).publishedAt);
+expect(html).toContain(currentLegalVersion(LEGAL_POLICIES, DOC_OF[page]).publishedAt);
 ```
 
 Add, inside the same `describe` block:
@@ -659,11 +675,14 @@ Expected: FAIL. The new date test finds `<time datetime="2026-10-07">` (the attr
 `apps/marketing/src/lib/legal-types.ts`, replace lines 7-8:
 
 ```ts
-  /**
-   * Labels of the "last updated" line. The date and the version themselves come from
-   * LEGAL_POLICIES in @ebda/shared/legal (Ruling LEGAL-4), never from this copy.
-   */
-  updated: { label: string; versionLabel: string };
+/**
+ * Labels of the "last updated" line. The date and the version themselves come from
+ * LEGAL_POLICIES in @ebda/shared/legal (Ruling LEGAL-4), never from this copy.
+ */
+updated: {
+  label: string;
+  versionLabel: string;
+}
 ```
 
 `apps/marketing/src/lib/legal-en.ts`, replace the header comment and lines 11-14:
@@ -749,6 +768,7 @@ git commit -m "feat(marketing): legal pages render date and version from the pol
 ### Task 3: Tables, RLS and tenant-guard classification
 
 **Files:**
+
 - Modify: `packages/database/prisma/schema.prisma` (User relations near line 98; new models after `model SystemSetting`, line ~2108)
 - Create: `packages/database/prisma/migrations/20261017000100_legal_acceptances_and_notices/migration.sql`
 - Create: `packages/database/prisma/migrations/20261017000100_legal_acceptances_and_notices/rollback.sql`
@@ -758,6 +778,7 @@ git commit -m "feat(marketing): legal pages render date and version from the pol
 - Test: `tests/integration/legal-tables-rls.test.ts` (new)
 
 **Interfaces:**
+
 - Produces Prisma models `LegalAcceptance`, `LegalNoticeSend`, `LegalNoticeDelivery` with compound unique keys `userId_docKey_version` and `docKey_version`; delivery `status` in `'queued' | 'sending' | 'sent' | 'failed'`; acceptance `source` in `'signup' | 'notice_ack'`.
 
 - [ ] **Step 1: Write the failing test**
@@ -1131,13 +1152,13 @@ const DOCUMENTED_NON_RLS: Record<string, string> = {
 ```
 
 ```ts
-  const USER_KEYED = [
-    'refresh_tokens',
-    'verification_tokens',
-    'onesignal_subscriptions',
-    'legal_acceptances',
-    'legal_notice_deliveries',
-  ];
+const USER_KEYED = [
+  'refresh_tokens',
+  'verification_tokens',
+  'onesignal_subscriptions',
+  'legal_acceptances',
+  'legal_notice_deliveries',
+];
 ```
 
 Then regenerate the client and the guard snapshot:
@@ -1150,6 +1171,7 @@ npm run gen:tenant-guard-schema -w packages/database
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run:
+
 ```bash
 npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
 npx vitest run tests/unit/tenant-guard-models.test.ts tests/unit/tenant-guard-schema-snapshot.test.ts
@@ -1157,6 +1179,7 @@ npx vitest run tests/integration/legal-tables-rls.test.ts tests/integration/rls-
 npm run gen:tenant-guard-schema -w packages/database -- --check
 psql "$DATABASE_URL" -c "SELECT constraint_name, delete_rule FROM information_schema.referential_constraints WHERE constraint_name LIKE 'legal_%'"
 ```
+
 Expected: the migration applies; all tests PASS (the guard-models test now has two more user-keyed cases); `--check` exits 0; psql shows `legal_acceptances_user_id_fkey | CASCADE` and `legal_notice_deliveries_user_id_fkey | CASCADE`, and no `NO ACTION`.
 
 - [ ] **Step 5: Commit**
@@ -1171,6 +1194,7 @@ git commit -m "feat(db): legal acceptance and notice tables under user-keyed rls
 ### Task 4: Signup click-wrap (API refuses without it, records acceptance)
 
 **Files:**
+
 - Create: `apps/api/src/services/legal-notice.service.ts` (first slice)
 - Modify: `apps/api/src/services/merchant-signup.service.ts` (schema + `signup()`)
 - Modify: `apps/admin/src/app/signup/page.tsx`
@@ -1179,6 +1203,7 @@ git commit -m "feat(db): legal acceptance and notice tables under user-keyed rls
 - Test: `tests/unit/merchant-signup-legal.test.ts` (new), `tests/integration/legal-signup-acceptance.test.ts` (new)
 
 **Interfaces:**
+
 - Consumes: `LEGAL_POLICIES`, `LEGAL_DOC_KEYS`, `currentLegalVersion`, `legalPolicyUrl`, `type LegalPolicies` (Task 1); Prisma `legalAcceptance` (Task 3).
 - Produces (in `legal-notice.service.ts`, used by Tasks 5, 7, 8):
   - `activeLegalPolicies(): LegalPolicies`
@@ -1489,38 +1514,38 @@ Add to `merchantSignupSchema`, after `tracking`:
 In `signup()`, the unverified-existing branch becomes:
 
 ```ts
-    if (existing && existing.role === 'store_admin' && !existing.emailVerified) {
-      // Signed up before but never verified (lost mail): treat as a resend. They just
-      // accepted the current policies again; record it (a no-op when already recorded).
-      await withUser(existing.id, tx =>
-        tx.legalAcceptance.createMany({
-          data: signupAcceptanceRows(existing.id, request),
-          skipDuplicates: true,
-        })
-      );
-      return this.resendVerification(existing.email);
-    }
+if (existing && existing.role === 'store_admin' && !existing.emailVerified) {
+  // Signed up before but never verified (lost mail): treat as a resend. They just
+  // accepted the current policies again; record it (a no-op when already recorded).
+  await withUser(existing.id, tx =>
+    tx.legalAcceptance.createMany({
+      data: signupAcceptanceRows(existing.id, request),
+      skipDuplicates: true,
+    })
+  );
+  return this.resendVerification(existing.email);
+}
 ```
 
 and the profile write becomes one transaction with the acceptance rows:
 
 ```ts
-    const acquisition = buildAcquisition(input.tracking, request);
-    // Profile + click-wrap acceptance in ONE transaction, as the new user (Ruling LEGAL-4).
-    await withUser(created.id, async tx => {
-      await tx.user.update({
-        where: { id: created.id },
-        data: {
-          phone,
-          language: language ?? 'ar',
-          ...(acquisition ? { acquisition: acquisition as unknown as Prisma.InputJsonValue } : {}),
-        },
-      });
-      await tx.legalAcceptance.createMany({
-        data: signupAcceptanceRows(created.id, request),
-        skipDuplicates: true,
-      });
-    });
+const acquisition = buildAcquisition(input.tracking, request);
+// Profile + click-wrap acceptance in ONE transaction, as the new user (Ruling LEGAL-4).
+await withUser(created.id, async tx => {
+  await tx.user.update({
+    where: { id: created.id },
+    data: {
+      phone,
+      language: language ?? 'ar',
+      ...(acquisition ? { acquisition: acquisition as unknown as Prisma.InputJsonValue } : {}),
+    },
+  });
+  await tx.legalAcceptance.createMany({
+    data: signupAcceptanceRows(created.id, request),
+    skipDuplicates: true,
+  });
+});
 ```
 
 `apps/admin/src/app/signup/page.tsx`:
@@ -1532,18 +1557,18 @@ import { legalPolicyUrl } from '@ebda/shared';
 State, next to `honeypot`:
 
 ```tsx
-  // Click-wrap (Ruling LEGAL-4): required; the API refuses a signup without it too.
-  const [agreed, setAgreed] = useState(false);
-  const [legalError, setLegalError] = useState(false);
+// Click-wrap (Ruling LEGAL-4): required; the API refuses a signup without it too.
+const [agreed, setAgreed] = useState(false);
+const [legalError, setLegalError] = useState(false);
 ```
 
 In `handleSubmit`, replace the validation lines:
 
 ```tsx
-    const found = validateSignup(fields);
-    setErrors(found);
-    setLegalError(!agreed);
-    if (Object.keys(found).length > 0 || !agreed) return;
+const found = validateSignup(fields);
+setErrors(found);
+setLegalError(!agreed);
+if (Object.keys(found).length > 0 || !agreed) return;
 ```
 
 and add `acceptedLegal: true,` to the `apiPost` body right after `company_site: honeypot,`.
@@ -1551,47 +1576,67 @@ and add `acceptedLegal: true,` to the `apiPost` body right after `company_site: 
 Insert above the submit `<Button>`:
 
 ```tsx
-        <div>
-          <label htmlFor="signup-legal" className="flex items-start gap-2 text-sm text-foreground">
-            <input
-              id="signup-legal"
-              name="acceptedLegal"
-              type="checkbox"
-              required
-              checked={agreed}
-              onChange={e => {
-                setAgreed(e.target.checked);
-                setLegalError(false);
-              }}
-              aria-invalid={legalError || undefined}
-              aria-describedby={legalError ? 'signup-legal-error' : undefined}
-              className="mt-0.5 h-4 w-4 shrink-0"
-            />
-            <span>
-              {t('legal.prefix')}
-              <a href={legalPolicyUrl('terms', locale)} target="_blank" rel="noopener noreferrer" className="text-primary-ink underline">
-                {t('legal.terms')}
-              </a>
-              {t('legal.sep')}
-              <a href={legalPolicyUrl('privacy', locale)} target="_blank" rel="noopener noreferrer" className="text-primary-ink underline">
-                {t('legal.privacy')}
-              </a>
-              {t('legal.sep')}
-              <a href={legalPolicyUrl('merchant', locale)} target="_blank" rel="noopener noreferrer" className="text-primary-ink underline">
-                {t('legal.merchant')}
-              </a>
-              {t('legal.lastSep')}
-              <a href={legalPolicyUrl('acceptableUse', locale)} target="_blank" rel="noopener noreferrer" className="text-primary-ink underline">
-                {t('legal.acceptableUse')}
-              </a>
-            </span>
-          </label>
-          {legalError && (
-            <p id="signup-legal-error" role="alert" className="mt-1 text-sm text-destructive-ink">
-              {tErr('legalRequired')}
-            </p>
-          )}
-        </div>
+<div>
+  <label htmlFor="signup-legal" className="flex items-start gap-2 text-sm text-foreground">
+    <input
+      id="signup-legal"
+      name="acceptedLegal"
+      type="checkbox"
+      required
+      checked={agreed}
+      onChange={e => {
+        setAgreed(e.target.checked);
+        setLegalError(false);
+      }}
+      aria-invalid={legalError || undefined}
+      aria-describedby={legalError ? 'signup-legal-error' : undefined}
+      className="mt-0.5 h-4 w-4 shrink-0"
+    />
+    <span>
+      {t('legal.prefix')}
+      <a
+        href={legalPolicyUrl('terms', locale)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary-ink underline"
+      >
+        {t('legal.terms')}
+      </a>
+      {t('legal.sep')}
+      <a
+        href={legalPolicyUrl('privacy', locale)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary-ink underline"
+      >
+        {t('legal.privacy')}
+      </a>
+      {t('legal.sep')}
+      <a
+        href={legalPolicyUrl('merchant', locale)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary-ink underline"
+      >
+        {t('legal.merchant')}
+      </a>
+      {t('legal.lastSep')}
+      <a
+        href={legalPolicyUrl('acceptableUse', locale)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary-ink underline"
+      >
+        {t('legal.acceptableUse')}
+      </a>
+    </span>
+  </label>
+  {legalError && (
+    <p id="signup-legal-error" role="alert" className="mt-1 text-sm text-destructive-ink">
+      {tErr('legalRequired')}
+    </p>
+  )}
+</div>
 ```
 
 i18n, `en.json` under `onboarding.signup`:
@@ -1629,6 +1674,7 @@ and under `onboarding.signup.errors`: `"legalRequired": "لازم توافق ع�
 (The Arabic renders exactly "أوافق على الشروط وسياسة الخصوصية واتفاقية التاجر وسياسة الاستخدام المقبول".)
 
 Callers that must send the new field. Add `acceptedLegal: true` to each request body:
+
 - `tests/integration/self-serve-onboarding.test.ts`, in `signup()`'s `.send({...})`, after `formToken`.
 - `tests/integration/self-serve-onboarding-live.test.ts:100`, in the `call('POST', '/auth/merchant/signup', {...})` body.
 - `tests/integration/store-creation-tenant-guard.test.ts:112`, in the `.send({...})` body.
@@ -1651,31 +1697,33 @@ const submit = (opts: { agree?: boolean } = {}) => {
 In `toHaveBeenCalledWith('/api/v1/auth/merchant/signup', {...})` add `acceptedLegal: true,` after `company_site: '',`.
 
 ```tsx
-  it('blocks submit until the policies are accepted, and links each policy on ebda.app', async () => {
-    render(<SignupPage />);
-    fill({ name: 'Mona', email: 'mona@x.com', phone: '01012345678', password: 'Str0ng!Passw0rd' });
-    submit({ agree: false });
-    expect(await screen.findByText('onboarding.signup.errors.legalRequired')).toBeTruthy();
-    expect(apiPost).not.toHaveBeenCalled();
-    const hrefs = screen.getAllByRole('link').map(a => a.getAttribute('href'));
-    expect(hrefs).toEqual(
-      expect.arrayContaining([
-        'https://ebda.app/en/terms/',
-        'https://ebda.app/en/privacy/',
-        'https://ebda.app/en/merchant-agreement/',
-        'https://ebda.app/en/acceptable-use/',
-      ])
-    );
-  });
+it('blocks submit until the policies are accepted, and links each policy on ebda.app', async () => {
+  render(<SignupPage />);
+  fill({ name: 'Mona', email: 'mona@x.com', phone: '01012345678', password: 'Str0ng!Passw0rd' });
+  submit({ agree: false });
+  expect(await screen.findByText('onboarding.signup.errors.legalRequired')).toBeTruthy();
+  expect(apiPost).not.toHaveBeenCalled();
+  const hrefs = screen.getAllByRole('link').map(a => a.getAttribute('href'));
+  expect(hrefs).toEqual(
+    expect.arrayContaining([
+      'https://ebda.app/en/terms/',
+      'https://ebda.app/en/privacy/',
+      'https://ebda.app/en/merchant-agreement/',
+      'https://ebda.app/en/acceptable-use/',
+    ])
+  );
+});
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run:
+
 ```bash
 npx vitest run tests/unit/merchant-signup-legal.test.ts tests/unit/ebda-ads-signup-persist.test.ts tests/unit/merchant-signup-phone.test.ts apps/admin/src/app/signup/page.test.tsx tests/unit/admin-i18n-key-parity.test.ts tests/unit/admin-i18n-no-hardcoded-strings.test.ts
 npx vitest run tests/integration/legal-signup-acceptance.test.ts tests/integration/self-serve-onboarding.test.ts tests/integration/merchant-signup-abuse.test.ts tests/integration/store-creation-tenant-guard.test.ts tests/integration/merchant-password-reset.test.ts --retry=1
 ```
+
 Expected: all PASS.
 
 - [ ] **Step 5: Commit**
@@ -1690,12 +1738,14 @@ git commit -m "feat(signup): required policy click-wrap recorded per document ve
 ### Task 5: Pending-notice API (`GET /me/legal-notices`, `POST /me/legal-notices/ack`)
 
 **Files:**
+
 - Modify: `apps/api/src/services/legal-notice.service.ts` (append)
 - Create: `apps/api/src/routes/legal-policy.routes.ts`
 - Modify: `apps/api/src/routes/index.ts` (import + mount after `router.use('/auth/mfa', mfaRoutes);`)
 - Test: `tests/integration/legal-notices.test.ts` (new)
 
 **Interfaces:**
+
 - Consumes: `computePendingNotices`, `LEGAL_DOC_KEYS`, `type PendingLegalNotice` (Task 1); `activeLegalPolicies`, `LEGAL_UA_MAX` (Task 4).
 - Produces:
   - `pendingNoticesFor(userId: string, role: string): Promise<PendingLegalNotice[]>`
@@ -1791,7 +1841,11 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
         .get('/api/v1/me/legal-notices')
         .set('Authorization', `Bearer ${token(userId, role)}`)
     );
-  const ack = (userId: string, items: unknown, role: 'store_admin' | 'super_admin' = 'store_admin') =>
+  const ack = (
+    userId: string,
+    items: unknown,
+    role: 'store_admin' | 'super_admin' = 'store_admin'
+  ) =>
     asApp(async () =>
       request(app)
         .post('/api/v1/me/legal-notices/ack')
@@ -1815,7 +1869,12 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
     operator = await mkUser('op', 'super_admin');
     for (const n of [1, 2]) {
       const s = await owner.store.create({
-        data: { name: `ln-${run}-${n}`, slug: `ln-${run}-${n}`, ownerId: merchant, status: 'active' },
+        data: {
+          name: `ln-${run}-${n}`,
+          slug: `ln-${run}-${n}`,
+          ownerId: merchant,
+          status: 'active',
+        },
       });
       storeIds.push(s.id);
     }
@@ -1869,9 +1928,15 @@ describe.skipIf(!hasDb)('pending legal notices', () => {
       expect(res.status, JSON.stringify(items)).toBe(422);
       expect(res.body.error.code).toBe('NOT_PENDING');
     }
-    expect(await owner.legalAcceptance.count({ where: { userId: merchant, docKey: 'terms', version: V } })).toBe(0);
+    expect(
+      await owner.legalAcceptance.count({
+        where: { userId: merchant, docKey: 'terms', version: V },
+      })
+    ).toBe(0);
     expect((await ack(merchant, [])).status).toBe(400);
-    expect((await ack(operator, [{ docKey: 'terms', version: V }], 'super_admin')).status).toBe(403);
+    expect((await ack(operator, [{ docKey: 'terms', version: V }], 'super_admin')).status).toBe(
+      403
+    );
   });
 
   it('one ack clears the notice for every store the merchant owns; a repeat ack is a no-op', async () => {
@@ -2077,12 +2142,14 @@ git commit -m "feat(api): pending legal notices and got-it acknowledgement"
 ### Task 6: Dashboard banner next to `BillingStatusBanner`
 
 **Files:**
+
 - Create: `apps/admin/src/components/legal/LegalNoticeBanner.tsx`
 - Create: `apps/admin/src/components/legal/LegalNoticeBanner.test.tsx`
 - Modify: `apps/admin/src/app/stores/[id]/layout.tsx` (import + mount after `BillingStatusBanner`)
 - Modify: `apps/admin/src/i18n/messages/en.json`, `ar.json` (new top-level `legalNotice`)
 
 **Interfaces:**
+
 - Consumes: `GET /api/v1/me/legal-notices` → `{ notices: PendingLegalNotice[] }`; `POST /api/v1/me/legal-notices/ack` (Task 5); `formatLegalDate`, `type PendingLegalNotice` (Task 1).
 - Produces: `LegalNoticeBanner({ storeId }: { storeId: string })`.
 
@@ -2289,11 +2356,11 @@ import { LegalNoticeBanner } from '../../../components/legal/LegalNoticeBanner';
 ```
 
 ```tsx
-    <AdminFeatureProvider storeId={storeId}>
-      {storeId && <BillingStatusBanner storeId={storeId} />}
-      {storeId && <LegalNoticeBanner storeId={storeId} />}
-      {children}
-    </AdminFeatureProvider>
+<AdminFeatureProvider storeId={storeId}>
+  {storeId && <BillingStatusBanner storeId={storeId} />}
+  {storeId && <LegalNoticeBanner storeId={storeId} />}
+  {children}
+</AdminFeatureProvider>
 ```
 
 `en.json` (top level, alphabetical neighbourhood is not enforced; place after `"looks"`):
@@ -2341,6 +2408,7 @@ git commit -m "feat(admin): non-blocking policy-change banner with got-it"
 ### Task 7: Email fan-out (template, mailer, idempotent Inngest function)
 
 **Files:**
+
 - Create: `apps/api/src/services/email-templates/legal-notice.ts`
 - Modify: `apps/api/src/services/platform-mailer.ts` (add `sendLegalNoticeEmail`)
 - Modify: `apps/api/src/services/legal-notice.service.ts` (append the fan-out)
@@ -2351,6 +2419,7 @@ git commit -m "feat(admin): non-blocking policy-change banner with got-it"
 - Test: `tests/unit/legal-notice-email.test.ts` (new), `tests/integration/legal-notice-fanout.test.ts` (new)
 
 **Interfaces:**
+
 - Consumes: `findLegalVersion`, `formatLegalDate`, `legalPolicyUrl`, `LEGAL_DOC_TITLE`, `isLegalDocKey` (Task 1); `activeLegalPolicies`/`activePolicies` (Task 4); `awaitCampaignSendSlot()` from `apps/api/src/lib/campaign-send-pacer.ts`; `asPlatformOperator`, `prisma` from `@ebda/database`.
 - Produces:
   - `legalNoticeTemplate` + `interface LegalNoticeEmailData { name; title; summary; effectiveOn; url }`
@@ -2403,7 +2472,13 @@ describe('sendLegalNoticeEmail', () => {
   });
   it('English', async () => {
     await sendLegalNoticeEmail(
-      { ...data, title: 'Terms of service', summary: 'Fee change.', effectiveOn: '20 November 2026', url: 'https://ebda.app/en/terms/' },
+      {
+        ...data,
+        title: 'Terms of service',
+        summary: 'Fee change.',
+        effectiveOn: '20 November 2026',
+        url: 'https://ebda.app/en/terms/',
+      },
       'en'
     );
     const mail = latestCapturedMailTo('m@test.local')!;
@@ -2476,7 +2551,7 @@ const asApp = <T>(fn: () => Promise<T>) =>
 
 function makeStep(memo: Map<string, unknown>) {
   return {
-    run: async <T,>(id: string, fn: () => Promise<T>): Promise<T> => {
+    run: async <T>(id: string, fn: () => Promise<T>): Promise<T> => {
       if (memo.has(id)) return memo.get(id) as T;
       const value = await fn();
       const serialized = value === undefined ? null : JSON.parse(JSON.stringify(value));
@@ -2496,7 +2571,15 @@ describe.skipIf(!hasDb)('legal notice email fan-out', () => {
   const mkUser = async (tag: string, role: 'store_admin' | 'super_admin', language = 'ar') => {
     const email = `lnf-${tag}-${run}-${crypto.randomUUID().slice(0, 6)}@test.local`;
     const u = await owner.user.create({
-      data: { email, passwordHash: 'x', firstName: 'Lnf', lastName: tag, role, emailVerified: true, language },
+      data: {
+        email,
+        passwordHash: 'x',
+        firstName: 'Lnf',
+        lastName: tag,
+        role,
+        emailVerified: true,
+        language,
+      },
     });
     emails[u.id] = email;
     return u.id;
@@ -2570,7 +2653,11 @@ describe.skipIf(!hasDb)('legal notice email fan-out', () => {
     const en = sendLegalNoticeEmail.mock.calls.find(c => c[0].email === emails[ids.en])!;
     expect(en[1]).toBe('en');
     const rows = await owner.legalNoticeDelivery.findMany({
-      where: { docKey: 'terms', version: V, userId: { in: [ids.two, ids.deletedOnly, ids.noStore] } },
+      where: {
+        docKey: 'terms',
+        version: V,
+        userId: { in: [ids.two, ids.deletedOnly, ids.noStore] },
+      },
       select: { userId: true, status: true },
     });
     expect(rows).toEqual([{ userId: ids.two, status: 'sent' }]);
@@ -2946,7 +3033,10 @@ export async function runLegalNoticeSend({
       failQueuedDeliveries(sentBy, docKey, version, 'BATCH_CAP_REACHED')
     );
   }
-  logger.info({ docKey, version, recipientCount: m.recipientCount, sent, failed }, '[LEGAL-NOTICE] done');
+  logger.info(
+    { docKey, version, recipientCount: m.recipientCount, sent, failed },
+    '[LEGAL-NOTICE] done'
+  );
   return { recipientCount: m.recipientCount, sent, failed };
 }
 
@@ -3001,6 +3091,7 @@ and add `| LegalNoticeSendRequestedEvent` as the last member of `AppEvent`.
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run:
+
 ```bash
 npx vitest run tests/unit/legal-notice-email.test.ts tests/unit/no-rls-bypass-in-runtime.test.ts tests/unit/inngest-step-serialization.test.ts
 # the service now imports more of @ebda/database: the signup unit tests mock it partially, re-prove them
@@ -3008,6 +3099,7 @@ npx vitest run tests/unit/merchant-signup-legal.test.ts tests/unit/ebda-ads-sign
 npx vitest run tests/integration/legal-notice-fanout.test.ts --retry=1
 tsc --noEmit -p apps/api/tsconfig.json
 ```
+
 Expected: all PASS; tsc exits 0.
 
 - [ ] **Step 5: Commit**
@@ -3022,6 +3114,7 @@ git commit -m "feat(api): idempotent legal-notice email fan-out to store owners"
 ### Task 8: Super-admin "Policy updates" (API + page + nav)
 
 **Files:**
+
 - Modify: `apps/api/src/services/legal-notice.service.ts` (append `policyOverview`, `requestNoticeSend`)
 - Modify: `apps/api/src/routes/legal-policy.routes.ts` (append `adminLegalPolicyRoutes`)
 - Modify: `apps/api/src/routes/index.ts` (mount before `router.use('/admin', adminProviderActivationRoutes);`)
@@ -3031,6 +3124,7 @@ git commit -m "feat(api): idempotent legal-notice email fan-out to store owners"
 - Test: `tests/integration/legal-policy-admin.test.ts` (new)
 
 **Interfaces:**
+
 - Consumes: `currentLegalVersion`, `isLegalDocKey`, `LEGAL_DOC_KEYS`, `LEGAL_DOC_TITLE`, `type LegalVersion` (Task 1); `inngest` client; `isP2002` (`apps/api/src/lib/prisma-errors.ts`); `auditLog` (`apps/api/src/middleware/security.ts`); `requireMfaEnrolled` (`apps/api/src/middleware/require-mfa.ts`).
 - Produces:
   - `interface LegalPolicyOverviewRow { docKey; title: {ar;en}; current: LegalVersion; send: { sentAt: string; sentBy: string; recipientCount: number | null } | null; deliveries: { queued; sending; sent; failed }; acceptedCount: number; canSend: boolean }`
@@ -3125,9 +3219,16 @@ describe.skipIf(!hasDb)('super-admin policy updates', () => {
         },
       })
     ).id;
-  const call = (method: 'get' | 'post', userId: string, role: 'store_admin' | 'super_admin', url: string) =>
+  const call = (
+    method: 'get' | 'post',
+    userId: string,
+    role: 'store_admin' | 'super_admin',
+    url: string
+  ) =>
     asApp(async () => {
-      const r = request(app)[method](url).set('Authorization', `Bearer ${token(userId, role)}`);
+      const r = request(app)
+        [method](url)
+        .set('Authorization', `Bearer ${token(userId, role)}`);
       return method === 'get' ? r : r.send({});
     });
   const sendUrl = (docKey: string, version: string) =>
@@ -3160,17 +3261,34 @@ describe.skipIf(!hasDb)('super-admin policy updates', () => {
     const res = await call('get', op, 'super_admin', '/api/v1/admin/legal-policies');
     expect(res.status).toBe(200);
     expect(res.headers['cache-control']).toBe('no-store');
-    const rows = res.body.data.policies as Array<{ docKey: string; current: { version: string }; canSend: boolean; send: unknown }>;
-    expect(rows.map(r => r.docKey)).toEqual(['legal', 'privacy', 'terms', 'acceptableUse', 'merchant']);
+    const rows = res.body.data.policies as Array<{
+      docKey: string;
+      current: { version: string };
+      canSend: boolean;
+      send: unknown;
+    }>;
+    expect(rows.map(r => r.docKey)).toEqual([
+      'legal',
+      'privacy',
+      'terms',
+      'acceptableUse',
+      'merchant',
+    ]);
     const terms = rows.find(r => r.docKey === 'terms')!;
     expect(terms).toMatchObject({ current: { version: V }, canSend: true, send: null });
     expect(rows.find(r => r.docKey === 'privacy')!.canSend).toBe(false);
-    expect((await call('get', merchant, 'store_admin', '/api/v1/admin/legal-policies')).status).toBe(403);
+    expect(
+      (await call('get', merchant, 'store_admin', '/api/v1/admin/legal-policies')).status
+    ).toBe(403);
   });
 
   it('refuses a non-material, a non-current and an unknown document', async () => {
-    expect((await call('post', op, 'super_admin', sendUrl('privacy', '1.0'))).body.error.code).toBe('NOT_MATERIAL');
-    expect((await call('post', op, 'super_admin', sendUrl('terms', '1.0'))).body.error.code).toBe('NOT_CURRENT');
+    expect((await call('post', op, 'super_admin', sendUrl('privacy', '1.0'))).body.error.code).toBe(
+      'NOT_MATERIAL'
+    );
+    expect((await call('post', op, 'super_admin', sendUrl('terms', '1.0'))).body.error.code).toBe(
+      'NOT_CURRENT'
+    );
     expect((await call('post', op, 'super_admin', sendUrl('cookies', '1.0'))).status).toBe(404);
     expect(send).not.toHaveBeenCalled();
   });
@@ -3183,7 +3301,9 @@ describe.skipIf(!hasDb)('super-admin policy updates', () => {
       name: 'legal/notice.send-requested',
       data: { docKey: 'terms', version: V, sentBy: op },
     });
-    expect(await owner.legalNoticeSend.count({ where: { docKey: 'terms', version: V, sentBy: op } })).toBe(1);
+    expect(
+      await owner.legalNoticeSend.count({ where: { docKey: 'terms', version: V, sentBy: op } })
+    ).toBe(1);
     const second = await call('post', op, 'super_admin', sendUrl('terms', V));
     expect(second.status).toBe(409);
     expect(second.body.error.code).toBe('ALREADY_SENT');
@@ -3257,7 +3377,10 @@ afterEach(() => {
 
 describe('policy updates page', () => {
   it('asks for confirmation in the page before sending, then posts once', async () => {
-    apiGet.mockResolvedValue({ data: { policies: [row('terms', true), row('privacy', false)] }, error: null });
+    apiGet.mockResolvedValue({
+      data: { policies: [row('terms', true), row('privacy', false)] },
+      error: null,
+    });
     apiPost.mockResolvedValue({ data: { send: {} }, error: null });
     const confirm = vi.spyOn(window, 'confirm');
     render(<PolicyUpdatesPage />);
@@ -3284,7 +3407,10 @@ describe('policy updates page', () => {
 
   it('explains a 409 and shows Latin-digit counts', async () => {
     apiGet.mockResolvedValue({ data: { policies: [row('terms', true)] }, error: null });
-    apiPost.mockResolvedValue({ data: null, error: { status: 409, code: 'ALREADY_SENT', message: 'x' } });
+    apiPost.mockResolvedValue({
+      data: null,
+      error: { status: 409, code: 'ALREADY_SENT', message: 'x' },
+    });
     render(<PolicyUpdatesPage />);
     expect((await screen.findByText(/accepted:/)).textContent).toContain('"n":"1234"');
     fireEvent.click(screen.getByRole('button', { name: 'sendNotice' }));
@@ -3310,7 +3436,13 @@ Expected: FAIL, `Failed to resolve import "./page"` / `adminLegalPolicyRoutes` i
 Append to `apps/api/src/services/legal-notice.service.ts` (merge imports):
 
 ```ts
-import { LEGAL_DOC_KEYS, LEGAL_DOC_TITLE, currentLegalVersion, type LegalDocKey, type LegalVersion } from '@ebda/shared';
+import {
+  LEGAL_DOC_KEYS,
+  LEGAL_DOC_TITLE,
+  currentLegalVersion,
+  type LegalDocKey,
+  type LegalVersion,
+} from '@ebda/shared';
 import { inngest } from '../lib/inngest/client';
 import { isP2002 } from '../lib/prisma-errors';
 
@@ -3335,7 +3467,12 @@ export async function policyOverview(operatorId: string): Promise<LegalPolicyOve
     for (const docKey of LEGAL_DOC_KEYS) {
       const current = currentLegalVersion(activePolicies, docKey);
       const send = sends.find(s => s.docKey === docKey && s.version === current.version) ?? null;
-      const deliveries: Record<DeliveryStatus, number> = { queued: 0, sending: 0, sent: 0, failed: 0 };
+      const deliveries: Record<DeliveryStatus, number> = {
+        queued: 0,
+        sending: 0,
+        sent: 0,
+        failed: 0,
+      };
       if (send) {
         for (const status of Object.keys(deliveries) as DeliveryStatus[]) {
           deliveries[status] = await prisma.legalNoticeDelivery.count({
@@ -3351,7 +3488,11 @@ export async function policyOverview(operatorId: string): Promise<LegalPolicyOve
         title: LEGAL_DOC_TITLE[docKey],
         current,
         send: send
-          ? { sentAt: send.sentAt.toISOString(), sentBy: send.sentBy, recipientCount: send.recipientCount }
+          ? {
+              sentAt: send.sentAt.toISOString(),
+              sentBy: send.sentBy,
+              recipientCount: send.recipientCount,
+            }
           : null,
         deliveries,
         acceptedCount,
@@ -3376,10 +3517,18 @@ export async function requestNoticeSend(
   if (!isLegalDocKey(docKey)) throw new AppError(404, 'NOT_FOUND', 'Unknown legal document');
   const current = currentLegalVersion(activePolicies, docKey);
   if (current.version !== version) {
-    throw new AppError(422, 'NOT_CURRENT', 'Only the current version of a document can be announced');
+    throw new AppError(
+      422,
+      'NOT_CURRENT',
+      'Only the current version of a document can be announced'
+    );
   }
   if (!current.material) {
-    throw new AppError(422, 'NOT_MATERIAL', 'This version is not marked material in LEGAL_POLICIES');
+    throw new AppError(
+      422,
+      'NOT_MATERIAL',
+      'This version is not marked material in LEGAL_POLICIES'
+    );
   }
   let row: { id: string; sentAt: Date };
   try {
@@ -3403,7 +3552,11 @@ export async function requestNoticeSend(
     await prisma.legalNoticeSend
       .delete({ where: { id: row.id } })
       .catch(e => logger.error({ err: e, docKey, version }, '[LEGAL-NOTICE] compensation failed'));
-    throw new AppError(502, 'ENQUEUE_FAILED', 'Could not start the email send; nothing was sent. Try again.');
+    throw new AppError(
+      502,
+      'ENQUEUE_FAILED',
+      'Could not start the email send; nothing was sent. Try again.'
+    );
   }
   return { docKey, version, sentAt: row.sentAt.toISOString() };
 }
@@ -3426,7 +3579,10 @@ export const adminLegalPolicyRoutes = Router();
 const superAdmin = [authenticate, requireMfaEnrolled, authorize('super_admin')];
 const sendParams = z.object({
   docKey: z.string().max(40),
-  version: z.string().regex(/^\d+(\.\d+)*$/).max(20),
+  version: z
+    .string()
+    .regex(/^\d+(\.\d+)*$/)
+    .max(20),
 });
 
 adminLegalPolicyRoutes.get(
@@ -3538,7 +3694,9 @@ function PolicyUpdatesInner() {
     );
     setSending(false);
     setConfirming(null);
-    setMessage(error ? (error.status === 409 ? t('alreadySent') : t('sendFailed')) : t('sendStarted'));
+    setMessage(
+      error ? (error.status === 409 ? t('alreadySent') : t('sendFailed')) : t('sendStarted')
+    );
     await load();
   };
 
@@ -3692,8 +3850,8 @@ and under `components.adminLayout`: en `"navPlatformPolicyUpdates": "Policy upda
 `buildStoreAdminNav.ts`: in `NavLabels`, before `platformSettings`:
 
 ```ts
-  /** Legal documents + material-change notices (super_admin only, Ruling LEGAL-4) */
-  platformPolicyUpdates: string;
+/** Legal documents + material-change notices (super_admin only, Ruling LEGAL-4) */
+platformPolicyUpdates: string;
 ```
 
 and in `buildSuperAdminNav`, before the Platform settings item:
@@ -3716,11 +3874,13 @@ and in `buildSuperAdminNav`, before the Platform settings item:
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run:
+
 ```bash
 npx vitest run apps/admin/src/app/policy-updates/page.test.tsx tests/unit/admin-i18n-key-parity.test.ts tests/unit/admin-i18n-keys-resolve.test.ts
 npx vitest run tests/integration/legal-policy-admin.test.ts --retry=1
 tsc --noEmit -p apps/api/tsconfig.json && tsc --noEmit -p apps/admin/tsconfig.json
 ```
+
 Expected: all PASS; both tsc runs exit 0.
 
 - [ ] **Step 5: Commit**
@@ -3735,6 +3895,7 @@ git commit -m "feat(admin): super-admin policy updates page with send notice"
 ### Task 9: Docs, rulings, runbook, blast-radius sweep, live verification
 
 **Files:**
+
 - Create: `docs/runbooks/legal-policy-change.md`
 - Modify: `docs/RULINGS.md` (append after the last ruling)
 - Modify: `docs/runbooks/SUPER-ADMIN-PLAYBOOK.md` (new section before `## Where the code lives`)
@@ -3831,7 +3992,7 @@ Fee changes always come with at least 30 days' notice.
 `docs/ENVIRONMENT.md` line 53: append to the end of the `CAMPAIGN_PLATFORM_SEND_INTERVAL_MS` bullet:
 
 ```markdown
- The same pacer also spaces the legal-notice emails (`legal-notice-send`, Ruling LEGAL-4), so an announcement to every merchant shares the bound with running campaigns.
+The same pacer also spaces the legal-notice emails (`legal-notice-send`, Ruling LEGAL-4), so an announcement to every merchant shares the bound with running campaigns.
 ```
 
 - [ ] **Step 3: Blast-radius sweep (state the result in the final report)**
@@ -3855,6 +4016,7 @@ Also confirm: the privacy policy already discloses "IP address, device and brows
 - [ ] **Step 4: Full gates**
 
 Run:
+
 ```bash
 npm run typecheck
 npm run lint
@@ -3864,6 +4026,7 @@ npx vitest run tests/integration/legal-signup-acceptance.test.ts tests/integrati
 npm run build -w apps/marketing
 graphify update .
 ```
+
 Expected: every command exits 0. Capture each exit code on its own line (no pipes) as evidence.
 
 - [ ] **Step 5: Commit**
@@ -3886,4 +4049,7 @@ psql "$PROD_DIRECT_URL" -c "SELECT relname, relrowsecurity, relforcerowsecurity 
 ```
 
 Report what could NOT be verified live and why. An email send to real merchants is NOT exercised: v1.0 is non-material, so there is nothing to send, and pressing Send notice would mail every merchant (ask Ahmad first). A real signup creates a real account, so ask before running one, or verify with the 400 probe above plus a read of the new account's `legal_acceptances` rows the next time a merchant signs up. The banner on production is proven only by tests until the first material version is sent.
+
+```
+
 ```
