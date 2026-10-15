@@ -174,6 +174,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // Bumped when a tap on add-to-cart is blocked ONLY by the empty required note:
   // PersonalisationField then scrolls to, focuses and explains itself (no add).
   const [noteNudge, setNoteNudge] = useState(0);
+  // Bumped when add-to-cart is tapped with an option still unset (C-02).
+  const [optionNudge, setOptionNudge] = useState(0);
   const [selectedImage, setSelectedImage] = useState(0);
   const [isAdding, setIsAdding] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -422,10 +424,14 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const handleAddToCart = async () => {
     if (!product) return;
 
-    // If this product has variants and no variant is selected yet, prompt the user
+    // An option is still unset (or the picked combination does not exist): the
+    // button is NOT disabled for that (C-02) — the tap takes the shopper to the
+    // first missing choice (VariantSelector `nudge`: scroll, focus, ring, live
+    // text). Same path for the main button, the Dahab pinned bar and the
+    // phone sticky bar, which all call this handler.
     const productVariants = product.variants ?? [];
     if (productVariants.length > 0 && !selectedVariant) {
-      toastSuccess('Select options', 'Please select all options before adding to cart');
+      setOptionNudge(n => n + 1);
       return;
     }
 
@@ -560,7 +566,6 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const effectiveInventory = selectedVariant ? selectedVariant.inventory : product.inventory;
 
   // Derived add-to-cart state
-  const variantRequired = hasVariants && !selectedVariant;
   // OOS decision: with a variant selected use that variant's stock; with NO
   // variant selected use the server's aggregate `inStock` flag, NOT
   // product.inventory directly — variant products carry 0/null product-level
@@ -585,16 +590,18 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // the field instead of adding (F6, the sticky bar's dead button). So a required
   // personalisation still can never be skipped by a second button.
   const noteMissing = personalisationMissing(product.personalisation, note);
-  const addDisabled = (outOfStock && !canBackorder) || variantRequired;
+  // `disabled` means the item cannot be bought (C-02). An option still to
+  // choose is recoverable, so it never disables or relabels the button; the
+  // tap nudges the selector instead (handleAddToCart).
+  const addDisabled = outOfStock && !canBackorder;
   // ONE source for the buy label and the price text: the main button, the Dahab
-  // pinned bar and the default sticky bar all read these.
-  const addLabel = variantRequired
-    ? t('Select Options', 'اختر الخيارات')
-    : canBackorder
-      ? t('Pre-order', 'اطلب مسبقاً')
-      : outOfStock
-        ? t('Out of Stock', 'غير متوفر')
-        : t('Add to Cart', translations['Add to Cart']);
+  // pinned bar and the default sticky bar all read these. The real verb at
+  // every step: no "Select options" placeholder label.
+  const addLabel = canBackorder
+    ? t('Pre-order', 'اطلب مسبقاً')
+    : outOfStock
+      ? t('Out of Stock', 'غير متوفر')
+      : t('Add to Cart', translations['Add to Cart']);
   const priceText =
     pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
       ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
@@ -720,14 +727,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             note={note}
             onNoteChange={setNote}
             noteNudge={noteNudge}
+            optionNudge={optionNudge}
             addLabel={
-              variantRequired
-                ? t('Choose options', 'اختيار المقاس')
-                : canBackorder
-                  ? t('Pre-order', 'طلب مسبق')
-                  : outOfStock
-                    ? t('Out of stock', 'غير متوفر')
-                    : t('Add to bag', 'إضافة للسلة')
+              canBackorder
+                ? t('Pre-order', 'طلب مسبق')
+                : outOfStock
+                  ? t('Out of stock', 'غير متوفر')
+                  : t('Add to bag', 'إضافة للسلة')
             }
             isWishlisted={isWishlisted}
             onToggleWishlist={handleToggleWishlist}
@@ -1060,6 +1066,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   onVariantSelect={setSelectedVariant}
                   onShopperSelect={() => setShopperPickedVariant(true)}
                   onSelectionChange={setPickedOptions}
+                  nudge={optionNudge}
                   swatchColor={model3d ? swatchColor : undefined}
                   sizeGuide={
                     product.sizeChart ? <SizeChartDialog chart={product.sizeChart} /> : undefined

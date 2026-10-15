@@ -187,6 +187,20 @@ const requiredNote = {
   },
 };
 
+/** A product with two option axes, nothing pre-picked (several variants). */
+const sized = {
+  options: [
+    { id: 'o1', name: 'Size', values: [{ value: 'S' }, { value: 'M' }] },
+    { id: 'o2', name: 'Color', values: [{ value: 'Rose' }, { value: 'Sand' }] },
+  ],
+  variants: [
+    { id: 'v1', price: 149000, inventory: 0, options: { Size: 'S', Color: 'Rose' } },
+    { id: 'v2', price: 149000, inventory: 3, options: { Size: 'M', Color: 'Sand' } },
+    { id: 'v3', price: 149000, inventory: 0, options: { Size: 'M', Color: 'Rose' } },
+    { id: 'v4', price: 149000, inventory: 0, options: { Size: 'S', Color: 'Sand' } },
+  ],
+};
+
 describe('default PDP sticky bar mirrors the main add button', () => {
   it('enabled product: same label, both enabled', async () => {
     const { stickyBtn, main } = await renderPdp(product());
@@ -238,23 +252,59 @@ describe('default PDP sticky bar mirrors the main add button', () => {
     expectMirror(main, stickyBtn, 'Pre-order', false);
   });
 
-  it('variant required (nothing picked yet): same label, both disabled', async () => {
-    const { stickyBtn, main } = await renderPdp(
-      product({
-        options: [
-          { id: 'o1', name: 'Size', values: [{ value: 'S' }, { value: 'M' }] },
-          { id: 'o2', name: 'Color', values: [{ value: 'Rose' }, { value: 'Sand' }] },
-        ],
-        variants: [
-          { id: 'v1', price: 149000, inventory: 0, options: { Size: 'S', Color: 'Rose' } },
-          { id: 'v2', price: 149000, inventory: 3, options: { Size: 'M', Color: 'Sand' } },
-          { id: 'v3', price: 149000, inventory: 0, options: { Size: 'M', Color: 'Rose' } },
-          { id: 'v4', price: 149000, inventory: 0, options: { Size: 'S', Color: 'Sand' } },
-        ],
-      })
-    );
-    expectMirror(main, stickyBtn, 'Select Options', true);
+  it('variant required (nothing picked yet): the real verb, both ENABLED (C-02)', async () => {
+    // A choice the shopper can still make is not a reason to paint the buy
+    // button disabled: `disabled` means the item cannot be bought.
+    const { stickyBtn, main } = await renderPdp(product(sized));
+    expectMirror(main, stickyBtn, 'Add to Cart', false);
   });
+
+  it.each(['main', 'sticky'] as const)(
+    'C-02: tap on the %s button with no size: focus moves to the Size group, the live text appears, never adds',
+    async which => {
+      const scrollSpy = mockScrollIntoView();
+      const { stickyBtn, main } = await renderPdp(product(sized));
+      const sizeGroup = document.querySelector('[data-option-group="Size"]') as HTMLElement;
+      const hint = sizeGroup.querySelector('[data-testid="variant-nudge"]') as HTMLElement;
+      // The live region exists BEFORE it has text, so the message is announced.
+      expect(hint.getAttribute('aria-live')).toBe('polite');
+      expect(hint.textContent).toBe('');
+
+      await act(async () => {
+        fireEvent.click(which === 'main' ? main : stickyBtn);
+      });
+
+      expect(ctx.addItem).not.toHaveBeenCalled();
+      expect(main.disabled).toBe(false);
+      expect(stickyBtn.disabled).toBe(false);
+      expect(document.activeElement).toBe(sizeGroup);
+      expect(scrollSpy).toHaveBeenCalled();
+      expect(hint.textContent).toBe('Choose Size');
+      expect(sizeGroup.getAttribute('aria-describedby')).toBe(hint.id);
+      expect(sizeGroup.getAttribute('aria-invalid')).toBe('true');
+      expect(sizeGroup.className).toContain('ring-2');
+
+      // Size picked, colour still missing: the next tap goes to Color.
+      fireEvent.click(screen.getByRole('button', { name: 'M' }));
+      expect(hint.textContent).toBe('');
+      await act(async () => {
+        fireEvent.click(which === 'main' ? main : stickyBtn);
+      });
+      const colorGroup = document.querySelector('[data-option-group="Color"]') as HTMLElement;
+      expect(document.activeElement).toBe(colorGroup);
+      expect(colorGroup.querySelector('[data-testid="variant-nudge"]')?.textContent).toBe(
+        'Choose Color'
+      );
+
+      // Everything picked: the same tap adds THAT variant.
+      fireEvent.click(screen.getByRole('button', { name: 'Sand' }));
+      await act(async () => {
+        fireEvent.click(which === 'main' ? main : stickyBtn);
+      });
+      expect(ctx.addItem).toHaveBeenCalledTimes(1);
+      expect(ctx.addItem.mock.calls[0][0]).toMatchObject({ variantId: 'v2' });
+    }
+  );
 });
 
 describe('Dahab PDP: the main and pinned buttons share the note nudge', () => {
@@ -285,6 +335,34 @@ describe('Dahab PDP: the main and pinned buttons share the note nudge', () => {
       });
       expect(ctx.addItem).not.toHaveBeenCalled();
       expect(document.activeElement).toBe(document.querySelector('input[maxlength]'));
+    }
+  );
+});
+
+describe('Dahab PDP: the main and pinned buttons nudge the first unset option (C-02)', () => {
+  it.each(['pdp-add', 'dahab-pinned-add'])(
+    '%s with no size: enabled, focuses the Size group with live text, never adds',
+    async testId => {
+      mockScrollIntoView();
+      vi.stubGlobal('IntersectionObserver', IO);
+      vi.stubGlobal('localStorage', {
+        getItem: () => null,
+        setItem: () => {},
+        removeItem: () => {},
+      });
+      const { default: ProductDetailClient } =
+        await import('../../apps/web/src/app/products/[slug]/ProductDetailClient');
+      ctx.store = { ...STORES.A, template: 'dahab' };
+      render(<ProductDetailClient initialProduct={product(sized) as never} />);
+      const btn = (await screen.findByTestId(testId)) as HTMLButtonElement;
+      expect(btn.disabled).toBe(false);
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      expect(ctx.addItem).not.toHaveBeenCalled();
+      const group = document.querySelector('[data-option-group="Size"]') as HTMLElement;
+      expect(document.activeElement).toBe(group);
+      expect(group.querySelector('[data-testid="variant-nudge"]')?.textContent).toBe('Choose Size');
     }
   );
 });

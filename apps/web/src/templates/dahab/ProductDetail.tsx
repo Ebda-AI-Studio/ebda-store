@@ -83,6 +83,8 @@ export interface DahabProductDetailProps {
   onNoteChange?: (v: string) => void;
   /** Bumped by the page when add-to-cart was tapped with only the required note missing. */
   noteNudge?: number;
+  /** Bumped by the page when add-to-cart was tapped with an option still unset (C-02). */
+  optionNudge?: number;
   /** Spec table, WhatsApp order button, share row — platform components. */
   specs?: ReactNode;
   extras?: ReactNode;
@@ -414,6 +416,7 @@ export function DahabProductDetail(p: DahabProductDetailProps) {
                 onShopperSelect={p.onShopperSelect}
                 appearance="swatch"
                 sizeGuide={p.sizeChart ? <SizeChartDialog chart={p.sizeChart} /> : undefined}
+                nudge={p.optionNudge}
               />
             ) : (
               <SizeChartDialog chart={p.sizeChart} className="mt-4" />
