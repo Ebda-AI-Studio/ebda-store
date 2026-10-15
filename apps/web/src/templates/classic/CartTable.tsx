@@ -8,8 +8,8 @@ import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
 
-import { REGION } from '@ebda/shared';
 /**
  * Classic template — cart list as a clean, table-style grid. Square
  * corners, thin dividers, formal typography matching Classic's
@@ -18,16 +18,16 @@ import { REGION } from '@ebda/shared';
 export default function ClassicCartTable({
   items,
   isRtl: isRtlProp,
-  currency = REGION.currency,
   urlPrefix = '',
   onUpdateQuantity,
   onRemove,
   typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
-  const { localize, money } = useNumerals();
+  const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const format = (price: number) => `${money(price)} ${currency}`;
+  // The ONE storefront price format (Ruling B1-28).
+  const format = useLocalePrice();
 
   return (
     <div

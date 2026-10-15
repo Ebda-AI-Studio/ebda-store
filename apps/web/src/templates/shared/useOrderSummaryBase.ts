@@ -11,13 +11,13 @@
 
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { formatTaxRowLabel } from '../../lib/tax-display';
 import type { OrderSummaryProps } from '../types';
 
-import { REGION } from '@ebda/shared';
 export interface OrderSummaryBaseResult {
   isRtl: boolean;
-  /** Format a piastres-denominated price as "X.XXX EGP" */
+  /** The storefront price format ("2,980 ج.م" / "EGP 2,980"), `useLocalePrice`. */
   fmt: (piastres: number) => string;
   /** RTL-resolved CTA label */
   ctaText: string | undefined;
@@ -33,29 +33,19 @@ export interface OrderSummaryBaseResult {
 }
 
 /**
- * The money format every theme OrderSummary prints ("2,980 EGP"). Exported so a surface that
- * repeats a summary figure (the cart's phone sticky total) prints it byte-identically.
- */
-export function orderSummaryMoney(money: (piastres: number) => string, currency: string) {
-  return (p: number) => `${money(p)} ${currency}`;
-}
-
-/**
- * The formatter the ACTIVE theme's OrderSummary prints money with. Most themes use
- * `orderSummaryMoney` (via this hook's `fmt`); a theme whose summary prints with the
- * storefront's `formatPrice` (Dahab: "EGP 2,980" / "2,980 ج.م") marks its component
- * `moneyFormat = 'locale'`. No themed summary = the cart's fallback summary (formatPrice).
+ * The formatter every theme's OrderSummary prints money with: the storefront's ONE price format
+ * (`useLocalePrice`: "2,980 ج.م" / "EGP 2,980", Ruling B1-28). It used to differ per theme
+ * ("2,980 EGP" on the five legacy themes, locale on Dahab); a surface that repeats a summary figure
+ * (the cart's phone sticky total) calls this so it stays byte-identical to the summary.
+ * `Summary`, `money` and `currency` are kept for the call sites' signature and are ignored.
  */
 export function summaryMoneyFormatter(
-  Summary: unknown,
-  money: (piastres: number) => string,
-  currency: string,
+  _Summary: unknown,
+  _money: unknown,
+  _currency: string,
   formatPrice: (piastres: number) => string
 ): (piastres: number) => string {
-  if (!Summary || (Summary as { moneyFormat?: string }).moneyFormat === 'locale') {
-    return formatPrice;
-  }
-  return orderSummaryMoney(money, currency);
+  return formatPrice;
 }
 
 /**
@@ -64,7 +54,6 @@ export function summaryMoneyFormatter(
  * destructure the result directly into your JSX.
  */
 export function useOrderSummaryBase({
-  currency = REGION.currency,
   ctaLabel,
   ctaLabelAr,
   summaryColors,
@@ -84,12 +73,13 @@ export function useOrderSummaryBase({
   | 'taxIncludedInPrice'
 >): OrderSummaryBaseResult {
   const { isRtl: ctxIsRtl } = useLanguage();
-  const { localize, money } = useNumerals();
+  const { localize } = useNumerals();
+  const formatPrice = useLocalePrice();
   const isRtl = isRtlProp ?? ctxIsRtl;
 
   return {
     isRtl,
-    fmt: orderSummaryMoney(money, currency),
+    fmt: formatPrice,
     ctaText: isRtl ? (ctaLabelAr ?? ctaLabel) : (ctaLabel ?? ctaLabelAr),
     summaryLabelBold: summaryColors?.bold !== false,
     labelColorStyle: summaryColors?.labelColor ? { color: summaryColors.labelColor } : undefined,

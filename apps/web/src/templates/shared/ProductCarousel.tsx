@@ -28,7 +28,8 @@ import { smoothScrollLeftTo, smoothScrollLeftBy } from '@/lib/smooth-scroll';
 import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
 import { useNumerals } from '../../hooks/useNumerals';
-import { getProductCardTextSizes, resolveColor, REGION } from '@ebda/shared';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
+import { getProductCardTextSizes, resolveColor } from '@ebda/shared';
 import { cn } from '@ebda/ui';
 import type { ProductCarouselProps } from '../types';
 import { DahabProductCarousel } from '../dahab/ProductCarousel';
@@ -67,7 +68,6 @@ function SharedProductCarousel({
   showSubtitleLines,
   seeAllHref,
   isRtl,
-  currency = REGION.currency,
   onAddToCart,
   urlPrefix = '',
   pack,
@@ -104,7 +104,9 @@ function SharedProductCarousel({
   // products get the overlay button; otherwise it's hidden.
   const { store, layout } = useStore();
   const renderNow = useRenderNow();
-  const { money, numerals } = useNumerals();
+  const { numerals } = useNumerals();
+  // The ONE storefront price format ("1,490 ج.م" / "EGP 1,490", Ruling B1-28).
+  const price = useLocalePrice();
   const showQuickAdd = store.theme?.showQuickAdd === true;
   // Item 4 (2026-07-12): when the merchant already has the outer showCardFrame
   // frame on AND opts into frameChromeDedup, suppress the inner pack-style
@@ -659,10 +661,10 @@ function SharedProductCarousel({
                               )}
                               {priceVisible && (
                                 <div
-                                  className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
+                                  className={`flex flex-wrap items-baseline gap-x-2 ${styles.productCardBody ? 'justify-center' : ''}`}
                                 >
                                   <span
-                                    className={`${textSizes.price} ${styles.productCardPrice}`}
+                                    className={`whitespace-nowrap ${textSizes.price} ${styles.productCardPrice}`}
                                     data-zone="productPrice"
                                     style={{
                                       fontFamily: productPriceZone?.fontFamily,
@@ -678,11 +680,11 @@ function SharedProductCarousel({
                                     {carouselPricing.mode === 'fromMin'
                                       ? `${isRtl ? 'من ' : 'From '}`
                                       : ''}
-                                    {money(carouselPricing.displayPrice)} {currency}
+                                    {price(carouselPricing.displayPrice)}
                                   </span>
                                   {carouselPricing.displayCompare && (
-                                    <span className="text-sm text-muted-foreground line-through">
-                                      {money(carouselPricing.displayCompare)}
+                                    <span className="whitespace-nowrap text-sm text-muted-foreground line-through">
+                                      {price(carouselPricing.displayCompare)}
                                     </span>
                                   )}
                                 </div>

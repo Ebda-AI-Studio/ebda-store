@@ -1221,8 +1221,8 @@ export default function CartClient() {
         </div>
       </div>
       {/* Phone sticky total: same checkoutBlocked rule + message as the summary CTA, and the
-          summary's own Total row (label, value AND money format: a themed OrderSummary prints
-          "2,980 EGP", the fallback summary formatPrice). That total is net of the promo discount
+          summary's own Total row (label, value AND money format: every summary prints the ONE
+          storefront format, "2,980 ج.م" / "EGP 2,980", B1-28). That total is net of the promo discount
           and carries no zone fee while shipping reads "calculated at checkout", so the bar never
           quotes the pre-discount subtotal. */}
       <StickyCartTotal

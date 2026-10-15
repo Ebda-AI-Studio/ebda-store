@@ -13,6 +13,7 @@ import { cn } from '@ebda/ui';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { useNumerals } from '../../hooks/useNumerals';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { getPackStyles } from './pack-styles';
 import {
   cardFrameClass,
@@ -104,7 +105,9 @@ function PecannbeeProductCardImpl({
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const { store, layout } = useStore();
   const renderNow = useRenderNow();
-  const { money, numerals } = useNumerals();
+  const { numerals } = useNumerals();
+  // The ONE storefront price format ("1,490 ج.م" / "EGP 1,490", Ruling B1-28).
+  const price = useLocalePrice();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const styles = getPackStyles(pack);
   const textSizes = getProductCardTextSizes(cardSize);
@@ -484,7 +487,7 @@ function PecannbeeProductCardImpl({
             )}
             {priceVisible && (
               <div
-                className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
+                className={`flex flex-wrap items-baseline gap-x-2 ${styles.productCardBody ? 'justify-center' : ''}`}
               >
                 <span
                   itemProp="offers"
@@ -496,7 +499,7 @@ function PecannbeeProductCardImpl({
                   <meta itemProp="price" content={String(fromMinor(pricing.displayPrice))} />
                   <span
                     data-zone="productPrice"
-                    className={`font-bold tabular-nums ${textSizes.price} ${styles.productCardPrice}`}
+                    className={`whitespace-nowrap font-bold tabular-nums ${textSizes.price} ${styles.productCardPrice}`}
                     style={{
                       fontFamily: productPriceZone?.fontFamily,
                       fontSize: responsiveFontSize(productPriceZone?.fontSize),
@@ -509,12 +512,12 @@ function PecannbeeProductCardImpl({
                     }}
                   >
                     {pricing.mode === 'fromMin' ? `${isRtl ? 'من ' : 'From '}` : ''}
-                    {money(pricing.displayPrice)} {currency}
+                    {price(pricing.displayPrice)}
                   </span>
                 </span>
                 {pricing.displayCompare && (
-                  <span className="text-sm text-muted-foreground line-through">
-                    {money(pricing.displayCompare)}
+                  <span className="whitespace-nowrap text-sm text-muted-foreground line-through">
+                    {price(pricing.displayCompare)}
                   </span>
                 )}
               </div>

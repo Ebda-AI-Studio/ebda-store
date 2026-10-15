@@ -8,8 +8,8 @@ import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
 
-import { REGION } from '@ebda/shared';
 /**
  * Bold template — cart as heavy-blocked rows with strong borders,
  * uppercase labels, and sharp contrast. Matches Bold's ProductCard +
@@ -18,16 +18,16 @@ import { REGION } from '@ebda/shared';
 export default function BoldCartTable({
   items,
   isRtl: isRtlProp,
-  currency = REGION.currency,
   urlPrefix = '',
   onUpdateQuantity,
   onRemove,
   typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
-  const { localize, money } = useNumerals();
+  const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const format = (price: number) => `${money(price)} ${currency}`;
+  // The ONE storefront price format (Ruling B1-28).
+  const format = useLocalePrice();
 
   return (
     <div className="space-y-4" dir={isRtl ? 'rtl' : 'ltr'}>

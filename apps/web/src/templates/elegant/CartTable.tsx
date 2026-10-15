@@ -8,8 +8,8 @@ import { CartLineUnavailableNotice } from '../shared/CartLineUnavailable';
 import { CartLineNote } from '../../components/commerce/CartLineNote';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
 
-import { REGION } from '@ebda/shared';
 /**
  * Elegant template — cart rendered with thin hairline dividers, generous
  * whitespace, and serif-friendly tracking to match Elegant's fashion-
@@ -18,16 +18,16 @@ import { REGION } from '@ebda/shared';
 export default function ElegantCartTable({
   items,
   isRtl: isRtlProp,
-  currency = REGION.currency,
   urlPrefix = '',
   onUpdateQuantity,
   onRemove,
   typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
-  const { localize, money } = useNumerals();
+  const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const format = (price: number) => `${money(price)} ${currency}`;
+  // The ONE storefront price format (Ruling B1-28).
+  const format = useLocalePrice();
 
   return (
     <div className="divide-y divide-border/50" dir={isRtl ? 'rtl' : 'ltr'}>
