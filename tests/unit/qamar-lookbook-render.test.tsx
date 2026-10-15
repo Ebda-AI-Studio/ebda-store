@@ -455,6 +455,24 @@ describe('section headings measure contrast against the PAINTED page (resolveBac
   });
 });
 
+describe('one section-heading alignment per page on qamar (T-03)', async () => {
+  const { SectionHeading } = await import('../../apps/web/src/templates/shared/SectionHeading');
+  const h2 = (pack: string, align?: 'start' | 'center' | 'end') =>
+    renderToStaticMarkup(
+      <SectionHeading
+        title="Shop by category"
+        isRtl
+        pack={pack as any}
+        headingZone={align ? { textAlign: align } : undefined}
+      />
+    ).match(/<h2 class="([^"]*)"/)?.[1] ?? '';
+  it('qamar start-aligns by default; legacy skins stay centred; a merchant align wins', () => {
+    expect(h2('qamar')).toMatch(/\btext-start\b/);
+    for (const p of ['minimal', 'modern', 'dahab']) expect(h2(p)).toMatch(/\btext-center\b/);
+    expect(h2('qamar', 'center')).toMatch(/\btext-center\b/);
+  });
+});
+
 describe('qamar display headings are not shrunk/grown by the Arabic font-size-adjust', () => {
   it('h1-h3 and .font-display reset it under the qamar pack; the collage motion has a reduced-motion end state', async () => {
     const { readFileSync } = await import('node:fs');

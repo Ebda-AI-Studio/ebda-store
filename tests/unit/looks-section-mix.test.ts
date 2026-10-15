@@ -137,7 +137,8 @@ describe('look section mix', () => {
         const onLookbook = applyTemplateFamily(base(), 'qamar', lookbook);
         expect(byType(onLookbook, 'featured-collection').settings.bgColor).toBe('token:card');
         expect(byType(onLookbook, 'hero').settings.presentation).toBe('collage');
-        expect(byType(onLookbook, 'category-grid').settings.layout).toBe('horizontal');
+        expect(byType(onLookbook, 'category-grid').settings.layout).toBe('grid');
+        expect(byType(onLookbook, 'category-grid').settings.layoutMobile).toBe('horizontal');
         const doc = applyTemplateFamily(onLookbook, 'qamar', getLook('qamar.atelier'), {
           from: lookbook,
           design,

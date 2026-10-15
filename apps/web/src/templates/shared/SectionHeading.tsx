@@ -231,9 +231,10 @@ export function SectionHeading({
   // the flanking editorial-divider hairlines auto-suppress because they only
   // read well on a centered line. Wrapper uses items-stretch so each child
   // takes the full row width and self-aligns via its own textAlign.
-  const kickerAlign = kickerZone?.textAlign ?? 'center';
-  const titleAlign = headingZone?.textAlign ?? 'center';
-  const subtitleAlign = subtitleZone?.textAlign ?? 'center';
+  const packAlign = getPackStyles(pack).sectionHeadingAlign ?? 'center';
+  const kickerAlign = kickerZone?.textAlign ?? packAlign;
+  const titleAlign = headingZone?.textAlign ?? packAlign;
+  const subtitleAlign = subtitleZone?.textAlign ?? packAlign;
   // 2026-05-20: removed the `&& align === 'center'` gate that previously
   // auto-suppressed flanking hairlines for non-centered text. That was
   // me second-guessing the merchant — if they explicitly enable the

@@ -82,7 +82,14 @@ export const LOOKS: readonly LookDefinition[] = [
       { type: 'shop-the-look', design: { bgColor: 'token:card' } },
       {
         type: 'category-grid',
-        design: { layout: 'horizontal', layoutMobile: 'horizontal', captionPosition: 'below' },
+        // Phones: a scrolling photo row. Desktop: a 4-column grid, so a short catalogue never
+        // leaves a start-aligned strip with an empty tail (quality bar L-05, fix round 1).
+        design: {
+          layout: 'grid',
+          layoutMobile: 'horizontal',
+          desktopColumns: 4,
+          captionPosition: 'below',
+        },
       },
       {
         type: 'featured-collection',

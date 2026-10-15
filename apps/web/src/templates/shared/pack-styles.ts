@@ -35,6 +35,11 @@ export interface PackStyles {
   productCardCta: string;
   /** Class for the section heading H2. */
   sectionHeading: string;
+  /**
+   * Default alignment of a `SectionHeading` title/kicker/subtitle when the merchant set none
+   * (per-zone `textAlign` still wins). Unset = 'center' (every legacy skin, unchanged).
+   */
+  sectionHeadingAlign?: 'start' | 'center';
   /** Class for the "see all" link in section heading. */
   sectionSeeAll: string;
   /** Hero overlay tint + treatment. */
@@ -246,6 +251,9 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
       'font-display text-2xl sm:text-3xl md:text-4xl font-bold text-foreground leading-[1.25] text-balance',
     sectionSeeAll:
       'text-sm font-medium text-foreground/70 hover:text-foreground underline-offset-4 hover:underline',
+    // Quality bar T-03: one heading alignment per page. The builder sections (SectionHeader:
+    // shop-the-look, new in) start-align, so the layout sections' headings do too.
+    sectionHeadingAlign: 'start',
     // White headline over ANY photo (light Atelier walls included): a dark ink scrim, densest
     // where the centred text sits. Not a token: the text is white on every look, so the scrim
     // is dark on every look (a `foreground` scrim is LIGHT on Lookbook). Pinned by
