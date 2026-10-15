@@ -1,7 +1,9 @@
 import { withStore } from '@ebda/database';
+import { BRAND } from '@ebda/shared';
+import { config } from '../config';
 
 export interface StoreContactTarget {
-  /** The store's public contact email, else its owner's account email; null when neither exists. */
+  /** The store's public contact email, else its owner's account email when that account is active; null when neither exists. */
   to: string | null;
   isDemo: boolean;
   slug: string;
@@ -22,11 +24,17 @@ export async function storeContactTarget(storeId: string): Promise<StoreContactT
         isDemo: true,
         slug: true,
         deletedAt: true,
-        owner: { select: { email: true } },
+        owner: { select: { email: true, status: true, deletedAt: true } },
       },
     })
   );
   if (!store || store.deletedAt) return null;
-  const to = store.email?.trim() || store.owner?.email?.trim() || null;
+  const ownerActive = store.owner?.status === 'active' && !store.owner.deletedAt;
+  const candidate = store.email?.trim() || (ownerActive ? store.owner?.email?.trim() : '') || null;
+  // An address equal to the platform sender / no-reply would loop mail back to Ebda: fall through.
+  const platform = new Set(
+    [config.smtpFromEmail, BRAND.noReplyEmail].map(a => a?.trim().toLowerCase())
+  );
+  const to = candidate && !platform.has(candidate.toLowerCase()) ? candidate : null;
   return { to, isDemo: store.isDemo, slug: store.slug };
 }

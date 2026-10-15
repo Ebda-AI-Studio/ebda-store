@@ -14,6 +14,8 @@ import publicRoutes from '@api/routes/public.routes';
 import { publicStoreContext } from '@api/middleware/tenant-context';
 import { errorHandler } from '@api/middleware/error-handler';
 import { inngest } from '@api/lib/inngest/client';
+import { redis } from '@api/services/redis.service';
+import { config } from '@api/config';
 import { storeContactTarget } from '@api/services/store-contact.service';
 import { hasDb, seedStoreWithoutBundlesFeature } from '../helpers/bundle-fixtures';
 
@@ -62,23 +64,42 @@ describe.skipIf(!hasDb)('storefront contact routing (FU46-1)', () => {
   let shop: { storeId: string; ownerId: string };
   let noEmail: { storeId: string; ownerId: string };
   let demo: { storeId: string; ownerId: string };
-  const send = vi.spyOn(inngest, 'send');
+  let capped: { storeId: string; ownerId: string };
+  let other: { storeId: string; ownerId: string };
+  let suspended: { storeId: string; ownerId: string };
+  let platformAddr: { storeId: string; ownerId: string };
+  let send: ReturnType<typeof vi.spyOn<typeof inngest, 'send'>>;
 
   beforeAll(async () => {
     app = buildApp();
+    await redis.connect();
     shop = await seedStoreWithoutBundlesFeature(`contact-${run}-shop`);
     noEmail = await seedStoreWithoutBundlesFeature(`contact-${run}-noemail`);
     demo = await seedStoreWithoutBundlesFeature(`contact-${run}-demo`);
+    capped = await seedStoreWithoutBundlesFeature(`contact-${run}-capped`);
+    other = await seedStoreWithoutBundlesFeature(`contact-${run}-other`);
+    suspended = await seedStoreWithoutBundlesFeature(`contact-${run}-susp`);
+    platformAddr = await seedStoreWithoutBundlesFeature(`contact-${run}-plat`);
     await withRlsBypass(async tx => {
+      await tx.store.update({ where: { id: suspended.storeId }, data: { email: null } });
+      await tx.user.update({ where: { id: suspended.ownerId }, data: { status: 'suspended' } });
+      await tx.store.update({
+        where: { id: platformAddr.storeId },
+        data: { email: config.smtpFromEmail.toUpperCase() },
+      });
       await tx.store.update({ where: { id: shop.storeId }, data: { email: 'shop@example.test' } });
       await tx.store.update({ where: { id: noEmail.storeId }, data: { email: null } });
       await tx.store.update({ where: { id: demo.storeId }, data: { isDemo: true } });
     });
   });
 
-  beforeEach(() => {
-    send.mockReset();
-    send.mockResolvedValue({ ids: ['evt'] } as never);
+  beforeEach(async () => {
+    // The per-IP writeLimiter (30/min) shares this private test Redis: reset it so the 21-message
+    // cap test is not starved by earlier requests from the same supertest IP.
+    await redis.getConnectedClient().flushdb();
+    // Re-install the spy per test: inngest.send is swapped once the real client has run.
+    vi.restoreAllMocks();
+    send = vi.spyOn(inngest, 'send').mockResolvedValue({ ids: ['evt'] } as never);
   });
 
   const post = (storeId: string | null, body: Record<string, unknown>) => {
@@ -127,5 +148,49 @@ describe.skipIf(!hasDb)('storefront contact routing (FU46-1)', () => {
       to: `bundle-fixture-nofeature-owner-contact-${run}-noemail@example.com`,
     });
     expect(await asApp(() => storeContactTarget(demo.storeId))).toMatchObject({ isDemo: true });
+  });
+
+  it('honeypot of any length is a silent success, never a 400', async () => {
+    const res = await post(shop.storeId, {
+      ...MESSAGE,
+      [CONTACT_HONEYPOT_FIELD]: 'x'.repeat(5000),
+    });
+    expect(res.status).toBe(200);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('X-Store-ID wins over a conflicting x-store-domain, and a body storeId is ignored', async () => {
+    const res = await request(app)
+      .post('/api/v1/public/contact')
+      .set('X-Store-ID', shop.storeId)
+      .set('x-store-domain', `bundle-fixture-nofeature-contact-${run}-other.ebda.app`)
+      .send({ ...MESSAGE, storeId: other.storeId });
+    expect(res.status).toBe(200);
+    expect(send).toHaveBeenCalledWith({
+      name: 'contact/form.submitted',
+      data: { storeId: shop.storeId, ...MESSAGE },
+    });
+  });
+
+  it('per-store cap: the 21st message in the window is dropped silently; another store is unaffected', async () => {
+    await redis.delete(`ratelimit:contact:${capped.storeId}`);
+    await redis.delete(`ratelimit:contact:${other.storeId}`);
+    for (let i = 0; i < 20; i++) expect((await post(capped.storeId, MESSAGE)).status).toBe(200);
+    expect(send).toHaveBeenCalledTimes(20);
+    const over = await post(capped.storeId, MESSAGE);
+    expect(over.status).toBe(200);
+    expect(over.body.success).toBe(true);
+    expect(send).toHaveBeenCalledTimes(20);
+    expect((await post(other.storeId, MESSAGE)).status).toBe(200);
+    expect(send).toHaveBeenCalledTimes(21);
+    expect(send).toHaveBeenLastCalledWith({
+      name: 'contact/form.submitted',
+      data: { storeId: other.storeId, ...MESSAGE },
+    });
+  });
+
+  it('recipient: a suspended owner is not mailed, and the platform sender address is never a target', async () => {
+    expect((await asApp(() => storeContactTarget(suspended.storeId)))?.to).toBeNull();
+    expect((await asApp(() => storeContactTarget(platformAddr.storeId)))?.to).toBeNull();
   });
 });

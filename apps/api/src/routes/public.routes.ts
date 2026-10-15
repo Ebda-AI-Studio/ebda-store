@@ -2161,6 +2161,9 @@ router.post(
   }
 );
 
+const CONTACT_STORE_WINDOW_SECONDS = 3600; // >= the repo's 120s TTL floor
+const CONTACT_STORE_MAX_PER_WINDOW = 20;
+
 // POST /contact - a shopper's storefront contact-page message, for THIS store (Ruling FU46-1).
 //
 // Resolved from X-Store-ID / x-store-domain like every /public write; a request that names no
@@ -2175,13 +2178,15 @@ router.post('/contact', writeLimiter, async (req: Request, res: Response, next: 
       email: z.string().email('Invalid email address'),
       subject: z.string().min(1, 'Subject is required').max(200),
       message: z.string().min(1, 'Message is required').max(5000),
-      [CONTACT_HONEYPOT_FIELD]: z.string().max(500).optional(),
+      // Any type/length: a bot stuffing the trap must get the silent success, never a 400.
+      [CONTACT_HONEYPOT_FIELD]: z.unknown().optional(),
     });
 
     const data = contactSchema.parse(req.body);
     const storeId = await getStoreIdFromRequest(req);
 
-    if ((data[CONTACT_HONEYPOT_FIELD] ?? '').trim() !== '') {
+    const trap = data[CONTACT_HONEYPOT_FIELD];
+    if (trap !== undefined && trap !== null && String(trap).trim() !== '') {
       logger.info({ storeId }, '[CONTACT] honeypot tripped; dropped');
       res.json({ success: true, data: { message: 'Message sent successfully' } });
       return;
@@ -2197,6 +2202,17 @@ router.post('/contact', writeLimiter, async (req: Request, res: Response, next: 
         messageEn: 'This is a demo store: messages are disabled',
         messageAr: 'ده متجر تجريبي — الرسائل مقفولة',
       });
+    }
+
+    // Per-STORE cap on top of the per-IP writeLimiter (FU46-1 review I1): a store UUID is public,
+    // so distributed callers could otherwise flood one merchant from its own verified sender.
+    // Over the cap: identical success to the shopper (no oracle), message dropped, store id logged.
+    // incrementRateLimit returns 0 when Redis is down (fail-open, like writeLimiter).
+    const sent = await redis.incrementRateLimit(`contact:${storeId}`, CONTACT_STORE_WINDOW_SECONDS);
+    if (sent > CONTACT_STORE_MAX_PER_WINDOW) {
+      logger.warn({ storeId }, '[CONTACT] per-store cap reached; message dropped');
+      res.json({ success: true, data: { message: 'Message sent successfully' } });
+      return;
     }
 
     await inngest.send({
