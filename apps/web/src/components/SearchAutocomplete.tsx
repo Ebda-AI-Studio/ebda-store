@@ -64,6 +64,11 @@ export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps)
   // Track the latest query the user typed so a slow earlier response
   // can't overwrite a faster later one. Same-stale-request guard pattern.
   const latestQueryRef = useRef('');
+  // The query the parent mounted us with (/search?q=… prefills the input). Suggestions for that
+  // untouched term would open a dropdown over the first row of the results the page already
+  // shows, so we stay closed until the visitor edits the field (PR 1 visual gate).
+  const mountedQueryRef = useRef(query.trim());
+  const editedRef = useRef(false);
 
   // ── Fetch suggestions ──────────────────────────────────────────────────────
 
@@ -115,6 +120,8 @@ export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps)
 
     const trimmed = query.trim();
     latestQueryRef.current = trimmed;
+    if (trimmed !== mountedQueryRef.current) editedRef.current = true;
+    if (!editedRef.current) return;
 
     if (trimmed.length < 2) {
       setSuggestions(null);
