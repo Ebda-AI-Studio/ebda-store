@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from 'react';
 import posthog from 'posthog-js';
 import * as Sentry from '@sentry/nextjs';
+import { scrubPostHogCapture } from '@ebda/shared';
 import { useConsent } from '../contexts/ConsentContext';
 
 /**
@@ -70,6 +71,9 @@ export function PostHogProvider({ children }: Props) {
       // Persistence type: cookie + localStorage. Cookie alone won't
       // survive Safari ITP 7-day cap; localStorage backs it up.
       persistence: 'localStorage+cookie',
+      // Free-text query values (?q=, ?search=, ?email=, ?phone=) never leave in a capture:
+      // the storefront search page is /search?q=<term> (@ebda/shared sentry-url-scrub).
+      before_send: scrubPostHogCapture,
     });
     // Session-replay is deliberately off (see above), so link PostHog ↔ Sentry
     // by distinct_id: a Sentry error then carries the id to look up that

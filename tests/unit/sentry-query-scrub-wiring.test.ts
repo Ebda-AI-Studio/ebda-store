@@ -50,9 +50,40 @@ describe('Sentry query-string scrubbing is wired everywhere', () => {
     '%s scrubs events, transactions and breadcrumbs',
     rel => {
       const src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
-      expect(src).toMatch(/beforeSend[\s\S]{0,200}scrubSentryEvent\(/);
+      // `beforeSend` itself (not satisfied by the beforeSendTransaction line).
+      expect(src).toMatch(/beforeSend(?!Transaction)[\s\S]{0,200}?scrubSentryEvent\(/);
       expect(src).toMatch(/beforeSendTransaction[\s\S]{0,80}scrubSentryEvent\(/);
       expect(src).toMatch(/beforeBreadcrumb[\s\S]{0,80}scrubSentryBreadcrumb\(/);
+    }
+  );
+});
+
+/**
+ * Same class for PostHog: every `posthog.init(` (web / admin / orders providers and the shared
+ * marketing + signup tracker) passes `before_send: scrubPostHogCapture`, so a `/search?q=<phone>`
+ * pageview never leaves with the phone (the pipeline itself is proven in
+ * posthog-search-query-scrub.test.ts).
+ */
+const phFiles = [
+  ...walk(path.join(ROOT, 'apps')),
+  ...walk(path.join(ROOT, 'packages/shared/src')),
+].filter(f => /\bposthog\.init\(/.test(fs.readFileSync(f, 'utf8')));
+
+describe('PostHog capture scrubbing is wired everywhere', () => {
+  it('finds the known PostHog inits (guards the scan itself)', () => {
+    expect(phFiles.map(f => path.relative(ROOT, f)).sort()).toEqual([
+      'apps/admin/src/components/PostHogProvider.tsx',
+      'apps/orders/src/components/PostHogProvider.tsx',
+      'apps/web/src/components/PostHogProvider.tsx',
+      'packages/shared/src/tracking/browser.ts',
+    ]);
+  });
+
+  it.each(phFiles.map(f => [path.relative(ROOT, f)]))(
+    '%s passes before_send: scrubPostHogCapture',
+    rel => {
+      const src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+      expect(src).toMatch(/posthog\.init\([\s\S]*?before_send:\s*scrubPostHogCapture/);
     }
   );
 });

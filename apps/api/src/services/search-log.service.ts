@@ -51,6 +51,8 @@ const EMAIL_LIKE = /@/;
 /**
  * 8+ digits with ANY non-letter between them (space, dash of any kind, slash, underscore,
  * comma, dot, brackets): a phone (local, +20, 0020) or a 14-digit national id.
+ * Accepted false positives (Ruling SEARCH-T5-3): `size 38 40 42 44`, `2024/2025`, 8+ digit
+ * barcodes. The log is lossy by design; the search itself is unaffected.
  */
 const PHONE_LIKE = /\d(?:[^\p{L}\d]*\d){7,}/u;
 /** Order numbers: `ORD<sep><base36 secs>…` and the legacy `ORD-<ms>-<hex>`, any separator. */

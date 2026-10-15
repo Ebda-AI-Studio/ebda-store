@@ -1,7 +1,7 @@
 /**
  * Redacts the VALUES of free-text query parameters (search box, typeahead, lookups by email or
  * phone) from URLs before they leave our process: Sentry events, transactions and breadcrumbs
- * (every app) and the API's own log lines.
+ * (every app), PostHog captures (every app) and the API's own log lines.
  *
  * Why (search program P0 Task 5 review, fix-the-class): a shopper pastes a phone or an email
  * into the storefront search box, it travels as `?search=01012345678` / `?q=…`, and the SDKs
@@ -49,7 +49,24 @@ export function redactSensitiveQuery(text: string): string {
   });
 }
 
-const MAX_DEPTH = 8;
+const MAX_DEPTH = 16;
+
+/**
+ * Write `next` into `container[key]`; if the container is frozen / read-only, switch to a
+ * shallow copy (copy-on-write) and write there. Returns the container to keep using.
+ */
+function put<C extends object>(container: C, key: string | number, next: unknown, original: C): C {
+  if (container === original && (Object.isFrozen(container) || !isWritable(container, key))) {
+    container = (Array.isArray(container) ? [...container] : { ...container }) as C;
+  }
+  (container as Record<string | number, unknown>)[key] = next;
+  return container;
+}
+
+function isWritable(obj: object, key: string | number): boolean {
+  const d = Object.getOwnPropertyDescriptor(obj, key);
+  return !d || d.writable === true || typeof d.set === 'function';
+}
 
 function scrubValue(value: unknown, depth: number, seen: WeakSet<object>): unknown {
   if (typeof value === 'string') return redactSensitiveQuery(value);
@@ -64,31 +81,39 @@ function scrubValue(value: unknown, depth: number, seen: WeakSet<object>): unkno
       typeof value[1] === 'string' &&
       SENSITIVE.has(value[0].toLowerCase())
     ) {
-      value[1] = REDACTED_QUERY_VALUE;
-      return value;
+      return put(value, 1, REDACTED_QUERY_VALUE, value);
     }
-    for (let i = 0; i < value.length; i++) value[i] = scrubValue(value[i], depth + 1, seen);
-    return value;
+    let out: unknown[] = value;
+    for (let i = 0; i < value.length; i++) {
+      const next = scrubValue(value[i], depth + 1, seen);
+      if (next !== value[i]) out = put(out, i, next, value);
+    }
+    return out;
   }
   const obj = value as Record<string, unknown>;
+  let out: Record<string, unknown> = obj;
   for (const key of Object.keys(obj)) {
-    obj[key] = scrubValue(obj[key], depth + 1, seen);
+    const next = scrubValue(obj[key], depth + 1, seen);
+    if (next !== obj[key]) out = put(out, key, next, obj);
   }
   // `query_string` as an object (`{ search: '…' }`).
-  const qs = obj.query_string;
+  const qs = out.query_string;
   if (qs && typeof qs === 'object' && !Array.isArray(qs)) {
     const q = qs as Record<string, unknown>;
+    let q2: Record<string, unknown> = q;
     for (const key of Object.keys(q)) {
-      if (SENSITIVE.has(key.toLowerCase()) && q[key]) q[key] = REDACTED_QUERY_VALUE;
+      if (SENSITIVE.has(key.toLowerCase()) && q[key]) q2 = put(q2, key, REDACTED_QUERY_VALUE, q);
     }
+    if (q2 !== q) out = put(out, 'query_string', q2, obj);
   }
-  return value;
+  return out;
 }
 
 /**
- * Scrub a Sentry event / transaction in place (every string, at any depth: request URL and
- * query string, breadcrumbs, spans, contexts, extra, transaction name). Use as `beforeSend`
- * and `beforeSendTransaction`. Returns the same object.
+ * Scrub a Sentry event / transaction (every string, at any depth: request URL and query
+ * string, breadcrumbs, spans, contexts, extra, transaction name). Use as `beforeSend` and
+ * `beforeSendTransaction`. Mutates in place where it can; a frozen object is copied instead
+ * (copy-on-write), so use the RETURN value.
  */
 export function scrubSentryEvent<T>(event: T): T {
   return scrubValue(event, 0, new WeakSet()) as T;
@@ -97,4 +122,14 @@ export function scrubSentryEvent<T>(event: T): T {
 /** `beforeBreadcrumb`: scrub navigation / fetch / xhr / console breadcrumbs. */
 export function scrubSentryBreadcrumb<T>(breadcrumb: T): T {
   return scrubValue(breadcrumb, 0, new WeakSet()) as T;
+}
+
+/**
+ * PostHog `before_send`: scrub a capture result (`$current_url`, `$referrer`,
+ * `$initial_current_url` / `$initial_referrer` in `$set_once`, custom URL props, exception
+ * values). A `/search?q=<phone>` pageview leaves as `/search?q=[Filtered]`. Null passes through
+ * (an earlier hook dropped the event).
+ */
+export function scrubPostHogCapture<T>(capture: T | null): T | null {
+  return capture == null ? capture : (scrubValue(capture, 0, new WeakSet()) as T);
 }

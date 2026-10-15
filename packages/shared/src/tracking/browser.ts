@@ -31,6 +31,8 @@ import {
   serializeAttribution,
 } from './attribution';
 import { EBDA_FUNNEL, type FunnelStep, type SignupTracking } from './funnel';
+// Relative (not the barrel): this subpath stays a small, pure browser module.
+import { scrubPostHogCapture } from '../utils/sentry-url-scrub';
 
 export interface TrackerConfig {
   /** Public Meta Pixel id (NEXT_PUBLIC_EBDA_META_PIXEL_ID). Empty -> Meta never loads. */
@@ -191,6 +193,8 @@ export function createTracker(config: TrackerConfig, win: Window): Tracker {
             capture_pageview: 'history_change',
             disable_session_recording: true,
             respect_dnt: true,
+            // Free-text query values (?q=, ?search=, ?email=, ?phone=) never leave in a capture.
+            before_send: scrubPostHogCapture,
           },
           PH_INSTANCE
         );

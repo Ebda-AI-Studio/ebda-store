@@ -263,6 +263,7 @@ export {
   redactSensitiveQuery,
   scrubSentryEvent,
   scrubSentryBreadcrumb,
+  scrubPostHogCapture,
   SENSITIVE_QUERY_PARAMS,
   REDACTED_QUERY_VALUE,
 } from './sentry-url-scrub';

@@ -96,6 +96,14 @@ describe('isPersonalDataTerm', () => {
   });
 });
 
+describe('accepted false positives (Ruling SEARCH-T5-3)', () => {
+  // 8+ digits split by non-letters look like a phone: dropped from the log (the search itself
+  // is unaffected). Pinned so a change to this trade-off is a visible decision.
+  it.each(['size 38 40 42 44', '2024/2025', '5901234123457'])('drops %j', t =>
+    expect(isPersonalDataTerm(t)).toBe(true)
+  );
+});
+
 describe('searchLogTerm', () => {
   it('normalises, so spelling variants share one row', () => {
     expect(searchLogTerm('أحذية')).toBe('احذيه');
