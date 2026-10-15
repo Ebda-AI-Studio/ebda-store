@@ -318,7 +318,7 @@ The announcement bar is the ONE place chromatic primary appears proudly.
 | Flat                 | No border, no shadow                                     | Product cards, empty state — content sits on the page |
 | Hairline             | `border-t border-foreground/20`                          | Order summary, divider above totals                   |
 | Hairline (subtle)    | `divide-y divide-border/50`, `border-b border-border/50` | Cart rows, top utility bar separation                 |
-| Bordered             | `border border-border`                                   | Newsletter input, social tiles                        |
+| Bordered             | `border border-border`                                   | Social tiles (form fields: `border-input`, K-05)      |
 | Subtle hover overlay | `bg-foreground/10`                                       | Hero image scrim, category hover                      |
 
 **Shadow Philosophy**: Elegant uses NO box-shadows. Depth is communicated entirely through hairline dividers, generous whitespace, and image overlays. The most "elevation" any element gets is the `bg-background/95 backdrop-blur-sm` quick-add overlay sliding up from the bottom of a product card — and even then, the visual is a frosted glass blur, not a shadow drop.

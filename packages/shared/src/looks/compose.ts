@@ -27,7 +27,8 @@ export function lookTheme(look: LookDefinition): Partial<StoreTheme> {
     accentColor: h(t.accent),
     accentForeground: h(t.onPrimary),
     borderColor: h(t.line),
-    inputColor: h(t.line),
+    // Inputs take the muted ink, not the hairline (quality bar K-05: boundaries >= 3:1).
+    inputColor: h(t.muted),
     ringColor: h(t.primary),
     bgPage: h(t.page),
     bgSectionAlt: h(t.surface),

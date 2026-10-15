@@ -626,7 +626,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
                     `Share your experience with this product from ${storeName}...`,
                     `شارك تجربتك مع هذا المنتج من ${storeName}...`
                   )}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                  className="w-full rounded-lg border border-input bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                 />
               </div>
 

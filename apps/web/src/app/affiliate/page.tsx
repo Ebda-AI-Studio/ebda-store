@@ -248,7 +248,7 @@ function AffiliatePageContent() {
                     onChange={handleChange}
                     placeholder={t('Your full name', 'اسمك الكامل')}
                     required
-                    className="w-full px-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
 
@@ -265,7 +265,7 @@ function AffiliatePageContent() {
                     onChange={handleChange}
                     placeholder="you@example.com"
                     required
-                    className="w-full px-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
 
@@ -280,7 +280,7 @@ function AffiliatePageContent() {
                     value={form.phone}
                     onChange={handleChange}
                     placeholder={REGION.phone.placeholderIntl}
-                    className="w-full px-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
 
@@ -302,7 +302,7 @@ function AffiliatePageContent() {
                       value={form.instagram}
                       onChange={handleChange}
                       placeholder={t('yourhandle', 'حسابك')}
-                      className="w-full pl-8 pr-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full pl-8 pr-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                   </div>
                 </div>
@@ -325,7 +325,7 @@ function AffiliatePageContent() {
                       value={form.tiktok}
                       onChange={handleChange}
                       placeholder={t('yourhandle', 'حسابك')}
-                      className="w-full pl-8 pr-4 py-2.5 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full pl-8 pr-4 py-2.5 border border-input rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                   </div>
                 </div>

@@ -275,7 +275,7 @@ export default function ClassicHeader({
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={t('Search', 'بحث')}
-            className="w-full ps-11 pe-4 py-2.5 border border-border bg-transparent font-serif text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500 rounded"
+            className="w-full ps-11 pe-4 py-2.5 border border-input bg-transparent font-serif text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500 rounded"
             dir={isRtl ? 'rtl' : 'ltr'}
             aria-label={t('Search products', 'بحث عن المنتجات')}
           />
@@ -292,7 +292,7 @@ export default function ClassicHeader({
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={t('Search our collection...', 'ابحث في مجموعتنا...')}
-            className="w-full py-1.5 px-0 border-b border-border bg-transparent font-serif text-base sm:text-sm text-center text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
+            className="w-full py-1.5 px-0 border-b border-input bg-transparent font-serif text-base sm:text-sm text-center text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
             dir={isRtl ? 'rtl' : 'ltr'}
             aria-label={t('Search products', 'بحث عن المنتجات')}
           />
@@ -337,7 +337,7 @@ export default function ClassicHeader({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder={t('Search...', 'بحث...')}
-                className="w-full py-2 px-0 border-b border-border bg-transparent text-sm font-serif text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
+                className="w-full py-2 px-0 border-b border-input bg-transparent text-sm font-serif text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-500"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 aria-label={t('Search products', 'بحث عن المنتجات')}
               />

@@ -272,7 +272,7 @@ export function InstapayReceiptUploader({
         value={form[key]}
         onChange={set(key)}
         dir={opts?.dir}
-        className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 text-base sm:text-sm"
+        className="mt-1 min-h-11 w-full rounded-md border border-input bg-background px-3 text-base sm:text-sm"
       />
     </div>
   );

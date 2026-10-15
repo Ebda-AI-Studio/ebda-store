@@ -257,7 +257,7 @@ export default function MinimalHeader({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={t('Search', 'بحث')}
-              className="w-full ps-10 pe-3 py-2.5 text-base sm:text-xs tracking-wide bg-transparent border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-200 rounded"
+              className="w-full ps-10 pe-3 py-2.5 text-base sm:text-xs tracking-wide bg-transparent border border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors duration-200 rounded"
               dir={isRtl ? 'rtl' : 'ltr'}
               aria-label={t('Search products', 'بحث عن المنتجات')}
             />
@@ -283,7 +283,7 @@ export default function MinimalHeader({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={t('Search...', 'بحث...')}
-              className="w-full text-center text-base sm:text-xs tracking-wide bg-transparent border-b border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground pb-2 transition-colors duration-200"
+              className="w-full text-center text-base sm:text-xs tracking-wide bg-transparent border-b border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground pb-2 transition-colors duration-200"
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}
               aria-label={t('Search products', 'بحث عن المنتجات')}

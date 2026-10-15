@@ -15,6 +15,8 @@ export interface StoreTheme {
   mutedColor: string;
   mutedForeground: string;
   borderColor: string;
+  /** Form-field boundary (`--input`). The palette keeps it on `borderColor` (Ruling B1-43). */
+  inputColor?: string;
   fontFamily: string;
   borderRadius: string;
   /**

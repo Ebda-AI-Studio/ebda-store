@@ -252,7 +252,7 @@ export default function ModernHeader({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder={t('Search', 'ابحث...')}
-                className="w-full ps-11 pe-4 py-3 bg-muted rounded-full border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out"
+                className="w-full ps-11 pe-4 py-3 bg-muted rounded-full border border-input focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 aria-label={t('Search products', 'بحث عن المنتجات')}
               />
@@ -276,7 +276,7 @@ export default function ModernHeader({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder={t('Search products...', 'ابحث عن المنتجات...')}
-                className="min-w-0 flex-1 px-4 py-2.5 bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out"
+                className="min-w-0 flex-1 px-4 py-2.5 bg-muted rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-base sm:text-sm transition-colors duration-300 ease-out"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 autoFocus={isSearchOpen}
                 aria-label={t('Search products', 'بحث عن المنتجات')}

@@ -247,7 +247,7 @@ export default function ElegantHeader({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={t('Search', 'بحث')}
-              className="w-full ps-11 pe-4 py-3 bg-transparent border-b border-border focus:outline-none focus:border-foreground text-base sm:text-sm tracking-[0.08em] placeholder:text-muted-foreground transition-colors duration-500"
+              className="w-full ps-11 pe-4 py-3 bg-transparent border-b border-input focus:outline-none focus:border-foreground text-base sm:text-sm tracking-[0.08em] placeholder:text-muted-foreground transition-colors duration-500"
               dir={isRtl ? 'rtl' : 'ltr'}
               aria-label={t('Search products', 'بحث عن المنتجات')}
             />
@@ -270,7 +270,7 @@ export default function ElegantHeader({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={t('What are you looking for?', 'ما الذي تبحث عنه؟')}
-              className="w-full px-0 py-3 bg-transparent border-0 border-b border-border focus:outline-none focus:border-foreground text-center text-base sm:text-sm tracking-[0.1em] placeholder:text-muted-foreground transition-colors duration-500"
+              className="w-full px-0 py-3 bg-transparent border-0 border-b border-input focus:outline-none focus:border-foreground text-center text-base sm:text-sm tracking-[0.1em] placeholder:text-muted-foreground transition-colors duration-500"
               dir={isRtl ? 'rtl' : 'ltr'}
               autoFocus={isSearchOpen}
               aria-label={t('Search products', 'بحث عن المنتجات')}

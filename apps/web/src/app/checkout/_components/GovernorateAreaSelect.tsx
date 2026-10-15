@@ -143,7 +143,7 @@ function Combobox({
 
   const borderClass = hasError
     ? 'border-destructive focus-within:border-destructive focus-within:ring-destructive'
-    : 'border-border focus-within:border-primary focus-within:ring-primary/20';
+    : 'border-input focus-within:border-primary focus-within:ring-primary/20';
 
   return (
     <div ref={containerRef} className="relative">

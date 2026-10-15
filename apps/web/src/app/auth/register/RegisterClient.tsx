@@ -165,7 +165,7 @@ export default function RegisterClient() {
                 <input
                   id="terms"
                   type="checkbox"
-                  className="mt-0.5 h-5 w-5 shrink-0 rounded border-border text-primary focus:ring-primary"
+                  className="mt-0.5 h-5 w-5 shrink-0 rounded border-input text-primary focus:ring-primary"
                   required
                 />
                 <label htmlFor="terms" className="text-sm text-muted-foreground">

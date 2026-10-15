@@ -96,7 +96,7 @@ export function PersonalisationField({
         enterKeyHint="done"
         onChange={e => onChange(e.target.value)}
         onBlur={() => setTouched(true)}
-        className="mt-2 block h-11 w-full rounded-[var(--radius)] border border-border bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:max-w-sm"
+        className="mt-2 block h-11 w-full rounded-[var(--radius)] border border-input bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:max-w-sm"
       />
       <p
         id={`${id}-hint`}

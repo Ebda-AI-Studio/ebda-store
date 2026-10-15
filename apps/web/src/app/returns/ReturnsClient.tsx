@@ -465,7 +465,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
                       type="checkbox"
                       checked={selectedBundleGroupIds.has(row.bundleGroupId)}
                       onChange={() => toggleBundleGroup(row.bundleGroupId)}
-                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                     />
                     <span className="flex-1 text-sm text-foreground">
                       {row.name}
@@ -486,7 +486,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
                       type="checkbox"
                       checked={selectedItemIds.has(row.item.id)}
                       onChange={() => toggleItem(row.item.id)}
-                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                     />
                     <span className="flex-1 text-sm text-foreground">
                       {row.item.product?.name || `Item #${row.item.id.slice(0, 8)}`}
@@ -546,7 +546,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
               'Describe the issue in more detail...',
               '\u0635\u0641 \u0627\u0644\u0645\u0634\u0643\u0644\u0629 \u0628\u0645\u0632\u064a\u062f \u0645\u0646 \u0627\u0644\u062a\u0641\u0635\u064a\u0644...'
             )}
-            className="w-full rounded-lg border border-border px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none sm:text-sm"
+            className="w-full rounded-lg border border-input px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none sm:text-sm"
           />
         </div>
 

@@ -402,7 +402,7 @@ export default function AddressesClient() {
                 type="checkbox"
                 checked={formData.isDefault}
                 onChange={e => setFormData({ ...formData, isDefault: e.target.checked })}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
               />
               <span className="text-sm text-foreground">
                 {t(
