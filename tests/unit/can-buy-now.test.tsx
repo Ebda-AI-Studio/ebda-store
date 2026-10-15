@@ -15,7 +15,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { canBuyNow, inStockNow } from '../../apps/web/src/lib/can-buy-now';
 import { autoSelectVariant, variantWithoutPicker } from '../../apps/web/src/lib/single-variant';
-import { productJsonLd } from '../../apps/web/src/lib/structured-data';
+import { itemList, productJsonLd } from '../../apps/web/src/lib/structured-data';
 
 vi.mock('../../apps/web/src/contexts/LanguageContext', async importOriginal => {
   const real = await importOriginal<Record<string, unknown>>();
@@ -127,6 +127,30 @@ describe('X-03: JSON-LD availability agrees with the buy button', () => {
       'https://schema.org/BackOrder'
     );
     expect(availability({ inventory: 0, inStock: false })).toBe('https://schema.org/OutOfStock');
+  });
+});
+
+describe('X-03 (fix round): the collection ItemList agrees with the PDP', () => {
+  const avail = (p: Record<string, unknown>) =>
+    (
+      itemList([{ name: 'P', url: 'u', price: 100, ...p }]) as {
+        itemListElement: Array<{ item: { offers: { availability: string } } }>;
+      }
+    ).itemListElement[0].item.offers.availability;
+  it('in stock / backorder / sold out', () => {
+    expect(avail({ inStock: true })).toBe('https://schema.org/InStock');
+    expect(avail({ inStock: false, acceptsBackorder: true })).toBe('https://schema.org/BackOrder');
+    expect(avail({ inStock: false })).toBe('https://schema.org/OutOfStock');
+  });
+  it('the PLP and home lists pass the backorder flag through the helper', () => {
+    for (const f of [
+      'apps/web/src/app/HomePageBody.tsx',
+      'apps/web/src/app/products/ProductsPageBody.tsx',
+    ]) {
+      expect(readFileSync(join(__dirname, '../..', f), 'utf8'), f).toMatch(
+        /acceptsBackorder: canBuyNow\(p\) && !inStockNow\(p\)/
+      );
+    }
   });
 });
 

@@ -426,6 +426,8 @@ interface ItemListProduct {
   price?: number | null; // in piastres (EGP * 1000)
   currency?: string;
   inStock?: boolean;
+  /** Sold out but taking backorders: BackOrder, the same answer as the PDP (X-03). */
+  acceptsBackorder?: boolean;
 }
 
 export function itemList(products: ItemListProduct[], listName?: string): object {
@@ -448,10 +450,13 @@ export function itemList(products: ItemListProduct[], listName?: string): object
                 '@type': 'Offer',
                 price: minorToDecimalString(p.price),
                 priceCurrency: p.currency ?? REGION.currency,
+                // The PDP's rule (X-03): an absent flag reads in stock, as before.
                 availability:
                   p.inStock !== false
                     ? 'https://schema.org/InStock'
-                    : 'https://schema.org/OutOfStock',
+                    : canBuyNow(p)
+                      ? 'https://schema.org/BackOrder'
+                      : 'https://schema.org/OutOfStock',
               },
             }
           : {}),

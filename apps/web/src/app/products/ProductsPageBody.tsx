@@ -13,7 +13,7 @@ import {
 import { breadcrumbJsonLd, itemList, storeAbsoluteUrl } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
 import ProductsClient from './ProductsClient';
-import { inStockNow } from '../../lib/can-buy-now';
+import { canBuyNow, inStockNow } from '../../lib/can-buy-now';
 
 /**
  * Products (PLP) page body — extracted 2026-07-12 (tenant-cacheable
@@ -168,6 +168,7 @@ export async function ProductsPageBody({
               price: number;
               inventory?: number;
               inStock?: boolean;
+              acceptsBackorder?: boolean;
             }>
           )
             .slice(0, 50)
@@ -178,6 +179,7 @@ export async function ProductsPageBody({
               price: p.price,
               currency: store.currency,
               inStock: inStockNow(p),
+              acceptsBackorder: canBuyNow(p) && !inStockNow(p),
             })),
           'All Products'
         )
