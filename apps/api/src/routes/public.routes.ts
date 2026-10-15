@@ -23,6 +23,8 @@ import {
   viewIngestLimiter,
 } from '../middleware/security';
 import { recordProductView } from '../services/view-ingest.service';
+import { recordSearch } from '../services/search-log.service';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
@@ -292,6 +294,18 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
         optionFilters: hasOptionFilters ? optionFilters : undefined,
       })
     );
+
+    // First-party search log (search program P0, Task 5): page 1 of a real query only, so
+    // paging does not double count; typeahead (/search/suggest) is not logged (keystrokes,
+    // Ruling SEARCH-6). Counted after the request transaction commits, in its own tenant
+    // transaction (E2), fail-open. A getCached hit is still counted: it counts searches, not
+    // DB reads. No identity is stored and personal-data-shaped terms are dropped.
+    if (effectiveSearch && (!page || page === '1') && !validCursor) {
+      const total = (result as { meta?: { total?: number } }).meta?.total ?? 0;
+      void deferAfterTenantCommit('search-log', () =>
+        recordSearch(storeId, effectiveSearch, total)
+      );
+    }
 
     // Edge-cacheable: product list is identical for all anonymous
     // visitors of the same store. Per-tenant via the default Vary on

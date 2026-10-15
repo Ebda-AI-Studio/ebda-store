@@ -119,6 +119,7 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       pageRevisions: 'StorePageRevision',
       productModels: 'ProductModel',
       sizeCharts: 'SizeChart',
+      searchQueryDaily: 'SearchQueryDaily',
       productModelBindings: 'ProductModelBinding',
       affiliates: 'Affiliate',
       affiliateReferrals: 'AffiliateReferral',
@@ -391,6 +392,14 @@ export const TENANT_GUARD_SCHEMA: readonly TenantGuardModel[] = [
       store: 'Store',
       product: 'Product',
       bindings: 'ProductModelBinding',
+    },
+  },
+  {
+    name: 'SearchQueryDaily',
+    table: 'search_query_daily',
+    storeId: true,
+    relations: {
+      store: 'Store',
     },
   },
   {

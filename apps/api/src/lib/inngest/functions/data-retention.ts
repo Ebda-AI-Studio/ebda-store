@@ -1,9 +1,10 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, withStore, acrossStores, acrossStoresFlat } from '@ebda/database';
+import { prisma, withStore, acrossStores, acrossStoresFlat, storeDirectory } from '@ebda/database';
 import { AuthService, eraseNeedsCrmReview } from '../../../services/auth.service';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { auditLog } from '../../../middleware/security';
+import { purgeSearchLog, SEARCH_LOG_RETENTION_DAYS } from '../../../services/search-log.service';
 
 /**
  * Data retention crons (iceberg item #15 / applicable GCC data-protection
@@ -94,6 +95,38 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
 
     logger.info({ cutoff, candidateCount, deleted }, 'abandoned-cart-purge: completed');
     return { purged: deleted, remaining: candidateCount - deleted };
+  }
+);
+
+/**
+ * search-log-purge — daily. Drops `search_query_daily` rows older than 90 Cairo days
+ * (search program P0, Task 5; Ruling SEARCH-4). The rows hold no identity, but storage
+ * limitation still applies: the merchant's insights page reads at most 90 days. Each store
+ * is purged in its own tenant transaction (`acrossStores`, strict RLS), soft-deleted stores
+ * included. Daily, so the table never holds more than ~91 days per store; one small DELETE
+ * per store per run.
+ */
+export const searchLogPurge: InngestFunction.Any = inngest.createFunction(
+  {
+    id: 'search-log-purge-daily',
+    name: `Purge storefront search log rows older than ${SEARCH_LOG_RETENTION_DAYS} days`,
+    retries: 1,
+    triggers: [{ cron: '30 4 * * *' }],
+  },
+  async ({ step }) => {
+    const purged = await step.run('purge', async () => {
+      let n = 0;
+      // Soft-deleted stores too: their rows must age out like everyone else's.
+      const storeIds = (await storeDirectory(undefined, { includeDeleted: true })).map(s => s.id);
+      for (const { value } of await acrossStores(storeId => purgeSearchLog(storeId), { storeIds }))
+        n += value;
+      return n;
+    });
+    logger.info(
+      { purged, retentionDays: SEARCH_LOG_RETENTION_DAYS },
+      'search-log-purge: completed'
+    );
+    return { purged };
   }
 );
 

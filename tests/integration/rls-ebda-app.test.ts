@@ -457,6 +457,8 @@ describe('every table with a store_id column is under STRICT, FORCED RLS (auto-e
     expect(tables).toEqual(expect.arrayContaining(['product_models', 'product_model_bindings']));
     // Size charts (B0 Task 9, 2026-10-16) — same automatic coverage.
     expect(tables).toContain('size_charts');
+    // Storefront search log (search program P0 Task 5, 2026-10-15) — same automatic coverage.
+    expect(tables).toContain('search_query_daily');
     const [{ n }] = await owner.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(*) AS n FROM public.store_page_revisions`;
     expect(Number(n)).toBeGreaterThanOrEqual(2); // not vacuously empty for the 0-row assertion below

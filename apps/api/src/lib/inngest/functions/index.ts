@@ -16,6 +16,7 @@ import { reviewRequest } from './review-request';
 import { reviewModeration } from './review-moderation';
 import {
   abandonedCartPurge,
+  searchLogPurge,
   softDeletedUserAnonymize,
   orderAnonymizeAtFiveYears,
 } from './data-retention';
@@ -107,6 +108,7 @@ const allInngestFunctions: InngestFunction.Any[] = [
   reviewRequest,
   reviewModeration,
   abandonedCartPurge,
+  searchLogPurge,
   softDeletedUserAnonymize,
   orderAnonymizeAtFiveYears,
   alertsFailureWatch,
