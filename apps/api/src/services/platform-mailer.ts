@@ -22,6 +22,7 @@ import { EmailService, renderBrandedShell } from './email.service';
 import { emailVerificationTemplate } from './email-templates/email-verification';
 import { passwordResetTemplate } from './email-templates/password-reset';
 import { staffInviteTemplate, type StaffInviteData } from './email-templates/staff-invite';
+import { legalNoticeTemplate, type LegalNoticeEmailData } from './email-templates/legal-notice';
 import { escapeHtml } from './email-templates/_util';
 
 export interface CapturedMail {
@@ -242,4 +243,41 @@ export async function sendStaffInviteEmail(data: StaffInviteData, language?: Lan
     },
     { redactLinkInLog: true }
   );
+}
+
+/**
+ * Material policy-change notice to a store owner (Rulings LEGAL-4, LEGAL-6). ONE bilingual
+ * email (Arabic block first, then English) whatever `users.language` says. Called once per
+ * recipient by the `legal-notice-send` Inngest function, which owns idempotency
+ * (legal_notice_deliveries) and throttling (the platform send pacer).
+ *
+ * A transactional legal/service notice, NOT marketing: it carries no unsubscribe link by
+ * design (Ruling LEGAL-4), and the email says so in its footer line.
+ *
+ * Throws on a provider error so the caller marks the delivery `failed`. Unlike the other
+ * platform mails it also throws in production when Resend is not configured: `deliver`
+ * would only log there, and the fan-out would record a mail nobody received as `sent`.
+ */
+export async function sendLegalNoticeEmail(
+  data: LegalNoticeEmailData & { email: string }
+): Promise<void> {
+  if (config.nodeEnv === 'production' && !ResendService.isConfigured()) {
+    throw new Error('RESEND_NOT_CONFIGURED');
+  }
+  const html = renderBrandedShell(legalNoticeTemplate.body(data), {
+    name: BRAND.product.nameEn,
+    nameAr: BRAND.product.nameAr,
+    logo: BRAND_EMAIL_LOGO_URL,
+    theme: null,
+    email: null,
+    phone: null,
+    address: null,
+    defaultLanguage: 'ar',
+  });
+  await deliver({
+    to: data.email,
+    subject: legalNoticeTemplate.subject(),
+    html,
+    replyTo: BRAND.supportEmail,
+  });
 }

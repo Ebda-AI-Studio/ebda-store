@@ -327,6 +327,13 @@ type EbdaAdsConversionRequestedEvent = EventPayload & {
   };
 };
 
+// Material legal-policy change (Ruling LEGAL-4): emitted ONLY by the super-admin
+// POST /admin/legal-policies/:docKey/:version/send-notice; see functions/legal-notice-send.ts.
+type LegalNoticeSendRequestedEvent = EventPayload & {
+  name: 'legal/notice.send-requested';
+  data: { docKey: string; version: string; sentBy: string };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -360,7 +367,8 @@ export type AppEvent =
   | GscIngestRequestedEvent
   | ContactFormSubmittedEvent
   | CampaignSendRequestedEvent
-  | EbdaAdsConversionRequestedEvent;
+  | EbdaAdsConversionRequestedEvent
+  | LegalNoticeSendRequestedEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots

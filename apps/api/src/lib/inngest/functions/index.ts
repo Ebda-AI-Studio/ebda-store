@@ -78,6 +78,7 @@ import {
 import { gscIngestCron, gscIngestOnDemand } from './gsc-ingest';
 import { contactFormSend } from './contact-form-send';
 import { campaignSend } from './campaign-send';
+import { legalNoticeSend } from './legal-notice-send';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -218,6 +219,9 @@ const allInngestFunctions: InngestFunction.Any[] = [
   // D2 email campaigns: event-triggered only (a merchant pressing send) —
   // no cron, so registering it sends nothing on its own.
   campaignSend,
+  // Material legal-policy change: one email per store owner (Ruling LEGAL-4). Event-triggered
+  // only (a super admin pressing Send notice).
+  legalNoticeSend,
 ];
 
 /**
