@@ -1,10 +1,13 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, withStore, acrossStores, acrossStoresFlat, storeDirectory } from '@ebda/database';
+import { prisma, withStore, acrossStores, acrossStoresFlat } from '@ebda/database';
 import { AuthService, eraseNeedsCrmReview } from '../../../services/auth.service';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { auditLog } from '../../../middleware/security';
-import { purgeSearchLog, SEARCH_LOG_RETENTION_DAYS } from '../../../services/search-log.service';
+import {
+  purgeSearchLogAcrossStores,
+  SEARCH_LOG_RETENTION_DAYS,
+} from '../../../services/search-log.service';
 
 /**
  * Data retention crons (iceberg item #15 / applicable GCC data-protection
@@ -114,18 +117,16 @@ export const searchLogPurge: InngestFunction.Any = inngest.createFunction(
     triggers: [{ cron: '30 4 * * *' }],
   },
   async ({ step }) => {
-    const purged = await step.run('purge', async () => {
-      let n = 0;
-      // Soft-deleted stores too: their rows must age out like everyone else's.
-      const storeIds = (await storeDirectory(undefined, { includeDeleted: true })).map(s => s.id);
-      for (const { value } of await acrossStores(storeId => purgeSearchLog(storeId), { storeIds }))
-        n += value;
-      return n;
-    });
+    // Every store, soft-deleted ones included; one failing store never stops the rest.
+    const { purged, failedStores } = await step.run('purge', () => purgeSearchLogAcrossStores());
     logger.info(
-      { purged, retentionDays: SEARCH_LOG_RETENTION_DAYS },
+      { purged, failedStores, retentionDays: SEARCH_LOG_RETENTION_DAYS },
       'search-log-purge: completed'
     );
+    // Loud, after every other store was purged: the run fails, so the failure watch sees it.
+    if (failedStores > 0) {
+      throw new Error(`search-log-purge: ${failedStores} store(s) failed; see the per-store log`);
+    }
     return { purged };
   }
 );

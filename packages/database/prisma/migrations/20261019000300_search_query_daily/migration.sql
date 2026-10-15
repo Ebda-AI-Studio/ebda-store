@@ -5,6 +5,9 @@
 --                        stored; phone / email / national-id / order-number / id / link shaped
 --                        terms are dropped before insert (apps/api/src/services/search-log.service.ts).
 --                        At most 1000 distinct terms per store per day (bloat cap, same file).
+--                        updated_at is DAY granularity (midnight of the Cairo day last counted):
+--                        no exact search time is kept (Ruling SEARCH-T5-6). Free-text terms can
+--                        still contain a typed name/place; never linked to a user/session/IP/order.
 --
 -- Viewer: admin /stores/[id]/insights/searches + the analytics "searches with no results" card.
 -- Retention: 90 days (Inngest search-log-purge-daily). Store delete CASCADEs (FK below); no
@@ -22,7 +25,7 @@ CREATE TABLE "search_query_daily" (
     "searches" INTEGER NOT NULL DEFAULT 0,
     "zero_results" INTEGER NOT NULL DEFAULT 0,
     "last_result_count" INTEGER NOT NULL DEFAULT 0,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_DATE,
 
     CONSTRAINT "search_query_daily_pkey" PRIMARY KEY ("id")
 );

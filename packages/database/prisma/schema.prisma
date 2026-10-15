@@ -1263,10 +1263,11 @@ model ProductModel {
 }
 
 // Storefront search log (search program P0, Task 5): one counter row per store, Cairo day and
-// NORMALISED term. No shopper identity is stored; phone/email/order-number/id-shaped terms are
-// dropped before insert (apps/api/src/services/search-log.service.ts). Viewer: admin
-// /stores/[id]/insights/searches + the analytics "searches with no results" card. Retention 90 days
-// (search-log-purge-daily). Store delete cascades.
+// NORMALISED term. Never linked to a user/session/IP/order; phone/email/order-number/id-shaped
+// terms are dropped before insert (apps/api/src/services/search-log.service.ts); free text may
+// still hold a typed name (Ruling SEARCH-T5-6). Viewer: admin /stores/[id]/insights/searches
+// + the analytics "searches with no results" card. Retention 90 days (search-log-purge-daily).
+// Store delete cascades.
 model SearchQueryDaily {
   id              String   @id @default(uuid())
   storeId         String   @map("store_id")
@@ -1275,7 +1276,8 @@ model SearchQueryDaily {
   searches        Int      @default(0)
   zeroResults     Int      @default(0) @map("zero_results")
   lastResultCount Int      @default(0) @map("last_result_count")
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+  // Day granularity on purpose (no exact search time): written by search-log.service only.
+  updatedAt       DateTime @default(dbgenerated("CURRENT_DATE")) @map("updated_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 

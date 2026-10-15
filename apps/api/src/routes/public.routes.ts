@@ -302,9 +302,9 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
     // DB reads. No identity is stored and personal-data-shaped terms are dropped.
     if (effectiveSearch && (!page || page === '1') && !validCursor) {
       const total = (result as { meta?: { total?: number } }).meta?.total ?? 0;
-      void deferAfterTenantCommit('search-log', () =>
-        recordSearch(storeId, effectiveSearch, total)
-      );
+      // The FULL raw term: the log folds it, checks it whole for personal data, and only then
+      // cuts it to 100 characters (a phone past char 100 is caught, not half-stored).
+      void deferAfterTenantCommit('search-log', () => recordSearch(storeId, rawSearch, total));
     }
 
     // Edge-cacheable: product list is identical for all anonymous

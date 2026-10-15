@@ -40,6 +40,7 @@
 // repo or in a plain `tsc` typecheck, only inside an actual CF build.
 import { default as nextHandler } from './.open-next/worker.js';
 import * as Sentry from '@sentry/cloudflare';
+import { scrubSentryBreadcrumb, scrubSentryEvent } from '@ebda/shared';
 import { companyHostRoute } from './company-host-route';
 
 interface WorkerEnv {
@@ -95,6 +96,11 @@ export default Sentry.withSentry(
     dsn: env.SENTRY_DSN,
     tracesSampleRate: env.SENTRY_DSN ? 0.1 : 0,
     environment: env.CF_ENV_NAME || 'production',
+    // Free-text query values (?search=, ?q=, ?email=, ?phone=) never leave in an event,
+    // a transaction or a breadcrumb (@ebda/shared sentry-url-scrub).
+    beforeSend: event => scrubSentryEvent(event),
+    beforeSendTransaction: event => scrubSentryEvent(event),
+    beforeBreadcrumb: breadcrumb => scrubSentryBreadcrumb(breadcrumb),
   }),
   baseHandler
 );

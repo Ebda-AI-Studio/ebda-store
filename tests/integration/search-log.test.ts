@@ -25,8 +25,9 @@ const { publicStoreContext } = await import('../../apps/api/src/middleware/tenan
 const { errorHandler } = await import('../../apps/api/src/middleware/error-handler');
 const { default: logger } = await import('../../apps/api/src/lib/logger');
 const { StoreService } = await import('../../apps/api/src/services/store.service');
-const { recordSearch, purgeSearchLog, getSearchInsights, isoDayMinus } =
+const { recordSearch, purgeSearchLog, purgeSearchLogAcrossStores, getSearchInsights, isoDayMinus } =
   await import('../../apps/api/src/services/search-log.service');
+const { requestLogger } = await import('../../apps/api/src/middleware/request-logger');
 
 const OWNER_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
 function appUrl(): string {
@@ -44,6 +45,8 @@ const asApp = <T>(fn: () => Promise<T>) =>
 function buildApp(): Express {
   const app = express();
   app.use(express.json());
+  // The API's own access log (app.ts mounts it on every request).
+  app.use(requestLogger);
   app.use((req: Request, res: Response, next: NextFunction) => {
     asApp(
       () =>
@@ -119,6 +122,8 @@ describe.skipIf(!hasDb)('recordSearch on ebda_app (guard + strict RLS)', () => {
     });
     // DATE column holds the Cairo calendar day (not the UTC day of Cairo midnight).
     expect(rows[0].date.toISOString().slice(0, 10)).toBe(today());
+    // No exact search time is kept: updated_at is the day only (Ruling SEARCH-T5-6).
+    expect(rows[0].updatedAt.toISOString()).toBe(`${today()}T00:00:00.000Z`);
   });
 
   it('never stores a phone, an email, an order number or an id, in any digit script', async () => {
@@ -197,6 +202,24 @@ describe.skipIf(!hasDb)('GET /public/products logs through the real HTTP path', 
     expect(await prisma.searchQueryDaily.count({ where: { storeId } })).toBe(0);
   });
 
+  it('a phone in ?search= never reaches any log line of the request (access log included)', async () => {
+    const storeId = await seedStore('nolog');
+    const spies = (['info', 'warn', 'error', 'debug'] as const).map(l => vi.spyOn(logger, l));
+    try {
+      for (const phone of ['01012345678', '٠١٠١٢٣٤٥٦٧٨', '010–1234–5678']) {
+        const res = await get(storeId, `search=${encodeURIComponent(phone)}`);
+        expect(res.status).toBe(200);
+        const logged = JSON.stringify(spies.map(s => s.mock.calls));
+        expect(logged).toContain('/products'); // the access log line ran (path, no query)
+        expect(logged).not.toContain(phone);
+        expect(logged).not.toContain(encodeURIComponent(phone));
+      }
+      expect(await prisma.searchQueryDaily.count({ where: { storeId } })).toBe(0);
+    } finally {
+      spies.forEach(s => s.mockRestore());
+    }
+  });
+
   it("records the real result count and never another store's", async () => {
     const storeId = await seedStore('count');
     const other = await seedStore('other');
@@ -235,8 +258,18 @@ describe.skipIf(!hasDb)('read API, retention and erasure', () => {
     expect(zero.totals.zeroResultSearches).toBe(2);
     expect(zero.totals.zeroResultRate).toBeCloseTo(2 / 3);
 
+    // k-anonymity floor: 'تيشرت' was searched once, so it is counted in the totals but never
+    // listed (a one-off pasted name or address never shows; Ruling SEARCH-T5-6).
     const all = await asApp(() => getSearchInsights(storeId, { days: 7, filter: 'all' }));
-    expect(all.terms.map(t => t.term)).toEqual(['كوتشي', 'تيشرت']);
+    expect(all.terms.map(t => t.term)).toEqual(['كوتشي']);
+    expect(all.totals.searches).toBe(3);
+    await asApp(() => recordSearch(storeId, 'تيشرت', 5));
+    const again = await asApp(() => getSearchInsights(storeId, { days: 7, filter: 'all' }));
+    // Equal searches: ties break on the term (ت sorts before ك).
+    expect(again.terms.map(t => [t.term, t.searches])).toEqual([
+      ['تيشرت', 2],
+      ['كوتشي', 2],
+    ]);
 
     const none = await asApp(() => getSearchInsights(empty, { days: 90, filter: 'all' }));
     expect(none).toEqual({
@@ -299,6 +332,32 @@ describe.skipIf(!hasDb)('read API, retention and erasure', () => {
     expect(await asApp(() => purgeSearchLog(storeId))).toBe(1);
     expect((await rowsOf(storeId)).map(r => r.term)).toEqual(['t0', 't90']);
     expect(await prisma.searchQueryDaily.count({ where: { storeId: other } })).toBe(1);
+  });
+
+  it('the purge sweep carries on past a failing store and reports it (store id + code only)', async () => {
+    const storeId = await seedStore('sweep');
+    const t = today();
+    await prisma.searchQueryDaily.createMany({
+      data: [
+        { storeId, date: asDate(isoDayMinus(t, 120)), term: 'قديم جدا', searches: 1 },
+        { storeId, date: asDate(t), term: 'جديد', searches: 1 },
+      ],
+    });
+    const err = vi.spyOn(logger, 'error');
+    try {
+      // A store id the tenant scope refuses: its purge throws; the next store must still run.
+      const res = await asApp(() =>
+        purgeSearchLogAcrossStores({ storeIds: ['not-a-store-id', storeId] })
+      );
+      expect(res).toEqual({ purged: 1, failedStores: 1 });
+      expect((await rowsOf(storeId)).map(r => r.term)).toEqual(['جديد']);
+      const logged = JSON.stringify(err.mock.calls);
+      expect(logged).toContain('not-a-store-id');
+      expect(logged).toContain('[SEARCH-LOG] purge failed');
+      expect(logged).not.toContain('قديم');
+    } finally {
+      err.mockRestore();
+    }
   });
 
   it('store deletion removes the store search log (FK cascade)', async () => {

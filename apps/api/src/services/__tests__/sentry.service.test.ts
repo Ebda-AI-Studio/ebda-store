@@ -56,4 +56,18 @@ describe('SentryService.errorHandler gate', () => {
     run(Object.assign(new Error('legacy 401'), { status: 401 }));
     expect(captureException).not.toHaveBeenCalled();
   });
+
+  it('never sends a phone typed into ?search= in the captured URL (search log review)', () => {
+    const next = vi.fn();
+    const req = {
+      url: '/api/v1/public/products?search=01012345678&page=1',
+      method: 'GET',
+      headers: {},
+    } as never;
+    SentryService.errorHandler()(new Error('crash'), req, {} as never, next);
+    expect(captureException).toHaveBeenCalledTimes(1);
+    const sent = JSON.stringify(captureException.mock.calls[0]);
+    expect(sent).not.toContain('01012345678');
+    expect(sent).toContain('search=[Filtered]&page=1');
+  });
 });

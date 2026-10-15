@@ -5,6 +5,7 @@ import { config } from '../config';
 import logger from '../lib/logger';
 import { Prisma } from '@ebda/database';
 import { isExpectedClientError } from '../middleware/error-handler';
+import { redactSensitiveQuery, scrubSentryBreadcrumb, scrubSentryEvent } from '@ebda/shared';
 
 // ==========================================
 // Sentry Error Monitoring Service (v8 API)
@@ -42,6 +43,12 @@ export class SentryService {
 
       // Ignore certain errors
       ignoreErrors: ['RATE_LIMITED', 'UNAUTHORIZED', 'NOT_FOUND', 'ValidationError'],
+
+      // Free-text query values (?search=, ?q=, ?email=, ?phone=) never leave in an event,
+      // a transaction or a breadcrumb (search log review, fix-the-class).
+      beforeSend: event => scrubSentryEvent(event),
+      beforeSendTransaction: event => scrubSentryEvent(event),
+      beforeBreadcrumb: breadcrumb => scrubSentryBreadcrumb(breadcrumb),
     });
 
     this.isInitialized = true;
@@ -100,7 +107,7 @@ export class SentryService {
         Sentry.captureException(err, {
           ...(integrityDefect ? { level: 'warning' as const } : {}),
           extra: {
-            url: req.url,
+            url: redactSensitiveQuery(req.url),
             method: req.method,
             headers: safeHeaders,
           },

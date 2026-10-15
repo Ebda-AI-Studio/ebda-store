@@ -33,6 +33,7 @@ import { createDatabaseRoleGuard } from './cf/database-role-guard';
 import { isPlatformOrigin } from './lib/cors-cache';
 import { config } from './config';
 import * as Sentry from '@sentry/cloudflare';
+import { scrubSentryBreadcrumb, scrubSentryEvent } from '@ebda/shared';
 
 export { AuthState } from './cf/auth-state';
 export { StoreRealtime } from './cf/store-realtime';
@@ -314,6 +315,11 @@ export default Sentry.withSentry(
         ? env.BUILD_COMMIT_SHA
         : undefined,
     tracesSampleRate: 0.1,
+    // Free-text query values (?search=, ?q=, ?email=, ?phone=) never leave in an event,
+    // a transaction or a breadcrumb (search log review, fix-the-class).
+    beforeSend: event => scrubSentryEvent(event),
+    beforeSendTransaction: event => scrubSentryEvent(event),
+    beforeBreadcrumb: breadcrumb => scrubSentryBreadcrumb(breadcrumb),
   }),
   handler as never
 );
