@@ -10,6 +10,39 @@
 
 **Spec:** `docs/plans/2026-10-14-templates-and-editor-program.md` (Phase B, scenario matrix, review loop, Rulings TPL-1..3). Read with it: `docs/ebda/templates/2026-10-14-directions.md` (Qamar A/B/C briefs), `docs/ebda/templates/looks.md`, `docs/ebda/templates/demo-store.md`, `docs/ebda/templates/platform-commerce.md`, `docs/plans/2026-10-14-phase-b0-platform-commerce.md` (§ Taste bar, B0-4 as amended by B0-49), `docs/plans/2026-10-14-marketing-levelup.md` (MKT-3), `docs/ebda/templates/research/qamar.md`.
 
+## Coordinator amendments (binding; override task text where they conflict)
+
+- **C1 (T2/T3)** — T2's Atelier mix omits `layout:'chips'` and `layout:'full-bleed'`; T3 adds those values to the schemas AND to the Atelier mix, and keeps `tests/integration/store-look.test.ts` green in both tasks.
+- **C2 (T3/T7)** — schema test fixtures include the required fields (`desktopColumns`, `mobileColumns`, `autoplayMs`).
+- **C3 (T6)** — archive ALL five placeholder families incl. the Phase S fashion products and the `fashion` category; rename `CATALOGUE` once and update its guard test.
+- **C4 (T11)** — no agent production action: the API deploy dispatch, every production SQL and the R2 upload/seed are STOP 2/3 items the controller runs only after Ahmad approves. The demo order refusal is proven LOCALLY (all order paths); no production order attempt.
+- **C5 (all)** — exact test file names, no globs (e.g. `builder-homepage-characterization.test.tsx`).
+- **C6 (T2)** — on a look switch, any look-owned setting the incoming look does not set is reset to the section default (no leakage between looks); test Lookbook→Atelier and Vitrine→Lookbook.
+- **C7 (T2)** — Atelier's carousel preset uses `newest` (never a demo category slug).
+- **C8 (T2, TPL-1)** — with `design:'keep'` a switch preserves every section-setting field the merchant changed from the OUTGOING look's preset (field-level diff); with `reset` or for newly added sections the incoming preset applies. Tests for both.
+- **C9 (T2/T5)** — add the Review Focus tests: Atelier→Vitrine switch keeps content; merchant-extreme contrast guard for the Qamar looks.
+- **C10 (T6/T9)** — the demo showroom page holds one hero section per look (each with its own imagery/video); each look's mix selects its own hero, consistent with B1-8.
+- **C11 (T7)** — shop-the-look product refs: extend the ref collection to blocks so an unknown or cross-store id gets the existing `REF_NOT_FOUND` warning (test it); rendering is store-scoped and skips missing/foreign products (test a foreign id never renders).
+- **C12 (T9)** — the demo-order coverage test pins exactly the 3 `.order.create(` sites by named function (OrderService.create, createAdminOrder, the WhatsApp payment-link creator) and fails on any `order.upsert`, `order.createMany` or raw `INSERT INTO orders`.
+- **C13 (T9)** — demo store also refuses `/public/:storeId/affiliates/apply` and `/public/:storeId/push/subscribe`; correct B1-13's contact reasoning (`/contact` has no store lookup and emails Ebda's sender) — the demo refuses it anyway.
+- **C14 (T9)** — `robots.ts` resolves the store via `/public/store/resolve` (`isDemo`) and emits noindex for the demo host.
+- **C15 (T3/T4)** — the full-bleed image break puts a SOLID scrim (or solid panel) behind the text block; the contrast test measures text over that scrim at ≥ 4.5:1 for every Qamar look.
+- **C16 (T5)** — add a before/after `MinimalHeader` snapshot proving non-Qamar headers are unchanged.
+- **C17 (T6)** — SKUs from full value slugs (no collisions); shipping zones and size charts use find-then-update/create; personalisation `enabled:true`; API imports stay inside `run()`.
+- **C18 (T6)** — drop `hero.webm` (one MP4 source); per-image cap 140 KB, total demo asset budget ≤ 7 MB, enforced by the test; update B1-9 text.
+- **C19 (T7)** — use `HeroBannerLink`'s real props `{link, label, urlPrefix, children}`; no nested `data-section="hero"`; add "Look total" to LanguageContext (ar+en). Shop-the-look item rows ARE a product render path: add them to the CLAUDE.md card-path list and pass the same price / compare-at / sold-out fields through the shared helpers; sold-out items show the shared sold-out label and stay linkable.
+- **C20 (T10)** — update the four LookPicker tests for the Qamar-first default and `git add` the test file.
+- **C21 (STOP 2)** — merge order: `feat/policy-change-notify` merges BEFORE B1 (migration-order gate).
+- **C22 (new STOP 1b after T8)** — Ahmad reviews Lookbook and Vitrine screenshots (same set as Atelier) before T10 flips them to `built`.
+- **C23 (STOP 2)** — before merge, the controller counts production stores on a Qamar look (read-only SQL) and rules on moving them to the `qamar` skin.
+- **C24 (T10)** — `docs/architecture/page-definition.md` gains the new variants and `shop-the-look`.
+- **C25 (all)** — no hardcoded `:3100`; use a free port passed in, never kill processes you did not start.
+- **C26 (T1)** — `ROLLBACK.md` gets a Qamar enum section (date 2026-10-18).
+- **C27 (T1)** — admin `skins.qamar` label ar+en (not selectable as a raw skin).
+- **C28 (T7)** — Lookbook hero overlay is a dark scrim under light text; covered by the contrast test.
+- **C29** — commit scopes from commitlint's scope-enum.
+- **C30 (T12)** — pass `${{ vars.SHOW_DEMO_STORE_LINK }}` via `env:` then `"$SHOW_DEMO_STORE_LINK"` in the shell.
+
 ## Global Constraints
 
 - Arabic-first: every surface is designed and screenshotted in Arabic (RTL, Arabic-Indic numerals on for the matrix run) first, then English. Every storefront string lives in `apps/web/src/contexts/LanguageContext.tsx` (EN + AR); no hardcoded copy in a skin.
