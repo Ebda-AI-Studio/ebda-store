@@ -320,6 +320,18 @@ export default function ProductDetailClient({
     : { ...(pdpHeadingZone || {}), fontSize: '20px' };
   const pdpScale = pageTextScale(pdp?.textScale);
   const pdpDensity = pageDensityStyle(pdp?.density);
+  // Decision (b), L-03 (W2a): an image-led look (`density: 'airy'`, design.md § "Image-led looks")
+  // shows the gallery edge to edge below `sm`, at 4:5 unless the merchant chose a gallery aspect;
+  // from `sm` it is the capped gallery every store has. Every other store is unchanged.
+  const airyGallery = store?.theme?.density === 'airy';
+  const merchantGalleryAspect = pdp?.imageAspect ?? resolvedLayout?.productsPage?.pdpImageAspect;
+  const galleryFrameClass = airyGallery
+    ? `relative ${
+        !merchantGalleryAspect || merchantGalleryAspect === 'auto'
+          ? 'aspect-[4/5] sm:aspect-[3/4]'
+          : pdpAspectClass
+      } -mx-4 w-[calc(100%+2rem)] max-w-none rounded-none sm:mx-auto sm:w-full sm:max-w-[400px] sm:rounded-[var(--radius)] lg:max-w-[600px] overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10`
+    : `relative ${pdpAspectClass} mx-auto max-w-[280px] sm:max-w-[400px] lg:max-w-[600px] overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-primary/5 to-primary/10`;
   const pdpNameZone = resolveSectionZone(pdp?.typography?.productName, undefined, store.theme);
   const pdpPriceZone = resolveSectionZone(pdp?.typography?.productPrice, undefined, store.theme);
   const pdpBgStyle = pageSurfaceStyle(pdp?.bgColor, store.theme, pdp?.colorScheme);
@@ -864,7 +876,7 @@ export default function ProductDetailClient({
           carries the per-store product-detail page background. */}
       <div className="flex-1" style={pdpBgStyle}>
         <div
-          className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8"
+          className={`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 ${airyGallery ? 'pb-8 sm:py-8' : 'py-8'}`}
           style={pdpDensity}
           data-zone="products"
         >
@@ -892,9 +904,7 @@ export default function ProductDetailClient({
           <div className="grid gap-8 md:grid-cols-12">
             {/* Images */}
             <div className="space-y-4 md:col-span-5">
-              <div
-                className={`relative ${pdpAspectClass} mx-auto max-w-[280px] sm:max-w-[400px] lg:max-w-[600px] overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-primary/5 to-primary/10`}
-              >
+              <div className={galleryFrameClass} data-gallery={airyGallery ? 'airy' : undefined}>
                 {model3d && (
                   <Model3dToggle
                     active={show3d}
