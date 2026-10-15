@@ -60,3 +60,13 @@ export function resolveSectionProducts(
   if (list.length === 0) list = pools.newArrivals.length > 0 ? pools.newArrivals : pools.featured;
   return list.slice(0, limit);
 }
+
+/** One `?ids=` request carries at most this many ids (the public route's page cap). */
+export const MANUAL_IDS_PER_FETCH = 50;
+
+/** Split ids into requests of at most `size`, so no referenced id is dropped past the cap. */
+export function idChunks(ids: readonly string[], size = MANUAL_IDS_PER_FETCH): string[][] {
+  const out: string[][] = [];
+  for (let k = 0; k < ids.length; k += size) out.push(ids.slice(k, k + size));
+  return out;
+}

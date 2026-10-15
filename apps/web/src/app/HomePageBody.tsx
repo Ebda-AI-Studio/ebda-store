@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { PLATFORM_MARKETING_URL } from '../lib/platform';
 import type { ResolvedStore } from '../lib/store-resolver';
 import { API_URL } from '../lib/api';
+import { idChunks, MANUAL_IDS_PER_FETCH } from '../builder/sections/section-products';
 import type { Product, Category } from '../lib/api';
 import {
   resolveLayoutSettings,
@@ -229,7 +230,7 @@ async function fetchHomepageData(
     bestSellersResult,
     testimonialsResult,
     categoryResults,
-    manualResult,
+    manualResults,
   ] = await Promise.all([
     prefetched?.featured ?? fetchFeaturedProducts(storeHeaders, store.id),
     prefetched?.categories ?? fetchHomeCategories(storeHeaders, store.id),
@@ -266,9 +267,12 @@ async function fetchHomepageData(
           .catch(() => null)
       )
     ),
-    manualIds.length > 0
-      ? fetch(
-          `${API_URL}/public/products?ids=${encodeURIComponent(manualIds.join(','))}&limit=50`,
+    // Chunked so every referenced id is fetched (two shop-the-look sections alone can name 48
+    // pieces, plus carousel/spotlight picks); the public route caps one page at 50.
+    Promise.all(
+      idChunks(manualIds).map(chunk =>
+        fetch(
+          `${API_URL}/public/products?ids=${encodeURIComponent(chunk.join(','))}&limit=${MANUAL_IDS_PER_FETCH}`,
           {
             next: { revalidate: 60, tags: [`products:${store.id}`] },
             headers: storeHeaders,
@@ -276,7 +280,8 @@ async function fetchHomepageData(
         )
           .then(r => (r.ok ? r.json() : null))
           .catch(() => null)
-      : Promise.resolve(null),
+      )
+    ),
   ]);
 
   let featuredProducts: Product[] = featuredResult?.data?.products ?? [];
@@ -299,7 +304,7 @@ async function fetchHomepageData(
   const testimonials: HomepageTestimonial[] = testimonialsResult?.data?.testimonials ?? [];
 
   const extraProductsMap = new Map<string, Product>();
-  for (const result of [...categoryResults, manualResult]) {
+  for (const result of [...categoryResults, ...manualResults]) {
     const list: Product[] = result?.data?.products ?? [];
     for (const p of list) {
       if (p?.id) extraProductsMap.set(p.id, p);

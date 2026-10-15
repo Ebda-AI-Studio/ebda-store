@@ -9,6 +9,7 @@ import type { HeroBannerProps } from '../types';
 import { getPackStyles } from './pack-styles';
 import { responsiveFontSize } from './section-typography';
 import { HeroBannerLink } from './HeroBannerLink';
+import { translations } from '../../contexts/LanguageContext';
 import { HeroVideo } from '../../components/commerce/HeroVideo';
 
 /**
@@ -107,7 +108,7 @@ export function HeroBanner({
   // prefer the visible headline, then the image alt text, then a generic
   // localized fallback so screen-reader users always get context for the
   // "whole slide is clickable" affordance.
-  const bannerLabel = text || alt || (isRtl ? 'عرض المزيد' : 'View more');
+  const bannerLabel = text || alt || (isRtl ? translations['View more'] : 'View more');
 
   // Framed mode (Ahmad 2026-05-17 night): merchant uploaded an image
   // they want shown in FULL without crop. Sit the hero inside a

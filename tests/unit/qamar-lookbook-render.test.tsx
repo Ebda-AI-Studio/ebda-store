@@ -502,6 +502,28 @@ describe('product grids never end on an orphan row (quality bar L-05)', async ()
   });
 });
 
+describe('homepage piece fetch is never capped below the referenced ids', async () => {
+  const { idChunks, MANUAL_IDS_PER_FETCH } =
+    await import('../../apps/web/src/builder/sections/section-products');
+  it('splits 2 x 6 x 4 shop-the-look pieces + 10 picks into whole chunks of <= 50', () => {
+    const ids = Array.from({ length: 58 }, (_, i) => `p${i}`);
+    const chunks = idChunks(ids);
+    expect(chunks.map(c => c.length)).toEqual([50, 8]);
+    expect(chunks.flat()).toEqual(ids);
+    expect(MANUAL_IDS_PER_FETCH).toBe(50);
+    expect(idChunks([])).toEqual([]);
+  });
+  it('HomePageBody fetches every chunk', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(
+      new URL('../../apps/web/src/app/HomePageBody.tsx', import.meta.url),
+      'utf8'
+    );
+    expect(src).toMatch(/idChunks\(manualIds\)\.map/);
+    expect(src).not.toMatch(/ids=\$\{encodeURIComponent\(manualIds/);
+  });
+});
+
 describe('qamar display headings are not shrunk/grown by the Arabic font-size-adjust', () => {
   it('h1-h3 and .font-display reset it under the qamar pack; the collage motion has a reduced-motion end state', async () => {
     const { readFileSync } = await import('node:fs');

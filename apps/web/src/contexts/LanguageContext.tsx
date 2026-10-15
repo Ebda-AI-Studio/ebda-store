@@ -308,6 +308,9 @@ export const translations = {
   'Only you see this in the editor. Visitors do not see an empty section.':
     'أنت وحدك ترى هذا في المحرر. لا يرى الزوار قسماً فارغاً.',
 
+  // Accessible name of a whole-slide hero link with no headline or alt (HeroBanner, HeroCollage).
+  'View more': 'عرض المزيد',
+
   // Shop-the-look section (Phase B1 Lookbook). Neutral noun forms, never a gendered imperative.
   'Shop the look': 'تسوّق اللوك',
   'Items in this look': 'قطع اللوك',

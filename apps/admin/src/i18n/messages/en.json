@@ -1535,7 +1535,7 @@
           "modeSlider": "Slider (rotating images)",
           "modeSingleHint": "Shows the first slide only. Best when you have one strong campaign image.",
           "modeSliderHint": "Cycles through every slide automatically. Best for showcasing multiple campaigns or collections.",
-          "fitLabel": "Image fit",
+          "fitLabel": "Presentation",
           "fitFill": "Fill (crop to edges)",
           "fitFit": "Fit (show whole image)",
           "fitFillHint": "The image fills the banner edge-to-edge and is cropped to fit. Best for wide 1920×700 images.",

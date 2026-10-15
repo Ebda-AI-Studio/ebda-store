@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { sanitizeUrl, type HeroSlide } from '@ebda/shared';
 import { HeroBannerLink } from './HeroBannerLink';
+import { translations } from '../../contexts/LanguageContext';
 import { zoneStyle, type ResolvedZone } from './section-typography';
 
 /**
@@ -46,7 +47,7 @@ export function HeroCollage({
   const cta = pick(isRtl, lead.ctaText, lead.ctaTextAr);
   const safeCta = sanitizeUrl(lead.ctaHref, '/products');
   const ctaHref = urlPrefix && safeCta.startsWith('/') ? `${urlPrefix}${safeCta}` : safeCta;
-  const label = headline || lead.alt || (isRtl ? 'عرض المزيد' : 'View more');
+  const label = headline || lead.alt || (isRtl ? translations['View more'] : 'View more');
 
   // Logical grid columns: in Arabic the lead photo starts on the right and the others overlap
   // towards the left. Each photo is a positioned frame so next/image can `fill` it.

@@ -347,7 +347,7 @@ export function PageRenderer({
   // Hero rendering: prefer the new HeroSlider/HeroBanner shells when the
   // store has supplied slides via layout.hero. When no slides exist we fall
   // back to the legacy T.Hero (which uses the per-store hero text fields).
-  // Collage (Ruling B1-2): needs three slide photos (in the reader's language); with fewer, the
+  // Collage (Ruling B1-2): needs three slides with a photo (`image`; HeroCollage shows `imageAr` in Arabic when set); with fewer, the
   // hero renders as the banner / slider below in full-bleed.
   const collageEligible =
     layout.hero.enabled &&
