@@ -7,6 +7,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
+import { isVariantProduct } from '@/lib/variant-product';
 import { formatPrice } from '@/lib/format';
 
 import { roundToMinor } from '@ebda/shared';
@@ -22,6 +23,7 @@ interface ProductOption {
   name: string;
   sku: string | null;
   hasVariants?: boolean;
+  variantCount?: number;
 }
 
 interface VariantOption {
@@ -107,7 +109,7 @@ export default function NewPurchaseOrderPage() {
   }
 
   function productHasVariants(productId: string): boolean {
-    return products.find(p => p.id === productId)?.hasVariants === true;
+    return isVariantProduct(products.find(p => p.id === productId));
   }
 
   function selectProduct(i: number, productId: string) {

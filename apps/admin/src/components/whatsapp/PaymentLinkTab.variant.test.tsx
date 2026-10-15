@@ -8,15 +8,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 
-const { apiGet, apiPost } = vi.hoisted(() => ({ apiGet: vi.fn(), apiPost: vi.fn() }));
+const { apiGet, apiPost, toastError } = vi.hoisted(() => ({
+  apiGet: vi.fn(),
+  apiPost: vi.fn(),
+  toastError: vi.fn(),
+}));
 vi.mock('../../lib/api', () => ({ apiGet, apiPost }));
 vi.mock('next-intl', () => ({ useLocale: () => 'en' }));
 vi.mock('@ebda/ui', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useToast: () => ({ success: vi.fn(), error: vi.fn() }),
+  useToast: () => ({ success: vi.fn(), error: toastError }),
 }));
 vi.mock('../../i18n/useT', () => {
-  const t = (key: string) => key;
+  const t = (key: string, values?: Record<string, string>) =>
+    values ? `${key}(${Object.values(values).join(',')})` : key;
   return { useT: () => t };
 });
 
@@ -71,5 +76,44 @@ describe('PaymentLinkTab — sized products', () => {
     expect(apiPost.mock.calls[0][1].items).toEqual([
       { productId: 'p-abaya', variantId: 'v-m', quantity: 1 },
     ]);
+  });
+});
+
+describe('PaymentLinkTab — W1b carries (W1a re-review minors 2 and 4)', () => {
+  async function pick(product: Record<string, unknown>, variants: () => Promise<unknown>) {
+    apiGet.mockImplementation(async (url: string) =>
+      url.includes('/variants') ? variants() : { data: { products: [product] } }
+    );
+    render(<PaymentLinkTab storeId="s1" />);
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.click(await screen.findByText(String(product.name)));
+    });
+  }
+
+  it('keys the size select on the real variant rows, not a drifted hasVariants column', async () => {
+    await pick({ ...PRODUCT, hasVariants: false, variantCount: 2 }, async () => ({
+      data: { variants: [{ id: 'v-m', title: 'M', price: null, isActive: true }] },
+    }));
+    const select = (await screen.findByLabelText(/variantLabel/)) as HTMLSelectElement;
+    expect([...select.options].map(o => o.value)).toEqual(['', 'v-m']);
+  });
+
+  it('a plain product (variantCount 0) gets no size select even if the column says sized', async () => {
+    await pick({ ...PRODUCT, hasVariants: true, variantCount: 0 }, async () => ({
+      data: { variants: [] },
+    }));
+    expect(screen.queryByLabelText(/variantLabel/)).toBeNull();
+    expect(apiGet.mock.calls.some(c => String(c[0]).includes('/variants'))).toBe(false);
+  });
+
+  it('a failed sizes load says so and names the product', async () => {
+    await pick({ ...PRODUCT, variantCount: 2 }, async () => {
+      throw new Error('network');
+    });
+    expect(toastError).toHaveBeenCalledWith(
+      'toastCouldNotSendTitle',
+      'errVariantsLoadFailed(Abaya)'
+    );
   });
 });

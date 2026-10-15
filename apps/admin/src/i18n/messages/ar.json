@@ -7971,6 +7971,7 @@
       "errWbsSendFailed": "تعذر على واتساب إرسال رابط الدفع. حاول مرة أخرى بعد قليل.",
       "errVariantRequired": "اختر المقاس أو الخيار لـ {name}.",
       "errVariantNotFound": "هذا المقاس أو الخيار من {name} لم يعد متاحًا.",
+      "errVariantsLoadFailed": "تعذّر تحميل مقاسات وخيارات {name}. حاول مرة أخرى.",
       "variantLabel": "المقاس / الخيار"
     },
     "botAnalytics": {

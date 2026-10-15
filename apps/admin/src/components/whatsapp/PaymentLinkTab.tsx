@@ -10,6 +10,7 @@ import { Button, useToast } from '@ebda/ui';
 import { apiGet, apiPost } from '../../lib/api';
 import { formatPrice } from '../../lib/format';
 import { useT } from '../../i18n/useT';
+import { isVariantProduct } from '../../lib/variant-product';
 import { paymentLinkErrorMessage } from './payment-link-errors';
 import { effectiveVariantPrice } from '../../lib/variant-price';
 import { useLocale } from 'next-intl';
@@ -32,8 +33,11 @@ interface ProductOption {
   nameAr?: string | null;
   price: number;
   sku: string | null;
-  /** Server column: the product is sold as one of its variants (C-01). */
+  /** Server column: the product is sold as one of its variants (C-01). Can drift. */
   hasVariants?: boolean;
+  /** Every variant row (the admin product list's `_count`), the same count the API's
+   *  VARIANT_REQUIRED gate keys on. Wins over the column when present. */
+  variantCount?: number;
 }
 
 interface VariantOption {
@@ -179,10 +183,10 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
   const productOf = (id: string) => products.find(p => p.id === id);
   // A sized product's line is complete only once its size is picked.
   const lineComplete = (l: CartLine) =>
-    !!l.productId && l.quantity > 0 && (!productOf(l.productId)?.hasVariants || !!l.variantId);
+    !!l.productId && l.quantity > 0 && (!isVariantProduct(productOf(l.productId)) || !!l.variantId);
   const validLines = cartLines.filter(lineComplete);
   const missingVariant = cartLines.some(
-    l => l.productId && productOf(l.productId)?.hasVariants && !l.variantId
+    l => l.productId && isVariantProduct(productOf(l.productId)) && !l.variantId
   );
   const linePrice = (l: CartLine) => {
     const product = productOf(l.productId);
@@ -194,6 +198,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
   };
   const loadVariants = async (productId: string) => {
     if (variantsByProduct[productId]) return;
+    const name = productOf(productId)?.name ?? '';
     try {
       const { data } = await apiGet<{ variants: VariantOption[] }>(
         `/api/v1/stores/${storeId}/products/${productId}/variants`
@@ -203,7 +208,9 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
         [productId]: (data?.variants ?? []).filter(v => v.isActive !== false),
       }));
     } catch {
-      toastError(t('toastCouldNotSendTitle'), t('errVariantRequired', { name: '' }));
+      // Its own message, naming the product (was the "pick a size for ." text
+      // with a blank name — W1a re-review minor 2).
+      toastError(t('toastCouldNotSendTitle'), t('errVariantsLoadFailed', { name }));
     }
   };
 
@@ -377,7 +384,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                         </button>
                       </div>
                     ) : null}
-                    {selected?.hasVariants && (
+                    {isVariantProduct(selected) && selected && (
                       <label className="mt-1 block text-xs text-muted-foreground">
                         {t('variantLabel')}
                         <select
@@ -428,7 +435,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                               onClick={() => {
                                 updateLine(idx, { productId: p.id, variantId: undefined });
                                 setLineQueries(prev => ({ ...prev, [idx]: '' }));
-                                if (p.hasVariants) void loadVariants(p.id);
+                                if (isVariantProduct(p)) void loadVariants(p.id);
                               }}
                               className="block w-full px-3 py-2 text-start text-sm hover:bg-orange-50 dark:hover:bg-orange-950/30"
                             >

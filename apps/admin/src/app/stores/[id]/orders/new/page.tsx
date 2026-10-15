@@ -8,6 +8,7 @@ import { useLocale } from 'next-intl';
 import { EGYPT_GOVERNORATES, areasForGovernorate, roundToMinor, REGION } from '@ebda/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../../lib/api';
+import { isVariantProduct } from '../../../../../lib/variant-product';
 import { useAuth } from '../../../../../lib/auth';
 import { formatPrice } from '@/lib/format';
 import { useT } from '@/i18n/useT';
@@ -30,7 +31,9 @@ interface ProductSearchResult {
   nameAr?: string;
   price: number;
   sku?: string;
+  /** Column; can drift from the rows. `variantCount` (every row) wins when present. */
   hasVariants?: boolean;
+  variantCount?: number;
   variants?: ProductVariant[];
 }
 
@@ -211,7 +214,8 @@ export default function NewOrderPage() {
     setProductResults([]);
 
     // If the product has variants, fetch them and show the variant picker.
-    const hasVariants = p.hasVariants || (p.variants && p.variants.length > 0);
+    // The API's rule (any variant row), not the column (W1a re-review minor 4).
+    const hasVariants = isVariantProduct(p) || (p.variants?.length ?? 0) > 0;
     if (hasVariants) {
       if (p.variants && p.variants.length > 0) {
         // Already have variants in the search result — go straight to picker.

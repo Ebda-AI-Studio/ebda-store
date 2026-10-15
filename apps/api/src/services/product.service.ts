@@ -475,6 +475,10 @@ export class ProductService {
         include: {
           images: { orderBy: { position: 'asc' } },
           categories: { include: { category: true } },
+          // Every variant row, disabled ones included: the same count the order /
+          // payment-link VARIANT_REQUIRED gates key on, so the admin size pickers
+          // can never disagree with the API (W1a re-review minor 4).
+          _count: { select: { variants: true } },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -499,9 +503,11 @@ export class ProductService {
         variantSumByProduct.set(row.productId, row._sum.inventory ?? 0);
       }
     }
-    const withTotalInventory = products.map(p => ({
+    const withTotalInventory = products.map(({ _count, ...p }) => ({
       ...p,
-      totalInventory: p.hasVariants ? (variantSumByProduct.get(p.id) ?? 0) : p.inventory,
+      // Keyed on the real variant rows, not the `hasVariants` column, which can drift.
+      totalInventory: _count.variants > 0 ? (variantSumByProduct.get(p.id) ?? 0) : p.inventory,
+      variantCount: _count.variants,
     }));
 
     // Sales quantity = SUM(order_items.quantity) per product, restricted to the

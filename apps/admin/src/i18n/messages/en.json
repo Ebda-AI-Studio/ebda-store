@@ -7971,6 +7971,7 @@
       "errWbsSendFailed": "WhatsApp could not send the payment link. Try again shortly.",
       "errVariantRequired": "Pick a size or option for {name}.",
       "errVariantNotFound": "That size or option of {name} is no longer available.",
+      "errVariantsLoadFailed": "Couldn't load the sizes and options of {name}. Try again.",
       "variantLabel": "Size / option"
     },
     "botAnalytics": {
