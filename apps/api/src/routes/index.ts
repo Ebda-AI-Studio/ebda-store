@@ -4,7 +4,7 @@ import merchantSignupRoutes from './merchant-signup.routes';
 import onboardingRoutes from './onboarding.routes';
 import setupGuideRoutes from './setup-guide.routes';
 import mfaRoutes from './mfa.routes';
-import { meLegalNoticeRoutes } from './legal-policy.routes';
+import { meLegalNoticeRoutes, adminLegalPolicyRoutes } from './legal-policy.routes';
 import storeRoutes from './store.routes';
 import blogRoutes from './blog.routes';
 import locationsRoutes from './locations.routes';
@@ -169,6 +169,10 @@ router.use('/admin', tenantContext, adminAnswerEngineRoutes);
 // carries its own authenticate → requireMfaEnrolled → authorize('super_admin').
 router.use('/admin', platformTaxRoutes);
 router.use('/admin', fiscalArchiveRoutes);
+
+// Super-admin policy updates (Ruling LEGAL-4). BEFORE adminRoutes' catch-all MFA gate; it
+// carries its own authenticate -> MFA -> super_admin chain.
+router.use('/admin', adminLegalPolicyRoutes);
 
 // Provider activation queue (PROVIDERS-ACTIVATION). Same reachability rule as the tax routes: before
 // adminRoutes' catch-all MFA gate; it carries its own authenticate → MFA → super_admin chain.

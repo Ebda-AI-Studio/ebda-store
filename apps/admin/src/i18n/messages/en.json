@@ -6061,6 +6061,7 @@
       "navPlatformBillingEvents": "Billing ledger (platform)",
       "navPlatformTaxVerification": "VAT verification (platform)",
       "navPlatformTaxArchive": "Tax archive (platform)",
+      "navPlatformPolicyUpdates": "Policy updates",
       "navPlatformSettings": "Platform settings",
       "navPlatformProviderActivation": "Activation requests (platform)"
     },
@@ -10183,5 +10184,33 @@
       "categoryHint": "Products in this category use this chart unless they have their own.",
       "manage": "Manage size charts"
     }
+  },
+  "policyUpdates": {
+    "title": "Policy updates",
+    "subtitle": "Legal documents, their current versions, and the notices sent to merchants.",
+    "loading": "Loading…",
+    "loadFailed": "Could not load the policy list.",
+    "version": "Version {version}",
+    "published": "Published {date}.",
+    "effective": "Takes effect {date}.",
+    "material": "Material change.",
+    "notMaterial": "Not material: no notice needed.",
+    "feeChange": "Affects fees (30 days' notice).",
+    "accepted": "Accepted by {n} accounts.",
+    "sentAt": "Notice sent {date}.",
+    "deliveries": "Emails: {sent} sent, {failed} failed, {queued} waiting, of {total}.",
+    "stuck": "{n} stuck while sending: these will not finish or retry by themselves. Check them manually.",
+    "failedTitle": "Failed emails",
+    "failedMore": "Showing the latest {shown} of {total}.",
+    "failedRow": "{email}: {reason} ({time})",
+    "sendNotice": "Send notice",
+    "confirmTitle": "Send this notice to every merchant?",
+    "confirmBody": "Every store owner gets an email, and a banner appears in their dashboard until they press Got it. This cannot be undone or sent twice.",
+    "confirmSend": "Yes, send it",
+    "cancel": "Cancel",
+    "sending": "Sending…",
+    "sendStarted": "Notice sent. Emails are going out now.",
+    "alreadySent": "A notice for this version was already sent.",
+    "sendFailed": "Could not start the send. Nothing was sent. Try again."
   }
 }

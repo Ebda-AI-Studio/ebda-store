@@ -23,10 +23,13 @@ import {
   legalPolicyUrl,
   type LegalDocKey,
   type LegalDocRef,
+  type LegalVersion,
   type LegalPolicies,
   type PendingLegalNotice,
 } from '@ebda/shared';
 import { AppError } from '../middleware/error-handler';
+import { inngest } from '../lib/inngest/client';
+import { isP2002 } from '../lib/prisma-errors';
 import logger from '../lib/logger';
 import { awaitCampaignSendSlot } from '../lib/campaign-send-pacer';
 import { sendLegalNoticeEmail } from './platform-mailer';
@@ -385,4 +388,168 @@ export async function failQueuedDeliveries(
     })
   );
   return r.count;
+}
+
+// ---------------------------------------------------------------------------
+// Super-admin "Policy updates" (Ruling LEGAL-4): overview + "Send notice".
+// ---------------------------------------------------------------------------
+
+/** Failed deliveries listed per version (the count above is exact; the list is capped). */
+export const FAILED_DELIVERIES_LIST_MAX = 100;
+
+/** `ahmad@example.com` -> `a***@example.com`: enough to recognise, never a full address. */
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf('@');
+  if (at <= 0) return '***';
+  return `${Array.from(email.slice(0, at))[0]}***${email.slice(at)}`;
+}
+
+export interface FailedDeliveryRow {
+  maskedEmail: string;
+  error: string | null;
+  at: string;
+}
+
+export interface LegalPolicyOverviewRow {
+  docKey: LegalDocKey;
+  title: { ar: string; en: string };
+  current: LegalVersion;
+  send: { sentAt: string; sentBy: string; recipientCount: number | null } | null;
+  /**
+   * `sending` = claimed but never marked: the job died mid-send. It is never re-sent and never
+   * completes by itself, so the page labels it "stuck", not "in progress".
+   */
+  deliveries: { queued: number; sending: number; sent: number; failed: number };
+  /** Newest first, capped at FAILED_DELIVERIES_LIST_MAX (A11: no SQL-only runbook step). */
+  failedDeliveries: FailedDeliveryRow[];
+  acceptedCount: number;
+  /** Material, current, and not yet announced. */
+  canSend: boolean;
+}
+
+/** The super-admin page: each document's current version, its notice and delivery state. */
+export async function policyOverview(operatorId: string): Promise<LegalPolicyOverviewRow[]> {
+  return asPlatformOperator(operatorId, async () => {
+    const sends = await prisma.legalNoticeSend.findMany({
+      select: { docKey: true, version: true, sentAt: true, sentBy: true, recipientCount: true },
+    });
+    const rows: LegalPolicyOverviewRow[] = [];
+    for (const docKey of LEGAL_DOC_KEYS) {
+      const current = currentLegalVersion(activePolicies, docKey);
+      const send = sends.find(s => s.docKey === docKey && s.version === current.version) ?? null;
+      const deliveries = { queued: 0, sending: 0, sent: 0, failed: 0 };
+      let failedDeliveries: FailedDeliveryRow[] = [];
+      if (send) {
+        const grouped = await prisma.legalNoticeDelivery.groupBy({
+          by: ['status'],
+          where: { docKey, version: current.version },
+          _count: { _all: true },
+        });
+        for (const g of grouped) {
+          if (g.status in deliveries)
+            deliveries[g.status as keyof typeof deliveries] = g._count._all;
+        }
+        if (deliveries.failed > 0) {
+          const failed = await prisma.legalNoticeDelivery.findMany({
+            where: { docKey, version: current.version, status: 'failed' },
+            orderBy: { updatedAt: 'desc' },
+            take: FAILED_DELIVERIES_LIST_MAX,
+            select: { userId: true, error: true, updatedAt: true },
+          });
+          const users = await prisma.user.findMany({
+            where: { id: { in: failed.map(f => f.userId) } },
+            select: { id: true, email: true },
+          });
+          const emailOf = new Map(users.map(u => [u.id, u.email]));
+          failedDeliveries = failed.map(f => ({
+            maskedEmail: maskEmail(emailOf.get(f.userId) ?? ''),
+            error: f.error,
+            at: f.updatedAt.toISOString(),
+          }));
+        }
+      }
+      const acceptedCount = await prisma.legalAcceptance.count({
+        where: { docKey, version: current.version },
+      });
+      rows.push({
+        docKey,
+        title: LEGAL_DOC_TITLE[docKey],
+        current,
+        send: send
+          ? {
+              sentAt: send.sentAt.toISOString(),
+              sentBy: send.sentBy,
+              recipientCount: send.recipientCount,
+            }
+          : null,
+        deliveries,
+        failedDeliveries,
+        acceptedCount,
+        canSend: current.material && !send,
+      });
+    }
+    return rows;
+  });
+}
+
+/**
+ * Announce a material version: one `legal_notice_sends` row (UNIQUE per version -> a second
+ * click is 409), then the Inngest event. Queue-then-send fails fast: if the enqueue throws,
+ * the row is removed and the caller gets 502, so nothing is left half-announced (no banner
+ * without an email run). Writes run as the acting super admin (RLS: sends are super-admin-write).
+ */
+export async function requestNoticeSend(
+  operatorId: string,
+  docKey: string,
+  version: string
+): Promise<{ docKey: string; version: string; sentAt: string }> {
+  if (!isLegalDocKey(docKey)) throw new AppError(404, 'NOT_FOUND', 'Unknown legal document');
+  const current = currentLegalVersion(activePolicies, docKey);
+  if (current.version !== version) {
+    throw new AppError(
+      422,
+      'NOT_CURRENT',
+      'Only the current version of a document can be announced'
+    );
+  }
+  if (!current.material) {
+    throw new AppError(
+      422,
+      'NOT_MATERIAL',
+      'This version is not marked material in LEGAL_POLICIES'
+    );
+  }
+  let row: { id: string; sentAt: Date };
+  try {
+    row = await asPlatformOperator(operatorId, () =>
+      prisma.legalNoticeSend.create({
+        data: { docKey, version, sentBy: operatorId },
+        select: { id: true, sentAt: true },
+      })
+    );
+  } catch (err) {
+    if (isP2002(err)) {
+      throw new AppError(409, 'ALREADY_SENT', 'A notice for this version was already sent');
+    }
+    throw err;
+  }
+  try {
+    await inngest.send({
+      name: 'legal/notice.send-requested',
+      data: { docKey, version, sentBy: operatorId },
+    });
+  } catch (err) {
+    logger.error({ err, docKey, version }, '[LEGAL-NOTICE] enqueue failed, removing the send row');
+    // DELETE is revoked on this table; the definer function checks the operator is a super admin.
+    await asPlatformOperator(
+      operatorId,
+      () => prisma.$executeRaw`SELECT public.ebda_withdraw_legal_notice_send(${row.id})`
+    ).catch(e => logger.error({ err: e, docKey, version }, '[LEGAL-NOTICE] compensation failed'));
+    throw new AppError(
+      502,
+      'ENQUEUE_FAILED',
+      'Could not start the email send; nothing was sent. Try again.'
+    );
+  }
+  return { docKey, version, sentAt: row.sentAt.toISOString() };
 }

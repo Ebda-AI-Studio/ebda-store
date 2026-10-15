@@ -6061,6 +6061,7 @@
       "navPlatformBillingEvents": "سجل الفوترة (المنصة)",
       "navPlatformTaxVerification": "توثيق ضريبة القيمة المضافة (المنصة)",
       "navPlatformTaxArchive": "الأرشيف الضريبي (المنصة)",
+      "navPlatformPolicyUpdates": "تحديثات السياسات",
       "navPlatformSettings": "إعدادات المنصة",
       "navPlatformProviderActivation": "طلبات التفعيل (المنصة)"
     },
@@ -10183,5 +10184,33 @@
       "categoryHint": "كل منتجات القسم بتاخد الجدول ده إلا لو للمنتج جدول خاص.",
       "manage": "إدارة جداول المقاسات"
     }
+  },
+  "policyUpdates": {
+    "title": "تحديثات السياسات",
+    "subtitle": "الوثائق القانونية وإصداراتها الحالية والإشعارات اللي اتبعتت للتجار.",
+    "loading": "جارٍ التحميل…",
+    "loadFailed": "ماقدرناش نحمّل قائمة السياسات.",
+    "version": "الإصدار {version}",
+    "published": "اتنشر {date}.",
+    "effective": "يسري من {date}.",
+    "material": "تغيير جوهري.",
+    "notMaterial": "مش جوهري: مش محتاج إشعار.",
+    "feeChange": "بيأثر على الرسوم (إشعار 30 يوم).",
+    "accepted": "وافق عليه {n} حساب.",
+    "sentAt": "الإشعار اتبعت {date}.",
+    "deliveries": "الرسائل: {sent} اتبعتت، {failed} فشلت، {queued} مستنية، من {total}.",
+    "stuck": "{n} علقت أثناء الإرسال: مش هتكمل ولا هتتعاد لوحدها. راجعها يدويًا.",
+    "failedTitle": "الرسائل اللي فشلت",
+    "failedMore": "معروض آخر {shown} من {total}.",
+    "failedRow": "{email} · السبب: {reason} · {time}",
+    "sendNotice": "ابعت الإشعار",
+    "confirmTitle": "تبعت الإشعار ده لكل التجار؟",
+    "confirmBody": "كل صاحب متجر هيوصله إيميل، وهيظهر له شريط في لوحة التحكم لحد ما يدوس «تمام، فهمت». مينفعش يتلغي أو يتبعت مرتين.",
+    "confirmSend": "أيوه، ابعته",
+    "cancel": "إلغاء",
+    "sending": "جارٍ الإرسال…",
+    "sendStarted": "الإشعار اتبعت. الإيميلات بتطلع دلوقتي.",
+    "alreadySent": "إشعار الإصدار ده اتبعت قبل كده.",
+    "sendFailed": "ماقدرناش نبدأ الإرسال. ماتبعتش حاجة. جرّب تاني."
   }
 }
