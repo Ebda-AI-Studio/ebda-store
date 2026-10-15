@@ -50,7 +50,8 @@ vi.mock('../MinimalChrome', () => ({
     React.createElement('div', { 'data-testid': 'minimal-chrome' }, children),
 }));
 
-import { PlatformNotFound } from '../PlatformNotFound';
+import { UnknownHostNotFound } from '../UnknownHostNotFound';
+import { unknownHostLinks } from '../../lib/unknown-store-page';
 import { RouteErrorFallback } from '../RouteErrorFallback';
 import ProductsListError from '../../app/products/error';
 import CheckoutError from '../../app/checkout/error';
@@ -64,30 +65,29 @@ afterEach(() => {
   refresh.mockReset();
 });
 
-describe('PlatformNotFound', () => {
+describe('UnknownHostNotFound', () => {
   // #1542
   it('renders Arabic copy for an Arabic visitor', () => {
     languageState.language = 'ar';
-    const { container } = render(<PlatformNotFound />);
-    expect(container.textContent).toContain('هذه الصفحة غير موجودة');
-    expect(container.textContent).toContain('الانتقال إلى ابدأ');
-    expect(container.textContent).not.toContain('This page doesn’t exist');
+    const { container } = render(<UnknownHostNotFound links={unknownHostLinks({})} />);
+    expect(container.textContent).toContain('المتجر ده مش موجود أو لسه ما فتحش');
+    expect(container.textContent).toContain('اعمل متجرك على إبدأ');
+    expect(container.textContent).not.toContain('Create your store on Ebda');
   });
 
   it('keeps the English copy for an English visitor', () => {
-    const { container } = render(<PlatformNotFound />);
-    expect(container.textContent).toContain('This page doesn’t exist');
-    expect(container.textContent).toContain('Go to Ebda AI Studio');
+    const { container } = render(<UnknownHostNotFound links={unknownHostLinks({})} />);
+    expect(container.textContent).toContain('This store doesn’t exist or hasn’t opened yet');
+    expect(container.textContent).toContain('Create your store on Ebda');
   });
 
-  // #1541 — the colour pairs that failed WCAG AA 4.5:1 are gone.
-  it('uses AA-contrast colours for the CTA and eyebrow', () => {
-    const { container } = render(<PlatformNotFound />);
-    const html = container.innerHTML;
-    expect(html).not.toContain('bg-[#FF6E01]');
-    expect(html).not.toContain('text-neutral-400');
-    expect(html).toContain('bg-[#C04E00]');
-    expect(html).toContain('text-neutral-600');
+  // #1541 — brand gold button with night text (not the retired Force orange).
+  it('uses Ebda brand colours, not the Force orange', () => {
+    const { container } = render(<UnknownHostNotFound links={unknownHostLinks({})} />);
+    const html = container.innerHTML.toLowerCase();
+    expect(html).not.toContain('#ff6e01');
+    expect(html).not.toContain('c04e00');
+    expect(html).toMatch(/background:\s*(#b08d57|rgb\(176, 141, 87\))/);
   });
 });
 

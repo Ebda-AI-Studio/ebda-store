@@ -31,10 +31,12 @@ describe('platform root redirect', () => {
   it('keeps the merchant 404 branded and free of the platform pitch', () => {
     const src = web('app/not-found.tsx');
     // Store context still gets the merchant's own not-found …
-    expect(src).toMatch(/if \(isStoreContext\) \{\s*return <StoreNotFound store=\{store\} \/>;/);
+    expect(src).toMatch(
+      /if \(notFoundKind\(storeDomain, store\) === 'store'\) \{\s*return <StoreNotFound store=\{store\} \/>;/
+    );
     // … and the platform landing is gone from the 404 path entirely.
     expect(src).not.toMatch(/EditorialLanding/);
-    expect(src).toMatch(/<PlatformNotFound \/>/);
+    expect(src).toMatch(/<UnknownHostNotFound /);
   });
 
   it('never lets a merchant-facing component link to the platform pitch', () => {
@@ -55,11 +57,11 @@ describe('platform root redirect', () => {
   });
 
   it('serves a real 404, not a redirect, for an unknown slug', () => {
-    // A redirect on a non-existent URL is a soft-404. PlatformNotFound renders;
+    // A redirect on a non-existent URL is a soft-404. UnknownHostNotFound renders;
     // it must not call redirect().
-    const src = web('components/PlatformNotFound.tsx');
+    const src = web('components/UnknownHostNotFound.tsx');
     expect(src).not.toContain('redirect(');
-    expect(src).toContain('PLATFORM_MARKETING_URL');
+    expect(web('lib/unknown-store-page.ts')).toContain('BRAND_MARKETING_URL');
   });
 
   it('titles the platform sentinel as a 404, not as a merchant store', () => {
