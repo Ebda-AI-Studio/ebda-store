@@ -4,8 +4,8 @@
 --                            "Got it"). Append-only for ebda_app: UPDATE/DELETE revoked below; the
 --                            users FK cascade still removes them (referential actions are not
 --                            subject to the referencing role's grants or RLS).
---   legal_notice_sends       NEW, platform-global (documented exception in
---                            tests/integration/rls-ebda-app.test.ts): one row per announced version.
+--   legal_notice_sends       NEW, platform-global (no user data) but under RLS: any signed-in user reads it
+--                            (the banner), only a super_admin writes. One row per announced version.
 --   legal_notice_deliveries  NEW, user-keyed. Email fan-out ledger, one row per recipient per version.
 --
 -- Additive only, all three tables empty at creation, so plain CREATE INDEX is correct
@@ -60,25 +60,37 @@ CREATE UNIQUE INDEX "legal_notice_deliveries_user_id_doc_key_version_key" ON "le
 CREATE INDEX "legal_notice_deliveries_doc_key_version_status_idx" ON "legal_notice_deliveries"("doc_key", "version", "status");
 ALTER TABLE "legal_notice_deliveries" ADD CONSTRAINT "legal_notice_deliveries_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- User-keyed strict RLS, same shape as refresh_tokens (20261008000100_tenant_defence_contract):
--- the row's user, or an ACTIVE super_admin (the fan-out runs as the operator who pressed send).
-DO $legal_user_keyed$
-DECLARE
-  t text;
-BEGIN
-  FOREACH t IN ARRAY ARRAY['legal_acceptances', 'legal_notice_deliveries'] LOOP
-    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
-    EXECUTE format('ALTER TABLE public.%I FORCE ROW LEVEL SECURITY', t);
-    EXECUTE format('DROP POLICY IF EXISTS ebda_user_isolation ON public.%I', t);
-    EXECUTE format(
-      'CREATE POLICY ebda_user_isolation ON public.%I AS PERMISSIVE FOR ALL TO ebda_app '
-      'USING (user_id = nullif(current_setting(''app.current_user_id'', true), '''') OR public.ebda_is_super_admin()) '
-      'WITH CHECK (user_id = nullif(current_setting(''app.current_user_id'', true), '''') OR public.ebda_is_super_admin())',
-      t
-    );
-  END LOOP;
-END
-$legal_user_keyed$;
+-- Strict RLS, one FOR ALL policy per table (tests/integration/rls-ebda-app.test.ts requires every policy to
+-- carry USING and WITH CHECK, both reading the user GUC). "cur" = nullif(current_setting('app.current_user_id',
+-- true), ''); a super-admin is an ACTIVE super_admin per public.ebda_is_super_admin(), and the operator
+-- paths (send route, fan-out) always carry a user id, so "super-admin AND cur is set" is that path.
+--   legal_acceptances       USING own row or super_admin (reads); WITH CHECK own row ONLY, so there is no
+--                           super_admin insert path: an acceptance is the user's own consent record.
+--   legal_notice_deliveries USING own row or super_admin; WITH CHECK super_admin: a merchant reads its row
+--                           but can never insert or rewrite it (the fan-out is the sole writer).
+--   legal_notice_sends      USING any request that carries a user (the merchant banner reads it; a
+--                           contextless connection sees nothing); WITH CHECK super_admin.
+-- DELETE is revoked on all three below (a FOR ALL USING would otherwise let a reader delete); user deletion
+-- still cascades because referential actions skip the referencing role's grants and RLS.
+ALTER TABLE "legal_acceptances" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "legal_acceptances" FORCE ROW LEVEL SECURITY;
+CREATE POLICY ebda_user_isolation ON "legal_acceptances" AS PERMISSIVE FOR ALL TO ebda_app
+  USING (user_id = nullif(current_setting('app.current_user_id', true), '') OR public.ebda_is_super_admin())
+  WITH CHECK (user_id = nullif(current_setting('app.current_user_id', true), ''));
+
+ALTER TABLE "legal_notice_deliveries" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "legal_notice_deliveries" FORCE ROW LEVEL SECURITY;
+CREATE POLICY ebda_user_isolation ON "legal_notice_deliveries" AS PERMISSIVE FOR ALL TO ebda_app
+  USING (user_id = nullif(current_setting('app.current_user_id', true), '') OR public.ebda_is_super_admin())
+  WITH CHECK (nullif(current_setting('app.current_user_id', true), '') IS NOT NULL AND public.ebda_is_super_admin());
+
+ALTER TABLE "legal_notice_sends" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "legal_notice_sends" FORCE ROW LEVEL SECURITY;
+CREATE POLICY ebda_user_isolation ON "legal_notice_sends" AS PERMISSIVE FOR ALL TO ebda_app
+  USING (nullif(current_setting('app.current_user_id', true), '') IS NOT NULL)
+  WITH CHECK (nullif(current_setting('app.current_user_id', true), '') IS NOT NULL AND public.ebda_is_super_admin());
 
 -- Acceptance is a legal record: the app may add rows, never rewrite or remove them.
 REVOKE UPDATE, DELETE ON "legal_acceptances" FROM ebda_app;
+REVOKE DELETE ON "legal_notice_deliveries" FROM ebda_app;
+REVOKE DELETE ON "legal_notice_sends" FROM ebda_app;

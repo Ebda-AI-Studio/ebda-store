@@ -3,7 +3,9 @@
  *   - legal_acceptances / legal_notice_deliveries are user-keyed: a user sees and writes only
  *     their own rows, a contextless read sees none;
  *   - legal_acceptances is append-only for ebda_app (UPDATE/DELETE revoked);
- *   - legal_notice_sends is platform-global (documented exception) and readable by any user;
+ *   - legal_notice_sends is platform-global but under RLS: readable by any signed-in user, written
+ *     only by a super_admin; legal_acceptances inserts are the user's own only; deliveries are
+ *     written only by the operator;
  *   - deleting a user cascades to their legal rows, including a super-admin hard delete.
  * Raw SQL on purpose: it proves the DATABASE layer (the guard allows raw SQL under a scope).
  * The contextless read uses an UNGUARDED ebda_app client (as rls-ebda-app.test.ts does): the
@@ -134,6 +136,142 @@ describe.skipIf(!hasDb)('legal tables under strict RLS', () => {
         )
       )
     ).rejects.toThrow(/permission denied/i);
+  });
+
+  it('legal_acceptances: DELETE is refused too (append-only)', async () => {
+    await expect(
+      asApp(() =>
+        withUser(users.a, () =>
+          prisma.$executeRawUnsafe(
+            `DELETE FROM public.legal_acceptances WHERE user_id = $1`,
+            users.a
+          )
+        )
+      )
+    ).rejects.toThrow(/permission denied/i);
+  });
+
+  it('legal_acceptances: a super-admin cannot insert an acceptance for another user', async () => {
+    await expect(
+      asApp(() =>
+        asPlatformOperator(users.op, () =>
+          prisma.$executeRawUnsafe(
+            `INSERT INTO public.legal_acceptances (id, user_id, doc_key, version, source) VALUES ($1, $2, 'privacy', '1.0', 'signup')`,
+            crypto.randomUUID(),
+            users.a
+          )
+        )
+      )
+    ).rejects.toThrow(/row-level security/i);
+  });
+
+  it('legal_acceptances: a super-admin can still read every row', async () => {
+    const rows = await asApp(() =>
+      asPlatformOperator(users.op, () =>
+        prisma.$queryRawUnsafe<Array<{ user_id: string }>>(
+          `SELECT user_id FROM public.legal_acceptances WHERE user_id IN ($1, $2)`,
+          users.a,
+          users.b
+        )
+      )
+    );
+    expect(rows.map(r => r.user_id).sort()).toEqual([users.a, users.b].sort());
+  });
+
+  it('legal_notice_deliveries: a merchant cannot insert or update its own delivery row', async () => {
+    await expect(
+      asApp(() =>
+        withUser(users.a, () =>
+          prisma.$executeRawUnsafe(
+            `INSERT INTO public.legal_notice_deliveries (id, user_id, doc_key, version, updated_at) VALUES ($1, $2, 'privacy', '1.0', now())`,
+            crypto.randomUUID(),
+            users.a
+          )
+        )
+      )
+    ).rejects.toThrow(/row-level security/i);
+    await expect(
+      asApp(() =>
+        withUser(users.a, () =>
+          prisma.$executeRawUnsafe(
+            `UPDATE public.legal_notice_deliveries SET status = 'sent' WHERE user_id = $1`,
+            users.a
+          )
+        )
+      )
+    ).rejects.toThrow(/row-level security/i);
+    const row = await owner.legalNoticeDelivery.findFirst({ where: { userId: users.a } });
+    expect(row?.status).toBe('queued');
+  });
+
+  it('legal_notice_deliveries: the operator (fan-out) can update a delivery row', async () => {
+    const touched = await asApp(() =>
+      asPlatformOperator(users.op, () =>
+        prisma.$executeRawUnsafe(
+          `UPDATE public.legal_notice_deliveries SET status = 'sending' WHERE user_id = $1`,
+          users.b
+        )
+      )
+    );
+    expect(touched).toBe(1);
+  });
+
+  it('legal_notice_sends: contextless sees none; a merchant cannot write or delete; the operator can', async () => {
+    const docKey = 'legal';
+    const version = `1.${run.replace(/\D/g, '').slice(0, 6) || '1'}`;
+    await owner.legalNoticeSend.create({ data: { docKey, version, sentBy: users.op } });
+    try {
+      const contextless = await asUnguardedApp(() =>
+        prisma.$queryRawUnsafe<Array<{ n: bigint }>>(
+          `SELECT count(*) AS n FROM public.legal_notice_sends WHERE version = $1`,
+          version
+        )
+      );
+      expect(Number(contextless[0].n)).toBe(0);
+      await expect(
+        asApp(() =>
+          withUser(users.a, () =>
+            prisma.$executeRawUnsafe(
+              `INSERT INTO public.legal_notice_sends (id, doc_key, version, sent_by) VALUES ($1, 'terms', $2, $3)`,
+              crypto.randomUUID(),
+              `x${version}`,
+              users.a
+            )
+          )
+        )
+      ).rejects.toThrow(/row-level security/i);
+      await expect(
+        asApp(() =>
+          withUser(users.a, () =>
+            prisma.$executeRawUnsafe(
+              `UPDATE public.legal_notice_sends SET recipient_count = 99 WHERE version = $1`,
+              version
+            )
+          )
+        )
+      ).rejects.toThrow(/row-level security/i);
+      await expect(
+        asApp(() =>
+          withUser(users.a, () =>
+            prisma.$executeRawUnsafe(
+              `DELETE FROM public.legal_notice_sends WHERE version = $1`,
+              version
+            )
+          )
+        )
+      ).rejects.toThrow(/permission denied/i);
+      const opUpd = await asApp(() =>
+        asPlatformOperator(users.op, () =>
+          prisma.$executeRawUnsafe(
+            `UPDATE public.legal_notice_sends SET recipient_count = 7 WHERE version = $1`,
+            version
+          )
+        )
+      );
+      expect(opUpd).toBe(1);
+    } finally {
+      await owner.legalNoticeSend.deleteMany({ where: { docKey, version } });
+    }
   });
 
   it('legal_notice_sends is readable by any signed-in user (platform-global)', async () => {
