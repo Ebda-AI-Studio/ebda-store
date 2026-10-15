@@ -7,6 +7,7 @@ import { Button, useToast } from '@ebda/ui';
 import { AdminLayout } from '../../../components/AdminLayout';
 import { apiGet, apiPut, apiDelete } from '../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { LegalAcceptancesPanel } from '../../../components/legal/LegalAcceptancesPanel';
 
 interface UserDetail {
   id: string;
@@ -289,6 +290,10 @@ export default function UserDetailPage() {
               </div>
             </div>
           )}
+
+          <div className="mt-6">
+            <LegalAcceptancesPanel userId={userId} />
+          </div>
         </div>
 
         {/* Edit Form */}

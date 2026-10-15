@@ -36,9 +36,14 @@ const row = (docKey: string, material: boolean, send: unknown = null) => ({
   },
   send,
   deliveries: { queued: 0, sending: 0, sent: 0, failed: 0 },
+  stuckSending: 0,
+  noRun: false,
+  stalled: false,
   acceptedCount: 1234,
   canSend: material && !send,
+  sendBlocked: null,
 });
+const SENT = { sentAt: '2026-10-21T10:00:00.000Z', sentBy: 'u', recipientCount: 5 };
 
 afterEach(() => {
   cleanup();
@@ -95,7 +100,7 @@ describe('policy updates page', () => {
     expect(await screen.findByText('loadFailed')).toBeTruthy();
   });
 
-  it('lists failed deliveries (masked) and labels a stuck row honestly, never "in progress"', async () => {
+  it('lists failed deliveries (masked) and labels an AGED sending row stuck (I4)', async () => {
     apiGet.mockResolvedValue({
       data: {
         policies: [
@@ -106,6 +111,7 @@ describe('policy updates page', () => {
               recipientCount: 5,
             }),
             deliveries: { queued: 0, sending: 2, sent: 1, failed: 2 },
+            stuckSending: 2,
             failedDeliveries: [
               {
                 maskedEmail: 'a***@example.com',
@@ -122,7 +128,7 @@ describe('policy updates page', () => {
     render(<PolicyUpdatesPage />);
     expect(await screen.findByText('failedTitle')).toBeTruthy();
     expect(screen.getByText(/a\*\*\*@example\.com/).textContent).toContain('SEND_JOB_FAILED');
-    expect(screen.getByText(/a\*\*\*@example\.com/).textContent).toContain('2026-10-21 10:05 UTC');
+    expect(screen.getByText(/a\*\*\*@example\.com/).textContent).toContain('2026-10-21 10:05');
     expect((await screen.findByText(/^stuck:/)).textContent).toContain('"n":"2"');
     expect(screen.getByText(/deliveries:/).textContent).not.toContain('sending');
   });
@@ -143,20 +149,99 @@ describe('policy updates page', () => {
     expect(screen.queryByText('sendFailed')).toBeNull();
   });
 
-  it('labels a send whose recipients were never materialised', async () => {
+  it('I4: a fresh send with no recipients yet reads "starting", never the red noRun', async () => {
+    apiGet.mockResolvedValue({
+      data: { policies: [row('terms', true, { ...SENT, recipientCount: null })] },
+      error: null,
+    });
+    render(<PolicyUpdatesPage />);
+    expect(await screen.findByText('starting')).toBeTruthy();
+    expect(screen.queryByText('noRun')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'resume' })).toBeNull();
+  });
+
+  it('I4: a sending row in flight reads neutral "sending", never "stuck"', async () => {
     apiGet.mockResolvedValue({
       data: {
         policies: [
-          row('terms', true, {
-            sentAt: '2026-10-21T10:00:00.000Z',
-            sentBy: 'u',
-            recipientCount: null,
-          }),
+          {
+            ...row('terms', true, SENT),
+            deliveries: { queued: 3, sending: 1, sent: 1, failed: 0 },
+          },
         ],
       },
       error: null,
     });
     render(<PolicyUpdatesPage />);
+    expect((await screen.findByText(/^inProgress:/)).textContent).toContain('"n":"4"');
+    expect(screen.queryByText(/^stuck:/)).toBeNull();
+  });
+
+  it('I4/I5: noRun (aged) is labelled and offers Resume, which confirms in the page and posts once', async () => {
+    apiGet.mockResolvedValue({
+      data: {
+        policies: [
+          { ...row('terms', true, { ...SENT, recipientCount: null }), noRun: true, stalled: true },
+        ],
+      },
+      error: null,
+    });
+    apiPost.mockResolvedValue({ data: { docKey: 'terms', version: '1.1' }, error: null });
+    render(<PolicyUpdatesPage />);
     expect(await screen.findByText('noRun')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'resume' }));
+    expect(apiPost).not.toHaveBeenCalled();
+    expect(screen.getByText('resumeBody')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'resumeConfirm' }));
+    await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
+    expect(apiPost).toHaveBeenCalledWith('/api/v1/admin/legal-policies/terms/1.1/resume', {});
+    expect(await screen.findByText('resumeStarted')).toBeTruthy();
+  });
+
+  it('I5: Retry failed shows the count, confirms, posts once and reports how many were requeued', async () => {
+    apiGet.mockResolvedValue({
+      data: {
+        policies: [
+          {
+            ...row('terms', true, SENT),
+            deliveries: { queued: 0, sending: 0, sent: 3, failed: 2 },
+          },
+        ],
+      },
+      error: null,
+    });
+    apiPost.mockResolvedValue({ data: { requeued: 2 }, error: null });
+    render(<PolicyUpdatesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'retryFailed:{"n":"2"}' }));
+    expect(screen.getByText('retryBody')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
+    expect(apiPost).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'retryFailed:{"n":"2"}' }));
+    fireEvent.click(screen.getByRole('button', { name: 'retryConfirm' }));
+    await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
+    expect(apiPost).toHaveBeenCalledWith('/api/v1/admin/legal-policies/terms/1.1/retry-failed', {});
+    expect(await screen.findByText('retryStarted:{"n":"2"}')).toBeTruthy();
+  });
+
+  it('I1: a fee change too close to its effective date shows why and offers no Send; a 422 from Send says the same', async () => {
+    apiGet.mockResolvedValueOnce({
+      data: {
+        policies: [{ ...row('terms', true), canSend: false, sendBlocked: 'NOTICE_TOO_LATE' }],
+      },
+      error: null,
+    });
+    render(<PolicyUpdatesPage />);
+    expect(await screen.findByText('tooLate')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'sendNotice' })).toBeNull();
+    cleanup();
+    apiGet.mockResolvedValue({ data: { policies: [row('terms', true)] }, error: null });
+    apiPost.mockResolvedValue({
+      data: null,
+      error: { status: 422, code: 'NOTICE_TOO_LATE', message: 'x' },
+    });
+    render(<PolicyUpdatesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'sendNotice' }));
+    fireEvent.click(screen.getByRole('button', { name: 'confirmSend' }));
+    expect(await screen.findByText('tooLate')).toBeTruthy();
   });
 });

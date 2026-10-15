@@ -8,6 +8,12 @@
  * POST that emails every store owner and turns on the dashboard banner. Delivery and
  * acknowledgement counts show what happened.
  *
+ * Run states (I4): the API decides what is unhealthy (aged rows only), the page never guesses
+ * from raw counts: `noRun` (no recipients 10 min after Send), `stalled` (nothing moved for
+ * 15 min), `stuckSending` (claimed 15+ min ago, never finishes). A run that is merely in flight
+ * reads as neutral "sending". Recovery (I5): "Resume" when stalled, "Retry failed" when any
+ * email failed; both confirm in the page and are safe to press (nobody is mailed twice).
+ *
  * Route guard: super_admin only (RequireSuperAdmin + the API's MFA + super_admin chain).
  */
 import { useCallback, useEffect, useState } from 'react';
@@ -25,18 +31,29 @@ interface PolicyRow {
   current: LegalVersion;
   send: { sentAt: string; sentBy: string; recipientCount: number | null } | null;
   deliveries: { queued: number; sending: number; sent: number; failed: number };
+  stuckSending?: number;
+  noRun?: boolean;
+  stalled?: boolean;
   failedDeliveries?: Array<{ maskedEmail: string; error: string | null; at: string }>;
   acceptedCount: number;
   canSend: boolean;
+  sendBlocked?: 'NOTICE_TOO_LATE' | null;
 }
+
+type Action = 'send' | 'resume' | 'retry';
+
+/** "2026-10-21 10:05": Latin digits, UTC (the "UTC" label lives in the i18n message). */
+const utcStamp = (iso: string) => iso.slice(0, 16).replace('T', ' ');
 
 function PolicyUpdatesInner() {
   const t = useT('policyUpdates');
   const locale = useLocale() === 'ar' ? 'ar' : 'en';
   const [rows, setRows] = useState<PolicyRow[] | null>(null);
   const [loadError, setLoadError] = useState(false);
-  const [confirming, setConfirming] = useState<LegalDocKey | null>(null);
-  const [sending, setSending] = useState(false);
+  const [confirming, setConfirming] = useState<{ docKey: LegalDocKey; action: Action } | null>(
+    null
+  );
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -49,24 +66,36 @@ function PolicyUpdatesInner() {
     void load();
   }, [load]);
 
-  const send = async (row: PolicyRow) => {
-    setSending(true);
+  const run = async (row: PolicyRow, action: Action) => {
+    setBusy(true);
     setMessage(null);
-    const { error } = await apiPost(
-      `/api/v1/admin/legal-policies/${row.docKey}/${encodeURIComponent(row.current.version)}/send-notice`,
+    const path = { send: 'send-notice', resume: 'resume', retry: 'retry-failed' }[action];
+    const { data, error } = await apiPost<{ requeued?: number }>(
+      `/api/v1/admin/legal-policies/${row.docKey}/${encodeURIComponent(row.current.version)}/${path}`,
       {}
     );
-    setSending(false);
+    setBusy(false);
     setConfirming(null);
-    setMessage(
-      !error
-        ? t('sendStarted')
-        : error.status === 409
-          ? t('alreadySent')
-          : error.code === 'WITHDRAW_FAILED'
-            ? t('sendUncertain')
-            : t('sendFailed')
-    );
+    if (error) {
+      setMessage(
+        error.code === 'NOTICE_TOO_LATE'
+          ? t('tooLate')
+          : action !== 'send'
+            ? t('actionFailed')
+            : error.status === 409
+              ? t('alreadySent')
+              : error.code === 'WITHDRAW_FAILED'
+                ? t('sendUncertain')
+                : t('sendFailed')
+      );
+    } else if (action === 'send') {
+      setMessage(t('sendStarted'));
+    } else if (action === 'resume') {
+      setMessage(t('resumeStarted'));
+    } else {
+      const n = data?.requeued ?? 0;
+      setMessage(n > 0 ? t('retryStarted', { n: String(n) }) : t('retryNone'));
+    }
     await load();
   };
 
@@ -79,6 +108,12 @@ function PolicyUpdatesInner() {
     );
   }
 
+  const confirmCopy: Record<Action, { title: string; body: string; yes: string }> = {
+    send: { title: t('confirmTitle'), body: t('confirmBody'), yes: t('confirmSend') },
+    resume: { title: t('resumeTitle'), body: t('resumeBody'), yes: t('resumeConfirm') },
+    retry: { title: t('retryTitle'), body: t('retryBody'), yes: t('retryConfirm') },
+  };
+
   return (
     <div className="space-y-4">
       {message && (
@@ -87,90 +122,132 @@ function PolicyUpdatesInner() {
         </p>
       )}
       <ul className="space-y-3">
-        {rows.map(row => (
-          <li key={row.docKey} className="rounded-lg border border-border p-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="font-medium">{row.title[locale]}</h2>
-              <span className="text-xs text-muted-foreground">
-                {t('version', { version: row.current.version })}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {t('published', { date: formatLegalDate(row.current.publishedAt, locale) })}{' '}
-              {t('effective', { date: formatLegalDate(row.current.effectiveAt, locale) })}
-            </p>
-            <p className="mt-1 text-sm">{row.current.summary[locale]}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {row.current.material ? t('material') : t('notMaterial')}
-              {row.current.feeChange ? ` ${t('feeChange')}` : ''}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {t('accepted', { n: String(row.acceptedCount) })}
-            </p>
-            {row.send && (
+        {rows.map(row => {
+          const d = row.deliveries;
+          const stuck = row.stuckSending ?? 0;
+          const inFlight =
+            !!row.send &&
+            !row.stalled &&
+            (row.send.recipientCount === null || d.queued > 0 || d.sending > stuck);
+          const open = confirming?.docKey === row.docKey ? confirming.action : null;
+          const copy = open ? confirmCopy[open] : null;
+          return (
+            <li key={row.docKey} className="rounded-lg border border-border p-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="font-medium">{row.title[locale]}</h2>
+                <span className="text-xs text-muted-foreground">
+                  {t('version', { version: row.current.version })}
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t('published', { date: formatLegalDate(row.current.publishedAt, locale) })}{' '}
+                {t('effective', { date: formatLegalDate(row.current.effectiveAt, locale) })}
+              </p>
+              <p className="mt-1 text-sm">{row.current.summary[locale]}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {t('sentAt', { date: formatLegalDate(row.send.sentAt.slice(0, 10), locale) })}{' '}
-                {t('deliveries', {
-                  total: String(row.send.recipientCount ?? 0),
-                  sent: String(row.deliveries.sent),
-                  failed: String(row.deliveries.failed),
-                  queued: String(row.deliveries.queued),
-                })}
+                {row.current.material ? t('material') : t('notMaterial')}
+                {row.current.feeChange ? ` ${t('feeChange')}` : ''}{' '}
+                {t('accepted', { n: String(row.acceptedCount) })}
               </p>
-            )}
-            {row.send && row.send.recipientCount === null && (
-              <p className="mt-1 text-xs text-destructive-ink">{t('noRun')}</p>
-            )}
-            {row.send && row.deliveries.sending > 0 && (
-              <p className="mt-1 text-xs text-destructive-ink">
-                {t('stuck', { n: String(row.deliveries.sending) })}
-              </p>
-            )}
-            {row.send && (row.failedDeliveries?.length ?? 0) > 0 && (
-              <div className="mt-2">
-                <h3 className="text-sm font-medium">{t('failedTitle')}</h3>
-                {row.deliveries.failed > (row.failedDeliveries?.length ?? 0) && (
-                  <p className="text-xs text-muted-foreground">
-                    {t('failedMore', {
-                      shown: String(row.failedDeliveries?.length ?? 0),
-                      total: String(row.deliveries.failed),
+              {row.sendBlocked === 'NOTICE_TOO_LATE' && (
+                <p className="mt-2 text-xs text-destructive-ink">{t('tooLate')}</p>
+              )}
+              {row.send && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {t('sentAt', { date: formatLegalDate(row.send.sentAt.slice(0, 10), locale) })}{' '}
+                  {row.send.recipientCount !== null &&
+                    t('deliveries', {
+                      total: String(row.send.recipientCount),
+                      sent: String(d.sent),
+                      failed: String(d.failed),
+                      queued: String(d.queued),
                     })}
-                  </p>
-                )}
-                <ul className="mt-1 space-y-1 text-xs">
-                  {row.failedDeliveries?.map((f, i) => (
-                    <li key={`${f.maskedEmail}-${i}`}>
-                      {t('failedRow', {
-                        email: `\u2066${f.maskedEmail}\u2069`,
-                        reason: f.error ?? '-',
-                        time: `${f.at.slice(0, 16).replace('T', ' ')} UTC`,
+                </p>
+              )}
+              {inFlight && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {row.send!.recipientCount === null
+                    ? t('starting')
+                    : t('inProgress', { n: String(d.queued + d.sending - stuck) })}
+                </p>
+              )}
+              {row.noRun && <p className="mt-1 text-xs text-destructive-ink">{t('noRun')}</p>}
+              {row.stalled && !row.noRun && (
+                <p className="mt-1 text-xs text-destructive-ink">
+                  {t('stalled', { n: String(d.queued) })}
+                </p>
+              )}
+              {stuck > 0 && (
+                <p className="mt-1 text-xs text-destructive-ink">
+                  {t('stuck', { n: String(stuck) })}
+                </p>
+              )}
+              {row.send && (row.failedDeliveries?.length ?? 0) > 0 && (
+                <div className="mt-2">
+                  <h3 className="text-sm font-medium">{t('failedTitle')}</h3>
+                  {d.failed > (row.failedDeliveries?.length ?? 0) && (
+                    <p className="text-xs text-muted-foreground">
+                      {t('failedMore', {
+                        shown: String(row.failedDeliveries?.length ?? 0),
+                        total: String(d.failed),
                       })}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {row.canSend && confirming !== row.docKey && (
-              <div className="mt-3">
-                <Button onClick={() => setConfirming(row.docKey)}>{t('sendNotice')}</Button>
-              </div>
-            )}
-            {confirming === row.docKey && (
-              <div className="mt-3 space-y-2 rounded-md bg-muted p-3 text-sm">
-                <p className="font-medium">{t('confirmTitle')}</p>
-                <p>{t('confirmBody')}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={() => send(row)} disabled={sending}>
-                    {sending ? t('sending') : t('confirmSend')}
-                  </Button>
-                  <Button onClick={() => setConfirming(null)} disabled={sending}>
-                    {t('cancel')}
-                  </Button>
+                    </p>
+                  )}
+                  <ul className="mt-1 space-y-1 text-xs">
+                    {row.failedDeliveries?.map((f, i) => (
+                      <li key={`${f.maskedEmail}-${i}`} className="break-words">
+                        {t('failedRow', {
+                          email: `⁦${f.maskedEmail}⁩`,
+                          reason: f.error ?? '-',
+                          time: `⁦${utcStamp(f.at)}⁩`,
+                        })}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </div>
-            )}
-          </li>
-        ))}
+              )}
+              {!open && (row.canSend || row.stalled || (row.send && d.failed > 0)) && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {row.canSend && (
+                    <Button onClick={() => setConfirming({ docKey: row.docKey, action: 'send' })}>
+                      {t('sendNotice')}
+                    </Button>
+                  )}
+                  {row.send && row.stalled && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfirming({ docKey: row.docKey, action: 'resume' })}
+                    >
+                      {t('resume')}
+                    </Button>
+                  )}
+                  {row.send && d.failed > 0 && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfirming({ docKey: row.docKey, action: 'retry' })}
+                    >
+                      {t('retryFailed', { n: String(d.failed) })}
+                    </Button>
+                  )}
+                </div>
+              )}
+              {open && copy && (
+                <div className="mt-3 space-y-2 rounded-md bg-muted p-3 text-sm">
+                  <p className="font-medium">{copy.title}</p>
+                  <p>{copy.body}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={() => run(row, open)} disabled={busy}>
+                      {busy ? t('sending') : copy.yes}
+                    </Button>
+                    <Button variant="outline" onClick={() => setConfirming(null)} disabled={busy}>
+                      {t('cancel')}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

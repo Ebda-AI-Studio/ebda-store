@@ -9244,7 +9244,8 @@
     "read": "Read the policy",
     "gotIt": "Got it",
     "saving": "Saving…",
-    "ackFailed": "Could not save. Please try again."
+    "ackFailed": "Could not save. Please try again.",
+    "readAria": "Read the {title}"
   },
   "looks": {
     "picker": {
@@ -10199,10 +10200,10 @@
     "accepted": "Accepted by {n} accounts.",
     "sentAt": "Notice sent {date}.",
     "deliveries": "Emails: {sent} sent, {failed} failed, {queued} waiting, of {total}.",
-    "stuck": "{n} stuck while sending: these will not finish or retry by themselves. Check them manually.",
+    "stuck": "{n} stuck while sending for over 15 minutes: they will not finish or retry by themselves. The owner may or may not have the email; check before contacting them.",
     "failedTitle": "Failed emails",
     "failedMore": "Showing the latest {shown} of {total}.",
-    "failedRow": "{email}: {reason} ({time})",
+    "failedRow": "{email}: {reason} ({time} UTC)",
     "sendNotice": "Send notice",
     "confirmTitle": "Send this notice to every merchant?",
     "confirmBody": "Every store owner gets an email, and a banner appears in their dashboard until they press Got it. This cannot be undone or sent twice.",
@@ -10212,7 +10213,45 @@
     "sendStarted": "Notice sent. Emails are going out now.",
     "alreadySent": "A notice for this version was already sent.",
     "sendUncertain": "The notice is recorded, but we could not confirm its emails started. Check this page before trying again.",
-    "noRun": "No email run recorded yet. If this stays so, the send did not start: check manually.",
-    "sendFailed": "Could not start the send. Nothing was sent. Try again."
+    "noRun": "The email run did not start (no recipients 10 minutes after Send). Press Resume.",
+    "sendFailed": "Could not start the send. Nothing was sent. Try again.",
+    "tooLate": "Too late to announce this fee change: it needs 30 days' notice before it takes effect. Move its effective date later in the code and redeploy.",
+    "starting": "Starting the email run…",
+    "inProgress": "Sending… {n} left.",
+    "stalled": "The email run stopped with {n} owners still waiting. Press Resume.",
+    "resume": "Resume",
+    "retryFailed": "Retry failed ({n})",
+    "resumeTitle": "Resume the email run?",
+    "resumeBody": "Only owners who have not been emailed yet get the email. Nobody is emailed twice.",
+    "resumeConfirm": "Yes, resume",
+    "retryTitle": "Email the owners whose email failed?",
+    "retryBody": "Only failed emails are sent again. Owners who already got it are not emailed twice.",
+    "retryConfirm": "Yes, retry",
+    "resumeStarted": "Email run resumed.",
+    "retryStarted": "Retrying {n} emails.",
+    "retryNone": "Nothing to retry: no email is marked failed now.",
+    "actionFailed": "Could not start the email run. Try again."
+  },
+  "legalAcceptances": {
+    "adminTitle": "Policy acceptances",
+    "mineTitle": "Policies you accepted",
+    "mineHint": "The legal documents you agreed to, and when.",
+    "loading": "Loading…",
+    "loadFailed": "Could not load the acceptance records.",
+    "empty": "No acceptance recorded.",
+    "version": "Version {version}",
+    "at": "{time} UTC",
+    "ip": "IP {ip}",
+    "source": {
+      "signup": "At signup",
+      "notice_ack": "Acknowledged the notice"
+    },
+    "deliveriesTitle": "Notice emails",
+    "status": {
+      "queued": "Waiting",
+      "sending": "Sending",
+      "sent": "Sent",
+      "failed": "Failed"
+    }
   }
 }

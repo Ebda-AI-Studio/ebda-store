@@ -42,8 +42,6 @@ export function LegalNoticeBanner({ storeId }: { storeId: string }) {
     };
   }, [storeId, load]);
 
-  if (notices.length === 0 && !failed) return null;
-
   const acknowledge = async () => {
     setSaving(true);
     setFailed(false);
@@ -54,7 +52,7 @@ export function LegalNoticeBanner({ storeId }: { storeId: string }) {
       setSaving(false);
       setNotices([]);
       // The button that had focus is unmounting; hand focus to the page, not <body>.
-      document.getElementById('admin-main-content')?.focus();
+      document.getElementById('admin-main-content')?.focus({ preventScroll: true });
       return;
     }
     const fresh = await load();
@@ -82,7 +80,13 @@ export function LegalNoticeBanner({ storeId }: { storeId: string }) {
             <span className="font-medium">{n.title[locale]}</span>
             {': '}
             {n.summary[locale]} {t('effective', { date: formatLegalDate(n.effectiveAt, locale) })}{' '}
-            <a href={n.url[locale]} target="_blank" rel="noopener noreferrer" className="underline">
+            <a
+              href={n.url[locale]}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+              aria-label={t('readAria', { title: n.title[locale] })}
+            >
               {t('read')}
             </a>
           </li>

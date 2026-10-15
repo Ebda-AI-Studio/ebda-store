@@ -155,4 +155,71 @@ describe('LegalNoticeBanner', () => {
     rerender(<LegalNoticeBanner storeId="s2" />);
     await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
   });
+
+  it('ack fails AND the re-read fails: the banner stays with the inline error (M13)', async () => {
+    apiGet
+      .mockResolvedValueOnce({ data: { notices: [notice('terms', 'أ')] }, error: null })
+      .mockResolvedValueOnce({ data: null, error: { status: 500, code: 'X', message: 'x' } });
+    apiPost.mockResolvedValue({ data: null, error: { status: 500, code: 'X', message: 'x' } });
+    render(<LegalNoticeBanner storeId="s1" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'gotIt' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('ackFailed');
+    expect(screen.getByRole('status').textContent).toContain('أ');
+    expect(screen.getByRole('button', { name: 'gotIt' })).not.toHaveProperty('disabled', true);
+  });
+
+  it('a double click posts once: the button is disabled while saving (M13)', async () => {
+    apiGet.mockResolvedValue({ data: { notices: [notice('terms', 'أ')] }, error: null });
+    let release: (v: unknown) => void = () => undefined;
+    apiPost.mockReturnValue(new Promise(r => (release = r)));
+    render(<LegalNoticeBanner storeId="s1" />);
+    const btn = await screen.findByRole('button', { name: 'gotIt' });
+    fireEvent.click(btn);
+    const saving = await screen.findByRole('button', { name: 'saving' });
+    expect(saving).toHaveProperty('disabled', true);
+    fireEvent.click(saving);
+    expect(apiPost).toHaveBeenCalledTimes(1);
+    release({ data: { acknowledged: 1 }, error: null });
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
+  });
+
+  it('each "Read the policy" link is named after its document (M11)', async () => {
+    apiGet.mockResolvedValue({
+      data: { notices: [notice('terms', 'أ'), notice('privacy', 'ب')] },
+      error: null,
+    });
+    render(<LegalNoticeBanner storeId="s1" />);
+    await screen.findByRole('status');
+    expect(screen.getAllByRole('link').map(a => a.getAttribute('aria-label'))).toEqual([
+      'readAria:{"title":"عنوان terms"}',
+      'readAria:{"title":"عنوان privacy"}',
+    ]);
+  });
+});
+
+describe('store layout mounts the banner (M13)', () => {
+  it('renders LegalNoticeBanner for the store in the URL, next to the billing banner', async () => {
+    vi.resetModules();
+    vi.doMock('next/navigation', () => ({ useParams: () => ({ id: 'store-9' }) }));
+    vi.doMock('../../hooks/useFeatures', () => ({
+      AdminFeatureProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    }));
+    vi.doMock('../../contexts/NotificationContext', () => ({
+      useNotifications: () => ({ subscribeToStore: vi.fn(), unsubscribeFromStore: vi.fn() }),
+    }));
+    vi.doMock('../billing/BillingStatusBanner', () => ({
+      BillingStatusBanner: ({ storeId }: { storeId: string }) => <div>billing:{storeId}</div>,
+    }));
+    apiGet.mockResolvedValue({ data: { notices: [notice('terms', 'أ')] }, error: null });
+    const { default: StoreLayout } = await import('../../app/stores/[id]/layout');
+    render(
+      <StoreLayout>
+        <p>page</p>
+      </StoreLayout>
+    );
+    expect(await screen.findByRole('status')).toBeTruthy();
+    expect(screen.getByText('billing:store-9')).toBeTruthy();
+    expect(screen.getByText('page')).toBeTruthy();
+    expect(apiGet).toHaveBeenCalledWith('/api/v1/me/legal-notices');
+  });
 });
