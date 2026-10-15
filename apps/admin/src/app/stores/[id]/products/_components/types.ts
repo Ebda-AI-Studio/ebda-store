@@ -12,6 +12,8 @@ export interface Product {
   status: string;
   images: { url: string }[];
   hasVariants: boolean;
+  /** Every variant row (admin list `_count`); wins over the column. */
+  variantCount?: number;
 }
 
 export interface Pagination {

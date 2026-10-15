@@ -1072,17 +1072,21 @@ export class ProductService {
     // Resolve ids that actually belong to this store and are not deleted.
     const existing = await prisma.product.findMany({
       where: { storeId, id: { in: safeIds }, deletedAt: null },
-      select: { id: true, hasVariants: true, price: true, inventory: true },
+      // The real variant ROWS, never the `hasVariants` column (it can drift): a
+      // bulk price/stock write on a variant product would break the inventory
+      // invariant (the parent column stays 0, variant row XOR product row).
+      select: { id: true, price: true, inventory: true, _count: { select: { variants: true } } },
     });
 
     if (existing.length === 0) return { updated: 0, skippedVariantProducts: 0 };
 
     const allIds = existing.map(p => p.id);
-    const simpleProducts = existing.filter(p => !p.hasVariants);
+    const isVariantProduct = (p: (typeof existing)[number]) => p._count.variants > 0;
+    const simpleProducts = existing.filter(p => !isVariantProduct(p));
     const simpleIds = simpleProducts.map(p => p.id);
     // Only count variant products as "skipped" when a price or inventory
     // mutation was requested — a status/flags-only edit isn't skipping anything.
-    const variantCount = existing.filter(p => p.hasVariants).length;
+    const variantCount = existing.filter(isVariantProduct).length;
     const skippedVariantProducts =
       fields.price !== undefined || fields.inventory !== undefined ? variantCount : 0;
 

@@ -130,13 +130,11 @@ export function CookiePreferencesModal() {
               </span>
               <span
                 className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                  // The thumb starts at the inline-start edge; in Arabic that is the
+                  // right, so it travels the other way (rtl:), never off the track.
                   marketingDraft
-                    ? isRtl
-                      ? 'translate-x-1'
-                      : 'translate-x-6'
-                    : isRtl
-                      ? 'translate-x-6'
-                      : 'translate-x-1'
+                    ? 'translate-x-6 rtl:-translate-x-6'
+                    : 'translate-x-1 rtl:-translate-x-1'
                 }`}
               />
             </button>

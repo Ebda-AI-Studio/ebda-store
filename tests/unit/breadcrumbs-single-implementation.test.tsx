@@ -102,6 +102,13 @@ describe('R-06: one breadcrumb implementation in the storefront', () => {
     expect(hits).toEqual([]);
   });
 
+  it('the storefront never imports the unused @ebda/ui Breadcrumb (a second grammar)', () => {
+    const hits = files.filter(f =>
+      /import\s*\{[^}]*\bBreadcrumb\b[^}]*\}\s*from\s*'@ebda\/ui'/.test(read(f))
+    );
+    expect(hits).toEqual([]);
+  });
+
   it('the PDP, PLP, cart, both bundle pages and the Dahab PDP use it', () => {
     for (const f of [
       'apps/web/src/app/products/[slug]/ProductDetailClient.tsx',

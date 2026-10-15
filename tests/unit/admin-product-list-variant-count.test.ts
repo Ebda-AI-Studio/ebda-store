@@ -17,6 +17,8 @@ vi.mock('@ebda/database', async importOriginal => ({
         { id: 'p2', hasVariants: false, inventory: 7, _count: { variants: 0 } },
       ]),
       count: vi.fn(async () => 2),
+      updateMany: vi.fn(async () => ({ count: 0 })),
+      update: vi.fn(async () => ({})),
     },
     productVariant: {
       groupBy: vi.fn(async () => [{ productId: 'p1', _sum: { inventory: 5 } }]),
@@ -49,5 +51,28 @@ describe('ProductService.list (admin) — variantCount', () => {
       ['p1', 5],
       ['p2', 7],
     ]);
+  });
+});
+
+describe('ProductService.bulkUpdate — a variant product is never written as simple (W1b fix round)', () => {
+  it('a drifted hasVariants=false product WITH variant rows is skipped by a bulk stock set', async () => {
+    vi.mocked(prisma.product.findMany).mockResolvedValueOnce([
+      { id: 'p1', price: 100, inventory: 0, _count: { variants: 2 } },
+      { id: 'p2', price: 100, inventory: 7, _count: { variants: 0 } },
+    ] as never);
+    vi.mocked(prisma.product.updateMany).mockClear();
+    const r = await ProductService.bulkUpdate('store-1', ['p1', 'p2'], {
+      inventory: { mode: 'set', value: 5 },
+    });
+    expect(r.skippedVariantProducts).toBe(1);
+    const select = vi.mocked(prisma.product.findMany).mock.calls.at(-1)![0]!.select as Record<
+      string,
+      unknown
+    >;
+    expect(select._count).toEqual({ select: { variants: true } });
+    const written = vi
+      .mocked(prisma.product.updateMany)
+      .mock.calls.map(c => (c[0] as { where: { id: { in: string[] } } }).where.id.in);
+    expect(written).toEqual([['p2']]);
   });
 });
