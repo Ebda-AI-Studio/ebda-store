@@ -529,7 +529,6 @@ describe('marketing SEO and trust surface', () => {
     for (const locale of ['ar', 'en'] as const)
       for (const page of LEGAL_SLUGS) {
         const html = renderToStaticMarkup(<LegalPage locale={locale} page={page} />);
-        expect(html).toContain(currentLegalVersion(LEGAL_POLICIES, DOC_OF[page]).publishedAt);
         expect(html).toContain('ahlan@ebda.app');
         expect(html).not.toMatch(/\[[^\]]*\]/);
         expect(html.match(/<section/g)!.length).toBeGreaterThanOrEqual(5);
@@ -557,15 +556,17 @@ describe('marketing SEO and trust surface', () => {
       }
     }
   });
-  it('footer.legalVersion renders from LEGAL_POLICIES, with no hard-coded version or date (A3)', () => {
-    const docs = (Object.keys(LEGAL_POLICIES) as LegalDocKey[]).map(k =>
-      currentLegalVersion(LEGAL_POLICIES, k)
-    );
-    const newest = docs.reduce((a, b) => (b.publishedAt > a.publishedAt ? b : a));
+  it('footer.legalVersion states the newest legal update date from LEGAL_POLICIES, no version (A3, M5)', () => {
+    // Independent of content.ts: every document's current publishedAt, sorted, newest last.
+    const latest = (Object.keys(LEGAL_POLICIES) as LegalDocKey[])
+      .map(k => currentLegalVersion(LEGAL_POLICIES, k).publishedAt)
+      .sort()
+      .at(-1)!;
     for (const locale of ['ar', 'en'] as const) {
       const t = COPY[locale].footer.legalVersion;
-      expect(t).toContain(newest.version);
-      expect(t).toContain(newest.publishedAt);
+      expect(t).toContain(formatLegalDate(latest, locale));
+      expect(t).not.toMatch(/version|الإصدار|\b\d+\.\d+\b/i);
+      expect(t).not.toMatch(/[٠-٩]/);
     }
     const src = readFileSync(
       path.resolve(__dirname, '../../apps/marketing/src/lib/content.ts'),
