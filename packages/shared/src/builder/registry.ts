@@ -387,6 +387,10 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
     group: 'template',
     settings: [
       ...headingSettings(false),
+      s.select('layout', 'Layout', 'طريقة العرض', [
+        opt('row', 'Row of reviews', 'صف آراء'),
+        opt('single', 'One quote', 'رأي واحد'),
+      ]),
       s.range('minRating', 'Minimum rating', 'أقل تقييم', 1, 5),
       s.check('verifiedOnly', 'Verified purchases only', 'مشتريات موثقة فقط', 'content'),
       ...styleSettings(),
@@ -656,6 +660,11 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
           },
           s.image('image', 'Image', 'الصورة', { localized: true }),
           s.text('label', 'Label', 'الاسم', { localized: true }),
+          s.select('tone', 'Band colour', 'لون الشريط', [
+            opt('primary', 'Main colour', 'اللون الأساسي'),
+            opt('accent', 'Accent', 'لون مميز'),
+            opt('line', 'Hairline colour', 'لون الخطوط'),
+          ]),
         ],
       },
     ],
@@ -678,6 +687,7 @@ export const SECTION_REGISTRY: readonly SectionDefinition[] = [
         opt('arch', 'Arch', 'قوس'),
         opt('rectangle', 'Rectangle', 'مستطيل'),
         opt('circle', 'Circle', 'دائري'),
+        opt('band', 'Full-width bands', 'شرائط بعرض الشاشة'),
       ]),
       s.select('columns', 'Columns (desktop)', 'الأعمدة (سطح المكتب)', [
         opt(2, '2', '2'),

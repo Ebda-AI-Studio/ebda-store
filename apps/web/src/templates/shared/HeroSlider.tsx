@@ -26,6 +26,7 @@ export function HeroSlider({
   isRtl,
   pack,
   presentation = 'full-bleed',
+  frameLine,
   headingZone,
   urlPrefix,
 }: HeroSliderProps) {
@@ -80,6 +81,7 @@ export function HeroSlider({
         pack={pack}
         priority
         presentation={presentation}
+        frameLine={frameLine}
         headingZone={headingZone}
         urlPrefix={urlPrefix}
       />
@@ -152,6 +154,7 @@ export function HeroSlider({
               priority={i === 0}
               active={i === activeIndex}
               presentation={presentation}
+              frameLine={frameLine}
               headingZone={headingZone}
               urlPrefix={urlPrefix}
             />

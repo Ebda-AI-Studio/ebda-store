@@ -28,8 +28,9 @@ const { invalidated, r2Cleanup, failValidation, notReady, lookMix, failAfterBuil
     r2Cleanup: vi.fn(),
     failValidation: { on: false },
     notReady: { on: false },
-    // A section mix injected into a registered look (Lookbook/Vitrine get their real mixes in
-    // Tasks 7-8; Atelier's own design values equal the skin defaults, so they prove nothing).
+    // A section mix injected into a registered look. Lookbook and Vitrine have real mixes since
+    // Tasks 7-8 (pinned in tests/unit/looks-section-mix.test.ts); these cases inject controlled
+    // ones (Atelier's own design values equal the skin defaults, so they prove nothing).
     lookMix: {} as Record<string, unknown[]>,
     // Makes applyLook's store-row update fail AFTER the builder step (Ruling LOOKS-10 retry path).
     failAfterBuilder: { on: false },
@@ -338,18 +339,22 @@ describe.skipIf(!hasDb)('PUT /stores/:id/look (ebda_app + tenant guard)', () => 
     const sec = (doc: Doc, type: string) => doc.sections.find(x => x.type === type)!.settings;
     const ok = async (m: { storeId: string; token: string }, lookId: string) =>
       expect((await put(m.storeId, m.token, { lookId, design: 'keep' })).status).toBe(200);
-    // Two columns + a framed hero on "Lookbook"; nothing on Atelier/Vitrine (C6 resets them).
+    // Two columns + a framed hero on "Lookbook"; the same sections with NO design keys on
+    // "Vitrine" (C6 resets them). Vitrine's real mix drops the category grid, so it is injected.
     const TWO = [
       { type: 'hero', design: { presentation: 'framed' } },
       { type: 'category-grid', design: { desktopColumns: 2 } },
       { type: 'image-text' },
     ];
+    const BARE = [{ type: 'hero' }, { type: 'category-grid' }, { type: 'image-text' }];
 
     beforeAll(() => {
       lookMix['qamar.lookbook'] = TWO;
+      lookMix['qamar.vitrine'] = BARE;
     });
     afterAll(() => {
       delete lookMix['qamar.lookbook'];
+      delete lookMix['qamar.vitrine'];
     });
 
     it('keep from a layout-built page applies the look; a look-owned key returns to the skin default', async () => {

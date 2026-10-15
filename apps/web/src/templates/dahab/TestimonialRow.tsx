@@ -3,6 +3,7 @@
 import type { TestimonialRowProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { DAHAB_CONTAINER, DahabSectionHeading, pick } from './ui';
+import { SingleTestimonial } from '../shared/TestimonialRow';
 
 function Stars({ rating, label }: { rating: number; label: string }) {
   return (
@@ -27,10 +28,22 @@ export function DahabTestimonialRow({
   title,
   titleAr,
   isRtl: isRtlProp,
+  layout,
 }: TestimonialRowProps) {
   const { isRtl: ctxIsRtl, t } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   if (testimonials.length === 0) return null;
+  // Platform variant (Ruling B1-2): Dahab honours the single-quote layout too.
+  if (layout === 'single')
+    return (
+      <div className={DAHAB_CONTAINER}>
+        <SingleTestimonial
+          testimonials={testimonials}
+          heading={pick(isRtl, title, titleAr) || t('Reviews', 'آراء العملاء')}
+          isRtl={isRtl}
+        />
+      </div>
+    );
   return (
     <div className={DAHAB_CONTAINER}>
       <DahabSectionHeading title={pick(isRtl, title, titleAr)} align="center" />

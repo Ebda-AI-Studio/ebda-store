@@ -180,8 +180,11 @@ export function FeaturedCollectionSection({
                 onAddToCart={onAddToCart}
               />
             );
+            // The wrapper is a one-cell grid so the card stretches to the row height, like a
+            // direct grid child: cards in a row keep equal heights and shared action baselines
+            // (quality bar L-06).
             return centred ? (
-              <div key={p.id} className={centred.item(i)}>
+              <div key={p.id} className={`${centred.item(i)} grid`}>
                 {card}
               </div>
             ) : (

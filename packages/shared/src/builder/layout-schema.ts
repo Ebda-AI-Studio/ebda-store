@@ -375,6 +375,8 @@ const layoutSchemaInternal = z
       enabled: z.boolean(),
       minRating: z.number().min(1).max(5),
       verifiedOnly: z.boolean(),
+      // Ruling B1-2: 'single' = one large customer quote (Vitrine); absent = the row.
+      layout: z.enum(['row', 'single']).optional(),
       // SectionTitleOverride fields — must be listed or Zod silently strips
       // them on PUT (same trap class as imageMobile 2026-05-16).
       title: z.string().optional(),

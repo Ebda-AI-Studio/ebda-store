@@ -119,7 +119,7 @@ export const collectionListSchema = z
     ...frame,
     heading: text(200),
     headingAr: text(200),
-    tileShape: z.enum(['arch', 'rectangle', 'circle']).optional(),
+    tileShape: z.enum(['arch', 'rectangle', 'circle', 'band']).optional(),
     columns: z.number().int().min(2).max(4).optional(),
   })
   .strict();
@@ -131,6 +131,8 @@ export const collectionBlockSchema = z
     imageAr: z.string().max(2048).optional(),
     label: text(80),
     labelAr: text(80),
+    /** Band colour when the list uses `tileShape: 'band'` (Ruling B1-2/B1-5). */
+    tone: z.enum(['primary', 'accent', 'line']).optional(),
   })
   .strict();
 

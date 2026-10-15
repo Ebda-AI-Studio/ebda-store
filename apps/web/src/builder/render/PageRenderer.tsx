@@ -353,6 +353,9 @@ export function PageRenderer({
     layout.hero.enabled &&
     layout.hero.presentation === 'collage' &&
     heroSlidesWithImage(layout.hero.slides).length >= 3;
+  // A framed hero draws its hairline on a store with a REGISTERED look only (Ruling B1-41): a
+  // legacy store, or a stored look id that is no longer registered, renders as before.
+  const heroFrameLine = !!getLook(store.look);
   const bannerPresentation =
     layout.hero.presentation === 'collage' ? 'full-bleed' : layout.hero.presentation;
   const sliderEligible =
@@ -451,6 +454,7 @@ export function PageRenderer({
                 isRtl={isRtl}
                 pack={templateId}
                 presentation={bannerPresentation}
+                frameLine={heroFrameLine}
                 headingZone={heroHeadingZone}
                 urlPrefix={storeUrl('')}
               />
@@ -464,6 +468,7 @@ export function PageRenderer({
                   isRtl={isRtl}
                   pack={templateId}
                   presentation={bannerPresentation}
+                  frameLine={heroFrameLine}
                   headingZone={heroHeadingZone}
                   urlPrefix={storeUrl('')}
                 />
@@ -956,6 +961,7 @@ export function PageRenderer({
                   subtitleZone={testimonialsSubtitleZone}
                   dividers={layout.testimonials.dividers}
                   sectionBgColor={layout.testimonials.bgColor}
+                  layout={layout.testimonials.layout}
                 />
               </section>
             )}

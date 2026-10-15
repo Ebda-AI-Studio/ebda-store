@@ -625,6 +625,8 @@ export interface TestimonialsSettings
   enabled: boolean;
   minRating: number;
   verifiedOnly: boolean;
+  /** `'single'` = one large customer quote (Ruling B1-2, Vitrine); absent = the row. */
+  layout?: 'row' | 'single';
   /** Per-section typography overrides — wins over global typography zones. */
   typography?: SectionTypographyOverride;
   /** Per-section divider overrides — see SectionDividers. Default undefined (off). */

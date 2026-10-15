@@ -36,8 +36,8 @@ const base = (): PageDefinition => {
 const defaultsOf = (type: string) => sectionFromPreset(type, 0, type).settings;
 const byType = (doc: PageDefinition, type: string) => doc.sections.find(s => s.type === type)!;
 
-// Stand-ins for the C8 cases (and Vitrine until its real mix lands in Task 8). The C6 leak
-// cases below use Lookbook's REAL mix (Task 7).
+// Stand-in for the C8 cases. The C6 leak cases below use the REAL Lookbook (Task 7) and Vitrine
+// (Task 8) mixes.
 type Mix = Pick<LookDefinition, 'sections'>;
 const lookbookLike: Mix = {
   sections: [
@@ -45,13 +45,6 @@ const lookbookLike: Mix = {
     { type: 'featured-collection', design: { bgColor: 'token:card', columns: 3 } },
     { type: 'testimonials' },
     { type: 'image-text' },
-  ],
-};
-const vitrineLike: Mix = {
-  sections: [
-    { type: 'hero', design: { presentation: 'framed' } },
-    { type: 'featured-collection' },
-    { type: 'testimonials', design: { layout: 'single' } },
   ],
 };
 
@@ -130,8 +123,36 @@ describe('look section mix', () => {
     expect(b).toEqual(a);
   });
 
-  describe('look switch: no design leakage between looks (C6, real Lookbook mix)', () => {
+  describe('look switch: no design leakage between looks (C6, real Lookbook + Vitrine mixes)', () => {
     const lookbook = getLook('qamar.lookbook')!;
+    const vitrine = getLook('qamar.vitrine')!;
+
+    it('no Qamar mix sets the hero mode (content, C6)', () => {
+      for (const l of [getLook('qamar.atelier')!, lookbook, vitrine])
+        for (const s of l.sections ?? []) expect(s.design ?? {}, l.id).not.toHaveProperty('mode');
+    });
+
+    it('Lookbook → Vitrine: framed hero, occasion bands, one quote; Lookbook keys reset', () => {
+      for (const design of ['keep', 'reset'] as const) {
+        const onLookbook = applyTemplateFamily(base(), 'qamar', lookbook);
+        const doc = applyTemplateFamily(onLookbook, 'qamar', vitrine, { from: lookbook, design });
+        expect(doc.sections.map(s => s.type)).toEqual(vitrine.sections!.map(s => s.type));
+        expect(byType(doc, 'hero').settings.presentation, design).toBe('framed');
+        expect(byType(doc, 'hero').settings.mode, design).toBe(
+          byType(onLookbook, 'hero').settings.mode
+        );
+        expect(byType(doc, 'hero').blocks, design).toEqual(byType(onLookbook, 'hero').blocks);
+        expect(byType(doc, 'collection-list').settings).toMatchObject({
+          tileShape: 'band',
+          headingAr: 'تسوّق حسب المناسبة',
+        });
+        expect(byType(doc, 'testimonials').settings.layout, design).toBe('single');
+        const fc = byType(doc, 'featured-collection').settings;
+        expect(fc.bgColor, design).toBe(defaultsOf('featured-collection').bgColor);
+        expect(doc.sections.some(s => s.type === 'shop-the-look')).toBe(false);
+      }
+    });
+
     it('Lookbook → Atelier drops Lookbook-only design keys back to the section default', () => {
       for (const design of ['keep', 'reset'] as const) {
         const onLookbook = applyTemplateFamily(base(), 'qamar', lookbook);
@@ -159,12 +180,18 @@ describe('look section mix', () => {
 
     it('Vitrine → Lookbook drops Vitrine-only design keys back to the section default', () => {
       for (const design of ['keep', 'reset'] as const) {
-        const onVitrine = applyTemplateFamily(base(), 'qamar', vitrineLike);
+        const onVitrine = applyTemplateFamily(base(), 'qamar', vitrine);
         expect(byType(onVitrine, 'testimonials').settings.layout).toBe('single');
+        expect(byType(onVitrine, 'collection-list').settings.tileShape).toBe('band');
         const doc = applyTemplateFamily(onVitrine, 'qamar', lookbook, {
-          from: vitrineLike,
+          from: vitrine,
           design,
         });
+        // Vitrine-only sections (the occasion bands) leave the draft
+        expect(
+          doc.sections.some(s => s.type === 'collection-list'),
+          design
+        ).toBe(false);
         expect(byType(doc, 'testimonials').settings.layout, design).toBe(
           defaultsOf('testimonials').layout
         );

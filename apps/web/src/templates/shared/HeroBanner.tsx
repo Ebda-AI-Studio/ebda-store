@@ -49,10 +49,12 @@ export function HeroBanner({
   pack,
   priority = true,
   presentation = 'full-bleed',
+  frameLine = false,
   headingZone,
   urlPrefix,
 }: HeroBannerProps) {
   const isFramed = presentation === 'framed';
+  const drawFrame = isFramed && frameLine;
   const desktopSrc = (isRtl && imageAr) || image;
   // Mobile-specific source falls back to the desktop image when not set.
   const dedicatedMobileSrc = (isRtl && imageMobileAr) || imageMobile;
@@ -117,12 +119,16 @@ export function HeroBanner({
   // displays (may letterbox at the sides on portrait-ish sources).
   // Full-bleed mode (default, pre-existing behavior): edge-to-edge,
   // object-cover. Both modes share the same aspect ratio wrappers.
+  // A drawn frame (look stores, B1-41) takes the look's corner radius so frame and hairline agree.
   const containerBaseClass = isFramed
-    ? 'relative w-full overflow-hidden rounded-2xl bg-muted aspect-[var(--hero-m-aspect)] max-h-[45vh] sm:aspect-[1920/700] sm:max-h-none'
+    ? `relative w-full overflow-hidden ${drawFrame ? 'rounded-[var(--radius)]' : 'rounded-2xl'} bg-muted aspect-[var(--hero-m-aspect)] max-h-[45vh] sm:aspect-[1920/700] sm:max-h-none`
     : 'relative w-full overflow-hidden bg-muted aspect-[var(--hero-m-aspect)] max-h-[45vh] sm:aspect-[1920/700] sm:max-h-none';
-  const imageObjectClass = isFramed ? 'object-contain' : 'object-cover';
-  // Focus only matters when the image is cropped (full-bleed cover), B1-32.
-  const objectPosition = isFramed ? undefined : heroObjectPosition(focus);
+  // A drawn frame (Vitrine, B1-41) is a shop window: the photo fills the frame (cover + focus)
+  // instead of letterboxing on the muted ground, and the hairline is the frame.
+  const contain = isFramed && !drawFrame;
+  const imageObjectClass = contain ? 'object-contain' : 'object-cover';
+  // Focus only matters when the image is cropped (cover), B1-32.
+  const objectPosition = contain ? undefined : heroObjectPosition(focus);
 
   const posterPicture = desktopSrc ? (
     <picture>
@@ -153,7 +159,12 @@ export function HeroBanner({
     // Desktop (sm:): sm:aspect-[1920/700] overrides the base class via media query —
     // both are classes now, so the later sm: utility wins (no inline-style override
     // trap). sm:max-h-none removes the mobile ceiling. overflow-hidden clips both.
-    <section className={containerBaseClass} style={mobileAspectStyle} dir={isRtl ? 'rtl' : 'ltr'}>
+    <section
+      className={containerBaseClass}
+      style={mobileAspectStyle}
+      dir={isRtl ? 'rtl' : 'ltr'}
+      data-frame-draw={drawFrame ? '' : undefined}
+    >
       <HeroBannerLink link={link} label={bannerLabel} urlPrefix={urlPrefix}>
         {desktopSrc &&
           (video ? (
@@ -164,7 +175,7 @@ export function HeroBanner({
               srcMobile={videoMobile}
               mobileQuery="(max-width: 639px)"
               active={active}
-              fit={isFramed ? 'contain' : 'cover'}
+              fit={contain ? 'contain' : 'cover'}
               position={objectPosition}
             >
               {posterPicture}
@@ -223,6 +234,15 @@ export function HeroBanner({
           </div>
         )}
       </HeroBannerLink>
+      {drawFrame && (
+        // Vitrine's hairline (Rulings B1-5, B1-7): the line colour inset from the frame edge,
+        // drawn in once from the centre (globals.css `frame-draw`). Decorative, never clickable.
+        <span
+          aria-hidden="true"
+          data-part="frame-line"
+          className="pointer-events-none absolute inset-3 rounded-[var(--radius)] border border-border sm:inset-4"
+        />
+      )}
     </section>
   );
 

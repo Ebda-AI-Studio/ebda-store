@@ -124,6 +124,28 @@ export const LOOKS: readonly LookDefinition[] = [
     skin: 'qamar',
     status: 'designed',
     chrome: { header: { logoPlacement: 'centre' } },
+    // Occasion first (Ruling B1-2/B1-5): a framed hero whose hairline draws in once, occasion
+    // bands, the window of new pieces, one customer line. No hero `mode` (plan amendment C6): the
+    // merchant's slider/single choice is content and survives a look switch.
+    sections: [
+      { type: 'hero', design: { presentation: 'framed' } },
+      {
+        type: 'collection-list',
+        design: { tileShape: 'band' },
+        preset: { heading: 'Shop by occasion', headingAr: 'تسوّق حسب المناسبة' },
+      },
+      {
+        type: 'featured-collection',
+        design: { columns: 4, mobileColumns: 2 },
+        preset: {
+          productSource: 'newest',
+          limit: 8,
+          heading: 'In the window',
+          headingAr: 'في الفاترينة',
+        },
+      },
+      { type: 'testimonials', design: { layout: 'single' } },
+    ],
     name: { ar: 'فاترينة', en: 'Vitrine' },
     forWhom: { ar: 'لهدوم المناسبات: فرح وخطوبة وسهرة.', en: 'For occasion wear.' },
     idea: { ar: 'تسوّق حسب المناسبة.', en: 'Occasion-first navigation.' },
@@ -135,7 +157,8 @@ export const LOOKS: readonly LookDefinition[] = [
       primary: '#1F4E54',
       onPrimary: '#FFFFFF',
       accent: '#9E5E5E',
-      line: '#E0E0E5',
+      // Champagne as the line role (Ruling B1-5): hairlines, the hero frame, the third band.
+      line: '#D8B96A',
       fonts: { display: 'Aref Ruqaa', body: 'Noto Sans Arabic', latin: 'Playfair Display' },
       radius: 'sm',
       density: 'regular',

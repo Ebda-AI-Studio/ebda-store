@@ -8,6 +8,8 @@
  * renders but opens the full catalogue (the validator warns the editor).
  */
 import React from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 import type { BlockNode, SectionPaddingMaxWidthVisibility } from '@ebda/shared';
 import type { Category } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
@@ -17,15 +19,30 @@ import { countText, PIECES } from '../../lib/plural';
 import { sectionBgStyle } from '../../templates/shared/section-bg';
 import { sectionSpacingClasses } from '../../templates/shared/section-spacing';
 import { DahabTile, type DahabTileShape } from '../../templates/dahab/CategoryCard';
+import { getPackStyles } from '../../templates/shared/pack-styles';
 import { SectionHeader } from './SectionHeader';
 
 export interface CollectionListSettings extends SectionPaddingMaxWidthVisibility {
   heading?: string;
   headingAr?: string;
-  tileShape?: DahabTileShape;
+  /** `'band'` = one full-width colour band per block (Ruling B1-2, Vitrine's occasions). */
+  tileShape?: DahabTileShape | 'band';
   columns?: number;
   bgColor?: string;
 }
+
+/**
+ * Band fills, each paired with its on-token (quality bar K-02). `line` reads `--border`, which a
+ * look composes from its `line` token (Vitrine: champagne, Ruling B1-5); legacy skins define
+ * `--border` and `--accent-foreground` too, so a band renders on every skin.
+ */
+export const BAND_TONES = {
+  primary: 'bg-primary text-primary-foreground',
+  accent: 'bg-accent text-accent-foreground',
+  line: 'bg-border text-foreground',
+} as const;
+const TONE_CYCLE = ['primary', 'accent', 'line'] as const;
+type BandTone = keyof typeof BAND_TONES;
 
 const COLS: Record<number, string> = {
   2: 'md:grid-cols-2',
@@ -75,6 +92,69 @@ export function CollectionListSection({
     })
     .filter(tile => tile.label);
   if (tiles.length === 0) return null;
+  const title = pick(settings.heading, settings.headingAr);
+  const editTitle = editorMode
+    ? { 'data-builder-setting': ar ? 'headingAr' : 'heading' }
+    : undefined;
+
+  if (settings.tileShape === 'band') {
+    const toneOf = (id: string, i: number): BandTone => {
+      const raw = blocks.find(b => b.id === id)?.settings.tone;
+      return typeof raw === 'string' && raw in BAND_TONES
+        ? (raw as BandTone)
+        : TONE_CYCLE[i % TONE_CYCLE.length];
+    };
+    return (
+      <section
+        data-section="collection-list"
+        data-tile-shape="band"
+        className={`bg-[hsl(var(--bg-page))] ${spacing.wrapperClass}`}
+        style={sectionBgStyle(settings.bgColor, store.theme)}
+      >
+        {title && (
+          <div className={spacing.innerContainerClass}>
+            {/* Bands run edge to edge, so the heading follows the pack's heading alignment
+                (start on qamar) and lines up with the band labels. */}
+            <SectionHeader
+              title={title}
+              center={getPackStyles(store.template).sectionHeadingAlign !== 'start'}
+              editTitle={editTitle}
+            />
+          </div>
+        )}
+        <ul>
+          {tiles.map((tile, i) => (
+            <li
+              key={tile.id}
+              data-tone={toneOf(tile.id, i)}
+              className={BAND_TONES[toneOf(tile.id, i)]}
+            >
+              <Link
+                href={tile.href}
+                className="mx-auto grid max-w-7xl grid-cols-[1fr_auto] items-center gap-4 px-4 py-5 transition-opacity duration-150 active:opacity-80 sm:px-6 lg:px-8"
+              >
+                <span className="font-display text-3xl [text-wrap:balance] sm:text-4xl">
+                  {tile.label}
+                </span>
+                {tile.image && (
+                  <span className="relative block h-28 w-20 overflow-hidden rounded-[var(--radius)] sm:h-40 sm:w-28">
+                    <Image
+                      src={tile.image}
+                      alt=""
+                      fill
+                      sizes="(min-width: 640px) 112px, 80px"
+                      className="object-cover"
+                    />
+                  </span>
+                )}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+
   const cols = settings.columns ?? Math.min(4, tiles.length);
 
   return (
@@ -84,13 +164,7 @@ export function CollectionListSection({
       style={sectionBgStyle(settings.bgColor, store.theme)}
     >
       <div className={spacing.innerContainerClass}>
-        <SectionHeader
-          title={pick(settings.heading, settings.headingAr)}
-          center
-          editTitle={
-            editorMode ? { 'data-builder-setting': ar ? 'headingAr' : 'heading' } : undefined
-          }
-        />
+        <SectionHeader title={title} center editTitle={editTitle} />
         <ul className={`grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 ${COLS[cols] ?? COLS[4]}`}>
           {tiles.map(tile => (
             <li key={tile.id}>
@@ -99,7 +173,7 @@ export function CollectionListSection({
                 image={tile.image}
                 label={tile.label}
                 meta={tile.meta}
-                shape={settings.tileShape ?? 'arch'}
+                shape={(settings.tileShape as DahabTileShape | undefined) ?? 'arch'}
                 sizes={`(min-width: 768px) ${Math.round(100 / cols)}vw, 50vw`}
               />
             </li>

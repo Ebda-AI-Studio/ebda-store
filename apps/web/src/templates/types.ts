@@ -463,6 +463,12 @@ export interface HeroBannerProps {
    */
   presentation?: 'full-bleed' | 'framed';
   /**
+   * Framed only: draw a hairline inside the frame in the line colour (`--border`), drawn in once
+   * (Ruling B1-7, Vitrine). The renderer turns it on for a look store only, so a legacy framed
+   * hero renders as before (Ruling B1-41).
+   */
+  frameLine?: boolean;
+  /**
    * Per-section typography zone override for the hero headline h1.
    * Resolved via resolveSectionZone() in HomePageContent and applied as
    * inline styles on the <h1> inside HeroBanner. Closes the wiring gap
@@ -491,6 +497,8 @@ export interface HeroSliderProps {
   pack?: import('@ebda/shared').TemplateId;
   /** See HeroBannerProps.presentation — same semantics, applies to every slide. */
   presentation?: 'full-bleed' | 'framed';
+  /** See HeroBannerProps.frameLine. */
+  frameLine?: boolean;
   /**
    * Per-section typography zone override for the hero headline h1.
    * Forwarded to each HeroBanner slide. Closes the wiring gap identified
@@ -671,6 +679,11 @@ export interface TestimonialRowProps {
    * 2026-06-05). Pass the raw value (hex OR 'token:<name>').
    */
   sectionBgColor?: string;
+  /**
+   * `'single'` = one large customer quote, no cards (Ruling B1-2, Vitrine). Absent or `'row'` =
+   * the skin's usual row. Every skin's row honours it (platform variant).
+   */
+  layout?: 'row' | 'single';
 }
 
 /**

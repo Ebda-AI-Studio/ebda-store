@@ -6,7 +6,7 @@
 // from the look's section mix at render (Ruling B1-8) or from `applyLook` on a merchant store.
 // One hero per look, tagged with `lookTag` (plan amendment C10), each with its own imagery; the
 // Atelier hero carries the hero clip. Shop-the-look (Task 7) is tagged for Lookbook; the occasion
-// band tone (Task 8) lands with that task.
+// list carries each band's tone (Task 8), used when a look sets `tileShape: 'band'` (Vitrine).
 import { getSectionDefinition, sectionFromPreset } from '@ebda/shared';
 import { QAMAR_LOOKS_STORY, QAMAR_OCCASIONS, QAMAR_PAGE_IMAGES } from '../qamar-demo/catalogue.mjs';
 
@@ -172,7 +172,13 @@ export function buildQamarHome(base, ctx) {
     QAMAR_OCCASIONS.map((o, i) => ({
       id: `occasion-${i + 1}`,
       type: 'collection',
-      settings: { categorySlug: o.slug, image: img(o.image), label: o.label, labelAr: o.labelAr },
+      settings: {
+        categorySlug: o.slug,
+        image: img(o.image),
+        label: o.label,
+        labelAr: o.labelAr,
+        tone: o.tone,
+      },
     }))
   );
   const testimonials = node('testimonials', 'testimonials', {

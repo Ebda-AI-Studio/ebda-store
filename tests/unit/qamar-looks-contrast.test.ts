@@ -141,3 +141,27 @@ describe('merchant-extreme colours on qamar looks', () => {
         expect(ratio(c, roles['--accent-foreground'])).toBeGreaterThanOrEqual(2);
       });
 });
+
+// Task 8 (Ruling B1-5): Vitrine's occasion bands paint text on primary, accent and the champagne
+// line token; the champagne hairline must read at least as well as the old grey line did.
+describe('vitrine band text', () => {
+  const t = LOOKS.find(l => l.id === 'qamar.vitrine')!.tokens;
+  it('onPrimary on primary band', () =>
+    expect(contrastRatio(t.primary, t.onPrimary)).toBeGreaterThanOrEqual(4.5));
+  it('onPrimary on accent band', () =>
+    expect(contrastRatio(t.accent, t.onPrimary)).toBeGreaterThanOrEqual(4.5));
+  it('ink on champagne line band', () =>
+    expect(contrastRatio(t.line, t.ink)).toBeGreaterThanOrEqual(4.5));
+  it('champagne hairline ≥ the old line against the page (1.4.11 direction)', () =>
+    expect(contrastRatio(t.page, t.line)).toBeGreaterThan(contrastRatio('#F5F5F6', '#E0E0E5')));
+  it('the composed theme paints exactly those pairs (accent-foreground = onPrimary, border = line)', () => {
+    const theme = composeStoreTheme({ template: 'qamar', look: 'qamar.vitrine' }) as Record<
+      string,
+      unknown
+    >;
+    const h = (v: string) => hexToHsl(v);
+    expect(theme.borderColor).toBe(h(t.line));
+    expect(theme.accentForeground).toBe(h(t.onPrimary));
+    expect(theme.primaryForeground).toBe(h(t.onPrimary));
+  });
+});

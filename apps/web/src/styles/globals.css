@@ -1189,6 +1189,22 @@ html[dir='rtl'] [data-pack='dahab'] .font-display {
   }
 }
 
+/* Framed hero hairline (Vitrine, Rulings B1-5 / B1-7): the line draws in once from the centre,
+   600ms ease-out-quint. Reduced motion: the line is simply there. */
+@keyframes frame-draw {
+  from {
+    clip-path: inset(50% 50% 50% 50%);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-frame-draw] > [data-part='frame-line'] {
+    animation: frame-draw 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
 /* Dahab skin on the two Phase 2 document sections (no markup change, so
    every other store renders exactly as before): display-face headings, the
    arch frame on the image, and a quieter newsletter field. */
