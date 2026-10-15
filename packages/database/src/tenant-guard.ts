@@ -105,6 +105,9 @@ export const STORE_MODEL = 'Store';
  */
 export const USER_KEYED_MODELS: Readonly<Record<string, string>> = {
   Address: 'userId',
+  // Ruling LEGAL-4: what a user accepted, and the per-recipient email ledger.
+  LegalAcceptance: 'userId',
+  LegalNoticeDelivery: 'userId',
   OneSignalSubscription: 'userId',
   RefreshToken: 'userId',
   VerificationToken: 'userId',
@@ -119,6 +122,8 @@ export const USER_KEYED_MODELS: Readonly<Record<string, string>> = {
 export const GLOBAL_MODELS: readonly string[] = [
   'AnswerEngineProviderConfig',
   'BillingWebhookEvent',
+  // Ruling LEGAL-4: one row per announced policy version, read by every merchant.
+  'LegalNoticeSend',
   'Plan',
   'SystemSetting',
 ];

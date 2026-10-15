@@ -83,6 +83,8 @@ const DOCUMENTED_NON_RLS: Record<string, string> = {
   _prisma_migrations: 'migration bookkeeping; not granted to ebda_app',
   plans: 'platform-global plan catalog (config; no tenant data, no store_id)',
   billing_webhook_events: 'provider-event dedupe ledger (no store_id, no tenant data)',
+  legal_notice_sends:
+    'announced policy versions (Ruling LEGAL-4): platform-global, read by every merchant',
 };
 
 let owner: AppPrismaClient;
@@ -1536,7 +1538,13 @@ describe('runWithRequestDb binds a client per request', () => {
 // 20261008000100_tenant_defence_contract)
 // ---------------------------------------------------------------------------
 describe('stores and the user-keyed token tables are under strict RLS too (R-EBDA-005)', () => {
-  const USER_KEYED = ['refresh_tokens', 'verification_tokens', 'onesignal_subscriptions'];
+  const USER_KEYED = [
+    'refresh_tokens',
+    'verification_tokens',
+    'onesignal_subscriptions',
+    'legal_acceptances',
+    'legal_notice_deliveries',
+  ];
 
   it('every forced table outside the global allowlist has at least one policy, ebda_app only', async () => {
     const rows = await owner.$queryRaw<
